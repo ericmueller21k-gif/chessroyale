@@ -78,12 +78,12 @@ export function HomeScreen({
       {!joinCode && <InstallCard />}
       <ol class="rules">
         <li>
-          <strong>{S.lobbySize} players, one move at a time.</strong> Every round you're dropped into a position you haven't seen.
-          Make one move. You keep the same colour for a whole stage.
+          <strong>{S.lobbySize} players, 8 boards, one move at a time.</strong> Every round you're dropped onto one of the boards
+          with {S.groupSize - 1} others. Make one move. You keep the same colour for a whole stage.
         </li>
         <li>
-          <strong>Beat your group, not the board.</strong> Stockfish scores every move. You score by playing better than the other
-          three players who got the same position.
+          <strong>Beat your group, not the board.</strong> Stockfish scores every move. You score by playing better than the others
+          who got the same position.
         </li>
         <li>
           <strong>Watch your time bank.</strong> {S.timeBankSeconds / 60} minutes for the match, +{S.timeIncrementSeconds} s every
@@ -94,8 +94,12 @@ export function HomeScreen({
           {S.powerUpsPerStage} each stage you survive, and unused ones carry over. Pick your moment.
         </li>
         <li>
-          <strong>The weakest go out.</strong> After every {S.roundsPerStage} rounds the bottom of the leaderboard is knocked out,
-          until two players are left for a real {S.duelClockSeconds / 60}-minute game.
+          <strong>The weakest go out.</strong> After every {S.roundsPerStage} rounds the bottom {S.knockoutsPerStage[0]} are knocked
+          out and the most lopsided board is closed, until 4 are left on the last board.
+        </li>
+        <li>
+          <strong>The 2v2 final.</strong> The last 4 play on the last board: seeds 1 & 4 against 2 & 3, teammates taking turns.
+          The best average move quality wins the match.
         </li>
         <li>
           <strong>Engine rating.</strong> Every move also feeds a rating estimate on Stockfish's Elo scale, so you can see the
@@ -122,7 +126,7 @@ export function HomeScreen({
       </label>
       {joinCode ? null : (
         <button type="button" class="btn btn-primary btn-wide" disabled={loading} onClick={() => onStart(remember(name), practice)}>
-          {loading ? "Loading the engine…" : "Play solo vs 31 bots"}
+          {loading ? "Loading the engine…" : `Play solo vs ${S.lobbySize - 1} bots`}
         </button>
       )}
       <div class="lobby-actions">

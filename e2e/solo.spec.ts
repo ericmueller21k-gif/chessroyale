@@ -23,8 +23,9 @@ async function clickMove(page: Page, uci: string) {
 async function bestMove(page: Page): Promise<string> {
   return page.evaluate(async () => {
     const m = (window as any).match;
-    const fen = m.phase.kind === "duel" ? m.phase.duel.fen : m.phase.board.fen;
-    const [top] = await m.engines[0].topMoves(fen, 1);
+    const fen = m.phase.board.fen;
+    // The same search the round is scored with, so this really is the best move.
+    const [top] = await m.runner.topMovesFor(fen);
     return top.move;
   });
 }
@@ -40,12 +41,15 @@ async function start(page: Page, query: string) {
   await expect(page.getByRole("heading", { name: "Today's openings" })).toBeVisible();
 }
 
-test("strong play survives every stage, reaches the duel, and sees results", async ({ page }) => {
-  await start(page, "rounds=1&clock=20&duel=30&pace=quick");
-  for (let i = 0; i < 400; i++) {
+test("strong play survives every stage, plays the 2v2 final, and sees results", async ({ page }) => {
+  test.setTimeout(240_000);
+  await start(page, "rounds=1&clock=20&pace=quick");
+  let finalTurns = 0;
+  for (let i = 0; i < 3000; i++) {
     const p = await phase(page);
     if (p === "results") break;
     if (p === "play") {
+      if (await page.evaluate(() => !!(window as any).match.final)) finalTurns++;
       // Moves are possible once the new board's settling-in countdown is over.
       await expect(page.locator(".intro-pill")).toHaveCount(0, { timeout: 10_000 });
       await clickMove(page, await bestMove(page));
@@ -56,23 +60,17 @@ test("strong play survives every stage, reaches the duel, and sees results", asy
     } else if (p === "stageBreak") {
       await expect(page.locator(".tower-row").first()).toBeVisible();
       await page.getByRole("button", { name: /Next stage|See how it ends/ }).click();
-    } else if (p === "duelColour") {
-      await page.getByRole("button", { name: "Play White" }).click();
-    } else if (p === "duel") {
-      const over = await page.evaluate(() => !!(window as any).match.phase.duel.over);
-      if (over) {
-        await page.getByRole("button", { name: "Results" }).click();
-      } else {
-        await page.getByRole("button", { name: "Resign" }).waitFor();
-        page.once("dialog", (d) => d.accept());
-        await page.getByRole("button", { name: "Resign" }).click();
-      }
+    } else if (p === "final") {
+      await expect(page.locator(".final-teams")).toBeVisible();
+      await page.waitForTimeout(300);
     } else {
       await page.waitForTimeout(200);
     }
   }
   await expect(page.getByRole("button", { name: "Play again" })).toBeVisible();
-  await expect(page.locator(".results h1")).toContainText(/of 32/);
+  await expect(page.locator(".results h1")).toContainText(/of 64/);
+  // Strong play reaches the final and gets turns in it.
+  expect(finalTurns).toBeGreaterThan(0);
 });
 
 test("missing every move gets you knocked out; the match plays out and shows results", async ({ page }) => {
@@ -91,5 +89,5 @@ test("missing every move gets you knocked out; the match plays out and shows res
       await page.waitForTimeout(250);
     }
   }
-  await expect(page.locator(".results h1")).toContainText(/(25|26|27|28|29|30|31|32)(st|nd|rd|th) of 32/);
+  await expect(page.locator(".results h1")).toContainText(/(5[7-9]|6[0-4])(st|nd|rd|th) of 64/);
 });

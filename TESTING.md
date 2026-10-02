@@ -12,9 +12,14 @@ that a real iPhone runs the chess engine fast enough, so that's the main thing t
 3. **A lobby with a friend.** On your computer, tap **Create a lobby** and send the invite link to a friend (or your own
    phone). When they've joined, tap **Start**. Your computer does the scoring for everyone, so keep that tab open.
    - Reload the page on the phone mid-match: it should drop you straight back into the same seat.
-   - If you're knocked out, you can watch the remaining boards and, at the end, the duel with an evaluation bar.
+   - If you're knocked out, you can watch the remaining boards and, at the end, the 2v2 final.
 
-**New in this version** (worth a look while you play):
+**New: 64 players and a 2v2 final.** 8 boards with 8 players each; each cut removes the bottom 8 and the most
+lopsided board, down to 4 players on the last board. Then a 2v2 final: seeds 1 & 4 against 2 & 3, teammates take
+turns, and the best average move quality wins. A solo match is about 25 minutes at the relaxed pace
+(`?rounds=1&pace=quick` for a very fast run-through that still reaches the final).
+
+**Also new in recent versions** (worth a look while you play):
 - Tick **Practice mode** on the first screen if you want unlimited power-ups (the engine's top 3 moves with arrows).
 - The strip above the board shows your position and how far you are above or below the elimination line; tap it
   for the full leaderboard. On a computer the leaderboard sits on the left all the time.

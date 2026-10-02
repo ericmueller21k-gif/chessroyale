@@ -6,7 +6,7 @@ import {
   botThinkMs,
   createMatch,
   endStage,
-  finishDuel,
+  finishFinal,
   outcomesFromGroup,
   scoreGroup,
   stagePlan,
@@ -111,13 +111,19 @@ export function runPoolMatch(rng: Rng, bots: readonly Bot[], pool: Pool, setting
     if (stage.index === 0) stage1Out = end.knockedOut.map((p) => p.id);
     state = end.state;
   }
-  const [a, b] = alivePlayers(state);
-  const winner = duelWinner(rng, { id: a!.id, skill: a!.skill! }, { id: b!.id, skill: b!.skill! }, pool, settings);
-  state = finishDuel(state, winner.id);
+  // The 2v2 final: each finalist plays finalMovesPerPlayer moves; placement by average loss.
+  const finalists = alivePlayers(state).map((p) => p.id);
+  for (let t = 0; t < finalists.length * settings.finalMovesPerPlayer && state.final; t++) {
+    const mover = state.final.order[t % state.final.order.length]!;
+    const s = pool.samples[Math.floor(rng() * pool.samples.length)]!;
+    const { loss } = botMove(rng, s, skill.get(mover)!, pool, settings);
+    state = applyRound(state, new Map([[0, [mover]]]), [{ playerId: mover, roundScore: 0, loss, thinkMs: botThinkMs(rng, settings) }], settings);
+  }
+  state = finishFinal(state, rng);
   return {
     placement: Object.fromEntries(state.players.map((p) => [p.id, p.placement!])),
     stage1Out,
-    duelists: [a!.id, b!.id],
+    duelists: finalists,
     groupRounds,
     deadRounds,
   };

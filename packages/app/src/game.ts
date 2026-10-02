@@ -1,4 +1,4 @@
-import type { BoardRound, NetStanding } from "@chessroyale/chess";
+import type { BoardRound, NetFinal, NetStanding } from "@chessroyale/chess";
 import type { Settings } from "@chessroyale/core";
 
 /**
@@ -45,19 +45,8 @@ export interface MoveRecord {
   roundScore: number;
 }
 
-export interface DuelView {
-  opponentName: string;
-  youColour: "w" | "b";
-  fen: string;
-  history: string[];
-  lastMove: string | null;
-  clocks: { w: number; b: number };
-  /** When the side to move's clock started (local time). */
-  turnStartedAt: number;
-  over: null | { winner: "you" | "opponent" | "draw"; reason: string };
-  /** Watching someone else's duel. */
-  spectator?: boolean;
-}
+/** The 2v2 final as the screens see it (same shape the server sends, with the board as a view). */
+export type FinalView = Omit<NetFinal, "board"> & { board: BoardView };
 
 /** The reveal: your group's picks and scores (same shape the server sends). */
 export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds"> & {
@@ -76,8 +65,8 @@ export type Phase =
   | { kind: "stageBreak"; stage: number; standings: Standing[]; knockedOut: Standing[]; cutoff: number; youOut: boolean; nextBoards: BoardView[] }
   | { kind: "simulating"; stage: number; round: number }
   | { kind: "spectating"; boards: BoardView[] }
-  | { kind: "duelColour"; opponentName: string }
-  | { kind: "duel"; duel: DuelView }
+  /** The final, watching (or between your turns). */
+  | { kind: "final"; final: FinalView }
   | { kind: "results"; placement: number; winner: string; youWon: boolean };
 
 export interface GameView {
@@ -118,11 +107,8 @@ export interface GameView {
   submit(move: string | null): void;
   skipReveal(): void;
   continueFromBreak(): void;
-  chooseColour(colour: "w" | "b"): void;
-  duelMove(move: string): void;
-  resign(): void;
-  finishAfterDuel(): void;
-  duelClocks(d: DuelView): { w: number; b: number };
+  /** The 2v2 final once it has started (also during your own turn in it). */
+  readonly final: FinalView | null;
 }
 
 /** While a round is being played, the leaderboard shows who has moved. */
@@ -131,5 +117,5 @@ export const roundLive = (m: Pick<GameView, "phase">) => m.phase.kind === "play"
 /** What the leaderboard's cut line says during a stage. */
 export const cutLabel = (m: Pick<GameView, "settings" | "stage">) =>
   m.stage === m.settings.knockoutsPerStage.length - 1
-    ? `Duel line · after round ${m.settings.roundsPerStage}`
+    ? `Final four line · after round ${m.settings.roundsPerStage}`
     : `Cut after round ${m.settings.roundsPerStage}`;
