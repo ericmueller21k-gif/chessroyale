@@ -34,8 +34,11 @@ export interface Settings {
   engineNodes: number;
   engineHashMb: number;
   botCandidateMoves: number;
-  /** Bot skill temperatures (in points of loss); lower is stronger. Chosen in milestone 2. */
-  botSkills: readonly number[];
+  /**
+   * Bot skill temperatures T (in points of loss), strongest to loosest. Bots get
+   * skills spread evenly on a log scale across this range. Chosen in milestone 2.
+   */
+  botSkillRange: readonly [number, number];
   botRandomMoveChance: number;
   /** Bots' recorded thinking time, for tie-breaks (seconds). */
   botThinkSeconds: readonly [number, number];
@@ -59,11 +62,17 @@ export const DEFAULT_SETTINGS: Settings = {
   openingPlies: 20,
   openingBalance: [0.4, 0.6],
   retireThreshold: 0.9,
-  engineNodes: 100_000,
+  engineNodes: 250_000,
   engineHashMb: 16,
   botCandidateMoves: 8,
-  botSkills: [0.5, 1, 2, 3, 5, 8, 12, 20],
+  botSkillRange: [0.25, 32],
   botRandomMoveChance: 0.02,
   botThinkSeconds: [2, 8],
   duelClockSeconds: 180,
 };
+
+/** `count` bot skills spread evenly on a log scale across `botSkillRange`, strongest first. */
+export function botSkillSpread(count: number, settings: Settings = DEFAULT_SETTINGS): number[] {
+  const [lo, hi] = settings.botSkillRange;
+  return Array.from({ length: count }, (_, i) => Math.round(lo * Math.pow(hi / lo, i / Math.max(1, count - 1)) * 1000) / 1000);
+}

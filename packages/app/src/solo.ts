@@ -116,6 +116,7 @@ export class SoloMatch implements GameView {
     if (this.runner.isDuel()) return this.startDuel();
     if (!this.you.alive) return void this.simulateRest();
     this.runner.deal();
+    this.runner.prefetch();
     const board = this.runner.boardOf(HUMAN)!;
     this.playStartedAt = Date.now();
     this.set({ kind: "play", board: boardView(board), deadline: this.playStartedAt + this.settings.moveClockSeconds * 1000 });

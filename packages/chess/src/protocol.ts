@@ -92,6 +92,8 @@ export type ServerMessage = { now: number } & (
     }
   | { t: "locked"; key: string }
   | { t: "scoreRequest"; key: string; jobs: ScoreJob[] }
+  /** To the host at the start of a round: every board, so it can search them while players think. */
+  | { t: "prefetch"; fens: string[] }
   | {
       t: "reveal";
       key: string;

@@ -22,10 +22,10 @@ record it in `DECISIONS.md`.
 ## Progress
 
 - [x] 1. Match engine and scoring (`packages/core`, `packages/chess`)
-- [ ] 2. Simulation and playtest report
-- [ ] 3. Solo build
-- [ ] 4. Multiplayer lobbies
-- [ ] 5. Spectating and polish
+- [x] 2. Simulation and playtest report (`reports/playtest.md`; settings decided in `DECISIONS.md`)
+- [x] 3. Solo build (`packages/app`)
+- [x] 4. Multiplayer lobbies (`packages/server`: Worker + Durable Object; deploy steps in `DEPLOY.md`)
+- [x] 5. Spectating and polish (eval bar, install). Real-phone check by Eric: `TESTING.md`
 
 ## Layout and commands
 
@@ -33,10 +33,22 @@ record it in `DECISIONS.md`.
 - `packages/core`: pure match logic (stages, grouping, scoring, the draw, retirement, bot picks). No UI, network or
   chess-engine code.
 - `packages/chess`: chess rules (chess.js), the Stockfish interface over UCI (`src/uci.ts`; Node transport in
-  `src/node.ts`), and the opening library (`data/openings.json`, built by `scripts/build-openings.ts`).
+  `src/node.ts`), the opening library (`data/openings.json`, built by `scripts/build-openings.ts`), the match runner
+  (`src/runner.ts`) and the lobby protocol (`src/protocol.ts`).
+- `packages/sim`: bot simulation that writes `reports/playtest.md`.
+- `packages/app`: the web app (Vite + Preact, chessground board, Stockfish in Web Workers). Screens in `src/screens/`;
+  `src/solo.ts` is solo play, `src/net.ts` multiplayer.
+- `packages/server`: `src/lobby.ts` is pure, testable lobby logic; `src/lobby-do.ts` the Durable Object;
+  `src/index.ts` routes `/api/*` and serves the app. Config: `wrangler.jsonc` at the repo root.
+- `e2e/`: Playwright tests that play full solo and two-player matches on emulated phones.
 
 ```sh
 npm install
 npm test                                       # vitest (engine tests run real Stockfish)
+npm run typecheck
+npm run dev                                    # app dev server (solo only; no API)
+npx wrangler dev                               # app + API + Durable Objects at http://localhost:8787
+npm run e2e                                    # Playwright: solo, multiplayer, install (multiplayer takes ~5 min)
+npm run simulate                               # bot simulation -> reports/playtest.md (about 1–2 hours)
 npx tsx packages/chess/scripts/build-openings.ts   # rebuild the opening library (~15 min, 4 engines)
 ```

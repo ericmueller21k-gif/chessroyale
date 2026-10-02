@@ -11,6 +11,7 @@ import {
   type ScoreJob,
   type ServerMessage,
   type UciEngine,
+  TopMovesCache,
 } from "@chessroyale/chess";
 import type { BoardView, DuelView, GameView, MoveRecord, Phase, Standing } from "./game.ts";
 
@@ -49,6 +50,8 @@ export class NetMatch implements GameView {
   private pendingResults: Extract<ServerMessage, { t: "results" }> | null = null;
   private closed = false;
   private retry = 0;
+  /** Top-move searches started while players think (the host's for every board, others' for their own). */
+  private top = new TopMovesCache(DEFAULT_SETTINGS.botCandidateMoves);
 
   constructor(
     readonly code: string,
@@ -167,6 +170,7 @@ export class NetMatch implements GameView {
         this.standingsList = m.standings;
         this.cutoff = m.cutoff;
         if (m.board) {
+          this.prefetch([m.board.fen]);
           this.currentBoard = m.board;
           this.playStartedAt = Date.now();
           return this.setPhase({ kind: "play", board: this.toView(m.board), deadline: this.local(m.deadline) });
@@ -177,6 +181,8 @@ export class NetMatch implements GameView {
           this.setPhase({ kind: "scoring", board: this.phase.board, move: this.myPick });
         }
         return;
+      case "prefetch":
+        return this.prefetch(m.fens);
       case "scoreRequest":
         return void this.hostScore(m.key, m.jobs);
       case "reveal":
@@ -291,7 +297,7 @@ export class NetMatch implements GameView {
       const [engine] = await this.engines();
       const moves = [...new Set(m.picks.flatMap((p) => (p.move ? [p.move] : [])))];
       // Same searches as the host (hostScore): the top moves, then one search over the picks outside them.
-      const top = await engine!.topMoves(m.fenBefore, this.settings.botCandidateMoves);
+      const top = await this.top.get(engine!, m.fenBefore);
       const mine: Record<string, number> = Object.fromEntries(top.map((x) => [x.move, x.expected]));
       const missing = moves.filter((mv) => mine[mv] === undefined);
       if (missing.length) for (const s of await engine!.scoreMoves(m.fenBefore, missing)) mine[s.move] = s.expected;
@@ -305,6 +311,12 @@ export class NetMatch implements GameView {
 
   // ---------------- Host work ----------------
 
+  private prefetch(fens: string[]) {
+    void this.engines()
+      .then((engines) => this.top.prefetch(engines, fens))
+      .catch(() => undefined);
+  }
+
   private async hostScore(key: string, jobs: ScoreJob[]) {
     const engines = await this.engines();
     const t = performance.now();
@@ -315,7 +327,7 @@ export class NetMatch implements GameView {
         while (next < jobs.length) {
           const i = next++;
           const job = jobs[i]!;
-          const top = await engine.topMoves(job.fen, this.settings.botCandidateMoves);
+          const top = await this.top.get(engine, job.fen);
           const best = top[0]!.expected;
           const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
           const legal = legalMoves(job.fen);

@@ -1,4 +1,4 @@
-import { shuffle, type Rng } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botSkillSpread, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import type { Entrant } from "./runner.ts";
 
 const NAMES = [
@@ -10,11 +10,11 @@ const NAMES = [
 ];
 
 /**
- * `count` bots with a wide spread of skill (T from 0.25, strongest, to 32, loosest),
+ * `count` bots with a wide spread of skill (see `botSkillRange` in settings),
  * named and shuffled. Used to fill empty seats.
  */
-export function botRoster(rng: Rng, count = 31): Entrant[] {
-  const skills = Array.from({ length: count }, (_, i) => Math.round(0.25 * Math.pow(128, i / Math.max(1, count - 1)) * 1000) / 1000);
+export function botRoster(rng: Rng, count = 31, settings: Settings = DEFAULT_SETTINGS): Entrant[] {
+  const skills = botSkillSpread(count, settings);
   const names = shuffle(rng, NAMES);
   return skills.map((skill, i) => ({ id: `bot${i}`, name: names[i % names.length]!, isBot: true, skill }));
 }

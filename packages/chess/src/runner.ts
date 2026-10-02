@@ -74,6 +74,36 @@ export interface RunnerSnapshot {
   retired: { boardId: number; reason: RetireReason }[];
 }
 
+/**
+ * Top-move searches started early (while players are still thinking), keyed by
+ * position. Boards are known when a round starts and the top-moves search
+ * doesn't depend on anyone's pick, so only picks outside the top moves need a
+ * search after the picks lock.
+ */
+export class TopMovesCache {
+  private searches = new Map<string, Promise<MoveScore[]>>();
+  constructor(private readonly n: number) {}
+
+  /** Starts a search for each position, spread across the engines; forgets older positions. */
+  prefetch(engines: readonly EngineLike[], fens: readonly string[]): void {
+    const keep = new Map<string, Promise<MoveScore[]>>();
+    fens.forEach((fen, i) => {
+      let search = this.searches.get(fen);
+      if (!search) {
+        search = engines[i % engines.length]!.topMoves(fen, this.n);
+        search.catch(() => this.searches.delete(fen));
+      }
+      keep.set(fen, search);
+    });
+    this.searches = keep;
+  }
+
+  /** The prefetched search for this position, or a fresh one on `engine`. */
+  get(engine: EngineLike, fen: string): Promise<MoveScore[]> {
+    return this.searches.get(fen) ?? engine.topMoves(fen, this.n);
+  }
+}
+
 export class MatchRunner {
   state: MatchState;
   boards = new Map<number, BoardState>();
@@ -81,6 +111,7 @@ export class MatchRunner {
   groups = new Map<number, string[]>();
   private retiredThisRound: { boardId: number; reason: RetireReason }[] = [];
   private usedFamilies = new Set<string>();
+  private top: TopMovesCache;
 
   constructor(
     private readonly opts: {
@@ -91,6 +122,7 @@ export class MatchRunner {
       entrants: readonly Entrant[];
     },
   ) {
+    this.top = new TopMovesCache(opts.settings.botCandidateMoves);
     const plan = stagePlan(opts.settings);
     const boardCount = plan[0]!.boards;
     const openings = pickOpenings(
@@ -148,6 +180,11 @@ export class MatchRunner {
     }
     this.groups = assignGroups(this.opts.rng, this.state, this.settings);
     return this.groups;
+  }
+
+  /** Starts this round's top-move searches now, so scoring after the picks lock is quick. */
+  prefetch(): void {
+    this.top.prefetch(this.opts.engines, [...this.groups.keys()].map((id) => this.boards.get(id)!.fen));
   }
 
   boardOf(playerId: string): BoardState | null {
@@ -211,7 +248,7 @@ export class MatchRunner {
   ): Promise<BoardRound> {
     void rng;
     const board = this.boards.get(boardId)!;
-    const top = await engine.topMoves(board.fen, this.settings.botCandidateMoves);
+    const top = await this.top.get(engine, board.fen);
     const botPicks = this.botPicksFor(boardId, playerIds, top);
     const picks: Record<string, string | null> = {};
     for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
@@ -291,6 +328,7 @@ export class MatchRunner {
     const runner = Object.create(MatchRunner.prototype) as MatchRunner;
     Object.assign(runner, {
       opts: { ...opts, entrants: [] },
+      top: new TopMovesCache(opts.settings.botCandidateMoves),
       state: snapshot.state,
       boards: new Map(snapshot.boards.map((b) => [b.id, { ...b, opening: byId.get(b.opening)! }])),
       groups: new Map(snapshot.groups),

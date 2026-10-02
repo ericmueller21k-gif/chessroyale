@@ -306,7 +306,7 @@ export class LobbyCore {
   private start(playerId: string) {
     if (this.r.phase !== "lobby" || playerId !== this.r.hostId) return;
     const empty = this.settings.lobbySize - this.r.humans.length;
-    const bots = botRoster(this.rng, empty);
+    const bots = botRoster(this.rng, empty, this.settings);
     this.r.bots = bots.map((b) => ({ id: b.id, name: b.name, skill: b.skill ?? 5 }));
     this.runner = new MatchRunner({
       settings: this.settings,
@@ -376,6 +376,10 @@ export class LobbyCore {
         alive: alive.has(h.id),
       });
       if (!alive.has(h.id)) this.sendSpectate(h.id);
+    }
+    if (this.r.hostId) {
+      const fens = [...this.runner.groups.keys()].map((id) => this.runner!.boards.get(id)!.fen);
+      this.send(this.r.hostId, { t: "prefetch", fens }, false);
     }
     if (!this.aliveHumans().length) return this.lock();
     this.setTimer("lock", deadline + this.settings.lateGraceMs);

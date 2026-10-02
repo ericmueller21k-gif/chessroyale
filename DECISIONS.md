@@ -7,8 +7,8 @@ these weren't reviewed first. Most are a single line in `packages/core/src/setti
 
 - **Engine build: Stockfish 19 "lite single-threaded" WebAssembly** (npm `stockfish`, 1.8 MB). It's the small-network
   build the spec asks for, needs no cross-origin isolation headers, and the same file runs in Node (child process)
-  and the browser (Web Worker). It speaks plain UCI over text. At 100,000 nodes a search takes about 0.15 s in Node
-  here, and repeated searches give identical numbers.
+  and the browser (Web Worker). It speaks plain UCI over text. At 100,000 nodes a search takes about 0.15–0.25 s in
+  Node here, and repeated searches give identical numbers. (Raised to 250,000 in milestone 2.)
 - **One search scores a whole group.** A MultiPV search returns the top N moves with win/draw/loss for each; any
   picked move outside them gets one extra search restricted to those moves (`searchmoves`). Bots use the same top-8
   search. Every search starts with `ucinewgame`, which clears the hash.
@@ -24,6 +24,34 @@ these weren't reviewed first. Most are a single line in `packages/core/src/setti
   gambits (`UNUSUAL_FAMILIES` in the build script).
 - **Each match picks 7 classic + 1 unusual opening from different families.**
 - **Chess rules: chess.js** (BSD-2). The board UI component is chosen in milestone 3.
+
+## Milestone 2: simulation and playtest report
+
+The report is `reports/playtest.md` (200 full bot matches at 100,000 nodes, plus 1,000 replayed matches per variant).
+Answer to its question 8, the settings changed or kept because of it:
+
+- **Engine budget: 100,000 → 250,000 nodes.** The report found the 100k search names the same group winner as a
+  search 20 times larger only 87% of the time (90th-percentile loss error 15 points). A follow-up on 60 more
+  positions measured 86.6% at 100k, **91.1% at 250k** and 94.0% at 500k, at 0.25, 0.59 and 1.08 s per search in
+  Node. 250k cuts the wrong-winner rate by a third. To keep the extra cost from adding a wait, each round's top-move
+  searches now **start as soon as the round is dealt**, while players think (solo; in multiplayer the server sends
+  the host every board at round start). After the picks lock, only a pick outside the top 8 needs a search. 500k
+  would risk running past the 10-second clock on a phone in solo. If Eric's iPhone test shows slow scoring, this is
+  the setting to lower.
+- **Scores between stages: keep reset.** Carry-over halves how often the strongest bot reaches the duel (15% vs 33%
+  at 8 rounds) without improving the overall skill order, because one bad early stage can't be recovered from.
+- **Rounds per stage: keep 8.** Going to 10 or 12 barely changes the rank correlation (0.667 → 0.670 → 0.675) and
+  adds 3–5 minutes. 6 rounds is about as fair and 2 minutes shorter, so it's the first thing to try if real matches
+  feel long.
+- **Dead rounds (43%): no change yet.** Bots almost always pick among the engine's top moves, so nearly half of
+  groups tie. People with 10 seconds on an unfamiliar position will spread out much more. If real players also tie
+  often, the lever is fewer quiet positions (a tighter opening balance window, or retiring boards earlier than 0.90).
+- **Retirement: keep 0.90.** About 4.7 boards a match are retired, almost all for reaching 0.90, which is the
+  intended way out of decided positions.
+- **Placement tracks skill (rank correlation 0.67), with plenty of upsets:** a top-4 bot goes out in stage 1 about a
+  quarter of the time, and the strongest bot wins about 1 match in 5. That fits a party game, so no change.
+- **Bot skills:** the spread used in the report (T from 0.25 to 32, log scale) is now the `botSkillRange` setting,
+  and the same spread fills empty seats in solo and in lobbies.
 
 ## Milestone 3: solo build
 

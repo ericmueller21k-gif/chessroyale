@@ -12,6 +12,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   DEFAULT_SETTINGS,
+  botSkillSpread,
   finishDuel,
   isDeadRound,
   mulberry32,
@@ -35,8 +36,8 @@ const root = fileURLToPath(new URL("../../../", import.meta.url));
 const library: Opening[] = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8"));
 const settings: Settings = DEFAULT_SETTINGS;
 
-/** 32 bots with a wide, even spread of skill on a log scale (T from 0.25 to 32). */
-const SKILLS = Array.from({ length: 32 }, (_, i) => Math.round(0.25 * Math.pow(128, i / 31) * 1000) / 1000);
+/** 32 bots with a wide, even spread of skill on a log scale (settings.botSkillRange). */
+const SKILLS = botSkillSpread(32, settings);
 const bots: Bot[] = SKILLS.map((skill, i) => ({ id: `bot${String(i + 1).padStart(2, "0")}`, skill }));
 const skillRank = new Map(bots.map((b, i) => [b.id, i + 1])); // 1 = strongest
 

@@ -1,4 +1,5 @@
 import { useState } from "preact/hooks";
+import { DEFAULT_SETTINGS as S } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 
 function remember(name: string): string {
@@ -45,7 +46,9 @@ export function HomeScreen({
       {!joinCode && <InstallCard />}
       <ol class="rules">
         <li>
-          <strong>32 players, 10 seconds a move.</strong> Every round you're dropped into a position you haven't seen. Make one
+          <strong>
+            {S.lobbySize} players, {S.moveClockSeconds} seconds a move.
+          </strong> Every round you're dropped into a position you haven't seen. Make one
           move.
         </li>
         <li>
@@ -53,8 +56,8 @@ export function HomeScreen({
           three players who got the same position.
         </li>
         <li>
-          <strong>The weakest go out.</strong> After every 8 rounds the bottom of the table is knocked out, until two players are left
-          for a real 3-minute game.
+          <strong>The weakest go out.</strong> After every {S.roundsPerStage} rounds the bottom of the table is knocked out, until two players are left
+          for a real {S.duelClockSeconds / 60}-minute game.
         </li>
       </ol>
       <label class="field">
