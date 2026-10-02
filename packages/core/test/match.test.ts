@@ -170,6 +170,7 @@ describe("time bank and power-ups", () => {
   const s = DEFAULT_SETTINGS;
 
   it("caps a move at the move clock, adds the increment, and never goes below zero", () => {
+    void s;
     let state = createMatch(entrants, boards);
     const me = () => state.players[0]!;
     expect(me().bankMs).toBe(600_000);
@@ -188,7 +189,7 @@ describe("time bank and power-ups", () => {
     expect(allowedMs(me())).toBe(5000);
   });
 
-  it("counts time and power-ups in the stage standings; using a power-up spends one", () => {
+  it("ranks on move quality only: time and power-ups don't change points; using a power-up spends one", () => {
     let state = createMatch(entrants, boards);
     const groups = assignGroups(mulberry32(1), state);
     state = applyRound(state, groups, [
@@ -199,10 +200,10 @@ describe("time bank and power-ups", () => {
     expect(p0!.powerUps).toBe(0);
     expect(p0!.powerUpsUsed).toBe(1);
     expect(p1!.powerUps).toBe(1);
-    // Thinking exactly the 5 s increment leaves the bank unchanged; the power-up costs 4.
     expect(standingPoints(p1!)).toBeCloseTo(3);
-    expect(standingPoints(p0!)).toBeCloseTo(3 - s.powerUpCostPoints);
-    expect(standings(state, mulberry32(2))[0]!.id).toBe("p1");
+    expect(standingPoints(p0!)).toBeCloseTo(3);
+    expect(p0!.thinkMsTotal).toBe(5000);
+    expect(p0!.movesTimed).toBe(1);
     // A player with none left can't use one.
     state = applyRound(state, groups, [{ playerId: "p0", roundScore: 0, loss: 0, thinkMs: 0, usedPowerUp: true }]);
     expect(state.players[0]!.powerUps).toBe(0);
@@ -212,7 +213,7 @@ describe("time bank and power-ups", () => {
     expect(next.players.find((p) => p.id === "p1")!.powerUps).toBe(2);
   });
 
-  it("practice players have unlimited power-ups (each still costs points)", () => {
+  it("practice players have unlimited power-ups", () => {
     let state = createMatch([{ id: "me", name: "Me", isBot: false, practice: true }, ...entrants.slice(1)], boards);
     const groups = assignGroups(mulberry32(1), state);
     for (let i = 0; i < 3; i++) {
@@ -220,8 +221,6 @@ describe("time bank and power-ups", () => {
     }
     expect(state.players[0]!.powerUps).toBe(1);
     expect(state.players[0]!.powerUpsUsed).toBe(3);
-    // Three instant moves bank 15 s (+0.5) and three power-ups cost 12.
-    expect(standingPoints(state.players[0]!)).toBeCloseTo(3 * (5 / 60) * s.timeBonusPointsPerMinute - 3 * s.powerUpCostPoints);
   });
 
   it("bots spend a power-up on sharp positions only", () => {

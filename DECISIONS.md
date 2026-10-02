@@ -103,16 +103,16 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
   same round, so one slow thinker could otherwise hold everyone up for minutes. Rounds still lock early once every
   human has moved, and solo never waits for bots. With an empty bank you still get the 5 s top-up. Bots record a
   thinking time of 3–20 s, which comes out of their banks too.
-- **Time counts in the standings, per stage.** Moving faster than the 5 s top-up gains 2 points a minute, and slower
-  loses at the same rate, measured over the current stage. The first version counted the whole bank (20 points for
-  10:00), which made every row read +20 and hid who was actually playing well, so it's now relative and starts at 0
-  each stage, like scores.
-- **Power-ups.** One at the start, plus one more for everyone who survives a cut, and unused ones carry over. Using one shows
-  the engine's top 3 moves as labelled arrows with each move's expected score. Each one used costs 4 points in that
-  stage's standings, which is Eric's "rewarded if not used" put as a cost, so the leaderboard stays readable. The
-  hint comes from the search the device already runs for the eval bar, so it appears almost at once. Bots use one when
-  a position is sharp (the second-best move loses 15+ points), then play the best move.
-- **Practice mode** (checkbox on the first screen): unlimited power-ups, each still charged, and a 💡 on the
+- **Points are move quality only** (Eric, later the same day). Time and power-ups don't change points: a bigger bank
+  already rewards whoever saves time for the hard positions, and a faster player shouldn't go through ahead of one who
+  played the better move. Less thinking time only breaks an exact tie at a cut, as before. Average time per move is
+  kept as a stat (results screen, and in the data for future player profiles). An interim version counted time (±2 points a
+  minute) and charged 4 points per power-up; that was dropped.
+- **Power-ups are free.** One at the start, plus one more for everyone who survives a cut, and unused ones carry over, so the
+  choice is when to spend them. Using one shows the engine's top 3 moves as labelled arrows with each move's expected
+  score. The hint comes from the search the device already runs for the eval bar, so it appears almost at once. Bots use
+  one when a position is sharp (the second-best move loses 15+ points), then play the best move.
+- **Practice mode** (checkbox on the first screen): unlimited power-ups, and a 💡 on the
   leaderboard so everyone can see who's using it. This replaces my earlier idea of 3 shuffled "good, okay, so-so"
   suggestions; the power-up view does the same job.
 - **Evaluation bar always shown**, on the play screen and for both duel players. The spec said players never see it;
@@ -125,8 +125,18 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
 - **Catching up on a board.** When you land on a board, the moves played since you last saw it are replayed (or the
   last 2 if it's new to you), up to 4 at about half a second each, before you can move. The move you watch drawn in
   the reveal counts as seen.
-- **Live leaderboard, styled like a racing timing tower.** Position, name, stage points, average per move, time bank
-  and power-ups. Rows slide to new positions after each round, a red line marks the elimination cut, and the 2 players
+- **Live leaderboard, styled like a racing timing tower.** Position, name, stage points, average per move, engine rating,
+  time bank and power-ups. The highest-rated player still in gets a 🔥. Rows slide to new positions after each round, a red line marks the elimination cut, and the 2 players
   either side of it pulse. On a computer it's a permanent sidebar. On a phone, a strip above the board shows your
   position, your gap to the cut and your power-ups, the reveal shows a compact tower (top 5, the bubble, you, bottom
   5), and tapping the strip opens the full tower.
+- **Engine rating ("Elo" column).** Not a real Elo, since games aren't played out. It's a performance estimate on
+  Stockfish's CCRL-anchored scale: Stockfish's own UCI_Elo mode (1320 to 3190) picked moves in 160 positions like the
+  game's boards, and each pick was scored the way players' picks are. A straight line through log(average loss) against
+  rating fits those points well (R² 0.98) and extends the scale below 1320 (`reports/rating-calibration.md`). A player's
+  average loss over every move in the match maps onto that line: 8 points a move ≈ 1760, 12 ≈ 1320, 3 ≈ 2830. It
+  starts as if the player had 8 average (1500-level) moves already, so it's shown after 3 moves and firms up as the
+  match goes on. Missed moves don't count (they're about the clock, not chess). Bots get ratings too, the clear
+  top-rated player still in gets a 🔥, and the results screen lists the 3 most dangerous players. Ratings are per
+  match for now; a lifetime rating needs player profiles, which can be built later on the same free Cloudflare setup.
+  Caveat: humans see these positions cold, on a clock, so expect ratings somewhat below their usual online ones.

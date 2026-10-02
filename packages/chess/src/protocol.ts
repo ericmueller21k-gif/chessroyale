@@ -30,13 +30,18 @@ export interface NetBoard {
 export interface NetStanding {
   id: string;
   name: string;
-  /** What the standings rank by: stage score plus the value of unused time and power-ups. */
+  /** What the standings rank by: the stage score (move quality only). */
   points: number;
   stageScore: number;
   /** Average round score this stage. */
   avg: number;
   bankMs: number;
+  /** Average thinking time per move over the match. */
+  avgThinkMs: number;
+  /** Engine-based rating estimate from every move so far (null until a few moves). */
+  rating: number | null;
   powerUps: number;
+  powerUpsUsed: number;
   practice: boolean;
   isBot: boolean;
   /** Knocked out (then `placement` is set). */

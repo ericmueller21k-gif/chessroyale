@@ -25,6 +25,9 @@ export function gapToCut(standings: readonly Standing[], cutoff: number): number
 export function RaceTower({ standings, cutoff, compact = false }: { standings: readonly Standing[]; cutoff: number; compact?: boolean }) {
   const alive = standings.filter((s) => !s.out);
   const knockouts = cutoff < alive.length;
+  // The highest-rated player still in, if there's a clear one: the one to fear.
+  const best = Math.max(-1, ...alive.map((s) => s.rating ?? -1));
+  const topRating = alive.filter((s) => s.rating === best).length === 1 ? best : null;
   let rows: (Standing & { rank: number })[] = standings.map((s, i) => ({ ...s, rank: i + 1 }));
   if (compact) {
     const keep = new Set<number>();
@@ -62,8 +65,9 @@ export function RaceTower({ standings, cutoff, compact = false }: { standings: r
       <div class="tower-head">
         <span>Pos</span>
         <span>Player</span>
-        <span title="Stage points: move scores, ± time saved or spent, − power-ups used">Pts</span>
+        <span title="Stage points (move quality only)">Pts</span>
         <span title="Average score per move this stage">Avg</span>
+        <span title="Engine rating estimate from every move so far">Elo</span>
         <span title="Time bank">Bank</span>
         <span title="Unused power-ups">⚡</span>
       </div>
@@ -96,6 +100,7 @@ export function RaceTower({ standings, cutoff, compact = false }: { standings: r
               </span>
               <span class="t-pts">{r.out ? "out" : pts(r.points)}</span>
               <span class="t-avg">{r.out ? "" : pts(r.avg)}</span>
+              <span class={`t-elo${r.rating !== null && r.rating === topRating ? " top" : ""}`}>{r.rating ?? "—"}</span>
               <span class="t-bank">{r.out ? "" : clockText(r.bankMs)}</span>
               <span class="t-pu">{r.out ? "" : r.practice ? "∞" : r.powerUps}</span>
             </div>

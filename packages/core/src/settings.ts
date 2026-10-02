@@ -14,17 +14,10 @@ export interface Settings {
   timeBankSeconds: number;
   /** Added to the bank at the start of every move (seconds), so even an empty bank leaves this long to move. */
   timeIncrementSeconds: number;
-  /**
-   * Standings count the change in your time bank over the stage at this many
-   * points per minute: moving faster than the increment gains, slower loses.
-   */
-  timeBonusPointsPerMinute: number;
   /** Power-ups (reveal the engine's top 3 moves): how many each player starts with. */
   powerUpsAtStart: number;
   /** Power-ups added for every player who survives a cut. */
   powerUpsPerStage: number;
-  /** Using a power-up costs this many points in the stage standings (so saving them pays). */
-  powerUpCostPoints: number;
   /** Bots use a power-up when the second-best candidate loses at least this many points. */
   botPowerUpLoss: number;
   /** Each player keeps one colour for a whole stage, swapping at stage breaks (needs 2+ boards). */
@@ -70,10 +63,8 @@ export const DEFAULT_SETTINGS: Settings = {
   moveClockSeconds: 30,
   timeBankSeconds: 600,
   timeIncrementSeconds: 5,
-  timeBonusPointsPerMinute: 2,
   powerUpsAtStart: 1,
   powerUpsPerStage: 1,
-  powerUpCostPoints: 4,
   botPowerUpLoss: 15,
   colourPerStage: true,
   lateGraceMs: 300,

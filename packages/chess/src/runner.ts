@@ -21,6 +21,7 @@ import {
   type Rng,
   type Settings,
   type Side,
+  estimateRating,
   standingPoints,
   standings,
 } from "@chessroyale/core";
@@ -416,7 +417,10 @@ export class MatchRunner {
       stageScore: Math.round(p.stageScore * 10) / 10,
       avg: p.stageRounds ? Math.round((p.stageScore / p.stageRounds) * 10) / 10 : 0,
       bankMs: p.bankMs,
+      avgThinkMs: p.movesTimed ? Math.round(p.thinkMsTotal / p.movesTimed) : 0,
+      rating: estimateRating(p.lossesByStage.flat()),
       powerUps: p.powerUps,
+      powerUpsUsed: p.powerUpsUsed,
       practice: p.practice,
       isBot: p.isBot,
       out: !p.alive,

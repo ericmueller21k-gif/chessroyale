@@ -881,7 +881,7 @@ p {
 .tower-head,
 .tower-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 48px 42px 40px 22px;
+  grid-template-columns: 30px minmax(0, 1fr) 46px 40px 46px 38px 20px;
   align-items: center;
   column-gap: 4px;
   padding: 0 8px 0 0;
@@ -945,6 +945,20 @@ p {
 .t-pts {
   text-align: right;
   font-weight: 800;
+}
+.t-elo {
+  text-align: right;
+  white-space: nowrap;
+  font-weight: 700;
+  color: #c9d1dd;
+}
+.t-elo.top {
+  color: #ff8a3d;
+}
+.t-elo.top::before {
+  content: "🔥";
+  font-size: 9px;
+  margin-right: 1px;
 }
 .t-avg,
 .t-bank {
@@ -1079,7 +1093,7 @@ p {
 @media (min-width: 1100px) and (min-height: 600px) {
   .tower-side {
     display: block;
-    flex: 0 0 320px;
+    flex: 0 0 360px;
     position: sticky;
     top: 0;
     align-self: flex-start;
@@ -1088,7 +1102,7 @@ p {
     padding: 14px 0 14px 14px;
   }
   .arena .screen {
-    width: min(calc(100vw - 340px), 1000px);
+    width: min(calc(100vw - 380px), 1000px);
   }
   .reveal-tower {
     display: none;
@@ -1164,4 +1178,46 @@ p {
 }
 .check strong {
   color: var(--text);
+}
+
+/* ---- Results stats ---- */
+
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.stat-tile {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: center;
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.scariest ol {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.scariest li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+.scariest li.you {
+  outline: 2px solid var(--accent);
 }

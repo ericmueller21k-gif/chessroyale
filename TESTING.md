@@ -19,7 +19,9 @@ that a real iPhone runs the chess engine fast enough, so that's the main thing t
 - The strip above the board shows your position and how far you are above or below the elimination line; tap it
   for the full leaderboard. On a computer the leaderboard sits on the left all the time.
 - You keep one colour per stage. When you land on a board, the last few moves you missed replay before you move.
-- Your time bank is under the countdown: 10 minutes, +5 s a move, 30 s at most per move.
+- Your time bank is under the countdown: 10 minutes, +5 s a move, 30 s at most per move. Time never costs points.
+- The **Elo** column is an engine-based rating estimate from your moves (it settles after a few rounds). Tell me if
+  it feels way off for you or your friends; it's easy to recalibrate.
 
 Quick tests: add `?rounds=2&clock=15` to the link (before creating a lobby, or for solo) for a much shorter match.
 

@@ -40,12 +40,12 @@ export interface PlayerState {
   stageRounds: number;
   /** Time left in the bank (ms). */
   bankMs: number;
-  /** The bank when the current stage started. */
-  stageStartBankMs: number;
   /** Unused power-ups. */
   powerUps: number;
   powerUpsUsed: number;
-  stagePowerUpsUsed: number;
+  /** Thinking time over the whole match and the moves it covers (for the average-time stat). */
+  thinkMsTotal: number;
+  movesTimed: number;
   /** Practice mode: unlimited power-ups (shown on the leaderboard). */
   practice: boolean;
   /** Colour played this stage (null when colours aren't fixed, e.g. the final four on one board). */
@@ -89,10 +89,10 @@ export function createMatch(
       stageThinkMs: 0,
       stageRounds: 0,
       bankMs: settings.timeBankSeconds * 1000,
-      stageStartBankMs: settings.timeBankSeconds * 1000,
       powerUps: settings.powerUpsAtStart,
       powerUpsUsed: 0,
-      stagePowerUpsUsed: 0,
+      thinkMsTotal: 0,
+      movesTimed: 0,
       practice: e.practice ?? false,
       colour: null,
       lossesByStage: [[]],
@@ -220,17 +220,8 @@ export function allowedMs(p: Pick<PlayerState, "bankMs">, settings: Settings = D
   return Math.min(settings.moveClockSeconds * 1000, p.bankMs + settings.timeIncrementSeconds * 1000);
 }
 
-/** Points from the time bank this stage: positive if you've moved faster than the increment, negative if slower. */
-export const timeBonus = (p: Pick<PlayerState, "bankMs" | "stageStartBankMs">, settings: Settings = DEFAULT_SETTINGS) =>
-  ((p.bankMs - p.stageStartBankMs) / 60000) * settings.timeBonusPointsPerMinute;
-
-/** Points spent on power-ups this stage. */
-export const powerUpCost = (p: Pick<PlayerState, "stagePowerUpsUsed">, settings: Settings = DEFAULT_SETTINGS) =>
-  p.stagePowerUpsUsed * settings.powerUpCostPoints;
-
-/** What the standings rank by: stage score, plus or minus time, minus power-ups used. */
-export const standingPoints = (p: PlayerState, settings: Settings = DEFAULT_SETTINGS) =>
-  p.stageScore + timeBonus(p, settings) - powerUpCost(p, settings);
+/** What the standings rank by: the stage score (move quality only; time and power-ups don't count). */
+export const standingPoints = (p: Pick<PlayerState, "stageScore">, _settings: Settings = DEFAULT_SETTINGS) => p.stageScore;
 
 /** Adds a round's results to the players and remembers boards and groupmates for the next rotation. */
 export function applyRound(
@@ -258,7 +249,8 @@ export function applyRound(
       bankMs: Math.max(0, p.bankMs + settings.timeIncrementSeconds * 1000 - think),
       powerUps: usedPowerUp && !p.practice ? p.powerUps - 1 : p.powerUps,
       powerUpsUsed: p.powerUpsUsed + (usedPowerUp ? 1 : 0),
-      stagePowerUpsUsed: p.stagePowerUpsUsed + (usedPowerUp ? 1 : 0),
+      thinkMsTotal: p.thinkMsTotal + think,
+      movesTimed: p.movesTimed + 1,
       lossesByStage,
       lastBoard: board,
       lastGroupmates: board === null ? [] : groups.get(board)!.filter((id) => id !== p.id),
@@ -283,8 +275,8 @@ export function outcomesFromGroup(
 }
 
 /**
- * Alive players ordered best first: standing points (stage score, plus or
- * minus time, minus power-ups used), then less thinking time, then a coin flip.
+ * Alive players ordered best first: stage score, then (only for an exact tie)
+ * less thinking time, then a coin flip.
  */
 export function standings(state: MatchState, rng: Rng, settings: Settings = DEFAULT_SETTINGS): PlayerState[] {
   const tiebreak = new Map(alivePlayers(state).map((p) => [p.id, rng()]));
@@ -324,8 +316,6 @@ export function endStage(
       stageScore: settings.scoresBetweenStages === "reset" ? 0 : p.stageScore,
       stageThinkMs: 0,
       stageRounds: 0,
-      stageStartBankMs: p.bankMs,
-      stagePowerUpsUsed: 0,
       powerUps: p.powerUps + settings.powerUpsPerStage,
       lossesByStage: [...p.lossesByStage, []],
     };

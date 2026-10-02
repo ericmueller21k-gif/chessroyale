@@ -70,16 +70,19 @@ export function HomeScreen({
         </li>
         <li>
           <strong>Watch your time bank.</strong> {S.timeBankSeconds / 60} minutes for the match, +{S.timeIncrementSeconds} s every
-          move, {S.moveClockSeconds} s at most per move. Time counts: every minute you save (or burn) beyond the +
-          {S.timeIncrementSeconds} s is worth ±{S.timeBonusPointsPerMinute} points.
+          move, {S.moveClockSeconds} s at most per move. Time never costs points: spend it on the hard positions.
         </li>
         <li>
-          <strong>⚡ Power-ups</strong> show the engine's top 3 moves. You get {S.powerUpsAtStart}, plus {S.powerUpsPerStage} each
-          stage you survive. Each one you use costs {S.powerUpCostPoints} points, so save them for the hard positions.
+          <strong>⚡ Power-ups</strong> show the engine's top 3 moves, free to use. You get {S.powerUpsAtStart}, plus{" "}
+          {S.powerUpsPerStage} each stage you survive, and unused ones carry over. Pick your moment.
         </li>
         <li>
           <strong>The weakest go out.</strong> After every {S.roundsPerStage} rounds the bottom of the leaderboard is knocked out,
           until two players are left for a real {S.duelClockSeconds / 60}-minute game.
+        </li>
+        <li>
+          <strong>Engine rating.</strong> Every move also feeds a rating estimate on Stockfish's Elo scale, so you can see the
+          scariest player in the lobby.
         </li>
       </ol>
       <label class="field">
