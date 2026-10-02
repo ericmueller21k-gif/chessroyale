@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, allowedMs, finishDuel, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, allowedMs, finishDuel, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   START_FEN,
@@ -80,7 +80,7 @@ export interface LobbyRecord {
   mismatches: number;
   counter: number;
   /** Per-lobby playtest overrides (rounds per stage, move clock, duel clock). */
-  overrides?: { roundsPerStage?: number; moveClockSeconds?: number; duelClockSeconds?: number };
+  overrides?: { roundsPerStage?: number; moveClockSeconds?: number; duelClockSeconds?: number; drawRuleByStage?: DrawRule[] };
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"]): LobbyRecord {
@@ -518,6 +518,7 @@ export class LobbyCore {
         bestMove: mine?.bestMove ?? null,
         playedMove: mine?.result.playedMove ?? null,
         picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, roundScore: p.roundScore })) ?? [],
+        drawRule: mine?.result.drawRule ?? "random",
         expectedAfter: score?.expectedAfter ?? {},
         bestExpected: score?.bestExpected ?? null,
         standings: st,

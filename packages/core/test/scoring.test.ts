@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { drawOdds, isDeadRound, mulberry32, scoreGroup, type GroupEvaluation, type Pick } from "../src/index.ts";
+import {
+  DEFAULT_SETTINGS,
+  drawOdds,
+  drawRuleFor,
+  isDeadRound,
+  mulberry32,
+  scoreGroup,
+  type DrawRule,
+  type GroupEvaluation,
+  type Pick,
+} from "../src/index.ts";
 
 // buildspec.md worked example: the best move leaves the mover 0.62.
 const evaluation: GroupEvaluation = {
@@ -113,5 +123,45 @@ describe("checks from the spec", () => {
     const ps: Pick[] = ["a", "b", "c"].map((m, k) => ({ playerId: `p${k}`, move: m }));
     expect(isDeadRound(scoreGroup(ps, flat, mulberry32(1)))).toBe(true);
     expect(isDeadRound(scoreGroup(picks, evaluation, mulberry32(1)))).toBe(false);
+  });
+});
+
+describe("draw rules", () => {
+  const share = (rule: DrawRule, ps: Pick[] = picks) => {
+    const rng = mulberry32(5);
+    const counts: Record<string, number> = {};
+    for (let i = 0; i < 4000; i++) {
+      const m = scoreGroup(ps, evaluation, rng, DEFAULT_SETTINGS, rule).playedMove;
+      counts[m] = (counts[m] ?? 0) + 1 / 4000;
+    }
+    return counts;
+  };
+
+  it("popular plays the most-picked move, drawing among ties", () => {
+    expect(Object.keys(share("popular"))).toEqual(["d2d4"]);
+    const allDifferent = [picks[0]!, picks[1]!, picks[3]!];
+    const s = share("popular", allDifferent);
+    expect(Object.keys(s).sort()).toEqual(["d2d4", "e2e4", "h2h4"]);
+    expect(s.e2e4!).toBeCloseTo(1 / 3, 1);
+  });
+
+  it("best plays the best move picked", () => {
+    expect(Object.keys(share("best"))).toEqual(["e2e4"]);
+    expect(scoreGroup(picks, evaluation, mulberry32(1), DEFAULT_SETTINGS, "best").drawRule).toBe("best");
+  });
+
+  it("weighted favours better moves but still plays weaker ones sometimes", () => {
+    const s = share("weighted");
+    // Losses 0, 4, 4, 32 with 4-point weights: e2e4 1, d2d4 2 × e^-1, h2h4 e^-8.
+    expect(s.e2e4!).toBeCloseTo(1 / (1 + 2 * Math.exp(-1)), 1);
+    expect(s.d2d4!).toBeGreaterThan(0.3);
+    expect(s.h2h4 ?? 0).toBeLessThan(0.01);
+  });
+
+  it("uses the stage's rule, and the last rule for later stages", () => {
+    const settings = { ...DEFAULT_SETTINGS, drawRuleByStage: ["popular", "best"] as DrawRule[] };
+    expect(drawRuleFor(0, settings)).toBe("popular");
+    expect(drawRuleFor(1, settings)).toBe("best");
+    expect(drawRuleFor(4, settings)).toBe("best");
   });
 });

@@ -1,6 +1,8 @@
 import type { BoardView, GameView, Standing } from "../game.ts";
 import { MiniBoard } from "../components/MiniBoard.tsx";
+import { useEffect } from "preact/hooks";
 import { RaceTower } from "../components/RaceTower.tsx";
+import { play } from "../sound.ts";
 
 export function StageBreakScreen(props: {
   match: GameView;
@@ -13,6 +15,11 @@ export function StageBreakScreen(props: {
 }) {
   const { match, stage, standings, knockedOut, cutoff, youOut, nextBoards: boards } = props;
   const finalStage = stage === match.settings.knockoutsPerStage.length - 1;
+  const wasIn = standings.some((s) => s.isYou && !s.out);
+  useEffect(() => {
+    if (youOut) play("out");
+    else if (wasIn) play("safe");
+  }, []);
   return (
     <div class="screen break">
       <h1>Stage {stage + 1} complete</h1>

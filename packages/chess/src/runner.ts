@@ -7,6 +7,7 @@ import {
   botChoose,
   botThinkMs,
   createMatch,
+  drawRuleFor,
   endStage,
   isDuel,
   keepBoards,
@@ -335,6 +336,7 @@ export class MatchRunner {
       evaluation,
       this.opts.rng,
       this.settings,
+      drawRuleFor(this.state.stage, this.settings),
     );
     const pickedExpected = playerIds.flatMap((id) => {
       const m = picks[id];

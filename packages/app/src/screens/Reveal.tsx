@@ -1,41 +1,85 @@
 import { useEffect, useState } from "preact/hooks";
 import { applyMove, sideToMove, toSan } from "@chessroyale/chess";
-import { Board, type Arrow } from "../components/Board.tsx";
+import type { DrawRule } from "@chessroyale/core";
+import { Board } from "../components/Board.tsx";
 import { RaceTower } from "../components/RaceTower.tsx";
+import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { cutLabel, type BoardView, type GameView, type GroupReveal } from "../game.ts";
 import { seenKey } from "../hooks.ts";
+import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 
 const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
 
-/** The group's picks as arrows with each pick's loss, your score, then the drawn move plays. */
+/** When each beat of the reveal starts (ms). */
+const DECIDING_AT = 1900;
+const PLAYED_AT = 2700;
+
+/** Why this move continues the board, in a few words. */
+function reason(rule: DrawRule, tied: boolean): string {
+  if (rule === "popular") return tied ? "tied for most picks, so drawn among those" : "the most popular move in your group";
+  if (rule === "best") return tied ? "the best move picked (a tie, drawn among those)" : "the best move in your group";
+  if (rule === "weighted") return "drawn at random, with better moves more likely";
+  return "drawn at random from your group's picks";
+}
+
+/**
+ * The round's end: everyone's moves slide in at once as see-through pieces
+ * with names over them, then one move is chosen to continue the board and
+ * plays, with the reason. Your score and the group's are listed alongside.
+ */
 export function RevealScreen({ match, mine, board }: { match: GameView; mine: GroupReveal; board: BoardView }) {
-  const [played, setPlayed] = useState(false);
-  // You watch the drawn move play here, so it won't be replayed next time you get this board.
+  const [beat, setBeat] = useState<"shades" | "deciding" | "played">("shades");
+  // You watch the chosen move play here, so it won't be replayed next time you get this board.
   useEffect(() => {
     match.seen.set(seenKey(board), board.ply + 1);
   }, [board]);
   useEffect(() => {
-    const t = setTimeout(() => setPlayed(true), 1800);
-    return () => clearTimeout(t);
+    const a = setTimeout(() => {
+      setBeat("deciding");
+      play("allIn");
+    }, DECIDING_AT);
+    const b = setTimeout(() => setBeat("played"), PLAYED_AT);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
   }, [mine]);
 
   const fen = mine.fenBefore;
+  const orientation = sideToMove(fen) === "w" ? "white" : "black";
   const me = mine.result.players.find((p) => match.isYou(p.playerId))!;
-  const mineIsBest = me.move === mine.bestMove;
-  const arrows: Arrow[] = played
-    ? []
-    : [
-        { move: mine.bestMove, brush: "green", label: mineIsBest ? "You ★" : "★" },
-        ...(me.move && !mineIsBest ? [{ move: me.move, brush: "blue" as const, label: "You" }] : []),
-        ...mine.result.players
-          .filter((p) => p.move && p.move !== mine.bestMove && p.move !== me.move)
-          .map((p) => ({ move: p.move!, brush: "paleGrey" as const })),
-      ];
+  const played = beat === "played";
+
+  // One shade per distinct move, with everyone who picked it.
+  const byMove = new Map<string, ShadeMove>();
+  for (const p of mine.result.players) {
+    if (!p.move) continue;
+    const s = byMove.get(p.move) ?? { move: p.move, names: [], you: false };
+    s.names.push(match.isYou(p.playerId) ? "You" : match.nameOf(p.playerId));
+    s.you ||= match.isYou(p.playerId);
+    byMove.set(p.move, s);
+  }
+  const shades = [...byMove.values()];
+
+  const rule = mine.result.drawRule;
+  const counts = shades.map((s) => s.names.length);
+  const losses = new Map(mine.result.players.flatMap((p) => (p.move && p.loss !== null ? [[p.move, p.loss] as const] : [])));
+  const bestLoss = Math.min(...losses.values());
+  const tied =
+    rule === "popular"
+      ? counts.filter((c) => c === Math.max(...counts)).length > 1
+      : rule === "best" && [...new Set([...losses].filter(([, l]) => l - bestLoss < 1e-9).map(([m]) => m))].length > 1;
   const drawnBy = mine.result.players.filter((p) => p.move === mine.result.playedMove);
   const yoursDrawn = drawnBy.some((p) => match.isYou(p.playerId));
   const others = drawnBy.filter((p) => !match.isYou(p.playerId)).map((p) => match.nameOf(p.playerId));
-  const whose = !drawnBy.length ? "the engine's move (nobody picked)" : yoursDrawn ? (others.length ? `your pick (and ${others.join(" & ")}'s)` : "your pick") : `${others.join(" & ")}'s pick`;
+  const whose = !drawnBy.length
+    ? "the engine's move (nobody picked)"
+    : yoursDrawn
+      ? others.length
+        ? `your pick (and ${others.join(" & ")}'s)`
+        : "your pick"
+      : `${others.join(" & ")}'s pick`;
 
   return (
     <div class="screen game" onClick={() => played && match.skipReveal()}>
@@ -44,10 +88,17 @@ export function RevealScreen({ match, mine, board }: { match: GameView; mine: Gr
         <div class="opening-name">{board.openingName}</div>
         <Board
           fen={played ? applyMove(fen, mine.result.playedMove) : fen}
-          orientation={sideToMove(fen) === "w" ? "white" : "black"}
+          orientation={orientation}
           lastMove={played ? mine.result.playedMove : board.lastMove}
-          arrows={arrows}
-        />
+        >
+          {!played && <ShadeMoves fen={fen} moves={shades} orientation={orientation} />}
+          {beat === "deciding" && (
+            <div class="round-over" role="status">
+              <strong>All moves in</strong>
+              <span>Choosing the move…</span>
+            </div>
+          )}
+        </Board>
       </div>
       <div class="reveal">
         <div class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>
@@ -61,7 +112,7 @@ export function RevealScreen({ match, mine, board }: { match: GameView; mine: Gr
             .map((p) => (
               <li key={p.playerId} class={match.isYou(p.playerId) ? "you" : ""}>
                 <span class="pick-name">
-                  {played && p.move === mine.result.playedMove && <span title="This pick continues the board">🎲 </span>}
+                  {played && p.move === mine.result.playedMove && <span title="This move continues the board">▶ </span>}
                   {match.nameOf(p.playerId)}
                 </span>
                 <span class="pick-move">{p.move ? toSan(fen, p.move) : "no move"}</span>
@@ -73,15 +124,15 @@ export function RevealScreen({ match, mine, board }: { match: GameView; mine: Gr
           <span class="drawn-main">
             {played ? (
               <>
-                🎲 The board continues with <strong>{toSan(fen, mine.result.playedMove)}</strong>, {whose}.
+                ▶ The board continues with <strong>{toSan(fen, mine.result.playedMove)}</strong>, {whose}: {reason(rule, tied)}.
               </>
             ) : (
-              "🎲 Drawing one of your group's moves to continue the board…"
+              "Everyone's moves are in. One of them will continue the board…"
             )}
           </span>
           <span class="muted small">
-            One pick per group is drawn at random to carry on the game. Your score only depends on your own move. Best was{" "}
-            {toSan(fen, mine.bestMove)}.{played && !match.serverPaced ? " Tap to continue." : ""}
+            Your score only depends on your own move. Best was {toSan(fen, mine.bestMove)}.
+            {played && !match.serverPaced ? " Tap to continue." : ""}
           </span>
         </div>
         <div class="reveal-tower">

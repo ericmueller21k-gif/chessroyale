@@ -51,7 +51,7 @@ test("strong play survives every stage, reaches the duel, and sees results", asy
       await clickMove(page, await bestMove(page));
       await expect.poll(() => phase(page)).not.toBe("play");
     } else if (p === "reveal") {
-      await page.waitForTimeout(1900);
+      await page.waitForTimeout(2800);
       await page.locator(".screen").click();
     } else if (p === "stageBreak") {
       await expect(page.locator(".tower-row").first()).toBeVisible();
@@ -82,7 +82,7 @@ test("missing every move gets you knocked out; the match plays out and shows res
     if (p === "results") break;
     if (p === "reveal") {
       await expect(page.locator(".round-score")).toContainText("-25");
-      await page.waitForTimeout(1900);
+      await page.waitForTimeout(2800);
       await page.locator(".screen").click();
     } else if (p === "stageBreak") {
       await expect(page.locator(".out-msg")).toBeVisible();

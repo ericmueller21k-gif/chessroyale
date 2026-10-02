@@ -6,6 +6,7 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { clockText } from "../components/RaceTower.tsx";
 import type { BoardView, GameView } from "../game.ts";
 import { useReplay } from "../hooks.ts";
+import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 
 const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
@@ -44,6 +45,9 @@ export function PlayScreen({
   const side = sideToMove(board.fen);
   const waiting = picked !== undefined;
   const shown = useReplay(match, board);
+  useEffect(() => {
+    if (!waiting) play("roundStart");
+  }, []);
   const hint = match.hint;
   const left = match.powerUpsLeft();
   // Once you've moved, your move stays on the board while the others finish.
@@ -112,7 +116,10 @@ export function PlayScreen({
                 type="button"
                 class="btn btn-secondary btn-powerup"
                 disabled={left <= 0 || hint !== null}
-                onClick={() => match.usePowerUp()}
+                onClick={() => {
+                  play("powerUp");
+                  match.usePowerUp();
+                }}
               >
                 {hint ? "Asking the engine…" : left === Infinity ? "💡 Show the engine's top 3 (practice)" : `⚡ Power-up: show the top 3 (${left} left)`}
               </button>

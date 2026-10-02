@@ -59,7 +59,7 @@ export interface DuelView {
 
 /** The reveal: your group's picks and scores (same shape the server sends). */
 export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds"> & {
-  result: Pick<BoardRound["result"], "players" | "playedMove">;
+  result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule">;
 };
 
 export type Phase =

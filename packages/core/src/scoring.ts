@@ -1,5 +1,5 @@
 import type { Rng } from "./rng.ts";
-import { DEFAULT_SETTINGS, type Settings } from "./settings.ts";
+import { DEFAULT_SETTINGS, type DrawRule, type Settings } from "./settings.ts";
 
 /**
  * Scoring from buildspec.md. Expected scores are from the mover's side, 0 to 1
@@ -35,6 +35,8 @@ export interface GroupResult {
   averageLoss: number | null;
   /** The move played on the board. */
   playedMove: string;
+  /** How it was chosen. */
+  drawRule: DrawRule;
   /** Chance each distinct move had of being drawn. */
   drawOdds: Record<string, number>;
 }
@@ -63,11 +65,46 @@ export function drawOdds(picks: readonly Pick[]): Record<string, number> {
   return odds;
 }
 
+/** The draw rule for a stage: its entry in drawRuleByStage, or the last entry. */
+export function drawRuleFor(stage: number, settings: Settings = DEFAULT_SETTINGS): DrawRule {
+  const rules = settings.drawRuleByStage;
+  return rules[Math.min(stage, rules.length - 1)] ?? "random";
+}
+
+/** Picks the move that continues the board, from the moves picked (one entry per pick) and their losses. */
+export function drawMove(
+  moves: readonly string[],
+  losses: Readonly<Record<string, number>>,
+  rule: DrawRule,
+  rng: Rng,
+  settings: Settings = DEFAULT_SETTINGS,
+): string {
+  const among = (xs: readonly string[]) => xs[Math.floor(rng() * xs.length)]!;
+  const distinct = [...new Set(moves)];
+  if (rule === "popular") {
+    const count = (m: string) => moves.filter((x) => x === m).length;
+    const top = Math.max(...distinct.map(count));
+    return among(distinct.filter((m) => count(m) === top));
+  }
+  if (rule === "best") {
+    const least = Math.min(...distinct.map((m) => losses[m]!));
+    return among(distinct.filter((m) => losses[m]! - least < 1e-9));
+  }
+  if (rule === "weighted") {
+    const weights = moves.map((m) => Math.exp(-losses[m]! / settings.drawWeightPoints));
+    let r = rng() * weights.reduce((s, w) => s + w, 0);
+    for (let i = 0; i < moves.length; i++) if ((r -= weights[i]!) <= 0) return moves[i]!;
+    return moves[moves.length - 1]!;
+  }
+  return among(moves);
+}
+
 export function scoreGroup(
   picks: readonly Pick[],
   evaluation: GroupEvaluation,
   rng: Rng,
   settings: Settings = DEFAULT_SETTINGS,
+  rule: DrawRule = "random",
 ): GroupResult {
   const picked = picks.filter((p) => p.move !== null);
   const losses = moveLosses(
@@ -80,8 +117,16 @@ export function scoreGroup(
       ? { playerId: p.playerId, move: null, loss: null, roundScore: settings.missedMoveScore }
       : { playerId: p.playerId, move: p.move, loss: losses[p.move]!, roundScore: averageLoss! - losses[p.move]! },
   );
-  const playedMove = picked.length ? picked[Math.floor(rng() * picked.length)]!.move! : evaluation.bestMove;
-  return { players, averageLoss, playedMove, drawOdds: drawOdds(picks) };
+  const playedMove = picked.length
+    ? drawMove(
+        picked.map((p) => p.move!),
+        losses,
+        rule,
+        rng,
+        settings,
+      )
+    : evaluation.bestMove;
+  return { players, averageLoss, playedMove, drawRule: rule, drawOdds: drawOdds(picks) };
 }
 
 /** A round is dead when every pick in the group is within `margin` points of the others. */

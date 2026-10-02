@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useState } from "preact/hooks";
-import { DEFAULT_SETTINGS, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, DRAW_RULES, type DrawRule, type Settings } from "@chessroyale/core";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { enginePool } from "./engine.ts";
@@ -16,11 +16,19 @@ import { RevealScreen } from "./screens/Reveal.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
 
-/** Playtest overrides from the URL, e.g. ?rounds=4&clock=15 (handy for quick tests). */
+/** Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). */
 function overridesFromUrl(): Partial<Settings> {
   const q = new URLSearchParams(location.search);
   const n = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
-  return JSON.parse(JSON.stringify({ roundsPerStage: n("rounds"), moveClockSeconds: n("clock"), duelClockSeconds: n("duel") }));
+  const draw = q.get("draw") as DrawRule | null;
+  return JSON.parse(
+    JSON.stringify({
+      roundsPerStage: n("rounds"),
+      moveClockSeconds: n("clock"),
+      duelClockSeconds: n("duel"),
+      drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
+    }),
+  );
 }
 
 /** An invite link (/lobby/ABCDE) opens the join form with the code filled in. */

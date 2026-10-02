@@ -1,9 +1,11 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { Chessground } from "chessground";
 import type { Api } from "chessground/api";
 import type { DrawShape } from "chessground/draw";
 import type { Key } from "chessground/types";
-import { legalMoves, sideToMove } from "@chessroyale/chess";
+import { legalMoves, pieceAt, sideToMove } from "@chessroyale/chess";
+import { play } from "../sound.ts";
 
 export interface Arrow {
   move: string;
@@ -23,6 +25,8 @@ interface BoardProps {
   small?: boolean;
   /** Animate changes (off for instant jumps). */
   animate?: boolean;
+  /** Drawn over the board (e.g. everyone's picks as see-through pieces). */
+  children?: ComponentChildren;
 }
 
 const sq = (s: string) => s as Key;
@@ -49,12 +53,24 @@ function shapesFor(arrows: Arrow[] = []): DrawShape[] {
 }
 
 /** Chessground board. Tap a piece then a square, or drag. Pawns reaching the last rank open a promotion picker. */
-export function Board({ fen, orientation, lastMove, interactive, onMove, arrows, small, animate = true }: BoardProps) {
+export function Board({ fen, orientation, lastMove, interactive, onMove, arrows, small, animate = true, children }: BoardProps) {
   const el = useRef<HTMLDivElement>(null);
   const api = useRef<Api | null>(null);
   const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null);
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
+  const prevFen = useRef(fen);
+
+  // A move appearing on a big board makes a sound (a capture sounds different).
+  useEffect(() => {
+    const before = prevFen.current;
+    prevFen.current = fen;
+    if (small || before === fen || !lastMove) return;
+    const to = lastMove.slice(2, 4);
+    const mover = pieceAt(before, lastMove.slice(0, 2));
+    const captured = !!pieceAt(before, to) || (mover?.type === "p" && lastMove[0] !== lastMove[2]);
+    play(captured ? "capture" : "move");
+  }, [fen]);
 
   useEffect(() => {
     api.current = Chessground(el.current!, {
@@ -115,6 +131,7 @@ export function Board({ fen, orientation, lastMove, interactive, onMove, arrows,
   return (
     <div class={`board-wrap ${small ? "board-small" : ""}`}>
       <div ref={el} class="board" />
+      {children}
       {promotion && (
         <div class="promo" role="dialog" aria-label="Promote to">
           {(["q", "r", "b", "n"] as const).map((p) => (
@@ -131,7 +148,7 @@ export function Board({ fen, orientation, lastMove, interactive, onMove, arrows,
 declare module "preact" {
   namespace JSX {
     interface IntrinsicElements {
-      piece: { class?: string };
+      piece: { class?: string; key?: string; style?: Record<string, string> };
     }
   }
 }
