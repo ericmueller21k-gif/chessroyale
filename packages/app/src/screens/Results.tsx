@@ -58,7 +58,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           </div>
         )}
       </div>
-      <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>
+      {avgMs > 0 && <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>}
       <div class="actions">
         <button type="button" class="btn btn-secondary" onClick={onHome}>
           Home

@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, botPick, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botPick, botThinkMs as thinkMs, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   sideToMove,
@@ -323,7 +323,7 @@ export class NetMatch implements GameView {
           const botThinkMs: Record<string, number> = {};
           for (const b of job.bots) {
             botPicks[b.id] = botPick(Math.random, candidates, b.skill, legal, this.settings);
-            botThinkMs[b.id] = Math.round((2 + Math.random() * 6) * 1000);
+            botThinkMs[b.id] = thinkMs(Math.random, this.settings);
           }
           const expectedAfter: Record<string, number> = Object.fromEntries(top.map((mv) => [mv.move, mv.expected]));
           const missing = [...Object.values(job.humanPicks), ...Object.values(botPicks)].filter(

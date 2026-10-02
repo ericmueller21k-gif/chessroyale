@@ -24,3 +24,44 @@ these weren't reviewed first. Most are a single line in `packages/core/src/setti
   gambits (`UNUSUAL_FAMILIES` in the build script).
 - **Each match picks 7 classic + 1 unusual opening from different families.**
 - **Chess rules: chess.js** (BSD-2). The board UI component is chosen in milestone 3.
+
+## Milestone 3: solo build
+
+- **Board component: chessground** (Lichess's board, GPL-3). Tap-tap and drag, legal-square dots, last-move highlight
+  and arrows for the reveal all come built in. GPL matches Stockfish's licence, so the app as a whole is GPL anyway.
+- **Engines in the browser: up to 4 Web Workers** (cores − 1). The 8 boards of a round are scored in parallel, so
+  scoring takes well under a second on a laptop. The results screen prints the time per round on that device.
+- **Pacing.** The opening grid plays for 6 s; the reveal shows for 4 s plus 1.5 s for the drawn move, and a tap skips
+  it; solo stage breaks wait for a tap. All are in `settings.ts`.
+- **When you're knocked out in solo,** the rest of the match is simulated quickly (there's nobody to watch) and the
+  results show where you finished. A duel between two bots is decided by lower average loss over a sample of
+  positions, rather than playing a 6-minute bot game.
+- **Solo duel vs a bot:** the bot thinks for a short random time (less when its clock is low), so it can lose on time
+  only if you play very fast. A draw goes to the lower average loss, as the spec says.
+- **Playtest overrides in the URL:** `?rounds=2&clock=15&duel=60` change those settings for that match only (also when
+  creating a lobby). Handy for a quick test; normal links play the real settings.
+
+## Milestone 4: multiplayer lobbies
+
+- **One Durable Object per lobby, with a 5-letter code** (no 0/O/1/I/L). Invite links are `/lobby/CODE`.
+- **Seats survive reloads.** Joining stores a seat token on the device; reopening the link (or reloading) rejoins the
+  same seat and the server resends the current screen.
+- **Host scoring.** After picks lock, the host's browser gets one job per board, scores it, and picks for the bots.
+  If the host leaves, the first connected player on a computer (else any player) becomes host and gets the job. If
+  nobody answers within 15 s, every pick on that round counts as equal (all score 0) rather than stalling the match.
+- **Cross-check.** Every other player's browser re-scores its own group after the reveal and reports mismatches,
+  which the server logs. The checker runs exactly the same searches as the host, in the same order, with the
+  `searchmoves` list sorted, so honest devices agree exactly. An early version used a slightly different sequence
+  and logged 2 mismatches in a test match; with identical searches the next full match logged none.
+- **Rounds lock early** once every live human has picked, so nobody waits out the clock for bots.
+- **Duel in multiplayer:** the server runs both clocks. If a finalist is a bot, the host's browser chooses its moves.
+  The higher final-four scorer has 15 s to choose a colour, then gets White.
+
+## Milestone 5: spectating and polish
+
+- **Evaluation bar** for duel spectators, computed by the spectator's own browser from the position on screen. The
+  server never sends evaluations, so the players can't see it even by inspecting traffic.
+- **Install:** web manifest, icons (gold crown over a pawn), and a service worker that precaches the app and the
+  1.8 MB engine, so solo works offline and the app opens instantly. Pages are always fetched fresh when online (the
+  Word Trap lesson), so updates show up on the next open. Android/desktop Chrome get an Install button; iPhone gets
+  Share → Add to Home Screen instructions.

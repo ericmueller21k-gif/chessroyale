@@ -13,6 +13,14 @@ export interface Settings {
   /** A pick arriving this long after the deadline still counts. */
   lateGraceMs: number;
   revealSeconds: number;
+  /** After the reveal, time for the drawn move to animate before the next round. */
+  drawnMoveSeconds: number;
+  /** How long the grid of openings plays before the first round. */
+  openingShowSeconds: number;
+  /** Multiplayer: how long the stage-break standings show (solo waits for a tap). */
+  stageBreakSeconds: number;
+  /** Multiplayer: time to choose a colour for the duel before White is picked for you. */
+  colourChoiceSeconds: number;
   roundsPerStage: number;
   /** Players knocked out at the end of each knockout stage; the duel follows. */
   knockoutsPerStage: readonly number[];
@@ -40,6 +48,10 @@ export const DEFAULT_SETTINGS: Settings = {
   moveClockSeconds: 10,
   lateGraceMs: 300,
   revealSeconds: 4,
+  drawnMoveSeconds: 1.5,
+  openingShowSeconds: 6,
+  stageBreakSeconds: 10,
+  colourChoiceSeconds: 15,
   roundsPerStage: 8,
   knockoutsPerStage: [8, 8, 8, 4, 2],
   scoresBetweenStages: "reset",

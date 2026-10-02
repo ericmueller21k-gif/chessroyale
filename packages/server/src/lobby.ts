@@ -102,11 +102,7 @@ export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecor
   };
 }
 
-const OPENING_MS = 6000;
-const REVEAL_EXTRA_MS = 1500;
-const BREAK_MS = 10_000;
 const SCORE_TIMEOUT_MS = 15_000;
-const COLOUR_TIMEOUT_MS = 15_000;
 const BOT_MOVE_TIMEOUT_MS = 8000;
 
 function netBoard(b: BoardState, withOpening = false): NetBoard {
@@ -325,9 +321,9 @@ export class LobbyCore {
     this.broadcast({
       t: "opening",
       boards: [...this.runner.boards.values()].map((b) => netBoard(b, true)),
-      until: now + OPENING_MS,
+      until: now + this.settings.openingShowSeconds * 1000,
     });
-    this.setTimer("startRound", now + OPENING_MS);
+    this.setTimer("startRound", now + this.settings.openingShowSeconds * 1000);
   }
 
   alarm() {
@@ -490,7 +486,7 @@ export class LobbyCore {
     const report = runner.finishRound(results, think);
     this.r.scoreRequest = null;
     this.r.phase = "reveal";
-    const until = this.io.now() + this.settings.revealSeconds * 1000 + REVEAL_EXTRA_MS;
+    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
     const st = this.standings();
     const cutoff = this.cutoff();
     for (const h of this.r.humans) {
@@ -527,7 +523,7 @@ export class LobbyCore {
     const end = runner.endStage();
     for (const p of end.knockedOut) this.r.placements[p.id] = p.placement!;
     this.r.phase = "stageBreak";
-    const until = this.io.now() + BREAK_MS;
+    const until = this.io.now() + this.settings.stageBreakSeconds * 1000;
     this.broadcast({
       t: "stageBreak",
       stage,
@@ -574,7 +570,7 @@ export class LobbyCore {
     };
     if (this.isBot(chooser.id)) return this.beginDuel("w");
     this.r.phase = "chooseColour";
-    const until = this.io.now() + COLOUR_TIMEOUT_MS;
+    const until = this.io.now() + this.settings.colourChoiceSeconds * 1000;
     this.broadcast({ t: "chooseColour", chooserId: chooser.id, until });
     this.setTimer("colourTimeout", until);
   }

@@ -109,7 +109,7 @@ export class SoloMatch implements GameView {
       entrants: [{ id: HUMAN, name: this.playerName, isBot: false }, ...botRoster(this.rng)],
     });
     this.set({ kind: "opening", boards: [...this.runner.boards.values()].map(boardView) });
-    this.timer = setTimeout(() => this.nextRound(), 6000);
+    this.timer = setTimeout(() => this.nextRound(), this.settings.openingShowSeconds * 1000);
   }
 
   private nextRound() {
@@ -148,7 +148,7 @@ export class SoloMatch implements GameView {
       roundScore: me.roundScore,
     });
     this.set({ kind: "reveal", mine, board });
-    this.timer = setTimeout(() => this.afterReveal(), this.settings.revealSeconds * 1000 + 1500);
+    this.timer = setTimeout(() => this.afterReveal(), (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000);
   }
 
   skipReveal() {
