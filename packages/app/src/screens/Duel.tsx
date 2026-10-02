@@ -38,8 +38,8 @@ export function DuelScreen({ match, duel }: { match: GameView; duel: DuelView })
         <span class={`duel-clock ${clocks[them] < 20000 ? "low" : ""}`}>{clock(clocks[them])}</span>
       </div>
       <div class="board-area">
-        <div class="duel-board-row">
-          {duel.spectator && <EvalBar fen={duel.fen} history={duel.history} orientation={duel.youColour} />}
+        <div class="board-row">
+          <EvalBar fen={duel.fen} orientation={duel.youColour} />
           <Board
           fen={duel.fen}
           orientation={duel.youColour === "w" ? "white" : "black"}

@@ -82,7 +82,7 @@ export class Lobby extends DurableObject<Env> {
     const core = this.core(this.record!.code);
     const attached = ws.deserializeAttachment() as { playerId?: string } | null;
     if (msg.t === "hello") {
-      const result = core.connect(msg.token, msg.name, msg.device);
+      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice);
       if (!result.ok) {
         ws.send(JSON.stringify({ t: "error", message: result.message, now: Date.now() }));
         ws.close(1008, result.message);

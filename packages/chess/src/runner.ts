@@ -1,8 +1,9 @@
 import {
   alivePlayers,
   applyRound,
+  assignColours,
   assignGroups,
-  botPick,
+  botChoose,
   botThinkMs,
   createMatch,
   endStage,
@@ -19,8 +20,13 @@ import {
   type RetireReason,
   type Rng,
   type Settings,
+  type Side,
+  estimateRating,
+  standingPoints,
+  standings,
 } from "@chessroyale/core";
-import { boardRetireReason, boardStatus, newBoard, playOnBoard, type BoardState } from "./boards.ts";
+import type { NetBoard, NetStanding } from "./protocol.ts";
+import { boardRetireReason, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
 import { legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
@@ -41,11 +47,13 @@ export interface Entrant {
   name: string;
   isBot: boolean;
   skill?: number | null;
+  practice?: boolean;
 }
 
 export interface HumanPick {
   move: string | null;
   thinkMs: number;
+  usedPowerUp?: boolean;
 }
 
 export interface BoardRound {
@@ -125,29 +133,41 @@ export class MatchRunner {
     this.top = new TopMovesCache(opts.settings.botCandidateMoves);
     const plan = stagePlan(opts.settings);
     const boardCount = plan[0]!.boards;
-    const openings = pickOpenings(
+    const plies = opts.settings.openingPlies;
+    // With colours per stage, half the boards have White to move and half Black (the opening one ply longer).
+    const blackBoards = opts.settings.colourPerStage && boardCount >= 2 ? Math.floor(boardCount / 2) : 0;
+    const whiteOpenings = pickOpenings(opts.rng, opts.library, { classic: boardCount - blackBoards - 1, unusual: 1 }, plies, opts.settings.openingBalance);
+    const blackOpenings = pickOpenings(
       opts.rng,
       opts.library,
-      { classic: boardCount - 1, unusual: 1 },
-      opts.settings.openingPlies,
+      { classic: blackBoards, unusual: 0 },
+      plies + 1,
       opts.settings.openingBalance,
+      new Set(whiteOpenings.map((o) => o.family)),
     );
+    const openings = [...whiteOpenings.map((o) => [o, plies] as const), ...blackOpenings.map((o) => [o, plies + 1] as const)];
     if (openings.length < boardCount) throw new Error("Not enough openings in the library");
-    openings.forEach((o, i) => {
-      this.boards.set(i, newBoard(i, o, opts.settings.openingPlies));
+    openings.forEach(([o, n], i) => {
+      this.boards.set(i, newBoard(i, o, n));
       this.usedFamilies.add(o.family);
     });
-    this.state = createMatch(opts.entrants, openings.map((_, i) => i));
+    this.state = createMatch(opts.entrants, openings.map((_, i) => i), opts.settings);
+    this.state = assignColours(this.state, opts.rng, this.whiteSeats());
+  }
+
+  /** Side to move on each board in play. */
+  boardSides(): Map<number, Side> {
+    return new Map(this.state.boards.map((id) => [id, sideToMove(this.boards.get(id)!.fen)]));
+  }
+
+  /** How many players play White this stage (null when colours aren't fixed). */
+  private whiteSeats(): number | null {
+    if (!this.settings.colourPerStage || this.state.boards.length < 2) return null;
+    return [...this.boardSides().values()].filter((s) => s === "w").length * this.settings.groupSize;
   }
 
   get settings() {
     return this.opts.settings;
-  }
-
-  /** Side to move on every board this round. */
-  get sideToMove(): "w" | "b" {
-    const first = this.boards.get(this.state.boards[0]!)!;
-    return sideToMove(first.fen);
   }
 
   private replaceBoard(id: number): void {
@@ -178,13 +198,18 @@ export class MatchRunner {
         this.replaceBoard(id);
       }
     }
-    this.groups = assignGroups(this.opts.rng, this.state, this.settings);
+    this.groups = assignGroups(this.opts.rng, this.state, this.settings, undefined, this.boardSides());
     return this.groups;
   }
 
   /** Starts this round's top-move searches now, so scoring after the picks lock is quick. */
   prefetch(): void {
     this.top.prefetch(this.opts.engines, [...this.groups.keys()].map((id) => this.boards.get(id)!.fen));
+  }
+
+  /** The engine's top moves in a position (shared with scoring, so a prefetched search is reused). */
+  topMovesFor(fen: string): Promise<MoveScore[]> {
+    return this.top.get(this.opts.engines[0]!, fen);
   }
 
   boardOf(playerId: string): BoardState | null {
@@ -217,11 +242,16 @@ export class MatchRunner {
     );
 
     const thinkMs: Record<string, number> = {};
-    for (const [id, p] of humanPicks) thinkMs[id] = p.thinkMs;
-    return this.finishRound(results, thinkMs);
+    const powerUps = new Set<string>();
+    for (const [id, p] of humanPicks) {
+      thinkMs[id] = p.thinkMs;
+      if (p.usedPowerUp) powerUps.add(id);
+    }
+    return this.finishRound(results, thinkMs, powerUps);
   }
 
   private botThink = new Map<string, number>();
+  private botPowerUps = new Set<string>();
 
   /** Picks for every player on a board: humans as given, bots from the engine's top moves. */
   botPicksFor(boardId: number, playerIds: readonly string[], top: readonly MoveScore[]): Record<string, string> {
@@ -234,7 +264,9 @@ export class MatchRunner {
       const p = this.player(id);
       if (!p.isBot) continue;
       this.botThink.set(id, botThinkMs(this.opts.rng, this.settings));
-      out[id] = botPick(this.opts.rng, candidates, p.skill ?? 5, legal, this.settings);
+      const choice = botChoose(this.opts.rng, candidates, p, legal, this.settings);
+      if (choice.usedPowerUp) this.botPowerUps.add(id);
+      out[id] = choice.move;
     }
     return out;
   }
@@ -291,11 +323,17 @@ export class MatchRunner {
   }
 
   /** Applies scored boards: updates scores and plays the drawn moves. */
-  finishRound(results: readonly BoardRound[], thinkMs: Readonly<Record<string, number>>): RoundReport {
+  finishRound(
+    results: readonly BoardRound[],
+    thinkMs: Readonly<Record<string, number>>,
+    usedPowerUp: ReadonlySet<string> = new Set(),
+  ): RoundReport {
     const think: Record<string, number> = { ...thinkMs };
     for (const r of results) for (const p of r.playerIds) think[p] ??= this.botThink.get(p) ?? 0;
-    const outcomes = results.flatMap((r) => outcomesFromGroup(r.result, think));
-    this.state = applyRound(this.state, this.groups, outcomes);
+    const used = new Set([...usedPowerUp, ...this.botPowerUps]);
+    this.botPowerUps = new Set();
+    const outcomes = results.flatMap((r) => outcomesFromGroup(r.result, think, used));
+    this.state = applyRound(this.state, this.groups, outcomes, this.settings);
     for (const r of results) {
       const board = this.boards.get(r.boardId)!;
       const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
@@ -307,6 +345,11 @@ export class MatchRunner {
   /** Records a bot's thinking time (when bot picks come from outside, e.g. the lobby host). */
   setBotThink(id: string, ms: number) {
     this.botThink.set(id, ms);
+  }
+
+  /** Records that a bot used a power-up this round (when bot picks come from outside). */
+  setBotPowerUp(id: string) {
+    this.botPowerUps.add(id);
   }
 
   /** Everything needed to rebuild the runner later (the lobby server stores this between messages). */
@@ -335,6 +378,7 @@ export class MatchRunner {
       usedFamilies: new Set(snapshot.usedFamilies),
       retiredThisRound: snapshot.retired,
       botThink: new Map(),
+      botPowerUps: new Set(),
     });
     return runner;
   }
@@ -347,13 +391,44 @@ export class MatchRunner {
   endStage() {
     const plan = stagePlan(this.settings);
     const nextBoards = plan[this.state.stage + 1]?.boards ?? 1;
-    const keep = keepBoards(
-      this.state.boards.map((id) => boardStatus(this.boards.get(id)!)),
-      nextBoards,
-    );
+    const status = this.state.boards.map((id) => boardStatus(this.boards.get(id)!));
+    let keep: number[];
+    if (this.settings.colourPerStage && nextBoards >= 2) {
+      // Keep half of each side to move, so colours still split evenly.
+      const sides = this.boardSides();
+      const white = Math.ceil(nextBoards / 2);
+      keep = [
+        ...keepBoards(status.filter((b) => sides.get(b.id) === "w"), white),
+        ...keepBoards(status.filter((b) => sides.get(b.id) === "b"), nextBoards - white),
+      ];
+    } else keep = keepBoards(status, nextBoards);
     const end = endStage(this.state, this.opts.rng, keep, this.settings);
     this.state = end.state;
-    return end;
+    if (!this.isDuel()) this.state = assignColours(this.state, this.opts.rng, this.whiteSeats());
+    return { ...end, state: this.state };
+  }
+
+  /** The live leaderboard: alive players best first, then knocked-out players by placement. */
+  leaderboard(): NetStanding[] {
+    const row = (p: PlayerState): NetStanding => ({
+      id: p.id,
+      name: p.name,
+      points: Math.round(standingPoints(p, this.settings) * 10) / 10,
+      stageScore: Math.round(p.stageScore * 10) / 10,
+      avg: p.stageRounds ? Math.round((p.stageScore / p.stageRounds) * 10) / 10 : 0,
+      bankMs: p.bankMs,
+      avgThinkMs: p.movesTimed ? Math.round(p.thinkMsTotal / p.movesTimed) : 0,
+      rating: estimateRating(p.lossesByStage.flat()),
+      powerUps: p.powerUps,
+      powerUpsUsed: p.powerUpsUsed,
+      practice: p.practice,
+      isBot: p.isBot,
+      out: !p.alive,
+      placement: p.placement,
+    });
+    const alive = standings(this.state, () => 0.5, this.settings);
+    const out = this.state.players.filter((p) => !p.alive).sort((a, b) => (a.placement ?? 99) - (b.placement ?? 99));
+    return [...alive, ...out].map(row);
   }
 
   isDuel(): boolean {
@@ -363,4 +438,20 @@ export class MatchRunner {
   alive(): PlayerState[] {
     return alivePlayers(this.state);
   }
+}
+
+/** A board as sent to (and shown in) the app. */
+export function netBoard(b: BoardState, withOpening = false): NetBoard {
+  const recent = recentMoves(b);
+  return {
+    id: b.id,
+    fen: b.fen,
+    lastMove: b.lastMove,
+    openingName: b.opening.name,
+    generation: b.generation,
+    ply: b.history.length,
+    recent: recent.moves,
+    recentFrom: recent.from,
+    ...(withOpening ? { openingMoves: b.history.slice(0, b.openingPlies) } : {}),
+  };
 }

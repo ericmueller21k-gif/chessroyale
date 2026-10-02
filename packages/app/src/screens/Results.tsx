@@ -8,6 +8,12 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
   const best = [...played].sort((a, b) => b.roundScore - a.roundScore)[0];
   const worst = [...played].sort((a, b) => a.roundScore - b.roundScore)[0];
   const avgMs = match.scoringMs.length ? match.scoringMs.reduce((a, b) => a + b, 0) / match.scoringMs.length : 0;
+  const standings = match.standings();
+  const me = standings.find((s) => s.isYou);
+  const scariest = standings
+    .filter((s) => s.rating !== null)
+    .sort((a, b) => b.rating! - a.rating!)
+    .slice(0, 3);
   return (
     <div class="screen results">
       <div class="trophy" aria-hidden="true">
@@ -18,6 +24,35 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
         {ordinal(placement)} of {match.totalPlayers}
       </h1>
       <p class="muted">{placement === 1 ? "You won the match!" : `${winner} won the match.`}</p>
+      {me && (
+        <div class="stat-tiles">
+          <div class="stat-tile">
+            <span class="stat-value">{me.rating ?? "—"}</span>
+            <span class="stat-label">Engine rating (est.)</span>
+          </div>
+          <div class="stat-tile">
+            <span class="stat-value">{(me.avgThinkMs / 1000).toFixed(1)} s</span>
+            <span class="stat-label">Average time per move</span>
+          </div>
+          <div class="stat-tile">
+            <span class="stat-value">{me.powerUpsUsed}</span>
+            <span class="stat-label">Power-ups used</span>
+          </div>
+        </div>
+      )}
+      {scariest.length > 0 && (
+        <div class="scariest">
+          <h2 class="small muted">Most dangerous players this match</h2>
+          <ol>
+            {scariest.map((s) => (
+              <li key={s.id} class={s.isYou ? "you" : ""}>
+                <span>{s.name}</span>
+                <strong>{s.rating}</strong>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       <table class="stage-table">
         <thead>
           <tr>

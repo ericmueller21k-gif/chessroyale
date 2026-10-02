@@ -192,4 +192,32 @@ describe("lobby", () => {
     const res = L.last("p1", "results")!;
     expect(Object.values(res.placements).sort((a, b) => a - b)).toEqual(Array.from({ length: 32 }, (_, i) => i + 1));
   });
+
+  it("gives each player their own deadline from their bank, and counts power-ups", () => {
+    const L = setup({ roundsPerStage: 2 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone", true);
+    L.core.message("p1", { t: "start" });
+    L.advance(6000);
+    const r1 = L.last("p1", "round")!;
+    expect(r1.deadline - L.now).toBe(30_000);
+    L.core.message("p1", { t: "powerUp", key: r1.key });
+    L.core.message("p2", { t: "powerUp", key: r1.key });
+    L.advance(12_000);
+    L.core.message("p1", { t: "pick", key: r1.key, move: legalMoves(r1.board!.fen)[0]! });
+    L.core.message("p2", { t: "pick", key: r1.key, move: legalMoves(L.last("p2", "round")!.board!.fen)[0]! });
+    L.hostScores("p1");
+    const st = L.last("p1", "reveal")!.standings;
+    const ann = st.find((s) => s.id === "p1")!;
+    const bo = st.find((s) => s.id === "p2")!;
+    expect(ann.powerUps).toBe(0);
+    expect(bo.powerUps).toBe(1); // practice: unlimited
+    expect(bo.practice).toBe(true);
+    expect(ann.bankMs).toBe(600_000 + 5000 - 12_000);
+    // A second power-up in the same match, with none left, isn't counted.
+    L.advance(10_000);
+    const r2 = L.last("p1", "round")!;
+    L.core.message("p1", { t: "powerUp", key: r2.key });
+    expect(L.core.record.round!.powerUps.p1).toBeUndefined();
+  });
 });

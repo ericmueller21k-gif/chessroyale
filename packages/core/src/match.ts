@@ -36,6 +36,20 @@ export interface PlayerState {
   stageScore: number;
   /** Thinking time in the current stage, for tie-breaks. */
   stageThinkMs: number;
+  /** Rounds played in the current stage (for the average). */
+  stageRounds: number;
+  /** Time left in the bank (ms). */
+  bankMs: number;
+  /** Unused power-ups. */
+  powerUps: number;
+  powerUpsUsed: number;
+  /** Thinking time over the whole match and the moves it covers (for the average-time stat). */
+  thinkMsTotal: number;
+  movesTimed: number;
+  /** Practice mode: unlimited power-ups (shown on the leaderboard). */
+  practice: boolean;
+  /** Colour played this stage (null when colours aren't fixed, e.g. the final four on one board). */
+  colour: Side | null;
   /** Losses per stage, for the results screen. */
   lossesByStage: number[][];
   lastBoard: number | null;
@@ -46,6 +60,8 @@ export interface PlayerState {
   placement: number | null;
 }
 
+export type Side = "w" | "b";
+
 export interface MatchState {
   stage: number;
   round: number;
@@ -55,8 +71,9 @@ export interface MatchState {
 }
 
 export function createMatch(
-  entrants: readonly { id: string; name: string; isBot: boolean; skill?: number | null }[],
+  entrants: readonly { id: string; name: string; isBot: boolean; skill?: number | null; practice?: boolean }[],
   boards: readonly number[],
+  settings: Settings = DEFAULT_SETTINGS,
 ): MatchState {
   return {
     stage: 0,
@@ -70,6 +87,14 @@ export function createMatch(
       alive: true,
       stageScore: 0,
       stageThinkMs: 0,
+      stageRounds: 0,
+      bankMs: settings.timeBankSeconds * 1000,
+      powerUps: settings.powerUpsAtStart,
+      powerUpsUsed: 0,
+      thinkMsTotal: 0,
+      movesTimed: 0,
+      practice: e.practice ?? false,
+      colour: null,
       lossesByStage: [[]],
       lastBoard: null,
       lastGroupmates: [],
@@ -84,23 +109,51 @@ export const alivePlayers = (state: MatchState) => state.players.filter((p) => p
 /**
  * Splits the alive players into groups, one per board. While there are 4 or
  * more boards nobody gets the same board twice in a row; repeat groupmates are
- * avoided where possible. Local search: start from a random split, then swap
- * players between groups whenever that doesn't make things worse.
+ * avoided where possible. When players have a colour for the stage and
+ * `boardSide` says which side is to move on each board, players only go to
+ * boards where their colour is to move.
  */
 export function assignGroups(
   rng: Rng,
   state: MatchState,
   settings: Settings = DEFAULT_SETTINGS,
   iterations = 4000,
+  boardSide?: ReadonlyMap<number, Side>,
 ): Map<number, string[]> {
   const players = alivePlayers(state);
-  const boards = shuffle(rng, state.boards);
   const strictBoards = state.boards.length >= 4;
+  const groups = new Map<number, string[]>();
+  const parts: [PlayerState[], number[]][] = [];
+  const sides: Side[] = ["w", "b"];
+  const byColour = (side: Side) => players.filter((p) => p.colour === side);
+  const boardsOf = (side: Side) => state.boards.filter((b) => boardSide?.get(b) === side);
+  const colourFits =
+    boardSide !== undefined &&
+    players.every((p) => p.colour !== null) &&
+    sides.every((side) => byColour(side).length === boardsOf(side).length * settings.groupSize);
+  if (colourFits) for (const side of sides) parts.push([byColour(side), boardsOf(side)]);
+  else parts.push([players, [...state.boards]]);
+  for (const [ps, bs] of parts) {
+    for (const [b, ids] of groupSubset(rng, ps, bs, strictBoards, settings, iterations)) groups.set(b, ids);
+  }
+  return groups;
+}
+
+/** Local search: start from a random split, then swap players between groups whenever that doesn't make things worse. */
+function groupSubset(
+  rng: Rng,
+  players: readonly PlayerState[],
+  boardIds: readonly number[],
+  strictBoards: boolean,
+  settings: Settings,
+  iterations: number,
+): Map<number, string[]> {
+  const boards = shuffle(rng, boardIds);
   const n = players.length;
   // slot[i] = index of the board (in `boards`) player i sits at.
   const order = shuffle(rng, players.map((_, i) => i));
   const slot = new Array<number>(n);
-  order.forEach((pi, k) => (slot[pi] = Math.floor(k / settings.groupSize)));
+  order.forEach((pi, k) => (slot[pi] = Math.min(boards.length - 1, Math.floor(k / settings.groupSize))));
   const mates = players.map((p) => new Set(p.lastGroupmates));
 
   const playerCost = (i: number, b: number): number => {
@@ -136,18 +189,46 @@ export function assignGroups(
   return groups;
 }
 
+/**
+ * Colours for a new stage: `whites` players play White and the rest Black.
+ * Players swap colour from the last stage where the numbers allow; the rest
+ * are chosen at random. Pass whites = null to clear colours (one board left).
+ */
+export function assignColours(state: MatchState, rng: Rng, whites: number | null): MatchState {
+  const alive = alivePlayers(state);
+  if (whites === null) return { ...state, players: state.players.map((p) => (p.alive ? { ...p, colour: null } : p)) };
+  // Preference order for White: last stage's Black players first, then no colour, then last stage's White.
+  const rank = (p: PlayerState) => (p.colour === "b" ? 0 : p.colour === null ? 1 : 2);
+  const order = shuffle(rng, alive).sort((a, b) => rank(a) - rank(b));
+  const white = new Set(order.slice(0, whites).map((p) => p.id));
+  return {
+    ...state,
+    players: state.players.map((p) => (p.alive ? { ...p, colour: white.has(p.id) ? "w" : "b" } : p)),
+  };
+}
+
 export interface RoundPlayerOutcome {
   playerId: string;
   roundScore: number;
   loss: number | null;
   thinkMs: number;
+  usedPowerUp?: boolean;
 }
+
+/** How long this player may think about the next move: the bank plus the increment, capped by the move clock. */
+export function allowedMs(p: Pick<PlayerState, "bankMs">, settings: Settings = DEFAULT_SETTINGS): number {
+  return Math.min(settings.moveClockSeconds * 1000, p.bankMs + settings.timeIncrementSeconds * 1000);
+}
+
+/** What the standings rank by: the stage score (move quality only; time and power-ups don't count). */
+export const standingPoints = (p: Pick<PlayerState, "stageScore">, _settings: Settings = DEFAULT_SETTINGS) => p.stageScore;
 
 /** Adds a round's results to the players and remembers boards and groupmates for the next rotation. */
 export function applyRound(
   state: MatchState,
   groups: Map<number, string[]>,
   outcomes: readonly RoundPlayerOutcome[],
+  settings: Settings = DEFAULT_SETTINGS,
 ): MatchState {
   const byPlayer = new Map(outcomes.map((o) => [o.playerId, o]));
   const boardOf = new Map<string, number>();
@@ -158,10 +239,18 @@ export function applyRound(
     const board = boardOf.get(p.id) ?? null;
     const lossesByStage = p.lossesByStage.map((l) => [...l]);
     if (o.loss !== null) lossesByStage[state.stage]!.push(o.loss);
+    const think = Math.max(0, Math.min(o.thinkMs, allowedMs(p, settings)));
+    const usedPowerUp = !!o.usedPowerUp && (p.practice || p.powerUps > 0);
     return {
       ...p,
       stageScore: p.stageScore + o.roundScore,
-      stageThinkMs: p.stageThinkMs + o.thinkMs,
+      stageThinkMs: p.stageThinkMs + think,
+      stageRounds: p.stageRounds + 1,
+      bankMs: Math.max(0, p.bankMs + settings.timeIncrementSeconds * 1000 - think),
+      powerUps: usedPowerUp && !p.practice ? p.powerUps - 1 : p.powerUps,
+      powerUpsUsed: p.powerUpsUsed + (usedPowerUp ? 1 : 0),
+      thinkMsTotal: p.thinkMsTotal + think,
+      movesTimed: p.movesTimed + 1,
       lossesByStage,
       lastBoard: board,
       lastGroupmates: board === null ? [] : groups.get(board)!.filter((id) => id !== p.id),
@@ -171,20 +260,31 @@ export function applyRound(
 }
 
 /** Converts a scored group into per-player outcomes, given each player's thinking time. */
-export function outcomesFromGroup(result: GroupResult, thinkMs: Readonly<Record<string, number>>): RoundPlayerOutcome[] {
+export function outcomesFromGroup(
+  result: GroupResult,
+  thinkMs: Readonly<Record<string, number>>,
+  usedPowerUp: ReadonlySet<string> = new Set(),
+): RoundPlayerOutcome[] {
   return result.players.map((p) => ({
     playerId: p.playerId,
     roundScore: p.roundScore,
     loss: p.loss,
     thinkMs: thinkMs[p.playerId] ?? 0,
+    usedPowerUp: usedPowerUp.has(p.playerId),
   }));
 }
 
-/** Alive players ordered best first: stage score, then less thinking time, then a coin flip. */
-export function standings(state: MatchState, rng: Rng): PlayerState[] {
+/**
+ * Alive players ordered best first: stage score, then (only for an exact tie)
+ * less thinking time, then a coin flip.
+ */
+export function standings(state: MatchState, rng: Rng, settings: Settings = DEFAULT_SETTINGS): PlayerState[] {
   const tiebreak = new Map(alivePlayers(state).map((p) => [p.id, rng()]));
   return alivePlayers(state).sort(
-    (a, b) => b.stageScore - a.stageScore || a.stageThinkMs - b.stageThinkMs || tiebreak.get(a.id)! - tiebreak.get(b.id)!,
+    (a, b) =>
+      standingPoints(b, settings) - standingPoints(a, settings) ||
+      a.stageThinkMs - b.stageThinkMs ||
+      tiebreak.get(a.id)! - tiebreak.get(b.id)!,
   );
 }
 
@@ -203,7 +303,7 @@ export function endStage(
   keepBoards: readonly number[],
   settings: Settings = DEFAULT_SETTINGS,
 ): StageEnd {
-  const ranked = standings(state, rng);
+  const ranked = standings(state, rng, settings);
   const k = settings.knockoutsPerStage[state.stage] ?? 0;
   const out = new Set(ranked.slice(ranked.length - k).map((p) => p.id));
   // Placements for this stage's knockouts: the last-ranked player gets the worst place.
@@ -215,6 +315,8 @@ export function endStage(
       ...p,
       stageScore: settings.scoresBetweenStages === "reset" ? 0 : p.stageScore,
       stageThinkMs: 0,
+      stageRounds: 0,
+      powerUps: p.powerUps + settings.powerUpsPerStage,
       lossesByStage: [...p.lossesByStage, []],
     };
   });
@@ -289,6 +391,24 @@ export function botPick(
   if (!candidates.length) return legalMoves[randomInt(rng, 0, legalMoves.length - 1)]!;
   const weights = candidates.map((c) => Math.exp(-c.loss / Math.max(skill, 1e-6)));
   return candidates[weightedIndex(rng, weights)]!.move;
+}
+
+/**
+ * A bot's move, using a power-up when it has one and the position is sharp
+ * (the second-best candidate loses at least `botPowerUpLoss`): then it plays the best move.
+ */
+export function botChoose(
+  rng: Rng,
+  candidates: readonly Candidate[],
+  bot: { skill: number | null; powerUps: number },
+  legalMoves: readonly string[],
+  settings: Settings = DEFAULT_SETTINGS,
+): { move: string; usedPowerUp: boolean } {
+  const sorted = [...candidates].sort((a, b) => a.loss - b.loss);
+  if (bot.powerUps > 0 && sorted.length > 1 && sorted[1]!.loss >= settings.botPowerUpLoss) {
+    return { move: sorted[0]!.move, usedPowerUp: true };
+  }
+  return { move: botPick(rng, candidates, bot.skill ?? 5, legalMoves, settings), usedPowerUp: false };
 }
 
 export function botThinkMs(rng: Rng, settings: Settings = DEFAULT_SETTINGS): number {

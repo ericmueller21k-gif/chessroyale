@@ -1,7 +1,6 @@
 import type { BoardView, GameView, Standing } from "../game.ts";
 import { MiniBoard } from "../components/MiniBoard.tsx";
-
-const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
+import { RaceTower } from "../components/RaceTower.tsx";
 
 export function StageBreakScreen(props: {
   match: GameView;
@@ -22,20 +21,13 @@ export function StageBreakScreen(props: {
           ? `You're out, in ${match.placement}${ordinal(match.placement ?? 0)} place. The rest of the match will be played out quickly.`
           : finalStage
             ? "You made the duel! One real game for the win."
-            : `You're through to stage ${stage + 2}.`}
+            : `You're through to stage ${stage + 2}. ${
+                stage + 1 === match.settings.knockoutsPerStage.length - 1
+                  ? "The final four share one board, so colours alternate."
+                  : "Colours swap for the next stage."
+              } You get ${match.settings.powerUpsPerStage} more power-up.`}
       </p>
-      <ol class="standings">
-        {standings.map((s, i) => (
-          <>
-            {i === cutoff && <li class="ko-line" aria-hidden="true">knockout line</li>}
-            <li key={s.id} class={`${s.isYou ? "you" : ""} ${i >= cutoff ? "out" : ""}`}>
-              <span class="st-rank">{i + 1}</span>
-              <span class="st-name">{s.name}</span>
-              <span class="st-score">{fmt(s.score)}</span>
-            </li>
-          </>
-        ))}
-      </ol>
+      <RaceTower standings={standings} cutoff={cutoff} />
       {!youOut && boards.length > 1 && (
         <>
           <h2 class="muted small">Boards in the next stage</h2>
@@ -65,3 +57,4 @@ export function ordinal(n: number) {
   const v = n % 100;
   return s[(v - 20) % 10] || s[v] || s[0];
 }
+

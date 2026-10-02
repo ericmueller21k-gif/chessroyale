@@ -1,28 +1,62 @@
+import { useState } from "preact/hooks";
+import { RaceTower, gapToCut } from "../components/RaceTower.tsx";
 import type { GameView } from "../game.ts";
 
-/** Stage, round and your rank, with a warning inside the knockout zone. */
+/**
+ * The strip above the board: stage and round, your position, how far you are
+ * from the knockout line, and your power-ups. Tap it for the full leaderboard.
+ */
 export function Hud({ match }: { match: GameView }) {
+  const [open, setOpen] = useState(false);
   // During the reveal the round counter has already moved on; show the round just played.
   const shownRound = match.phase.kind === "reveal" ? match.roundsPlayed : match.roundsPlayed + 1;
   const standings = match.standings();
-  const rank = standings.findIndex((x) => x.isYou) + 1;
+  const alive = standings.filter((s) => !s.out);
+  const rank = alive.findIndex((x) => x.isYou) + 1;
   const inZone = rank > match.cutoff;
-  const me = standings[rank - 1];
+  const gap = gapToCut(standings, match.cutoff);
+  const left = match.powerUpsLeft();
   return (
-    <header class="hud">
-      <div class="hud-stage">
-        Stage {match.stage + 1}/{match.settings.knockoutsPerStage.length}
-        <span class="muted">
-          {" "}
-          · Round {Math.min(shownRound, match.settings.roundsPerStage)}/{match.settings.roundsPerStage}
+    <>
+      <button type="button" class="hud" onClick={() => setOpen(true)} aria-label="Show the leaderboard">
+        <span class="hud-stage">
+          S{match.stage + 1}
+          <span class="muted">
+            {" "}
+            · R{Math.min(shownRound, match.settings.roundsPerStage)}/{match.settings.roundsPerStage}
+          </span>
         </span>
-      </div>
-      <div class={`hud-rank ${inZone ? "danger" : ""}`} title={inZone ? "Knockout zone" : undefined}>
-        #{rank}
-        <span class="muted"> of {standings.length}</span>
-        {inZone && <span class="zone-badge">KO zone</span>}
-        <span class="hud-score">{me ? (me.score >= 0 ? "+" : "") + me.score.toFixed(1) : ""}</span>
-      </div>
-    </header>
+        {rank > 0 && (
+          <span class={`hud-rank ${inZone ? "danger" : ""}`}>
+            P{rank}
+            <span class="muted">/{alive.length}</span>
+          </span>
+        )}
+        {gap !== null && rank > 0 && (
+          <span class={`hud-gap ${gap < 0 ? "danger" : "safe"}`}>
+            {gap >= 0 ? `+${gap.toFixed(1)} safe` : `${gap.toFixed(1)} KO`}
+          </span>
+        )}
+        <span class="hud-pu" title="Power-ups">
+          ⚡{left === Infinity ? "∞" : left}
+        </span>
+        <span class="hud-more" aria-hidden="true">
+          ☰
+        </span>
+      </button>
+      {open && (
+        <div class="tower-overlay" role="dialog" aria-label="Leaderboard" onClick={() => setOpen(false)}>
+          <div class="tower-sheet" onClick={(e) => e.stopPropagation()}>
+            <div class="tower-sheet-head">
+              <strong>Leaderboard</strong>
+              <button type="button" class="tower-close" onClick={() => setOpen(false)} aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <RaceTower standings={standings} cutoff={match.cutoff} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

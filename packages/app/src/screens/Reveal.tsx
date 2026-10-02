@@ -1,7 +1,9 @@
 import { useEffect, useState } from "preact/hooks";
 import { applyMove, sideToMove, toSan } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
+import { RaceTower } from "../components/RaceTower.tsx";
 import type { BoardView, GameView, GroupReveal } from "../game.ts";
+import { seenKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 
 const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
@@ -9,6 +11,10 @@ const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
 /** The group's picks as arrows with each pick's loss, your score, then the drawn move plays. */
 export function RevealScreen({ match, mine, board }: { match: GameView; mine: GroupReveal; board: BoardView }) {
   const [played, setPlayed] = useState(false);
+  // You watch the drawn move play here, so it won't be replayed next time you get this board.
+  useEffect(() => {
+    match.seen.set(seenKey(board), board.ply + 1);
+  }, [board]);
   useEffect(() => {
     const t = setTimeout(() => setPlayed(true), 1800);
     return () => clearTimeout(t);
@@ -55,6 +61,9 @@ export function RevealScreen({ match, mine, board }: { match: GameView; mine: Gr
               </li>
             ))}
         </ul>
+        <div class="reveal-tower">
+          <RaceTower standings={match.standings()} cutoff={match.cutoff} compact />
+        </div>
         <div class="muted small">
           Best was {toSan(fen, mine.bestMove)}.{" "}
           {played ? `Played: ${toSan(fen, mine.result.playedMove)}${playedBy.length ? ` (${playedBy.join(" & ")})` : " (engine)"}.${match.serverPaced ? "" : " Tap to continue."}` : "Drawing a pick to play…"}

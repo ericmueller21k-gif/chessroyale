@@ -38,6 +38,7 @@ test("two players in a lobby with 30 bots play a whole match; a reload rejoins t
   await expect(guest.getByRole("heading", { name: "Today's openings" })).toBeVisible();
 
   let reloaded = false;
+  let usedPowerUp = false;
   const done = new Set<string>();
   const stopAt = Date.now() + 9 * 60_000;
   for (let i = 0; Date.now() < stopAt && done.size < 2; i++) {
@@ -48,7 +49,13 @@ test("two players in a lobby with 30 bots play a whole match; a reload rejoins t
       if (done.has(name)) continue;
       const k = await phase(p);
       if (k === "results") done.add(name);
-      else if (k === "play") await playBest(p);
+      else if (k === "play" && name === "guest" && !usedPowerUp) {
+        // Use a power-up once: the engine's top 3 show up, and the guest plays the first.
+        usedPowerUp = true;
+        await p.evaluate(() => (window as any).match.usePowerUp());
+        await expect(p.locator(".hints li")).toHaveCount(3, { timeout: 15_000 });
+        await p.evaluate(() => (window as any).match.submit((window as any).match.hint[0].move));
+      } else if (k === "play") await playBest(p);
       else if (k === "reveal" && name === "guest" && !reloaded) {
         reloaded = true;
         await guest.reload();
