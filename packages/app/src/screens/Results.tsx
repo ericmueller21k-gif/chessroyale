@@ -1,0 +1,72 @@
+import { applyMove } from "@chessroyale/chess";
+import { MiniBoard } from "../components/MiniBoard.tsx";
+import type { GameView } from "../game.ts";
+import { ordinal } from "./StageBreak.tsx";
+
+export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
+  const played = match.moves.filter((m) => m.move !== null);
+  const best = [...played].sort((a, b) => b.roundScore - a.roundScore)[0];
+  const worst = [...played].sort((a, b) => a.roundScore - b.roundScore)[0];
+  const avgMs = match.scoringMs.length ? match.scoringMs.reduce((a, b) => a + b, 0) / match.scoringMs.length : 0;
+  return (
+    <div class="screen results">
+      <div class="trophy" aria-hidden="true">
+        {placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
+      </div>
+      <h1>
+        {placement}
+        {ordinal(placement)} of {match.totalPlayers}
+      </h1>
+      <p class="muted">{placement === 1 ? "You won the match!" : `${winner} won the match.`}</p>
+      <table class="stage-table">
+        <thead>
+          <tr>
+            <th>Stage</th>
+            <th>Average loss per move</th>
+          </tr>
+        </thead>
+        <tbody>
+          {match.lossesByStage.map((l, i) =>
+            l.length ? (
+              <tr key={i}>
+                <td>{i < match.settings.knockoutsPerStage.length ? `Stage ${i + 1}` : "Duel"}</td>
+                <td>{(l.reduce((a, b) => a + b, 0) / l.length).toFixed(1)} pts</td>
+              </tr>
+            ) : null,
+          )}
+        </tbody>
+      </table>
+      <p class="muted small">Lower is better: 0 means you matched the engine's best move.</p>
+      <div class="best-worst">
+        {best && (
+          <div>
+            <h2>Best move</h2>
+            <MiniBoard fen={applyMove(best.fen, best.move!)} lastMove={best.move} orientation={best.fen.split(" ")[1] === "w" ? "white" : "black"} />
+            <p>
+              {best.san}: {best.roundScore >= 0 ? "+" : ""}
+              {best.roundScore.toFixed(1)}
+            </p>
+          </div>
+        )}
+        {worst && worst !== best && (
+          <div>
+            <h2>Worst move</h2>
+            <MiniBoard fen={applyMove(worst.fen, worst.move!)} lastMove={worst.move} orientation={worst.fen.split(" ")[1] === "w" ? "white" : "black"} />
+            <p>
+              {worst.san}: {worst.roundScore.toFixed(1)}
+            </p>
+          </div>
+        )}
+      </div>
+      <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" onClick={onHome}>
+          Home
+        </button>
+        <button type="button" class="btn btn-primary" onClick={onAgain}>
+          Play again
+        </button>
+      </div>
+    </div>
+  );
+}

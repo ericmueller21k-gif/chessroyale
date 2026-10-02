@@ -88,4 +88,26 @@ describe("MatchRunner", () => {
     expect(missed.roundScore).toBe(-25);
     void START_FEN;
   });
+
+  it("can be saved and restored mid-match (as the lobby server does between messages)", async () => {
+    const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 2 };
+    const runner = new MatchRunner({
+      settings,
+      rng: mulberry32(3),
+      engines: [fake],
+      library,
+      entrants: Array.from({ length: 32 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 3 })),
+    });
+    runner.deal();
+    await runner.score(new Map());
+    const saved = JSON.parse(JSON.stringify(runner.snapshot()));
+    const restored = MatchRunner.restore(saved, { settings, rng: mulberry32(4), engines: [fake], library });
+    expect(restored.state).toEqual(runner.state);
+    expect(restored.boards.get(0)!.fen).toBe(runner.boards.get(0)!.fen);
+    restored.deal();
+    const report = await restored.score(new Map());
+    expect(report.boards).toHaveLength(8);
+    expect(restored.stageComplete()).toBe(true);
+  });
 });
+

@@ -66,6 +66,14 @@ export interface RoundReport {
   retired: { boardId: number; reason: RetireReason }[];
 }
 
+export interface RunnerSnapshot {
+  state: MatchState;
+  boards: (Omit<BoardState, "opening"> & { opening: string })[];
+  groups: [number, string[]][];
+  usedFamilies: string[];
+  retired: { boardId: number; reason: RetireReason }[];
+}
+
 export class MatchRunner {
   state: MatchState;
   boards = new Map<number, BoardState>();
@@ -172,25 +180,27 @@ export class MatchRunner {
     );
 
     const thinkMs: Record<string, number> = {};
-    const outcomes = results.flatMap((r) => {
-      for (const p of r.playerIds) thinkMs[p] = humanPicks.get(p)?.thinkMs ?? this.botThink.get(p) ?? 0;
-      return outcomesFromGroup(r.result, thinkMs);
-    });
-    this.state = applyRound(this.state, this.groups, outcomes);
-    for (const r of results) {
-      const board = this.boards.get(r.boardId)!;
-      const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
-      this.boards.set(r.boardId, playOnBoard(board, r.result.playedMove, moverExpected));
-    }
-    return {
-      stage: this.state.stage,
-      round: this.state.round - 1,
-      boards: results,
-      retired: this.retiredThisRound,
-    };
+    for (const [id, p] of humanPicks) thinkMs[id] = p.thinkMs;
+    return this.finishRound(results, thinkMs);
   }
 
   private botThink = new Map<string, number>();
+
+  /** Picks for every player on a board: humans as given, bots from the engine's top moves. */
+  botPicksFor(boardId: number, playerIds: readonly string[], top: readonly MoveScore[]): Record<string, string> {
+    const board = this.boards.get(boardId)!;
+    const legal = legalMoves(board.fen);
+    const best = top[0]!.expected;
+    const candidates = top.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
+    const out: Record<string, string> = {};
+    for (const id of playerIds) {
+      const p = this.player(id);
+      if (!p.isBot) continue;
+      this.botThink.set(id, botThinkMs(this.opts.rng, this.settings));
+      out[id] = botPick(this.opts.rng, candidates, p.skill ?? 5, legal, this.settings);
+    }
+    return out;
+  }
 
   private async scoreBoard(
     engine: EngineLike,
@@ -199,34 +209,96 @@ export class MatchRunner {
     humanPicks: ReadonlyMap<string, HumanPick>,
     rng: Rng,
   ): Promise<BoardRound> {
+    void rng;
     const board = this.boards.get(boardId)!;
     const top = await engine.topMoves(board.fen, this.settings.botCandidateMoves);
-    const legal = legalMoves(board.fen);
-    const bestExpected = top[0]!.expected;
-    const candidates = top.map((m) => ({ move: m.move, loss: Math.max(0, (bestExpected - m.expected) * 100) }));
-
-    const picks = playerIds.map((id) => {
-      const p = this.player(id);
-      if (!p.isBot) return { playerId: id, move: humanPicks.get(id)?.move ?? null };
-      this.botThink.set(id, botThinkMs(rng, this.settings));
-      return { playerId: id, move: botPick(rng, candidates, p.skill ?? 5, legal, this.settings) };
-    });
-
+    const botPicks = this.botPicksFor(boardId, playerIds, top);
+    const picks: Record<string, string | null> = {};
+    for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
     const known = new Map(top.map((m) => [m.move, m.expected]));
-    const missing = picks.flatMap((p) => (p.move && !known.has(p.move) ? [p.move] : []));
+    const missing = Object.values(picks).flatMap((m) => (m && !known.has(m) ? [m] : []));
     if (missing.length) for (const m of await engine.scoreMoves(board.fen, missing)) known.set(m.move, m.expected);
-
-    const evaluation: GroupEvaluation = {
-      bestExpected,
+    return this.resolveBoard(boardId, playerIds, picks, {
       bestMove: top[0]!.move,
+      bestExpected: top[0]!.expected,
       expectedAfter: Object.fromEntries(known),
-    };
-    const result = scoreGroup(picks, evaluation, rng, this.settings);
-    const best = Math.max(bestExpected, ...picks.flatMap((p) => (p.move ? [known.get(p.move)!] : [])));
-    const scored = [...known.entries()]
+    });
+  }
+
+  /**
+   * Scores one board from evaluations and picks (bots included), and draws the
+   * move to play. The lobby server calls this with evaluations from the host.
+   */
+  resolveBoard(
+    boardId: number,
+    playerIds: readonly string[],
+    picks: Readonly<Record<string, string | null>>,
+    evaluation: GroupEvaluation,
+  ): BoardRound {
+    const board = this.boards.get(boardId)!;
+    const result = scoreGroup(
+      playerIds.map((id) => ({ playerId: id, move: picks[id] ?? null })),
+      evaluation,
+      this.opts.rng,
+      this.settings,
+    );
+    const pickedExpected = playerIds.flatMap((id) => {
+      const m = picks[id];
+      return m && evaluation.expectedAfter[m] !== undefined ? [evaluation.expectedAfter[m]!] : [];
+    });
+    const best = Math.max(evaluation.bestExpected, ...pickedExpected);
+    const scored = Object.entries(evaluation.expectedAfter)
       .map(([move, expected]) => ({ move, expected, loss: Math.max(0, (best - expected) * 100) }))
       .sort((a, b) => b.expected - a.expected);
-    return { boardId, fenBefore: board.fen, playerIds, result, scored, bestMove: top[0]!.move };
+    return { boardId, fenBefore: board.fen, playerIds: [...playerIds], result, scored, bestMove: evaluation.bestMove };
+  }
+
+  /** Applies scored boards: updates scores and plays the drawn moves. */
+  finishRound(results: readonly BoardRound[], thinkMs: Readonly<Record<string, number>>): RoundReport {
+    const think: Record<string, number> = { ...thinkMs };
+    for (const r of results) for (const p of r.playerIds) think[p] ??= this.botThink.get(p) ?? 0;
+    const outcomes = results.flatMap((r) => outcomesFromGroup(r.result, think));
+    this.state = applyRound(this.state, this.groups, outcomes);
+    for (const r of results) {
+      const board = this.boards.get(r.boardId)!;
+      const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
+      this.boards.set(r.boardId, playOnBoard(board, r.result.playedMove, moverExpected));
+    }
+    return { stage: this.state.stage, round: this.state.round - 1, boards: [...results], retired: this.retiredThisRound };
+  }
+
+  /** Records a bot's thinking time (when bot picks come from outside, e.g. the lobby host). */
+  setBotThink(id: string, ms: number) {
+    this.botThink.set(id, ms);
+  }
+
+  /** Everything needed to rebuild the runner later (the lobby server stores this between messages). */
+  snapshot(): RunnerSnapshot {
+    return {
+      state: this.state,
+      boards: [...this.boards.values()].map((b) => ({ ...b, opening: b.opening.id })),
+      groups: [...this.groups.entries()],
+      usedFamilies: [...this.usedFamilies],
+      retired: this.retiredThisRound,
+    };
+  }
+
+  static restore(
+    snapshot: RunnerSnapshot,
+    opts: { settings: Settings; rng: Rng; engines: readonly EngineLike[]; library: readonly Opening[] },
+  ): MatchRunner {
+    const byId = new Map(opts.library.map((o) => [o.id, o]));
+    const runner = Object.create(MatchRunner.prototype) as MatchRunner;
+    Object.assign(runner, {
+      opts: { ...opts, entrants: [] },
+      state: snapshot.state,
+      boards: new Map(snapshot.boards.map((b) => [b.id, { ...b, opening: byId.get(b.opening)! }])),
+      groups: new Map(snapshot.groups),
+      usedFamilies: new Set(snapshot.usedFamilies),
+      retiredThisRound: snapshot.retired,
+      botThink: new Map(),
+    });
+    return runner;
   }
 
   stageComplete(): boolean {

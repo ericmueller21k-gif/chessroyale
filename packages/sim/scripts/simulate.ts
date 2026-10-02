@@ -64,6 +64,20 @@ const allLosses: number[] = [];
 async function runRealMatches(workerIndex: number, count: number) {
   const engine = await createNodeEngine({ nodes: settings.engineNodes, hashMb: settings.engineHashMb });
   for (let m = 0; m < count; m++) {
+    try {
+      await runOneMatch(engine, workerIndex, m);
+    } catch (e) {
+      log(`match failed (worker ${workerIndex}, #${m}): ${(e as Error).message}`);
+      failures++;
+    }
+  }
+  engine.close();
+}
+
+let failures = 0;
+
+async function runOneMatch(engine: Awaited<ReturnType<typeof createNodeEngine>>, workerIndex: number, m: number) {
+  {
     const start = Date.now();
     const rng = mulberry32(SEED * 100_000 + workerIndex * 1000 + m);
     const seats = shuffle(rng, bots);
@@ -119,13 +133,12 @@ async function runRealMatches(workerIndex: number, count: number) {
     });
     log(`match ${realMatches.length}/${MATCHES} (${((Date.now() - start) / 1000).toFixed(1)}s)`);
   }
-  engine.close();
 }
 
 const perWorker = Array.from({ length: WORKERS }, (_, w) => Math.floor(MATCHES / WORKERS) + (w < MATCHES % WORKERS ? 1 : 0));
 await Promise.all(perWorker.map((n, w) => runRealMatches(w, n)));
 const pool: Pool = { samples, outsideLosses };
-log(`phase A done: ${realMatches.length} matches, ${samples.length} positions`);
+log(`phase A done: ${realMatches.length} matches (${failures} failed), ${samples.length} positions`);
 
 // ---------------- Analysis helpers ----------------
 

@@ -1,0 +1,389 @@
+{
+ "skills": [
+  0.25,
+  0.292,
+  0.342,
+  0.4,
+  0.468,
+  0.547,
+  0.639,
+  0.748,
+  0.874,
+  1.023,
+  1.196,
+  1.398,
+  1.635,
+  1.913,
+  2.237,
+  2.616,
+  3.059,
+  3.577,
+  4.183,
+  4.892,
+  5.72,
+  6.69,
+  7.823,
+  9.149,
+  10.699,
+  12.511,
+  14.631,
+  17.11,
+  20.009,
+  23.399,
+  27.364,
+  32
+ ],
+ "real": {
+  "matches": 4,
+  "spearman": 0.6217925219941348,
+  "top4OutStage1": 0.5,
+  "strongestInDuel": 0.5,
+  "strongestWins": 0.5,
+  "meanPlacementOfStrongest": 7,
+  "deadRate": 0.46279761904761907
+ },
+ "variants": [
+  {
+   "rounds": 6,
+   "carry": "reset",
+   "summary": {
+    "matches": 50,
+    "spearman": 0.681041055718475,
+    "top4OutStage1": 0.24,
+    "strongestInDuel": 0.38,
+    "strongestWins": 0.12,
+    "meanPlacementOfStrongest": 6.38,
+    "deadRate": 0.44952380952380955
+   }
+  },
+  {
+   "rounds": 6,
+   "carry": "carry",
+   "summary": {
+    "matches": 50,
+    "spearman": 0.6266788856304987,
+    "top4OutStage1": 0.34,
+    "strongestInDuel": 0.18,
+    "strongestWins": 0.1,
+    "meanPlacementOfStrongest": 11.48,
+    "deadRate": 0.45111111111111113
+   }
+  },
+  {
+   "rounds": 8,
+   "carry": "reset",
+   "summary": {
+    "matches": 50,
+    "spearman": 0.6679252199413489,
+    "top4OutStage1": 0.38,
+    "strongestInDuel": 0.32,
+    "strongestWins": 0.18,
+    "meanPlacementOfStrongest": 10.86,
+    "deadRate": 0.4467857142857143
+   }
+  },
+  {
+   "rounds": 8,
+   "carry": "carry",
+   "summary": {
+    "matches": 50,
+    "spearman": 0.657991202346041,
+    "top4OutStage1": 0.34,
+    "strongestInDuel": 0.08,
+    "strongestWins": 0.08,
+    "meanPlacementOfStrongest": 11.64,
+    "deadRate": 0.43761904761904763
+   }
+  },
+  {
+   "rounds": 10,
+   "carry": "reset",
+   "summary": {
+    "matches": 50,
+    "spearman": 0.6760850439882699,
+    "top4OutStage1": 0.28,
+    "strongestInDuel": 0.34,
+    "strongestWins": 0.24,
+    "meanPlacementOfStrongest": 9.78,
+    "deadRate": 0.45352380952380955
+   }
+  },
+  {
+   "rounds": 10,
+   "carry": "carry",
+   "summary": {
+    "matches": 50,
+    "spearman": 0.6426173020527858,
+    "top4OutStage1": 0.26,
+    "strongestInDuel": 0.22,
+    "strongestWins": 0.14,
+    "meanPlacementOfStrongest": 9.08,
+    "deadRate": 0.4554285714285714
+   }
+  },
+  {
+   "rounds": 12,
+   "carry": "reset",
+   "summary": {
+    "matches": 50,
+    "spearman": 0.6858651026392962,
+    "top4OutStage1": 0.26,
+    "strongestInDuel": 0.3,
+    "strongestWins": 0.22,
+    "meanPlacementOfStrongest": 8.74,
+    "deadRate": 0.4507936507936508
+   }
+  },
+  {
+   "rounds": 12,
+   "carry": "carry",
+   "summary": {
+    "matches": 50,
+    "spearman": 0.6923313782991203,
+    "top4OutStage1": 0.26,
+    "strongestInDuel": 0.2,
+    "strongestWins": 0.1,
+    "meanPlacementOfStrongest": 9.72,
+    "deadRate": 0.45055555555555554
+   }
+  }
+ ],
+ "retiredTotals": {
+  "decided": 11
+ },
+ "budget": {
+  "orderAgree": 2,
+  "verdictAgree": 55,
+  "checked": 4
+ },
+ "realMatches": [
+  {
+   "placement": {
+    "bot19": 17,
+    "bot22": 21,
+    "bot07": 3,
+    "bot03": 6,
+    "bot05": 8,
+    "bot31": 24,
+    "bot32": 32,
+    "bot14": 2,
+    "bot08": 25,
+    "bot28": 31,
+    "bot21": 18,
+    "bot15": 14,
+    "bot20": 19,
+    "bot17": 10,
+    "bot29": 23,
+    "bot02": 30,
+    "bot30": 26,
+    "bot24": 28,
+    "bot10": 15,
+    "bot26": 29,
+    "bot06": 16,
+    "bot16": 13,
+    "bot18": 12,
+    "bot09": 5,
+    "bot27": 27,
+    "bot13": 7,
+    "bot04": 9,
+    "bot25": 20,
+    "bot12": 4,
+    "bot11": 22,
+    "bot23": 11,
+    "bot01": 1
+   },
+   "stage1Out": [
+    "bot08",
+    "bot30",
+    "bot27",
+    "bot24",
+    "bot26",
+    "bot02",
+    "bot28",
+    "bot32"
+   ],
+   "duelists": [
+    "bot14",
+    "bot01"
+   ],
+   "groupRounds": 168,
+   "deadRounds": 89,
+   "retired": {
+    "decided": 2
+   },
+   "searches": 172,
+   "ms": 32008
+  },
+  {
+   "placement": {
+    "bot02": 7,
+    "bot19": 23,
+    "bot25": 25,
+    "bot30": 32,
+    "bot26": 20,
+    "bot23": 13,
+    "bot29": 31,
+    "bot01": 4,
+    "bot13": 24,
+    "bot20": 27,
+    "bot11": 10,
+    "bot18": 18,
+    "bot05": 6,
+    "bot16": 14,
+    "bot03": 5,
+    "bot04": 1,
+    "bot09": 2,
+    "bot15": 8,
+    "bot10": 3,
+    "bot06": 17,
+    "bot22": 22,
+    "bot07": 28,
+    "bot27": 26,
+    "bot31": 29,
+    "bot21": 11,
+    "bot32": 30,
+    "bot17": 21,
+    "bot24": 19,
+    "bot14": 16,
+    "bot28": 15,
+    "bot12": 12,
+    "bot08": 9
+   },
+   "stage1Out": [
+    "bot25",
+    "bot27",
+    "bot20",
+    "bot07",
+    "bot31",
+    "bot32",
+    "bot29",
+    "bot30"
+   ],
+   "duelists": [
+    "bot04",
+    "bot09"
+   ],
+   "groupRounds": 168,
+   "deadRounds": 76,
+   "retired": {
+    "decided": 3
+   },
+   "searches": 177,
+   "ms": 32858
+  },
+  {
+   "placement": {
+    "bot17": 21,
+    "bot03": 25,
+    "bot15": 27,
+    "bot21": 19,
+    "bot14": 10,
+    "bot13": 8,
+    "bot02": 11,
+    "bot30": 24,
+    "bot23": 28,
+    "bot28": 22,
+    "bot32": 29,
+    "bot06": 13,
+    "bot22": 7,
+    "bot01": 1,
+    "bot18": 9,
+    "bot07": 2,
+    "bot10": 17,
+    "bot29": 30,
+    "bot19": 18,
+    "bot20": 12,
+    "bot05": 5,
+    "bot08": 32,
+    "bot11": 6,
+    "bot09": 4,
+    "bot25": 20,
+    "bot26": 31,
+    "bot24": 23,
+    "bot04": 3,
+    "bot27": 26,
+    "bot31": 16,
+    "bot16": 15,
+    "bot12": 14
+   },
+   "stage1Out": [
+    "bot03",
+    "bot27",
+    "bot15",
+    "bot23",
+    "bot32",
+    "bot29",
+    "bot26",
+    "bot08"
+   ],
+   "duelists": [
+    "bot01",
+    "bot07"
+   ],
+   "groupRounds": 168,
+   "deadRounds": 66,
+   "retired": {
+    "decided": 3
+   },
+   "searches": 175,
+   "ms": 33205
+  },
+  {
+   "placement": {
+    "bot11": 30,
+    "bot22": 26,
+    "bot01": 22,
+    "bot20": 19,
+    "bot03": 11,
+    "bot27": 13,
+    "bot29": 20,
+    "bot23": 25,
+    "bot26": 29,
+    "bot13": 7,
+    "bot12": 16,
+    "bot04": 9,
+    "bot21": 12,
+    "bot32": 31,
+    "bot05": 1,
+    "bot19": 8,
+    "bot08": 18,
+    "bot31": 28,
+    "bot16": 10,
+    "bot28": 32,
+    "bot30": 24,
+    "bot17": 17,
+    "bot09": 5,
+    "bot25": 21,
+    "bot18": 4,
+    "bot06": 15,
+    "bot10": 2,
+    "bot02": 3,
+    "bot14": 6,
+    "bot07": 27,
+    "bot24": 23,
+    "bot15": 14
+   },
+   "stage1Out": [
+    "bot23",
+    "bot22",
+    "bot07",
+    "bot31",
+    "bot26",
+    "bot11",
+    "bot32",
+    "bot28"
+   ],
+   "duelists": [
+    "bot05",
+    "bot10"
+   ],
+   "groupRounds": 168,
+   "deadRounds": 80,
+   "retired": {
+    "decided": 3
+   },
+   "searches": 176,
+   "ms": 33958
+  }
+ ]
+}

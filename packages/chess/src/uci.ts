@@ -4,6 +4,8 @@
  * fixed budget give the same numbers everywhere.
  */
 
+import { applyMove, gameEnd } from "./rules.ts";
+
 export interface UciTransport {
   send(command: string): void;
   onLine(listener: (line: string) => void): void;
@@ -126,10 +128,30 @@ export class UciEngine {
     return [...last.values()].sort((a, b) => a.multipv - b.multipv).map(({ move, expected }) => ({ move, expected }));
   }
 
-  /** Expected score after each of the given moves (one search restricted to them). */
+  /**
+   * Expected score after each of the given moves: one search restricted to them.
+   * Stockfish occasionally leaves a requested move out of that output; any such
+   * move is scored from the position after it instead (see scoreAfter).
+   */
   scoreMoves(fen: string, moves: readonly string[]): Promise<MoveScore[]> {
     const unique = [...new Set(moves)];
-    return this.serial(() => (unique.length ? this.search(fen, unique.length, unique) : Promise.resolve([])));
+    return this.serial(async () => {
+      if (!unique.length) return [];
+      const found = await this.search(fen, unique.length, unique);
+      const have = new Set(found.map((m) => m.move));
+      for (const m of unique) if (!have.has(m)) found.push({ move: m, expected: await this.scoreAfter(fen, m) });
+      return found;
+    });
+  }
+
+  /** Mover's expected score after `move`, from a search of the resulting position (or the game result if it ends). */
+  private async scoreAfter(fen: string, move: string): Promise<number> {
+    const next = applyMove(fen, move);
+    const end = gameEnd(next, []);
+    if (end === "checkmate") return 1;
+    if (end) return 0.5;
+    const [best] = await this.search(next, 1);
+    return best ? 1 - best.expected : 0.5;
   }
 
   /** Top N moves with the mover's expected score after each (for bots). */
@@ -149,6 +171,8 @@ export class UciEngine {
       const have = new Set(top.map((m) => m.move));
       const missing = [...new Set(moves)].filter((m) => !have.has(m));
       const extra = missing.length ? await this.search(fen, missing.length, missing) : [];
+      const gotExtra = new Set(extra.map((m) => m.move));
+      for (const m of missing) if (!gotExtra.has(m)) extra.push({ move: m, expected: await this.scoreAfter(fen, m) });
       const all = [...top, ...extra.filter((m) => !have.has(m.move))];
       return { best: top[0]!, moves: all.sort((a, b) => b.expected - a.expected) };
     });
