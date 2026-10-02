@@ -1,4 +1,4 @@
-import type { BoardView, GameView } from "../game.ts";
+import { cutLabel, type BoardView, type GameView } from "../game.ts";
 import { MiniBoard } from "../components/MiniBoard.tsx";
 import { RaceTower } from "../components/RaceTower.tsx";
 
@@ -16,7 +16,7 @@ export function SpectateScreen({ match, boards, note }: { match: GameView; board
           ))}
         </div>
       )}
-      <RaceTower standings={st} cutoff={match.cutoff} />
+      <RaceTower standings={st} cutoff={match.cutoff} cutLabel={cutLabel(match)} />
     </div>
   );
 }

@@ -27,7 +27,7 @@ export function StageBreakScreen(props: {
                   : "Colours swap for the next stage."
               } You get ${match.settings.powerUpsPerStage} more power-up.`}
       </p>
-      <RaceTower standings={standings} cutoff={cutoff} />
+      <RaceTower standings={standings} cutoff={cutoff} cutLabel="Cut" />
       {!youOut && boards.length > 1 && (
         <>
           <h2 class="muted small">Boards in the next stage</h2>

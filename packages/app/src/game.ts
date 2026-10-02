@@ -102,6 +102,8 @@ export interface GameView {
   usePowerUp(): void;
   /** White's expected score in a position (for the evaluation bar), from this device's engine. */
   evaluate(fen: string): Promise<number | null>;
+  /** Players who have moved this round (lights up the leaderboard as they finish). */
+  readonly done: ReadonlySet<string>;
   /** Moves already seen on each board (key "id:generation"), to replay only what you missed. */
   readonly seen: Map<string, number>;
   /** Players ranked at or below this many go out at the end of the stage. */
@@ -118,3 +120,12 @@ export interface GameView {
   finishAfterDuel(): void;
   duelClocks(d: DuelView): { w: number; b: number };
 }
+
+/** While a round is being played, the leaderboard shows who has moved. */
+export const roundLive = (m: Pick<GameView, "phase">) => m.phase.kind === "play" || m.phase.kind === "scoring";
+
+/** What the leaderboard's cut line says during a stage. */
+export const cutLabel = (m: Pick<GameView, "settings" | "stage">) =>
+  m.stage === m.settings.knockoutsPerStage.length - 1
+    ? `Duel line · after round ${m.settings.roundsPerStage}`
+    : `Cut after round ${m.settings.roundsPerStage}`;

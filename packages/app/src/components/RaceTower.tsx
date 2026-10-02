@@ -22,7 +22,21 @@ export function gapToCut(standings: readonly Standing[], cutoff: number): number
  * players either side of it (the bubble) pulse. `compact` shows the top 5,
  * the bubble, you, and the bottom 5.
  */
-export function RaceTower({ standings, cutoff, compact = false }: { standings: readonly Standing[]; cutoff: number; compact?: boolean }) {
+export function RaceTower({
+  standings,
+  cutoff,
+  compact = false,
+  done,
+  cutLabel = "Cut line",
+}: {
+  standings: readonly Standing[];
+  cutoff: number;
+  compact?: boolean;
+  /** Players who have moved this round (shown in green while a round is being played). */
+  done?: ReadonlySet<string>;
+  /** Text on the cut line, e.g. "Cut after round 8". */
+  cutLabel?: string;
+}) {
   const alive = standings.filter((s) => !s.out);
   const knockouts = cutoff < alive.length;
   // The highest-rated player still in, if there's a clear one: the one to fear.
@@ -79,7 +93,7 @@ export function RaceTower({ standings, cutoff, compact = false }: { standings: r
         ))}
         {line !== null && (
           <div class="tower-cut" style={{ transform: `translateY(${line}px)` }}>
-            <span>Elimination</span>
+            <span>{cutLabel}</span>
           </div>
         )}
         {rows.map((r) => {
@@ -90,11 +104,12 @@ export function RaceTower({ standings, cutoff, compact = false }: { standings: r
           return (
             <div
               key={r.id}
-              class={`tower-row${r.isYou ? " you" : ""}${zone ? " zone" : ""}${bubble ? " bubble" : ""}${r.out ? " out" : ""}${podium}`}
+              class={`tower-row${r.isYou ? " you" : ""}${done?.has(r.id) ? " done" : ""}${done && !r.out && !done.has(r.id) ? " thinking" : ""}${zone ? " zone" : ""}${bubble ? " bubble" : ""}${r.out ? " out" : ""}${podium}`}
               style={{ transform: `translateY(${ys.get(r.id)}px)` }}
             >
               <span class="t-pos">{r.out ? `${r.placement ?? "✕"}` : r.rank}</span>
               <span class="t-name">
+                {done?.has(r.id) && <span class="t-check">✓ </span>}
                 {r.name}
                 {r.practice && <span title="Practice mode (unlimited power-ups)"> 💡</span>}
               </span>

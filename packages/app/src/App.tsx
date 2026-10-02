@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, type Settings } from "@chessroyale/core";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { enginePool } from "./engine.ts";
-import type { GameView } from "./game.ts";
+import { cutLabel, roundLive, type GameView } from "./game.ts";
 import { NetMatch } from "./net.ts";
 import { SoloMatch } from "./solo.ts";
 import { DuelColourScreen, DuelScreen } from "./screens/Duel.tsx";
@@ -143,7 +143,7 @@ export function App() {
   return (
     <div class="arena">
       <aside class="tower-side">
-        <RaceTower standings={match.standings()} cutoff={match.cutoff} />
+        <RaceTower standings={match.standings()} cutoff={match.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
       </aside>
       {screen}
     </div>

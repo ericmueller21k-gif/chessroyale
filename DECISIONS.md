@@ -140,3 +140,21 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
   top-rated player still in gets a 🔥, and the results screen lists the 3 most dangerous players. Ratings are per
   match for now; a lifetime rating needs player profiles, which can be built later on the same free Cloudflare setup.
   Caveat: humans see these positions cold, on a clock, so expect ratings somewhat below their usual online ones.
+
+## Round flow, after Eric's first computer test (Oct 2, 2026)
+
+- **Your move stays on the board** once you've made it, with a "Waiting for other players · 17/32" banner. Before,
+  the board snapped back to the old position while the round was scored, which looked like your move had been
+  replaced.
+- **The leaderboard lights up as players finish.** Names turn green with a ✓. Bots finish at their recorded
+  thinking time (drawn when the round starts, and part of the server's saved state), humans as their move arrives
+  (the server now tells everyone). Once every human has moved, any bot still "thinking" finishes in a quick stagger
+  (about a second) while the round is scored, so a fast player never waits 20 s for bots.
+- **Scores only change once everyone has finished.** Solo now scores in two steps (work out, then apply), so the
+  leaderboard and round counter don't move behind the waiting banner.
+- **The reveal says which pick continues the board.** One pick per group is drawn at random to carry the game on,
+  and the reveal used to say so only in small print, so a different move appearing looked like a bug. Now a 🎲
+  callout names the move and whose pick it was, the picks list marks it, your arrow is labelled "You" and the best
+  move "★". Castling was checked with real taps and drags on phone and desktop (`e2e/castling.spec.ts`).
+- **The cut line reads "Cut after round 8"**, and the danger zone is amber ("at risk") instead of dark red, which
+  read as "already eliminated". The first cut is after 8 rounds; `?rounds=2` in a link makes it 2 for quick tests.

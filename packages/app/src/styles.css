@@ -976,10 +976,11 @@ p {
   border-left-color: var(--accent);
 }
 .tower-row.zone {
-  background: rgba(255, 93, 93, 0.12);
+  background: rgba(244, 160, 64, 0.1);
 }
 .tower-row.zone .t-pos {
-  background: #7a2328;
+  background: #6b4a1c;
+  color: #ffd9a0;
 }
 .tower-row.bubble {
   animation: bubble 1.6s ease-in-out infinite;
@@ -1220,4 +1221,68 @@ p {
 }
 .scariest li.you {
   outline: 2px solid var(--accent);
+}
+
+/* Live round: green as players finish. */
+.tower-row.done .t-name {
+  color: #5fe39a;
+}
+.t-check {
+  color: #5fe39a;
+  font-weight: 900;
+}
+.tower-row.thinking .t-name {
+  color: #b7bfcc;
+}
+.waiting-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 16px;
+  animation: fade 160ms ease-out;
+}
+.waiting-count {
+  margin-left: auto;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--good);
+}
+.waiting-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.waiting-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dot 1s ease-in-out infinite;
+}
+.waiting-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.waiting-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes dot {
+  50% {
+    opacity: 0.25;
+    transform: translateY(-3px);
+  }
+}
+.drawn {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border-left: 4px solid var(--accent);
+}
+.drawn-main {
+  font-size: 16px;
 }

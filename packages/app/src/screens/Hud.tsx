@@ -1,6 +1,6 @@
 import { useState } from "preact/hooks";
 import { RaceTower, gapToCut } from "../components/RaceTower.tsx";
-import type { GameView } from "../game.ts";
+import { cutLabel, roundLive, type GameView } from "../game.ts";
 
 /**
  * The strip above the board: stage and round, your position, how far you are
@@ -34,7 +34,7 @@ export function Hud({ match }: { match: GameView }) {
         )}
         {gap !== null && rank > 0 && (
           <span class={`hud-gap ${gap < 0 ? "danger" : "safe"}`}>
-            {gap >= 0 ? `+${gap.toFixed(1)} safe` : `${gap.toFixed(1)} KO`}
+            {gap >= 0 ? `+${gap.toFixed(1)} safe` : `${gap.toFixed(1)} at risk`}
           </span>
         )}
         <span class="hud-pu" title="Power-ups">
@@ -53,7 +53,7 @@ export function Hud({ match }: { match: GameView }) {
                 ✕
               </button>
             </div>
-            <RaceTower standings={standings} cutoff={match.cutoff} />
+            <RaceTower standings={standings} cutoff={match.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
           </div>
         </div>
       )}

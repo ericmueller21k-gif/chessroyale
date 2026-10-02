@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { sideToMove } from "@chessroyale/chess";
+import { applyMove, sideToMove } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { Countdown } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
@@ -46,6 +46,10 @@ export function PlayScreen({
   const shown = useReplay(match, board);
   const hint = match.hint;
   const left = match.powerUpsLeft();
+  // Once you've moved, your move stays on the board while the others finish.
+  const moved = waiting && picked ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
+  const alive = match.standings().filter((s) => !s.out);
+  const doneCount = alive.filter((s) => match.done.has(s.id)).length;
   const arrows: Arrow[] =
     !waiting && hint ? hint.map((h, i) => ({ move: h.move, brush: HINT_BRUSHES[i]!, label: (h.expected * 100).toFixed(1) })) : [];
   return (
@@ -59,9 +63,9 @@ export function PlayScreen({
         <div class="board-row">
           <EvalBar fen={board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />
           <Board
-            fen={shown.fen}
+            fen={moved?.fen ?? shown.fen}
             orientation={side === "w" ? "white" : "black"}
-            lastMove={shown.lastMove}
+            lastMove={moved?.lastMove ?? shown.lastMove}
             interactive={!waiting && !shown.replaying}
             onMove={(m) => match.submit(m)}
             arrows={arrows}
@@ -70,7 +74,21 @@ export function PlayScreen({
       </div>
       <div class="play-footer">
         {waiting ? (
-          <div class="status">{picked ? "Move locked in. Scoring…" : "Time's up. Scoring…"}</div>
+          <div class="waiting-banner" role="status">
+            <span class="waiting-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span>
+              <strong>{picked ? "Move in." : "Time's up."}</strong> Waiting for other players
+            </span>
+            {alive.length > 0 && (
+              <span class="waiting-count">
+                {doneCount}/{alive.length}
+              </span>
+            )}
+          </div>
         ) : (
           <>
             <Countdown deadline={deadline} total={allowedMs ?? match.settings.moveClockSeconds * 1000} />
