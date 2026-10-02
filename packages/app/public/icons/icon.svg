@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#1b1d22"/>
+  <g fill="#f4b740">
+    <!-- crown -->
+    <path d="M150 190 L176 110 L216 160 L256 92 L296 160 L336 110 L362 190 Z"/>
+    <rect x="150" y="196" width="212" height="22" rx="6"/>
+    <!-- pawn -->
+    <circle cx="256" cy="262" r="40"/>
+    <path d="M226 300 H286 L300 360 H212 Z"/>
+    <rect x="176" y="362" width="160" height="34" rx="10"/>
+  </g>
+</svg>

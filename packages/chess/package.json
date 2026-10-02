@@ -1,0 +1,16 @@
+{
+  "name": "@chessroyale/chess",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chess rules (chess.js), the Stockfish engine interface over UCI, and the opening library.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts",
+    "./data/*": "./data/*"
+  },
+  "dependencies": {
+    "chess.js": "^1.4.0",
+    "stockfish": "^19.0.0"
+  }
+}

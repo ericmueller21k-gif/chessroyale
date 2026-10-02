@@ -1,0 +1,119 @@
+import { DurableObject } from "cloudflare:workers";
+import type { ClientMessage, Opening, ServerMessage } from "@chessroyale/chess";
+import openings from "@chessroyale/chess/data/openings.json";
+import { LobbyCore, newLobbyRecord, type LobbyRecord } from "./lobby.ts";
+import type { Env } from "./index.ts";
+
+const library = openings as Opening[];
+
+/**
+ * One Durable Object per lobby. Holds the clock, the groups, the picks and the
+ * draw; scoring comes from the host's browser. Uses WebSocket hibernation, so
+ * the object can sleep between messages: state lives in storage, and timing
+ * uses alarms.
+ */
+export class Lobby extends DurableObject<Env> {
+  private record: LobbyRecord | null = null;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.blockConcurrencyWhile(async () => {
+      this.record = (await ctx.storage.get<LobbyRecord>("lobby")) ?? null;
+    });
+  }
+
+  private core(code: string): LobbyCore {
+    this.record ??= newLobbyRecord(code, Date.now());
+    return new LobbyCore(this.record, {
+      now: () => Date.now(),
+      send: (playerId, msg) => {
+        const text = JSON.stringify({ ...msg, now: Date.now() } as ServerMessage);
+        for (const ws of this.socketsOf(playerId)) {
+          try {
+            ws.send(text);
+          } catch {
+            // Socket already closed.
+          }
+        }
+      },
+    }, library);
+  }
+
+  /** Sockets belonging to a player (identified after "hello" via the socket's attachment). */
+  private socketsOf(playerId: string): WebSocket[] {
+    return this.ctx.getWebSockets().filter((ws) => (ws.deserializeAttachment() as { playerId?: string } | null)?.playerId === playerId);
+  }
+
+  private async persist(core: LobbyCore) {
+    this.record = core.save();
+    await this.ctx.storage.put("lobby", this.record);
+    const at = core.nextAlarm;
+    if (at) await this.ctx.storage.setAlarm(at);
+    else await this.ctx.storage.deleteAlarm();
+  }
+
+  async exists(): Promise<boolean> {
+    return this.record !== null;
+  }
+
+  async create(code: string, overrides?: LobbyRecord["overrides"]): Promise<void> {
+    if (this.record) return;
+    this.record = newLobbyRecord(code, Date.now(), overrides);
+    await this.ctx.storage.put("lobby", this.record);
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 });
+    if (!this.record) return new Response("No such lobby", { status: 404 });
+    const pair = new WebSocketPair();
+    const [client, server] = [pair[0], pair[1]];
+    // The player id is attached to the socket after "hello".
+    this.ctx.acceptWebSocket(server);
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer) {
+    let msg: ClientMessage;
+    try {
+      msg = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw));
+    } catch {
+      return;
+    }
+    const core = this.core(this.record!.code);
+    const attached = ws.deserializeAttachment() as { playerId?: string } | null;
+    if (msg.t === "hello") {
+      const result = core.connect(msg.token, msg.name, msg.device);
+      if (!result.ok) {
+        ws.send(JSON.stringify({ t: "error", message: result.message, now: Date.now() }));
+        ws.close(1008, result.message);
+        return;
+      }
+      ws.serializeAttachment({ playerId: result.playerId });
+      // connect() sent the welcome before the socket was attached; send it again now it can be found.
+      core.resendTo(result.playerId);
+      await this.persist(core);
+      return;
+    }
+    const playerId = attached?.playerId;
+    if (!playerId) return;
+    core.message(playerId, msg);
+    await this.persist(core);
+  }
+
+  async webSocketClose(ws: WebSocket) {
+    const playerId = (ws.deserializeAttachment() as { playerId?: string } | null)?.playerId;
+    if (!playerId || !this.record) return;
+    const others = this.socketsOf(playerId).filter((s) => s !== ws);
+    if (others.length) return;
+    const core = this.core(this.record.code);
+    core.disconnect(playerId);
+    await this.persist(core);
+  }
+
+  async alarm() {
+    if (!this.record) return;
+    const core = this.core(this.record.code);
+    core.alarm();
+    await this.persist(core);
+  }
+}
