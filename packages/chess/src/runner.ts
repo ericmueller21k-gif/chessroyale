@@ -470,7 +470,7 @@ export class MatchRunner {
 
 /** A board as sent to (and shown in) the app. */
 export function netBoard(b: BoardState, withOpening = false): NetBoard {
-  const recent = recentMoves(b);
+  const recent = recentMoves(b, 5);
   return {
     id: b.id,
     fen: b.fen,
@@ -480,6 +480,7 @@ export function netBoard(b: BoardState, withOpening = false): NetBoard {
     ply: b.history.length,
     recent: recent.moves,
     recentFrom: recent.from,
+    history: [...b.history],
     ...(withOpening ? { openingMoves: b.history.slice(0, b.openingPlies) } : {}),
   };
 }

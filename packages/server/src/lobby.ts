@@ -80,7 +80,9 @@ export interface LobbyRecord {
   mismatches: number;
   counter: number;
   /** Per-lobby playtest overrides (rounds per stage, move clock, duel clock). */
-  overrides?: { roundsPerStage?: number; moveClockSeconds?: number; duelClockSeconds?: number; drawRuleByStage?: DrawRule[] };
+  overrides?: Partial<Pick<Settings, "roundsPerStage" | "moveClockSeconds" | "duelClockSeconds" | "revealSeconds" | "drawnMoveSeconds" | "boardIntroSeconds">> & {
+    drawRuleByStage?: DrawRule[];
+  };
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"]): LobbyRecord {
@@ -349,7 +351,8 @@ export class LobbyCore {
     if (!this.runner) return;
     if (this.runner.isDuel()) return this.startDuel();
     this.runner.deal();
-    const now = this.io.now();
+    // The move clock starts after a short settling-in countdown on the new board.
+    const now = this.io.now() + this.settings.boardIntroSeconds * 1000;
     const key = `${this.runner.state.stage}-${this.runner.state.round}-${++this.r.counter}`;
     // Each human's deadline comes from their own time bank.
     const deadlines: Record<string, number> = {};
@@ -367,6 +370,7 @@ export class LobbyCore {
         key,
         stage: this.runner.state.stage,
         round: this.runner.state.round,
+        startsAt: now,
         deadline: deadlines[h.id] ?? deadline,
         board: board ? netBoard(board) : null,
         standings: st,
@@ -405,9 +409,10 @@ export class LobbyCore {
     const now = this.io.now();
     const deadline = round.deadlines?.[playerId] ?? round.deadline;
     if (now > deadline + this.settings.lateGraceMs) return; // Late picks count as a miss.
+    if (now < round.startedAt - 500) return; // Before the clock starts.
     const board = this.runner?.boardOf(playerId);
     if (!board || !legalMoves(board.fen).includes(move)) return;
-    round.picks[playerId] = { move, thinkMs: Math.min(now - round.startedAt, deadline - round.startedAt) };
+    round.picks[playerId] = { move, thinkMs: Math.max(0, Math.min(now - round.startedAt, deadline - round.startedAt)) };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     if (this.aliveHumans().every((h) => round.picks[h.id])) this.lock();
   }
@@ -416,6 +421,7 @@ export class LobbyCore {
   private powerUp(playerId: string, key: string) {
     const round = this.r.round;
     if (this.r.phase !== "play" || !round || round.key !== key || round.picks[playerId] || !this.runner) return;
+    if (this.io.now() < round.startedAt - 500) return;
     const p = this.runner.state.players.find((x) => x.id === playerId);
     if (!p?.alive || !(p.practice || p.powerUps > 0)) return;
     (round.powerUps ??= {})[playerId] = true;

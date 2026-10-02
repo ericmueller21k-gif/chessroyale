@@ -10,10 +10,10 @@ export class RoundProgress {
 
   constructor(private readonly onChange: () => void) {}
 
-  /** A new round: bots finish `botsDoneIn[id]` ms from now. */
-  start(botsDoneIn: Readonly<Record<string, number>>) {
+  /** A new round: bots finish `botsDoneIn[id]` ms after the clock starts, `startsInMs` from now. */
+  start(botsDoneIn: Readonly<Record<string, number>>, startsInMs = 0) {
     this.reset();
-    for (const [id, ms] of Object.entries(botsDoneIn)) this.timers.push(setTimeout(() => this.mark(id), ms));
+    for (const [id, ms] of Object.entries(botsDoneIn)) this.timers.push(setTimeout(() => this.mark(id), Math.max(0, startsInMs) + ms));
   }
 
   mark(id: string) {

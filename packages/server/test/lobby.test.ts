@@ -34,7 +34,7 @@ function setup(settings: Partial<Settings> = {}) {
     },
     library,
     mulberry32(7),
-    { ...DEFAULT_SETTINGS, roundsPerStage: 1, ...settings },
+    { ...DEFAULT_SETTINGS, roundsPerStage: 1, boardIntroSeconds: 0, ...settings },
   );
   const take = (id: string) => {
     const msgs = inbox.get(id) ?? [];
@@ -219,5 +219,21 @@ describe("lobby", () => {
     const r2 = L.last("p1", "round")!;
     L.core.message("p1", { t: "powerUp", key: r2.key });
     expect(L.core.record.round!.powerUps.p1).toBeUndefined();
+  });
+
+  it("starts the move clock after the board's settling-in countdown, and ignores moves before it", () => {
+    const L = setup({ boardIntroSeconds: 5, roundsPerStage: 2 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.message("p1", { t: "start" });
+    L.advance(6000);
+    const r = L.last("p1", "round")!;
+    expect(r.startsAt - L.now).toBe(5000);
+    expect(r.deadline - r.startsAt).toBe(30_000);
+    const move = legalMoves(r.board!.fen)[0]!;
+    L.core.message("p1", { t: "pick", key: r.key, move });
+    expect(L.core.record.round!.picks.p1).toBeUndefined();
+    L.advance(5000 + 3000);
+    L.core.message("p1", { t: "pick", key: r.key, move });
+    expect(L.core.record.round!.picks.p1!.thinkMs).toBe(3000);
   });
 });

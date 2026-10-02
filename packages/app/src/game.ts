@@ -21,6 +21,8 @@ export interface BoardView {
   /** The last few moves and the position before them, to replay what you missed. */
   recent: string[];
   recentFrom: string;
+  /** Every move from the starting position, to step back through the game. */
+  history: string[];
 }
 
 /** One row of the live leaderboard. */
@@ -66,9 +68,11 @@ export type Phase =
   | { kind: "loading" }
   | { kind: "lobby" }
   | { kind: "opening"; boards: BoardView[] }
-  | { kind: "play"; board: BoardView; deadline: number; allowedMs: number }
+  /** `startsAt`: when the move clock starts (after the new board's settling-in countdown). */
+  | { kind: "play"; board: BoardView; startsAt: number; deadline: number; allowedMs: number }
   | { kind: "scoring"; board: BoardView; move: string | null }
-  | { kind: "reveal"; mine: GroupReveal; board: BoardView }
+  /** `until`: when the next board comes up (local time). */
+  | { kind: "reveal"; mine: GroupReveal; board: BoardView; until: number }
   | { kind: "stageBreak"; stage: number; standings: Standing[]; knockedOut: Standing[]; cutoff: number; youOut: boolean; nextBoards: BoardView[] }
   | { kind: "simulating"; stage: number; round: number }
   | { kind: "spectating"; boards: BoardView[] }

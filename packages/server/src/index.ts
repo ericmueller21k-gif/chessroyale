@@ -1,4 +1,4 @@
-import { DRAW_RULES, type DrawRule } from "@chessroyale/core";
+import { DRAW_RULES, PACE_SETTINGS, type DrawRule } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 
 export { Lobby } from "./lobby-do.ts";
@@ -28,6 +28,7 @@ export default {
         const n = (k: string) => (url.searchParams.has(k) ? Math.max(1, Math.min(600, Number(url.searchParams.get(k)) || 0)) : undefined);
         const draw = url.searchParams.get("draw") as DrawRule | null;
         const overrides = {
+          ...(url.searchParams.get("pace") === "quick" ? PACE_SETTINGS.quick : {}),
           roundsPerStage: n("rounds"),
           moveClockSeconds: n("clock"),
           duelClockSeconds: n("duel"),

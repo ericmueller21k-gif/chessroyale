@@ -11,8 +11,8 @@ test("castling registers by tap-tap and by drag", async ({ page }, info) => {
     (window as any).picked = [];
     m.submit = (mv: string) => (window as any).picked.push(mv);
     m.hint = [{ move: "e1g1", san: "O-O", expected: 0.55 }, { move: "a2a3", san: "a3", expected: 0.52 }, { move: "h2h3", san: "h3", expected: 0.51 }];
-    const board = { id: 99, generation: 0, ply: 30, fen, lastMove: null, openingName: "Castle test", recent: [], recentFrom: fen };
-    m.set({ kind: "play", board, deadline: Date.now() + 60000, allowedMs: 60000 });
+    const board = { id: 99, generation: 0, ply: 30, fen, lastMove: null, openingName: "Castle test", recent: [], recentFrom: fen, history: [] };
+    m.set({ kind: "play", board, startsAt: Date.now() - 1, deadline: Date.now() + 60000, allowedMs: 60000 });
   }, FEN);
   await page.waitForTimeout(500);
   const wrap = page.locator(".board-area .cg-wrap").first();
@@ -29,8 +29,8 @@ test("castling registers by tap-tap and by drag", async ({ page }, info) => {
   await page.evaluate((fen) => {
     const m = (window as any).match;
     (window as any).picked = [];
-    const board = { id: 98, generation: 0, ply: 30, fen, lastMove: null, openingName: "Castle test", recent: [], recentFrom: fen };
-    m.set({ kind: "play", board, deadline: Date.now() + 60000, allowedMs: 60000 });
+    const board = { id: 98, generation: 0, ply: 30, fen, lastMove: null, openingName: "Castle test", recent: [], recentFrom: fen, history: [] };
+    m.set({ kind: "play", board, startsAt: Date.now() - 1, deadline: Date.now() + 60000, allowedMs: 60000 });
   }, FEN);
   await page.waitForTimeout(500);
   await page.mouse.move(at("e1").x, at("e1").y);
