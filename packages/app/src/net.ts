@@ -326,7 +326,7 @@ export class NetMatch implements GameView {
         fenBefore: m.fenBefore,
         bestMove: m.bestMove!,
         playerIds: m.picks.map((p) => p.playerId),
-        result: { players: m.picks, playedMove: m.playedMove! },
+        result: { players: m.picks, playedMove: m.playedMove!, drawRule: m.drawRule ?? "random" },
       },
     });
     void this.crossCheck(m);

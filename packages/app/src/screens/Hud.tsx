@@ -1,4 +1,5 @@
 import { useState } from "preact/hooks";
+import { MuteButton } from "../components/MuteButton.tsx";
 import { RaceTower, gapToCut } from "../components/RaceTower.tsx";
 import { cutLabel, roundLive, type GameView } from "../game.ts";
 
@@ -17,7 +18,7 @@ export function Hud({ match }: { match: GameView }) {
   const gap = gapToCut(standings, match.cutoff);
   const left = match.powerUpsLeft();
   return (
-    <>
+    <div class="hud-row">
       <button type="button" class="hud" onClick={() => setOpen(true)} aria-label="Show the leaderboard">
         <span class="hud-stage">
           S{match.stage + 1}
@@ -44,6 +45,7 @@ export function Hud({ match }: { match: GameView }) {
           ☰
         </span>
       </button>
+      <MuteButton />
       {open && (
         <div class="tower-overlay" role="dialog" aria-label="Leaderboard" onClick={() => setOpen(false)}>
           <div class="tower-sheet" onClick={(e) => e.stopPropagation()}>
@@ -57,6 +59,6 @@ export function Hud({ match }: { match: GameView }) {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

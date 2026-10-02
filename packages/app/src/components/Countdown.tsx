@@ -1,29 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { play } from "../sound.ts";
 
-let audio: AudioContext | null = null;
-
-/** Call from a tap so browsers allow sound later. */
-export function unlockAudio() {
-  try {
-    audio ??= new AudioContext();
-    void audio.resume();
-  } catch {
-    // No audio: the countdown still changes colour.
-  }
-}
-
-function beep(high: boolean) {
-  if (!audio) return;
-  const o = audio.createOscillator();
-  const g = audio.createGain();
-  o.frequency.value = high ? 880 : 660;
-  g.gain.setValueAtTime(0.0001, audio.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.2, audio.currentTime + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.15);
-  o.connect(g).connect(audio.destination);
-  o.start();
-  o.stop(audio.currentTime + 0.16);
-}
+export { unlockAudio } from "../sound.ts";
 
 /** Shrinking bar and seconds left; the last 3 seconds turn red with a beep each second. */
 export function Countdown({ deadline, total }: { deadline: number; total: number }) {
@@ -44,7 +22,7 @@ export function Countdown({ deadline, total }: { deadline: number; total: number
   useEffect(() => {
     if (urgent && secs > 0 && lastBeep.current !== secs) {
       lastBeep.current = secs;
-      beep(secs === 1);
+      play(secs === 1 ? "tickLast" : "tick");
     }
   }, [urgent, secs]);
   return (

@@ -1,3 +1,4 @@
+import type { DrawRule } from "@chessroyale/core";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
  * lobby), sent as JSON over a WebSocket. Times are server milliseconds; each
@@ -136,6 +137,8 @@ export type ServerMessage = { now: number } & (
       bestMove: string | null;
       playedMove: string | null;
       picks: NetPick[];
+      /** How the played move was chosen from the group's picks. */
+      drawRule: DrawRule;
       /** For the cross-check: the group's evaluation as the host computed it. */
       expectedAfter: Record<string, number>;
       bestExpected: number | null;

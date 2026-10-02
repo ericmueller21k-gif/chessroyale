@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import { DEFAULT_SETTINGS as S } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
+import { MuteButton } from "../components/MuteButton.tsx";
 
 function remember(name: string): string {
   const n = name.trim() || "Player";
@@ -57,6 +58,7 @@ export function HomeScreen({
           ♚
         </span>
         Battle Royale Chess
+        <MuteButton />
       </h1>
       {!joinCode && <InstallCard />}
       <ol class="rules">

@@ -1,6 +1,8 @@
 import { applyMove } from "@chessroyale/chess";
 import { MiniBoard } from "../components/MiniBoard.tsx";
 import type { GameView } from "../game.ts";
+import { useEffect } from "preact/hooks";
+import { play } from "../sound.ts";
 import { ordinal } from "./StageBreak.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
@@ -8,6 +10,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
   const best = [...played].sort((a, b) => b.roundScore - a.roundScore)[0];
   const worst = [...played].sort((a, b) => a.roundScore - b.roundScore)[0];
   const avgMs = match.scoringMs.length ? match.scoringMs.reduce((a, b) => a + b, 0) / match.scoringMs.length : 0;
+  useEffect(() => {
+    if (placement === 1) play("win");
+  }, []);
   const standings = match.standings();
   const me = standings.find((s) => s.isYou);
   const scariest = standings

@@ -5,6 +5,16 @@
 
 export type ScoreCarry = "reset" | "carry";
 
+/**
+ * How the move that continues a board is chosen from the group's picks:
+ * - random: each pick is one ticket (the original spec)
+ * - popular: the move most players picked (a tie is drawn among the tied moves)
+ * - best: the best move picked (a tie is drawn)
+ * - weighted: a draw where better moves get more tickets (see drawWeightPoints)
+ */
+export type DrawRule = "random" | "popular" | "best" | "weighted";
+export const DRAW_RULES: readonly DrawRule[] = ["random", "popular", "best", "weighted"];
+
 export interface Settings {
   lobbySize: number;
   groupSize: number;
@@ -38,6 +48,10 @@ export interface Settings {
   knockoutsPerStage: readonly number[];
   scoresBetweenStages: ScoreCarry;
   missedMoveScore: number;
+  /** Draw rule per knockout stage (the last entry covers later stages). */
+  drawRuleByStage: readonly DrawRule[];
+  /** Weighted draw: a pick's tickets halve for roughly every this-many × 0.7 points of loss (exp(-loss / this)). */
+  drawWeightPoints: number;
   openingPlies: number;
   /** A line qualifies if the side to move's expected score at its end is inside this window. */
   openingBalance: readonly [number, number];
@@ -77,6 +91,8 @@ export const DEFAULT_SETTINGS: Settings = {
   knockoutsPerStage: [8, 8, 8, 4, 2],
   scoresBetweenStages: "reset",
   missedMoveScore: -25,
+  drawRuleByStage: ["popular", "best"],
+  drawWeightPoints: 4,
   openingPlies: 20,
   openingBalance: [0.4, 0.6],
   retireThreshold: 0.9,

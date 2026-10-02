@@ -1,4 +1,4 @@
-import { Chess } from "chess.js";
+import { Chess, type Square } from "chess.js";
 
 /** Chess rules via chess.js. Moves are in UCI form (e2e4, e7e8q). */
 
@@ -15,6 +15,12 @@ export function applyMove(fen: string, uci: string): string {
 export function toSan(fen: string, uci: string): string {
   const chess = new Chess(fen);
   return chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }).san;
+}
+
+/** The piece on a square: colour and type (p, n, b, r, q, k), or null. */
+export function pieceAt(fen: string, square: string): { color: "w" | "b"; type: "p" | "n" | "b" | "r" | "q" | "k" } | null {
+  const p = new Chess(fen).get(square as Square);
+  return p ? { color: p.color, type: p.type } : null;
 }
 
 export function sideToMove(fen: string): "w" | "b" {

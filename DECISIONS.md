@@ -158,3 +158,21 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
   move "★". Castling was checked with real taps and drags on phone and desktop (`e2e/castling.spec.ts`).
 - **The cut line reads "Cut after round 8"**, and the danger zone is amber ("at risk") instead of dark red, which
   read as "already eliminated". The first cut is after 8 rounds; `?rounds=2` in a link makes it 2 for quick tests.
+
+## Which move continues the board, and sounds (Oct 2, 2026)
+
+- **Draw rule per stage (Eric's hybrid).** Stage 1 plays the **most popular** pick in the group (a tie is drawn among
+  the tied moves, so with four different picks it's random, and weaker players still see their move sometimes).
+  From stage 2 the **best** pick in the group continues the board. This reverses the spec's pure lottery, by Eric's
+  request. Two more rules are available to compare: `weighted` (a draw where better moves get more tickets,
+  `exp(-loss/4)`, so the best move usually wins but others sometimes do) and `random` (the original). Try one for a
+  whole match with `?draw=weighted` (also when creating a lobby). It's `drawRuleByStage` in settings.
+- **The reveal shows everyone's move at once.** See-through copies of each moved piece slide to their squares with
+  the players' names stacked above (yours in blue). Then "All moves in · choosing the move", then the chosen move plays
+  with the reason ("the most popular move in your group", "the best move in your group", …).
+- **Sounds, synthesised in the browser** (Web Audio, so nothing to license or download): a wooden "thock" for every
+  move on the main board (your move, the catch-up replay, the chosen move, the duel), a sharper double knock for
+  captures, a soft chime when a round starts, a sparkle for a power-up, a ding when all moves are in, a rising chord
+  when you survive a cut, a falling one when you're out, and a fanfare for winning. The countdown beeps moved into the
+  same module. A 🔊/🔇 button sits next to the strip and on the first screen, remembered per device. Browsers only allow
+  sound after a tap, so the first tap anywhere turns it on. Recorded samples can replace any of these later.
