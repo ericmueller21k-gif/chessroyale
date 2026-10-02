@@ -54,3 +54,9 @@ export function boardStatus(board: BoardState): BoardStatus {
 export function boardRetireReason(board: BoardState, settings: Settings): RetireReason | null {
   return retireReason(boardStatus(board), settings);
 }
+
+/** The last `n` moves played on a board and the position before them (for replaying what a player missed). */
+export function recentMoves(board: BoardState, n = 4): { from: string; moves: string[] } {
+  const k = Math.min(n, board.history.length);
+  return { from: fenAfter(board.history.slice(0, board.history.length - k)), moves: board.history.slice(board.history.length - k) };
+}

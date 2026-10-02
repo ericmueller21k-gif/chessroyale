@@ -33,7 +33,7 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
 }));
 
 describe("MatchRunner", () => {
-  it("plays a whole match of 32 bots down to the duel, keeping boards in step", async () => {
+  it("plays a whole match of 32 bots down to the duel; players keep one colour per stage", async () => {
     const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 3 };
     const rng = mulberry32(1);
     const runner = new MatchRunner({
@@ -45,11 +45,25 @@ describe("MatchRunner", () => {
     });
     expect(fenAfter(line.slice(0, 20))).toBe(runner.boards.get(0)!.fen);
     let rounds = 0;
+    let lastStage = -1;
+    let colours = new Map<string, string | null>();
     while (!runner.isDuel()) {
-      const side = runner.sideToMove;
       const groups = runner.deal();
-      // Every board has the same side to move, and 4 players.
-      for (const id of groups.keys()) expect(runner.boards.get(id)!.fen.split(" ")[1]).toBe(side);
+      const sides = [...groups.keys()].map((id) => runner.boards.get(id)!.fen.split(" ")[1]);
+      if (groups.size >= 2) {
+        // Half the boards have each side to move, and everyone sits on a board where their colour is to move.
+        expect(sides.filter((s) => s === "w")).toHaveLength(groups.size / 2);
+        for (const [id, ids] of groups) for (const pid of ids) expect(runner.player(pid).colour).toBe(runner.boards.get(id)!.fen.split(" ")[1]);
+      }
+      // Colours stay fixed through a stage, and most players swap at the break.
+      const now = new Map(runner.alive().map((p) => [p.id, p.colour]));
+      if (runner.state.stage === lastStage) expect(now).toEqual(colours);
+      else if (lastStage >= 0 && groups.size >= 2) {
+        const swapped = [...now].filter(([id, c]) => colours.get(id) && colours.get(id) !== c).length;
+        expect(swapped).toBeGreaterThanOrEqual(now.size / 2);
+      }
+      lastStage = runner.state.stage;
+      colours = now;
       expect([...groups.values()].every((g) => g.length === 4)).toBe(true);
       const report = await runner.score(new Map());
       for (const b of report.boards) {

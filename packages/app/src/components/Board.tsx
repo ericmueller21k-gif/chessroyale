@@ -8,6 +8,8 @@ import { legalMoves, sideToMove } from "@chessroyale/chess";
 export interface Arrow {
   move: string;
   brush: "green" | "blue" | "red" | "yellow" | "paleGrey" | "paleBlue";
+  /** Short text on the arrow, e.g. an expected score. */
+  label?: string;
 }
 
 interface BoardProps {
@@ -38,7 +40,12 @@ function destsFor(fen: string): Map<Key, Key[]> {
 }
 
 function shapesFor(arrows: Arrow[] = []): DrawShape[] {
-  return arrows.map((a) => ({ orig: sq(a.move.slice(0, 2)), dest: sq(a.move.slice(2, 4)), brush: a.brush }));
+  return arrows.map((a) => ({
+    orig: sq(a.move.slice(0, 2)),
+    dest: sq(a.move.slice(2, 4)),
+    brush: a.brush,
+    ...(a.label ? { label: { text: a.label } } : {}),
+  }));
 }
 
 /** Chessground board. Tap a piece then a square, or drag. Pawns reaching the last rank open a promotion picker. */
@@ -54,7 +61,10 @@ export function Board({ fen, orientation, lastMove, interactive, onMove, arrows,
       fen,
       orientation,
       coordinates: !small,
-      viewOnly: !interactive,
+      // Input is wired up only when a board is created interactive, so big boards always are;
+      // `movable` and `selectable` decide whether moving is allowed right now.
+      viewOnly: !!small,
+      selectable: { enabled: !!interactive },
       animation: { enabled: animate, duration: 220 },
       highlight: { lastMove: true, check: true },
       movable: { free: false, showDests: true },
@@ -76,7 +86,7 @@ export function Board({ fen, orientation, lastMove, interactive, onMove, arrows,
       fen,
       orientation,
       turnColor: color,
-      viewOnly: !interactive,
+      selectable: { enabled: !!interactive },
       animation: { enabled: animate, duration: 220 },
       lastMove: lastMove ? [sq(lastMove.slice(0, 2)), sq(lastMove.slice(2, 4))] : undefined,
       check: undefined,

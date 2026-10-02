@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, finishDuel, standings, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, allowedMs, finishDuel, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   START_FEN,
@@ -6,9 +6,9 @@ import {
   botRoster,
   gameEnd,
   legalMoves,
+  netBoard,
   sideToMove,
   type BoardScore,
-  type BoardState,
   type ClientMessage,
   type NetBoard,
   type NetDuel,
@@ -39,6 +39,7 @@ interface Human {
   token: string;
   connected: boolean;
   device: "phone" | "computer";
+  practice?: boolean;
 }
 
 type Timer =
@@ -61,9 +62,12 @@ export interface LobbyRecord {
   bots: { id: string; name: string; skill: number }[];
   round: null | {
     key: string;
+    /** The latest personal deadline (the round locks then at the latest). */
     deadline: number;
+    deadlines: Record<string, number>;
     startedAt: number;
     picks: Record<string, { move: string; thinkMs: number }>;
+    powerUps: Record<string, true>;
   };
   timer: null | { at: number; kind: Timer };
   /** Last phase message per human, re-sent on reconnect. */
@@ -105,16 +109,6 @@ export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecor
 const SCORE_TIMEOUT_MS = 15_000;
 const BOT_MOVE_TIMEOUT_MS = 8000;
 
-function netBoard(b: BoardState, withOpening = false): NetBoard {
-  return {
-    id: b.id,
-    fen: b.fen,
-    lastMove: b.lastMove,
-    openingName: b.opening.name,
-    ...(withOpening ? { openingMoves: b.history.slice(0, b.openingPlies) } : {}),
-  };
-}
-
 export class LobbyCore {
   private runner: MatchRunner | null = null;
 
@@ -127,7 +121,7 @@ export class LobbyCore {
   ) {
     this.settings = { ...settings, ...(record.overrides ?? {}) };
     if (record.runner) {
-      this.runner = MatchRunner.restore(record.runner, { settings, rng, engines: [], library });
+      this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library });
     }
   }
 
@@ -182,8 +176,7 @@ export class LobbyCore {
   }
 
   private standings(): NetStanding[] {
-    if (!this.runner) return [];
-    return standings(this.runner.state, () => 0.5).map((p) => ({ id: p.id, name: p.name, score: p.stageScore }));
+    return this.runner?.leaderboard() ?? [];
   }
 
   private cutoff(): number {
@@ -205,7 +198,7 @@ export class LobbyCore {
 
   // ---------------- Connections ----------------
 
-  connect(token: string | undefined, name: string | undefined, device: "phone" | "computer" = "computer") {
+  connect(token: string | undefined, name: string | undefined, device: "phone" | "computer" = "computer", practice = false) {
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
     if (existing) {
       existing.connected = true;
@@ -222,7 +215,7 @@ export class LobbyCore {
     const clean = (name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || `Player ${this.r.humans.length + 1}`;
     const id = `p${++this.r.counter}`;
     const newToken = Array.from({ length: 24 }, () => Math.floor(this.rng() * 16).toString(16)).join("");
-    this.r.humans.push({ id, name: clean, token: newToken, connected: true, device });
+    this.r.humans.push({ id, name: clean, token: newToken, connected: true, device, practice });
     if (!this.r.hostId) this.r.hostId = id;
     this.send(id, { t: "welcome", playerId: id, token: newToken, code: this.r.code }, false);
     this.broadcast(this.lobbyMessage(), false);
@@ -269,6 +262,8 @@ export class LobbyCore {
         return this.start(playerId);
       case "pick":
         return this.pick(playerId, msg.key, msg.move);
+      case "powerUp":
+        return this.powerUp(playerId, msg.key);
       case "scores":
         return this.scores(playerId, msg.key, msg.boards);
       case "crossCheck":
@@ -313,7 +308,7 @@ export class LobbyCore {
       rng: this.rng,
       engines: [],
       library: this.library,
-      entrants: [...this.r.humans.map((h) => ({ id: h.id, name: h.name, isBot: false })), ...bots],
+      entrants: [...this.r.humans.map((h) => ({ id: h.id, name: h.name, isBot: false, practice: !!h.practice })), ...bots],
     });
     this.r.phase = "opening";
     const now = this.io.now();
@@ -356,8 +351,11 @@ export class LobbyCore {
     this.runner.deal();
     const now = this.io.now();
     const key = `${this.runner.state.stage}-${this.runner.state.round}-${++this.r.counter}`;
-    const deadline = now + this.settings.moveClockSeconds * 1000;
-    this.r.round = { key, deadline, startedAt: now, picks: {} };
+    // Each human's deadline comes from their own time bank.
+    const deadlines: Record<string, number> = {};
+    for (const h of this.aliveHumans()) deadlines[h.id] = now + allowedMs(this.runner.player(h.id), this.settings);
+    const deadline = Math.max(now, ...Object.values(deadlines));
+    this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {} };
     this.r.phase = "play";
     const st = this.standings();
     const cutoff = this.cutoff();
@@ -369,7 +367,7 @@ export class LobbyCore {
         key,
         stage: this.runner.state.stage,
         round: this.runner.state.round,
-        deadline,
+        deadline: deadlines[h.id] ?? deadline,
         board: board ? netBoard(board) : null,
         standings: st,
         cutoff,
@@ -404,12 +402,22 @@ export class LobbyCore {
     const round = this.r.round;
     if (this.r.phase !== "play" || !round || round.key !== key || round.picks[playerId]) return;
     const now = this.io.now();
-    if (now > round.deadline + this.settings.lateGraceMs) return; // Late picks count as a miss.
+    const deadline = round.deadlines?.[playerId] ?? round.deadline;
+    if (now > deadline + this.settings.lateGraceMs) return; // Late picks count as a miss.
     const board = this.runner?.boardOf(playerId);
     if (!board || !legalMoves(board.fen).includes(move)) return;
-    round.picks[playerId] = { move, thinkMs: Math.min(now - round.startedAt, this.settings.moveClockSeconds * 1000) };
+    round.picks[playerId] = { move, thinkMs: Math.min(now - round.startedAt, deadline - round.startedAt) };
     this.send(playerId, { t: "locked", key }, false);
     if (this.aliveHumans().every((h) => round.picks[h.id])) this.lock();
+  }
+
+  /** A power-up: the player's browser shows the engine's top moves; the server just counts it. */
+  private powerUp(playerId: string, key: string) {
+    const round = this.r.round;
+    if (this.r.phase !== "play" || !round || round.key !== key || round.picks[playerId] || !this.runner) return;
+    const p = this.runner.state.players.find((x) => x.id === playerId);
+    if (!p?.alive || !(p.practice || p.powerUps > 0)) return;
+    (round.powerUps ??= {})[playerId] = true;
   }
 
   /** Picks are locked: ask the host's browser to score every board. */
@@ -421,7 +429,9 @@ export class LobbyCore {
       boardId,
       fen: this.runner!.boards.get(boardId)!.fen,
       humanPicks: Object.fromEntries(ids.filter((id) => !skills.has(id)).map((id) => [id, this.r.round!.picks[id]?.move ?? null])),
-      bots: ids.filter((id) => skills.has(id)).map((id) => ({ id, skill: skills.get(id)! })),
+      bots: ids
+        .filter((id) => skills.has(id))
+        .map((id) => ({ id, skill: skills.get(id)!, powerUps: this.runner!.player(id).powerUps })),
     }));
     this.r.scoreRequest = { key: this.r.round.key, jobs };
     for (const h of this.r.humans) this.io.send(h.id, { t: "locked", key: this.r.round.key });
@@ -476,6 +486,7 @@ export class LobbyCore {
         const m = s?.botPicks[b.id];
         picks[b.id] = m && legal.includes(m) ? m : legal[0]!;
         runner.setBotThink(b.id, s?.botThinkMs[b.id] ?? 5000);
+        if (s?.botPowerUps?.includes(b.id)) runner.setBotPowerUp(b.id);
       }
       const bestExpected = s?.bestExpected ?? 0.5;
       const expectedAfter: Record<string, number> = { ...(s?.expectedAfter ?? {}) };
@@ -486,8 +497,9 @@ export class LobbyCore {
       return runner.resolveBoard(job.boardId, ids, picks, { bestMove, bestExpected, expectedAfter });
     });
     const think = Object.fromEntries(Object.entries(round.picks).map(([id, p]) => [id, p.thinkMs]));
-    for (const h of this.aliveHumans()) think[h.id] ??= this.settings.moveClockSeconds * 1000;
-    const report = runner.finishRound(results, think);
+    // A miss uses the whole of the player's time for the move.
+    for (const h of this.aliveHumans()) think[h.id] ??= (round.deadlines?.[h.id] ?? round.deadline) - round.startedAt;
+    const report = runner.finishRound(results, think, new Set(Object.keys(round.powerUps ?? {})));
     this.r.scoreRequest = null;
     this.r.phase = "reveal";
     const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
@@ -523,7 +535,7 @@ export class LobbyCore {
     const stage = runner.state.stage;
     const before = this.standings();
     const cutoff = this.cutoff();
-    if (stage === this.settings.knockoutsPerStage.length - 1) for (const s of before) this.r.finalFour[s.id] = s.score;
+    if (stage === this.settings.knockoutsPerStage.length - 1) for (const s of before) if (!s.out) this.r.finalFour[s.id] = s.points;
     const end = runner.endStage();
     for (const p of end.knockedOut) this.r.placements[p.id] = p.placement!;
     this.r.phase = "stageBreak";

@@ -1,4 +1,4 @@
-import type { BoardRound } from "@chessroyale/chess";
+import type { BoardRound, NetStanding } from "@chessroyale/chess";
 import type { Settings } from "@chessroyale/core";
 
 /**
@@ -14,13 +14,23 @@ export interface BoardView {
   openingName: string;
   /** The named opening's moves, for the opening animation. */
   openingMoves?: string[];
+  /** A new number means the board was replaced with a fresh game. */
+  generation: number;
+  /** Moves played on the board so far. */
+  ply: number;
+  /** The last few moves and the position before them, to replay what you missed. */
+  recent: string[];
+  recentFrom: string;
 }
 
-export interface Standing {
-  id: string;
-  name: string;
-  score: number;
-  isYou: boolean;
+/** One row of the live leaderboard. */
+export type Standing = NetStanding & { isYou: boolean };
+
+/** A power-up's suggestion: one of the engine's top moves and the mover's expected score after it. */
+export interface Hint {
+  move: string;
+  san: string;
+  expected: number;
 }
 
 export interface MoveRecord {
@@ -56,7 +66,7 @@ export type Phase =
   | { kind: "loading" }
   | { kind: "lobby" }
   | { kind: "opening"; boards: BoardView[] }
-  | { kind: "play"; board: BoardView; deadline: number }
+  | { kind: "play"; board: BoardView; deadline: number; allowedMs: number }
   | { kind: "scoring"; board: BoardView; move: string | null }
   | { kind: "reveal"; mine: GroupReveal; board: BoardView }
   | { kind: "stageBreak"; stage: number; standings: Standing[]; knockedOut: Standing[]; cutoff: number; youOut: boolean; nextBoards: BoardView[] }
@@ -80,7 +90,20 @@ export interface GameView {
   readonly lossesByStage: number[][];
   readonly moves: MoveRecord[];
   readonly scoringMs: number[];
+  /** The live leaderboard: alive players best first, then those knocked out. */
   standings(): Standing[];
+  /** Practice mode: unlimited power-ups. */
+  readonly practice: boolean;
+  /** Power-ups you can use now (Infinity in practice mode). */
+  powerUpsLeft(): number;
+  /** This move's power-up suggestions, once used. */
+  readonly hint: Hint[] | null;
+  /** Uses a power-up on the current move: the engine's top 3 moves. */
+  usePowerUp(): void;
+  /** White's expected score in a position (for the evaluation bar), from this device's engine. */
+  evaluate(fen: string): Promise<number | null>;
+  /** Moves already seen on each board (key "id:generation"), to replay only what you missed. */
+  readonly seen: Map<string, number>;
   /** Players ranked at or below this many go out at the end of the stage. */
   readonly cutoff: number;
   nameOf(id: string): string;

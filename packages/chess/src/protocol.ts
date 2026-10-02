@@ -17,12 +17,31 @@ export interface NetBoard {
   lastMove: string | null;
   openingName: string;
   openingMoves?: string[];
+  /** Replacements this board slot has had (a new number means a new game). */
+  generation: number;
+  /** Moves played on this board so far. */
+  ply: number;
+  /** The last few moves (up to 4) and the position before them, to replay what a player missed. */
+  recent: string[];
+  recentFrom: string;
 }
 
+/** One row of the live leaderboard. */
 export interface NetStanding {
   id: string;
   name: string;
-  score: number;
+  /** What the standings rank by: stage score plus the value of unused time and power-ups. */
+  points: number;
+  stageScore: number;
+  /** Average round score this stage. */
+  avg: number;
+  bankMs: number;
+  powerUps: number;
+  practice: boolean;
+  isBot: boolean;
+  /** Knocked out (then `placement` is set). */
+  out: boolean;
+  placement: number | null;
 }
 
 export interface NetPick {
@@ -41,6 +60,8 @@ export interface BoardScore {
   expectedAfter: Record<string, number>;
   botPicks: Record<string, string>;
   botThinkMs: Record<string, number>;
+  /** Bots that used a power-up on this board. */
+  botPowerUps?: string[];
 }
 
 export interface ScoreJob {
@@ -48,7 +69,7 @@ export interface ScoreJob {
   fen: string;
   /** Human picks on this board (null = missed). */
   humanPicks: Record<string, string | null>;
-  bots: { id: string; skill: number }[];
+  bots: { id: string; skill: number; powerUps: number }[];
 }
 
 export interface NetDuel {
@@ -63,9 +84,10 @@ export interface NetDuel {
 }
 
 export type ClientMessage =
-  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer" }
+  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean }
   | { t: "start" }
   | { t: "pick"; key: string; move: string }
+  | { t: "powerUp"; key: string }
   | { t: "scores"; key: string; boards: BoardScore[] }
   | { t: "crossCheck"; key: string; boardId: number; ok: boolean; detail?: string }
   | { t: "chooseColour"; colour: "w" | "b" }
@@ -84,6 +106,7 @@ export type ServerMessage = { now: number } & (
       key: string;
       stage: number;
       round: number;
+      /** This player's deadline (from their own time bank). */
       deadline: number;
       board: NetBoard | null;
       standings: NetStanding[];

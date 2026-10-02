@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useState } from "preact/hooks";
 import { DEFAULT_SETTINGS, type Settings } from "@chessroyale/core";
 import { unlockAudio } from "./components/Countdown.tsx";
+import { RaceTower } from "./components/RaceTower.tsx";
 import { enginePool } from "./engine.ts";
 import type { GameView } from "./game.ts";
 import { NetMatch } from "./net.ts";
@@ -50,7 +51,9 @@ export function App() {
   useEffect(() => {
     if (!linkCode) return;
     try {
-      if (localStorage.getItem(`brc.lobby.${linkCode}`)) joinLobby(localStorage.getItem("brc.name") ?? "Player", linkCode);
+      if (localStorage.getItem(`brc.lobby.${linkCode}`)) {
+        joinLobby(localStorage.getItem("brc.name") ?? "Player", linkCode, localStorage.getItem("brc.practice") === "1");
+      }
     } catch {
       // No storage: show the join form.
     }
@@ -63,27 +66,27 @@ export function App() {
     if (debug) (window as unknown as { match: GameView }).match = m;
   };
 
-  const startSolo = async (name: string) => {
+  const startSolo = async (name: string, practice: boolean) => {
     unlockAudio();
     setLoading(true);
     const engines = await enginePool();
     setLoading(false);
-    const m = new SoloMatch(engines, name, { ...DEFAULT_SETTINGS, ...overridesFromUrl() });
+    const m = new SoloMatch(engines, name, { ...DEFAULT_SETTINGS, ...overridesFromUrl() }, practice);
     use(m);
     m.start();
   };
 
-  const joinLobby = (name: string, code: string) => {
+  const joinLobby = (name: string, code: string, practice: boolean) => {
     unlockAudio();
     setError(null);
-    const m = new NetMatch(code.toUpperCase(), name, enginePool);
+    const m = new NetMatch(code.toUpperCase(), name, enginePool, practice);
     m.settings = { ...DEFAULT_SETTINGS, ...overridesFromUrl() };
     use(m);
     history.replaceState(null, "", `/lobby/${m.code}${location.search}`);
     m.connect();
   };
 
-  const createLobby = async (name: string) => {
+  const createLobby = async (name: string, practice: boolean) => {
     setLoading(true);
     try {
       const params = new URLSearchParams(location.search);
@@ -91,7 +94,7 @@ export function App() {
       const res = await fetch(`/api/lobby?${params}`, { method: "POST" });
       const body = (await res.json()) as { code?: string; message?: string };
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");
-      joinLobby(name, body.code);
+      joinLobby(name, body.code, practice);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -108,8 +111,8 @@ export function App() {
   if (!match) {
     return (
       <HomeScreen
-        onStart={(n) => void startSolo(n)}
-        onCreateLobby={(n) => void createLobby(n)}
+        onStart={(n, p) => void startSolo(n, p)}
+        onCreateLobby={(n, p) => void createLobby(n, p)}
         onJoinLobby={joinLobby}
         loading={loading}
         joinCode={linkCode}
@@ -130,6 +133,26 @@ export function App() {
     );
   }
 
+  const screen = renderPhase(match, {
+    leave,
+    again: () => (match instanceof SoloMatch ? void startSolo(match.playerName, match.practice) : leave()),
+  });
+  // Computers get the leaderboard as a permanent sidebar during the knockout stages.
+  const tower = ["play", "scoring", "reveal", "spectating"].includes(match.phase.kind) && match.standings().length > 0;
+  if (!tower) return screen;
+  return (
+    <div class="arena">
+      <aside class="tower-side">
+        <RaceTower standings={match.standings()} cutoff={match.cutoff} />
+      </aside>
+      {screen}
+    </div>
+  );
+}
+
+const boardKey = (b: { id: number; generation: number; ply: number }) => `${b.id}:${b.generation}:${b.ply}`;
+
+function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void }) {
   const p = match.phase;
   switch (p.kind) {
     case "loading":
@@ -139,7 +162,7 @@ export function App() {
         </div>
       );
     case "lobby":
-      return match instanceof NetMatch ? <LobbyScreen match={match} onLeave={leave} /> : null;
+      return match instanceof NetMatch ? <LobbyScreen match={match} onLeave={actions.leave} /> : null;
     case "opening":
       return <OpeningGrid boards={p.boards} title="Today's openings" />;
     case "spectating":
@@ -151,9 +174,9 @@ export function App() {
         />
       );
     case "play":
-      return <PlayScreen match={match} board={p.board} deadline={p.deadline} />;
+      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} deadline={p.deadline} allowedMs={p.allowedMs} />;
     case "scoring":
-      return <PlayScreen match={match} board={p.board} deadline={0} picked={p.move} />;
+      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} deadline={0} picked={p.move} />;
     case "reveal":
       return <RevealScreen match={match} mine={p.mine} board={p.board} />;
     case "stageBreak":
@@ -177,8 +200,8 @@ export function App() {
           match={match}
           placement={p.placement}
           winner={p.winner}
-          onAgain={() => (match instanceof SoloMatch ? void startSolo(match.playerName) : leave())}
-          onHome={leave}
+          onAgain={actions.again}
+          onHome={actions.leave}
         />
       );
   }

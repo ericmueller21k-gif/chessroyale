@@ -8,8 +8,27 @@ export type ScoreCarry = "reset" | "carry";
 export interface Settings {
   lobbySize: number;
   groupSize: number;
-  /** Seconds a player has to pick a move. */
+  /** The longest a single move may take (seconds), so a round never waits long for anyone. */
   moveClockSeconds: number;
+  /** Each player's time bank for the whole match (seconds). Thinking time comes out of it. */
+  timeBankSeconds: number;
+  /** Added to the bank at the start of every move (seconds), so even an empty bank leaves this long to move. */
+  timeIncrementSeconds: number;
+  /**
+   * Standings count the change in your time bank over the stage at this many
+   * points per minute: moving faster than the increment gains, slower loses.
+   */
+  timeBonusPointsPerMinute: number;
+  /** Power-ups (reveal the engine's top 3 moves): how many each player starts with. */
+  powerUpsAtStart: number;
+  /** Power-ups added for every player who survives a cut. */
+  powerUpsPerStage: number;
+  /** Using a power-up costs this many points in the stage standings (so saving them pays). */
+  powerUpCostPoints: number;
+  /** Bots use a power-up when the second-best candidate loses at least this many points. */
+  botPowerUpLoss: number;
+  /** Each player keeps one colour for a whole stage, swapping at stage breaks (needs 2+ boards). */
+  colourPerStage: boolean;
   /** A pick arriving this long after the deadline still counts. */
   lateGraceMs: number;
   revealSeconds: number;
@@ -48,7 +67,15 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   lobbySize: 32,
   groupSize: 4,
-  moveClockSeconds: 10,
+  moveClockSeconds: 30,
+  timeBankSeconds: 600,
+  timeIncrementSeconds: 5,
+  timeBonusPointsPerMinute: 2,
+  powerUpsAtStart: 1,
+  powerUpsPerStage: 1,
+  powerUpCostPoints: 4,
+  botPowerUpLoss: 15,
+  colourPerStage: true,
   lateGraceMs: 300,
   revealSeconds: 4,
   drawnMoveSeconds: 1.5,
@@ -67,7 +94,7 @@ export const DEFAULT_SETTINGS: Settings = {
   botCandidateMoves: 8,
   botSkillRange: [0.25, 32],
   botRandomMoveChance: 0.02,
-  botThinkSeconds: [2, 8],
+  botThinkSeconds: [3, 20],
   duelClockSeconds: 180,
 };
 

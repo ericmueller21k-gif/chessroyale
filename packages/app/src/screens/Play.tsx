@@ -1,34 +1,104 @@
+import { useEffect, useState } from "preact/hooks";
 import { sideToMove } from "@chessroyale/chess";
-import { Board } from "../components/Board.tsx";
+import { Board, type Arrow } from "../components/Board.tsx";
 import { Countdown } from "../components/Countdown.tsx";
+import { EvalBar } from "../components/EvalBar.tsx";
+import { clockText } from "../components/RaceTower.tsx";
 import type { BoardView, GameView } from "../game.ts";
+import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 
-export function PlayScreen({ match, board, deadline, picked }: { match: GameView; board: BoardView; deadline: number; picked?: string | null }) {
+const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
+
+/** Your time bank, ticking down while you think. */
+function BankClock({ match, deadline, allowedMs }: { match: GameView; deadline: number; allowedMs: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
+  const me = match.standings().find((s) => s.isYou);
+  if (!me) return null;
+  const startedAt = deadline - allowedMs;
+  const bank = Math.max(0, me.bankMs + match.settings.timeIncrementSeconds * 1000 - Math.max(0, now - startedAt));
+  return (
+    <span class={`bank ${bank < 60_000 ? "low" : ""}`} title="Time bank: +5 s every move; what's left counts as points">
+      Bank {clockText(bank)}
+    </span>
+  );
+}
+
+export function PlayScreen({
+  match,
+  board,
+  deadline,
+  allowedMs,
+  picked,
+}: {
+  match: GameView;
+  board: BoardView;
+  deadline: number;
+  allowedMs?: number;
+  picked?: string | null;
+}) {
   const side = sideToMove(board.fen);
   const waiting = picked !== undefined;
+  const shown = useReplay(match, board);
+  const hint = match.hint;
+  const left = match.powerUpsLeft();
+  const arrows: Arrow[] =
+    !waiting && hint ? hint.map((h, i) => ({ move: h.move, brush: HINT_BRUSHES[i]!, label: (h.expected * 100).toFixed(1) })) : [];
   return (
     <div class="screen game">
       <Hud match={match} />
       <div class="board-area">
-        <div class="opening-name">{board.openingName}</div>
-        <Board
-          fen={board.fen}
-          orientation={side === "w" ? "white" : "black"}
-          lastMove={board.lastMove}
-          interactive={!waiting}
-          onMove={(m) => match.submit(m)}
-        />
+        <div class="opening-name">
+          {board.openingName}
+          {shown.replaying && <span class="replay-tag"> · catching up…</span>}
+        </div>
+        <div class="board-row">
+          <EvalBar fen={board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />
+          <Board
+            fen={shown.fen}
+            orientation={side === "w" ? "white" : "black"}
+            lastMove={shown.lastMove}
+            interactive={!waiting && !shown.replaying}
+            onMove={(m) => match.submit(m)}
+            arrows={arrows}
+          />
+        </div>
       </div>
       <div class="play-footer">
         {waiting ? (
           <div class="status">{picked ? "Move locked in. Scoring…" : "Time's up. Scoring…"}</div>
         ) : (
           <>
-            <Countdown deadline={deadline} total={match.settings.moveClockSeconds * 1000} />
-            <div class="status">
-              You play <strong>{side === "w" ? "White" : "Black"}</strong>. Find the best move: your first move is final.
+            <Countdown deadline={deadline} total={allowedMs ?? match.settings.moveClockSeconds * 1000} />
+            <div class="play-row">
+              <span class="status">
+                You play <strong>{side === "w" ? "White" : "Black"}</strong>
+              </span>
+              {allowedMs !== undefined && <BankClock match={match} deadline={deadline} allowedMs={allowedMs} />}
             </div>
+            {hint && hint.length > 0 ? (
+              <ol class="hints">
+                {hint.map((h, i) => (
+                  <li key={h.move} class={`hint-${HINT_BRUSHES[i]}`}>
+                    <strong>{h.san}</strong>
+                    <span>{(h.expected * 100).toFixed(1)}% expected</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <button
+                type="button"
+                class="btn btn-secondary btn-powerup"
+                disabled={left <= 0 || hint !== null}
+                onClick={() => match.usePowerUp()}
+              >
+                {hint ? "Asking the engine…" : left === Infinity ? "💡 Show the engine's top 3 (practice)" : `⚡ Power-up: show the top 3 (${left} left)`}
+              </button>
+            )}
           </>
         )}
       </div>

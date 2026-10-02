@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, botPick, botThinkMs as thinkMs, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botChoose, botPick, botThinkMs as thinkMs, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   sideToMove,
@@ -13,7 +13,8 @@ import {
   type UciEngine,
   TopMovesCache,
 } from "@chessroyale/chess";
-import type { BoardView, DuelView, GameView, MoveRecord, Phase, Standing } from "./game.ts";
+import type { BoardView, DuelView, GameView, Hint, MoveRecord, Phase, Standing } from "./game.ts";
+import { hintsFrom, whiteExpected } from "./hints.ts";
 
 /**
  * A multiplayer match: the lobby server runs the clock and the draw; this
@@ -52,11 +53,14 @@ export class NetMatch implements GameView {
   private retry = 0;
   /** Top-move searches started while players think (the host's for every board, others' for their own). */
   private top = new TopMovesCache(DEFAULT_SETTINGS.botCandidateMoves);
+  hint: Hint[] | null = null;
+  readonly seen = new Map<string, number>();
 
   constructor(
     readonly code: string,
     readonly playerName: string,
     private readonly engines: () => Promise<UciEngine[]>,
+    readonly practice = false,
   ) {}
 
   get totalPlayers() {
@@ -73,6 +77,31 @@ export class NetMatch implements GameView {
   }
   standings(): Standing[] {
     return this.standingsList.map((s) => ({ ...s, isYou: s.id === this.myId }));
+  }
+  powerUpsLeft(): number {
+    if (this.practice) return Infinity;
+    if (this.hint) return 0;
+    return this.standingsList.find((s) => s.id === this.myId)?.powerUps ?? 0;
+  }
+  usePowerUp() {
+    if (this.phase.kind !== "play" || !this.key || this.hint || this.powerUpsLeft() <= 0) return;
+    const fen = this.phase.board.fen;
+    this.send({ t: "powerUp", key: this.key });
+    this.hint = [];
+    this.emit();
+    void this.engines()
+      .then((engines) => this.top.get(engines[0]!, fen))
+      .then((top) => {
+        if (this.phase.kind === "play" && this.phase.board.fen === fen) {
+          this.hint = hintsFrom(fen, top);
+          this.emit();
+        }
+      })
+      .catch(() => undefined);
+  }
+  async evaluate(fen: string): Promise<number | null> {
+    const engines = await this.engines();
+    return whiteExpected(fen, await this.top.get(engines[0]!, fen));
   }
   get inviteUrl() {
     return `${location.origin}/lobby/${this.code}`;
@@ -113,7 +142,7 @@ export class NetMatch implements GameView {
         // No storage: join as a new player.
       }
       const device = matchMedia("(pointer: coarse)").matches ? "phone" : "computer";
-      this.send({ t: "hello", token, name: this.playerName, device });
+      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as ServerMessage);
     ws.onclose = () => {
@@ -135,7 +164,7 @@ export class NetMatch implements GameView {
   }
 
   private toView(b: NetBoard): BoardView {
-    return { id: b.id, fen: b.fen, lastMove: b.lastMove, openingName: b.openingName, openingMoves: b.openingMoves };
+    return b;
   }
 
   private onMessage(m: ServerMessage) {
@@ -165,6 +194,7 @@ export class NetMatch implements GameView {
       case "round":
         this.key = m.key;
         this.myPick = null;
+        this.hint = null;
         this.stage = m.stage;
         this.roundsPlayed = m.round;
         this.standingsList = m.standings;
@@ -173,7 +203,8 @@ export class NetMatch implements GameView {
           this.prefetch([m.board.fen]);
           this.currentBoard = m.board;
           this.playStartedAt = Date.now();
-          return this.setPhase({ kind: "play", board: this.toView(m.board), deadline: this.local(m.deadline) });
+          const deadline = this.local(m.deadline);
+          return this.setPhase({ kind: "play", board: this.toView(m.board), deadline, allowedMs: Math.max(0, deadline - Date.now()) });
         }
         return this.emit();
       case "locked":
@@ -333,8 +364,11 @@ export class NetMatch implements GameView {
           const legal = legalMoves(job.fen);
           const botPicks: Record<string, string> = {};
           const botThinkMs: Record<string, number> = {};
+          const botPowerUps: string[] = [];
           for (const b of job.bots) {
-            botPicks[b.id] = botPick(Math.random, candidates, b.skill, legal, this.settings);
+            const choice = botChoose(Math.random, candidates, { skill: b.skill, powerUps: b.powerUps ?? 0 }, legal, this.settings);
+            botPicks[b.id] = choice.move;
+            if (choice.usedPowerUp) botPowerUps.push(b.id);
             botThinkMs[b.id] = thinkMs(Math.random, this.settings);
           }
           const expectedAfter: Record<string, number> = Object.fromEntries(top.map((mv) => [mv.move, mv.expected]));
@@ -342,7 +376,7 @@ export class NetMatch implements GameView {
             (mv): mv is string => !!mv && expectedAfter[mv] === undefined,
           );
           if (missing.length) for (const s of await engine.scoreMoves(job.fen, missing)) expectedAfter[s.move] = s.expected;
-          out[i] = { boardId: job.boardId, bestMove: top[0]!.move, bestExpected: best, expectedAfter, botPicks, botThinkMs };
+          out[i] = { boardId: job.boardId, bestMove: top[0]!.move, bestExpected: best, expectedAfter, botPicks, botThinkMs, botPowerUps };
         }
       }),
     );

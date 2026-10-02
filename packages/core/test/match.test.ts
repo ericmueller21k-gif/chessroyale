@@ -3,7 +3,10 @@ import {
   DEFAULT_SETTINGS,
   alivePlayers,
   applyRound,
+  allowedMs,
+  assignColours,
   assignGroups,
+  botChoose,
   botPick,
   createMatch,
   endStage,
@@ -13,6 +16,7 @@ import {
   mulberry32,
   retireReason,
   stagePlan,
+  standingPoints,
   standings,
   type MatchState,
 } from "../src/index.ts";
@@ -159,5 +163,93 @@ describe("botPick", () => {
     };
     expect(count(0.5)).toBeGreaterThan(0.95);
     expect(count(20)).toBeLessThan(0.6);
+  });
+});
+
+describe("time bank and power-ups", () => {
+  const s = DEFAULT_SETTINGS;
+
+  it("caps a move at the move clock, adds the increment, and never goes below zero", () => {
+    let state = createMatch(entrants, boards);
+    const me = () => state.players[0]!;
+    expect(me().bankMs).toBe(600_000);
+    expect(allowedMs(me())).toBe(30_000);
+    const groups = assignGroups(mulberry32(1), state);
+    const play = (thinkMs: number) =>
+      (state = applyRound(state, groups, [{ playerId: "p0", roundScore: 0, loss: 0, thinkMs }]));
+    play(12_000); // 600 + 5 - 12
+    expect(me().bankMs).toBe(593_000);
+    play(99_000); // capped at 30 s
+    expect(me().bankMs).toBe(568_000);
+    state = { ...state, players: state.players.map((p, i) => (i === 0 ? { ...p, bankMs: 2000 } : p)) };
+    expect(allowedMs(me())).toBe(7000);
+    play(7000);
+    expect(me().bankMs).toBe(0);
+    expect(allowedMs(me())).toBe(5000);
+  });
+
+  it("counts time and power-ups in the stage standings; using a power-up spends one", () => {
+    let state = createMatch(entrants, boards);
+    const groups = assignGroups(mulberry32(1), state);
+    state = applyRound(state, groups, [
+      { playerId: "p0", roundScore: 3, loss: 0, thinkMs: 5000, usedPowerUp: true },
+      { playerId: "p1", roundScore: 3, loss: 0, thinkMs: 5000 },
+    ]);
+    const [p0, p1] = state.players;
+    expect(p0!.powerUps).toBe(0);
+    expect(p0!.powerUpsUsed).toBe(1);
+    expect(p1!.powerUps).toBe(1);
+    // Thinking exactly the 5 s increment leaves the bank unchanged; the power-up costs 4.
+    expect(standingPoints(p1!)).toBeCloseTo(3);
+    expect(standingPoints(p0!)).toBeCloseTo(3 - s.powerUpCostPoints);
+    expect(standings(state, mulberry32(2))[0]!.id).toBe("p1");
+    // A player with none left can't use one.
+    state = applyRound(state, groups, [{ playerId: "p0", roundScore: 0, loss: 0, thinkMs: 0, usedPowerUp: true }]);
+    expect(state.players[0]!.powerUps).toBe(0);
+    expect(state.players[0]!.powerUpsUsed).toBe(1);
+    // Survivors get another at the cut.
+    const next = endStage(state, mulberry32(3), [0, 1, 2, 3, 4, 5]).state;
+    expect(next.players.find((p) => p.id === "p1")!.powerUps).toBe(2);
+  });
+
+  it("practice players have unlimited power-ups (each still costs points)", () => {
+    let state = createMatch([{ id: "me", name: "Me", isBot: false, practice: true }, ...entrants.slice(1)], boards);
+    const groups = assignGroups(mulberry32(1), state);
+    for (let i = 0; i < 3; i++) {
+      state = applyRound(state, groups, [{ playerId: "me", roundScore: 0, loss: 0, thinkMs: 0, usedPowerUp: true }]);
+    }
+    expect(state.players[0]!.powerUps).toBe(1);
+    expect(state.players[0]!.powerUpsUsed).toBe(3);
+    // Three instant moves bank 15 s (+0.5) and three power-ups cost 12.
+    expect(standingPoints(state.players[0]!)).toBeCloseTo(3 * (5 / 60) * s.timeBonusPointsPerMinute - 3 * s.powerUpCostPoints);
+  });
+
+  it("bots spend a power-up on sharp positions only", () => {
+    const sharp = [{ move: "a", loss: 0 }, { move: "b", loss: 30 }];
+    const quiet = [{ move: "a", loss: 0 }, { move: "b", loss: 2 }];
+    expect(botChoose(mulberry32(1), sharp, { skill: 20, powerUps: 1 }, ["a", "b"])).toEqual({ move: "a", usedPowerUp: true });
+    expect(botChoose(mulberry32(1), sharp, { skill: 20, powerUps: 0 }, ["a", "b"]).usedPowerUp).toBe(false);
+    expect(botChoose(mulberry32(1), quiet, { skill: 20, powerUps: 1 }, ["a", "b"]).usedPowerUp).toBe(false);
+  });
+});
+
+describe("colours per stage", () => {
+  it("splits players evenly and swaps last stage's colours where it can", () => {
+    let state = assignColours(createMatch(entrants, boards), mulberry32(1), 16);
+    expect(state.players.filter((p) => p.colour === "w")).toHaveLength(16);
+    const before = new Map(state.players.map((p) => [p.id, p.colour]));
+    state = assignColours(state, mulberry32(2), 16);
+    expect(state.players.every((p) => p.colour !== before.get(p.id))).toBe(true);
+    expect(assignColours(state, mulberry32(3), null).players.every((p) => p.colour === null)).toBe(true);
+  });
+
+  it("groups players only onto boards where their colour is to move", () => {
+    const state = assignColours(createMatch(entrants, boards), mulberry32(1), 16);
+    const sides = new Map(boards.map((b) => [b, b < 4 ? ("w" as const) : ("b" as const)]));
+    const groups = assignGroups(mulberry32(4), state, DEFAULT_SETTINGS, 4000, sides);
+    for (const [b, ids] of groups) {
+      expect(ids).toHaveLength(4);
+      for (const id of ids) expect(state.players.find((p) => p.id === id)!.colour).toBe(sides.get(b));
+    }
   });
 });

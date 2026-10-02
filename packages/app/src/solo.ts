@@ -1,7 +1,8 @@
-import { DEFAULT_SETTINGS, botPick, finishDuel, standings, type PlayerState, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, allowedMs, botPick, finishDuel, type PlayerState, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   applyMove,
+  netBoard,
   gameEnd,
   legalMoves,
   sideToMove,
@@ -13,13 +14,14 @@ import {
 } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster } from "@chessroyale/chess";
-import type { BoardView, DuelView, GameView, MoveRecord, Phase, Standing } from "./game.ts";
+import type { BoardView, DuelView, GameView, Hint, MoveRecord, Phase, Standing } from "./game.ts";
+import { hintsFrom, whiteExpected } from "./hints.ts";
 
 export const HUMAN = "you";
 const library = openingsData as Opening[];
 
 export function boardView(b: BoardState): BoardView {
-  return { id: b.id, fen: b.fen, lastMove: b.lastMove, openingName: b.opening.name, openingMoves: b.history.slice(0, b.openingPlies) };
+  return netBoard(b, true);
 }
 
 /**
@@ -38,11 +40,14 @@ export class SoloMatch implements GameView {
   private playStartedAt = 0;
   private duelOpponent: PlayerState | null = null;
   private duelLosses = { you: [] as number[], bot: [] as number[] };
+  hint: Hint[] | null = null;
+  readonly seen = new Map<string, number>();
 
   constructor(
     private readonly engines: UciEngine[],
     readonly playerName: string,
     readonly settings: Settings = DEFAULT_SETTINGS,
+    readonly practice = false,
   ) {}
 
   // ---- GameView ----
@@ -69,7 +74,26 @@ export class SoloMatch implements GameView {
     return id === HUMAN;
   }
   standings(): Standing[] {
-    return standings(this.runner.state, () => 0.5).map((p) => ({ id: p.id, name: p.name, score: p.stageScore, isYou: p.id === HUMAN }));
+    return this.runner.leaderboard().map((s) => ({ ...s, isYou: s.id === HUMAN }));
+  }
+  powerUpsLeft(): number {
+    if (this.practice) return Infinity;
+    return this.hint ? 0 : this.you.powerUps;
+  }
+  usePowerUp() {
+    if (this.phase.kind !== "play" || this.hint || this.powerUpsLeft() <= 0) return;
+    const fen = this.phase.board.fen;
+    this.hint = [];
+    this.emit();
+    void this.runner.topMovesFor(fen).then((top) => {
+      if (this.phase.kind === "play" && this.phase.board.fen === fen) {
+        this.hint = hintsFrom(fen, top);
+        this.emit();
+      }
+    });
+  }
+  async evaluate(fen: string): Promise<number | null> {
+    return whiteExpected(fen, await this.runner.topMovesFor(fen));
   }
   get cutoff(): number {
     return this.runner.alive().length - (this.settings.knockoutsPerStage[this.runner.state.stage] ?? 0);
@@ -106,7 +130,7 @@ export class SoloMatch implements GameView {
       rng: this.rng,
       engines: this.engines,
       library,
-      entrants: [{ id: HUMAN, name: this.playerName, isBot: false }, ...botRoster(this.rng)],
+      entrants: [{ id: HUMAN, name: this.playerName, isBot: false, practice: this.practice }, ...botRoster(this.rng, 31, this.settings)],
     });
     this.set({ kind: "opening", boards: [...this.runner.boards.values()].map(boardView) });
     this.timer = setTimeout(() => this.nextRound(), this.settings.openingShowSeconds * 1000);
@@ -119,8 +143,10 @@ export class SoloMatch implements GameView {
     this.runner.prefetch();
     const board = this.runner.boardOf(HUMAN)!;
     this.playStartedAt = Date.now();
-    this.set({ kind: "play", board: boardView(board), deadline: this.playStartedAt + this.settings.moveClockSeconds * 1000 });
-    this.timer = setTimeout(() => this.submit(null), this.settings.moveClockSeconds * 1000 + this.settings.lateGraceMs);
+    this.hint = null;
+    const allowed = allowedMs(this.you, this.settings);
+    this.set({ kind: "play", board: boardView(board), deadline: this.playStartedAt + allowed, allowedMs: allowed });
+    this.timer = setTimeout(() => this.submit(null), allowed + this.settings.lateGraceMs);
   }
 
   /** The human's pick; final once made. */
@@ -131,11 +157,12 @@ export class SoloMatch implements GameView {
   private async score(move: string | null) {
     if (this.phase.kind !== "play") return;
     if (this.timer) clearTimeout(this.timer);
-    const { board } = this.phase;
-    const thinkMs = Math.min(Date.now() - this.playStartedAt, this.settings.moveClockSeconds * 1000);
+    const { board, allowedMs: allowed } = this.phase;
+    const thinkMs = Math.min(Date.now() - this.playStartedAt, allowed);
+    const usedPowerUp = this.hint !== null;
     this.set({ kind: "scoring", board, move });
     const t = performance.now();
-    const report = await this.runner.score(new Map([[HUMAN, { move, thinkMs }]]));
+    const report = await this.runner.score(new Map([[HUMAN, { move, thinkMs, usedPowerUp }]]));
     this.scoringMs.push(performance.now() - t);
     const mine = report.boards.find((b) => b.playerIds.includes(HUMAN))!;
     const me = mine.result.players.find((p) => p.playerId === HUMAN)!;
@@ -163,7 +190,7 @@ export class SoloMatch implements GameView {
     const stage = this.runner.state.stage;
     const before = this.standings();
     const cutoff = this.cutoff;
-    if (stage === this.settings.knockoutsPerStage.length - 1) for (const s of before) this.finalFourScores.set(s.id, s.score);
+    if (stage === this.settings.knockoutsPerStage.length - 1) for (const s of before) if (!s.out) this.finalFourScores.set(s.id, s.points);
     const end = this.runner.endStage();
     const outIds = new Set(end.knockedOut.map((p) => p.id));
     this.set({

@@ -46,13 +46,15 @@ test("strong play survives every stage, reaches the duel, and sees results", asy
     const p = await phase(page);
     if (p === "results") break;
     if (p === "play") {
+      // Moves are possible once the replay of what you missed has finished.
+      await expect(page.locator(".replay-tag")).toHaveCount(0);
       await clickMove(page, await bestMove(page));
       await expect.poll(() => phase(page)).not.toBe("play");
     } else if (p === "reveal") {
       await page.waitForTimeout(1900);
       await page.locator(".screen").click();
     } else if (p === "stageBreak") {
-      await expect(page.locator(".standings li").first()).toBeVisible();
+      await expect(page.locator(".tower-row").first()).toBeVisible();
       await page.getByRole("button", { name: /Next stage|See how it ends/ }).click();
     } else if (p === "duelColour") {
       await page.getByRole("button", { name: "Play White" }).click();

@@ -93,3 +93,40 @@ Answer to its question 8, the settings changed or kept because of it:
   1.8 MB engine, so solo works offline and the app opens instantly. Pages are always fetched fresh when online (the
   Word Trap lesson), so updates show up on the next open. Android/desktop Chrome get an Install button; iPhone gets
   Share → Add to Home Screen instructions.
+
+## Changes after Eric's first look (Oct 2, 2026)
+
+Eric asked for these. Where they reverse the spec, the request wins; the details were my call.
+
+- **Time bank instead of a fixed 10-second clock.** Each player has 10 minutes for the match, +5 s added at the start
+  of every move, and no single move may take more than 30 s. The 30 s cap matters in lobbies: all 32 players are on the
+  same round, so one slow thinker could otherwise hold everyone up for minutes. Rounds still lock early once every
+  human has moved, and solo never waits for bots. With an empty bank you still get the 5 s top-up. Bots record a
+  thinking time of 3–20 s, which comes out of their banks too.
+- **Time counts in the standings, per stage.** Moving faster than the 5 s top-up gains 2 points a minute, and slower
+  loses at the same rate, measured over the current stage. The first version counted the whole bank (20 points for
+  10:00), which made every row read +20 and hid who was actually playing well, so it's now relative and starts at 0
+  each stage, like scores.
+- **Power-ups.** One at the start, plus one more for everyone who survives a cut, and unused ones carry over. Using one shows
+  the engine's top 3 moves as labelled arrows with each move's expected score. Each one used costs 4 points in that
+  stage's standings, which is Eric's "rewarded if not used" put as a cost, so the leaderboard stays readable. The
+  hint comes from the search the device already runs for the eval bar, so it appears almost at once. Bots use one when
+  a position is sharp (the second-best move loses 15+ points), then play the best move.
+- **Practice mode** (checkbox on the first screen): unlimited power-ups, each still charged, and a 💡 on the
+  leaderboard so everyone can see who's using it. This replaces my earlier idea of 3 shuffled "good, okay, so-so"
+  suggestions; the power-up view does the same job.
+- **Evaluation bar always shown**, on the play screen and for both duel players. The spec said players never see it;
+  Eric decided otherwise. On the play screen it reuses the top-moves search already running for scoring.
+- **One colour per stage.** Half the boards now have White to move and half Black (openings are cut at 20 or 21
+  plies). Each player is White or Black for a whole stage, so the board never flips under you, and colours swap at
+  each cut, as evenly as the numbers allow. Shrinking keeps half of each colour's boards. The final four share one
+  board, so colours alternate there. Grouping only seats players on boards where their colour is to move, which also
+  means you never get the same board twice in a row.
+- **Catching up on a board.** When you land on a board, the moves played since you last saw it are replayed (or the
+  last 2 if it's new to you), up to 4 at about half a second each, before you can move. The move you watch drawn in
+  the reveal counts as seen.
+- **Live leaderboard, styled like a racing timing tower.** Position, name, stage points, average per move, time bank
+  and power-ups. Rows slide to new positions after each round, a red line marks the elimination cut, and the 2 players
+  either side of it pulse. On a computer it's a permanent sidebar. On a phone, a strip above the board shows your
+  position, your gap to the cut and your power-ups, the reveal shows a compact tower (top 5, the bubble, you, bottom
+  5), and tapping the strip opens the full tower.

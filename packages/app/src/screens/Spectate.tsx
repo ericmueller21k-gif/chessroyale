@@ -1,7 +1,6 @@
 import type { BoardView, GameView } from "../game.ts";
 import { MiniBoard } from "../components/MiniBoard.tsx";
-
-const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
+import { RaceTower } from "../components/RaceTower.tsx";
 
 /** For knocked-out players: the boards in play and the live standings. */
 export function SpectateScreen({ match, boards, note }: { match: GameView; boards: BoardView[]; note?: string }) {
@@ -17,18 +16,7 @@ export function SpectateScreen({ match, boards, note }: { match: GameView; board
           ))}
         </div>
       )}
-      <ol class="standings">
-        {st.map((s, i) => (
-          <>
-            {i === match.cutoff && <li class="ko-line" aria-hidden="true">knockout line</li>}
-            <li key={s.id} class={s.isYou ? "you" : ""}>
-              <span class="st-rank">{i + 1}</span>
-              <span class="st-name">{s.name}</span>
-              <span class="st-score">{fmt(s.score)}</span>
-            </li>
-          </>
-        ))}
-      </ol>
+      <RaceTower standings={st} cutoff={match.cutoff} />
     </div>
   );
 }

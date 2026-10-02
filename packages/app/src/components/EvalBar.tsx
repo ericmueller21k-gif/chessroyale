@@ -3,10 +3,18 @@ import { gameEnd, sideToMove } from "@chessroyale/chess";
 import { enginePool } from "../engine.ts";
 
 /**
- * Live evaluation for duel spectators: White's expected score, worked out in
- * this browser. It is never sent anywhere, so the two players never see it.
+ * The evaluation bar: White's expected score in the position on screen, worked
+ * out in this browser. `evaluate` lets a match reuse a search it already has.
  */
-export function EvalBar({ fen, history, orientation }: { fen: string; history: string[]; orientation: "w" | "b" }) {
+export function EvalBar({
+  fen,
+  orientation,
+  evaluate,
+}: {
+  fen: string;
+  orientation: "w" | "b";
+  evaluate?: (fen: string) => Promise<number | null>;
+}) {
   const [white, setWhite] = useState<number | null>(null);
 
   useEffect(() => {
@@ -21,6 +29,11 @@ export function EvalBar({ fen, history, orientation }: { fen: string; history: s
       return;
     }
     void (async () => {
+      if (evaluate) {
+        const w = await evaluate(fen);
+        if (live && w !== null) setWhite(w);
+        return;
+      }
       const engines = await enginePool();
       // The last engine: the host's own duties use the first ones.
       const [best] = await engines[engines.length - 1]!.topMoves(fen, 1);
@@ -29,12 +42,12 @@ export function EvalBar({ fen, history, orientation }: { fen: string; history: s
     return () => {
       live = false;
     };
-  }, [fen, history.length]);
+  }, [fen]);
 
   const w = white ?? 0.5;
   const label = white === null ? "…" : `${Math.round(w * 100)}%`;
   return (
-    <div class={`eval-bar ${orientation === "b" ? "flipped" : ""}`} title="White's expected score (only spectators see this)">
+    <div class={`eval-bar ${orientation === "b" ? "flipped" : ""}`} title="White's expected score">
       <div class="eval-white" style={{ height: `${w * 100}%` }} />
       <span class="eval-label">{label}</span>
     </div>
