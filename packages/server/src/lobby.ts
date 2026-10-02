@@ -1,17 +1,13 @@
-import { DEFAULT_SETTINGS, allowedMs, finishDuel, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, allowedMs, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
-  START_FEN,
-  applyMove,
   botRoster,
-  gameEnd,
   legalMoves,
   netBoard,
-  sideToMove,
+  toSan,
   type BoardScore,
   type ClientMessage,
-  type NetBoard,
-  type NetDuel,
+  type NetFinal,
   type NetStanding,
   type Opening,
   type RunnerSnapshot,
@@ -22,7 +18,7 @@ import {
 /**
  * One lobby's logic, independent of Cloudflare: players and tokens, the round
  * clock, picks, scoring via the host's browser, the draw, stage breaks and the
- * duel. The Durable Object stores `record` between messages and calls `alarm()`
+ * 2v2 final. The Durable Object stores `record` between messages and calls `alarm()`
  * at `nextAlarm`.
  */
 
@@ -47,15 +43,12 @@ type Timer =
   | "lock"
   | "afterReveal"
   | "nextRound"
-  | "scoreTimeout"
-  | "colourTimeout"
-  | "duelFlag"
-  | "botMoveTimeout";
+  | "scoreTimeout";
 
 export interface LobbyRecord {
   code: string;
   createdAt: number;
-  phase: "lobby" | "opening" | "play" | "scoring" | "reveal" | "stageBreak" | "chooseColour" | "duel" | "results";
+  phase: "lobby" | "opening" | "play" | "scoring" | "reveal" | "stageBreak" | "final" | "results";
   humans: Human[];
   hostId: string | null;
   runner: RunnerSnapshot | null;
@@ -73,14 +66,11 @@ export interface LobbyRecord {
   /** Last phase message per human, re-sent on reconnect. */
   last: Record<string, Outgoing>;
   scoreRequest: null | { key: string; jobs: ScoreJob[] };
-  finalFour: Record<string, number>;
   placements: Record<string, number>;
-  duel: null | (NetDuel & { losses: Record<string, number[]> });
-  chooserId: string | null;
   mismatches: number;
   counter: number;
-  /** Per-lobby playtest overrides (rounds per stage, move clock, duel clock). */
-  overrides?: Partial<Pick<Settings, "roundsPerStage" | "moveClockSeconds" | "duelClockSeconds" | "revealSeconds" | "drawnMoveSeconds" | "boardIntroSeconds">> & {
+  /** Per-lobby playtest overrides (rounds per stage, move clock, pace, draw rule). */
+  overrides?: Partial<Pick<Settings, "roundsPerStage" | "moveClockSeconds" | "revealSeconds" | "drawnMoveSeconds" | "boardIntroSeconds">> & {
     drawRuleByStage?: DrawRule[];
   };
 }
@@ -99,17 +89,15 @@ export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecor
     timer: null,
     last: {},
     scoreRequest: null,
-    finalFour: {},
     placements: {},
-    duel: null,
-    chooserId: null,
     mismatches: 0,
     counter: 0,
   };
 }
 
 const SCORE_TIMEOUT_MS = 15_000;
-const BOT_MOVE_TIMEOUT_MS = 8000;
+/** In the final, how long each move is shown before the next turn. */
+const FINAL_SHOW_MS = 3200;
 
 export class LobbyCore {
   private runner: MatchRunner | null = null;
@@ -253,7 +241,6 @@ export class LobbyCore {
     if (this.r.phase === "scoring" && this.r.scoreRequest) {
       this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest });
     }
-    if (this.r.phase === "duel" && this.r.duel && !this.r.duel.over) this.requestBotMoveIfNeeded();
   }
 
   // ---------------- Messages ----------------
@@ -272,25 +259,6 @@ export class LobbyCore {
         if (!msg.ok) {
           this.r.mismatches++;
           console.log(`cross-check mismatch in ${this.r.code} (${msg.key}, board ${msg.boardId}): ${msg.detail ?? ""}`);
-        }
-        return;
-      case "chooseColour":
-        if (this.r.phase === "chooseColour" && playerId === this.r.chooserId) this.beginDuel(msg.colour);
-        return;
-      case "duelMove":
-        return this.duelMove(playerId, msg.move);
-      case "resign":
-        if (this.r.duel && !this.r.duel.over && [this.r.duel.white, this.r.duel.black].includes(playerId)) {
-          const winner = this.r.duel.white === playerId ? this.r.duel.black : this.r.duel.white;
-          this.endDuel(winner, `${this.nameOf(playerId)} resigned`);
-        }
-        return;
-      case "botMove":
-        return this.botMove(playerId, msg.ply, msg.move, msg.loss);
-      case "duelLoss":
-        if (this.r.duel && playerId === this.r.hostId) {
-          const mover = msg.ply % 2 === 0 ? this.r.duel.white : this.r.duel.black;
-          (this.r.duel.losses[mover] ??= []).push(msg.loss);
         }
         return;
       case "hello":
@@ -337,54 +305,63 @@ export class LobbyCore {
         return this.afterReveal();
       case "scoreTimeout":
         return this.scoreTimeout();
-      case "colourTimeout":
-        if (this.r.phase === "chooseColour") this.beginDuel("w");
-        return;
-      case "duelFlag":
-        return this.checkFlag();
-      case "botMoveTimeout":
-        return this.botMoveFallback();
     }
   }
 
+  /** Humans playing this round (everyone alive in the knockout stages; just the mover in a final turn). */
+  private roundHumans(): Human[] {
+    const playing = new Set([...(this.runner?.groups.values() ?? [])].flat());
+    return this.r.humans.filter((h) => playing.has(h.id));
+  }
+
   private nextRound() {
-    if (!this.runner) return;
-    if (this.runner.isDuel()) return this.startDuel();
-    this.runner.deal();
-    // The move clock starts after a short settling-in countdown on the new board.
-    const now = this.io.now() + this.settings.boardIntroSeconds * 1000;
-    const key = `${this.runner.state.stage}-${this.runner.state.round}-${++this.r.counter}`;
+    const runner = this.runner;
+    if (!runner) return;
+    if (runner.isOver()) return this.finishMatch();
+    runner.deal();
+    const final = runner.isFinal();
+    // The move clock starts after a short settling-in countdown on a new board (not in the final: it's one board).
+    const now = this.io.now() + (final ? 0 : this.settings.boardIntroSeconds * 1000);
+    const key = `${runner.state.stage}-${runner.state.round}-${++this.r.counter}`;
     // Each human's deadline comes from their own time bank.
     const deadlines: Record<string, number> = {};
-    for (const h of this.aliveHumans()) deadlines[h.id] = now + allowedMs(this.runner.player(h.id), this.settings);
+    const playing = this.roundHumans();
+    for (const h of playing) deadlines[h.id] = now + allowedMs(runner.player(h.id), this.settings);
     const deadline = Math.max(now, ...Object.values(deadlines));
     this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {} };
     this.r.phase = "play";
     const st = this.standings();
     const cutoff = this.cutoff();
-    const alive = new Set(this.runner.alive().map((p) => p.id));
+    const alive = new Set(runner.alive().map((p) => p.id));
+    const inRound = new Set(playing.map((h) => h.id));
     for (const h of this.r.humans) {
-      const board = alive.has(h.id) ? this.runner.boardOf(h.id) : null;
+      const board = inRound.has(h.id) ? runner.boardOf(h.id) : null;
       this.send(h.id, {
         t: "round",
         key,
-        stage: this.runner.state.stage,
-        round: this.runner.state.round,
+        stage: runner.state.stage,
+        round: runner.state.round,
         startsAt: now,
         deadline: deadlines[h.id] ?? deadline,
         board: board ? netBoard(board) : null,
         standings: st,
         cutoff,
         alive: alive.has(h.id),
-        botsDoneIn: this.runner.botThinkTimes(),
+        botsDoneIn: final ? {} : runner.botThinkTimes(),
       });
-      if (!alive.has(h.id)) this.sendSpectate(h.id);
+      if (final) this.send(h.id, { t: "final", final: runner.finalView()!, standings: st }, !inRound.has(h.id));
+      else if (!alive.has(h.id)) this.sendSpectate(h.id);
     }
     if (this.r.hostId) {
-      const fens = [...this.runner.groups.keys()].map((id) => this.runner!.boards.get(id)!.fen);
+      const fens = [...runner.groups.keys()].map((id) => runner.boards.get(id)!.fen);
       this.send(this.r.hostId, { t: "prefetch", fens }, false);
     }
-    if (!this.aliveHumans().length) return this.lock();
+    if (!playing.length) {
+      // Only bots this round: in the final a bot "thinks" for its recorded time first.
+      if (!final) return this.lock();
+      const mover = [...runner.groups.values()][0]![0]!;
+      return this.setTimer("lock", this.io.now() + Math.min(6000, Math.max(1500, runner.botThinkTimes()[mover] ?? 2500)));
+    }
     this.setTimer("lock", deadline + this.settings.lateGraceMs);
   }
 
@@ -414,7 +391,7 @@ export class LobbyCore {
     if (!board || !legalMoves(board.fen).includes(move)) return;
     round.picks[playerId] = { move, thinkMs: Math.max(0, Math.min(now - round.startedAt, deadline - round.startedAt)) };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
-    if (this.aliveHumans().every((h) => round.picks[h.id])) this.lock();
+    if (this.roundHumans().every((h) => round.picks[h.id])) this.lock();
   }
 
   /** A power-up: the player's browser shows the engine's top moves; the server just counts it. */
@@ -504,9 +481,20 @@ export class LobbyCore {
     });
     const think = Object.fromEntries(Object.entries(round.picks).map(([id, p]) => [id, p.thinkMs]));
     // A miss uses the whole of the player's time for the move.
-    for (const h of this.aliveHumans()) think[h.id] ??= (round.deadlines?.[h.id] ?? round.deadline) - round.startedAt;
+    for (const h of this.roundHumans()) think[h.id] ??= (round.deadlines?.[h.id] ?? round.deadline) - round.startedAt;
     const report = runner.finishRound(results, think, new Set(Object.keys(round.powerUps ?? {})));
     this.r.scoreRequest = null;
+    if (runner.final) {
+      // The final: everyone sees the move just played and its loss, then the next turn.
+      const b = report.boards[0]!;
+      const p = b.result.players[0]!;
+      const last: NetFinal["last"] = { playerId: p.playerId, move: b.result.playedMove, san: toSan(b.fenBefore, b.result.playedMove), loss: p.loss };
+      this.r.phase = "final";
+      const st = this.standings();
+      this.broadcast({ t: "final", final: runner.finalView(last)!, standings: st });
+      this.setTimer("afterReveal", this.io.now() + FINAL_SHOW_MS);
+      return;
+    }
     this.r.phase = "reveal";
     const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
     const st = this.standings();
@@ -539,10 +527,13 @@ export class LobbyCore {
   private afterReveal() {
     const runner = this.runner!;
     if (!runner.stageComplete()) return this.nextRound();
+    if (runner.isFinal()) {
+      runner.finishFinal();
+      return this.finishMatch();
+    }
     const stage = runner.state.stage;
     const before = this.standings();
     const cutoff = this.cutoff();
-    if (stage === this.settings.knockoutsPerStage.length - 1) for (const s of before) if (!s.out) this.r.finalFour[s.id] = s.points;
     const end = runner.endStage();
     for (const p of end.knockedOut) this.r.placements[p.id] = p.placement!;
     this.r.phase = "stageBreak";
@@ -560,165 +551,20 @@ export class LobbyCore {
     this.setTimer("nextRound", until);
   }
 
-  // ---------------- Duel ----------------
+  // ---------------- Results ----------------
 
-  private isBot(id: string) {
-    return this.r.bots.some((b) => b.id === id);
-  }
-
-  private startDuel() {
-    const [a, b] = this.runner!.alive();
-    if (this.isBot(a!.id) && this.isBot(b!.id)) {
-      // Two bots: the one with the lower average loss over the match wins.
-      const avg = (p: typeof a) => {
-        const all = p!.lossesByStage.flat();
-        return all.reduce((s, x) => s + x, 0) / Math.max(1, all.length);
-      };
-      const winner = avg(a) <= avg(b) ? a! : b!;
-      return this.finishMatch(winner.id);
-    }
-    const chooser = (this.r.finalFour[a!.id] ?? 0) >= (this.r.finalFour[b!.id] ?? 0) ? a! : b!;
-    const other = chooser === a ? b! : a!;
-    this.r.chooserId = chooser.id;
-    this.r.duel = {
-      white: chooser.id,
-      black: other.id,
-      fen: START_FEN,
-      history: [],
-      lastMove: null,
-      clocks: { w: this.settings.duelClockSeconds * 1000, b: this.settings.duelClockSeconds * 1000 },
-      turnStartedAt: 0,
-      over: null,
-      losses: {},
-    };
-    if (this.isBot(chooser.id)) return this.beginDuel("w");
-    this.r.phase = "chooseColour";
-    const until = this.io.now() + this.settings.colourChoiceSeconds * 1000;
-    this.broadcast({ t: "chooseColour", chooserId: chooser.id, until });
-    this.setTimer("colourTimeout", until);
-  }
-
-  private beginDuel(chooserColour: "w" | "b") {
-    const d = this.r.duel!;
-    const chooser = this.r.chooserId!;
-    const other = d.white === chooser ? d.black : d.white;
-    d.white = chooserColour === "w" ? chooser : other;
-    d.black = chooserColour === "w" ? other : chooser;
-    d.turnStartedAt = this.io.now();
-    this.r.phase = "duel";
-    this.broadcastDuel();
-    this.setTimer("duelFlag", d.turnStartedAt + d.clocks.w);
-    this.requestBotMoveIfNeeded();
-  }
-
-  private broadcastDuel() {
-    const { losses: _losses, ...duel } = this.r.duel!;
-    this.broadcast({ t: "duel", duel, finalists: [duel.white, duel.black] });
-  }
-
-  private mover(): string {
-    const d = this.r.duel!;
-    return sideToMove(d.fen) === "w" ? d.white : d.black;
-  }
-
-  private requestBotMoveIfNeeded() {
-    const d = this.r.duel!;
-    if (d.over || !this.isBot(this.mover())) return;
-    const host = this.r.hostId;
-    const skill = this.r.bots.find((b) => b.id === this.mover())!.skill;
-    if (host) this.io.send(host, { t: "botMoveRequest", ply: d.history.length, fen: d.fen, skill });
-    this.setTimer("botMoveTimeout", Math.min(this.io.now() + BOT_MOVE_TIMEOUT_MS, this.flagAt()));
-  }
-
-  private flagAt(): number {
-    const d = this.r.duel!;
-    return d.turnStartedAt + d.clocks[sideToMove(d.fen)];
-  }
-
-  private applyDuelMove(move: string) {
-    const d = this.r.duel!;
-    const side = sideToMove(d.fen);
-    const now = this.io.now();
-    d.clocks[side] = Math.max(0, d.clocks[side] - (now - d.turnStartedAt));
-    if (d.clocks[side] <= 0) return this.checkFlag();
-    const fenBefore = d.fen;
-    d.fen = applyMove(d.fen, move);
-    d.history.push(move);
-    d.lastMove = move;
-    d.turnStartedAt = now;
-    const end = gameEnd(START_FEN, d.history);
-    if (end === "checkmate") return this.endDuel(side === "w" ? d.white : d.black, "Checkmate");
-    if (end) {
-      // A draw goes to the player with the lower average loss per move in the duel.
-      const avg = (id: string) => {
-        const l = d.losses[id] ?? [];
-        return l.reduce((s, x) => s + x, 0) / Math.max(1, l.length);
-      };
-      const winner = avg(d.white) <= avg(d.black) ? d.white : d.black;
-      return this.endDuel(winner, `Draw (${end.replace("_", " ")}), decided on move quality`);
-    }
-    this.broadcastDuel();
-    if (this.r.hostId && !this.isBot(side === "w" ? d.white : d.black)) {
-      this.io.send(this.r.hostId, { t: "duelScoreRequest", ply: d.history.length - 1, fen: fenBefore, move });
-    }
-    this.setTimer("duelFlag", this.flagAt());
-    this.requestBotMoveIfNeeded();
-  }
-
-  private duelMove(playerId: string, move: string) {
-    const d = this.r.duel;
-    if (this.r.phase !== "duel" || !d || d.over || this.mover() !== playerId || !legalMoves(d.fen).includes(move)) return;
-    this.applyDuelMove(move);
-  }
-
-  private botMove(playerId: string, ply: number, move: string, loss: number | null) {
-    const d = this.r.duel;
-    if (!d || d.over || playerId !== this.r.hostId || ply !== d.history.length || !this.isBot(this.mover())) return;
-    if (!legalMoves(d.fen).includes(move)) return;
-    if (loss !== null) (d.losses[this.mover()] ??= []).push(loss);
-    this.applyDuelMove(move);
-  }
-
-  private botMoveFallback() {
-    const d = this.r.duel;
-    if (!d || d.over) return;
-    if (this.flagAt() <= this.io.now()) return this.checkFlag();
-    if (!this.isBot(this.mover())) return this.setTimer("duelFlag", this.flagAt());
-    const legal = legalMoves(d.fen);
-    this.applyDuelMove(legal[Math.floor(this.rng() * legal.length)]!);
-  }
-
-  private checkFlag() {
-    const d = this.r.duel;
-    if (!d || d.over) return;
-    const side = sideToMove(d.fen);
-    if (this.flagAt() > this.io.now()) {
-      this.setTimer(this.isBot(this.mover()) ? "botMoveTimeout" : "duelFlag", this.flagAt());
-      return;
-    }
-    d.clocks[side] = 0;
-    this.endDuel(side === "w" ? d.black : d.white, "Out of time");
-  }
-
-  private endDuel(winnerId: string, reason: string) {
-    const d = this.r.duel!;
-    d.over = { winner: winnerId, reason };
-    this.r.timer = null;
-    this.broadcastDuel();
-    this.finishMatch(winnerId);
-  }
-
-  private finishMatch(winnerId: string) {
+  private finishMatch() {
     const runner = this.runner!;
-    runner.state = finishDuel(runner.state, winnerId);
     for (const p of runner.state.players) this.r.placements[p.id] = p.placement!;
     this.r.phase = "results";
     this.r.timer = null;
+    const winner = runner.state.players.find((p) => p.placement === 1);
     const msg: Outgoing = {
       t: "results",
       placements: { ...this.r.placements },
-      winner: this.nameOf(winnerId),
+      winner: winner ? this.nameOf(winner.id) : "",
       lossesByStage: Object.fromEntries(this.r.humans.map((h) => [h.id, runner.player(h.id).lossesByStage])),
+      standings: this.standings(),
     };
     this.broadcast(msg);
   }

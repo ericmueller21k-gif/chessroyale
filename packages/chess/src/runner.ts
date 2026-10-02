@@ -9,7 +9,10 @@ import {
   createMatch,
   drawRuleFor,
   endStage,
-  isDuel,
+  finalComplete,
+  finalMover,
+  finishFinal,
+  isFinal,
   keepBoards,
   outcomesFromGroup,
   scoreGroup,
@@ -27,8 +30,8 @@ import {
   standingPoints,
   standings,
 } from "@chessroyale/core";
-import type { NetBoard, NetStanding } from "./protocol.ts";
-import { boardRetireReason, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
+import type { NetBoard, NetFinal, NetStanding } from "./protocol.ts";
+import { boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
 import { legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
@@ -164,10 +167,10 @@ export class MatchRunner {
     return new Map(this.state.boards.map((id) => [id, sideToMove(this.boards.get(id)!.fen)]));
   }
 
-  /** How many players play White this stage (null when colours aren't fixed). */
+  /** How many players play White this stage: half (null when colours aren't fixed: one board left, or the final). */
   private whiteSeats(): number | null {
-    if (!this.settings.colourPerStage || this.state.boards.length < 2) return null;
-    return [...this.boardSides().values()].filter((s) => s === "w").length * this.settings.groupSize;
+    if (!this.settings.colourPerStage || this.state.boards.length < 2 || this.state.final) return null;
+    return Math.floor(this.alive().length / 2);
   }
 
   get settings() {
@@ -192,17 +195,30 @@ export class MatchRunner {
     this.boards.set(id, newBoard(id, chosen, plies, old.generation + 1));
   }
 
-  /** Retires finished or decided boards, then groups the players. */
+  /**
+   * Groups the players for the next round. Boards are never swapped: a board
+   * whose game has ended leaves play (its players spread over the others until
+   * the cut), unless it's the last board, which then gets a fresh opening.
+   * In the final, the "group" is the finalist whose turn it is.
+   */
   deal(): Map<number, string[]> {
     this.retiredThisRound = [];
-    for (const id of this.state.boards) {
-      const reason = boardRetireReason(this.boards.get(id)!, this.settings);
-      if (reason) {
-        this.retiredThisRound.push({ boardId: id, reason });
-        this.replaceBoard(id);
+    const over = this.state.boards.filter((id) => boardStatus(this.boards.get(id)!).gameOver);
+    if (over.length) {
+      const live = this.state.boards.filter((id) => !over.includes(id));
+      for (const id of over) this.retiredThisRound.push({ boardId: id, reason: "game_over" });
+      if (live.length) this.state = { ...this.state, boards: live };
+      else {
+        this.replaceBoard(over[0]!);
+        this.state = { ...this.state, boards: [over[0]!] };
+        this.retiredThisRound = [{ boardId: over[0]!, reason: "replaced" }];
       }
     }
-    this.groups = assignGroups(this.opts.rng, this.state, this.settings, undefined, this.boardSides());
+    if (this.state.final) {
+      this.groups = new Map([[this.state.boards[0]!, [finalMover(this.state.final)]]]);
+    } else {
+      this.groups = assignGroups(this.opts.rng, this.state, this.settings, undefined, this.boardSides());
+    }
     // Bots' thinking times are drawn now, so a screen can show each bot finishing at its moment.
     this.botThink = new Map(
       this.alive()
@@ -412,27 +428,79 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
+    if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
+  }
+
+  /** The final board's game has ended. */
+  private finalGameOver(): boolean {
+    const id = this.state.boards[0];
+    return id !== undefined && boardStatus(this.boards.get(id)!).gameOver;
+  }
+
+  /** Ends the final: finalists placed 1st to 4th by move quality (a tie goes to the team that won the game). */
+  finishFinal() {
+    const f = this.state.final!;
+    const board = this.boards.get(this.state.boards[0]!)!;
+    let winningTeam: 0 | 1 | null = null;
+    if (boardEnd(board) === "checkmate") {
+      // The side that just moved delivered mate. teams[0] started as the side to move at the final's start.
+      const matedSide = sideToMove(board.fen);
+      const startSide = f.turn % 2 === 0 ? matedSide : matedSide === "w" ? "b" : "w";
+      winningTeam = matedSide === startSide ? 1 : 0;
+    }
+    this.state = finishFinal(this.state, this.opts.rng, winningTeam);
+  }
+
+  /** The final's teams and turn, for the screens. */
+  get final() {
+    return this.state.final ?? null;
+  }
+
+  /** The final as sent to the screens; `last` is the move just played (if any). */
+  finalView(last: NetFinal["last"] = null): NetFinal | null {
+    const f = this.state.final;
+    if (!f) return null;
+    const board = this.boards.get(this.state.boards[0]!)!;
+    const done = this.stageComplete();
+    const scores: NetFinal["scores"] = {};
+    for (const id of f.order) {
+      const l = this.player(id).finalLosses;
+      scores[id] = { avg: l.length ? Math.round((l.reduce((s, x) => s + x, 0) / l.length) * 10) / 10 : null, moves: l.length };
+    }
+    return {
+      board: netBoard(board),
+      teams: f.teams,
+      order: f.order,
+      turn: f.turn,
+      totalTurns: f.order.length * this.settings.finalMovesPerPlayer,
+      mover: done ? null : finalMover(f),
+      scores,
+      last,
+    };
   }
 
   /** Ends the stage: knockouts, then shrink to the most balanced boards. */
   endStage() {
     const plan = stagePlan(this.settings);
     const nextBoards = plan[this.state.stage + 1]?.boards ?? 1;
+    // One board fewer each cut (finished games first, then the most lopsided); boards are never swapped.
+    // Keep both sides to move as even as possible, so each colour still has boards to play on.
     const status = this.state.boards.map((id) => boardStatus(this.boards.get(id)!));
-    let keep: number[];
-    if (this.settings.colourPerStage && nextBoards >= 2) {
-      // Keep half of each side to move, so colours still split evenly.
-      const sides = this.boardSides();
-      const white = Math.ceil(nextBoards / 2);
-      keep = [
-        ...keepBoards(status.filter((b) => sides.get(b.id) === "w"), white),
-        ...keepBoards(status.filter((b) => sides.get(b.id) === "b"), nextBoards - white),
-      ];
-    } else keep = keepBoards(status, nextBoards);
+    const count = Math.min(nextBoards, this.state.boards.length);
+    const sides = this.boardSides();
+    const white = status.filter((b) => sides.get(b.id) === "w");
+    const black = status.filter((b) => sides.get(b.id) === "b");
+    let keepWhite = Math.min(white.length, Math.ceil(count / 2));
+    const keepBlack = Math.min(black.length, count - keepWhite);
+    keepWhite = Math.min(white.length, count - keepBlack);
+    const keep =
+      this.settings.colourPerStage && count >= 2
+        ? [...keepBoards(white, keepWhite), ...keepBoards(black, keepBlack)]
+        : keepBoards(status, count);
     const end = endStage(this.state, this.opts.rng, keep, this.settings);
     this.state = end.state;
-    if (!this.isDuel()) this.state = assignColours(this.state, this.opts.rng, this.whiteSeats());
+    this.state = assignColours(this.state, this.opts.rng, this.whiteSeats());
     return { ...end, state: this.state };
   }
 
@@ -459,8 +527,13 @@ export class MatchRunner {
     return [...alive, ...out].map(row);
   }
 
-  isDuel(): boolean {
-    return isDuel(this.state, this.settings);
+  isFinal(): boolean {
+    return isFinal(this.state, this.settings);
+  }
+
+  /** The match is over: everyone placed. */
+  isOver(): boolean {
+    return this.state.players.every((p) => p.placement !== null);
   }
 
   alive(): PlayerState[] {

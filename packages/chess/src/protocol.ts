@@ -80,15 +80,22 @@ export interface ScoreJob {
   bots: { id: string; skill: number; powerUps: number }[];
 }
 
-export interface NetDuel {
-  white: string;
-  black: string;
-  fen: string;
-  history: string[];
-  lastMove: string | null;
-  clocks: { w: number; b: number };
-  turnStartedAt: number;
-  over: null | { winner: string | "draw"; reason: string };
+/** The 2v2 final, for every screen: teams, whose turn, each finalist's move quality, and the last move. */
+export interface NetFinal {
+  board: NetBoard;
+  /** teams[0] plays the side that was to move when the final started. */
+  teams: [string[], string[]];
+  /** Turn order (cycled). */
+  order: string[];
+  /** Moves made so far, and how many there will be in all. */
+  turn: number;
+  totalTurns: number;
+  /** Whose turn it is (null once the final is over). */
+  mover: string | null;
+  /** Each finalist's average loss per move in the final (null before their first move) and moves made. */
+  scores: Record<string, { avg: number | null; moves: number }>;
+  /** The move just played, with its loss (null loss = missed, then the engine's move was played). */
+  last: null | { playerId: string; move: string; san: string; loss: number | null };
 }
 
 export type ClientMessage =
@@ -97,12 +104,7 @@ export type ClientMessage =
   | { t: "pick"; key: string; move: string }
   | { t: "powerUp"; key: string }
   | { t: "scores"; key: string; boards: BoardScore[] }
-  | { t: "crossCheck"; key: string; boardId: number; ok: boolean; detail?: string }
-  | { t: "chooseColour"; colour: "w" | "b" }
-  | { t: "duelMove"; move: string }
-  | { t: "resign" }
-  | { t: "botMove"; ply: number; move: string; loss: number | null }
-  | { t: "duelLoss"; ply: number; loss: number };
+  | { t: "crossCheck"; key: string; boardId: number; ok: boolean; detail?: string };
 
 export type ServerMessage = { now: number } & (
   | { t: "welcome"; playerId: string; token: string; code: string }
@@ -161,9 +163,14 @@ export type ServerMessage = { now: number } & (
       placements: Record<string, number>;
     }
   | { t: "spectate"; boards: NetBoard[]; standings: NetStanding[]; stage: number; round: number }
-  | { t: "chooseColour"; chooserId: string; until: number }
-  | { t: "duel"; duel: NetDuel; finalists: [string, string] }
-  | { t: "botMoveRequest"; ply: number; fen: string; skill: number }
-  | { t: "duelScoreRequest"; ply: number; fen: string; move: string }
-  | { t: "results"; placements: Record<string, number>; winner: string; lossesByStage: Record<string, number[][]> }
+  /** The final's state, sent to everyone after each move and when a new turn starts. */
+  | { t: "final"; final: NetFinal; standings: NetStanding[] }
+  | {
+      t: "results";
+      placements: Record<string, number>;
+      winner: string;
+      lossesByStage: Record<string, number[][]>;
+      /** The final leaderboard (ratings, time, power-ups), for the results screen. */
+      standings: NetStanding[];
+    }
 );

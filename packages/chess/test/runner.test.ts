@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, finishDuel, mulberry32, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, mulberry32, stagePlan, type Settings } from "@chessroyale/core";
 import { legalMoves, MatchRunner, START_FEN, sanLineToUci, fenAfter, type EngineLike, type Opening } from "../src/index.ts";
 
 /** A stand-in engine: every legal move gets a deterministic pseudo-score. */
@@ -33,38 +33,40 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
 }));
 
 describe("MatchRunner", () => {
-  it("plays a whole match of 32 bots down to the duel; players keep one colour per stage", async () => {
-    const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 3 };
+  it("plays a whole 64-bot match: one board fewer per cut, one colour per stage, then the 2v2 final", async () => {
+    const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 2 };
     const rng = mulberry32(1);
     const runner = new MatchRunner({
       settings,
       rng,
       engines: [fake, fake],
       library,
-      entrants: Array.from({ length: 32 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 1 + i })),
+      entrants: Array.from({ length: 64 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 1 + i })),
     });
     expect(fenAfter(line.slice(0, 20))).toBe(runner.boards.get(0)!.fen);
+    const plan = stagePlan(settings);
     let rounds = 0;
     let lastStage = -1;
     let colours = new Map<string, string | null>();
-    while (!runner.isDuel()) {
+    while (!runner.isFinal()) {
       const groups = runner.deal();
-      const sides = [...groups.keys()].map((id) => runner.boards.get(id)!.fen.split(" ")[1]);
+      // Boards are never swapped; the count follows the plan (fewer only if a game ended).
+      expect(groups.size).toBeLessThanOrEqual(plan[runner.state.stage]!.boards);
+      expect([...groups.values()].flat()).toHaveLength(runner.alive().length);
       if (groups.size >= 2) {
-        // Half the boards have each side to move, and everyone sits on a board where their colour is to move.
-        expect(sides.filter((s) => s === "w")).toHaveLength(groups.size / 2);
+        // Everyone sits on a board where their colour is to move; groups are 7-10 when boards are odd.
         for (const [id, ids] of groups) for (const pid of ids) expect(runner.player(pid).colour).toBe(runner.boards.get(id)!.fen.split(" ")[1]);
+        for (const g of groups.values()) expect(g.length).toBeGreaterThanOrEqual(5);
       }
       // Colours stay fixed through a stage, and most players swap at the break.
       const now = new Map(runner.alive().map((p) => [p.id, p.colour]));
       if (runner.state.stage === lastStage) expect(now).toEqual(colours);
       else if (lastStage >= 0 && groups.size >= 2) {
         const swapped = [...now].filter(([id, c]) => colours.get(id) && colours.get(id) !== c).length;
-        expect(swapped).toBeGreaterThanOrEqual(now.size / 2);
+        expect(swapped).toBeGreaterThanOrEqual(now.size / 2 - 1);
       }
       lastStage = runner.state.stage;
       colours = now;
-      expect([...groups.values()].every((g) => g.length === 4)).toBe(true);
       const report = await runner.score(new Map());
       for (const b of report.boards) {
         const sum = b.result.players.reduce((s, p) => s + p.roundScore, 0);
@@ -73,10 +75,23 @@ describe("MatchRunner", () => {
       rounds++;
       if (runner.stageComplete()) runner.endStage();
     }
-    expect(rounds).toBe(15);
-    expect(runner.alive()).toHaveLength(2);
-    runner.state = finishDuel(runner.state, runner.alive()[0]!.id);
-    expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 32 }, (_, i) => i + 1));
+    expect(rounds).toBe(16);
+    expect(runner.alive()).toHaveLength(4);
+    expect(runner.state.boards).toHaveLength(1);
+    // The final: one finalist moves per turn, alternating teams.
+    const movers: string[] = [];
+    while (!runner.stageComplete()) {
+      const groups = runner.deal();
+      expect([...groups.values()].flat()).toHaveLength(1);
+      movers.push([...groups.values()][0]![0]!);
+      await runner.score(new Map());
+    }
+    const f = runner.final!;
+    expect(movers.slice(0, 4)).toEqual(f.order);
+    expect(movers.length === 4 * settings.finalMovesPerPlayer || movers.length < 4 * settings.finalMovesPerPlayer).toBe(true);
+    runner.finishFinal();
+    expect(runner.isOver()).toBe(true);
+    expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 64 }, (_, i) => i + 1));
   });
 
   it("scores a human's pick and a miss", async () => {
@@ -86,7 +101,7 @@ describe("MatchRunner", () => {
       rng,
       engines: [fake],
       library,
-      entrants: [{ id: "me", name: "Me", isBot: false }, ...Array.from({ length: 31 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 2 }))],
+      entrants: [{ id: "me", name: "Me", isBot: false }, ...Array.from({ length: 63 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 2 }))],
     });
     runner.deal();
     const board = runner.boardOf("me")!;

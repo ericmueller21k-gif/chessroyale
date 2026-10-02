@@ -60,20 +60,13 @@ test("two players in a lobby with 30 bots play a whole match; a reload rejoins t
         reloaded = true;
         await guest.reload();
         await expect.poll(() => phase(guest), { timeout: 20_000 }).not.toBe("none");
-      } else if (k === "duelColour") await p.evaluate(() => (window as any).match.chooseColour("w"));
-      else if (k === "duel") {
-        const d = await p.evaluate(() => (window as any).match.phase.duel);
-        if (d.over) await p.evaluate(() => (window as any).match.finishAfterDuel());
-        else if (!d.spectator && (d.history.length % 2 === 0) === (d.youColour === "w")) {
-          await p.evaluate(() => (window as any).match.resign());
-        }
       }
     }
     await host.waitForTimeout(250);
     if (i % 40 === 0) console.log(i, await phase(host), await phase(guest));
   }
   expect(done.size).toBe(2);
-  // Same seat after the reload: the guest's results show a placement out of 32.
-  await expect(guest.locator(".results h1")).toContainText(/of 32/);
-  await expect(host.locator(".results h1")).toContainText(/of 32/);
+  // Same seat after the reload: the guest's results show a placement out of 64.
+  await expect(guest.locator(".results h1")).toContainText(/of 64/);
+  await expect(host.locator(".results h1")).toContainText(/of 64/);
 });

@@ -34,6 +34,19 @@ function BankClock({ match, startsAt, now }: { match: GameView; startsAt: number
   );
 }
 
+/** In the final: whose side you're moving for, and with whom. */
+function FinalTurnLabel({ match, side }: { match: GameView; side: "w" | "b" }) {
+  const f = match.final!;
+  const team = f.teams.find((t) => t.some((id) => match.isYou(id))) ?? [];
+  const mate = team.find((id) => !match.isYou(id));
+  return (
+    <>
+      <strong>FINAL</strong> · your move for {side === "w" ? "White" : "Black"}
+      {mate ? ` (with ${match.nameOf(mate)})` : ""}
+    </>
+  );
+}
+
 export function PlayScreen({
   match,
   board,
@@ -84,7 +97,9 @@ export function PlayScreen({
     <div class="screen game">
       <Hud match={match} />
       <div class="board-area">
-        <div class="opening-name">{board.openingName}</div>
+        <div class="opening-name">
+          {match.final ? <FinalTurnLabel match={match} side={side} /> : board.openingName}
+        </div>
         <div class="board-row">
           <EvalBar fen={history.fen ?? board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />
           <Board fen={fen} orientation={side === "w" ? "white" : "black"} lastMove={lastMove} interactive={canMove} onMove={(m) => match.submit(m)} arrows={arrows}>

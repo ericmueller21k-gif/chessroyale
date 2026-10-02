@@ -1,7 +1,6 @@
-import { DEFAULT_SETTINGS, botChoose, botPick, botThinkMs as thinkMs, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botChoose, botThinkMs as thinkMs, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
-  sideToMove,
   toSan,
   type BoardScore,
   type ClientMessage,
@@ -13,7 +12,7 @@ import {
   type UciEngine,
   TopMovesCache,
 } from "@chessroyale/chess";
-import type { BoardView, DuelView, GameView, Hint, MoveRecord, Phase, Standing } from "./game.ts";
+import type { BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
 
@@ -38,8 +37,8 @@ export class NetMatch implements GameView {
   stage = 0;
   roundsPlayed = 0;
   cutoff = 0;
-  /** Lobby view of the waiting duel chooser (when someone else chooses). */
-  waitingFor: string | null = null;
+  /** The 2v2 final once it has started. */
+  final: FinalView | null = null;
   readonly serverPaced = true;
 
   private ws: WebSocket | null = null;
@@ -49,7 +48,6 @@ export class NetMatch implements GameView {
   private myPick: string | null = null;
   private currentBoard: NetBoard | null = null;
   private standingsList: NetStanding[] = [];
-  private pendingResults: Extract<ServerMessage, { t: "results" }> | null = null;
   private closed = false;
   private retry = 0;
   /** Top-move searches started while players think (the host's for every board, others' for their own). */
@@ -249,48 +247,18 @@ export class NetMatch implements GameView {
         this.stage = m.stage;
         if (this.phase.kind !== "stageBreak") this.setPhase({ kind: "spectating", boards: m.boards.map((b) => this.toView(b)) });
         return;
-      case "chooseColour":
-        if (m.chooserId === this.myId) return this.setPhase({ kind: "duelColour", opponentName: "your opponent" });
-        this.waitingFor = this.nameOf(m.chooserId);
-        return this.setPhase({ kind: "spectating", boards: [] });
-      case "duel": {
-        const d = m.duel;
-        const mine = this.myId === d.white || this.myId === d.black;
-        const youColour = this.myId === d.black ? "b" : "w";
-        const opponentId = youColour === "w" ? d.black : d.white;
-        const over = d.over
-          ? {
-              winner: d.over.winner === this.myId ? ("you" as const) : mine ? ("opponent" as const) : ("draw" as const),
-              reason: mine ? d.over.reason : `${this.nameOf(d.over.winner)} wins: ${d.over.reason}`,
-            }
-          : null;
-        const view: DuelView = {
-          opponentName: mine ? this.nameOf(opponentId) : `${this.nameOf(d.white)} vs ${this.nameOf(d.black)}`,
-          youColour,
-          fen: d.fen,
-          history: d.history,
-          lastMove: d.lastMove,
-          clocks: d.clocks,
-          turnStartedAt: this.local(d.turnStartedAt),
-          over,
-          spectator: !mine,
-        };
-        return this.setPhase({ kind: "duel", duel: view });
-      }
-      case "botMoveRequest":
-        return void this.hostBotMove(m.ply, m.fen, m.skill);
-      case "duelScoreRequest":
-        return void this.hostDuelScore(m.ply, m.fen, m.move);
+      case "final":
+        this.final = { ...m.final, board: this.toView(m.final.board) };
+        this.standingsList = m.standings;
+        // During your own turn the play screen stays up; otherwise watch the final.
+        if (this.phase.kind === "play" && m.final.mover === this.myId) return this.emit();
+        return this.setPhase({ kind: "final", final: this.final });
       case "results":
         if (this.myId) {
           this.placement = m.placements[this.myId] ?? this.placement;
           this.lossesByStage = m.lossesByStage[this.myId] ?? [];
         }
-        // A finalist sees the final position first and taps through to results.
-        if (this.phase.kind === "duel" && !this.phase.duel.spectator) {
-          this.pendingResults = m;
-          return this.emit();
-        }
+        if (m.standings) this.standingsList = m.standings;
         return this.showResults(m);
     }
   }
@@ -397,25 +365,6 @@ export class NetMatch implements GameView {
     this.send({ t: "scores", key, boards: out });
   }
 
-  private async hostBotMove(ply: number, fen: string, skill: number) {
-    const [engine] = await this.engines();
-    const top = await engine!.topMoves(fen, this.settings.botCandidateMoves);
-    const best = top[0]!.expected;
-    const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
-    const move = botPick(Math.random, candidates, skill, legalMoves(fen), this.settings);
-    // Think for a moment so the bot doesn't move instantly.
-    await new Promise((r) => setTimeout(r, 800 + Math.random() * 1500));
-    this.send({ t: "botMove", ply, move, loss: candidates.find((c) => c.move === move)?.loss ?? null });
-  }
-
-  private async hostDuelScore(ply: number, fen: string, move: string) {
-    const engines = await this.engines();
-    const engine = engines[1] ?? engines[0]!;
-    const a = await engine.analyse(fen, [move], 1);
-    const mine = a.moves.find((x) => x.move === move);
-    if (mine) this.send({ t: "duelLoss", ply, loss: Math.max(0, (a.best.expected - mine.expected) * 100) });
-  }
-
   // ---------------- Player actions ----------------
 
   startMatch() {
@@ -433,29 +382,4 @@ export class NetMatch implements GameView {
 
   skipReveal() {}
   continueFromBreak() {}
-
-  chooseColour(colour: "w" | "b") {
-    this.send({ t: "chooseColour", colour });
-  }
-
-  duelMove(move: string) {
-    if (this.phase.kind !== "duel" || this.phase.duel.over || this.phase.duel.spectator) return;
-    const d = this.phase.duel;
-    if (sideToMove(d.fen) !== d.youColour || !legalMoves(d.fen).includes(move)) return;
-    this.send({ t: "duelMove", move });
-  }
-
-  resign() {
-    this.send({ t: "resign" });
-  }
-
-  finishAfterDuel() {
-    if (this.pendingResults) this.showResults(this.pendingResults);
-  }
-
-  duelClocks(d: DuelView) {
-    const side = sideToMove(d.fen);
-    const running = d.over ? 0 : Date.now() - d.turnStartedAt;
-    return { ...d.clocks, [side]: Math.max(0, d.clocks[side] - running) };
-  }
 }

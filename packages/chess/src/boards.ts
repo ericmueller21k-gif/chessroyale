@@ -1,4 +1,4 @@
-import { retireReason, type BoardStatus, type RetireReason, type Settings } from "@chessroyale/core";
+import type { BoardStatus } from "@chessroyale/core";
 import type { Opening } from "./openings.ts";
 import { applyMove, fenAfter, gameEnd, START_FEN, type GameEnd } from "./rules.ts";
 
@@ -51,9 +51,6 @@ export function boardStatus(board: BoardState): BoardStatus {
   return { id: board.id, expected: board.expected, gameOver: boardEnd(board) !== null };
 }
 
-export function boardRetireReason(board: BoardState, settings: Settings): RetireReason | null {
-  return retireReason(boardStatus(board), settings);
-}
 
 /** The last `n` moves played on a board and the position before them (for replaying what a player missed). */
 export function recentMoves(board: BoardState, n = 4): { from: string; moves: string[] } {

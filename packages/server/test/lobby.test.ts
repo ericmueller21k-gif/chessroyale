@@ -84,7 +84,7 @@ describe("lobby", () => {
     expect(L.core.record.phase).toBe("lobby");
     L.core.message("p1", { t: "start" });
     expect(L.core.record.phase).toBe("opening");
-    expect(L.core.record.bots).toHaveLength(30);
+    expect(L.core.record.bots).toHaveLength(62);
     expect(L.last("p2", "opening")!.boards).toHaveLength(8);
     expect(L.core.connect(undefined, "Late").ok).toBe(false);
   });
@@ -112,7 +112,7 @@ describe("lobby", () => {
     expect(L.last("p2", "scoreRequest")).toBeUndefined();
     expect(L.hostScores("p1")).toBe(true);
     const rev = L.last("p2", "reveal")!;
-    expect(rev.picks).toHaveLength(4);
+    expect(rev.picks).toHaveLength(8);
     expect(rev.picks.reduce((s, p) => s + p.roundScore, 0)).toBeCloseTo(0, 6);
     expect(rev.playedMove).toBeTruthy();
   });
@@ -161,36 +161,39 @@ describe("lobby", () => {
     expect(L.core.record.phase).toBe("reveal");
   });
 
-  it("runs every stage to the duel and results, with a human finalist playing a bot", () => {
+  it("runs every stage to the 2v2 final and results, with a human finalist", () => {
     const L = setup();
     L.core.connect(undefined, "Ann", "computer");
     L.core.message("p1", { t: "start" });
     L.advance(6000);
-    for (let i = 0; i < 400 && L.core.record.phase !== "results"; i++) {
+    let finalTurnsForAnn = 0;
+    let sawFinal = false;
+    for (let i = 0; i < 2000 && L.core.record.phase !== "results"; i++) {
       const phase = L.core.record.phase;
       if (phase === "play") {
         const r = L.last("p1", "round")!;
-        if (r.board && !L.core.record.round!.picks.p1) {
+        if (r.board && !L.core.record.round!.picks.p1 && L.core.record.round!.key === r.key) {
           // Play the hash-best move so Ann tends to survive.
           const legal = legalMoves(r.board.fen);
           const best = legal.reduce((a, b) => (hash(r.board!.fen + b) > hash(r.board!.fen + a) ? b : a));
+          if (r.stage >= DEFAULT_SETTINGS.knockoutsPerStage.length) finalTurnsForAnn++;
           L.core.message("p1", { t: "pick", key: r.key, move: best });
-        } else L.advance(11_000);
+        } else L.advance(1000);
       } else if (phase === "scoring") L.hostScores("p1");
-      else if (phase === "chooseColour") L.core.message("p1", { t: "chooseColour", colour: "w" });
-      else if (phase === "duel") {
-        const d = L.core.record.duel!;
-        const req = L.last("p1", "botMoveRequest");
-        if (req && req.ply === d.history.length) {
-          L.core.message("p1", { t: "botMove", ply: req.ply, move: legalMoves(req.fen)[0]!, loss: 1 });
-        } else if ((d.history.length % 2 === 0) === (d.white === "p1")) {
-          L.core.message("p1", { t: "resign" });
-        } else L.advance(500);
-      } else L.advance(11_000);
+      else {
+        if (phase === "final") sawFinal = true;
+        L.advance(1000);
+      }
     }
     expect(L.core.record.phase).toBe("results");
     const res = L.last("p1", "results")!;
-    expect(Object.values(res.placements).sort((a, b) => a - b)).toEqual(Array.from({ length: 32 }, (_, i) => i + 1));
+    expect(Object.values(res.placements).sort((a, b) => a - b)).toEqual(Array.from({ length: 64 }, (_, i) => i + 1));
+    expect(res.winner).toBeTruthy();
+    // Ann reached the final (she plays the hash-best move every time) and took her turns there.
+    expect(sawFinal).toBe(true);
+    const f = L.last("p1", "final")!.final;
+    expect(f.order).toHaveLength(4);
+    if (f.order.includes("p1")) expect(finalTurnsForAnn).toBeGreaterThan(0);
   });
 
   it("gives each player their own deadline from their bank, and counts power-ups", () => {

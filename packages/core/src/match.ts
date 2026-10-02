@@ -48,8 +48,10 @@ export interface PlayerState {
   movesTimed: number;
   /** Practice mode: unlimited power-ups (shown on the leaderboard). */
   practice: boolean;
-  /** Colour played this stage (null when colours aren't fixed, e.g. the final four on one board). */
+  /** Colour played this stage (null when colours aren't fixed, e.g. the last stages on one board). */
   colour: Side | null;
+  /** The final: loss of each move (a miss counts as finalMissLoss). */
+  finalLosses: number[];
   /** Losses per stage, for the results screen. */
   lossesByStage: number[][];
   lastBoard: number | null;
@@ -62,12 +64,27 @@ export interface PlayerState {
 
 export type Side = "w" | "b";
 
+/**
+ * The 2v2 final on the last board: seeds 1 and 4 against 2 and 3, teammates
+ * alternating their side's moves. Placement is by each player's own move quality.
+ */
+export interface FinalState {
+  /** Who moves, turn by turn (cycled): seed 1, seed 2, seed 4, seed 3. */
+  order: string[];
+  /** teams[0] plays the side to move when the final starts. */
+  teams: [string[], string[]];
+  /** Moves made so far. */
+  turn: number;
+}
+
 export interface MatchState {
   stage: number;
   round: number;
   players: PlayerState[];
   /** Ids of the boards in play this stage. */
   boards: number[];
+  /** Set once the knockout stages are over. */
+  final?: FinalState;
 }
 
 export function createMatch(
@@ -95,6 +112,7 @@ export function createMatch(
       movesTimed: 0,
       practice: e.practice ?? false,
       colour: null,
+      finalLosses: [],
       lossesByStage: [[]],
       lastBoard: null,
       lastGroupmates: [],
@@ -127,10 +145,12 @@ export function assignGroups(
   const sides: Side[] = ["w", "b"];
   const byColour = (side: Side) => players.filter((p) => p.colour === side);
   const boardsOf = (side: Side) => state.boards.filter((b) => boardSide?.get(b) === side);
+  // Colours fit when every player has one and each colour has a board where it's to move. Group sizes then
+  // follow the numbers (an odd number of boards makes them 7-10 instead of 8).
   const colourFits =
     boardSide !== undefined &&
     players.every((p) => p.colour !== null) &&
-    sides.every((side) => byColour(side).length === boardsOf(side).length * settings.groupSize);
+    sides.every((side) => byColour(side).length === 0 || boardsOf(side).length > 0);
   if (colourFits) for (const side of sides) parts.push([byColour(side), boardsOf(side)]);
   else parts.push([players, [...state.boards]]);
   for (const [ps, bs] of parts) {
@@ -153,7 +173,9 @@ function groupSubset(
   // slot[i] = index of the board (in `boards`) player i sits at.
   const order = shuffle(rng, players.map((_, i) => i));
   const slot = new Array<number>(n);
-  order.forEach((pi, k) => (slot[pi] = Math.min(boards.length - 1, Math.floor(k / settings.groupSize))));
+  // Deal round-robin, so group sizes differ by at most one; swaps keep the sizes.
+  order.forEach((pi, k) => (slot[pi] = k % boards.length));
+  void settings;
   const mates = players.map((p) => new Set(p.lastGroupmates));
 
   const playerCost = (i: number, b: number): number => {
@@ -239,11 +261,13 @@ export function applyRound(
     const board = boardOf.get(p.id) ?? null;
     const lossesByStage = p.lossesByStage.map((l) => [...l]);
     if (o.loss !== null) lossesByStage[state.stage]!.push(o.loss);
+    const finalLosses = state.final ? [...p.finalLosses, o.loss ?? settings.finalMissLoss] : p.finalLosses;
     const think = Math.max(0, Math.min(o.thinkMs, allowedMs(p, settings)));
     const usedPowerUp = !!o.usedPowerUp && (p.practice || p.powerUps > 0);
     return {
       ...p,
       stageScore: p.stageScore + o.roundScore,
+      finalLosses,
       stageThinkMs: p.stageThinkMs + think,
       stageRounds: p.stageRounds + 1,
       bankMs: Math.max(0, p.bankMs + settings.timeIncrementSeconds * 1000 - think),
@@ -256,7 +280,7 @@ export function applyRound(
       lastGroupmates: board === null ? [] : groups.get(board)!.filter((id) => id !== p.id),
     };
   });
-  return { ...state, players, round: state.round + 1 };
+  return { ...state, players, round: state.round + 1, final: state.final && { ...state.final, turn: state.final.turn + 1 } };
 }
 
 /** Converts a scored group into per-player outcomes, given each player's thinking time. */
@@ -320,25 +344,62 @@ export function endStage(
       lossesByStage: [...p.lossesByStage, []],
     };
   });
+  const next: MatchState = { stage: state.stage + 1, round: 0, players, boards: [...keepBoards] };
+  if (next.stage >= settings.knockoutsPerStage.length) {
+    // Seeds from this stage's standings: 1 & 4 against 2 & 3, alternating 1, 2, 4, 3.
+    const seeds = ranked.filter((p) => !out.has(p.id)).map((p) => p.id);
+    if (seeds.length === 4) {
+      const [s1, s2, s3, s4] = seeds as [string, string, string, string];
+      next.final = { order: [s1, s2, s4, s3], teams: [[s1, s4], [s2, s3]], turn: 0 };
+    }
+  }
   return {
-    state: { stage: state.stage + 1, round: 0, players, boards: [...keepBoards] },
+    state: next,
     knockedOut: ranked.filter((p) => out.has(p.id)).map((p) => ({ ...p, placement: placement.get(p.id)! })),
   };
 }
 
-/** True once the knockout stages are over and only the duel remains. */
-export const isDuel = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
+/** True once the knockout stages are over and the 2v2 final is on. */
+export const isFinal = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
   state.stage >= settings.knockoutsPerStage.length;
 
 export const stageComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
   state.round >= settings.roundsPerStage;
 
-/** Records the duel result: winner 1st, loser 2nd. */
-export function finishDuel(state: MatchState, winnerId: string): MatchState {
+/** The finalist to move now. */
+export const finalMover = (f: FinalState) => f.order[f.turn % f.order.length]!;
+
+/** The final ends once everyone has made their moves (or the game ends: the caller checks the board). */
+export const finalComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
+  !!state.final && state.final.turn >= state.final.order.length * settings.finalMovesPerPlayer;
+
+/** A finalist's average loss per move in the final (lower is better). */
+export const finalAverage = (p: Pick<PlayerState, "finalLosses">) =>
+  p.finalLosses.length ? p.finalLosses.reduce((s, x) => s + x, 0) / p.finalLosses.length : Infinity;
+
+/**
+ * Places the finalists 1st to 4th by average loss in the final; a tie goes to
+ * the team that won the game (`winningTeam`, 0 or 1, if it ended), then less
+ * thinking time, then a coin flip.
+ */
+export function finishFinal(state: MatchState, rng: Rng, winningTeam: 0 | 1 | null = null): MatchState {
+  const f = state.final!;
+  const team = (id: string) => (f.teams[0].includes(id) ? 0 : 1);
+  const coin = new Map(f.order.map((id) => [id, rng()]));
+  const ranked = state.players
+    .filter((p) => p.alive)
+    .sort(
+      (a, b) =>
+        finalAverage(a) - finalAverage(b) ||
+        (winningTeam === null ? 0 : (team(a.id) === winningTeam ? 0 : 1) - (team(b.id) === winningTeam ? 0 : 1)) ||
+        a.stageThinkMs - b.stageThinkMs ||
+        coin.get(a.id)! - coin.get(b.id)!,
+    );
+  const place = new Map(ranked.map((p, i) => [p.id, i + 1]));
   return {
     ...state,
     players: state.players.map((p) =>
-      p.alive ? { ...p, alive: false, placement: p.id === winnerId ? 1 : 2, outInStage: p.id === winnerId ? null : state.stage } : p,
+      p.alive ? { ...p, alive: false, placement: place.get(p.id)!, outInStage: place.get(p.id) === 1 ? null : state.stage } : p,
     ),
   };
 }
@@ -352,19 +413,19 @@ export interface BoardStatus {
   gameOver: boolean;
 }
 
-export type RetireReason = "game_over" | "decided";
+/**
+ * Why a board left play: its game ended mid-stage ("game_over"), or it was the
+ * last board and had to be replaced with a fresh opening ("replaced").
+ */
+export type RetireReason = "game_over" | "replaced";
 
-/** A board is retired when its game is over or either side's expected score has reached the threshold. */
-export function retireReason(board: BoardStatus, settings: Settings = DEFAULT_SETTINGS): RetireReason | null {
-  if (board.gameOver) return "game_over";
-  if (board.expected >= settings.retireThreshold || board.expected <= 1 - settings.retireThreshold) return "decided";
-  return null;
-}
-
-/** When fewer boards are needed, keep those whose expected score is closest to 0.50. */
+/**
+ * When fewer boards are needed, keep the most balanced: finished games go
+ * first, then the most lopsided (expected score furthest from 0.50).
+ */
 export function keepBoards(boards: readonly BoardStatus[], count: number): number[] {
   return [...boards]
-    .sort((a, b) => Math.abs(a.expected - 0.5) - Math.abs(b.expected - 0.5) || a.id - b.id)
+    .sort((a, b) => Number(a.gameOver) - Number(b.gameOver) || Math.abs(a.expected - 0.5) - Math.abs(b.expected - 0.5) || a.id - b.id)
     .slice(0, count)
     .map((b) => b.id);
 }

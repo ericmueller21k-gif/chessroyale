@@ -193,3 +193,29 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
   timed from the server so everyone moves on together.
 - **Step through a board's game** with ◀ ▶ (and ⏮ ⏭, or the arrow keys on a computer) under the board, all the way
   back to the first move. While looking back the board can't take a move; ⏭ returns to the live position.
+
+## 64 players, one board fewer per cut, and a 2v2 final (Oct 2, 2026)
+
+Eric's design; the details were my call.
+
+- **64 players on 8 boards, 8 per board.** Bigger groups make a round's score fairer (you're measured against 7
+  players, not 3), and the reveal shows up to 8 moves sliding in at once.
+- **Each cut removes the bottom 8 and one board**: 64/8 → 56/7 → 48/6 → 40/5 → 32/4 → 24/3 → 16/2 → 8/1, then the last 4
+  play the final. The board that closes is the most lopsided (furthest from 50/50), keeping both sides to move
+  represented so each colour still has boards. 5 rounds per stage (40 knockout rounds, about 25 minutes relaxed).
+- **Boards are never swapped.** The same games develop all match. If a game actually ends mid-stage, that board leaves
+  play and its players spread over the other boards until the cut; only if the very last board's game ends does it
+  get a fresh opening. In the bot check this happened 0.16 times per match.
+- **Colours stay fixed per stage with any number of boards.** Players split half White, half Black. With an odd number
+  of boards the boards' sides alternate 4/3 then 3/4, so group sizes become 7-10 instead of exactly 8. With one board
+  left, colours alternate as before.
+- **The 2v2 final replaces the duel.** It's on the last board, the game everyone has watched. Seeds (from the last
+  stage's standings) 1 & 4 play the side to move, 2 & 3 the other, and the turns go seed 1, 2, 4, 3. Each finalist
+  makes 5 moves (fewer if the game ends). Every move is scored as usual and placement 1st-4th is by average loss per
+  move in the final. A missed move counts as 25. A tie goes to the team that won the game, then less thinking time.
+  So a deliberately bad move only hurts the player who makes it. There's no settling-in countdown in the final (it's
+  one board), each move is shown for about 3 s, and bot finalists "think" for 1.5-4 s.
+- **Bot check** (`reports/format-sim.md`): placement tracks skill about as well as the old format (rank correlation 0.63
+  vs 0.67), a top-8 bot goes out in stage 1 about a quarter of the time, and the strongest bot reaches the final about
+  1 match in 4. 6 rounds per stage was a little fairer but within noise, so 5 it is.
+- **Wins on a profile** (Eric's idea) needs player profiles first; parked.

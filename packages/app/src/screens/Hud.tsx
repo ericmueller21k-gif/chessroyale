@@ -13,7 +13,14 @@ export function Hud({ match }: { match: GameView }) {
   const shownRound = match.phase.kind === "reveal" ? match.roundsPlayed : match.roundsPlayed + 1;
   const standings = match.standings();
   const alive = standings.filter((s) => !s.out);
-  const rank = alive.findIndex((x) => x.isYou) + 1;
+  let rank = alive.findIndex((x) => x.isYou) + 1;
+  if (match.final) {
+    // In the final, position is by average loss per move in the final (lowest first).
+    const f = match.final;
+    const avg = (id: string) => f.scores[id]?.avg ?? Infinity;
+    const order = [...f.order].sort((a, b) => avg(a) - avg(b));
+    rank = order.findIndex((id) => match.isYou(id)) + 1;
+  }
   const inZone = rank > match.cutoff;
   const gap = gapToCut(standings, match.cutoff);
   const left = match.powerUpsLeft();
@@ -21,11 +28,17 @@ export function Hud({ match }: { match: GameView }) {
     <div class="hud-row">
       <button type="button" class="hud" onClick={() => setOpen(true)} aria-label="Show the leaderboard">
         <span class="hud-stage">
-          S{match.stage + 1}
-          <span class="muted">
-            {" "}
-            · R{Math.min(shownRound, match.settings.roundsPerStage)}/{match.settings.roundsPerStage}
-          </span>
+          {match.final ? (
+            "FINAL"
+          ) : (
+            <>
+              S{match.stage + 1}
+              <span class="muted">
+                {" "}
+                · R{Math.min(shownRound, match.settings.roundsPerStage)}/{match.settings.roundsPerStage}
+              </span>
+            </>
+          )}
         </span>
         {rank > 0 && (
           <span class={`hud-rank ${inZone ? "danger" : ""}`}>
@@ -33,7 +46,7 @@ export function Hud({ match }: { match: GameView }) {
             <span class="muted">/{alive.length}</span>
           </span>
         )}
-        {gap !== null && rank > 0 && (
+        {gap !== null && rank > 0 && !match.final && (
           <span class={`hud-gap ${gap < 0 ? "danger" : "safe"}`}>
             {gap >= 0 ? `+${gap.toFixed(1)} safe` : `${gap.toFixed(1)} at risk`}
           </span>

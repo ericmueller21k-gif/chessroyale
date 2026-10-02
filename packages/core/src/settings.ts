@@ -47,10 +47,8 @@ export interface Settings {
   openingShowSeconds: number;
   /** Multiplayer: how long the stage-break standings show (solo waits for a tap). */
   stageBreakSeconds: number;
-  /** Multiplayer: time to choose a colour for the duel before White is picked for you. */
-  colourChoiceSeconds: number;
   roundsPerStage: number;
-  /** Players knocked out at the end of each knockout stage; the duel follows. */
+  /** Players knocked out at the end of each knockout stage; the 2v2 final follows. */
   knockoutsPerStage: readonly number[];
   scoresBetweenStages: ScoreCarry;
   missedMoveScore: number;
@@ -61,8 +59,6 @@ export interface Settings {
   openingPlies: number;
   /** A line qualifies if the side to move's expected score at its end is inside this window. */
   openingBalance: readonly [number, number];
-  /** Retire a board once either side's expected score reaches this. */
-  retireThreshold: number;
   engineNodes: number;
   engineHashMb: number;
   botCandidateMoves: number;
@@ -74,7 +70,10 @@ export interface Settings {
   botRandomMoveChance: number;
   /** Bots' recorded thinking time, for tie-breaks (seconds). */
   botThinkSeconds: readonly [number, number];
-  duelClockSeconds: number;
+  /** The 2v2 final: moves each finalist makes (fewer if the game ends first). */
+  finalMovesPerPlayer: number;
+  /** In the final, a missed move counts as this many points of loss. */
+  finalMissLoss: number;
 }
 
 /** "Relaxed" is the default; "quick" shortens the reveal and the settling-in time on a new board. */
@@ -85,8 +84,8 @@ export const PACE_SETTINGS: Record<Pace, Partial<Settings>> = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  lobbySize: 32,
-  groupSize: 4,
+  lobbySize: 64,
+  groupSize: 8,
   moveClockSeconds: 30,
   timeBankSeconds: 600,
   timeIncrementSeconds: 5,
@@ -100,23 +99,22 @@ export const DEFAULT_SETTINGS: Settings = {
   boardIntroSeconds: 5,
   openingShowSeconds: 6,
   stageBreakSeconds: 10,
-  colourChoiceSeconds: 15,
-  roundsPerStage: 8,
-  knockoutsPerStage: [8, 8, 8, 4, 2],
+  roundsPerStage: 5,
+  knockoutsPerStage: [8, 8, 8, 8, 8, 8, 8, 4],
   scoresBetweenStages: "reset",
   missedMoveScore: -25,
   drawRuleByStage: ["popular", "best"],
   drawWeightPoints: 4,
   openingPlies: 20,
   openingBalance: [0.4, 0.6],
-  retireThreshold: 0.9,
   engineNodes: 250_000,
   engineHashMb: 16,
   botCandidateMoves: 8,
   botSkillRange: [0.25, 32],
   botRandomMoveChance: 0.02,
   botThinkSeconds: [3, 20],
-  duelClockSeconds: 180,
+  finalMovesPerPlayer: 5,
+  finalMissLoss: 25,
 };
 
 /** `count` bot skills spread evenly on a log scale across `botSkillRange`, strongest first. */

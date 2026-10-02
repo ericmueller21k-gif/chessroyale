@@ -1,8 +1,9 @@
 # Battle Royale Chess
 
-32 players, one move at a time. Each round you get 10 seconds on a position you haven't seen; Stockfish scores
-every pick, and you score by playing better than the other three players on your board. The weakest go out after
-each stage until two players are left for a real 3-minute game.
+64 players on 8 boards, one move at a time. Each round you get a position on one of the boards with 7 others; Stockfish
+scores every pick, and you score by playing better than the rest of your group. After every stage the bottom 8 go
+out and the most lopsided board closes, until 4 players are left on the last board for a 2v2 final, where teammates
+alternate moves and the best average move quality wins.
 
 - Brief: `buildspec.md`. Decisions and their reasons: `DECISIONS.md`. Bot playtest: `reports/playtest.md`.
 - Deploying (Cloudflare, free): `DEPLOY.md`. Checking on a real phone: `TESTING.md`.

@@ -6,7 +6,7 @@ import { enginePool } from "./engine.ts";
 import { cutLabel, roundLive, type GameView } from "./game.ts";
 import { NetMatch } from "./net.ts";
 import { SoloMatch } from "./solo.ts";
-import { DuelColourScreen, DuelScreen } from "./screens/Duel.tsx";
+import { FinalScreen } from "./screens/Final.tsx";
 import { HomeScreen } from "./screens/Home.tsx";
 import { LobbyScreen } from "./screens/Lobby.tsx";
 import { OpeningGrid } from "./screens/OpeningGrid.tsx";
@@ -26,7 +26,6 @@ function overridesFromUrl(): Partial<Settings> {
       ...(quickPace() ? PACE_SETTINGS.quick : {}),
       roundsPerStage: n("rounds"),
       moveClockSeconds: n("clock"),
-      duelClockSeconds: n("duel"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
     }),
   );
@@ -158,7 +157,7 @@ export function App() {
     again: () => (match instanceof SoloMatch ? void startSolo(match.playerName, match.practice) : leave()),
   });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages.
-  const tower = ["play", "scoring", "reveal", "spectating"].includes(match.phase.kind) && match.standings().length > 0;
+  const tower = ["play", "scoring", "reveal", "spectating", "final"].includes(match.phase.kind) && match.standings().length > 0;
   if (!tower) return screen;
   return (
     <div class="arena">
@@ -190,7 +189,6 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
         <SpectateScreen
           match={match}
           boards={p.boards}
-          note={match instanceof NetMatch && match.waitingFor ? `${match.waitingFor} is choosing a colour for the duel…` : undefined}
         />
       );
     case "play":
@@ -210,10 +208,8 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
           </p>
         </div>
       );
-    case "duelColour":
-      return <DuelColourScreen match={match} opponentName={p.opponentName} />;
-    case "duel":
-      return <DuelScreen match={match} duel={p.duel} />;
+    case "final":
+      return <FinalScreen match={match} final={p.final} />;
     case "results":
       return (
         <ResultsScreen

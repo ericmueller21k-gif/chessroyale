@@ -1564,3 +1564,93 @@ p {
 .picks li.chosen {
   box-shadow: inset 4px 0 0 #2fd27a;
 }
+
+/* ---- The 2v2 final ---- */
+
+.final-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.final-screen .final-panel {
+  grid-column: 2;
+  grid-row: 2;
+  margin-top: 28px;
+}
+.final-last {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border-left: 4px solid var(--accent);
+  font-size: 16px;
+  min-height: 52px;
+}
+.final-last .good {
+  color: var(--good);
+  font-weight: 800;
+}
+.final-last .bad {
+  color: var(--bad);
+  font-weight: 800;
+}
+.final-teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.final-team {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+.final-team-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.side-chip {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+}
+.side-chip.w {
+  background: #f2f2f2;
+}
+.side-chip.b {
+  background: #222;
+}
+.final-player {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+.final-player .muted {
+  grid-column: 1 / -1;
+}
+.final-player.you {
+  border-color: var(--accent);
+}
+.final-player.to-move {
+  background: color-mix(in srgb, var(--good) 16%, transparent);
+}
+.final-name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.final-avg {
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
