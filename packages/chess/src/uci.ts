@@ -134,7 +134,8 @@ export class UciEngine {
    * move is scored from the position after it instead (see scoreAfter).
    */
   scoreMoves(fen: string, moves: readonly string[]): Promise<MoveScore[]> {
-    const unique = [...new Set(moves)];
+    // Sorted so the same set of moves always gives the same search, whoever asks.
+    const unique = [...new Set(moves)].sort();
     return this.serial(async () => {
       if (!unique.length) return [];
       const found = await this.search(fen, unique.length, unique);
@@ -169,7 +170,7 @@ export class UciEngine {
       const top = await this.search(fen, Math.max(1, topN));
       if (!top.length) throw new Error(`No legal moves in ${fen}`);
       const have = new Set(top.map((m) => m.move));
-      const missing = [...new Set(moves)].filter((m) => !have.has(m));
+      const missing = [...new Set(moves)].filter((m) => !have.has(m)).sort();
       const extra = missing.length ? await this.search(fen, missing.length, missing) : [];
       const gotExtra = new Set(extra.map((m) => m.move));
       for (const m of missing) if (!gotExtra.has(m)) extra.push({ move: m, expected: await this.scoreAfter(fen, m) });

@@ -10,10 +10,11 @@
     "build": "npm run build -w @chessroyale/app",
     "dev": "npm run dev -w @chessroyale/app",
     "e2e": "playwright test",
-    "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/chess --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/app --noEmit",
+    "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/chess --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/app --noEmit && tsc -p packages/server --noEmit",
     "simulate": "tsx packages/sim/scripts/simulate.ts"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261002.1",
     "@playwright/test": "^1.56.1",
     "@types/node": "^22.20.5",
     "tsx": "^4.23.15",

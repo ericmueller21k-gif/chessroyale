@@ -12,7 +12,7 @@ import {
   type UciEngine,
 } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { botRoster } from "./bots.ts";
+import { botRoster } from "@chessroyale/chess";
 import type { BoardView, DuelView, GameView, MoveRecord, Phase, Standing } from "./game.ts";
 
 export const HUMAN = "you";

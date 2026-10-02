@@ -4,10 +4,11 @@ export default defineConfig({
   testDir: "e2e",
   timeout: 300_000,
   reporter: "list",
-  use: { baseURL: "http://localhost:4180", trace: "retain-on-failure" },
+  use: { baseURL: "http://localhost:8788", trace: "retain-on-failure" },
   webServer: {
-    command: "npm run build -w @chessroyale/app && npm run preview -w @chessroyale/app -- --port 4180 --strictPort",
-    url: "http://localhost:4180",
+    // The real Worker and Durable Objects, run locally by wrangler, serving the built app.
+    command: "npm run build && npx wrangler dev --port 8788",
+    url: "http://localhost:8788",
     reuseExistingServer: true,
     timeout: 120_000,
   },

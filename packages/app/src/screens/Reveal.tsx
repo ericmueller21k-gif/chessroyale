@@ -57,7 +57,7 @@ export function RevealScreen({ match, mine, board }: { match: GameView; mine: Gr
         </ul>
         <div class="muted small">
           Best was {toSan(fen, mine.bestMove)}.{" "}
-          {played ? `Played: ${toSan(fen, mine.result.playedMove)}${playedBy.length ? ` (${playedBy.join(" & ")})` : " (engine)"}. Tap to continue.` : "Drawing a pick to play…"}
+          {played ? `Played: ${toSan(fen, mine.result.playedMove)}${playedBy.length ? ` (${playedBy.join(" & ")})` : " (engine)"}.${match.serverPaced ? "" : " Tap to continue."}` : "Drawing a pick to play…"}
         </div>
       </div>
     </div>

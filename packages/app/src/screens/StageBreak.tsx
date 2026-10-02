@@ -48,9 +48,13 @@ export function StageBreakScreen(props: {
       )}
       <p class="muted small">{knockedOut.length} out: {knockedOut.map((k) => k.name).join(", ")}</p>
       <div class="actions">
-        <button type="button" class="btn btn-primary" onClick={() => match.continueFromBreak()}>
-          {youOut ? "See how it ends" : "Next stage"}
-        </button>
+        {match.serverPaced ? (
+          <div class="status">{youOut ? "You can stay and watch, or leave." : "The next stage starts in a few seconds…"}</div>
+        ) : (
+          <button type="button" class="btn btn-primary" onClick={() => match.continueFromBreak()}>
+            {youOut ? "See how it ends" : "Next stage"}
+          </button>
+        )}
       </div>
     </div>
   );

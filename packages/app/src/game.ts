@@ -43,6 +43,8 @@ export interface DuelView {
   /** When the side to move's clock started (local time). */
   turnStartedAt: number;
   over: null | { winner: "you" | "opponent" | "draw"; reason: string };
+  /** Watching someone else's duel. */
+  spectator?: boolean;
 }
 
 /** The reveal: your group's picks and scores (same shape the server sends). */
@@ -66,6 +68,8 @@ export type Phase =
 
 export interface GameView {
   readonly settings: Settings;
+  /** Multiplayer: the server moves the match on, so there are no "continue" taps. */
+  readonly serverPaced?: boolean;
   readonly phase: Phase;
   readonly playerName: string;
   /** Current stage (0-based) and rounds completed in it. */
