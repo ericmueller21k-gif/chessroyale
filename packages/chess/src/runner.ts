@@ -1,5 +1,6 @@
 import {
   alivePlayers,
+  allowedMs,
   applyRound,
   assignColours,
   assignGroups,
@@ -80,6 +81,8 @@ export interface RunnerSnapshot {
   groups: [number, string[]][];
   usedFamilies: string[];
   retired: { boardId: number; reason: RetireReason }[];
+  /** Bots' thinking times for the round dealt (drawn at the deal, so screens can show bots finishing). */
+  botThink?: [string, number][];
 }
 
 /**
@@ -199,7 +202,18 @@ export class MatchRunner {
       }
     }
     this.groups = assignGroups(this.opts.rng, this.state, this.settings, undefined, this.boardSides());
+    // Bots' thinking times are drawn now, so a screen can show each bot finishing at its moment.
+    this.botThink = new Map(
+      this.alive()
+        .filter((p) => p.isBot)
+        .map((p) => [p.id, Math.min(botThinkMs(this.opts.rng, this.settings), allowedMs(p, this.settings))]),
+    );
     return this.groups;
+  }
+
+  /** Each bot's thinking time this round (ms after the round starts). */
+  botThinkTimes(): Record<string, number> {
+    return Object.fromEntries(this.botThink);
   }
 
   /** Starts this round's top-move searches now, so scoring after the picks lock is quick. */
@@ -227,6 +241,18 @@ export class MatchRunner {
    * parallel across the engines.
    */
   async score(humanPicks: ReadonlyMap<string, HumanPick>): Promise<RoundReport> {
+    const scored = await this.evaluate(humanPicks);
+    return this.finishRound(scored.results, scored.thinkMs, scored.powerUps);
+  }
+
+  /**
+   * The engine work of `score` without applying it: every board scored and its
+   * move drawn, but scores and boards unchanged until `finishRound` (so a
+   * screen can wait for everyone to finish before showing results).
+   */
+  async evaluate(
+    humanPicks: ReadonlyMap<string, HumanPick>,
+  ): Promise<{ results: BoardRound[]; thinkMs: Record<string, number>; powerUps: Set<string> }> {
     const { rng } = this.opts;
     const entries = [...this.groups.entries()];
     const results: BoardRound[] = new Array(entries.length);
@@ -240,14 +266,13 @@ export class MatchRunner {
         }
       }),
     );
-
     const thinkMs: Record<string, number> = {};
     const powerUps = new Set<string>();
     for (const [id, p] of humanPicks) {
       thinkMs[id] = p.thinkMs;
       if (p.usedPowerUp) powerUps.add(id);
     }
-    return this.finishRound(results, thinkMs, powerUps);
+    return { results, thinkMs, powerUps };
   }
 
   private botThink = new Map<string, number>();
@@ -263,7 +288,7 @@ export class MatchRunner {
     for (const id of playerIds) {
       const p = this.player(id);
       if (!p.isBot) continue;
-      this.botThink.set(id, botThinkMs(this.opts.rng, this.settings));
+      if (!this.botThink.has(id)) this.botThink.set(id, botThinkMs(this.opts.rng, this.settings));
       const choice = botChoose(this.opts.rng, candidates, p, legal, this.settings);
       if (choice.usedPowerUp) this.botPowerUps.add(id);
       out[id] = choice.move;
@@ -360,6 +385,7 @@ export class MatchRunner {
       groups: [...this.groups.entries()],
       usedFamilies: [...this.usedFamilies],
       retired: this.retiredThisRound,
+      botThink: [...this.botThink],
     };
   }
 
@@ -377,7 +403,7 @@ export class MatchRunner {
       groups: new Map(snapshot.groups),
       usedFamilies: new Set(snapshot.usedFamilies),
       retiredThisRound: snapshot.retired,
-      botThink: new Map(),
+      botThink: new Map(snapshot.botThink ?? []),
       botPowerUps: new Set(),
     });
     return runner;

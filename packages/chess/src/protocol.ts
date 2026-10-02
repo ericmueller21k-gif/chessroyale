@@ -117,7 +117,11 @@ export type ServerMessage = { now: number } & (
       standings: NetStanding[];
       cutoff: number;
       alive: boolean;
+      /** When each bot finishes thinking (ms after the round starts), for the leaderboard's "done" marks. */
+      botsDoneIn: Record<string, number>;
     }
+  /** A human has made their move this round (sent to everyone, for the leaderboard). */
+  | { t: "moved"; key: string; playerId: string }
   | { t: "locked"; key: string }
   | { t: "scoreRequest"; key: string; jobs: ScoreJob[] }
   /** To the host at the start of a round: every board, so it can search them while players think. */

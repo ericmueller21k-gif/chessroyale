@@ -16,6 +16,7 @@ import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster } from "@chessroyale/chess";
 import type { BoardView, DuelView, GameView, Hint, MoveRecord, Phase, Standing } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
+import { RoundProgress } from "./progress.ts";
 
 export const HUMAN = "you";
 const library = openingsData as Opening[];
@@ -42,6 +43,7 @@ export class SoloMatch implements GameView {
   private duelLosses = { you: [] as number[], bot: [] as number[] };
   hint: Hint[] | null = null;
   readonly seen = new Map<string, number>();
+  private progress = new RoundProgress(() => this.emit());
 
   constructor(
     private readonly engines: UciEngine[],
@@ -63,6 +65,9 @@ export class SoloMatch implements GameView {
   }
   get placement() {
     return this.you.placement;
+  }
+  get done(): ReadonlySet<string> {
+    return this.progress.done;
   }
   get lossesByStage() {
     return this.you.lossesByStage;
@@ -117,6 +122,7 @@ export class SoloMatch implements GameView {
 
   dispose() {
     if (this.timer) clearTimeout(this.timer);
+    this.progress.reset();
     this.listeners.clear();
   }
 
@@ -141,6 +147,7 @@ export class SoloMatch implements GameView {
     if (!this.you.alive) return void this.simulateRest();
     this.runner.deal();
     this.runner.prefetch();
+    this.progress.start(this.runner.botThinkTimes());
     const board = this.runner.boardOf(HUMAN)!;
     this.playStartedAt = Date.now();
     this.hint = null;
@@ -160,10 +167,19 @@ export class SoloMatch implements GameView {
     const { board, allowedMs: allowed } = this.phase;
     const thinkMs = Math.min(Date.now() - this.playStartedAt, allowed);
     const usedPowerUp = this.hint !== null;
+    this.progress.mark(HUMAN);
     this.set({ kind: "scoring", board, move });
     const t = performance.now();
-    const report = await this.runner.score(new Map([[HUMAN, { move, thinkMs, usedPowerUp }]]));
-    this.scoringMs.push(performance.now() - t);
+    // Score while the bots still thinking finish (they light up the leaderboard), then reveal.
+    // Scores and the leaderboard only change once everyone has finished.
+    const [scored] = await Promise.all([
+      this.runner.evaluate(new Map([[HUMAN, { move, thinkMs, usedPowerUp }]])).then((r) => {
+        this.scoringMs.push(performance.now() - t);
+        return r;
+      }),
+      this.progress.finishAll(this.runner.alive().map((p) => p.id)),
+    ]);
+    const report = this.runner.finishRound(scored.results, scored.thinkMs, scored.powerUps);
     const mine = report.boards.find((b) => b.playerIds.includes(HUMAN))!;
     const me = mine.result.players.find((p) => p.playerId === HUMAN)!;
     this.moves.push({

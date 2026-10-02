@@ -15,6 +15,7 @@ import {
 } from "@chessroyale/chess";
 import type { BoardView, DuelView, GameView, Hint, MoveRecord, Phase, Standing } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
+import { RoundProgress } from "./progress.ts";
 
 /**
  * A multiplayer match: the lobby server runs the clock and the draw; this
@@ -55,6 +56,10 @@ export class NetMatch implements GameView {
   private top = new TopMovesCache(DEFAULT_SETTINGS.botCandidateMoves);
   hint: Hint[] | null = null;
   readonly seen = new Map<string, number>();
+  private progress = new RoundProgress(() => this.emit());
+  get done(): ReadonlySet<string> {
+    return this.progress.done;
+  }
 
   constructor(
     readonly code: string,
@@ -155,6 +160,7 @@ export class NetMatch implements GameView {
 
   dispose() {
     this.closed = true;
+    this.progress.reset();
     this.ws?.close();
     this.listeners.clear();
   }
@@ -195,6 +201,7 @@ export class NetMatch implements GameView {
         this.key = m.key;
         this.myPick = null;
         this.hint = null;
+        this.progress.start(m.botsDoneIn ?? {});
         this.stage = m.stage;
         this.roundsPlayed = m.round;
         this.standingsList = m.standings;
@@ -207,10 +214,14 @@ export class NetMatch implements GameView {
           return this.setPhase({ kind: "play", board: this.toView(m.board), deadline, allowedMs: Math.max(0, deadline - Date.now()) });
         }
         return this.emit();
+      case "moved":
+        if (m.key === this.key) this.progress.mark(m.playerId);
+        return;
       case "locked":
-        if (this.phase.kind === "play" && m.key === this.key) {
-          this.setPhase({ kind: "scoring", board: this.phase.board, move: this.myPick });
-        }
+        if (m.key !== this.key) return;
+        // Everyone's in: anyone still shown as thinking (bots) finishes quickly while the host scores.
+        void this.progress.finishAll(this.standingsList.filter((s) => !s.out).map((s) => s.id), 900);
+        if (this.phase.kind === "play") this.setPhase({ kind: "scoring", board: this.phase.board, move: this.myPick });
         return;
       case "prefetch":
         return this.prefetch(m.fens);
@@ -413,6 +424,7 @@ export class NetMatch implements GameView {
     if (this.phase.kind !== "play" || !this.key || !move) return;
     this.myPick = move;
     this.send({ t: "pick", key: this.key, move });
+    if (this.myId) this.progress.mark(this.myId);
     this.setPhase({ kind: "scoring", board: this.phase.board, move });
   }
 

@@ -372,6 +372,7 @@ export class LobbyCore {
         standings: st,
         cutoff,
         alive: alive.has(h.id),
+        botsDoneIn: this.runner.botThinkTimes(),
       });
       if (!alive.has(h.id)) this.sendSpectate(h.id);
     }
@@ -407,7 +408,7 @@ export class LobbyCore {
     const board = this.runner?.boardOf(playerId);
     if (!board || !legalMoves(board.fen).includes(move)) return;
     round.picks[playerId] = { move, thinkMs: Math.min(now - round.startedAt, deadline - round.startedAt) };
-    this.send(playerId, { t: "locked", key }, false);
+    for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     if (this.aliveHumans().every((h) => round.picks[h.id])) this.lock();
   }
 
@@ -485,7 +486,6 @@ export class LobbyCore {
       for (const b of job.bots) {
         const m = s?.botPicks[b.id];
         picks[b.id] = m && legal.includes(m) ? m : legal[0]!;
-        runner.setBotThink(b.id, s?.botThinkMs[b.id] ?? 5000);
         if (s?.botPowerUps?.includes(b.id)) runner.setBotPowerUp(b.id);
       }
       const bestExpected = s?.bestExpected ?? 0.5;
