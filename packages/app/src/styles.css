@@ -661,4 +661,169 @@ p {
   .screen.game.duel .board-area .board-wrap {
     width: min(100%, calc(100dvh - 220px));
   }
+  .screen.game.duel .duel-board-row .eval-bar ~ .board-wrap {
+    width: min(calc(100% - 24px), calc(100dvh - 220px));
+  }
+}
+
+/* Spectators' evaluation bar beside the duel board. */
+.duel-board-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+.duel-board-row .eval-bar ~ .board-wrap {
+  width: min(calc(100% - 24px), calc(100dvh - 330px));
+}
+.eval-bar {
+  position: relative;
+  flex: 0 0 18px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #333;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.eval-bar.flipped {
+  justify-content: flex-start;
+}
+.eval-white {
+  background: #f2f2f2;
+  transition: height 0.4s ease;
+}
+.eval-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  color: #888;
+  mix-blend-mode: difference;
+  white-space: nowrap;
+}
+
+/* ---- Lobby ---- */
+
+.lobby-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.join-row {
+  display: flex;
+  gap: 8px;
+}
+
+.code-input {
+  width: 120px;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-align: center;
+  text-transform: uppercase;
+  min-height: 50px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  user-select: text;
+}
+
+.invite {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.invite-code {
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: 8px;
+  user-select: text;
+}
+
+.lobby-players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.lobby-players li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.lobby-players li.you {
+  outline: 2px solid var(--accent);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dot.on {
+  background: var(--good);
+}
+
+.host-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ---- Install card ---- */
+
+.install-card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.install-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+}
+.install-title {
+  font-weight: 800;
+  padding-right: 36px;
+}
+.install-text {
+  margin: 0;
+  line-height: 1.45;
+}
+.share-icon {
+  vertical-align: -3px;
+  color: var(--accent);
 }

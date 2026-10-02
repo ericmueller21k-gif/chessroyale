@@ -1,5 +1,6 @@
 import { sideToMove } from "@chessroyale/chess";
 import { Board } from "../components/Board.tsx";
+import { EvalBar } from "../components/EvalBar.tsx";
 import type { DuelView, GameView } from "../game.ts";
 
 const clock = (ms: number) => {
@@ -28,7 +29,7 @@ export function DuelColourScreen({ match, opponentName }: { match: GameView; opp
 export function DuelScreen({ match, duel }: { match: GameView; duel: DuelView }) {
   const clocks = match.duelClocks(duel);
   const turn = sideToMove(duel.fen);
-  const yourTurn = !duel.over && turn === duel.youColour;
+  const yourTurn = !duel.over && !duel.spectator && turn === duel.youColour;
   const them = duel.youColour === "w" ? "b" : "w";
   return (
     <div class="screen game duel">
@@ -37,29 +38,34 @@ export function DuelScreen({ match, duel }: { match: GameView; duel: DuelView })
         <span class={`duel-clock ${clocks[them] < 20000 ? "low" : ""}`}>{clock(clocks[them])}</span>
       </div>
       <div class="board-area">
-        <Board
+        <div class="duel-board-row">
+          {duel.spectator && <EvalBar fen={duel.fen} history={duel.history} orientation={duel.youColour} />}
+          <Board
           fen={duel.fen}
           orientation={duel.youColour === "w" ? "white" : "black"}
           lastMove={duel.lastMove}
           interactive={yourTurn}
           onMove={(m) => match.duelMove(m)}
-        />
+          />
+        </div>
       </div>
       <div class={`duel-player ${yourTurn ? "active" : ""}`}>
-        <span>{match.playerName}</span>
+        <span>{duel.spectator ? (duel.youColour === "w" ? "White" : "Black") : match.playerName}</span>
         <span class={`duel-clock ${clocks[duel.youColour] < 20000 ? "low" : ""}`}>{clock(clocks[duel.youColour])}</span>
       </div>
       <div class="actions">
         {duel.over ? (
           <>
-            <div class={`duel-result ${duel.over.winner === "you" ? "good" : "bad"}`}>
-              {duel.over.winner === "you" ? "You win the match!" : `${duel.opponentName} wins`}
+            <div class={`duel-result ${duel.over.winner === "you" ? "good" : duel.spectator ? "" : "bad"}`}>
+              {duel.spectator ? "Game over" : duel.over.winner === "you" ? "You win the match!" : `${duel.opponentName} wins`}
               <div class="muted small">{duel.over.reason}</div>
             </div>
             <button type="button" class="btn btn-primary" onClick={() => match.finishAfterDuel()}>
               Results
             </button>
           </>
+        ) : duel.spectator ? (
+          <div class="status">Watching the duel</div>
         ) : (
           <button type="button" class="btn btn-secondary" onClick={() => confirm("Resign the duel?") && match.resign()}>
             Resign
