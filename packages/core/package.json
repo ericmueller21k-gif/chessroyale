@@ -1,0 +1,8 @@
+{
+  "name": "@chessroyale/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure match logic: stages, grouping, scoring, the draw, board retirement and bot picks. No UI, network or chess-engine code.",
+  "exports": { ".": "./src/index.ts" }
+}
