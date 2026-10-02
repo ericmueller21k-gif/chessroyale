@@ -22,9 +22,11 @@ export interface NetBoard {
   generation: number;
   /** Moves played on this board so far. */
   ply: number;
-  /** The last few moves (up to 4) and the position before them, to replay what a player missed. */
+  /** The last few moves (up to 5) and the position before them, to replay what a player missed. */
   recent: string[];
   recentFrom: string;
+  /** Every move from the starting position, to step back through the game. */
+  history: string[];
 }
 
 /** One row of the live leaderboard. */
@@ -112,6 +114,8 @@ export type ServerMessage = { now: number } & (
       key: string;
       stage: number;
       round: number;
+      /** When the move clock starts (after the new board's settling-in countdown). */
+      startsAt: number;
       /** This player's deadline (from their own time bank). */
       deadline: number;
       board: NetBoard | null;

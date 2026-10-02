@@ -34,9 +34,15 @@ export interface Settings {
   colourPerStage: boolean;
   /** A pick arriving this long after the deadline still counts. */
   lateGraceMs: number;
+  /** The reveal before the chosen move plays: everyone's moves, then selecting the move. */
   revealSeconds: number;
   /** After the reveal, time for the drawn move to animate before the next round. */
   drawnMoveSeconds: number;
+  /**
+   * A new board's settling-in time before the move clock starts: a short
+   * countdown while the last few moves replay.
+   */
+  boardIntroSeconds: number;
   /** How long the grid of openings plays before the first round. */
   openingShowSeconds: number;
   /** Multiplayer: how long the stage-break standings show (solo waits for a tap). */
@@ -71,6 +77,13 @@ export interface Settings {
   duelClockSeconds: number;
 }
 
+/** "Relaxed" is the default; "quick" shortens the reveal and the settling-in time on a new board. */
+export type Pace = "relaxed" | "quick";
+export const PACE_SETTINGS: Record<Pace, Partial<Settings>> = {
+  relaxed: {},
+  quick: { revealSeconds: 3, drawnMoveSeconds: 2.5, boardIntroSeconds: 2 },
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   lobbySize: 32,
   groupSize: 4,
@@ -82,8 +95,9 @@ export const DEFAULT_SETTINGS: Settings = {
   botPowerUpLoss: 15,
   colourPerStage: true,
   lateGraceMs: 300,
-  revealSeconds: 4,
-  drawnMoveSeconds: 1.5,
+  revealSeconds: 5,
+  drawnMoveSeconds: 4,
+  boardIntroSeconds: 5,
   openingShowSeconds: 6,
   stageBreakSeconds: 10,
   colourChoiceSeconds: 15,

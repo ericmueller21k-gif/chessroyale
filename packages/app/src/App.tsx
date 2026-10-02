@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useState } from "preact/hooks";
-import { DEFAULT_SETTINGS, DRAW_RULES, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, type DrawRule, type Settings } from "@chessroyale/core";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { enginePool } from "./engine.ts";
@@ -23,12 +23,23 @@ function overridesFromUrl(): Partial<Settings> {
   const draw = q.get("draw") as DrawRule | null;
   return JSON.parse(
     JSON.stringify({
+      ...(quickPace() ? PACE_SETTINGS.quick : {}),
       roundsPerStage: n("rounds"),
       moveClockSeconds: n("clock"),
       duelClockSeconds: n("duel"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
     }),
   );
+}
+
+/** Quick pace: off by default (relaxed), set by the first screen's toggle or ?pace=quick. */
+function quickPace(): boolean {
+  if (new URLSearchParams(location.search).get("pace") === "quick") return true;
+  try {
+    return localStorage.getItem("brc.pace") === "quick";
+  } catch {
+    return false;
+  }
 }
 
 /** An invite link (/lobby/ABCDE) opens the join form with the code filled in. */
@@ -99,6 +110,7 @@ export function App() {
     try {
       const params = new URLSearchParams(location.search);
       params.delete("debug");
+      if (quickPace()) params.set("pace", "quick");
       const res = await fetch(`/api/lobby?${params}`, { method: "POST" });
       const body = (await res.json()) as { code?: string; message?: string };
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");
@@ -182,11 +194,11 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
         />
       );
     case "play":
-      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} deadline={p.deadline} allowedMs={p.allowedMs} />;
+      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={p.startsAt} deadline={p.deadline} allowedMs={p.allowedMs} />;
     case "scoring":
       return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} deadline={0} picked={p.move} />;
     case "reveal":
-      return <RevealScreen match={match} mine={p.mine} board={p.board} />;
+      return <RevealScreen key={`${p.board.id}:${p.board.ply}`} match={match} mine={p.mine} board={p.board} until={p.until} />;
     case "stageBreak":
       return <StageBreakScreen match={match} {...p} />;
     case "simulating":

@@ -68,8 +68,10 @@ export function Board({ fen, orientation, lastMove, interactive, onMove, arrows,
     if (small || before === fen || !lastMove) return;
     const to = lastMove.slice(2, 4);
     const mover = pieceAt(before, lastMove.slice(0, 2));
-    const captured = !!pieceAt(before, to) || (mover?.type === "p" && lastMove[0] !== lastMove[2]);
-    play(captured ? "capture" : "move");
+    if (!mover) return;
+    const captured = !!pieceAt(before, to) || (mover.type === "p" && lastMove[0] !== lastMove[2]);
+    const castled = mover.type === "k" && Math.abs(lastMove.charCodeAt(0) - lastMove.charCodeAt(2)) === 2;
+    play(captured ? "capture" : castled ? "castle" : "move");
   }, [fen]);
 
   useEffect(() => {

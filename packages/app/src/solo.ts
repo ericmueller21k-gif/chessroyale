@@ -147,13 +147,15 @@ export class SoloMatch implements GameView {
     if (!this.you.alive) return void this.simulateRest();
     this.runner.deal();
     this.runner.prefetch();
-    this.progress.start(this.runner.botThinkTimes());
+    // The move clock starts after a short settling-in countdown on the new board.
+    const intro = this.settings.boardIntroSeconds * 1000;
+    this.progress.start(this.runner.botThinkTimes(), intro);
     const board = this.runner.boardOf(HUMAN)!;
-    this.playStartedAt = Date.now();
+    this.playStartedAt = Date.now() + intro;
     this.hint = null;
     const allowed = allowedMs(this.you, this.settings);
-    this.set({ kind: "play", board: boardView(board), deadline: this.playStartedAt + allowed, allowedMs: allowed });
-    this.timer = setTimeout(() => this.submit(null), allowed + this.settings.lateGraceMs);
+    this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed });
+    this.timer = setTimeout(() => this.submit(null), intro + allowed + this.settings.lateGraceMs);
   }
 
   /** The human's pick; final once made. */
@@ -165,7 +167,8 @@ export class SoloMatch implements GameView {
     if (this.phase.kind !== "play") return;
     if (this.timer) clearTimeout(this.timer);
     const { board, allowedMs: allowed } = this.phase;
-    const thinkMs = Math.min(Date.now() - this.playStartedAt, allowed);
+    if (move !== null && Date.now() < this.playStartedAt - 300) return; // Before the clock starts.
+    const thinkMs = Math.max(0, Math.min(Date.now() - this.playStartedAt, allowed));
     const usedPowerUp = this.hint !== null;
     this.progress.mark(HUMAN);
     this.set({ kind: "scoring", board, move });
@@ -191,8 +194,9 @@ export class SoloMatch implements GameView {
       loss: me.loss,
       roundScore: me.roundScore,
     });
-    this.set({ kind: "reveal", mine, board });
-    this.timer = setTimeout(() => this.afterReveal(), (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000);
+    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
+    this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });
+    this.timer = setTimeout(() => this.afterReveal(), revealMs);
   }
 
   skipReveal() {

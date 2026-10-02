@@ -41,17 +41,17 @@ async function start(page: Page, query: string) {
 }
 
 test("strong play survives every stage, reaches the duel, and sees results", async ({ page }) => {
-  await start(page, "rounds=1&clock=20&duel=30");
+  await start(page, "rounds=1&clock=20&duel=30&pace=quick");
   for (let i = 0; i < 400; i++) {
     const p = await phase(page);
     if (p === "results") break;
     if (p === "play") {
-      // Moves are possible once the replay of what you missed has finished.
-      await expect(page.locator(".replay-tag")).toHaveCount(0);
+      // Moves are possible once the new board's settling-in countdown is over.
+      await expect(page.locator(".intro-pill")).toHaveCount(0, { timeout: 10_000 });
       await clickMove(page, await bestMove(page));
       await expect.poll(() => phase(page)).not.toBe("play");
     } else if (p === "reveal") {
-      await page.waitForTimeout(2800);
+      await page.waitForTimeout(3600);
       await page.locator(".screen").click();
     } else if (p === "stageBreak") {
       await expect(page.locator(".tower-row").first()).toBeVisible();
@@ -76,13 +76,13 @@ test("strong play survives every stage, reaches the duel, and sees results", asy
 });
 
 test("missing every move gets you knocked out; the match plays out and shows results", async ({ page }) => {
-  await start(page, "rounds=2&clock=3");
+  await start(page, "rounds=2&clock=3&pace=quick");
   for (let i = 0; i < 200; i++) {
     const p = await phase(page);
     if (p === "results") break;
     if (p === "reveal") {
       await expect(page.locator(".round-score")).toContainText("-25");
-      await page.waitForTimeout(2800);
+      await page.waitForTimeout(3600);
       await page.locator(".screen").click();
     } else if (p === "stageBreak") {
       await expect(page.locator(".out-msg")).toBeVisible();

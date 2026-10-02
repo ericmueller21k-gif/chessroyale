@@ -201,7 +201,7 @@ export class NetMatch implements GameView {
         this.key = m.key;
         this.myPick = null;
         this.hint = null;
-        this.progress.start(m.botsDoneIn ?? {});
+        this.progress.start(m.botsDoneIn ?? {}, this.local(m.startsAt ?? m.now) - Date.now());
         this.stage = m.stage;
         this.roundsPlayed = m.round;
         this.standingsList = m.standings;
@@ -209,9 +209,10 @@ export class NetMatch implements GameView {
         if (m.board) {
           this.prefetch([m.board.fen]);
           this.currentBoard = m.board;
-          this.playStartedAt = Date.now();
+          const startsAt = this.local(m.startsAt ?? m.now);
+          this.playStartedAt = startsAt;
           const deadline = this.local(m.deadline);
-          return this.setPhase({ kind: "play", board: this.toView(m.board), deadline, allowedMs: Math.max(0, deadline - Date.now()) });
+          return this.setPhase({ kind: "play", board: this.toView(m.board), startsAt, deadline, allowedMs: Math.max(0, deadline - startsAt) });
         }
         return this.emit();
       case "moved":
@@ -321,6 +322,7 @@ export class NetMatch implements GameView {
     }
     this.setPhase({
       kind: "reveal",
+      until: this.local(m.until),
       board: this.toView(this.currentBoard),
       mine: {
         fenBefore: m.fenBefore,
@@ -422,6 +424,7 @@ export class NetMatch implements GameView {
 
   submit(move: string | null) {
     if (this.phase.kind !== "play" || !this.key || !move) return;
+    if (Date.now() < this.phase.startsAt - 300) return; // Before the clock starts.
     this.myPick = move;
     this.send({ t: "pick", key: this.key, move });
     if (this.myId) this.progress.mark(this.myId);

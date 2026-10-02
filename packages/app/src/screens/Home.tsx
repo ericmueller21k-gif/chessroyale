@@ -36,6 +36,21 @@ export function HomeScreen({
       return false;
     }
   });
+  const [relaxed, setRelaxed] = useState(() => {
+    try {
+      return localStorage.getItem("brc.pace") !== "quick";
+    } catch {
+      return true;
+    }
+  });
+  const toggleRelaxed = (on: boolean) => {
+    setRelaxed(on);
+    try {
+      localStorage.setItem("brc.pace", on ? "relaxed" : "quick");
+    } catch {
+      // Not important.
+    }
+  };
   const togglePractice = (on: boolean) => {
     setPractice(on);
     try {
@@ -96,6 +111,13 @@ export function HomeScreen({
         <span>
           <strong>Practice mode:</strong> unlimited power-ups (the engine's top 3 moves, any time). You're marked 💡 on the
           leaderboard.
+        </span>
+      </label>
+      <label class="check">
+        <input type="checkbox" checked={relaxed} onChange={(e) => toggleRelaxed(e.currentTarget.checked)} />
+        <span>
+          <strong>Relaxed pace:</strong> a few seconds to settle on each new board and to watch the chosen move. Untick for
+          quick games (also applies to lobbies you create).
         </span>
       </label>
       {joinCode ? null : (

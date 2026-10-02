@@ -1,12 +1,14 @@
 /**
- * Game sounds, synthesised with Web Audio (no sound files to load or license).
- * Browsers only allow audio after a tap, so call unlockAudio() from one. The
- * mute choice is remembered on the device.
+ * Game sounds. Pieces use recorded wooden knocks (move, capture, castle, from
+ * PyChess, GPL-3); cues like the round start or the reveal use a soft
+ * marimba-style voice synthesised with Web Audio, kept low and warm. Browsers
+ * only allow audio after a tap, so call unlockAudio() from one. The mute
+ * choice is remembered on the device.
  */
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
-let noise: AudioBuffer | null = null;
+const samples = new Map<string, AudioBuffer>();
 const MUTE_KEY = "brc.muted";
 let muted = (() => {
   try {
@@ -17,17 +19,27 @@ let muted = (() => {
 })();
 const listeners = new Set<() => void>();
 
-/** Call from a tap so browsers allow sound later. */
+const SAMPLE_FILES = { move: "/sounds/move.mp3", capture: "/sounds/capture.mp3", castle: "/sounds/castle.mp3" } as const;
+
+/** Call from a tap so browsers allow sound later. Also loads the recorded samples. */
 export function unlockAudio() {
   try {
     if (!ctx) {
       ctx = new AudioContext();
       master = ctx.createGain();
       master.gain.value = 0.9;
-      master.connect(ctx.destination);
-      noise = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
-      const d = noise.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      // A gentle low-pass keeps every cue soft on phone speakers.
+      const soften = ctx.createBiquadFilter();
+      soften.type = "lowpass";
+      soften.frequency.value = 6000;
+      master.connect(soften).connect(ctx.destination);
+      for (const [name, url] of Object.entries(SAMPLE_FILES)) {
+        void fetch(url)
+          .then((r) => r.arrayBuffer())
+          .then((b) => ctx!.decodeAudioData(b))
+          .then((buf) => samples.set(name, buf))
+          .catch(() => undefined);
+      }
     }
     void ctx.resume();
   } catch {
@@ -50,82 +62,83 @@ export function onMuteChange(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
-/** A wooden "thock": a short filtered noise burst for the click plus a low body. */
-function thock(at: number, pitch = 1, level = 1) {
-  const c = ctx!;
-  const src = c.createBufferSource();
-  src.buffer = noise;
-  const band = c.createBiquadFilter();
-  band.type = "bandpass";
-  band.frequency.value = 1800 * pitch;
-  band.Q.value = 1.4;
-  const g = c.createGain();
-  g.gain.setValueAtTime(0.0001, at);
-  g.gain.exponentialRampToValueAtTime(0.5 * level, at + 0.003);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.07);
-  src.connect(band).connect(g).connect(master!);
+function sample(name: keyof typeof SAMPLE_FILES, at: number, level = 1, rate = 1) {
+  const buf = samples.get(name);
+  if (!buf) return;
+  const src = ctx!.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = rate;
+  const g = ctx!.createGain();
+  g.gain.value = level;
+  src.connect(g).connect(master!);
   src.start(at);
-  src.stop(at + 0.08);
-
-  const body = c.createOscillator();
-  body.type = "sine";
-  body.frequency.setValueAtTime(240 * pitch, at);
-  body.frequency.exponentialRampToValueAtTime(110 * pitch, at + 0.09);
-  const bg = c.createGain();
-  bg.gain.setValueAtTime(0.0001, at);
-  bg.gain.exponentialRampToValueAtTime(0.45 * level, at + 0.004);
-  bg.gain.exponentialRampToValueAtTime(0.0001, at + 0.12);
-  body.connect(bg).connect(master!);
-  body.start(at);
-  body.stop(at + 0.13);
 }
 
-/** A soft bell-like note. */
-function bell(at: number, freq: number, length = 0.5, level = 0.18, type: OscillatorType = "sine") {
+/** One soft marimba-like note: a sine with a quick, warm decay and a faint wooden overtone. */
+function mallet(at: number, freq: number, level = 0.2, decay = 0.9) {
   const c = ctx!;
-  for (const [mult, amp] of [
-    [1, 1],
-    [2, 0.25],
-    [3, 0.08],
+  for (const [mult, amp, len] of [
+    [1, 1, decay],
+    [4, 0.12, decay * 0.18],
+    [10, 0.03, 0.03],
   ] as const) {
     const o = c.createOscillator();
-    o.type = type;
+    o.type = "sine";
     o.frequency.value = freq * mult;
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(level * amp, at + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, at + length);
+    g.gain.exponentialRampToValueAtTime(level * amp, at + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
     o.connect(g).connect(master!);
     o.start(at);
-    o.stop(at + length + 0.02);
+    o.stop(at + len + 0.02);
   }
 }
 
-export type SoundName = "move" | "capture" | "roundStart" | "allIn" | "powerUp" | "safe" | "out" | "win" | "tick" | "tickLast";
+// Note frequencies (Hz), kept in a warm middle range.
+const A3 = 220, C4 = 261.6, D4 = 293.7, E4 = 329.6, G4 = 392, A4 = 440, B4 = 493.9, C5 = 523.3, D5 = 587.3, E5 = 659.3, G5 = 784, A5 = 880;
+
+export type SoundName =
+  | "move"
+  | "capture"
+  | "castle"
+  | "roundStart"
+  | "reelTick"
+  | "chosen"
+  | "count"
+  | "countGo"
+  | "powerUp"
+  | "safe"
+  | "out"
+  | "win"
+  | "tick"
+  | "tickLast";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
-  move: (t) => thock(t, 1, 1),
-  capture: (t) => {
-    thock(t, 1.2, 1.1);
-    thock(t + 0.05, 0.85, 0.9);
-  },
+  move: (t) => sample("move", t),
+  capture: (t) => sample("capture", t),
+  castle: (t) => sample("castle", t),
   roundStart: (t) => {
-    bell(t, 659, 0.35, 0.12);
-    bell(t + 0.09, 988, 0.5, 0.12);
+    mallet(t, E4, 0.2, 1.2);
+    mallet(t + 0.14, B4, 0.16, 1.4);
   },
-  allIn: (t) => bell(t, 1319, 0.45, 0.1),
-  powerUp: (t) => [784, 988, 1175, 1568].forEach((f, i) => bell(t + i * 0.055, f, 0.35, 0.1, "triangle")),
+  // The "selecting move" reel: a light wooden tick per step.
+  reelTick: (t) => sample("move", t, 0.35, 1.6),
+  chosen: (t) => [G4, B4, D5].forEach((f, i) => mallet(t + i * 0.07, f, 0.17, 1.1)),
+  count: (t) => mallet(t, A4, 0.14, 0.5),
+  countGo: (t) => mallet(t, D5, 0.16, 0.8),
+  powerUp: (t) => [D5, E5, G5, A5].forEach((f, i) => mallet(t + i * 0.06, f, 0.12, 0.6)),
   safe: (t) => {
-    [523, 659, 784].forEach((f) => bell(t, f, 0.7, 0.09));
-    bell(t + 0.18, 1047, 0.8, 0.11);
+    [C4, E4, G4].forEach((f, i) => mallet(t + i * 0.09, f, 0.16, 1.2));
+    mallet(t + 0.3, C5, 0.16, 1.6);
   },
-  out: (t) => [392, 330, 262].forEach((f, i) => bell(t + i * 0.16, f, 0.6, 0.13, "triangle")),
+  out: (t) => [E4, C4, A3].forEach((f, i) => mallet(t + i * 0.22, f, 0.2, 1.2)),
   win: (t) => {
-    [523, 659, 784, 1047].forEach((f, i) => bell(t + i * 0.12, f, 0.5, 0.12, "triangle"));
-    [523, 659, 784, 1047].forEach((f) => bell(t + 0.55, f, 1.4, 0.08));
+    [C4, E4, G4, C5, E5].forEach((f, i) => mallet(t + i * 0.1, f, 0.16, 1.2));
+    [C4, G4, C5, E5].forEach((f) => mallet(t + 0.6, f, 0.12, 2.2));
   },
-  tick: (t) => bell(t, 660, 0.15, 0.2, "square"),
-  tickLast: (t) => bell(t, 880, 0.2, 0.2, "square"),
+  tick: (t) => mallet(t, D4, 0.16, 0.25),
+  tickLast: (t) => mallet(t, A4, 0.18, 0.4),
 };
 
 export function play(name: SoundName) {

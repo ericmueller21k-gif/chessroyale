@@ -23,7 +23,21 @@ function at(square: string, orientation: "white" | "black") {
  * square, with the players' names stacked above where it lands. Sits over the
  * board (inside its wrapper) and lets taps through.
  */
-export function ShadeMoves({ fen, moves, orientation }: { fen: string; moves: ShadeMove[]; orientation: "white" | "black" }) {
+export function ShadeMoves({
+  fen,
+  moves,
+  orientation,
+  highlight = null,
+  chosen = null,
+}: {
+  fen: string;
+  moves: ShadeMove[];
+  orientation: "white" | "black";
+  /** The move the "selecting" reel is on right now. */
+  highlight?: string | null;
+  /** The move that was chosen (the others fade). */
+  chosen?: string | null;
+}) {
   const [landed, setLanded] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setLanded(true), 60);
@@ -40,7 +54,9 @@ export function ShadeMoves({ fen, moves, orientation }: { fen: string; moves: Sh
         return (
           <piece
             key={m.move}
-            class={`${piece.color === "w" ? "white" : "black"} ${NAMES[piece.type]} shade${m.you ? " shade-you" : ""}`}
+            class={`${piece.color === "w" ? "white" : "black"} ${NAMES[piece.type]} shade${m.you ? " shade-you" : ""}${
+              highlight === m.move ? " reel-on" : ""
+            }${chosen ? (chosen === m.move ? " chosen" : " not-chosen") : ""}`}
             style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
           />
         );
@@ -49,7 +65,11 @@ export function ShadeMoves({ fen, moves, orientation }: { fen: string; moves: Sh
         moves.map((m) => {
           const to = at(m.move.slice(2, 4), orientation);
           return (
-            <div key={`tag${m.move}`} class={`shade-tag${m.you ? " you" : ""}`} style={{ left: `${to.left + 6.25}%`, top: `${to.top}%` }}>
+            <div
+              key={`tag${m.move}`}
+              class={`shade-tag${m.you ? " you" : ""}${chosen && chosen !== m.move ? " not-chosen" : ""}`}
+              style={{ left: `${to.left + 6.25}%`, top: `${to.top}%` }}
+            >
               {m.names.map((n) => (
                 <span key={n}>{n}</span>
               ))}
@@ -58,4 +78,10 @@ export function ShadeMoves({ fen, moves, orientation }: { fen: string; moves: Sh
         })}
     </div>
   );
+}
+
+/** A green ring around a square (where the chosen move landed). */
+export function SquareRing({ square, orientation }: { square: string; orientation: "white" | "black" }) {
+  const p = at(square, orientation);
+  return <div class="square-ring" style={{ left: `${p.left}%`, top: `${p.top}%` }} aria-hidden="true" />;
 }

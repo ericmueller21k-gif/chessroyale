@@ -176,3 +176,20 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
   when you survive a cut, a falling one when you're out, and a fanfare for winning. The countdown beeps moved into the
   same module. A 🔊/🔇 button sits next to the strip and on the first screen, remembered per device. Browsers only allow
   sound after a tap, so the first tap anywhere turns it on. Recorded samples can replace any of these later.
+
+## Pace, the reveal, history and real piece sounds (Oct 2, 2026)
+
+- **Piece sounds are recorded wooden knocks** from PyChess (GPL-3, the same licence as the app): one for a move, a
+  double knock for a capture, king-and-rook for castling. Lichess's classic set is listed as non-free in its own
+  licence file, and its alternative sets are AGPL, so PyChess was the clean choice. Other cues (round start, the
+  reveal's reel ticks and landing, the 3-2-1, cuts, the win) are a soft marimba-style voice in a lower, warmer
+  range than before, and the move clock's last-seconds beeps use it too.
+- **Relaxed pace by default**, with a toggle on the first screen (unticked = quick; `?pace=quick` in a link). Relaxed:
+  a 5 s settling-in countdown on each new board while up to the last 5 moves replay (the move clock and bank don't
+  run during it), and a 9 s reveal. Quick: 2 s and 5.5 s.
+- **The reveal is a sequence:** everyone's moves slide in as see-through pieces with names; "Selecting move…" fades in
+  while a highlight ticks across the candidates and slows down like a reel; it lands with a green ring and a chime,
+  the others fade, and the move plays with a green ring on its square; then a big translucent 3-2-1 "Next board",
+  timed from the server so everyone moves on together.
+- **Step through a board's game** with ◀ ▶ (and ⏮ ⏭, or the arrow keys on a computer) under the board, all the way
+  back to the first move. While looking back the board can't take a move; ⏭ returns to the live position.
