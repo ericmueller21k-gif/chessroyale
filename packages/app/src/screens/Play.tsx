@@ -22,18 +22,6 @@ function useNow(ms = 200) {
   return now;
 }
 
-/** Your time bank, ticking down while you think (it doesn't move during the settling-in countdown). */
-function BankClock({ match, startsAt, now }: { match: GameView; startsAt: number; now: number }) {
-  const me = match.standings().find((s) => s.isYou);
-  if (!me) return null;
-  const bank = Math.max(0, me.bankMs + match.settings.timeIncrementSeconds * 1000 - Math.max(0, now - startsAt));
-  return (
-    <span class={`bank ${bank < 60_000 ? "low" : ""}`} title="Time bank: +5 s every move, 30 s at most per move">
-      Bank {clockText(bank)}
-    </span>
-  );
-}
-
 /** In the final: whose side you're moving for, and with whom. */
 function FinalTurnLabel({ match, side }: { match: GameView; side: "w" | "b" }) {
   const f = match.final!;
@@ -75,6 +63,7 @@ export function PlayScreen({
   useTicks(introLeft, COUNT_FROM_SECONDS, intro);
   const total = allowedMs ?? match.settings.moveClockSeconds * 1000;
   const secsLeft = Math.ceil((deadline - now) / 1000);
+  const moveLeft = Math.max(0, deadline - Math.max(now, startsAt));
   const ending = !waiting && !intro && deadline > 0 && secsLeft > 0 && secsLeft <= COUNT_FROM_SECONDS;
 
   const hint = match.hint;
@@ -106,7 +95,13 @@ export function PlayScreen({
             {ending && <CenterCount label="Round end" n={secsLeft} />}
           </Board>
         </div>
-        <HistoryNav view={history} total={board.history.length} />
+        <HistoryNav view={history} total={board.history.length}>
+          {!waiting && deadline > 0 && (
+            <span class={`move-clock${moveLeft <= 10_000 ? " low" : ""}`} role="timer" aria-label="Time left for this move">
+              {clockText(Math.ceil(moveLeft / 1000) * 1000)}
+            </span>
+          )}
+        </HistoryNav>
       </div>
       <div class="play-footer">
         {waiting ? (
@@ -127,14 +122,6 @@ export function PlayScreen({
           </div>
         ) : (
           <>
-            <div class="play-row">
-              <span class="status">
-                You play <strong>{side === "w" ? "White" : "Black"}</strong>
-                {intro && <span class="muted"> · {shown.replaying ? "replay" : "get ready"}</span>}
-                {history.browsing && <span class="muted"> · looking back</span>}
-              </span>
-              {allowedMs !== undefined && <BankClock match={match} startsAt={startsAt} now={now} />}
-            </div>
             {hint && hint.length > 0 ? (
               <ol class="hints">
                 {hint.map((h, i) => (
@@ -147,11 +134,11 @@ export function PlayScreen({
             ) : (
               <button
                 type="button"
-                class="btn btn-secondary btn-powerup"
+                class="btn-powerup"
                 disabled={left <= 0 || hint !== null}
                 onClick={() => match.usePowerUp()}
               >
-                {hint ? "Asking the engine…" : left === Infinity ? "💡 Show the engine's top 3 (practice)" : `⚡ Power-up: show the top 3 (${left} left)`}
+                {hint ? "Asking the engine…" : left === Infinity ? "💡 Top 3 moves (practice)" : `⚡ Power-up: top 3 moves · ${left} left`}
               </button>
             )}
           </>

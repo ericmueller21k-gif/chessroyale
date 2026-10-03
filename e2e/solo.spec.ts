@@ -61,7 +61,10 @@ test("strong play survives every stage, plays the 2v2 final, and sees results", 
       await expect(page.locator(".tower-row").first()).toBeVisible();
       await page.getByRole("button", { name: /Next stage|See how it ends/ }).click();
     } else if (p === "final") {
-      await expect(page.locator(".final-teams")).toBeVisible();
+      // Watching the final shows the teams (unless your turn has already come up meanwhile).
+      await expect
+        .poll(async () => (await phase(page)) !== "final" || (await page.locator(".final-teams").isVisible()))
+        .toBe(true);
       await page.waitForTimeout(300);
     } else {
       await page.waitForTimeout(200);
