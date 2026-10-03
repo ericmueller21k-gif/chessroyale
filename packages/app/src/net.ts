@@ -8,6 +8,7 @@ import {
   type BoardSlot,
   type NetBoard,
   type NetStanding,
+  type LivePick,
   type ScoreJob,
   type ServerMessage,
   type UciEngine,
@@ -203,6 +204,7 @@ export class NetMatch implements GameView {
         return this.setPhase({ kind: "opening", boards: m.boards.map((b) => this.toView(b)) });
       case "round":
         this.key = m.key;
+        this.tally = null;
         this.myPick = null;
         this.hint = null;
         this.progress.start(m.botsDoneIn ?? {}, this.local(m.startsAt ?? m.now) - Date.now());
@@ -236,7 +238,13 @@ export class NetMatch implements GameView {
         else if (this.phase.kind === "watching") this.setPhase({ kind: "scoring", board: this.phase.board, move: null, watched: true });
         return;
       case "prefetch":
-        return this.prefetch(m.fens);
+        this.prefetch(m.fens);
+        if (m.plan) void this.planBots(m.plan);
+        return;
+      case "tally":
+        if (m.key !== this.key) return;
+        this.tally = m.picks.map((p) => ({ ...p, at: this.local(p.at) }));
+        return this.emit();
       case "scoreRequest":
         return void this.hostScore(m.key, m.jobs);
       case "reveal":
@@ -346,6 +354,27 @@ export class NetMatch implements GameView {
       .catch(() => undefined);
   }
 
+  /** Crowd, host only: decide the bots' picks now (from the round's search) so everyone can watch them come in. */
+  private async planBots(plan: NonNullable<Extract<ServerMessage, { t: "prefetch" }>["plan"]>) {
+    try {
+      const engines = await this.engines();
+      const top = await this.top.get(engines[0]!, plan.fen);
+      const best = top[0]!.expected;
+      const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
+      const legal = legalMoves(plan.fen);
+      const picks: Record<string, string> = {};
+      const powerUps: string[] = [];
+      for (const b of plan.bots) {
+        const choice = botChoose(Math.random, candidates, { skill: b.skill, powerUps: b.powerUps ?? 0 }, legal, this.settings);
+        picks[b.id] = choice.move;
+        if (choice.usedPowerUp) powerUps.push(b.id);
+      }
+      if (this.key === plan.key) this.send({ t: "botPlan", key: plan.key, picks, powerUps });
+    } catch {
+      // No engine: the bots pick at scoring time instead.
+    }
+  }
+
   private async hostScore(key: string, jobs: ScoreJob[]) {
     const engines = await this.engines();
     const t = performance.now();
@@ -364,6 +393,14 @@ export class NetMatch implements GameView {
           const botThinkMs: Record<string, number> = {};
           const botPowerUps: string[] = [];
           for (const b of job.bots) {
+            // Crowd: picks decided at the start of the round (and already shown live) stand.
+            const planned = job.botPlan?.[b.id];
+            if (planned) {
+              botPicks[b.id] = planned;
+              if (job.botPlanPowerUps?.includes(b.id)) botPowerUps.push(b.id);
+              botThinkMs[b.id] = thinkMs(Math.random, this.settings);
+              continue;
+            }
             const choice = botChoose(Math.random, candidates, { skill: b.skill, powerUps: b.powerUps ?? 0 }, legal, this.settings);
             botPicks[b.id] = choice.move;
             if (choice.usedPowerUp) botPowerUps.push(b.id);
@@ -395,6 +432,12 @@ export class NetMatch implements GameView {
     this.send({ t: "pick", key: this.key, move });
     if (this.myId) this.progress.mark(this.myId);
     this.setPhase({ kind: "scoring", board: this.phase.board, move });
+  }
+
+  /** Crowd: the picks visible to you so far this round (null while you still have to pick). */
+  private tally: LivePick[] | null = null;
+  livePicks(): LivePick[] | null {
+    return this.tally;
   }
 
   augmentVote: Augment | null = null;

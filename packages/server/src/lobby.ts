@@ -12,6 +12,7 @@ import {
   type NetStanding,
   type Opening,
   type RunnerSnapshot,
+  type LivePick,
   type ScoreJob,
   type ServerMessage,
 } from "@chessroyale/chess";
@@ -62,6 +63,9 @@ export interface LobbyRecord {
     startedAt: number;
     picks: Record<string, { move: string; thinkMs: number }>;
     powerUps: Record<string, true>;
+    /** Crowd: the host's early bot picks, and when each bot finishes (ms after the clock starts). */
+    botPlan?: { picks: Record<string, string>; powerUps: string[] };
+    botsDoneIn?: Record<string, number>;
   };
   timer: null | { at: number; kind: Timer };
   /** Last phase message per human, re-sent on reconnect. */
@@ -266,6 +270,12 @@ export class LobbyCore {
           console.log(`cross-check mismatch in ${this.r.code} (${msg.key}, board ${msg.boardId}): ${msg.detail ?? ""}`);
         }
         return;
+      case "botPlan":
+        if (playerId === this.r.hostId && this.r.round?.key === msg.key && this.r.phase === "play" && !this.r.round.botPlan) {
+          this.r.round.botPlan = { picks: msg.picks, powerUps: msg.powerUps };
+          this.sendTally();
+        }
+        return;
       case "augment":
         if (this.r.phase === "stageBreak" && this.settings.augments && this.runner?.player(playerId)?.alive) {
           this.r.augmentVotes = { ...(this.r.augmentVotes ?? {}), [playerId]: msg.choice };
@@ -346,7 +356,7 @@ export class LobbyCore {
     const playing = this.roundHumans();
     for (const h of playing) deadlines[h.id] = now + allowedMs(runner.player(h.id), this.settings);
     const deadline = Math.max(now, ...Object.values(deadlines));
-    this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {} };
+    this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {}, ...(final ? {} : { botsDoneIn: runner.botThinkTimes() }) };
     this.r.phase = "play";
     const st = this.standings();
     const cutoff = this.cutoff();
@@ -378,7 +388,14 @@ export class LobbyCore {
     }
     if (this.r.hostId) {
       const fens = [...runner.groups.keys()].map((id) => runner.boards.get(id)!.fen);
-      this.send(this.r.hostId, { t: "prefetch", fens }, false);
+      const skills = new Map(this.r.bots.map((b) => [b.id, b.skill]));
+      const ids = [...runner.groups.values()][0] ?? [];
+      // Crowd: the host decides the bots' picks now, so everyone who has picked can watch them come in.
+      const plan =
+        crowd && !final
+          ? { key, fen: fens[0]!, bots: ids.filter((id) => skills.has(id)).map((id) => ({ id, skill: skills.get(id)!, powerUps: runner.player(id).powerUps })) }
+          : undefined;
+      this.send(this.r.hostId, { t: "prefetch", fens, ...(plan ? { plan } : {}) }, false);
     }
     if (!playing.length) {
       // Only bots this round: in the final a bot "thinks" for its recorded time first; in Crowd the watching team sees
@@ -423,7 +440,29 @@ export class LobbyCore {
     if (!board || !legalMoves(board.fen).includes(move)) return;
     round.picks[playerId] = { move, thinkMs: Math.max(0, Math.min(now - round.startedAt, deadline - round.startedAt)) };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
+    this.sendTally();
     if (this.roundHumans().every((h) => round.picks[h.id])) this.lock();
+  }
+
+  /**
+   * Crowd: the picks so far, to everyone allowed to see them: players who have
+   * picked this round, and the team that's watching. Bots' picks show from the
+   * moment each bot finishes thinking. Nobody sees picks before making their own.
+   */
+  private sendTally() {
+    const round = this.r.round;
+    const runner = this.runner;
+    if (!round || !runner || this.settings.mode !== "crowd" || runner.isFinal()) return;
+    const picks: LivePick[] = [
+      ...Object.entries(round.picks).map(([playerId, p]) => ({ playerId, move: p.move, at: round.startedAt + p.thinkMs })),
+      ...Object.entries(round.botPlan?.picks ?? {}).map(([playerId, move]) => ({ playerId, move, at: round.startedAt + (round.botsDoneIn?.[playerId] ?? 0) })),
+    ];
+    const playing = new Set(this.roundHumans().map((h) => h.id));
+    for (const h of this.r.humans) {
+      const alive = runner.player(h.id)?.alive;
+      if (!alive || (playing.has(h.id) && !round.picks[h.id])) continue;
+      this.send(h.id, { t: "tally", key: round.key, picks }, false);
+    }
   }
 
   /** A power-up: the player's browser shows the engine's top moves; the server just counts it. */
@@ -448,6 +487,7 @@ export class LobbyCore {
       bots: ids
         .filter((id) => skills.has(id))
         .map((id) => ({ id, skill: skills.get(id)!, powerUps: this.runner!.player(id).powerUps })),
+      ...(this.r.round!.botPlan ? { botPlan: this.r.round!.botPlan.picks, botPlanPowerUps: this.r.round!.botPlan.powerUps } : {}),
     }));
     this.r.scoreRequest = { key: this.r.round.key, jobs };
     for (const h of this.r.humans) this.io.send(h.id, { t: "locked", key: this.r.round.key });

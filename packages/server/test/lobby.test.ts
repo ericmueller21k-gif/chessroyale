@@ -282,4 +282,46 @@ describe("lobby: Crowd mode", () => {
     L.advance(10_000);
     expect(L.last("p1", "round")!.moveClock).toBe(25);
   });
+
+  it("live tallies: nobody sees picks before making their own; the watching team sees them; the bot plan is scored", () => {
+    const L = setup({ ...modeSettings("crowd"), firstStageRounds: 4, roundsPerStage: 2, boardIntroSeconds: 0 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone");
+    L.core.message("p1", { t: "start" });
+    L.advance(DEFAULT_SETTINGS.openingShowSeconds * 1000);
+    // Find a round where exactly one of the two humans is picking.
+    for (let i = 0; i < 4; i++) {
+      const r1 = L.last("p1", "round")!;
+      const r2 = L.last("p2", "round")!;
+      if (!!r1.watching !== !!r2.watching) {
+        const [picker, watcher, rp] = r1.watching ? (["p2", "p1", r2] as const) : (["p1", "p2", r1] as const);
+        const pre = L.last(picker, "prefetch") ?? L.last(watcher, "prefetch");
+        expect(pre?.plan?.bots).toHaveLength(49);
+        // The host sends its plan; the watcher sees it, the picker (not picked yet) doesn't.
+        const host = L.last("p1", "prefetch") ? "p1" : "p2";
+        const plan = Object.fromEntries(pre!.plan!.bots.map((b) => [b.id, legalMoves(pre!.plan!.fen)[0]!]));
+        L.take(picker);
+        L.take(watcher);
+        L.core.message(host, { t: "botPlan", key: rp.key, picks: plan, powerUps: [] });
+        expect(L.last(watcher, "tally")!.picks).toHaveLength(49);
+        expect(L.last(picker, "tally")).toBeUndefined();
+        // After picking, the picker sees everything, their own pick included.
+        const move = legalMoves(rp.board!.fen)[1]!;
+        L.core.message(picker, { t: "pick", key: rp.key, move });
+        const t = L.last(picker, "tally")!;
+        expect(t.picks).toHaveLength(50);
+        expect(t.picks.find((p) => p.playerId === picker)!.move).toBe(move);
+        // Scoring uses the plan.
+        const req = L.last(host, "scoreRequest")!;
+        expect(req.jobs[0]!.botPlan).toEqual(plan);
+        return;
+      }
+      if (!r1.watching) L.core.message("p1", { t: "pick", key: r1.key, move: legalMoves(r1.board!.fen)[0]! });
+      if (!r2.watching) L.core.message("p2", { t: "pick", key: r2.key, move: legalMoves(r2.board!.fen)[0]! });
+      if (r1.watching && r2.watching) L.advance(5000);
+      L.hostScores("p1");
+      L.advance(10_000);
+    }
+    throw new Error("the humans were always on the same team");
+  });
 });

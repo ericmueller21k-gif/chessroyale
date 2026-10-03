@@ -88,6 +88,16 @@ export interface ScoreJob {
   /** Human picks on this board (null = missed). */
   humanPicks: Record<string, string | null>;
   bots: { id: string; skill: number; powerUps: number }[];
+  /** Crowd: bot picks decided at the start of the round (shown live); use these instead of choosing again. */
+  botPlan?: Record<string, string>;
+  botPlanPowerUps?: string[];
+}
+
+/** A pick shown live in Crowd once you've picked (or while your team watches): visible from `at` (server time). */
+export interface LivePick {
+  playerId: string;
+  move: string;
+  at: number;
 }
 
 /** The 2v2 final, for every screen: teams, whose turn, each finalist's move quality, and the last move. */
@@ -115,6 +125,8 @@ export type ClientMessage =
   | { t: "powerUp"; key: string }
   | { t: "scores"; key: string; boards: BoardScore[] }
   | { t: "crossCheck"; key: string; boardId: number; ok: boolean; detail?: string }
+  /** Crowd: the host's early bot picks for this round. */
+  | { t: "botPlan"; key: string; picks: Record<string, string>; powerUps: string[] }
   /** Crowd augments: this player's vote on the next round's move clock. */
   | { t: "augment"; choice: Augment };
 
@@ -149,7 +161,14 @@ export type ServerMessage = { now: number } & (
   | { t: "locked"; key: string }
   | { t: "scoreRequest"; key: string; jobs: ScoreJob[] }
   /** To the host at the start of a round: every board, so it can search them while players think. */
-  | { t: "prefetch"; fens: string[] }
+  | {
+      t: "prefetch";
+      fens: string[];
+      /** Crowd: the bots picking this round, so the host can decide their picks now (sent back as botPlan). */
+      plan?: { key: string; fen: string; bots: { id: string; skill: number; powerUps: number }[] };
+    }
+  /** Crowd: the picks so far (bots appear at their thinking time), to players who've picked and to the watching team. */
+  | { t: "tally"; key: string; picks: LivePick[] }
   | {
       t: "reveal";
       key: string;

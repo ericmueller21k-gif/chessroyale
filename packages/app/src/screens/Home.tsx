@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, type GameMode } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
+import { crowdAnimations, setCrowdAnimations } from "../prefs.ts";
 import { MuteButton } from "../components/MuteButton.tsx";
 
 const OPENING_KEY = "brc.openingMoves";
@@ -114,6 +115,7 @@ export function HomeScreen({
     saveMode(next);
   };
   const crowd = modeChoice.mode === "crowd";
+  const [anim, setAnim] = useState(crowdAnimations);
   const [openingMoves, setOpeningMoves] = useState(chosenOpeningMoves);
   const changeOpeningMoves = (n: number) => {
     const v = Math.max(0, Math.min(MAX_OPENING_MOVES, n));
@@ -252,6 +254,20 @@ export function HomeScreen({
               <span>You pick every turn</span>
             </button>
           </div>
+          <label class="check">
+            <input
+              type="checkbox"
+              checked={anim}
+              onChange={(e) => {
+                setAnim(e.currentTarget.checked);
+                setCrowdAnimations(e.currentTarget.checked);
+              }}
+            />
+            <span>
+              <strong>Animations:</strong> every pick flies onto the board as its own ghost piece (busy, on purpose). Off: just
+              the names over each picked square, and only the chosen piece moves.
+            </span>
+          </label>
           <label class="check">
             <input type="checkbox" checked={modeChoice.augments} onChange={(e) => changeMode({ augments: e.currentTarget.checked })} />
             <span>

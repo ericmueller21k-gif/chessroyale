@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS, allowedMs, clockAfterVote, cutSeconds, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
-import { MatchRunner, boardSlots, netBoard, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
+import { MatchRunner, boardSlots, netBoard, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster } from "@chessroyale/chess";
 import type { BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing } from "./game.ts";
@@ -43,6 +43,36 @@ export class SoloMatch implements GameView {
   get settings(): Settings {
     return this.runner?.settings ?? this.baseSettings;
   }
+  /** Crowd: this round's live picks (bots decided at the start, shown as each finishes thinking). */
+  private live: { startsAt: number; times: Record<string, number>; picks: ReadonlyMap<string, string> | null; mine: LivePick | null; rushFrom: number | null } | null = null;
+
+  private startLive(startsAt: number, times: Record<string, number>) {
+    if (this.settings.mode !== "crowd") return void (this.live = null);
+    const live = { startsAt, times, picks: null as ReadonlyMap<string, string> | null, mine: null, rushFrom: null };
+    this.live = live;
+    void this.runner.planBotPicks().then((picks) => {
+      if (this.live === live) {
+        live.picks = picks;
+        this.emit();
+      }
+    });
+  }
+
+  livePicks(): LivePick[] | null {
+    const live = this.live;
+    // Hidden until you've picked; the watching team sees them all along.
+    if (!live?.picks || this.phase.kind === "play") return null;
+    const out: LivePick[] = [];
+    let k = 0;
+    for (const [playerId, move] of live.picks) {
+      let at = live.startsAt + (live.times[playerId] ?? 0);
+      if (live.rushFrom !== null && at > live.rushFrom) at = live.rushFrom + 15 * k++;
+      out.push({ playerId, move, at });
+    }
+    if (live.mine) out.push(live.mine);
+    return out;
+  }
+
   augmentVote: Augment | null = null;
   voteAugment(choice: Augment) {
     if (this.phase.kind !== "stageBreak" || !this.phase.augments) return;
@@ -153,6 +183,7 @@ export class SoloMatch implements GameView {
     // The move clock starts after a short settling-in countdown on the new board.
     const intro = this.settings.boardIntroSeconds * 1000;
     this.progress.start(this.runner.botThinkTimes(), intro);
+    this.startLive(Date.now() + intro, this.runner.botThinkTimes());
     const board = this.runner.boardOf(HUMAN)!;
     this.playStartedAt = Date.now() + intro;
     this.hint = null;
@@ -175,6 +206,12 @@ export class SoloMatch implements GameView {
     const usedPowerUp = this.hint !== null;
     const inFinal = this.runner.isFinal();
     this.progress.mark(HUMAN);
+    if (this.live) {
+      // Your pick shows straight away; the bots still thinking finish quickly (as they do on the leaderboard).
+      const now = Date.now();
+      if (move) this.live.mine = { playerId: HUMAN, move, at: now };
+      this.live.rushFrom = now;
+    }
     this.set({ kind: "scoring", board, move });
     const t = performance.now();
     // Score while the bots still thinking finish (they light up the leaderboard), then reveal.
@@ -208,8 +245,12 @@ export class SoloMatch implements GameView {
   private watchTurn() {
     const board = this.runner.boards.get(this.runner.state.boards[0]!)!;
     const think = Math.min(this.settings.moveClockSeconds * 1000, 5000);
-    this.progress.start(this.runner.botThinkTimes(), 0);
+    // The bots' thinking is squeezed into the few seconds you watch.
+    const scale = think / (this.settings.botThinkSeconds[1] * 1000);
+    const times = Object.fromEntries(Object.entries(this.runner.botThinkTimes()).map(([id, ms]) => [id, ms * scale]));
+    this.progress.start(times, 0);
     const now = Date.now();
+    this.startLive(now, times);
     this.set({ kind: "watching", board: boardView(board), startsAt: now, deadline: now + think });
     this.timer = setTimeout(() => void this.scoreWatched(), think);
   }

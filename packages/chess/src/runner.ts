@@ -212,6 +212,8 @@ export class MatchRunner {
    */
   deal(): Map<number, string[]> {
     this.retiredThisRound = [];
+    this.planned = new Map();
+    this.planning = null;
     const over = this.state.boards.filter((id) => boardStatus(this.boards.get(id)!).gameOver);
     if (over.length) {
       const live = this.state.boards.filter((id) => !over.includes(id));
@@ -286,6 +288,7 @@ export class MatchRunner {
     humanPicks: ReadonlyMap<string, HumanPick>,
   ): Promise<{ results: BoardRound[]; thinkMs: Record<string, number>; powerUps: Set<string> }> {
     const { rng } = this.opts;
+    if (this.planning) await this.planning;
     const entries = [...this.groups.entries()];
     const results: BoardRound[] = new Array(entries.length);
     let next = 0;
@@ -309,6 +312,27 @@ export class MatchRunner {
 
   private botThink = new Map<string, number>();
   private botPowerUps = new Set<string>();
+  /** Bot picks decided early this round (so a screen can show them live as each bot finishes). */
+  private planned = new Map<string, string>();
+  private planning: Promise<unknown> | null = null;
+
+  /**
+   * Decides every bot's pick for this round now, from the engine's top moves,
+   * instead of at scoring time. Scoring then uses these picks.
+   */
+  planBotPicks(): Promise<ReadonlyMap<string, string>> {
+    const groups = [...this.groups.entries()];
+    const run = (async () => {
+      for (const [boardId, ids] of groups) {
+        const top = await this.topMovesFor(this.boards.get(boardId)!.fen);
+        if (this.groups.get(boardId) !== ids) return this.planned; // a new round has been dealt meanwhile
+        for (const [id, move] of Object.entries(this.botPicksFor(boardId, ids, top))) this.planned.set(id, move);
+      }
+      return this.planned;
+    })();
+    this.planning = run;
+    return run;
+  }
 
   /** Picks for every player on a board: humans as given, bots from the engine's top moves. */
   botPicksFor(boardId: number, playerIds: readonly string[], top: readonly MoveScore[]): Record<string, string> {
@@ -320,6 +344,11 @@ export class MatchRunner {
     for (const id of playerIds) {
       const p = this.player(id);
       if (!p.isBot) continue;
+      const plannedMove = this.planned.get(id);
+      if (plannedMove) {
+        out[id] = plannedMove;
+        continue;
+      }
       if (!this.botThink.has(id)) this.botThink.set(id, botThinkMs(this.opts.rng, this.settings));
       const choice = botChoose(this.opts.rng, candidates, p, legal, this.settings);
       if (choice.usedPowerUp) this.botPowerUps.add(id);

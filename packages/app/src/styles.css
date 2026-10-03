@@ -2460,3 +2460,77 @@ button.history-label {
 .hud-spacer {
   margin-left: auto;
 }
+
+/* ---- Crowd: every pick as a ghost piece ---- */
+
+.crowd-layer piece.crowd-ghost {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+  opacity: 0.38;
+  transition:
+    left 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.3s;
+  filter: drop-shadow(0 0 4px rgba(244, 183, 64, 0.7));
+}
+.crowd-layer piece.crowd-ghost.you {
+  opacity: 0.7;
+  filter: drop-shadow(0 0 5px var(--accent));
+}
+.crowd-layer piece.crowd-ghost.still {
+  opacity: 0.5;
+  animation: fade 250ms ease-out;
+}
+.crowd-layer.faint piece.crowd-ghost {
+  opacity: 0.22;
+}
+.crowd-layer.faint piece.crowd-ghost.you,
+.crowd-layer.faint piece.crowd-ghost.still {
+  opacity: 0.4;
+}
+.crowd-layer .not-chosen piece.crowd-ghost,
+.crowd-layer piece.crowd-ghost.not-chosen,
+.crowd-layer .crowd-tag.not-chosen {
+  opacity: 0.08;
+  transition: opacity 0.35s;
+}
+.crowd-layer .chosen piece.crowd-ghost,
+.crowd-layer piece.crowd-ghost.chosen {
+  opacity: 0.9;
+  filter: drop-shadow(0 0 4px #2fd27a) drop-shadow(0 0 10px #2fd27a);
+  animation: chosen-blink 0.2s steps(1, end) 3;
+}
+.crowd-tag {
+  z-index: 2;
+}
+.crowd-tag .tag-more {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.crowd-tag.you span:first-child {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.crowd-tag.chosen span {
+  background: #1f8f52;
+}
+.pick-count {
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+/* Crowd tags: each name fits within one square's width so neighbouring columns stay readable. */
+.crowd-tag span {
+  max-width: 17cqw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+  padding: 0 3px;
+  line-height: 1.25;
+}
+.crowd-tag .tag-more {
+  font-size: 10px;
+  font-weight: 900;
+}

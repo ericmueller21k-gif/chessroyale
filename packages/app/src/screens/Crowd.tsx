@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { applyMove, sideToMove, toSan } from "@chessroyale/chess";
 import type { Augment } from "@chessroyale/core";
-import { Board, type Arrow } from "../components/Board.tsx";
+import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
+import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
+import { crowdAnimations, onPrefsChange } from "../prefs.ts";
 import { myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { seenKey } from "../hooks.ts";
 import { play } from "../sound.ts";
@@ -13,6 +15,31 @@ import { Hud } from "./Hud.tsx";
 import { ordinal } from "./StageBreak.tsx";
 
 const sideName = (s: "w" | "b") => (s === "w" ? "White" : "Black");
+
+/** The device's Crowd animation setting, kept in sync if it changes. */
+export function useCrowdAnimations(): boolean {
+  const [on, setOn] = useState(crowdAnimations());
+  useEffect(() => onPrefsChange(() => setOn(crowdAnimations())), []);
+  return on;
+}
+
+/** Picks as ghost pieces with names, ranked by the leaderboard. */
+export function ghostPicks(match: GameView, picks: readonly { playerId: string; move: string | null }[]): GhostPick[] {
+  const rank = new Map(match.standings().map((s, i) => [s.id, i]));
+  return picks.flatMap((p) =>
+    p.move ? [{ id: p.playerId, name: match.nameOf(p.playerId), move: p.move, you: match.isYou(p.playerId), rank: rank.get(p.playerId) ?? 999 }] : [],
+  );
+}
+
+/** The live picks visible right now (each from its moment), as ghosts. */
+export function LiveGhosts({ match, fen, orientation }: { match: GameView; fen: string; orientation: "white" | "black" }) {
+  const animate = useCrowdAnimations();
+  const now = useFrameNow();
+  const live = match.livePicks();
+  if (!live) return null;
+  const visible = live.filter((p) => p.at <= now).sort((a, b) => a.at - b.at);
+  return <CrowdGhosts fen={fen} picks={ghostPicks(match, visible)} orientation={orientation} animate={animate} faint />;
+}
 const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
 
 /** Crowd 50 v 50: the other team is choosing (or their votes are being counted). You watch. */
@@ -47,6 +74,7 @@ export function WatchScreen({
           <EvalBar fen={board.fen} orientation={team} evaluate={(f) => match.evaluate(f)} />
           <Board fen={board.fen} orientation={team === "w" ? "white" : "black"} lastMove={board.lastMove}>
             {!counting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={Math.max(1, deadline - startsAt)} />}
+            <LiveGhosts match={match} fen={board.fen} orientation={team === "w" ? "white" : "black"} />
           </Board>
         </div>
       </div>
@@ -74,19 +102,32 @@ export function WatchScreen({
 }
 
 /**
- * Crowd's reveal: a live poll instead of the shuffle. The most picked moves
- * grow as vote bars (and arrows on the board), the winner blinks three times
- * with three tones, then it's played.
+ * Crowd's reveal. Animations on: every pick comes in as its own ghost piece in
+ * quick succession (silently), each move tagged with its top three names and
+ * "+N". Animations off: the tags and one still ghost per move at once. Either
+ * way the vote bars count up, the winner blinks three times with three tones,
+ * and then only the chosen piece moves.
  */
 export function CrowdReveal({ match, mine, board, until }: { match: GameView; mine: GroupReveal; board: BoardView; until: number }) {
   const [start] = useState(Date.now());
   const now = useFrameNow();
+  const animate = useCrowdAnimations();
   const total = Math.max(2500, until - start);
-  const growEnd = Math.min(1500, total * 0.32);
-  const landAt = growEnd + 250;
-  const playAt = landAt + 750;
+  const picks = mine.result.players;
+  // Every pick, in a mixed order (not grouped by move), for the rapid succession of ghosts.
+  const ghosts = useMemo(() => {
+    const h = (s: string) => [...s].reduce((a, c) => (Math.imul(a ^ c.charCodeAt(0), 16777619) >>> 0), 2166136261);
+    return ghostPicks(match, picks).sort((a, b) => h(a.id) - h(b.id));
+  }, [mine]);
+  const n = Math.max(1, ghosts.length);
+  // Animations on: one ghost every `step` ms (all 50 in about two seconds), fitted to the time there is.
+  const step = Math.max(20, Math.min(60, (total - 2600) / n));
   const t = now - start;
-  const grow = Math.min(1, t / growEnd);
+  const shown = animate ? Math.min(ghosts.length, Math.floor(t / step) + 1) : ghosts.length;
+  const countEnd = animate ? n * step + 350 : 600;
+  const grow = animate ? shown / n : Math.min(1, t / countEnd);
+  const landAt = countEnd + 300;
+  const playAt = landAt + 750;
   const landed = t >= landAt;
   const played = t >= playAt;
   useEffect(() => {
@@ -96,7 +137,6 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const fen = mine.fenBefore;
   const team = myTeam(match);
   const orientation = (team ?? sideToMove(fen)) === "w" ? "white" : "black";
-  const picks = mine.result.players;
   const voters = picks.filter((p) => p.move).length;
   const rows = useMemo(() => {
     const byMove = new Map<string, { move: string; votes: number; you: boolean }>();
@@ -114,23 +154,10 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const yours = me?.move ?? null;
   const yourRow = yours && !rows.some((r) => r.move === yours) ? { move: yours, votes: picks.filter((p) => p.move === yours).length, you: true } : null;
 
-  // A roulette blip as each bar grows in, then three tones as the winner blinks.
-  const step = Math.min(rows.length, Math.floor(grow * rows.length + 0.001));
-  useEffect(() => {
-    if (step > 0 && !landed) play("reel");
-  }, [step]);
+  // The ghosts come in silently; the winner gets three tones as it blinks.
   useEffect(() => {
     if (landed) play("select");
   }, [landed]);
-
-  const brushes = ["green", "blue", "yellow"] as const;
-  const arrows: Arrow[] = played
-    ? []
-    : rows.slice(0, 3).map((r, i) => ({
-        move: r.move,
-        brush: landed ? (r.move === mine.result.playedMove ? "green" : "paleGrey") : brushes[i]!,
-        label: String(Math.round(r.votes * grow)),
-      }));
 
   return (
     <div class="screen game crowd" onClick={() => played && match.skipReveal()}>
@@ -139,7 +166,10 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
         <div class="opening-name">
           <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
         </div>
-        <Board fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation} lastMove={played ? mine.result.playedMove : board.lastMove} arrows={arrows}>
+        <Board fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation} lastMove={played ? mine.result.playedMove : board.lastMove}>
+          {!played && (
+            <CrowdGhosts fen={fen} picks={ghosts.slice(0, shown)} orientation={orientation} animate={animate} chosen={landed ? mine.result.playedMove : null} />
+          )}
           {played && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
         </Board>
       </div>

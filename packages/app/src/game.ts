@@ -1,4 +1,4 @@
-import type { BoardRound, BoardSlot, NetFinal, NetStanding } from "@chessroyale/chess";
+import type { BoardRound, BoardSlot, LivePick, NetFinal, NetStanding } from "@chessroyale/chess";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 
 /**
@@ -116,6 +116,12 @@ export interface GameView {
   readonly final: FinalView | null;
   /** Every board slot as it stands now, for the strip of tiny boards along the top. */
   slots(): BoardSlot[];
+  /**
+   * Crowd: the picks you're allowed to see this round, each visible from `at`
+   * (local time): none until you've picked, then everyone's as they come in.
+   * The watching team sees them all along. Null when hidden.
+   */
+  livePicks(): LivePick[] | null;
   /** Crowd augments: your vote on the next round's move clock (at a cut). */
   voteAugment(choice: Augment): void;
   /** Your vote at this cut, if any. */
