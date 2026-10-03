@@ -1,5 +1,5 @@
 import type { BoardRound, BoardSlot, NetFinal, NetStanding } from "@chessroyale/chess";
-import type { Settings } from "@chessroyale/core";
+import { roundsInStage, type Settings } from "@chessroyale/core";
 
 /**
  * What the screens need from a match, whether it runs in this browser (solo)
@@ -127,5 +127,5 @@ export const roundLive = (m: Pick<GameView, "phase">) => m.phase.kind === "play"
 /** What the leaderboard's cut line says during a stage. */
 export const cutLabel = (m: Pick<GameView, "settings" | "stage">) =>
   m.stage === m.settings.knockoutsPerStage.length - 1
-    ? `Final four line · after round ${m.settings.roundsPerStage}`
-    : `Cut after round ${m.settings.roundsPerStage}`;
+    ? `Final four line · after round ${roundsInStage(m.settings, m.stage)}`
+    : `Cut after round ${roundsInStage(m.settings, m.stage)}`;

@@ -28,6 +28,8 @@ export interface Settings {
   powerUpsAtStart: number;
   /** Power-ups added for every player who survives a cut. */
   powerUpsPerStage: number;
+  /** Most power-ups a player can hold (extra ones earned at a full hand are lost). */
+  powerUpsMax: number;
   /** Bots use a power-up when the second-best candidate loses at least this many points. */
   botPowerUpLoss: number;
   /** Each player keeps one colour for a whole stage, swapping at stage breaks (needs 2+ boards). */
@@ -48,6 +50,8 @@ export interface Settings {
   /** Multiplayer: how long the stage-break standings show (solo waits for a tap). */
   stageBreakSeconds: number;
   roundsPerStage: number;
+  /** Rounds in stage 1, before the first cut: longer, so one bad start doesn't knock anyone out. */
+  firstStageRounds: number;
   /** Players knocked out at the end of each knockout stage; the 2v2 final follows. */
   knockoutsPerStage: readonly number[];
   scoresBetweenStages: ScoreCarry;
@@ -56,7 +60,8 @@ export interface Settings {
   drawRuleByStage: readonly DrawRule[];
   /** Weighted draw: a pick's tickets halve for roughly every this-many × 0.7 points of loss (exp(-loss / this)). */
   drawWeightPoints: number;
-  openingPlies: number;
+  /** Opening moves per side played on each board before the first round (0-10, a lobby setting). Boards where Black starts get one ply more. */
+  openingMoves: number;
   /** A line qualifies if the side to move's expected score at its end is inside this window. */
   openingBalance: readonly [number, number];
   engineNodes: number;
@@ -89,8 +94,9 @@ export const DEFAULT_SETTINGS: Settings = {
   moveClockSeconds: 30,
   timeBankSeconds: 600,
   timeIncrementSeconds: 5,
-  powerUpsAtStart: 1,
+  powerUpsAtStart: 3,
   powerUpsPerStage: 1,
+  powerUpsMax: 5,
   botPowerUpLoss: 15,
   colourPerStage: true,
   lateGraceMs: 300,
@@ -100,12 +106,13 @@ export const DEFAULT_SETTINGS: Settings = {
   openingShowSeconds: 6,
   stageBreakSeconds: 10,
   roundsPerStage: 5,
+  firstStageRounds: 8,
   knockoutsPerStage: [8, 8, 8, 8, 8, 8, 8, 4],
   scoresBetweenStages: "reset",
   missedMoveScore: -25,
   drawRuleByStage: ["popular", "best"],
   drawWeightPoints: 4,
-  openingPlies: 20,
+  openingMoves: 4,
   openingBalance: [0.4, 0.6],
   engineNodes: 250_000,
   engineHashMb: 16,
@@ -122,3 +129,13 @@ export function botSkillSpread(count: number, settings: Settings = DEFAULT_SETTI
   const [lo, hi] = settings.botSkillRange;
   return Array.from({ length: count }, (_, i) => Math.round(lo * Math.pow(hi / lo, i / Math.max(1, count - 1)) * 1000) / 1000);
 }
+
+/** Longest opening a lobby can choose, in moves per side. */
+export const MAX_OPENING_MOVES = 10;
+
+/** Plies of opening on a board where White starts (Black-start boards get one more). */
+export const openingPlies = (s: Pick<Settings, "openingMoves">) => 2 * Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(s.openingMoves)));
+
+/** Rounds in a knockout stage (stage 0 is the longer first one). */
+export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRounds">, stage: number) =>
+  stage === 0 ? s.firstStageRounds : s.roundsPerStage;

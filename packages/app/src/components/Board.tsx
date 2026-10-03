@@ -60,6 +60,7 @@ export function Board({ fen, orientation, lastMove, interactive, onMove, arrows,
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
   const prevFen = useRef(fen);
+  const lastSound = useRef(0);
 
   // A move appearing on a big board makes a sound (a capture sounds different).
   useEffect(() => {
@@ -71,6 +72,10 @@ export function Board({ fen, orientation, lastMove, interactive, onMove, arrows,
     if (!mover) return;
     const captured = !!pieceAt(before, to) || (mover.type === "p" && lastMove[0] !== lastMove[2]);
     const castled = mover.type === "k" && Math.abs(lastMove.charCodeAt(0) - lastMove.charCodeAt(2)) === 2;
+    // A fast replay (a whole game from move 0) would be a clatter: at most one knock every 180 ms.
+    const now = performance.now();
+    if (now - lastSound.current < 180) return;
+    lastSound.current = now;
     play(captured ? "capture" : castled ? "castle" : "move");
   }, [fen]);
 

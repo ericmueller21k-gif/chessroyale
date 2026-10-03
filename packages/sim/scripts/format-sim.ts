@@ -13,7 +13,7 @@ const library = JSON.parse(readFileSync(new URL("../../chess/data/openings.json"
 const N = Number(process.argv[2] ?? 20);
 const engines = await Promise.all(Array.from({ length: 4 }, () => createNodeEngine({ nodes: 100_000, hashMb: 16 })));
 for (const rounds of [5, 6]) {
-  const settings: Settings = { ...DEFAULT_SETTINGS, engineNodes: 100_000, roundsPerStage: rounds };
+  const settings: Settings = { ...DEFAULT_SETTINGS, engineNodes: 100_000, roundsPerStage: rounds, firstStageRounds: rounds };
   const rhos: number[] = []; let top8out1 = 0, bestFinal = 0, bestWins = 0, top4Final = 0, ended = 0, groupRounds = 0, dead = 0, finalTurns = 0, roundCount = 0;
   for (let m = 0; m < N; m++) {
     const rng = mulberry32(500 + m);

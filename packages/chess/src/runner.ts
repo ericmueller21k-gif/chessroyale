@@ -1,5 +1,6 @@
 import {
   alivePlayers,
+  openingPlies,
   allowedMs,
   applyRound,
   assignColours,
@@ -140,7 +141,7 @@ export class MatchRunner {
     this.top = new TopMovesCache(opts.settings.botCandidateMoves);
     const plan = stagePlan(opts.settings);
     const boardCount = plan[0]!.boards;
-    const plies = opts.settings.openingPlies;
+    const plies = openingPlies(opts.settings);
     // With colours per stage, half the boards have White to move and half Black (the opening one ply longer).
     const blackBoards = opts.settings.colourPerStage && boardCount >= 2 ? Math.floor(boardCount / 2) : 0;
     const whiteOpenings = pickOpenings(opts.rng, opts.library, { classic: boardCount - blackBoards - 1, unusual: 1 }, plies, opts.settings.openingBalance);
@@ -180,7 +181,7 @@ export class MatchRunner {
   private replaceBoard(id: number): void {
     const old = this.boards.get(id)!;
     const side = sideToMove(old.fen);
-    const plies = side === "w" ? this.settings.openingPlies : this.settings.openingPlies + 1;
+    const plies = side === "w" ? openingPlies(this.settings) : openingPlies(this.settings) + 1;
     const [opening] = pickOpenings(
       this.opts.rng,
       this.opts.library,
@@ -555,7 +556,7 @@ export function netBoard(b: BoardState, withOpening = false): NetBoard {
     id: b.id,
     fen: b.fen,
     lastMove: b.lastMove,
-    openingName: b.opening.name,
+    openingName: b.opening.names?.[b.openingPlies] ?? b.opening.name,
     generation: b.generation,
     ply: b.history.length,
     recent: recent.moves,

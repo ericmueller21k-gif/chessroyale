@@ -179,7 +179,7 @@ function summarise(results: { placement: Record<string, number>; stage1Out: stri
 const variants: { rounds: number; carry: "reset" | "carry"; summary: Summary }[] = [];
 for (const rounds of [6, 8, 10, 12]) {
   for (const carry of ["reset", "carry"] as const) {
-    const s: Settings = { ...settings, roundsPerStage: rounds, scoresBetweenStages: carry };
+    const s: Settings = { ...settings, roundsPerStage: rounds, firstStageRounds: rounds, scoresBetweenStages: carry };
     const rng = mulberry32(SEED * 7 + rounds * 13 + (carry === "carry" ? 1 : 0));
     const results = Array.from({ length: POOL_MATCHES }, () => runPoolMatch(rng, shuffle(rng, bots), pool, s));
     variants.push({ rounds, carry, summary: summarise(results) });

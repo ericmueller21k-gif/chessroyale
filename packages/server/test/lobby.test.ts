@@ -17,7 +17,7 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
   unusual: i >= 25,
   moves: line,
   namedPlies: 21,
-  expected: { 20: 0.5, 21: 0.5 },
+  expected: Object.fromEntries(Array.from({ length: 22 }, (_, n) => [n, 0.5])),
 }));
 
 type Msg = ServerMessage;
@@ -34,7 +34,7 @@ function setup(settings: Partial<Settings> = {}) {
     },
     library,
     mulberry32(7),
-    { ...DEFAULT_SETTINGS, roundsPerStage: 1, boardIntroSeconds: 0, ...settings },
+    { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...settings },
   );
   const take = (id: string) => {
     const msgs = inbox.get(id) ?? [];
@@ -203,7 +203,7 @@ describe("lobby", () => {
   });
 
   it("gives each player their own deadline from their bank, and counts power-ups", () => {
-    const L = setup({ roundsPerStage: 2 });
+    const L = setup({ roundsPerStage: 2, firstStageRounds: 2, powerUpsAtStart: 1 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone", true);
     L.core.message("p1", { t: "start" });
@@ -231,7 +231,7 @@ describe("lobby", () => {
   });
 
   it("starts the move clock after the board's settling-in countdown, and ignores moves before it", () => {
-    const L = setup({ boardIntroSeconds: 5, roundsPerStage: 2 });
+    const L = setup({ boardIntroSeconds: 5, roundsPerStage: 2, firstStageRounds: 2 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.message("p1", { t: "start" });
     L.advance(6000);

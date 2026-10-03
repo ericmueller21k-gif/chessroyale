@@ -2,15 +2,17 @@ import type { Rng } from "@chessroyale/core";
 import { shuffle } from "@chessroyale/core";
 
 /**
- * The opening library: named lines from the Lichess chess-openings data (CC0),
- * extended with the engine's best moves where a named line is short, and kept
- * only if the position at the end is balanced. Built by scripts/build-openings.ts.
+ * The opening library: positions reached by named lines from the Lichess
+ * chess-openings data (CC0), for every opening length from 0 to 10 moves per
+ * side, kept only if balanced. Built by scripts/build-openings.ts.
  */
 export interface Opening {
   id: string;
   eco: string;
   /** Full name, e.g. "Sicilian Defense: Najdorf Variation". */
   name: string;
+  /** The name for each length the line is shown at (the longest named line those moves match). */
+  names?: Record<number, string>;
   /** Opening family (the part before the colon), used to keep boards distinct. */
   family: string;
   unusual: boolean;
@@ -52,6 +54,15 @@ export function pickOpenings(
       if (o.unusual !== unusual || families.has(o.family) || !usableAt(o, plies, window)) continue;
       chosen.push(o);
       families.add(o.family);
+    }
+  }
+  // Short openings have few families (none at all at 0 moves): fill up with repeats, distinct lines first.
+  const want = counts.classic + counts.unusual;
+  for (const allowSame of [false, true]) {
+    for (const o of shuffle(rng, library)) {
+      if (chosen.length >= want) break;
+      if (!usableAt(o, plies, window) || (!allowSame && chosen.includes(o))) continue;
+      chosen.push(o);
     }
   }
   return chosen;
