@@ -266,3 +266,30 @@ Eric's requests; the details were my call.
   bar on the board's top edge as well. "You play White" and the bank clock are gone from the play screen. The bank
   is still in the full leaderboard.
 - **The power-up is a small outlined pill** ("⚡ Power-up: top 3 moves · 1 left") instead of a full-width button.
+
+## One line of controls, a power-up button, live numbers, a smarter small scoreboard (Oct 3, 2026)
+
+Eric's requests; the details were my call.
+
+- **One line of controls under the board:** back (‹‹) on the left, forward (››) on the right, each in a soft
+  rounded box; between them your move clock and the power-up button. Going straight to the first move was dropped:
+  there's no time for it mid-round.
+- **The power-up is one round button with a lightning bolt and "x1" above it** (how many you hold). It's lit when you
+  can use one and greyed out at x0. While it's in use this move it shows as an outlined ring and the count drops. When
+  you earn one (and when the match starts) it flashes yellow a few times and the count ticks over. The engine's top
+  3 show as arrows on the board and as one line of small chips under the controls.
+- **The strip: your points are big** (green above the cut, red in the knockout zone), **then the cut line's score in
+  yellow** ("CUT −1.1"). Eric asked for the lobby average there, but a points average would always read about 0.0:
+  every round score is measured against your own group's average, so across the lobby they cancel out (only missed
+  moves pull it below zero). The cut line's score moves as the game goes on and tells you where you stand, so I used
+  that instead. Swapping it for something else is a one-line change. The power-up count left the strip, since the
+  button shows it.
+- **Numbers are live.** Your position, your points, the cut score and every player's points on the leaderboards count
+  up or down to their new values (about 0.7 s) and flash green when they improve, red when they drop. Rows still slide
+  to their new places.
+- **The phone's small scoreboard never scrolls; it shows as many players as fit**, in this order: you, the leader,
+  the last place through and the first place out (with the cut line between them), your neighbours, the rest of the
+  top five, then outwards from you. "⋯" marks the gaps. On a 700 px-tall phone that's about 4-5 rows; on a typical
+  phone it's 8-10. Each row shows position, name, points, average, rating and power-ups, with small column labels.
+  Tapping it opens the full leaderboard; the arrow in its header still minimises it. Computers keep the full
+  leaderboard on the left.

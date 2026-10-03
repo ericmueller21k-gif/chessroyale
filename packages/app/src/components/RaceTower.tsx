@@ -1,19 +1,11 @@
 import type { Standing } from "../game.ts";
+import { LiveNumber } from "./LiveNumber.tsx";
 
 const pts = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
 export const clockText = (ms: number) => {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
-
-/** Ahead of (+) or behind (−) the knockout line, in points; null when nobody goes out. */
-export function gapToCut(standings: readonly Standing[], cutoff: number): number | null {
-  const alive = standings.filter((s) => !s.out);
-  const i = alive.findIndex((s) => s.isYou);
-  if (i < 0 || cutoff >= alive.length || cutoff <= 0) return null;
-  const me = alive[i]!;
-  return i < cutoff ? me.points - alive[cutoff]!.points : me.points - alive[cutoff - 1]!.points;
-}
 
 /**
  * The live leaderboard, styled like a racing timing tower. Rows slide to their
@@ -26,6 +18,7 @@ export function RaceTower({
   cutoff,
   compact = false,
   mini = false,
+  keep: keepOnly,
   done,
   cutLabel = "Cut line",
 }: {
@@ -34,6 +27,8 @@ export function RaceTower({
   compact?: boolean;
   /** Small rows with just position, name and points (the phone's scoreboard under the board). */
   mini?: boolean;
+  /** Show only these players (positions among those still in, 0-based), with "⋯" between gaps. */
+  keep?: ReadonlySet<number>;
   /** Players who have moved this round (shown in green while a round is being played). */
   done?: ReadonlySet<string>;
   /** Text on the cut line, e.g. "Cut after round 8". */
@@ -46,7 +41,9 @@ export function RaceTower({
   const best = Math.max(-1, ...alive.map((s) => s.rating ?? -1));
   const topRating = alive.filter((s) => s.rating === best).length === 1 ? best : null;
   let rows: (Standing & { rank: number })[] = standings.map((s, i) => ({ ...s, rank: i + 1 }));
-  if (compact) {
+  if (keepOnly) {
+    rows = rows.filter((r) => !r.out && keepOnly.has(r.rank - 1));
+  } else if (compact) {
     const keep = new Set<number>();
     const n = alive.length;
     for (let i = 0; i < Math.min(5, n); i++) keep.add(i);
@@ -75,7 +72,7 @@ export function RaceTower({
     ys.set(r.id, y);
     y += ROW;
   });
-  if (knockouts && line === null && rows.length && !compact) line = y;
+  if (knockouts && line === null && rows.length && !compact && !keepOnly) line = y;
 
   return (
     <div class={`tower${compact ? " tower-compact" : ""}${mini ? " tower-mini" : ""}`} style={{ "--row": `${ROW}px` }}>
@@ -116,7 +113,7 @@ export function RaceTower({
                 {r.name}
                 {r.practice && <span title="Practice mode (unlimited power-ups)"> 💡</span>}
               </span>
-              <span class="t-pts">{r.out ? "out" : pts(r.points)}</span>
+              <span class="t-pts">{r.out ? "out" : <LiveNumber value={r.points} format={pts} />}</span>
               <span class="t-avg">{r.out ? "" : pts(r.avg)}</span>
               <span class={`t-elo${r.rating !== null && r.rating === topRating ? " top" : ""}`}>{r.rating ?? "—"}</span>
               <span class="t-bank">{r.out ? "" : clockText(r.bankMs)}</span>

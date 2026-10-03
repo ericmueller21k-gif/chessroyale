@@ -7,6 +7,7 @@ import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import { clockText } from "../components/RaceTower.tsx";
 import type { BoardView, GameView } from "../game.ts";
 import { MiniTower } from "../components/MiniTower.tsx";
+import { PowerUpButton } from "../components/PowerUpButton.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 
@@ -67,7 +68,9 @@ export function PlayScreen({
   const ending = !waiting && !intro && deadline > 0 && secsLeft > 0 && secsLeft <= COUNT_FROM_SECONDS;
 
   const hint = match.hint;
-  const left = match.powerUpsLeft();
+  // Power-ups you hold (one in use this move already counts as spent).
+  const held = match.practice ? Infinity : (match.standings().find((s) => s.isYou)?.powerUps ?? 0);
+  const powerUps = hint !== null ? Math.max(0, held - 1) : held;
   // Once you've moved, your move stays on the board while the others finish.
   const moved = waiting && picked ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
   const alive = match.standings().filter((s) => !s.out);
@@ -95,13 +98,18 @@ export function PlayScreen({
             {ending && <CenterCount label="Round end" n={secsLeft} />}
           </Board>
         </div>
-        <HistoryNav view={history} total={board.history.length}>
-          {!waiting && deadline > 0 && (
-            <span class={`move-clock${moveLeft <= 10_000 ? " low" : ""}`} role="timer" aria-label="Time left for this move">
-              {clockText(Math.ceil(moveLeft / 1000) * 1000)}
-            </span>
-          )}
-        </HistoryNav>
+        <HistoryNav
+          view={history}
+          total={board.history.length}
+          clock={
+            !waiting && deadline > 0 ? (
+              <span class={`move-clock${moveLeft <= 10_000 ? " low" : ""}`} role="timer" aria-label="Time left for this move">
+                {clockText(Math.ceil(moveLeft / 1000) * 1000)}
+              </span>
+            ) : null
+          }
+          extra={<PowerUpButton count={powerUps} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />}
+        />
       </div>
       <div class="play-footer">
         {waiting ? (
@@ -122,25 +130,17 @@ export function PlayScreen({
           </div>
         ) : (
           <>
-            {hint && hint.length > 0 ? (
+            {hint && hint.length > 0 && (
               <ol class="hints">
                 {hint.map((h, i) => (
                   <li key={h.move} class={`hint-${HINT_BRUSHES[i]}`}>
                     <strong>{h.san}</strong>
-                    <span>{(h.expected * 100).toFixed(1)}% expected</span>
+                    <span>{(h.expected * 100).toFixed(1)}%</span>
                   </li>
                 ))}
               </ol>
-            ) : (
-              <button
-                type="button"
-                class="btn-powerup"
-                disabled={left <= 0 || hint !== null}
-                onClick={() => match.usePowerUp()}
-              >
-                {hint ? "Asking the engine…" : left === Infinity ? "💡 Top 3 moves (practice)" : `⚡ Power-up: top 3 moves · ${left} left`}
-              </button>
             )}
+            {hint && hint.length === 0 && <p class="muted small hints-wait">Asking the engine…</p>}
           </>
         )}
       </div>
