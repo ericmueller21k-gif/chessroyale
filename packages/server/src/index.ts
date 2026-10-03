@@ -31,7 +31,7 @@ export default {
         const mode = url.searchParams.get("mode") === "crowd" ? "crowd" : "classic";
         const overrides = {
           ...modeSettings(mode, { crowdTeams: url.searchParams.get("turns") !== "all", augments: url.searchParams.get("augments") !== "0" }),
-          ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2.5, drawnMoveSeconds: 1.5 } : PACE_SETTINGS.quick) : {}),
+          ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2, drawnMoveSeconds: 1.2 } : PACE_SETTINGS.quick) : {}),
           roundsPerStage: n("rounds"),
           firstStageRounds: n("rounds"),
           moveClockSeconds: n("clock"),

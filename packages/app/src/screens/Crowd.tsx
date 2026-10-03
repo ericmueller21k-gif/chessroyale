@@ -32,12 +32,24 @@ export function ghostPicks(match: GameView, picks: readonly { playerId: string; 
 }
 
 /** The live picks visible right now (each from its moment), as ghosts. */
+/** Picks already on screen this turn (by position), so the reveal doesn't animate them a second time. */
+const seenLive = { fen: "", ids: new Set<string>() };
+
 export function LiveGhosts({ match, fen, orientation }: { match: GameView; fen: string; orientation: "white" | "black" }) {
   const animate = useCrowdAnimations();
   const now = useFrameNow();
+  // Picks made before you could see them catch up in a quick wave from this moment; later ones arrive live.
+  const [since] = useState(Date.now());
   const live = match.livePicks();
   if (!live) return null;
-  const visible = live.filter((p) => p.at <= now).sort((a, b) => a.at - b.at);
+  const sorted = [...live].sort((a, b) => a.at - b.at);
+  let k = 0;
+  const visible = sorted.filter((p) => (p.at <= since ? since + 35 * k++ : p.at) <= now);
+  if (seenLive.fen !== fen) {
+    seenLive.fen = fen;
+    seenLive.ids = new Set();
+  }
+  for (const p of visible) seenLive.ids.add(p.playerId);
   return <CrowdGhosts fen={fen} picks={ghostPicks(match, visible)} orientation={orientation} animate={animate} faint />;
 }
 const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
@@ -119,14 +131,22 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     const h = (s: string) => [...s].reduce((a, c) => (Math.imul(a ^ c.charCodeAt(0), 16777619) >>> 0), 2166136261);
     return ghostPicks(match, picks).sort((a, b) => h(a.id) - h(b.id));
   }, [mine]);
-  const n = Math.max(1, ghosts.length);
-  // Animations on: one ghost every `step` ms (all 50 in about two seconds), fitted to the time there is.
-  const step = Math.max(20, Math.min(60, (total - 2600) / n));
+  // Picks you already watched come in live stay where they are; only the rest animate in, one every `step` ms.
+  const seen = useMemo(() => {
+    const ids = seenLive.fen === mine.fenBefore ? seenLive.ids : new Set<string>();
+    return ghosts.filter((g) => ids.has(g.id)).length;
+  }, [mine]);
+  const ordered = useMemo(() => {
+    const ids = seenLive.fen === mine.fenBefore ? seenLive.ids : new Set<string>();
+    return [...ghosts.filter((g) => ids.has(g.id)), ...ghosts.filter((g) => !ids.has(g.id))];
+  }, [ghosts]);
+  const unseen = Math.max(0, ghosts.length - seen);
+  const step = Math.max(20, Math.min(60, (total - 2200) / Math.max(1, unseen)));
   const t = now - start;
-  const shown = animate ? Math.min(ghosts.length, Math.floor(t / step) + 1) : ghosts.length;
-  const countEnd = animate ? n * step + 350 : 600;
-  const grow = animate ? shown / n : Math.min(1, t / countEnd);
-  const landAt = countEnd + 300;
+  const shown = animate ? Math.min(ghosts.length, seen + Math.floor(t / step) + (unseen ? 1 : 0)) : ghosts.length;
+  const countEnd = animate ? (unseen ? unseen * step + 350 : 150) : seen === ghosts.length ? 150 : 600;
+  const grow = ghosts.length ? (animate ? shown / ghosts.length : Math.min(1, t / countEnd)) : 1;
+  const landAt = countEnd + 250;
   const playAt = landAt + 750;
   const landed = t >= landAt;
   const played = t >= playAt;
@@ -168,7 +188,14 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
         </div>
         <Board fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation} lastMove={played ? mine.result.playedMove : board.lastMove}>
           {!played && (
-            <CrowdGhosts fen={fen} picks={ghosts.slice(0, shown)} orientation={orientation} animate={animate} chosen={landed ? mine.result.playedMove : null} />
+            <CrowdGhosts
+              fen={fen}
+              picks={ordered.slice(0, shown)}
+              orientation={orientation}
+              animate={animate}
+              instant={new Set(ordered.slice(0, seen).map((g) => g.id))}
+              chosen={landed ? mine.result.playedMove : null}
+            />
           )}
           {played && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
         </Board>

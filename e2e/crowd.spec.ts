@@ -5,7 +5,7 @@ const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? 
 test("Crowd 50 v 50: plays your team's turns, watches the other team's, votes at cuts, through the final to results", async ({ page }) => {
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&clock=10");
+  await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&clock=20");
   await page.getByLabel("Your name").fill("T");
   await page.getByRole("button", { name: /Play solo vs 99 bots/ }).click();
   const seen = new Set<string>();
@@ -21,8 +21,12 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, votes at
       await page.evaluate(async () => {
         const m = (window as any).match;
         if (m.phase.kind !== "play") return;
-        const top = await m.runner.topMovesFor(m.phase.board.fen);
-        m.submit(top[0].move);
+        // The best move if the engine answers quickly; any legal move otherwise (a busy test machine mustn't miss the clock).
+        const fen = m.phase.board.fen;
+        const top = await Promise.race([m.runner.topMovesFor(fen), new Promise((r) => setTimeout(() => r(null), 12000))]);
+        // (A teammate bot's planned pick is a legal move in the same position.)
+        const fallback = [...(m.runner.planned?.values() ?? [])][0];
+        if (m.phase.kind === "play") m.submit(top ? (top as any)[0].move : fallback);
       });
     } else if (p === "reveal") {
       // The live poll shows (unless the short quick-pace reveal has already moved on).

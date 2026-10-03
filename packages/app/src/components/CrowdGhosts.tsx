@@ -21,8 +21,8 @@ export interface GhostPick {
 }
 
 /** One see-through piece that slides from its square to the picked square once it appears. */
-function Ghost({ fen, move, orientation, you }: { fen: string; move: string; orientation: "white" | "black"; you: boolean }) {
-  const [landed, setLanded] = useState(false);
+function Ghost({ fen, move, orientation, you, instant }: { fen: string; move: string; orientation: "white" | "black"; you: boolean; instant?: boolean }) {
+  const [landed, setLanded] = useState(!!instant);
   useEffect(() => {
     const raf = requestAnimationFrame(() => requestAnimationFrame(() => setLanded(true)));
     return () => cancelAnimationFrame(raf);
@@ -52,6 +52,7 @@ export function CrowdGhosts({
   animate,
   chosen = null,
   faint = false,
+  instant,
 }: {
   fen: string;
   picks: GhostPick[];
@@ -60,6 +61,8 @@ export function CrowdGhosts({
   chosen?: string | null;
   /** Live tallies while players are still picking: a little more see-through. */
   faint?: boolean;
+  /** Picks already shown (live): they start on their square instead of sliding in again. */
+  instant?: ReadonlySet<string>;
 }) {
   const byMove = new Map<string, GhostPick[]>();
   for (const p of picks) byMove.set(p.move, [...(byMove.get(p.move) ?? []), p]);
@@ -69,7 +72,7 @@ export function CrowdGhosts({
       {animate
         ? picks.map((p) => (
             <div key={p.id} class={`ghost-wrap${cls(p.move)}`}>
-              <Ghost fen={fen} move={p.move} orientation={orientation} you={p.you} />
+              <Ghost fen={fen} move={p.move} orientation={orientation} you={p.you} instant={instant?.has(p.id)} />
             </div>
           ))
         : [...byMove.keys()].map((move) => {
