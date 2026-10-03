@@ -12,8 +12,10 @@ record it in `DECISIONS.md`.
   his real phone or computer, or reversing a rule he set.
 - Don't stop for review between milestones (Eric, Oct 2, 2026, overriding the spec's "stop after each milestone"):
   commit, push and keep going. Opening and merging your own PRs into `main` is fine; `main` auto-deploys.
-- Free hosting only. Cloudflare (Workers + Durable Objects, deployed from GitHub) is already set up on Eric's account
-  for Word Trap; this repo deploys the same way.
+- Hosting: Cloudflare (Workers + Durable Objects, deployed from GitHub) on Eric's account, same as Word Trap. Eric is
+  happy to pay for hosting and services where it helps, including a good domain (Oct 3, 2026). Prefer Cloudflare's own
+  products (custom domain, D1, KV, R2, Workers Paid if needed) so everything stays in one account. The actual
+  purchase or sign-up is still Eric's to do: recommend what to buy, with the price, and ask.
 - Phone-first and app-like, also good on a computer: big tap targets, no accidental scrolling or zoom, light and dark
   mode.
 - Keep every tunable in one settings file (`packages/core/src/settings.ts`).
