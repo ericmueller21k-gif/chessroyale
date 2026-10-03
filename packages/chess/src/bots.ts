@@ -17,5 +17,9 @@ const NAMES = [
 export function botRoster(rng: Rng, count = DEFAULT_SETTINGS.lobbySize - 1, settings: Settings = DEFAULT_SETTINGS): Entrant[] {
   const skills = botSkillSpread(count, settings);
   const names = shuffle(rng, NAMES);
-  return skills.map((skill, i) => ({ id: `bot${i}`, name: names[i % names.length]!, isBot: true, skill }));
+  // Past the name list (big lobbies), names repeat with a number: "Queenie 2".
+  return skills.map((skill, i) => {
+    const lap = Math.floor(i / names.length);
+    return { id: `bot${i}`, name: `${names[i % names.length]!}${lap ? ` ${lap + 1}` : ""}`, isBot: true, skill };
+  });
 }

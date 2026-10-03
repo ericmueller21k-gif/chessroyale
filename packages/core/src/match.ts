@@ -329,9 +329,19 @@ export function endStage(
 ): StageEnd {
   const ranked = standings(state, rng, settings);
   const k = settings.knockoutsPerStage[state.stage] ?? 0;
-  const out = new Set(ranked.slice(ranked.length - k).map((p) => p.id));
-  // Placements for this stage's knockouts: the last-ranked player gets the worst place.
-  const placement = new Map(ranked.map((p, i) => [p.id, i + 1]));
+  const teams = isTeamMatch(settings);
+  // Crowd 50 v 50: the bottom of each team goes, half the knockouts each, so the teams stay even.
+  const out = new Set(
+    teams
+      ? (["w", "b"] as const).flatMap((side) => {
+          const team = ranked.filter((p) => p.colour === side);
+          return team.slice(team.length - Math.floor(k / 2)).map((p) => p.id);
+        })
+      : ranked.slice(ranked.length - k).map((p) => p.id),
+  );
+  // Placements for this stage's knockouts: they take the last k places, best of them first (the last-ranked gets the worst).
+  const outRanked = ranked.filter((p) => out.has(p.id));
+  const placement = new Map(outRanked.map((p, i) => [p.id, ranked.length - outRanked.length + i + 1]));
   const players = state.players.map((p) => {
     if (!p.alive) return p;
     if (out.has(p.id)) return { ...p, alive: false, outInStage: state.stage, placement: placement.get(p.id)! };
@@ -348,7 +358,13 @@ export function endStage(
   if (next.stage >= settings.knockoutsPerStage.length) {
     // Seeds from this stage's standings: 1 & 4 against 2 & 3, alternating 1, 2, 4, 3.
     const seeds = ranked.filter((p) => !out.has(p.id)).map((p) => p.id);
-    if (seeds.length === 4) {
+    const colourOf = new Map(ranked.map((p) => [p.id, p.colour]));
+    const [w1, w2] = seeds.filter((id) => colourOf.get(id) === "w");
+    const [b1, b2] = seeds.filter((id) => colourOf.get(id) === "b");
+    if (teams && w1 && w2 && b1 && b2) {
+      // Each team's top two play the final for their side (the runner puts the side to move first).
+      next.final = { order: [w1, b1, w2, b2], teams: [[w1, w2], [b1, b2]], turn: 0 };
+    } else if (seeds.length === 4) {
       const [s1, s2, s3, s4] = seeds as [string, string, string, string];
       next.final = { order: [s1, s2, s4, s3], teams: [[s1, s4], [s2, s3]], turn: 0 };
     }
@@ -358,6 +374,9 @@ export function endStage(
     knockedOut: ranked.filter((p) => out.has(p.id)).map((p) => ({ ...p, placement: placement.get(p.id)! })),
   };
 }
+
+/** Crowd 50 v 50: players keep one colour (their team) all match. */
+export const isTeamMatch = (settings: Pick<Settings, "mode" | "crowdTeams">) => settings.mode === "crowd" && settings.crowdTeams;
 
 /** True once the knockout stages are over and the 2v2 final is on. */
 export const isFinal = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>

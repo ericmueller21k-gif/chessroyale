@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, allowedMs, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, allowedMs, clockAfterVote, cutSeconds, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -70,10 +70,13 @@ export interface LobbyRecord {
   placements: Record<string, number>;
   mismatches: number;
   counter: number;
-  /** Per-lobby settings: opening length, plus playtest overrides (rounds per stage, move clock, pace, draw rule). */
-  overrides?: Partial<Pick<Settings, "roundsPerStage" | "firstStageRounds" | "moveClockSeconds" | "revealSeconds" | "drawnMoveSeconds" | "boardIntroSeconds" | "openingMoves">> & {
+  /** Per-lobby settings: the mode and its options, opening length, plus playtest overrides (rounds, clock, pace, draw rule). */
+  overrides?: Partial<Settings> & {
     drawRuleByStage?: DrawRule[];
   };
+  /** Crowd augments: the move clock as voted (seconds), and this cut's votes. */
+  moveClock?: number;
+  augmentVotes?: Record<string, Augment>;
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"]): LobbyRecord {
@@ -111,6 +114,7 @@ export class LobbyCore {
     private settings: Settings = DEFAULT_SETTINGS,
   ) {
     this.settings = { ...settings, ...(record.overrides ?? {}) };
+    if (record.moveClock) this.settings = { ...this.settings, moveClockSeconds: record.moveClock };
     if (record.runner) {
       this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library });
     }
@@ -262,6 +266,11 @@ export class LobbyCore {
           console.log(`cross-check mismatch in ${this.r.code} (${msg.key}, board ${msg.boardId}): ${msg.detail ?? ""}`);
         }
         return;
+      case "augment":
+        if (this.r.phase === "stageBreak" && this.settings.augments && this.runner?.player(playerId)?.alive) {
+          this.r.augmentVotes = { ...(this.r.augmentVotes ?? {}), [playerId]: msg.choice };
+        }
+        return;
       case "hello":
         return;
     }
@@ -319,6 +328,14 @@ export class LobbyCore {
     const runner = this.runner;
     if (!runner) return;
     if (runner.isOver()) return this.finishMatch();
+    if (this.r.augmentVotes) {
+      // Crowd augments: the cut's vote sets the move clock from now on.
+      const clock = clockAfterVote(this.settings.moveClockSeconds, Object.values(this.r.augmentVotes), this.settings);
+      this.r.augmentVotes = undefined;
+      this.r.moveClock = clock;
+      this.settings = { ...this.settings, moveClockSeconds: clock };
+      runner.setMoveClock(clock);
+    }
     runner.deal();
     const final = runner.isFinal();
     // The move clock starts after a short settling-in countdown on a new board (not in the final: it's one board).
@@ -335,8 +352,11 @@ export class LobbyCore {
     const cutoff = this.cutoff();
     const alive = new Set(runner.alive().map((p) => p.id));
     const inRound = new Set(playing.map((h) => h.id));
+    const crowd = this.settings.mode === "crowd";
     for (const h of this.r.humans) {
-      const board = inRound.has(h.id) ? runner.boardOf(h.id) : null;
+      // Crowd 50 v 50: the team not picking still gets the board, to watch the vote come in.
+      const watching = crowd && !final && alive.has(h.id) && !inRound.has(h.id);
+      const board = inRound.has(h.id) ? runner.boardOf(h.id) : watching ? runner.boards.get(runner.state.boards[0]!)! : null;
       this.send(h.id, {
         t: "round",
         key,
@@ -350,6 +370,8 @@ export class LobbyCore {
         alive: alive.has(h.id),
         botsDoneIn: final ? {} : runner.botThinkTimes(),
         slots: this.slots(),
+        ...(watching ? { watching: true } : {}),
+        moveClock: this.settings.moveClockSeconds,
       });
       if (final) this.send(h.id, { t: "final", final: runner.finalView()!, standings: st, slots: this.slots() }, !inRound.has(h.id));
       else if (!alive.has(h.id)) this.sendSpectate(h.id);
@@ -359,7 +381,9 @@ export class LobbyCore {
       this.send(this.r.hostId, { t: "prefetch", fens }, false);
     }
     if (!playing.length) {
-      // Only bots this round: in the final a bot "thinks" for its recorded time first.
+      // Only bots this round: in the final a bot "thinks" for its recorded time first; in Crowd the watching team sees
+      // the vote come in for a few seconds.
+      if (crowd && !final) return this.setTimer("lock", now + Math.min(this.settings.moveClockSeconds * 1000, 5000));
       if (!final) return this.lock();
       const mover = [...runner.groups.values()][0]![0]!;
       return this.setTimer("lock", this.io.now() + Math.min(6000, Math.max(1500, runner.botThinkTimes()[mover] ?? 2500)));
@@ -509,7 +533,8 @@ export class LobbyCore {
     const cutoff = this.cutoff();
     const slots = this.slots();
     for (const h of this.r.humans) {
-      const mine = report.boards.find((b) => b.playerIds.includes(h.id));
+      // Crowd: everyone still in sees the one board's vote, whether or not their team picked this turn.
+      const mine = report.boards.find((b) => b.playerIds.includes(h.id)) ?? (this.settings.mode === "crowd" && runner.player(h.id).alive ? report.boards[0] : undefined);
       const score = mine ? byBoard.get(mine.boardId) : undefined;
       this.send(h.id, {
         t: "reveal",
@@ -547,7 +572,10 @@ export class LobbyCore {
     const end = runner.endStage();
     for (const p of end.knockedOut) this.r.placements[p.id] = p.placement!;
     this.r.phase = "stageBreak";
-    const until = this.io.now() + this.settings.stageBreakSeconds * 1000;
+    const crowd = this.settings.mode === "crowd";
+    const augments = crowd && this.settings.augments;
+    if (augments) this.r.augmentVotes = {};
+    const until = this.io.now() + (crowd ? cutSeconds(this.settings) : this.settings.stageBreakSeconds) * 1000;
     this.broadcast({
       t: "stageBreak",
       stage,
@@ -558,6 +586,7 @@ export class LobbyCore {
       until,
       placements: { ...this.r.placements },
       slots: this.slots(),
+      ...(augments ? { augments: true, moveClock: this.settings.moveClockSeconds } : {}),
     });
     this.setTimer("nextRound", until);
   }
@@ -576,6 +605,7 @@ export class LobbyCore {
       winner: winner ? this.nameOf(winner.id) : "",
       lossesByStage: Object.fromEntries(this.r.humans.map((h) => [h.id, runner.player(h.id).lossesByStage])),
       standings: this.standings(),
+      ...(this.settings.mode === "crowd" ? { gameWinner: runner.gameWinner() } : {}),
     };
     this.broadcast(msg);
   }

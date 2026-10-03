@@ -15,7 +15,18 @@ export type ScoreCarry = "reset" | "carry";
 export type DrawRule = "random" | "popular" | "best" | "weighted";
 export const DRAW_RULES: readonly DrawRule[] = ["random", "popular", "best", "weighted"];
 
+/** Game modes: Classic (many boards, players rotate) and Crowd (everyone on one board, the most popular move is played). */
+export type GameMode = "classic" | "crowd";
+
 export interface Settings {
+  mode: GameMode;
+  /** Crowd: two teams, 50 v 50, each playing one side all game (false: everyone picks for whichever side is to move). */
+  crowdTeams: boolean;
+  /** Crowd: after each cut, players vote on the next round's move clock (more time, same, less time). */
+  augments: boolean;
+  /** Augments: seconds added or taken per vote, and the clock's limits. */
+  clockStepSeconds: number;
+  clockRange: readonly [number, number];
   lobbySize: number;
   groupSize: number;
   /** The longest a single move may take (seconds), so a round never waits long for anyone. */
@@ -89,6 +100,11 @@ export const PACE_SETTINGS: Record<Pace, Partial<Settings>> = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
+  mode: "classic",
+  crowdTeams: true,
+  augments: true,
+  clockStepSeconds: 5,
+  clockRange: [10, 40],
   lobbySize: 64,
   groupSize: 8,
   moveClockSeconds: 30,
@@ -139,3 +155,54 @@ export const openingPlies = (s: Pick<Settings, "openingMoves">) => 2 * Math.max(
 /** Rounds in a knockout stage (stage 0 is the longer first one). */
 export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRounds">, stage: number) =>
   stage === 0 ? s.firstStageRounds : s.roundsPerStage;
+
+/**
+ * Crowd mode: 100 players on one board from the starting position, the most
+ * popular pick always played. No cuts for the first 10 moves (20 plies), then
+ * a cut after every move (2 plies) down to the final four, who play the 2v2.
+ * Scores carry over all game (a stage is only one move long). 3 power-ups,
+ * none earned.
+ */
+export const CROWD_SETTINGS: Partial<Settings> = {
+  mode: "crowd",
+  lobbySize: 100,
+  groupSize: 100,
+  knockoutsPerStage: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2],
+  firstStageRounds: 20,
+  roundsPerStage: 2,
+  scoresBetweenStages: "carry",
+  colourPerStage: false,
+  drawRuleByStage: ["popular"],
+  powerUpsAtStart: 3,
+  powerUpsPerStage: 0,
+  openingMoves: 0,
+  moveClockSeconds: 20,
+  boardIntroSeconds: 0,
+  // One board from the starting position: no opening grid to show.
+  openingShowSeconds: 0.5,
+  revealSeconds: 3.5,
+  drawnMoveSeconds: 2,
+  stageBreakSeconds: 4,
+  botThinkSeconds: [2, 14],
+};
+
+/** How long the cut screen shows: longer when there's an augment vote to make. */
+export const cutSeconds = (s: Pick<Settings, "augments" | "stageBreakSeconds">) => (s.augments ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
+
+/** Settings for a mode (Classic is the default). */
+export function modeSettings(mode: GameMode, opts: { crowdTeams?: boolean; augments?: boolean } = {}): Partial<Settings> {
+  if (mode !== "crowd") return {};
+  return { ...CROWD_SETTINGS, ...(opts.crowdTeams !== undefined ? { crowdTeams: opts.crowdTeams } : {}), ...(opts.augments !== undefined ? { augments: opts.augments } : {}) };
+}
+
+export type Augment = "more" | "same" | "less";
+
+/** The move clock after an augment vote (majority wins; a tie or no votes keeps it the same). */
+export function clockAfterVote(clock: number, votes: readonly Augment[], s: Pick<Settings, "clockStepSeconds" | "clockRange">): number {
+  const n = (a: Augment) => votes.filter((v) => v === a).length;
+  const more = n("more");
+  const less = n("less");
+  const same = n("same");
+  const step = more > less && more > same ? s.clockStepSeconds : less > more && less > same ? -s.clockStepSeconds : 0;
+  return Math.max(s.clockRange[0], Math.min(s.clockRange[1], clock + step));
+}

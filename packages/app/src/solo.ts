@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, allowedMs, type PlayerState, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, allowedMs, clockAfterVote, cutSeconds, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster } from "@chessroyale/chess";
@@ -35,9 +35,20 @@ export class SoloMatch implements GameView {
   constructor(
     private readonly engines: UciEngine[],
     readonly playerName: string,
-    readonly settings: Settings = DEFAULT_SETTINGS,
+    private readonly baseSettings: Settings = DEFAULT_SETTINGS,
     readonly practice = false,
   ) {}
+
+  /** The match's settings (the move clock can change with Crowd augment votes). */
+  get settings(): Settings {
+    return this.runner?.settings ?? this.baseSettings;
+  }
+  augmentVote: Augment | null = null;
+  voteAugment(choice: Augment) {
+    if (this.phase.kind !== "stageBreak" || !this.phase.augments) return;
+    this.augmentVote = choice;
+    this.emit();
+  }
 
   // ---- GameView ----
 
@@ -138,6 +149,7 @@ export class SoloMatch implements GameView {
     if (this.runner.isFinal()) return void this.finalTurn();
     this.runner.deal();
     this.runner.prefetch();
+    if (!this.runner.boardOf(HUMAN)) return this.watchTurn();
     // The move clock starts after a short settling-in countdown on the new board.
     const intro = this.settings.boardIntroSeconds * 1000;
     this.progress.start(this.runner.botThinkTimes(), intro);
@@ -192,6 +204,27 @@ export class SoloMatch implements GameView {
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
   }
 
+  /** Crowd 50 v 50: the other team's turn. You watch their vote come in, then see it. */
+  private watchTurn() {
+    const board = this.runner.boards.get(this.runner.state.boards[0]!)!;
+    const think = Math.min(this.settings.moveClockSeconds * 1000, 5000);
+    this.progress.start(this.runner.botThinkTimes(), 0);
+    const now = Date.now();
+    this.set({ kind: "watching", board: boardView(board), startsAt: now, deadline: now + think });
+    this.timer = setTimeout(() => void this.scoreWatched(), think);
+  }
+
+  private async scoreWatched() {
+    if (this.phase.kind !== "watching") return;
+    const { board } = this.phase;
+    this.set({ kind: "scoring", board, move: null, watched: true });
+    const [scored] = await Promise.all([this.runner.evaluate(new Map()), this.progress.finishAll(this.runner.alive().map((p) => p.id), 600)]);
+    const report = this.runner.finishRound(scored.results, scored.thinkMs, scored.powerUps);
+    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
+    this.set({ kind: "reveal", mine: report.boards[0]!, board, until: Date.now() + revealMs });
+    this.timer = setTimeout(() => this.afterReveal(), revealMs);
+  }
+
   skipReveal() {
     if (this.phase.kind !== "reveal" && this.phase.kind !== "final") return;
     if (this.timer) clearTimeout(this.timer);
@@ -209,6 +242,10 @@ export class SoloMatch implements GameView {
     const cutoff = this.cutoff;
     const end = this.runner.endStage();
     const outIds = new Set(end.knockedOut.map((p) => p.id));
+    const crowd = this.settings.mode === "crowd";
+    const breakMs = cutSeconds(this.settings) * 1000;
+    this.augmentVote = null;
+    if (crowd) this.timer = setTimeout(() => this.continueFromBreak(), breakMs);
     this.set({
       kind: "stageBreak",
       stage,
@@ -217,11 +254,19 @@ export class SoloMatch implements GameView {
       cutoff,
       youOut: outIds.has(HUMAN),
       nextBoards: this.runner.state.boards.map((id) => boardView(this.runner.boards.get(id)!)),
+      ...(crowd ? { until: Date.now() + breakMs, augments: this.settings.augments && !outIds.has(HUMAN), moveClock: this.settings.moveClockSeconds } : {}),
     });
   }
 
   continueFromBreak() {
-    if (this.phase.kind === "stageBreak") this.nextRound();
+    if (this.phase.kind !== "stageBreak") return;
+    if (this.timer) clearTimeout(this.timer);
+    if (this.phase.augments) {
+      // Your vote is the lobby's (the bots don't vote).
+      this.runner.setMoveClock(clockAfterVote(this.settings.moveClockSeconds, this.augmentVote ? [this.augmentVote] : [], this.settings));
+    }
+    this.augmentVote = null;
+    this.nextRound();
   }
 
   // ---------------- The 2v2 final ----------------
@@ -291,6 +336,12 @@ export class SoloMatch implements GameView {
 
   private finish() {
     const winner = this.runner.state.players.find((p) => p.placement === 1);
-    this.set({ kind: "results", placement: this.you.placement!, winner: winner?.name ?? "", youWon: this.you.placement === 1 });
+    this.set({
+      kind: "results",
+      placement: this.you.placement!,
+      winner: winner?.name ?? "",
+      youWon: this.you.placement === 1,
+      ...(this.settings.mode === "crowd" ? { gameWinner: this.runner.gameWinner() } : {}),
+    });
   }
 }

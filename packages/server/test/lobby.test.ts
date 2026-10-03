@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -244,5 +244,42 @@ describe("lobby", () => {
     L.advance(5000 + 3000);
     L.core.message("p1", { t: "pick", key: r.key, move });
     expect(L.core.record.round!.picks.p1!.thinkMs).toBe(3000);
+  });
+});
+
+describe("lobby: Crowd mode", () => {
+  it("50 v 50: the watching team gets the board, everyone sees the vote, and the cut's augment vote sets the clock", () => {
+    const L = setup({ ...modeSettings("crowd"), firstStageRounds: 2, roundsPerStage: 2, boardIntroSeconds: 0 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone");
+    L.core.message("p1", { t: "start" });
+    expect(L.core.record.bots).toHaveLength(98);
+    L.advance(DEFAULT_SETTINGS.openingShowSeconds * 1000);
+    for (let round = 0; round < 2; round++) {
+      const r1 = L.last("p1", "round")!;
+      const r2 = L.last("p2", "round")!;
+      expect(r1.key).toBe(r2.key);
+      for (const [id, r] of [["p1", r1], ["p2", r2]] as const) {
+        // Everyone gets the one board; the team not to move is marked as watching.
+        expect(r.board).toBeTruthy();
+        const playing = !r.watching;
+        if (playing) L.core.message(id, { t: "pick", key: r.key, move: legalMoves(r.board!.fen)[0]! });
+      }
+      if (r1.watching && r2.watching) L.advance(5000); // only bots picking: the vote shows for a few seconds
+      expect(L.hostScores("p1")).toBe(true);
+      const v1 = L.last("p1", "reveal")!;
+      const v2 = L.last("p2", "reveal")!;
+      expect(v1.picks).toHaveLength(50);
+      expect(v2.picks).toHaveLength(50);
+      expect(v1.playedMove).toBe(v2.playedMove);
+      L.advance(10_000);
+    }
+    const brk = L.last("p1", "stageBreak")!;
+    expect(brk.augments).toBe(true);
+    expect(brk.knockedOut).toHaveLength(16);
+    L.core.message("p1", { t: "augment", choice: "more" });
+    L.core.message("p2", { t: "augment", choice: "more" });
+    L.advance(10_000);
+    expect(L.last("p1", "round")!.moveClock).toBe(25);
   });
 });

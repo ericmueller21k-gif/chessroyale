@@ -358,3 +358,38 @@ recommend specific options with prices when we get there.
 - **A sound when every board moves after a round:** a quick ripple of 8 soft wooden knocks while the tiny boards light
   up one after another. It happens when the chosen move plays on your board, and the tiny boards now hold their old
   positions until then, so they no longer give away the chosen move during the selecting reel.
+
+## Crowd mode: 100 players, one board (Oct 3, 2026)
+
+Eric's design; the details were my call. The 8-board version stays as **Classic** (the version before modes is commit
+`bd726b5` on main; the session's git proxy wouldn't push a tag). The first screen has a mode picker.
+
+- **One game from the starting position, 100 players, the most popular pick always played.** Scoring is unchanged:
+  your move's quality against the average of everyone who picked with you.
+- **Two ways to play, a lobby setting:**
+  - **50 v 50 (default):** random even teams, you play your side all game. Your team picks on your side's turns; on the
+    other team's turns you watch their vote come in (a count of who's voted), then see it. Cuts take the same number
+    from each team (each team has its own cut line, so the leaderboard shows your team), and the final is each team's
+    top two, teammates alternating.
+  - **Everyone moves:** everyone picks for whichever side is to move, every turn; cuts by overall score; the final is
+    seeds 1 & 4 against 2 & 3.
+- **No cuts for the first 10 moves (20 plies), then a cut after every move** (2 plies): 100 → 84 → 70 → 58 → 48 → 40 →
+  32 → 26 → 20 → 16 → 12 → 8 → 6 → 4 (all even, so the teams stay even), then the 2v2 final (5 moves each). Scores carry
+  over all game, since a "stage" is only one move: a cut ranks your whole game, not one move.
+- **3 power-ups, none earned.** 20 s move clock. No settling-in countdown or opening grid (it's one board everyone has
+  been watching).
+- **If the game ends before the final** (mate, stalemate, repetition), a fresh game starts from the starting position
+  and the cuts carry on. In the final, the game ending ends the final.
+- **Winning the game goes on your record, not your score** (Eric). Placement is move quality only; the results screen
+  says whether your team won the game (the side that mated, or the side the engine rates 60%+ when the final ends),
+  ready for profiles.
+- **Augments (on by default; a switch turns them off):** after each cut, three cards: More time (+5 s), Same, Less time
+  (−5 s), for the next round's move clock (10-40 s). I made it a vote (the majority decides; a tie or no votes keeps
+  it), since Eric described it as pacing; in solo your vote decides. It can become a personal pick, and more augments
+  can be added as cards.
+- **The reveal is a live poll, not the shuffle:** the most picked moves grow as vote bars and as arrows on the board
+  with vote counts, with a roulette blip per bar; the winner blinks three times with the three tones, then it's
+  played. You see your pick, your score for it and the best move.
+- **The cut screen:** CUT, how many went out and how many are left, the names struck through, whether you're through,
+  the augment cards and a countdown (about 7 s; 4 s without augments).
+- Bots past the name list get numbered names ("Queenie 2") for 100-player lobbies.

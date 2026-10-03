@@ -1,6 +1,6 @@
 import { applyMove } from "@chessroyale/chess";
 import { MiniBoard } from "../components/MiniBoard.tsx";
-import type { GameView } from "../game.ts";
+import { myTeam, type GameView } from "../game.ts";
 import { ordinal } from "./StageBreak.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
@@ -9,6 +9,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
   const worst = [...played].sort((a, b) => a.roundScore - b.roundScore)[0];
   const avgMs = match.scoringMs.length ? match.scoringMs.reduce((a, b) => a + b, 0) / match.scoringMs.length : 0;
   const standings = match.standings();
+  const team = myTeam(match);
+  const gameWinner = match.phase.kind === "results" ? match.phase.gameWinner : undefined;
   const me = standings.find((s) => s.isYou);
   const scariest = standings
     .filter((s) => s.rating !== null)
@@ -24,6 +26,15 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
         {ordinal(placement)} of {match.totalPlayers}
       </h1>
       <p class="muted">{placement === 1 ? "You won the match!" : `${winner} won the match.`}</p>
+      {team && (
+        <p class={`team-result ${gameWinner === team ? "good" : gameWinner ? "bad" : ""}`}>
+          {gameWinner === team
+            ? `Your team (${team === "w" ? "White" : "Black"}) won the game: a win on your record.`
+            : gameWinner
+              ? `Your team (${team === "w" ? "White" : "Black"}) lost the game.`
+              : "The game was a draw."}
+        </p>
+      )}
       {me && (
         <div class="stat-tiles">
           <div class="stat-tile">

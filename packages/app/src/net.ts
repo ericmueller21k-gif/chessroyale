@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, botChoose, botThinkMs as thinkMs, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botChoose, botThinkMs as thinkMs, type Augment, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -210,6 +210,12 @@ export class NetMatch implements GameView {
         this.roundsPlayed = m.round;
         this.standingsList = m.standings;
         this.cutoff = m.cutoff;
+        if (m.moveClock) this.settings = { ...this.settings, moveClockSeconds: m.moveClock };
+        if (m.board && m.watching) {
+          // Crowd 50 v 50: the other team is choosing.
+          this.currentBoard = m.board;
+          return this.setPhase({ kind: "watching", board: this.toView(m.board), startsAt: this.local(m.startsAt ?? m.now), deadline: this.local(m.deadline) });
+        }
         if (m.board) {
           this.prefetch([m.board.fen]);
           this.currentBoard = m.board;
@@ -227,6 +233,7 @@ export class NetMatch implements GameView {
         // Everyone's in: anyone still shown as thinking (bots) finishes quickly while the host scores.
         void this.progress.finishAll(this.standingsList.filter((s) => !s.out).map((s) => s.id), 900);
         if (this.phase.kind === "play") this.setPhase({ kind: "scoring", board: this.phase.board, move: this.myPick });
+        else if (this.phase.kind === "watching") this.setPhase({ kind: "scoring", board: this.phase.board, move: null, watched: true });
         return;
       case "prefetch":
         return this.prefetch(m.fens);
@@ -236,6 +243,7 @@ export class NetMatch implements GameView {
         return this.onReveal(m);
       case "stageBreak": {
         this.standingsList = m.standings;
+        this.augmentVote = null;
         const youOut = !!this.myId && m.knockedOut.includes(this.myId);
         if (this.myId && m.placements[this.myId]) this.placement = m.placements[this.myId]!;
         return this.setPhase({
@@ -246,6 +254,9 @@ export class NetMatch implements GameView {
           cutoff: m.cutoff,
           youOut,
           nextBoards: m.nextBoards.map((b) => this.toView(b)),
+          until: this.local(m.until),
+          augments: m.augments,
+          moveClock: m.moveClock,
         });
       }
       case "spectate":
@@ -273,7 +284,7 @@ export class NetMatch implements GameView {
 
   private showResults(m: Extract<ServerMessage, { t: "results" }>) {
     const placement = (this.myId && m.placements[this.myId]) || this.placement || this.totalPlayers;
-    this.setPhase({ kind: "results", placement, winner: m.winner, youWon: placement === 1 });
+    this.setPhase({ kind: "results", placement, winner: m.winner, youWon: placement === 1, gameWinner: m.gameWinner });
   }
 
   private onReveal(m: Extract<ServerMessage, { t: "reveal" }>) {
@@ -384,6 +395,14 @@ export class NetMatch implements GameView {
     this.send({ t: "pick", key: this.key, move });
     if (this.myId) this.progress.mark(this.myId);
     this.setPhase({ kind: "scoring", board: this.phase.board, move });
+  }
+
+  augmentVote: Augment | null = null;
+  voteAugment(choice: Augment) {
+    if (this.phase.kind !== "stageBreak" || !this.phase.augments) return;
+    this.augmentVote = choice;
+    this.send({ t: "augment", choice });
+    this.emit();
   }
 
   skipReveal() {}
