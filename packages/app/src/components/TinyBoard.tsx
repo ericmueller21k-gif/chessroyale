@@ -69,7 +69,8 @@ export function BoardsStrip({ slots, current, frozen = false }: { slots: BoardSl
     play("ripple");
   }, [key]);
   const list = shown.current;
-  if (!list.length) return null;
+  // One board (Crowd): nothing to show beside the big board.
+  if (list.length <= 1) return null;
   return (
     <div class="boards-strip" role="list" aria-label="All boards">
       {list.map((s, i) => (

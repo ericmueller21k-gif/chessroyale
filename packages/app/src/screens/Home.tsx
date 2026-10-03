@@ -1,9 +1,47 @@
 import { useState } from "preact/hooks";
-import { DEFAULT_SETTINGS as S, MAX_OPENING_MOVES } from "@chessroyale/core";
+import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, type GameMode } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 
 const OPENING_KEY = "brc.openingMoves";
+const MODE_KEY = "brc.mode";
+const TURNS_KEY = "brc.crowdTurns";
+const AUGMENTS_KEY = "brc.augments";
+
+export interface ModeChoice {
+  mode: GameMode;
+  /** Crowd: 50 v 50 teams (true) or everyone moves (false). */
+  crowdTeams: boolean;
+  augments: boolean;
+}
+
+/** The mode for solo games and lobbies you create: ?mode=crowd&turns=all&augments=0, else this device's choice. */
+export function chosenMode(): ModeChoice {
+  const q = new URLSearchParams(location.search);
+  const get = (k: string) => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  };
+  const mode = (q.get("mode") ?? get(MODE_KEY)) === "crowd" ? "crowd" : "classic";
+  return {
+    mode,
+    crowdTeams: (q.get("turns") ?? get(TURNS_KEY)) !== "all",
+    augments: (q.get("augments") ?? get(AUGMENTS_KEY)) !== "0",
+  };
+}
+
+function saveMode(c: ModeChoice) {
+  try {
+    localStorage.setItem(MODE_KEY, c.mode);
+    localStorage.setItem(TURNS_KEY, c.crowdTeams ? "teams" : "all");
+    localStorage.setItem(AUGMENTS_KEY, c.augments ? "1" : "0");
+  } catch {
+    // Not important.
+  }
+}
 
 /** Opening moves per side for solo games and lobbies you create: ?moves=N, else this device's choice, else the default. */
 export function chosenOpeningMoves(): number {
@@ -69,6 +107,13 @@ export function HomeScreen({
       // Not important.
     }
   };
+  const [modeChoice, setModeChoice] = useState(chosenMode);
+  const changeMode = (patch: Partial<ModeChoice>) => {
+    const next = { ...modeChoice, ...patch };
+    setModeChoice(next);
+    saveMode(next);
+  };
+  const crowd = modeChoice.mode === "crowd";
   const [openingMoves, setOpeningMoves] = useState(chosenOpeningMoves);
   const changeOpeningMoves = (n: number) => {
     const v = Math.max(0, Math.min(MAX_OPENING_MOVES, n));
@@ -104,6 +149,48 @@ export function HomeScreen({
         <MuteButton />
       </h1>
       {!joinCode && <InstallCard />}
+      {!joinCode && (
+        <div class="mode-pick" role="radiogroup" aria-label="Game mode">
+          <button type="button" role="radio" aria-checked={!crowd} class={!crowd ? "on" : ""} onClick={() => changeMode({ mode: "classic" })}>
+            <strong>Classic</strong>
+            <span>{S.lobbySize} players · 8 boards</span>
+          </button>
+          <button type="button" role="radio" aria-checked={crowd} class={crowd ? "on" : ""} onClick={() => changeMode({ mode: "crowd" })}>
+            <strong>Crowd</strong>
+            <span>{C.lobbySize} players · 1 board</span>
+          </button>
+        </div>
+      )}
+      {crowd && !joinCode ? (
+        <ol class="rules">
+          <li>
+            <strong>{C.lobbySize} players, one game, from the first move.</strong>{" "}
+            {modeChoice.crowdTeams
+              ? "Two teams of 50: you play White or Black all game. Your team picks a move together, the other team answers."
+              : "Everyone picks a move for whichever side is to move, every turn."}
+          </li>
+          <li>
+            <strong>The most popular move is played.</strong> Stockfish scores every pick, and you score by picking better than
+            the others who picked with you.
+          </li>
+          <li>
+            <strong>No cuts for the first {(C.firstStageRounds ?? 20) / 2} moves.</strong> Then after every move the lowest scorers
+            go out ({modeChoice.crowdTeams ? "the same number from each team" : "by overall score"}), until 4 are left.
+          </li>
+          <li>
+            <strong>⚡ {C.powerUpsAtStart} power-ups</strong> show the engine's top 3 moves. That's all you get, so pick your moments.
+          </li>
+          {modeChoice.augments && (
+            <li>
+              <strong>Augments.</strong> After every cut, vote: more time, the same, or less time on the clock for the next round.
+            </li>
+          )}
+          <li>
+            <strong>The 2v2 final.</strong> The last 4 play on, teammates taking turns; the best average move quality wins. Winning
+            the game goes on your record, but it's move quality that places you.
+          </li>
+        </ol>
+      ) : (
       <ol class="rules">
         <li>
           <strong>{S.lobbySize} players, 8 boards, one move at a time.</strong> Every round you're dropped onto one of the boards
@@ -134,6 +221,7 @@ export function HomeScreen({
           scariest player in the lobby.
         </li>
       </ol>
+      )}
       <label class="field">
         <span>Your name</span>
         <input value={name} maxLength={16} onInput={(e) => setName(e.currentTarget.value)} placeholder="You" />
@@ -152,7 +240,27 @@ export function HomeScreen({
           quick games (also applies to lobbies you create).
         </span>
       </label>
-      {joinCode ? null : (
+      {crowd && !joinCode && (
+        <>
+          <div class="mode-pick small-pick" role="radiogroup" aria-label="Turns">
+            <button type="button" role="radio" aria-checked={modeChoice.crowdTeams} class={modeChoice.crowdTeams ? "on" : ""} onClick={() => changeMode({ crowdTeams: true })}>
+              <strong>50 v 50</strong>
+              <span>You play one side</span>
+            </button>
+            <button type="button" role="radio" aria-checked={!modeChoice.crowdTeams} class={!modeChoice.crowdTeams ? "on" : ""} onClick={() => changeMode({ crowdTeams: false })}>
+              <strong>Everyone moves</strong>
+              <span>You pick every turn</span>
+            </button>
+          </div>
+          <label class="check">
+            <input type="checkbox" checked={modeChoice.augments} onChange={(e) => changeMode({ augments: e.currentTarget.checked })} />
+            <span>
+              <strong>Augments:</strong> vote on the clock after every cut (more time, same, less time).
+            </span>
+          </label>
+        </>
+      )}
+      {joinCode || crowd ? null : (
         <div class="stepper-field">
           <span>
             <strong>Opening moves:</strong> how many moves each side has already played on every board when the match
@@ -171,7 +279,7 @@ export function HomeScreen({
       )}
       {joinCode ? null : (
         <button type="button" class="btn btn-primary btn-wide" disabled={loading} onClick={() => onStart(remember(name), practice)}>
-          {loading ? "Loading the engine…" : `Play solo vs ${S.lobbySize - 1} bots`}
+          {loading ? "Loading the engine…" : `Play solo vs ${(crowd ? C.lobbySize! : S.lobbySize) - 1} bots`}
         </button>
       )}
       <div class="lobby-actions">

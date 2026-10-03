@@ -2212,3 +2212,251 @@ button.history-label {
   border-color: var(--accent);
   cursor: default;
 }
+
+/* ---- Mode picker (first screen) ---- */
+
+.mode-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mode-pick button {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mode-pick button strong {
+  font-size: 17px;
+}
+.mode-pick button span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.mode-pick button.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.small-pick button {
+  padding: 8px 10px;
+}
+.small-pick button strong {
+  font-size: 15px;
+}
+
+/* ---- Crowd: team chip, poll, cut ---- */
+
+.team-chip {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 2px solid var(--text);
+  vertical-align: -1px;
+}
+.team-chip.w {
+  background: #fff;
+}
+.team-chip.b {
+  background: #111;
+}
+.tower-team {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.poll {
+  display: grid;
+  gap: 5px;
+}
+.poll-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 34px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.3s;
+}
+.poll-move {
+  font-weight: 800;
+}
+.poll-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  overflow: hidden;
+}
+.poll-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--accent);
+}
+.poll-votes {
+  text-align: right;
+  font-weight: 800;
+}
+.poll-you {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.poll-row.you {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.poll-row.win {
+  background: color-mix(in srgb, #2fd27a 20%, var(--surface));
+  animation: chosen-blink 0.2s steps(1, end) 3;
+}
+.poll-row.win .poll-bar i {
+  background: #2fd27a;
+}
+.poll-row.lose {
+  opacity: 0.45;
+}
+.poll-result {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.poll-result .round-score {
+  font-size: 26px;
+}
+.crowd-cut {
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+}
+.cut-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 800;
+}
+.cut-badge {
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: #ff4d4d;
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+.cut-out {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-height: 120px;
+  overflow: hidden;
+}
+.cut-name {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: line-through;
+}
+.cut-name.you {
+  color: #ff4d4d;
+  text-decoration: none;
+  font-weight: 800;
+}
+.cut-vote-title {
+  font-size: 16px;
+  margin: 6px 0 0;
+}
+.augments {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.augment {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 16px 6px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface) 80%, #000));
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  animation: augment-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.augment:nth-child(2) {
+  animation-delay: 0.08s;
+}
+.augment:nth-child(3) {
+  animation-delay: 0.16s;
+}
+.augment-icon {
+  font-size: 28px;
+}
+.augment-secs {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.augment.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: translateY(-3px);
+}
+@keyframes augment-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+}
+.team-result {
+  font-weight: 800;
+}
+.team-result.good {
+  color: var(--good);
+}
+.team-result.bad {
+  color: var(--danger);
+}
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game .poll {
+    gap: 3px;
+  }
+  .screen.game .poll-row {
+    padding: 2px 8px;
+    font-size: 13px;
+  }
+  .screen.game .poll-result .round-score {
+    font-size: 20px;
+  }
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game .poll {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    margin-top: 24px;
+  }
+}
+
+.hud-spacer {
+  margin-left: auto;
+}

@@ -1,11 +1,11 @@
 import { useEffect, useReducer, useState } from "preact/hooks";
-import { DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, type DrawRule, type Settings } from "@chessroyale/core";
-import { chosenOpeningMoves } from "./screens/Home.tsx";
+import { DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, modeSettings, type DrawRule, type Settings } from "@chessroyale/core";
+import { chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool } from "./engine.ts";
-import { cutLabel, roundLive, type GameView } from "./game.ts";
+import { cutLabel, isCrowd, roundLive, towerView, type GameView } from "./game.ts";
 import { NetMatch } from "./net.ts";
 import { SoloMatch } from "./solo.ts";
 import { FinalScreen } from "./screens/Final.tsx";
@@ -16,6 +16,7 @@ import { PlayScreen } from "./screens/Play.tsx";
 import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
 import { SoundLab } from "./screens/SoundLab.tsx";
+import { CrowdCut, CrowdReveal, WatchScreen } from "./screens/Crowd.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
 
@@ -24,14 +25,19 @@ function overridesFromUrl(): Partial<Settings> {
   const q = new URLSearchParams(location.search);
   const n = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
   const draw = q.get("draw") as DrawRule | null;
+  const mode = chosenMode();
+  const crowd = mode.mode === "crowd";
   return JSON.parse(
     JSON.stringify({
-      ...(quickPace() ? PACE_SETTINGS.quick : {}),
+      // The mode's own rules and pace first, then pace and playtest overrides on top.
+      ...modeSettings(mode.mode, { crowdTeams: mode.crowdTeams, augments: mode.augments }),
+      ...(quickPace() ? (crowd ? { revealSeconds: 2.5, drawnMoveSeconds: 1.5 } : PACE_SETTINGS.quick) : {}),
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),
       moveClockSeconds: n("clock"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
-      openingMoves: chosenOpeningMoves(),
+      // (Crowd always starts from move 0: its own openingMoves stays.)
+      ...(crowd ? {} : { openingMoves: chosenOpeningMoves() }),
     }),
   );
 }
@@ -117,7 +123,12 @@ export function App() {
       const params = new URLSearchParams(location.search);
       params.delete("debug");
       if (quickPace()) params.set("pace", "quick");
-      params.set("moves", String(chosenOpeningMoves()));
+      const mode = chosenMode();
+      params.set("mode", mode.mode);
+      if (mode.mode === "crowd") {
+        params.set("turns", mode.crowdTeams ? "teams" : "all");
+        params.set("augments", mode.augments ? "1" : "0");
+      } else params.set("moves", String(chosenOpeningMoves()));
       const res = await fetch(`/api/lobby?${params}`, { method: "POST" });
       const body = (await res.json()) as { code?: string; message?: string };
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");
@@ -167,12 +178,20 @@ export function App() {
     again: () => (match instanceof SoloMatch ? void startSolo(match.playerName, match.practice) : leave()),
   });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages.
-  const tower = ["play", "scoring", "reveal", "spectating", "final"].includes(match.phase.kind) && match.standings().length > 0;
+  const tower = ["play", "scoring", "reveal", "spectating", "final", "watching"].includes(match.phase.kind) && match.standings().length > 0;
   if (!tower) return screen;
   return (
     <div class="arena">
       <aside class="tower-side">
-        <RaceTower standings={match.standings()} cutoff={match.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
+        {(() => {
+          const v = towerView(match);
+          return (
+            <>
+              {v.teamLabel && <div class="tower-team">{v.teamLabel}</div>}
+              <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
+            </>
+          );
+        })()}
       </aside>
       {screen}
     </div>
@@ -204,10 +223,15 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
     case "play":
       return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={p.startsAt} deadline={p.deadline} allowedMs={p.allowedMs} />;
     case "scoring":
+      if (p.watched) return <WatchScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={0} deadline={0} counting />;
       return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} deadline={0} picked={p.move} />;
+    case "watching":
+      return <WatchScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={p.startsAt} deadline={p.deadline} />;
     case "reveal":
+      if (isCrowd(match)) return <CrowdReveal key={`${p.board.id}:${p.board.ply}`} match={match} mine={p.mine} board={p.board} until={p.until} />;
       return <RevealScreen key={`${p.board.id}:${p.board.ply}`} match={match} mine={p.mine} board={p.board} until={p.until} />;
     case "stageBreak":
+      if (isCrowd(match)) return <CrowdCut match={match} {...p} />;
       return <StageBreakScreen match={match} {...p} />;
     case "simulating":
       return (

@@ -1,5 +1,6 @@
 import {
   alivePlayers,
+  isTeamMatch,
   openingPlies,
   allowedMs,
   applyRound,
@@ -144,7 +145,8 @@ export class MatchRunner {
     const plies = openingPlies(opts.settings);
     // With colours per stage, half the boards have White to move and half Black (the opening one ply longer).
     const blackBoards = opts.settings.colourPerStage && boardCount >= 2 ? Math.floor(boardCount / 2) : 0;
-    const whiteOpenings = pickOpenings(opts.rng, opts.library, { classic: boardCount - blackBoards - 1, unusual: 1 }, plies, opts.settings.openingBalance);
+    const unusual = boardCount - blackBoards > 2 ? 1 : 0;
+    const whiteOpenings = pickOpenings(opts.rng, opts.library, { classic: boardCount - blackBoards - unusual, unusual }, plies, opts.settings.openingBalance);
     const blackOpenings = pickOpenings(
       opts.rng,
       opts.library,
@@ -160,7 +162,8 @@ export class MatchRunner {
       this.usedFamilies.add(o.family);
     });
     this.state = createMatch(opts.entrants, openings.map((_, i) => i), opts.settings);
-    this.state = assignColours(this.state, opts.rng, this.whiteSeats());
+    // Crowd 50 v 50: a random half play White all match, the rest Black.
+    this.state = assignColours(this.state, opts.rng, isTeamMatch(this.settings) ? Math.floor(this.alive().length / 2) : this.whiteSeats());
   }
 
   /** Side to move on each board in play. */
@@ -176,6 +179,11 @@ export class MatchRunner {
 
   get settings() {
     return this.opts.settings;
+  }
+
+  /** Crowd augments: the move clock for the rounds from now on. */
+  setMoveClock(seconds: number): void {
+    this.opts.settings = { ...this.opts.settings, moveClockSeconds: seconds };
   }
 
   private replaceBoard(id: number): void {
@@ -217,13 +225,19 @@ export class MatchRunner {
     }
     if (this.state.final) {
       this.groups = new Map([[this.state.boards[0]!, [finalMover(this.state.final)]]]);
+    } else if (isTeamMatch(this.settings)) {
+      // Crowd 50 v 50: the team whose side is to move picks; the other team watches.
+      const board = this.state.boards[0]!;
+      const side = sideToMove(this.boards.get(board)!.fen);
+      this.groups = new Map([[board, this.alive().filter((p) => p.colour === side).map((p) => p.id)]]);
     } else {
       this.groups = assignGroups(this.opts.rng, this.state, this.settings, undefined, this.boardSides());
     }
     // Bots' thinking times are drawn now, so a screen can show each bot finishing at its moment.
+    const picking = new Set([...this.groups.values()].flat());
     this.botThink = new Map(
       this.alive()
-        .filter((p) => p.isBot)
+        .filter((p) => p.isBot && picking.has(p.id))
         .map((p) => [p.id, Math.min(botThinkMs(this.opts.rng, this.settings), allowedMs(p, this.settings))]),
     );
     return this.groups;
@@ -501,7 +515,16 @@ export class MatchRunner {
         : keepBoards(status, count);
     const end = endStage(this.state, this.opts.rng, keep, this.settings);
     this.state = end.state;
-    this.state = assignColours(this.state, this.opts.rng, this.whiteSeats());
+    if (!isTeamMatch(this.settings)) this.state = assignColours(this.state, this.opts.rng, this.whiteSeats());
+    const f = this.state.final;
+    if (f && isTeamMatch(this.settings)) {
+      // teams[0] must be the side to move when the final starts.
+      const side = sideToMove(this.boards.get(this.state.boards[0]!)!.fen);
+      if (this.player(f.teams[0][0]!).colour !== side) {
+        const [a, b] = f.teams;
+        this.state = { ...this.state, final: { ...f, teams: [b, a], order: [b[0]!, a[0]!, b[1]!, a[1]!] } };
+      }
+    }
     return { ...end, state: this.state };
   }
 
@@ -522,10 +545,28 @@ export class MatchRunner {
       isBot: p.isBot,
       out: !p.alive,
       placement: p.placement,
+      team: isTeamMatch(this.settings) ? p.colour : null,
     });
     const alive = standings(this.state, () => 0.5, this.settings);
     const out = this.state.players.filter((p) => !p.alive).sort((a, b) => (a.placement ?? 99) - (b.placement ?? 99));
     return [...alive, ...out].map(row);
+  }
+
+  /**
+   * Who won the game on the board when the match ended: the side that mated,
+   * or the side the engine rates clearly ahead (60%+) if it's unfinished;
+   * otherwise a draw (null).
+   */
+  gameWinner(): Side | null {
+    const id = this.state.boards[0];
+    if (id === undefined) return null;
+    const board = this.boards.get(id)!;
+    const end = boardEnd(board);
+    const toMove = sideToMove(board.fen);
+    const other: Side = toMove === "w" ? "b" : "w";
+    if (end === "checkmate") return other;
+    if (end) return null;
+    return board.expected >= 0.6 ? toMove : board.expected <= 0.4 ? other : null;
   }
 
   isFinal(): boolean {

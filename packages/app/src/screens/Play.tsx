@@ -71,7 +71,8 @@ export function PlayScreen({
   const powerUps = hint !== null ? Math.max(0, held - 1) : held;
   // Once you've moved, your move stays on the board while the others finish.
   const moved = waiting && picked ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
-  const alive = match.standings().filter((s) => !s.out);
+  // Crowd 50 v 50: only your team is picking this turn.
+  const alive = match.standings().filter((s) => !s.out && (s.team == null || s.team === side));
   const doneCount = alive.filter((s) => match.done.has(s.id)).length;
   const arrows: Arrow[] =
     !waiting && hint && !history.browsing
@@ -86,7 +87,15 @@ export function PlayScreen({
       <Hud match={match} />
       <div class="board-area">
         <div class="opening-name">
-          {match.final ? <FinalTurnLabel match={match} side={side} /> : board.openingName}
+          {match.final ? (
+            <FinalTurnLabel match={match} side={side} />
+          ) : match.settings.mode === "crowd" ? (
+            <>
+              Your pick for <strong>{side === "w" ? "White" : "Black"}</strong> · the most popular move is played
+            </>
+          ) : (
+            board.openingName
+          )}
         </div>
         <div class="board-row">
           <EvalBar fen={history.fen ?? board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />

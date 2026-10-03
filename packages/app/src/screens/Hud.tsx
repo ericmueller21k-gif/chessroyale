@@ -4,7 +4,7 @@ import { LiveNumber } from "../components/LiveNumber.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { clockText } from "../components/RaceTower.tsx";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
-import { myBoardId, type GameView } from "../game.ts";
+import { isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
 
 /**
@@ -44,8 +44,11 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
   const [open, setOpen] = useState(false);
   // During the reveal the round counter has already moved on; show the round just played.
   const shownRound = match.phase.kind === "reveal" ? match.roundsPlayed : match.roundsPlayed + 1;
-  const standings = match.standings();
+  // Crowd 50 v 50: your team, with your team's cut line.
+  const view = towerView(match);
+  const standings = view.standings;
   const alive = standings.filter((s) => !s.out);
+  const cutoff = view.cutoff;
   let rank = alive.findIndex((x) => x.isYou) + 1;
   if (match.final) {
     // In the final, position is by average loss per move in the final (lowest first).
@@ -55,10 +58,17 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
     rank = order.findIndex((id) => match.isYou(id)) + 1;
   }
   const me = alive[alive.findIndex((x) => x.isYou)];
-  const knockouts = match.cutoff > 0 && match.cutoff < alive.length;
+  const knockouts = cutoff > 0 && cutoff < alive.length;
   // The score on the cut line: the last player who'd go through.
-  const cutScore = knockouts ? alive[match.cutoff - 1]!.points : null;
-  const inZone = knockouts && rank > match.cutoff;
+  const cutScore = knockouts ? alive[cutoff - 1]!.points : null;
+  const inZone = knockouts && rank > cutoff;
+  // Crowd: the move number on the board, and turns left until the cut.
+  const crowd = isCrowd(match);
+  const p = match.phase;
+  const fen = "board" in p && p.board ? p.board.fen : null;
+  const moveNo = fen ? Number(fen.split(" ")[5]) || 1 : null;
+  const turnsLeft = roundsInStage(match.settings, match.stage) - match.roundsPlayed;
+  const team = view.teamLabel ? (alive.find((s) => s.isYou)?.team ?? null) : null;
   return (
     <>
       <div class="hud-row">
@@ -66,6 +76,12 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
           <span class="hud-stage">
             {match.final ? (
               "FINAL"
+            ) : crowd ? (
+              <>
+                {team && <span class={`team-chip ${team}`} title={view.teamLabel ?? ""} aria-label={view.teamLabel ?? ""} />}
+                {moveNo ? `Move ${moveNo}` : "Crowd"}
+                <span class="muted"> · {turnsLeft <= 1 ? "cut now" : `cut in ${turnsLeft}`}</span>
+              </>
             ) : (
               <>
                 S{match.stage + 1}
@@ -93,7 +109,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
               <LiveNumber value={cutScore} format={pts} />
             </span>
           )}
-          <BankTime match={match} />
+          {crowd ? <span class="hud-spacer" /> : <BankTime match={match} />}
         </button>
         <MuteButton />
       </div>

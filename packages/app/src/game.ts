@@ -1,5 +1,5 @@
 import type { BoardRound, BoardSlot, NetFinal, NetStanding } from "@chessroyale/chess";
-import { roundsInStage, type Settings } from "@chessroyale/core";
+import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 
 /**
  * What the screens need from a match, whether it runs in this browser (solo)
@@ -59,15 +59,20 @@ export type Phase =
   | { kind: "opening"; boards: BoardView[] }
   /** `startsAt`: when the move clock starts (after the new board's settling-in countdown). */
   | { kind: "play"; board: BoardView; startsAt: number; deadline: number; allowedMs: number }
-  | { kind: "scoring"; board: BoardView; move: string | null }
+  /** `watched`: Crowd 50 v 50, the other team's vote is being counted. */
+  | { kind: "scoring"; board: BoardView; move: string | null; watched?: boolean }
   /** `until`: when the next board comes up (local time). */
   | { kind: "reveal"; mine: GroupReveal; board: BoardView; until: number }
-  | { kind: "stageBreak"; stage: number; standings: Standing[]; knockedOut: Standing[]; cutoff: number; youOut: boolean; nextBoards: BoardView[] }
+  /** Crowd 50 v 50: the other team is choosing; you watch the vote come in. */
+  | { kind: "watching"; board: BoardView; startsAt: number; deadline: number }
+  /** `until`: when the next round starts (Crowd: the cut screen and its augment vote). */
+  | { kind: "stageBreak"; stage: number; standings: Standing[]; knockedOut: Standing[]; cutoff: number; youOut: boolean; nextBoards: BoardView[]; until?: number; augments?: boolean; moveClock?: number }
   | { kind: "simulating"; stage: number; round: number }
   | { kind: "spectating"; boards: BoardView[] }
   /** The final, watching (or between your turns). */
   | { kind: "final"; final: FinalView }
-  | { kind: "results"; placement: number; winner: string; youWon: boolean };
+  /** `gameWinner`: Crowd, who won the game on the board (null for a draw). */
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null };
 
 export interface GameView {
   readonly settings: Settings;
@@ -111,7 +116,32 @@ export interface GameView {
   readonly final: FinalView | null;
   /** Every board slot as it stands now, for the strip of tiny boards along the top. */
   slots(): BoardSlot[];
+  /** Crowd augments: your vote on the next round's move clock (at a cut). */
+  voteAugment(choice: Augment): void;
+  /** Your vote at this cut, if any. */
+  readonly augmentVote: Augment | null;
 }
+
+/** Crowd 50 v 50: your team (the side you play all match), if you have one. */
+export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {
+  return m.standings().find((s) => s.isYou)?.team ?? null;
+}
+
+/**
+ * The leaderboard as you should see it: in Crowd 50 v 50 each team has its own
+ * cut (half the knockouts each), so it shows your team with your team's cut line.
+ */
+export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage">): { standings: Standing[]; cutoff: number; teamLabel: string | null } {
+  const all = m.standings();
+  const team = all.find((s) => s.isYou)?.team ?? null;
+  if (!team) return { standings: all, cutoff: m.cutoff, teamLabel: null };
+  const mine = all.filter((s) => s.team === team);
+  const alive = mine.filter((s) => !s.out).length;
+  const k = m.settings.knockoutsPerStage[m.stage] ?? 0;
+  return { standings: mine, cutoff: alive - Math.floor(k / 2), teamLabel: team === "w" ? "White team" : "Black team" };
+}
+
+export const isCrowd = (m: Pick<GameView, "settings">) => m.settings.mode === "crowd";
 
 /** The board you're on this turn (highlighted in the strip), if any. */
 export function myBoardId(m: Pick<GameView, "phase" | "final">): number | null {
@@ -122,10 +152,14 @@ export function myBoardId(m: Pick<GameView, "phase" | "final">): number | null {
 }
 
 /** While a round is being played, the leaderboard shows who has moved. */
-export const roundLive = (m: Pick<GameView, "phase">) => m.phase.kind === "play" || m.phase.kind === "scoring";
+export const roundLive = (m: Pick<GameView, "phase">) => m.phase.kind === "play" || m.phase.kind === "scoring" || m.phase.kind === "watching";
 
 /** What the leaderboard's cut line says during a stage. */
 export const cutLabel = (m: Pick<GameView, "settings" | "stage">) =>
-  m.stage === m.settings.knockoutsPerStage.length - 1
+  m.settings.mode === "crowd"
+    ? m.stage === m.settings.knockoutsPerStage.length - 1
+      ? "Final four line"
+      : "Cut line"
+    : m.stage === m.settings.knockoutsPerStage.length - 1
     ? `Final four line · after round ${roundsInStage(m.settings, m.stage)}`
     : `Cut after round ${roundsInStage(m.settings, m.stage)}`;

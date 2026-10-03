@@ -1,4 +1,4 @@
-import type { DrawRule } from "@chessroyale/core";
+import type { Augment, DrawRule } from "@chessroyale/core";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
  * lobby), sent as JSON over a WebSocket. Times are server milliseconds; each
@@ -58,6 +58,8 @@ export interface NetStanding {
   /** Knocked out (then `placement` is set). */
   out: boolean;
   placement: number | null;
+  /** Crowd 50 v 50: the player's team (the side they play all match). */
+  team?: "w" | "b" | null;
 }
 
 export interface NetPick {
@@ -112,7 +114,9 @@ export type ClientMessage =
   | { t: "pick"; key: string; move: string }
   | { t: "powerUp"; key: string }
   | { t: "scores"; key: string; boards: BoardScore[] }
-  | { t: "crossCheck"; key: string; boardId: number; ok: boolean; detail?: string };
+  | { t: "crossCheck"; key: string; boardId: number; ok: boolean; detail?: string }
+  /** Crowd augments: this player's vote on the next round's move clock. */
+  | { t: "augment"; choice: Augment };
 
 export type ServerMessage = { now: number } & (
   | { t: "welcome"; playerId: string; token: string; code: string }
@@ -135,6 +139,10 @@ export type ServerMessage = { now: number } & (
       /** When each bot finishes thinking (ms after the round starts), for the leaderboard's "done" marks. */
       botsDoneIn: Record<string, number>;
       slots: BoardSlot[];
+      /** Crowd 50 v 50: the other team is choosing; this player watches (`board` is still sent). */
+      watching?: boolean;
+      /** The move clock this round (seconds), which augment votes can change. */
+      moveClock?: number;
     }
   /** A human has made their move this round (sent to everyone, for the leaderboard). */
   | { t: "moved"; key: string; playerId: string }
@@ -173,6 +181,9 @@ export type ServerMessage = { now: number } & (
       until: number;
       placements: Record<string, number>;
       slots: BoardSlot[];
+      /** Crowd: players may vote on the next round's move clock until `until`. */
+      augments?: boolean;
+      moveClock?: number;
     }
   | { t: "spectate"; boards: NetBoard[]; standings: NetStanding[]; stage: number; round: number; slots: BoardSlot[] }
   /** The final's state, sent to everyone after each move and when a new turn starts. */
@@ -184,5 +195,7 @@ export type ServerMessage = { now: number } & (
       lossesByStage: Record<string, number[][]>;
       /** The final leaderboard (ratings, time, power-ups), for the results screen. */
       standings: NetStanding[];
+      /** Crowd: who won the game on the board (the side that mated, or the side clearly ahead), null for a draw. */
+      gameWinner?: "w" | "b" | null;
     }
 );

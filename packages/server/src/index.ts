@@ -1,4 +1,4 @@
-import { DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, type DrawRule } from "@chessroyale/core";
+import { DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, modeSettings, type DrawRule } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 
 export { Lobby } from "./lobby-do.ts";
@@ -27,14 +27,17 @@ export default {
         // Playtest overrides, e.g. POST /api/lobby?rounds=2&clock=15
         const n = (k: string) => (url.searchParams.has(k) ? Math.max(1, Math.min(600, Number(url.searchParams.get(k)) || 0)) : undefined);
         const draw = url.searchParams.get("draw") as DrawRule | null;
+        // The mode first (its own pace and rules), then pace and playtest overrides on top.
+        const mode = url.searchParams.get("mode") === "crowd" ? "crowd" : "classic";
         const overrides = {
-          ...(url.searchParams.get("pace") === "quick" ? PACE_SETTINGS.quick : {}),
+          ...modeSettings(mode, { crowdTeams: url.searchParams.get("turns") !== "all", augments: url.searchParams.get("augments") !== "0" }),
+          ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2.5, drawnMoveSeconds: 1.5 } : PACE_SETTINGS.quick) : {}),
           roundsPerStage: n("rounds"),
           firstStageRounds: n("rounds"),
           moveClockSeconds: n("clock"),
           drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
           // Opening moves per side on each board (0-10), chosen by the lobby's creator.
-          openingMoves: url.searchParams.has("moves")
+          openingMoves: mode === "classic" && url.searchParams.has("moves")
             ? Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(Number(url.searchParams.get("moves")) || 0)))
             : undefined,
         };

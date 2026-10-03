@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { cutLabel, roundLive, type GameView } from "../game.ts";
+import { cutLabel, roundLive, towerView, type GameView } from "../game.ts";
 import { LeaderboardSheet } from "./LeaderboardSheet.tsx";
 import { RaceTower } from "./RaceTower.tsx";
 import { pickRows } from "../pick-rows.ts";
@@ -45,11 +45,13 @@ export function MiniTower({ match }: { match: GameView }) {
     return () => ro.disconnect();
   }, [open]);
 
-  const standings = match.standings();
+  const view = towerView(match);
+  const standings = view.standings;
+  const cutoff = view.cutoff;
   const alive = standings.filter((s) => !s.out);
   const rank = alive.findIndex((s) => s.isYou);
   // On a computer-sized panel the box has a fixed height; fill it too.
-  const keep = pickRows(alive.length, rank, match.cutoff, (k) => towerHeight(k, match.cutoff, alive.length) <= Math.max(space, HEAD + ROW * 3));
+  const keep = pickRows(alive.length, rank, cutoff, (k) => towerHeight(k, cutoff, alive.length) <= Math.max(space, HEAD + ROW * 3));
 
   const toggle = (e: Event) => {
     e.stopPropagation();
@@ -65,7 +67,7 @@ export function MiniTower({ match }: { match: GameView }) {
     <section class={`mini-tower${open ? "" : " closed"}`} aria-label="Leaderboard">
       <div class="mini-tower-head">
         <button type="button" class="mini-tower-title" onClick={() => setSheet(true)}>
-          Leaderboard <span class="muted">· tap for all {alive.length}</span>
+          {view.teamLabel ?? "Leaderboard"} <span class="muted">· tap for all {alive.length}</span>
         </button>
         <button type="button" class="mini-tower-toggle" onClick={toggle} aria-expanded={open} aria-label={open ? "Minimise the leaderboard" : "Show the leaderboard"}>
           {open ? "▾" : "▴"}
@@ -73,7 +75,7 @@ export function MiniTower({ match }: { match: GameView }) {
       </div>
       {open && (
         <div class="mini-tower-body" ref={body} onClick={() => setSheet(true)}>
-          <RaceTower standings={standings} cutoff={match.cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
+          <RaceTower standings={standings} cutoff={cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
         </div>
       )}
       {sheet && <LeaderboardSheet match={match} onClose={() => setSheet(false)} />}
