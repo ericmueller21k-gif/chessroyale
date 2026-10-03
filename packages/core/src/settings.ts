@@ -180,8 +180,9 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   boardIntroSeconds: 0,
   // One board from the starting position: no opening grid to show.
   openingShowSeconds: 0.5,
-  revealSeconds: 3.5,
-  drawnMoveSeconds: 2,
+  // Most of the show happens live (picks appear as they're made), so the reveal itself is short.
+  revealSeconds: 2.5,
+  drawnMoveSeconds: 1.5,
   stageBreakSeconds: 4,
   botThinkSeconds: [2, 14],
 };

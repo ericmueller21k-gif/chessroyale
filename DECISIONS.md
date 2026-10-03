@@ -413,3 +413,14 @@ Eric's requests; the details were my call.
   to the server, which streams the picks only to players allowed to see them and has the host score with that plan.
 - **"23/50 picked"** now shows above the board while you're choosing, as well as in the waiting banner and while you
   watch the other team.
+
+## Crowd: no double animation (Oct 3, 2026)
+
+- Picks are always tracked; they're just invisible until you've picked. **The moment you pick, the picks already made
+  catch up in a quick wave** (one every 35 ms, all 50 in under two seconds), then the rest arrive live as they're made.
+  The watching team sees them live all along.
+- **At the end of the turn, picks you've already seen stay where they are.** Only picks you hadn't seen yet animate in;
+  then straight to the winner's three blinks and tones, and the move. If you missed your move (so saw nothing live),
+  the reveal animates them all as before.
+- Because most of it now happens live, **the Crowd reveal is shorter**: 4 s (2.5 + 1.5) instead of 5.5 s, 3.2 s at
+  quick pace.

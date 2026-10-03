@@ -31,7 +31,7 @@ function overridesFromUrl(): Partial<Settings> {
     JSON.stringify({
       // The mode's own rules and pace first, then pace and playtest overrides on top.
       ...modeSettings(mode.mode, { crowdTeams: mode.crowdTeams, augments: mode.augments }),
-      ...(quickPace() ? (crowd ? { revealSeconds: 2.5, drawnMoveSeconds: 1.5 } : PACE_SETTINGS.quick) : {}),
+      ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2 } : PACE_SETTINGS.quick) : {}),
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),
       moveClockSeconds: n("clock"),
