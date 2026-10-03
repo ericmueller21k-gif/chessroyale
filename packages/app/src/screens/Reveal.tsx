@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { applyMove, sideToMove, toSan } from "@chessroyale/chess";
 import type { DrawRule } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
+import { EvalBar } from "../components/EvalBar.tsx";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { ShadeMoves, SquareRing, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { type BoardView, type GameView, type GroupReveal } from "../game.ts";
@@ -119,6 +120,9 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
       <Hud match={match} stripFrozen={!played} />
       <div class="board-area">
         <div class="opening-name">{board.openingName}</div>
+        {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
+        <div class="board-row">
+        <EvalBar fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
         <Board
           fen={played ? applyMove(fen, mine.result.playedMove) : fen}
           orientation={orientation}
@@ -130,6 +134,7 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
           {played && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
           {selecting && <div class="selecting-label">Selecting move…</div>}
         </Board>
+        </div>
       </div>
       <div class="reveal">
         <div class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>

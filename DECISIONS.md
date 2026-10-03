@@ -424,3 +424,12 @@ Eric's requests; the details were my call.
   the reveal animates them all as before.
 - Because most of it now happens live, **the Crowd reveal is shorter**: 4 s (2.5 + 1.5) instead of 5.5 s, 3.2 s at
   quick pace.
+
+## The board never moves (Oct 3, 2026)
+
+Eric: the board changed size between choosing a move and the end-of-turn selection, which was dizzying. Cause: the
+reveal screens (Classic and Crowd) drew the board without the evaluation bar beside it, so on a phone it grew from
+314 to 362 px and shifted left. Both reveals now use the same eval bar + board row as the play screen (the bar shows
+the position on the board, including the chosen move once played). Measured every 100 ms through whole turns on
+phones (390×780, 390×664) and computers (1440×900, 1000×760), both modes: one position and size for the board in
+every phase. An e2e test now fails if the board moves or resizes during a turn.

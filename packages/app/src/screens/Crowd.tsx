@@ -186,6 +186,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
         <div class="opening-name">
           <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
         </div>
+        {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
+        <div class="board-row">
+        <EvalBar fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
         <Board fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation} lastMove={played ? mine.result.playedMove : board.lastMove}>
           {!played && (
             <CrowdGhosts
@@ -199,6 +202,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           )}
           {played && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
         </Board>
+        </div>
       </div>
       <div class="poll" role="status">
         {rows.map((r) => {
