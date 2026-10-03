@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { applyMove, sideToMove, toSan } from "@chessroyale/chess";
 import type { DrawRule } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
-import { RaceTower } from "../components/RaceTower.tsx";
+import { MiniTower } from "../components/MiniTower.tsx";
 import { ShadeMoves, SquareRing, type ShadeMove } from "../components/ShadeMoves.tsx";
-import { cutLabel, type BoardView, type GameView, type GroupReveal } from "../game.ts";
+import { type BoardView, type GameView, type GroupReveal } from "../game.ts";
 import { seenKey } from "../hooks.ts";
-import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 
 const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
@@ -22,8 +21,8 @@ function reason(rule: DrawRule, tied: boolean): string {
 /**
  * The reveal's timeline (ms from when it appears), fitted into the time until
  * the next board: everyone's moves slide in, a "selecting" reel ticks across
- * them and lands on the chosen move, the move plays, then a 3-2-1 before the
- * next board comes up for everyone.
+ * them and lands on the chosen move, then the move plays and stays on show
+ * until the next board comes up (which opens with its own "Round start" 3-2-1).
  */
 function timeline(total: number) {
   const shadesEnd = Math.min(2200, total * 0.25);
@@ -86,19 +85,6 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
   const played = elapsed >= playAt;
   const stepNo = selecting ? steps.filter((s) => shadesEnd + s.at <= elapsed).length - 1 : -1;
   const reelOn = selecting && stepNo >= 0 ? (shades[steps[stepNo]!.index]?.move ?? null) : null;
-  const secondsLeft = Math.ceil((until - now) / 1000);
-  const counting = played && secondsLeft <= 3 && secondsLeft > 0;
-
-  // Sounds: a tick per reel step, a chime on landing, a soft count before the next board.
-  useEffect(() => {
-    if (stepNo >= 0) play("reelTick");
-  }, [stepNo]);
-  useEffect(() => {
-    if (landed) play("chosen");
-  }, [landed]);
-  useEffect(() => {
-    if (counting) play("count");
-  }, [counting ? secondsLeft : 0]);
 
   const rule = mine.result.drawRule;
   const counts = shades.map((s) => s.names.length);
@@ -134,12 +120,6 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
           )}
           {played && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
           {selecting && <div class="selecting-label">Selecting move…</div>}
-          {counting && (
-            <div class="next-count" key={secondsLeft} role="status">
-              <span>{secondsLeft}</span>
-              <small>Next board</small>
-            </div>
-          )}
         </Board>
       </div>
       <div class="reveal">
@@ -174,10 +154,8 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
             {played && !match.serverPaced ? " Tap to continue." : ""}
           </span>
         </div>
-        <div class="reveal-tower">
-          <RaceTower standings={match.standings()} cutoff={match.cutoff} compact cutLabel={cutLabel(match)} />
-        </div>
       </div>
+      <MiniTower match={match} />
     </div>
   );
 }

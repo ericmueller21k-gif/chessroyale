@@ -115,6 +115,12 @@ describe("lobby", () => {
     expect(rev.picks).toHaveLength(8);
     expect(rev.picks.reduce((s, p) => s + p.roundScore, 0)).toBeCloseTo(0, 6);
     expect(rev.playedMove).toBeTruthy();
+    // Every board slot comes with the round and the reveal, the reveal's after the moves were played.
+    expect(r1.slots.map((x) => x.id)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(r1.slots.every((x) => x.live)).toBe(true);
+    const mine = rev.slots.find((x) => x.id === r2.board!.id)!;
+    expect(mine.lastMove).toBe(rev.playedMove);
+    expect(mine.fen).toBe(rev.board!.fen);
   });
 
   it("counts a missing pick as a miss when the clock runs out", () => {

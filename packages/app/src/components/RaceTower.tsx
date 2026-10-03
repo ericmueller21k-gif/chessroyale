@@ -1,6 +1,5 @@
 import type { Standing } from "../game.ts";
 
-const ROW = 30;
 const pts = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
 export const clockText = (ms: number) => {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -26,17 +25,21 @@ export function RaceTower({
   standings,
   cutoff,
   compact = false,
+  mini = false,
   done,
   cutLabel = "Cut line",
 }: {
   standings: readonly Standing[];
   cutoff: number;
   compact?: boolean;
+  /** Small rows with just position, name and points (the phone's scoreboard under the board). */
+  mini?: boolean;
   /** Players who have moved this round (shown in green while a round is being played). */
   done?: ReadonlySet<string>;
   /** Text on the cut line, e.g. "Cut after round 8". */
   cutLabel?: string;
 }) {
+  const ROW = mini ? 22 : 30;
   const alive = standings.filter((s) => !s.out);
   const knockouts = cutoff < alive.length;
   // The highest-rated player still in, if there's a clear one: the one to fear.
@@ -75,7 +78,7 @@ export function RaceTower({
   if (knockouts && line === null && rows.length && !compact) line = y;
 
   return (
-    <div class={`tower ${compact ? "tower-compact" : ""}`}>
+    <div class={`tower${compact ? " tower-compact" : ""}${mini ? " tower-mini" : ""}`} style={{ "--row": `${ROW}px` }}>
       <div class="tower-head">
         <span>Pos</span>
         <span>Player</span>

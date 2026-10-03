@@ -29,6 +29,14 @@ export interface NetBoard {
   history: string[];
 }
 
+/** A board at a glance, for the strip of tiny boards along the top (slots never move; closed ones stay greyed). */
+export interface BoardSlot {
+  id: number;
+  fen: string;
+  lastMove: string | null;
+  live: boolean;
+}
+
 /** One row of the live leaderboard. */
 export interface NetStanding {
   id: string;
@@ -126,6 +134,7 @@ export type ServerMessage = { now: number } & (
       alive: boolean;
       /** When each bot finishes thinking (ms after the round starts), for the leaderboard's "done" marks. */
       botsDoneIn: Record<string, number>;
+      slots: BoardSlot[];
     }
   /** A human has made their move this round (sent to everyone, for the leaderboard). */
   | { t: "moved"; key: string; playerId: string }
@@ -151,6 +160,8 @@ export type ServerMessage = { now: number } & (
       standings: NetStanding[];
       cutoff: number;
       until: number;
+      /** Every board after this round's moves. */
+      slots: BoardSlot[];
     }
   | {
       t: "stageBreak";
@@ -161,10 +172,11 @@ export type ServerMessage = { now: number } & (
       nextBoards: NetBoard[];
       until: number;
       placements: Record<string, number>;
+      slots: BoardSlot[];
     }
-  | { t: "spectate"; boards: NetBoard[]; standings: NetStanding[]; stage: number; round: number }
+  | { t: "spectate"; boards: NetBoard[]; standings: NetStanding[]; stage: number; round: number; slots: BoardSlot[] }
   /** The final's state, sent to everyone after each move and when a new turn starts. */
-  | { t: "final"; final: NetFinal; standings: NetStanding[] }
+  | { t: "final"; final: NetFinal; standings: NetStanding[]; slots: BoardSlot[] }
   | {
       t: "results";
       placements: Record<string, number>;

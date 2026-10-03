@@ -321,42 +321,10 @@ p {
   font-size: 15px;
 }
 
-.countdown {
-  position: relative;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
-.countdown-bar {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  background: var(--accent);
-  opacity: 0.35;
-}
 
-.countdown-secs {
-  position: relative;
-  font-size: 24px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
 
-.countdown.urgent .countdown-bar {
-  background: var(--danger);
-  opacity: 0.6;
-}
 
-.countdown.urgent .countdown-secs {
-  color: var(--danger);
-  animation: pulse 1s ease-in-out infinite;
-}
 
 @keyframes pulse {
   50% {
@@ -652,7 +620,7 @@ p {
   margin-bottom: 4px;
 }
 
-/* ---- Computer layout: board left, panel right ---- */
+/* ---- Computer layout: boards strip on top, board left, panel right ---- */
 
 @media (min-width: 900px) and (min-height: 600px) {
   :root {
@@ -661,50 +629,49 @@ p {
   .screen.game {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto auto 1fr;
     column-gap: 28px;
+    row-gap: 10px;
     align-content: start;
   }
-  .screen.game .hud {
+  .screen.game .boards-strip {
     grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .screen.game .hud-row {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
   .screen.game .board-area {
-    grid-row: 2 / 4;
+    grid-column: 1;
+    grid-row: 3 / 5;
   }
   .screen.game .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 120px));
+    width: min(100%, calc(100dvh - 215px));
   }
   .screen.game .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 24px), calc(100dvh - 120px));
+    width: min(calc(100% - 24px), calc(100dvh - 215px));
   }
   .screen.game .play-footer,
   .screen.game .reveal,
-  .screen.game .actions,
-  .screen.game .duel-player {
+  .screen.game .final-panel {
     grid-column: 2;
+    grid-row: 3;
     align-self: start;
-  }
-  .screen.game .reveal,
-  .screen.game .play-footer {
-    grid-row: 2;
     align-content: start;
-    margin-top: 28px;
+    margin-top: 24px;
+  }
+  .screen.game .mini-tower {
+    grid-column: 2;
+    grid-row: 4;
+    align-self: start;
+    margin-top: 12px;
+  }
+  .mini-tower-body {
+    max-height: 340px;
   }
 }
 
-/* The duel stays a single column everywhere: clocks above and below the board. */
-@media (min-width: 900px) and (min-height: 600px) {
-  .screen.game.duel {
-    display: flex;
-    width: min(100vw, 720px);
-  }
-  .screen.game.duel .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 220px));
-  }
-  .screen.game.duel .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 24px), calc(100dvh - 220px));
-  }
-}
 
 /* Evaluation bar beside the main board. */
 .board-row {
@@ -1090,9 +1057,6 @@ p {
 .tower-side {
   display: none;
 }
-.reveal-tower {
-  display: block;
-}
 @media (min-width: 1100px) and (min-height: 600px) {
   .tower-side {
     display: block;
@@ -1106,9 +1070,6 @@ p {
   }
   .arena .screen {
     width: min(calc(100vw - 380px), 1000px);
-  }
-  .reveal-tower {
-    display: none;
   }
 }
 
@@ -1390,42 +1351,7 @@ p {
   font-size: 16px;
 }
 
-/* ---- New board: settling-in countdown ---- */
 
-.intro-pill {
-  position: absolute;
-  left: 50%;
-  top: 8px;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px 6px 6px;
-  border-radius: 999px;
-  background: rgba(16, 18, 22, 0.82);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: fade 200ms ease-out;
-}
-.intro-count {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-text);
-  font-weight: 900;
-}
-.intro-bar {
-  display: grid;
-  place-items: center;
-  opacity: 0.85;
-}
 
 /* ---- Step through a board's game ---- */
 
@@ -1520,47 +1446,6 @@ p {
     opacity: 0.35;
   }
 }
-.next-count {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 5;
-  display: grid;
-  place-items: center;
-  width: 110px;
-  height: 110px;
-  border-radius: 50%;
-  background: rgba(16, 18, 22, 0.55);
-  color: #fff;
-  pointer-events: none;
-  animation: count-pop 900ms ease-out forwards;
-}
-.next-count span {
-  font-size: 54px;
-  font-weight: 900;
-  line-height: 1;
-}
-.next-count small {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.8;
-}
-@keyframes count-pop {
-  0% {
-    transform: translate(-50%, -50%) scale(0.7);
-    opacity: 0;
-  }
-  20% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.55;
-  }
-}
 .picks li.chosen {
   box-shadow: inset 4px 0 0 #2fd27a;
 }
@@ -1571,11 +1456,6 @@ p {
   display: grid;
   gap: 12px;
   align-content: start;
-}
-.final-screen .final-panel {
-  grid-column: 2;
-  grid-row: 2;
-  margin-top: 28px;
 }
 .final-last {
   padding: 12px 14px;
@@ -1653,4 +1533,328 @@ p {
 .final-avg {
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---- Every board, tiny and live, along the top ---- */
+
+.boards-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+}
+.strip-slot {
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  min-width: 0;
+}
+.tiny-board {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  outline: 1px solid transparent;
+  image-rendering: pixelated;
+}
+.ts-l {
+  fill: #a8b0bc;
+}
+.ts-d {
+  fill: #747e8d;
+}
+.ts-m {
+  fill: #c9b458;
+}
+.tp-w {
+  fill: #fff;
+}
+.tp-b {
+  fill: #0d0f12;
+}
+.strip-num {
+  font-size: 9px;
+  line-height: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.strip-slot.current .tiny-board {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.strip-slot.current .strip-num {
+  color: var(--accent);
+}
+.strip-slot.closed .tiny-board {
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+.strip-slot.closed .strip-num {
+  opacity: 0.5;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .boards-strip {
+    grid-template-columns: repeat(8, minmax(0, 56px));
+    justify-content: center;
+    gap: 10px;
+  }
+}
+
+/* ---- The move clock: a thin bar along the board's top edge ---- */
+
+.board-wrap {
+  container-type: inline-size;
+}
+.timer-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 5px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  overflow: hidden;
+  z-index: 3;
+  pointer-events: none;
+}
+.timer-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.timer-bar.low .timer-fill {
+  background: var(--danger);
+}
+
+/* ---- Round start / Round end: banner and a big 3-2-1 on the board ---- */
+
+.center-count {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+.cc-banner {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  transform: translateX(-50%);
+  padding: 5px 16px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: #000;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  animation: fade 200ms ease-out;
+}
+.cc-num {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  font-size: 44cqw;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #000;
+  -webkit-text-stroke: 2.4cqw #fff;
+  paint-order: stroke fill;
+  text-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  animation: cc-pop 1s ease-out forwards;
+}
+@keyframes cc-pop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+  22% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.75);
+    opacity: 0;
+  }
+}
+
+/* ---- The small scoreboard under the board (phones and narrow screens) ---- */
+
+.mini-tower {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #101216;
+}
+.mini-tower-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  background: #181b21;
+  color: #eef0f4;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.mini-tower-head .muted {
+  color: #9aa2b1;
+  font-variant-numeric: tabular-nums;
+}
+.mini-tower-toggle {
+  margin-left: auto;
+  color: #9aa2b1;
+}
+.mini-tower-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.mini-tower .tower {
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 12px;
+}
+.tower-mini .tower-head {
+  display: none;
+}
+.tower-mini .tower-row {
+  grid-template-columns: 26px minmax(0, 1fr) 48px;
+}
+.tower-mini .t-avg,
+.tower-mini .t-elo,
+.tower-mini .t-bank,
+.tower-mini .t-pu {
+  display: none;
+}
+@media (min-width: 1100px) and (min-height: 600px) {
+  .mini-tower {
+    display: none;
+  }
+}
+
+/* ---- Phones: one locked screen, nothing scrolls but the scoreboard ---- */
+
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    gap: 6px;
+    padding-top: calc(env(safe-area-inset-top) + 6px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 6px);
+  }
+  .screen.game > * {
+    flex: none;
+  }
+  .screen.game .board-area {
+    gap: 8px;
+  }
+  .screen.game .board-area .board-wrap {
+    width: min(100%, calc(100dvh - 370px));
+    min-width: 220px;
+  }
+  .screen.game .board-row .eval-bar ~ .board-wrap {
+    width: min(calc(100% - 24px), calc(100dvh - 370px));
+  }
+  /* With the scoreboard minimised, the board takes the room. */
+  .screen.game:has(.mini-tower.closed) .board-area .board-wrap {
+    width: min(100%, calc(100dvh - 290px));
+  }
+  .screen.game:has(.mini-tower.closed) .board-row .eval-bar ~ .board-wrap {
+    width: min(calc(100% - 24px), calc(100dvh - 290px));
+  }
+  .screen.game .mini-tower {
+    flex: 1 1 0;
+    min-height: 28px;
+  }
+  .screen.game .mini-tower.closed {
+    flex: none;
+  }
+  .screen.game .hud,
+  .screen.game .mute-btn {
+    min-height: 36px;
+  }
+  .screen.game .opening-name {
+    font-size: 12px;
+    line-height: 14px;
+  }
+  .screen.game .history-nav button {
+    height: 30px;
+  }
+  .screen.game .play-footer {
+    gap: 6px;
+  }
+  .screen.game .btn-powerup {
+    min-height: 42px;
+    font-size: 15px;
+  }
+  .screen.game .waiting-banner {
+    min-height: 42px;
+  }
+  .screen.game .hints {
+    gap: 4px;
+  }
+  /* Reveal: the score, everyone's picks in one swipeable line, the verdict. */
+  .screen.game .reveal {
+    gap: 6px;
+  }
+  .screen.game .round-score {
+    font-size: 24px;
+  }
+  .screen.game .picks {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .screen.game .picks li {
+    flex: none;
+  }
+  .screen.game .picks li {
+    grid-template-columns: auto auto auto;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  .screen.game .drawn {
+    padding: 6px 10px;
+    gap: 2px;
+  }
+  .screen.game .drawn-main {
+    font-size: 13px;
+  }
+  .screen.game .drawn .small {
+    font-size: 11px;
+  }
+  /* Final: the teams panel scrolls inside the screen if it must. */
+  .screen.game .final-panel {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    gap: 8px;
+  }
+  .screen.game .final-panel > p {
+    display: none;
+  }
 }

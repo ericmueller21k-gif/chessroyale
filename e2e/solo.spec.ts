@@ -51,7 +51,7 @@ test("strong play survives every stage, plays the 2v2 final, and sees results", 
     if (p === "play") {
       if (await page.evaluate(() => !!(window as any).match.final)) finalTurns++;
       // Moves are possible once the new board's settling-in countdown is over.
-      await expect(page.locator(".intro-pill")).toHaveCount(0, { timeout: 10_000 });
+      await expect(page.locator(".cc-banner", { hasText: "Round start" })).toHaveCount(0, { timeout: 10_000 });
       await clickMove(page, await bestMove(page));
       await expect.poll(() => phase(page)).not.toBe("play");
     } else if (p === "reveal") {

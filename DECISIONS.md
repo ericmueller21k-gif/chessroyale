@@ -219,3 +219,34 @@ Eric's design; the details were my call.
   vs 0.67), a top-8 bot goes out in stage 1 about a quarter of the time, and the strongest bot reaches the final about
   1 match in 4. 6 rounds per stage was a little fairer but within noise, so 5 it is.
 - **Wins on a profile** (Eric's idea) needs player profiles first; parked.
+
+## One locked phone screen, every board on top, one countdown style, ticks only (Oct 3, 2026)
+
+Eric's requests; the details were my call.
+
+- **Phones get one locked screen** (anything under 900 px wide): nothing scrolls or moves around. From top to
+  bottom: the 8 tiny boards, the stage/position strip, the board (a little smaller, about 300 px on a short phone
+  screen), ◀ ▶, the move controls, and a small scoreboard. The scoreboard is the only part that scrolls, inside its
+  own box, kept centred on you. Its rows show just position, name and points. Its header ("Leaderboard P12/64 · +3.1")
+  minimises it to one line, and with it minimised the board grows into the space. The choice is remembered on the
+  device. The full leaderboard is still one tap on the strip, and the stage breaks and results show it in full.
+  Landscape phones (under 520 px tall) keep the scrolling layout, since a locked screen would leave no room for the board.
+- **Computers keep the full scoreboard on the left** (at 1100 px and wider). Between 900 and 1100 px the small
+  scoreboard sits under the move controls instead.
+- **All 8 boards along the top, on every game screen** (phone and computer): tiny pixel boards (grey squares, white
+  and black blocks for pieces, pawns small and kings largest, last move tinted) numbered 1-8. They're live: each one
+  shows its position after every round. Yours this turn has an orange ring. A board that has closed (at a cut, or
+  because its game ended) stays in its place, greyed out, so the numbers never shift. They're always drawn with White
+  at the bottom. The server sends every board slot with each round, reveal, stage break, final and spectate message.
+- **The move clock is a thin bar on the board's top edge.** It's full when the clock starts and shrinks right to left
+  to nothing at your deadline (30 s, or less when your bank is short). It turns red for the last 10 s, with a tick
+  each second. The old bar and number under the board are gone, and so is the "Get ready" pill.
+- **One countdown for the start and the end of a round.** A black "ROUND START" or "ROUND END" banner, outlined in
+  white, always in the same place near the top of the board, and a huge black 3, 2, 1 with a white outline in the
+  middle of the board that grows, settles and fades each second. "Round start" covers the new board's settling-in
+  time (the last moves replay underneath; the numbers show for its last 3 s). "Round end" shows for the last 3 s of
+  your move clock. The reveal's own "Next board" 3-2-1 is gone, since the next board opens with "Round start". Once
+  you've moved, the bar and the "Round end" count are hidden while you wait.
+- **Sounds: piece sounds and a clock tick, nothing else.** The tick is a short, dry click (filtered noise, like a
+  watch) used by every timer: the last 10 s of the move clock and the 3-2-1 of "Round start". The marimba cues for
+  the round start, power-up, reel, landing, cuts and win are all removed.
