@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useState } from "preact/hooks";
 import { DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, type DrawRule, type Settings } from "@chessroyale/core";
+import { chosenOpeningMoves } from "./screens/Home.tsx";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { enginePool } from "./engine.ts";
@@ -25,8 +26,10 @@ function overridesFromUrl(): Partial<Settings> {
     JSON.stringify({
       ...(quickPace() ? PACE_SETTINGS.quick : {}),
       roundsPerStage: n("rounds"),
+      firstStageRounds: n("rounds"),
       moveClockSeconds: n("clock"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
+      openingMoves: chosenOpeningMoves(),
     }),
   );
 }
@@ -110,6 +113,7 @@ export function App() {
       const params = new URLSearchParams(location.search);
       params.delete("debug");
       if (quickPace()) params.set("pace", "quick");
+      params.set("moves", String(chosenOpeningMoves()));
       const res = await fetch(`/api/lobby?${params}`, { method: "POST" });
       const body = (await res.json()) as { code?: string; message?: string };
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");

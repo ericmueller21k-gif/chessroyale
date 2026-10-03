@@ -1,7 +1,23 @@
 import { useState } from "preact/hooks";
-import { DEFAULT_SETTINGS as S } from "@chessroyale/core";
+import { DEFAULT_SETTINGS as S, MAX_OPENING_MOVES } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
+
+const OPENING_KEY = "brc.openingMoves";
+
+/** Opening moves per side for solo games and lobbies you create: ?moves=N, else this device's choice, else the default. */
+export function chosenOpeningMoves(): number {
+  const clamp = (n: number) => Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(n)));
+  const q = new URLSearchParams(location.search).get("moves");
+  if (q !== null && Number.isFinite(Number(q))) return clamp(Number(q));
+  try {
+    const v = localStorage.getItem(OPENING_KEY);
+    if (v !== null && Number.isFinite(Number(v))) return clamp(Number(v));
+  } catch {
+    // No storage.
+  }
+  return S.openingMoves;
+}
 
 function remember(name: string): string {
   const n = name.trim() || "Player";
@@ -51,6 +67,16 @@ export function HomeScreen({
       // Not important.
     }
   };
+  const [openingMoves, setOpeningMoves] = useState(chosenOpeningMoves);
+  const changeOpeningMoves = (n: number) => {
+    const v = Math.max(0, Math.min(MAX_OPENING_MOVES, n));
+    setOpeningMoves(v);
+    try {
+      localStorage.setItem(OPENING_KEY, String(v));
+    } catch {
+      // Not important.
+    }
+  };
   const togglePractice = (on: boolean) => {
     setPractice(on);
     try {
@@ -91,10 +117,10 @@ export function HomeScreen({
         </li>
         <li>
           <strong>⚡ Power-ups</strong> show the engine's top 3 moves, free to use. You get {S.powerUpsAtStart}, plus{" "}
-          {S.powerUpsPerStage} each stage you survive, and unused ones carry over. Pick your moment.
+          {S.powerUpsPerStage} each stage you survive, and unused ones carry over (up to {S.powerUpsMax}). Pick your moment.
         </li>
         <li>
-          <strong>The weakest go out.</strong> After every {S.roundsPerStage} rounds the bottom {S.knockoutsPerStage[0]} are knocked
+          <strong>The weakest go out.</strong> After the first {S.firstStageRounds} rounds, then every {S.roundsPerStage}, the bottom {S.knockoutsPerStage[0]} are knocked
           out and the most lopsided board is closed, until 4 are left on the last board.
         </li>
         <li>
@@ -124,6 +150,23 @@ export function HomeScreen({
           quick games (also applies to lobbies you create).
         </span>
       </label>
+      {joinCode ? null : (
+        <div class="stepper-field">
+          <span>
+            <strong>Opening moves:</strong> how many moves each side has already played on every board when the match
+            starts. Fewer is simpler; more gives sharper positions (also applies to lobbies you create).
+          </span>
+          <div class="stepper" role="group" aria-label="Opening moves per side">
+            <button type="button" aria-label="Fewer opening moves" disabled={openingMoves <= 0} onClick={() => changeOpeningMoves(openingMoves - 1)}>
+              −
+            </button>
+            <output aria-live="polite">{openingMoves}</output>
+            <button type="button" aria-label="More opening moves" disabled={openingMoves >= MAX_OPENING_MOVES} onClick={() => changeOpeningMoves(openingMoves + 1)}>
+              +
+            </button>
+          </div>
+        </div>
+      )}
       {joinCode ? null : (
         <button type="button" class="btn btn-primary btn-wide" disabled={loading} onClick={() => onStart(remember(name), practice)}>
           {loading ? "Loading the engine…" : `Play solo vs ${S.lobbySize - 1} bots`}

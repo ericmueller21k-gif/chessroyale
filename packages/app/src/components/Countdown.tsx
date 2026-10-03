@@ -36,18 +36,21 @@ export function useTicks(secs: number, from = TICK_FROM_SECONDS, active = true) 
 
 /**
  * The move clock as a thin bar snug to the top edge of the board: full when
- * the clock starts, shrinking right to left to nothing at the deadline. It
- * turns red, and ticks every second, for the last 10 seconds.
+ * the clock starts, shrinking from both ends towards the middle until it's
+ * gone at the deadline, and fading from green through yellow to red as time
+ * runs out. It ticks every second for the last 10 seconds.
  */
 export function TimerBar({ startsAt, deadline, total }: { startsAt: number; deadline: number; total: number }) {
   const now = useFrameNow();
   const left = Math.max(0, deadline - Math.max(now, startsAt));
   const secs = Math.ceil(left / 1000);
-  const low = left <= TICK_FROM_SECONDS * 1000;
+  const frac = total > 0 ? Math.min(1, left / total) : 0;
   useTicks(secs, TICK_FROM_SECONDS, now >= startsAt);
+  // Green (hue 130) at full time down to red (hue 0) at none.
+  const color = `hsl(${Math.round(130 * frac)} 85% 50%)`;
   return (
-    <div class={`timer-bar${low ? " low" : ""}`} role="timer" aria-label={`${secs} seconds left`}>
-      <div class="timer-fill" style={{ width: `${total > 0 ? Math.min(100, (100 * left) / total) : 0}%` }} />
+    <div class="timer-bar" role="timer" aria-label={`${secs} seconds left`}>
+      <div class="timer-fill" style={{ width: `${frac * 100}%`, background: color, boxShadow: `0 0 6px ${color}` }} />
     </div>
   );
 }

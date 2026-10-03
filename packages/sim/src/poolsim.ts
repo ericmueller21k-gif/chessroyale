@@ -14,6 +14,7 @@ import {
   type Candidate,
   type Rng,
   type Settings,
+  roundsInStage,
 } from "@chessroyale/core";
 
 /**
@@ -87,8 +88,8 @@ export function runPoolMatch(rng: Rng, bots: readonly Bot[], pool: Pool, setting
   let stage1Out: string[] = [];
   let groupRounds = 0;
   let deadRounds = 0;
-  for (const stage of plan) {
-    for (let r = 0; r < settings.roundsPerStage; r++) {
+  for (const [stageNo, stage] of plan.entries()) {
+    for (let r = 0; r < roundsInStage(settings, stageNo); r++) {
       const groups = assignGroups(rng, state, settings);
       const outcomes = [...groups.values()].flatMap((ids) => {
         const s = pool.samples[Math.floor(rng() * pool.samples.length)]!;

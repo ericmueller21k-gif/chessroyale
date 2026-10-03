@@ -1,4 +1,4 @@
-import { DRAW_RULES, PACE_SETTINGS, type DrawRule } from "@chessroyale/core";
+import { DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, type DrawRule } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 
 export { Lobby } from "./lobby-do.ts";
@@ -30,9 +30,13 @@ export default {
         const overrides = {
           ...(url.searchParams.get("pace") === "quick" ? PACE_SETTINGS.quick : {}),
           roundsPerStage: n("rounds"),
+          firstStageRounds: n("rounds"),
           moveClockSeconds: n("clock"),
-          duelClockSeconds: n("duel"),
           drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
+          // Opening moves per side on each board (0-10), chosen by the lobby's creator.
+          openingMoves: url.searchParams.has("moves")
+            ? Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(Number(url.searchParams.get("moves")) || 0)))
+            : undefined,
         };
         await stub.create(code, JSON.parse(JSON.stringify(overrides)));
         return json({ code });

@@ -4,7 +4,7 @@ import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, newLobbyRecord, type LobbyRecord } from "./lobby.ts";
 import type { Env } from "./index.ts";
 
-const library = openings as Opening[];
+const library = openings as unknown as Opening[];
 
 /**
  * One Durable Object per lobby. Holds the clock, the groups, the picks and the

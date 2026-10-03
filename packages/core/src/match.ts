@@ -1,6 +1,6 @@
 import { randomInt, shuffle, weightedIndex, type Rng } from "./rng.ts";
 import type { GroupResult } from "./scoring.ts";
-import { DEFAULT_SETTINGS, type Settings } from "./settings.ts";
+import { DEFAULT_SETTINGS, roundsInStage, type Settings } from "./settings.ts";
 
 /**
  * Match structure from buildspec.md: knockout stages scored on move quality,
@@ -340,7 +340,7 @@ export function endStage(
       stageScore: settings.scoresBetweenStages === "reset" ? 0 : p.stageScore,
       stageThinkMs: 0,
       stageRounds: 0,
-      powerUps: p.powerUps + settings.powerUpsPerStage,
+      powerUps: Math.min(settings.powerUpsMax, p.powerUps + settings.powerUpsPerStage),
       lossesByStage: [...p.lossesByStage, []],
     };
   });
@@ -364,7 +364,7 @@ export const isFinal = (state: MatchState, settings: Settings = DEFAULT_SETTINGS
   state.stage >= settings.knockoutsPerStage.length;
 
 export const stageComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
-  state.round >= settings.roundsPerStage;
+  state.round >= roundsInStage(settings, state.stage);
 
 /** The finalist to move now. */
 export const finalMover = (f: FinalState) => f.order[f.turn % f.order.length]!;

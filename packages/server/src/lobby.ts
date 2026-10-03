@@ -70,8 +70,8 @@ export interface LobbyRecord {
   placements: Record<string, number>;
   mismatches: number;
   counter: number;
-  /** Per-lobby playtest overrides (rounds per stage, move clock, pace, draw rule). */
-  overrides?: Partial<Pick<Settings, "roundsPerStage" | "moveClockSeconds" | "revealSeconds" | "drawnMoveSeconds" | "boardIntroSeconds">> & {
+  /** Per-lobby settings: opening length, plus playtest overrides (rounds per stage, move clock, pace, draw rule). */
+  overrides?: Partial<Pick<Settings, "roundsPerStage" | "firstStageRounds" | "moveClockSeconds" | "revealSeconds" | "drawnMoveSeconds" | "boardIntroSeconds" | "openingMoves">> & {
     drawRuleByStage?: DrawRule[];
   };
 }

@@ -230,20 +230,23 @@ describe("time bank and power-ups", () => {
       { playerId: "p1", roundScore: 3, loss: 0, thinkMs: 5000 },
     ]);
     const [p0, p1] = state.players;
-    expect(p0!.powerUps).toBe(0);
+    expect(p0!.powerUps).toBe(2);
     expect(p0!.powerUpsUsed).toBe(1);
-    expect(p1!.powerUps).toBe(1);
+    expect(p1!.powerUps).toBe(3);
     expect(standingPoints(p1!)).toBeCloseTo(3);
     expect(standingPoints(p0!)).toBeCloseTo(3);
     expect(p0!.thinkMsTotal).toBe(5000);
     expect(p0!.movesTimed).toBe(1);
     // A player with none left can't use one.
-    state = applyRound(state, groups, [{ playerId: "p0", roundScore: 0, loss: 0, thinkMs: 0, usedPowerUp: true }]);
+    for (let i = 0; i < 3; i++) state = applyRound(state, groups, [{ playerId: "p0", roundScore: 0, loss: 0, thinkMs: 0, usedPowerUp: true }]);
     expect(state.players[0]!.powerUps).toBe(0);
-    expect(state.players[0]!.powerUpsUsed).toBe(1);
-    // Survivors get another at the cut.
-    const next = endStage(state, mulberry32(3), [0, 1, 2, 3, 4, 5]).state;
-    expect(next.players.find((p) => p.id === "p1")!.powerUps).toBe(2);
+    expect(state.players[0]!.powerUpsUsed).toBe(3);
+    // Survivors get another at the cut, up to 5 held.
+    let next = endStage(state, mulberry32(3), [0, 1, 2, 3, 4, 5]).state;
+    expect(next.players.find((p) => p.id === "p1")!.powerUps).toBe(4);
+    next = endStage(next, mulberry32(4), [0, 1, 2, 3, 4, 5]).state;
+    next = endStage(next, mulberry32(5), [0, 1, 2, 3, 4, 5]).state;
+    expect(next.players.find((p) => p.id === "p1")!.powerUps).toBe(5);
   });
 
   it("practice players have unlimited power-ups", () => {
@@ -252,7 +255,7 @@ describe("time bank and power-ups", () => {
     for (let i = 0; i < 3; i++) {
       state = applyRound(state, groups, [{ playerId: "me", roundScore: 0, loss: 0, thinkMs: 0, usedPowerUp: true }]);
     }
-    expect(state.players[0]!.powerUps).toBe(1);
+    expect(state.players[0]!.powerUps).toBe(3);
     expect(state.players[0]!.powerUpsUsed).toBe(3);
   });
 

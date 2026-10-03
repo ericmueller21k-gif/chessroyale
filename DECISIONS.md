@@ -293,3 +293,36 @@ Eric's requests; the details were my call.
   phone it's 8-10. Each row shows position, name, points, average, rating and power-ups, with small column labels.
   Tapping it opens the full leaderboard; the arrow in its header still minimises it. Computers keep the full
   leaderboard on the left.
+
+## Power-up slots, a centre-closing timer, shorter openings, replay from move 0 (Oct 3, 2026)
+
+Eric's requests; the details were my call.
+
+- **Power-ups: start with 3, hold at most 5** (one more each stage you survive; one earned on a full hand is lost).
+  Under the board they're a row of 5 small round slots with a lightning bolt: lit for each one you hold, grey for
+  missing or used. Tap a lit one to see the engine's top 3 on this move; the slot turns into a breathing outlined
+  ring while it's in use. Tapping a grey one gives a little shake and does nothing. Newly earned ones light up with
+  a few yellow flashes, one after another (and your first 3 do at the start of the match).
+- **The move clock moved off the controls line.** The line under the board is now ‹‹, the power-up slots, ››, all
+  smaller, so the board area is tighter and the scoreboard gets more room. **Your total time left (the bank) is in
+  the top line** on the right, ticking while you think and red under a minute. The bar on the board still shows
+  this move's time.
+- **The timer bar is square-cornered, 3 px, with a slight glow.** It starts full and closes in from both ends to
+  nothing in the middle, fading from green through yellow to red.
+- **Openings are 4 moves per side by default, and a lobby setting from 0 to 10** (Eric: fewer is friendlier for a wide
+  audience). It's a stepper on the first screen ("Opening moves"), remembered on the device and used for solo games and
+  lobbies you create (`?moves=N` in a link). Boards where Black starts get one ply more. At 0 every White-to-move board
+  starts from the initial position.
+- **The opening library was rebuilt for every length from 0 to 10 moves**, from named Lichess lines only (no engine
+  filler moves): for each length, the distinct positions named lines reach, one per named variation, most travelled
+  first (up to 100 classic and 30 unusual per length). Each is scored at both lengths it can be shown at and kept if
+  balanced (40-60%), and each board is named after the longest named line its moves actually match (so a 4-move
+  board says "Italian Game", not the name of a 12-move line it was cut from). Short lengths have few families, so
+  boards may share a family (or, at 0 moves, the starting position).
+- **A board you've never seen replays from move 0.** On a board you've seen before, the moves you missed replay
+  (up to 5), as before. A whole game replays quickly to fit in the "Round start" countdown (as fast as 0.09 s a
+  move), and the piece sounds are thinned to one knock every 0.18 s so it isn't a clatter.
+- **The phone scoreboard has a bit of margin left and right.**
+- **Stage 1 is longer: 8 rounds before the first cut** (later stages stay at 5). Eric: bad players shouldn't be
+  punished instantly. The cut ranks the whole stage's points, so one bad move early is diluted over 8. It adds about
+  3 rounds (roughly 2 minutes relaxed). `firstStageRounds` in settings; `?rounds=N` in a playtest link sets every stage.

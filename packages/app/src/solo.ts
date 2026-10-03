@@ -9,7 +9,7 @@ import { RoundProgress } from "./progress.ts";
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
 const FINAL_SHOW_MS = 3200;
-const library = openingsData as Opening[];
+const library = openingsData as unknown as Opening[];
 
 export function boardView(b: BoardState): BoardView {
   return netBoard(b, true);

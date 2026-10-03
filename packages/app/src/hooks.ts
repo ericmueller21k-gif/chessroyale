@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { applyMove } from "@chessroyale/chess";
+import { START_FEN, applyMove } from "@chessroyale/chess";
 import type { BoardView, GameView } from "./game.ts";
 
 const MAX_REPLAY = 5;
@@ -7,10 +7,11 @@ const MAX_REPLAY = 5;
 export const seenKey = (b: Pick<BoardView, "id" | "generation">) => `${b.id}:${b.generation}`;
 
 /**
- * Replays the moves played on a board since this player last saw it (or the
- * last 2 moves of a board that's new to them), up to 5, then settles on the
- * current position. The steps are paced to fill `withinMs` (the new board's
- * settling-in time). Returns the position to show and whether it's replaying.
+ * Replays the moves played on a board since this player last saw it (up to
+ * 5), or the whole game from move 0 on a board that's new to them, then
+ * settles on the current position. The steps are paced to fill `withinMs`
+ * (the new board's settling-in time). Returns the position to show and
+ * whether it's replaying.
  */
 export function useReplay(
   match: GameView,
@@ -20,8 +21,18 @@ export function useReplay(
   const [frames] = useState(() => {
     const key = seenKey(board);
     const last = match.seen.get(key);
-    const missed = last === undefined ? 2 : board.ply - last;
     match.seen.set(key, board.ply);
+    if (last === undefined && board.history.length) {
+      // First time on this board: the whole game from the starting position.
+      const out = [{ fen: START_FEN, lastMove: null as string | null }];
+      let fen = START_FEN;
+      for (const m of board.history) {
+        fen = applyMove(fen, m);
+        out.push({ fen, lastMove: m });
+      }
+      return out;
+    }
+    const missed = last === undefined ? 0 : board.ply - last;
     const k = Math.max(0, Math.min(MAX_REPLAY, missed, board.recent.length));
     if (k === 0) return [];
     const head = board.recent.slice(0, board.recent.length - k);
@@ -35,10 +46,11 @@ export function useReplay(
   });
   const [step, setStep] = useState(0);
   const moves = Math.max(1, frames.length - 1);
-  const stepMs = Math.max(350, Math.min(800, (withinMs - 1100) / moves));
+  // A long game from move 0 plays quickly; a few missed moves play at a readable pace.
+  const stepMs = Math.max(moves > MAX_REPLAY ? 90 : 350, Math.min(800, (withinMs - 1000) / moves));
   useEffect(() => {
     if (step >= frames.length - 1) return;
-    const t = setTimeout(() => setStep((s) => s + 1), step === 0 ? 500 : stepMs);
+    const t = setTimeout(() => setStep((s) => s + 1), step === 0 ? 400 : stepMs);
     return () => clearTimeout(t);
   }, [step, frames.length]);
   if (!frames.length || step >= frames.length - 1) return { fen: board.fen, lastMove: board.lastMove, replaying: false };

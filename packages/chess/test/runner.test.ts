@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, mulberry32, stagePlan, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, mulberry32, openingPlies, stagePlan, type Settings } from "@chessroyale/core";
 import { legalMoves, MatchRunner, START_FEN, sanLineToUci, fenAfter, type EngineLike, type Opening } from "../src/index.ts";
 
 /** A stand-in engine: every legal move gets a deterministic pseudo-score. */
@@ -29,12 +29,12 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
   unusual: i >= 25,
   moves: line,
   namedPlies: 21,
-  expected: { 20: 0.5, 21: 0.5 },
+  expected: Object.fromEntries(Array.from({ length: 22 }, (_, n) => [n, 0.5])),
 }));
 
 describe("MatchRunner", () => {
   it("plays a whole 64-bot match: one board fewer per cut, one colour per stage, then the 2v2 final", async () => {
-    const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 2 };
+    const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 2, firstStageRounds: 2 };
     const rng = mulberry32(1);
     const runner = new MatchRunner({
       settings,
@@ -43,7 +43,7 @@ describe("MatchRunner", () => {
       library,
       entrants: Array.from({ length: 64 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 1 + i })),
     });
-    expect(fenAfter(line.slice(0, 20))).toBe(runner.boards.get(0)!.fen);
+    expect(fenAfter(line.slice(0, openingPlies(settings)))).toBe(runner.boards.get(0)!.fen);
     const plan = stagePlan(settings);
     let rounds = 0;
     let lastStage = -1;
@@ -119,7 +119,7 @@ describe("MatchRunner", () => {
   });
 
   it("can be saved and restored mid-match (as the lobby server does between messages)", async () => {
-    const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 2 };
+    const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 2, firstStageRounds: 2 };
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(3),

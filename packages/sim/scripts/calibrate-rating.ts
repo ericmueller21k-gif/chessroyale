@@ -11,7 +11,7 @@
 import { writeFileSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_SETTINGS, mulberry32, shuffle } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, mulberry32, openingPlies, shuffle } from "@chessroyale/core";
 import { applyMove, fenAfter, gameEnd, type Opening } from "@chessroyale/chess";
 import { createNodeEngine, nodeTransport } from "@chessroyale/chess/node";
 
@@ -64,7 +64,7 @@ const players = await Promise.all(LEVELS.map(limitedEngine));
 const fens: string[] = [];
 for (const o of shuffle(rng, library)) {
   if (fens.length >= POSITIONS) break;
-  const plies = rng() < 0.5 ? settings.openingPlies : settings.openingPlies + 1;
+  const plies = rng() < 0.5 ? openingPlies(settings) : openingPlies(settings) + 1;
   if (o.moves.length < plies) continue;
   let fen = fenAfter(o.moves.slice(0, plies));
   const extra = Math.floor(rng() * 16);

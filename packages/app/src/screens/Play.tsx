@@ -4,10 +4,9 @@ import { Board, type Arrow } from "../components/Board.tsx";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
-import { clockText } from "../components/RaceTower.tsx";
 import type { BoardView, GameView } from "../game.ts";
 import { MiniTower } from "../components/MiniTower.tsx";
-import { PowerUpButton } from "../components/PowerUpButton.tsx";
+import { PowerUps } from "../components/PowerUpButton.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 
@@ -64,7 +63,6 @@ export function PlayScreen({
   useTicks(introLeft, COUNT_FROM_SECONDS, intro);
   const total = allowedMs ?? match.settings.moveClockSeconds * 1000;
   const secsLeft = Math.ceil((deadline - now) / 1000);
-  const moveLeft = Math.max(0, deadline - Math.max(now, startsAt));
   const ending = !waiting && !intro && deadline > 0 && secsLeft > 0 && secsLeft <= COUNT_FROM_SECONDS;
 
   const hint = match.hint;
@@ -101,14 +99,7 @@ export function PlayScreen({
         <HistoryNav
           view={history}
           total={board.history.length}
-          clock={
-            !waiting && deadline > 0 ? (
-              <span class={`move-clock${moveLeft <= 10_000 ? " low" : ""}`} role="timer" aria-label="Time left for this move">
-                {clockText(Math.ceil(moveLeft / 1000) * 1000)}
-              </span>
-            ) : null
-          }
-          extra={<PowerUpButton count={powerUps} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />}
+          extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />}
         />
       </div>
       <div class="play-footer">
