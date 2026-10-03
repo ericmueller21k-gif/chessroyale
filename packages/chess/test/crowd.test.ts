@@ -93,6 +93,24 @@ describe("Crowd mode", () => {
     expect(runner.leaderboard()[0]!.team).toBeNull();
   });
 
+  it("bot picks decided at the start of a round are the ones scored", async () => {
+    const settings: Settings = { ...base, crowdTeams: true };
+    const runner = new MatchRunner({
+      settings,
+      rng: mulberry32(5),
+      engines: [fake],
+      library,
+      entrants: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 1 + (i % 20) })),
+    });
+    for (let round = 0; round < 3; round++) {
+      runner.deal();
+      const planned = new Map(await runner.planBotPicks());
+      expect(planned.size).toBe(50);
+      const report = await runner.score(new Map());
+      for (const p of report.boards[0]!.result.players) expect(p.move).toBe(planned.get(p.playerId));
+    }
+  });
+
   it("augment votes: majority moves the clock by a step, within limits; ties keep it", () => {
     expect(clockAfterVote(20, ["more", "more", "less"], base)).toBe(25);
     expect(clockAfterVote(20, ["less", "less", "same"], base)).toBe(15);

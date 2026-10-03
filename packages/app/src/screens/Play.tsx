@@ -7,6 +7,7 @@ import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView } from "../game.ts";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
+import { LiveGhosts } from "./Crowd.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 
@@ -70,7 +71,9 @@ export function PlayScreen({
   const held = match.practice ? Infinity : (match.standings().find((s) => s.isYou)?.powerUps ?? 0);
   const powerUps = hint !== null ? Math.max(0, held - 1) : held;
   // Once you've moved, your move stays on the board while the others finish.
-  const moved = waiting && picked ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
+  // (Crowd keeps the position on screen and shows everyone's picks over it instead.)
+  const crowd = match.settings.mode === "crowd";
+  const moved = waiting && picked && !crowd ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
   // Crowd 50 v 50: only your team is picking this turn.
   const alive = match.standings().filter((s) => !s.out && (s.team == null || s.team === side));
   const doneCount = alive.filter((s) => match.done.has(s.id)).length;
@@ -91,7 +94,10 @@ export function PlayScreen({
             <FinalTurnLabel match={match} side={side} />
           ) : match.settings.mode === "crowd" ? (
             <>
-              Your pick for <strong>{side === "w" ? "White" : "Black"}</strong> · the most popular move is played
+              Your pick for <strong>{side === "w" ? "White" : "Black"}</strong> ·{" "}
+              <span class="pick-count">
+                {doneCount}/{alive.length} picked
+              </span>
             </>
           ) : (
             board.openingName
@@ -109,6 +115,7 @@ export function PlayScreen({
               />
             )}
             {ending && <CenterCount label="Round end" n={secsLeft} />}
+            {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={side === "w" ? "white" : "black"} />}
           </Board>
         </div>
         <HistoryNav

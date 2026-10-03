@@ -393,3 +393,23 @@ Eric's design; the details were my call. The 8-board version stays as **Classic*
 - **The cut screen:** CUT, how many went out and how many are left, the names struck through, whether you're through,
   the augment cards and a countdown (about 7 s; 4 s without augments).
 - Bots past the name list get numbered names ("Queenie 2") for 100-player lobbies.
+
+## Crowd: every pick on the board, live tallies, an animations switch (Oct 3, 2026)
+
+Eric's requests; the details were my call.
+
+- **Every pick is a ghost piece with names.** Each picked move gets a tag over its square with the top three names (by
+  leaderboard, you first) and "+N" for the rest; names are cut to about a square and a half so neighbouring tags stay
+  readable. Cluttered on purpose.
+- **Animations on (default):** every single pick is its own see-through piece sliding onto its square, in quick
+  succession and in a mixed order (20 knight picks are 20 knights; all 50 in about two seconds), silently. Then the
+  winner blinks three times with the three tones, the others fade, and it's played.
+- **Animations off** (a checkbox on the first screen, remembered on the device; `?anim=0` in a link): the tags and one
+  still ghost per move, all at once, and only the chosen piece moves.
+- **Live tallies.** You never see other picks before making yours. Once you've picked (and all along for the team
+  that's watching), everyone's picks appear as they're made: humans the moment they pick, bots the moment they finish
+  thinking, as fainter ghosts with tags. To make that possible, bots now decide their picks at the start of the round
+  (from the search that already runs then) instead of at scoring time; online, the host decides them and sends the plan
+  to the server, which streams the picks only to players allowed to see them and has the host score with that plan.
+- **"23/50 picked"** now shows above the board while you're choosing, as well as in the waiting banner and while you
+  watch the other team.
