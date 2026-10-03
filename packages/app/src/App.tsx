@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, type DrawRule, type Settin
 import { chosenOpeningMoves } from "./screens/Home.tsx";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
+import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool } from "./engine.ts";
 import { cutLabel, roundLive, type GameView } from "./game.ts";
 import { NetMatch } from "./net.ts";
@@ -14,6 +15,7 @@ import { OpeningGrid } from "./screens/OpeningGrid.tsx";
 import { PlayScreen } from "./screens/Play.tsx";
 import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
+import { SoundLab } from "./screens/SoundLab.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
 
@@ -53,6 +55,7 @@ export function App() {
   const [match, setMatch] = useState<AnyMatch | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [soundLab, setSoundLab] = useState(() => new URLSearchParams(location.search).has("soundlab"));
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
 
   useEffect(() => {
@@ -83,6 +86,7 @@ export function App() {
   const debug = new URLSearchParams(location.search).has("debug");
   const use = (m: AnyMatch) => {
     match?.dispose();
+    resetBoardsStrip();
     setMatch(m);
     if (debug) (window as unknown as { match: GameView }).match = m;
   };
@@ -131,6 +135,7 @@ export function App() {
     history.replaceState(null, "", "/");
   };
 
+  if (!match && soundLab) return <SoundLab onBack={() => setSoundLab(false)} />;
   if (!match) {
     return (
       <HomeScreen
@@ -140,6 +145,7 @@ export function App() {
         loading={loading}
         joinCode={linkCode}
         error={error}
+        onSoundLab={() => setSoundLab(true)}
       />
     );
   }

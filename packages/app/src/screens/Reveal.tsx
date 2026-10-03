@@ -116,7 +116,7 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
 
   return (
     <div class="screen game" onClick={() => played && match.skipReveal()}>
-      <Hud match={match} />
+      <Hud match={match} stripFrozen={!played} />
       <div class="board-area">
         <div class="opening-name">{board.openingName}</div>
         <Board

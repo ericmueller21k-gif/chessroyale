@@ -40,7 +40,7 @@ const pts = (x: number) => (Math.abs(x) < 0.05 ? "0.0" : (x > 0 ? "+" : "−") +
  * score on the cut line. Tap it for the full leaderboard. Then every board as
  * a tiny live board (yours ringed).
  */
-export function Hud({ match }: { match: GameView }) {
+export function Hud({ match, stripFrozen = false }: { match: GameView; stripFrozen?: boolean }) {
   const [open, setOpen] = useState(false);
   // During the reveal the round counter has already moved on; show the round just played.
   const shownRound = match.phase.kind === "reveal" ? match.roundsPlayed : match.roundsPlayed + 1;
@@ -97,7 +97,7 @@ export function Hud({ match }: { match: GameView }) {
         </button>
         <MuteButton />
       </div>
-      <BoardsStrip slots={match.slots()} current={myBoardId(match)} />
+      <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />
       {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}
     </>
   );

@@ -343,3 +343,18 @@ domain bought through Cloudflare Registrar (sold at cost, no markup) so DNS, hos
 account. Accounts, profiles and ranked will use Cloudflare D1 (SQL) for players and match history. Workers Paid
 ($5/month) only if we outgrow the free limits (Durable Object requests or CPU time). Eric does the purchases; I'll
 recommend specific options with prices when we get there.
+
+## "15 opening moves", a sound lab, and a sound for every board moving (Oct 3, 2026)
+
+- **Eric saw about 15 opening moves in the first rounds.** The opening itself is right (8 plies, 9 where Black
+  starts). What he saw was the replay from move 0 that plays on a board you haven't seen before: in stage 1 you land on
+  a new board almost every round, and by round 5-6 that board has the opening plus 5-6 drawn moves. It now says so on
+  the board, under "Round start": "New board: replaying it from the start" (or "Replaying the moves you missed").
+- **Sound lab** (a link on the first screen, or `?soundlab`): play a full roulette in each voice and choose the one the
+  game uses on this device: steel pan (the new default, aiming at Mario Kart 64's warm item roulette: harmonic
+  partials, a slight pitch settle on each strike and a soft stick tap), kalimba, marimba, glockenspiel, music box and
+  the 8-bit blip. It also previews the other sounds, and says where to find or make a sample (freesound.org CC0,
+  BeepBox) to replace any of them.
+- **A sound when every board moves after a round:** a quick ripple of 8 soft wooden knocks while the tiny boards light
+  up one after another. It happens when the chosen move plays on your board, and the tiny boards now hold their old
+  positions until then, so they no longer give away the chosen move during the selecting reel.

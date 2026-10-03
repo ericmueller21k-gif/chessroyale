@@ -94,57 +94,145 @@ function clockTick(at: number, level = 0.5) {
   src.start(at);
 }
 
-/** A bright, game-like blip: a square wave with a sine an octave up, quick attack and short decay. */
-function blip(at: number, freq: number, len = 0.08, level = 0.05) {
+/** One struck note built from partials: [frequency multiple, level, decay seconds]. */
+function strike(at: number, freq: number, partials: readonly (readonly [number, number, number])[], level: number, opts: { glide?: number; type?: OscillatorType } = {}) {
   const c = ctx!;
-  for (const [type, mult, amp] of [
-    ["square", 1, 1],
-    ["sine", 2, 0.8],
-  ] as const) {
+  for (const [mult, amp, decay] of partials) {
     const o = c.createOscillator();
-    o.type = type;
-    o.frequency.value = freq * mult;
+    o.type = opts.type ?? "sine";
+    // A struck pan or bar starts a hair sharp and settles: a touch of warmth.
+    o.frequency.setValueAtTime(freq * mult * (1 + (opts.glide ?? 0)), at);
+    o.frequency.exponentialRampToValueAtTime(freq * mult, at + 0.04);
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(level * amp, at + 0.003);
-    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    g.gain.exponentialRampToValueAtTime(level * amp, at + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + decay);
     o.connect(g).connect(master!);
     o.start(at);
-    o.stop(at + len + 0.02);
+    o.stop(at + decay + 0.02);
   }
 }
 
-// The roulette climbs a major arpeggio and starts again, like a kart racer's item roulette.
-const ROULETTE = [1046.5, 1318.5, 1568, 2093]; // C6 E6 G6 C7
+/** A short soft noise tap (the stick hitting), band-passed around `freq`. */
+function tap(at: number, freq: number, level: number) {
+  const c = ctx!;
+  const len = 0.015;
+  const buf = c.createBuffer(1, Math.ceil(c.sampleRate * len), c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 3;
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const band = c.createBiquadFilter();
+  band.type = "bandpass";
+  band.frequency.value = freq;
+  band.Q.value = 2;
+  const g = c.createGain();
+  g.gain.value = level;
+  src.connect(band).connect(g).connect(master!);
+  src.start(at);
+}
+
+/**
+ * Voices for the reveal's "selecting move" roulette, to audition in the sound
+ * lab (?soundlab). Each plays one note; the roulette climbs a major arpeggio
+ * from `base` (C, E, G, C), and the winner is three of the same note.
+ */
+export const REEL_VOICES = {
+  pan: {
+    label: "Steel pan (warm, default)",
+    base: 523.25, // C5
+    note: (t: number, f: number, l = 1) => {
+      strike(t, f, [[1, 1, 0.5], [2, 0.45, 0.32], [3, 0.18, 0.18], [4.02, 0.08, 0.1]], 0.16 * l, { glide: 0.012 });
+      tap(t, 2400, 0.08 * l);
+    },
+  },
+  kalimba: {
+    label: "Kalimba (soft pluck)",
+    base: 523.25,
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.45], [5.4, 0.12, 0.05], [2, 0.12, 0.2]], 0.17 * l),
+  },
+  marimba: {
+    label: "Marimba (wooden)",
+    base: 523.25,
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.38], [4, 0.14, 0.07], [10, 0.03, 0.02]], 0.18 * l),
+  },
+  glock: {
+    label: "Glockenspiel (bright bell)",
+    base: 1046.5, // C6
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.6], [2.76, 0.3, 0.25], [5.4, 0.12, 0.1]], 0.1 * l),
+  },
+  musicbox: {
+    label: "Music box (tinkly)",
+    base: 1046.5,
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.8], [3, 0.15, 0.3], [4.2, 0.05, 0.08]], 0.09 * l),
+  },
+  chip: {
+    label: "8-bit blip",
+    base: 1046.5,
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.07], [2, 0.8, 0.05]], 0.05 * l, { type: "square" }),
+  },
+} as const;
+export type ReelVoice = keyof typeof REEL_VOICES;
+const VOICE_KEY = "brc.reelVoice";
+let reelVoice: ReelVoice = (() => {
+  try {
+    const v = localStorage.getItem(VOICE_KEY);
+    return v && v in REEL_VOICES ? (v as ReelVoice) : "pan";
+  } catch {
+    return "pan";
+  }
+})();
+export const getReelVoice = () => reelVoice;
+export function setReelVoice(v: ReelVoice) {
+  reelVoice = v;
+  try {
+    localStorage.setItem(VOICE_KEY, v);
+  } catch {
+    // Not important.
+  }
+}
+
+const ARPEGGIO = [1, 1.26, 1.5, 2]; // C E G C
 let rouletteStep = 0;
 
-export type SoundName = "move" | "capture" | "castle" | "tick" | "reel" | "select";
+export type SoundName = "move" | "capture" | "castle" | "tick" | "reel" | "select" | "ripple";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
   capture: (t) => sample("capture", t),
   castle: (t) => sample("castle", t),
   tick: (t) => clockTick(t),
-  // One step of the "selecting move" reel: a quick two-note flick up the arpeggio.
+  // One step of the "selecting move" reel: the next note up the arpeggio, with a quick grace note above.
   reel: (t) => {
-    const f = ROULETTE[rouletteStep++ % ROULETTE.length]!;
-    blip(t, f, 0.06);
-    blip(t + 0.03, f * 1.5, 0.05, 0.035);
+    const v = REEL_VOICES[reelVoice];
+    const f = v.base * ARPEGGIO[rouletteStep++ % ARPEGGIO.length]!;
+    v.note(t, f);
+    v.note(t + 0.035, f * 1.5, 0.45);
   },
-  // The winner: three of the same tone, in time with its three blinks.
+  // The winner: three of the same note, in time with its three blinks.
   select: (t) => {
     rouletteStep = 0;
-    for (let i = 0; i < 3; i++) blip(t + i * 0.2, 1568, 0.15, 0.06);
+    const v = REEL_VOICES[reelVoice];
+    for (let i = 0; i < 3; i++) v.note(t + i * 0.2, v.base * 1.5, 1.2);
+  },
+  // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
+  ripple: (t) => {
+    for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));
   },
 };
 
-export function play(name: SoundName) {
+/** Plays a sound; `voice` previews a roulette voice without choosing it (the sound lab). */
+export function play(name: SoundName, voice?: ReelVoice) {
   // Tests read this log (set window.__soundLog = [] to start one).
   (globalThis as { __soundLog?: string[] }).__soundLog?.push(`${name}:${ctx?.state ?? "none"}${muted ? ":muted" : ""}`);
   if (muted || !ctx || !master || ctx.state !== "running") return;
+  const chosen = reelVoice;
+  if (voice) reelVoice = voice;
   try {
     SOUNDS[name](ctx.currentTime + 0.005);
   } catch {
     // Ignore audio errors.
+  } finally {
+    reelVoice = chosen;
   }
 }

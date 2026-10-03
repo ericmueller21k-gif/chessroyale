@@ -28,7 +28,7 @@ test("only piece sounds, clock ticks and the reveal reel play, and muting silenc
   expect(names).toContain("tick");
   expect(names.some((n) => n === "move" || n === "capture")).toBe(true);
   // Besides the reveal reel and its winner, nothing else makes a sound: no jingles for the power-up or the round start.
-  expect(names.every((n) => ["move", "capture", "castle", "tick", "reel", "select"].includes(n))).toBe(true);
+  expect(names.every((n) => ["move", "capture", "castle", "tick", "reel", "select", "ripple"].includes(n))).toBe(true);
   for (const n of ["reel", "select"]) expect(names).toContain(n);
   // The audio context was running (unlocked by the tap), so they were actually heard.
   expect(log.filter((l) => l.startsWith("tick")).every((l) => l.includes(":running"))).toBe(true);
