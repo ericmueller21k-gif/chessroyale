@@ -6,6 +6,7 @@ import { MiniTower } from "../components/MiniTower.tsx";
 import { ShadeMoves, SquareRing, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { type BoardView, type GameView, type GroupReveal } from "../game.ts";
 import { seenKey } from "../hooks.ts";
+import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 
 const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
@@ -21,13 +22,14 @@ function reason(rule: DrawRule, tied: boolean): string {
 /**
  * The reveal's timeline (ms from when it appears), fitted into the time until
  * the next board: everyone's moves slide in, a "selecting" reel ticks across
- * them and lands on the chosen move, then the move plays and stays on show
+ * them (a rising roulette blip per step) and lands on the chosen move (it
+ * blinks three times with three tones), then the move plays and stays on show
  * until the next board comes up (which opens with its own "Round start" 3-2-1).
  */
 function timeline(total: number) {
   const shadesEnd = Math.min(2200, total * 0.25);
   const reelEnd = shadesEnd + Math.min(2000, total * 0.24);
-  const playAt = reelEnd + 600;
+  const playAt = reelEnd + 800;
   return { shadesEnd, reelEnd, playAt };
 }
 
@@ -85,6 +87,13 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
   const played = elapsed >= playAt;
   const stepNo = selecting ? steps.filter((s) => shadesEnd + s.at <= elapsed).length - 1 : -1;
   const reelOn = selecting && stepNo >= 0 ? (shades[steps[stepNo]!.index]?.move ?? null) : null;
+  // Sounds: a roulette blip per reel step, then three tones as the winner blinks.
+  useEffect(() => {
+    if (stepNo >= 0) play("reel");
+  }, [stepNo]);
+  useEffect(() => {
+    if (landed) play("select");
+  }, [landed]);
 
   const rule = mine.result.drawRule;
   const counts = shades.map((s) => s.names.length);
