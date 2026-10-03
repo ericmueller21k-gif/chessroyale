@@ -32,27 +32,48 @@ export function useHistoryView(history: readonly string[]) {
   };
 }
 
+const Chevrons = ({ back }: { back?: boolean }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" style={back ? { transform: "scaleX(-1)" } : undefined}>
+    <path d="M6 6l6 6-6 6" />
+    <path d="M12 6l6 6-6 6" />
+  </svg>
+);
+
 /**
- * ◀ and ▶ either side of the board's foot. The middle shows `children` (the
- * move clock) on the live position, or which move you're looking at; tap it
- * then to jump back to the live position.
+ * The line of controls under the board: back on the left, forward on the
+ * right (double chevrons in soft rounded boxes), and between them `clock`
+ * (hidden while looking back, when "Move 14 · back to live" shows instead;
+ * tap it to return) and `extra` (the power-up).
  */
-export function HistoryNav({ view, total, children }: { view: ReturnType<typeof useHistoryView>; total: number; children?: ComponentChildren }) {
+export function HistoryNav({
+  view,
+  total,
+  clock,
+  extra,
+}: {
+  view: ReturnType<typeof useHistoryView>;
+  total: number;
+  clock?: ComponentChildren;
+  extra?: ComponentChildren;
+}) {
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
   return (
     <div class={`history-nav ${view.browsing ? "browsing" : ""}`}>
-      <button type="button" aria-label="Previous move" disabled={view.ply === 0} onClick={() => view.go(view.ply - 1)}>
-        ◀
+      <button type="button" class="nav-btn" aria-label="Previous move" disabled={view.ply === 0} onClick={() => view.go(view.ply - 1)}>
+        <Chevrons back />
       </button>
-      {view.browsing ? (
-        <button type="button" class="history-label" onClick={() => view.live()} aria-label="Back to the live position">
-          Move {moveNo(view.ply)} · {view.ply}/{total} · back to live
-        </button>
-      ) : (
-        <span class="history-label">{children}</span>
-      )}
-      <button type="button" aria-label="Next move" disabled={!view.browsing} onClick={() => view.go(view.ply + 1)}>
-        ▶
+      <div class="nav-middle">
+        {view.browsing ? (
+          <button type="button" class="history-label" onClick={() => view.live()} aria-label="Back to the live position">
+            Move {moveNo(view.ply)} · {view.ply}/{total} · back to live
+          </button>
+        ) : (
+          clock && <span class="history-label">{clock}</span>
+        )}
+        {extra}
+      </div>
+      <button type="button" class="nav-btn" aria-label="Next move" disabled={!view.browsing} onClick={() => view.go(view.ply + 1)}>
+        <Chevrons />
       </button>
     </div>
   );

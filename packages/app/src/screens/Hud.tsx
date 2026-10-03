@@ -1,13 +1,17 @@
 import { useState } from "preact/hooks";
+import { LeaderboardSheet } from "../components/LeaderboardSheet.tsx";
+import { LiveNumber } from "../components/LiveNumber.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
-import { RaceTower, gapToCut } from "../components/RaceTower.tsx";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
-import { cutLabel, myBoardId, roundLive, type GameView } from "../game.ts";
+import { myBoardId, type GameView } from "../game.ts";
+
+const pts = (x: number) => (Math.abs(x) < 0.05 ? "0.0" : (x > 0 ? "+" : "−") + Math.abs(x).toFixed(1));
 
 /**
- * Above the board: one clean line with stage and round, your position, how
- * far you are from the knockout line and your power-ups (tap it for the full
- * leaderboard), then every board as a tiny live board (yours ringed).
+ * Above the board: one clean line with stage and round, your position, your
+ * points (green while you're above the cut, red below it) and, in yellow, the
+ * score on the cut line. Tap it for the full leaderboard. Then every board as
+ * a tiny live board (yours ringed).
  */
 export function Hud({ match }: { match: GameView }) {
   const [open, setOpen] = useState(false);
@@ -23,60 +27,53 @@ export function Hud({ match }: { match: GameView }) {
     const order = [...f.order].sort((a, b) => avg(a) - avg(b));
     rank = order.findIndex((id) => match.isYou(id)) + 1;
   }
-  const inZone = rank > match.cutoff;
-  const gap = gapToCut(standings, match.cutoff);
-  const left = match.powerUpsLeft();
+  const me = alive[alive.findIndex((x) => x.isYou)];
+  const knockouts = match.cutoff > 0 && match.cutoff < alive.length;
+  // The score on the cut line: the last player who'd go through.
+  const cutScore = knockouts ? alive[match.cutoff - 1]!.points : null;
+  const inZone = knockouts && rank > match.cutoff;
   return (
     <>
-    <div class="hud-row">
-      <button type="button" class="hud" onClick={() => setOpen(true)} aria-label="Show the leaderboard">
-        <span class="hud-stage">
-          {match.final ? (
-            "FINAL"
-          ) : (
-            <>
-              S{match.stage + 1}
-              <span class="muted">
-                {" "}
-                · R{Math.min(shownRound, match.settings.roundsPerStage)}/{match.settings.roundsPerStage}
-              </span>
-            </>
+      <div class="hud-row">
+        <button type="button" class="hud" onClick={() => setOpen(true)} aria-label="Show the leaderboard">
+          <span class="hud-stage">
+            {match.final ? (
+              "FINAL"
+            ) : (
+              <>
+                S{match.stage + 1}
+                <span class="muted">
+                  {" "}
+                  · R{Math.min(shownRound, match.settings.roundsPerStage)}/{match.settings.roundsPerStage}
+                </span>
+              </>
+            )}
+          </span>
+          {rank > 0 && (
+            <span class={`hud-rank ${inZone ? "danger" : ""}`}>
+              P<LiveNumber value={rank} format={(x) => String(Math.round(x))} goodWhenDown />
+              <span class="muted">/{match.final ? match.final.order.length : alive.length}</span>
+            </span>
           )}
-        </span>
-        {rank > 0 && (
-          <span class={`hud-rank ${inZone ? "danger" : ""}`}>
-            P{rank}
-            <span class="muted">/{alive.length}</span>
+          {me && !match.final && (
+            <span class={`hud-score ${inZone ? "danger" : "safe"}`} title="Your points this stage">
+              <LiveNumber value={me.points} format={pts} />
+            </span>
+          )}
+          {cutScore !== null && me && !match.final && (
+            <span class="hud-cut" title="Points on the cut line (the last place that goes through)">
+              <small>cut</small>
+              <LiveNumber value={cutScore} format={pts} />
+            </span>
+          )}
+          <span class="hud-more" aria-hidden="true">
+            ☰
           </span>
-        )}
-        {gap !== null && rank > 0 && !match.final && (
-          <span class={`hud-gap ${gap < 0 ? "danger" : "safe"}`}>
-            {gap >= 0 ? `+${gap.toFixed(1)} safe` : `${gap.toFixed(1)} at risk`}
-          </span>
-        )}
-        <span class="hud-pu" title="Power-ups">
-          ⚡{left === Infinity ? "∞" : left}
-        </span>
-        <span class="hud-more" aria-hidden="true">
-          ☰
-        </span>
-      </button>
-      <MuteButton />
-      {open && (
-        <div class="tower-overlay" role="dialog" aria-label="Leaderboard" onClick={() => setOpen(false)}>
-          <div class="tower-sheet" onClick={(e) => e.stopPropagation()}>
-            <div class="tower-sheet-head">
-              <strong>Leaderboard</strong>
-              <button type="button" class="tower-close" onClick={() => setOpen(false)} aria-label="Close">
-                ✕
-              </button>
-            </div>
-            <RaceTower standings={standings} cutoff={match.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
-          </div>
-        </div>
-      )}
-    </div>
-    <BoardsStrip slots={match.slots()} current={myBoardId(match)} />
+        </button>
+        <MuteButton />
+      </div>
+      <BoardsStrip slots={match.slots()} current={myBoardId(match)} />
+      {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}
     </>
   );
 }

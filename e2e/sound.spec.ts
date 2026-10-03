@@ -12,7 +12,9 @@ test("only piece sounds and clock ticks play, and muting silences them", async (
   await expect(page.locator(".cc-banner")).toHaveText("Round start");
   await expect(page.locator(".center-count")).toHaveCount(0, { timeout: 10_000 });
   await expect(page.locator(".timer-bar")).toBeVisible();
-  await page.getByRole("button", { name: /Power-up/ }).click();
+  await expect(page.locator(".pu-count")).toHaveText("x1");
+  await page.getByRole("button", { name: /Use a power-up/ }).click();
+  await expect(page.locator(".pu-btn.used")).toBeVisible();
   await expect(page.locator(".hints li")).toHaveCount(3, { timeout: 15_000 });
   await page.evaluate(() => (window as any).match.submit((window as any).match.hint[0].move));
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("reveal");

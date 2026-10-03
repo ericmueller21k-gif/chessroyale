@@ -1,14 +1,29 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { cutLabel, roundLive, type GameView } from "../game.ts";
+import { LeaderboardSheet } from "./LeaderboardSheet.tsx";
 import { RaceTower } from "./RaceTower.tsx";
+import { pickRows } from "../pick-rows.ts";
 
 const KEY = "brc.miniTower";
-const pts = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
+const ROW = 22;
+const HEAD = 18;
+
+/** Height the tower takes for a set of rows (rows, "⋯" gaps and the cut line), matching RaceTower's layout. */
+function towerHeight(keep: Set<number>, cutoff: number, n: number): number {
+  const idx = [...keep].sort((a, b) => a - b);
+  let h = HEAD + idx.length * ROW;
+  idx.forEach((i, k) => {
+    if (k > 0 && i - idx[k - 1]! > 1) h += ROW * 0.6;
+    if (cutoff < n && i === cutoff) h += 10;
+  });
+  return h;
+}
 
 /**
- * The phone's scoreboard under the board: small rows (position, name,
- * points) in a box that scrolls on its own, kept centred on you. Its header
- * minimises it to one line; the choice is remembered on the device.
+ * The phone's scoreboard under the board. It never scrolls: it shows as many
+ * players as fit (you, the leaders, your neighbours and the cut line first),
+ * with position, name, points, average, rating and power-ups. Tap it for the
+ * full leaderboard; the header's arrow minimises it (remembered on the device).
  */
 export function MiniTower({ match }: { match: GameView }) {
   const [open, setOpen] = useState(() => {
@@ -18,27 +33,26 @@ export function MiniTower({ match }: { match: GameView }) {
       return true;
     }
   });
+  const [sheet, setSheet] = useState(false);
+  const [space, setSpace] = useState(0);
   const body = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setSpace(el.clientHeight));
+    ro.observe(el);
+    setSpace(el.clientHeight);
+    return () => ro.disconnect();
+  }, [open]);
+
   const standings = match.standings();
   const alive = standings.filter((s) => !s.out);
-  const rank = alive.findIndex((s) => s.isYou) + 1;
-  const me = alive[rank - 1];
+  const rank = alive.findIndex((s) => s.isYou);
+  // On a computer-sized panel the box has a fixed height; fill it too.
+  const keep = pickRows(alive.length, rank, match.cutoff, (k) => towerHeight(k, match.cutoff, alive.length) <= Math.max(space, HEAD + ROW * 3));
 
-  // Keep your row in view (again once the rows have slid to their new places).
-  useEffect(() => {
-    const centre = () => {
-      const box = body.current;
-      const row = box?.querySelector<HTMLElement>(".tower-row.you");
-      if (!box || !row) return;
-      const y = row.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
-      box.scrollTop = Math.max(0, y - box.clientHeight / 2 + row.clientHeight / 2);
-    };
-    centre();
-    const t = setTimeout(centre, 800);
-    return () => clearTimeout(t);
-  }, [open, rank, alive.length]);
-
-  const toggle = () => {
+  const toggle = (e: Event) => {
+    e.stopPropagation();
     setOpen(!open);
     try {
       localStorage.setItem(KEY, open ? "0" : "1");
@@ -49,22 +63,20 @@ export function MiniTower({ match }: { match: GameView }) {
 
   return (
     <section class={`mini-tower${open ? "" : " closed"}`} aria-label="Leaderboard">
-      <button type="button" class="mini-tower-head" onClick={toggle} aria-expanded={open}>
-        <span>Leaderboard</span>
-        {me && (
-          <span class="muted">
-            P{rank}/{alive.length} · {pts(me.points)}
-          </span>
-        )}
-        <span class="mini-tower-toggle" aria-hidden="true">
+      <div class="mini-tower-head">
+        <button type="button" class="mini-tower-title" onClick={() => setSheet(true)}>
+          Leaderboard <span class="muted">· tap for all {alive.length}</span>
+        </button>
+        <button type="button" class="mini-tower-toggle" onClick={toggle} aria-expanded={open} aria-label={open ? "Minimise the leaderboard" : "Show the leaderboard"}>
           {open ? "▾" : "▴"}
-        </span>
-      </button>
+        </button>
+      </div>
       {open && (
-        <div class="mini-tower-body" ref={body}>
-          <RaceTower standings={standings} cutoff={match.cutoff} mini done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
+        <div class="mini-tower-body" ref={body} onClick={() => setSheet(true)}>
+          <RaceTower standings={standings} cutoff={match.cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
         </div>
       )}
+      {sheet && <LeaderboardSheet match={match} onClose={() => setSheet(false)} />}
     </section>
   );
 }
