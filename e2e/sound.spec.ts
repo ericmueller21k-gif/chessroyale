@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
-test("only piece sounds and clock ticks play, and muting silences them", async ({ page }) => {
+test("only piece sounds, clock ticks and the reveal reel play, and muting silences them", async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/?debug&pace=quick");
   await page.getByLabel("Your name").fill("T");
@@ -27,8 +27,9 @@ test("only piece sounds and clock ticks play, and muting silences them", async (
   const names = log.map((l) => l.split(":")[0]);
   expect(names).toContain("tick");
   expect(names.some((n) => n === "move" || n === "capture")).toBe(true);
-  // Nothing else makes a sound: no jingles for the power-up, the reveal or the round start.
-  expect(names.every((n) => ["move", "capture", "castle", "tick"].includes(n))).toBe(true);
+  // Besides the reveal reel and its winner, nothing else makes a sound: no jingles for the power-up or the round start.
+  expect(names.every((n) => ["move", "capture", "castle", "tick", "reel", "select"].includes(n))).toBe(true);
+  for (const n of ["reel", "select"]) expect(names).toContain(n);
   // The audio context was running (unlocked by the tap), so they were actually heard.
   expect(log.filter((l) => l.startsWith("tick")).every((l) => l.includes(":running"))).toBe(true);
   // Muting silences them.

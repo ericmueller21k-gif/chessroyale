@@ -326,3 +326,12 @@ Eric's requests; the details were my call.
 - **Stage 1 is longer: 8 rounds before the first cut** (later stages stay at 5). Eric: bad players shouldn't be
   punished instantly. The cut ranks the whole stage's points, so one bad move early is diluted over 8. It adds about
   3 rounds (roughly 2 minutes relaxed). `firstStageRounds` in settings; `?rounds=N` in a playtest link sets every stage.
+
+## Timer bar flush with the board; the reveal reel's sound is back (Oct 3, 2026)
+
+- **The timer bar touches the board's top edge**, 3 px, square, no glow, starting dark green and fading through
+  yellow to red.
+- **The "selecting move" reel has a sound again**, aiming at a kart racer's item roulette: each reel step is a quick,
+  bright two-note flick climbing a major arpeggio (C-E-G-C), so it rolls faster then slower with the reel. When it
+  lands, the winning move blinks three times with three identical tones. Both are synthesised placeholders until Eric
+  finds a sample.

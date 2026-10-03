@@ -1437,6 +1437,14 @@ button.history-label {
 .shade-layer piece.chosen {
   opacity: 1;
   filter: drop-shadow(0 0 4px #2fd27a) drop-shadow(0 0 12px #2fd27a);
+  animation: chosen-blink 0.2s steps(1, end) 3;
+}
+/* The winning move blinks three times, in time with the three tones. */
+@keyframes chosen-blink {
+  50% {
+    opacity: 0.15;
+    filter: none;
+  }
 }
 .shade-layer piece.not-chosen,
 .shade-tag.not-chosen {
@@ -1645,7 +1653,7 @@ button.history-label {
   position: absolute;
   left: 0;
   right: 0;
-  top: -5px;
+  top: -3px;
   height: 3px;
   display: flex;
   justify-content: center;

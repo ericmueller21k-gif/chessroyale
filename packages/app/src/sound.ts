@@ -1,7 +1,8 @@
 /**
- * Game sounds, kept to two kinds: pieces use recorded wooden knocks (move,
- * capture, castle, from PyChess, GPL-3), and every timer uses one clean clock
- * tick synthesised with Web Audio. Nothing else makes a sound. Browsers
+ * Game sounds: pieces use recorded wooden knocks (move, capture, castle, from
+ * PyChess, GPL-3); every timer uses one clean clock tick; the reveal's
+ * "selecting move" reel has a roulette-style arpeggio and three tones for the
+ * winner (all synthesised with Web Audio, placeholders until real samples). Browsers
  * only allow audio after a tap, so call unlockAudio() from one. The mute
  * choice is remembered on the device.
  */
@@ -93,13 +94,48 @@ function clockTick(at: number, level = 0.5) {
   src.start(at);
 }
 
-export type SoundName = "move" | "capture" | "castle" | "tick";
+/** A bright, game-like blip: a square wave with a sine an octave up, quick attack and short decay. */
+function blip(at: number, freq: number, len = 0.08, level = 0.05) {
+  const c = ctx!;
+  for (const [type, mult, amp] of [
+    ["square", 1, 1],
+    ["sine", 2, 0.8],
+  ] as const) {
+    const o = c.createOscillator();
+    o.type = type;
+    o.frequency.value = freq * mult;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(level * amp, at + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    o.connect(g).connect(master!);
+    o.start(at);
+    o.stop(at + len + 0.02);
+  }
+}
+
+// The roulette climbs a major arpeggio and starts again, like a kart racer's item roulette.
+const ROULETTE = [1046.5, 1318.5, 1568, 2093]; // C6 E6 G6 C7
+let rouletteStep = 0;
+
+export type SoundName = "move" | "capture" | "castle" | "tick" | "reel" | "select";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
   capture: (t) => sample("capture", t),
   castle: (t) => sample("castle", t),
   tick: (t) => clockTick(t),
+  // One step of the "selecting move" reel: a quick two-note flick up the arpeggio.
+  reel: (t) => {
+    const f = ROULETTE[rouletteStep++ % ROULETTE.length]!;
+    blip(t, f, 0.06);
+    blip(t + 0.03, f * 1.5, 0.05, 0.035);
+  },
+  // The winner: three of the same tone, in time with its three blinks.
+  select: (t) => {
+    rouletteStep = 0;
+    for (let i = 0; i < 3; i++) blip(t + i * 0.2, 1568, 0.15, 0.06);
+  },
 };
 
 export function play(name: SoundName) {
