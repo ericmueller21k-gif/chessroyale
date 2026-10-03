@@ -1,13 +1,13 @@
 import { useEffect, useState } from "preact/hooks";
 import { applyMove, sideToMove } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
-import { Countdown } from "../components/Countdown.tsx";
+import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import { clockText } from "../components/RaceTower.tsx";
 import type { BoardView, GameView } from "../game.ts";
+import { MiniTower } from "../components/MiniTower.tsx";
 import { useReplay } from "../hooks.ts";
-import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 
 const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
@@ -71,13 +71,11 @@ export function PlayScreen({
   const introLeft = Math.ceil((startsAt - now) / 1000);
   const shown = useReplay(match, board, Math.max(0, startsAt - mountedAt));
   const history = useHistoryView(board.history);
-  useEffect(() => {
-    if (waiting) return;
-    if (!intro) play("roundStart");
-  }, [intro]);
-  useEffect(() => {
-    if (intro && introLeft > 0 && introLeft <= 3) play("count");
-  }, [introLeft]);
+  // The same 3-2-1 (with a tick each second) opens the round and closes it.
+  useTicks(introLeft, COUNT_FROM_SECONDS, intro);
+  const total = allowedMs ?? match.settings.moveClockSeconds * 1000;
+  const secsLeft = Math.ceil((deadline - now) / 1000);
+  const ending = !waiting && !intro && deadline > 0 && secsLeft > 0 && secsLeft <= COUNT_FROM_SECONDS;
 
   const hint = match.hint;
   const left = match.powerUpsLeft();
@@ -103,12 +101,9 @@ export function PlayScreen({
         <div class="board-row">
           <EvalBar fen={history.fen ?? board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />
           <Board fen={fen} orientation={side === "w" ? "white" : "black"} lastMove={lastMove} interactive={canMove} onMove={(m) => match.submit(m)} arrows={arrows}>
-            {intro && (
-              <div class="intro-pill" role="status">
-                <span class="intro-count">{introLeft}</span>
-                <span>{shown.replaying ? "Replaying the last moves" : "Get ready"}</span>
-              </div>
-            )}
+            {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} />}
+            {intro && <CenterCount label="Round start" n={introLeft <= COUNT_FROM_SECONDS ? introLeft : null} />}
+            {ending && <CenterCount label="Round end" n={secsLeft} />}
           </Board>
         </div>
         <HistoryNav view={history} total={board.history.length} />
@@ -132,16 +127,10 @@ export function PlayScreen({
           </div>
         ) : (
           <>
-            {intro ? (
-              <div class="countdown intro-bar">
-                <span class="countdown-secs">Your move in {introLeft}…</span>
-              </div>
-            ) : (
-              <Countdown deadline={deadline} total={allowedMs ?? match.settings.moveClockSeconds * 1000} />
-            )}
             <div class="play-row">
               <span class="status">
                 You play <strong>{side === "w" ? "White" : "Black"}</strong>
+                {intro && <span class="muted"> · {shown.replaying ? "replay" : "get ready"}</span>}
                 {history.browsing && <span class="muted"> · looking back</span>}
               </span>
               {allowedMs !== undefined && <BankClock match={match} startsAt={startsAt} now={now} />}
@@ -160,10 +149,7 @@ export function PlayScreen({
                 type="button"
                 class="btn btn-secondary btn-powerup"
                 disabled={left <= 0 || hint !== null}
-                onClick={() => {
-                  play("powerUp");
-                  match.usePowerUp();
-                }}
+                onClick={() => match.usePowerUp()}
               >
                 {hint ? "Asking the engine…" : left === Infinity ? "💡 Show the engine's top 3 (practice)" : `⚡ Power-up: show the top 3 (${left} left)`}
               </button>
@@ -171,6 +157,7 @@ export function PlayScreen({
           </>
         )}
       </div>
+      <MiniTower match={match} />
     </div>
   );
 }

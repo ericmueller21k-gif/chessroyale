@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS, allowedMs, type PlayerState, type Settings } from "@chessroyale/core";
-import { MatchRunner, netBoard, toSan, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
+import { MatchRunner, boardSlots, netBoard, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster } from "@chessroyale/chess";
 import type { BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing } from "./game.ts";
@@ -67,6 +67,9 @@ export class SoloMatch implements GameView {
   }
   standings(): Standing[] {
     return this.runner.leaderboard().map((s) => ({ ...s, isYou: s.id === HUMAN }));
+  }
+  slots(): BoardSlot[] {
+    return this.runner ? boardSlots(this.runner.boards, this.runner.state.boards) : [];
   }
   powerUpsLeft(): number {
     if (this.practice) return Infinity;

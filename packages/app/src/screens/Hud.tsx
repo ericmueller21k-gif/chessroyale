@@ -1,11 +1,13 @@
 import { useState } from "preact/hooks";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { RaceTower, gapToCut } from "../components/RaceTower.tsx";
-import { cutLabel, roundLive, type GameView } from "../game.ts";
+import { BoardsStrip } from "../components/TinyBoard.tsx";
+import { cutLabel, myBoardId, roundLive, type GameView } from "../game.ts";
 
 /**
- * The strip above the board: stage and round, your position, how far you are
- * from the knockout line, and your power-ups. Tap it for the full leaderboard.
+ * Above the board: every board as a tiny live board (yours ringed), then the
+ * strip with stage and round, your position, how far you are from the
+ * knockout line, and your power-ups. Tap the strip for the full leaderboard.
  */
 export function Hud({ match }: { match: GameView }) {
   const [open, setOpen] = useState(false);
@@ -25,6 +27,8 @@ export function Hud({ match }: { match: GameView }) {
   const gap = gapToCut(standings, match.cutoff);
   const left = match.powerUpsLeft();
   return (
+    <>
+    <BoardsStrip slots={match.slots()} current={myBoardId(match)} />
     <div class="hud-row">
       <button type="button" class="hud" onClick={() => setOpen(true)} aria-label="Show the leaderboard">
         <span class="hud-stage">
@@ -73,5 +77,6 @@ export function Hud({ match }: { match: GameView }) {
         </div>
       )}
     </div>
+    </>
   );
 }

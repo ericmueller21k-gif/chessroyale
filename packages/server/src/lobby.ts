@@ -4,6 +4,7 @@ import {
   botRoster,
   legalMoves,
   netBoard,
+  boardSlots,
   toSan,
   type BoardScore,
   type ClientMessage,
@@ -348,8 +349,9 @@ export class LobbyCore {
         cutoff,
         alive: alive.has(h.id),
         botsDoneIn: final ? {} : runner.botThinkTimes(),
+        slots: this.slots(),
       });
-      if (final) this.send(h.id, { t: "final", final: runner.finalView()!, standings: st }, !inRound.has(h.id));
+      if (final) this.send(h.id, { t: "final", final: runner.finalView()!, standings: st, slots: this.slots() }, !inRound.has(h.id));
       else if (!alive.has(h.id)) this.sendSpectate(h.id);
     }
     if (this.r.hostId) {
@@ -365,6 +367,11 @@ export class LobbyCore {
     this.setTimer("lock", deadline + this.settings.lateGraceMs);
   }
 
+  /** Every board slot, for the strip of tiny boards. */
+  private slots() {
+    return boardSlots(this.runner!.boards, this.runner!.state.boards);
+  }
+
   private sendSpectate(id: string) {
     if (!this.runner) return;
     this.send(
@@ -375,6 +382,7 @@ export class LobbyCore {
         standings: this.standings(),
         stage: this.runner.state.stage,
         round: this.runner.state.round,
+        slots: this.slots(),
       },
       false,
     );
@@ -491,7 +499,7 @@ export class LobbyCore {
       const last: NetFinal["last"] = { playerId: p.playerId, move: b.result.playedMove, san: toSan(b.fenBefore, b.result.playedMove), loss: p.loss };
       this.r.phase = "final";
       const st = this.standings();
-      this.broadcast({ t: "final", final: runner.finalView(last)!, standings: st });
+      this.broadcast({ t: "final", final: runner.finalView(last)!, standings: st, slots: this.slots() });
       this.setTimer("afterReveal", this.io.now() + FINAL_SHOW_MS);
       return;
     }
@@ -499,6 +507,7 @@ export class LobbyCore {
     const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
     const st = this.standings();
     const cutoff = this.cutoff();
+    const slots = this.slots();
     for (const h of this.r.humans) {
       const mine = report.boards.find((b) => b.playerIds.includes(h.id));
       const score = mine ? byBoard.get(mine.boardId) : undefined;
@@ -518,6 +527,7 @@ export class LobbyCore {
         standings: st,
         cutoff,
         until,
+        slots,
       });
       if (!mine) this.sendSpectate(h.id);
     }
@@ -547,6 +557,7 @@ export class LobbyCore {
       nextBoards: runner.state.boards.map((b) => netBoard(runner.boards.get(b)!)),
       until,
       placements: { ...this.r.placements },
+      slots: this.slots(),
     });
     this.setTimer("nextRound", until);
   }

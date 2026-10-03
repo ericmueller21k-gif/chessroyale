@@ -1,4 +1,4 @@
-import type { BoardRound, NetFinal, NetStanding } from "@chessroyale/chess";
+import type { BoardRound, BoardSlot, NetFinal, NetStanding } from "@chessroyale/chess";
 import type { Settings } from "@chessroyale/core";
 
 /**
@@ -109,6 +109,16 @@ export interface GameView {
   continueFromBreak(): void;
   /** The 2v2 final once it has started (also during your own turn in it). */
   readonly final: FinalView | null;
+  /** Every board slot as it stands now, for the strip of tiny boards along the top. */
+  slots(): BoardSlot[];
+}
+
+/** The board you're on this turn (highlighted in the strip), if any. */
+export function myBoardId(m: Pick<GameView, "phase" | "final">): number | null {
+  const p = m.phase;
+  if (p.kind === "play" || p.kind === "scoring" || p.kind === "reveal") return p.board.id;
+  if (p.kind === "final") return p.final.board.id;
+  return null;
 }
 
 /** While a round is being played, the leaderboard shows who has moved. */

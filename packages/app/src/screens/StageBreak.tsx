@@ -1,8 +1,6 @@
 import type { BoardView, GameView, Standing } from "../game.ts";
 import { MiniBoard } from "../components/MiniBoard.tsx";
-import { useEffect } from "preact/hooks";
 import { RaceTower } from "../components/RaceTower.tsx";
-import { play } from "../sound.ts";
 
 export function StageBreakScreen(props: {
   match: GameView;
@@ -15,11 +13,6 @@ export function StageBreakScreen(props: {
 }) {
   const { match, stage, standings, knockedOut, cutoff, youOut, nextBoards: boards } = props;
   const finalStage = stage === match.settings.knockoutsPerStage.length - 1;
-  const wasIn = standings.some((s) => s.isYou && !s.out);
-  useEffect(() => {
-    if (youOut) play("out");
-    else if (wasIn) play("safe");
-  }, []);
   return (
     <div class="screen break">
       <h1>Stage {stage + 1} complete</h1>
@@ -27,7 +20,7 @@ export function StageBreakScreen(props: {
         {youOut
           ? `You're out, in ${match.placement}${ordinal(match.placement ?? 0)} place. The rest of the match will be played out quickly.`
           : finalStage
-            ? "You made the duel! One real game for the win."
+            ? "You made the final four! A 2v2 on one board: teammates take turns, and the best average move quality wins."
             : `You're through to stage ${stage + 2}. ${
                 stage + 1 === match.settings.knockoutsPerStage.length - 1
                   ? "The final four share one board, so colours alternate."

@@ -30,7 +30,7 @@ import {
   standingPoints,
   standings,
 } from "@chessroyale/core";
-import type { NetBoard, NetFinal, NetStanding } from "./protocol.ts";
+import type { BoardSlot, NetBoard, NetFinal, NetStanding } from "./protocol.ts";
 import { boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
 import { legalMoves, sideToMove } from "./rules.ts";
@@ -542,6 +542,13 @@ export class MatchRunner {
 }
 
 /** A board as sent to (and shown in) the app. */
+/** Every board slot (live or closed), in slot order, for the strip of tiny boards. */
+export function boardSlots(boards: Map<number, BoardState>, live: number[]): BoardSlot[] {
+  return [...boards.values()]
+    .sort((a, b) => a.id - b.id)
+    .map((b) => ({ id: b.id, fen: b.fen, lastMove: b.lastMove, live: live.includes(b.id) }));
+}
+
 export function netBoard(b: BoardState, withOpening = false): NetBoard {
   const recent = recentMoves(b, 5);
   return {

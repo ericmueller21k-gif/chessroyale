@@ -5,6 +5,7 @@ import {
   type BoardScore,
   type ClientMessage,
   type LobbyPlayer,
+  type BoardSlot,
   type NetBoard,
   type NetStanding,
   type ScoreJob,
@@ -48,6 +49,7 @@ export class NetMatch implements GameView {
   private myPick: string | null = null;
   private currentBoard: NetBoard | null = null;
   private standingsList: NetStanding[] = [];
+  private slotList: BoardSlot[] = [];
   private closed = false;
   private retry = 0;
   /** Top-move searches started while players think (the host's for every board, others' for their own). */
@@ -80,6 +82,9 @@ export class NetMatch implements GameView {
   }
   standings(): Standing[] {
     return this.standingsList.map((s) => ({ ...s, isYou: s.id === this.myId }));
+  }
+  slots(): BoardSlot[] {
+    return this.slotList;
   }
   powerUpsLeft(): number {
     if (this.practice) return Infinity;
@@ -173,6 +178,7 @@ export class NetMatch implements GameView {
 
   private onMessage(m: ServerMessage) {
     this.offset = m.now - Date.now();
+    if ("slots" in m && m.slots) this.slotList = m.slots;
     switch (m.t) {
       case "welcome":
         this.myId = m.playerId;

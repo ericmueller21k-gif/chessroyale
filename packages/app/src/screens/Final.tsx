@@ -5,7 +5,6 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { FinalView, GameView } from "../game.ts";
 import { seenKey } from "../hooks.ts";
-import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
 
 /** Which colour each team has: teams[0] had the move when the final started. */
@@ -33,7 +32,6 @@ export function FinalScreen({ match, final }: { match: GameView; final: FinalVie
     .filter((id) => final.scores[id]?.avg !== null)
     .sort((a, b) => final.scores[a]!.avg! - final.scores[b]!.avg!)[0];
   useEffect(() => {
-    if (final.last && final.last.loss !== null && final.last.loss < 0.5) play("chosen");
     // Everyone watches the final board, so nothing needs replaying on your turn.
     match.seen.set(seenKey(final.board), final.board.ply);
   }, [final.turn]);
