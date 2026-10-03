@@ -36,6 +36,7 @@ export function HomeScreen({
   loading,
   joinCode,
   error,
+  onSoundLab,
 }: {
   onStart: (name: string, practice: boolean) => void;
   onCreateLobby: (name: string, practice: boolean) => void;
@@ -43,6 +44,7 @@ export function HomeScreen({
   loading: boolean;
   joinCode?: string;
   error?: string | null;
+  onSoundLab?: () => void;
 }) {
   const [code, setCode] = useState(joinCode ?? "");
   const [practice, setPractice] = useState(() => {
@@ -193,6 +195,11 @@ export function HomeScreen({
         </div>
       </div>
       {error && <p class="out-msg">{error}</p>}
+      {onSoundLab && (
+        <button type="button" class="link-btn" onClick={onSoundLab}>
+          🔊 Sound lab: choose the reveal's roulette sound
+        </button>
+      )}
       <p class="muted small">
         Engine: <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0,{" "}
         <a href="https://github.com/official-stockfish/Stockfish">source</a>), running in your browser.

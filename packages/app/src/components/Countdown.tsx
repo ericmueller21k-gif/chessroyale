@@ -60,10 +60,11 @@ export function TimerBar({ startsAt, deadline, total }: { startsAt: number; dead
  * "Round end" banner in one place, and a big 3, 2, 1 in the middle of the
  * board that grows, shrinks and fades. `n` is null while only the banner shows.
  */
-export function CenterCount({ label, n }: { label: string; n: number | null }) {
+export function CenterCount({ label, n, note }: { label: string; n: number | null; note?: string | null }) {
   return (
     <div class="center-count" role="status" aria-live="polite">
       <div class="cc-banner">{label}</div>
+      {note && <div class="cc-note">{note}</div>}
       {n !== null && n > 0 && (
         <div class="cc-num" key={n}>
           {n}

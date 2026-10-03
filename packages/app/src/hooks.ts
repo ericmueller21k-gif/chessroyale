@@ -17,7 +17,7 @@ export function useReplay(
   match: GameView,
   board: BoardView,
   withinMs = 2500,
-): { fen: string; lastMove: string | null; replaying: boolean } {
+): { fen: string; lastMove: string | null; replaying: boolean; fromStart: boolean } {
   const [frames] = useState(() => {
     const key = seenKey(board);
     const last = match.seen.get(key);
@@ -53,6 +53,8 @@ export function useReplay(
     const t = setTimeout(() => setStep((s) => s + 1), step === 0 ? 400 : stepMs);
     return () => clearTimeout(t);
   }, [step, frames.length]);
-  if (!frames.length || step >= frames.length - 1) return { fen: board.fen, lastMove: board.lastMove, replaying: false };
-  return { ...frames[step]!, replaying: true };
+  // A replay from move 0 starts at the initial position.
+  const fromStart = frames[0]?.fen === START_FEN && frames.length > 1;
+  if (!frames.length || step >= frames.length - 1) return { fen: board.fen, lastMove: board.lastMove, replaying: false, fromStart };
+  return { ...frames[step]!, replaying: true, fromStart };
 }

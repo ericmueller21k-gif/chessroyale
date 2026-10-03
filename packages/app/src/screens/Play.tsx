@@ -92,7 +92,13 @@ export function PlayScreen({
           <EvalBar fen={history.fen ?? board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />
           <Board fen={fen} orientation={side === "w" ? "white" : "black"} lastMove={lastMove} interactive={canMove} onMove={(m) => match.submit(m)} arrows={arrows}>
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} />}
-            {intro && <CenterCount label="Round start" n={introLeft <= COUNT_FROM_SECONDS ? introLeft : null} />}
+            {intro && (
+              <CenterCount
+                label="Round start"
+                n={introLeft <= COUNT_FROM_SECONDS ? introLeft : null}
+                note={shown.replaying ? (shown.fromStart ? "New board: replaying it from the start" : "Replaying the moves you missed") : null}
+              />
+            )}
             {ending && <CenterCount label="Round end" n={secsLeft} />}
           </Board>
         </div>
