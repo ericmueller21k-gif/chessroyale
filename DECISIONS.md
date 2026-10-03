@@ -335,3 +335,11 @@ Eric's requests; the details were my call.
   bright two-note flick climbing a major arpeggio (C-E-G-C), so it rolls faster then slower with the reel. When it
   lands, the winning move blinks three times with three identical tones. Both are synthesised placeholders until Eric
   finds a sample.
+
+## Paid hosting and a domain are on the table (Oct 3, 2026)
+
+Eric will front money for hosting and services, and wants a good URL. Plan: stay on Cloudflare and add a custom
+domain bought through Cloudflare Registrar (sold at cost, no markup) so DNS, hosting and the Worker live in one
+account. Accounts, profiles and ranked will use Cloudflare D1 (SQL) for players and match history. Workers Paid
+($5/month) only if we outgrow the free limits (Durable Object requests or CPU time). Eric does the purchases; I'll
+recommend specific options with prices when we get there.
