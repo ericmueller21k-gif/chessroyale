@@ -634,11 +634,11 @@ p {
     row-gap: 10px;
     align-content: start;
   }
-  .screen.game .boards-strip {
+  .screen.game .hud-row {
     grid-column: 1 / -1;
     grid-row: 1;
   }
-  .screen.game .hud-row {
+  .screen.game .boards-strip {
     grid-column: 1 / -1;
     grid-row: 2;
   }
@@ -650,7 +650,7 @@ p {
     width: min(100%, calc(100dvh - 215px));
   }
   .screen.game .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 24px), calc(100dvh - 215px));
+    width: min(calc(100% - 48px), calc(100dvh - 215px));
   }
   .screen.game .play-footer,
   .screen.game .reveal,
@@ -681,7 +681,7 @@ p {
   width: 100%;
 }
 .board-row .eval-bar ~ .board-wrap {
-  width: min(calc(100% - 24px), calc(100dvh - 330px));
+  width: min(calc(100% - 48px), calc(100dvh - 330px));
 }
 .eval-bar {
   position: relative;
@@ -1091,9 +1091,21 @@ p {
   color: var(--danger);
 }
 .btn-powerup {
-  flex: none;
-  min-height: 46px;
-  font-size: 15px;
+  justify-self: center;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.btn-powerup:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 .hints {
   list-style: none;
@@ -1357,18 +1369,17 @@ p {
 
 .history-nav {
   display: grid;
-  grid-template-columns: 40px 48px 1fr 48px 40px;
+  grid-template-columns: 44px 1fr 44px;
   align-items: center;
   gap: 6px;
   width: 100%;
 }
-.history-nav button {
-  height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
+.history-nav > button:not(.history-label) {
+  height: 32px;
+  border: none;
+  background: none;
   color: var(--text);
-  font-size: 15px;
+  font-size: 18px;
   cursor: pointer;
 }
 .history-nav button:disabled {
@@ -1376,10 +1387,27 @@ p {
   cursor: default;
 }
 .history-label {
+  justify-self: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+button.history-label {
+  color: var(--accent);
+  cursor: pointer;
+}
+.move-clock {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.move-clock.low {
+  color: var(--danger);
 }
 .history-nav.browsing .history-label {
   color: var(--accent);
@@ -1771,18 +1799,18 @@ p {
     gap: 8px;
   }
   .screen.game .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 370px));
+    width: min(100%, calc(100dvh - 335px));
     min-width: 220px;
   }
   .screen.game .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 24px), calc(100dvh - 370px));
+    width: min(calc(100% - 48px), calc(100dvh - 335px));
   }
   /* With the scoreboard minimised, the board takes the room. */
   .screen.game:has(.mini-tower.closed) .board-area .board-wrap {
-    width: min(100%, calc(100dvh - 290px));
+    width: min(100%, calc(100dvh - 255px));
   }
   .screen.game:has(.mini-tower.closed) .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 24px), calc(100dvh - 290px));
+    width: min(calc(100% - 48px), calc(100dvh - 255px));
   }
   .screen.game .mini-tower {
     flex: 1 1 0;
@@ -1799,16 +1827,13 @@ p {
     font-size: 12px;
     line-height: 14px;
   }
-  .screen.game .history-nav button {
-    height: 30px;
+  .screen.game .history-nav > button:not(.history-label) {
+    height: 28px;
   }
   .screen.game .play-footer {
     gap: 6px;
   }
-  .screen.game .btn-powerup {
-    min-height: 42px;
-    font-size: 15px;
-  }
+
   .screen.game .waiting-banner {
     min-height: 42px;
   }
@@ -1857,4 +1882,24 @@ p {
   .screen.game .final-panel > p {
     display: none;
   }
+}
+
+/* The strip above the boards: one clean line, no box (sound toggle too). */
+.screen.game .hud,
+.screen.game .mute-btn {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.screen.game .hud {
+  padding: 0 2px;
+}
+.screen.game .mute-btn {
+  width: 36px;
+}
+
+/* The evaluation bar sits left of the board; a matching gap on the right keeps the board centred. */
+.board-row:has(.eval-bar)::after {
+  content: "";
+  flex: 0 0 18px;
 }

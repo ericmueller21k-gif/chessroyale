@@ -5,9 +5,9 @@ import { BoardsStrip } from "../components/TinyBoard.tsx";
 import { cutLabel, myBoardId, roundLive, type GameView } from "../game.ts";
 
 /**
- * Above the board: every board as a tiny live board (yours ringed), then the
- * strip with stage and round, your position, how far you are from the
- * knockout line, and your power-ups. Tap the strip for the full leaderboard.
+ * Above the board: one clean line with stage and round, your position, how
+ * far you are from the knockout line and your power-ups (tap it for the full
+ * leaderboard), then every board as a tiny live board (yours ringed).
  */
 export function Hud({ match }: { match: GameView }) {
   const [open, setOpen] = useState(false);
@@ -28,7 +28,6 @@ export function Hud({ match }: { match: GameView }) {
   const left = match.powerUpsLeft();
   return (
     <>
-    <BoardsStrip slots={match.slots()} current={myBoardId(match)} />
     <div class="hud-row">
       <button type="button" class="hud" onClick={() => setOpen(true)} aria-label="Show the leaderboard">
         <span class="hud-stage">
@@ -77,6 +76,7 @@ export function Hud({ match }: { match: GameView }) {
         </div>
       )}
     </div>
+    <BoardsStrip slots={match.slots()} current={myBoardId(match)} />
     </>
   );
 }

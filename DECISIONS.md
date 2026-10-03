@@ -250,3 +250,19 @@ Eric's requests; the details were my call.
 - **Sounds: piece sounds and a clock tick, nothing else.** The tick is a short, dry click (filtered noise, like a
   watch) used by every timer: the last 10 s of the move clock and the 3-2-1 of "Round start". The marimba cues for
   the round start, power-up, reel, landing, cuts and win are all removed.
+
+## Cleaner play screen (Oct 3, 2026)
+
+Eric's requests; the details were my call.
+
+- **The stage/position strip moved above the tiny boards** and lost its white box and border, as did the sound
+  toggle: one clean line, left to right ("S1 · R1/5  P12/64  +3.1 safe … ⚡1 ☰ 🔊"). Tapping it still opens the full
+  leaderboard.
+- **The board is centred on the screen.** The evaluation bar stays on the left, and an equal empty gap on the right
+  balances it.
+- **History is just ◀ on the left and ▶ on the right**, with no boxes. ⏮ and ⏭ are gone. While you're looking back,
+  the middle says "Move 14 · 27/40 · back to live"; tap it to return.
+- **Your move clock is shown small in the middle below the board** (0:24), turning red for the last 10 s, with the
+  bar on the board's top edge as well. "You play White" and the bank clock are gone from the play screen. The bank
+  is still in the full leaderboard.
+- **The power-up is a small outlined pill** ("⚡ Power-up: top 3 moves · 1 left") instead of a full-width button.
