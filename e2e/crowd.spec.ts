@@ -47,3 +47,38 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, votes at
   const places = await page.evaluate(() => (window as any).match.runner.state.players.map((p: any) => p.placement).sort((a: number, b: number) => a - b));
   expect(places).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
 });
+
+test("the board never moves or resizes during a turn (Crowd and Classic)", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  for (const mode of ["crowd", "classic"]) {
+    await page.goto(`/?debug&pace=quick&mode=${mode}`);
+    await page.getByLabel("Your name").fill("T");
+    await page.getByRole("button", { name: /Play solo/ }).click();
+    await expect.poll(() => phase(page), { timeout: 30_000 }).toMatch(/play|watching/);
+    const rects = new Map<string, Set<string>>();
+    const stopAt = Date.now() + 25_000;
+    while (Date.now() < stopAt) {
+      const [kind, rect] = await page.evaluate(async () => {
+        const m = (window as any).match;
+        const k = m.phase.kind;
+        if (k === "play" && !(window as any).__sub && Date.now() > m.phase.startsAt + 1000) {
+          (window as any).__sub = 1;
+          const top = await m.runner.topMovesFor(m.phase.board.fen);
+          if (m.phase.kind === "play") m.submit(top[0].move);
+          setTimeout(() => ((window as any).__sub = 0), 500);
+        }
+        const r = document.querySelector(".board-wrap .board")?.getBoundingClientRect();
+        return [k, r ? `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}` : "none"];
+      });
+      if (["play", "scoring", "watching", "reveal"].includes(kind)) {
+        if (!rects.has(rect)) rects.set(rect, new Set());
+        rects.get(rect)!.add(kind);
+      }
+      if (kind === "stageBreak" && mode === "classic") await page.evaluate(() => (window as any).match.continueFromBreak());
+      await page.waitForTimeout(100);
+    }
+    const summary = [...rects].map(([r, k]) => `${r} (${[...k].join("/")})`);
+    expect(summary, `${mode}: board positions seen`).toHaveLength(1);
+    expect([...rects.values()][0]!.size).toBeGreaterThanOrEqual(3);
+  }
+});
