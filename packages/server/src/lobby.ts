@@ -2,6 +2,8 @@ import { DEFAULT_SETTINGS, allowedMs, botVotes, raidBossElo, clockAfterVote, cut
 import {
   MatchRunner,
   botRoster,
+  bossIntroTimeline,
+  bossShowMs,
   legalMoves,
   netBoard,
   boardSlots,
@@ -141,10 +143,8 @@ const SCORE_TIMEOUT_MS = 15_000;
 const FINAL_SHOW_MS = 3200;
 const FINAL_CUT_MS = 1800;
 /** Boss battle: how long the boss's move shows, how long a strike shows, and how long the host has to play the boss. */
-const BOSS_SHOW_MS = 1800;
 const BOSS_KILL_MS = 3800;
 const BOSS_TIMEOUT_MS = 15_000;
-const BOSS_INTRO_MS = 5500;
 /** The God King's summoning and bolt, added to a reveal where he plays the move. */
 const KING_FX_MS = 3900;
 
@@ -384,6 +384,8 @@ export class LobbyCore {
     this.r.phase = voting ? "vote" : "opening";
     this.broadcast(this.lobbyMessage(), false);
     if (voting) return this.startVote(0);
+    // Boss raid: straight to the boss's intro, which replays the opening from the starting position itself.
+    if (this.settings.raid) return this.setTimer("startRound", now + 300);
     this.broadcast({
       t: "opening",
       boards: [...this.runner.boards.values()].map((b) => netBoard(b, true)),
@@ -527,7 +529,7 @@ export class LobbyCore {
   private playBoss(move: string) {
     this.r.bossKey = undefined;
     this.runner!.applyBossMove(move);
-    const until = this.io.now() + BOSS_SHOW_MS;
+    const until = this.io.now() + bossShowMs(this.runner!.bossView()?.lastMove);
     this.broadcast(this.bossMessage(until));
     this.setTimer("nextRound", until);
   }
@@ -562,7 +564,7 @@ export class LobbyCore {
         // The boss arrives: it takes over from an even position of the game just played.
         this.r.bossIntroDone = true;
         this.r.phase = "boss";
-        const until = this.io.now() + BOSS_INTRO_MS;
+        const until = this.io.now() + bossIntroTimeline(runner.boards.get(runner.state.boards[0]!)!.history.length).total;
         this.broadcast({ ...this.bossMessage(until), intro: true } as Outgoing);
         return this.setTimer("nextRound", until);
       }

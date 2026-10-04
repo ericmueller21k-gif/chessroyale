@@ -5,3 +5,4 @@ export * from "./boards.ts";
 export * from "./runner.ts";
 export * from "./protocol.ts";
 export * from "./bots.ts";
+export * from "./boss-timing.ts";

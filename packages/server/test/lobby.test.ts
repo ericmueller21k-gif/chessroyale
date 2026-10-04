@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
-import { legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { bossIntroTimeline, legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -435,7 +435,11 @@ describe("lobby: Crowd mode", () => {
     expect(intro.boss.raid).toBe(true);
     expect(intro.boss.openingName).toBeTruthy();
     expect(intro.boss.board.ply).toBe(10);
-    L.advance(6000);
+    // No opening screen first: the intro replays the opening from the start itself, then "START!".
+    expect(L.last("p2", "opening")).toBeUndefined();
+    const introMs = bossIntroTimeline(10).total;
+    expect(intro.until - intro.now).toBe(introMs);
+    L.advance(introMs);
     const r = L.last("p1", "round")!;
     expect(r.board).toBeTruthy();
     // One calls the King's strike: not a majority of 2 yet.
