@@ -1,9 +1,10 @@
 import { DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, modeSettings, type DrawRule } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
+import { handleAccountApi, type AccountEnv } from "./api.ts";
 
 export { Lobby } from "./lobby-do.ts";
 
-export interface Env {
+export interface Env extends AccountEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   ASSETS: Fetcher;
 }
@@ -18,6 +19,9 @@ const json = (body: unknown, status = 200) =>
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    // Accounts: /api/me, /api/results, /api/auth/*
+    const account = await handleAccountApi(request, env);
+    if (account) return account;
     // POST /api/lobby → { code }
     if (url.pathname === "/api/lobby" && request.method === "POST") {
       for (let i = 0; i < 5; i++) {
