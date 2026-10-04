@@ -7,7 +7,7 @@ import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
-import { KingCalls } from "../components/KingAlly.tsx";
+import { BossDock, Dots } from "../components/BossDock.tsx";
 import { KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { useReplay } from "../hooks.ts";
@@ -118,6 +118,8 @@ export function PlayScreen({
         <div class="opening-name">
           {match.final ? (
             <FinalTurnLabel match={match} side={side} />
+          ) : match.boss ? (
+            <BossHeading side={side} note={`${doneCount}/${alive.length} picked`} />
           ) : match.settings.mode === "crowd" ? (
             <>
               Your pick for <strong>{side === "w" ? "White" : "Black"}</strong> ·{" "}
@@ -145,27 +147,51 @@ export function PlayScreen({
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={side === "w" ? "white" : "black"} />}
           </Board>
         </div>
-        <HistoryNav
-          view={history}
-          total={board.history.length}
-          extra={
-            match.boss ? (
-              // Boss battle: power-ups became the King's charges.
-              <KingCalls
-                charges={match.boss.kingCharges}
-                called={match.kingCalled}
-                strike={strike}
-                struck={match.boss.staggerNext}
-                canCall={!waiting && !intro && !shown.replaying && !striking}
-                onCall={(s) => match.callKing(s)}
-              />
+        {!match.boss && (
+          <HistoryNav
+            view={history}
+            total={board.history.length}
+            extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />}
+          />
+        )}
+      </div>
+      {match.boss ? (
+        <BossDock
+          match={match}
+          nav={{ view: history, total: board.history.length }}
+          canCall={!waiting && !intro && !shown.replaying && !striking}
+          strike={strike}
+          status={
+            striking ? (
+              <span>
+                <strong>👑 The God King strikes the boss!</strong> <span class="muted">The clock is stopped.</span>
+              </span>
+            ) : waiting ? (
+              <span>
+                <Dots /> <strong>{picked ? "Move in." : "Time's up."}</strong>{" "}
+                <span class="muted">
+                  Waiting for the others · {doneCount}/{alive.length}
+                </span>
+              </span>
+            ) : intro ? (
+              <span class="muted">Get ready…</span>
+            ) : strike?.mine && !match.boss.staggerNext ? (
+              <span>
+                <strong>Strike called.</strong>{" "}
+                <span class="muted">
+                  {strike.calls} of {strike.needed} needed. Pick your move meanwhile.
+                </span>
+              </span>
             ) : (
-              <PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />
+              <span>
+                <strong>Your move.</strong>{" "}
+                <span class="muted">{match.boss.staggerNext ? "The boss is staggered: its next move will be weaker." : match.boss.kingCharges > 0 ? "Or summon the God King." : ""}</span>
+              </span>
             )
           }
         />
-      </div>
-      <div class="play-footer">
+      ) : (
+        <div class="play-footer">
         {waiting ? (
           <div class="waiting-banner" role="status">
             <span class="waiting-dots" aria-hidden="true">
@@ -174,7 +200,7 @@ export function PlayScreen({
               <i />
             </span>
             <span>
-              <strong>{match.kingCalled ? "God King called." : picked ? "Move in." : "Time's up."}</strong> Waiting for other players
+              <strong>{picked ? "Move in." : "Time's up."}</strong> Waiting for other players
             </span>
             {alive.length > 0 && (
               <span class="waiting-count">
@@ -198,7 +224,18 @@ export function PlayScreen({
           </>
         )}
       </div>
+      )}
       <MiniTower match={match} />
     </div>
+  );
+}
+
+/** Boss battle: the line above the board, the same on every screen of it. */
+export function BossHeading({ side, note }: { side: "w" | "b"; note?: string }) {
+  return (
+    <>
+      <strong>BOSS BATTLE</strong> · you play {side === "w" ? "White" : "Black"}
+      {note ? <> · {note}</> : null}
+    </>
   );
 }

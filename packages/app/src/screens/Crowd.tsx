@@ -8,6 +8,8 @@ import { MiniTower } from "../components/MiniTower.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
 import { KingSummon, kingSquare } from "../components/GodKing.tsx";
+import { BossDock, Dots } from "../components/BossDock.tsx";
+import { BossHeading } from "./Play.tsx";
 import { crowdAnimations, onPrefsChange } from "../prefs.ts";
 import { finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { seenKey } from "../hooks.ts";
@@ -199,7 +201,13 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
       <Hud match={match} />
       <div class="board-area">
         <div class="opening-name">
-          <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
+          {match.boss ? (
+            <BossHeading side={sideToMove(fen)} note={mine.king ? "the God King's move" : `${voters} ${voters === 1 ? "vote" : "votes"}`} />
+          ) : (
+            <>
+              <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
+            </>
+          )}
         </div>
         {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
         <div class="board-row">
@@ -220,6 +228,47 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
         </Board>
         </div>
       </div>
+      {match.boss ? (
+        <BossDock
+          match={match}
+          status={
+            <>
+              <span class="dock-line">
+                {!landed ? (
+                  mine.king ? (
+                    <strong>👑 The God King answers the call…</strong>
+                  ) : (
+                    <>
+                      <Dots /> <strong>Counting the votes…</strong>
+                    </>
+                  )
+                ) : mine.king ? (
+                  <>
+                    <strong class="gold">👑 The God King plays {toSan(fen, mine.result.playedMove)}</strong>{" "}
+                    <span class="muted">· {mine.kingCalls} of {picks.length} called him</span>
+                  </>
+                ) : (
+                  <>
+                    <strong>The crowd plays {toSan(fen, mine.result.playedMove)}</strong>{" "}
+                    <span class="muted">
+                      · {picks.filter((p) => p.move === mine.result.playedMove).length} of {voters} {voters === 1 ? "vote" : "votes"}
+                    </span>
+                  </>
+                )}
+              </span>
+              <span class="dock-line muted">
+                {!me
+                  ? `Your team watched this one · best was ${toSan(fen, mine.bestMove)}`
+                  : !me.move
+                    ? mine.king !== undefined && match.kingCalled
+                      ? "You called the King: no score for you this move."
+                      : "No move from you this time."
+                    : `You picked ${toSan(fen, me.move)} (${fmt(me.roundScore)}) · best was ${toSan(fen, mine.bestMove)}`}
+              </span>
+            </>
+          }
+        />
+      ) : (
       <div class="poll" role="status">
         {rows.map((r) => {
           const win = landed && r.move === mine.result.playedMove;
@@ -266,6 +315,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           )}
         </div>
       </div>
+      )}
       <MiniTower match={match} />
     </div>
   );

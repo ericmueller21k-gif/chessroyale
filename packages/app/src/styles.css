@@ -3089,30 +3089,11 @@ button.history-label {
   color: #ffb4b4;
   text-align: right;
 }
-.boss-panel {
-  display: grid;
-  gap: 8px;
-}
-.boss-status {
-  min-height: 2.6em;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.boss-fallen {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  align-items: center;
-}
-.boss-fallen-name,
 .final-out-name {
   font-size: 13px;
   color: var(--muted);
   text-decoration: line-through;
 }
-.boss-fallen-name.you,
 .final-out-name.you {
   color: var(--bad);
 }
@@ -3326,11 +3307,6 @@ button.history-label {
 .king-row .poll-bar i {
   background: #d4a531;
 }
-.boss-king {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 .king-calls {
   display: flex;
   align-items: center;
@@ -3344,21 +3320,6 @@ button.history-label {
 .king-call.strike.on {
   background: #c2410c;
   color: #fff;
-}
-.king-calls.confirming {
-  padding: 6px 8px;
-  border-radius: 12px;
-  border: 2px solid #d4a531;
-  background: color-mix(in srgb, #d4a531 10%, var(--surface));
-  animation: banner-in 200ms ease-out;
-}
-.king-confirm-text {
-  flex: 1 1 180px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.king-confirm-text .muted {
-  font-weight: 400;
 }
 .king-call.yes {
   background: #d4a531;
@@ -3519,4 +3480,73 @@ button.history-label {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* ---- Boss battle: the dock under the board (same size on every screen, so nothing moves) ---- */
+.boss-dock {
+  display: grid;
+  gap: 6px;
+  flex: none;
+}
+.boss-dock-controls {
+  height: 36px;
+}
+.boss-dock .nav-middle.king-calls {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.boss-dock .king-call {
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+.boss-dock .king-charges {
+  font-size: 12px;
+  letter-spacing: -2px;
+  white-space: nowrap;
+}
+.boss-dock-status {
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 12px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 19px;
+}
+.boss-dock-status > span:only-child:not(.dock-line) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dock-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dock-line.muted {
+  font-size: 13px;
+}
+.dock-line:empty {
+  display: none;
+}
+.boss-dock-status .gold {
+  color: #d4a531;
+}
+.boss-dock-status .bad {
+  color: var(--bad);
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game .boss-dock {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    margin-top: 24px;
+  }
 }
