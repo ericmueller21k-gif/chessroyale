@@ -30,6 +30,7 @@ export interface AccountEnv {
 
 export const SESSION_COOKIE = "hc_session";
 const STATE_COOKIE = "hc_oauth";
+const NEXT_COOKIE = "hc_next";
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
@@ -41,6 +42,14 @@ export function readCookie(request: Request, name: string): string | null {
 const cookie = (name: string, value: string, maxAge: number) =>
   `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 const sessionCookie = (token: string) => cookie(SESSION_COOKIE, token, 365 * 86_400);
+
+/** Online play needs a signed-in account once a way to sign in is set up (guests play solo against bots). */
+export const signInRequired = (env: AccountEnv) => !!((env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) || env.RESEND_API_KEY);
+export const isSignedIn = (user: User | null) => !!(user && (user.email || user.google_sub));
+export const SIGN_IN_TO_PLAY = "Sign in to play online. Guests can play solo against bots.";
+
+/** Where to go after signing in: a path on this site only. */
+const safeNext = (next: string | null) => (next && /^\/(?!\/)[\w\-/]*$/.test(next) ? next : "/");
 
 /** The account behind a request's session cookie (for the lobby server). */
 export async function accountOf(request: Request, env: AccountEnv): Promise<User | null> {
@@ -57,7 +66,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (!path.startsWith("/api/me") && !path.startsWith("/api/auth/") && path !== "/api/results") return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
   const email = !!env.RESEND_API_KEY;
-  if (path === "/api/auth/config") return json({ accounts: !!env.DB, google, email });
+  if (path === "/api/auth/config") return json({ accounts: !!env.DB, google, email, onlineNeedsSignIn: !!env.DB && signInRequired(env) });
   if (!env.DB) return json({ message: "Accounts aren't set up yet." }, 503);
   const sql: Sql = d1Sql(env.DB);
   await ensureSchema(sql, env.DB);
@@ -151,10 +160,10 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       state,
       prompt: "select_account",
     });
-    return new Response(null, {
-      status: 302,
-      headers: { location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "set-cookie": cookie(STATE_COOKIE, state, 600), "cache-control": "no-store" },
-    });
+    const headers = new Headers({ location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "cache-control": "no-store" });
+    headers.append("set-cookie", cookie(STATE_COOKIE, state, 600));
+    headers.append("set-cookie", cookie(NEXT_COOKIE, safeNext(url.searchParams.get("next")), 600));
+    return new Response(null, { status: 302, headers });
   }
   if (path === "/api/auth/google/callback" && request.method === "GET") {
     if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
@@ -172,7 +181,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const claims = id_token ? (JSON.parse(atob(id_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string; email?: string; email_verified?: boolean; name?: string; aud?: string }) : null;
     if (!claims?.sub || claims.aud !== env.GOOGLE_CLIENT_ID) return Response.redirect(`${url.origin}/?signin=failed`, 302);
     const user = await signInWithIdentity(sql, current, "google", claims.sub, { email: claims.email_verified ? (claims.email ?? null) : null, name: claims.name ?? null }, now);
-    return signInAs(user, `${url.origin}/?signin=google`);
+    return signInAs(user, `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}?signin=google`);
   }
 
   return json({ message: "Not found" }, 404);

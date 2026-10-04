@@ -23,7 +23,7 @@ export interface Profile {
 
 export interface AccountState {
   /** Sign-in options the server has set up (null until known; accounts false = no accounts here). */
-  config: { accounts: boolean; google: boolean; email: boolean } | null;
+  config: { accounts: boolean; google: boolean; email: boolean; onlineNeedsSignIn?: boolean } | null;
   profile: Profile | null;
 }
 
@@ -68,9 +68,13 @@ export async function updateProfile(patch: { name?: string; icon?: string }): Pr
   set({ profile: await api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify(patch) }) });
 }
 
-export const signInWithGoogle = () => {
-  location.href = "/api/auth/google/start";
+/** Off to Google; it sends you back to `next` (this page by default). */
+export const signInWithGoogle = (next = location.pathname) => {
+  location.href = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
 };
+
+/** Online play needs signing in (once sign-in is set up); guests play solo against bots. */
+export const mustSignInToPlayOnline = () => !!state.config?.onlineNeedsSignIn && !state.profile?.user.signedIn;
 
 export async function sendEmailCode(email: string): Promise<void> {
   await api("/api/auth/email/start", { method: "POST", body: JSON.stringify({ email }) });

@@ -4,7 +4,7 @@ const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? 
 
 test("only piece sounds, clock ticks and the reveal reel play, and muting silences them", async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
-  await page.goto("/?debug&pace=quick");
+  await page.goto("/?debug&mode=classic&pace=quick");
   await page.getByLabel("Your name").fill("T");
   await page.getByRole("button", { name: /Play solo/ }).click();
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");

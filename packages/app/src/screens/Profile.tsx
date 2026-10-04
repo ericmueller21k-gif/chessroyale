@@ -1,14 +1,12 @@
 import { useEffect, useState } from "preact/hooks";
 import { ordinal } from "./StageBreak.tsx";
+import { SignIn } from "../components/SignIn.tsx";
 import {
   ICONS,
   account,
   onAccountChange,
-  sendEmailCode,
-  signInWithGoogle,
   signOut,
   updateProfile,
-  verifyEmailCode,
   type ModeStats,
 } from "../account.ts";
 
@@ -46,9 +44,6 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
   const { config, profile } = useAccount();
   const [tab, setTab] = useState<"all" | "classic" | "crowd">("all");
   const [name, setName] = useState(profile?.user.name ?? "");
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => setName(profile?.user.name ?? ""), [profile?.user.name]);
@@ -134,37 +129,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
       {!u.signedIn && config && (config.google || config.email) && (
         <div class="signin">
           <h2>Keep your profile</h2>
-          {config.google && (
-            <button type="button" class="btn btn-google" onClick={signInWithGoogle}>
-              <span aria-hidden="true">G</span> Continue with Google
-            </button>
-          )}
-          {config.email &&
-            (codeSent ? (
-              <div class="signin-row">
-                <input inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" maxLength={6} value={code} onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ""))} />
-                <button type="button" class="btn btn-primary" disabled={busy || code.length !== 6} onClick={() => void run(() => verifyEmailCode(email, code), "You're signed in.")}>
-                  Sign in
-                </button>
-              </div>
-            ) : (
-              <div class="signin-row">
-                <input type="email" autoComplete="email" placeholder="you@example.com" value={email} onInput={(e) => setEmail(e.currentTarget.value)} />
-                <button
-                  type="button"
-                  class="btn btn-secondary"
-                  disabled={busy || !email.includes("@")}
-                  onClick={() =>
-                    void run(async () => {
-                      await sendEmailCode(email);
-                      setCodeSent(true);
-                    }, `We sent a code to ${email}.`)
-                  }
-                >
-                  Email me a code
-                </button>
-              </div>
-            ))}
+          <SignIn google={config.google} email={config.email} next="/profile" />
         </div>
       )}
       {msg && <p class="muted small">{msg}</p>}

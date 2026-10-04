@@ -190,6 +190,15 @@ export const CROWD_SETTINGS: Partial<Settings> = {
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "augments" | "stageBreakSeconds">) => (s.augments ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
 
+/**
+ * Only the keys that are actually set. Spread over a mode's settings, an
+ * unset playtest option (`rounds: undefined`) would otherwise wipe the mode's
+ * own value and leave the Classic default in its place.
+ */
+export function definedOnly<T extends object>(o: T): Partial<T> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
 /** Settings for a mode (Classic is the default). */
 export function modeSettings(mode: GameMode, opts: { crowdTeams?: boolean; augments?: boolean } = {}): Partial<Settings> {
   if (mode !== "crowd") return {};
