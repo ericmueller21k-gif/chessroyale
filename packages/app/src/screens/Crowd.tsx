@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { applyMove, sideToMove, toSan } from "@chessroyale/chess";
+import { applyMove, inCheck, pieceAt, sideToMove, toSan } from "@chessroyale/chess";
+import type { KingCue } from "../godKing.ts";
 import type { Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
@@ -172,6 +173,21 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     const from = mine.result.playedMove.slice(0, 2);
     return { side: crowd, orientation: orient, kingBefore: before, kingAfter: later, target: from === before ? null : from, mode: "move" as const, startAt: start + landAt, moveAt: start + playAt, exitAt };
   }, [mine, landAt, playAt]);
+  // The God King's word on the crowd's move, once it lands.
+  const kingCues = useMemo(() => {
+    if (!match.boss) return [];
+    if (mine.king) return [{ cue: "kingPlays" as KingCue, key: `kingplays-${fen}` }];
+    const played = mine.result.playedMove;
+    const loss = picks.find((p) => p.move === played)?.loss ?? null;
+    const key = `crowd-${fen}`;
+    const out: { cue: KingCue; key: string }[] = [];
+    if (loss !== null && loss >= 12) out.push({ cue: "badMove", key });
+    if (inCheck(applyMove(fen, played))) out.push({ cue: "crowdCheck", key });
+    if (pieceAt(fen, played.slice(2, 4))) out.push({ cue: "crowdCapture", key });
+    if (loss !== null && loss <= 1) out.push({ cue: "greatMove", key });
+    else if (loss !== null && loss <= 4) out.push({ cue: "goodMove", key });
+    return out;
+  }, [mine]);
   const team = myTeam(match);
   const orientation = (team ?? sideToMove(fen)) === "w" ? "white" : "black";
   const voters = picks.filter((p) => p.move).length;
@@ -231,6 +247,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
       {match.boss ? (
         <BossDock
           match={match}
+          side={sideToMove(fen)}
+          cues={mine.king ? kingCues : landed ? kingCues : []}
+          away={!!godKing && now >= godKing.startAt && now < godKing.exitAt + 900}
           status={
             <>
               <span class="dock-line">

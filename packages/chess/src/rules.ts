@@ -57,3 +57,29 @@ export function fenAfter(uciMoves: readonly string[], startFen = START_FEN): str
   for (const m of uciMoves) chess.move({ from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] });
   return chess.fen();
 }
+
+/**
+ * Whether `color`'s queen (any of them) is attacked by the other side and not
+ * safely defended: attacked by a cheaper piece, or attacked and undefended.
+ * For the God King's "your queen is under attack!".
+ */
+export function queenInDanger(fen: string, color: "w" | "b"): boolean {
+  const chess = new Chess(fen);
+  const them = color === "w" ? "b" : "w";
+  const value = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 } as const;
+  for (const row of chess.board()) {
+    for (const sq of row) {
+      if (!sq || sq.type !== "q" || sq.color !== color) continue;
+      const attackers = chess.attackers(sq.square, them);
+      if (!attackers.length) continue;
+      const cheaper = attackers.some((a) => value[chess.get(a as Square)!.type] < value.q);
+      if (cheaper || !chess.isAttacked(sq.square, color)) return true;
+    }
+  }
+  return false;
+}
+
+/** Whether the side to move is in check. */
+export function inCheck(fen: string): boolean {
+  return new Chess(fen).inCheck();
+}

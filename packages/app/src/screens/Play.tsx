@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { applyMove, sideToMove } from "@chessroyale/chess";
+import { applyMove, inCheck, queenInDanger, sideToMove } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
-import { EvalBar } from "../components/EvalBar.tsx";
+import { EvalBar, knownEval } from "../components/EvalBar.tsx";
+import type { KingCue } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { MiniTower } from "../components/MiniTower.tsx";
@@ -110,6 +111,24 @@ export function PlayScreen({
       exitAt: strike.until! - 900,
     };
   }, [strike?.at, board.fen]);
+  // What the God King might say about the position: danger first, then how it's going, then small talk.
+  const kingCues = useMemo(() => {
+    if (!match.boss || waiting) return [];
+    const out: { cue: KingCue; key: string }[] = [];
+    if (strike?.at) out.push({ cue: "struck", key: `struck-${strike.at}` });
+    if (queenInDanger(board.fen, side)) out.push({ cue: "queenDanger", key: `queen-${board.fen}` });
+    if (inCheck(board.fen)) out.push({ cue: "inCheck", key: `check-${board.fen}` });
+    out.push({ cue: "intro", key: "intro" });
+    if (match.boss.kingCharges <= 0) out.push({ cue: "spent", key: "spent" });
+    const w = knownEval(board.fen);
+    if (w !== undefined) {
+      const ours = side === "w" ? w : 1 - w;
+      if (ours >= 0.85) out.push({ cue: "winning", key: `winning-${board.fen}` });
+      else if (ours <= 0.15) out.push({ cue: "losing", key: `losing-${board.fen}` });
+    }
+    out.push({ cue: "idle", key: `idle-${board.fen}` });
+    return out;
+  }, [board.fen, strike?.at, waiting]);
 
   return (
     <div class="screen game">
@@ -158,6 +177,9 @@ export function PlayScreen({
       {match.boss ? (
         <BossDock
           match={match}
+          side={side}
+          cues={kingCues}
+          away={striking}
           nav={{ view: history, total: board.history.length }}
           canCall={!waiting && !intro && !shown.replaying && !striking}
           strike={strike}

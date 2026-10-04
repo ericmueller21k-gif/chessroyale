@@ -3487,26 +3487,33 @@ button.history-label {
 }
 
 /* ---- Boss battle: the dock under the board (same size on every screen, so nothing moves) ---- */
+@font-face {
+  font-family: "Press Start 2P";
+  src: url("/fonts/press-start-2p.woff2") format("woff2");
+  font-display: swap;
+}
 .boss-dock {
   display: grid;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 74px;
+  gap: 8px;
   flex: none;
+  position: relative;
 }
-.boss-dock-controls {
+.boss-dock-main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.boss-dock-nav {
   height: 36px;
 }
-.boss-dock .nav-middle.king-calls {
-  flex-wrap: nowrap;
-  gap: 6px;
-}
-.boss-dock .king-call {
-  padding: 4px 9px;
-  white-space: nowrap;
-}
-.boss-dock .king-charges {
+.dock-hint {
   font-size: 12px;
-  letter-spacing: -2px;
+  font-weight: 700;
+  color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .boss-dock-status {
   height: 48px;
@@ -3553,6 +3560,236 @@ button.history-label {
     align-self: start;
     margin-top: 24px;
   }
+}
+
+/* The God King standing by. */
+.gk-unit {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr 14px;
+  justify-items: center;
+  height: 90px;
+}
+.gk-unit-btn {
+  position: relative;
+  width: 74px;
+  height: 76px;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  background: radial-gradient(ellipse at 50% 92%, rgba(0, 0, 0, 0.18) 0 28%, transparent 30%);
+  cursor: default;
+  display: grid;
+  place-items: end center;
+}
+.gk-unit.ready .gk-unit-btn {
+  cursor: pointer;
+  background:
+    radial-gradient(ellipse at 50% 92%, rgba(0, 0, 0, 0.18) 0 28%, transparent 30%),
+    radial-gradient(circle at 50% 60%, rgba(242, 193, 78, 0.35), transparent 65%);
+  animation: gk-ready 1.8s ease-in-out infinite;
+}
+.gk-unit-btn:disabled {
+  opacity: 1;
+}
+.gk-unit:not(.ready) .god-king {
+  filter: saturate(0.6) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
+  opacity: 0.75;
+}
+.gk-unit.spent .god-king {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+.gk-unit.away .gk-unit-btn {
+  opacity: 0;
+  transition: opacity 200ms;
+}
+.gk-unit .god-king {
+  width: 48px;
+  height: 72px;
+}
+.gk-unit-charges {
+  font-size: 11px;
+  letter-spacing: -2px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+@keyframes gk-ready {
+  50% {
+    box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.55), 0 0 14px rgba(242, 193, 78, 0.45);
+  }
+}
+/* Idle, like a unit in an RPG: he breathes, his crown bobs, his sword sways. */
+.god-king.idle {
+  transform-origin: 50% 100%;
+  animation: gk-breathe 2.4s ease-in-out infinite;
+}
+.god-king.idle .gk-crown {
+  animation: gk-crown-bob 2.4s ease-in-out infinite;
+}
+.god-king.idle .gk-sword {
+  transform-box: fill-box;
+  transform-origin: 50% 20%;
+  animation: gk-sword-sway 3.2s ease-in-out infinite;
+}
+@keyframes gk-breathe {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.015, 1.035);
+  }
+}
+@keyframes gk-crown-bob {
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+@keyframes gk-sword-sway {
+  0%,
+  100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}
+
+/* His speech bubble: a pixel text box above him, over the board's corner. */
+.gk-bubble {
+  position: absolute;
+  right: 4px;
+  bottom: calc(100% + 8px);
+  z-index: 12;
+  width: max-content;
+  max-width: min(250px, 72vw);
+  padding: 9px 10px 8px;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 9px;
+  line-height: 1.6;
+  color: #1a1406;
+  background: #fffbea;
+  border: 3px solid #1a1406;
+  border-radius: 2px;
+  box-shadow: 4px 4px 0 rgba(26, 20, 6, 0.85);
+  image-rendering: pixelated;
+  animation: gk-bubble-in 160ms steps(3, end) both;
+  pointer-events: none;
+}
+.gk-bubble::after {
+  content: "";
+  position: absolute;
+  right: 26px;
+  bottom: -11px;
+  width: 12px;
+  height: 12px;
+  background: #fffbea;
+  border-right: 3px solid #1a1406;
+  border-bottom: 3px solid #1a1406;
+  transform: rotate(45deg);
+}
+.gk-bubble-rest {
+  visibility: hidden;
+}
+@keyframes gk-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Summoning him: a pause-menu window over the board, the screen dimmed behind. */
+.gk-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(6, 4, 14, 0.58);
+  backdrop-filter: blur(1.5px);
+  animation: fade 140ms ease-out;
+}
+.gk-menu {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(320px, calc(100vw - 32px));
+  display: grid;
+  gap: 8px;
+  padding: 16px 14px 14px;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  color: #fff;
+  background: linear-gradient(180deg, #1e1b4b, #0f0b2e);
+  border: 3px solid #fff;
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px #1a1406, 0 14px 40px rgba(0, 0, 0, 0.6);
+  animation: gk-menu-in 180ms steps(4, end) both;
+}
+@keyframes gk-menu-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+}
+.gk-menu-title {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #f2c14e;
+  text-align: center;
+}
+.gk-menu-note {
+  font-size: 9px;
+  text-align: center;
+  color: #c7c3f0;
+  margin-bottom: 4px;
+}
+.gk-menu-item {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 10px 10px 10px 28px;
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.gk-menu-item small {
+  font-size: 8px;
+  line-height: 1.6;
+  color: #c7c3f0;
+}
+.gk-menu-item::before {
+  content: "▶";
+  position: absolute;
+  left: 9px;
+  top: 10px;
+  font-size: 10px;
+  color: #f2c14e;
+  opacity: 0;
+}
+.gk-menu-item:hover:not(:disabled)::before,
+.gk-menu-item:focus-visible::before,
+.gk-menu-item:active::before {
+  opacity: 1;
+}
+.gk-menu-item:hover:not(:disabled),
+.gk-menu-item:focus-visible {
+  border-color: #f2c14e;
+  outline: none;
+}
+.gk-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.gk-menu-item.back {
+  font-size: 9px;
+  justify-self: center;
+  padding: 8px 12px 8px 26px;
+  background: none;
 }
 
 /* ---- Fighting-game banner over the board ("START!", the boss's "QUEEN DOWN!") ---- */
@@ -3735,4 +3972,79 @@ button.history-label {
   to {
     background-position: 52px 0;
   }
+}
+
+/* His commands: a little Final Fantasy-style window above his head. */
+.gk-command {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 12;
+  width: min(230px, 64vw);
+  display: grid;
+  gap: 2px;
+  padding: 8px 6px;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  color: #fff;
+  background: linear-gradient(180deg, #2a3cbd 0%, #13207a 55%, #0a1150 100%);
+  border: 3px solid #f4f4f4;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px #0b0b1a, 4px 6px 0 rgba(0, 0, 0, 0.35);
+  animation: gk-command-in 120ms steps(3, end) both;
+}
+.gk-command::after {
+  content: "";
+  position: absolute;
+  right: 26px;
+  bottom: -10px;
+  border: 7px solid transparent;
+  border-top-color: #f4f4f4;
+}
+@keyframes gk-command-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scaleY(0.4);
+  }
+}
+.gk-command-item {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  padding: 7px 6px 7px 22px;
+  border: none;
+  background: none;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gk-command-label {
+  font-size: 11px;
+  text-shadow: 2px 2px 0 #0b0b1a;
+}
+.gk-command-note {
+  font-size: 7px;
+  line-height: 1.6;
+  color: #c9d1ff;
+}
+.gk-command-item.at::before {
+  content: "▶";
+  position: absolute;
+  left: 4px;
+  top: 7px;
+  font-size: 10px;
+  color: #fff;
+  animation: gk-cursor 0.5s steps(2, end) infinite;
+}
+@keyframes gk-cursor {
+  50% {
+    translate: 2px 0;
+  }
+}
+.gk-command-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.gk-unit.open .gk-unit-btn {
+  box-shadow: 0 0 0 2px #f2c14e, 0 0 14px rgba(242, 193, 78, 0.6);
 }

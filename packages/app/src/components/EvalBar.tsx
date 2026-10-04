@@ -9,6 +9,10 @@ import { enginePool } from "../engine.ts";
  */
 let lastShown: number | null = null;
 const known = new Map<string, number>();
+/** White's expected score in a position the bar has already worked out, if it has. */
+export function knownEval(fen: string): number | undefined {
+  return known.get(fen);
+}
 const remember = (fen: string, w: number) => {
   if (known.size > 200) known.clear();
   known.set(fen, w);

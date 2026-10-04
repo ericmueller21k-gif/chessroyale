@@ -645,3 +645,21 @@ Eric asked for this.
 - **Sounds** (`public/sounds/banner/`, credits in the folder).
   - `start.mp3`: a whoosh, a punch and a short blast.
   - `boss-roar.mp3`: a CC0 yell pitched down into a growl, over a low rumble.
+
+## The God King stands by the board, talks, and takes commands like a Final Fantasy unit (Oct 4, 2026)
+
+Eric asked for this.
+
+- **He's the button.**
+  - The two King buttons are gone. The God King stands at the right of the dock under the board, in your colour, with his charges as crowns at his feet.
+  - He idles like an RPG unit: he breathes, his crown bobs and his sword sways.
+  - He glows gold when he can be called, is dimmed when he can't, and turns grey when his charges are spent. He steps away while he's on the board.
+- **His commands.**
+  - Tap him and a little blue window opens above his head, like an old Final Fantasy battle menu, with a ▶ cursor and retro menu blips: "Play move" (his move at full strength; you won't pick) and "Strike" (the boss's next move is weaker; the clock stops, then you pick).
+  - Strike is greyed out once struck, or while your call waits for the others.
+  - Tap him again to close the menu. Choosing a command is the confirmation (two deliberate taps), so there's no separate "Are you sure?".
+  - The pause-menu version (dimmed screen, window over the board) was built first; Eric preferred this. It's kept as a generic `PauseMenu` component for later menus.
+- **His lines** (`godKing.ts`). 49 lines across 17 moments, shown in a pixel speech bubble (Press Start 2P, OFL, hosted with the app) that types itself out over the board's corner.
+  - The moments: introducing himself on your first move; your queen in danger (attacked by a cheaper piece, or attacked and undefended); your king in check; great, good and bad crowd moves (by the played move's loss: ≤1, ≤4, ≥12); crowd captures and checks; boss captures; a boss blunder (a ≥30-point swing in the eval bar's numbers); the boss staggered; his strike; him playing the move; winning or losing (≥85% / ≤15%); out of charges; idle small talk.
+  - Urgent moments (queen, check, his own actions) always speak. Others roll a chance and wait at least 6 s after the last line. Each moment speaks once, and a moment never repeats its previous line.
+- **Sounds.** Menu blips from the same CC0 retro pack (`public/sounds/menu/`).
