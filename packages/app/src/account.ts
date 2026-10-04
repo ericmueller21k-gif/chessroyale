@@ -1,0 +1,104 @@
+/**
+ * Your account, as the screens see it: a guest account made the first time
+ * you open the site, which signing in with Google or an emailed code turns
+ * into a profile that follows you across devices. Talks to /api/me and
+ * /api/auth/*; if the server has no accounts (local dev), it stays hidden.
+ */
+
+export interface ModeStats {
+  matches: number;
+  wins: number;
+  finals: number;
+  avgPlacement: number | null;
+  best: number | null;
+  teamWins: number;
+}
+
+export interface Profile {
+  user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean };
+  stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats };
+  rating: number | null;
+  recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
+}
+
+export interface AccountState {
+  /** Sign-in options the server has set up (null until known; accounts false = no accounts here). */
+  config: { accounts: boolean; google: boolean; email: boolean } | null;
+  profile: Profile | null;
+}
+
+export const ICONS = ["♟", "♞", "♝", "♜", "♛", "♚", "🦁", "🦊", "🐺", "🦅", "🐉", "🔥", "⚡", "👑", "🎯", "🧠"];
+
+let state: AccountState = { config: null, profile: null };
+const listeners = new Set<() => void>();
+const set = (patch: Partial<AccountState>) => {
+  state = { ...state, ...patch };
+  listeners.forEach((l) => l());
+};
+
+export const account = () => state;
+export function onAccountChange(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, { credentials: "same-origin", ...init, headers: { "content-type": "application/json", ...init?.headers } });
+  const body = (await res.json().catch(() => ({}))) as T & { message?: string };
+  if (!res.ok) throw new Error(body.message ?? `Something went wrong (${res.status}).`);
+  return body;
+}
+
+/** Loads the sign-in options and your profile (making a guest account the first time). */
+export async function loadAccount(name?: string): Promise<void> {
+  try {
+    const config = await api<NonNullable<AccountState["config"]>>("/api/auth/config");
+    set({ config });
+    if (!config.accounts) return;
+    const q = name ? `?name=${encodeURIComponent(name)}` : "";
+    set({ profile: await api<Profile>(`/api/me${q}`) });
+  } catch {
+    // No server (local dev) or offline: play on without an account.
+    set({ config: { accounts: false, google: false, email: false } });
+  }
+}
+
+export async function updateProfile(patch: { name?: string; icon?: string }): Promise<void> {
+  if (!state.profile) return;
+  set({ profile: await api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify(patch) }) });
+}
+
+export const signInWithGoogle = () => {
+  location.href = "/api/auth/google/start";
+};
+
+export async function sendEmailCode(email: string): Promise<void> {
+  await api("/api/auth/email/start", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+export async function verifyEmailCode(email: string, code: string): Promise<void> {
+  set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }) });
+}
+
+export async function signOut(): Promise<void> {
+  set({ profile: await api<Profile>("/api/auth/logout", { method: "POST" }) });
+}
+
+/** A solo match's result, onto your profile (online matches are saved by the server). */
+export async function recordSoloResult(r: {
+  mode: "classic" | "crowd";
+  placement: number;
+  players: number;
+  team?: "w" | "b" | null;
+  teamWon?: boolean | null;
+  avgScore?: number | null;
+  rating?: number | null;
+}): Promise<void> {
+  if (!state.profile) return;
+  try {
+    await api("/api/results", { method: "POST", body: JSON.stringify(r) });
+    set({ profile: await api<Profile>("/api/me") });
+  } catch {
+    // Not important enough to bother the player.
+  }
+}

@@ -1,0 +1,173 @@
+import { describe, expect, it } from "vitest";
+import { createRequire } from "node:module";
+import {
+  createGuest,
+  ensureSchema,
+  profile,
+  recordResult,
+  signInWithIdentity,
+  startEmailCode,
+  updateProfile,
+  userFromToken,
+  verifyEmailCode,
+  type Sql,
+} from "../src/accounts.ts";
+import { handleAccountApi } from "../src/api.ts";
+
+// node:sqlite through require (Vite doesn't know it as a built-in yet).
+const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
+
+/** The SQL interface over an in-memory SQLite (stands in for D1). */
+function memorySql(): Sql {
+  const db = new DatabaseSync(":memory:");
+  return {
+    async run(sql, ...p) {
+      db.prepare(sql).run(...(p as never[]));
+    },
+    async first(sql, ...p) {
+      return (db.prepare(sql).get(...(p as never[])) ?? null) as never;
+    },
+    async all(sql, ...p) {
+      return db.prepare(sql).all(...(p as never[])) as never;
+    },
+  };
+}
+
+/** A fake D1 binding over the same in-memory SQLite, for the HTTP handler. */
+function memoryD1(): D1Database {
+  const db = new DatabaseSync(":memory:");
+  const stmt = (sql: string, params: unknown[] = []) => ({
+    bind: (...p: unknown[]) => stmt(sql, p),
+    run: async () => (db.prepare(sql).run(...(params as never[])), { success: true }),
+    first: async () => db.prepare(sql).get(...(params as never[])) ?? null,
+    all: async () => ({ results: db.prepare(sql).all(...(params as never[])) }),
+  });
+  return { prepare: (sql: string) => stmt(sql) } as unknown as D1Database;
+}
+
+describe("accounts", () => {
+  it("guest accounts, sessions, profile edits", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user, token } = await createGuest(sql, 1000, "  Eric  ");
+    expect(user.name).toBe("Eric");
+    expect((await userFromToken(sql, token, 2000))!.id).toBe(user.id);
+    expect(await userFromToken(sql, "nope", 2000)).toBeNull();
+    const u = await updateProfile(sql, user.id, { name: "Hunter", icon: "🦁" });
+    expect([u.name, u.icon]).toEqual(["Hunter", "🦁"]);
+    expect((await updateProfile(sql, user.id, { icon: "not-an-icon" })).icon).toBe("🦁");
+  });
+
+  it("profile stats from results", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000);
+    await recordResult(sql, user.id, { mode: "classic", online: false, placement: 1, players: 64, rating: 1700 }, 2000);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 30, players: 100, team: "w", teamWon: true }, 3000);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 3, players: 100, team: "w", teamWon: false }, 4000);
+    const p = await profile(sql, user);
+    expect(p.stats.all).toMatchObject({ matches: 3, wins: 1, finals: 2, best: 1, avgPlacement: 11.3, teamWins: 1 });
+    expect(p.stats.crowd.matches).toBe(2);
+    expect(p.recent[0]!.placement).toBe(3);
+    expect(p.rating).toBe(1700);
+  });
+
+  it("signing in: attaches to the guest, or switches to the existing account and brings the guest's results", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const a = await createGuest(sql, 1000);
+    const linked = await signInWithIdentity(sql, a.user, "google", "sub-1", { email: "e@x.com", name: "Eric" }, 2000);
+    expect(linked.id).toBe(a.user.id);
+    expect(linked.google_sub).toBe("sub-1");
+    expect(linked.email).toBe("e@x.com");
+    // A new device: a guest plays a match, then signs in with the same Google account.
+    const b = await createGuest(sql, 3000);
+    await recordResult(sql, b.user.id, { mode: "classic", online: false, placement: 5, players: 64 }, 3500);
+    const back = await signInWithIdentity(sql, b.user, "google", "sub-1", {}, 4000);
+    expect(back.id).toBe(a.user.id);
+    expect((await profile(sql, back)).stats.all.matches).toBe(1);
+    // The email from Google signs in to the same account too.
+    const c = await createGuest(sql, 5000);
+    expect((await signInWithIdentity(sql, c.user, "email", "e@x.com", {}, 6000)).id).toBe(a.user.id);
+  });
+
+  it("email codes: one use, expiry, attempts and rate limits", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const s = await startEmailCode(sql, "a@b.co", 0);
+    expect(s.ok).toBe(true);
+    const code = s.ok ? s.code : "";
+    expect(code).toMatch(/^\d{6}$/);
+    expect((await startEmailCode(sql, "a@b.co", 10_000)).ok).toBe(false); // too soon
+    expect(await verifyEmailCode(sql, "a@b.co", code === "000000" ? "111111" : "000000", 20_000)).toBe(false);
+    expect(await verifyEmailCode(sql, "a@b.co", code, 20_000)).toBe(true);
+    expect(await verifyEmailCode(sql, "a@b.co", code, 21_000)).toBe(false); // used
+    const t = await startEmailCode(sql, "a@b.co", 60_000);
+    expect(t.ok).toBe(true);
+    expect(await verifyEmailCode(sql, "a@b.co", t.ok ? t.code : "", 60_000 + 11 * 60_000)).toBe(false); // expired
+    // 5 a hour.
+    for (let i = 2; i < 5; i++) expect((await startEmailCode(sql, "a@b.co", 60_000 + i * 40_000)).ok).toBe(true);
+    expect((await startEmailCode(sql, "a@b.co", 60_000 + 6 * 40_000)).ok).toBe(false);
+  });
+});
+
+describe("account API", () => {
+  const origin = "https://hunchess.com";
+  const call = async (env: object, path: string, init: RequestInit & { cookie?: string } = {}, fetcher?: typeof fetch) => {
+    const headers = new Headers(init.headers);
+    if (init.cookie) headers.set("cookie", init.cookie);
+    const res = (await handleAccountApi(new Request(origin + path, { ...init, headers }), env as never, fetcher))!;
+    const set = res.headers.get("set-cookie");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body: any = res.status === 302 ? null : await res.json().catch(() => null);
+    return { res, cookie: set?.split(";")[0] ?? init.cookie, body };
+  };
+
+  it("config says what's set up; /api/me makes a guest; email code sign-in works end to end", async () => {
+    const env = { DB: memoryD1(), RESEND_API_KEY: "re_test" };
+    expect((await call(env, "/api/auth/config")).body).toEqual({ accounts: true, google: false, email: true });
+    const me = await call(env, "/api/me?name=Eric");
+    expect(me.body.user.name).toBe("Eric");
+    expect(me.body.user.signedIn).toBe(false);
+    let sentCode = "";
+    const fakeResend = (async (_url: string, init: RequestInit) => {
+      sentCode = /(\d{6}) is your/.exec(JSON.parse(String(init.body)).subject)![1]!;
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    const start = await call(env, "/api/auth/email/start", { method: "POST", body: JSON.stringify({ email: "Eric@Example.com" }), cookie: me.cookie }, fakeResend);
+    expect(start.body).toEqual({ ok: true });
+    const bad = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: "000000" === sentCode ? "111111" : "000000" }), cookie: me.cookie });
+    expect(bad.res.status).toBe(400);
+    const ok = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: sentCode }), cookie: me.cookie });
+    expect(ok.body.user.signedIn).toBe(true);
+    expect(ok.body.user.email).toBe("eric@example.com");
+    // Results go on the profile.
+    await call(env, "/api/results", { method: "POST", body: JSON.stringify({ mode: "crowd", placement: 2, players: 100 }), cookie: ok.cookie });
+    expect((await call(env, "/api/me", { cookie: ok.cookie })).body.stats.crowd.matches).toBe(1);
+  });
+
+  it("Google: start redirects with state; the callback checks it and signs in", async () => {
+    const env = { DB: memoryD1(), GOOGLE_CLIENT_ID: "cid", GOOGLE_CLIENT_SECRET: "secret" };
+    const me = await call(env, "/api/me");
+    const start = await call(env, "/api/auth/google/start", { cookie: me.cookie });
+    const loc = new URL(start.res.headers.get("location")!);
+    expect(loc.origin).toBe("https://accounts.google.com");
+    expect(loc.searchParams.get("redirect_uri")).toBe(`${origin}/api/auth/google/callback`);
+    const state = loc.searchParams.get("state")!;
+    const stateCookie = start.res.headers.get("set-cookie")!.split(";")[0]!;
+    const claims = btoa(JSON.stringify({ sub: "g-123", aud: "cid", email: "e@gmail.com", email_verified: true, name: "Eric M" }));
+    const fakeGoogle = (async () => new Response(JSON.stringify({ id_token: `x.${claims}.y` }), { status: 200 })) as unknown as typeof fetch;
+    // A wrong state is refused.
+    const forged = await call(env, `/api/auth/google/callback?state=nope&code=c`, { cookie: `${me.cookie}; ${stateCookie}` }, fakeGoogle);
+    expect(forged.res.headers.get("location")).toContain("signin=failed");
+    const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${me.cookie}; ${stateCookie}` }, fakeGoogle);
+    expect(cb.res.headers.get("location")).toBe(`${origin}/?signin=google`);
+    const after = await call(env, "/api/me", { cookie: cb.cookie });
+    expect(after.body.user).toMatchObject({ signedIn: true, google: true, email: "e@gmail.com" });
+  });
+
+  it("without a database, only the config answers", async () => {
+    expect((await call({}, "/api/auth/config")).body).toEqual({ accounts: false, google: false, email: false });
+    expect((await call({}, "/api/me")).res.status).toBe(503);
+  });
+});

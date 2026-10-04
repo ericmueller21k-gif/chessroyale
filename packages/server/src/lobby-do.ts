@@ -2,6 +2,8 @@ import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, newLobbyRecord, type LobbyRecord } from "./lobby.ts";
+import { accountOf } from "./api.ts";
+import { d1Sql, recordResult } from "./accounts.ts";
 import type { Env } from "./index.ts";
 
 const library = openings as unknown as Opening[];
@@ -46,6 +48,16 @@ export class Lobby extends DurableObject<Env> {
 
   private async persist(core: LobbyCore) {
     this.record = core.save();
+    // Match over: results go on signed-in players' profiles (once).
+    if (this.record.phase === "results" && !this.record.resultsSaved && this.env.DB) {
+      this.record.resultsSaved = true;
+      const sql = d1Sql(this.env.DB);
+      const mode = this.record.overrides?.mode === "crowd" ? "crowd" : "classic";
+      for (const r of core.humanResults()) {
+        const userId = this.record.accounts?.[r.playerId];
+        if (userId) await recordResult(sql, userId, { ...r, mode, online: true }, Date.now()).catch(() => undefined);
+      }
+    }
     await this.ctx.storage.put("lobby", this.record);
     const at = core.nextAlarm;
     if (at) await this.ctx.storage.setAlarm(at);
@@ -67,8 +79,10 @@ export class Lobby extends DurableObject<Env> {
     if (!this.record) return new Response("No such lobby", { status: 404 });
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
-    // The player id is attached to the socket after "hello".
+    // The player id is attached to the socket after "hello"; the account (from the session cookie) now.
+    const account = await accountOf(request, this.env).catch(() => null);
     this.ctx.acceptWebSocket(server);
+    server.serializeAttachment({ userId: account?.id });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -80,7 +94,7 @@ export class Lobby extends DurableObject<Env> {
       return;
     }
     const core = this.core(this.record!.code);
-    const attached = ws.deserializeAttachment() as { playerId?: string } | null;
+    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string } | null;
     if (msg.t === "hello") {
       const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice);
       if (!result.ok) {
@@ -88,7 +102,12 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, result.message);
         return;
       }
-      ws.serializeAttachment({ playerId: result.playerId });
+      ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId });
+      if (attached?.userId) {
+        // (core.save() returns the record the core works on, so this sticks.)
+        const rec = core.save();
+        rec.accounts = { ...(rec.accounts ?? {}), [result.playerId]: attached.userId };
+      }
       // connect() sent the welcome before the socket was attached; send it again now it can be found.
       core.resendTo(result.playerId);
       await this.persist(core);

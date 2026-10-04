@@ -78,6 +78,9 @@ export interface LobbyRecord {
   overrides?: Partial<Settings> & {
     drawRuleByStage?: DrawRule[];
   };
+  /** Signed-in players' account ids (by player id), so results go on their profiles. */
+  accounts?: Record<string, string>;
+  resultsSaved?: boolean;
   /** Crowd augments: the move clock as voted (seconds), and this cut's votes. */
   moveClock?: number;
   augmentVotes?: Record<string, Augment>;
@@ -632,6 +635,21 @@ export class LobbyCore {
   }
 
   // ---------------- Results ----------------
+
+  /** Each human's result once the match is over (for their profiles). */
+  humanResults(): { playerId: string; placement: number; players: number; team: "w" | "b" | null; teamWon: boolean | null; avgScore: number | null; rating: number | null }[] {
+    const runner = this.runner;
+    if (!runner || this.r.phase !== "results") return [];
+    const st = this.standings();
+    const winner = this.settings.mode === "crowd" ? runner.gameWinner() : null;
+    return this.r.humans.flatMap((h) => {
+      const row = st.find((s) => s.id === h.id);
+      const placement = this.r.placements[h.id];
+      if (!row || !placement) return [];
+      const team = row.team ?? null;
+      return [{ playerId: h.id, placement, players: runner.state.players.length, team, teamWon: team && winner ? team === winner : null, avgScore: row.avg ?? null, rating: row.rating ?? null }];
+    });
+  }
 
   private finishMatch() {
     const runner = this.runner!;

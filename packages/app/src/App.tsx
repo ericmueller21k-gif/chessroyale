@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "preact/hooks";
+import { useEffect, useReducer, useRef, useState } from "preact/hooks";
 import { DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, modeSettings, type DrawRule, type Settings } from "@chessroyale/core";
 import { chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -16,6 +16,8 @@ import { PlayScreen } from "./screens/Play.tsx";
 import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
 import { SoundLab } from "./screens/SoundLab.tsx";
+import { ProfileScreen } from "./screens/Profile.tsx";
+import { loadAccount, recordSoloResult } from "./account.ts";
 import { CrowdCut, CrowdReveal, WatchScreen } from "./screens/Crowd.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
@@ -59,9 +61,36 @@ type AnyMatch = GameView & { dispose(): void };
 
 export function App() {
   const [match, setMatch] = useState<AnyMatch | null>(null);
+  const savedResult = useRef<AnyMatch | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [soundLab, setSoundLab] = useState(() => new URLSearchParams(location.search).has("soundlab"));
+  const [showProfile, setShowProfile] = useState(() => new URLSearchParams(location.search).has("signin"));
+  // Your account (a guest one the first time).
+  useEffect(() => {
+    let name: string | undefined;
+    try {
+      name = localStorage.getItem("brc.name") ?? undefined;
+    } catch {
+      // No storage.
+    }
+    void loadAccount(name);
+  }, []);
+  // A solo match's result goes on your profile (online results are saved by the server).
+  useEffect(() => {
+    if (!(match instanceof SoloMatch) || match.phase.kind !== "results" || savedResult.current === match) return;
+    savedResult.current = match;
+    const me = match.standings().find((s) => s.isYou);
+    void recordSoloResult({
+      mode: match.settings.mode,
+      placement: match.phase.placement,
+      players: match.totalPlayers,
+      team: me?.team ?? null,
+      teamWon: match.phase.gameWinner === undefined || !me?.team ? null : match.phase.gameWinner === me.team,
+      avgScore: me?.avg ?? null,
+      rating: me?.rating ?? null,
+    });
+  });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
 
   useEffect(() => {
@@ -147,6 +176,16 @@ export function App() {
   };
 
   if (!match && soundLab) return <SoundLab onBack={() => setSoundLab(false)} />;
+  if (!match && showProfile) {
+    return (
+      <ProfileScreen
+        onBack={() => {
+          setShowProfile(false);
+          if (location.search.includes("signin")) history.replaceState(null, "", "/");
+        }}
+      />
+    );
+  }
   if (!match) {
     return (
       <HomeScreen
@@ -157,6 +196,7 @@ export function App() {
         joinCode={linkCode}
         error={error}
         onSoundLab={() => setSoundLab(true)}
+        onProfile={() => setShowProfile(true)}
       />
     );
   }

@@ -1,6 +1,8 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, type GameMode } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
+import { account, updateProfile } from "../account.ts";
+import { useAccount } from "./Profile.tsx";
 import { crowdAnimations, setCrowdAnimations } from "../prefs.ts";
 import { MuteButton } from "../components/MuteButton.tsx";
 
@@ -65,6 +67,9 @@ function remember(name: string): string {
   } catch {
     // Not important.
   }
+  // Your profile takes the name you play under.
+  const p = account().profile;
+  if (p && p.user.name !== n) void updateProfile({ name: n }).catch(() => undefined);
   return n;
 }
 
@@ -76,6 +81,7 @@ export function HomeScreen({
   joinCode,
   error,
   onSoundLab,
+  onProfile,
 }: {
   onStart: (name: string, practice: boolean) => void;
   onCreateLobby: (name: string, practice: boolean) => void;
@@ -84,7 +90,9 @@ export function HomeScreen({
   joinCode?: string;
   error?: string | null;
   onSoundLab?: () => void;
+  onProfile?: () => void;
 }) {
+  const { profile } = useAccount();
   const [code, setCode] = useState(joinCode ?? "");
   const [practice, setPractice] = useState(() => {
     try {
@@ -141,6 +149,10 @@ export function HomeScreen({
       return "";
     }
   });
+  // A signed-in profile's name fills in the name box (e.g. on a new device).
+  useEffect(() => {
+    if (profile?.user.signedIn && !name) setName(profile.user.name);
+  }, [profile?.user.name]);
   return (
     <div class="screen home">
       <h1 class="logo">
@@ -150,6 +162,18 @@ export function HomeScreen({
         Battle Royale Chess
         <MuteButton />
       </h1>
+      {profile && onProfile && (
+        <button type="button" class="account-chip" onClick={onProfile} aria-label="Your profile">
+          <span class="account-icon" aria-hidden="true">
+            {profile.user.icon}
+          </span>
+          <span class="account-name">{profile.user.name}</span>
+          <span class="muted small">
+            {profile.stats.all.matches ? `${profile.stats.all.matches} played · ${profile.stats.all.wins} won` : "No matches yet"}
+          </span>
+          <span class="account-cta">{profile.user.signedIn ? "Profile ›" : "Sign in ›"}</span>
+        </button>
+      )}
       {!joinCode && <InstallCard />}
       {!joinCode && (
         <div class="mode-pick" role="radiogroup" aria-label="Game mode">
