@@ -159,7 +159,7 @@ export function HomeScreen({
         <span class="logo-crown" aria-hidden="true">
           ♚
         </span>
-        Battle Royale Chess
+        HunChess
         <MuteButton />
       </h1>
       {profile && onProfile && (
