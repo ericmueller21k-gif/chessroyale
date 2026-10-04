@@ -1,7 +1,7 @@
 {
-  "name": "Battle Royale Chess",
-  "short_name": "BR Chess",
-  "description": "32 players, one move at a time. Play better moves than the field.",
+  "name": "HunChess",
+  "short_name": "HunChess",
+  "description": "A hundred players, one move at a time. Play better moves than the field.",
   "id": "/",
   "start_url": "/",
   "scope": "/",

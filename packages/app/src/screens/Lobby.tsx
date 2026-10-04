@@ -4,7 +4,7 @@ export function LobbyScreen({ match, onLeave }: { match: NetMatch; onLeave: () =
   const humans = match.players.filter((p) => !p.isBot);
   const share = async () => {
     try {
-      if (navigator.share) await navigator.share({ title: "Battle Royale Chess", text: `Join my lobby: ${match.code}`, url: match.inviteUrl });
+      if (navigator.share) await navigator.share({ title: "HunChess", text: `Join my lobby: ${match.code}`, url: match.inviteUrl });
       else await navigator.clipboard.writeText(match.inviteUrl);
     } catch {
       // Dismissed.

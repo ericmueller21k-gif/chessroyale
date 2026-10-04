@@ -20,7 +20,7 @@ export function InstallCard() {
   };
 
   return (
-    <div class="install-card" role="region" aria-label="Install Battle Royale Chess">
+    <div class="install-card" role="region" aria-label="Install HunChess">
       <button type="button" class="install-close" onClick={close} aria-label="Dismiss">
         ✕
       </button>

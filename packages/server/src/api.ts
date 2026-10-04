@@ -24,7 +24,7 @@ export interface AccountEnv {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   RESEND_API_KEY?: string;
-  /** Sender for sign-in codes, e.g. "Hun Chess <login@hunchess.com>". */
+  /** Sender for sign-in codes, e.g. "HunChess <login@hunchess.com>". */
   EMAIL_FROM?: string;
 }
 
@@ -120,11 +120,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       method: "POST",
       headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({
-        from: env.EMAIL_FROM ?? "Hun Chess <login@hunchess.com>",
+        from: env.EMAIL_FROM ?? "HunChess <login@hunchess.com>",
         to: [address],
-        subject: `${started.code} is your Hun Chess code`,
-        text: `Your Hun Chess sign-in code is ${started.code}. It works for 10 minutes. If you didn't ask for it, ignore this email.`,
-        html: `<p>Your Hun Chess sign-in code is</p><p style="font-size:28px;font-weight:800;letter-spacing:6px">${started.code}</p><p>It works for 10 minutes. If you didn't ask for it, ignore this email.</p>`,
+        subject: `${started.code} is your HunChess code`,
+        text: `Your HunChess sign-in code is ${started.code}. It works for 10 minutes. If you didn't ask for it, ignore this email.`,
+        html: `<p>Your HunChess sign-in code is</p><p style="font-size:28px;font-weight:800;letter-spacing:6px">${started.code}</p><p>It works for 10 minutes. If you didn't ask for it, ignore this email.</p>`,
       }),
     });
     if (!sent.ok) return json({ message: "We couldn't send the email. Try again in a minute." }, 502);
