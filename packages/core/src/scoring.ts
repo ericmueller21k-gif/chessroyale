@@ -27,6 +27,8 @@ export interface PlayerRoundResult {
   /** Points given away versus the best move; null for a miss. */
   loss: number | null;
   roundScore: number;
+  /** Called the King (boss battle) instead of picking: no score either way, and not a miss. */
+  abstained?: boolean;
 }
 
 export interface GroupResult {

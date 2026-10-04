@@ -572,3 +572,17 @@ Eric asked for the King to become a real character: a custom piece, summoned wit
 - **Sounds** (`public/sounds/god-king/`, all CC0, credits in the folder). They play at summon, appear, the "hyuah!" sword raise, the bolt, the hit and the exit.
   - Most come from Juhani Junkala's retro 512-effect pack. The battle cry is a grunt from HaelDB's yell pack with a light 16-bit crunch.
   - Each file can be swapped by replacing it under the same name.
+
+## The God King, reworked after Eric's first look (Oct 4, 2026)
+
+- **Calling him is your turn.** Tapping "Call the King" or "Strike the boss" asks "Are you sure? You won't pick a move." Yes sends the call instead of a move.
+  - Callers abstain from the round. They score 0 for it, it doesn't count as a miss, and they don't vote. For the boss's strike-down they count the round's average loss, so calling neither shields nor punishes you.
+  - Once you've called you can't also pick, and a pick rules out calling.
+- **No figure below the board.** Only the two buttons and the crowns stay.
+- **Everything happens on your king's square.**
+  - A dozen thin bolts converge on the square where your king stands, then a beam and a flash.
+  - The God King takes the king's place there, at exactly one square's size (the real king is hidden while he's on the board).
+  - He raises his sword, and a thin bolt hits the piece he moves, or the boss's king with "−N HP" (the middle of `kingStrikeLoss`).
+  - If his move is a king move, he walks with it.
+  - As the round ends, holy light takes him away from whatever square he's on, and the ordinary king drops back there.
+- **Leave sound.** The laser-like exit sound is replaced with a synthesised falling shimmer that fades out (`leave.mp3`), so he vanishes rather than fires.

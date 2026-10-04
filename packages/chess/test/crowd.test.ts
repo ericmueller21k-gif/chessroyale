@@ -197,6 +197,9 @@ describe("Crowd mode", () => {
     for (const p of runner.alive()) runner.kingStrikers.add(p.id);
     const r = await runner.score(new Map());
     expect(r.boards[0]!.kingStrike).toBe(true);
+    // Calling the King is your turn: no move, no score, and not a miss.
+    expect(r.boards[0]!.result.players.every((p) => p.abstained && p.roundScore === 0)).toBe(true);
+    expect(runner.alive().every((p) => (p.misses ?? 0) === 0)).toBe(true);
     expect(runner.boss!.staggerNext).toBe(true);
     expect(runner.boss!.kingCharges).toBe(2);
     expect(runner.bossMoveKind()).toBe("stagger");

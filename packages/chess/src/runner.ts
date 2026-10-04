@@ -453,8 +453,12 @@ export class MatchRunner {
     evaluation: GroupEvaluation,
   ): BoardRound {
     const board = this.boards.get(boardId)!;
+    // Boss battle: humans who called the King (or his strike) instead of picking abstain: no score, not a miss.
+    const abstained = new Set(
+      this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && (this.kingCallers.has(id) || this.kingStrikers.has(id))) : [],
+    );
     const result = scoreGroup(
-      playerIds.map((id) => ({ playerId: id, move: picks[id] ?? null })),
+      playerIds.filter((id) => !abstained.has(id)).map((id) => ({ playerId: id, move: picks[id] ?? null })),
       evaluation,
       this.opts.rng,
       this.settings,
@@ -468,6 +472,7 @@ export class MatchRunner {
     const scored = Object.entries(evaluation.expectedAfter)
       .map(([move, expected]) => ({ move, expected, loss: Math.max(0, (best - expected) * 100) }))
       .sort((a, b) => b.expected - a.expected);
+    for (const id of abstained) result.players.push({ playerId: id, move: null, loss: null, roundScore: 0, abstained: true });
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
     return {

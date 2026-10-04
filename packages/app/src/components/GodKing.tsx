@@ -1,4 +1,5 @@
 import { useEffect } from "preact/hooks";
+import { useFrameNow } from "./Countdown.tsx";
 import { pieceAt } from "@chessroyale/chess";
 import { play, type SoundName } from "../sound.ts";
 
@@ -60,17 +61,16 @@ function squareXY(square: string, orientation: "white" | "black") {
   return { x: col * 100 + 50, y: row * 100 + 50 };
 }
 
-/** A jagged bolt from (x1, y1) to (x2, y2). */
+/** A thin jagged bolt from (x1, y1) to (x2, y2). */
 function boltPath(x1: number, y1: number, x2: number, y2: number, seed: number) {
-  const steps = 7;
+  const steps = 6;
   let d = `M${x1} ${y1}`;
+  const nx = -(y2 - y1);
+  const ny = x2 - x1;
+  const len = Math.hypot(nx, ny) || 1;
   for (let i = 1; i < steps; i++) {
     const t = i / steps;
-    const jitter = (((seed * 9301 + i * 49297) % 233280) / 233280 - 0.5) * 60;
-    // Offset sideways from the line, alternating.
-    const nx = -(y2 - y1);
-    const ny = x2 - x1;
-    const len = Math.hypot(nx, ny) || 1;
+    const jitter = (((seed * 9301 + i * 49297) % 233280) / 233280 - 0.5) * 46 * (1 - t * 0.6);
     d += ` L${x1 + (x2 - x1) * t + (nx / len) * jitter} ${y1 + (y2 - y1) * t + (ny / len) * jitter}`;
   }
   return `${d} L${x2} ${y2}`;
@@ -85,82 +85,115 @@ export function kingSquare(fen: string, side: "w" | "b"): string | null {
   return null;
 }
 
+/** Where the converging bolts start: points around the board's edge. */
+const EDGE = Array.from({ length: 12 }, (_, i) => {
+  const a = (i / 12) * Math.PI * 2 + 0.3;
+  return { x: 400 + Math.cos(a) * 560, y: 400 + Math.sin(a) * 560 };
+});
+
 /**
- * Summoning the God King, over the board (about 3.6 s, all CSS timings):
- * three slow bolts converge on the centre, a beam of light, a flash, and the
- * God King stands there with his sword. He raises it and a thin bolt strikes
- * `target`: the piece he moves ("move"), or the boss's king ("strike", with a
- * floating "−N HP"). Then holy light takes him away and the plain king drops in.
+ * Summoning the God King on your king's square. A dozen thin bolts converge on
+ * the square, a beam of light, a flash, and the God King stands there in your
+ * king's place (the real king is hidden while he's on the board). He raises his
+ * sword and a thin bolt strikes `target`: the piece he moves ("move", which then
+ * plays at `moveAt`), or the boss's king ("strike", with a floating "-N HP").
+ * At `exitAt` (the round ending) holy light takes him away on whatever square
+ * he's on, and the plain king drops back there. All times are Date.now() values.
  */
 export function KingSummon({
   side,
   orientation,
+  kingBefore,
+  kingAfter,
   target,
   mode,
   hp,
+  startAt,
+  moveAt,
+  exitAt,
 }: {
   side: "w" | "b";
   orientation: "white" | "black";
+  /** Your king's square when he arrives, and after the move (the same unless the king itself moves). */
+  kingBefore: string;
+  kingAfter: string;
   target: string | null;
   mode: "move" | "strike";
-  /** Strike: the points the boss loses, shown as HP. */
   hp?: number;
+  startAt: number;
+  moveAt: number;
+  exitAt: number;
 }) {
-  const t = target ? squareXY(target, orientation) : { x: 400, y: 400 };
-  // His sounds, in time with the animation (the CSS timings below).
+  const now = useFrameNow();
+  const t = now - startAt;
+  const out = now - exitAt;
+  const square = now >= moveAt ? kingAfter : kingBefore;
+  const k = squareXY(square, orientation);
+  const k0 = squareXY(kingBefore, orientation);
+  const tg = target ? squareXY(target, orientation) : null;
+  const present = t >= 1300 && out < 700;
+  const raised = t >= 1550;
+  // His sounds, in time with the animation.
   useEffect(() => {
     const cues: [SoundName, number][] = [
-      ["gkSummon", 0],
-      ["gkAppear", 1350],
-      ["gkHyuah", 1820],
-      ["gkBolt", 2060],
-      ...(mode === "strike" ? ([["gkHit", 2260]] as [SoundName, number][]) : []),
-      ["gkLeave", 2950],
+      ["gkSummon", startAt],
+      ["gkAppear", startAt + 1250],
+      ["gkHyuah", startAt + 1550],
+      ...(tg ? ([["gkBolt", startAt + 1760]] as [SoundName, number][]) : []),
+      ...(mode === "strike" ? ([["gkHit", startAt + 1980]] as [SoundName, number][]) : []),
+      ["gkLeave", exitAt],
     ];
-    const timers = cues.map(([name, at]) => setTimeout(() => play(name), at));
+    const timers = cues.map(([name, at]) => setTimeout(() => play(name), Math.max(0, at - Date.now())));
     return () => timers.forEach(clearTimeout);
   }, []);
-  const corners = [
-    [0, 0],
-    [800, 120],
-    [120, 800],
-  ];
+  if (out > 900) return null;
+  const pct = (v: number) => `${v / 8}%`;
+  const hideClass = present ? ` hide-king-${side}` : "";
   return (
-    <div class={`king-summon ${mode}`} role="alert" aria-label={mode === "move" ? "The God King plays the move" : "The God King strikes the boss"}>
+    <div class={`king-summon ${mode}${hideClass}`} aria-label={mode === "move" ? "The God King plays the move" : "The God King strikes the boss"}>
       <svg class="ks-fx" viewBox="0 0 800 800" preserveAspectRatio="none" aria-hidden="true">
         <defs>
-          <radialGradient id="ks-flash">
+          <radialGradient id="ks-glow">
             <stop offset="0" stop-color="#fffbe6" stop-opacity="1" />
-            <stop offset="1" stop-color="#ffe9a3" stop-opacity="0" />
+            <stop offset="1" stop-color="#ffe08a" stop-opacity="0" />
           </radialGradient>
           <linearGradient id="ks-beam" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stop-color="#fffbe6" stop-opacity="0.95" />
-            <stop offset="1" stop-color="#ffe08a" stop-opacity="0.15" />
+            <stop offset="0" stop-color="#fffbe6" stop-opacity="0" />
+            <stop offset="1" stop-color="#fff3c4" stop-opacity="0.95" />
           </linearGradient>
         </defs>
-        {/* Converging bolts, slow, one after another. */}
-        {corners.map(([x, y], i) => (
-          <path key={i} class={`ks-bolt ks-converge c${i}`} d={boltPath(x!, y!, 400, 380, i + 3)} />
-        ))}
-        <rect class="ks-beam" x="340" y="0" width="120" height="460" fill="url(#ks-beam)" />
-        <circle class="ks-flash" cx="400" cy="400" r="420" fill="url(#ks-flash)" />
-        {/* His strike: from the sword's point to the target square. */}
-        <path class="ks-bolt ks-strike" d={boltPath(400, 300, t.x, t.y, 11)} />
-        <circle class="ks-hit" cx={t.x} cy={t.y} r="46" />
-        {/* Leaving: holy light. */}
-        <rect class="ks-exit" x="330" y="0" width="140" height="800" fill="url(#ks-beam)" />
+        {/* A dozen thin bolts converging on your king, faster and faster. */}
+        {t < 1250 &&
+          EDGE.map((e, i) => {
+            const at = 950 * (1 - Math.pow(1 - i / EDGE.length, 1.6));
+            const age = t - at;
+            if (age < 0 || age > 170) return null;
+            return <path key={i} class="ks-bolt" d={boltPath(e.x, e.y, k0.x, k0.y, i + 7)} style={{ opacity: 1 - age / 170 }} />;
+          })}
+        {/* The beam down onto the square, then the flash. */}
+        {t >= 900 && t < 1300 && <rect x={k0.x - 26} y={0} width={52} height={k0.y + 40} fill="url(#ks-beam)" style={{ opacity: Math.min(1, (t - 900) / 150) * (t > 1200 ? (1300 - t) / 100 : 1) }} />}
+        {t >= 1200 && t < 1550 && <circle cx={k0.x} cy={k0.y} r={70 + (t - 1200) / 4} fill="url(#ks-glow)" style={{ opacity: 1 - (t - 1200) / 350 }} />}
+        {/* His bolt: from his square to the piece he moves, or to the boss's king. */}
+        {tg && t >= 1750 && t < 2050 && <path class="ks-bolt strike" d={boltPath(k0.x, k0.y - 30, tg.x, tg.y, 13)} style={{ opacity: t < 1900 ? 1 : (2050 - t) / 150 }} />}
+        {tg && t >= 1800 && t < 2200 && <circle class="ks-hit" cx={tg.x} cy={tg.y} r={20 + (t - 1800) / 8} style={{ opacity: 1 - (t - 1800) / 400 }} />}
+        {/* Leaving: a column of holy light on his square. */}
+        {out >= 0 && out < 500 && <rect x={k.x - 40} y={0} width={80} height={k.y + 50} fill="url(#ks-beam)" style={{ opacity: out < 150 ? out / 150 : (500 - out) / 350 }} />}
       </svg>
-      <div class="ks-king">
-        <GodKingSprite side={side} />
-      </div>
-      <div class="ks-king raised">
-        <GodKingSprite side={side} raised />
-      </div>
-      <span class={`ks-plain cg-wrap`} aria-hidden="true">
-        <piece class={`${side === "w" ? "white" : "black"} king`} />
-      </span>
-      {mode === "strike" && (
-        <span class="ks-hp" style={{ left: `${t.x / 8}%`, top: `${t.y / 8}%` }}>
+      {present && (
+        <div
+          class={`ks-god${raised ? " raised" : ""}${out >= 0 ? " leaving" : ""}`}
+          style={{ left: pct(k.x - 50), top: pct(k.y - 50), opacity: out >= 0 ? Math.max(0, 1 - out / 400) : Math.min(1, (t - 1300) / 150) }}
+        >
+          <GodKingSprite side={side} raised={raised} />
+        </div>
+      )}
+      {out >= 350 && out < 900 && (
+        <span class="ks-plain cg-wrap" style={{ left: pct(k.x - 50), top: pct(k.y - 50) }} aria-hidden="true">
+          <piece class={`${side === "w" ? "white" : "black"} king`} />
+        </span>
+      )}
+      {mode === "strike" && tg && t >= 1950 && t < 3000 && (
+        <span class="ks-hp" style={{ left: pct(tg.x), top: pct(tg.y) }}>
           −{hp ?? 10} HP
         </span>
       )}

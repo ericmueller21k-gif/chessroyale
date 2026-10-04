@@ -491,7 +491,9 @@ export class NetMatch implements GameView {
     if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled) return;
     this.kingCalled = strike ? "strike" : "play";
     this.send({ t: "king", key: this.key, ...(strike ? { strike: true } : {}) });
-    this.emit();
+    // Calling him is your turn: wait for the others like after a move.
+    if (this.myId) this.progress.mark(this.myId);
+    this.setPhase({ kind: "scoring", board: this.phase.board, move: null });
   }
 
   private myVoteLocal: { key: string; entry: VoteView["votes"][number] } | null = null;

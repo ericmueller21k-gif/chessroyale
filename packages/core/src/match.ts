@@ -278,6 +278,9 @@ export interface RoundPlayerOutcome {
   loss: number | null;
   thinkMs: number;
   usedPowerUp?: boolean;
+  /** Called the King instead of picking: counts as the round's average loss for the boss's strikes, and isn't a miss. */
+  abstained?: boolean;
+  neutralLoss?: number;
 }
 
 /** How long this player may think about the next move: the bank plus the increment, capped by the move clock. */
@@ -304,7 +307,7 @@ export function applyRound(
     const board = boardOf.get(p.id) ?? null;
     const lossesByStage = p.lossesByStage.map((l) => [...l]);
     if (o.loss !== null) lossesByStage[state.stage]!.push(o.loss);
-    const finalLosses = state.final || state.boss ? [...p.finalLosses, o.loss ?? settings.finalMissLoss] : p.finalLosses;
+    const finalLosses = state.final || state.boss ? [...p.finalLosses, o.abstained ? (o.neutralLoss ?? 0) : (o.loss ?? settings.finalMissLoss)] : p.finalLosses;
     const think = Math.max(0, Math.min(o.thinkMs, allowedMs(p, settings)));
     const usedPowerUp = !!o.usedPowerUp && (p.practice || p.powerUps > 0);
     return {
@@ -318,7 +321,7 @@ export function applyRound(
       powerUpsUsed: p.powerUpsUsed + (usedPowerUp ? 1 : 0),
       thinkMsTotal: p.thinkMsTotal + think,
       movesTimed: p.movesTimed + 1,
-      misses: (p.misses ?? 0) + (o.loss === null ? 1 : 0),
+      misses: (p.misses ?? 0) + (o.loss === null && !o.abstained ? 1 : 0),
       lossesByStage,
       lastBoard: board,
       lastGroupmates: board === null ? [] : groups.get(board)!.filter((id) => id !== p.id),
@@ -358,6 +361,7 @@ export function outcomesFromGroup(
     loss: p.loss,
     thinkMs: thinkMs[p.playerId] ?? 0,
     usedPowerUp: usedPowerUp.has(p.playerId),
+    ...(p.abstained ? { abstained: true, neutralLoss: result.averageLoss ?? 0 } : {}),
   }));
 }
 

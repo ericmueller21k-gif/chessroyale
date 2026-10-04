@@ -4,7 +4,6 @@ import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
-import { KingAlly } from "../components/KingAlly.tsx";
 import type { BossView, GameView } from "../game.ts";
 import { seenKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
@@ -162,11 +161,11 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
           {left !== null && left > 0 && <span class="muted small"> · your move in {left}</span>}
         </div>
         <div class="boss-king">
-          <KingAlly side={boss.crowdSide} charges={boss.kingCharges} called={null} canCall={false} />
+          <span class="boss-king-crowns" aria-hidden="true">{"👑".repeat(Math.max(0, boss.kingCharges)) || "—"}</span>
           <span class="muted small">
             {boss.kingCharges > 0
-              ? `The King: ${boss.kingCharges} ${boss.kingCharges === 1 ? "charge" : "charges"}${boss.raid ? "" : " (your leftover power-ups)"}. On your move, call him to play it at full strength, or to strike the boss so its next move is weaker. More than half the crowd has to call.`
-              : "The King has spent his charges."}
+              ? `The God King: ${boss.kingCharges} ${boss.kingCharges === 1 ? "charge" : "charges"}${boss.raid ? "" : " (your leftover power-ups)"}. Instead of picking a move, summon him to play it at full strength, or to strike the boss so its next move is weaker. More than half the crowd has to call.`
+              : "The God King has spent his charges."}
           </span>
         </div>
         {boss.kills.length > 0 && (
