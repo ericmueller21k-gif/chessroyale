@@ -663,3 +663,19 @@ Eric asked for this.
   - The moments: introducing himself on your first move; your queen in danger (attacked by a cheaper piece, or attacked and undefended); your king in check; great, good and bad crowd moves (by the played move's loss: ≤1, ≤4, ≥12); crowd captures and checks; boss captures; a boss blunder (a ≥30-point swing in the eval bar's numbers); the boss staggered; his strike; him playing the move; winning or losing (≥85% / ≤15%); out of charges; idle small talk.
   - Urgent moments (queen, check, his own actions) always speak. Others roll a chance and wait at least 6 s after the last line. Each moment speaks once, and a moment never repeats its previous line.
 - **Sounds.** Menu blips from the same CC0 retro pack (`public/sounds/menu/`).
+
+## The God King, toned down: he's secondary to the chess (Oct 4, 2026)
+
+Eric's feedback after playing it: too much King.
+
+- **No instruction text.**
+  - The dock's "Tap the God King" / "God King · N charges" line is gone; that row is just the move-history arrows now.
+  - The status line says just "Your move." (plus the staggered note when it applies).
+  - Instead, at most once every six moves while he has charges, he may say "Need a hand? Tap me." or similar.
+- **Smaller.** The figure is about 20% smaller (40 × 60 px), and his command window is narrower (176 px) with one-line notes ("Full strength. Uses your turn." / "Weakens its next move.").
+- **Paced by moves, not seconds.** Eric wants him to speak 5–10 times a game, about every 4–5 moves; before this he was mostly silent.
+  - Small talk (idle chatter, the tap-me reminder, winning or losing) rests for 3 moves after any line. Then its chance grows by 30% with each quiet move. That's about 6–7 lines of small talk in a 35-move game, by simulation and unit test.
+  - Reactions add to that: good move 35%, captures 50%, bad or great move 75–80%.
+  - Urgent moments always speak: queen in danger, check, his own actions, a boss blunder.
+  - Two lines that aren't urgent stay at least 8 s apart, so the reveal and the boss's move can't both talk over each other.
+- **Boss blunders.** The boss screen compares the engine's numbers before and after the boss's move (the eval bar's, cached). A swing of 15 points or more toward the crowd always gets a line, such as "It's reeling! Want me to finish it?" or "A blunder! Find the punishing move." This catches the weak bosses' random stumbles and real blunders alike.

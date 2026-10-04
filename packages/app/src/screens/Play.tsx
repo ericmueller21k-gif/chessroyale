@@ -3,7 +3,7 @@ import { applyMove, inCheck, queenInDanger, sideToMove } from "@chessroyale/ches
 import { Board, type Arrow } from "../components/Board.tsx";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { EvalBar, knownEval } from "../components/EvalBar.tsx";
-import type { KingCue } from "../godKing.ts";
+import { kingTurn, type KingCue } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { MiniTower } from "../components/MiniTower.tsx";
@@ -114,6 +114,7 @@ export function PlayScreen({
   // What the God King might say about the position: danger first, then how it's going, then small talk.
   const kingCues = useMemo(() => {
     if (!match.boss || waiting) return [];
+    kingTurn(board.fen);
     const out: { cue: KingCue; key: string }[] = [];
     if (strike?.at) out.push({ cue: "struck", key: `struck-${strike.at}` });
     if (queenInDanger(board.fen, side)) out.push({ cue: "queenDanger", key: `queen-${board.fen}` });
@@ -126,6 +127,7 @@ export function PlayScreen({
       if (ours >= 0.85) out.push({ cue: "winning", key: `winning-${board.fen}` });
       else if (ours <= 0.15) out.push({ cue: "losing", key: `losing-${board.fen}` });
     }
+    if (match.boss.kingCharges > 0 && board.ply >= 6) out.push({ cue: "nudge", key: `nudge-${Math.floor(board.ply / 12)}` });
     out.push({ cue: "idle", key: `idle-${board.fen}` });
     return out;
   }, [board.fen, strike?.at, waiting]);
@@ -207,7 +209,7 @@ export function PlayScreen({
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}
-                <span class="muted">{match.boss.staggerNext ? "The boss is staggered: its next move will be weaker." : match.boss.kingCharges > 0 ? "Or summon the God King." : ""}</span>
+                {match.boss.staggerNext && <span class="muted">The boss is staggered: its next move will be weaker.</span>}
               </span>
             )
           }

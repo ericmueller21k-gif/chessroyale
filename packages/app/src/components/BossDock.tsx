@@ -67,9 +67,7 @@ export function BossDock({
               <button type="button" class="history-label" onClick={() => view.live()} aria-label="Back to the live position">
                 Move {moveNo(view.ply)} · {view.ply}/{nav!.total} · back to live
               </button>
-            ) : (
-              <span class="dock-hint">{ready ? "Tap the God King" : charges > 0 ? `God King · ${charges} ${charges === 1 ? "charge" : "charges"}` : "God King · spent"}</span>
-            )}
+            ) : null}
           </div>
           <button type="button" class="nav-btn" aria-label="Next move" disabled={!view?.browsing} onClick={() => view?.go(view.ply + 1)}>
             <Chevrons />
@@ -160,8 +158,8 @@ function CommandMenu({ strike, struck, onPick }: { strike?: StrikeState; struck:
   const [at, setAt] = useState(0);
   const strikeOff = struck || !!strike?.mine;
   const items = [
-    { label: "Play move", note: "My move, at full strength. You won't pick.", off: false, strike: false },
-    { label: "Strike", note: struck ? "Already struck this move." : strike?.mine ? `Called: ${strike.calls} of ${strike.needed} needed.` : "Its next move is weaker. Clock stops, then you pick.", off: strikeOff, strike: true },
+    { label: "Play move", note: "Full strength. Uses your turn.", off: false, strike: false },
+    { label: "Strike", note: struck ? "Already struck." : strike?.mine ? `Called ${strike.calls}/${strike.needed}.` : "Weakens its next move.", off: strikeOff, strike: true },
   ];
   return (
     <div class="gk-command" role="menu" aria-label="God King commands">
