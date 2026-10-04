@@ -145,7 +145,11 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   // On your first move, strike the boss (alone, you're the whole crowd): its next move is staggered.
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   await page.getByRole("button", { name: "Strike the boss" }).click();
-  await expect(page.getByRole("button", { name: "Strike called" })).toBeVisible();
+  // A quick confirm: calling him is your whole turn.
+  await expect(page.getByText("Summon the God King to strike the boss?")).toBeVisible();
+  await page.getByRole("button", { name: "Yes" }).click();
+  // Alone you're the whole crowd, so he comes at once: on your king's square, striking the boss.
+  await expect(page.getByLabel("The God King strikes the boss")).toBeVisible({ timeout: 15_000 });
   const seen = new Set<string>();
   await playToResults(page, seen, 7);
   expect(await phase(page)).toBe("results");

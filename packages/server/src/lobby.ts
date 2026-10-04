@@ -332,11 +332,15 @@ export class LobbyCore {
       case "vote":
         return this.castVote(playerId, msg.key, msg.option);
       case "king": {
+        // Calling the King (or his strike) is this player's whole turn: no move of their own.
         const round = this.r.round;
-        if (this.r.phase === "play" && round?.key === msg.key && this.runner?.boss?.kingCharges && this.runner.player(playerId)?.alive) {
-          if (msg.strike) (round.kingStrikes ??= {})[playerId] = true;
-          else (round.kingCalls ??= {})[playerId] = true;
-        }
+        if (this.r.phase !== "play" || round?.key !== msg.key || !this.runner?.boss?.kingCharges || !this.runner.player(playerId)?.alive) return;
+        if (round.picks[playerId] || this.called(playerId)) return;
+        if (msg.strike) (round.kingStrikes ??= {})[playerId] = true;
+        else (round.kingCalls ??= {})[playerId] = true;
+        for (const h of this.r.humans) this.send(h.id, { t: "moved", key: round.key, playerId }, false);
+        this.sendTally();
+        if (this.roundHumans().every((h) => round.picks[h.id] || this.called(h.id))) this.lock();
         return;
       }
       case "bossMove":
@@ -657,9 +661,15 @@ export class LobbyCore {
     );
   }
 
+  /** Boss battle: this player called the King (or his strike) this round instead of picking. */
+  private called(playerId: string): boolean {
+    const round = this.r.round;
+    return !!(round?.kingCalls?.[playerId] || round?.kingStrikes?.[playerId]);
+  }
+
   private pick(playerId: string, key: string, move: string) {
     const round = this.r.round;
-    if (this.r.phase !== "play" || !round || round.key !== key || round.picks[playerId]) return;
+    if (this.r.phase !== "play" || !round || round.key !== key || round.picks[playerId] || this.called(playerId)) return;
     const now = this.io.now();
     const deadline = round.deadlines?.[playerId] ?? round.deadline;
     if (now > deadline + this.settings.lateGraceMs) return; // Late picks count as a miss.
@@ -669,7 +679,7 @@ export class LobbyCore {
     round.picks[playerId] = { move, thinkMs: Math.max(0, Math.min(now - round.startedAt, deadline - round.startedAt)) };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     this.sendTally();
-    if (this.roundHumans().every((h) => round.picks[h.id])) this.lock();
+    if (this.roundHumans().every((h) => round.picks[h.id] || this.called(h.id))) this.lock();
   }
 
   /**
@@ -688,7 +698,7 @@ export class LobbyCore {
     const playing = new Set(this.roundHumans().map((h) => h.id));
     for (const h of this.r.humans) {
       const alive = runner.player(h.id)?.alive;
-      if (!alive || (playing.has(h.id) && !round.picks[h.id])) continue;
+      if (!alive || (playing.has(h.id) && !round.picks[h.id] && !this.called(h.id))) continue;
       this.send(h.id, { t: "tally", key: round.key, picks }, false);
     }
   }

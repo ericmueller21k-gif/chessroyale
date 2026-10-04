@@ -3292,62 +3292,6 @@ button.history-label {
 }
 
 /* ---- The King ---- */
-.king-ally {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.king-figure {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  display: inline-block;
-  transform-origin: 50% 100%;
-  animation: king-sway 3.2s ease-in-out infinite;
-}
-.king-figure piece {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background-size: cover;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
-}
-.king-sword {
-  position: absolute;
-  right: -8px;
-  bottom: 2px;
-  font-size: 16px;
-  transform-origin: 20% 80%;
-  transform: rotate(-20deg);
-  animation: sword-idle 2.4s ease-in-out infinite;
-}
-@keyframes king-sway {
-  50% {
-    transform: rotate(2deg) translateY(-1px);
-  }
-}
-@keyframes sword-idle {
-  50% {
-    transform: rotate(-8deg);
-  }
-}
-.king-ally.striking .king-figure {
-  animation: king-rise 700ms ease-out forwards;
-}
-.king-ally.striking .king-sword {
-  animation: sword-raise 700ms cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
-}
-@keyframes king-rise {
-  to {
-    transform: scale(1.25) translateY(-4px);
-  }
-}
-@keyframes sword-raise {
-  to {
-    transform: rotate(-135deg) translate(-4px, -10px);
-  }
-}
 .king-call {
   display: grid;
   justify-items: start;
@@ -3379,34 +3323,6 @@ button.history-label {
 .king-charges i {
   font-style: normal;
 }
-.king-strike {
-  position: absolute;
-  inset: 22% 10%;
-  z-index: 5;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 4px;
-  border-radius: 16px;
-  color: #fff;
-  background: radial-gradient(circle, rgba(212, 165, 49, 0.9) 0%, rgba(60, 40, 0, 0.88) 80%);
-  box-shadow: 0 0 30px rgba(212, 165, 49, 0.8);
-  animation: banner-in 300ms ease-out;
-}
-.king-strike strong {
-  font-size: 20px;
-}
-.king-strike > span {
-  font-size: 26px;
-  font-weight: 900;
-}
-.king-strike .king-figure {
-  width: 64px;
-  height: 64px;
-}
-.king-strike .king-sword {
-  font-size: 26px;
-}
 .king-row .poll-bar i {
   background: #d4a531;
 }
@@ -3414,9 +3330,6 @@ button.history-label {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.king-strike .king-ally {
-  margin-bottom: 14px;
 }
 .king-calls {
   display: flex;
@@ -3432,13 +3345,24 @@ button.history-label {
   background: #c2410c;
   color: #fff;
 }
-.king-strike.at-boss {
-  background: radial-gradient(circle, rgba(194, 65, 12, 0.92) 0%, rgba(50, 10, 0, 0.9) 80%);
-  box-shadow: 0 0 30px rgba(194, 65, 12, 0.8);
+.king-calls.confirming {
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 2px solid #d4a531;
+  background: color-mix(in srgb, #d4a531 10%, var(--surface));
+  animation: banner-in 200ms ease-out;
 }
-.king-strike.at-boss > span {
-  font-size: 14px;
+.king-confirm-text {
+  flex: 1 1 180px;
+  font-size: 13px;
   font-weight: 600;
+}
+.king-confirm-text .muted {
+  font-weight: 400;
+}
+.king-call.yes {
+  background: #d4a531;
+  color: #1a1406;
 }
 .boss-staggered {
   color: #fdba74;
@@ -3494,6 +3418,11 @@ button.history-label {
   z-index: 6;
   pointer-events: none;
 }
+/* While the God King stands in his place, the real king is hidden. */
+.board-wrap:has(.king-summon.hide-king-w) cg-board piece.king.white,
+.board-wrap:has(.king-summon.hide-king-b) cg-board piece.king.black {
+  opacity: 0;
+}
 .ks-fx {
   position: absolute;
   inset: 0;
@@ -3504,183 +3433,40 @@ button.history-label {
 .ks-bolt {
   fill: none;
   stroke: #fffdf0;
-  stroke-width: 7;
+  stroke-width: 3.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 6px #ffe066) drop-shadow(0 0 14px #ffd23f);
-  stroke-dasharray: 1400;
-  stroke-dashoffset: 1400;
-  opacity: 0;
+  filter: drop-shadow(0 0 3px #ffe066) drop-shadow(0 0 8px #ffd23f);
 }
-.ks-converge {
-  animation: bolt-draw 380ms ease-out forwards;
-}
-.ks-converge.c0 {
-  animation-delay: 0ms;
-}
-.ks-converge.c1 {
-  animation-delay: 380ms;
-}
-.ks-converge.c2 {
-  animation-delay: 700ms;
-}
-.ks-strike {
-  stroke-width: 5;
-  animation: bolt-draw 320ms ease-in forwards 2050ms;
-}
-@keyframes bolt-draw {
-  0% {
-    opacity: 1;
-    stroke-dashoffset: 1400;
-  }
-  55% {
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
-  100% {
-    opacity: 0;
-    stroke-dashoffset: 0;
-  }
-}
-.ks-beam {
-  opacity: 0;
-  transform-origin: 50% 0;
-  transform-box: fill-box;
-  animation: beam-down 450ms ease-in forwards 950ms;
-}
-@keyframes beam-down {
-  0% {
-    opacity: 0;
-    transform: scaleY(0);
-  }
-  60% {
-    opacity: 1;
-    transform: scaleY(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scaleY(1);
-  }
-}
-.ks-flash {
-  opacity: 0;
-  animation: flash 420ms ease-out forwards 1300ms;
-}
-@keyframes flash {
-  0% {
-    opacity: 0;
-  }
-  25% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+.ks-bolt.strike {
+  stroke-width: 3;
 }
 .ks-hit {
-  fill: rgba(255, 236, 140, 0.55);
+  fill: rgba(255, 236, 140, 0.45);
   stroke: #fff6c2;
-  stroke-width: 4;
-  opacity: 0;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: hit-ring 420ms ease-out forwards 2200ms;
+  stroke-width: 3;
 }
-@keyframes hit-ring {
-  0% {
-    opacity: 1;
-    transform: scale(0.3);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.4);
-  }
-}
-.ks-exit {
-  opacity: 0;
-  animation: holy 520ms ease-out forwards 2950ms;
-}
-@keyframes holy {
-  0% {
-    opacity: 0;
-  }
-  40% {
-    opacity: 0.95;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-.ks-king {
+.ks-god {
   position: absolute;
-  left: 33%;
-  top: 14%;
-  width: 34%;
-  opacity: 0;
-  animation: gk-arrive 300ms ease-out forwards 1380ms, gk-bob 1.6s ease-in-out infinite 1700ms, gk-swap-out 1ms linear forwards 1820ms;
+  width: 12.5%;
+  height: 12.5%;
+  /* Exactly one square, like the board's pieces. */
+  animation: gk-bob 1.6s ease-in-out infinite;
 }
-.ks-king.raised {
-  animation: gk-show 1ms linear forwards 1820ms, gk-bob 1.6s ease-in-out infinite 1820ms, gk-dim 250ms ease-out forwards 2050ms, gk-leave 400ms ease-in forwards 3000ms;
-}
-.ks-king.raised .gk-sword {
-  transform: translate(30px, -52px) rotate(200deg);
-}
-@keyframes gk-arrive {
-  from {
-    opacity: 0;
-    transform: scale(0.6) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.ks-god.leaving {
+  filter: brightness(2.5);
 }
 @keyframes gk-bob {
   50% {
-    translate: 0 -4px;
+    translate: 0 -3%;
     rotate: 1.5deg;
-  }
-}
-@keyframes gk-swap-out {
-  to {
-    opacity: 0;
-  }
-}
-@keyframes gk-show {
-  to {
-    opacity: 1;
-  }
-}
-@keyframes gk-dim {
-  to {
-    opacity: 0.45;
-  }
-}
-@keyframes gk-leave {
-  from {
-    opacity: 0.45;
-    filter: brightness(1);
-  }
-  to {
-    opacity: 0;
-    filter: brightness(3);
-    transform: translateY(-30px) scale(0.9);
   }
 }
 .ks-plain {
   position: absolute;
-  left: 43.75%;
-  top: 40%;
   width: 12.5%;
   aspect-ratio: 1;
-  opacity: 0;
-  animation: king-drop 450ms cubic-bezier(0.3, 1.6, 0.5, 1) forwards 3250ms, king-fade 300ms ease-in forwards 3700ms;
-}
-@keyframes king-fade {
-  to {
-    opacity: 0;
-    transform: translateY(0) scale(0.8);
-  }
+  animation: king-drop 350ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
 .ks-plain piece {
   position: absolute;
@@ -3692,7 +3478,7 @@ button.history-label {
 @keyframes king-drop {
   from {
     opacity: 0;
-    transform: translateY(-60px);
+    transform: translateY(-60%);
   }
   to {
     opacity: 1;
@@ -3702,13 +3488,12 @@ button.history-label {
 .ks-hp {
   position: absolute;
   transform: translate(-50%, -50%);
-  font-size: clamp(18px, 6vw, 30px);
+  font-size: clamp(16px, 5vw, 26px);
   font-weight: 900;
   color: #ff4d4d;
   text-shadow: 0 2px 0 #3a0000, 0 0 10px rgba(255, 60, 60, 0.7);
-  opacity: 0;
   white-space: nowrap;
-  animation: hp-float 1100ms ease-out forwards 2250ms;
+  animation: hp-float 1050ms ease-out both;
 }
 @keyframes hp-float {
   0% {
@@ -3723,4 +3508,9 @@ button.history-label {
     opacity: 0;
     transform: translate(-50%, -170%) scale(1);
   }
+}
+.ks-god .god-king {
+  display: block;
+  width: 100%;
+  height: 100%;
 }

@@ -234,11 +234,12 @@ export class SoloMatch implements GameView {
 
   private bossIntroDone = false;
   kingCalled: "play" | "strike" | null = null;
+  /** Calling the God King (to play the move, or to strike the boss) is your whole turn: no move of your own. */
   callKing(strike = false) {
     if (this.phase.kind !== "play" || !this.runner.boss?.kingCharges || this.kingCalled) return;
     this.kingCalled = strike ? "strike" : "play";
     (strike ? this.runner.kingStrikers : this.runner.kingCallers).add(HUMAN);
-    this.emit();
+    void this.score(null);
   }
   get boss(): BossView | null {
     const v = this.runner?.bossView();

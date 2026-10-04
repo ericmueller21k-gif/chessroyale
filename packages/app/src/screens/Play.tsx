@@ -7,7 +7,7 @@ import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView } from "../game.ts";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
-import { KingAlly } from "../components/KingAlly.tsx";
+import { KingCalls } from "../components/KingAlly.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
@@ -125,7 +125,7 @@ export function PlayScreen({
           extra={
             match.boss ? (
               // Boss battle: power-ups became the King's charges.
-              <KingAlly side={match.boss.crowdSide} charges={match.boss.kingCharges} called={match.kingCalled} canCall={!waiting && !intro} onCall={(strike) => match.callKing(strike)} />
+              <KingCalls charges={match.boss.kingCharges} called={match.kingCalled} canCall={!waiting && !intro && !shown.replaying} onCall={(strike) => match.callKing(strike)} />
             ) : (
               <PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />
             )
@@ -141,7 +141,7 @@ export function PlayScreen({
               <i />
             </span>
             <span>
-              <strong>{picked ? "Move in." : "Time's up."}</strong> Waiting for other players
+              <strong>{match.kingCalled ? (match.kingCalled === "strike" ? "Strike called." : "God King called.") : picked ? "Move in." : "Time's up."}</strong> Waiting for other players
             </span>
             {alive.length > 0 && (
               <span class="waiting-count">
