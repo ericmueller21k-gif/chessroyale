@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, modeSettings, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, definedOnly, modeSettings, type DrawRule, type Settings } from "@chessroyale/core";
 import { chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -17,7 +17,10 @@ import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
 import { SoundLab } from "./screens/SoundLab.tsx";
 import { ProfileScreen } from "./screens/Profile.tsx";
-import { loadAccount, recordSoloResult } from "./account.ts";
+import { loadAccount, mustSignInToPlayOnline, recordSoloResult } from "./account.ts";
+import { useAccount } from "./screens/Profile.tsx";
+import { LandingScreen } from "./screens/Landing.tsx";
+import { LegalScreen } from "./screens/Legal.tsx";
 import { CrowdCut, CrowdReveal, WatchScreen } from "./screens/Crowd.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
@@ -29,19 +32,19 @@ function overridesFromUrl(): Partial<Settings> {
   const draw = q.get("draw") as DrawRule | null;
   const mode = chosenMode();
   const crowd = mode.mode === "crowd";
-  return JSON.parse(
-    JSON.stringify({
-      // The mode's own rules and pace first, then pace and playtest overrides on top.
-      ...modeSettings(mode.mode, { crowdTeams: mode.crowdTeams, augments: mode.augments }),
-      ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2 } : PACE_SETTINGS.quick) : {}),
+  return {
+    // The mode's own rules and pace first, then pace and playtest overrides on top (only the ones that are set).
+    ...modeSettings(mode.mode, { crowdTeams: mode.crowdTeams, augments: mode.augments }),
+    ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2 } : PACE_SETTINGS.quick) : {}),
+    ...definedOnly({
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),
       moveClockSeconds: n("clock"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
       // (Crowd always starts from move 0: its own openingMoves stays.)
-      ...(crowd ? {} : { openingMoves: chosenOpeningMoves() }),
+      openingMoves: crowd ? undefined : chosenOpeningMoves(),
     }),
-  );
+  };
 }
 
 /** Quick pace: off by default (relaxed), set by the first screen's toggle or ?pace=quick. */
@@ -57,6 +60,18 @@ function quickPace(): boolean {
 /** An invite link (/lobby/ABCDE) opens the join form with the code filled in. */
 const linkCode = location.pathname.match(/^\/lobby\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
 
+/** Back from Google: ?signin=google (or failed). Read once, then tidied out of the address bar. */
+const signinParam = new URLSearchParams(location.search).get("signin");
+
+const GUEST_KEY = "brc.guest";
+const storedGuest = () => {
+  try {
+    return localStorage.getItem(GUEST_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
 type AnyMatch = GameView & { dispose(): void };
 
 export function App() {
@@ -65,7 +80,28 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [soundLab, setSoundLab] = useState(() => new URLSearchParams(location.search).has("soundlab"));
-  const [showProfile, setShowProfile] = useState(() => new URLSearchParams(location.search).has("signin"));
+  const [showProfile, setShowProfile] = useState(() => location.pathname === "/profile");
+  const [legal, setLegal] = useState<"privacy" | "terms" | null>(() =>
+    location.pathname === "/privacy" ? "privacy" : location.pathname === "/terms" ? "terms" : null,
+  );
+  // Chose "play vs bots as a guest" on the landing page (this device remembers).
+  const [guest, setGuest] = useState(storedGuest);
+  const [inviteSkipped, setInviteSkipped] = useState(false);
+  const chooseGuest = (on: boolean) => {
+    setGuest(on);
+    try {
+      localStorage.setItem(GUEST_KEY, on ? "1" : "0");
+    } catch {
+      // Not important.
+    }
+  };
+  const { config, profile } = useAccount();
+  useEffect(() => {
+    if (!signinParam) return;
+    const q = new URLSearchParams(location.search);
+    q.delete("signin");
+    history.replaceState(null, "", `${location.pathname}${q.size ? `?${q}` : ""}`);
+  }, []);
   // Your account (a guest one the first time).
   useEffect(() => {
     let name: string | undefined;
@@ -176,12 +212,53 @@ export function App() {
   };
 
   if (!match && soundLab) return <SoundLab onBack={() => setSoundLab(false)} />;
+  if (!match && legal) {
+    return (
+      <LegalScreen
+        page={legal}
+        onBack={() => {
+          setLegal(null);
+          history.replaceState(null, "", "/");
+        }}
+      />
+    );
+  }
   if (!match && showProfile) {
     return (
       <ProfileScreen
         onBack={() => {
           setShowProfile(false);
-          if (location.search.includes("signin")) history.replaceState(null, "", "/");
+          if (location.pathname === "/profile") history.replaceState(null, "", "/");
+        }}
+      />
+    );
+  }
+  // Still finding out who you are: a plain splash rather than a flash of the wrong screen.
+  if (!match && (config === null || (config.accounts && !profile))) {
+    return (
+      <div class="screen center">
+        <h1 class="logo splash-logo">
+          <span class="logo-crown" aria-hidden="true">
+            ♚
+          </span>
+          HunChess
+        </h1>
+      </div>
+    );
+  }
+  // Not signed in, where online play needs it: the landing page (an invite link shows it even to guests).
+  const noLanding = new URLSearchParams(location.search).has("nolanding");
+  if (!match && !noLanding && config?.onlineNeedsSignIn && profile && !profile.user.signedIn && (!guest || (linkCode && !inviteSkipped))) {
+    return (
+      <LandingScreen
+        google={config.google}
+        email={config.email}
+        joinCode={linkCode}
+        failed={signinParam === "failed"}
+        onGuest={() => {
+          chooseGuest(true);
+          setInviteSkipped(true);
+          if (linkCode) history.replaceState(null, "", "/");
         }}
       />
     );
@@ -193,8 +270,10 @@ export function App() {
         onCreateLobby={(n, p) => void createLobby(n, p)}
         onJoinLobby={joinLobby}
         loading={loading}
-        joinCode={linkCode}
+        joinCode={mustSignInToPlayOnline() ? undefined : linkCode}
         error={error}
+        onlineLocked={mustSignInToPlayOnline()}
+        onSignIn={() => chooseGuest(false)}
         onSoundLab={() => setSoundLab(true)}
         onProfile={() => setShowProfile(true)}
       />

@@ -28,7 +28,8 @@ export function chosenMode(): ModeChoice {
       return null;
     }
   };
-  const mode = (q.get("mode") ?? get(MODE_KEY)) === "crowd" ? "crowd" : "classic";
+  // Crowd (50 v 50) is the main mode: Classic only when chosen.
+  const mode = (q.get("mode") ?? get(MODE_KEY)) === "classic" ? "classic" : "crowd";
   return {
     mode,
     crowdTeams: (q.get("turns") ?? get(TURNS_KEY)) !== "all",
@@ -82,6 +83,8 @@ export function HomeScreen({
   error,
   onSoundLab,
   onProfile,
+  onlineLocked,
+  onSignIn,
 }: {
   onStart: (name: string, practice: boolean) => void;
   onCreateLobby: (name: string, practice: boolean) => void;
@@ -91,6 +94,9 @@ export function HomeScreen({
   error?: string | null;
   onSoundLab?: () => void;
   onProfile?: () => void;
+  /** Online play needs signing in, and you're a guest. */
+  onlineLocked?: boolean;
+  onSignIn?: () => void;
 }) {
   const { profile } = useAccount();
   const [code, setCode] = useState(joinCode ?? "");
@@ -177,13 +183,13 @@ export function HomeScreen({
       {!joinCode && <InstallCard />}
       {!joinCode && (
         <div class="mode-pick" role="radiogroup" aria-label="Game mode">
-          <button type="button" role="radio" aria-checked={!crowd} class={!crowd ? "on" : ""} onClick={() => changeMode({ mode: "classic" })}>
-            <strong>Classic</strong>
-            <span>{S.lobbySize} players · 8 boards</span>
-          </button>
           <button type="button" role="radio" aria-checked={crowd} class={crowd ? "on" : ""} onClick={() => changeMode({ mode: "crowd" })}>
             <strong>Crowd</strong>
             <span>{C.lobbySize} players · 1 board</span>
+          </button>
+          <button type="button" role="radio" aria-checked={!crowd} class={!crowd ? "on" : ""} onClick={() => changeMode({ mode: "classic" })}>
+            <strong>Classic</strong>
+            <span>{S.lobbySize} players · 8 boards</span>
           </button>
         </div>
       )}
@@ -322,6 +328,15 @@ export function HomeScreen({
           {loading ? "Loading the engine…" : `Play solo vs ${(crowd ? C.lobbySize! : S.lobbySize) - 1} bots`}
         </button>
       )}
+      {onlineLocked ? (
+        <div class="signin online-locked">
+          <h2>Play online</h2>
+          <p class="muted small">Online matches are real people only, so they need an account. It takes a few seconds with Google or your email.</p>
+          <button type="button" class="btn btn-primary" onClick={onSignIn}>
+            Sign in to play online
+          </button>
+        </div>
+      ) : (
       <div class="lobby-actions">
         {!joinCode && (
           <button type="button" class="btn btn-secondary" disabled={loading} onClick={() => onCreateLobby(remember(name), practice)}>
@@ -342,6 +357,7 @@ export function HomeScreen({
           </button>
         </div>
       </div>
+      )}
       {error && <p class="out-msg">{error}</p>}
       {onSoundLab && (
         <button type="button" class="link-btn" onClick={onSoundLab}>

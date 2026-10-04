@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, newLobbyRecord, type LobbyRecord } from "./lobby.ts";
-import { accountOf } from "./api.ts";
+import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired } from "./api.ts";
 import { d1Sql, recordResult } from "./accounts.ts";
 import type { Env } from "./index.ts";
 
@@ -82,7 +82,9 @@ export class Lobby extends DurableObject<Env> {
     // The player id is attached to the socket after "hello"; the account (from the session cookie) now.
     const account = await accountOf(request, this.env).catch(() => null);
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ userId: account?.id });
+    // Online play needs a signed-in account (once sign-in is set up); a guest is told so on "hello".
+    const guest = !!this.env.DB && signInRequired(this.env) && !isSignedIn(account);
+    server.serializeAttachment({ userId: account?.id, guest });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -94,8 +96,13 @@ export class Lobby extends DurableObject<Env> {
       return;
     }
     const core = this.core(this.record!.code);
-    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string } | null;
+    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean } | null;
     if (msg.t === "hello") {
+      if (attached?.guest) {
+        ws.send(JSON.stringify({ t: "error", message: SIGN_IN_TO_PLAY, now: Date.now() }));
+        ws.close(1008, "Sign in to play online");
+        return;
+      }
       const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice);
       if (!result.ok) {
         ws.send(JSON.stringify({ t: "error", message: result.message, now: Date.now() }));

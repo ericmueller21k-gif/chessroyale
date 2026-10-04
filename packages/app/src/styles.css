@@ -2704,3 +2704,173 @@ button.history-label {
   display: flex;
   gap: 8px;
 }
+
+/* ---- Landing ---- */
+.landing {
+  gap: 18px;
+}
+.landing-head {
+  display: grid;
+  gap: 6px;
+}
+.landing-head .logo {
+  margin: 0;
+}
+.landing-tag {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.landing-tag strong {
+  color: var(--text);
+}
+.landing-main {
+  display: grid;
+  gap: 18px;
+}
+.demo-frame {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.demo-video {
+  display: block;
+  width: min(100%, 300px);
+  aspect-ratio: 390 / 700;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 22px;
+  border: 6px solid var(--surface-2);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.landing-actions {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.landing-signin h2 {
+  font-size: 18px;
+}
+.signin-options {
+  display: grid;
+  gap: 8px;
+}
+.btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.signin-msg {
+  margin: 0;
+}
+.or-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.or-line::before,
+.or-line::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--line);
+}
+.landing-note {
+  margin: -4px 0 0;
+  text-align: center;
+}
+.faq {
+  display: grid;
+  gap: 6px;
+}
+.faq h2 {
+  margin: 8px 0 4px;
+  font-size: 18px;
+}
+.faq details {
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0 14px;
+}
+.faq summary {
+  cursor: pointer;
+  padding: 13px 0;
+  font-weight: 700;
+  list-style-position: outside;
+}
+.faq details p {
+  margin: 0 0 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.landing-foot {
+  text-align: center;
+  padding-bottom: 6px;
+}
+.landing-foot a,
+.legal a {
+  color: inherit;
+}
+.splash-logo {
+  justify-content: center;
+}
+.online-locked p {
+  margin: 0;
+  line-height: 1.45;
+}
+.legal {
+  line-height: 1.5;
+}
+.legal h1 {
+  margin: 8px 0 0;
+}
+.legal h2 {
+  margin: 10px 0 0;
+  font-size: 17px;
+}
+.legal p,
+.legal ul {
+  margin: 0;
+  color: var(--muted);
+}
+.legal ul {
+  padding-left: 20px;
+}
+.legal .btn {
+  flex: none;
+  margin-top: 10px;
+}
+@media (min-width: 900px) {
+  .screen.landing {
+    width: min(100vw, 980px);
+  }
+  .landing-main {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 40px;
+  }
+  .landing-head {
+    text-align: left;
+  }
+  .demo-video {
+    width: 320px;
+  }
+  .faq {
+    max-width: 720px;
+  }
+}
+/* Narrow phones: the email box gets its own line. */
+.signin-options .signin-row {
+  flex-wrap: wrap;
+}
+.signin-options .signin-row input {
+  flex: 1 1 210px;
+}
+.signin-options .signin-row .btn {
+  flex: 1 0 auto;
+}

@@ -1,6 +1,6 @@
-import { DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, modeSettings, type DrawRule } from "@chessroyale/core";
+import { DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, type DrawRule } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
-import { handleAccountApi, type AccountEnv } from "./api.ts";
+import { SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, signInRequired, type AccountEnv } from "./api.ts";
 
 export { Lobby } from "./lobby-do.ts";
 
@@ -24,6 +24,7 @@ export default {
     if (account) return account;
     // POST /api/lobby → { code }
     if (url.pathname === "/api/lobby" && request.method === "POST") {
+      if (env.DB && signInRequired(env) && !isSignedIn(await accountOf(request, env))) return json({ message: SIGN_IN_TO_PLAY }, 401);
       for (let i = 0; i < 5; i++) {
         const code = randomCode();
         const stub = env.LOBBIES.get(env.LOBBIES.idFromName(code));
@@ -36,14 +37,17 @@ export default {
         const overrides = {
           ...modeSettings(mode, { crowdTeams: url.searchParams.get("turns") !== "all", augments: url.searchParams.get("augments") !== "0" }),
           ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2, drawnMoveSeconds: 1.2 } : PACE_SETTINGS.quick) : {}),
-          roundsPerStage: n("rounds"),
-          firstStageRounds: n("rounds"),
-          moveClockSeconds: n("clock"),
-          drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
-          // Opening moves per side on each board (0-10), chosen by the lobby's creator.
-          openingMoves: mode === "classic" && url.searchParams.has("moves")
-            ? Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(Number(url.searchParams.get("moves")) || 0)))
-            : undefined,
+          // Playtest overrides and the creator's choices: only the ones that are set.
+          ...definedOnly({
+            roundsPerStage: n("rounds"),
+            firstStageRounds: n("rounds"),
+            moveClockSeconds: n("clock"),
+            drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
+            // Opening moves per side on each board (0-10), chosen by the lobby's creator.
+            openingMoves: mode === "classic" && url.searchParams.has("moves")
+              ? Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(Number(url.searchParams.get("moves")) || 0)))
+              : undefined,
+          }),
         };
         await stub.create(code, JSON.parse(JSON.stringify(overrides)));
         return json({ code });

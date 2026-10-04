@@ -21,7 +21,7 @@ test("two players in a lobby with 30 bots play a whole match; a reload rejoins t
   const host = await hostCtx.newPage();
   const guest = await guestCtx.newPage();
 
-  await host.goto("/?debug&rounds=1&clock=12&pace=quick");
+  await host.goto("/?debug&mode=classic&rounds=1&clock=12&pace=quick");
   await host.getByLabel("Your name").fill("Hosty");
   await host.getByRole("button", { name: "Create a lobby" }).click();
   await expect(host.getByRole("heading", { name: /^Lobby / })).toBeVisible();

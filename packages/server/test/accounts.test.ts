@@ -12,7 +12,7 @@ import {
   verifyEmailCode,
   type Sql,
 } from "../src/accounts.ts";
-import { handleAccountApi } from "../src/api.ts";
+import { handleAccountApi, isSignedIn, signInRequired } from "../src/api.ts";
 
 // node:sqlite through require (Vite doesn't know it as a built-in yet).
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
@@ -125,7 +125,7 @@ describe("account API", () => {
 
   it("config says what's set up; /api/me makes a guest; email code sign-in works end to end", async () => {
     const env = { DB: memoryD1(), RESEND_API_KEY: "re_test" };
-    expect((await call(env, "/api/auth/config")).body).toEqual({ accounts: true, google: false, email: true });
+    expect((await call(env, "/api/auth/config")).body).toEqual({ accounts: true, google: false, email: true, onlineNeedsSignIn: true });
     const me = await call(env, "/api/me?name=Eric");
     expect(me.body.user.name).toBe("Eric");
     expect(me.body.user.signedIn).toBe(false);
@@ -166,8 +166,34 @@ describe("account API", () => {
     expect(after.body.user).toMatchObject({ signedIn: true, google: true, email: "e@gmail.com" });
   });
 
+  it("Google sends you back where you started (an invite link), and only to a path on this site", async () => {
+    const env = { DB: memoryD1(), GOOGLE_CLIENT_ID: "cid", GOOGLE_CLIENT_SECRET: "secret" };
+    const claims = btoa(JSON.stringify({ sub: "g-9", aud: "cid" }));
+    const fakeGoogle = (async () => new Response(JSON.stringify({ id_token: `x.${claims}.y` }), { status: 200 })) as unknown as typeof fetch;
+    for (const [next, back] of [["/lobby/ABCDE", "/lobby/ABCDE"], ["//evil.example", "/"], ["https://evil.example", "/"]] as const) {
+      const me = await call(env, "/api/me");
+      const start = await call(env, `/api/auth/google/start?next=${encodeURIComponent(next)}`, { cookie: me.cookie });
+      const cookies = start.res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+      const state = new URL(start.res.headers.get("location")!).searchParams.get("state");
+      const cb = await call(env, `/api/auth/google/callback?state=${state}&code=c`, { cookie: `${me.cookie}; ${cookies}` }, fakeGoogle);
+      expect(cb.res.headers.get("location")).toBe(`${origin}${back}?signin=google`);
+    }
+  });
+
+  it("online play needs a signed-in account once sign-in is set up", () => {
+    expect(signInRequired({})).toBe(false);
+    expect(signInRequired({ RESEND_API_KEY: "k" })).toBe(true);
+    expect(signInRequired({ GOOGLE_CLIENT_ID: "a" })).toBe(false);
+    expect(signInRequired({ GOOGLE_CLIENT_ID: "a", GOOGLE_CLIENT_SECRET: "b" })).toBe(true);
+    const base = { id: "u", name: "P", icon: "♟", created_at: 0 };
+    expect(isSignedIn(null)).toBe(false);
+    expect(isSignedIn({ ...base, email: null, google_sub: null })).toBe(false);
+    expect(isSignedIn({ ...base, email: "a@b.co", google_sub: null })).toBe(true);
+    expect(isSignedIn({ ...base, email: null, google_sub: "g" })).toBe(true);
+  });
+
   it("without a database, only the config answers", async () => {
-    expect((await call({}, "/api/auth/config")).body).toEqual({ accounts: false, google: false, email: false });
+    expect((await call({}, "/api/auth/config")).body).toEqual({ accounts: false, google: false, email: false, onlineNeedsSignIn: false });
     expect((await call({}, "/api/me")).res.status).toBe(503);
   });
 });
