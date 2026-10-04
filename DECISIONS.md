@@ -465,3 +465,94 @@ Eric's worry is that guests make cheating too easy, so the plan is now:
 ## Sign-in secrets in the Secrets Store (Oct 4, 2026)
 
 Eric put `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `RESEND_API_KEY` in the account Secrets Store (store `c4aab92a84ec4217acd83a530a799d80`), not in the Worker's own secrets. I bound them in `wrangler.jsonc` (`secrets_store_secrets`) instead of asking him to redo it, since the store keeps them in one place for the whole account. `withSecrets()` reads each one as a plain string whether it comes from the store (`.get()`, cached for 5 minutes) or is a Worker secret, so either setup works. `keep_vars` is also on, so variables set in the dashboard survive deploys.
+
+## 50 v 50 revamp: pre-game votes, three endings, a boss, and Play now (Oct 4, 2026)
+
+Eric's brief (voice, late at night, "make the calls"): the 50 v 50 becomes the main mode. Players pick how each match goes by pushing pawns into squares in the middle of the board, the 2v2 ending is replaced by bigger endings including a Stockfish boss, and matchmaking replaces lobbies for the main mode. My calls, in order:
+
+**Pre-game votes (`packages/core/src/votes.ts`).**
+- **Three zones, not four.** Each zone is a 2×2 block on files b–c, d–e and f–g, ranks 4–5. Leaving out the a- and h-files is the "cut out the far left and right" option Eric suggested, and it gives three clean, even zones.
+- **How you vote.** Push one of your pawns two squares into a zone: White pawns land on rank 4, Black pawns on rank 5. Both teams vote at once, so 100 ghost pawns stream in from both sides, with a live count in each zone. You can also tap a card under the board (quicker, and accessible).
+- **Timing.** One vote each, 8 seconds per vote. The result shows for 2.5 s with the winning zone pulsing.
+- **Order.** How it ends comes first, then the speed: the speed of a boss battle or a duel feels different, so the format is decided first.
+- **Counting.** Most votes wins. A tie is drawn at random; no votes gives the default (Team final, Standard).
+- **Bots.** Each vote gets a fresh random lean, so results vary from game to game and a few humans can swing a close one.
+- **Easy to change.** Options, names, icons and what each one sets are plain data in `PREGAME_VOTES`.
+- **Speeds.** Slow is 30 s a move, Standard 20 s, Bullet 10 s.
+- **The toggle.** The old "augments" switch now turns these votes on and off. Off means Team final at Standard. The vote after each cut (more / same / less time) is replaced; it's still in the code behind `cutClockVote`, which is off.
+- **Board orientation.** From Black's side the board is flipped, so the cards are mirrored to match the zones.
+
+**The three endings.** They come from `FinalFormat`, and the knockouts adjust to leave the right number of players.
+- **Team final (top 8).** It starts 4v4, with teammates taking turns for their side (every 4th move of your side is yours).
+  - After each player has moved 3 times, the weakest on each side goes out: 4v4 → 3v3 → 2v2.
+  - The 2v2 plays to the end of the game. 160 moves is a safety cap; past it, the engine's verdict decides.
+  - **Who goes out is decided by average loss per move over the whole match** (`matchLoss`, with a miss counting 25), not by the final's moves alone. That answers Eric's worry that one blunder, or one brilliant move the engine misjudges, could decide it: a whole game of moves sits behind every cut.
+  - Winning the game goes on both teammates' records, as Eric asked. Placement (and later rating) still comes from your own move quality.
+- **Boss battle (top 10).** The third option has two parts:
+  - **The board.** At first I had the ten start a fresh game from the starting position. Eric then asked for a position from **the game they just played**, around moves 5–12, roughly even, and never better for the boss. So the battle starts from a position in that game with White (the crowd) to move, between moves 5 and 12:
+    - If possible, one where White's expected score is 0.50–0.60, taking the one nearest move 8.
+    - Otherwise, the position closest to even that still favours White.
+    - Otherwise, the starting position, which is even by definition.
+  - **Choosing it costs nothing.** Every position's evaluation was recorded when that move was scored (`BoardState.evals`), so no extra engine search is needed and it works the same solo and online.
+  - **The intro.** A 5.5 s screen shows the boss appearing and says which move of their game it takes over from.
+  - **How moves are chosen.** The most popular pick is played, and picks are scored as usual.
+  - **Strikes.** Every 3 crowd moves the boss strikes down the player who lost the most points over those 3 moves; a tie goes against the weaker player over the match. Strikes continue down to 3 survivors.
+  - **The strike animation.** A white-red flash, a skull, the victim's name shaken and crossed out, and a slight screen shake. No new sound, keeping to Eric's earlier "piece sounds, ticks and the reveal only".
+  - **The end.** The battle ends on mate, a draw, or 60 crowd moves; at the cap, the engine's verdict decides. Those still standing share the result on their records.
+  - **The boss's strength.** It's set from the ten's own engine ratings, weighted towards the best: the top player counts 10 times, the 10th once. Then an offset is added, clamped to 800–3000, and Stockfish plays at UCI_Elo. The number stays secret. Instead the boss has a name and look that scale with its strength (The Pawn Golem 🗿, The Iron Bishop 🤖, The Black Knight 🐴, The Tower Tyrant 🏰, The Grandmaster Wraith 👻, The Engine Eternal 👹) and a 1–5 skull threat rating.
+  - **Calibration.** See below.
+- **Duel (top 2).** This is the third option Eric left to me. The best player on each side plays 1v1 to the end, and the winner of the game places first. It's cheap to build (it's the team final with one player a side) and it's a real contrast to the other two: a showdown instead of a team effort.
+
+**Boss calibration (`packages/sim/scripts/boss-sim.ts`, `reports/boss-calibration.md`).**
+- **The setup.** Crowds of 10 bots (the most popular pick played, the weakest struck down every 3 moves) played White against Stockfish at the crowd's weighted rating plus an offset.
+- **Crowd types.** I modelled human-like crowds (expert, club, casual, beginner) as bots that also play a random move now and then.
+- **Findings** (6–8 games a row, so noisy, in `reports/boss-calibration.md`):
+  - **Strong crowds.** A boss at the crowd's own weighted rating gave the expert crowd 33% wins and 50% draws. About 150 points weaker made it easy (83% wins).
+  - **Club crowds.** At about 100 points weaker, they won 38%, drew 25% and lost 38%. That's the target: very hard but beatable. So **the offset is −100.**
+  - **Weak crowds** (rated below about 1900 on our scale) lost almost every game, even against Stockfish's floor of UCI_Elo 1320. A crowd of shaky voters plays worse than its rating suggests.
+  - **The fix for weak crowds.** Below 2100 the boss **stumbles**: now and then it plays a random legal move instead, a real mistake the crowd can punish. The chance is (2100 − strength) / 1000, at most 25%.
+  - **How I got there.** A random top-5 move wasn't enough, because those are still good moves. Stumbling from 2300 at up to 50% went too far: weak crowds won 7–8 of 8. At up to 40% they still won 6–7 of 8, so the cap is now 25%.
+  - **This is a starting point for real players.** Real human crowds probably agree on natural moves better than random bots do. With actual games, the offset and the stumble are the two numbers to tune (`bossEloOffset`, `bossStumbleBelow`, `bossStumbleMax` in settings.ts).
+
+**Play now (matchmaking).**
+- **The flow.** One button, no lobby: you join the 50 v 50 lobby that's filling up and watch the count climb towards 100. The match starts when it's full, or 60 s after the lobby opened, with bots in the empty seats. Unranked only for now, since nobody has a rating yet.
+- **How it's built.** A `Matchmaker` Durable Object hands out the current lobby, one request at a time, so two players arriving together never open two lobbies. A matchmade lobby has no host button and starts itself on an alarm.
+- **Settings.** Local tests use an 8 s fill (`MATCH_FILL_SECONDS`).
+- **Later.** Filling with bots "around players' ratings" waits for ranked: bot strength is a temperature, not a rating, and mapping between the two needs its own calibration. It's in the roadmap.
+- **Private lobbies.** Create and Join with a code still work, for playing with friends.
+
+**Other details.**
+- **Who plays the boss online.** The host's browser plays the boss's moves (`bossRequest` → `bossMove`), the same way it already scores rounds: the free Worker can't run Stockfish. If the host doesn't answer in 15 s, another player is asked; if nobody can, the boss plays a random legal move so the match never stalls.
+- **The boss bar.** During the battle it replaces the board strip above the board on every screen, so the board stays put throughout the battle.
+- **Playtest URL options.** `?format=team|boss|duel` skips the votes; `?finalTurns=N` and `?bossMoves=N` shorten those endings for tests.
+
+**The King, the crowd's champion in the boss battle.** Eric's idea, 90% built for him to test.
+- **Charges.** When the battle starts, the ten's leftover power-ups become the King's charges: one per 10 left (rounded), at least 1, at most 3. Their individual power-ups go to zero. Eric wondered whether charges should be individual or shared. I made them shared because the battle is a team effort, and saving power-ups through the game now pays off at the end.
+- **Calling him.** On a crowd move, anyone can tap **Call the King** as well as picking their move. If more than half the crowd calls and a charge is left, the King plays instead of the popular move. Picks are still scored as usual, so calling never protects you from the boss's strikes.
+  - Bots call him when the crowd's popular move would lose 6 points or more, and back a human's call 60% of the time. That way a lone human in a solo game can still bring him in.
+- **His strength.** The King plays the engine's best move at full strength: the same search that scores the picks, so it costs nothing extra. It's always stronger than the boss, which plays limited to its UCI_Elo. On screen this reads as "plays at full strength".
+- **How he looks.** A king piece in the crowd's colour with a sword at his side, beside the board in place of the power-ups during the battle. Charges show as crowns. He sways gently, and the sword wiggles.
+  - When he plays, a gold card appears over the board ("The King steps in", with his move) as he rises and raises his sword. The poll shows a 👑 King row with the number who called.
+  - No confirmation step, as Eric said.
+
+**The King's strike (Eric's idea, to test).** The King has a second action for the same charge: **Strike the boss**.
+- **How it's called.** The same way as the play: more than half the crowd must call. If both are called, playing the move wins.
+- **What it does.** The boss's next move becomes a staggered one: from its top 8 moves, the one that loses nearest 10 points (range 5–15, `kingStrikeLoss`). That's a clear step back, never a catastrophe.
+- **Bots** never start a strike, but back a human's call 60% of the time.
+- **On screen.** An orange "The King strikes the boss!" card. The boss's move then says it "staggered from the King's strike". The poll shows a ⚔️ Strike row.
+- **How to use it best (Eric wasn't sure yet).** It's worth more in quiet positions, where the boss's best move matters most. Playing the King yourself is worth more when the crowd can't find the move. Players will work this out, which adds skill.
+
+## Boss raid: a mode of its own (Oct 4, 2026)
+
+Eric: friends will want to queue up together for a boss, so make it a standalone mode with up to 50 people, a handful of engine strengths, always stronger than the lobby's average.
+- **What it is.** A third mode card, **Boss raid**. Up to 50 players and no bots, picking the crowd's moves together (most popular wins).
+  - **With friends:** create a raid and share the code; the host starts.
+  - **Alone:** take the boss on yourself; you are the whole crowd.
+  - Play now stays 50 v 50 only.
+- **The board.** It starts from a named classical opening 5 moves in, from the opening library, the same balanced named lines as Classic. This was Eric's first boss idea ("four to six moves, lines every decent player knows"). A short roulette of famous opening names flicks past before the real one lands.
+- **The boss's strength comes in six tiers**: 1400, 1700, 2000, 2300, 2600 and 2900. Each is one boss: The Pawn Golem, The Iron Bishop, The Black Knight, The Tower Tyrant, The Grandmaster Wraith and The Engine Eternal, ready for sprites later.
+  - **The rule.** A raid gets the weakest tier that's stronger than the group's average rating.
+  - **Ratings.** Each player's rating comes from their profile (their last engine rating), sent when they join. No rating counts as 1500.
+  - **Low tiers.** The stumble rule above still applies, so the 1400 and 1700 bosses are beatable for new players.
+- **Strikes and the King.** The boss still strikes down the worst recent mover every 3 moves, but only down to half the group, so a small group of friends isn't wiped out. The King has all 3 charges (there are no power-ups to convert).
+- **Records.** Results go on profiles as their own mode ("Boss" tab). Those still standing share the win.

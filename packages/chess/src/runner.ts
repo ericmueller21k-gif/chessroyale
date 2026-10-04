@@ -31,11 +31,25 @@ import {
   estimateRating,
   standingPoints,
   standings,
+  bossElo,
+  bossInfo,
+  bossStumbleChance,
+  bossStartPly,
+  kingCharges,
+  raidBossElo,
+  bossKill,
+  bossKillDue,
+  finishBoss,
+  matchLoss,
+  teamFinalCutIn,
+  teamFinalStep,
+  finalToTheEnd,
+  interleave,
 } from "@chessroyale/core";
-import type { BoardSlot, NetBoard, NetFinal, NetStanding } from "./protocol.ts";
-import { boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
+import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
+import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { legalMoves, sideToMove } from "./rules.ts";
+import { legalMoves, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 
 /**
@@ -47,6 +61,8 @@ import type { MoveScore } from "./uci.ts";
 export interface EngineLike {
   topMoves(fen: string, n: number): Promise<MoveScore[]>;
   scoreMoves(fen: string, moves: readonly string[]): Promise<MoveScore[]>;
+  /** A move at a limited strength (the boss); engines without it play their top move. */
+  playAtElo?(fen: string, elo: number, nodes?: number): Promise<string>;
 }
 
 export interface Entrant {
@@ -64,6 +80,12 @@ export interface HumanPick {
 }
 
 export interface BoardRound {
+  /** Boss battle: the King played the move (the crowd called him), and how many called. */
+  king?: boolean;
+  kingCalls?: number;
+  /** Boss battle: the King struck the boss (its next move is a weaker one), and how many called for the strike. */
+  kingStrike?: boolean;
+  strikeCalls?: number;
   boardId: number;
   fenBefore: string;
   playerIds: string[];
@@ -141,7 +163,7 @@ export class MatchRunner {
   ) {
     this.top = new TopMovesCache(opts.settings.botCandidateMoves);
     const plan = stagePlan(opts.settings);
-    const boardCount = plan[0]!.boards;
+    const boardCount = plan[0]?.boards ?? 1;
     const plies = openingPlies(opts.settings);
     // With colours per stage, half the boards have White to move and half Black (the opening one ply longer).
     const blackBoards = opts.settings.colourPerStage && boardCount >= 2 ? Math.floor(boardCount / 2) : 0;
@@ -164,6 +186,31 @@ export class MatchRunner {
     this.state = createMatch(opts.entrants, openings.map((_, i) => i), opts.settings);
     // Crowd 50 v 50: a random half play White all match, the rest Black.
     this.state = assignColours(this.state, opts.rng, isTeamMatch(this.settings) ? Math.floor(this.alive().length / 2) : this.whiteSeats());
+    if (this.settings.raid) this.startRaid();
+  }
+
+  /** Boss raid: the boss is there from the start, on a named opening; strikes stop at half the group; the King has every charge. */
+  private startRaid() {
+    const id = this.state.boards[0]!;
+    const board = this.boards.get(id)!;
+    const n = this.alive().length;
+    this.bossLast = null;
+    this.state = {
+      ...this.state,
+      players: this.state.players.map((p) => ({ ...p, colour: null, powerUps: 0 })),
+      boss: {
+        elo: this.settings.bossFixedElo || raidBossElo([]),
+        crowdSide: sideToMove(board.fen),
+        startPly: board.history.length,
+        crowdMoves: 0,
+        sinceKill: 0,
+        kills: [],
+        kingCharges: this.settings.kingChargesMax,
+        kingMoves: [],
+        kingStrikes: [],
+        minSurvivors: Math.ceil(n / 2),
+      },
+    };
   }
 
   /** Side to move on each board in play. */
@@ -184,6 +231,11 @@ export class MatchRunner {
   /** Crowd augments: the move clock for the rounds from now on. */
   setMoveClock(seconds: number): void {
     this.opts.settings = { ...this.opts.settings, moveClockSeconds: seconds };
+  }
+
+  /** Pre-game votes: settings from the winning options (how it ends, the clock) for the rest of the match. */
+  patchSettings(patch: Partial<Settings>): void {
+    this.opts.settings = { ...this.opts.settings, ...patch };
   }
 
   private replaceBoard(id: number): void {
@@ -210,8 +262,15 @@ export class MatchRunner {
    * the cut), unless it's the last board, which then gets a fresh opening.
    * In the final, the "group" is the finalist whose turn it is.
    */
+  /** Boss battle: humans who called the King this move (set by the screens or the lobby server before scoring). */
+  kingCallers = new Set<string>();
+  /** Boss battle: humans who called for the King's strike this move. */
+  kingStrikers = new Set<string>();
+
   deal(): Map<number, string[]> {
     this.retiredThisRound = [];
+    this.kingCallers = new Set();
+    this.kingStrikers = new Set();
     this.planned = new Map();
     this.planning = null;
     const over = this.state.boards.filter((id) => boardStatus(this.boards.get(id)!).gameOver);
@@ -225,7 +284,10 @@ export class MatchRunner {
         this.retiredThisRound = [{ boardId: over[0]!, reason: "replaced" }];
       }
     }
-    if (this.state.final) {
+    if (this.state.boss) {
+      // Boss battle: everyone left picks the crowd's move together (call playBoss first when it's the boss's turn).
+      this.groups = new Map([[this.state.boards[0]!, this.alive().map((p) => p.id)]]);
+    } else if (this.state.final) {
       this.groups = new Map([[this.state.boards[0]!, [finalMover(this.state.final)]]]);
     } else if (isTeamMatch(this.settings)) {
       // Crowd 50 v 50: the team whose side is to move picks; the other team watches.
@@ -406,7 +468,40 @@ export class MatchRunner {
     const scored = Object.entries(evaluation.expectedAfter)
       .map(([move, expected]) => ({ move, expected, loss: Math.max(0, (best - expected) * 100) }))
       .sort((a, b) => b.expected - a.expected);
-    return { boardId, fenBefore: board.fen, playerIds: [...playerIds], result, scored, bestMove: evaluation.bestMove };
+    const king = this.kingDecision(playerIds, result);
+    if (king.plays) result.playedMove = evaluation.bestMove;
+    return {
+      boardId,
+      fenBefore: board.fen,
+      playerIds: [...playerIds],
+      result,
+      scored,
+      bestMove: evaluation.bestMove,
+      ...(this.state.boss ? { king: king.plays, kingCalls: king.calls, kingStrike: king.strikes, strikeCalls: king.strikeCalls } : {}),
+    };
+  }
+
+  /**
+   * Boss battle: the King plays (the engine's best move, at full strength: stronger than the boss) when more than
+   * half the crowd calls him and he has a charge left. Bots call him when the crowd's popular move would lose
+   * kingBotLoss points or more, and back a human's call with kingBotFollow chance.
+   */
+  private kingDecision(playerIds: readonly string[], result: GroupResult): { plays: boolean; calls: number; strikes: boolean; strikeCalls: number } {
+    const b = this.state.boss;
+    if (!b || !(b.kingCharges ?? 0)) return { plays: false, calls: 0, strikes: false, strikeCalls: 0 };
+    const humans = playerIds.filter((id) => this.kingCallers.has(id)).length;
+    const strikers = playerIds.filter((id) => this.kingStrikers.has(id) && !this.kingCallers.has(id)).length;
+    const popularLoss = result.players.find((p) => p.move === result.playedMove)?.loss ?? 0;
+    let calls = humans;
+    let strikeCalls = strikers;
+    for (const id of playerIds) {
+      if (!this.player(id).isBot) continue;
+      if (popularLoss >= this.settings.kingBotLoss || (humans > 0 && this.opts.rng() < this.settings.kingBotFollow)) calls++;
+      // Bots never start a strike, but back a human's call for one.
+      else if (strikers > 0 && this.opts.rng() < this.settings.kingBotFollow) strikeCalls++;
+    }
+    const plays = calls * 2 > playerIds.length;
+    return { plays, calls, strikes: !plays && strikeCalls * 2 > playerIds.length, strikeCalls };
   }
 
   /** Applies scored boards: updates scores and plays the drawn moves. */
@@ -420,7 +515,22 @@ export class MatchRunner {
     const used = new Set([...usedPowerUp, ...this.botPowerUps]);
     this.botPowerUps = new Set();
     const outcomes = results.flatMap((r) => outcomesFromGroup(r.result, think, used));
+    const kingPlayed = results.some((r) => r.king);
+    const kingStruck = results.some((r) => r.kingStrike);
     this.state = applyRound(this.state, this.groups, outcomes, this.settings);
+    if ((kingPlayed || kingStruck) && this.state.boss) {
+      const b = this.state.boss;
+      this.state = {
+        ...this.state,
+        boss: {
+          ...b,
+          kingCharges: Math.max(0, (b.kingCharges ?? 0) - 1),
+          kingMoves: kingPlayed ? [...(b.kingMoves ?? []), b.crowdMoves] : (b.kingMoves ?? []),
+          kingStrikes: kingStruck ? [...(b.kingStrikes ?? []), b.crowdMoves] : (b.kingStrikes ?? []),
+          staggerNext: kingStruck || b.staggerNext,
+        },
+      };
+    }
     for (const r of results) {
       const board = this.boards.get(r.boardId)!;
       const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
@@ -468,12 +578,153 @@ export class MatchRunner {
       botThink: new Map(snapshot.botThink ?? []),
       botPowerUps: new Set(),
     });
+    // The boss battle's board isn't in the opening library.
+    for (const [id, b] of runner.boards) if (!b.opening) runner.boards.set(id, { ...b, opening: BOSS_OPENING });
     return runner;
   }
 
   stageComplete(): boolean {
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves;
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
+  }
+
+  // ---------------- Boss battle ----------------
+
+  /** The boss battle, once on. */
+  get boss() {
+    return this.state.boss ?? null;
+  }
+
+  /** The boss is to move (and the game isn't over). */
+  bossToMove(): boolean {
+    const b = this.state.boss;
+    if (!b || this.finalGameOver()) return false;
+    return sideToMove(this.boards.get(this.state.boards[0]!)!.fen) !== b.crowdSide;
+  }
+
+  /** Whether the boss stumbles this move (a random top-5 move): only a weak boss does, now and then. */
+  bossStumbles(): boolean {
+    return this.opts.rng() < bossStumbleChance(this.state.boss!.elo, this.settings);
+  }
+
+  /** How the boss plays its next move: staggered by the King's strike, stumbling (a weak boss), or at its strength. */
+  bossMoveKind(): BossMoveKind {
+    if (this.state.boss?.staggerNext) return "stagger";
+    return this.bossStumbles() ? "stumble" : "elo";
+  }
+
+  /** The boss's move from an engine (at its strength), played on the board. */
+  async playBoss(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
+    const fen = this.boards.get(this.state.boards[0]!)!.fen;
+    const kind = this.bossMoveKind();
+    const move = await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss);
+    this.applyBossMove(move, kind === "stagger");
+    return move;
+  }
+
+  /** Plays the boss's move (from the host's engine online). An illegal move is replaced by the first legal one. */
+  applyBossMove(move: string, staggered = !!this.state.boss?.staggerNext): string {
+    const id = this.state.boards[0]!;
+    const board = this.boards.get(id)!;
+    const legal = legalMoves(board.fen);
+    const m = legal.includes(move) ? move : legal[0]!;
+    this.boards.set(id, playOnBoard(board, m, 1 - board.expected));
+    this.bossLast = { move: m, san: toSan(board.fen, m), ...(staggered ? { staggered: true } : {}) };
+    if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
+    return m;
+  }
+
+  private bossLast: { move: string; san: string; staggered?: boolean } | null = null;
+
+  /** The boss strikes now (every bossKillEvery crowd moves). */
+  bossKillDue(): boolean {
+    return bossKillDue(this.state, this.settings) && !this.finalGameOver();
+  }
+
+  /** The boss strikes down the player with the worst recent moves; returns who. */
+  bossKill(): string | null {
+    const k = bossKill(this.state, this.opts.rng, this.settings);
+    this.state = k.state;
+    return k.victim;
+  }
+
+  /** Ends the boss battle: the result from the board (mate, a draw, or the engine's verdict at the move cap). */
+  finishBossBattle(): "crowd" | "boss" | "draw" {
+    const b = this.state.boss!;
+    const winner = this.gameWinner();
+    const result = winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    this.state = finishBoss(this.state, this.opts.rng, result, this.settings);
+    return result;
+  }
+
+  /** The boss battle as sent to the screens. */
+  bossView(justKilled: string | null = null): NetBoss | null {
+    const b = this.state.boss;
+    if (!b) return null;
+    const info = bossInfo(b.elo);
+    const strikes = this.alive().length > (b.minSurvivors ?? this.settings.bossMinSurvivors) && !b.result;
+    return {
+      board: netBoard(this.boards.get(this.state.boards[0]!)!),
+      name: info.name,
+      icon: info.icon,
+      threat: info.threat,
+      crowdSide: b.crowdSide,
+      crowdMoves: b.crowdMoves,
+      maxMoves: this.settings.bossMaxMoves,
+      strikeIn: strikes ? Math.max(0, this.settings.bossKillEvery - b.sinceKill) : null,
+      kills: b.kills,
+      startMove: Math.floor((b.startPly ?? 0) / 2) + 1,
+      kingCharges: b.kingCharges ?? 0,
+      kingMoves: b.kingMoves ?? [],
+      kingStrikes: b.kingStrikes ?? [],
+      staggerNext: !!b.staggerNext,
+      raid: !!this.settings.raid,
+      openingName: this.settings.raid ? netBoard(this.boards.get(this.state.boards[0]!)!).openingName : null,
+      lastMove: this.bossLast,
+      justKilled,
+      ...(b.result ? { result: b.result } : {}),
+    };
+  }
+
+  /** Sets up the boss battle after the last cut: a fresh board, the crowd as White, the boss's strength from the crowd's ratings. */
+  private startBoss() {
+    const id = this.state.boards[0] ?? 0;
+    const old = this.boards.get(id)!;
+    // From the game just played: a roughly even position between moves 5 and 12, White (the crowd) to move.
+    const startPly = bossStartPly(old.evals ?? [], old.history.length);
+    const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
+    this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
+    const alive = this.alive();
+    const elo = bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
+    this.bossLast = null;
+    this.state = {
+      ...this.state,
+      boards: [id],
+      // One crowd now: no teams.
+      // Their leftover power-ups become the King's charges.
+      players: this.state.players.map((p) => (p.alive ? { ...p, colour: null, finalLosses: [], powerUps: 0 } : p)),
+      boss: {
+        elo,
+        crowdSide: "w",
+        startPly,
+        crowdMoves: 0,
+        sinceKill: 0,
+        kills: [],
+        kingCharges: kingCharges(alive.reduce((n, p) => n + p.powerUps, 0), this.settings),
+        kingMoves: [],
+      },
+    };
+  }
+
+  // ---------------- Team final ----------------
+
+  /** Team final: after a turn, the weakest on each side go out when a step ends. Returns who went out. */
+  afterFinalTurn(): string[] {
+    if (!this.state.final || this.finalGameOver()) return [];
+    const step = teamFinalStep(this.state, this.opts.rng, this.settings);
+    this.state = step.state;
+    return step.out;
   }
 
   /** The final board's game has ended. */
@@ -487,13 +738,18 @@ export class MatchRunner {
     const f = this.state.final!;
     const board = this.boards.get(this.state.boards[0]!)!;
     let winningTeam: 0 | 1 | null = null;
-    if (boardEnd(board) === "checkmate") {
+    if (finalToTheEnd(f)) {
+      // Played to the end (or the cap): the winner of the game, by mate or the engine's verdict.
+      const winner = this.gameWinner();
+      const side0 = this.player(f.teams[0][0]!).colour;
+      if (winner && side0) winningTeam = winner === side0 ? 0 : 1;
+    } else if (boardEnd(board) === "checkmate") {
       // The side that just moved delivered mate. teams[0] started as the side to move at the final's start.
       const matedSide = sideToMove(board.fen);
       const startSide = f.turn % 2 === 0 ? matedSide : matedSide === "w" ? "b" : "w";
       winningTeam = matedSide === startSide ? 1 : 0;
     }
-    this.state = finishFinal(this.state, this.opts.rng, winningTeam);
+    this.state = finishFinal(this.state, this.opts.rng, winningTeam, this.settings);
   }
 
   /** The final's teams and turn, for the screens. */
@@ -502,25 +758,36 @@ export class MatchRunner {
   }
 
   /** The final as sent to the screens; `last` is the move just played (if any). */
-  finalView(last: NetFinal["last"] = null): NetFinal | null {
+  finalView(last: NetFinal["last"] = null, justOut: string[] = []): NetFinal | null {
     const f = this.state.final;
     if (!f) return null;
     const board = this.boards.get(this.state.boards[0]!)!;
     const done = this.stageComplete();
     const scores: NetFinal["scores"] = {};
-    for (const id of f.order) {
-      const l = this.player(id).finalLosses;
-      scores[id] = { avg: l.length ? Math.round((l.reduce((s, x) => s + x, 0) / l.length) * 10) / 10 : null, moves: l.length };
+    for (const id of [...f.order, ...(f.out ?? []).map((o) => o.id)]) {
+      const p = this.player(id);
+      const l = p.finalLosses;
+      const ml = matchLoss(p, this.settings);
+      scores[id] = {
+        avg: l.length ? Math.round((l.reduce((s, x) => s + x, 0) / l.length) * 10) / 10 : null,
+        moves: l.length,
+        matchLoss: Number.isFinite(ml) ? Math.round(ml * 10) / 10 : null,
+        rating: estimateRating(p.lossesByStage.flat()),
+      };
     }
     return {
       board: netBoard(board),
       teams: f.teams,
       order: f.order,
       turn: f.turn,
-      totalTurns: f.order.length * this.settings.finalMovesPerPlayer,
+      totalTurns: finalToTheEnd(f) ? this.settings.finalMaxTurns : f.order.length * this.settings.finalMovesPerPlayer,
       mover: done ? null : finalMover(f),
       scores,
       last,
+      format: f.format ?? "classic",
+      cutIn: teamFinalCutIn(f, this.settings),
+      out: f.out ?? [],
+      justOut,
     };
   }
 
@@ -545,13 +812,14 @@ export class MatchRunner {
     const end = endStage(this.state, this.opts.rng, keep, this.settings);
     this.state = end.state;
     if (!isTeamMatch(this.settings)) this.state = assignColours(this.state, this.opts.rng, this.whiteSeats());
+    if (isTeamMatch(this.settings) && this.settings.finalFormat === "boss" && this.isFinal() && !this.state.boss) this.startBoss();
     const f = this.state.final;
     if (f && isTeamMatch(this.settings)) {
       // teams[0] must be the side to move when the final starts.
       const side = sideToMove(this.boards.get(this.state.boards[0]!)!.fen);
       if (this.player(f.teams[0][0]!).colour !== side) {
         const [a, b] = f.teams;
-        this.state = { ...this.state, final: { ...f, teams: [b, a], order: [b[0]!, a[0]!, b[1]!, a[1]!] } };
+        this.state = { ...this.state, final: { ...f, teams: [b, a], order: interleave(b, a) } };
       }
     }
     return { ...end, state: this.state };
@@ -610,6 +878,41 @@ export class MatchRunner {
   alive(): PlayerState[] {
     return alivePlayers(this.state);
   }
+}
+
+export type BossMoveKind = "elo" | "stumble" | "stagger";
+
+/**
+ * The boss's move. "elo": Stockfish at its strength. "stumble" (a weak boss, now and then): any legal move, a
+ * real mistake the crowd can punish. "stagger" (the King struck it): from its top moves, one that gives away
+ * `strikeLoss` points (the one nearest the middle of that range): a clear step back, never a disaster.
+ */
+export async function bossMoveFrom(
+  engine: EngineLike,
+  fen: string,
+  elo: number,
+  nodes: number,
+  kind: BossMoveKind | boolean,
+  rng: Rng = Math.random,
+  strikeLoss: readonly [number, number] = [5, 15],
+): Promise<string> {
+  const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
+  if (k === "stumble") {
+    const legal = legalMoves(fen);
+    return legal[Math.floor(rng() * legal.length)]!;
+  }
+  if (k === "stagger") {
+    const top = await engine.topMoves(fen, 8);
+    const best = top[0]!.expected;
+    const withLoss = top.map((m) => ({ move: m.move, loss: (best - m.expected) * 100 }));
+    const [lo, hi] = strikeLoss;
+    const mid = (lo + hi) / 2;
+    const inRange = withLoss.filter((m) => m.loss >= lo && m.loss <= hi);
+    const pool = inRange.length ? inRange : withLoss.filter((m) => m.loss <= hi * 1.5);
+    return [...pool].sort((a, b) => Math.abs(a.loss - mid) - Math.abs(b.loss - mid))[0]!.move;
+  }
+  if (!engine.playAtElo) return (await engine.topMoves(fen, 1))[0]!.move;
+  return engine.playAtElo(fen, elo, nodes);
 }
 
 /** A board as sent to (and shown in) the app. */

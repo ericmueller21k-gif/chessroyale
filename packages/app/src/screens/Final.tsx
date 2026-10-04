@@ -28,9 +28,13 @@ export function FinalScreen({ match, final }: { match: GameView; final: FinalVie
     const mine = final.teams.findIndex((t) => t.some((id) => match.isYou(id)));
     return (mine >= 0 ? sides[mine] : "w") === "w" ? "white" : "black";
   })();
-  const leader = [...final.order]
-    .filter((id) => final.scores[id]?.avg !== null)
-    .sort((a, b) => final.scores[a]!.avg! - final.scores[b]!.avg!)[0];
+  // Team final and duel: the whole match counts (average loss per move over every move); classic: the final's moves.
+  const whole = final.format === "team" || final.format === "duel";
+  const quality = (id: string) => (whole ? final.scores[id]?.matchLoss : final.scores[id]?.avg) ?? null;
+  const leader = [...final.order].filter((id) => quality(id) !== null).sort((a, b) => quality(a)! - quality(b)!)[0];
+  const size = final.teams[0].length;
+  const title = final.format === "duel" ? "DUEL · 1v1" : `FINAL · ${size}v${size}`;
+  const justOut = final.justOut ?? [];
   useEffect(() => {
     // Everyone watches the final board, so nothing needs replaying on your turn.
     match.seen.set(seenKey(final.board), final.board.ply);
@@ -41,7 +45,17 @@ export function FinalScreen({ match, final }: { match: GameView; final: FinalVie
       <Hud match={match} />
       <div class="board-area">
         <div class="opening-name">
-          <strong>FINAL · 2v2</strong> · move {Math.min(final.turn + (final.mover ? 1 : 0), final.totalTurns)} of {final.totalTurns}
+          <strong>{title}</strong> ·{" "}
+          {whole ? (
+            <>
+              move {final.turn + (final.mover ? 1 : 0)}
+              {final.cutIn != null ? ` · next cut in ${final.cutIn}` : " · to the end"}
+            </>
+          ) : (
+            <>
+              move {Math.min(final.turn + (final.mover ? 1 : 0), final.totalTurns)} of {final.totalTurns}
+            </>
+          )}
         </div>
         <div class="board-row">
           <EvalBar fen={history.fen ?? final.board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
@@ -54,6 +68,12 @@ export function FinalScreen({ match, final }: { match: GameView; final: FinalVie
         <HistoryNav view={history} total={final.board.history.length} />
       </div>
       <div class="final-panel">
+        {justOut.length > 0 && (
+          <div class="final-cut" role="alert">
+            ❌ <strong>{justOut.map((id) => (match.isYou(id) ? "You" : match.nameOf(id))).join(" and ")}</strong>{" "}
+            {justOut.length === 1 && !match.isYou(justOut[0]!) ? "is" : "are"} out: the weakest on {justOut.length === 1 ? "their" : "each"} side over the match.
+          </div>
+        )}
         <div class="final-last" role="status">
           {final.mover ? (
             final.last && Date.now() ? (
@@ -94,20 +114,33 @@ export function FinalScreen({ match, final }: { match: GameView; final: FinalVie
                     {leader === id && <span title="Lowest average loss so far">👑 </span>}
                     {match.isYou(id) ? "You" : match.nameOf(id)}
                   </span>
-                  <span class="final-avg" title="Average loss per move in the final (lower is better)">
-                    {avgText(final.scores[id]?.avg ?? null)}
+                  <span class="final-avg" title={whole ? "Average loss per move over the whole match (lower is better)" : "Average loss per move in the final (lower is better)"}>
+                    {avgText(quality(id))}
                   </span>
                   <span class="muted small">
-                    {final.scores[id]?.moves ?? 0} {(final.scores[id]?.moves ?? 0) === 1 ? "move" : "moves"}
+                    {whole && final.scores[id]?.rating ? `${final.scores[id]!.rating} rated` : `${final.scores[id]?.moves ?? 0} ${(final.scores[id]?.moves ?? 0) === 1 ? "move" : "moves"}`}
                   </span>
                 </div>
               ))}
             </div>
           ))}
         </div>
+        {(final.out?.length ?? 0) > 0 && (
+          <div class="final-outs">
+            <span class="muted small">Out:</span>
+            {final.out!.map((o) => (
+              <span key={o.id} class={`final-out-name${match.isYou(o.id) ? " you" : ""}`}>
+                {match.isYou(o.id) ? "You" : match.nameOf(o.id)}
+              </span>
+            ))}
+          </div>
+        )}
         <p class="muted small">
-          Teammates take turns moving for their side. The lowest average loss per move wins the match; the game's result only
-          breaks a tie.
+          {final.format === "duel"
+            ? "The best player on each side, one on one, to the end of the game. The winner of the game wins the match."
+            : final.format === "team"
+              ? "Teammates take turns for their side. After each round of turns the weakest on each side goes out (average loss over the whole match), down to 2v2, which plays to the end. Winning the game goes on both teammates' records; your own move quality places you."
+              : "Teammates take turns moving for their side. The lowest average loss per move wins the match; the game's result only breaks a tie."}
         </p>
       </div>
     </div>

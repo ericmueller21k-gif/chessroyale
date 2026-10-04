@@ -52,7 +52,7 @@ export class Lobby extends DurableObject<Env> {
     if (this.record.phase === "results" && !this.record.resultsSaved && this.env.DB) {
       this.record.resultsSaved = true;
       const sql = d1Sql(this.env.DB);
-      const mode = this.record.overrides?.mode === "crowd" ? "crowd" : "classic";
+      const mode = this.record.overrides?.raid ? "boss" : this.record.overrides?.mode === "crowd" ? "crowd" : "classic";
       for (const r of core.humanResults()) {
         const userId = this.record.accounts?.[r.playerId];
         if (userId) await recordResult(sql, userId, { ...r, mode, online: true }, Date.now()).catch(() => undefined);
@@ -68,10 +68,23 @@ export class Lobby extends DurableObject<Env> {
     return this.record !== null;
   }
 
-  async create(code: string, overrides?: LobbyRecord["overrides"]): Promise<void> {
+  async create(code: string, overrides?: LobbyRecord["overrides"], auto?: { fillAt: number }): Promise<void> {
     if (this.record) return;
     this.record = newLobbyRecord(code, Date.now(), overrides);
+    if (auto) {
+      // Matchmade: it starts by itself at fillAt (or when full).
+      const core = this.core(code);
+      core.setAuto(auto.fillAt);
+      await this.persist(core);
+      return;
+    }
     await this.ctx.storage.put("lobby", this.record);
+  }
+
+  /** Matchmaking: still taking players. */
+  async joinable(): Promise<boolean> {
+    if (!this.record) return false;
+    return this.core(this.record.code).joinable();
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -103,7 +116,7 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, "Sign in to play online");
         return;
       }
-      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice);
+      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null);
       if (!result.ok) {
         ws.send(JSON.stringify({ t: "error", message: result.message, now: Date.now() }));
         ws.close(1008, result.message);

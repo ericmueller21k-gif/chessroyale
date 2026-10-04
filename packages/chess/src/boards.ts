@@ -16,7 +16,12 @@ export interface BoardState {
   lastMove: string | null;
   /** How many replacements this slot has had. */
   generation: number;
+  /** Side to move's expected score after each ply (index = moves played), as searched when the move was played. */
+  evals?: number[];
 }
+
+/** The boss battle's board: a fresh game from the starting position. */
+export const BOSS_OPENING: Opening = { id: "boss", eco: "", name: "Boss battle", family: "Boss battle", unusual: false, moves: [], namedPlies: 0, expected: { 0: 0.5 } };
 
 export function newBoard(id: number, opening: Opening, plies: number, generation = 0): BoardState {
   const history = opening.moves.slice(0, plies);
@@ -29,6 +34,7 @@ export function newBoard(id: number, opening: Opening, plies: number, generation
     expected: opening.expected[plies] ?? 0.5,
     lastMove: history[history.length - 1] ?? null,
     generation,
+    evals: [...Array(history.length).fill(0.5), opening.expected[plies] ?? 0.5],
   };
 }
 
@@ -40,6 +46,7 @@ export function playOnBoard(board: BoardState, move: string, moverExpected: numb
     fen: applyMove(board.fen, move),
     expected: 1 - moverExpected,
     lastMove: move,
+    evals: [...(board.evals ?? []), 1 - moverExpected],
   };
 }
 

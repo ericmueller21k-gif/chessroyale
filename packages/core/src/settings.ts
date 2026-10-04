@@ -1,5 +1,5 @@
 /**
- * Every tunable in Battle Royale Chess lives here, so playtest changes never
+ * Every tunable in HunChess lives here, so playtest changes never
  * touch game code. Starting values come from buildspec.md.
  */
 
@@ -17,13 +17,61 @@ export const DRAW_RULES: readonly DrawRule[] = ["random", "popular", "best", "we
 
 /** Game modes: Classic (many boards, players rotate) and Crowd (everyone on one board, the most popular move is played). */
 export type GameMode = "classic" | "crowd";
+/** What the first screen offers: Classic, Crowd (50 v 50), and the boss raid (a Crowd variant). */
+export type ModeChoiceId = GameMode | "raid";
+
+/**
+ * How a Crowd 50 v 50 match ends (chosen by the pre-game vote):
+ * - team: the top 8 play on, 4v4 with teammates taking turns, shrinking to 3v3 and then 2v2, which plays to the end
+ * - boss: the top 10 team up on a fresh board against a Stockfish boss, which strikes down the weakest every few moves
+ * - duel: the best player on each side plays 1v1 to the end
+ */
+export type FinalFormat = "team" | "boss" | "duel";
 
 export interface Settings {
   mode: GameMode;
   /** Crowd: two teams, 50 v 50, each playing one side all game (false: everyone picks for whichever side is to move). */
   crowdTeams: boolean;
-  /** Crowd: after each cut, players vote on the next round's move clock (more time, same, less time). */
+  /** Crowd 50 v 50: before the game, everyone votes on how it ends and how fast it is (see votes.ts). */
   augments: boolean;
+  /** Crowd: after each cut, players vote on the next round's move clock (more time, same, less time). Off since the pre-game votes. */
+  cutClockVote: boolean;
+  /** Crowd 50 v 50: how the match ends (set by the pre-game vote). */
+  finalFormat: FinalFormat;
+  /** Pre-game votes: seconds to vote, and how long each result shows. */
+  voteSeconds: number;
+  voteResultSeconds: number;
+  /** Team final: players per side at each step (the last step plays to the end of the game). */
+  teamFinalSizes: readonly number[];
+  /** Team final: moves each player makes before a step's weakest player on each side goes out. */
+  teamFinalMovesPerStep: number;
+  /** Team final and duel: the most moves before the game is adjudicated by the engine (a safety cap). */
+  finalMaxTurns: number;
+  /** Boss battle: crowd moves between the boss's strikes, and how many survive its strikes at least. */
+  bossKillEvery: number;
+  bossMinSurvivors: number;
+  /** Boss battle: the most crowd moves before the game is adjudicated by the engine. */
+  bossMaxMoves: number;
+  /** Boss battle: the boss's strength over the crowd's weighted rating, and its limits (Stockfish UCI_Elo). */
+  bossEloOffset: number;
+  bossEloRange: readonly [number, number];
+  /** Boss battle: the boss's search budget per move. */
+  bossNodes: number;
+  /** Boss raid (a mode of its own): up to 50 players against a boss, no bots, from a named opening. */
+  raid: boolean;
+  /** Boss raid: the boss's strength, set from the lobby's ratings when it starts (0: from the crowd, as in 50 v 50). */
+  bossFixedElo: number;
+  /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
+  kingStrikeLoss: readonly [number, number];
+  /** Boss battle, the King (the crowd's champion): charges from the ten's leftover power-ups (one per this many, 1 to kingChargesMax). */
+  kingPowerUpsPerCharge: number;
+  kingChargesMax: number;
+  /** Bots call the King when the crowd's popular move loses at least this many points, and back a human's call with this chance. */
+  kingBotLoss: number;
+  kingBotFollow: number;
+  /** Boss battle: below this strength the boss sometimes plays a random legal move instead (up to this chance). */
+  bossStumbleBelow: number;
+  bossStumbleMax: number;
   /** Augments: seconds added or taken per vote, and the clock's limits. */
   clockStepSeconds: number;
   clockRange: readonly [number, number];
@@ -103,6 +151,28 @@ export const DEFAULT_SETTINGS: Settings = {
   mode: "classic",
   crowdTeams: true,
   augments: true,
+  cutClockVote: false,
+  finalFormat: "team",
+  voteSeconds: 8,
+  voteResultSeconds: 2.5,
+  teamFinalSizes: [4, 3, 2],
+  teamFinalMovesPerStep: 3,
+  finalMaxTurns: 160,
+  bossKillEvery: 3,
+  bossMinSurvivors: 3,
+  bossMaxMoves: 60,
+  bossEloOffset: -100,
+  bossEloRange: [800, 3000],
+  bossNodes: 250_000,
+  raid: false,
+  bossFixedElo: 0,
+  kingStrikeLoss: [5, 15],
+  kingPowerUpsPerCharge: 10,
+  kingChargesMax: 3,
+  kingBotLoss: 6,
+  kingBotFollow: 0.6,
+  bossStumbleBelow: 2100,
+  bossStumbleMax: 0.25,
   clockStepSeconds: 5,
   clockRange: [10, 40],
   lobbySize: 64,
@@ -163,11 +233,21 @@ export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRo
  * Scores carry over all game (a stage is only one move long). 3 power-ups,
  * none earned.
  */
+/** Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 10 (boss battle) or 2 (duel). */
+export const CROWD_KNOCKOUTS: Record<FinalFormat, readonly number[]> = {
+  team: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4],
+  boss: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 2],
+  duel: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2, 2],
+};
+/** Crowd "everyone moves": down to 4 for the 2v2 final. */
+export const CROWD_EVERYONE_KNOCKOUTS: readonly number[] = [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2];
+
 export const CROWD_SETTINGS: Partial<Settings> = {
   mode: "crowd",
   lobbySize: 100,
   groupSize: 100,
-  knockoutsPerStage: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2],
+  knockoutsPerStage: CROWD_KNOCKOUTS.team,
+  finalFormat: "team",
   firstStageRounds: 20,
   roundsPerStage: 2,
   scoresBetweenStages: "carry",
@@ -187,8 +267,25 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   botThinkSeconds: [2, 14],
 };
 
+/**
+ * Boss raid: everyone (up to 50, no bots) picks the crowd's moves together
+ * against a boss, from a named opening 5 moves in. The boss strikes down to
+ * half the group; the King has 3 charges.
+ */
+export const RAID_SETTINGS: Partial<Settings> = {
+  ...CROWD_SETTINGS,
+  raid: true,
+  crowdTeams: false,
+  augments: false,
+  lobbySize: 50,
+  groupSize: 50,
+  knockoutsPerStage: [],
+  openingMoves: 5,
+  powerUpsAtStart: 0,
+};
+
 /** How long the cut screen shows: longer when there's an augment vote to make. */
-export const cutSeconds = (s: Pick<Settings, "augments" | "stageBreakSeconds">) => (s.augments ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
+export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
 
 /**
  * Only the keys that are actually set. Spread over a mode's settings, an
@@ -202,7 +299,13 @@ export function definedOnly<T extends object>(o: T): Partial<T> {
 /** Settings for a mode (Classic is the default). */
 export function modeSettings(mode: GameMode, opts: { crowdTeams?: boolean; augments?: boolean } = {}): Partial<Settings> {
   if (mode !== "crowd") return {};
-  return { ...CROWD_SETTINGS, ...(opts.crowdTeams !== undefined ? { crowdTeams: opts.crowdTeams } : {}), ...(opts.augments !== undefined ? { augments: opts.augments } : {}) };
+  return {
+    ...CROWD_SETTINGS,
+    ...(opts.crowdTeams !== undefined ? { crowdTeams: opts.crowdTeams } : {}),
+    ...(opts.augments !== undefined ? { augments: opts.augments } : {}),
+    // Everyone moves keeps the 2v2 final of the last four.
+    ...(opts.crowdTeams === false ? { knockoutsPerStage: CROWD_EVERYONE_KNOCKOUTS } : {}),
+  };
 }
 
 export type Augment = "more" | "same" | "less";

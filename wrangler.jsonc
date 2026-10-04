@@ -14,9 +14,15 @@
     "run_worker_first": ["/api/*"]
   },
   "durable_objects": {
-    "bindings": [{ "name": "LOBBIES", "class_name": "Lobby" }]
+    "bindings": [
+      { "name": "LOBBIES", "class_name": "Lobby" },
+      { "name": "MATCHMAKER", "class_name": "Matchmaker" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Lobby"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Lobby"] },
+    { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] }
+  ],
   // Accounts, profiles and match results (tables are created by the Worker on first use: see accounts.ts).
   "d1_databases": [{ "binding": "DB", "database_name": "hunchess", "database_id": "103097fd-f61b-4296-8b89-bd967ac33142" }],
   "secrets_store_secrets": [

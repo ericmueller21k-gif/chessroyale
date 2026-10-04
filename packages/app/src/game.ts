@@ -1,4 +1,4 @@
-import type { BoardRound, BoardSlot, LivePick, NetFinal, NetStanding } from "@chessroyale/chess";
+import type { BoardRound, BoardSlot, LivePick, NetBoss, NetFinal, NetStanding, NetVote } from "@chessroyale/chess";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 
 /**
@@ -48,8 +48,14 @@ export interface MoveRecord {
 /** The 2v2 final as the screens see it (same shape the server sends, with the board as a view). */
 export type FinalView = Omit<NetFinal, "board"> & { board: BoardView };
 
+/** A pre-game vote as the screens see it (times are local). */
+export type VoteView = NetVote;
+
+/** The boss battle as the screens see it. */
+export type BossView = Omit<NetBoss, "board"> & { board: BoardView };
+
 /** The reveal: your group's picks and scores (same shape the server sends). */
-export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds"> & {
+export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls" | "kingStrike" | "strikeCalls"> & {
   result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule">;
 };
 
@@ -71,8 +77,12 @@ export type Phase =
   | { kind: "spectating"; boards: BoardView[] }
   /** The final, watching (or between your turns). */
   | { kind: "final"; final: FinalView }
-  /** `gameWinner`: Crowd, who won the game on the board (null for a draw). */
-  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null };
+  /** A pre-game vote (Crowd 50 v 50): push a pawn into a zone. */
+  | { kind: "vote"; vote: VoteView }
+  /** Boss battle: the boss thinking, its move, or its strike (`until`: when the next crowd move starts). */
+  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean }
+  /** `gameWinner`: Crowd, who won the game on the board (null for a draw). `bossResult`: who won a boss battle. */
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw" };
 
 export interface GameView {
   readonly settings: Settings;
@@ -126,6 +136,13 @@ export interface GameView {
   voteAugment(choice: Augment): void;
   /** Your vote at this cut, if any. */
   readonly augmentVote: Augment | null;
+  /** A pre-game vote: yours (an option, 0-2), once cast. */
+  castVote(option: number): void;
+  /** The boss battle once it has started (also during the crowd's moves in it). */
+  readonly boss: BossView | null;
+  /** Boss battle: call the King for this move: to play it, or to strike the boss (if more than half the crowd calls). */
+  callKing(strike?: boolean): void;
+  readonly kingCalled: "play" | "strike" | null;
 }
 
 /** Crowd 50 v 50: your team (the side you play all match), if you have one. */
@@ -137,8 +154,10 @@ export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {
  * The leaderboard as you should see it: in Crowd 50 v 50 each team has its own
  * cut (half the knockouts each), so it shows your team with your team's cut line.
  */
-export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage">): { standings: Standing[]; cutoff: number; teamLabel: string | null } {
+export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage"> & { boss?: BossView | null }): { standings: Standing[]; cutoff: number; teamLabel: string | null } {
   const all = m.standings();
+  // Boss battle: one crowd, no cut line (the boss strikes instead).
+  if (m.boss) return { standings: all, cutoff: all.filter((s) => !s.out).length, teamLabel: "The crowd" };
   const team = all.find((s) => s.isYou)?.team ?? null;
   if (!team) return { standings: all, cutoff: m.cutoff, teamLabel: null };
   const mine = all.filter((s) => s.team === team);
@@ -148,6 +167,12 @@ export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" 
 }
 
 export const isCrowd = (m: Pick<GameView, "settings">) => m.settings.mode === "crowd";
+
+/** What the last cut leads to, by name: the team final, the boss battle, the duel (or the final four). */
+export function finalName(s: Pick<Settings, "mode" | "crowdTeams" | "finalFormat">): string {
+  if (s.mode !== "crowd" || !s.crowdTeams) return "Final four";
+  return s.finalFormat === "boss" ? "Boss battle" : s.finalFormat === "duel" ? "Duel" : "Team final";
+}
 
 /** The board you're on this turn (highlighted in the strip), if any. */
 export function myBoardId(m: Pick<GameView, "phase" | "final">): number | null {
@@ -164,7 +189,7 @@ export const roundLive = (m: Pick<GameView, "phase">) => m.phase.kind === "play"
 export const cutLabel = (m: Pick<GameView, "settings" | "stage">) =>
   m.settings.mode === "crowd"
     ? m.stage === m.settings.knockoutsPerStage.length - 1
-      ? "Final four line"
+      ? `${finalName(m.settings)} line`
       : "Cut line"
     : m.stage === m.settings.knockoutsPerStage.length - 1
     ? `Final four line · after round ${roundsInStage(m.settings, m.stage)}`

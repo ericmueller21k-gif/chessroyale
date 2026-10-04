@@ -20,6 +20,8 @@ interface BoardProps {
   lastMove?: string | null;
   /** Enable moving for the side to move. */
   interactive?: boolean;
+  /** Only these moves may be played (default: every legal move). */
+  moves?: readonly string[];
   onMove?: (uci: string) => void;
   arrows?: Arrow[];
   small?: boolean;
@@ -31,9 +33,9 @@ interface BoardProps {
 
 const sq = (s: string) => s as Key;
 
-function destsFor(fen: string): Map<Key, Key[]> {
+function destsFor(fen: string, only?: readonly string[]): Map<Key, Key[]> {
   const dests = new Map<Key, Key[]>();
-  for (const m of legalMoves(fen)) {
+  for (const m of only ?? legalMoves(fen)) {
     const from = sq(m.slice(0, 2));
     const to = sq(m.slice(2, 4));
     const list = dests.get(from) ?? [];
@@ -53,7 +55,7 @@ function shapesFor(arrows: Arrow[] = []): DrawShape[] {
 }
 
 /** Chessground board. Tap a piece then a square, or drag. Pawns reaching the last rank open a promotion picker. */
-export function Board({ fen, orientation, lastMove, interactive, onMove, arrows, small, animate = true, children }: BoardProps) {
+export function Board({ fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children }: BoardProps) {
   const el = useRef<HTMLDivElement>(null);
   const api = useRef<Api | null>(null);
   const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null);
@@ -115,7 +117,7 @@ export function Board({ fen, orientation, lastMove, interactive, onMove, arrows,
       check: undefined,
       movable: {
         color: interactive ? color : undefined,
-        dests: interactive ? destsFor(fen) : new Map(),
+        dests: interactive ? destsFor(fen, moves) : new Map(),
         events: {
           after: (from, to) => {
             const moves = legalMoves(fen).filter((m) => m.startsWith(from + to));
@@ -126,7 +128,7 @@ export function Board({ fen, orientation, lastMove, interactive, onMove, arrows,
       },
     });
     api.current?.setAutoShapes(shapesFor(arrows));
-  }, [fen, orientation, lastMove, interactive, arrows, animate]);
+  }, [fen, orientation, lastMove, interactive, arrows, animate, moves?.join()]);
 
   const promote = (piece: string) => {
     if (!promotion) return;

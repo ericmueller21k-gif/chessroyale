@@ -7,8 +7,9 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
+import { KingStrike } from "../components/KingAlly.tsx";
 import { crowdAnimations, onPrefsChange } from "../prefs.ts";
-import { myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { seenKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
@@ -201,6 +202,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             />
           )}
           {played && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
+          {mine.king && landed && t < playAt + 1600 && <KingStrike side={sideToMove(fen)} san={toSan(fen, mine.result.playedMove)} />}
+          {mine.kingStrike && played && t < playAt + 2200 && <KingStrike side={sideToMove(fen)} san="" strike />}
         </Board>
         </div>
       </div>
@@ -226,6 +229,24 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             </span>
             <span class="poll-votes">{Math.round(yourRow.votes * grow)}</span>
             <span class="poll-you">you</span>
+          </div>
+        )}
+        {mine.king !== undefined && (mine.strikeCalls ?? 0) > 0 && (
+          <div class={`poll-row king-row${landed && mine.kingStrike ? " win" : ""}`}>
+            <span class="poll-move">⚔️ Strike</span>
+            <span class="poll-bar">
+              <i style={{ width: `${Math.min(100, (100 * (mine.strikeCalls ?? 0) * grow) / Math.max(1, voters))}%` }} />
+            </span>
+            <span class="poll-votes">{Math.round((mine.strikeCalls ?? 0) * grow)}</span>
+          </div>
+        )}
+        {mine.king !== undefined && (mine.kingCalls ?? 0) > 0 && (
+          <div class={`poll-row king-row${landed && mine.king ? " win" : ""}`}>
+            <span class="poll-move">👑 King</span>
+            <span class="poll-bar">
+              <i style={{ width: `${Math.min(100, (100 * (mine.kingCalls ?? 0) * grow) / Math.max(1, voters))}%` }} />
+            </span>
+            <span class="poll-votes">{Math.round((mine.kingCalls ?? 0) * grow)}</span>
           </div>
         )}
         <div class="poll-result">
@@ -258,6 +279,7 @@ const AUGMENTS: { choice: Augment; title: string; step: number }[] = [
  */
 export function CrowdCut({
   match,
+  stage,
   standings,
   knockedOut,
   youOut,
@@ -266,6 +288,7 @@ export function CrowdCut({
   moveClock,
 }: {
   match: GameView;
+  stage: number;
   standings: Standing[];
   knockedOut: Standing[];
   youOut: boolean;
@@ -276,7 +299,9 @@ export function CrowdCut({
   const now = useFrameNow();
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   const aliveAfter = standings.filter((s) => !s.out).length - knockedOut.length;
-  const final = aliveAfter <= 4;
+  // The last cut: what comes next (team final, boss battle, duel, or the final four).
+  const final = stage >= match.settings.knockoutsPerStage.length - 1;
+  const next = finalName(match.settings);
   const s = match.settings;
   const clock = moveClock ?? s.moveClockSeconds;
   const at = (step: number) => Math.max(s.clockRange[0], Math.min(s.clockRange[1], clock + step * s.clockStepSeconds));
@@ -285,11 +310,19 @@ export function CrowdCut({
       <div class="cut-head">
         <span class="cut-badge">CUT</span>
         <span>
-          {knockedOut.length} out · {aliveAfter} left{final ? " · the final is next" : ""}
+          {knockedOut.length} out · {aliveAfter} left{final ? ` · the ${next.toLowerCase()} is next` : ""}
         </span>
       </div>
       <p class={youOut ? "out-msg" : "safe-msg"}>
-        {youOut ? `You're out, in ${match.placement}${ordinal(match.placement ?? 0)} place.` : final ? "You made the final four!" : "You're through."}
+        {youOut
+          ? `You're out, in ${match.placement}${ordinal(match.placement ?? 0)} place.`
+          : final
+            ? next === "Boss battle"
+              ? "You face the boss!"
+              : next === "Duel"
+                ? "You're in the duel!"
+                : `You made the ${next.toLowerCase()}!`
+            : "You're through."}
       </p>
       <div class="cut-out" aria-label="Knocked out">
         {knockedOut.map((k) => (

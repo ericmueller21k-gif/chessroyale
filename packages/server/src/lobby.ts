@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, allowedMs, clockAfterVote, cutSeconds, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, allowedMs, botVotes, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -13,6 +13,7 @@ import {
   type Opening,
   type RunnerSnapshot,
   type LivePick,
+  type NetVote,
   type ScoreJob,
   type ServerMessage,
 } from "@chessroyale/chess";
@@ -38,6 +39,8 @@ interface Human {
   connected: boolean;
   device: "phone" | "computer";
   practice?: boolean;
+  /** The rating on their profile (for a boss raid's strength). */
+  rating?: number | null;
 }
 
 type Timer =
@@ -45,12 +48,16 @@ type Timer =
   | "lock"
   | "afterReveal"
   | "nextRound"
-  | "scoreTimeout";
+  | "scoreTimeout"
+  | "voteEnd"
+  | "voteNext"
+  | "bossTimeout"
+  | "autoStart";
 
 export interface LobbyRecord {
   code: string;
   createdAt: number;
-  phase: "lobby" | "opening" | "play" | "scoring" | "reveal" | "stageBreak" | "final" | "results";
+  phase: "lobby" | "opening" | "vote" | "play" | "scoring" | "reveal" | "stageBreak" | "final" | "boss" | "results";
   humans: Human[];
   hostId: string | null;
   runner: RunnerSnapshot | null;
@@ -63,6 +70,9 @@ export interface LobbyRecord {
     startedAt: number;
     picks: Record<string, { move: string; thinkMs: number }>;
     powerUps: Record<string, true>;
+    /** Boss battle: players who called the King this move. */
+    kingCalls?: Record<string, true>;
+    kingStrikes?: Record<string, true>;
     /** Crowd: the host's early bot picks, and when each bot finishes (ms after the clock starts). */
     botPlan?: { picks: Record<string, string>; powerUps: string[] };
     botsDoneIn?: Record<string, number>;
@@ -84,6 +94,24 @@ export interface LobbyRecord {
   /** Crowd augments: the move clock as voted (seconds), and this cut's votes. */
   moveClock?: number;
   augmentVotes?: Record<string, Augment>;
+  /** The pre-game vote in progress: humans' votes as they come, the bots' (decided when it opens), and its result. */
+  vote?: {
+    index: number;
+    key: string;
+    startsAt: number;
+    until: number;
+    votes: Record<string, { option: number; at: number }>;
+    bots: { id: string; option: number; at: number }[];
+    result: number | null;
+    nextAt?: number;
+  };
+  /** Boss battle: the boss move the host owes the server. */
+  bossKey?: string;
+  bossStumble?: boolean;
+  bossKind?: "elo" | "stumble" | "stagger";
+  bossIntroDone?: boolean;
+  /** Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. */
+  auto?: { fillAt: number };
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"]): LobbyRecord {
@@ -107,8 +135,14 @@ export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecor
 }
 
 const SCORE_TIMEOUT_MS = 15_000;
-/** In the final, how long each move is shown before the next turn. */
+/** In the final, how long each move is shown before the next turn (longer when players go out). */
 const FINAL_SHOW_MS = 3200;
+const FINAL_CUT_MS = 1800;
+/** Boss battle: how long the boss's move shows, how long a strike shows, and how long the host has to play the boss. */
+const BOSS_SHOW_MS = 1800;
+const BOSS_KILL_MS = 3800;
+const BOSS_TIMEOUT_MS = 15_000;
+const BOSS_INTRO_MS = 5500;
 
 export class LobbyCore {
   private runner: MatchRunner | null = null;
@@ -174,7 +208,13 @@ export class LobbyCore {
       hostId: this.r.hostId,
       started: this.r.phase !== "lobby",
       lobbySize: this.settings.lobbySize,
+      ...(this.r.auto ? { auto: true, fillAt: this.r.auto.fillAt } : {}),
     };
+  }
+
+  /** Matchmaking: this lobby still takes players (open, not full, a few seconds left before it fills with bots). */
+  joinable(): boolean {
+    return this.r.phase === "lobby" && !!this.r.auto && this.r.humans.length < this.settings.lobbySize && this.io.now() < this.r.auto.fillAt - 2000;
   }
 
   private standings(): NetStanding[] {
@@ -200,7 +240,7 @@ export class LobbyCore {
 
   // ---------------- Connections ----------------
 
-  connect(token: string | undefined, name: string | undefined, device: "phone" | "computer" = "computer", practice = false) {
+  connect(token: string | undefined, name: string | undefined, device: "phone" | "computer" = "computer", practice = false, rating: number | null = null) {
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
     if (existing) {
       existing.connected = true;
@@ -217,10 +257,12 @@ export class LobbyCore {
     const clean = (name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || `Player ${this.r.humans.length + 1}`;
     const id = `p${++this.r.counter}`;
     const newToken = Array.from({ length: 24 }, () => Math.floor(this.rng() * 16).toString(16)).join("");
-    this.r.humans.push({ id, name: clean, token: newToken, connected: true, device, practice });
+    this.r.humans.push({ id, name: clean, token: newToken, connected: true, device, practice, rating: typeof rating === "number" && Number.isFinite(rating) ? Math.max(400, Math.min(3400, rating)) : null });
     if (!this.r.hostId) this.r.hostId = id;
     this.send(id, { t: "welcome", playerId: id, token: newToken, code: this.r.code }, false);
     this.broadcast(this.lobbyMessage(), false);
+    // Matchmade and full: start now.
+    if (this.r.auto && this.r.humans.length >= this.settings.lobbySize) this.startMatch();
     return { ok: true as const, playerId: id };
   }
 
@@ -253,6 +295,7 @@ export class LobbyCore {
     if (this.r.phase === "scoring" && this.r.scoreRequest) {
       this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest });
     }
+    if (this.r.phase === "boss" && this.r.bossKey) this.sendBossRequest(host);
   }
 
   // ---------------- Messages ----------------
@@ -280,9 +323,22 @@ export class LobbyCore {
         }
         return;
       case "augment":
-        if (this.r.phase === "stageBreak" && this.settings.augments && this.runner?.player(playerId)?.alive) {
+        if (this.r.phase === "stageBreak" && this.settings.cutClockVote && this.runner?.player(playerId)?.alive) {
           this.r.augmentVotes = { ...(this.r.augmentVotes ?? {}), [playerId]: msg.choice };
         }
+        return;
+      case "vote":
+        return this.castVote(playerId, msg.key, msg.option);
+      case "king": {
+        const round = this.r.round;
+        if (this.r.phase === "play" && round?.key === msg.key && this.runner?.boss?.kingCharges && this.runner.player(playerId)?.alive) {
+          if (msg.strike) (round.kingStrikes ??= {})[playerId] = true;
+          else (round.kingCalls ??= {})[playerId] = true;
+        }
+        return;
+      }
+      case "bossMove":
+        if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key) this.playBoss(msg.move);
         return;
       case "hello":
         return;
@@ -292,8 +348,20 @@ export class LobbyCore {
   // ---------------- Match flow ----------------
 
   private start(playerId: string) {
-    if (this.r.phase !== "lobby" || playerId !== this.r.hostId) return;
-    const empty = this.settings.lobbySize - this.r.humans.length;
+    if (this.r.phase !== "lobby" || playerId !== this.r.hostId || this.r.auto) return;
+    this.startMatch();
+  }
+
+  /** Fills the empty seats with bots and starts: the pre-game votes (Crowd 50 v 50) or the opening. */
+  private startMatch() {
+    if (this.r.phase !== "lobby") return;
+    if (this.settings.raid) {
+      // Boss raid: no bots; the boss is the weakest that's stronger than the group's average rating.
+      const patch = { bossFixedElo: raidBossElo(this.r.humans.map((h) => h.rating ?? null)) };
+      this.r.overrides = { ...(this.r.overrides ?? {}), ...patch } as LobbyRecord["overrides"];
+      this.settings = { ...this.settings, ...patch };
+    }
+    const empty = this.settings.raid ? 0 : this.settings.lobbySize - this.r.humans.length;
     const bots = botRoster(this.rng, empty, this.settings);
     this.r.bots = bots.map((b) => ({ id: b.id, name: b.name, skill: b.skill ?? 5 }));
     this.runner = new MatchRunner({
@@ -303,9 +371,11 @@ export class LobbyCore {
       library: this.library,
       entrants: [...this.r.humans.map((h) => ({ id: h.id, name: h.name, isBot: false, practice: !!h.practice })), ...bots],
     });
-    this.r.phase = "opening";
     const now = this.io.now();
+    const voting = pregameVotes(this.settings).length > 0;
+    this.r.phase = voting ? "vote" : "opening";
     this.broadcast(this.lobbyMessage(), false);
+    if (voting) return this.startVote(0);
     this.broadcast({
       t: "opening",
       boards: [...this.runner.boards.values()].map((b) => netBoard(b, true)),
@@ -328,7 +398,145 @@ export class LobbyCore {
         return this.afterReveal();
       case "scoreTimeout":
         return this.scoreTimeout();
+      case "voteEnd":
+        return this.endVote();
+      case "voteNext":
+        return this.r.vote && this.r.vote.index + 1 < pregameVotes(this.settings).length ? this.startVote(this.r.vote.index + 1) : this.nextRound();
+      case "bossTimeout":
+        return this.bossTimeout();
+      case "autoStart":
+        // Matchmade: time's up, bots fill the rest (if anyone is still here).
+        if (this.r.phase === "lobby" && this.r.humans.some((h) => h.connected)) this.startMatch();
+        return;
     }
+  }
+
+  /** Arms the matchmaking timer (called once when the lobby is made for "Play now"). */
+  setAuto(fillAt: number) {
+    this.r.auto = { fillAt };
+    this.setTimer("autoStart", fillAt);
+  }
+
+  // ---------------- Pre-game votes ----------------
+
+  private voteView(): NetVote {
+    const v = this.r.vote!;
+    const side = (id: string) => this.runner?.player(id)?.colour ?? "w";
+    return {
+      key: v.key,
+      index: v.index,
+      count: pregameVotes(this.settings).length,
+      startsAt: v.startsAt,
+      until: v.until,
+      votes: [
+        ...v.bots.map((b) => ({ playerId: b.id, option: b.option, at: b.at, side: side(b.id) })),
+        ...Object.entries(v.votes).map(([playerId, x]) => ({ playerId, option: x.option, at: x.at, side: side(playerId) })),
+      ],
+      result: v.result,
+      ...(v.nextAt ? { nextAt: v.nextAt } : {}),
+    };
+  }
+
+  private startVote(index: number) {
+    const runner = this.runner!;
+    const def = pregameVotes(this.settings)[index]!;
+    const now = this.io.now();
+    const ms = this.settings.voteSeconds * 1000;
+    const bots = runner.state.players.filter((p) => p.isBot).map((p) => p.id);
+    this.r.vote = {
+      index,
+      key: `v${index}-${++this.r.counter}`,
+      startsAt: now,
+      until: now + ms,
+      votes: {},
+      bots: botVotes(this.rng, bots, def.options.length, ms).map((b) => ({ id: b.id, option: b.option, at: now + b.atMs })),
+      result: null,
+    };
+    this.r.phase = "vote";
+    this.broadcast({ t: "vote", vote: this.voteView(), standings: this.standings() });
+    this.setTimer("voteEnd", now + ms);
+  }
+
+  private castVote(playerId: string, key: string, option: number) {
+    const v = this.r.vote;
+    if (this.r.phase !== "vote" || !v || v.key !== key || v.result !== null || v.votes[playerId]) return;
+    const now = this.io.now();
+    if (now > v.until + this.settings.lateGraceMs || !Number.isInteger(option) || option < 0 || option > 2 || !this.runner?.player(playerId)) return;
+    v.votes[playerId] = { option, at: now };
+    const side = this.runner.player(playerId).colour ?? "w";
+    for (const h of this.r.humans) this.send(h.id, { t: "voteCast", key, playerId, option, at: now, side }, false);
+    // Re-sent on reconnect with everyone's votes so far.
+    for (const h of this.r.humans) this.r.last[h.id] = { t: "vote", vote: this.voteView(), standings: this.standings() };
+  }
+
+  private endVote() {
+    const v = this.r.vote;
+    if (this.r.phase !== "vote" || !v || v.result !== null) return;
+    const def = pregameVotes(this.settings)[v.index]!;
+    const choices = [...v.bots.map((b) => b.option), ...Object.values(v.votes).map((x) => x.option)];
+    v.result = tallyVotes(choices, def.options.length, def.defaultOption, this.rng);
+    const patch = def.options[v.result]!.patch;
+    // Kept in the overrides, so the settings survive the Durable Object sleeping.
+    this.r.overrides = { ...(this.r.overrides ?? {}), ...patch } as LobbyRecord["overrides"];
+    this.settings = { ...this.settings, ...patch };
+    this.runner!.patchSettings(patch);
+    v.nextAt = this.io.now() + this.settings.voteResultSeconds * 1000;
+    this.broadcast({ t: "vote", vote: this.voteView(), standings: this.standings() });
+    this.setTimer("voteNext", v.nextAt);
+  }
+
+  // ---------------- Boss battle ----------------
+
+  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null } = {}): Outgoing {
+    return { t: "boss", boss: this.runner!.bossView(opts.justKilled ?? null)!, standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}) };
+  }
+
+  /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
+  private requestBoss() {
+    this.r.phase = "boss";
+    this.r.bossKey = `b-${++this.r.counter}`;
+    this.r.bossKind = this.runner!.bossMoveKind();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    const host = this.r.hostId && this.human(this.r.hostId)?.connected ? this.r.hostId : this.pickHost();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+  }
+
+  private sendBossRequest(host: string) {
+    const runner = this.runner!;
+    const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+    this.io.send(host, {
+      t: "bossRequest",
+      key: this.r.bossKey!,
+      fen,
+      elo: runner.boss!.elo,
+      nodes: this.settings.bossNodes,
+      ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : {}),
+    });
+  }
+
+  private playBoss(move: string) {
+    this.r.bossKey = undefined;
+    this.runner!.applyBossMove(move);
+    const until = this.io.now() + BOSS_SHOW_MS;
+    this.broadcast(this.bossMessage(until));
+    this.setTimer("nextRound", until);
+  }
+
+  private bossTimeout() {
+    if (this.r.phase !== "boss" || !this.r.bossKey) return;
+    const next = this.pickHost(this.r.hostId ?? undefined);
+    if (next && next !== this.r.hostId) {
+      this.r.hostId = next;
+      this.sendBossRequest(next);
+      this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+      return;
+    }
+    // Nobody can run the engine: the boss plays a random legal move so the match can go on.
+    const runner = this.runner!;
+    const legal = legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
+    this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
 
   /** Humans playing this round (everyone alive in the knockout stages; just the mover in a final turn). */
@@ -341,6 +549,21 @@ export class LobbyCore {
     const runner = this.runner;
     if (!runner) return;
     if (runner.isOver()) return this.finishMatch();
+    if (runner.boss) {
+      if (!this.r.bossIntroDone) {
+        // The boss arrives: it takes over from an even position of the game just played.
+        this.r.bossIntroDone = true;
+        this.r.phase = "boss";
+        const until = this.io.now() + BOSS_INTRO_MS;
+        this.broadcast({ ...this.bossMessage(until), intro: true } as Outgoing);
+        return this.setTimer("nextRound", until);
+      }
+      if (runner.stageComplete()) {
+        runner.finishBossBattle();
+        return this.finishMatch();
+      }
+      if (runner.bossToMove()) return this.requestBoss();
+    }
     if (this.r.augmentVotes) {
       // Crowd augments: the cut's vote sets the move clock from now on.
       const clock = clockAfterVote(this.settings.moveClockSeconds, Object.values(this.r.augmentVotes), this.settings);
@@ -350,7 +573,7 @@ export class LobbyCore {
       runner.setMoveClock(clock);
     }
     runner.deal();
-    const final = runner.isFinal();
+    const final = !!runner.final;
     // The move clock starts after a short settling-in countdown on a new board (not in the final: it's one board).
     const now = this.io.now() + (final ? 0 : this.settings.boardIntroSeconds * 1000);
     const key = `${runner.state.stage}-${runner.state.round}-${++this.r.counter}`;
@@ -455,7 +678,7 @@ export class LobbyCore {
   private sendTally() {
     const round = this.r.round;
     const runner = this.runner;
-    if (!round || !runner || this.settings.mode !== "crowd" || runner.isFinal()) return;
+    if (!round || !runner || this.settings.mode !== "crowd" || runner.final) return;
     const picks: LivePick[] = [
       ...Object.entries(round.picks).map(([playerId, p]) => ({ playerId, move: p.move, at: round.startedAt + p.thinkMs })),
       ...Object.entries(round.botPlan?.picks ?? {}).map(([playerId, move]) => ({ playerId, move, at: round.startedAt + (round.botsDoneIn?.[playerId] ?? 0) })),
@@ -535,6 +758,8 @@ export class LobbyCore {
   private applyScores(boards: BoardScore[]) {
     const runner = this.runner!;
     const round = this.r.round!;
+    runner.kingCallers = new Set(Object.keys(round.kingCalls ?? {}));
+    runner.kingStrikers = new Set(Object.keys(round.kingStrikes ?? {}));
     const byBoard = new Map(boards.map((b) => [b.boardId, b]));
     const results = this.r.scoreRequest!.jobs.map((job) => {
       const s = byBoard.get(job.boardId);
@@ -564,10 +789,13 @@ export class LobbyCore {
       const b = report.boards[0]!;
       const p = b.result.players[0]!;
       const last: NetFinal["last"] = { playerId: p.playerId, move: b.result.playedMove, san: toSan(b.fenBefore, b.result.playedMove), loss: p.loss };
+      // Team final: when a step ends, the weakest on each side go out.
+      const out = runner.afterFinalTurn();
+      for (const id of out) this.r.placements[id] = runner.player(id).placement!;
       this.r.phase = "final";
       const st = this.standings();
-      this.broadcast({ t: "final", final: runner.finalView(last)!, standings: st, slots: this.slots() });
-      this.setTimer("afterReveal", this.io.now() + FINAL_SHOW_MS);
+      this.broadcast({ t: "final", final: runner.finalView(last, out)!, standings: st, slots: this.slots() });
+      this.setTimer("afterReveal", this.io.now() + FINAL_SHOW_MS + (out.length ? FINAL_CUT_MS : 0));
       return;
     }
     this.r.phase = "reveal";
@@ -590,6 +818,7 @@ export class LobbyCore {
         playedMove: mine?.result.playedMove ?? null,
         picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, roundScore: p.roundScore })) ?? [],
         drawRule: mine?.result.drawRule ?? "random",
+        ...(mine?.king !== undefined ? { king: mine.king, kingCalls: mine.kingCalls, kingStrike: mine.kingStrike, strikeCalls: mine.strikeCalls } : {}),
         expectedAfter: score?.expectedAfter ?? {},
         bestExpected: score?.bestExpected ?? null,
         standings: st,
@@ -604,6 +833,19 @@ export class LobbyCore {
 
   private afterReveal() {
     const runner = this.runner!;
+    if (runner.boss) {
+      // The boss strikes when it's due: the crowd's worst recent mover goes.
+      if (runner.bossKillDue()) {
+        const victim = runner.bossKill()!;
+        this.r.placements[victim] = runner.player(victim).placement!;
+        this.r.phase = "boss";
+        const until = this.io.now() + BOSS_KILL_MS;
+        this.broadcast(this.bossMessage(until, { justKilled: victim }));
+        this.setTimer("nextRound", until);
+        return;
+      }
+      return this.nextRound();
+    }
     if (!runner.stageComplete()) return this.nextRound();
     if (runner.isFinal()) {
       runner.finishFinal();
@@ -616,7 +858,7 @@ export class LobbyCore {
     for (const p of end.knockedOut) this.r.placements[p.id] = p.placement!;
     this.r.phase = "stageBreak";
     const crowd = this.settings.mode === "crowd";
-    const augments = crowd && this.settings.augments;
+    const augments = crowd && this.settings.cutClockVote;
     if (augments) this.r.augmentVotes = {};
     const until = this.io.now() + (crowd ? cutSeconds(this.settings) : this.settings.stageBreakSeconds) * 1000;
     this.broadcast({
@@ -642,12 +884,18 @@ export class LobbyCore {
     if (!runner || this.r.phase !== "results") return [];
     const st = this.standings();
     const winner = this.settings.mode === "crowd" ? runner.gameWinner() : null;
+    const boss = runner.boss;
     return this.r.humans.flatMap((h) => {
       const row = st.find((s) => s.id === h.id);
       const placement = this.r.placements[h.id];
       if (!row || !placement) return [];
       const team = row.team ?? null;
-      return [{ playerId: h.id, placement, players: runner.state.players.length, team, teamWon: team && winner ? team === winner : null, avgScore: row.avg ?? null, rating: row.rating ?? null }];
+      // Boss battle: those still standing at the end share the result.
+      const p = runner.player(h.id);
+      const reachedBoss = p.outInStage === null || p.outInStage >= this.settings.knockoutsPerStage.length;
+      const survived = !!boss && reachedBoss && !boss.kills.some((k) => k.id === h.id);
+      const teamWon = boss?.result ? (survived && boss.result !== "draw" ? boss.result === "crowd" : null) : team && winner ? team === winner : null;
+      return [{ playerId: h.id, placement, players: runner.state.players.length, team, teamWon, avgScore: row.avg ?? null, rating: row.rating ?? null }];
     });
   }
 
@@ -664,6 +912,7 @@ export class LobbyCore {
       lossesByStage: Object.fromEntries(this.r.humans.map((h) => [h.id, runner.player(h.id).lossesByStage])),
       standings: this.standings(),
       ...(this.settings.mode === "crowd" ? { gameWinner: runner.gameWinner() } : {}),
+      ...(runner.boss?.result ? { bossResult: runner.boss.result } : {}),
     };
     this.broadcast(msg);
   }
