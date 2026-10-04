@@ -1,6 +1,6 @@
 import { DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, type DrawRule } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
-import { SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, signInRequired, type AccountEnv } from "./api.ts";
+import { SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, signInRequired, withSecrets, type AccountEnv } from "./api.ts";
 
 export { Lobby } from "./lobby-do.ts";
 
@@ -17,8 +17,10 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, rawEnv: Env): Promise<Response> {
     const url = new URL(request.url);
+    // (The sign-in secrets may live in the Secrets Store: read them as strings.)
+    const env = url.pathname.startsWith("/api/") ? await withSecrets(rawEnv) : rawEnv;
     // Accounts: /api/me, /api/results, /api/auth/*
     const account = await handleAccountApi(request, env);
     if (account) return account;

@@ -28,6 +28,30 @@ export interface AccountEnv {
   EMAIL_FROM?: string;
 }
 
+const SECRET_KEYS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY", "EMAIL_FROM"] as const;
+let secretCache: { at: number; values: Partial<Record<(typeof SECRET_KEYS)[number], string>> } | null = null;
+
+/**
+ * The sign-in secrets as plain strings. Each can be a Worker secret (already a
+ * string) or a binding to the account's Secrets Store (read with `.get()`;
+ * see wrangler.jsonc). Store reads are cached for 5 minutes per instance.
+ */
+export async function withSecrets<E extends object>(env: E): Promise<E & AccountEnv> {
+  const now = Date.now();
+  if (!secretCache || now - secretCache.at > 5 * 60_000) {
+    const values: Partial<Record<(typeof SECRET_KEYS)[number], string>> = {};
+    for (const k of SECRET_KEYS) {
+      const v = (env as Record<string, unknown>)[k];
+      if (typeof v === "string") values[k] = v;
+      else if (v && typeof (v as { get?: unknown }).get === "function") {
+        values[k] = await (v as { get(): Promise<string> }).get().catch(() => undefined);
+      }
+    }
+    secretCache = { at: now, values };
+  }
+  return { ...env, ...secretCache.values };
+}
+
 export const SESSION_COOKIE = "hc_session";
 const STATE_COOKIE = "hc_oauth";
 const NEXT_COOKIE = "hc_next";

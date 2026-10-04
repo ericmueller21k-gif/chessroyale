@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, newLobbyRecord, type LobbyRecord } from "./lobby.ts";
-import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired } from "./api.ts";
+import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, recordResult } from "./accounts.ts";
 import type { Env } from "./index.ts";
 
@@ -83,7 +83,7 @@ export class Lobby extends DurableObject<Env> {
     const account = await accountOf(request, this.env).catch(() => null);
     this.ctx.acceptWebSocket(server);
     // Online play needs a signed-in account (once sign-in is set up); a guest is told so on "hello".
-    const guest = !!this.env.DB && signInRequired(this.env) && !isSignedIn(account);
+    const guest = !!this.env.DB && signInRequired(await withSecrets(this.env)) && !isSignedIn(account);
     server.serializeAttachment({ userId: account?.id, guest });
     return new Response(null, { status: 101, webSocket: client });
   }
