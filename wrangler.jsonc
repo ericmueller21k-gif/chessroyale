@@ -30,6 +30,11 @@
     { "binding": "GOOGLE_CLIENT_SECRET", "store_id": "c4aab92a84ec4217acd83a530a799d80", "secret_name": "GOOGLE_CLIENT_SECRET" },
     { "binding": "RESEND_API_KEY", "store_id": "c4aab92a84ec4217acd83a530a799d80", "secret_name": "RESEND_API_KEY" }
   ],
+  // The game's addresses (Cloudflare sets up DNS and certificates on deploy). hunchess.com was added in the dashboard.
+  "routes": [
+    { "pattern": "hunchess.com", "custom_domain": true },
+    { "pattern": "www.hunchess.com", "custom_domain": true }
+  ],
   "observability": { "enabled": true },
   // Keep variables set in the dashboard when a deploy runs (otherwise each deploy would wipe plain-text ones).
   "keep_vars": true
