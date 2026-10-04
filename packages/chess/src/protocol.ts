@@ -151,7 +151,8 @@ export interface NetBoss {
   raid: boolean;
   openingName: string | null;
   /** The boss's last move, and who it struck down just now. */
-  lastMove: null | { move: string; san: string; staggered?: boolean };
+  /** `captured`: the piece it took ("q" for a queen: its banner). */
+  lastMove: null | { move: string; san: string; staggered?: boolean; captured?: string };
   justKilled?: string | null;
   /** Set when the battle is over. */
   result?: "crowd" | "boss" | "draw";

@@ -624,3 +624,24 @@ Eric: during a God King move, the text and the leaderboard below the board kept 
   - The long explanation (the confirmation and the home page's FAQ cover it).
   - The old KingCalls component.
 - **The line above the board** reads the same on each screen ("BOSS BATTLE · you play White · …"), with only the short note at the end changing.
+
+## Boss intro replays the opening, then "START!"; a fighting-game banner for big moments (Oct 4, 2026)
+
+Eric asked for this.
+
+- **The intro, from the normal starting position.**
+  - The boss's card (with the opening roulette in a raid) sits over the starting position.
+  - The card fades, and the game so far is replayed one move at a time, White, Black, White, Black, with the usual move sounds.
+  - Then a fighting-game "START!" banner, and the first move.
+  - Timing (`bossIntroTimeline` in the chess package, shared by the server and solo): card 2.6 s; then moves at 2.4 s ÷ plies (110–260 ms each; a raid's 10 plies take 240 ms each); then a 0.25 s beat and the 1.5 s banner. A raid's intro is about 6.75 s.
+  - In a raid there's no opening screen first any more, since it would show the finished position before the replay.
+- **The banner (`FightBanner`), reusable.**
+  - A flash, then a slanted band shoots in over moving speed lines, big italic outlined text slams down, holds, and the band shoots off.
+  - Its sizes follow the board's width, so it fits any board.
+  - Two looks: "start" (red and orange) and "boss" (purple and dark red, with the boss's face in a ring).
+- **The boss takes your queen.** "QUEEN DOWN!", with "<boss> takes your queen", its face (its emoji for now; a sprite can replace it later) and a roar.
+  - The boss's move now records what it captured (`lastMove.captured`).
+  - That screen stays up 1.3 s longer (`bossShowMs`) so the banner plays out.
+- **Sounds** (`public/sounds/banner/`, credits in the folder).
+  - `start.mp3`: a whoosh, a punch and a short blast.
+  - `boss-roar.mp3`: a CC0 yell pitched down into a growl, over a low rumble.

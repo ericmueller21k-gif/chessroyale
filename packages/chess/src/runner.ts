@@ -49,7 +49,7 @@ import {
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
 import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { legalMoves, sideToMove, toSan } from "./rules.ts";
+import { legalMoves, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 
 /**
@@ -646,12 +646,14 @@ export class MatchRunner {
     const legal = legalMoves(board.fen);
     const m = legal.includes(move) ? move : legal[0]!;
     this.boards.set(id, playOnBoard(board, m, 1 - board.expected));
-    this.bossLast = { move: m, san: toSan(board.fen, m), ...(staggered ? { staggered: true } : {}) };
+    const captured = pieceAt(board.fen, m.slice(2, 4))?.type;
+    this.bossLast = { move: m, san: toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
     return m;
   }
 
-  private bossLast: { move: string; san: string; staggered?: boolean } | null = null;
+  /** The boss's last move, and the piece it took (if any). */
+  private bossLast: { move: string; san: string; staggered?: boolean; captured?: string } | null = null;
 
   /** The boss strikes now (every bossKillEvery crowd moves). */
   bossKillDue(): boolean {

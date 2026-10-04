@@ -1,4 +1,6 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
+import { bossIntroTimeline, fenAfter } from "@chessroyale/chess";
+import { FightBanner } from "../components/FightBanner.tsx";
 import { Board } from "../components/Board.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
@@ -78,7 +80,19 @@ export function BossBar({ boss }: { boss: BossView }) {
  */
 export function BossScreen({ match, boss, until, thinking, intro }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean }) {
   const now = useFrameNow();
+  const [mountedAt] = useState(Date.now());
   const victim = boss.justKilled ?? null;
+  // The intro: the boss's card over the starting position, the game so far replayed quickly from the start,
+  // then "START!".
+  const history = boss.board.history;
+  const tl = useMemo(() => bossIntroTimeline(history.length), [history.length]);
+  const t = now - mountedAt;
+  const plies = intro ? Math.max(0, Math.min(history.length, Math.floor((t - tl.replayAt) / Math.max(1, tl.step)))) : history.length;
+  const introFen = useMemo(() => (intro ? fenAfter(history.slice(0, plies)) : boss.board.fen), [intro, plies, boss.board.fen]);
+  const introLast = intro ? (plies > 0 ? history[plies - 1]! : null) : boss.board.lastMove;
+  const showCard = intro && t < tl.replayAt;
+  // The boss takes your queen: its banner, face and roar.
+  const tookQueen = !intro && !thinking && !victim && boss.lastMove?.captured === "q";
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   const youStruck = victim !== null && match.isYou(victim);
   useEffect(() => {
@@ -94,10 +108,12 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
         </div>
         <div class="board-row">
           <EvalBar fen={boss.board.fen} orientation={boss.crowdSide} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boss.board.fen} orientation={boss.crowdSide === "w" ? "white" : "black"} lastMove={boss.board.lastMove}>
+          <Board fen={introFen} orientation={boss.crowdSide === "w" ? "white" : "black"} lastMove={introLast}>
             {!thinking && !victim && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={boss.crowdSide === "w" ? "white" : "black"} />}
-            {intro && (
-              <div class="boss-intro" role="alert">
+            {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
+            {tookQueen && <FightBanner tone="boss" face={boss.icon} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} sound="bossRoar" />}
+            {showCard && (
+              <div class={`boss-intro${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
                 <span class="boss-intro-icon" aria-hidden="true">
                   {boss.icon}
                 </span>

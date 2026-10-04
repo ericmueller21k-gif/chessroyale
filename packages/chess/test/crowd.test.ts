@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteMoves, voteOptionOf, type Settings } from "@chessroyale/core";
-import { legalMoves, MatchRunner, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
+import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
   let h = 2166136261;
@@ -174,6 +174,24 @@ describe("Crowd mode", () => {
     expect(["crowd", "boss", "draw"]).toContain(result);
     expect(runner.isOver()).toBe(true);
     expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+  });
+
+  it("boss battle timing: the intro replays the game, and the boss taking your queen stays up longer for its banner", async () => {
+    // A 10-ply opening: the card, ten moves at 240 ms, a beat, then "START!".
+    expect(bossIntroTimeline(10)).toEqual({ step: 240, replayAt: 2600, bannerAt: 5250, total: 6750 });
+    // A long game replays faster, a short one no slower than the cap.
+    expect(bossIntroTimeline(24).step).toBe(110);
+    expect(bossIntroTimeline(0).total).toBe(2600 + 250 + 1500);
+    expect(bossShowMs({ captured: "q" })).toBeGreaterThan(bossShowMs({ captured: "b" }));
+    expect(bossShowMs(null)).toBe(1800);
+    // The boss's move records what it took.
+    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000 } as Settings;
+    const lib: Opening[] = [{ ...library[0]!, moves: sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]), expected: { 10: 0.52 } }];
+    const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fake], library: lib, entrants: [{ id: "h0", name: "H0", isBot: false }] });
+    runner.deal();
+    await runner.score(new Map([["h0", { move: "a4c6", thinkMs: 1000 }]]));
+    runner.applyBossMove("d7c6");
+    expect(runner.bossView()!.lastMove).toMatchObject({ san: "dxc6", captured: "b" });
   });
 
   it("boss raid: humans only, the boss from the first move on a named opening, strikes down to half, the King's strike staggers the boss", async () => {

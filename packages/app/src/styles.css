@@ -3258,6 +3258,10 @@ button.history-label {
   color: #fff;
   background: radial-gradient(circle, rgba(70, 10, 40, 0.82) 0%, rgba(10, 0, 10, 0.9) 75%);
   animation: banner-in 500ms ease-out;
+  transition: opacity 330ms ease-in;
+}
+.boss-intro.leaving {
+  opacity: 0;
 }
 .boss-intro-icon {
   font-size: 72px;
@@ -3548,5 +3552,187 @@ button.history-label {
     grid-row: 3;
     align-self: start;
     margin-top: 24px;
+  }
+}
+
+/* ---- Fighting-game banner over the board ("START!", the boss's "QUEEN DOWN!") ---- */
+.fight-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  /* Sizes below follow the board's width (cqw), so the banner fits any board. */
+  container-type: inline-size;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fb-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  animation: fb-flash 1.5s linear both;
+}
+.fb-band {
+  position: relative;
+  width: 140%;
+  height: 32%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3cqw;
+  overflow: hidden;
+  transform: skewY(-7deg);
+  border-top: 4px solid #fff7d6;
+  border-bottom: 4px solid #fff7d6;
+  background: linear-gradient(90deg, #7f1d1d, #dc2626 20%, #f97316 50%, #dc2626 80%, #7f1d1d);
+  box-shadow: 0 0 0 3px #1a0a00, 0 10px 30px rgba(0, 0, 0, 0.55);
+  animation: fb-band 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+.fight-banner.boss .fb-band {
+  background: linear-gradient(90deg, #0b0612, #3b0764 22%, #7f1d1d 50%, #3b0764 78%, #0b0612);
+  border-color: #fca5a5;
+}
+.fb-lines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.22) 0 2px, transparent 2px 26px);
+  animation: fb-lines 0.35s linear infinite;
+}
+.fb-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 17cqw;
+  height: 17cqw;
+  font-size: 10.5cqw;
+  line-height: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #451a03 0%, #0b0612 75%);
+  box-shadow: 0 0 0 4px #fca5a5, 0 0 24px rgba(248, 113, 113, 0.9);
+  transform: skewY(7deg);
+  animation: fb-face 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+.fb-words {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  transform: skewY(7deg);
+}
+.fb-text {
+  font-family: "Arial Black", "Helvetica Neue", Impact, system-ui, sans-serif;
+  font-size: 16cqw;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #fff7d6;
+  -webkit-text-stroke: 3px #1a0a00;
+  paint-order: stroke fill;
+  text-shadow:
+    5px 5px 0 #1a0a00,
+    0 0 24px rgba(255, 200, 80, 0.85);
+  white-space: nowrap;
+  animation: fb-slam 1.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+.fight-banner.boss .fb-text {
+  font-size: 8.4cqw;
+  -webkit-text-stroke-width: 2px;
+  color: #fee2e2;
+  text-shadow:
+    5px 5px 0 #1a0a00,
+    0 0 24px rgba(248, 113, 113, 0.9);
+}
+.fb-sub {
+  margin-top: 2px;
+  font-size: 3.3cqw;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 2px 2px 0 #1a0a00;
+  animation: fb-sub 1.5s ease-out both;
+}
+@keyframes fb-band {
+  0% {
+    translate: -110% 0;
+  }
+  14% {
+    translate: 0 0;
+  }
+  18% {
+    translate: -1.5% 0;
+  }
+  22%,
+  84% {
+    translate: 0 0;
+  }
+  100% {
+    translate: 110% 0;
+  }
+}
+@keyframes fb-slam {
+  0%,
+  12% {
+    opacity: 0;
+    scale: 2.6;
+  }
+  20% {
+    opacity: 1;
+    scale: 0.9;
+  }
+  26% {
+    scale: 1.06;
+  }
+  32%,
+  84% {
+    scale: 1;
+    opacity: 1;
+  }
+  100% {
+    scale: 1;
+    opacity: 1;
+  }
+}
+@keyframes fb-face {
+  0%,
+  10% {
+    opacity: 0;
+    translate: -60% 0;
+  }
+  22%,
+  100% {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes fb-sub {
+  0%,
+  26% {
+    opacity: 0;
+  }
+  36%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes fb-flash {
+  0%,
+  17% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.55;
+  }
+  30%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes fb-lines {
+  to {
+    background-position: 52px 0;
   }
 }
