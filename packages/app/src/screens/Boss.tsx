@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { bossIntroTimeline, fenAfter, inCheck } from "@chessroyale/chess";
-import { knownEval } from "../components/EvalBar.tsx";
-import { resetKingSpeech, type KingCue } from "../godKing.ts";
+import { kingSay, resetKingSpeech, type KingCue } from "../godKing.ts";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { Board } from "../components/Board.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
@@ -103,16 +102,23 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
     const out: { cue: KingCue; key: string }[] = [];
     if (inCheck(boss.board.fen)) out.push({ cue: "inCheck", key });
     if (m.staggered) out.push({ cue: "staggered", key });
-    const before = history.length === boss.board.ply ? fenAfter(history.slice(0, -1)) : null;
-    const w0 = before ? knownEval(before) : undefined;
-    const w1 = knownEval(boss.board.fen);
-    if (w0 !== undefined && w1 !== undefined) {
-      const swing = boss.crowdSide === "w" ? w1 - w0 : w0 - w1;
-      if (swing >= 0.3) out.push({ cue: "bossBlunder", key });
-    }
     if (m.captured && m.captured !== "q") out.push({ cue: "bossCapture", key });
     return out;
   }, [boss.board.fen, thinking, intro, victim]);
+  // A boss blunder: the engine's numbers before and after its move (the eval bar's, already worked out or cheap).
+  useEffect(() => {
+    if (intro || thinking || victim || !boss.lastMove || history.length !== boss.board.ply) return;
+    let live = true;
+    const before = fenAfter(history.slice(0, -1));
+    void Promise.all([match.evaluate(before), match.evaluate(boss.board.fen)]).then(([w0, w1]) => {
+      if (!live || w0 === null || w1 === null) return;
+      const swing = boss.crowdSide === "w" ? w1 - w0 : w0 - w1;
+      if (swing >= 0.15) kingSay("bossBlunder", `blunder-${boss.board.fen}`);
+    });
+    return () => {
+      live = false;
+    };
+  }, [boss.board.fen, thinking]);
   // The boss takes your queen: its banner, face and roar.
   const tookQueen = !intro && !thinking && !victim && boss.lastMove?.captured === "q";
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
