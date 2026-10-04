@@ -1,4 +1,4 @@
-// Cloudflare Worker for Battle Royale Chess: serves the app (packages/app/dist) and
+// Cloudflare Worker for HunChess: serves the app (packages/app/dist) and
 // the lobby server (packages/server): one Durable Object per lobby, over WebSockets.
 // The chess engine runs in browsers. Secrets (set in the dashboard, not here): GOOGLE_CLIENT_ID,
 // GOOGLE_CLIENT_SECRET, RESEND_API_KEY.
@@ -19,5 +19,7 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Lobby"] }],
   // Accounts, profiles and match results (tables are created by the Worker on first use: see accounts.ts).
   "d1_databases": [{ "binding": "DB", "database_name": "hunchess", "database_id": "103097fd-f61b-4296-8b89-bd967ac33142" }],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Keep variables set in the dashboard when a deploy runs (otherwise each deploy would wipe plain-text ones).
+  "keep_vars": true
 }
