@@ -673,8 +673,9 @@ Eric's feedback after playing it: too much King.
   - The status line says just "Your move." (plus the staggered note when it applies).
   - Instead, at most once every six moves while he has charges, he may say "Need a hand? Tap me." or similar.
 - **Smaller.** The figure is about 20% smaller (40 × 60 px), and his command window is narrower (176 px) with one-line notes ("Full strength. Uses your turn." / "Weakens its next move.").
-- **Quieter.**
-  - Small talk waits at least 15 s after his last line (was 6 s).
-  - The chances drop: idle 15%, good move 20%, captures 40%, winning or losing 20%.
-  - Urgent moments still always speak: queen in danger, check, his own actions, a boss blunder.
+- **Paced by moves, not seconds.** Eric wants him to speak 5–10 times a game, about every 4–5 moves; before this he was mostly silent.
+  - Small talk (idle chatter, the tap-me reminder, winning or losing) rests for 3 moves after any line. Then its chance grows by 30% with each quiet move. That's about 6–7 lines of small talk in a 35-move game, by simulation and unit test.
+  - Reactions add to that: good move 35%, captures 50%, bad or great move 75–80%.
+  - Urgent moments always speak: queen in danger, check, his own actions, a boss blunder.
+  - Two lines that aren't urgent stay at least 8 s apart, so the reveal and the boss's move can't both talk over each other.
 - **Boss blunders.** The boss screen compares the engine's numbers before and after the boss's move (the eval bar's, cached). A swing of 15 points or more toward the crowd always gets a line, such as "It's reeling! Want me to finish it?" or "A blunder! Find the punishing move." This catches the weak bosses' random stumbles and real blunders alike.
