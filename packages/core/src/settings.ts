@@ -63,6 +63,8 @@ export interface Settings {
   bossFixedElo: number;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
+  /** Boss battle: how long the King's strike takes on screen (ms). The move clock stands still meanwhile. */
+  kingStrikeMs: number;
   /** Boss battle, the King (the crowd's champion): charges from the ten's leftover power-ups (one per this many, 1 to kingChargesMax). */
   kingPowerUpsPerCharge: number;
   kingChargesMax: number;
@@ -167,6 +169,7 @@ export const DEFAULT_SETTINGS: Settings = {
   raid: false,
   bossFixedElo: 0,
   kingStrikeLoss: [5, 15],
+  kingStrikeMs: 4400,
   kingPowerUpsPerCharge: 10,
   kingChargesMax: 3,
   kingBotLoss: 6,

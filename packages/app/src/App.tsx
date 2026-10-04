@@ -381,10 +381,10 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
         />
       );
     case "play":
-      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={p.startsAt} deadline={p.deadline} allowedMs={p.allowedMs} />;
+      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={p.startsAt} deadline={p.deadline} allowedMs={p.allowedMs} strike={p.strike} />;
     case "scoring":
       if (p.watched) return <WatchScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={0} deadline={0} counting />;
-      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} deadline={0} picked={p.move} />;
+      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} deadline={0} picked={p.move} strike={p.strike} />;
     case "watching":
       return <WatchScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={p.startsAt} deadline={p.deadline} />;
     case "reveal":

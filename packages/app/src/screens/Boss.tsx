@@ -164,7 +164,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
           <span class="boss-king-crowns" aria-hidden="true">{"👑".repeat(Math.max(0, boss.kingCharges)) || "—"}</span>
           <span class="muted small">
             {boss.kingCharges > 0
-              ? `The God King: ${boss.kingCharges} ${boss.kingCharges === 1 ? "charge" : "charges"}${boss.raid ? "" : " (your leftover power-ups)"}. Instead of picking a move, summon him to play it at full strength, or to strike the boss so its next move is weaker. More than half the crowd has to call.`
+              ? `The God King: ${boss.kingCharges} ${boss.kingCharges === 1 ? "charge" : "charges"}${boss.raid ? "" : " (your leftover power-ups)"}. Summon him to play a move at full strength instead of picking one, or to strike the boss right away so its next move is weaker (the clock stops while he strikes; then you pick as usual). More than half the crowd has to call.`
               : "The God King has spent his charges."}
           </span>
         </div>

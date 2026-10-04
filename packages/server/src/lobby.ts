@@ -70,9 +70,11 @@ export interface LobbyRecord {
     startedAt: number;
     picks: Record<string, { move: string; thinkMs: number }>;
     powerUps: Record<string, true>;
-    /** Boss battle: players who called the King this move. */
+    /** Boss battle: players who called the King this move, and who called for his strike. */
     kingCalls?: Record<string, true>;
     kingStrikes?: Record<string, true>;
+    /** Boss battle: the King's strike on screen (the move clock stands still from `at` to `until`). */
+    strike?: { at: number; until: number };
     /** Crowd: the host's early bot picks, and when each bot finishes (ms after the clock starts). */
     botPlan?: { picks: Record<string, string>; powerUps: string[] };
     botsDoneIn?: Record<string, number>;
@@ -143,7 +145,7 @@ const BOSS_SHOW_MS = 1800;
 const BOSS_KILL_MS = 3800;
 const BOSS_TIMEOUT_MS = 15_000;
 const BOSS_INTRO_MS = 5500;
-/** The God King's summoning and bolt, added to a reveal where he acts. */
+/** The God King's summoning and bolt, added to a reveal where he plays the move. */
 const KING_FX_MS = 3900;
 
 export class LobbyCore {
@@ -332,12 +334,12 @@ export class LobbyCore {
       case "vote":
         return this.castVote(playerId, msg.key, msg.option);
       case "king": {
-        // Calling the King (or his strike) is this player's whole turn: no move of their own.
         const round = this.r.round;
         if (this.r.phase !== "play" || round?.key !== msg.key || !this.runner?.boss?.kingCharges || !this.runner.player(playerId)?.alive) return;
+        if (msg.strike) return this.callStrike(playerId);
+        // Calling the King to play the move is this player's whole turn: no move of their own.
         if (round.picks[playerId] || this.called(playerId)) return;
-        if (msg.strike) (round.kingStrikes ??= {})[playerId] = true;
-        else (round.kingCalls ??= {})[playerId] = true;
+        (round.kingCalls ??= {})[playerId] = true;
         for (const h of this.r.humans) this.send(h.id, { t: "moved", key: round.key, playerId }, false);
         this.sendTally();
         if (this.roundHumans().every((h) => round.picks[h.id] || this.called(h.id))) this.lock();
@@ -661,10 +663,47 @@ export class LobbyCore {
     );
   }
 
-  /** Boss battle: this player called the King (or his strike) this round instead of picking. */
+  /** Boss battle: this player called the King to play this move instead of picking. */
   private called(playerId: string): boolean {
-    const round = this.r.round;
-    return !!(round?.kingCalls?.[playerId] || round?.kingStrikes?.[playerId]);
+    return !!this.r.round?.kingCalls?.[playerId];
+  }
+
+  /**
+   * Boss battle: a call for the King's strike. When enough have called he strikes now: everyone sees it, the
+   * move clock stands still while he does (every deadline, and every bot still thinking, moves back by that
+   * long), and then the move goes on.
+   */
+  private callStrike(playerId: string) {
+    const round = this.r.round!;
+    const runner = this.runner!;
+    const now = this.io.now();
+    if (round.kingStrikes?.[playerId] || round.strike || now < round.startedAt - 500 || now > round.deadline) return;
+    (round.kingStrikes ??= {})[playerId] = true;
+    runner.kingStrikers = new Set(Object.keys(round.kingStrikes));
+    const { struck, calls } = runner.callStrike(playerId);
+    const crowd = ([...runner.groups.values()][0] ?? []).length;
+    const needed = Math.floor(crowd / 2) + 1;
+    if (!struck) {
+      for (const h of this.roundHumans()) this.send(h.id, { t: "strike", key: round.key, calls, needed }, false);
+      return;
+    }
+    const ms = this.settings.kingStrikeMs;
+    round.strike = { at: now, until: now + ms };
+    round.deadline += ms;
+    for (const id of Object.keys(round.deadlines)) round.deadlines[id]! += ms;
+    for (const [id, at] of Object.entries(round.botsDoneIn ?? {})) if (round.startedAt + at > now) round.botsDoneIn![id] = at + ms;
+    for (const h of this.roundHumans()) {
+      this.send(h.id, { t: "strike", key: round.key, calls, needed, at: now, until: now + ms, deadline: round.deadlines[h.id] ?? round.deadline });
+    }
+    this.sendTally();
+    this.setTimer("lock", round.deadline + this.settings.lateGraceMs);
+  }
+
+  /** Time spent on this move so far (or up to `upTo`), leaving out the King's strike. */
+  private thinkTime(round: NonNullable<LobbyRecord["round"]>, upTo: number): number {
+    const s = round.strike;
+    const frozen = s ? Math.max(0, Math.min(upTo, s.until) - s.at) : 0;
+    return Math.max(0, upTo - round.startedAt - frozen);
   }
 
   private pick(playerId: string, key: string, move: string) {
@@ -676,7 +715,7 @@ export class LobbyCore {
     if (now < round.startedAt - 500) return; // Before the clock starts.
     const board = this.runner?.boardOf(playerId);
     if (!board || !legalMoves(board.fen).includes(move)) return;
-    round.picks[playerId] = { move, thinkMs: Math.max(0, Math.min(now - round.startedAt, deadline - round.startedAt)) };
+    round.picks[playerId] = { move, thinkMs: Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline)) };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     this.sendTally();
     if (this.roundHumans().every((h) => round.picks[h.id] || this.called(h.id))) this.lock();
@@ -771,7 +810,6 @@ export class LobbyCore {
     const runner = this.runner!;
     const round = this.r.round!;
     runner.kingCallers = new Set(Object.keys(round.kingCalls ?? {}));
-    runner.kingStrikers = new Set(Object.keys(round.kingStrikes ?? {}));
     const byBoard = new Map(boards.map((b) => [b.boardId, b]));
     const results = this.r.scoreRequest!.jobs.map((job) => {
       const s = byBoard.get(job.boardId);
@@ -793,7 +831,7 @@ export class LobbyCore {
     });
     const think = Object.fromEntries(Object.entries(round.picks).map(([id, p]) => [id, p.thinkMs]));
     // A miss uses the whole of the player's time for the move.
-    for (const h of this.roundHumans()) think[h.id] ??= (round.deadlines?.[h.id] ?? round.deadline) - round.startedAt;
+    for (const h of this.roundHumans()) think[h.id] ??= this.thinkTime(round, round.deadlines?.[h.id] ?? round.deadline);
     const report = runner.finishRound(results, think, new Set(Object.keys(round.powerUps ?? {})));
     this.r.scoreRequest = null;
     if (runner.final) {
@@ -811,7 +849,7 @@ export class LobbyCore {
       return;
     }
     this.r.phase = "reveal";
-    const kingActs = report.boards.some((b) => b.king || b.kingStrike);
+    const kingActs = report.boards.some((b) => b.king);
     const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? KING_FX_MS : 0);
     const st = this.standings();
     const cutoff = this.cutoff();
@@ -831,7 +869,7 @@ export class LobbyCore {
         playedMove: mine?.result.playedMove ?? null,
         picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, roundScore: p.roundScore })) ?? [],
         drawRule: mine?.result.drawRule ?? "random",
-        ...(mine?.king !== undefined ? { king: mine.king, kingCalls: mine.kingCalls, kingStrike: mine.kingStrike, strikeCalls: mine.strikeCalls } : {}),
+        ...(mine?.king !== undefined ? { king: mine.king, kingCalls: mine.kingCalls } : {}),
         expectedAfter: score?.expectedAfter ?? {},
         bestExpected: score?.bestExpected ?? null,
         standings: st,

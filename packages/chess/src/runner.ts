@@ -83,9 +83,6 @@ export interface BoardRound {
   /** Boss battle: the King played the move (the crowd called him), and how many called. */
   king?: boolean;
   kingCalls?: number;
-  /** Boss battle: the King struck the boss (its next move is a weaker one), and how many called for the strike. */
-  kingStrike?: boolean;
-  strikeCalls?: number;
   boardId: number;
   fenBefore: string;
   playerIds: string[];
@@ -266,11 +263,14 @@ export class MatchRunner {
   kingCallers = new Set<string>();
   /** Boss battle: humans who called for the King's strike this move. */
   kingStrikers = new Set<string>();
+  /** Boss battle: how many bots back a strike this move (drawn when a human first calls for one). */
+  private strikeBots: number | null = null;
 
   deal(): Map<number, string[]> {
     this.retiredThisRound = [];
     this.kingCallers = new Set();
     this.kingStrikers = new Set();
+    this.strikeBots = null;
     this.planned = new Map();
     this.planning = null;
     const over = this.state.boards.filter((id) => boardStatus(this.boards.get(id)!).gameOver);
@@ -453,10 +453,8 @@ export class MatchRunner {
     evaluation: GroupEvaluation,
   ): BoardRound {
     const board = this.boards.get(boardId)!;
-    // Boss battle: humans who called the King (or his strike) instead of picking abstain: no score, not a miss.
-    const abstained = new Set(
-      this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && (this.kingCallers.has(id) || this.kingStrikers.has(id))) : [],
-    );
+    // Boss battle: humans who called the King instead of picking abstain: no score, not a miss.
+    const abstained = new Set(this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && this.kingCallers.has(id)) : []);
     const result = scoreGroup(
       playerIds.filter((id) => !abstained.has(id)).map((id) => ({ playerId: id, move: picks[id] ?? null })),
       evaluation,
@@ -482,7 +480,7 @@ export class MatchRunner {
       result,
       scored,
       bestMove: evaluation.bestMove,
-      ...(this.state.boss ? { king: king.plays, kingCalls: king.calls, kingStrike: king.strikes, strikeCalls: king.strikeCalls } : {}),
+      ...(this.state.boss ? { king: king.plays, kingCalls: king.calls } : {}),
     };
   }
 
@@ -491,22 +489,38 @@ export class MatchRunner {
    * half the crowd calls him and he has a charge left. Bots call him when the crowd's popular move would lose
    * kingBotLoss points or more, and back a human's call with kingBotFollow chance.
    */
-  private kingDecision(playerIds: readonly string[], result: GroupResult): { plays: boolean; calls: number; strikes: boolean; strikeCalls: number } {
+  private kingDecision(playerIds: readonly string[], result: GroupResult): { plays: boolean; calls: number } {
     const b = this.state.boss;
-    if (!b || !(b.kingCharges ?? 0)) return { plays: false, calls: 0, strikes: false, strikeCalls: 0 };
+    if (!b || !(b.kingCharges ?? 0)) return { plays: false, calls: 0 };
     const humans = playerIds.filter((id) => this.kingCallers.has(id)).length;
-    const strikers = playerIds.filter((id) => this.kingStrikers.has(id) && !this.kingCallers.has(id)).length;
     const popularLoss = result.players.find((p) => p.move === result.playedMove)?.loss ?? 0;
     let calls = humans;
-    let strikeCalls = strikers;
     for (const id of playerIds) {
       if (!this.player(id).isBot) continue;
       if (popularLoss >= this.settings.kingBotLoss || (humans > 0 && this.opts.rng() < this.settings.kingBotFollow)) calls++;
-      // Bots never start a strike, but back a human's call for one.
-      else if (strikers > 0 && this.opts.rng() < this.settings.kingBotFollow) strikeCalls++;
     }
-    const plays = calls * 2 > playerIds.length;
-    return { plays, calls, strikes: !plays && strikeCalls * 2 > playerIds.length, strikeCalls };
+    return { plays: calls * 2 > playerIds.length, calls };
+  }
+
+  /**
+   * Boss battle: `playerId` calls for the King's strike, in the middle of the crowd's move. He strikes at once
+   * when more than half the crowd has called (bots never start one, but back a human's call with kingBotFollow
+   * chance): a charge is spent and the boss's next move is a weaker one. The move itself goes on: everyone
+   * still picks. One strike per move. Returns whether he struck, and how many have called.
+   */
+  callStrike(playerId: string): { struck: boolean; calls: number } {
+    const b = this.state.boss;
+    const ids = [...this.groups.values()][0] ?? [];
+    if (!b || !(b.kingCharges ?? 0) || b.staggerNext || !ids.includes(playerId)) return { struck: false, calls: 0 };
+    this.kingStrikers.add(playerId);
+    this.strikeBots ??= ids.filter((id) => this.player(id).isBot && this.opts.rng() < this.settings.kingBotFollow).length;
+    const calls = ids.filter((id) => this.kingStrikers.has(id)).length + this.strikeBots;
+    if (calls * 2 <= ids.length) return { struck: false, calls };
+    this.state = {
+      ...this.state,
+      boss: { ...b, kingCharges: Math.max(0, (b.kingCharges ?? 0) - 1), kingStrikes: [...(b.kingStrikes ?? []), b.crowdMoves + 1], staggerNext: true },
+    };
+    return { struck: true, calls };
   }
 
   /** Applies scored boards: updates scores and plays the drawn moves. */
@@ -521,18 +535,15 @@ export class MatchRunner {
     this.botPowerUps = new Set();
     const outcomes = results.flatMap((r) => outcomesFromGroup(r.result, think, used));
     const kingPlayed = results.some((r) => r.king);
-    const kingStruck = results.some((r) => r.kingStrike);
     this.state = applyRound(this.state, this.groups, outcomes, this.settings);
-    if ((kingPlayed || kingStruck) && this.state.boss) {
+    if (kingPlayed && this.state.boss) {
       const b = this.state.boss;
       this.state = {
         ...this.state,
         boss: {
           ...b,
           kingCharges: Math.max(0, (b.kingCharges ?? 0) - 1),
-          kingMoves: kingPlayed ? [...(b.kingMoves ?? []), b.crowdMoves] : (b.kingMoves ?? []),
-          kingStrikes: kingStruck ? [...(b.kingStrikes ?? []), b.crowdMoves] : (b.kingStrikes ?? []),
-          staggerNext: kingStruck || b.staggerNext,
+          kingMoves: [...(b.kingMoves ?? []), b.crowdMoves],
         },
       };
     }

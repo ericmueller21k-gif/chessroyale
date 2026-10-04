@@ -9,7 +9,8 @@ same name to change it; the game plays them at these moments of the God King's a
 | appear.mp3 | the flash: the God King appears | Junkala, `sfx_sounds_fanfare1` |
 | hyuah.mp3 | he raises his sword ("hyuah!") | HaelDB, *Male Grunt/Yelling sounds*, `3grunt3` (trimmed, light 16-bit crunch) |
 | bolt.mp3 | his bolt strikes | Junkala, `sfx_exp_shortest_hard4` |
-| hit.mp3 | the boss loses HP (a strike) | Junkala, `sfx_damage_hit3` |
+| hit.mp3 | the boss loses HP (the last of his three slashes) | Junkala, `sfx_damage_hit3` |
+| slash.mp3 | each of his three slashes on the boss | Made for the game (a bright noise swish with a metallic ring, synthesised with ffmpeg; no licence needed) |
 | leave.mp3 | holy light: he vanishes | Made for the game (a falling three-tone shimmer, synthesised with ffmpeg; no licence needed) |
 
 - https://opengameart.org/content/512-sound-effects-8-bit-style (CC0)

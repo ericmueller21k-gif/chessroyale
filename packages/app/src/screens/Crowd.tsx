@@ -150,8 +150,6 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const landAt = countEnd + 250;
   // The God King playing the move: his summoning and his bolt come first (about 2.1 s), then the piece moves.
   const playAt = landAt + (mine.king ? 2100 : 750);
-  // His strike on the boss comes after the crowd's move has played.
-  const strikeAt = playAt + 300;
   const landed = t >= landAt;
   const played = t >= playAt;
   useEffect(() => {
@@ -159,23 +157,18 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   }, [board]);
 
   const fen = mine.fenBefore;
-  // The God King: summoned on your king's square, then he plays the move (or strikes the boss), and leaves as the round ends.
+  // The God King: summoned on your king's square, then he plays the move, and leaves as the round ends.
   const godKing = useMemo(() => {
-    if (!mine.king && !mine.kingStrike) return null;
+    if (!mine.king) return null;
     const crowd = sideToMove(fen);
-    const boss = crowd === "w" ? "b" : "w";
     const after = applyMove(fen, mine.result.playedMove);
     const before = kingSquare(fen, crowd);
     const later = kingSquare(after, crowd);
     if (!before || !later) return null;
     const orient = (myTeam(match) ?? crowd) === "w" ? ("white" as const) : ("black" as const);
     const exitAt = Math.max(start + playAt + 2900, until - 900);
-    if (mine.king) {
-      const from = mine.result.playedMove.slice(0, 2);
-      return { side: crowd, orientation: orient, kingBefore: before, kingAfter: later, target: from === before ? null : from, mode: "move" as const, startAt: start + landAt, moveAt: start + playAt, exitAt };
-    }
-    const hp = Math.round((match.settings.kingStrikeLoss[0] + match.settings.kingStrikeLoss[1]) / 2);
-    return { side: crowd, orientation: orient, kingBefore: later, kingAfter: later, target: kingSquare(after, boss), mode: "strike" as const, hp, startAt: start + strikeAt, moveAt: start + strikeAt, exitAt };
+    const from = mine.result.playedMove.slice(0, 2);
+    return { side: crowd, orientation: orient, kingBefore: before, kingAfter: later, target: from === before ? null : from, mode: "move" as const, startAt: start + landAt, moveAt: start + playAt, exitAt };
   }, [mine, landAt, playAt]);
   const team = myTeam(match);
   const orientation = (team ?? sideToMove(fen)) === "w" ? "white" : "black";
@@ -249,15 +242,6 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             </span>
             <span class="poll-votes">{Math.round(yourRow.votes * grow)}</span>
             <span class="poll-you">you</span>
-          </div>
-        )}
-        {mine.king !== undefined && (mine.strikeCalls ?? 0) > 0 && (
-          <div class={`poll-row king-row${landed && mine.kingStrike ? " win" : ""}`}>
-            <span class="poll-move">⚔️ Strike</span>
-            <span class="poll-bar">
-              <i style={{ width: `${Math.min(100, (100 * (mine.strikeCalls ?? 0) * grow) / Math.max(1, voters))}%` }} />
-            </span>
-            <span class="poll-votes">{Math.round((mine.strikeCalls ?? 0) * grow)}</span>
           </div>
         )}
         {mine.king !== undefined && (mine.kingCalls ?? 0) > 0 && (

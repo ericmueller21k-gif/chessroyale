@@ -40,9 +40,21 @@ export function useTicks(secs: number, from = TICK_FROM_SECONDS, active = true) 
  * gone at the deadline, and fading from dark green through yellow to red as time
  * runs out. It ticks every second for the last 10 seconds.
  */
-export function TimerBar({ startsAt, deadline, total }: { startsAt: number; deadline: number; total: number }) {
+export function TimerBar({
+  startsAt,
+  deadline,
+  total,
+  frozen,
+}: {
+  startsAt: number;
+  deadline: number;
+  total: number;
+  /** The clock stood still from `at` to `until` (the God King's strike); `deadline` already includes it. */
+  frozen?: { at: number; until: number };
+}) {
   const now = useFrameNow();
-  const left = Math.max(0, deadline - Math.max(now, startsAt));
+  // While frozen, what's left once the clock runs again.
+  const left = Math.max(0, deadline - (frozen && now >= frozen.at && now < frozen.until ? frozen.until : Math.max(now, startsAt)));
   const secs = Math.ceil(left / 1000);
   const frac = total > 0 ? Math.min(1, left / total) : 0;
   useTicks(secs, TICK_FROM_SECONDS, now >= startsAt);

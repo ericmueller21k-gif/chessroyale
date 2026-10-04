@@ -214,7 +214,7 @@ export class NetMatch implements GameView {
         return this.setPhase({ kind: "opening", boards: m.boards.map((b) => this.toView(b)) });
       case "round":
         this.key = m.key;
-        this.kingCalled = null;
+        this.kingCalled = false;
         this.tally = null;
         this.myPick = null;
         this.hint = null;
@@ -245,13 +245,23 @@ export class NetMatch implements GameView {
         if (m.key !== this.key) return;
         // Everyone's in: anyone still shown as thinking (bots) finishes quickly while the host scores.
         void this.progress.finishAll(this.standingsList.filter((s) => !s.out).map((s) => s.id), 900);
-        if (this.phase.kind === "play") this.setPhase({ kind: "scoring", board: this.phase.board, move: this.myPick });
+        if (this.phase.kind === "play") this.setPhase({ kind: "scoring", board: this.phase.board, move: this.myPick, strike: this.phase.strike });
         else if (this.phase.kind === "watching") this.setPhase({ kind: "scoring", board: this.phase.board, move: null, watched: true });
         return;
       case "prefetch":
         this.prefetch(m.fens);
         if (m.plan) void this.planBots(m.plan);
         return;
+      case "strike": {
+        // Players who already picked see him strike too.
+        if (m.key !== this.key || (this.phase.kind !== "play" && (this.phase.kind !== "scoring" || this.phase.watched))) return;
+        const prev = this.phase.strike;
+        const strike = { calls: m.calls, needed: m.needed, mine: !!prev?.mine, ...(m.at !== undefined ? { at: this.local(m.at), until: this.local(m.until!) } : {}) };
+        // He struck: the clock stood still meanwhile, for the bots still thinking too.
+        if (m.at !== undefined && m.until !== undefined && prev?.at === undefined) this.progress.postpone(m.until - m.at);
+        if (this.phase.kind === "scoring") return this.setPhase({ ...this.phase, strike });
+        return this.setPhase({ ...this.phase, ...(m.deadline !== undefined ? { deadline: this.local(m.deadline) } : {}), strike });
+      }
       case "tally":
         if (m.key !== this.key) return;
         this.tally = m.picks.map((p) => ({ ...p, at: this.local(p.at) }));
@@ -356,7 +366,7 @@ export class NetMatch implements GameView {
         bestMove: m.bestMove!,
         playerIds: m.picks.map((p) => p.playerId),
         result: { players: m.picks, playedMove: m.playedMove!, drawRule: m.drawRule ?? "random" },
-        ...(m.king !== undefined ? { king: m.king, kingCalls: m.kingCalls, kingStrike: m.kingStrike, strikeCalls: m.strikeCalls } : {}),
+        ...(m.king !== undefined ? { king: m.king, kingCalls: m.kingCalls } : {}),
       },
     });
     void this.crossCheck(m);
@@ -474,10 +484,11 @@ export class NetMatch implements GameView {
   submit(move: string | null) {
     if (this.phase.kind !== "play" || !this.key || !move) return;
     if (Date.now() < this.phase.startsAt - 300) return; // Before the clock starts.
+    if (this.phase.strike?.until && Date.now() < this.phase.strike.until) return; // While the King strikes.
     this.myPick = move;
     this.send({ t: "pick", key: this.key, move });
     if (this.myId) this.progress.mark(this.myId);
-    this.setPhase({ kind: "scoring", board: this.phase.board, move });
+    this.setPhase({ kind: "scoring", board: this.phase.board, move, strike: this.phase.strike });
   }
 
   /** Crowd: the picks visible to you so far this round (null while you still have to pick). */
@@ -486,14 +497,22 @@ export class NetMatch implements GameView {
     return this.tally;
   }
 
-  kingCalled: "play" | "strike" | null = null;
+  kingCalled = false;
   callKing(strike = false) {
     if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled) return;
-    this.kingCalled = strike ? "strike" : "play";
-    this.send({ t: "king", key: this.key, ...(strike ? { strike: true } : {}) });
-    // Calling him is your turn: wait for the others like after a move.
+    if (strike) {
+      // A strike isn't your turn: you still pick once he's done (the server says when he strikes).
+      if (this.phase.strike?.mine) return;
+      this.send({ t: "king", key: this.key, strike: true });
+      const crowd = this.standingsList.filter((x) => !x.out).length;
+      const prev = this.phase.strike;
+      return this.setPhase({ ...this.phase, strike: { calls: (prev?.calls ?? 0) + 1, needed: prev?.needed ?? Math.floor(crowd / 2) + 1, mine: true } });
+    }
+    this.kingCalled = true;
+    this.send({ t: "king", key: this.key });
+    // Calling him to play is your turn: wait for the others like after a move.
     if (this.myId) this.progress.mark(this.myId);
-    this.setPhase({ kind: "scoring", board: this.phase.board, move: null });
+    this.setPhase({ kind: "scoring", board: this.phase.board, move: null, strike: this.phase.strike });
   }
 
   private myVoteLocal: { key: string; entry: VoteView["votes"][number] } | null = null;

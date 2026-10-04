@@ -85,6 +85,15 @@ export function kingSquare(fen: string, side: "w" | "b"): string | null {
   return null;
 }
 
+/** The strike's three slashes: when each lands (ms after the summon starts). */
+export const SLASH_AT = [1800, 2250, 2700] as const;
+
+/** `hp` in three slashes (10: 3, 3, 4). */
+export function slashes(hp: number): number[] {
+  const each = Math.floor(hp / 3);
+  return [each, each, hp - 2 * each];
+}
+
 /** Where the converging bolts start: points around the board's edge. */
 const EDGE = Array.from({ length: 12 }, (_, i) => {
   const a = (i / 12) * Math.PI * 2 + 0.3;
@@ -95,10 +104,11 @@ const EDGE = Array.from({ length: 12 }, (_, i) => {
  * Summoning the God King on your king's square. A dozen thin bolts converge on
  * the square, a beam of light, a flash, and the God King stands there in your
  * king's place (the real king is hidden while he's on the board). He raises his
- * sword and a thin bolt strikes `target`: the piece he moves ("move", which then
- * plays at `moveAt`), or the boss's king ("strike", with a floating "-N HP").
- * At `exitAt` (the round ending) holy light takes him away on whatever square
- * he's on, and the plain king drops back there. All times are Date.now() values.
+ * sword, then either a thin bolt strikes the piece he moves ("move", which then
+ * plays at `moveAt`), or he slashes the boss's king three times ("strike", each
+ * with its own sound and a yellow "−N" adding up to `hp`). At `exitAt` holy
+ * light takes him away on whatever square he's on, and the plain king drops
+ * back there. All times are Date.now() values.
  */
 export function KingSummon({
   side,
@@ -133,17 +143,24 @@ export function KingSummon({
   const tg = target ? squareXY(target, orientation) : null;
   const present = t >= 1300 && out < 700;
   const raised = t >= 1550;
+  const strike = mode === "strike";
+  const hits = slashes(hp ?? 10);
   // His sounds, in time with the animation.
   useEffect(() => {
     const cues: [SoundName, number][] = [
       ["gkSummon", startAt],
       ["gkAppear", startAt + 1250],
       ["gkHyuah", startAt + 1550],
-      ...(tg ? ([["gkBolt", startAt + 1760]] as [SoundName, number][]) : []),
-      ...(mode === "strike" ? ([["gkHit", startAt + 1980]] as [SoundName, number][]) : []),
+      ...(strike
+        ? SLASH_AT.map((at, i) => [i === 2 ? "gkHit" : "gkSlash", startAt + at - 20] as [SoundName, number])
+        : tg
+          ? ([["gkBolt", startAt + 1760]] as [SoundName, number][])
+          : []),
+      ...(strike ? ([["gkSlash", startAt + SLASH_AT[2] - 40]] as [SoundName, number][]) : []),
       ["gkLeave", exitAt],
     ];
-    const timers = cues.map(([name, at]) => setTimeout(() => play(name), Math.max(0, at - Date.now())));
+    // Cues already past (a screen shown partway through) stay silent.
+    const timers = cues.filter(([, at]) => at > Date.now() - 300).map(([name, at]) => setTimeout(() => play(name), Math.max(0, at - Date.now())));
     return () => timers.forEach(clearTimeout);
   }, []);
   if (out > 900) return null;
@@ -173,9 +190,36 @@ export function KingSummon({
         {/* The beam down onto the square, then the flash. */}
         {t >= 900 && t < 1300 && <rect x={k0.x - 26} y={0} width={52} height={k0.y + 40} fill="url(#ks-beam)" style={{ opacity: Math.min(1, (t - 900) / 150) * (t > 1200 ? (1300 - t) / 100 : 1) }} />}
         {t >= 1200 && t < 1550 && <circle cx={k0.x} cy={k0.y} r={70 + (t - 1200) / 4} fill="url(#ks-glow)" style={{ opacity: 1 - (t - 1200) / 350 }} />}
-        {/* His bolt: from his square to the piece he moves, or to the boss's king. */}
-        {tg && t >= 1750 && t < 2050 && <path class="ks-bolt strike" d={boltPath(k0.x, k0.y - 30, tg.x, tg.y, 13)} style={{ opacity: t < 1900 ? 1 : (2050 - t) / 150 }} />}
-        {tg && t >= 1800 && t < 2200 && <circle class="ks-hit" cx={tg.x} cy={tg.y} r={20 + (t - 1800) / 8} style={{ opacity: 1 - (t - 1800) / 400 }} />}
+        {/* His bolt to the piece he moves. */}
+        {!strike && tg && t >= 1750 && t < 2050 && <path class="ks-bolt strike" d={boltPath(k0.x, k0.y - 30, tg.x, tg.y, 13)} style={{ opacity: t < 1900 ? 1 : (2050 - t) / 150 }} />}
+        {!strike && tg && t >= 1800 && t < 2200 && <circle class="ks-hit" cx={tg.x} cy={tg.y} r={20 + (t - 1800) / 8} style={{ opacity: 1 - (t - 1800) / 400 }} />}
+        {/* The strike: three quick slashes on the boss's king, each a flash of his bolt and a cut across the square. */}
+        {strike &&
+          tg &&
+          SLASH_AT.map((at, i) => {
+            const age = t - at;
+            if (age < -60 || age > 380) return null;
+            // Alternate the cut's direction: \, /, then straight across.
+            const dir = [
+              [-1, -1, 1, 1],
+              [1, -1, -1, 1],
+              [-1, 0, 1, 0],
+            ][i]!;
+            const r = 46;
+            const sweep = Math.min(1, Math.max(0, (age + 60) / 110));
+            const x1 = tg.x + dir[0]! * r;
+            const y1 = tg.y + dir[1]! * r;
+            const x2 = x1 + (tg.x + dir[2]! * r - x1) * sweep;
+            const y2 = y1 + (tg.y + dir[3]! * r - y1) * sweep;
+            const fade = age < 160 ? 1 : Math.max(0, 1 - (age - 160) / 220);
+            return (
+              <g key={i}>
+                {age < 120 && <path class="ks-bolt strike" d={boltPath(k0.x, k0.y - 30, tg.x, tg.y, 21 + i)} style={{ opacity: age < 0 ? 0.6 : 1 - age / 120 }} />}
+                <line class="ks-slash" x1={x1} y1={y1} x2={x2} y2={y2} style={{ opacity: fade }} />
+                {age >= 0 && <circle class="ks-hit" cx={tg.x} cy={tg.y} r={18 + age / 7} style={{ opacity: Math.max(0, 1 - age / 380) }} />}
+              </g>
+            );
+          })}
         {/* Leaving: a column of holy light on his square. */}
         {out >= 0 && out < 500 && <rect x={k.x - 40} y={0} width={80} height={k.y + 50} fill="url(#ks-beam)" style={{ opacity: out < 150 ? out / 150 : (500 - out) / 350 }} />}
       </svg>
@@ -192,11 +236,15 @@ export function KingSummon({
           <piece class={`${side === "w" ? "white" : "black"} king`} />
         </span>
       )}
-      {mode === "strike" && tg && t >= 1950 && t < 3000 && (
-        <span class="ks-hp" style={{ left: pct(tg.x), top: pct(tg.y) }}>
-          −{hp ?? 10} HP
-        </span>
-      )}
+      {strike &&
+        tg &&
+        SLASH_AT.map((at, i) =>
+          t >= at && t < at + 1000 ? (
+            <span key={i} class="ks-hp" style={{ left: pct(tg.x + (i - 1) * 34), top: pct(tg.y - 10 + i * 6) }}>
+              −{hits[i]}
+            </span>
+          ) : null,
+        )}
     </div>
   );
 }
