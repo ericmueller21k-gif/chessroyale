@@ -257,7 +257,7 @@ export async function verifyEmailCode(sql: Sql, email: string, code: string, now
 // ---------------- Results and profiles ----------------
 
 export interface MatchResult {
-  mode: "classic" | "crowd";
+  mode: "classic" | "crowd" | "boss";
   online: boolean;
   placement: number;
   players: number;
@@ -271,7 +271,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   await sql.run(
     "INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     userId,
-    r.mode === "crowd" ? "crowd" : "classic",
+    r.mode === "crowd" || r.mode === "boss" ? r.mode : "classic",
     r.online ? 1 : 0,
     Math.max(1, Math.round(r.placement)),
     Math.max(1, Math.round(r.players)),
@@ -294,7 +294,7 @@ export interface ModeStats {
 
 export interface Profile {
   user: Pick<User, "id" | "name" | "icon"> & { signedIn: boolean; email: string | null; google: boolean };
-  stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats };
+  stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
 }
@@ -314,7 +314,7 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
   });
   return {
     user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub },
-    stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")) },
+    stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
     rating: rows.find((r) => r.rating !== null)?.rating ?? null,
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,

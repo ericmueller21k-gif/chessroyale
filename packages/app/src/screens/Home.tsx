@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, type GameMode } from "@chessroyale/core";
+import { BOSS_TIERS, CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, type ModeChoiceId } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { account, updateProfile } from "../account.ts";
 import { useAccount } from "./Profile.tsx";
@@ -12,7 +12,8 @@ const TURNS_KEY = "brc.crowdTurns";
 const AUGMENTS_KEY = "brc.augments";
 
 export interface ModeChoice {
-  mode: GameMode;
+  /** Classic, Crowd (50 v 50) or the boss raid. */
+  mode: ModeChoiceId;
   /** Crowd: 50 v 50 teams (true) or everyone moves (false). */
   crowdTeams: boolean;
   augments: boolean;
@@ -28,8 +29,9 @@ export function chosenMode(): ModeChoice {
       return null;
     }
   };
-  // Crowd (50 v 50) is the main mode: Classic only when chosen.
-  const mode = (q.get("mode") ?? get(MODE_KEY)) === "classic" ? "classic" : "crowd";
+  // Crowd (50 v 50) is the main mode: Classic or the boss raid only when chosen.
+  const picked = q.get("mode") ?? get(MODE_KEY);
+  const mode = picked === "classic" ? "classic" : picked === "raid" ? "raid" : "crowd";
   return {
     mode,
     crowdTeams: (q.get("turns") ?? get(TURNS_KEY)) !== "all",
@@ -85,6 +87,7 @@ export function HomeScreen({
   onProfile,
   onlineLocked,
   onSignIn,
+  onPlayNow,
 }: {
   onStart: (name: string, practice: boolean) => void;
   onCreateLobby: (name: string, practice: boolean) => void;
@@ -97,6 +100,8 @@ export function HomeScreen({
   /** Online play needs signing in, and you're a guest. */
   onlineLocked?: boolean;
   onSignIn?: () => void;
+  /** "Play now": matchmaking into a 50 v 50 lobby. */
+  onPlayNow?: (name: string) => void;
 }) {
   const { profile } = useAccount();
   const [code, setCode] = useState(joinCode ?? "");
@@ -129,6 +134,7 @@ export function HomeScreen({
     saveMode(next);
   };
   const crowd = modeChoice.mode === "crowd";
+  const raid = modeChoice.mode === "raid";
   const [anim, setAnim] = useState(crowdAnimations);
   const [openingMoves, setOpeningMoves] = useState(chosenOpeningMoves);
   const changeOpeningMoves = (n: number) => {
@@ -182,18 +188,42 @@ export function HomeScreen({
       )}
       {!joinCode && <InstallCard />}
       {!joinCode && (
-        <div class="mode-pick" role="radiogroup" aria-label="Game mode">
+        <div class="mode-pick three" role="radiogroup" aria-label="Game mode">
           <button type="button" role="radio" aria-checked={crowd} class={crowd ? "on" : ""} onClick={() => changeMode({ mode: "crowd" })}>
             <strong>Crowd</strong>
             <span>{C.lobbySize} players · 1 board</span>
           </button>
-          <button type="button" role="radio" aria-checked={!crowd} class={!crowd ? "on" : ""} onClick={() => changeMode({ mode: "classic" })}>
+          <button type="button" role="radio" aria-checked={raid} class={raid ? "on" : ""} onClick={() => changeMode({ mode: "raid" })}>
+            <strong>Boss raid</strong>
+            <span>Up to {R.lobbySize} vs a boss</span>
+          </button>
+          <button type="button" role="radio" aria-checked={modeChoice.mode === "classic"} class={modeChoice.mode === "classic" ? "on" : ""} onClick={() => changeMode({ mode: "classic" })}>
             <strong>Classic</strong>
             <span>{S.lobbySize} players · 8 boards</span>
           </button>
         </div>
       )}
-      {crowd && !joinCode ? (
+      {raid && !joinCode ? (
+        <ol class="rules">
+          <li>
+            <strong>You and your friends against a boss.</strong> Up to {R.lobbySize} players pick the crowd's move together; the
+            most popular pick is played. Create a raid and share the code, or take the boss on alone.
+          </li>
+          <li>
+            <strong>A named opening, {R.openingMoves} moves in.</strong> The boss picks one from the classics and you play on from
+            there.
+          </li>
+          <li>
+            <strong>The boss is always a step above you.</strong> Six bosses from {BOSS_TIERS[0]} to {BOSS_TIERS[BOSS_TIERS.length - 1]}{" "}
+            strength; you get the weakest one that's stronger than your group's average rating. Every {S.bossKillEvery} moves it
+            strikes down whoever played worst, down to half the group.
+          </li>
+          <li>
+            <strong>👑 The King</strong> fights for you {S.kingChargesMax} times: call him to play a move at full strength, or to
+            strike the boss so its next move is a weaker one. More than half of you have to call.
+          </li>
+        </ol>
+      ) : crowd && !joinCode ? (
         <ol class="rules">
           <li>
             <strong>{C.lobbySize} players, one game, from the first move.</strong>{" "}
@@ -207,20 +237,24 @@ export function HomeScreen({
           </li>
           <li>
             <strong>No cuts for the first {(C.firstStageRounds ?? 20) / 2} moves.</strong> Then after every move the lowest scorers
-            go out ({modeChoice.crowdTeams ? "the same number from each team" : "by overall score"}), until 4 are left.
+            go out ({modeChoice.crowdTeams ? "the same number from each team" : "by overall score"}).
           </li>
           <li>
             <strong>⚡ {C.powerUpsAtStart} power-ups</strong> show the engine's top 3 moves. That's all you get, so pick your moments.
           </li>
-          {modeChoice.augments && (
+          {modeChoice.crowdTeams ? (
             <li>
-              <strong>Augments.</strong> After every cut, vote: more time, the same, or less time on the clock for the next round.
+              <strong>{modeChoice.augments ? "You vote on the ending." : "The team final."}</strong>{" "}
+              {modeChoice.augments
+                ? "Before the first move everyone pushes a pawn into a zone: a team final (top 8 play 4v4, 3v3, then 2v2 to the end), a boss battle (top 10 against a Stockfish boss) or a duel (the best of each side, 1v1). Then the speed: slow, standard or bullet."
+                : "The top 8 play on, 4v4 with teammates taking turns, then 3v3, then 2v2 to the end of the game."}{" "}
+              Winning the game goes on your record; your own move quality places you.
+            </li>
+          ) : (
+            <li>
+              <strong>The 2v2 final.</strong> The last 4 play on, teammates taking turns; the best average move quality wins.
             </li>
           )}
-          <li>
-            <strong>The 2v2 final.</strong> The last 4 play on, teammates taking turns; the best average move quality wins. Winning
-            the game goes on your record, but it's move quality that places you.
-          </li>
         </ol>
       ) : (
       <ol class="rules">
@@ -301,12 +335,13 @@ export function HomeScreen({
           <label class="check">
             <input type="checkbox" checked={modeChoice.augments} onChange={(e) => changeMode({ augments: e.currentTarget.checked })} />
             <span>
-              <strong>Augments:</strong> vote on the clock after every cut (more time, same, less time).
+              <strong>Pre-game votes:</strong> before the first move, everyone votes on how the match ends and how fast it is, by
+              pushing a pawn into a zone. Off: a team final at the standard speed.
             </span>
           </label>
         </>
       )}
-      {joinCode || crowd ? null : (
+      {joinCode || crowd || raid ? null : (
         <div class="stepper-field">
           <span>
             <strong>Opening moves:</strong> how many moves each side has already played on every board when the match
@@ -323,9 +358,15 @@ export function HomeScreen({
           </div>
         </div>
       )}
+      {joinCode || onlineLocked || !onPlayNow || raid ? null : (
+        <button type="button" class="btn btn-primary btn-wide play-now" disabled={loading} onClick={() => onPlayNow(remember(name))}>
+          <strong>Play now</strong>
+          <span>50 v 50 online · unranked</span>
+        </button>
+      )}
       {joinCode ? null : (
-        <button type="button" class="btn btn-primary btn-wide" disabled={loading} onClick={() => onStart(remember(name), practice)}>
-          {loading ? "Loading the engine…" : `Play solo vs ${(crowd ? C.lobbySize! : S.lobbySize) - 1} bots`}
+        <button type="button" class={`btn ${onlineLocked || !onPlayNow ? "btn-primary" : "btn-secondary"} btn-wide`} disabled={loading} onClick={() => onStart(remember(name), practice)}>
+          {loading ? "Loading the engine…" : raid ? "Take on the boss alone" : `Play solo vs ${(crowd ? C.lobbySize! : S.lobbySize) - 1} bots`}
         </button>
       )}
       {onlineLocked ? (
@@ -340,7 +381,7 @@ export function HomeScreen({
       <div class="lobby-actions">
         {!joinCode && (
           <button type="button" class="btn btn-secondary" disabled={loading} onClick={() => onCreateLobby(remember(name), practice)}>
-            Create a lobby
+            {raid ? "Create a raid" : "Create a lobby"}
           </button>
         )}
         <div class="join-row">

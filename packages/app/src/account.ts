@@ -16,7 +16,7 @@ export interface ModeStats {
 
 export interface Profile {
   user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean };
-  stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats };
+  stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
 }
@@ -90,7 +90,7 @@ export async function signOut(): Promise<void> {
 
 /** A solo match's result, onto your profile (online matches are saved by the server). */
 export async function recordSoloResult(r: {
-  mode: "classic" | "crowd";
+  mode: "classic" | "crowd" | "boss";
   placement: number;
   players: number;
   team?: "w" | "b" | null;

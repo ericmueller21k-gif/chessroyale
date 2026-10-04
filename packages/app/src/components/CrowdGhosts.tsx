@@ -53,6 +53,7 @@ export function CrowdGhosts({
   chosen = null,
   faint = false,
   instant,
+  tags = true,
 }: {
   fen: string;
   picks: GhostPick[];
@@ -63,6 +64,8 @@ export function CrowdGhosts({
   faint?: boolean;
   /** Picks already shown (live): they start on their square instead of sliding in again. */
   instant?: ReadonlySet<string>;
+  /** Name tags over each picked square (off for the pre-game votes, which show counts instead). */
+  tags?: boolean;
 }) {
   const byMove = new Map<string, GhostPick[]>();
   for (const p of picks) byMove.set(p.move, [...(byMove.get(p.move) ?? []), p]);
@@ -87,7 +90,7 @@ export function CrowdGhosts({
               />
             );
           })}
-      {[...byMove].map(([move, ps]) => {
+      {tags && [...byMove].map(([move, ps]) => {
         const to = at(move.slice(2, 4), orientation);
         const ranked = [...ps].sort((a, b) => Number(b.you) - Number(a.you) || a.rank - b.rank);
         const shown = ranked.slice(0, 3);

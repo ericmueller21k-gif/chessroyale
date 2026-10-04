@@ -113,13 +113,66 @@ export interface NetFinal {
   /** Whose turn it is (null once the final is over). */
   mover: string | null;
   /** Each finalist's average loss per move in the final (null before their first move) and moves made. */
-  scores: Record<string, { avg: number | null; moves: number }>;
+  scores: Record<string, { avg: number | null; moves: number; matchLoss?: number | null; rating?: number | null }>;
   /** The move just played, with its loss (null loss = missed, then the engine's move was played). */
   last: null | { playerId: string; move: string; san: string; loss: number | null };
+  /** classic (fixed moves each), team (4v4, 3v3, then 2v2 to the end) or duel (1v1 to the end). */
+  format?: "classic" | "team" | "duel";
+  /** Team final: turns until the next cut (null on the last step), and who has gone out so far. */
+  cutIn?: number | null;
+  out?: { id: string; turn: number }[];
+  /** Team final: who went out just now (after the move in `last`). */
+  justOut?: string[];
+}
+
+/** The boss battle, for every screen. */
+export interface NetBoss {
+  board: NetBoard;
+  name: string;
+  icon: string;
+  /** 1 to 5: how scary the boss is (its Elo stays secret). */
+  threat: number;
+  /** The side the crowd plays. */
+  crowdSide: "w" | "b";
+  crowdMoves: number;
+  maxMoves: number;
+  /** Crowd moves until the boss strikes again (null when it won't strike any more). */
+  strikeIn: number | null;
+  kills: { id: string; atMove: number }[];
+  /** The move number the battle started from (a position from the game just played). */
+  startMove: number;
+  /** The King, the crowd's champion: charges left, the crowd moves he played, and after which he struck the boss. */
+  kingCharges: number;
+  kingMoves: number[];
+  kingStrikes: number[];
+  /** The King has struck: the boss's next move will be a weaker one. */
+  staggerNext: boolean;
+  /** Boss raid (its own mode), and the opening it starts from. */
+  raid: boolean;
+  openingName: string | null;
+  /** The boss's last move, and who it struck down just now. */
+  lastMove: null | { move: string; san: string; staggered?: boolean };
+  justKilled?: string | null;
+  /** Set when the battle is over. */
+  result?: "crowd" | "boss" | "draw";
+}
+
+/** A pre-game vote, for every screen: everyone's votes, each visible from `at` (server time). */
+export interface NetVote {
+  key: string;
+  /** Which vote (index into PREGAME_VOTES) and how many there are. */
+  index: number;
+  count: number;
+  startsAt: number;
+  until: number;
+  votes: { playerId: string; option: number; at: number; side: "w" | "b" }[];
+  /** The winning option once counted (then shown until `nextAt`). */
+  result: number | null;
+  nextAt?: number;
 }
 
 export type ClientMessage =
-  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean }
+  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; rating?: number | null }
   | { t: "start" }
   | { t: "pick"; key: string; move: string }
   | { t: "powerUp"; key: string }
@@ -128,11 +181,26 @@ export type ClientMessage =
   /** Crowd: the host's early bot picks for this round. */
   | { t: "botPlan"; key: string; picks: Record<string, string>; powerUps: string[] }
   /** Crowd augments: this player's vote on the next round's move clock. */
-  | { t: "augment"; choice: Augment };
+  | { t: "augment"; choice: Augment }
+  /** Boss battle: this player calls the King for this move (to play it, or to strike the boss). */
+  | { t: "king"; key: string; strike?: boolean }
+  /** A pre-game vote (Crowd 50 v 50): the option this player pushed a pawn into. */
+  | { t: "vote"; key: string; option: number }
+  /** Boss battle, host only: the boss's move. */
+  | { t: "bossMove"; key: string; move: string };
 
 export type ServerMessage = { now: number } & (
   | { t: "welcome"; playerId: string; token: string; code: string }
-  | { t: "lobby"; players: LobbyPlayer[]; hostId: string | null; started: boolean; lobbySize: number }
+  | {
+      t: "lobby";
+      players: LobbyPlayer[];
+      hostId: string | null;
+      started: boolean;
+      lobbySize: number;
+      /** Matchmade ("Play now"): no host start; the match starts when full or at `fillAt` (server time), bots filling the rest. */
+      auto?: boolean;
+      fillAt?: number | null;
+    }
   | { t: "error"; message: string }
   | { t: "opening"; boards: NetBoard[]; until: number }
   | {
@@ -181,6 +249,11 @@ export type ServerMessage = { now: number } & (
       picks: NetPick[];
       /** How the played move was chosen from the group's picks. */
       drawRule: DrawRule;
+      /** Boss battle: the King played the move, and how many called him; or he struck the boss. */
+      king?: boolean;
+      kingCalls?: number;
+      kingStrike?: boolean;
+      strikeCalls?: number;
       /** For the cross-check: the group's evaluation as the host computed it. */
       expectedAfter: Record<string, number>;
       bestExpected: number | null;
@@ -207,6 +280,14 @@ export type ServerMessage = { now: number } & (
   | { t: "spectate"; boards: NetBoard[]; standings: NetStanding[]; stage: number; round: number; slots: BoardSlot[] }
   /** The final's state, sent to everyone after each move and when a new turn starts. */
   | { t: "final"; final: NetFinal; standings: NetStanding[]; slots: BoardSlot[] }
+  /** A pre-game vote: sent when it opens (with the bots' votes and their moments) and with its result. */
+  | { t: "vote"; vote: NetVote; standings: NetStanding[] }
+  /** A human's vote in the open vote. */
+  | { t: "voteCast"; key: string; playerId: string; option: number; at: number; side: "w" | "b" }
+  /** Boss battle: the boss's move or strike (`until`: when the next crowd move starts). */
+  | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean }
+  /** To the host: play the boss's move. */
+  | { t: "bossRequest"; key: string; fen: string; elo: number; nodes: number; stumble?: boolean; stagger?: boolean }
   | {
       t: "results";
       placements: Record<string, number>;
@@ -216,5 +297,7 @@ export type ServerMessage = { now: number } & (
       standings: NetStanding[];
       /** Crowd: who won the game on the board (the side that mated, or the side clearly ahead), null for a draw. */
       gameWinner?: "w" | "b" | null;
+      /** Boss battle: who won it. */
+      bossResult?: "crowd" | "boss" | "draw";
     }
 );

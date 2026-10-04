@@ -2611,7 +2611,7 @@ button.history-label {
   background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 .profile-tabs {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
 }
 .profile-stats {
   display: grid;
@@ -2873,4 +2873,600 @@ button.history-label {
 }
 .signin-options .signin-row .btn {
   flex: 1 0 auto;
+}
+
+/* ---- Pre-game votes ---- */
+.vote-head {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+.vote-head h1 {
+  margin: 0;
+  font-size: 24px;
+}
+.vote-head p {
+  margin: 0;
+  min-height: 1.4em;
+}
+.vote-step {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.vote-zones {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.vote-zone {
+  position: absolute;
+  box-sizing: border-box;
+  border: 3px solid color-mix(in srgb, var(--accent) 80%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: opacity 300ms, background 300ms, transform 300ms;
+}
+.vote-zone.mine {
+  border-color: #3b82f6;
+  background: color-mix(in srgb, #3b82f6 22%, transparent);
+}
+.vote-zone.win {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 35%, transparent);
+  animation: zone-win 500ms ease-in-out 3;
+}
+.vote-zone.lose {
+  opacity: 0.25;
+}
+@keyframes zone-win {
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 18px var(--good);
+  }
+}
+.vote-zone-icon {
+  font-size: clamp(18px, 6vw, 30px);
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+.vote-zone-count {
+  font-weight: 900;
+  font-size: clamp(13px, 3.6vw, 18px);
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 8px;
+  padding: 0 6px;
+}
+.vote-banner {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 30%;
+  z-index: 4;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(10, 12, 16, 0.86);
+  color: #fff;
+  text-align: center;
+  animation: banner-in 280ms ease-out;
+}
+.vote-banner strong {
+  font-size: 22px;
+}
+.vote-banner span {
+  font-size: 13px;
+  opacity: 0.85;
+}
+.vote-banner .vote-banner-icon {
+  font-size: 40px;
+  opacity: 1;
+}
+@keyframes banner-in {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+}
+.vote-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.vote-card {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+.vote-card:disabled {
+  cursor: default;
+}
+.vote-card.on {
+  border-color: #3b82f6;
+}
+.vote-card.win {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 14%, var(--surface));
+}
+.vote-card.lose {
+  opacity: 0.45;
+}
+.vote-card-icon {
+  font-size: 22px;
+}
+.vote-card strong {
+  font-size: 14px;
+}
+.vote-card-blurb {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.25;
+}
+.vote-card-bar {
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+  margin-top: 4px;
+}
+.vote-card-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 200ms;
+}
+.vote-card-count {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+/* ---- Boss battle ---- */
+.boss-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #3a0d12, #1b0d22);
+  color: #fff;
+  min-height: 44px;
+}
+.boss-icon {
+  font-size: 26px;
+  animation: boss-breathe 2.4s ease-in-out infinite;
+}
+@keyframes boss-breathe {
+  50% {
+    transform: scale(1.12);
+  }
+}
+.boss-name {
+  display: grid;
+  line-height: 1.15;
+  flex: 1;
+  min-width: 0;
+}
+.boss-name strong {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.boss-threat i {
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.22;
+}
+.boss-threat i.on {
+  opacity: 1;
+}
+.boss-next {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffb4b4;
+  text-align: right;
+}
+.boss-panel {
+  display: grid;
+  gap: 8px;
+}
+.boss-status {
+  min-height: 2.6em;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.boss-fallen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+.boss-fallen-name,
+.final-out-name {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.boss-fallen-name.you,
+.final-out-name.you {
+  color: var(--bad);
+}
+.boss-strike {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+  color: #fff;
+  background: radial-gradient(circle, rgba(200, 20, 30, 0.75) 0%, rgba(40, 0, 0, 0.85) 70%);
+  animation: strike-flash 700ms ease-out;
+}
+@keyframes strike-flash {
+  0% {
+    background: rgba(255, 255, 255, 0.95);
+  }
+  30% {
+    background: rgba(255, 40, 40, 0.9);
+  }
+}
+.boss-strike-skull {
+  font-size: 64px;
+  animation: skull-in 600ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes skull-in {
+  from {
+    transform: scale(0.2) rotate(-30deg);
+    opacity: 0;
+  }
+}
+.boss-strike-text {
+  font-size: 14px;
+  opacity: 0.9;
+}
+.boss-strike-name {
+  font-size: 26px;
+  position: relative;
+  animation: victim-shake 500ms ease-in-out 600ms 2;
+}
+.boss-strike-name::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  top: 52%;
+  height: 4px;
+  background: #ff3b3b;
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: strike-through 400ms ease-out 1200ms forwards;
+}
+@keyframes victim-shake {
+  25% {
+    transform: translateX(-6px) rotate(-2deg);
+  }
+  75% {
+    transform: translateX(6px) rotate(2deg);
+  }
+}
+@keyframes strike-through {
+  to {
+    transform: scaleX(1);
+  }
+}
+.boss-screen.striking .board-area {
+  animation: screen-shake 400ms ease-in-out 1;
+}
+@keyframes screen-shake {
+  25% {
+    transform: translate(-4px, 2px);
+  }
+  50% {
+    transform: translate(4px, -2px);
+  }
+  75% {
+    transform: translate(-2px, 1px);
+  }
+}
+
+/* ---- Team final ---- */
+.final-cut {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bad) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--bad) 50%, transparent);
+  animation: banner-in 280ms ease-out;
+}
+.final-outs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+/* From Black's side the zones run the other way, so the cards do too. */
+.vote-cards.flipped {
+  direction: rtl;
+}
+.vote-cards.flipped .vote-card {
+  direction: ltr;
+}
+
+/* ---- Play now ---- */
+.play-now {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-height: 62px;
+}
+.play-now strong {
+  font-size: 19px;
+}
+.play-now span {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.finding h1 {
+  margin: 0;
+}
+.finding-count {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+}
+.finding-count strong {
+  font-size: 64px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.finding-count span {
+  font-size: 22px;
+  color: var(--muted);
+}
+.finding-bar {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.finding-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 300ms;
+}
+.boss-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 16px;
+  text-align: center;
+  color: #fff;
+  background: radial-gradient(circle, rgba(70, 10, 40, 0.82) 0%, rgba(10, 0, 10, 0.9) 75%);
+  animation: banner-in 500ms ease-out;
+}
+.boss-intro-icon {
+  font-size: 72px;
+  animation: skull-in 700ms cubic-bezier(0.2, 1.6, 0.4, 1), boss-breathe 2.4s ease-in-out 700ms infinite;
+}
+.boss-intro-name {
+  font-size: 26px;
+}
+.boss-intro-note {
+  font-size: 13px;
+  opacity: 0.9;
+  max-width: 280px;
+}
+
+/* ---- The King ---- */
+.king-ally {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.king-figure {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: inline-block;
+  transform-origin: 50% 100%;
+  animation: king-sway 3.2s ease-in-out infinite;
+}
+.king-figure piece {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+.king-sword {
+  position: absolute;
+  right: -8px;
+  bottom: 2px;
+  font-size: 16px;
+  transform-origin: 20% 80%;
+  transform: rotate(-20deg);
+  animation: sword-idle 2.4s ease-in-out infinite;
+}
+@keyframes king-sway {
+  50% {
+    transform: rotate(2deg) translateY(-1px);
+  }
+}
+@keyframes sword-idle {
+  50% {
+    transform: rotate(-8deg);
+  }
+}
+.king-ally.striking .king-figure {
+  animation: king-rise 700ms ease-out forwards;
+}
+.king-ally.striking .king-sword {
+  animation: sword-raise 700ms cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+@keyframes king-rise {
+  to {
+    transform: scale(1.25) translateY(-4px);
+  }
+}
+@keyframes sword-raise {
+  to {
+    transform: rotate(-135deg) translate(-4px, -10px);
+  }
+}
+.king-call {
+  display: grid;
+  justify-items: start;
+  gap: 0;
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 2px solid #d4a531;
+  background: color-mix(in srgb, #d4a531 14%, var(--surface));
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.king-call strong {
+  font-size: 13px;
+}
+.king-call:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.king-call.on {
+  background: #d4a531;
+  color: #1a1406;
+  opacity: 1;
+}
+.king-charges {
+  font-size: 11px;
+}
+.king-charges i {
+  font-style: normal;
+}
+.king-strike {
+  position: absolute;
+  inset: 22% 10%;
+  z-index: 5;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  border-radius: 16px;
+  color: #fff;
+  background: radial-gradient(circle, rgba(212, 165, 49, 0.9) 0%, rgba(60, 40, 0, 0.88) 80%);
+  box-shadow: 0 0 30px rgba(212, 165, 49, 0.8);
+  animation: banner-in 300ms ease-out;
+}
+.king-strike strong {
+  font-size: 20px;
+}
+.king-strike > span {
+  font-size: 26px;
+  font-weight: 900;
+}
+.king-strike .king-figure {
+  width: 64px;
+  height: 64px;
+}
+.king-strike .king-sword {
+  font-size: 26px;
+}
+.king-row .poll-bar i {
+  background: #d4a531;
+}
+.boss-king {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.king-strike .king-ally {
+  margin-bottom: 14px;
+}
+.king-calls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.king-call.strike {
+  border-color: #c2410c;
+  background: color-mix(in srgb, #c2410c 12%, var(--surface));
+}
+.king-call.strike.on {
+  background: #c2410c;
+  color: #fff;
+}
+.king-strike.at-boss {
+  background: radial-gradient(circle, rgba(194, 65, 12, 0.92) 0%, rgba(50, 10, 0, 0.9) 80%);
+  box-shadow: 0 0 30px rgba(194, 65, 12, 0.8);
+}
+.king-strike.at-boss > span {
+  font-size: 14px;
+  font-weight: 600;
+}
+.boss-staggered {
+  color: #fdba74;
+}
+.opening-roulette {
+  font-size: 17px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.opening-roulette.spinning {
+  opacity: 0.75;
+}
+.opening-roulette.landed {
+  background: #d4a531;
+  color: #1a1406;
+  animation: zone-win 400ms ease-in-out 2;
+}
+.mode-pick.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+.mode-pick.three button {
+  padding: 8px 8px;
+}
+.mode-pick.three button strong {
+  font-size: 15px;
+}
+.mode-pick.three button span {
+  font-size: 12px;
 }

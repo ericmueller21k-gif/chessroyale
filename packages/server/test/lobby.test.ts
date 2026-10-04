@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -249,7 +249,7 @@ describe("lobby", () => {
 
 describe("lobby: Crowd mode", () => {
   it("50 v 50: the watching team gets the board, everyone sees the vote, and the cut's augment vote sets the clock", () => {
-    const L = setup({ ...modeSettings("crowd"), firstStageRounds: 2, roundsPerStage: 2, boardIntroSeconds: 0 });
+    const L = setup({ ...modeSettings("crowd"), augments: false, cutClockVote: true, firstStageRounds: 2, roundsPerStage: 2, boardIntroSeconds: 0 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
@@ -284,7 +284,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("live tallies: nobody sees picks before making their own; the watching team sees them; the bot plan is scored", () => {
-    const L = setup({ ...modeSettings("crowd"), firstStageRounds: 4, roundsPerStage: 2, boardIntroSeconds: 0 });
+    const L = setup({ ...modeSettings("crowd"), augments: false, firstStageRounds: 4, roundsPerStage: 2, boardIntroSeconds: 0 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
@@ -323,5 +323,127 @@ describe("lobby: Crowd mode", () => {
       L.advance(10_000);
     }
     throw new Error("the humans were always on the same team");
+  });
+
+  it("pre-game votes: everyone votes on the ending and the speed; the winners set the match's settings", () => {
+    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }), boardIntroSeconds: 0 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone");
+    L.core.message("p1", { t: "start" });
+    const v = L.last("p2", "vote")!.vote;
+    expect(v.index).toBe(0);
+    expect(v.count).toBe(PREGAME_VOTES.length);
+    expect(v.votes).toHaveLength(98);
+    expect(v.result).toBeNull();
+    // A vote shows up for everyone at once; a second vote from the same player doesn't count.
+    L.core.message("p1", { t: "vote", key: v.key, option: 1 });
+    L.core.message("p1", { t: "vote", key: v.key, option: 2 });
+    const casts = L.take("p2").filter((m) => m.t === "voteCast");
+    expect(casts).toHaveLength(1);
+    expect(casts[0]).toMatchObject({ playerId: "p1", option: 1 });
+    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    const done = L.last("p1", "vote")!.vote;
+    expect(done.result).not.toBeNull();
+    const format = PREGAME_VOTES[0]!.options[done.result!]!;
+    expect(L.core.record.overrides?.finalFormat).toBe(format.patch.finalFormat);
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    const speedVote = L.last("p1", "vote")!.vote;
+    expect(speedVote.index).toBe(1);
+    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    const speed = PREGAME_VOTES[1]!.options[L.last("p1", "vote")!.vote.result!]!;
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    // The game starts with the voted clock.
+    expect(L.last("p1", "round")!.moveClock).toBe(speed.patch.moveClockSeconds);
+  });
+
+  it("boss battle online: the host plays the boss's moves, the boss strikes every 3 crowd moves, results carry the outcome", () => {
+    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, bossMaxMoves: 7 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone");
+    L.core.message("p1", { t: "start" });
+    L.advance(1000);
+    let bossMoves = 0;
+    let strikes = 0;
+    for (let i = 0; i < 400 && L.core.record.phase !== "results"; i++) {
+      const req = L.last("p1", "bossRequest") ?? L.last("p2", "bossRequest");
+      if (req && L.core.record.phase === "boss" && L.core.record.bossKey === req.key) {
+        const host = L.last("p1", "bossRequest") ? "p1" : "p2";
+        L.core.message(host, { t: "bossMove", key: req.key, move: legalMoves(req.fen)[0]! });
+        bossMoves++;
+        const b = L.last("p2", "boss")!;
+        expect(b.boss.lastMove).not.toBeNull();
+        L.take("p1");
+        L.take("p2");
+        L.advance(2000);
+        continue;
+      }
+      if (L.core.record.phase === "play") {
+        for (const id of ["p1", "p2"]) {
+          const r = L.last(id, "round");
+          if (r?.board && !r.watching && r.alive) L.core.message(id, { t: "pick", key: r.key, move: legalMoves(r.board.fen)[0]! });
+        }
+        L.advance(25_000);
+      }
+      if (L.core.record.phase === "scoring") L.hostScores("p1") || L.hostScores("p2");
+      const b = L.last("p1", "boss");
+      if (b?.boss.justKilled) {
+        strikes++;
+        L.take("p1");
+      }
+      L.advance(5000);
+    }
+    expect(L.core.record.phase).toBe("results");
+    expect(bossMoves).toBeGreaterThan(0);
+    expect(strikes).toBe(2);
+    const res = L.last("p1", "results")!;
+    expect(["crowd", "boss", "draw"]).toContain(res.bossResult);
+    expect(Object.keys(res.placements)).toHaveLength(100);
+  });
+
+  it("matchmade lobbies start by themselves: at the fill time with bots, or as soon as they're full", () => {
+    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }) });
+    L.core.setAuto(L.now + 60_000);
+    L.core.connect(undefined, "Ann", "phone");
+    expect(L.core.joinable()).toBe(true);
+    expect(L.last("p1", "lobby")).toMatchObject({ auto: true, fillAt: L.now + 60_000 });
+    // No host start for matchmade lobbies.
+    L.core.message("p1", { t: "start" });
+    expect(L.core.record.phase).toBe("lobby");
+    L.advance(59_000);
+    expect(L.core.joinable()).toBe(false);
+    L.advance(1_000);
+    expect(L.core.record.phase).toBe("vote");
+    expect(L.core.record.bots).toHaveLength(99);
+
+    const F = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), lobbySize: 3 });
+    F.core.setAuto(F.now + 60_000);
+    for (const n of ["A", "B", "C"]) F.core.connect(undefined, n, "phone");
+    expect(F.core.record.phase).toBe("opening");
+    expect(F.core.record.bots).toHaveLength(0);
+  });
+
+  it("boss raid: humans only, the boss a step above the group's average rating, from a named opening", () => {
+    const L = setup({ ...RAID_SETTINGS });
+    L.core.connect(undefined, "Ann", "computer", false, 1500);
+    L.core.connect(undefined, "Bo", "phone", false, 1900);
+    L.core.message("p1", { t: "start" });
+    expect(L.core.record.bots).toHaveLength(0);
+    expect(L.core.record.overrides?.bossFixedElo).toBe(2000);
+    L.advance(1000);
+    const intro = L.last("p2", "boss")!;
+    expect(intro.intro).toBe(true);
+    expect(intro.boss.raid).toBe(true);
+    expect(intro.boss.openingName).toBeTruthy();
+    expect(intro.boss.board.ply).toBe(10);
+    L.advance(6000);
+    const r = L.last("p1", "round")!;
+    expect(r.board).toBeTruthy();
+    // Both pick; one calls the King's strike (not a majority of 2: nothing happens).
+    L.core.message("p1", { t: "king", key: r.key, strike: true });
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: r.key, move: legalMoves(r.board!.fen)[0]! });
+    expect(L.hostScores("p1")).toBe(true);
+    const v = L.last("p1", "reveal")!;
+    expect(v.kingStrike).toBe(false);
+    expect(v.strikeCalls).toBe(1);
   });
 });

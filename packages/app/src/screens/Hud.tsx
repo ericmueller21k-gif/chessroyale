@@ -6,6 +6,7 @@ import { clockText } from "../components/RaceTower.tsx";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
 import { isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
+import { BossBar } from "./Boss.tsx";
 
 /**
  * Your total time left (the bank), ticking down while you think. Each move
@@ -51,12 +52,14 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
   const cutoff = view.cutoff;
   let rank = alive.findIndex((x) => x.isYou) + 1;
   if (match.final) {
-    // In the final, position is by average loss per move in the final (lowest first).
+    // In the final, position is by average loss per move in the final (lowest first); in a team final or duel, over the whole match.
     const f = match.final;
-    const avg = (id: string) => f.scores[id]?.avg ?? Infinity;
+    const whole = f.format === "team" || f.format === "duel";
+    const avg = (id: string) => (whole ? f.scores[id]?.matchLoss : f.scores[id]?.avg) ?? Infinity;
     const order = [...f.order].sort((a, b) => avg(a) - avg(b));
     rank = order.findIndex((id) => match.isYou(id)) + 1;
   }
+  const boss = match.boss;
   const me = alive[alive.findIndex((x) => x.isYou)];
   const knockouts = cutoff > 0 && cutoff < alive.length;
   // The score on the cut line: the last player who'd go through.
@@ -76,6 +79,10 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
           <span class="hud-stage">
             {match.final ? (
               "FINAL"
+            ) : boss ? (
+              <>
+                BOSS<span class="muted"> · move {Math.min(boss.crowdMoves + 1, boss.maxMoves)}</span>
+              </>
             ) : crowd ? (
               <>
                 {team && <span class={`team-chip ${team}`} title={view.teamLabel ?? ""} aria-label={view.teamLabel ?? ""} />}
@@ -98,12 +105,12 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
               <span class="muted">/{match.final ? match.final.order.length : alive.length}</span>
             </span>
           )}
-          {me && !match.final && (
+          {me && !match.final && !boss && (
             <span class={`hud-score ${inZone ? "danger" : "safe"}`} title="Your points this stage">
               <LiveNumber value={me.points} format={pts} />
             </span>
           )}
-          {cutScore !== null && me && !match.final && (
+          {cutScore !== null && me && !match.final && !boss && (
             <span class="hud-cut" title="Points on the cut line (the last place that goes through)">
               <small>cut</small>
               <LiveNumber value={cutScore} format={pts} />
@@ -113,7 +120,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
         </button>
         <MuteButton />
       </div>
-      <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />
+      {boss ? <BossBar boss={boss} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
       {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}
     </>
   );

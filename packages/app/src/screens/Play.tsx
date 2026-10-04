@@ -7,6 +7,7 @@ import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView } from "../game.ts";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
+import { KingAlly } from "../components/KingAlly.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
@@ -27,11 +28,11 @@ function useNow(ms = 200) {
 function FinalTurnLabel({ match, side }: { match: GameView; side: "w" | "b" }) {
   const f = match.final!;
   const team = f.teams.find((t) => t.some((id) => match.isYou(id))) ?? [];
-  const mate = team.find((id) => !match.isYou(id));
+  const mates = team.filter((id) => !match.isYou(id)).map((id) => match.nameOf(id));
   return (
     <>
-      <strong>FINAL</strong> · your move for {side === "w" ? "White" : "Black"}
-      {mate ? ` (with ${match.nameOf(mate)})` : ""}
+      <strong>{f.format === "duel" ? "DUEL" : "FINAL"}</strong> · your move for {side === "w" ? "White" : "Black"}
+      {mates.length ? ` (with ${mates.join(", ")})` : ""}
     </>
   );
 }
@@ -121,7 +122,14 @@ export function PlayScreen({
         <HistoryNav
           view={history}
           total={board.history.length}
-          extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />}
+          extra={
+            match.boss ? (
+              // Boss battle: power-ups became the King's charges.
+              <KingAlly side={match.boss.crowdSide} charges={match.boss.kingCharges} called={match.kingCalled} canCall={!waiting && !intro} onCall={(strike) => match.callKing(strike)} />
+            ) : (
+              <PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />
+            )
+          }
         />
       </div>
       <div class="play-footer">

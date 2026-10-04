@@ -130,7 +130,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/results" && request.method === "POST") {
     const b = (await request.json().catch(() => null)) as Partial<MatchResult> | null;
     if (!b || typeof b.placement !== "number" || typeof b.players !== "number") return json({ message: "Bad result" }, 400);
-    await recordResult(sql, current.id, { ...b, online: false, mode: b.mode === "crowd" ? "crowd" : "classic" } as MatchResult, now);
+    await recordResult(sql, current.id, { ...b, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic" } as MatchResult, now);
     return json({ ok: true });
   }
 

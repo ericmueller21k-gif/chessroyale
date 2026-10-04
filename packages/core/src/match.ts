@@ -60,6 +60,8 @@ export interface PlayerState {
   outInStage: number | null;
   /** Final placement, 1 = winner (set when knocked out or after the duel). */
   placement: number | null;
+  /** Moves missed over the match (each counts as finalMissLoss in matchLoss). */
+  misses?: number;
 }
 
 export type Side = "w" | "b";
@@ -75,6 +77,45 @@ export interface FinalState {
   teams: [string[], string[]];
   /** Moves made so far. */
   turn: number;
+  /**
+   * classic: a fixed number of moves each (finalMovesPerPlayer). team (Crowd 50 v 50): teamFinalSizes per
+   * side, the weakest on each side going out after every step, the last step playing to the end. duel: 1v1 to the end.
+   */
+  format?: "classic" | "team" | "duel";
+  /** Team final: index into teamFinalSizes, and the turn the current order started on. */
+  step?: number;
+  stepStart?: number;
+  /** Team final: who went out, and after which turn. */
+  out?: { id: string; turn: number }[];
+}
+
+/** Boss battle: the crowd (playing White) against Stockfish at `elo`. */
+export interface BossState {
+  elo: number;
+  /** The side the crowd plays. */
+  crowdSide: Side;
+  /** The battle starts from this many moves (plies) into the game just played. */
+  startPly?: number;
+  /** Crowd moves made, and since the boss last struck. */
+  crowdMoves: number;
+  sinceKill: number;
+  /** Who the boss struck down, after which crowd move. */
+  kills: { id: string; atMove: number }[];
+  /** How the battle ended (set at the end): the crowd won, the boss won, or a draw. */
+  result?: "crowd" | "boss" | "draw";
+  /** The King: charges left, and the crowd moves he played. */
+  kingCharges?: number;
+  kingMoves?: number[];
+  /** The King struck the boss: its next move is a weaker one; and the crowd moves he struck after. */
+  staggerNext?: boolean;
+  kingStrikes?: number[];
+  /** Strikes stop with this many left (boss raid: half the group; 50 v 50: bossMinSurvivors). */
+  minSurvivors?: number;
+}
+
+/** The King's charges: the ten's leftover power-ups, one charge per kingPowerUpsPerCharge (rounded), 1 to kingChargesMax. */
+export function kingCharges(powerUpsLeft: number, s: Pick<Settings, "kingPowerUpsPerCharge" | "kingChargesMax">): number {
+  return Math.max(1, Math.min(s.kingChargesMax, Math.round(powerUpsLeft / s.kingPowerUpsPerCharge)));
 }
 
 export interface MatchState {
@@ -85,6 +126,8 @@ export interface MatchState {
   boards: number[];
   /** Set once the knockout stages are over. */
   final?: FinalState;
+  /** Set once the knockout stages are over in a boss battle. */
+  boss?: BossState;
 }
 
 export function createMatch(
@@ -261,7 +304,7 @@ export function applyRound(
     const board = boardOf.get(p.id) ?? null;
     const lossesByStage = p.lossesByStage.map((l) => [...l]);
     if (o.loss !== null) lossesByStage[state.stage]!.push(o.loss);
-    const finalLosses = state.final ? [...p.finalLosses, o.loss ?? settings.finalMissLoss] : p.finalLosses;
+    const finalLosses = state.final || state.boss ? [...p.finalLosses, o.loss ?? settings.finalMissLoss] : p.finalLosses;
     const think = Math.max(0, Math.min(o.thinkMs, allowedMs(p, settings)));
     const usedPowerUp = !!o.usedPowerUp && (p.practice || p.powerUps > 0);
     return {
@@ -275,12 +318,32 @@ export function applyRound(
       powerUpsUsed: p.powerUpsUsed + (usedPowerUp ? 1 : 0),
       thinkMsTotal: p.thinkMsTotal + think,
       movesTimed: p.movesTimed + 1,
+      misses: (p.misses ?? 0) + (o.loss === null ? 1 : 0),
       lossesByStage,
       lastBoard: board,
       lastGroupmates: board === null ? [] : groups.get(board)!.filter((id) => id !== p.id),
     };
   });
-  return { ...state, players, round: state.round + 1, final: state.final && { ...state.final, turn: state.final.turn + 1 } };
+  return {
+    ...state,
+    players,
+    round: state.round + 1,
+    final: state.final && { ...state.final, turn: state.final.turn + 1 },
+    boss: state.boss && { ...state.boss, crowdMoves: state.boss.crowdMoves + 1, sinceKill: state.boss.sinceKill + 1 },
+  };
+}
+
+/**
+ * A player's average loss per move over the whole match, a missed move counting
+ * as finalMissLoss (lower is better; Infinity before any move). It's the steady
+ * measure the late game ranks by, so one blunder (or one brilliant move) can't
+ * decide alone.
+ */
+export function matchLoss(p: Pick<PlayerState, "lossesByStage" | "misses">, settings: Settings = DEFAULT_SETTINGS): number {
+  const losses = p.lossesByStage.flat();
+  const misses = p.misses ?? 0;
+  const n = losses.length + misses;
+  return n ? (losses.reduce((s, x) => s + x, 0) + misses * settings.finalMissLoss) / n : Infinity;
 }
 
 /** Converts a scored group into per-player outcomes, given each player's thinking time. */
@@ -359,14 +422,23 @@ export function endStage(
     // Seeds from this stage's standings: 1 & 4 against 2 & 3, alternating 1, 2, 4, 3.
     const seeds = ranked.filter((p) => !out.has(p.id)).map((p) => p.id);
     const colourOf = new Map(ranked.map((p) => [p.id, p.colour]));
-    const [w1, w2] = seeds.filter((id) => colourOf.get(id) === "w");
-    const [b1, b2] = seeds.filter((id) => colourOf.get(id) === "b");
-    if (teams && w1 && w2 && b1 && b2) {
+    const whites = seeds.filter((id) => colourOf.get(id) === "w");
+    const blacks = seeds.filter((id) => colourOf.get(id) === "b");
+    const [w1, w2] = whites;
+    const [b1, b2] = blacks;
+    if (teams && settings.finalFormat === "boss") {
+      // The boss battle is set up by the runner (it needs a fresh board and the boss's strength).
+    } else if (teams && settings.finalFormat === "duel" && w1 && b1) {
+      next.final = { order: [w1, b1], teams: [[w1], [b1]], turn: 0, format: "duel" };
+    } else if (teams && settings.finalFormat === "team" && whites.length && whites.length === blacks.length) {
+      // Each team's survivors, best first, teammates taking turns for their side.
+      next.final = { order: interleave(whites, blacks), teams: [whites, blacks], turn: 0, format: "team", step: 0, stepStart: 0, out: [] };
+    } else if (teams && w1 && w2 && b1 && b2) {
       // Each team's top two play the final for their side (the runner puts the side to move first).
-      next.final = { order: [w1, b1, w2, b2], teams: [[w1, w2], [b1, b2]], turn: 0 };
+      next.final = { order: [w1, b1, w2, b2], teams: [[w1, w2], [b1, b2]], turn: 0, format: "classic" };
     } else if (seeds.length === 4) {
       const [s1, s2, s3, s4] = seeds as [string, string, string, string];
-      next.final = { order: [s1, s2, s4, s3], teams: [[s1, s4], [s2, s3]], turn: 0 };
+      next.final = { order: [s1, s2, s4, s3], teams: [[s1, s4], [s2, s3]], turn: 0, format: "classic" };
     }
   }
   return {
@@ -385,12 +457,65 @@ export const isFinal = (state: MatchState, settings: Settings = DEFAULT_SETTINGS
 export const stageComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
   state.round >= roundsInStage(settings, state.stage);
 
-/** The finalist to move now. */
-export const finalMover = (f: FinalState) => f.order[f.turn % f.order.length]!;
+/** Turn order: a[0], b[0], a[1], b[1], ... */
+export function interleave(a: readonly string[], b: readonly string[]): string[] {
+  return Array.from({ length: Math.max(a.length, b.length) }, (_, i) => [a[i], b[i]]).flat().filter((x): x is string => !!x);
+}
 
-/** The final ends once everyone has made their moves (or the game ends: the caller checks the board). */
-export const finalComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
-  !!state.final && state.final.turn >= state.final.order.length * settings.finalMovesPerPlayer;
+/** The finalist to move now. */
+export const finalMover = (f: FinalState) => f.order[(f.turn - (f.stepStart ?? 0)) % f.order.length]!;
+
+/** Plays to the end of the game (team final and duel), with finalMaxTurns as a safety cap. */
+export const finalToTheEnd = (f: FinalState) => f.format === "team" || f.format === "duel";
+
+/**
+ * The final ends once everyone has made their moves (or the game ends: the
+ * caller checks the board). A team final or duel plays to the end, up to the cap.
+ */
+export const finalComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) => {
+  const f = state.final;
+  if (!f) return false;
+  if (finalToTheEnd(f)) return f.turn >= settings.finalMaxTurns;
+  return f.turn >= f.order.length * settings.finalMovesPerPlayer;
+};
+
+/** Team final: turns left until the next step's cut (null on the last step, which plays to the end). */
+export function teamFinalCutIn(f: FinalState, settings: Settings = DEFAULT_SETTINGS): number | null {
+  if (f.format !== "team" || (f.step ?? 0) >= settings.teamFinalSizes.length - 1) return null;
+  return Math.max(0, f.order.length * settings.teamFinalMovesPerStep - (f.turn - (f.stepStart ?? 0)));
+}
+
+/**
+ * Team final: when a step's moves are done, the weakest player on each side
+ * (by matchLoss) goes out, and the rest carry on with a shorter turn order.
+ * Those out are placed just below the players still in. Returns who went out.
+ */
+export function teamFinalStep(state: MatchState, rng: Rng, settings: Settings = DEFAULT_SETTINGS): { state: MatchState; out: string[] } {
+  const f = state.final;
+  if (!f || teamFinalCutIn(f, settings) !== 0) return { state, out: [] };
+  const coin = new Map(f.order.map((id) => [id, rng()]));
+  const byId = new Map(state.players.map((p) => [p.id, p]));
+  const worse = (a: string, b: string) => matchLoss(byId.get(b)!, settings) - matchLoss(byId.get(a)!, settings) || coin.get(a)! - coin.get(b)!;
+  const nextSize = settings.teamFinalSizes[(f.step ?? 0) + 1] ?? 1;
+  const goes = f.teams.flatMap((t) => [...t].sort(worse).slice(0, Math.max(0, t.length - nextSize)));
+  const out = new Set(goes);
+  const teams: [string[], string[]] = [f.teams[0].filter((id) => !out.has(id)), f.teams[1].filter((id) => !out.has(id))];
+  // They take the places just below everyone still in, the better of them first.
+  const aliveAfter = state.players.filter((p) => p.alive && !out.has(p.id)).length;
+  const placed = [...goes].sort((a, b) => worse(b, a));
+  const placement = new Map(placed.map((id, i) => [id, aliveAfter + i + 1]));
+  // teams[0] moved on even turns from the final's start, so the side to move now leads the new order.
+  const first = f.turn % 2 === 0 ? 0 : 1;
+  const order = first === 0 ? interleave(teams[0], teams[1]) : interleave(teams[1], teams[0]);
+  return {
+    out: goes,
+    state: {
+      ...state,
+      players: state.players.map((p) => (out.has(p.id) ? { ...p, alive: false, outInStage: state.stage, placement: placement.get(p.id)! } : p)),
+      final: { ...f, teams, order, step: (f.step ?? 0) + 1, stepStart: f.turn, out: [...(f.out ?? []), ...goes.map((id) => ({ id, turn: f.turn }))] },
+    },
+  };
+}
 
 /** A finalist's average loss per move in the final (lower is better). */
 export const finalAverage = (p: Pick<PlayerState, "finalLosses">) =>
@@ -401,15 +526,19 @@ export const finalAverage = (p: Pick<PlayerState, "finalLosses">) =>
  * the team that won the game (`winningTeam`, 0 or 1, if it ended), then less
  * thinking time, then a coin flip.
  */
-export function finishFinal(state: MatchState, rng: Rng, winningTeam: 0 | 1 | null = null): MatchState {
+export function finishFinal(state: MatchState, rng: Rng, winningTeam: 0 | 1 | null = null, settings: Settings = DEFAULT_SETTINGS): MatchState {
   const f = state.final!;
   const team = (id: string) => (f.teams[0].includes(id) ? 0 : 1);
   const coin = new Map(f.order.map((id) => [id, rng()]));
+  // Team final: by matchLoss (the whole game counts). Duel: the winner of the game first. Classic: by the final's moves.
+  const quality = (p: PlayerState) => (finalToTheEnd(f) ? matchLoss(p, settings) : finalAverage(p));
+  const duelWin = (p: PlayerState) => (f.format === "duel" && winningTeam !== null ? (team(p.id) === winningTeam ? 0 : 1) : 0);
   const ranked = state.players
     .filter((p) => p.alive)
     .sort(
       (a, b) =>
-        finalAverage(a) - finalAverage(b) ||
+        duelWin(a) - duelWin(b) ||
+        quality(a) - quality(b) ||
         (winningTeam === null ? 0 : (team(a.id) === winningTeam ? 0 : 1) - (team(b.id) === winningTeam ? 0 : 1)) ||
         a.stageThinkMs - b.stageThinkMs ||
         coin.get(a.id)! - coin.get(b.id)!,
@@ -420,6 +549,49 @@ export function finishFinal(state: MatchState, rng: Rng, winningTeam: 0 | 1 | nu
     players: state.players.map((p) =>
       p.alive ? { ...p, alive: false, placement: place.get(p.id)!, outInStage: place.get(p.id) === 1 ? null : state.stage } : p,
     ),
+  };
+}
+
+// ---- Boss battle ----
+
+/** The boss strikes after every bossKillEvery crowd moves, while more than bossMinSurvivors are left. */
+export const bossKillDue = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
+  !!state.boss && state.boss.sinceKill >= settings.bossKillEvery && alivePlayers(state).length > (state.boss.minSurvivors ?? settings.bossMinSurvivors);
+
+/**
+ * The boss strikes down the player with the worst moves since its last strike
+ * (most points lost over those moves, a miss counting as finalMissLoss); a tie
+ * goes against the weaker player over the match. They take the last place still open.
+ */
+export function bossKill(state: MatchState, rng: Rng, settings: Settings = DEFAULT_SETTINGS): { state: MatchState; victim: string | null } {
+  const boss = state.boss;
+  if (!boss) return { state, victim: null };
+  const alive = alivePlayers(state);
+  const k = Math.max(1, boss.sinceKill);
+  const recent = (p: PlayerState) => p.finalLosses.slice(-k).reduce((s, x) => s + x, 0);
+  const coin = new Map(alive.map((p) => [p.id, rng()]));
+  const victim = [...alive].sort((a, b) => recent(b) - recent(a) || matchLoss(b, settings) - matchLoss(a, settings) || coin.get(a.id)! - coin.get(b.id)!)[0];
+  if (!victim) return { state, victim: null };
+  const place = alive.length;
+  return {
+    victim: victim.id,
+    state: {
+      ...state,
+      players: state.players.map((p) => (p.id === victim.id ? { ...p, alive: false, outInStage: state.stage, placement: place } : p)),
+      boss: { ...boss, sinceKill: 0, kills: [...boss.kills, { id: victim.id, atMove: boss.crowdMoves }] },
+    },
+  };
+}
+
+/** Ends the boss battle: the survivors placed by matchLoss (they all share the result on their records). */
+export function finishBoss(state: MatchState, rng: Rng, result: "crowd" | "boss" | "draw", settings: Settings = DEFAULT_SETTINGS): MatchState {
+  const coin = new Map(state.players.map((p) => [p.id, rng()]));
+  const ranked = alivePlayers(state).sort((a, b) => matchLoss(a, settings) - matchLoss(b, settings) || coin.get(a.id)! - coin.get(b.id)!);
+  const place = new Map(ranked.map((p, i) => [p.id, i + 1]));
+  return {
+    ...state,
+    boss: state.boss && { ...state.boss, result },
+    players: state.players.map((p) => (p.alive ? { ...p, alive: false, placement: place.get(p.id)!, outInStage: place.get(p.id) === 1 ? null : state.stage } : p)),
   };
 }
 

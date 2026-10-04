@@ -11,6 +11,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
   const standings = match.standings();
   const team = myTeam(match);
   const gameWinner = match.phase.kind === "results" ? match.phase.gameWinner : undefined;
+  const bossResult = match.phase.kind === "results" ? match.phase.bossResult : undefined;
+  // Boss battle: those still standing at the end share the result.
+  const survived = !!match.boss && !match.boss.kills.some((k) => match.isYou(k.id)) && placement <= 10;
   const me = standings.find((s) => s.isYou);
   const scariest = standings
     .filter((s) => s.rating !== null)
@@ -26,7 +29,17 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
         {ordinal(placement)} of {match.totalPlayers}
       </h1>
       <p class="muted">{placement === 1 ? "You won the match!" : `${winner} won the match.`}</p>
-      {team && (
+      {bossResult && match.boss && (
+        <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
+          {match.boss.icon}{" "}
+          {bossResult === "crowd"
+            ? `The crowd beat ${match.boss.name}!${survived ? " A win on your record." : ""}`
+            : bossResult === "boss"
+              ? `${match.boss.name} won.`
+              : `A draw with ${match.boss.name}.`}
+        </p>
+      )}
+      {team && !bossResult && (
         <p class={`team-result ${gameWinner === team ? "good" : gameWinner ? "bad" : ""}`}>
           {gameWinner === team
             ? `Your team (${team === "w" ? "White" : "Black"}) won the game: a win on your record.`

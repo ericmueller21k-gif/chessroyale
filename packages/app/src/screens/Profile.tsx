@@ -42,7 +42,7 @@ function Stats({ s }: { s: ModeStats }) {
 /** Your profile: icon, name, stats, recent matches, and signing in to keep it across devices. */
 export function ProfileScreen({ onBack }: { onBack: () => void }) {
   const { config, profile } = useAccount();
-  const [tab, setTab] = useState<"all" | "classic" | "crowd">("all");
+  const [tab, setTab] = useState<"all" | "classic" | "crowd" | "boss">("all");
   const [name, setName] = useState(profile?.user.name ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -96,13 +96,13 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
         ))}
       </div>
       <div class="mode-pick small-pick profile-tabs" role="tablist">
-        {(["all", "classic", "crowd"] as const).map((t) => (
+        {(["all", "classic", "crowd", "boss"] as const).map((t) => (
           <button type="button" role="tab" aria-selected={tab === t} key={t} class={tab === t ? "on" : ""} onClick={() => setTab(t)}>
-            <strong>{t === "all" ? "All" : t === "classic" ? "Classic" : "Crowd"}</strong>
+            <strong>{t === "all" ? "All" : t === "classic" ? "Classic" : t === "crowd" ? "Crowd" : "Boss"}</strong>
           </button>
         ))}
       </div>
-      <Stats s={profile.stats[tab]} />
+      <Stats s={profile.stats[tab] ?? { matches: 0, wins: 0, finals: 0, avgPlacement: null, best: null, teamWins: 0 }} />
       {tab === "crowd" && profile.stats.crowd.matches > 0 && (
         <p class="muted small">
           Your team won the game {crowdTeamWins} of {profile.stats.crowd.matches} times.
@@ -117,7 +117,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
               <li key={r.playedAt}>
                 <span class={`recent-place${r.placement === 1 ? " gold" : r.placement <= 4 ? " final" : ""}`}>{nth(r.placement)}</span>
                 <span>
-                  {r.mode === "crowd" ? "Crowd" : "Classic"} · {r.players} players{r.online ? "" : " · solo"}
+                  {r.mode === "crowd" ? "Crowd" : r.mode === "boss" ? "Boss raid" : "Classic"} · {r.players} players{r.online ? "" : " · solo"}
                   {r.teamWon === true ? " · team won" : r.teamWon === false ? " · team lost" : ""}
                 </span>
                 <span class="muted small">{new Date(r.playedAt).toLocaleDateString()}</span>

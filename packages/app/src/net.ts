@@ -13,9 +13,11 @@ import {
   type ServerMessage,
   type UciEngine,
   TopMovesCache,
+  bossMoveFrom,
 } from "@chessroyale/chess";
-import type { BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing } from "./game.ts";
+import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
+import { account } from "./account.ts";
 import { RoundProgress } from "./progress.ts";
 
 /**
@@ -41,7 +43,13 @@ export class NetMatch implements GameView {
   cutoff = 0;
   /** The 2v2 final once it has started. */
   final: FinalView | null = null;
+  /** The boss battle once it has started. */
+  boss: BossView | null = null;
+  /** Matchmade lobby ("Play now"): starts by itself at fillAt (local time). */
+  auto = false;
+  fillAt: number | null = null;
   readonly serverPaced = true;
+  private voteState: VoteView | null = null;
 
   private ws: WebSocket | null = null;
   private listeners = new Set<() => void>();
@@ -151,7 +159,7 @@ export class NetMatch implements GameView {
         // No storage: join as a new player.
       }
       const device = matchMedia("(pointer: coarse)").matches ? "phone" : "computer";
-      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice });
+      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, rating: account().profile?.rating ?? null });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as ServerMessage);
     ws.onclose = () => {
@@ -198,12 +206,15 @@ export class NetMatch implements GameView {
         this.players = m.players;
         this.hostId = m.hostId;
         this.started = m.started;
+        this.auto = !!m.auto;
+        this.fillAt = m.fillAt ? this.local(m.fillAt) : null;
         if (!m.started && this.phase.kind !== "lobby") this.phase = { kind: "lobby" };
         return this.emit();
       case "opening":
         return this.setPhase({ kind: "opening", boards: m.boards.map((b) => this.toView(b)) });
       case "round":
         this.key = m.key;
+        this.kingCalled = null;
         this.tally = null;
         this.myPick = null;
         this.hint = null;
@@ -278,6 +289,29 @@ export class NetMatch implements GameView {
         // During your own turn the play screen stays up; otherwise watch the final.
         if (this.phase.kind === "play" && m.final.mover === this.myId) return this.emit();
         return this.setPhase({ kind: "final", final: this.final });
+      case "vote": {
+        this.standingsList = m.standings;
+        const v = m.vote;
+        this.voteState = { ...v, startsAt: this.local(v.startsAt), until: this.local(v.until), votes: v.votes.map((x) => ({ ...x, at: this.local(x.at) })), ...(v.nextAt ? { nextAt: this.local(v.nextAt) } : {}) };
+        // Keep your own vote if the server's copy hasn't caught up yet.
+        if (this.myVoteLocal && this.myVoteLocal.key === v.key && !this.voteState.votes.some((x) => x.playerId === this.myId)) {
+          this.voteState.votes.push(this.myVoteLocal.entry);
+        }
+        return this.setPhase({ kind: "vote", vote: this.voteState });
+      }
+      case "voteCast": {
+        const v = this.voteState;
+        if (!v || v.key !== m.key || v.votes.some((x) => x.playerId === m.playerId)) return;
+        this.voteState = { ...v, votes: [...v.votes, { playerId: m.playerId, option: m.option, at: this.local(m.at), side: m.side }] };
+        return this.setPhase({ kind: "vote", vote: this.voteState });
+      }
+      case "boss":
+        this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+        this.standingsList = m.standings;
+        this.currentBoard = m.boss.board;
+        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro });
+      case "bossRequest":
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo");
       case "results":
         if (this.myId) {
           this.placement = m.placements[this.myId] ?? this.placement;
@@ -292,7 +326,7 @@ export class NetMatch implements GameView {
 
   private showResults(m: Extract<ServerMessage, { t: "results" }>) {
     const placement = (this.myId && m.placements[this.myId]) || this.placement || this.totalPlayers;
-    this.setPhase({ kind: "results", placement, winner: m.winner, youWon: placement === 1, gameWinner: m.gameWinner });
+    this.setPhase({ kind: "results", placement, winner: m.winner, youWon: placement === 1, gameWinner: m.gameWinner, ...(m.bossResult ? { bossResult: m.bossResult } : {}) });
   }
 
   private onReveal(m: Extract<ServerMessage, { t: "reveal" }>) {
@@ -322,6 +356,7 @@ export class NetMatch implements GameView {
         bestMove: m.bestMove!,
         playerIds: m.picks.map((p) => p.playerId),
         result: { players: m.picks, playedMove: m.playedMove!, drawRule: m.drawRule ?? "random" },
+        ...(m.king !== undefined ? { king: m.king, kingCalls: m.kingCalls, kingStrike: m.kingStrike, strikeCalls: m.strikeCalls } : {}),
       },
     });
     void this.crossCheck(m);
@@ -347,6 +382,17 @@ export class NetMatch implements GameView {
   }
 
   // ---------------- Host work ----------------
+
+  /** Boss battle, host only: play the boss's move with this device's engine at the boss's strength. */
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger") {
+    try {
+      const [engine] = await this.engines();
+      const move = await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss);
+      this.send({ t: "bossMove", key, move });
+    } catch {
+      // No engine here: the server asks someone else, or plays a random move.
+    }
+  }
 
   private prefetch(fens: string[]) {
     void this.engines()
@@ -438,6 +484,26 @@ export class NetMatch implements GameView {
   private tally: LivePick[] | null = null;
   livePicks(): LivePick[] | null {
     return this.tally;
+  }
+
+  kingCalled: "play" | "strike" | null = null;
+  callKing(strike = false) {
+    if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled) return;
+    this.kingCalled = strike ? "strike" : "play";
+    this.send({ t: "king", key: this.key, ...(strike ? { strike: true } : {}) });
+    this.emit();
+  }
+
+  private myVoteLocal: { key: string; entry: VoteView["votes"][number] } | null = null;
+  castVote(option: number) {
+    const v = this.voteState;
+    if (this.phase.kind !== "vote" || !v || v.result !== null || !this.myId || v.votes.some((x) => x.playerId === this.myId) || Date.now() > v.until) return;
+    const side = this.standingsList.find((s) => s.id === this.myId)?.team ?? "w";
+    const entry = { playerId: this.myId, option, at: Date.now(), side };
+    this.myVoteLocal = { key: v.key, entry };
+    this.send({ t: "vote", key: v.key, option });
+    this.voteState = { ...v, votes: [...v.votes, entry] };
+    this.setPhase({ kind: "vote", vote: this.voteState });
   }
 
   augmentVote: Augment | null = null;

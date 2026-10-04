@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, definedOnly, modeSettings, type DrawRule, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, definedOnly, modeSettings, type DrawRule, type FinalFormat, type Settings } from "@chessroyale/core";
 import { chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -17,11 +17,13 @@ import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
 import { SoundLab } from "./screens/SoundLab.tsx";
 import { ProfileScreen } from "./screens/Profile.tsx";
-import { loadAccount, mustSignInToPlayOnline, recordSoloResult } from "./account.ts";
+import { account, loadAccount, mustSignInToPlayOnline, recordSoloResult } from "./account.ts";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
 import { LegalScreen } from "./screens/Legal.tsx";
 import { CrowdCut, CrowdReveal, WatchScreen } from "./screens/Crowd.tsx";
+import { VoteScreen } from "./screens/Vote.tsx";
+import { BossScreen } from "./screens/Boss.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
 
@@ -31,19 +33,29 @@ function overridesFromUrl(): Partial<Settings> {
   const n = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
   const draw = q.get("draw") as DrawRule | null;
   const mode = chosenMode();
-  const crowd = mode.mode === "crowd";
+  const raid = mode.mode === "raid";
+  const crowd = mode.mode === "crowd" || raid;
+  // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
+  const format = q.get("format") as FinalFormat | null;
+  const forced = crowd && format && format in CROWD_KNOCKOUTS ? { finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format], augments: false } : {};
   return {
     // The mode's own rules and pace first, then pace and playtest overrides on top (only the ones that are set).
-    ...modeSettings(mode.mode, { crowdTeams: mode.crowdTeams, augments: mode.augments }),
+    // The boss raid: its own settings, and (solo) a boss a step above your rating.
+    ...(raid
+      ? { ...RAID_SETTINGS, bossFixedElo: raidBossElo([account().profile?.rating ?? null]) }
+      : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { crowdTeams: mode.crowdTeams, augments: mode.augments })),
     ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2 } : PACE_SETTINGS.quick) : {}),
     ...definedOnly({
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),
       moveClockSeconds: n("clock"),
+      finalMaxTurns: n("finalTurns"),
+      bossMaxMoves: n("bossMoves"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
       // (Crowd always starts from move 0: its own openingMoves stays.)
       openingMoves: crowd ? undefined : chosenOpeningMoves(),
     }),
+    ...forced,
   };
 }
 
@@ -118,7 +130,7 @@ export function App() {
     savedResult.current = match;
     const me = match.standings().find((s) => s.isYou);
     void recordSoloResult({
-      mode: match.settings.mode,
+      mode: match.settings.raid ? "boss" : match.settings.mode,
       placement: match.phase.placement,
       players: match.totalPlayers,
       team: me?.team ?? null,
@@ -172,7 +184,8 @@ export function App() {
     m.start();
   };
 
-  const joinLobby = (name: string, code: string, practice: boolean) => {
+  const joinLobby = (name: string, code: string, practice: boolean, fromPlayNow = false) => {
+    if (!fromPlayNow) playNowTries.current = 0;
     unlockAudio();
     setError(null);
     const m = new NetMatch(code.toUpperCase(), name, enginePool, practice);
@@ -190,7 +203,9 @@ export function App() {
       if (quickPace()) params.set("pace", "quick");
       const mode = chosenMode();
       params.set("mode", mode.mode);
-      if (mode.mode === "crowd") {
+      if (mode.mode === "raid") {
+        // (The server sets up the raid.)
+      } else if (mode.mode === "crowd") {
         params.set("turns", mode.crowdTeams ? "teams" : "all");
         params.set("augments", mode.augments ? "1" : "0");
       } else params.set("moves", String(chosenOpeningMoves()));
@@ -198,6 +213,25 @@ export function App() {
       const body = (await res.json()) as { code?: string; message?: string };
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");
       joinLobby(name, body.code, practice);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** "Play now": into the 50 v 50 lobby that's filling up. */
+  const playNowTries = useRef(0);
+  const retriedFor = useRef<AnyMatch | null>(null);
+  const playNow = async (name: string, retry = false) => {
+    playNowTries.current = retry ? playNowTries.current + 1 : 1;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/play", { method: "POST" });
+      const body = (await res.json()) as { code?: string; message?: string };
+      if (!body.code) throw new Error(body.message ?? "Couldn't find a match.");
+      joinLobby(name, body.code, false, true);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -268,6 +302,7 @@ export function App() {
       <HomeScreen
         onStart={(n, p) => void startSolo(n, p)}
         onCreateLobby={(n, p) => void createLobby(n, p)}
+        onPlayNow={(n) => void playNow(n)}
         onJoinLobby={joinLobby}
         loading={loading}
         joinCode={mustSignInToPlayOnline() ? undefined : linkCode}
@@ -280,6 +315,12 @@ export function App() {
     );
   }
 
+  // Play now: the lobby started a moment before we got in, so get the next one.
+  if (match instanceof NetMatch && match.error && /already started|full/.test(match.error) && playNowTries.current > 0 && playNowTries.current < 3 && retriedFor.current !== match) {
+    retriedFor.current = match;
+    const name = match.playerName;
+    queueMicrotask(() => void playNow(name, true));
+  }
   if (match instanceof NetMatch && match.error) {
     return (
       <div class="screen center">
@@ -297,7 +338,7 @@ export function App() {
     again: () => (match instanceof SoloMatch ? void startSolo(match.playerName, match.practice) : leave()),
   });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages.
-  const tower = ["play", "scoring", "reveal", "spectating", "final", "watching"].includes(match.phase.kind) && match.standings().length > 0;
+  const tower = ["play", "scoring", "reveal", "spectating", "final", "watching", "boss"].includes(match.phase.kind) && match.standings().length > 0;
   if (!tower) return screen;
   return (
     <div class="arena">
@@ -363,6 +404,10 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
       );
     case "final":
       return <FinalScreen match={match} final={p.final} />;
+    case "vote":
+      return <VoteScreen match={match} vote={p.vote} />;
+    case "boss":
+      return <BossScreen match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} />;
     case "results":
       return (
         <ResultsScreen

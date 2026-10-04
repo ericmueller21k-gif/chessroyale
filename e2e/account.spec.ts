@@ -25,7 +25,7 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
   await expect(chip).toContainText("Hunter");
   await expect(chip.locator(".account-icon")).toHaveText("🦁");
   // A quick solo match (missing every move) lands on the profile.
-  await page.goto("/?debug&pace=quick&mode=crowd&rounds=1");
+  await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&augments=0");
   await page.getByLabel("Your name").fill("Hunter");
   await page.getByRole("button", { name: /Play solo/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind), { timeout: 3 * 60_000 }).toBe("results");

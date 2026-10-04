@@ -179,6 +179,30 @@ export class UciEngine {
     });
   }
 
+  /**
+   * A move played the way Stockfish plays at a given strength (UCI_Elo, 1320 to
+   * 3190, CCRL-anchored): the boss in a boss battle. Strength limits are switched
+   * off again afterwards, so scoring searches are unaffected.
+   */
+  playAtElo(fen: string, elo: number, nodes = this.options.nodes): Promise<string> {
+    return this.serial(async () => {
+      this.transport.send("ucinewgame");
+      this.transport.send("setoption name MultiPV value 1");
+      this.transport.send("setoption name UCI_LimitStrength value true");
+      this.transport.send(`setoption name UCI_Elo value ${Math.round(Math.max(1320, Math.min(3190, elo)))}`);
+      await this.ready();
+      this.transport.send(`position fen ${fen}`);
+      const done = this.until((l) => l.startsWith("bestmove"));
+      this.transport.send(`go nodes ${nodes}`);
+      const lines = await done;
+      this.transport.send("setoption name UCI_LimitStrength value false");
+      await this.ready();
+      const move = lines[lines.length - 1]!.split(/\s+/)[1];
+      if (!move || move === "(none)") throw new Error(`No move in ${fen}`);
+      return move;
+    });
+  }
+
   close(): void {
     try {
       this.transport.send("quit");

@@ -9,7 +9,7 @@ const FAQ: [string, string][] = [
   ],
   [
     "How does 50 v 50 work?",
-    "100 players, one game of chess from the first move. You're on White or Black for the whole game. Every turn your team of 50 picks a move, and the most popular pick is played. Stockfish scores every pick, so you score by choosing well, even when the crowd goes the other way. After move 10 the lowest scorers go out after every move, until the last 4 play a 2v2 final.",
+    "100 players, one game of chess from the first move. You're on White or Black for the whole game. Every turn your team of 50 picks a move, and the most popular pick is played. Stockfish scores every pick, so you score by choosing well, even when the crowd goes the other way. After move 10 the lowest scorers go out after every move. Before the game, everyone votes on how it ends: a team final (4v4 down to 2v2), a boss battle against Stockfish, or a duel between the best of each side.",
   ],
   ["Is it free?", "Yes. Coins and cosmetics will be earned by playing, never bought, and they never change the game."],
   [
