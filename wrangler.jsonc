@@ -1,7 +1,7 @@
 // Cloudflare Worker for HunChess: serves the app (packages/app/dist) and
 // the lobby server (packages/server): one Durable Object per lobby, over WebSockets.
-// The chess engine runs in browsers. Secrets (set in the dashboard, not here): GOOGLE_CLIENT_ID,
-// GOOGLE_CLIENT_SECRET, RESEND_API_KEY.
+// The chess engine runs in browsers. The sign-in secrets GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and
+// RESEND_API_KEY live in the account's Secrets Store (bound below; values never here).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "chessroyale",
@@ -19,6 +19,11 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Lobby"] }],
   // Accounts, profiles and match results (tables are created by the Worker on first use: see accounts.ts).
   "d1_databases": [{ "binding": "DB", "database_name": "hunchess", "database_id": "103097fd-f61b-4296-8b89-bd967ac33142" }],
+  "secrets_store_secrets": [
+    { "binding": "GOOGLE_CLIENT_ID", "store_id": "c4aab92a84ec4217acd83a530a799d80", "secret_name": "GOOGLE_CLIENT_ID" },
+    { "binding": "GOOGLE_CLIENT_SECRET", "store_id": "c4aab92a84ec4217acd83a530a799d80", "secret_name": "GOOGLE_CLIENT_SECRET" },
+    { "binding": "RESEND_API_KEY", "store_id": "c4aab92a84ec4217acd83a530a799d80", "secret_name": "RESEND_API_KEY" }
+  ],
   "observability": { "enabled": true },
   // Keep variables set in the dashboard when a deploy runs (otherwise each deploy would wipe plain-text ones).
   "keep_vars": true
