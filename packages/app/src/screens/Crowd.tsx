@@ -7,7 +7,7 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
-import { KingStrike } from "../components/KingAlly.tsx";
+import { KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { crowdAnimations, onPrefsChange } from "../prefs.ts";
 import { finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { seenKey } from "../hooks.ts";
@@ -148,7 +148,10 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const countEnd = animate ? (unseen ? unseen * step + 350 : 150) : seen === ghosts.length ? 150 : 600;
   const grow = ghosts.length ? (animate ? shown / ghosts.length : Math.min(1, t / countEnd)) : 1;
   const landAt = countEnd + 250;
-  const playAt = landAt + 750;
+  // The God King playing the move: his summoning and his bolt come first (about 2.4 s), then the piece moves.
+  const playAt = landAt + (mine.king ? 2400 : 750);
+  // His strike on the boss comes after the crowd's move has played.
+  const strikeAt = playAt + 300;
   const landed = t >= landAt;
   const played = t >= playAt;
   useEffect(() => {
@@ -202,8 +205,18 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             />
           )}
           {played && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
-          {mine.king && landed && t < playAt + 1600 && <KingStrike side={sideToMove(fen)} san={toSan(fen, mine.result.playedMove)} />}
-          {mine.kingStrike && played && t < playAt + 2200 && <KingStrike side={sideToMove(fen)} san="" strike />}
+          {mine.king && landed && t < landAt + 3900 && (
+            <KingSummon side={sideToMove(fen)} orientation={orientation} target={mine.result.playedMove.slice(0, 2)} mode="move" />
+          )}
+          {mine.kingStrike && t >= strikeAt && t < strikeAt + 3900 && (
+            <KingSummon
+              side={sideToMove(fen)}
+              orientation={orientation}
+              target={kingSquare(applyMove(fen, mine.result.playedMove), sideToMove(fen) === "w" ? "b" : "w")}
+              mode="strike"
+              hp={Math.round((match.settings.kingStrikeLoss[0] + match.settings.kingStrikeLoss[1]) / 2)}
+            />
+          )}
         </Board>
         </div>
       </div>

@@ -20,7 +20,18 @@ let muted = (() => {
 })();
 const listeners = new Set<() => void>();
 
-const SAMPLE_FILES = { move: "/sounds/move.mp3", capture: "/sounds/capture.mp3", castle: "/sounds/castle.mp3" } as const;
+const SAMPLE_FILES = {
+  move: "/sounds/move.mp3",
+  capture: "/sounds/capture.mp3",
+  castle: "/sounds/castle.mp3",
+  // The God King (boss battle): CC0 retro cuts, see public/sounds/god-king/CREDITS.md.
+  gkSummon: "/sounds/god-king/summon.mp3",
+  gkAppear: "/sounds/god-king/appear.mp3",
+  gkHyuah: "/sounds/god-king/hyuah.mp3",
+  gkBolt: "/sounds/god-king/bolt.mp3",
+  gkHit: "/sounds/god-king/hit.mp3",
+  gkLeave: "/sounds/god-king/leave.mp3",
+} as const;
 
 /** Call from a tap so browsers allow sound later. Also loads the recorded samples. */
 export function unlockAudio() {
@@ -195,7 +206,20 @@ export function setReelVoice(v: ReelVoice) {
 const ARPEGGIO = [1, 1.26, 1.5, 2]; // C E G C
 let rouletteStep = 0;
 
-export type SoundName = "move" | "capture" | "castle" | "tick" | "reel" | "select" | "ripple";
+export type SoundName =
+  | "move"
+  | "capture"
+  | "castle"
+  | "tick"
+  | "reel"
+  | "select"
+  | "ripple"
+  | "gkSummon"
+  | "gkAppear"
+  | "gkHyuah"
+  | "gkBolt"
+  | "gkHit"
+  | "gkLeave";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -215,6 +239,12 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
     const v = REEL_VOICES[reelVoice];
     for (let i = 0; i < 3; i++) v.note(t + i * 0.2, v.base * 1.5, 1.2);
   },
+  gkSummon: (t) => sample("gkSummon", t, 0.7),
+  gkAppear: (t) => sample("gkAppear", t, 0.7),
+  gkHyuah: (t) => sample("gkHyuah", t, 0.9),
+  gkBolt: (t) => sample("gkBolt", t, 0.8),
+  gkHit: (t) => sample("gkHit", t, 0.8),
+  gkLeave: (t) => sample("gkLeave", t, 0.6),
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));

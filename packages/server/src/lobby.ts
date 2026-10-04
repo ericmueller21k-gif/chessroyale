@@ -143,6 +143,8 @@ const BOSS_SHOW_MS = 1800;
 const BOSS_KILL_MS = 3800;
 const BOSS_TIMEOUT_MS = 15_000;
 const BOSS_INTRO_MS = 5500;
+/** The God King's summoning and bolt, added to a reveal where he acts. */
+const KING_FX_MS = 3900;
 
 export class LobbyCore {
   private runner: MatchRunner | null = null;
@@ -799,7 +801,8 @@ export class LobbyCore {
       return;
     }
     this.r.phase = "reveal";
-    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
+    const kingActs = report.boards.some((b) => b.king || b.kingStrike);
+    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? KING_FX_MS : 0);
     const st = this.standings();
     const cutoff = this.cutoff();
     const slots = this.slots();
