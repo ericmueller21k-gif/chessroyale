@@ -556,3 +556,19 @@ Eric: friends will want to queue up together for a boss, so make it a standalone
   - **Low tiers.** The stumble rule above still applies, so the 1400 and 1700 bosses are beatable for new players.
 - **Strikes and the King.** The boss still strikes down the worst recent mover every 3 moves, but only down to half the group, so a small group of friends isn't wiped out. The King has all 3 charges (there are no power-ups to convert).
 - **Records.** Results go on profiles as their own mode ("Boss" tab). Those still standing share the win.
+
+## The God King (Oct 4, 2026)
+
+Eric asked for the King to become a real character: a custom piece, summoned with lightning, striking with his sword, and leaving in holy light, with SNES-style sounds.
+- **The sprite** (`components/GodKing.tsx`) is my own SVG, inspired by Eric's reference image. It's a crowned, visored knight-king on a three-tier chess base, holding a sword point down, drawn in the crowd's colour with the board's outline style and gold for the crown and hilt, so it still reads as a chess piece.
+  - It's drawn in parts so it can move: a gentle bob and sway, and the sword swings up to his side when he commands.
+  - In the move picker, the ordinary king stands by with his small sword; the God King only appears when summoned.
+- **The summoning** (about 3.6 s over the board, CSS timings):
+  1. Three slow bolts converge.
+  2. A beam of light, then a flash, and the God King stands there.
+  3. He raises his sword, and a thin bolt strikes the piece he moves (then it moves) or, for a strike, the boss's king, with a floating "−10 HP".
+  4. Holy light takes him away, and the plain king drops in and fades.
+- **Timing.** The reveal gets 3.9 s extra whenever he acts, solo and online. His move plays right after his bolt; his strike comes after the crowd's own move.
+- **Sounds** (`public/sounds/god-king/`, all CC0, credits in the folder). They play at summon, appear, the "hyuah!" sword raise, the bolt, the hit and the exit.
+  - Most come from Juhani Junkala's retro 512-effect pack. The battle cry is a grunt from HaelDB's yell pack with a light 16-bit crunch.
+  - Each file can be swapped by replacing it under the same name.

@@ -14,6 +14,8 @@ const BOSS_SHOW_MS = 1800;
 const BOSS_THINK_MS = 1200;
 const BOSS_KILL_MS = 3800;
 const BOSS_INTRO_MS = 5500;
+/** The God King's summoning and bolt, added to a reveal where he acts. */
+const KING_FX_MS = 3900;
 const library = openingsData as unknown as Opening[];
 
 export function boardView(b: BoardState): BoardView {
@@ -345,7 +347,7 @@ export class SoloMatch implements GameView {
       roundScore: me.roundScore,
     });
     if (inFinal) return this.showFinalMove(report);
-    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
+    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king || mine.kingStrike ? KING_FX_MS : 0);
     this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
   }

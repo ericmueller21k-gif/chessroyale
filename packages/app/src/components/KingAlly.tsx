@@ -57,14 +57,3 @@ export function KingAlly({
     </div>
   );
 }
-
-/** Over the board when the King plays: he raises his sword and his move lands in gold. */
-export function KingStrike({ side, san, strike = false }: { side: "w" | "b"; san: string; strike?: boolean }) {
-  return (
-    <div class={`king-strike${strike ? " at-boss" : ""}`} role="alert">
-      <KingAlly side={side} charges={0} called={null} canCall={false} striking />
-      <strong>{strike ? "The King strikes the boss!" : "The King steps in"}</strong>
-      <span>{strike ? "Its next move will be a weaker one" : san}</span>
-    </div>
-  );
-}
