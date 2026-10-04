@@ -32,7 +32,7 @@ export function useHistoryView(history: readonly string[]) {
   };
 }
 
-const Chevrons = ({ back }: { back?: boolean }) => (
+export const Chevrons = ({ back }: { back?: boolean }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" style={back ? { transform: "scaleX(-1)" } : undefined}>
     <path d="M6 6l6 6-6 6" />
     <path d="M12 6l6 6-6 6" />

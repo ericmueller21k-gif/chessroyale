@@ -600,3 +600,27 @@ Eric's second look: the God King animation is right, but the eval bar jumped aro
   - Calling him to *play* the move is still your whole turn (callers abstain, as before).
 - **Three slashes.** The strike shows as three quick slashes on the boss's king. Each has a slash sound (the last also the hit) and a yellow number, adding up to the middle of `kingStrikeLoss`: −3, −3, −4. The effect is unchanged: the boss's next move loses 5–15 points.
 - **Slash sound.** `slash.mp3` is a short noise swish with a metallic ring, synthesised with ffmpeg.
+
+## Boss battle: one fixed dock under the board (Oct 4, 2026)
+
+Eric: during a God King move, the text and the leaderboard below the board kept moving from screen to screen.
+
+- **What moved.** Each screen of a boss move had its own content below the board, so the leaderboard's top edge jumped between 490 and 574 px on a phone:
+  - your move: the King buttons, whose crowns wrapped onto a second line
+  - the reveal: a "👑 King" vote bar (the green bar with a 1: how many called him) and a score line
+  - the boss's turn: a status line and a four-line God King explanation
+- **The dock.** In boss battles, every screen now has the same dock under the board, with two rows of fixed height:
+  1. The King's buttons and crowns, always there and greyed out when they can't be used. On the boss's turn they show their plain labels, so nothing from the last move carries over. "Are you sure?" swaps them for "Yes, summon him" and "No", with the question in the status line.
+  2. A fixed two-line status, for example:
+     - "Your move. Or summon the God King."
+     - "👑 The God King plays Ng3 · 1 of 1 called him" / "You called the King: no score for you this move."
+     - "The crowd plays e4 · 6 of 10 votes" / "You picked e4 (+0.4) · best was d4"
+     - "The Iron Bishop is thinking…"
+     - "🤖 The Iron Bishop played a5" / "Your move in 2"
+- The leaderboard now stays at the same height on every screen of a boss move (checked on a phone screen: 540 px throughout).
+- **Removed.**
+  - The vote bars in boss battles: the ghost pieces on the board already show the votes.
+  - The King vote bar.
+  - The long explanation (the confirmation and the home page's FAQ cover it).
+  - The old KingCalls component.
+- **The line above the board** reads the same on each screen ("BOSS BATTLE · you play White · …"), with only the short note at the end changing.

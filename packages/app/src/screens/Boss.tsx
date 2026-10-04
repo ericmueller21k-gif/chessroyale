@@ -7,6 +7,8 @@ import { SquareRing } from "../components/ShadeMoves.tsx";
 import type { BossView, GameView } from "../game.ts";
 import { seenKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
+import { BossDock, Dots } from "../components/BossDock.tsx";
+import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
 
 /** For the raid's opening roulette: famous lines flicking past before the real one lands. */
@@ -88,7 +90,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
       <Hud match={match} />
       <div class="board-area">
         <div class="opening-name">
-          <strong>BOSS BATTLE</strong> · the crowd plays {boss.crowdSide === "w" ? "White" : "Black"}
+          <BossHeading side={boss.crowdSide} note={thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
         </div>
         <div class="board-row">
           <EvalBar fen={boss.board.fen} orientation={boss.crowdSide} evaluate={(f) => match.evaluate(f)} />
@@ -125,60 +127,46 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
           </Board>
         </div>
       </div>
-      <div class="boss-panel">
-        <div class="boss-status" role="status">
-          {intro ? (
-            <span>
-              {boss.raid ? "All of you against the boss." : "Ten of you against the boss."} The most popular pick is played. Every {match.settings.bossKillEvery} moves it strikes down
-              whoever played worst since its last strike.
+      <BossDock
+        match={match}
+        idle
+        status={
+          <>
+            <span class="dock-line">
+              {intro ? (
+                <strong>{boss.raid ? "All of you against the boss." : "Ten of you against the boss."}</strong>
+              ) : victim ? (
+                <strong class="bad">
+                  💀 {boss.name} struck down {name(victim)}
+                </strong>
+              ) : thinking ? (
+                <>
+                  <Dots /> <strong>{boss.name}</strong> is thinking…
+                </>
+              ) : boss.lastMove ? (
+                <>
+                  {boss.icon} <strong>{boss.name}</strong> played <strong>{boss.lastMove.san}</strong>
+                </>
+              ) : null}
             </span>
-          ) : victim ? (
-            youStruck ? (
-              <span class="out-msg">
-                Your recent moves were the crowd's worst. You finish {match.placement}
-                {ordinal(match.placement ?? 0)}.
-              </span>
-            ) : (
-              <span>
-                <strong>{name(victim)}</strong> made the crowd's worst moves since the last strike.
-              </span>
-            )
-          ) : thinking ? (
-            <>
-              <span class="waiting-dots" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>{" "}
-              <strong>{boss.name}</strong> is thinking…
-            </>
-          ) : boss.lastMove ? (
-            <span>
-              {boss.icon} <strong>{boss.name}</strong> {boss.lastMove.staggered ? "staggered from the King's strike and played" : "played"}{" "}
-              <strong>{boss.lastMove.san}</strong>
+            <span class="dock-line muted">
+              {intro
+                ? `The most popular pick is played. Every ${match.settings.bossKillEvery} moves it strikes down whoever played worst.`
+                : victim
+                  ? youStruck
+                    ? `Your recent moves were the crowd's worst. You finish ${match.placement}${ordinal(match.placement ?? 0)}.`
+                    : "The crowd's worst moves since its last strike."
+                  : boss.lastMove?.staggered && !thinking
+                    ? "Staggered by the God King's strike: a weaker move."
+                    : left !== null && left > 0
+                      ? `Your move in ${left}`
+                      : boss.kills.length
+                        ? `Struck down: ${boss.kills.map((k) => name(k.id)).join(", ")}`
+                        : ""}
             </span>
-          ) : null}
-          {left !== null && left > 0 && <span class="muted small"> · your move in {left}</span>}
-        </div>
-        <div class="boss-king">
-          <span class="boss-king-crowns" aria-hidden="true">{"👑".repeat(Math.max(0, boss.kingCharges)) || "—"}</span>
-          <span class="muted small">
-            {boss.kingCharges > 0
-              ? `The God King: ${boss.kingCharges} ${boss.kingCharges === 1 ? "charge" : "charges"}${boss.raid ? "" : " (your leftover power-ups)"}. Summon him to play a move at full strength instead of picking one, or to strike the boss right away so its next move is weaker (the clock stops while he strikes; then you pick as usual). More than half the crowd has to call.`
-              : "The God King has spent his charges."}
-          </span>
-        </div>
-        {boss.kills.length > 0 && (
-          <div class="boss-fallen" aria-label="Struck down">
-            <span class="muted small">Struck down:</span>
-            {boss.kills.map((k) => (
-              <span key={k.id} class={`boss-fallen-name${match.isYou(k.id) ? " you" : ""}`}>
-                {name(k.id)}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+          </>
+        }
+      />
       <MiniTower match={match} />
     </div>
   );
