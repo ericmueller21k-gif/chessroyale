@@ -144,14 +144,24 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   expect(boss.board.ply).toBe(10);
   // On your first move, strike the boss (alone, you're the whole crowd): its next move is staggered.
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
-  await page.getByRole("button", { name: "Strike the boss" }).click();
-  // A quick confirm. A strike isn't your turn: the clock stops while he strikes, then you pick.
-  await expect(page.getByText("Summon the God King to strike the boss?")).toBeVisible();
-  await page.getByRole("button", { name: "Yes" }).click();
+  // He stands by the board and introduces himself. Tap him: his commands open above his head; tap again to close.
+  await expect(page.locator(".gk-bubble")).toBeVisible({ timeout: 5_000 });
+  const king = page.getByRole("button", { name: /God King: tap to summon/ });
+  await king.click();
+  await expect(page.getByRole("menu", { name: "God King commands" })).toBeVisible();
+  await king.click();
+  await expect(page.getByRole("menu", { name: "God King commands" })).toHaveCount(0);
+  await king.click();
+  // A strike isn't your turn: the clock stops while he strikes, then you pick.
+  await page.getByRole("menuitem", { name: /Strike/ }).click();
   // Alone you're the whole crowd, so he comes at once, during your move: on your king's square, striking the boss.
   await expect(page.getByLabel("The God King strikes the boss")).toBeVisible({ timeout: 5_000 });
   expect(await phase(page)).toBe("play");
-  await expect(page.getByRole("button", { name: "Boss struck" })).toBeDisabled();
+  // One strike a move: Strike is greyed out now.
+  await expect(page.locator(".king-summon")).toHaveCount(0, { timeout: 8_000 });
+  await king.click();
+  await expect(page.getByRole("menuitem", { name: /Strike/ })).toBeDisabled();
+  await king.click();
   // Then he's gone and the move goes on: still yours to pick.
   await expect(page.locator(".king-summon")).toHaveCount(0, { timeout: 8_000 });
   expect(await phase(page)).toBe("play");

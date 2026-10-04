@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { bossIntroTimeline, fenAfter } from "@chessroyale/chess";
+import { bossIntroTimeline, fenAfter, inCheck } from "@chessroyale/chess";
+import { knownEval } from "../components/EvalBar.tsx";
+import { resetKingSpeech, type KingCue } from "../godKing.ts";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { Board } from "../components/Board.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
@@ -91,6 +93,26 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   const introFen = useMemo(() => (intro ? fenAfter(history.slice(0, plies)) : boss.board.fen), [intro, plies, boss.board.fen]);
   const introLast = intro ? (plies > 0 ? history[plies - 1]! : null) : boss.board.lastMove;
   const showCard = intro && t < tl.replayAt;
+  // A new boss battle: the God King starts afresh (he'll introduce himself on your first move).
+  useState(() => intro && resetKingSpeech());
+  // The God King's word on the boss's move.
+  const kingCues = useMemo(() => {
+    const m = boss.lastMove;
+    if (intro || thinking || victim || !m) return [];
+    const key = `boss-${boss.board.fen}`;
+    const out: { cue: KingCue; key: string }[] = [];
+    if (inCheck(boss.board.fen)) out.push({ cue: "inCheck", key });
+    if (m.staggered) out.push({ cue: "staggered", key });
+    const before = history.length === boss.board.ply ? fenAfter(history.slice(0, -1)) : null;
+    const w0 = before ? knownEval(before) : undefined;
+    const w1 = knownEval(boss.board.fen);
+    if (w0 !== undefined && w1 !== undefined) {
+      const swing = boss.crowdSide === "w" ? w1 - w0 : w0 - w1;
+      if (swing >= 0.3) out.push({ cue: "bossBlunder", key });
+    }
+    if (m.captured && m.captured !== "q") out.push({ cue: "bossCapture", key });
+    return out;
+  }, [boss.board.fen, thinking, intro, victim]);
   // The boss takes your queen: its banner, face and roar.
   const tookQueen = !intro && !thinking && !victim && boss.lastMove?.captured === "q";
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
@@ -145,7 +167,8 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
       </div>
       <BossDock
         match={match}
-        idle
+        side={boss.crowdSide}
+        cues={kingCues}
         status={
           <>
             <span class="dock-line">
