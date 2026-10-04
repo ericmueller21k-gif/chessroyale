@@ -55,18 +55,31 @@ export type VoteView = NetVote;
 export type BossView = Omit<NetBoss, "board"> & { board: BoardView };
 
 /** The reveal: your group's picks and scores (same shape the server sends). */
-export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls" | "kingStrike" | "strikeCalls"> & {
+export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls"> & {
   result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule">;
 };
+
+/**
+ * Boss battle: calls for the God King's strike this move. Once he strikes, `at` to `until` is the strike on
+ * screen; the move clock stands still meanwhile (the play phase's deadline already includes it).
+ */
+export interface StrikeState {
+  calls: number;
+  needed: number;
+  /** You've called for it. */
+  mine: boolean;
+  at?: number;
+  until?: number;
+}
 
 export type Phase =
   | { kind: "loading" }
   | { kind: "lobby" }
   | { kind: "opening"; boards: BoardView[] }
   /** `startsAt`: when the move clock starts (after the new board's settling-in countdown). */
-  | { kind: "play"; board: BoardView; startsAt: number; deadline: number; allowedMs: number }
+  | { kind: "play"; board: BoardView; startsAt: number; deadline: number; allowedMs: number; strike?: StrikeState }
   /** `watched`: Crowd 50 v 50, the other team's vote is being counted. */
-  | { kind: "scoring"; board: BoardView; move: string | null; watched?: boolean }
+  | { kind: "scoring"; board: BoardView; move: string | null; watched?: boolean; strike?: StrikeState }
   /** `until`: when the next board comes up (local time). */
   | { kind: "reveal"; mine: GroupReveal; board: BoardView; until: number }
   /** Crowd 50 v 50: the other team is choosing; you watch the vote come in. */
@@ -140,9 +153,13 @@ export interface GameView {
   castVote(option: number): void;
   /** The boss battle once it has started (also during the crowd's moves in it). */
   readonly boss: BossView | null;
-  /** Boss battle: call the King for this move: to play it, or to strike the boss (if more than half the crowd calls). */
+  /**
+   * Boss battle: call the King (if more than half the crowd calls). To play this move: your whole turn. Or to
+   * strike the boss now (`strike`): the clock stands still while he does, then everyone picks as usual.
+   */
   callKing(strike?: boolean): void;
-  readonly kingCalled: "play" | "strike" | null;
+  /** You called the King to play this move. */
+  readonly kingCalled: boolean;
 }
 
 /** Crowd 50 v 50: your team (the side you play all match), if you have one. */

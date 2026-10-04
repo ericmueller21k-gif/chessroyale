@@ -219,8 +219,9 @@ export function HomeScreen({
             strikes down whoever played worst, down to half the group.
           </li>
           <li>
-            <strong>👑 The King</strong> fights for you {S.kingChargesMax} times: call him to play a move at full strength, or to
-            strike the boss so its next move is a weaker one. More than half of you have to call.
+            <strong>👑 The King</strong> fights for you {S.kingChargesMax} times: call him to play a move at full strength (instead of
+            picking one), or to strike the boss there and then so its next move is a weaker one (the clock stops while he does, then
+            you all pick as usual). More than half of you have to call.
           </li>
         </ol>
       ) : crowd && !joinCode ? (

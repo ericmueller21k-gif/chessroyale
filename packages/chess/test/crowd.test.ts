@@ -192,20 +192,31 @@ describe("Crowd mode", () => {
     expect(boss.kingCharges).toBe(3);
     expect(runner.boards.get(0)!.history).toHaveLength(10);
     expect(runner.bossToMove()).toBe(false);
-    // A strike: the boss's next move is a staggered one, and a charge is spent.
+    // A strike, mid-move: when more than half the crowd calls, the boss's next move is a staggered one and a charge is spent.
     runner.deal();
-    for (const p of runner.alive()) runner.kingStrikers.add(p.id);
-    const r = await runner.score(new Map());
-    expect(r.boards[0]!.kingStrike).toBe(true);
-    // Calling the King is your turn: no move, no score, and not a miss.
-    expect(r.boards[0]!.result.players.every((p) => p.abstained && p.roundScore === 0)).toBe(true);
-    expect(runner.alive().every((p) => (p.misses ?? 0) === 0)).toBe(true);
+    expect(["h0", "h1", "h2"].map((id) => runner.callStrike(id).struck)).toEqual([false, false, false]);
+    expect(runner.callStrike("h3")).toEqual({ struck: true, calls: 4 });
     expect(runner.boss!.staggerNext).toBe(true);
     expect(runner.boss!.kingCharges).toBe(2);
+    // One strike per move.
+    expect(runner.callStrike("h4").struck).toBe(false);
+    expect(runner.boss!.kingCharges).toBe(2);
+    // The move goes on: everyone still picks, and it's scored as usual.
+    const move = legalMoves(runner.boards.get(0)!.fen)[0]!;
+    const r = await runner.score(new Map(runner.alive().map((p) => [p.id, { move, thinkMs: 1000 }])));
+    expect(r.boards[0]!.result.players.every((p) => !p.abstained && p.move === move)).toBe(true);
     expect(runner.bossMoveKind()).toBe("stagger");
     await runner.playBoss();
     expect(runner.boss!.staggerNext).toBe(false);
     expect(runner.bossView()!.lastMove!.staggered).toBe(true);
+    // Calling the King to play the move is your turn: no move, no score, and not a miss.
+    runner.deal();
+    for (const p of runner.alive()) runner.kingCallers.add(p.id);
+    const k = await runner.score(new Map());
+    expect(k.boards[0]!.king).toBe(true);
+    expect(k.boards[0]!.result.players.every((p) => p.abstained && p.roundScore === 0)).toBe(true);
+    expect(runner.alive().every((p) => (p.misses ?? 0) === 0)).toBe(true);
+    expect(runner.boss!.kingCharges).toBe(1);
     while (!runner.stageComplete()) {
       if (runner.bossToMove()) {
         await runner.playBoss();

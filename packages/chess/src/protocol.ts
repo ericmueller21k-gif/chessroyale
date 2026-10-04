@@ -182,7 +182,10 @@ export type ClientMessage =
   | { t: "botPlan"; key: string; picks: Record<string, string>; powerUps: string[] }
   /** Crowd augments: this player's vote on the next round's move clock. */
   | { t: "augment"; choice: Augment }
-  /** Boss battle: this player calls the King for this move (to play it, or to strike the boss). */
+  /**
+   * Boss battle: this player calls the King. To play this move (their whole turn: no pick of their own), or
+   * (`strike`) to strike the boss right now, after which the move goes on and they still pick.
+   */
   | { t: "king"; key: string; strike?: boolean }
   /** A pre-game vote (Crowd 50 v 50): the option this player pushed a pawn into. */
   | { t: "vote"; key: string; option: number }
@@ -237,6 +240,12 @@ export type ServerMessage = { now: number } & (
     }
   /** Crowd: the picks so far (bots appear at their thinking time), to players who've picked and to the watching team. */
   | { t: "tally"; key: string; picks: LivePick[] }
+  /**
+   * Boss battle: calls for the King's strike so far this move, and how many it takes (more than half the crowd).
+   * When he strikes, `at` to `until` is the strike on screen: the move clock stands still and `deadline` is this
+   * player's new deadline, pushed back by that long.
+   */
+  | { t: "strike"; key: string; calls: number; needed: number; at?: number; until?: number; deadline?: number }
   | {
       t: "reveal";
       key: string;
@@ -252,8 +261,6 @@ export type ServerMessage = { now: number } & (
       /** Boss battle: the King played the move, and how many called him; or he struck the boss. */
       king?: boolean;
       kingCalls?: number;
-      kingStrike?: boolean;
-      strikeCalls?: number;
       /** For the cross-check: the group's evaluation as the host computed it. */
       expectedAfter: Record<string, number>;
       bestExpected: number | null;

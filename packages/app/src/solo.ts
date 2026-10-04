@@ -55,7 +55,7 @@ export class SoloMatch implements GameView {
 
   private startLive(startsAt: number, times: Record<string, number>) {
     if (this.settings.mode !== "crowd") return void (this.live = null);
-    const live = { startsAt, times, picks: null as ReadonlyMap<string, string> | null, mine: null, rushFrom: null };
+    const live = { startsAt, times: { ...times }, picks: null as ReadonlyMap<string, string> | null, mine: null, rushFrom: null };
     this.live = live;
     void this.runner.planBotPicks().then((picks) => {
       if (this.live === live) {
@@ -233,13 +233,35 @@ export class SoloMatch implements GameView {
   // ---------------- Boss battle ----------------
 
   private bossIntroDone = false;
-  kingCalled: "play" | "strike" | null = null;
-  /** Calling the God King (to play the move, or to strike the boss) is your whole turn: no move of your own. */
+  kingCalled = false;
+  /** This move's strike on screen, if the King struck (the clock stood still from `at` to `until`). */
+  private frozen: { at: number; until: number } | null = null;
+  /**
+   * Calling the God King. To play the move: your whole turn, no move of your own. To strike the boss: he comes
+   * now if enough of the crowd has called, the clock stands still while he strikes, and then you pick as usual.
+   */
   callKing(strike = false) {
     if (this.phase.kind !== "play" || !this.runner.boss?.kingCharges || this.kingCalled) return;
-    this.kingCalled = strike ? "strike" : "play";
-    (strike ? this.runner.kingStrikers : this.runner.kingCallers).add(HUMAN);
+    if (strike) return this.callStrike();
+    this.kingCalled = true;
+    this.runner.kingCallers.add(HUMAN);
     void this.score(null);
+  }
+  private callStrike() {
+    const phase = this.phase;
+    if (phase.kind !== "play" || phase.strike?.mine || Date.now() < this.playStartedAt - 300) return;
+    const { struck, calls } = this.runner.callStrike(HUMAN);
+    const needed = Math.floor((this.runner.groups.values().next().value?.length ?? 1) / 2) + 1;
+    if (!struck) return this.set({ ...phase, strike: { calls, needed, mine: true } });
+    const ms = this.settings.kingStrikeMs;
+    const at = Date.now();
+    this.frozen = { at, until: at + ms };
+    this.progress.postpone(ms);
+    if (this.live) for (const [id, t] of Object.entries(this.live.times)) if (this.live.startsAt + t > at) this.live.times[id] = t + ms;
+    const deadline = phase.deadline + ms;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.submit(null), deadline - at + this.settings.lateGraceMs);
+    this.set({ ...phase, deadline, strike: { calls, needed, mine: true, at, until: at + ms } });
   }
   get boss(): BossView | null {
     const v = this.runner?.bossView();
@@ -289,7 +311,8 @@ export class SoloMatch implements GameView {
       if (this.runner.bossToMove()) return void this.bossTurn();
     } else if (this.runner.isFinal()) return void this.finalTurn();
     this.runner.deal();
-    this.kingCalled = null;
+    this.kingCalled = false;
+    this.frozen = null;
     this.runner.prefetch();
     if (!this.runner.boardOf(HUMAN)) return this.watchTurn();
     // The move clock starts after a short settling-in countdown on the new board.
@@ -314,7 +337,10 @@ export class SoloMatch implements GameView {
     if (this.timer) clearTimeout(this.timer);
     const { board, allowedMs: allowed } = this.phase;
     if (move !== null && Date.now() < this.playStartedAt - 300) return; // Before the clock starts.
-    const thinkMs = Math.max(0, Math.min(Date.now() - this.playStartedAt, allowed));
+    const now = Date.now();
+    if (move !== null && this.frozen && now < this.frozen.until) return; // While the King strikes.
+    const frozen = this.frozen ? Math.max(0, Math.min(now, this.frozen.until) - this.frozen.at) : 0;
+    const thinkMs = Math.max(0, Math.min(now - this.playStartedAt - frozen, allowed));
     const usedPowerUp = this.hint !== null;
     const inFinal = !!this.runner.final;
     this.progress.mark(HUMAN);
@@ -348,7 +374,7 @@ export class SoloMatch implements GameView {
       roundScore: me.roundScore,
     });
     if (inFinal) return this.showFinalMove(report);
-    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king || mine.kingStrike ? KING_FX_MS : 0);
+    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? KING_FX_MS : 0);
     this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
   }

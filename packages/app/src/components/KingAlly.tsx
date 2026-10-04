@@ -1,20 +1,27 @@
 import { useState } from "preact/hooks";
+import type { StrikeState } from "../game.ts";
 
 /**
- * Boss battle: summon the God King instead of picking a move. Two ways, each
- * for one of the crowd's charges: he plays the move himself (at full engine
- * strength, stronger than the boss), or he strikes the boss so its next move is
- * a weaker one. He comes when more than half the crowd calls. Calling him is
- * your whole turn, so a tap asks to confirm first.
+ * Boss battle: the God King, for one of the crowd's charges, when more than half
+ * the crowd calls. Two ways: he plays this move himself (at full engine
+ * strength, stronger than the boss), which is your whole turn; or he strikes the
+ * boss right now (its next move will be a weaker one), the clock standing still
+ * while he does, and then you pick your move as usual. A tap asks to confirm.
  */
 export function KingCalls({
   charges,
   called,
+  strike,
+  struck,
   canCall,
   onCall,
 }: {
   charges: number;
-  called: "play" | "strike" | null;
+  /** You called him to play this move. */
+  called: boolean;
+  strike?: StrikeState;
+  /** He has struck the boss this move (one strike a move). */
+  struck: boolean;
   canCall: boolean;
   onCall: (strike: boolean) => void;
 }) {
@@ -24,12 +31,12 @@ export function KingCalls({
       {charges > 0 ? Array.from({ length: charges }, (_, i) => <i key={i}>👑</i>) : "spent"}
     </span>
   );
-  if (confirm && !called) {
+  if (confirm && canCall && !called) {
     return (
       <div class="king-calls confirming" role="dialog" aria-label="Summon the God King?">
         <span class="king-confirm-text">
           {confirm === "play" ? "Summon the God King to play this move?" : "Summon the God King to strike the boss?"}{" "}
-          <span class="muted">You won't pick a move.</span>
+          <span class="muted">{confirm === "play" ? "You won't pick a move." : "The clock stops while he strikes, then you pick your move."}</span>
         </span>
         <button
           type="button"
@@ -47,28 +54,27 @@ export function KingCalls({
       </div>
     );
   }
+  const strikeLabel = struck ? "Boss struck" : strike?.mine ? `Strike called ${strike.calls}/${strike.needed}` : "Strike the boss";
   return (
     <div class="king-calls">
-      {(
-        [
-          [false, "Call the King", "King called", "He plays this move at full engine strength if more than half the crowd calls him"],
-          [true, "Strike the boss", "Strike called", "The boss's next move will be a weaker one if more than half the crowd calls for it"],
-        ] as const
-      ).map(([strike, label, done, title]) => {
-        const mine = called === (strike ? "strike" : "play");
-        return (
-          <button
-            type="button"
-            key={label}
-            class={`king-call${strike ? " strike" : ""}${mine ? " on" : ""}`}
-            disabled={!canCall || !!called || charges <= 0}
-            onClick={() => setConfirm(strike ? "strike" : "play")}
-            title={title}
-          >
-            <strong>{mine ? done : label}</strong>
-          </button>
-        );
-      })}
+      <button
+        type="button"
+        class={`king-call${called ? " on" : ""}`}
+        disabled={!canCall || called || charges <= 0}
+        onClick={() => setConfirm("play")}
+        title="He plays this move at full engine strength if more than half the crowd calls him"
+      >
+        <strong>{called ? "King called" : "Call the King"}</strong>
+      </button>
+      <button
+        type="button"
+        class={`king-call strike${strike?.mine || struck ? " on" : ""}`}
+        disabled={!canCall || called || struck || !!strike?.mine || charges <= 0}
+        onClick={() => setConfirm("strike")}
+        title="He strikes now if more than half the crowd calls for it: the boss's next move will be a weaker one"
+      >
+        <strong>{strikeLabel}</strong>
+      </button>
       {crowns}
     </div>
   );

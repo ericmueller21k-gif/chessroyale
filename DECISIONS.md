@@ -586,3 +586,17 @@ Eric asked for the King to become a real character: a custom piece, summoned wit
   - If his move is a king move, he walks with it.
   - As the round ends, holy light takes him away from whatever square he's on, and the ordinary king drops back there.
 - **Leave sound.** The laser-like exit sound is replaced with a synthesised falling shimmer that fades out (`leave.mp3`), so he vanishes rather than fires.
+
+## The God King's strike happens during the move; the eval bar holds steady (Oct 4, 2026)
+
+Eric's second look: the God King animation is right, but the eval bar jumped around, and a strike also played a move.
+
+- **Eval bar.** Every screen change (your move → reveal → the boss's turn → your next move) mounted a fresh bar that started at 50% and slid back to the real value, so it moved several times per move.
+  - The bar now remembers what it last showed and each position's value, so it only moves when a move lands on the board: once when the God King's move plays, once for the boss's reply.
+- **The strike is no longer your turn.**
+  - "Strike the boss" (confirmed: "The clock stops while he strikes, then you pick your move") counts towards a strike during the move. When more than half the crowd has called (bots back a human's call as before), he strikes at once, on everyone's screen.
+  - The move clock stands still for the strike (`kingStrikeMs`, 4.4 s). Every deadline moves back by that long, and so do bots still thinking. Time on the move leaves it out.
+  - Then the move goes on and everyone picks as usual. One strike per move. The button shows "Strike called 2/4" while calls come in, and "Boss struck" after.
+  - Calling him to *play* the move is still your whole turn (callers abstain, as before).
+- **Three slashes.** The strike shows as three quick slashes on the boss's king. Each has a slash sound (the last also the hit) and a yellow number, adding up to the middle of `kingStrikeLoss`: −3, −3, −4. The effect is unchanged: the boss's next move loses 5–15 points.
+- **Slash sound.** `slash.mp3` is a short noise swish with a metallic ring, synthesised with ffmpeg.

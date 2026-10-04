@@ -1,13 +1,14 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { applyMove, sideToMove } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
-import type { BoardView, GameView } from "../game.ts";
+import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { KingCalls } from "../components/KingAlly.tsx";
+import { KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
@@ -44,6 +45,7 @@ export function PlayScreen({
   deadline,
   allowedMs,
   picked,
+  strike,
 }: {
   match: GameView;
   board: BoardView;
@@ -51,6 +53,7 @@ export function PlayScreen({
   deadline: number;
   allowedMs?: number;
   picked?: string | null;
+  strike?: StrikeState;
 }) {
   const side = sideToMove(board.fen);
   const waiting = picked !== undefined;
@@ -84,7 +87,29 @@ export function PlayScreen({
       : [];
   const fen = history.fen ?? moved?.fen ?? shown.fen;
   const lastMove = history.browsing ? history.lastMove : (moved?.lastMove ?? shown.lastMove);
-  const canMove = !waiting && !intro && !shown.replaying && !history.browsing;
+  // Boss battle: the God King striking the boss. The clock stands still and nobody moves until he's gone.
+  const striking = !!strike?.at && now < strike.until!;
+  const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking;
+  const godKing = useMemo(() => {
+    if (!strike?.at) return null;
+    const boss = side === "w" ? "b" : "w";
+    const mine = kingSquare(board.fen, side);
+    const target = kingSquare(board.fen, boss);
+    if (!mine || !target) return null;
+    const hp = Math.round((match.settings.kingStrikeLoss[0] + match.settings.kingStrikeLoss[1]) / 2);
+    return {
+      side,
+      orientation: side === "w" ? ("white" as const) : ("black" as const),
+      kingBefore: mine,
+      kingAfter: mine,
+      target,
+      mode: "strike" as const,
+      hp,
+      startAt: strike.at,
+      moveAt: strike.at,
+      exitAt: strike.until! - 900,
+    };
+  }, [strike?.at, board.fen]);
 
   return (
     <div class="screen game">
@@ -107,7 +132,7 @@ export function PlayScreen({
         <div class="board-row">
           <EvalBar fen={history.fen ?? board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />
           <Board fen={fen} orientation={side === "w" ? "white" : "black"} lastMove={lastMove} interactive={canMove} onMove={(m) => match.submit(m)} arrows={arrows}>
-            {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} />}
+            {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
             {intro && (
               <CenterCount
                 label="Round start"
@@ -115,7 +140,8 @@ export function PlayScreen({
                 note={shown.replaying ? (shown.fromStart ? "New board: replaying it from the start" : "Replaying the moves you missed") : null}
               />
             )}
-            {ending && <CenterCount label="Round end" n={secsLeft} />}
+            {ending && !striking && <CenterCount label="Round end" n={secsLeft} />}
+            {godKing && <KingSummon {...godKing} />}
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={side === "w" ? "white" : "black"} />}
           </Board>
         </div>
@@ -125,7 +151,14 @@ export function PlayScreen({
           extra={
             match.boss ? (
               // Boss battle: power-ups became the King's charges.
-              <KingCalls charges={match.boss.kingCharges} called={match.kingCalled} canCall={!waiting && !intro && !shown.replaying} onCall={(strike) => match.callKing(strike)} />
+              <KingCalls
+                charges={match.boss.kingCharges}
+                called={match.kingCalled}
+                strike={strike}
+                struck={match.boss.staggerNext}
+                canCall={!waiting && !intro && !shown.replaying && !striking}
+                onCall={(s) => match.callKing(s)}
+              />
             ) : (
               <PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />
             )
@@ -141,7 +174,7 @@ export function PlayScreen({
               <i />
             </span>
             <span>
-              <strong>{match.kingCalled ? (match.kingCalled === "strike" ? "Strike called." : "God King called.") : picked ? "Move in." : "Time's up."}</strong> Waiting for other players
+              <strong>{match.kingCalled ? "God King called." : picked ? "Move in." : "Time's up."}</strong> Waiting for other players
             </span>
             {alive.length > 0 && (
               <span class="waiting-count">

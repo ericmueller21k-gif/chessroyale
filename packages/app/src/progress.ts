@@ -7,13 +7,28 @@
 export class RoundProgress {
   done = new Set<string>();
   private timers: ReturnType<typeof setTimeout>[] = [];
+  /** When each bot still thinking finishes (Date.now() values). */
+  private due = new Map<string, number>();
 
   constructor(private readonly onChange: () => void) {}
 
   /** A new round: bots finish `botsDoneIn[id]` ms after the clock starts, `startsInMs` from now. */
   start(botsDoneIn: Readonly<Record<string, number>>, startsInMs = 0) {
     this.reset();
-    for (const [id, ms] of Object.entries(botsDoneIn)) this.timers.push(setTimeout(() => this.mark(id), Math.max(0, startsInMs) + ms));
+    const now = Date.now();
+    for (const [id, ms] of Object.entries(botsDoneIn)) this.due.set(id, now + Math.max(0, startsInMs) + ms);
+    this.schedule();
+  }
+
+  /** The clock stood still (the King's strike): bots still thinking finish `ms` later. */
+  postpone(ms: number) {
+    for (const [id, at] of this.due) if (!this.done.has(id)) this.due.set(id, at + ms);
+    this.schedule();
+  }
+
+  private schedule() {
+    this.clearTimers();
+    for (const [id, at] of this.due) if (!this.done.has(id)) this.timers.push(setTimeout(() => this.mark(id), Math.max(0, at - Date.now())));
   }
 
   mark(id: string) {
@@ -33,6 +48,7 @@ export class RoundProgress {
 
   reset() {
     this.clearTimers();
+    this.due = new Map();
     this.done = new Set();
   }
 

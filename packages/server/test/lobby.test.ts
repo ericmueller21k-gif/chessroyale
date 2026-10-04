@@ -438,12 +438,22 @@ describe("lobby: Crowd mode", () => {
     L.advance(6000);
     const r = L.last("p1", "round")!;
     expect(r.board).toBeTruthy();
-    // Both pick; one calls the King's strike (not a majority of 2: nothing happens).
+    // One calls the King's strike: not a majority of 2 yet.
     L.core.message("p1", { t: "king", key: r.key, strike: true });
+    expect(L.last("p2", "strike")).toMatchObject({ calls: 1, needed: 2 });
+    expect(L.last("p2", "strike")!.at).toBeUndefined();
+    // The second call: he strikes now. The clock stands still while he does (deadlines move back), and the move goes on.
+    L.advance(2000);
+    L.core.message("p2", { t: "king", key: r.key, strike: true });
+    const s = L.last("p1", "strike")!;
+    expect(s).toMatchObject({ calls: 2, needed: 2, at: L.now, until: L.now + DEFAULT_SETTINGS.kingStrikeMs, deadline: r.deadline + DEFAULT_SETTINGS.kingStrikeMs });
+    expect(L.core.save().runner?.state.boss?.staggerNext).toBe(true);
+    L.advance(DEFAULT_SETTINGS.kingStrikeMs + 1000);
     for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: r.key, move: legalMoves(r.board!.fen)[0]! });
+    // Time on the move leaves out the strike.
+    expect(L.core.record.round!.picks.p1!.thinkMs).toBe(3000);
     expect(L.hostScores("p1")).toBe(true);
     const v = L.last("p1", "reveal")!;
-    expect(v.kingStrike).toBe(false);
-    expect(v.strikeCalls).toBe(1);
+    expect(v.picks.every((p) => p.move)).toBe(true);
   });
 });

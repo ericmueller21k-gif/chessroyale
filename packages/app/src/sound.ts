@@ -31,6 +31,7 @@ const SAMPLE_FILES = {
   gkBolt: "/sounds/god-king/bolt.mp3",
   gkHit: "/sounds/god-king/hit.mp3",
   gkLeave: "/sounds/god-king/leave.mp3",
+  gkSlash: "/sounds/god-king/slash.mp3",
 } as const;
 
 /** Call from a tap so browsers allow sound later. Also loads the recorded samples. */
@@ -219,7 +220,8 @@ export type SoundName =
   | "gkHyuah"
   | "gkBolt"
   | "gkHit"
-  | "gkLeave";
+  | "gkLeave"
+  | "gkSlash";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -244,6 +246,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gkHyuah: (t) => sample("gkHyuah", t, 0.9),
   gkBolt: (t) => sample("gkBolt", t, 0.8),
   gkHit: (t) => sample("gkHit", t, 0.8),
+  gkSlash: (t) => sample("gkSlash", t, 0.85),
   gkLeave: (t) => sample("gkLeave", t, 0.6),
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {

@@ -106,7 +106,7 @@ export interface BossState {
   /** The King: charges left, and the crowd moves he played. */
   kingCharges?: number;
   kingMoves?: number[];
-  /** The King struck the boss: its next move is a weaker one; and the crowd moves he struck after. */
+  /** The King struck the boss: its next move is a weaker one; and the crowd moves he struck during (1-based, like kingMoves). */
   staggerNext?: boolean;
   kingStrikes?: number[];
   /** Strikes stop with this many left (boss raid: half the group; 50 v 50: bossMinSurvivors). */
