@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CRATES, ITEM_COLORS, ITEM_DEFS, cleanLook, isShiny, itemChance, mulberry32, purity, rollCrate } from "../src/index.ts";
+import { CRATES, ITEM_COLORS, ITEM_DEFS, PURITY_BANDS, cleanLook, isShiny, itemChance, mulberry32, purity, rollBlemish, rollCrate } from "../src/index.ts";
 
 const crate = CRATES[0]!;
 
@@ -20,14 +20,18 @@ describe("crates", () => {
     let shiny = 0;
     let fischer = 0;
     let pearl = 0;
+    let middle = 0;
+    let dark = 0;
     for (let i = 0; i < n; i++) {
       const r = rollCrate(rng, crate);
       count[r.def] = (count[r.def] ?? 0) + 1;
       if (isShiny(r.blemish)) shiny++;
       if (r.fischer) fischer++;
       if (r.color === "pearl") pearl++;
+      if (purity(r.blemish) >= 30 && purity(r.blemish) < 70) middle++;
+      if (purity(r.blemish) < 5) dark++;
       expect(r.blemish).toBeGreaterThanOrEqual(0);
-      expect(r.blemish).toBeLessThanOrEqual(49);
+      expect(r.blemish).toBeLessThanOrEqual(100);
     }
     expect(count["santa-beard"]! / n).toBeCloseTo(0.42, 1);
     // Sublime (four items) about 14% in all, 3.5% each.
@@ -36,9 +40,13 @@ describe("crates", () => {
     expect(sublime).toBeLessThan(0.15);
     expect(fischer / n).toBeGreaterThan(0.015);
     expect(fischer / n).toBeLessThan(0.025);
-    // Shiny about 2.5% of the time; Pearl about 0.5%.
-    expect(shiny / n).toBeGreaterThan(0.018);
-    expect(shiny / n).toBeLessThan(0.032);
+    // Shiny (90%+) about 1 in 250; most between 30% and 70% (80%); under 5% about 1 in 100. Pearl about 0.5%.
+    expect(shiny / n).toBeGreaterThan(0.003);
+    expect(shiny / n).toBeLessThan(0.005);
+    expect(middle / n).toBeGreaterThan(0.79);
+    expect(middle / n).toBeLessThan(0.81);
+    expect(dark / n).toBeGreaterThan(0.0085);
+    expect(dark / n).toBeLessThan(0.0115);
     expect(pearl / n).toBeGreaterThan(0.003);
     expect(pearl / n).toBeLessThan(0.007);
   });
@@ -68,15 +76,49 @@ describe("crates", () => {
     expect(cleanLook({ head: { def: "santa-hat", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBeUndefined();
   });
 
-  it("purity is shown to one decimal", () => {
+  it("purity is shown to one decimal; shiny from 90%", () => {
     expect(purity(8.5)).toBe(91.5);
     expect(isShiny(8.5)).toBe(true);
-    expect(isShiny(10)).toBe(false);
+    expect(isShiny(10)).toBe(true);
+    expect(isShiny(10.1)).toBe(false);
+    expect(purity(100)).toBe(0);
+  });
+
+  it("the purity bands run from 100% to 0% with no gaps, and the roll follows them", () => {
+    expect(PURITY_BANDS.reduce((s, b) => s + b.weight, 0)).toBeCloseTo(100);
+    expect(PURITY_BANDS[0]!.high).toBe(100);
+    expect(PURITY_BANDS[PURITY_BANDS.length - 1]!.low).toBe(0);
+    PURITY_BANDS.slice(1).forEach((b, i) => expect(Math.round((PURITY_BANDS[i]!.low - b.high) * 10)).toBe(1));
+    const chance = (pred: (low: number) => boolean) => PURITY_BANDS.filter((b) => pred(b.low)).reduce((s, b) => s + b.weight, 0);
+    expect(chance((low) => low >= 90)).toBeCloseTo(0.4); // shiny: 1 in 250
+    expect(chance((low) => low < 5)).toBeCloseTo(1); // under 5%: 1 in 100
+    expect(chance((low) => low >= 30 && low < 70)).toBe(80);
+    // The lowest draw is perfect, the highest 0%, and every value is in tenths within 0-100.
+    expect(rollBlemish(() => 0)).toBe(0);
+    expect(rollBlemish(() => 0.9999999)).toBe(100);
+    const rng = mulberry32(11);
+    for (let i = 0; i < 20_000; i++) {
+      const b = rollBlemish(rng);
+      expect(b).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThanOrEqual(100);
+      expect(Math.round(b * 10) / 10).toBe(b);
+    }
+    // A purer draw is never less pure.
+    let last = -1;
+    for (let u = 0; u < 1; u += 0.00001) {
+      const b = rollBlemish(() => u);
+      expect(b).toBeGreaterThanOrEqual(last);
+      last = b;
+    }
   });
 
   it("a look from elsewhere keeps only valid slots", () => {
     expect(cleanLook({ head: { def: "santa-hat", color: "emerald", blemish: 8.5, seed: 3 }, face: { def: "santa-hat" }, skin: "x" })).toEqual({
       head: { def: "santa-hat", color: "emerald", blemish: 8.5, seed: 3 },
     });
+    // Any purity from 100% to 0% passes, including items rolled under the old 0-49 blemish; beyond is capped.
+    expect(cleanLook({ face: { def: "santa-beard", color: "red", blemish: 49, seed: 1 } }).face?.blemish).toBe(49);
+    expect(cleanLook({ face: { def: "santa-beard", color: "red", blemish: 100, seed: 1 } }).face?.blemish).toBe(100);
+    expect(cleanLook({ face: { def: "santa-beard", color: "red", blemish: 140, seed: 1 } }).face?.blemish).toBe(100);
   });
 });

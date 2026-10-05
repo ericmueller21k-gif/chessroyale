@@ -52,7 +52,9 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
    - Items may rise at most about 9 points above the square (a clip caps them).
 6. **Look at it.** Run `npm run preview:items -- <scratchpad>/sheet.png items=<id>[,<id>]` and read the PNG. Add
    `color=…&color2=…` to try colours, and always try Pearl (nearly white) and Midnight (nearly black).
-   The sheet shows the item on white and black pawns, on every skin, and as cards (plain, heavy blemish, shiny).
+   The sheet shows the item on white and black pawns, on every skin, and as cards from shiny to 0% purity (pick them
+   with `purities=95,50,0`). At 0% the painted parts are blotched all over, so check any part painted outside a
+   `Region` (it won't darken).
    Fix anything clipped, floating, misaligned or unreadable before going on. Keep the PNG out of the repo.
 7. **Test it.** Update the odds assertions in `crates.test.ts` and add a test for anything new (a new roll, a new field).
    A new stored field needs a column: add an `ALTER TABLE` to `LOCKER_MIGRATIONS` in `locker.ts` (it runs once and

@@ -879,8 +879,8 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
 
     So the crown is 0.4%.
   - **Colour:** Red 30%, Yellow 30%, Sage 14%, Opal 9%, Cobalt 7%, Midnight 4.5%, Emerald 3%, Oceanic 2%, Pearl 0.5%. Opal, Oceanic and Pearl have a two-tone sheen.
-  - **Purity:** 100% minus a blemish of 0–49%, rolled as 49 × u^0.431. Shiny (blemish under 10%) is about 2.5% of rolls; under 1% blemish is about 1 in 8,000.
-  - **Stacked:** a shiny Pearl crown is about 1 in 2 million; a Pearl crown at 99%+ about 1 in 400 million. A test of 100,000 rolls checks the proportions.
+  - **Purity:** 100% minus a blemish of 0–100%, rolled by bands (retuned Oct 5, below). Shiny (90%+) is 1 in 250; under 5% is 1 in 100; 80% of items land between 30% and 70%.
+  - **Stacked:** a shiny Pearl crown is about 1 in 12.5 million; a Pearl crown at 99%+ about 1 in 1.25 billion. A test of 100,000 rolls checks the proportions.
 - **Slots:** head, face, skin and weapon (new: held at the pawn's side). Skins replace the pawn and combine with the rest (a Snowman in a Santa Hat). They show in the votes and on the cut screen, not on the game board. Other online players see your look (sent on joining, cleaned by the server). The old shop hats still show when no crate item is on the head.
 - **Paint system** (`components/Items.tsx`), Eric's suggestion:
   - Each item is drawn once on the pawn's square with marked paint regions. Those get the colour automatically, then the blemish, then the shine; outlines and fixed parts (white fur, coal, ice) stay as drawn.
@@ -910,6 +910,24 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - **Chimney (skin):** the pawn itself, sitting in a chimney up to its chest. The bricks are always red with white mortar; the rolled colour paints the chimney's cap. The pawn is drawn in the skin, so the anchors are the pawn's.
   - All four were checked on white and black pawns, on the other skins, and with the other items worn.
 - **Testing switches** (while `CRATES_FREE`): checkboxes on the crate page, or `?fischer=1` / `?shiny=1`, force Fischer Random and a shiny. The server ignores them once crates aren't free.
+- **Purity, retuned (Eric, Oct 5):** shiny showed up too often, and purity now goes all the way to 0%.
+  - **The odds** (`PURITY_BANDS` in `core/crates.ts`), even within each band, purity to one decimal:
+
+    | Purity | Chance |
+    | --- | --- |
+    | 99–100% ✨ | 0.004% (1 in 25,000) |
+    | 90–98.9% ✨ | 0.396% |
+    | 70–89.9% | 9.6% |
+    | 30–69.9% | 80% |
+    | 5–29.9% | 9% |
+    | 0–4.9% | 1% |
+
+    So shiny is exactly 1 in 250 (was about 1 in 40), under 5% exactly 1 in 100, and an average item is about 50% pure (was about 66%). I picked 80% for "most between 30% and 70%", split the rest evenly above and below, and kept 99%+ as a 1-in-25,000 brag inside the shiny band. A band table, not a curve, so each number Eric names is one line to change; the crate page lists the same table.
+  - **Shiny is 90.0% and up, as shown.** It was "blemish under 10", which made a 90.0% item not shiny, against Eric's "90%+". Only an item at exactly 90.0% changes.
+  - **0% looks** blotched all over: the blotch colour over the whole painted part, a darker shade of its colour (red goes dark red, yellow mustard, Pearl a grey lavender). Blotches now also run past the square's edge (antler tips, the crown's flames), copying the nearest blotch inside, so those are covered too. The Present's bow knot became a painted part, so it darkens with the rest. Fixed parts (the candy cane's white, fur, ice) stay as drawn.
+  - **Items people own keep their purity:** the stored blemish isn't touched (old rolls are all 51–100%), and their blotches keep their shape; only the parts past the square's edge and the Present's knot now pick up blotches too. Only the odds for new rolls changed.
+  - **The strip's decoy tiles** already rolled their purity with the real roll, so they follow the new odds: about one shiny decoy every six opens, instead of about one per open (some 42 decoy items pass by in each open).
+  - The fitting sheet (`npm run preview:items`) now shows cards at 95, 70, 50, 30, 5 and 0% purity (`purities=` to choose).
 
 ## The God King's Last Stand (design, Oct 5, 2026; to build)
 
