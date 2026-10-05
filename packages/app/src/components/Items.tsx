@@ -12,6 +12,8 @@ import { PawnHat } from "./Cosmetics.tsx";
 
 export interface Finish {
   color: string;
+  /** Two-colour items (a present's ribbon). */
+  color2?: string | null;
   blemish: number;
   seed: number;
 }
@@ -259,18 +261,115 @@ function FireIceCrown({ p }: { p: Paint }) {
   );
 }
 
-const ITEM_ART: Record<string, (p: { p: Paint; side: "w" | "b" }) => ComponentChildren> = {
+/** A present, worn as a helmet: the box over the head down to the neck, its ribbon and bow in the second colour. */
+function Present({ p, p2 }: { p: Paint; p2: Paint }) {
+  return (
+    <g>
+      <Region p={p} name="box" d={["M37 22 L63 22 L63 38 Q63 39.5 61.5 39.5 L38.5 39.5 Q37 39.5 37 38 Z", "M35 15.5 Q35 14.5 36 14.5 L64 14.5 Q65 14.5 65 15.5 L65 22 L35 22 Z"]} />
+      <Region p={p2} name="ribbon" d={["M47 14.5 L53 14.5 L53 39.5 L47 39.5 Z", "M50 14.5 C44 4 34 7 40 14.5 Z", "M50 14.5 C56 4 66 7 60 14.5 Z"]} />
+      <path d="M47 22 H53" fill="none" {...LINE} {...lw(2)} />
+      <circle cx="50" cy="13.6" r="2.6" fill={p2.fill} {...LINE} {...lw(2)} />
+    </g>
+  );
+}
+
+/** A candy cane at the pawn's side: white, striped in its colour. */
+const CANE = "M86 94 L86 30 A14 14 0 0 0 58 30 L58 33 A3 3 0 0 0 64 33 L64 30 A8 8 0 0 1 80 30 L80 94 A3 3 0 0 0 86 94 Z";
+function CandyCane({ p }: { p: Paint }) {
+  const stripes = [];
+  for (let y = -6; y < 112; y += 10) stripes.push(`M50 ${y} L100 ${y + 22} L100 ${y + 27} L50 ${y + 5} Z`);
+  return (
+    <g transform="rotate(14 80 60)">
+      <clipPath id={`${p.id}-cane`}>
+        <path d={CANE} />
+      </clipPath>
+      <path d={CANE} fill="#fbfbf8" />
+      <g clip-path={`url(#${p.id}-cane)`}>
+        <Region p={p} name="stripes" d={stripes} outline={false} />
+        <path d="M84.5 34 V90" stroke="#fff" opacity="0.55" {...lw(1.6)} stroke-linecap="round" />
+      </g>
+      <path d={CANE} fill="none" {...LINE} />
+    </g>
+  );
+}
+
+/** A gingerbread man (a skin): the whole cookie takes the colour; white icing, gumdrop buttons. */
+const GINGER =
+  "M56 34.5 Q60 38 66 39 L78 40 Q84 41 84 47 Q84 53 78 53 L64 53 L64 62 L74 82 Q77 89 70 91 Q65 92 63 87 L53 73 Q50 68 47 73 L37 87 Q35 92 30 91 Q23 89 26 82 L36 62 L36 53 L22 53 Q16 53 16 47 Q16 41 22 40 L34 39 Q40 38 44 34.5 A13 13 0 1 1 56 34.5 Z";
+function Gingerbread({ p, side }: { p: Paint; side: "w" | "b" }) {
+  const icing = side === "w" ? "#fffdf7" : "#2b1d16";
+  const zig = (x: number, y: number, dx: number, dy: number, n: number) => {
+    let d = `M${x} ${y}`;
+    for (let i = 1; i <= n; i++) d += ` L${x + dx * i} ${y + (i % 2 ? dy : 0)}`;
+    return d;
+  };
+  return (
+    <g>
+      <ellipse cx="50" cy="92" rx="26" ry="3" fill="#000" opacity="0.12" />
+      <Region p={p} name="cookie" d={[GINGER]} />
+      <g fill="none" stroke={icing} stroke-linecap="round" stroke-linejoin="round" {...lw(1.8)}>
+        <path d="M22.5 42 Q25 46.5 22.5 51" />
+        <path d={"M77.5 42 Q75 46.5 77.5 51"} />
+        <path d={zig(27, 82.5, 2, 2.4, 4)} />
+        <path d={zig(65, 82.5, 2, 2.4, 4)} />
+        <path d="M45 27 Q50 31 55 27" />
+      </g>
+      <circle cx="45.5" cy="21" r="1.9" fill={icing} />
+      <circle cx="54.5" cy="21" r="1.9" fill={icing} />
+      {[44, 52, 60].map((y, i) => (
+        <circle key={y} cx="50" cy={y} r="2.6" fill={["#e11d48", "#16a34a", "#e11d48"][i]} stroke="#1d1d1f" {...lw(1.2)} />
+      ))}
+    </g>
+  );
+}
+
+/** The cburnett pawn, on the 100 × 100 square (for skins that show the pawn itself). */
+const PAWN_PATH =
+  "m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z";
+
+/** A chimney (a skin): the pawn sitting in a red-brick chimney up to its chest; the cap takes the colour. */
+function Chimney({ p, side }: { p: Paint; side: "w" | "b" }) {
+  const bricks = [];
+  for (let row = 0, y = 64; y < 96; row++, y += 6.5) {
+    bricks.push(<path key={`h${y}`} d={`M24 ${y} H76`} />);
+    for (let x = row % 2 ? 31 : 37.5; x < 76; x += 13) bricks.push(<path key={`v${y}-${x}`} d={`M${x} ${y} v6.5`} />);
+  }
+  return (
+    <g>
+      <g transform="scale(2.2222)">
+        <path d={PAWN_PATH} fill={side === "w" ? "#fff" : "#000"} stroke="#000" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <ellipse cx="50" cy="95" rx="30" ry="3" fill="#000" opacity="0.12" />
+      <clipPath id={`${p.id}-brick`}>
+        <rect x="24" y="61" width="52" height="33" />
+      </clipPath>
+      <rect x="24" y="61" width="52" height="33" fill="#b3322b" />
+      <g clip-path={`url(#${p.id}-brick)`} fill="none" stroke="#f3eee6" {...lw(1.5)}>
+        {bricks}
+      </g>
+      <rect x="24" y="61" width="52" height="33" fill="none" {...LINE} />
+      <Region p={p} name="cap" d={["M19 55 Q19 53.5 20.5 53.5 L79.5 53.5 Q81 53.5 81 55 L81 62.5 L19 62.5 Z"]} />
+    </g>
+  );
+}
+
+const ITEM_ART: Record<string, (p: { p: Paint; p2: Paint; side: "w" | "b" }) => ComponentChildren> = {
   "santa-hat": SantaHat,
   antlers: Antlers,
   "santa-beard": SantaBeard,
   snowman: Snowman,
   "gift-tube": GiftTube,
   "fire-ice-crown": FireIceCrown,
+  present: Present,
+  "candy-cane": CandyCane,
+  gingerbread: Gingerbread,
+  chimney: Chimney,
 };
 
 /** The shine's box where an item is drawn in its own coordinates (the tube is drawn tilted, in a group). */
 const SHINE_BOX: Record<string, [number, number, number, number]> = {
   "gift-tube": [74, 22, 16, 76],
+  "candy-cane": [56, 14, 32, 84],
 };
 
 /** Where each item sits on the pawn's square, to frame it alone (a card, the strip): x, y, w, h. */
@@ -281,6 +380,10 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   snowman: [16, 6, 68, 88],
   "gift-tube": [62, 18, 40, 82],
   "fire-ice-crown": [30, -6, 40, 34],
+  present: [31, 1, 38, 41],
+  "candy-cane": [60, 12, 38, 88],
+  gingerbread: [14, 8, 72, 86],
+  chimney: [16, 14, 68, 84],
 };
 
 /**
@@ -293,6 +396,9 @@ const FRAMES: Record<string, [number, number, number, number]> = {
 const PAWN_ANCHORS = { head: 25, face: 40 };
 const SKIN_ANCHORS: Record<string, { head: number; face: number }> = {
   snowman: { head: 14, face: 22 },
+  gingerbread: { head: 15, face: 26 },
+  // The chimney shows the pawn itself, so its anchors are the pawn's.
+  chimney: PAWN_ANCHORS,
 };
 /** The line in each item's drawing that meets its slot's anchor (head and face items). */
 const ATTACH: Record<string, number> = {
@@ -300,6 +406,7 @@ const ATTACH: Record<string, number> = {
   antlers: 16,
   "fire-ice-crown": 24,
   "santa-beard": 23,
+  present: 25,
 };
 /** How far a piece's anchors sit from the pawn's (for the old shop hats, drawn for the pawn). */
 export const anchorsFor = (skin?: string) => (skin && SKIN_ANCHORS[skin]) || PAWN_ANCHORS;
@@ -307,12 +414,17 @@ export const anchorsFor = (skin?: string) => (skin && SKIN_ANCHORS[skin]) || PAW
 /** One item, drawn into an existing svg on the pawn's square. */
 export function ItemLayer({ def, finish, side = "w" }: { def: string; finish: Finish; side?: "w" | "b" }) {
   const p = usePaint(finish, def);
+  // The second colour (two-colour items): the same blemish, its own blotches.
+  const p2 = usePaint({ color: finish.color2 ?? finish.color, blemish: finish.blemish, seed: finish.seed + 101 }, def);
   const Art = ITEM_ART[def];
   if (!Art) return null;
   return (
     <g>
-      <defs>{p.defs}</defs>
-      <Art p={p} side={side} />
+      <defs>
+        {p.defs}
+        {p2.defs}
+      </defs>
+      <Art p={p} p2={p2} side={side} />
     </g>
   );
 }

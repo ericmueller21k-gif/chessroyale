@@ -29,7 +29,11 @@ describe("crates", () => {
       expect(r.blemish).toBeGreaterThanOrEqual(0);
       expect(r.blemish).toBeLessThanOrEqual(49);
     }
-    expect(count["santa-beard"]! / n).toBeCloseTo(0.55, 1);
+    expect(count["santa-beard"]! / n).toBeCloseTo(0.42, 1);
+    // Sublime (four items) about 14% in all, 3.5% each.
+    const sublime = ["snowman", "present", "gingerbread", "chimney"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
+    expect(sublime).toBeGreaterThan(0.13);
+    expect(sublime).toBeLessThan(0.15);
     expect(fischer / n).toBeGreaterThan(0.015);
     expect(fischer / n).toBeLessThan(0.025);
     // Shiny about 2.5% of the time; Pearl about 0.5%.
@@ -44,9 +48,24 @@ describe("crates", () => {
     for (let i = 0; i < 50; i++) {
       const r = rollCrate(rng, crate, { fischer: true, shiny: true });
       expect(r.fischer).toBe(true);
-      expect(["gift-tube", "fire-ice-crown"]).toContain(r.def);
+      expect(["gift-tube", "candy-cane", "fire-ice-crown"]).toContain(r.def);
       expect(isShiny(r.blemish)).toBe(true);
     }
+  });
+
+  it("a present rolls a second colour; one-colour items don't", () => {
+    const rng = mulberry32(3);
+    let presents = 0;
+    for (let i = 0; i < 5000; i++) {
+      const r = rollCrate(rng, crate);
+      if (r.def === "present") {
+        presents++;
+        expect(ITEM_COLORS.map((c) => c.id)).toContain(r.color2);
+      } else expect(r.color2).toBeUndefined();
+    }
+    expect(presents).toBeGreaterThan(100);
+    expect(cleanLook({ head: { def: "present", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBe("cobalt");
+    expect(cleanLook({ head: { def: "santa-hat", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBeUndefined();
   });
 
   it("purity is shown to one decimal", () => {

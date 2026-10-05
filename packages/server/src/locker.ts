@@ -26,6 +26,9 @@ export const LOCKER_SCHEMA = [
   )`,
 ];
 
+/** Columns added after the tables first shipped (each run once; "duplicate column" afterwards is fine). */
+export const LOCKER_MIGRATIONS = [`ALTER TABLE items ADD COLUMN color2 TEXT`];
+
 export interface LockerState {
   items: ItemInstance[];
   equipped: Partial<Record<ItemSlot, string>>;
@@ -37,7 +40,7 @@ export interface LockerState {
 }
 
 export async function lockerState(sql: Sql, userId: string): Promise<LockerState> {
-  const items = await sql.all<ItemInstance>("SELECT id, def, color, blemish, seed FROM items WHERE user_id = ? ORDER BY created_at DESC", userId);
+  const items = await sql.all<ItemInstance>("SELECT id, def, color, color2, blemish, seed FROM items WHERE user_id = ? ORDER BY created_at DESC", userId);
   const rows = await sql.all<{ slot: ItemSlot; item_id: string }>("SELECT slot, item_id FROM equipped_items WHERE user_id = ?", userId);
   const equipped: LockerState["equipped"] = {};
   const look: ItemLook = {};
@@ -45,8 +48,9 @@ export async function lockerState(sql: Sql, userId: string): Promise<LockerState
     const it = items.find((i) => i.id === r.item_id);
     if (!it || itemDef(it.def)?.slot !== r.slot) continue;
     equipped[r.slot] = it.id;
-    look[r.slot] = { def: it.def, color: it.color, blemish: it.blemish, seed: it.seed };
+    look[r.slot] = { def: it.def, color: it.color, blemish: it.blemish, seed: it.seed, ...(it.color2 ? { color2: it.color2 } : {}) };
   }
+  for (const it of items) if (!it.color2) delete it.color2;
   return { items, equipped, look, crates: CRATES_FREE ? null : 0, keys: CRATES_FREE ? null : 0 };
 }
 
@@ -65,18 +69,19 @@ export async function openCrate(
   const roll = rollCrate(mulberry32(seed), crate, CRATES_FREE ? force : {});
   const id = [...crypto.getRandomValues(new Uint8Array(9))].map((b) => b.toString(16).padStart(2, "0")).join("");
   await sql.run(
-    "INSERT INTO items (id, user_id, def, color, blemish, seed, crate, fischer, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO items (id, user_id, def, color, color2, blemish, seed, crate, fischer, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     id,
     userId,
     roll.def,
     roll.color,
+    roll.color2 ?? null,
     roll.blemish,
     roll.seed,
     crate.id,
     roll.fischer ? 1 : 0,
     now,
   );
-  return { ok: true, roll, item: { id, def: roll.def, color: roll.color, blemish: roll.blemish, seed: roll.seed }, locker: await lockerState(sql, userId) };
+  return { ok: true, roll, item: { id, def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed }, locker: await lockerState(sql, userId) };
 }
 
 /** Equips an item you own in its slot, or (item null) empties the slot. */

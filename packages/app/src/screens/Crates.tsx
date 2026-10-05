@@ -31,7 +31,9 @@ const colorIndex = (c: string) => ITEM_COLORS.findIndex((x) => x.id === c);
 const pct = (x: number) => (x >= 0.01 ? `${(x * 100).toFixed(x >= 0.1 ? 0 : 1)}%` : `${(x * 100).toFixed(2)}%`);
 
 /** An item's one-line finish: "Emerald · Purity 91.5%". */
-export const finishLine = (it: { color: string; blemish: number }) => `${itemColor(it.color).name} · Purity ${purity(it.blemish).toFixed(1)}%`;
+/** Its colour name (both, for a two-colour item). */
+export const colorName = (it: { color: string; color2?: string | null }) => itemColor(it.color).name + (it.color2 ? ` & ${itemColor(it.color2).name}` : "");
+export const finishLine = (it: { color: string; color2?: string | null; blemish: number }) => `${colorName(it)} · Purity ${purity(it.blemish).toFixed(1)}%`;
 
 // ---------------- Crates ----------------
 
@@ -98,7 +100,7 @@ function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
           return (
             <div key={def} class="odds-row" style={{ "--tier": t.color }}>
               <span class="odds-art">
-                <ItemArt def={def} finish={{ color: "red", blemish: 12, seed: 1 }} />
+                <ItemArt def={def} finish={{ color: "red", color2: "emerald", blemish: 12, seed: 1 }} />
               </span>
               <span class="odds-text">
                 <strong>{d.name}</strong>
@@ -153,7 +155,7 @@ function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
 
 // ---------------- Opening ----------------
 
-type Tile = { kind: "item"; def: string; finish: { color: string; blemish: number; seed: number } } | { kind: "fischer" };
+type Tile = { kind: "item"; def: string; finish: { color: string; color2?: string; blemish: number; seed: number } } | { kind: "fischer" };
 
 function pickWeighted<T extends { weight: number }>(list: readonly T[]): T {
   let r = Math.random() * list.reduce((s, x) => s + x.weight, 0);
@@ -161,7 +163,7 @@ function pickWeighted<T extends { weight: number }>(list: readonly T[]): T {
   return list[list.length - 1]!;
 }
 
-const decoyFinish = () => ({ color: pickWeighted(ITEM_COLORS).id, blemish: rollBlemish(Math.random), seed: Math.floor(Math.random() * 2 ** 31) });
+const decoyFinish = () => ({ color: pickWeighted(ITEM_COLORS).id, color2: pickWeighted(ITEM_COLORS).id, blemish: rollBlemish(Math.random), seed: Math.floor(Math.random() * 2 ** 31) });
 
 /** A strip of tiles: decoys by the odds (Fischer Random a little more often than it lands, to tease), the result at `land`. */
 function stripTiles(list: readonly { item: string; weight: number }[], landTile: Tile, length: number, land: number): Tile[] {
@@ -251,7 +253,7 @@ function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fis
   const strips = useMemo(() => {
     if (!result) return null;
     const { roll, item } = result;
-    const finish = { color: item.color, blemish: item.blemish, seed: item.seed };
+    const finish = { color: item.color, color2: item.color2 ?? undefined, blemish: item.blemish, seed: item.seed };
     const first: Tile = roll.fischer ? { kind: "fischer" } : { kind: "item", def: item.def, finish };
     return {
       one: stripTiles(crate.strip, first, 46, 38),
@@ -380,7 +382,7 @@ export function LockerPanel() {
             >
               <ItemArt def={it.def} finish={it} />
               <strong>{d.name}</strong>
-              <span class="small">{itemColor(it.color).name}</span>
+              <span class="small">{colorName(it)}</span>
               <span class="small muted">
                 {purity(it.blemish).toFixed(1)}%{isShiny(it.blemish) ? " ✨" : ""}
               </span>

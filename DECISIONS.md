@@ -871,11 +871,11 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
 
     | Tier | Item | Slot | Chance |
     | --- | --- | --- | --- |
-    | Novice | Santa Beard | face | 55% |
-    | Broad | Antlers | head | 25% |
-    | Paragon | Santa Hat | head | 12% |
-    | Sublime | Snowman | skin | 6% |
-    | Fischer Random (a second spin) | Exalted Gift-Wrap Tube (weapon, 80%) or Transcendent Fire & Ice Crown (head, 20%) | | 2% |
+    | Novice | Santa Beard | face | 42% |
+    | Broad | Antlers | head | 26% |
+    | Paragon | Santa Hat | head | 16% |
+    | Sublime | Snowman, Present, Gingerbread Man, Chimney | skin, head, skin, skin | 14% in all (3.5% each) |
+    | Fischer Random (a second spin) | Exalted Gift-Wrap Tube (weapon, 40%) or Candy Cane (weapon, 40%), Transcendent Fire & Ice Crown (head, 20%) | | 2% |
 
     So the crown is 0.4%.
   - **Colour:** Red 30%, Yellow 30%, Sage 14%, Opal 9%, Cobalt 7%, Midnight 4.5%, Emerald 3%, Oceanic 2%, Pearl 0.5%. Opal, Oceanic and Pearl have a two-tone sheen.
@@ -902,4 +902,11 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - Each head or face item names the line in its own drawing that meets its anchor (`ATTACH` in Items.tsx: the hat's brim, the beard's top edge), and the avatar shifts it there, on a pawn or a skin.
   - A new item needs only that number; a new skin, its anchors.
   - The old shop hats moved up 9 points to sit snug on the head too.
+- **Four more items (Eric, Oct 5):** Present, Candy Cane, Gingerbread Man and Chimney.
+  - **Odds.** Eric asked for the tier below Exalted to be "close to like 12–15% odds". I read that as the Sublime tier, now four items, at 14% in all (3.5% each). Reading it as each item at 12–15% would make Sublime about half of all drops, commoner than the Novice beard, which breaks the "each tier rarer" ladder. To make room, the beard, antlers and hat went from 55/25/12 to 42/26/16. The candy cane splits the Exalted share of Fischer Random with the tube (40/40), and the crown stays at 20% (0.4% overall). Each tier is still rarer than the one before.
+  - **Present: two colours.** It's a helmet: the box covers the head down to the neck, with a bow on top. The box and the ribbon (and bow) each roll a colour with the usual odds, independently, so a matching pair is possible (red & red, about 9%). Items flagged `colors: 2` roll the second colour, stored as `color2`. D1 gets a new column, added once by `ALTER TABLE` on start-up. Both colours share one blemish, with separate blotches. Shown as "Red & Emerald".
+  - **Candy Cane:** always white, striped in its rolled colour; held at the side like the tube.
+  - **Gingerbread Man (skin):** the whole cookie takes the colour, as Eric suggested. White icing and a smile (chocolate icing on the black side), with red and green gumdrop buttons. Anchors: hat 15, beard 26.
+  - **Chimney (skin):** the pawn itself, sitting in a chimney up to its chest. The bricks are always red with white mortar; the rolled colour paints the chimney's cap. The pawn is drawn in the skin, so the anchors are the pawn's.
+  - All four were checked on white and black pawns, on the other skins, and with the other items worn.
 - **Testing switches** (while `CRATES_FREE`): checkboxes on the crate page, or `?fischer=1` / `?shiny=1`, force Fischer Random and a shiny. The server ignores them once crates aren't free.
