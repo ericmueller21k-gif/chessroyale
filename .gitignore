@@ -5,3 +5,4 @@ test-results/
 playwright-report/
 *.log
 reports/demo/
+items-preview.png
