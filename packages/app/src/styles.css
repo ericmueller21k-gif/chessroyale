@@ -4454,48 +4454,195 @@ button.history-label {
   gap: 8px;
 }
 
-/* Boss raid: pick your boss (a scrolling row of cards, weakest first). */
-.boss-picker {
+/* Boss raid: the boss menu that opens when you start (one row per boss, weakest first). */
+.boss-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 2px 2px 8px;
-  margin: 0 -2px;
-  scroll-snap-type: x proximity;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fade 160ms ease-out;
+}
+@media (min-height: 700px) and (min-width: 600px) {
+  .boss-menu-overlay {
+    align-items: center;
+  }
+  .boss-menu {
+    border-radius: 16px;
+  }
+}
+.boss-menu {
+  width: min(100vw, 480px);
+  max-height: 94dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-radius: 16px 16px 0 0;
+  padding: 10px 10px calc(env(safe-area-inset-bottom) + 10px);
+}
+.boss-menu-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px 8px;
+}
+.boss-menu-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.boss-menu-list {
+  display: grid;
+  gap: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
-.boss-picker button {
-  flex: 0 0 auto;
-  width: 96px;
+.boss-row {
   display: grid;
-  justify-items: center;
-  gap: 2px;
-  padding: 8px 6px;
+  grid-template-columns: 36px 1fr 86px;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 5px 10px;
   border: 2px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  text-align: center;
+  text-align: left;
   cursor: pointer;
-  scroll-snap-align: start;
 }
-.boss-picker button.on {
+.boss-row:active {
+  transform: scale(0.98);
+}
+.boss-row.on {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
-.boss-picker .bp-icon {
-  font-size: 28px;
-  line-height: 1.1;
+.boss-row .br-icon {
+  font-size: 26px;
+  line-height: 1;
+  text-align: center;
 }
-.boss-picker strong {
-  font-size: 13px;
+.boss-row .br-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.boss-row .br-main strong {
+  font-size: 15px;
   line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.boss-picker .bp-sub {
+.boss-row .br-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  vertical-align: 2px;
+}
+.boss-row .br-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   color: var(--muted);
+}
+.boss-row.match .br-sub {
+  white-space: normal;
+}
+.boss-row .br-skulls {
+  flex: 0 0 auto;
+  width: 58px;
+  font-size: 10px;
+  letter-spacing: -1px;
   white-space: nowrap;
+}
+/* Each boss's strength as a bar on one shared scale; the line marks your rating. */
+.boss-row .br-bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--good), var(--accent) 50%, var(--bad));
+}
+/* (The unfilled rest of the scale.) */
+.boss-row .br-bar i {
+  position: absolute;
+  inset: 0 0 0 auto;
+  border-radius: 0 3px 3px 0;
+  background: var(--surface-2);
+}
+.boss-row .br-bar::after {
+  content: "";
+  position: absolute;
+  left: var(--you);
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+}
+.boss-row .br-elo {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+}
+.boss-row .br-elo strong {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.boss-row .br-vs {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* The narrowest phones (320 px): a little tighter, so every name fits. */
+@media (max-width: 360px) {
+  .boss-row {
+    grid-template-columns: 28px 1fr 76px;
+    gap: 8px;
+    padding: 5px 8px;
+  }
+  .boss-row .br-icon {
+    font-size: 22px;
+  }
+  .boss-row .br-main strong {
+    font-size: 14px;
+  }
+  .boss-row .br-tag {
+    margin-left: 4px;
+    padding: 1px 4px;
+    font-size: 9px;
+  }
+  .boss-row .br-skulls {
+    width: 50px;
+    font-size: 9px;
+  }
+  .boss-row .br-vs {
+    font-size: 10px;
+  }
+}
+.br-vs.easy {
+  color: var(--good);
+}
+.br-vs.even {
+  color: var(--accent);
+}
+.br-vs.hard {
+  color: #f08c3a;
+}
+.br-vs.brutal {
+  color: var(--bad);
 }
 
 /* Your banner ("QUEEN SLAIN!"): holy gold and blue, the God King's face. */
