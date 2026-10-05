@@ -1,7 +1,7 @@
 """
 The God King's pixel portrait for his cut-in banner: a holy armoured king (spiked
 gold crown on a steel helm, burning gold eyes in the visor, layered gold-trimmed
-pauldrons, the king's cross on his chest, a royal cape), drawn from shapes with
+pauldrons, the king's cross on his chest, a crimson cape), drawn from shapes with
 light from the top left, outlined, with golden sparks.
 
     python3 scripts/god-king-portrait.py   # writes god-king-portrait-w.png and -b.png in packages/app/public/sprites (needs ffmpeg)
@@ -42,7 +42,7 @@ def poly(pts, base, cx=None, cy=None, rx=10, ry=10):
                 if (y1 > py) != (y2 > py) and px < (x2 - x1) * (py - y1) / (y2 - y1) + x1: inside = not inside
             if inside: put(x, y, shade(base, x, y, cx, cy, rx, ry))
 
-# Cape behind (royal blue-violet).
+# Cape behind (royal crimson).
 poly([(2, 60), (6, 34), (20, 30), (44, 30), (58, 34), (62, 60)], "c", 32, 40, 30, 20)
 # Pauldrons: three layered plates each side, gold trims.
 for side in (-1, 1):
@@ -128,7 +128,8 @@ PALETTE = {
     "K": "#0b0b14", "k1": "#0b0b14",
     "s4": "#f4f7fb", "s3": "#c3ccd9", "s2": "#8692a5", "s1": "#4a5366",
     "g4": "#fff1a8", "g3": "#f2c14e", "g2": "#c48a1c", "g1": "#7a5410",
-    "c4": "#7c8cf0", "c3": "#4f46e5", "c2": "#3730a3", "c1": "#1e1b5e",
+    # The cape: royal crimson, so it stands out against the banner's navy.
+    "c4": "#f87171", "c3": "#dc2626", "c2": "#991b1b", "c1": "#5f0f14",
     "e4": "#fffbe0", "e3": "#ffd54a", "e2": "#f59e0b",
     "r3": "#ef4444", "r2": "#991b1b", "b3": "#60a5fa", "b2": "#1d4ed8",
     "p1": "#ffe08a", "p2": "#fbbf24",

@@ -694,7 +694,7 @@ Eric asked for a Fire Emblem style banner the moment the God King raises his swo
   - the target: the piece he moves (the board's own piece art), or the boss's face for a strike.
 - **The portrait.** After two simpler tries that didn't read as godlike, it's a detailed 64 × 60 pixel image in the style of Eric's reference (an ornate armoured lord), as a holy version:
   - a steel helm under a five-spiked gold crown with a cross and jewels, and burning gold eyes in an angled visor;
-  - layered, gold-trimmed pauldrons with gold spikes, a gold gorget, the king's cross on his chest, and a royal blue cape;
+  - layered, gold-trimmed pauldrons with gold spikes, a gold gorget, the king's cross on his chest, and a crimson cape (it was royal blue at first, but blended into the navy banner);
   - golden sparks around him.
   - It's drawn from shapes with light from the top left and outlined, by `scripts/god-king-portrait.py`. It's shown scaled up with crisp pixels and a pulsing golden glow.
   - **Two versions, always** (Eric: everything the God King shows comes in both colours). `god-king-portrait-w.png` and `-b.png` (about 1 KB each) are the same picture with the armour recoloured: white steel for White, blackened steel for Black; gold, eyes, cape and sparks unchanged. The cut-in picks the crowd's colour, like his figure on the board, beside it and in the summon.
