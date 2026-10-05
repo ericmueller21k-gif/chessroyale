@@ -4,6 +4,7 @@ import { buyShopItem, equipShopItem } from "../account.ts";
 import { HattedPawn, KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
+import { CratesPanel, LockerPanel } from "./Crates.tsx";
 
 /**
  * The shop: cosmetics by category. Get an item (free while we test), then
@@ -12,6 +13,7 @@ import { useAccount } from "./Profile.tsx";
 export function ShopScreen({ onBack }: { onBack: () => void }) {
   const { profile, config } = useAccount();
   const [slot, setSlot] = useState<ShopSlot>("king");
+  const [area, setArea] = useState<"shop" | "crates" | "locker">(() => (new URLSearchParams(location.search).has("crates") ? "crates" : "shop"));
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const shop = profile?.shop;
@@ -39,6 +41,19 @@ export function ShopScreen({ onBack }: { onBack: () => void }) {
           🪙 {shop?.coins ?? 0}
         </span>
       </div>
+      <div class="area-tabs" role="tablist">
+        {(["shop", "crates", "locker"] as const).map((a) => (
+          <button type="button" role="tab" key={a} aria-selected={area === a} class={area === a ? "on" : ""} onClick={() => setArea(a)}>
+            {a === "shop" ? "Shop" : a === "crates" ? "Crates" : "Locker"}
+          </button>
+        ))}
+      </div>
+      {config?.accounts && profile && area === "crates" ? (
+        <CratesPanel />
+      ) : config?.accounts && profile && area === "locker" ? (
+        <LockerPanel />
+      ) : (
+        <>
       {SHOP_FREE && <p class="shop-note">Everything is free while we test the shop.</p>}
       {!config?.accounts || !shop ? (
         <p class="muted">The shop needs your account, which isn't available here.</p>
@@ -78,6 +93,8 @@ export function ShopScreen({ onBack }: { onBack: () => void }) {
             })}
           </div>
           <p class="muted small shop-soon">Coming later: King kill moves and more animations.</p>
+        </>
+      )}
         </>
       )}
     </div>

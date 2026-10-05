@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { PREGAME_VOTES, VOTE_ZONE_FILES, allVoteMoves, equippedLook, voteMoves, voteOptionOf } from "@chessroyale/core";
+import { type ItemLook, PREGAME_VOTES, VOTE_ZONE_FILES, allVoteMoves, equippedLook, voteMoves, voteOptionOf } from "@chessroyale/core";
 import { account } from "../account.ts";
-import { PawnHat } from "../components/Cosmetics.tsx";
+import { Avatar } from "../components/Items.tsx";
 import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
@@ -19,14 +19,15 @@ function zoneBox(option: number, orientation: "white" | "black") {
 }
 
 /** Your pawn's hat, on the square it was pushed to. */
-function VoteHat({ square, orientation, hat }: { square: string; orientation: "white" | "black"; hat: string }) {
+/** Your pushed pawn as you look: your skin (a snowman replaces the pawn) and your items, on its square. */
+function VoteAvatar({ square, orientation, hat, look, side }: { square: string; orientation: "white" | "black"; hat: string; look: ItemLook; side: "w" | "b" }) {
   const f = square.charCodeAt(0) - 97;
   const r = Number(square[1]) - 1;
   const col = orientation === "white" ? f : 7 - f;
   const row = orientation === "white" ? 7 - r : r;
   return (
-    <span class="vote-hat" style={{ left: `${col * 12.5}%`, top: `${row * 12.5}%` }}>
-      <PawnHat hat={hat} />
+    <span class="vote-hat vote-avatar" style={{ left: `${col * 12.5}%`, top: `${row * 12.5}%` }}>
+      <Avatar look={look} side={side} hat={hat} />
     </span>
   );
 }
@@ -58,7 +59,11 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
   const visible = vote.votes.filter((v) => v.at <= now || match.isYou(v.playerId));
   const counts = def.options.map((_, i) => visible.filter((v) => v.option === i).length);
   const rank = useMemo(() => new Map(match.standings().map((s, i) => [s.id, i])), [vote.key]);
-  const ghosts: GhostPick[] = visible.map((v) => ({
+  // Your look (crate items) and shop hat: if you wear anything, your pawn shows as you (not a ghost).
+  const look = account().profile?.locker?.look ?? {};
+  const hat = equippedLook(account().profile?.shop, "hat").hat ?? "none";
+  const dressed = hat !== "none" || Object.keys(look).length > 0;
+  const ghosts: GhostPick[] = visible.filter((v) => !(dressed && match.isYou(v.playerId) && myMove)).map((v) => ({
     id: v.playerId,
     name: match.isYou(v.playerId) ? "You" : match.nameOf(v.playerId),
     move: match.isYou(v.playerId) && myMove ? myMove : pawnFor(v.playerId, v.side, v.option),
@@ -74,8 +79,6 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
     setMyMove(move ?? voteMoves(side, option)[0]!);
     match.castVote(option);
   };
-  // Your hat from the shop, on the pawn you pushed.
-  const hat = equippedLook(account().profile?.shop, "hat").hat ?? "none";
   const nextLabel = vote.index + 1 < vote.count ? PREGAME_VOTES[vote.index + 1]!.title : "The game begins";
   const nextIn = vote.nextAt ? Math.max(0, Math.ceil((vote.nextAt - now) / 1000)) : null;
 
@@ -124,7 +127,7 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
               })}
             </div>
             <CrowdGhosts fen={fen} picks={ghosts} orientation={orientation} animate={animate} trail={trail} faint tags={false} />
-            {mine && myMove && hat !== "none" && <VoteHat square={myMove.slice(2, 4)} orientation={orientation} hat={hat} />}
+            {mine && myMove && dressed && <VoteAvatar square={myMove.slice(2, 4)} orientation={orientation} hat={hat} look={look} side={side} />}
             {winner && (
               <div class="vote-banner" role="status">
                 <span class="vote-banner-icon">{winner.icon}</span>

@@ -1,3 +1,4 @@
+import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -60,6 +61,8 @@ export interface NetStanding {
   placement: number | null;
   /** Crowd 50 v 50: the player's team (the side they play all match). */
   team?: "w" | "b" | null;
+  /** A person's crate items (shown on the cut screen). */
+  look?: ItemLook;
 }
 
 export interface NetPick {
@@ -175,7 +178,8 @@ export interface NetVote {
 }
 
 export type ClientMessage =
-  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; rating?: number | null }
+  /** `look`: the crate items you wear (others see them on the cut screen). */
+  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; rating?: number | null; look?: unknown }
   | { t: "start" }
   | { t: "pick"; key: string; move: string }
   | { t: "powerUp"; key: string }

@@ -162,7 +162,7 @@ export class NetMatch implements GameView {
         // No storage: join as a new player.
       }
       const device = matchMedia("(pointer: coarse)").matches ? "phone" : "computer";
-      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, rating: account().profile?.rating ?? null });
+      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, rating: account().profile?.rating ?? null, look: account().profile?.locker?.look ?? {} });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as ServerMessage);
     ws.onclose = () => {
