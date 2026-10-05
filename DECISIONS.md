@@ -679,3 +679,7 @@ Eric's feedback after playing it: too much King.
   - Urgent moments always speak: queen in danger, check, his own actions, a boss blunder.
   - Two lines that aren't urgent stay at least 8 s apart, so the reveal and the boss's move can't both talk over each other.
 - **Boss blunders.** The boss screen compares the engine's numbers before and after the boss's move (the eval bar's, cached). A swing of 15 points or more toward the crowd always gets a line, such as "It's reeling! Want me to finish it?" or "A blunder! Find the punishing move." This catches the weak bosses' random stumbles and real blunders alike.
+
+## The God King's bubble carries across screens (Oct 5, 2026)
+
+Eric saw the bubble flash a couple of times as it ended. Each screen of a turn (your move, the reveal, the boss's turn) draws its own God King, and a line still showing when the screen changed popped in and retyped from the first letter on the new screen, sometimes only 0.1 s before it ended. Now the line remembers when it started: a new screen picks it up where it was (no second pop-in, no retyping), and it fades out over its last quarter-second.

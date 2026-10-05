@@ -81,7 +81,7 @@ const QUIET_MS = 8000;
 const REST_MOVES = 3;
 const PER_QUIET_MOVE = 0.3;
 
-let current: { text: string; until: number } | null = null;
+let current: { text: string; at: number; until: number } | null = null;
 let lastAt = 0;
 let quietMoves = 0;
 const turns = new Set<string>();
@@ -112,15 +112,19 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
   const options = lines.length > 1 ? lines.filter((l) => l !== lastLine.get(cue)) : lines;
   const text = options[Math.floor(rng() * options.length)]!;
   lastLine.set(cue, text);
-  current = { text, until: now + SPEECH_MS };
+  current = { text, at: now, until: now + SPEECH_MS };
   lastAt = now;
   quietMoves = 0;
   return text;
 }
 
-/** The line on screen right now, if any. */
-export function kingLine(now = Date.now()): string | null {
-  return current && now < current.until ? current.text : null;
+/**
+ * The line on screen right now, if any, and when it started. Every screen of a
+ * turn draws its own God King; they all show the same line from the same moment,
+ * so a screen change carries on where the bubble was instead of starting over.
+ */
+export function kingLine(now = Date.now()): { text: string; at: number; until: number } | null {
+  return current && now < current.until ? current : null;
 }
 
 /** For tests: forget everything said. */

@@ -16,7 +16,7 @@ describe("the God King's lines", () => {
     const t = 1_000_000;
     const intro = kingSay("intro", "intro", t, always)!;
     expect(KING_LINES.intro).toContain(intro);
-    expect(kingLine(t + 100)).toBe(intro);
+    expect(kingLine(t + 100)).toEqual({ text: intro, at: t, until: t + SPEECH_MS });
     expect(kingLine(t + SPEECH_MS + 1)).toBeNull();
     // The same moment again (a screen drawn twice): silent.
     expect(kingSay("intro", "intro", t + 10, always)).toBeNull();

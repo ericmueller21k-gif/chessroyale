@@ -124,7 +124,7 @@ function GodKingUnit({
   const line = kingLine(now);
   return (
     <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}`}>
-      {menu ?? (line && !away && <SpeechBubble key={line} text={line} />)}
+      {menu ?? (line && !away && <SpeechBubble key={line.at} text={line.text} at={line.at} until={line.until} now={now} />)}
       <button type="button" class="gk-unit-btn" disabled={!ready} onClick={onTap} aria-label={ready ? "God King: tap to summon him" : "God King"}>
         <GodKingSprite side={side} class="idle" />
       </button>
@@ -135,13 +135,17 @@ function GodKingUnit({
   );
 }
 
-/** A pixel speech bubble; the words type themselves out. */
-function SpeechBubble({ text }: { text: string }) {
-  const [start] = useState(Date.now());
-  const now = useFrameNow();
-  const shown = Math.min(text.length, Math.floor((now - start) / 28) + 1);
+/**
+ * A pixel speech bubble; the words type themselves out. It runs from the line's
+ * own start (`at`), so a new screen mid-line picks up where the last one was:
+ * no second pop-in, no retyping. It fades out over its last moments.
+ */
+function SpeechBubble({ text, at, until, now }: { text: string; at: number; until: number; now: number }) {
+  const shown = Math.min(text.length, Math.floor((now - at) / 28) + 1);
+  const fresh = now - at < 200;
+  const leaving = until - now < 260;
   return (
-    <div class="gk-bubble" role="status" aria-label={text}>
+    <div class={`gk-bubble${fresh ? " fresh" : ""}${leaving ? " leaving" : ""}`} role="status" aria-label={text}>
       <span aria-hidden="true">{text.slice(0, shown)}</span>
       <span class="gk-bubble-rest" aria-hidden="true">
         {text.slice(shown)}
