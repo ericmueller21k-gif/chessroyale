@@ -619,7 +619,7 @@ export class MatchRunner {
     return sideToMove(this.boards.get(this.state.boards[0]!)!.fen) !== b.crowdSide;
   }
 
-  /** Whether the boss stumbles this move (a random top-5 move): only a weak boss does, now and then. */
+  /** Whether the boss slips this move (a small inaccuracy from its top moves): only a weak boss does, now and then. */
   bossStumbles(): boolean {
     return this.opts.rng() < bossStumbleChance(this.state.boss!.elo, this.settings);
   }
@@ -634,7 +634,7 @@ export class MatchRunner {
   async playBoss(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const kind = this.bossMoveKind();
-    const move = await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss);
+    const move = await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings));
     this.applyBossMove(move, kind === "stagger");
     return move;
   }
@@ -900,10 +900,58 @@ export class MatchRunner {
 
 export type BossMoveKind = "elo" | "stumble" | "stagger";
 
+/** The limits on a boss's moves (see bossSlipLoss, bossMaxLoss and bossMaxLogitLoss in settings). */
+export interface BossGuard {
+  slipLoss: readonly [number, number];
+  maxLoss: number;
+  maxLogitLoss: number;
+}
+
+export const DEFAULT_BOSS_GUARD: BossGuard = { slipLoss: [2, 7], maxLoss: 10, maxLogitLoss: 1 };
+
+export const bossGuardFrom = (s: { bossSlipLoss: readonly [number, number]; bossMaxLoss: number; bossMaxLogitLoss: number }): BossGuard => ({
+  slipLoss: s.bossSlipLoss,
+  maxLoss: s.bossMaxLoss,
+  maxLogitLoss: s.bossMaxLogitLoss,
+});
+
+const logit = (p: number) => {
+  const q = Math.min(0.999, Math.max(0.001, p));
+  return Math.log(q / (1 - q));
+};
+
 /**
- * The boss's move. "elo": Stockfish at its strength. "stumble" (a weak boss, now and then): any legal move, a
- * real mistake the crowd can punish. "stagger" (the King struck it): from its top moves, one that gives away
- * `strikeLoss` points (the one nearest the middle of that range): a clear step back, never a disaster.
+ * How much a move gives away against the best: points of expected score (0-100) and log-odds. Log-odds
+ * catch a blunder in a position that's already won or lost, where the points shrink (0.05 to 0.01 is 4
+ * points but throws the rest away).
+ */
+export function moveLoss(best: number, got: number): { points: number; logit: number } {
+  const g = Math.min(best, got);
+  return { points: (best - g) * 100, logit: logit(best) - logit(g) };
+}
+
+/** Within the guard: never more than maxLoss points, nor more than maxLogitLoss log-odds (a couple of points is always fine). */
+export function withinGuard(loss: { points: number; logit: number }, guard: BossGuard): boolean {
+  return loss.points <= guard.maxLoss && (loss.logit <= guard.maxLogitLoss || loss.points <= 2);
+}
+
+/** From the top moves, the one nearest the middle of `range` (points lost) that the guard allows; the best if none is in range. */
+function pickByLoss(top: readonly MoveScore[], range: readonly [number, number], guard: BossGuard): string {
+  const best = top[0]!.expected;
+  const scored = top.map((m) => ({ move: m.move, loss: moveLoss(best, m.expected) })).filter((m) => withinGuard(m.loss, guard));
+  const [lo, hi] = range;
+  const mid = (lo + hi) / 2;
+  const inRange = scored.filter((m) => m.loss.points >= lo && m.loss.points <= hi);
+  if (!inRange.length) return top[0]!.move;
+  return [...inRange].sort((a, b) => Math.abs(a.loss.points - mid) - Math.abs(b.loss.points - mid))[0]!.move;
+}
+
+/**
+ * The boss's move. "elo": Stockfish at its strength. "stumble" (a weak boss, now and then): a slip, a small
+ * deliberate inaccuracy from its top moves. "stagger" (the King struck it): from its top moves, one that gives
+ * away `strikeLoss` points: a clear step back. Every move then passes the blunder guard: Stockfish's limited
+ * strength picks some moves that hang a piece or the queen; one that gives away more than the guard allows is
+ * swapped for a slip. A boss loses on mistakes, never by throwing material away.
  */
 export async function bossMoveFrom(
   engine: EngineLike,
@@ -911,26 +959,35 @@ export async function bossMoveFrom(
   elo: number,
   nodes: number,
   kind: BossMoveKind | boolean,
-  rng: Rng = Math.random,
+  _rng: Rng = Math.random,
   strikeLoss: readonly [number, number] = [5, 15],
+  guard: BossGuard = DEFAULT_BOSS_GUARD,
 ): Promise<string> {
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
-  if (k === "stumble") {
-    const legal = legalMoves(fen);
-    return legal[Math.floor(rng() * legal.length)]!;
-  }
+  const top = await engine.topMoves(fen, 8);
+  if (!top.length) return legalMoves(fen)[0]!;
+  const bestMove = top[0]!.move;
+  // A move other than the best is checked once more, head to head with the best in one focused search (the
+  // eight-line search spreads itself thin and now and then misjudges a move); failing that, the best is played.
+  const confirm = async (move: string, g: BossGuard): Promise<string> => {
+    if (move === bestMove) return move;
+    const scored = await engine.scoreMoves(fen, [bestMove, move]);
+    const best = scored.find((m) => m.move === bestMove)?.expected;
+    const got = scored.find((m) => m.move === move)?.expected;
+    if (best === undefined || got === undefined) return bestMove;
+    return withinGuard(moveLoss(Math.max(best, got), got), g) ? move : bestMove;
+  };
+  if (k === "stumble") return confirm(pickByLoss(top, guard.slipLoss, guard), guard);
+  // The King's strike may give away more than a slip, up to its own range (still never a piece for nothing).
   if (k === "stagger") {
-    const top = await engine.topMoves(fen, 8);
-    const best = top[0]!.expected;
-    const withLoss = top.map((m) => ({ move: m.move, loss: (best - m.expected) * 100 }));
-    const [lo, hi] = strikeLoss;
-    const mid = (lo + hi) / 2;
-    const inRange = withLoss.filter((m) => m.loss >= lo && m.loss <= hi);
-    const pool = inRange.length ? inRange : withLoss.filter((m) => m.loss <= hi * 1.5);
-    return [...pool].sort((a, b) => Math.abs(a.loss - mid) - Math.abs(b.loss - mid))[0]!.move;
+    const g = { ...guard, maxLoss: Math.max(guard.maxLoss, strikeLoss[1]), maxLogitLoss: Math.max(guard.maxLogitLoss, 1.5) };
+    return confirm(pickByLoss(top, strikeLoss, g), g);
   }
-  if (!engine.playAtElo) return (await engine.topMoves(fen, 1))[0]!.move;
-  return engine.playAtElo(fen, elo, nodes);
+  if (!engine.playAtElo) return bestMove;
+  const move = await engine.playAtElo(fen, elo, nodes);
+  const best = top[0]!.expected;
+  const got = top.find((m) => m.move === move)?.expected ?? (await engine.scoreMoves(fen, [move]))[0]?.expected ?? 0;
+  return confirm(withinGuard(moveLoss(best, got), guard) ? move : pickByLoss(top, guard.slipLoss, guard), guard);
 }
 
 /** A board as sent to (and shown in) the app. */

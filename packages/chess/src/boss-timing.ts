@@ -1,3 +1,5 @@
+import { fenAfter, pieceAt } from "./rules.ts";
+
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
  * and the clock that ends it agree.
@@ -19,4 +21,16 @@ export function bossIntroTimeline(plies: number) {
 /** How long the boss's move stays on screen: longer when it takes your queen (its banner and roar). */
 export function bossShowMs(lastMove: { captured?: string } | null | undefined): number {
   return 1800 + (lastMove?.captured === "q" ? 1300 : 0);
+}
+
+/** The last move in a game (from the starting position) took a queen. */
+export function lastMoveTookQueen(history: readonly string[]): boolean {
+  const m = history[history.length - 1];
+  if (!m) return false;
+  return pieceAt(fenAfter(history.slice(0, -1)), m.slice(2, 4))?.type === "q";
+}
+
+/** The boss thinks for at least this long; longer when the crowd has just taken its queen (your banner plays first). */
+export function bossThinkMs(history: readonly string[]): number {
+  return lastMoveTookQueen(history) ? 2000 : 1200;
 }

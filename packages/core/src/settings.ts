@@ -71,9 +71,18 @@ export interface Settings {
   /** Bots call the King when the crowd's popular move loses at least this many points, and back a human's call with this chance. */
   kingBotLoss: number;
   kingBotFollow: number;
-  /** Boss battle: below this strength the boss sometimes plays a random legal move instead (up to this chance). */
+  /** Boss battle: below this strength the boss sometimes slips (up to this chance): a small deliberate inaccuracy, never a blunder. */
   bossStumbleBelow: number;
   bossStumbleMax: number;
+  /** Boss battle: a slip gives away this many points (from its top moves; the one nearest the middle). */
+  bossSlipLoss: readonly [number, number];
+  /**
+   * Boss battle, the blunder guard: no boss move may give away more than this many points of expected score, nor
+   * more than this much in log-odds (the same guard in a position that's already won or lost, where points shrink).
+   * Stockfish's own limited strength hangs pieces; a move that would is swapped for a slip.
+   */
+  bossMaxLoss: number;
+  bossMaxLogitLoss: number;
   /** Augments: seconds added or taken per vote, and the clock's limits. */
   clockStepSeconds: number;
   clockRange: readonly [number, number];
@@ -176,6 +185,9 @@ export const DEFAULT_SETTINGS: Settings = {
   kingBotFollow: 0.6,
   bossStumbleBelow: 2100,
   bossStumbleMax: 0.25,
+  bossSlipLoss: [2, 7],
+  bossMaxLoss: 10,
+  bossMaxLogitLoss: 1,
   clockStepSeconds: 5,
   clockRange: [10, 40],
   lobbySize: 64,

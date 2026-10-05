@@ -13,6 +13,7 @@ import {
   type ServerMessage,
   type UciEngine,
   TopMovesCache,
+  bossGuardFrom,
   bossMoveFrom,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
@@ -397,7 +398,7 @@ export class NetMatch implements GameView {
   private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger") {
     try {
       const [engine] = await this.engines();
-      const move = await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss);
+      const move = await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings));
       this.send({ t: "bossMove", key, move });
     } catch {
       // No engine here: the server asks someone else, or plays a random move.

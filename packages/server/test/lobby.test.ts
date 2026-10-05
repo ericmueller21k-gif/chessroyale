@@ -370,6 +370,8 @@ describe("lobby: Crowd mode", () => {
         const host = L.last("p1", "bossRequest") ? "p1" : "p2";
         L.core.message(host, { t: "bossMove", key: req.key, move: legalMoves(req.fen)[0]! });
         bossMoves++;
+        // (Held a moment if the crowd just took its queen: its banner plays first.)
+        if (L.core.record.bossPending) L.advance(2100);
         const b = L.last("p2", "boss")!;
         expect(b.boss.lastMove).not.toBeNull();
         L.take("p1");
