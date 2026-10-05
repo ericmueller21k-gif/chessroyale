@@ -23,7 +23,7 @@ import {
 import { account, equipLockerItem, openCrate } from "../account.ts";
 import { Avatar, CrateArt, FischerArt, ItemArt, KeyArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
-import { play } from "../sound.ts";
+import { play, unlockAudio } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
@@ -139,6 +139,8 @@ function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
         type="button"
         class="ff-button"
         onClick={() => {
+          // (A tap: the moment a phone allows sound, so the strip's clicks are heard.)
+          unlockAudio();
           play("menuSelect");
           setOpening(true);
         }}

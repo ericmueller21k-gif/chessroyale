@@ -5237,31 +5237,7 @@ button.history-label {
   gap: 8px;
   margin-top: 6px;
 }
-/* A shiny item glints (its colour sweeps in the drawing; this adds a sparkle). */
-.item-art.shiny {
-  position: relative;
-}
-.item-art.shiny::after {
-  content: "✦";
-  position: absolute;
-  top: 2%;
-  right: 6%;
-  font-size: max(10px, 16%);
-  color: #fff8c4;
-  text-shadow: 0 0 6px #fde047;
-  animation: sparkle 1.6s ease-in-out infinite;
-}
-@keyframes sparkle {
-  0%,
-  100% {
-    transform: scale(0.6) rotate(0deg);
-    opacity: 0.4;
-  }
-  50% {
-    transform: scale(1.15) rotate(45deg);
-    opacity: 1;
-  }
-}
+/* A shiny item: its shine rolls across the drawing itself (Items.tsx). */
 /* The locker. */
 .locker-preview {
   display: flex;
@@ -5318,4 +5294,23 @@ button.history-label {
 .vote-avatar .avatar {
   width: 100%;
   height: 100%;
+}
+/* A shiny item's shine rolls across it: slowly over, then a pause. */
+.item-shine {
+  mix-blend-mode: screen;
+  animation: shine-roll 4.2s ease-in-out infinite;
+}
+@keyframes shine-roll {
+  0% {
+    transform: translateX(calc(-1 * var(--shine-d)));
+  }
+  70%,
+  100% {
+    transform: translateX(var(--shine-d));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .item-shine {
+    animation: none;
+  }
 }
