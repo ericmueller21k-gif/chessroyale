@@ -683,3 +683,22 @@ Eric's feedback after playing it: too much King.
 ## The God King's bubble carries across screens (Oct 5, 2026)
 
 Eric saw the bubble flash a couple of times as it ended. Each screen of a turn (your move, the reveal, the boss's turn) draws its own God King, and a line still showing when the screen changed popped in and retyped from the first letter on the new screen, sometimes only 0.1 s before it ended. Now the line remembers when it started: a new screen picks it up where it was (no second pop-in, no retyping), and it fades out over its last quarter-second.
+
+## The God King's cut-in banner (Oct 5, 2026)
+
+Eric asked for a Fire Emblem style banner the moment the God King raises his sword, before he moves the piece.
+
+- **What it shows.** It uses the START banner's motion (flash, slanted band over speed lines, slam), in his colours instead of red: navy and indigo with gold borders. Left to right:
+  - his pixel portrait: crowned, helmed, eyes burning white with a blue glow, a red cape behind;
+  - "GOD KING" over what he's doing: the move in SAN (e.g. "Bxe7") or "STRIKE!";
+  - the target: the piece he moves (the board's own piece art), or the boss's face for a strike.
+- **The portrait.** After two simpler tries that didn't read as godlike, it's a detailed 64 × 60 pixel image in the style of Eric's reference (an ornate armoured lord), as a holy version:
+  - a steel helm under a five-spiked gold crown with a cross and jewels, and burning gold eyes in an angled visor;
+  - one big gold-rimmed pauldron per shoulder, its layered plates shown as seams inside it (two stacked plates read as four shoulders), with gold spikes; a gold gorget, the king's cross on his chest, and a crimson cape (it was royal blue at first, but blended into the navy banner);
+  - golden sparks around him.
+  - It's drawn from shapes with light from the top left and outlined, by `scripts/god-king-portrait.py`. It's shown scaled up with crisp pixels and a pulsing golden glow.
+  - **Two versions, always** (Eric: everything the God King shows comes in both colours). `god-king-portrait-w.png` and `-b.png` (about 1 KB each) are the same picture with the armour recoloured: white steel for White, blackened steel for Black; gold, eyes, cape and sparks unchanged. The cut-in picks the crowd's colour, like his figure on the board, beside it and in the summon.
+- **Timing.** The banner plays for 1.5 s right after his "hyuah!" sword raise. His bolt, the move and the strike's three slashes all come 1.5 s later than before.
+  - The reveal where he plays the move gets 5.4 s extra (was 3.9 s), in solo and online.
+  - A strike stops the clock for 5.9 s (`kingStrikeMs`, was 4.4 s).
+- **Sound.** `cutin.mp3`: a whoosh into a sword ring (CC0 retro pack).

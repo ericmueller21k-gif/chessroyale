@@ -109,6 +109,7 @@ export function PlayScreen({
       startAt: strike.at,
       moveAt: strike.at,
       exitAt: strike.until! - 900,
+      bossIcon: match.boss?.icon,
     };
   }, [strike?.at, board.fen]);
   // What the God King might say about the position: danger first, then how it's going, then small talk.

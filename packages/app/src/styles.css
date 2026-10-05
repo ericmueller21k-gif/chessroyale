@@ -4047,3 +4047,102 @@ button.history-label {
 .gk-unit.open .gk-unit-btn {
   box-shadow: 0 0 0 2px #f2c14e, 0 0 14px rgba(242, 193, 78, 0.6);
 }
+
+/* The God King's cut-in: the START banner's motion in his colours, his portrait, the move, the piece. */
+.fight-banner.king-cut .fb-band {
+  height: 36%;
+  gap: 2.5cqw;
+  background: linear-gradient(90deg, #050816, #1e3a8a 22%, #312e81 50%, #1e3a8a 78%, #050816);
+  border-color: #f2c14e;
+  box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(242, 193, 78, 0.45), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.kc-portrait {
+  position: relative;
+  flex: none;
+  width: 28cqw;
+  transform: skewY(7deg);
+  animation: kc-portrait 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+.gk-portrait {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0.5cqw 0.5cqw 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 1.2cqw rgba(242, 193, 78, 0.45));
+  animation: gk-portrait-glow 0.9s ease-in-out infinite alternate;
+}
+@keyframes gk-portrait-glow {
+  to {
+    filter: drop-shadow(0.5cqw 0.5cqw 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 2.4cqw rgba(255, 224, 138, 0.75));
+  }
+}
+.kc-words {
+  min-width: 0;
+}
+.kc-label {
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 2.6cqw;
+  color: #f2c14e;
+  text-shadow: 2px 2px 0 #0b0b1a;
+  letter-spacing: 0.06em;
+  margin-bottom: 1.2cqw;
+  animation: fb-sub 1.5s ease-out both;
+}
+.fight-banner.king-cut .kc-text {
+  font-size: 11cqw;
+  color: #fff7d6;
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    0 0 24px rgba(147, 197, 253, 0.9);
+}
+.kc-target {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 15cqw;
+  height: 15cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 247, 214, 0.35), transparent 70%);
+  transform: skewY(7deg);
+  animation: kc-target 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+.kc-target piece {
+  position: absolute;
+  inset: 8%;
+  width: auto;
+  height: auto;
+  background-size: cover;
+}
+.kc-boss {
+  font-size: 10cqw;
+  line-height: 1;
+}
+@keyframes kc-portrait {
+  0%,
+  8% {
+    opacity: 0;
+    translate: -70% 0;
+  }
+  20%,
+  100% {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes kc-target {
+  0%,
+  22% {
+    opacity: 0;
+    scale: 0.4;
+  }
+  32% {
+    opacity: 1;
+    scale: 1.15;
+  }
+  38%,
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+}

@@ -32,6 +32,7 @@ const SAMPLE_FILES = {
   gkHit: "/sounds/god-king/hit.mp3",
   gkLeave: "/sounds/god-king/leave.mp3",
   gkSlash: "/sounds/god-king/slash.mp3",
+  gkCutIn: "/sounds/god-king/cutin.mp3",
   bannerStart: "/sounds/banner/start.mp3",
   bossRoar: "/sounds/banner/boss-roar.mp3",
   menuOpen: "/sounds/menu/open.mp3",
@@ -227,6 +228,7 @@ export type SoundName =
   | "gkHit"
   | "gkLeave"
   | "gkSlash"
+  | "gkCutIn"
   | "bannerStart"
   | "bossRoar"
   | "menuOpen"
@@ -257,6 +259,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gkBolt: (t) => sample("gkBolt", t, 0.8),
   gkHit: (t) => sample("gkHit", t, 0.8),
   gkSlash: (t) => sample("gkSlash", t, 0.85),
+  gkCutIn: (t) => sample("gkCutIn", t, 0.85),
   bannerStart: (t) => sample("bannerStart", t, 0.9),
   bossRoar: (t) => sample("bossRoar", t, 0.9),
   menuOpen: (t) => sample("menuOpen", t, 0.7),
