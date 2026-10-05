@@ -67,6 +67,8 @@ export function unlockAudio() {
 }
 
 export const isMuted = () => muted;
+/** Sound is on (the audio context is running). */
+export const audioRunning = () => ctx?.state === "running";
 export function setMuted(m: boolean) {
   muted = m;
   try {

@@ -89,9 +89,11 @@ interface Paint {
   finish: Finish;
   /** Fills that go from the colour to a bright tip (the crown's flames). */
   flameFill: string;
+  /** The item's own box (where it's drawn), so the shine rolls across the item itself. */
+  box: [number, number, number, number];
 }
 
-function usePaint(finish: Finish): Paint {
+function usePaint(finish: Finish, def: string): Paint {
   const id = useUid();
   const c = itemColor(finish.color);
   const sheen = c.hex2;
@@ -110,11 +112,12 @@ function usePaint(finish: Finish): Paint {
         <stop offset="1" stop-color={lighten(c.hex, 0.85)} />
       </linearGradient>
       {isShiny(finish.blemish) && (
-        <linearGradient id={`${id}-s`} x1="0" y1="0" x2="1" y2="0.4">
-          <stop offset="0.35" stop-color="#fff" stop-opacity="0" />
-          <stop offset="0.5" stop-color="#fff" stop-opacity="0.85" />
-          <stop offset="0.65" stop-color="#fff" stop-opacity="0" />
-          <animateTransform attributeName="gradientTransform" type="translate" values="-1 0;1 0;1 0" keyTimes="0;0.55;1" dur="2.8s" repeatCount="indefinite" />
+        <linearGradient id={`${id}-s`} x1="0" y1="0" x2="1" y2="0.5">
+          <stop offset="0.12" stop-color="#fff" stop-opacity="0" />
+          <stop offset="0.35" stop-color="#fff" stop-opacity="0.3" />
+          <stop offset="0.5" stop-color="#fff" stop-opacity="0.75" />
+          <stop offset="0.65" stop-color="#fff" stop-opacity="0.3" />
+          <stop offset="0.88" stop-color="#fff" stop-opacity="0" />
         </linearGradient>
       )}
     </>
@@ -127,6 +130,7 @@ function usePaint(finish: Finish): Paint {
     defs,
     finish,
     flameFill: `url(#${id}-f)`,
+    box: SHINE_BOX[def] ?? FRAMES[def] ?? [0, 0, 100, 100],
   };
 }
 
@@ -154,7 +158,12 @@ function Region({ p, d, name, fill, over, outline = true }: { p: Paint; d: strin
       <g clip-path={`url(#${clip})`}>
         {over}
         {blotches && <path d={blotches} fill={p.blotch} opacity="0.85" />}
-        {isShiny(p.finish.blemish) && <rect x="-10" y="-20" width="120" height="140" fill={`url(#${p.id}-s)`} />}
+        {isShiny(p.finish.blemish) && (
+          // The shine: a soft band of light that rolls slowly across the item (a CSS animation slides it).
+          <g class="item-shine" style={{ "--shine-d": `${(p.box[2] * 1.2).toFixed(1)}px` }}>
+            <rect x={p.box[0]} y={p.box[1]} width={p.box[2]} height={p.box[3]} fill={`url(#${p.id}-s)`} />
+          </g>
+        )}
       </g>
       {outline &&
         d.map((x) => (
@@ -259,6 +268,11 @@ const ITEM_ART: Record<string, (p: { p: Paint; side: "w" | "b" }) => ComponentCh
   "fire-ice-crown": FireIceCrown,
 };
 
+/** The shine's box where an item is drawn in its own coordinates (the tube is drawn tilted, in a group). */
+const SHINE_BOX: Record<string, [number, number, number, number]> = {
+  "gift-tube": [74, 22, 16, 76],
+};
+
 /** Where each item sits on the pawn's square, to frame it alone (a card, the strip): x, y, w, h. */
 const FRAMES: Record<string, [number, number, number, number]> = {
   "santa-hat": [30, 0, 46, 30],
@@ -271,7 +285,7 @@ const FRAMES: Record<string, [number, number, number, number]> = {
 
 /** One item, drawn into an existing svg on the pawn's square. */
 export function ItemLayer({ def, finish, side = "w" }: { def: string; finish: Finish; side?: "w" | "b" }) {
-  const p = usePaint(finish);
+  const p = usePaint(finish, def);
   const Art = ITEM_ART[def];
   if (!Art) return null;
   return (
