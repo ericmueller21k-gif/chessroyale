@@ -5609,8 +5609,11 @@ button.history-label {
   display: grid;
   place-items: end center;
   width: 150px;
-  height: 104px;
+  height: 84px;
   margin: 6px auto 10px;
+}
+.gk-epilogue.rises {
+  height: 156px;
 }
 .gk-epilogue .god-king.fallen {
   width: 120px;
@@ -5655,9 +5658,10 @@ button.history-label {
   }
 }
 .gk-epilogue-bubble {
+  top: 0;
   left: 50%;
   right: auto;
-  bottom: calc(100% - 4px);
+  bottom: auto;
   translate: -50% 0;
   max-width: min(220px, 80vw);
 }

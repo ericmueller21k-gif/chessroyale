@@ -10,12 +10,20 @@ const pct = (v: number) => `${v / 8}%`;
 const ease = (p: number) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
 const clamp01 = (p: number) => Math.max(0, Math.min(1, p));
 
-/** The slash that hit him on the i-th blow: its angle (degrees) and where its damage number floats off. */
-function blow(i: number) {
+/**
+ * The slash that hit him on the i-th blow: its angle (degrees) and where its damage number floats off (in board
+ * units, from his square `at`): spread around him, towards the middle of the board so none spills off its edge.
+ */
+function blow(i: number, at: { x: number; y: number }) {
   const angle = (i * 137.5 + 20) % 180;
-  const side = i % 2 === 0 ? -1 : 1;
-  return { angle, dx: side * (22 + ((i * 29) % 34)), dy: -18 - ((i * 17) % 30) };
+  const side = at.x > 560 ? -1 : at.x < 240 ? 1 : i % 2 === 0 ? -1 : 1;
+  const up = at.y > 160 ? -1 : 1;
+  const x = Math.max(40, Math.min(760, at.x + side * (14 + ((i * 29) % 58))));
+  const y = Math.max(40, Math.min(770, at.y + up * (16 + ((i * 17) % 52))));
+  return { angle, x, y };
 }
+/** How long the piece takes to slide back to its square. */
+export const SLIDE_MS = 450;
 /** Slashes that send a stylised red drop flying (a few, no more). */
 const DROPS = [5, 11, 17, 22];
 
@@ -35,7 +43,7 @@ export function clearSquare(fen: string, square: string): string {
 export function lastStandBoard(t: number): "after" | "pushed" | "back" | "before" {
   const L = LAST_STAND;
   if (t < L.crashAt) return "after";
-  if (t < L.slideAt + 400) return "pushed";
+  if (t < L.slideAt + SLIDE_MS) return "pushed";
   if (t < L.fadeAt + L.fadeMs) return "back";
   return "before";
 }
@@ -95,12 +103,13 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
   const jolt = hurt ? (lastBlow % 2 === 0 ? -1.2 : 1.2) : 0;
   // The piece he takes the blow for: knocked a little aside as he lands, then sliding back to where it came from.
   const len = Math.hypot(from.x - to.x, from.y - to.y) || 1;
-  const pushed = { x: to.x + ((from.x - to.x) / len) * 26, y: to.y + ((from.y - to.y) / len) * 26 };
-  const knock = clamp01((t - L.crashAt) / 120);
-  const slide = ease(clamp01((t - L.slideAt) / 400));
+  const push = Math.min(48, len * 0.6);
+  const pushed = { x: to.x + ((from.x - to.x) / len) * push, y: to.y + ((from.y - to.y) / len) * push };
+  const knock = clamp01((t - L.crashAt) / 140);
+  const slide = ease(clamp01((t - L.slideAt) / SLIDE_MS));
   const px = t < L.slideAt ? to.x + (pushed.x - to.x) * knock : pushed.x + (from.x - pushed.x) * slide;
   const py = t < L.slideAt ? to.y + (pushed.y - to.y) * knock : pushed.y + (from.y - pushed.y) * slide;
-  const showPiece = piece && t >= L.crashAt && t < L.slideAt + 400;
+  const showPiece = piece && piece.type !== "k" && t >= L.crashAt && t < L.slideAt + SLIDE_MS;
   const crash = t - L.crashAt;
   return (
     <div class="last-stand" role="alert" aria-label={`The God King's Last Stand: ${line}`}>
@@ -125,7 +134,7 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
         {Array.from({ length: L.slashes }, (_, i) => {
           const age = t - (L.slashAt + i * L.slashEveryMs);
           if (age < -30 || age > 240) return null;
-          const { angle } = blow(i);
+          const { angle } = blow(i, to);
           const r = 52;
           const a = (angle * Math.PI) / 180;
           const sweep = clamp01((age + 30) / 70);
@@ -152,9 +161,9 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
       {Array.from({ length: L.slashes }, (_, i) => {
         const age = t - (L.slashAt + i * L.slashEveryMs);
         if (age < 0 || age > 760) return null;
-        const b = blow(i);
+        const b = blow(i, to);
         return (
-          <span key={i} class="ls-dmg" style={{ left: pct(to.x + b.dx), top: pct(to.y + b.dy) }}>
+          <span key={i} class="ls-dmg" style={{ left: pct(b.x), top: pct(b.y) }}>
             −{hits[i]}
           </span>
         );
@@ -162,7 +171,7 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
       {DROPS.map((i) => {
         const age = t - (L.slashAt + i * L.slashEveryMs);
         if (age < 0 || age > 700) return null;
-        const dir = i % 2 === 0 ? 1 : -1;
+        const dir = to.x > 560 ? -1 : to.x < 240 ? 1 : i % 2 === 0 ? 1 : -1;
         const p = age / 700;
         return <span key={i} class="ls-drop" style={{ left: pct(to.x + dir * (14 + 70 * p)), top: pct(to.y - 10 - 90 * p + 190 * p * p), opacity: 1 - p * p, rotate: `${dir * (30 + 90 * p)}deg` }} />;
       })}
