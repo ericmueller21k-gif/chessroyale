@@ -1,6 +1,7 @@
 // Cloudflare Worker for HunChess: serves the app (packages/app/dist) and
 // the lobby server (packages/server): one Durable Object per lobby, over WebSockets.
-// The chess engine runs in browsers. The sign-in secrets GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and
+// The chess engine runs in browsers; the engine server (engine/Dockerfile: native Stockfish in a Container)
+// re-checks the close calls that decide cuts. The sign-in secrets GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and
 // RESEND_API_KEY live in the account's Secrets Store (bound below; values never here).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -16,12 +17,16 @@
   "durable_objects": {
     "bindings": [
       { "name": "LOBBIES", "class_name": "Lobby" },
-      { "name": "MATCHMAKER", "class_name": "Matchmaker" }
+      { "name": "MATCHMAKER", "class_name": "Matchmaker" },
+      { "name": "ENGINE", "class_name": "EngineServer" }
     ]
   },
+  // The engine server: one vCPU (Stockfish is single-threaded here), asleep after 3 idle minutes.
+  "containers": [{ "class_name": "EngineServer", "image": "./engine/Dockerfile", "instance_type": "standard-2", "max_instances": 2 }],
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Lobby"] },
-    { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] }
+    { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] },
+    { "tag": "v3", "new_sqlite_classes": ["EngineServer"] }
   ],
   // Accounts, profiles and match results (tables are created by the Worker on first use: see accounts.ts).
   "d1_databases": [{ "binding": "DB", "database_name": "hunchess", "database_id": "103097fd-f61b-4296-8b89-bd967ac33142" }],

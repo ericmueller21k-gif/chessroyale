@@ -233,7 +233,8 @@ export type SoundName =
   | "bossRoar"
   | "menuOpen"
   | "menuClose"
-  | "menuSelect";
+  | "menuSelect"
+  | "gavel";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -266,6 +267,13 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   menuClose: (t) => sample("menuClose", t, 0.7),
   menuSelect: (t) => sample("menuSelect", t, 0.8),
   gkLeave: (t) => sample("gkLeave", t, 0.6),
+  // The judge's gavel at a cut: two heavy wooden knocks (the piece sounds, pitched down).
+  gavel: (t) => {
+    for (const [dt, level] of [[0, 1], [0.26, 0.85]] as const) {
+      sample("capture", t + dt, level, 0.55);
+      sample("move", t + dt, level * 0.8, 0.45);
+    }
+  },
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));

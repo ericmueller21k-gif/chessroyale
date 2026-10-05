@@ -1,4 +1,5 @@
-import type { BoardRound, BoardSlot, LivePick, NetBoss, NetFinal, NetStanding, NetVote } from "@chessroyale/chess";
+import { toSan, type BoardRound, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetStanding, type NetVote } from "@chessroyale/chess";
+import { brilliance } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 
 /**
@@ -43,7 +44,46 @@ export interface MoveRecord {
   san: string;
   loss: number | null;
   roundScore: number;
+  /** The engine's best move (after the re-check), and how many of those who picked found it (within 1.5 points). */
+  bestMove?: string;
+  found?: number;
+  pickers?: number;
+  /** Everyone's average loss that turn. */
+  avgLoss?: number | null;
+  /** Your pick separated the field (a brilliant move, made without a power-up). */
+  brilliant?: boolean;
+  usedPowerUp?: boolean;
 }
+
+/** Your move from a reveal, with what the elimination breakdown needs (null if you weren't picking). */
+export function moveRecordFrom(stage: number, round: number, mine: GroupReveal, isYou: (id: string) => boolean): MoveRecord | null {
+  const players = mine.result.players;
+  const me = players.find((p) => isYou(p.playerId));
+  if (!me) return null;
+  const picked = players.filter((p) => p.move && p.loss !== null);
+  const bril = brilliance(players);
+  return {
+    stage,
+    round,
+    fen: mine.fenBefore,
+    move: me.move,
+    san: me.move ? toSan(mine.fenBefore, me.move) : "—",
+    loss: me.loss,
+    roundScore: me.roundScore,
+    bestMove: mine.bestMove,
+    found: picked.filter((p) => p.loss! <= 1.5).length,
+    pickers: picked.length,
+    avgLoss: picked.length ? picked.reduce((s, p) => s + p.loss!, 0) / picked.length : null,
+    brilliant: !!bril?.players.includes(me.playerId),
+    usedPowerUp: !!me.usedPowerUp,
+  };
+}
+
+/**
+ * Your last elimination (Crowd): your score and the cut line's when you went out, for the breakdown on the
+ * cut screen and the results.
+ */
+export const elimination: { current: { stage: number; you: number; line: number; placement: number | null; out: number; left: number } | null } = { current: null };
 
 /** The 2v2 final as the screens see it (same shape the server sends, with the board as a view). */
 export type FinalView = Omit<NetFinal, "board"> & { board: BoardView };

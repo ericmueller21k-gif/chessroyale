@@ -3,11 +3,13 @@ import type { Lobby } from "./lobby-do.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 import { randomCode } from "./codes.ts";
 import { SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, signInRequired, withSecrets, type AccountEnv } from "./api.ts";
+import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 
 export { Lobby } from "./lobby-do.ts";
 export { Matchmaker } from "./matchmaker.ts";
+export { EngineServer } from "./engine.ts";
 
-export interface Env extends AccountEnv {
+export interface Env extends AccountEnv, EngineEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   ASSETS: Fetcher;
@@ -26,6 +28,21 @@ export default {
     // Accounts: /api/me, /api/results, /api/auth/*
     const account = await handleAccountApi(request, env);
     if (account) return account;
+    // POST /api/engine/score {fen, moves} → {moves}: the engine server's deeper look at a few moves (solo games'
+    // re-checks); 503 when there's no server or today's budget is spent (the device then re-checks itself).
+    if (url.pathname === "/api/engine/score" && request.method === "POST") {
+      const body = (await request.json().catch(() => null)) as { fen?: unknown; moves?: unknown; boards?: unknown } | null;
+      const moves = Array.isArray(body?.moves) ? body.moves.filter((m): m is string => typeof m === "string").slice(0, 8) : [];
+      if (typeof body?.fen !== "string" || !moves.length) return json({ message: "Bad request" }, 400);
+      // Several boards re-checked at once (Classic) share the budget, so the round still takes a few seconds.
+      const boards = Math.max(1, Math.min(8, Math.round(Number(body.boards) || 1)));
+      const out = await serverScoreAt(env, body.fen, moves, Math.max(400_000, Math.round(SERVER_RECHECK_NODES / boards)));
+      return out ? json({ moves: out }) : json({ message: "Engine server unavailable" }, 503);
+    }
+    // GET /api/engine/ping: wakes the engine server (a solo game is starting).
+    if (url.pathname === "/api/engine/ping") {
+      return json({ ok: await warmEngine(env) });
+    }
     // POST /api/play → { code }: "Play now", the 50 v 50 lobby that's filling up (unranked).
     if (url.pathname === "/api/play" && request.method === "POST") {
       if (env.DB && signInRequired(env) && !isSignedIn(await accountOf(request, env))) return json({ message: SIGN_IN_TO_PLAY }, 401);
@@ -53,7 +70,7 @@ export default {
         const mode = raid || url.searchParams.get("mode") === "crowd" ? "crowd" : "classic";
         const overrides = {
           ...(raid ? RAID_SETTINGS : modeSettings(mode, { crowdTeams: url.searchParams.get("turns") !== "all", augments: url.searchParams.get("augments") !== "0" })),
-          ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2, drawnMoveSeconds: 1.2 } : PACE_SETTINGS.quick) : {}),
+          ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
           // Playtest overrides and the creator's choices: only the ones that are set.
           ...definedOnly({
             // Boss raid: the boss the creator picked (one of the tiers), else one a step above the group.

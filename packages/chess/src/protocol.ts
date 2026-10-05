@@ -67,6 +67,8 @@ export interface NetPick {
   move: string | null;
   loss: number | null;
   roundScore: number;
+  /** Used a power-up this round (so the pick can't count as brilliant). */
+  usedPowerUp?: boolean;
 }
 
 /** What the host's browser computes for one board after picks lock. */
@@ -231,7 +233,8 @@ export type ServerMessage = { now: number } & (
   /** A human has made their move this round (sent to everyone, for the leaderboard). */
   | { t: "moved"; key: string; playerId: string }
   | { t: "locked"; key: string }
-  | { t: "scoreRequest"; key: string; jobs: ScoreJob[] }
+  /** `serverRecheck`: the engine server re-checks the close calls, so the host skips its own re-check. */
+  | { t: "scoreRequest"; key: string; jobs: ScoreJob[]; serverRecheck?: boolean }
   /** To the host at the start of a round: every board, so it can search them while players think. */
   | {
       t: "prefetch";

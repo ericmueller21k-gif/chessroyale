@@ -14,12 +14,14 @@ import {
   type UciEngine,
   TopMovesCache,
   bossGuardFrom,
+  recheckCloseCalls,
   bossMoveFrom,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
 import { RoundProgress } from "./progress.ts";
+import { moveRecordFrom, type GroupReveal } from "./game.ts";
 
 /**
  * A multiplayer match: the lobby server runs the clock and the draw; this
@@ -268,7 +270,7 @@ export class NetMatch implements GameView {
         this.tally = m.picks.map((p) => ({ ...p, at: this.local(p.at) }));
         return this.emit();
       case "scoreRequest":
-        return void this.hostScore(m.key, m.jobs);
+        return void this.hostScore(m.key, m.jobs, !!m.serverRecheck);
       case "reveal":
         return this.onReveal(m);
       case "stageBreak": {
@@ -346,30 +348,16 @@ export class NetMatch implements GameView {
     this.standingsList = m.standings;
     this.cutoff = m.cutoff;
     if (!m.fenBefore || !this.currentBoard) return this.emit();
-    const me = m.picks.find((p) => p.playerId === this.myId);
-    if (me) {
-      this.moves.push({
-        stage: m.stage,
-        round: m.roundsPlayed - 1,
-        fen: m.fenBefore,
-        move: me.move,
-        san: me.move ? toSan(m.fenBefore, me.move) : "—",
-        loss: me.loss,
-        roundScore: me.roundScore,
-      });
-    }
-    this.setPhase({
-      kind: "reveal",
-      until: this.local(m.until),
-      board: this.toView(this.currentBoard),
-      mine: {
-        fenBefore: m.fenBefore,
-        bestMove: m.bestMove!,
-        playerIds: m.picks.map((p) => p.playerId),
-        result: { players: m.picks, playedMove: m.playedMove!, drawRule: m.drawRule ?? "random" },
-        ...(m.king !== undefined ? { king: m.king, kingCalls: m.kingCalls } : {}),
-      },
-    });
+    const mine: GroupReveal = {
+      fenBefore: m.fenBefore,
+      bestMove: m.bestMove!,
+      playerIds: m.picks.map((p) => p.playerId),
+      result: { players: m.picks, playedMove: m.playedMove!, drawRule: m.drawRule ?? "random" },
+      ...(m.king !== undefined ? { king: m.king, kingCalls: m.kingCalls } : {}),
+    };
+    const record = moveRecordFrom(m.stage, m.roundsPlayed - 1, mine, (id) => id === this.myId);
+    if (record) this.moves.push(record);
+    this.setPhase({ kind: "reveal", until: this.local(m.until), board: this.toView(this.currentBoard), mine });
     void this.crossCheck(m);
   }
 
@@ -432,7 +420,7 @@ export class NetMatch implements GameView {
     }
   }
 
-  private async hostScore(key: string, jobs: ScoreJob[]) {
+  private async hostScore(key: string, jobs: ScoreJob[], serverRecheck = false) {
     const engines = await this.engines();
     const t = performance.now();
     const out: BoardScore[] = new Array(jobs.length);
@@ -468,7 +456,11 @@ export class NetMatch implements GameView {
             (mv): mv is string => !!mv && expectedAfter[mv] === undefined,
           );
           if (missing.length) for (const s of await engine.scoreMoves(job.fen, missing)) expectedAfter[s.move] = s.expected;
-          out[i] = { boardId: job.boardId, bestMove: top[0]!.move, bestExpected: best, expectedAfter, botPicks, botThinkMs, botPowerUps };
+          const people = Object.values(job.humanPicks).some((m) => !!m);
+          const checked = serverRecheck || !people
+            ? { bestMove: top[0]!.move, bestExpected: best, expectedAfter }
+            : await recheckCloseCalls(engine, job.fen, { bestMove: top[0]!.move, bestExpected: best, expectedAfter }, [...Object.values(job.humanPicks), ...Object.values(botPicks)], this.settings);
+          out[i] = { boardId: job.boardId, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, botPicks, botThinkMs, botPowerUps };
         }
       }),
     );

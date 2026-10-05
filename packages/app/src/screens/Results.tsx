@@ -1,10 +1,15 @@
 import { applyMove } from "@chessroyale/chess";
 import { MiniBoard } from "../components/MiniBoard.tsx";
-import { myTeam, type GameView } from "../game.ts";
+import { elimination, myTeam, type GameView } from "../game.ts";
+import { useState } from "preact/hooks";
+import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
   const played = match.moves.filter((m) => m.move !== null);
+  const [review, setReview] = useState(false);
+  // Out at a cut (Crowd): the breakdown measures you against the line you missed.
+  const elim = elimination.current;
   const best = [...played].sort((a, b) => b.roundScore - a.roundScore)[0];
   const worst = [...played].sort((a, b) => a.roundScore - b.roundScore)[0];
   const avgMs = match.scoringMs.length ? match.scoringMs.reduce((a, b) => a + b, 0) / match.scoringMs.length : 0;
@@ -117,6 +122,12 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           </div>
         )}
       </div>
+      {played.some((m) => m.bestMove) && (
+        <button type="button" class="btn btn-secondary btn-wide" onClick={() => setReview(true)}>
+          {elim ? "Why you went out" : "Your game, move by move"}
+        </button>
+      )}
+      {review && <Breakdown moves={match.moves} you={elim?.you} line={elim?.line} placement={elim ? placement : null} onClose={() => setReview(false)} />}
       {avgMs > 0 && <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>}
       <div class="actions">
         <button type="button" class="btn btn-secondary" onClick={onHome}>

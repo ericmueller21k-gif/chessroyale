@@ -5,6 +5,8 @@ import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs } from "@chessroy
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
+import { warmEngineServer, withServerRecheck } from "./engine.ts";
+import { moveRecordFrom, type GroupReveal } from "./game.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -166,10 +168,12 @@ export class SoloMatch implements GameView {
   }
 
   start() {
+    warmEngineServer();
     this.runner = new MatchRunner({
       settings: this.settings,
       rng: this.rng,
-      engines: this.engines,
+      // Re-checks go to the engine server first (see withServerRecheck).
+      engines: this.engines.map((e) => withServerRecheck(e, () => this.runner?.state.boards.length ?? 1)),
       library,
       // A boss raid alone is just you against the boss.
       entrants: [
@@ -365,16 +369,8 @@ export class SoloMatch implements GameView {
     ]);
     const report = this.runner.finishRound(scored.results, scored.thinkMs, scored.powerUps);
     const mine = report.boards.find((b) => b.playerIds.includes(HUMAN))!;
-    const me = mine.result.players.find((p) => p.playerId === HUMAN)!;
-    this.moves.push({
-      stage: report.stage,
-      round: report.round,
-      fen: mine.fenBefore,
-      move,
-      san: move ? toSan(mine.fenBefore, move) : "—",
-      loss: me.loss,
-      roundScore: me.roundScore,
-    });
+    const record = moveRecordFrom(report.stage, report.round, mine, (id) => id === HUMAN);
+    if (record) this.moves.push(record);
     if (inFinal) return this.showFinalMove(report);
     const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? KING_FX_MS : 0);
     this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });
