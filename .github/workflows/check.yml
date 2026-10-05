@@ -1,0 +1,20 @@
+# Runs on every pull request (and on main): the typecheck and the unit tests. A red check means don't merge.
+# The phone tests (e2e) are slower and run in the Claude Code session before each merge.
+name: check
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
