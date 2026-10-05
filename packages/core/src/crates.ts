@@ -57,6 +57,8 @@ export interface ItemDef {
    * e.g. a cape or wings, seen around the piece).
    */
   layer?: "front" | "back";
+  /** Rolls a second colour too (both with the usual colour odds), e.g. a present's box and its ribbon. */
+  colors?: 2;
 }
 
 /** Whether an item is drawn behind the piece. */
@@ -67,7 +69,11 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "antlers", name: "Antlers", tier: "broad", slot: "head", description: "Guides the sleigh through the endgame." },
   { id: "santa-hat", name: "Santa Hat", tier: "paragon", slot: "head", description: "Knows who's been naughty in the opening." },
   { id: "snowman", name: "Snowman", tier: "sublime", slot: "skin", description: "Your pawn, built of snow, with a scarf." },
+  { id: "present", name: "Present", tier: "sublime", slot: "head", colors: 2, description: "Worn as a helmet. Box in one colour, ribbon in another. No peeking." },
+  { id: "gingerbread", name: "Gingerbread Man", tier: "sublime", slot: "skin", description: "Run, run, as fast as you can. Iced, with gumdrop buttons." },
+  { id: "chimney", name: "Chimney", tier: "sublime", slot: "skin", description: "Your pawn, sitting in a brick chimney. Came down the wrong one." },
   { id: "gift-tube", name: "Gift-Wrap Tube", tier: "exalted", slot: "weapon", description: "Wrapping-paper tube, tri-blend stripes. Swing responsibly." },
+  { id: "candy-cane", name: "Candy Cane", tier: "exalted", slot: "weapon", description: "White, striped in its colour. Sharpened at one end (allegedly)." },
   { id: "fire-ice-crown", name: "Fire & Ice Crown", tier: "transcendent", slot: "head", description: "A crown of winter ice, burning in its own colour." },
 ];
 
@@ -79,7 +85,7 @@ export const FISCHER = "fischer";
 export interface CrateDef {
   id: string;
   name: string;
-  /** The strip's odds out of 100: the four common items and Fischer Random. */
+  /** The strip's odds out of 100: the Novice to Sublime items and Fischer Random. */
   strip: readonly { item: string; weight: number }[];
   /** Fischer Random's odds out of 100. */
   fischer: readonly { item: string; weight: number }[];
@@ -90,14 +96,19 @@ export const CRATES: readonly CrateDef[] = [
     id: "winter-1",
     name: "Winter Crate · Series 1",
     strip: [
-      { item: "santa-beard", weight: 55 },
-      { item: "antlers", weight: 25 },
-      { item: "santa-hat", weight: 12 },
-      { item: "snowman", weight: 6 },
+      // Each tier rarer than the one before; Sublime, 14% in all, split evenly over its four items.
+      { item: "santa-beard", weight: 42 },
+      { item: "antlers", weight: 26 },
+      { item: "santa-hat", weight: 16 },
+      { item: "snowman", weight: 3.5 },
+      { item: "present", weight: 3.5 },
+      { item: "gingerbread", weight: 3.5 },
+      { item: "chimney", weight: 3.5 },
       { item: FISCHER, weight: 2 },
     ],
     fischer: [
-      { item: "gift-tube", weight: 80 },
+      { item: "gift-tube", weight: 40 },
+      { item: "candy-cane", weight: 40 },
       { item: "fire-ice-crown", weight: 20 },
     ],
   },
@@ -108,11 +119,15 @@ export const crateDef = (id: string) => CRATES.find((c) => c.id === id);
 /** While testing: unlimited crates and keys, and the test switches (?fischer=1, ?shiny=1) work. */
 export const CRATES_FREE = true;
 
-/** One item a player owns: which item, its colour, its blemish (0-49) and the seed that shapes its blotches. */
+/**
+ * One item a player owns: which item, its colour (and a second colour for two-colour items), its blemish (0-49)
+ * and the seed that shapes its blotches.
+ */
 export interface ItemInstance {
   id: string;
   def: string;
   color: string;
+  color2?: string | null;
   blemish: number;
   seed: number;
 }
@@ -143,6 +158,8 @@ export interface CrateRoll {
   fischer: boolean;
   def: string;
   color: string;
+  /** Two-colour items only. */
+  color2?: string;
   blemish: number;
   seed: number;
 }
@@ -155,7 +172,9 @@ export function rollCrate(rng: Rng, crate: CrateDef, force: { fischer?: boolean;
   const color = pick(rng, ITEM_COLORS).id;
   const blemish = force.shiny ? Math.round(rng() * 99) / 10 : rollBlemish(rng);
   const seed = Math.floor(rng() * 2 ** 31);
-  return { fischer, def, color, blemish, seed };
+  const roll: CrateRoll = { fischer, def, color, blemish, seed };
+  if (itemDef(def)?.colors === 2) roll.color2 = pick(rng, ITEM_COLORS).id;
+  return roll;
 }
 
 /** Chance of a drop's item, out of 1 (for the crate page). */
@@ -170,7 +189,7 @@ export function itemChance(crate: CrateDef, def: string): number {
 }
 
 /** What a player wears (votes and the cut screen): an item instance per slot, as sent to others online. */
-export type ItemLook = Partial<Record<ItemSlot, Pick<ItemInstance, "def" | "color" | "blemish" | "seed">>>;
+export type ItemLook = Partial<Record<ItemSlot, { def: string; color: string; color2?: string; blemish: number; seed: number }>>;
 
 /** Keeps only well-formed slots (a look from another player, or from storage). */
 export function cleanLook(raw: unknown): ItemLook {
@@ -182,7 +201,9 @@ export function cleanLook(raw: unknown): ItemLook {
     const d = itemDef(String(v.def));
     if (!d || d.slot !== slot) continue;
     const blemish = Math.max(0, Math.min(49, Number(v.blemish) || 0));
-    out[slot] = { def: d.id, color: itemColor(String(v.color)).id, blemish, seed: Math.abs(Math.floor(Number(v.seed) || 0)) % 2 ** 31 };
+    const item: NonNullable<ItemLook[typeof slot]> = { def: d.id, color: itemColor(String(v.color)).id, blemish, seed: Math.abs(Math.floor(Number(v.seed) || 0)) % 2 ** 31 };
+    if (d.colors === 2) item.color2 = itemColor(String(v.color2 ?? v.color)).id;
+    out[slot] = item;
   }
   return out;
 }

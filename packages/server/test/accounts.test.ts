@@ -245,11 +245,11 @@ describe("account API", () => {
     const r = await openCrate(sql, guest.id, "winter-1", { fischer: true, shiny: true }, 1100);
     if (!r.ok) throw new Error(r.message);
     expect(r.roll.fischer).toBe(true);
-    expect(["gift-tube", "fire-ice-crown"]).toContain(r.item.def);
+    expect(["gift-tube", "candy-cane", "fire-ice-crown"]).toContain(r.item.def);
     expect(r.item.blemish).toBeLessThan(10);
     expect(r.locker.items).toHaveLength(1);
     // Equip it in its own slot only; empty the slot again.
-    const slot = r.item.def === "gift-tube" ? "weapon" : "head";
+    const slot = r.item.def === "fire-ice-crown" ? "head" : "weapon";
     expect((await equipLocker(sql, guest.id, slot === "head" ? "face" : "head", r.item.id)).ok).toBe(false);
     const eq = await equipLocker(sql, guest.id, slot, r.item.id);
     expect(eq.ok && eq.locker.look[slot]?.def).toBe(r.item.def);
@@ -265,6 +265,24 @@ describe("account API", () => {
     expect(merged.equipped[slot]).toBe(r.item.id);
     const emptied = await equipLocker(sql, account.id, slot, null);
     expect(emptied.ok && emptied.locker.equipped[slot]).toBeUndefined();
+  });
+
+  it("the locker keeps a present's second colour, and adding that column again is harmless", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    await ensureSchema(sql, {}); // a second connection runs the column migration again
+    const { user } = await createGuest(sql, 1000, "Guest");
+    let present;
+    for (let i = 0; i < 400 && !present; i++) {
+      const r = await openCrate(sql, user.id, "winter-1", {}, 1100 + i);
+      if (r.ok && r.item.def === "present") present = r.item;
+    }
+    if (!present) throw new Error("no present in 400 opens");
+    expect(present.color2).toBeTruthy();
+    const eq = await equipLocker(sql, user.id, "head", present.id);
+    expect(eq.ok && eq.locker.look.head?.color2).toBe(present.color2);
+    const st = await lockerState(sql, user.id);
+    expect(st.items.find((i) => i.def !== "present")?.color2).toBeUndefined();
   });
 
   it("icons: a drawn 48 × 48 PNG is accepted; other sizes, other formats and junk are not", async () => {

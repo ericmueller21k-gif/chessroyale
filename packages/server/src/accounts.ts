@@ -7,7 +7,7 @@
  */
 
 import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, shopItem, starterItem, type ShopSlot, type ShopState } from "@chessroyale/core";
-import { LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
+import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
 
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
@@ -96,6 +96,10 @@ const ready = new WeakSet<object>();
 export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
   if (ready.has(key)) return;
   for (const s of SCHEMA) await sql.run(s);
+  for (const s of LOCKER_MIGRATIONS)
+    await sql.run(s).catch((e: unknown) => {
+      if (!/duplicate column/i.test(String(e))) throw e;
+    });
   ready.add(key);
 }
 
