@@ -928,3 +928,47 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - **Items people own keep their purity:** the stored blemish isn't touched (old rolls are all 51–100%), and their blotches keep their shape; only the parts past the square's edge and the Present's knot now pick up blotches too. Only the odds for new rolls changed.
   - **The strip's decoy tiles** already rolled their purity with the real roll, so they follow the new odds: about one shiny decoy every six opens, instead of about one per open (some 42 decoy items pass by in each open).
   - The fitting sheet (`npm run preview:items`) now shows cards at 95, 70, 50, 30, 5 and 0% purity (`purities=` to choose).
+
+## The God King's Last Stand (design, Oct 5, 2026; to build)
+
+Eric's idea: when the God King has nothing left to give, he still has himself. Once per game, if the crowd plays a
+disastrous move, he dives onto the board, takes the blow meant for that piece, and dies. The move is undone. Below
+are the calls I made as director; the `god-king` delegate builds it.
+
+- **Where:** every boss battle (the 50 v 50 boss final and the boss raid), solo and online.
+- **When it triggers.** All of these must hold:
+  - He has **no charges left** (all spent, or none to begin with), and the Last Stand hasn't happened yet this game.
+  - The crowd's played move is a **disaster** by the judge's own numbers for that round: it gives away at least
+    `lastStandLoss` (30) points of expected score compared with the best move.
+  - The crowd **wasn't already lost** before it: the best move was worth at least `lastStandFrom` (40). A position
+    that's already gone isn't saved.
+  - This is "a massive blunder", not "the game is decided anyway": a lost endgame never triggers it.
+- **What it does.**
+  - The disastrous move is taken back.
+  - That round's scores **stand**: players who picked the blunder still lose for it, and those who didn't still
+    score. The judge's verdict is never changed.
+  - The crowd then **picks again** from the same position with a fresh clock. The blunder is barred: shown greyed,
+    and it can't be picked. Bots pick again too. The re-pick is an ordinary scored round.
+  - The boss doesn't move until the re-pick is played.
+- **Afterwards he's fallen.** His fallen figure lies in the dock for the rest of the game: on his side, armour
+  cracked, greyed. No lines, no menu, no crowns.
+  - If the crowd **wins**, he rises again on the result screen in holy light with a line ("A god does not stay
+    down."). If it loses, he stays down.
+- **The moment** (the clock stands still throughout, `lastStandMs`, about 8–9 s; the delegate tunes the exact
+  timings), on everyone's screen:
+  1. The blunder lands on the board, and everything freezes.
+  2. From the dock, he leaps up out of view, then crashes down onto the blundered piece's square: impact flash,
+     board shake, dust.
+  3. A cut-in banner: "LAST STAND" with his portrait and one of his lines. Lines include "Fall back! This blow is
+     mine.", "Not while I stand!", "Retreat — I'll hold the line!" and "Go! I'll take it from here."
+  4. The piece slides back to the square it came from. He stands alone where it was.
+  5. The hit: about 25 rapid slashes, in the same style as his strike on the boss but on him, each with a red damage
+     number floating off (−7, −12, −9, …). Grunts of agony; his armour cracks; a few stylised red drops.
+  6. He staggers, collapses, and fades from the board. The dock now shows his fallen figure. A last line: "Finish…
+     it… for me."
+  7. The clock resumes and the crowd re-picks.
+- **New art:** a cracked-armour variant and a collapse/fallen pose of his sprite, and a battle-damaged portrait for
+  the banner. Each needs white and black versions. New sounds: a leap, a crash, rapid slashes, grunts of agony and a
+  death groan, all CC0 and credited.
+- **Testing switch:** `?laststand=1` in solo makes the next crowd move trigger it (with his charges spent), so Eric
+  can see it on demand.
