@@ -45,6 +45,8 @@ directs; a delegate does one kind of work and reports back. Eric can also open a
   `npm run preview:items -- out.png items=<id>`.
 - `engine`: Stockfish everywhere: the judge's fairness, the hybrid (host device + engine server), boss strength,
   engine costs and their sim reports.
+- `god-king`: the God King and the boss battle's presentation: his powers (rules, server, protocol), sprite,
+  portrait, banners, lines, sounds, the boss dock and its animations.
 - Lanes keep sessions out of each other's files. Run one delegate per lane at a time. In `DECISIONS.md`, add to your
   own sections rather than rewriting others'.
 
