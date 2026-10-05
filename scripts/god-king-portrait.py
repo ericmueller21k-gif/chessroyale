@@ -4,7 +4,10 @@ gold crown on a steel helm, burning gold eyes in the visor, layered gold-trimmed
 pauldrons, the king's cross on his chest, a royal cape), drawn from shapes with
 light from the top left, outlined, with golden sparks.
 
-    python3 scripts/god-king-portrait.py   # writes packages/app/public/sprites/god-king-portrait.png (needs ffmpeg)
+    python3 scripts/god-king-portrait.py   # writes god-king-portrait-w.png and -b.png in packages/app/public/sprites (needs ffmpeg)
+
+Two versions, one per side: the same picture, his armour recoloured (white steel
+for White, blackened steel for Black). Nothing else changes.
 """
 import json, math, random, subprocess
 W, H = 64, 60
@@ -130,11 +133,14 @@ PALETTE = {
     "r3": "#ef4444", "r2": "#991b1b", "b3": "#60a5fa", "b2": "#1d4ed8",
     "p1": "#ffe08a", "p2": "#fbbf24",
 }
-rgba = bytearray()
-for row in grid:
-    for c in row:
-        h = PALETTE[c] if c else None
-        rgba += bytes([int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16), 255]) if h else bytes(4)
-out = "packages/app/public/sprites/god-king-portrait.png"
-subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-i", "-", "-frames:v", "1", out], input=bytes(rgba), check=True)
-print("wrote", out)
+# Black: the same pixels, the steel blackened (gold, eyes, cape and sparks unchanged).
+BLACK_STEEL = {"s4": "#7b8494", "s3": "#4a515f", "s2": "#2c313b", "s1": "#171a20"}
+for side, palette in (("w", PALETTE), ("b", {**PALETTE, **BLACK_STEEL})):
+    rgba = bytearray()
+    for row in grid:
+        for c in row:
+            h = palette[c] if c else None
+            rgba += bytes([int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16), 255]) if h else bytes(4)
+    out = f"packages/app/public/sprites/god-king-portrait-{side}.png"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-i", "-", "-frames:v", "1", out], input=bytes(rgba), check=True)
+    print("wrote", out)

@@ -696,7 +696,8 @@ Eric asked for a Fire Emblem style banner the moment the God King raises his swo
   - a steel helm under a five-spiked gold crown with a cross and jewels, and burning gold eyes in an angled visor;
   - layered, gold-trimmed pauldrons with gold spikes, a gold gorget, the king's cross on his chest, and a royal blue cape;
   - golden sparks around him.
-  - It's drawn from shapes with light from the top left and outlined, by `scripts/god-king-portrait.py`, which writes `public/sprites/god-king-portrait.png` (1 KB). It's shown scaled up with crisp pixels and a pulsing golden glow.
+  - It's drawn from shapes with light from the top left and outlined, by `scripts/god-king-portrait.py`. It's shown scaled up with crisp pixels and a pulsing golden glow.
+  - **Two versions, always** (Eric: everything the God King shows comes in both colours). `god-king-portrait-w.png` and `-b.png` (about 1 KB each) are the same picture with the armour recoloured: white steel for White, blackened steel for Black; gold, eyes, cape and sparks unchanged. The cut-in picks the crowd's colour, like his figure on the board, beside it and in the summon.
 - **Timing.** The banner plays for 1.5 s right after his "hyuah!" sword raise. His bolt, the move and the strike's three slashes all come 1.5 s later than before.
   - The reveal where he plays the move gets 5.4 s extra (was 3.9 s), in solo and online.
   - A strike stops the clock for 5.9 s (`kingStrikeMs`, was 4.4 s).
