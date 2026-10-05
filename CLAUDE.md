@@ -28,6 +28,21 @@ record it in `DECISIONS.md`.
 - Never merge red: every PR runs the typecheck and unit tests on GitHub (`.github/workflows/check.yml`); wait for it
   to pass, and run the e2e suite (`npm run e2e`) yourself before merging anything that changes gameplay or screens.
 - Classic (8 boards) will be reworked (Eric, Oct 5, 2026): don't invest in it until he decides the new design.
+- Merge PRs with a **merge commit**, not squash: the working branch then stays part of `main`'s history, so the next
+  push is a plain fast-forward (squash merges left the branch diverged, needing a force-push). After merging, bring
+  the branch up to date with `git pull origin main` before the next change.
+- The "Workers Builds: chessroyale" check fails instantly on PR branches: it's Cloudflare's preview build for
+  non-production branches, not a code failure. Only `check` (and the e2e run) decide whether a PR is green. Production
+  builds from `main` deploy as usual.
+
+## Delegates
+
+Specialist agents live in `.claude/agents/` (one file each: a name, when to use it, its instructions). The main session
+directs; a delegate does one kind of work and reports back. Eric can also open a new session and talk to one directly
+("use the item-builder agent to add …"). Each session works on its own branch and opens its own PR.
+
+- `item-builder`: crate items and shop cosmetics (definition, art, fit, odds, tests, shipping). Its fitting sheet:
+  `npm run preview:items -- out.png items=<id>`.
 
 ## Progress
 
