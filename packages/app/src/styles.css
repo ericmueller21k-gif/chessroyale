@@ -3666,8 +3666,15 @@ button.history-label {
   border-radius: 2px;
   box-shadow: 4px 4px 0 rgba(26, 20, 6, 0.85);
   image-rendering: pixelated;
-  animation: gk-bubble-in 160ms steps(3, end) both;
   pointer-events: none;
+  transition: opacity 240ms ease-in;
+}
+/* Pops in only when the line starts, not when a new screen picks it up. */
+.gk-bubble.fresh {
+  animation: gk-bubble-in 160ms steps(3, end) both;
+}
+.gk-bubble.leaving {
+  opacity: 0;
 }
 .gk-bubble::after {
   content: "";
