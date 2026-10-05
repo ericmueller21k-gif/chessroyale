@@ -52,7 +52,15 @@ export interface ItemDef {
   tier: ItemTier;
   slot: ItemSlot;
   description: string;
+  /**
+   * Where it's drawn relative to the piece: in front (the default: hats, beards, weapons) or behind it ("back":
+   * e.g. a cape or wings, seen around the piece).
+   */
+  layer?: "front" | "back";
 }
+
+/** Whether an item is drawn behind the piece. */
+export const behindPiece = (def: string) => itemDef(def)?.layer === "back";
 
 export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "santa-beard", name: "Santa Beard", tier: "novice", slot: "face", description: "Ho ho ho." },

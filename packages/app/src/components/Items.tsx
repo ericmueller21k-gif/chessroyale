@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
-import { isShiny, itemColor, mulberry32, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { behindPiece, isShiny, itemColor, mulberry32, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { PawnHat } from "./Cosmetics.tsx";
 
 /**
@@ -317,17 +317,40 @@ export function ItemArt({ def, finish, side = "w", class: cls }: { def: string; 
 export function Avatar({ look, side = "w", hat = "none" }: { look?: ItemLook; side?: "w" | "b"; hat?: string }) {
   const at = (slot: ItemSlot) => look?.[slot];
   const skin = at("skin");
+  // Worn items in drawing order (face, head, then a weapon), split by layer: behind the piece or in front of it.
+  const worn = (["face", "head", "weapon"] as const).flatMap((slot) => {
+    const it = at(slot);
+    return it ? [{ slot, it }] : [];
+  });
+  const layer = (back: boolean) => (
+    // (Items may rise a little above the square, never more: the clip caps their height.)
+    <svg class={`avatar-items ${back ? "back" : "front"}`} viewBox="0 0 100 100">
+      <defs>
+        <clipPath id="avatar-cap">
+          <rect x="-12" y="-9" width="124" height="112" />
+        </clipPath>
+      </defs>
+      <g clip-path="url(#avatar-cap)">
+        {worn
+          .filter(({ it }) => behindPiece(it.def) === back)
+          .map(({ slot, it }) => (
+            <ItemLayer key={slot} def={it.def} finish={it} side={side} />
+          ))}
+      </g>
+    </svg>
+  );
   return (
     <span class="avatar cg-wrap" aria-hidden="true">
-      {!skin && <piece class={`${side === "w" ? "white" : "black"} pawn`} />}
+      {layer(true)}
+      {skin ? (
+        <svg class="avatar-skin" viewBox="0 0 100 100">
+          <ItemLayer def={skin.def} finish={skin} side={side} />
+        </svg>
+      ) : (
+        <piece class={`${side === "w" ? "white" : "black"} pawn`} />
+      )}
       {!at("head") && hat !== "none" && <PawnHat hat={hat} />}
-      <svg class="avatar-items" viewBox="0 0 100 100">
-        {skin && <ItemLayer def={skin.def} finish={skin} side={side} />}
-        {(["face", "head", "weapon"] as const).map((slot) => {
-          const it = at(slot);
-          return it ? <ItemLayer key={slot} def={it.def} finish={it} side={side} /> : null;
-        })}
-      </svg>
+      {layer(false)}
     </span>
   );
 }
