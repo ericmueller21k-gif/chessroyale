@@ -263,42 +263,59 @@ export function KingSummon({
   );
 }
 
-/** The God King's pixel portrait for his cut-in: helmed and crowned, eyes burning white, his cape behind. */
+/**
+ * The God King's pixel portrait for his cut-in, drawn to match his figure on
+ * the board: the gold crown with its cross, the ivory helm with the visor and
+ * breathing slits, white armour, his sword point down in front. Godlike: a
+ * golden halo with rays behind him, and gold light burning through the visor.
+ */
 const PORTRAIT = [
-  "........G...G...G.......",
-  "........GG..G..GG.......",
-  ".......KGGGGGGGGGK......",
-  ".......KGgrGGGrgGK......",
-  "......KKKKKKKKKKKKK.....",
-  ".....KdsSSSSSSSSSsdK....",
-  "....KdsSSSSSSSSSSSsdK...",
-  "....KdsSSKKKKKKKSSsdK...",
-  "....KdsKWWKKKKKWWKsdK...",
-  "....KdsKKWWWKWWWKKsdK...",
-  "....KdsSKKKKKKKKKSsdK...",
-  "....KddsKdKdKdKdKsddK...",
-  ".....KddsSSSSSSSsddK....",
-  "......KKddssssddKK......",
-  "..RRKKsSKKddddKKSsKKRR..",
-  ".RrKsSSSSsKKKKsSSSSsKrR.",
-  "RrKsSSSSSSsSSsSSSSSSsKrR",
-  "RrKdsSSSSSSGGSSSSSSsdKrR",
-  "RrKdsSSSSSGGGGSSSSSsdKrR",
-  "RrKddsSSSSSGGSSSSSsddKrR",
-  "RrrKddssSSSSSSSSssddKrrR",
-  "RrrKKddsssssssssssddKKrR",
-  "RrrrKKKKKKKKKKKKKKKKKrrR",
+  ".........y...KKGGKK...y.........",
+  "..........y.KGGGGGGKh.y.........",
+  "..........hhKGGGGGGKhhh.........",
+  ".........KK..KKGGKK...KK........",
+  "....yy..KGGK..KGGGK..KGGK..yy...",
+  "......yhKGGK...KGGK..KGGKhy.....",
+  ".......hKGGKKKKKGGKKKKGGKh......",
+  "......hhKGGGGGGGGGGGGGGK.hh.....",
+  "......h.KGGGrGGbbGGrGGGK..h.....",
+  "......h.KGggggggggggggGK..h.....",
+  ".....hh..KwWWWWWWWWWWvK...hh....",
+  "..yyyhh..KwWWWWWWWWWWvK...hhyyy.",
+  ".....hh..KwWWWWWWWWWWvK...hh....",
+  "......h..KKKKKKKKKKKKKK...h.....",
+  "......h..KwKYYYKKYYYKvK...h.....",
+  "......hh.KwKKyKKKKyKKvK..hh.....",
+  ".......h.KwWWWWWWWWWWvK..h......",
+  "......yhhKwWKWKWWKWKWvK.hhy.....",
+  "....yy..hKwWKWKWWKWKWvKhh..yy...",
+  ".........KwWKWKWWKWKWvKh........",
+  ".........KwWKWKWWKWKWvK.........",
+  ".........KwWWWWWWWWWWvK.........",
+  "..........KKKKKGGKKKKK..........",
+  ".............vvGGvv.............",
+  "....KKKKKKKKKKKggKKKKKKKKKKK....",
+  "...KWwwwKWWWWWWggWWWWWWKvvvWK...",
+  "...KWwwwKWWWWWWggWWWWWWKvvvWK...",
+  "...KWwwwKWWGGGGGGGGGGWWKvvvWK...",
+  "...KWwwwKWWggggggggggWWKvvvWK...",
+  "...KWwwwKWWWWWWBbWWWWWWKvvvWK...",
+  "...KWwwwKWWWWWWBbWWWWWWKvvvWK...",
+  "...KWwwwKWWWWWWBbWWWWWWKvvvWK...",
 ];
 const PORTRAIT_COLOURS: Record<string, string> = {
-  K: "#0b0b1a",
+  K: "#1d1d1f",
+  W: "#f7f7f5",
+  w: "#dfe3e9",
+  v: "#aab3bf",
   G: "#f2c14e",
-  g: "#a8741a",
+  g: "#b8860b",
   r: "#e11d48",
-  S: "#d5dbe4",
-  s: "#8d98a8",
-  d: "#4b5563",
-  W: "#ffffff",
-  R: "#9f1239",
+  b: "#60a5fa",
+  Y: "#fff6b0",
+  y: "#ffd54a",
+  h: "#ffe08a",
+  B: "#e6ecf3",
 };
 
 export function GodKingPortrait() {
@@ -306,13 +323,15 @@ export function GodKingPortrait() {
   PORTRAIT.forEach((row, y) =>
     [...row].forEach((ch, x) => {
       if (ch === ".") return;
-      // The cape's inner fold (lower case r below the shoulders) is a darker red than the crown's jewels.
-      const fill = ch === "r" && y > 12 ? "#5b0f24" : PORTRAIT_COLOURS[ch]!;
-      cells.push(<rect key={`${x}-${y}`} x={x} y={y} width="1.02" height="1.02" fill={fill} class={ch === "W" ? "gkp-eye" : undefined} />);
+      // The halo is a little see-through, its rays more so (the gold under his eyes isn't a ray).
+      const ray = ch === "y" && y !== 15;
+      const opacity = ch === "h" ? 0.85 : ray ? 0.55 : undefined;
+      const glow = ch === "Y" || (ch === "y" && y === 15);
+      cells.push(<rect key={`${x}-${y}`} x={x} y={y} width="1.02" height="1.02" fill={PORTRAIT_COLOURS[ch]!} opacity={opacity} class={glow ? "gkp-eye" : ray || ch === "h" ? "gkp-halo" : undefined} />);
     }),
   );
   return (
-    <svg class="gk-portrait" viewBox="0 0 24 23" shape-rendering="crispEdges" aria-hidden="true">
+    <svg class="gk-portrait" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true">
       {cells}
     </svg>
   );

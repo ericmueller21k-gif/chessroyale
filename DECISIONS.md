@@ -692,7 +692,9 @@ Eric asked for a Fire Emblem style banner the moment the God King raises his swo
   - his pixel portrait: crowned, helmed, eyes burning white with a blue glow, a red cape behind;
   - "GOD KING" over what he's doing: the move in SAN (e.g. "Bxe7") or "STRIKE!";
   - the target: the piece he moves (the board's own piece art), or the boss's face for a strike.
-- **The portrait** is a 24 × 23 pixel grid drawn as an SVG (`GodKingPortrait`), so it stays crisp at any size.
+- **The portrait** is a 32 × 32 pixel grid drawn as an SVG (`GodKingPortrait`), so it stays crisp at any size. The first version (a dark knight with white eyes) didn't read as him, so it was redrawn to match his figure on the board:
+  - the gold crown with its cross, the ivory helm with visor and breathing slits, white armour, and his sword point down in front;
+  - godlike touches: a softly glowing golden halo with rays, and gold light burning through the visor.
 - **Timing.** The banner plays for 1.5 s right after his "hyuah!" sword raise. His bolt, the move and the strike's three slashes all come 1.5 s later than before.
   - The reveal where he plays the move gets 5.4 s extra (was 3.9 s), in solo and online.
   - A strike stops the clock for 5.9 s (`kingStrikeMs`, was 4.4 s).

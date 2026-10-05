@@ -4145,9 +4145,17 @@ button.history-label {
 }
 @keyframes gkp-eye {
   from {
-    filter: drop-shadow(0 0 0.3px #fff) drop-shadow(0 0 0.6px #93c5fd);
+    filter: drop-shadow(0 0 0.3px #fff6b0) drop-shadow(0 0 0.6px #f2c14e);
   }
   to {
-    filter: drop-shadow(0 0 0.6px #fff) drop-shadow(0 0 1.4px #bfdbfe);
+    filter: drop-shadow(0 0 0.6px #fff) drop-shadow(0 0 1.4px #f2c14e);
+  }
+}
+.gkp-halo {
+  animation: gkp-halo 1.2s ease-in-out infinite alternate;
+}
+@keyframes gkp-halo {
+  to {
+    filter: drop-shadow(0 0 0.8px #ffe08a);
   }
 }
