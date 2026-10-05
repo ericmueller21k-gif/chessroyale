@@ -44,23 +44,22 @@ def poly(pts, base, cx=None, cy=None, rx=10, ry=10):
 
 # Cape behind (royal crimson).
 poly([(2, 60), (6, 34), (20, 30), (44, 30), (58, 34), (62, 60)], "c", 32, 40, 30, 20)
-# Pauldrons: three layered plates each side, gold trims.
+# Pauldrons: one big rounded plate per shoulder; the overlapping lames are curved
+# lines across it (a dark seam with a gold trim under it), not separate plates.
 for side in (-1, 1):
-    cx = 32 + side * 19
-    for i, (oy, rx, ry) in enumerate([(37, 12, 7.5), (45, 11, 7)]):
-        ellipse(cx + side * i, oy, rx, ry, "s")
-        for x in range(int(cx + side * i - rx) - 1, int(cx + side * i + rx) + 2):
-            for y in range(int(oy - ry) - 1, int(oy + ry) + 2):
-                if 0 <= x < W and 0 <= y < H and grid[y][x] and grid[y][x][0] == "s":
-                    d = ((x + .5 - cx - side * i) / rx) ** 2 + ((y + .5 - oy) / ry) ** 2
-                    if 0.84 <= d <= 1.0 and y < oy + 1: put(x, y, "K")
-                    elif 0.55 <= d < 0.84 and y < oy - 2 and (x + y) % 7 == 0: put(x, y, "g3")
-        # gold trim along the lower edge of each plate
-        for x in range(int(cx + side * i - rx), int(cx + side * i + rx) + 1):
-            for y in range(int(oy), int(oy + ry) + 2):
-                if 0 <= x < W and 0 <= y < H and grid[y][x] and grid[y][x][0] == "s":
-                    d = ((x + .5 - cx - side * i) / rx) ** 2 + ((y + .5 - oy) / ry) ** 2
-                    if 0.66 <= d <= 1.0: put(x, y, "g3" if d < 0.84 else "g2")
+    cx, cy, rx, ry = 32 + side * 19, 41, 13, 10.5
+    ellipse(cx, cy, rx, ry, "s")
+    for x in range(int(cx - rx) - 1, int(cx + rx) + 2):
+        for y in range(int(cy - ry) - 1, int(cy + ry) + 2):
+            if not (0 <= x < W and 0 <= y < H and grid[y][x] and grid[y][x][0] == "s"): continue
+            nx = (x + .5 - cx) / rx
+            d = nx ** 2 + ((y + .5 - cy) / ry) ** 2
+            if d > 0.8: put(x, y, "g2" if y > cy else "g3"); continue   # gold rim
+            # seams curving down at the outer edge, like stacked lames
+            bend = 2.2 * (nx * side) ** 2
+            for seam in (cy - 2, cy + 3):
+                if abs(y - (seam + bend)) < 0.5: put(x, y, "K")
+                elif abs(y - (seam + bend + 1)) < 0.5: put(x, y, "g3")
     # spikes on the top plate
     for k in range(3):
         bx = cx + side * (k * 5 - 3)
