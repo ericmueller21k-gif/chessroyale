@@ -17,6 +17,7 @@ import {
   type Sql,
 } from "../src/accounts.ts";
 import { handleAccountApi, isSignedIn, signInRequired } from "../src/api.ts";
+import { equipLocker, lockerState, openCrate } from "../src/locker.ts";
 
 // node:sqlite through require (Vite doesn't know it as a built-in yet).
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
@@ -232,6 +233,38 @@ describe("account API", () => {
     expect(shop.owned).toEqual(expect.arrayContaining(["hat-crown", "king-storm", "king-hellfire"]));
     expect(shop.equipped).toEqual({ king: "king-hellfire", hat: "hat-crown" });
     expect((await shopState(sql, guest.id)).owned).not.toContain("hat-crown");
+  });
+
+  it("the locker: crates open on the server (free while testing), items equip by slot, and a guest's items follow them", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user: guest } = await createGuest(sql, 1000, "Guest");
+    expect((await lockerState(sql, guest.id)).items).toEqual([]);
+    expect((await openCrate(sql, guest.id, "nope", {}, 1100)).ok).toBe(false);
+    // The test switch lands on Fischer Random: an Exalted or Transcendent item, shiny when asked.
+    const r = await openCrate(sql, guest.id, "winter-1", { fischer: true, shiny: true }, 1100);
+    if (!r.ok) throw new Error(r.message);
+    expect(r.roll.fischer).toBe(true);
+    expect(["gift-tube", "fire-ice-crown"]).toContain(r.item.def);
+    expect(r.item.blemish).toBeLessThan(10);
+    expect(r.locker.items).toHaveLength(1);
+    // Equip it in its own slot only; empty the slot again.
+    const slot = r.item.def === "gift-tube" ? "weapon" : "head";
+    expect((await equipLocker(sql, guest.id, slot === "head" ? "face" : "head", r.item.id)).ok).toBe(false);
+    const eq = await equipLocker(sql, guest.id, slot, r.item.id);
+    expect(eq.ok && eq.locker.look[slot]?.def).toBe(r.item.def);
+    expect((await profile(sql, guest)).locker.equipped[slot]).toBe(r.item.id);
+    // Someone else's item can't be equipped.
+    const { user: other } = await createGuest(sql, 1200, "Other");
+    expect(await equipLocker(sql, other.id, slot, r.item.id)).toEqual({ ok: false, message: "That isn't yours." });
+    // Signing in to an existing account brings the guest's items along.
+    const account = await signInWithIdentity(sql, null, "email", "crates@example.com", {}, 1300);
+    await signInWithIdentity(sql, guest, "email", "crates@example.com", {}, 1400);
+    const merged = await lockerState(sql, account.id);
+    expect(merged.items.map((i) => i.id)).toContain(r.item.id);
+    expect(merged.equipped[slot]).toBe(r.item.id);
+    const emptied = await equipLocker(sql, account.id, slot, null);
+    expect(emptied.ok && emptied.locker.equipped[slot]).toBeUndefined();
   });
 
   it("icons: a drawn 48 × 48 PNG is accepted; other sizes, other formats and junk are not", async () => {

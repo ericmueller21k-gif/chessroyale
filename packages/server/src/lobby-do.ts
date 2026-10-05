@@ -146,7 +146,7 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, "Sign in to play online");
         return;
       }
-      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null);
+      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null, msg.look);
       if (!result.ok) {
         ws.send(JSON.stringify({ t: "error", message: result.message, now: Date.now() }));
         ws.close(1008, result.message);

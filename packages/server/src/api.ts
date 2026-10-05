@@ -1,3 +1,4 @@
+import { equipLocker, lockerState, openCrate } from "./locker.ts";
 import {
   buyItem,
   cleanEmail,
@@ -90,7 +91,7 @@ export async function accountOf(request: Request, env: AccountEnv): Promise<User
 export async function handleAccountApi(request: Request, env: AccountEnv, fetcher: typeof fetch = fetch): Promise<Response | null> {
   const url = new URL(request.url);
   const path = url.pathname;
-  if (!path.startsWith("/api/me") && !path.startsWith("/api/auth/") && path !== "/api/results" && !path.startsWith("/api/shop")) return null;
+  if (!path.startsWith("/api/me") && !path.startsWith("/api/auth/") && path !== "/api/results" && !path.startsWith("/api/shop") && !path.startsWith("/api/locker")) return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
   const email = !!env.RESEND_API_KEY;
   if (path === "/api/auth/config") return json({ accounts: !!env.DB, google, email, onlineNeedsSignIn: !!env.DB && signInRequired(env) });
@@ -135,6 +136,20 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const { item } = (await request.json().catch(() => ({}))) as { item?: unknown };
     const r = path === "/api/shop/buy" ? await buyItem(sql, current.id, item, now) : await equipItem(sql, current.id, item);
     return r.ok ? json(r.shop) : json({ message: r.message }, 400);
+  }
+
+  // The locker. GET /api/locker; POST /api/locker/open {crate, fischer?, shiny?} (the test switches work only while
+  // crates are free); POST /api/locker/equip {slot, item} (item null empties the slot).
+  if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id));
+  if (path === "/api/locker/open" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown };
+    const r = await openCrate(sql, current.id, b.crate, { fischer: b.fischer === true, shiny: b.shiny === true }, now);
+    return r.ok ? json(r) : json({ message: r.message }, 400);
+  }
+  if (path === "/api/locker/equip" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { slot?: unknown; item?: unknown };
+    const r = await equipLocker(sql, current.id, b.slot, b.item ?? null);
+    return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
 
   // POST /api/results: a solo match's result, from the browser.

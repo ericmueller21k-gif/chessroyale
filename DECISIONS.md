@@ -861,3 +861,37 @@ Eric's design:
 - **Then:** the verdict, "Why was I cut?" if you're out, and the names.
 - **Length:** 10 s (Crowd's `stageBreakSeconds`, was 4); quick pace (tests) keeps 4.
 - **Eric asked whether a whole side could be wiped out:** not in 50 v 50, since every cut takes the same number from each team.
+
+## Crates: Winter Crate · Series 1 (Oct 5, 2026)
+
+Eric's design, a fun bonus for now: free and unlimited while testing, and fully compliant (odds shown, regional rules) if it ever involves money.
+
+- **Three independent layers of rarity** (`core/crates.ts`):
+  - **Tier, which decides the item.** The tier names honour Puzzle Pirates:
+
+    | Tier | Item | Slot | Chance |
+    | --- | --- | --- | --- |
+    | Novice | Santa Beard | face | 55% |
+    | Broad | Antlers | head | 25% |
+    | Paragon | Santa Hat | head | 12% |
+    | Sublime | Snowman | skin | 6% |
+    | Fischer Random (a second spin) | Exalted Gift-Wrap Tube (weapon, 80%) or Transcendent Fire & Ice Crown (head, 20%) | | 2% |
+
+    So the crown is 0.4%.
+  - **Colour:** Red 30%, Yellow 30%, Sage 14%, Opal 9%, Cobalt 7%, Midnight 4.5%, Emerald 3%, Oceanic 2%, Pearl 0.5%. Opal, Oceanic and Pearl have a two-tone sheen.
+  - **Purity:** 100% minus a blemish of 0–49%, rolled as 49 × u^0.431. Shiny (blemish under 10%) is about 2.5% of rolls; under 1% blemish is about 1 in 8,000.
+  - **Stacked:** a shiny Pearl crown is about 1 in 2 million; a Pearl crown at 99%+ about 1 in 400 million. A test of 100,000 rolls checks the proportions.
+- **Slots:** head, face, skin and weapon (new: held at the pawn's side). Skins replace the pawn and combine with the rest (a Snowman in a Santa Hat). They show in the votes and on the cut screen, not on the game board. Other online players see your look (sent on joining, cleaned by the server). The old shop hats still show when no crate item is on the head.
+- **Paint system** (`components/Items.tsx`), Eric's suggestion:
+  - Each item is drawn once on the pawn's square with marked paint regions. Those get the colour automatically, then the blemish, then the shine; outlines and fixed parts (white fur, coal, ice) stay as drawn.
+  - **Blemish:** a seeded noise field cut so exactly that share of cells is blotched; overlapping dark round blotches in one path, so even 100 pawns are cheap.
+  - **Shine:** a sweeping highlight plus a sparkle.
+  - The Fire & Ice Crown's flames burn in its rolled colour. The tube has tri-blend stripes (its colour, a light tint and white).
+- **Server-side rolls.** Crates open on the server (`POST /api/locker/open`), and each item is stored with its colour, blemish and seed (D1 tables `items`, `equipped_items`), so nobody can make themselves a Pearl crown. A guest's items follow them when they sign in.
+- **Opening:**
+  - A CS:GO-style strip: decoy tiles by the odds, with Fischer Random shown three times as often as it lands to tease.
+  - It eases out over 6.2 s with a click per passing tile, so the clicks slow as it lands.
+  - Landing on Fischer Random shows a gold crown with "?", the "FISCHER RANDOM!" banner, and a second spin among Exalted and Transcendent items.
+  - The reveal is an FF-style window (the God King's menu style) with the tier, name, colour, purity and "Shiny!".
+- **Where:** Shop → Crates (with each crate's page of odds) and Shop → Locker (avatar preview, items rarest first, tap to wear or take off).
+- **Testing switches** (while `CRATES_FREE`): checkboxes on the crate page, or `?fischer=1` / `?shiny=1`, force Fischer Random and a shiny. The server ignores them once crates aren't free.

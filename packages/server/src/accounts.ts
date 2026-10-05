@@ -7,6 +7,7 @@
  */
 
 import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, shopItem, starterItem, type ShopSlot, type ShopState } from "@chessroyale/core";
+import { LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
 
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
@@ -86,6 +87,8 @@ const SCHEMA = [
     user_id TEXT PRIMARY KEY,
     coins INTEGER NOT NULL DEFAULT 0
   )`,
+  // Crate items and what's equipped (locker.ts).
+  ...LOCKER_SCHEMA,
 ];
 
 const ready = new WeakSet<object>();
@@ -341,6 +344,7 @@ export interface ModeStats {
 export interface Profile {
   user: Pick<User, "id" | "name" | "icon"> & { signedIn: boolean; email: string | null; google: boolean };
   shop: ShopState;
+  locker: LockerState;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
@@ -362,6 +366,7 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
   return {
     user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub },
     shop: await shopState(sql, user.id),
+    locker: await lockerState(sql, user.id),
     stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
     rating: rows.find((r) => r.rating !== null)?.rating ?? null,
     recent: rows.slice(0, 10).map((r) => ({
@@ -426,4 +431,5 @@ async function moveShop(sql: Sql, from: string, to: string): Promise<void> {
   await sql.run("DELETE FROM inventory WHERE user_id = ?", from);
   await sql.run("DELETE FROM equipped WHERE user_id = ?", from);
   await sql.run("DELETE FROM wallets WHERE user_id = ?", from);
+  await moveLocker(sql, from, to);
 }

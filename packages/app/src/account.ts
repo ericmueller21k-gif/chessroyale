@@ -1,4 +1,5 @@
 import type { ShopState } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot } from "@chessroyale/core";
 
 /**
  * Your account, as the screens see it: a guest account made the first time
@@ -20,6 +21,8 @@ export interface Profile {
   user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean };
   /** The shop: coins, items owned and what's equipped (missing from an older server). */
   shop?: ShopState;
+  /** Crate items you own, what you wear, and your crates and keys (null: unlimited while testing). */
+  locker?: Locker;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
@@ -82,6 +85,28 @@ export async function equipShopItem(item: string): Promise<void> {
   if (!state.profile) return;
   const shop = await api<ShopState>("/api/shop/equip", { method: "POST", body: JSON.stringify({ item }) });
   set({ profile: { ...state.profile, shop } });
+}
+
+export interface Locker {
+  items: ItemInstance[];
+  equipped: Partial<Record<ItemSlot, string>>;
+  look: ItemLook;
+  crates: number | null;
+  keys: number | null;
+}
+
+/** Opens a crate on the server. `force`: the test switches (?fischer=1, ?shiny=1), honoured only while testing. */
+export async function openCrate(crate: string, force: { fischer?: boolean; shiny?: boolean } = {}): Promise<{ roll: CrateRoll; item: ItemInstance }> {
+  const r = await api<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/locker/open", { method: "POST", body: JSON.stringify({ crate, ...force }) });
+  if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
+  return { roll: r.roll, item: r.item };
+}
+
+/** Wears a crate item in its slot (null empties the slot). */
+export async function equipLockerItem(slot: ItemSlot, item: string | null): Promise<void> {
+  if (!state.profile) return;
+  const locker = await api<Locker>("/api/locker/equip", { method: "POST", body: JSON.stringify({ slot, item }) });
+  set({ profile: { ...state.profile, locker } });
 }
 
 /** Off to Google; it sends you back to `next` (this page by default). */

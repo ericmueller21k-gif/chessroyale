@@ -14,7 +14,7 @@ import { BossHeading } from "./Play.tsx";
 import { crowdAnimations, crowdTrail, onPrefsChange } from "../prefs.ts";
 import { elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { GavelPiece } from "../components/Gavel.tsx";
-import { HattedPawn } from "../components/Cosmetics.tsx";
+import { Avatar } from "../components/Items.tsx";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { account } from "../account.ts";
 import { seenKey } from "../hooks.ts";
@@ -436,6 +436,7 @@ export function CrowdCut({
   const at = (step: number) => Math.max(s.clockRange[0], Math.min(s.clockRange[1], clock + step * s.clockStepSeconds));
   const cutNow = new Set(knockedOut.map((k) => k.id));
   const myHat = equippedLook(account().profile?.shop, "hat").hat ?? "none";
+  const myLook = account().profile?.locker?.look;
   // Fixed seats: by team (White left, Black right), then by id.
   const seats = useMemo(() => {
     const byId = (a: Standing, b: Standing) => (a.id < b.id ? -1 : 1);
@@ -470,10 +471,11 @@ export function CrowdCut({
         {seats.map((p) => {
           const side = p.team === "b" ? "b" : "w";
           const hat = p.isYou ? myHat : p.isBot ? BOT_HATS[hash(p.id) % BOT_HATS.length]! : "none";
+          const look = p.isYou ? myLook : p.look;
           const state = cutNow.has(p.id) ? (slammed ? " cut-now" : " doomed") : p.out ? " gone" : "";
           return (
             <span key={p.id} class={`grid-pawn${state}${p.isYou ? " you" : ""}`} title={p.isYou ? "You" : p.name}>
-              <HattedPawn hat={hat} side={side} />
+              <Avatar look={look} side={side} hat={hat} />
             </span>
           );
         })}

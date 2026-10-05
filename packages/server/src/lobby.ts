@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, allowedMs, botVotes, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, cleanLook, type ItemLook, allowedMs, botVotes, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -47,6 +47,8 @@ interface Human {
   practice?: boolean;
   /** The rating on their profile (for a boss raid's strength). */
   rating?: number | null;
+  /** The crate items they wear. */
+  look?: ItemLook;
 }
 
 type Timer =
@@ -232,7 +234,8 @@ export class LobbyCore {
   }
 
   private standings(): NetStanding[] {
-    return this.runner?.leaderboard() ?? [];
+    const looks = new Map(this.r.humans.flatMap((h) => (h.look && Object.keys(h.look).length ? [[h.id, h.look] as const] : [])));
+    return (this.runner?.leaderboard() ?? []).map((s) => (looks.has(s.id) ? { ...s, look: looks.get(s.id)! } : s));
   }
 
   private cutoff(): number {
@@ -254,10 +257,11 @@ export class LobbyCore {
 
   // ---------------- Connections ----------------
 
-  connect(token: string | undefined, name: string | undefined, device: "phone" | "computer" = "computer", practice = false, rating: number | null = null) {
+  connect(token: string | undefined, name: string | undefined, device: "phone" | "computer" = "computer", practice = false, rating: number | null = null, look: unknown = undefined) {
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
     if (existing) {
       existing.connected = true;
+      if (look !== undefined) existing.look = cleanLook(look);
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
       this.broadcast(this.lobbyMessage(), false);
@@ -271,7 +275,7 @@ export class LobbyCore {
     const clean = (name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || `Player ${this.r.humans.length + 1}`;
     const id = `p${++this.r.counter}`;
     const newToken = Array.from({ length: 24 }, () => Math.floor(this.rng() * 16).toString(16)).join("");
-    this.r.humans.push({ id, name: clean, token: newToken, connected: true, device, practice, rating: typeof rating === "number" && Number.isFinite(rating) ? Math.max(400, Math.min(3400, rating)) : null });
+    this.r.humans.push({ id, name: clean, token: newToken, connected: true, device, practice, rating: typeof rating === "number" && Number.isFinite(rating) ? Math.max(400, Math.min(3400, rating)) : null, look: cleanLook(look) });
     if (!this.r.hostId) this.r.hostId = id;
     this.send(id, { t: "welcome", playerId: id, token: newToken, code: this.r.code }, false);
     this.broadcast(this.lobbyMessage(), false);
