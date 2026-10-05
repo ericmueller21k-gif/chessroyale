@@ -216,6 +216,8 @@ export class MatchRunner {
       engines: readonly EngineLike[];
       library: readonly Opening[];
       entrants: readonly Entrant[];
+      /** Boss raid: the side the crowd plays (White unless "b": a test switch, so the God King can be seen in black). */
+      raidSide?: Side;
     },
   ) {
     this.top = new TopMovesCache(opts.settings.botCandidateMoves);
@@ -223,7 +225,8 @@ export class MatchRunner {
     const boardCount = plan[0]?.boards ?? 1;
     const plies = openingPlies(opts.settings);
     // With colours per stage, half the boards have White to move and half Black (the opening one ply longer).
-    const blackBoards = opts.settings.colourPerStage && boardCount >= 2 ? Math.floor(boardCount / 2) : 0;
+    const raidBlack = !!opts.settings.raid && opts.raidSide === "b";
+    const blackBoards = raidBlack ? boardCount : opts.settings.colourPerStage && boardCount >= 2 ? Math.floor(boardCount / 2) : 0;
     const unusual = boardCount - blackBoards > 2 ? 1 : 0;
     const whiteOpenings = pickOpenings(opts.rng, opts.library, { classic: boardCount - blackBoards - unusual, unusual }, plies, opts.settings.openingBalance);
     const blackOpenings = pickOpenings(
@@ -669,7 +672,7 @@ export class MatchRunner {
       // Otherwise a re-pick that's been played clears the bar on the move he took back.
       this.state = {
         ...this.state,
-        boss: stand ? { ...b, crowdMoves: b.crowdMoves - 1, kingCharges: 0, lastStand: { atMove: b.crowdMoves, ...stand }, barred: stand.move } : b,
+        boss: stand ? { ...b, crowdMoves: b.crowdMoves - 1, kingCharges: 0, lastStand: { atMove: b.crowdMoves, charges: b.kingCharges ?? 0, ...stand }, barred: stand.move } : b,
       };
       if (stand) this.forceLastStand = false;
     }

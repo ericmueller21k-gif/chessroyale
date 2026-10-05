@@ -5345,3 +5345,326 @@ button.history-label {
     animation: none;
   }
 }
+
+/* ---- The God King's Last Stand (components/LastStand.tsx; timings in boss-timing.ts) ---- */
+.last-stand {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+}
+/* 1. Everything freezes: the board goes cold and grey, after a flash. */
+.ls-freeze {
+  position: absolute;
+  inset: 0;
+  background: rgba(120, 165, 230, 0.2);
+  backdrop-filter: grayscale(0.9) brightness(0.9);
+  -webkit-backdrop-filter: grayscale(0.9) brightness(0.9);
+}
+.ls-flash {
+  position: absolute;
+  inset: 0;
+  background: #f4f9ff;
+}
+.ls-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.ls-frost {
+  fill: none;
+  stroke: #dbeafe;
+  stroke-width: 5;
+  filter: drop-shadow(0 0 6px #93c5fd);
+}
+/* 2. His fall onto the square, the crash, the dust. */
+.ls-streak {
+  fill: #fff7d6;
+  filter: blur(6px);
+}
+.ls-impact {
+  fill: rgba(255, 250, 225, 0.95);
+  filter: drop-shadow(0 0 12px #ffd84d);
+}
+.ls-ring {
+  fill: none;
+  stroke: #fff3c4;
+  stroke-width: 6;
+}
+.ls-dust {
+  fill: #c9b79a;
+}
+.board-area.ls-shake {
+  animation: ls-shake 450ms ease-in-out 1;
+}
+@keyframes ls-shake {
+  15% {
+    transform: translate(-7px, 4px);
+  }
+  35% {
+    transform: translate(6px, -4px);
+  }
+  55% {
+    transform: translate(-4px, 2px);
+  }
+  75% {
+    transform: translate(3px, -1px);
+  }
+}
+.ls-god {
+  position: absolute;
+  z-index: 2;
+  width: 12.5%;
+  height: 12.5%;
+}
+.ls-god .god-king {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 30% 96%;
+}
+.ls-god.falling .god-king {
+  filter: brightness(1.8) drop-shadow(0 0 6px #fff3c4);
+}
+/* Each blow: a red-white flash on him. */
+.ls-god .god-king.hurt {
+  filter: brightness(1.6) sepia(1) saturate(5) hue-rotate(-28deg) drop-shadow(0 0 5px #ff3b3b);
+}
+/* 6. He staggers, then collapses onto his side. */
+.ls-god.stagger .god-king {
+  animation: ls-stagger 450ms ease-in-out 1;
+}
+.ls-god.collapse .god-king {
+  animation: ls-collapse 420ms cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+  filter: saturate(0.4);
+}
+@keyframes ls-stagger {
+  25% {
+    rotate: -9deg;
+    translate: -4% 0;
+  }
+  60% {
+    rotate: 7deg;
+    translate: 3% 0;
+  }
+}
+@keyframes ls-collapse {
+  0% {
+    rotate: 6deg;
+  }
+  100% {
+    rotate: -86deg;
+    translate: -6% 8%;
+  }
+}
+/* The piece he takes the blow for: knocked aside, then sliding back. */
+.ls-piece {
+  position: absolute;
+  z-index: 1;
+  width: 12.5%;
+  aspect-ratio: 1;
+}
+.ls-piece piece {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+}
+/* 5. The slashes he takes, their damage numbers and a few stylised drops. */
+.ls-slash {
+  stroke: #fff4f4;
+  stroke-width: 6;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px #ff2d2d) drop-shadow(0 0 2px #fff);
+}
+.ls-hit {
+  fill: rgba(255, 70, 70, 0.4);
+  stroke: #ffd2d2;
+  stroke-width: 3;
+}
+.ls-dmg {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: clamp(9px, 2.9vw, 14px);
+  color: #ff5252;
+  text-shadow: 2px 2px 0 #2a0000, -1px -1px 0 #2a0000, 1px -1px 0 #2a0000, -1px 1px 0 #2a0000;
+  white-space: nowrap;
+  animation: ls-dmg 760ms ease-out both;
+}
+@keyframes ls-dmg {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -20%) scale(0.5);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -60%) scale(1.25);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -190%) scale(1);
+  }
+}
+.ls-drop {
+  position: absolute;
+  z-index: 3;
+  width: 1.5%;
+  aspect-ratio: 0.75;
+  translate: -50% -50%;
+  background: #d61f2c;
+  border-radius: 50% 0 50% 50%;
+  box-shadow: inset -1px -1px 0 #7f0f16;
+}
+/* 3. His cut-in: darker than his usual one (blood red and black, gold trim), held a little longer for the line. */
+.fight-banner.last-stand-cut .fb-band {
+  height: 38%;
+  gap: 2cqw;
+  background: linear-gradient(90deg, #070103, #5b0a12 22%, #170206 50%, #5b0a12 78%, #070103);
+  border-color: #f2c14e;
+  box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(220, 38, 38, 0.5), 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+.fight-banner.last-stand-cut .fb-flash,
+.fight-banner.last-stand-cut .fb-band,
+.fight-banner.last-stand-cut .fb-text,
+.fight-banner.last-stand-cut .kc-portrait {
+  animation-duration: 2.1s;
+}
+.fight-banner.last-stand-cut .kc-portrait {
+  width: 23cqw;
+}
+.fight-banner.last-stand-cut .gk-portrait {
+  filter: drop-shadow(0.5cqw 0.5cqw 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 1.6cqw rgba(239, 68, 68, 0.6));
+}
+.fight-banner.last-stand-cut .kc-text {
+  font-size: 9.6cqw;
+  color: #fff7d6;
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    0 0 24px rgba(248, 113, 113, 0.9);
+}
+.ls-line {
+  margin-top: 1.6cqw;
+  max-width: 64cqw;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 2.6cqw;
+  line-height: 1.5;
+  text-align: center;
+  color: #fde68a;
+  text-shadow: 2px 2px 0 #0b0b1a;
+  animation: fb-sub 2.1s ease-out both;
+}
+/* In the dock: he leaps up out of view, onto the board. */
+.gk-unit.leaping .god-king.leap {
+  transform-origin: 50% 100%;
+  animation: gk-leap 450ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+@keyframes gk-leap {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+  22% {
+    transform: translateY(3px) scale(1.12, 0.8);
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-240px) scale(0.9, 1.2);
+    opacity: 0;
+  }
+}
+/* Fallen: on his side, cracked and greyed, for the rest of the battle. No menu, no crowns. */
+.gk-unit.fallen .gk-unit-btn {
+  cursor: default;
+  background: none;
+  place-items: end center;
+}
+.gk-unit.fallen .god-king.fallen {
+  width: 58px;
+  height: 36px;
+  filter: grayscale(0.85) brightness(0.92) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+  opacity: 0.85;
+  animation: gk-fallen-in 500ms ease-out both;
+}
+.gk-fallen-shadow {
+  fill: rgba(0, 0, 0, 0.22);
+}
+@keyframes gk-fallen-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+/* The result screen: he rises again in holy light if the crowd won, or stays down. */
+.gk-epilogue {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  width: 150px;
+  height: 104px;
+  margin: 6px auto 10px;
+}
+.gk-epilogue .god-king.fallen {
+  width: 120px;
+  height: 75px;
+  filter: grayscale(0.85) brightness(0.9);
+  opacity: 0.85;
+}
+.gk-epilogue.up .god-king {
+  width: 60px;
+  height: 90px;
+  animation: gk-rise 600ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes gk-rise {
+  from {
+    transform: translateY(14px) scale(0.85);
+    filter: brightness(3);
+    opacity: 0.4;
+  }
+}
+.gk-epilogue-beam {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 70px;
+  height: 140%;
+  translate: -50% 0;
+  background: linear-gradient(to top, rgba(255, 243, 196, 0.85), rgba(255, 243, 196, 0));
+  filter: blur(3px);
+  animation: gk-beam 1400ms ease-out both;
+}
+@keyframes gk-beam {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.2);
+  }
+  40% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0.35;
+  }
+}
+.gk-epilogue-bubble {
+  left: 50%;
+  right: auto;
+  bottom: calc(100% - 4px);
+  translate: -50% 0;
+  max-width: min(220px, 80vw);
+}
+.gk-epilogue-bubble::after {
+  left: calc(50% - 6px);
+  right: auto;
+}
+.barred-note {
+  white-space: nowrap;
+}

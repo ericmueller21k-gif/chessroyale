@@ -6,62 +6,136 @@ import { equippedLook } from "@chessroyale/core";
 import { account } from "../account.ts";
 
 /** Your equipped God King effect (from the shop) as CSS colours for his bolts, beam and glow. */
-function kingEffectStyle(): Record<string, string> {
+export function kingEffectStyle(): Record<string, string> {
   const look = equippedLook(account().profile?.shop, "king");
   return { "--ks-bolt": look.bolt!, "--ks-glow": look.glow!, "--ks-beam": look.beam! };
+}
+
+/** His colours: armour in the crowd's colour, outlined like the board's pieces; gold for the crown and hilt. */
+function kingColours(side: "w" | "b") {
+  return { fill: side === "w" ? "#f7f7f5" : "#1d1d1f", line: side === "w" ? "#1d1d1f" : "#f7f7f5", gold: "#f2c14e" };
+}
+
+/** His body: the three-tier base, the armour and the visored helm (in a 100 × 150 box, standing). */
+function KingBody({ fill, line }: { fill: string; line: string }) {
+  return (
+    <g class="gk-body" stroke={line} stroke-width="3" stroke-linejoin="round">
+      {/* Base: three tiers, like every piece on the board. */}
+      <rect x="14" y="132" width="72" height="12" rx="3" fill={fill} />
+      <path d="M22 132 Q22 122 30 119 L70 119 Q78 122 78 132 Z" fill={fill} />
+      <rect x="24" y="111" width="52" height="8" rx="3" fill={fill} />
+      {/* Armour: shoulders, chest and the skirt down to the base. */}
+      <path d="M18 66 Q20 52 36 50 L64 50 Q80 52 82 66 L84 84 L74 86 L72 111 L28 111 L26 86 L16 84 Z" fill={fill} />
+      <path d="M36 52 L50 66 L64 52" fill="none" />
+      <path d="M28 86 L72 86" fill="none" />
+      {/* Helmet with a visor. */}
+      <path d="M34 26 Q50 20 66 26 L65 46 Q50 56 35 46 Z" fill={fill} />
+      <path d="M38 32 L62 32" fill="none" />
+      <g stroke={line} stroke-width="2.5">
+        <line x1="42" y1="35" x2="42" y2="43" />
+        <line x1="46" y1="35" x2="46" y2="45" />
+        <line x1="54" y1="35" x2="54" y2="45" />
+        <line x1="58" y1="35" x2="58" y2="43" />
+      </g>
+    </g>
+  );
+}
+
+/** His crown and its cross. */
+function KingCrown({ line, gold }: { line: string; gold: string }) {
+  return (
+    <g class="gk-crown" fill={gold} stroke={line} stroke-width="2" stroke-linejoin="round">
+      <path d="M32 24 L30 8 L40 15 L45 5 L50 13 L55 5 L60 15 L70 8 L68 24 Q50 19 32 24 Z" />
+      <path d="M48 0 h4 v3 h3 v4 h-3 v4 h-4 v-4 h-3 v-4 h3 Z" />
+    </g>
+  );
+}
+
+/** His sword, point down in front of him, his fist on the grip (`fist`: with his hand on it). */
+function KingSword({ fill, line, gold, fist = true, raised = false }: { fill: string; line: string; gold: string; fist?: boolean; raised?: boolean }) {
+  return (
+    <g class={`gk-sword${raised ? " raised" : ""}`} stroke={line} stroke-width="2" stroke-linejoin="round">
+      <path d="M47.5 92 L52.5 92 L52.5 126 L50 131 L47.5 126 Z" fill="#dfe6ee" />
+      <rect x="36" y="88" width="28" height="5" rx="2.5" fill={gold} />
+      <rect x="47" y="70" width="6" height="18" rx="2" fill={gold} />
+      <circle cx="50" cy="67" r="5" fill={gold} />
+      {fist && <rect x="42" y="74" width="16" height="10" rx="4" fill={fill} stroke={line} />}
+    </g>
+  );
+}
+
+/**
+ * Cracks in his armour (his Last Stand), worse at each level 1 to 3: a split across the helm, then the chest
+ * and a shoulder, then the skirt and the base. Each is a dark jagged line with a bright chipped edge beside it.
+ */
+const CRACKS: string[][] = [
+  ["M57 25 L54 31 L58 36 L55 42", "M38 28 L42 33 L39 38"],
+  ["M64 54 L58 61 L62 67 L56 74 L59 80", "M22 62 L28 67 L25 73", "M45 56 L49 60"],
+  ["M34 88 L39 95 L35 101 L40 108", "M66 90 L61 97 L65 104", "M30 121 L36 126 L33 131", "M70 134 L64 139"],
+];
+function KingCracks({ level, line }: { level: number; line: string }) {
+  if (level <= 0) return null;
+  const paths = CRACKS.slice(0, level).flat();
+  return (
+    <g class="gk-cracks" fill="none" stroke-linejoin="round" stroke-linecap="round">
+      {paths.map((d) => (
+        <g key={d}>
+          <path d={d} stroke="#fff6d8" stroke-width="2" transform="translate(1.6 0.6)" opacity="0.85" />
+          <path d={d} stroke={line} stroke-width="2.6" />
+        </g>
+      ))}
+    </g>
+  );
 }
 
 /**
  * The God King: a chess piece of our own, drawn in parts so he can move. A
  * crowned, visored knight-king on a three-tier chess base, a sword held point
  * down in front of him. Drawn in the crowd's colour, outlined like the board's
- * pieces, with gold for the crown and the hilt.
+ * pieces, with gold for the crown and the hilt. `cracks` (1 to 3): his armour
+ * cracking under the blows of his Last Stand.
  */
-export function GodKingSprite({ side, raised = false, class: cls = "" }: { side: "w" | "b"; raised?: boolean; class?: string }) {
-  const fill = side === "w" ? "#f7f7f5" : "#1d1d1f";
-  const line = side === "w" ? "#1d1d1f" : "#f7f7f5";
-  const gold = "#f2c14e";
+export function GodKingSprite({ side, raised = false, cracks = 0, class: cls = "" }: { side: "w" | "b"; raised?: boolean; cracks?: number; class?: string }) {
+  const { fill, line, gold } = kingColours(side);
   return (
     <svg class={`god-king ${cls}`} viewBox="0 0 100 150" aria-hidden="true">
-      <g class="gk-body" stroke={line} stroke-width="3" stroke-linejoin="round">
-        {/* Base: three tiers, like every piece on the board. */}
-        <rect x="14" y="132" width="72" height="12" rx="3" fill={fill} />
-        <path d="M22 132 Q22 122 30 119 L70 119 Q78 122 78 132 Z" fill={fill} />
-        <rect x="24" y="111" width="52" height="8" rx="3" fill={fill} />
-        {/* Armour: shoulders, chest and the skirt down to the base. */}
-        <path d="M18 66 Q20 52 36 50 L64 50 Q80 52 82 66 L84 84 L74 86 L72 111 L28 111 L26 86 L16 84 Z" fill={fill} />
-        <path d="M36 52 L50 66 L64 52" fill="none" />
-        <path d="M28 86 L72 86" fill="none" />
-        {/* Helmet with a visor. */}
-        <path d="M34 26 Q50 20 66 26 L65 46 Q50 56 35 46 Z" fill={fill} />
-        <path d="M38 32 L62 32" fill="none" />
-        <g stroke={line} stroke-width="2.5">
-          <line x1="42" y1="35" x2="42" y2="43" />
-          <line x1="46" y1="35" x2="46" y2="45" />
-          <line x1="54" y1="35" x2="54" y2="45" />
-          <line x1="58" y1="35" x2="58" y2="43" />
-        </g>
+      <KingBody fill={fill} line={line} />
+      <KingCracks level={cracks} line={line} />
+      <KingCrown line={line} gold={gold} />
+      <KingSword fill={fill} line={line} gold={gold} raised={raised} />
+    </svg>
+  );
+}
+
+/**
+ * The God King fallen (after his Last Stand): toppled on his side like a beaten
+ * chess piece, his armour cracked, his crown knocked off beside his head and his
+ * sword on the ground. Greyed in the dock for the rest of the battle.
+ */
+export function GodKingFallen({ side, class: cls = "" }: { side: "w" | "b"; class?: string }) {
+  const { fill, line, gold } = kingColours(side);
+  return (
+    <svg class={`god-king fallen ${cls}`} viewBox="0 0 160 100" aria-hidden="true">
+      <ellipse class="gk-fallen-shadow" cx="86" cy="94" rx="72" ry="5" />
+      {/* His crown, knocked off, on the ground by his head. */}
+      <g transform="translate(-8 76) rotate(-24 50 12) scale(0.6)">
+        <KingCrown line={line} gold={gold} />
       </g>
-      {/* Crown and cross. */}
-      <g class="gk-crown" fill={gold} stroke={line} stroke-width="2" stroke-linejoin="round">
-        <path d="M32 24 L30 8 L40 15 L45 5 L50 13 L55 5 L60 15 L70 8 L68 24 Q50 19 32 24 Z" />
-        <path d="M48 0 h4 v3 h3 v4 h-3 v4 h-4 v-4 h-3 v-4 h3 Z" />
+      {/* Lying on his side: the standing figure turned a quarter, head to the left, base to the right. */}
+      <g transform="translate(12 98) rotate(-90)">
+        <KingBody fill={fill} line={line} />
+        <KingCracks level={3} line={line} />
       </g>
-      {/* The sword, point down in front of him; it lifts when he commands. */}
-      <g class={`gk-sword${raised ? " raised" : ""}`} stroke={line} stroke-width="2" stroke-linejoin="round">
-        <path d="M47.5 92 L52.5 92 L52.5 126 L50 131 L47.5 126 Z" fill="#dfe6ee" />
-        <rect x="36" y="88" width="28" height="5" rx="2.5" fill={gold} />
-        <rect x="47" y="70" width="6" height="18" rx="2" fill={gold} />
-        <circle cx="50" cy="67" r="5" fill={gold} />
-        {/* His fist on the grip. */}
-        <rect x="42" y="74" width="16" height="10" rx="4" fill={fill} stroke={line} />
+      {/* His sword, dropped on the ground in front of him. */}
+      <g transform="translate(-4 124) rotate(-90) scale(0.7)">
+        <KingSword fill={fill} line={line} gold={gold} fist={false} />
       </g>
     </svg>
   );
 }
 
 /** Centre of a square on the board in a 0-800 coordinate space, from the given side. */
-function squareXY(square: string, orientation: "white" | "black") {
+export function squareXY(square: string, orientation: "white" | "black") {
   const f = square.charCodeAt(0) - 97;
   const r = Number(square[1]) - 1;
   const col = orientation === "white" ? f : 7 - f;
@@ -278,8 +352,9 @@ export function KingSummon({
  * scripts/god-king-portrait.py), scaled up with crisp pixels; his armour in
  * the crowd's colour (the same picture recoloured for Black).
  */
-export function GodKingPortrait({ side }: { side: "w" | "b" }) {
-  return <img class="gk-portrait" src={`/sprites/god-king-portrait-${side}.png`} alt="" width={64} height={60} draggable={false} />;
+export function GodKingPortrait({ side, hurt = false }: { side: "w" | "b"; hurt?: boolean }) {
+  const name = hurt ? "god-king-portrait-hurt" : "god-king-portrait";
+  return <img class="gk-portrait" src={`/sprites/${name}-${side}.png`} alt="" width={64} height={60} draggable={false} />;
 }
 
 const PIECE_NAMES = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" } as const;

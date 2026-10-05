@@ -163,9 +163,9 @@ export interface NetBoss {
   justKilled?: string | null;
   /**
    * The God King's Last Stand, once it has happened (he has fallen): the crowd's move he took back, during which
-   * crowd move, what it gave away and the bar it crossed.
+   * crowd move, what it gave away, the bar it crossed, and the charges he still had (they went with him).
    */
-  lastStand?: { atMove: number; move: string; loss: number; bar: number } | null;
+  lastStand?: { atMove: number; move: string; loss: number; bar: number; charges: number } | null;
   /** The re-pick after his Last Stand: the move he took back can't be picked. */
   barred?: string | null;
   /** Set when the battle is over. */

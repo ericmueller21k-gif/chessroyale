@@ -9,6 +9,8 @@ import { MiniTower } from "../components/MiniTower.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
 import { KING_CUT_MS, KingSummon, kingSquare } from "../components/GodKing.tsx";
+import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.tsx";
+import { LAST_STAND, LAST_STAND_MS } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossHeading } from "./Play.tsx";
 import { crowdAnimations, crowdTrail, onPrefsChange } from "../prefs.ts";
@@ -141,7 +143,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const now = useFrameNow();
   const animate = useCrowdAnimations();
   const trail = useCrowdTrail();
-  const total = Math.max(2500, until - start);
+  // Boss battle: the God King's Last Stand on this move (it plays out after the move lands, in its own extra time).
+  const stand = match.boss && mine.lastStand ? mine.lastStand : null;
+  const total = Math.max(2500, until - start - (stand ? LAST_STAND_MS : 0));
   const picks = mine.result.players;
   // Every pick, in a mixed order (not grouped by move), for the rapid succession of ghosts.
   const ghosts = useMemo(() => {
@@ -169,10 +173,27 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const landed = t >= landAt;
   const played = t >= playAt;
   useEffect(() => {
-    match.seen.set(seenKey(board), board.ply + 1);
+    match.seen.set(seenKey(board), board.ply + (stand ? 0 : 1));
   }, [board]);
 
   const fen = mine.fenBefore;
+  // The Last Stand: the move lands, he crashes onto the square, the piece slides back, he falls (lastStandBoard).
+  const ts = t - playAt;
+  const standMove = stand ? mine.result.playedMove : null;
+  const kingMoved = !!standMove && pieceAt(fen, standMove.slice(0, 2))?.type === "k";
+  const onBoard = useMemo(() => {
+    const move = mine.result.playedMove;
+    if (!played) return { fen, lastMove: board.lastMove };
+    const after = applyMove(fen, move);
+    if (!stand) return { fen: after, lastMove: move };
+    const at = lastStandBoard(ts);
+    const to = move.slice(2, 4);
+    // (A king is never taken off the board: it just slides back.)
+    if (at === "after" || (kingMoved && at === "pushed")) return { fen: after, lastMove: move };
+    if (at === "pushed") return { fen: clearSquare(after, to), lastMove: move };
+    if (at === "back" && !kingMoved) return { fen: clearSquare(fen, to), lastMove: board.lastMove };
+    return { fen, lastMove: board.lastMove };
+  }, [played, stand && lastStandBoard(ts)]);
   // The God King: summoned on your king's square, then he plays the move, and leaves as the round ends.
   const godKing = useMemo(() => {
     if (!mine.king) return null;
@@ -199,9 +220,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
       piece,
     };
   }, [mine, landAt, playAt]);
-  // The God King's word on the crowd's move, once it lands.
+  // The God King's word on the crowd's move, once it lands (none on his Last Stand: it speaks for itself).
   const kingCues = useMemo(() => {
-    if (!match.boss) return [];
+    if (!match.boss || stand) return [];
     if (mine.king) return [{ cue: "kingPlays" as KingCue, key: `kingplays-${fen}` }];
     const played = mine.result.playedMove;
     const loss = picks.find((p) => p.move === played)?.loss ?? null;
@@ -243,12 +264,12 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   }, [landed]);
 
   return (
-    <div class="screen game crowd" onClick={() => played && match.skipReveal()}>
+    <div class="screen game crowd" onClick={() => played && !stand && match.skipReveal()}>
       <Hud match={match} />
-      <div class="board-area">
+      <div class={`board-area${stand && ts >= LAST_STAND.crashAt && ts < LAST_STAND.crashAt + 450 ? " ls-shake" : ""}`}>
         <div class="opening-name">
           {match.boss ? (
-            <BossHeading side={sideToMove(fen)} note={mine.king ? "the God King's move" : `${voters} ${voters === 1 ? "vote" : "votes"}`} />
+            <BossHeading side={sideToMove(fen)} note={mine.king ? "the God King's move" : stand && ts >= LAST_STAND.freezeAt ? "the God King's Last Stand" : `${voters} ${voters === 1 ? "vote" : "votes"}`} />
           ) : (
             <>
               <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
@@ -257,8 +278,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
         </div>
         {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
         <div class="board-row">
-        <EvalBar fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-        <Board fen={played ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation} lastMove={played ? mine.result.playedMove : board.lastMove}>
+        <EvalBar fen={played && !stand ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
+        <Board fen={onBoard.fen} orientation={orientation} lastMove={onBoard.lastMove}>
           {!played && (
             <CrowdGhosts
               fen={fen}
@@ -270,8 +291,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               chosen={landed ? mine.result.playedMove : null}
             />
           )}
-          {played && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
+          {played && (!stand || ts < LAST_STAND.crashAt) && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
           {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
+          {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} />}
         </Board>
         </div>
       </div>
@@ -280,8 +302,25 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           match={match}
           side={sideToMove(fen)}
           cues={mine.king ? kingCues : landed ? kingCues : []}
-          away={!!godKing && now >= godKing.startAt && now < godKing.exitAt + 900}
+          away={(!!godKing && now >= godKing.startAt && now < godKing.exitAt + 900) || (!!stand && ts >= LAST_STAND.leapAt + 450 && ts < LAST_STAND.fadeAt)}
+          leaping={!!stand && ts >= LAST_STAND.leapAt && ts < LAST_STAND.leapAt + 450}
+          charges={stand && ts < LAST_STAND.leapAt ? (match.boss?.lastStand?.charges ?? 0) : undefined}
+          fallen={stand ? ts >= LAST_STAND.fadeAt : undefined}
           status={
+            stand && ts >= LAST_STAND.freezeAt ? (
+              <>
+                <span class="dock-line">
+                  <strong class="gold">{ts < LAST_STAND.slideAt ? "👑 Last Stand!" : ts < LAST_STAND.fadeAt ? "👑 He takes the blow!" : "👑 The God King has fallen"}</strong>
+                </span>
+                <span class="dock-line muted">
+                  {ts < LAST_STAND.slideAt
+                    ? `${toSan(fen, stand.move)}: −${stand.loss.toFixed(0)} · best ${toSan(fen, mine.bestMove)}`
+                    : ts < LAST_STAND.fadeAt
+                      ? `${toSan(fen, stand.move)} is taken back`
+                      : "The crowd picks again"}
+                </span>
+              </>
+            ) : (
             <>
               <span class="dock-line">
                 {!landed ? (
@@ -317,6 +356,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                     : `You: ${toSan(fen, me.move)} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`}
               </span>
             </>
+            )
           }
         />
       ) : (

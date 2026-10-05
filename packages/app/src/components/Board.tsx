@@ -116,6 +116,7 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
 
   useEffect(() => {
     const color = sideToMove(fen) === "w" ? "white" : "black";
+    const only = moves;
     api.current?.set({
       fen,
       orientation,
@@ -129,7 +130,7 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
         dests: interactive ? destsFor(fen, moves) : new Map(),
         events: {
           after: (from, to) => {
-            const moves = legalMoves(fen).filter((m) => m.startsWith(from + to));
+            const moves = (only ?? legalMoves(fen)).filter((m) => m.startsWith(from + to));
             if (moves.length > 1) setPromotion({ from, to });
             else if (moves[0]) onMoveRef.current?.(moves[0]);
           },

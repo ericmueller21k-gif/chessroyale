@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { applyMove, inCheck, queenInDanger, sideToMove } from "@chessroyale/chess";
+import { applyMove, inCheck, legalMoves, queenInDanger, sideToMove, toSan } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { EvalBar, knownEval } from "../components/EvalBar.tsx";
@@ -82,10 +82,13 @@ export function PlayScreen({
   // Crowd 50 v 50: only your team is picking this turn.
   const alive = match.standings().filter((s) => !s.out && (s.team == null || s.team === side));
   const doneCount = alive.filter((s) => match.done.has(s.id)).length;
-  const arrows: Arrow[] =
-    !waiting && hint && !history.browsing
-      ? hint.map((h, i) => ({ move: h.move, brush: HINT_BRUSHES[i]!, label: (h.expected * 100).toFixed(1) }))
-      : [];
+  // Boss battle, the re-pick after the God King's Last Stand: the move he took back is greyed out and can't be played.
+  const barred = match.boss?.barred && legalMoves(board.fen).includes(match.boss.barred) ? match.boss.barred : null;
+  const allowed = useMemo(() => (barred ? legalMoves(board.fen).filter((m) => m !== barred) : undefined), [board.fen, barred]);
+  const arrows: Arrow[] = [
+    ...(!waiting && hint && !history.browsing ? hint.map((h, i) => ({ move: h.move, brush: HINT_BRUSHES[i]!, label: (h.expected * 100).toFixed(1) })) : []),
+    ...(barred && !waiting && !history.browsing ? [{ move: barred, brush: "paleGrey" as const, label: "✕" }] : []),
+  ];
   const fen = history.fen ?? moved?.fen ?? shown.fen;
   const lastMove = history.browsing ? history.lastMove : (moved?.lastMove ?? shown.lastMove);
   // Boss battle: the God King striking the boss. The clock stands still and nobody moves until he's gone.
@@ -155,7 +158,7 @@ export function PlayScreen({
         </div>
         <div class="board-row">
           <EvalBar fen={history.fen ?? board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} orientation={side === "w" ? "white" : "black"} lastMove={lastMove} interactive={canMove} onMove={(m) => match.submit(m)} arrows={arrows}>
+          <Board fen={fen} orientation={side === "w" ? "white" : "black"} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows}>
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
             {intro && (
               <CenterCount
@@ -210,7 +213,7 @@ export function PlayScreen({
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}
-                {match.boss.staggerNext && <span class="muted">Boss staggered.</span>}
+                {barred ? <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span> : match.boss.staggerNext && <span class="muted">Boss staggered.</span>}
               </span>
             )
           }

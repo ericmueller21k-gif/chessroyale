@@ -1,10 +1,10 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { GameView, StrikeState } from "../game.ts";
-import { kingLine, kingSay, type KingCue } from "../godKing.ts";
+import { kingLine, kingSay, setKingFallen, type KingCue } from "../godKing.ts";
 import { play } from "../sound.ts";
 import { useFrameNow } from "./Countdown.tsx";
-import { GodKingSprite } from "./GodKing.tsx";
+import { GodKingFallen, GodKingSprite } from "./GodKing.tsx";
 import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
 
 /**
@@ -28,6 +28,9 @@ export function BossDock({
   side = "w",
   cues = [],
   away = false,
+  leaping = false,
+  fallen: fallenNow,
+  charges: chargesShown,
 }: {
   match: GameView;
   /** Your move: step back through the game (the arrows are greyed out elsewhere). */
@@ -41,14 +44,23 @@ export function BossDock({
   cues?: { cue: KingCue; key: string }[];
   /** He's on the board right now (summoned), not standing by. */
   away?: boolean;
+  /** His Last Stand: he leaps up out of the dock onto the board. */
+  leaping?: boolean;
+  /** He has fallen (after his Last Stand); by default, once it has happened. The reveal where it happens times it. */
+  fallen?: boolean;
+  /** The crowns to show, if not the battle's (the reveal of his Last Stand shows the ones he had until he leaps). */
+  charges?: number;
 }) {
   const boss = match.boss;
-  const charges = boss?.kingCharges ?? 0;
+  const fallen = fallenNow ?? !!boss?.lastStand;
+  const charges = fallen ? 0 : (chargesShown ?? boss?.kingCharges ?? 0);
   const [menu, setMenu] = useState(false);
   const view = nav?.view;
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
-  const ready = canCall && charges > 0 && !match.kingCalled;
+  const ready = canCall && charges > 0 && !match.kingCalled && !fallen;
   const cueKey = cues.map((c) => c.key).join("|");
+  // Fallen, he says nothing more (but his last words, and his return if the crowd wins).
+  useEffect(() => setKingFallen(fallen), [fallen]);
   useEffect(() => {
     for (const c of cues) if (kingSay(c.cue, c.key)) break;
   }, [cueKey]);
@@ -80,6 +92,8 @@ export function BossDock({
         charges={charges}
         ready={ready}
         away={away}
+        leaping={leaping}
+        fallen={fallen}
         menu={
           menu && ready ? (
             <CommandMenu
@@ -108,6 +122,8 @@ function GodKingUnit({
   charges,
   ready,
   away,
+  leaping,
+  fallen,
   menu,
   onTap,
 }: {
@@ -115,16 +131,30 @@ function GodKingUnit({
   charges: number;
   ready: boolean;
   away: boolean;
+  leaping: boolean;
+  fallen: boolean;
   menu: ComponentChildren;
   onTap: () => void;
 }) {
   const now = useFrameNow();
   const line = kingLine(now);
+  if (fallen) {
+    // After his Last Stand: his fallen figure, on his side, cracked and greyed. No menu, no crowns.
+    return (
+      <div class="gk-unit fallen">
+        {line && <SpeechBubble key={line.at} text={line.text} at={line.at} until={line.until} now={now} />}
+        <span class="gk-unit-btn" role="img" aria-label="The God King has fallen">
+          <GodKingFallen side={side} />
+        </span>
+        <span class="gk-unit-charges" />
+      </div>
+    );
+  }
   return (
-    <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}`}>
-      {menu ?? (line && !away && <SpeechBubble key={line.at} text={line.text} at={line.at} until={line.until} now={now} />)}
+    <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${leaping ? " leaping" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}`}>
+      {menu ?? (line && !away && !leaping && <SpeechBubble key={line.at} text={line.text} at={line.at} until={line.until} now={now} />)}
       <button type="button" class="gk-unit-btn" disabled={!ready} onClick={onTap} aria-label={ready ? "God King: tap to summon him" : "God King"}>
-        <GodKingSprite side={side} class="idle" />
+        <GodKingSprite side={side} class={leaping ? "leap" : "idle"} />
       </button>
       <span class="gk-unit-charges" aria-label={`${charges} charges left`}>
         {charges > 0 ? "👑".repeat(charges) : "—"}

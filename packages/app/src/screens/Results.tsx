@@ -4,6 +4,7 @@ import { elimination, myTeam, type GameView } from "../game.ts";
 import { useState } from "preact/hooks";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
+import { GodKingEpilogue } from "../components/LastStand.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
   const played = match.moves.filter((m) => m.move !== null);
@@ -44,6 +45,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
               : `A draw with ${match.boss.name}.`}
         </p>
       )}
+      {/* After his Last Stand: he rises again if the crowd won; otherwise he stays down. */}
+      {bossResult && match.boss?.lastStand && <GodKingEpilogue side={match.boss.crowdSide} rises={bossResult === "crowd"} />}
       {team && !bossResult && (
         <p class={`team-result ${gameWinner === team ? "good" : gameWinner ? "bad" : ""}`}>
           {gameWinner === team

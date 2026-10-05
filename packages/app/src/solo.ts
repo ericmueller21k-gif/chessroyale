@@ -39,6 +39,8 @@ export class SoloMatch implements GameView {
   private progress = new RoundProgress(() => this.emit());
   /** Test switch (?laststand=1): the boss battle's first crowd move calls for the God King's Last Stand, whatever it is. */
   forceLastStand = typeof location !== "undefined" && new URLSearchParams(location.search).get("laststand") === "1";
+  /** Test switch (?side=b): a boss raid alone, playing Black (to see the God King in black). */
+  private raidSide = typeof location !== "undefined" && new URLSearchParams(location.search).get("side") === "b" ? ("b" as const) : undefined;
 
   constructor(
     private readonly engines: UciEngine[],
@@ -177,6 +179,7 @@ export class SoloMatch implements GameView {
       // Re-checks go to the engine server first (see withServerRecheck).
       engines: this.engines.map((e) => withServerRecheck(e, () => this.runner?.state.boards.length ?? 1)),
       library,
+      raidSide: this.raidSide,
       // A boss raid alone is just you against the boss.
       entrants: [
         { id: HUMAN, name: this.playerName, isBot: false, practice: this.practice },

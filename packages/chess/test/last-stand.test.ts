@@ -80,7 +80,7 @@ describe("the God King's Last Stand: the rule", () => {
     expect(runner.boss!.crowdMoves).toBe(0);
     // His charges are gone with him; he has fallen.
     expect(runner.boss!.kingCharges).toBe(0);
-    expect(runner.boss!.lastStand).toEqual({ atMove: 1, move: BLUNDER, loss: 47, bar: 35 });
+    expect(runner.boss!.lastStand).toEqual({ atMove: 1, move: BLUNDER, loss: 47, bar: 35, charges: 3 });
     expect(runner.bossView()!.barred).toBe(BLUNDER);
     // The scores stand: the loss is on your record.
     expect(runner.player("h0").finalLosses).toEqual([47]);

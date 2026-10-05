@@ -113,9 +113,9 @@ export interface BossState {
   minSurvivors?: number;
   /**
    * The God King's Last Stand (once per game): the crowd's disastrous move he took back, during which crowd move
-   * (1-based, like kingMoves), what it gave away and the bar it crossed. Set, he has fallen: no charges, no menu.
+   * (1-based, like kingMoves), what it gave away, the bar it crossed and the charges he fell with. Set, he has fallen: no charges, no menu.
    */
-  lastStand?: { atMove: number; move: string; loss: number; bar: number };
+  lastStand?: { atMove: number; move: string; loss: number; bar: number; charges: number };
   /** The re-pick after his Last Stand: this move (the one he took back) can't be picked. Cleared once it's played. */
   barred?: string;
 }
