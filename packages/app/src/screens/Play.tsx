@@ -189,13 +189,13 @@ export function PlayScreen({
           status={
             striking ? (
               <span>
-                <strong>👑 The God King strikes the boss!</strong> <span class="muted">The clock is stopped.</span>
+                <strong>👑 He strikes the boss!</strong> <span class="muted">Clock stopped.</span>
               </span>
             ) : waiting ? (
               <span>
                 <Dots /> <strong>{picked ? "Move in." : "Time's up."}</strong>{" "}
                 <span class="muted">
-                  Waiting for the others · {doneCount}/{alive.length}
+                  Waiting · {doneCount}/{alive.length}
                 </span>
               </span>
             ) : intro ? (
@@ -204,13 +204,13 @@ export function PlayScreen({
               <span>
                 <strong>Strike called.</strong>{" "}
                 <span class="muted">
-                  {strike.calls} of {strike.needed} needed. Pick your move meanwhile.
+                  {strike.calls}/{strike.needed} needed. Pick your move.
                 </span>
               </span>
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}
-                {match.boss.staggerNext && <span class="muted">The boss is staggered: its next move will be weaker.</span>}
+                {match.boss.staggerNext && <span class="muted">Boss staggered.</span>}
               </span>
             )
           }

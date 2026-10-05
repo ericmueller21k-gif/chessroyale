@@ -702,3 +702,16 @@ Eric asked for a Fire Emblem style banner the moment the God King raises his swo
   - The reveal where he plays the move gets 5.4 s extra (was 3.9 s), in solo and online.
   - A strike stops the clock for 5.9 s (`kingStrikeMs`, was 4.4 s).
 - **Sound.** `cutin.mp3`: a whoosh into a sword ring (CC0 retro pack).
+
+## Boss dock: one row (Oct 5, 2026)
+
+Eric: the replay arrows' row was empty space, so the status box moves between them.
+
+- The dock is now a single 62 px row: « [status box] » beside the God King. It was 90 px (an arrows row over a status row), so the board area gains 28 px; the leaderboard starts at 512 px on an iPhone 13 instead of 540.
+- While you step back through the game, the box shows "Move 5 · 9/10 · back to live" (tap it to return).
+- The God King's column shrinks to match (figure 33 × 50 px, crowns at his feet).
+- The status lines are shorter to fit the narrower box (13 px / 12 px), for example:
+  - "👑 God King plays Be2" / "You called him · no score" (or "3 of 8 called him · no score")
+  - "Crowd plays e4 · 6/10" / "You: e4 (+0.4) · best d4"
+  - "🤖 Boss plays a5" / "Your move in 2"
+  - "👑 He strikes the boss!" / "Clock stopped."
