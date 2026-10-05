@@ -9,6 +9,9 @@ export function PawnHat({ hat }: { hat: string }) {
   const line = { stroke: "#1d1d1f", "stroke-width": 3, "stroke-linejoin": "round" as const };
   return (
     <svg class="pawn-hat" viewBox="0 0 100 100" aria-hidden="true">
+      {/* Drawn with brims near y 34; moved up so a hat sits snug on the pawn's head (brim near y 25, a few points
+          below the top of the head), not over the whole head. */}
+      <g transform="translate(0 -9)">
       {hat === "party" && (
         <g {...line}>
           <path d="M50 2 L64 34 L36 34 Z" fill="#ec4899" />
@@ -44,6 +47,7 @@ export function PawnHat({ hat }: { hat: string }) {
           <rect x="32" y="31" width="36" height="5" rx="2" fill="#a16207" />
         </g>
       )}
+      </g>
     </svg>
   );
 }

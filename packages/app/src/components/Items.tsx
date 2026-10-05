@@ -283,6 +283,27 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   "fire-ice-crown": [30, -6, 40, 34],
 };
 
+/**
+ * Fitting items to the piece. A piece (the pawn, or a skin) has anchor points on its 100 × 100 square: where a
+ * hat's brim sits (a few points below the top of its head, like a real hat) and where a beard starts (just below
+ * the middle of its head). Each item names the line in its own drawing that meets its slot's anchor (a hat's brim,
+ * a beard's top edge), and the avatar lines them up. A new item needs only that one number; a new skin, its anchors.
+ * (The cburnett pawn's head: top at y 20, centre 29, radius 9.)
+ */
+const PAWN_ANCHORS = { head: 25, face: 40 };
+const SKIN_ANCHORS: Record<string, { head: number; face: number }> = {
+  snowman: { head: 14, face: 22 },
+};
+/** The line in each item's drawing that meets its slot's anchor (head and face items). */
+const ATTACH: Record<string, number> = {
+  "santa-hat": 22,
+  antlers: 16,
+  "fire-ice-crown": 24,
+  "santa-beard": 23,
+};
+/** How far a piece's anchors sit from the pawn's (for the old shop hats, drawn for the pawn). */
+export const anchorsFor = (skin?: string) => (skin && SKIN_ANCHORS[skin]) || PAWN_ANCHORS;
+
 /** One item, drawn into an existing svg on the pawn's square. */
 export function ItemLayer({ def, finish, side = "w" }: { def: string; finish: Finish; side?: "w" | "b" }) {
   const p = usePaint(finish, def);
@@ -322,6 +343,9 @@ export function Avatar({ look, side = "w", hat = "none" }: { look?: ItemLook; si
     const it = at(slot);
     return it ? [{ slot, it }] : [];
   });
+  const anchors = anchorsFor(skin?.def);
+  /** How far to move an item so its attach line meets its slot's anchor on this piece. */
+  const shift = (slot: ItemSlot, def: string) => (slot === "head" || slot === "face") && ATTACH[def] !== undefined ? anchors[slot] - ATTACH[def]! : 0;
   const layer = (back: boolean) => (
     // (Items may rise a little above the square, never more: the clip caps their height.)
     <svg class={`avatar-items ${back ? "back" : "front"}`} viewBox="0 0 100 100">
@@ -334,7 +358,9 @@ export function Avatar({ look, side = "w", hat = "none" }: { look?: ItemLook; si
         {worn
           .filter(({ it }) => behindPiece(it.def) === back)
           .map(({ slot, it }) => (
-            <ItemLayer key={slot} def={it.def} finish={it} side={side} />
+            <g key={slot} transform={`translate(0 ${shift(slot, it.def)})`}>
+              <ItemLayer def={it.def} finish={it} side={side} />
+            </g>
           ))}
       </g>
     </svg>
@@ -349,7 +375,11 @@ export function Avatar({ look, side = "w", hat = "none" }: { look?: ItemLook; si
       ) : (
         <piece class={`${side === "w" ? "white" : "black"} pawn`} />
       )}
-      {!at("head") && hat !== "none" && <PawnHat hat={hat} />}
+      {!at("head") && hat !== "none" && (
+        <span class="avatar-hat" style={{ transform: `translateY(${anchors.head - PAWN_ANCHORS.head}%)` }}>
+          <PawnHat hat={hat} />
+        </span>
+      )}
       {layer(false)}
     </span>
   );

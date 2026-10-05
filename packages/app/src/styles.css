@@ -4907,7 +4907,7 @@ button.history-label {
   width: 100%;
   height: 100%;
 }
-.avatar > piece,
+.avatar.cg-wrap > piece,
 .avatar > .pawn-hat,
 .avatar > .avatar-items,
 .avatar > .avatar-skin {
@@ -4923,7 +4923,7 @@ button.history-label {
 .avatar > .avatar-items.back {
   z-index: 1;
 }
-.avatar > piece,
+.avatar.cg-wrap > piece,
 .avatar > .avatar-skin {
   z-index: 2;
 }
@@ -4932,6 +4932,18 @@ button.history-label {
 }
 .avatar > .avatar-items.front {
   z-index: 4;
+}
+.avatar > .avatar-hat {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+}
+.avatar > .avatar-hat .pawn-hat {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
 /* ---- Crates and the locker: Final Fantasy-style windows, like the God King's commands ---- */
