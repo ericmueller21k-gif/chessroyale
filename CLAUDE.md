@@ -25,6 +25,9 @@ record it in `DECISIONS.md`.
 - Next phase (accounts, profiles, matchmaking, ranked, coins/icons/emotes): see `ROADMAP.md` for the order and what
   needs Eric.
 - Explain rules and scoring in plain language on screen. Real playtests drive changes, so make tweaks easy.
+- Never merge red: every PR runs the typecheck and unit tests on GitHub (`.github/workflows/check.yml`); wait for it
+  to pass, and run the e2e suite (`npm run e2e`) yourself before merging anything that changes gameplay or screens.
+- Classic (8 boards) will be reworked (Eric, Oct 5, 2026): don't invest in it until he decides the new design.
 
 ## Progress
 
