@@ -12,8 +12,8 @@ const FINAL_SHOW_MS = 3200;
 /** Boss battle: how long the boss's move shows, how long it thinks at least, and how long a strike shows. */
 const BOSS_THINK_MS = 1200;
 const BOSS_KILL_MS = 3800;
-/** The God King's summoning and bolt, added to a reveal where he acts. */
-const KING_FX_MS = 3900;
+/** The God King's summoning, cut-in banner and bolt, added to a reveal where he plays the move. */
+const KING_FX_MS = 5400;
 const library = openingsData as unknown as Opening[];
 
 export function boardView(b: BoardState): BoardView {

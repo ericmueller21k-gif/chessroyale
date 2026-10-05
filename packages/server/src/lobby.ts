@@ -145,8 +145,8 @@ const FINAL_CUT_MS = 1800;
 /** Boss battle: how long the boss's move shows, how long a strike shows, and how long the host has to play the boss. */
 const BOSS_KILL_MS = 3800;
 const BOSS_TIMEOUT_MS = 15_000;
-/** The God King's summoning and bolt, added to a reveal where he plays the move. */
-const KING_FX_MS = 3900;
+/** The God King's summoning, cut-in banner and bolt, added to a reveal where he plays the move. */
+const KING_FX_MS = 5400;
 
 export class LobbyCore {
   private runner: MatchRunner | null = null;

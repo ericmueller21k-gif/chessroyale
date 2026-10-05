@@ -10,6 +10,7 @@ same name to change it; the game plays them at these moments of the God King's a
 | hyuah.mp3 | he raises his sword ("hyuah!") | HaelDB, *Male Grunt/Yelling sounds*, `3grunt3` (trimmed, light 16-bit crunch) |
 | bolt.mp3 | his bolt strikes | Junkala, `sfx_exp_shortest_hard4` |
 | hit.mp3 | the boss loses HP (the last of his three slashes) | Junkala, `sfx_damage_hit3` |
+| cutin.mp3 | his cut-in banner sweeps in | A synthesised whoosh into Junkala's `sfx_wpn_sword2` |
 | slash.mp3 | each of his three slashes on the boss | Made for the game (a bright noise swish with a metallic ring, synthesised with ffmpeg; no licence needed) |
 | leave.mp3 | holy light: he vanishes | Made for the game (a falling three-tone shimmer, synthesised with ffmpeg; no licence needed) |
 

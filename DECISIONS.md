@@ -683,3 +683,17 @@ Eric's feedback after playing it: too much King.
 ## The God King's bubble carries across screens (Oct 5, 2026)
 
 Eric saw the bubble flash a couple of times as it ended. Each screen of a turn (your move, the reveal, the boss's turn) draws its own God King, and a line still showing when the screen changed popped in and retyped from the first letter on the new screen, sometimes only 0.1 s before it ended. Now the line remembers when it started: a new screen picks it up where it was (no second pop-in, no retyping), and it fades out over its last quarter-second.
+
+## The God King's cut-in banner (Oct 5, 2026)
+
+Eric asked for a Fire Emblem style banner the moment the God King raises his sword, before he moves the piece.
+
+- **What it shows.** It uses the START banner's motion (flash, slanted band over speed lines, slam), in his colours instead of red: navy and indigo with gold borders. Left to right:
+  - his pixel portrait: crowned, helmed, eyes burning white with a blue glow, a red cape behind;
+  - "GOD KING" over what he's doing: the move in SAN (e.g. "Bxe7") or "STRIKE!";
+  - the target: the piece he moves (the board's own piece art), or the boss's face for a strike.
+- **The portrait** is a 24 × 23 pixel grid drawn as an SVG (`GodKingPortrait`), so it stays crisp at any size.
+- **Timing.** The banner plays for 1.5 s right after his "hyuah!" sword raise. His bolt, the move and the strike's three slashes all come 1.5 s later than before.
+  - The reveal where he plays the move gets 5.4 s extra (was 3.9 s), in solo and online.
+  - A strike stops the clock for 5.9 s (`kingStrikeMs`, was 4.4 s).
+- **Sound.** `cutin.mp3`: a whoosh into a sword ring (CC0 retro pack).

@@ -8,7 +8,7 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { MiniTower } from "../components/MiniTower.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
-import { KingSummon, kingSquare } from "../components/GodKing.tsx";
+import { KING_CUT_MS, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossHeading } from "./Play.tsx";
 import { crowdAnimations, onPrefsChange } from "../prefs.ts";
@@ -151,8 +151,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const countEnd = animate ? (unseen ? unseen * step + 350 : 150) : seen === ghosts.length ? 150 : 600;
   const grow = ghosts.length ? (animate ? shown / ghosts.length : Math.min(1, t / countEnd)) : 1;
   const landAt = countEnd + 250;
-  // The God King playing the move: his summoning and his bolt come first (about 2.1 s), then the piece moves.
-  const playAt = landAt + (mine.king ? 2100 : 750);
+  // The God King playing the move: his summoning, his cut-in banner and his bolt come first, then the piece moves.
+  const playAt = landAt + (mine.king ? 2100 + KING_CUT_MS : 750);
   const landed = t >= landAt;
   const played = t >= playAt;
   useEffect(() => {
@@ -171,7 +171,20 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     const orient = (myTeam(match) ?? crowd) === "w" ? ("white" as const) : ("black" as const);
     const exitAt = Math.max(start + playAt + 2900, until - 900);
     const from = mine.result.playedMove.slice(0, 2);
-    return { side: crowd, orientation: orient, kingBefore: before, kingAfter: later, target: from === before ? null : from, mode: "move" as const, startAt: start + landAt, moveAt: start + playAt, exitAt };
+    const piece = pieceAt(fen, from)?.type;
+    return {
+      side: crowd,
+      orientation: orient,
+      kingBefore: before,
+      kingAfter: later,
+      target: from === before ? null : from,
+      mode: "move" as const,
+      startAt: start + landAt,
+      moveAt: start + playAt,
+      exitAt,
+      san: toSan(fen, mine.result.playedMove),
+      piece,
+    };
   }, [mine, landAt, playAt]);
   // The God King's word on the crowd's move, once it lands.
   const kingCues = useMemo(() => {

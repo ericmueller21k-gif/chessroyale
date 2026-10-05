@@ -169,7 +169,7 @@ export const DEFAULT_SETTINGS: Settings = {
   raid: false,
   bossFixedElo: 0,
   kingStrikeLoss: [5, 15],
-  kingStrikeMs: 4400,
+  kingStrikeMs: 5900,
   kingPowerUpsPerCharge: 10,
   kingChargesMax: 3,
   kingBotLoss: 6,
