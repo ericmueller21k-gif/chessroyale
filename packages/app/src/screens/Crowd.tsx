@@ -11,7 +11,7 @@ import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
 import { KING_CUT_MS, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossHeading } from "./Play.tsx";
-import { crowdAnimations, onPrefsChange } from "../prefs.ts";
+import { crowdAnimations, crowdTrail, onPrefsChange } from "../prefs.ts";
 import { finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { seenKey } from "../hooks.ts";
 import { play } from "../sound.ts";
@@ -24,6 +24,13 @@ const sideName = (s: "w" | "b") => (s === "w" ? "White" : "Black");
 export function useCrowdAnimations(): boolean {
   const [on, setOn] = useState(crowdAnimations());
   useEffect(() => onPrefsChange(() => setOn(crowdAnimations())), []);
+  return on;
+}
+
+/** The device's motion trail setting (Crowd, with animations on), kept in sync if it changes. */
+export function useCrowdTrail(): boolean {
+  const [on, setOn] = useState(crowdTrail());
+  useEffect(() => onPrefsChange(() => setOn(crowdTrail())), []);
   return on;
 }
 
@@ -41,6 +48,7 @@ const seenLive = { fen: "", ids: new Set<string>() };
 
 export function LiveGhosts({ match, fen, orientation }: { match: GameView; fen: string; orientation: "white" | "black" }) {
   const animate = useCrowdAnimations();
+  const trail = useCrowdTrail();
   const now = useFrameNow();
   // Picks made before you could see them catch up in a quick wave from this moment; later ones arrive live.
   const [since] = useState(Date.now());
@@ -54,7 +62,7 @@ export function LiveGhosts({ match, fen, orientation }: { match: GameView; fen: 
     seenLive.ids = new Set();
   }
   for (const p of visible) seenLive.ids.add(p.playerId);
-  return <CrowdGhosts fen={fen} picks={ghostPicks(match, visible)} orientation={orientation} animate={animate} faint />;
+  return <CrowdGhosts fen={fen} picks={ghostPicks(match, visible)} orientation={orientation} animate={animate} trail={trail} faint />;
 }
 const fmt = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
 
@@ -128,6 +136,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const [start] = useState(Date.now());
   const now = useFrameNow();
   const animate = useCrowdAnimations();
+  const trail = useCrowdTrail();
   const total = Math.max(2500, until - start);
   const picks = mine.result.players;
   // Every pick, in a mixed order (not grouped by move), for the rapid succession of ghosts.
@@ -248,6 +257,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               picks={ordered.slice(0, shown)}
               orientation={orientation}
               animate={animate}
+              trail={trail}
               instant={new Set(ordered.slice(0, seen).map((g) => g.id))}
               chosen={landed ? mine.result.playedMove : null}
             />

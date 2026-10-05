@@ -2516,35 +2516,53 @@ button.history-label {
 }
 .crowd-tag {
   z-index: 2;
+  /* One name per square, never wider than the square. */
+  max-width: calc(12.5% - 2px);
 }
-.crowd-tag .tag-more {
+.crowd-tag span {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+  line-height: 1.25;
+  padding: 0 3px;
+}
+/* "+N": everyone else who picked it, a badge on the piece's top-right corner. */
+.crowd-count {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-100%, 0);
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  box-shadow: 0 0 0 1px rgba(16, 18, 22, 0.6);
+  animation: ghost-pop 200ms ease-out;
+}
+.crowd-mark.not-chosen .crowd-tag,
+.crowd-mark.not-chosen .crowd-count {
+  opacity: 0.08;
+  transition: opacity 0.35s;
+}
+.crowd-mark.you .crowd-tag span {
   background: var(--accent);
   color: var(--accent-text);
 }
-.crowd-tag.you span:first-child {
-  background: var(--accent);
-  color: var(--accent-text);
-}
-.crowd-tag.chosen span {
+.crowd-mark.chosen .crowd-tag span,
+.crowd-mark.chosen .crowd-count {
   background: #1f8f52;
+  color: #fff;
 }
 .pick-count {
   font-weight: 800;
   color: var(--text);
   font-variant-numeric: tabular-nums;
-}
-/* Crowd tags: each name fits within one square's width so neighbouring columns stay readable. */
-.crowd-tag span {
-  max-width: 17cqw;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 9px;
-  padding: 0 3px;
-  line-height: 1.25;
-}
-.crowd-tag .tag-more {
-  font-size: 10px;
-  font-weight: 900;
 }
 
 /* ---- Account chip and profile ---- */
@@ -4503,4 +4521,81 @@ button.history-label {
   text-shadow:
     5px 5px 0 #0b1020,
     0 0 24px rgba(253, 224, 71, 0.9);
+}
+
+/* Motion trail: a pick flying in (from --dx/--dy squares away), two echoes behind it; it fades as it lands. */
+.crowd-layer piece.crowd-flyer {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+  pointer-events: none;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 0 4px rgba(244, 183, 64, 0.8));
+  --fly-peak: 0.62;
+  animation: ghost-fly var(--fly-ms, 420ms) cubic-bezier(0.25, 0.75, 0.35, 1) both;
+}
+.crowd-layer piece.crowd-flyer.you {
+  --fly-peak: 0.85;
+  filter: drop-shadow(0 0 5px var(--accent));
+}
+.crowd-layer piece.crowd-flyer.echo1 {
+  --fly-peak: 0.3;
+  animation-delay: 40ms;
+}
+.crowd-layer piece.crowd-flyer.echo2 {
+  --fly-peak: 0.15;
+  animation-delay: 80ms;
+}
+@keyframes ghost-fly {
+  0% {
+    transform: translate(calc(var(--dx) * 100%), calc(var(--dy) * 100%));
+    opacity: 0;
+  }
+  15% {
+    opacity: var(--fly-peak);
+  }
+  80% {
+    opacity: var(--fly-peak);
+  }
+  100% {
+    transform: none;
+    opacity: 0;
+  }
+}
+/* The fixed ghost waits for its flyer: hidden until it lands (a new square), or pops as it lands. */
+.crowd-layer piece.crowd-ghost.land-first {
+  animation: ghost-land-first calc(var(--fly-ms, 420ms) + 200ms) ease-out both;
+}
+.crowd-layer piece.crowd-ghost.land {
+  animation: ghost-land calc(var(--fly-ms, 420ms) + 200ms) ease-out;
+}
+@keyframes ghost-land-first {
+  0%,
+  62% {
+    opacity: 0;
+    scale: 1.18;
+  }
+}
+@keyframes ghost-land {
+  0%,
+  62% {
+    scale: 1;
+  }
+  68% {
+    scale: 1.18;
+    filter: drop-shadow(0 0 8px rgba(244, 183, 64, 0.95));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .crowd-layer piece.crowd-flyer {
+    display: none;
+  }
+  .crowd-layer piece.crowd-ghost.land-first,
+  .crowd-layer piece.crowd-ghost.land {
+    animation: none;
+  }
+}
+.check.disabled {
+  opacity: 0.5;
 }
