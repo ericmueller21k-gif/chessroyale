@@ -179,30 +179,30 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
           <>
             <span class="dock-line">
               {intro ? (
-                <strong>{boss.raid ? "All of you against the boss." : "Ten of you against the boss."}</strong>
+                <strong>{boss.raid ? "All of you vs the boss." : "Ten of you vs the boss."}</strong>
               ) : victim ? (
                 <strong class="bad">
-                  💀 {boss.name} struck down {name(victim)}
+                  💀 Struck down: {name(victim)}
                 </strong>
               ) : thinking ? (
                 <>
-                  <Dots /> <strong>{boss.name}</strong> is thinking…
+                  <Dots /> <strong>The boss</strong> is thinking…
                 </>
               ) : boss.lastMove ? (
                 <>
-                  {boss.icon} <strong>{boss.name}</strong> played <strong>{boss.lastMove.san}</strong>
+                  {boss.icon} Boss plays <strong>{boss.lastMove.san}</strong>
                 </>
               ) : null}
             </span>
             <span class="dock-line muted">
               {intro
-                ? `The most popular pick is played. Every ${match.settings.bossKillEvery} moves it strikes down whoever played worst.`
+                ? `Worst mover struck every ${match.settings.bossKillEvery} moves.`
                 : victim
                   ? youStruck
-                    ? `Your recent moves were the crowd's worst. You finish ${match.placement}${ordinal(match.placement ?? 0)}.`
-                    : "The crowd's worst moves since its last strike."
+                    ? `You played worst. You finish ${match.placement}${ordinal(match.placement ?? 0)}.`
+                    : "Worst moves since its last strike."
                   : boss.lastMove?.staggered && !thinking
-                    ? "Staggered by the God King's strike: a weaker move."
+                    ? "Staggered: a weaker move."
                     : left !== null && left > 0
                       ? `Your move in ${left}`
                       : boss.kills.length

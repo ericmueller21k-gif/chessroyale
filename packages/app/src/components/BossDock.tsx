@@ -11,8 +11,9 @@ import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
  * Boss battle: everything below the board, the same on every screen (your move,
  * the reveal, the boss's turn) so nothing moves from one to the next:
  *
- * - on the left, a row for stepping through the game, and one status line (two
- *   at most) saying what's happening right now;
+ * - on the left, one row: the arrows for stepping through the game either side
+ *   of a status box (two lines at most) saying what's happening right now, or
+ *   which move you're looking at while you step back;
  * - on the right, the God King himself, standing by and breathing, with his
  *   charges at his feet. He says a few words now and then (`cues`). Tap him
  *   and his commands pop up above his head, like an old Final Fantasy battle
@@ -57,25 +58,22 @@ export function BossDock({
   }, [ready]);
   return (
     <div class="boss-dock">
-      <div class="boss-dock-main">
-        <div class={`history-nav boss-dock-nav${view?.browsing ? " browsing" : ""}`}>
-          <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
-            <Chevrons back />
-          </button>
-          <div class="nav-middle">
-            {view?.browsing ? (
-              <button type="button" class="history-label" onClick={() => view.live()} aria-label="Back to the live position">
-                Move {moveNo(view.ply)} · {view.ply}/{nav!.total} · back to live
-              </button>
-            ) : null}
-          </div>
-          <button type="button" class="nav-btn" aria-label="Next move" disabled={!view?.browsing} onClick={() => view?.go(view.ply + 1)}>
-            <Chevrons />
-          </button>
-        </div>
+      <div class={`history-nav boss-dock-main${view?.browsing ? " browsing" : ""}`}>
+        <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
+          <Chevrons back />
+        </button>
         <div class="boss-dock-status" role="status" aria-live="polite">
-          {status}
+          {view?.browsing ? (
+            <button type="button" class="history-label" onClick={() => view.live()} aria-label="Back to the live position">
+              Move {moveNo(view.ply)} · {view.ply}/{nav!.total} · back to live
+            </button>
+          ) : (
+            status
+          )}
         </div>
+        <button type="button" class="nav-btn" aria-label="Next move" disabled={!view?.browsing} onClick={() => view?.go(view.ply + 1)}>
+          <Chevrons />
+        </button>
       </div>
       <GodKingUnit
         side={side}

@@ -3500,26 +3500,31 @@ button.history-label {
   position: relative;
 }
 .boss-dock-main {
-  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
   gap: 6px;
   min-width: 0;
+  height: 62px;
 }
-.boss-dock-nav {
-  height: 36px;
+.boss-dock-main > .nav-btn {
+  height: 100%;
 }
 .boss-dock-status {
-  height: 48px;
+  height: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 2px;
-  padding: 0 12px;
+  padding: 0 10px;
   overflow: hidden;
   border-radius: 12px;
   background: var(--surface);
   border: 1px solid var(--line);
-  font-size: 14px;
-  line-height: 19px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.boss-dock-status > .history-label {
+  align-self: center;
 }
 .boss-dock-status > span:only-child:not(.dock-line) {
   display: -webkit-box;
@@ -3534,7 +3539,7 @@ button.history-label {
   text-overflow: ellipsis;
 }
 .dock-line.muted {
-  font-size: 13px;
+  font-size: 12px;
 }
 .dock-line:empty {
   display: none;
@@ -3558,14 +3563,14 @@ button.history-label {
 .gk-unit {
   position: relative;
   display: grid;
-  grid-template-rows: 1fr 14px;
+  grid-template-rows: 1fr 12px;
   justify-items: center;
-  height: 90px;
+  height: 62px;
 }
 .gk-unit-btn {
   position: relative;
   width: 58px;
-  height: 76px;
+  height: 50px;
   padding: 0;
   border: none;
   border-radius: 14px;
@@ -3597,13 +3602,13 @@ button.history-label {
   transition: opacity 200ms;
 }
 .gk-unit .god-king {
-  width: 40px;
-  height: 60px;
+  width: 33px;
+  height: 50px;
 }
 .gk-unit-charges {
   font-size: 9px;
   letter-spacing: -2px;
-  line-height: 14px;
+  line-height: 12px;
   white-space: nowrap;
 }
 @keyframes gk-ready {

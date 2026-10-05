@@ -276,26 +276,27 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                   )
                 ) : mine.king ? (
                   <>
-                    <strong class="gold">👑 The God King plays {toSan(fen, mine.result.playedMove)}</strong>{" "}
-                    <span class="muted">· {mine.kingCalls} of {picks.length} called him</span>
+                    <strong class="gold">👑 God King plays {toSan(fen, mine.result.playedMove)}</strong>
                   </>
                 ) : (
                   <>
-                    <strong>The crowd plays {toSan(fen, mine.result.playedMove)}</strong>{" "}
+                    <strong>Crowd plays {toSan(fen, mine.result.playedMove)}</strong>{" "}
                     <span class="muted">
-                      · {picks.filter((p) => p.move === mine.result.playedMove).length} of {voters} {voters === 1 ? "vote" : "votes"}
+                      · {picks.filter((p) => p.move === mine.result.playedMove).length}/{voters}
                     </span>
                   </>
                 )}
               </span>
               <span class="dock-line muted">
                 {!me
-                  ? `Your team watched this one · best was ${toSan(fen, mine.bestMove)}`
+                  ? `You watched · best ${toSan(fen, mine.bestMove)}`
                   : !me.move
                     ? mine.king !== undefined && match.kingCalled
-                      ? "You called the King: no score for you this move."
-                      : "No move from you this time."
-                    : `You picked ${toSan(fen, me.move)} (${fmt(me.roundScore)}) · best was ${toSan(fen, mine.bestMove)}`}
+                      ? picks.length > 1
+                        ? `${mine.kingCalls} of ${picks.length} called him · no score`
+                        : "You called him · no score"
+                      : "No move from you."
+                    : `You: ${toSan(fen, me.move)} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`}
               </span>
             </>
           }
