@@ -785,6 +785,16 @@ Eric wants to choose which boss to fight.
 - Boss raid shows a row of boss cards (name, skulls, strength), weakest first, plus "Match me" (the old behaviour: a step above your rating, the default).
 - The choice is saved on the device and used for solo ("Take on the boss alone") and for raids you create. The server takes `?boss=<tier>` and keeps the pick for rematches; an unpicked raid still matches the group.
 
+## The boss menu comes first (Oct 5, 2026)
+
+Eric: when you take on the boss alone, the first thing should be choosing which boss to fight, with each one's strength alongside.
+
+- **A menu, not a row.** "Take on the boss alone" now opens "Choose your boss": all ten bosses in one list, weakest first. Each row has the icon, the name, its skulls, its strength (1400 to 3190), and a coloured "vs you" (−100 green, ≈ your level gold, +300 orange, +500 and up red). A bar for each boss puts them all on one scale, with a line at your rating. A tap picks the boss and starts. The old scrolling row of cards on the home screen is gone.
+- **Solo always fights a named boss.** "Match me" is gone from the solo menu. The boss it would have picked (the weakest above your rating) is tagged "your match", and it's highlighted the first time. After that, your last pick is highlighted. Your rating is your profile's engine rating, or 1500 if you're unrated, and the header shows which.
+- **"Create a raid" opens the same menu,** plus "Match the group" at the top (the old behaviour: the weakest boss above the group's average, decided when the raid starts). I did raids too so there's one way to pick a boss, not a menu for solo and a row of cards for raids. Joining a raid by code skips it: the host picked.
+- **`?boss=N` skips the menu** (for tests and links). The pick is kept on the device as before, and in memory too, for browsers without storage.
+- Checked on a 390 px and a 320 px phone, light and dark. Ten rows fit without scrolling on an iPhone 13; on a 320 px phone the list scrolls inside the sheet.
+
 ## A banner when you take the boss's queen (Oct 5, 2026)
 
 Only the boss's capture had a banner ("QUEEN DOWN!").
