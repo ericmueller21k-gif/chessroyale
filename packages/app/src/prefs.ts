@@ -27,3 +27,28 @@ export function onPrefsChange(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
+
+const TRAIL_KEY = "brc.crowdTrail";
+
+/**
+ * Crowd, with animations on: the motion trail. Every new pick flies from its piece's square to where it lands
+ * (with a short trail), then hands over to the one fixed ghost on that square. Off: picks just pop in place.
+ */
+export function crowdTrail(): boolean {
+  const q = new URLSearchParams(location.search).get("trail");
+  if (q !== null) return q !== "0";
+  try {
+    return localStorage.getItem(TRAIL_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setCrowdTrail(on: boolean) {
+  try {
+    localStorage.setItem(TRAIL_KEY, on ? "1" : "0");
+  } catch {
+    // Not important.
+  }
+  listeners.forEach((l) => l());
+}

@@ -3,7 +3,7 @@ import { BOSS_TIERS, bossInfo, CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_O
 import { InstallCard } from "../components/InstallCard.tsx";
 import { account, updateProfile } from "../account.ts";
 import { useAccount } from "./Profile.tsx";
-import { crowdAnimations, setCrowdAnimations } from "../prefs.ts";
+import { crowdAnimations, crowdTrail, setCrowdAnimations, setCrowdTrail } from "../prefs.ts";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 
@@ -194,6 +194,7 @@ export function HomeScreen({
     }
   };
   const [anim, setAnim] = useState(crowdAnimations);
+  const [trail, setTrail] = useState(crowdTrail);
   const [openingMoves, setOpeningMoves] = useState(chosenOpeningMoves);
   const changeOpeningMoves = (n: number) => {
     const v = Math.max(0, Math.min(MAX_OPENING_MOVES, n));
@@ -394,8 +395,23 @@ export function HomeScreen({
               }}
             />
             <span>
-              <strong>Animations:</strong> every pick flies onto the board as its own ghost piece (busy, on purpose). Off: just
-              the names over each picked square, and only the chosen piece moves.
+              <strong>Animations:</strong> every pick shows on the board as a ghost piece on its square. Off: just the names over
+              each picked square, and only the chosen piece moves.
+            </span>
+          </label>
+          <label class={`check${anim ? "" : " disabled"}`}>
+            <input
+              type="checkbox"
+              checked={anim && trail}
+              disabled={!anim}
+              onChange={(e) => {
+                setTrail(e.currentTarget.checked);
+                setCrowdTrail(e.currentTarget.checked);
+              }}
+            />
+            <span>
+              <strong>Motion trail:</strong> watch every pick fly from its piece to its square, as if everyone's moving their
+              pieces. They all land on the same fixed spot.
             </span>
           </label>
           <label class="check">

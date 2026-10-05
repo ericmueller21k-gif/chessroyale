@@ -791,3 +791,22 @@ Only the boss's capture had a banner ("QUEEN DOWN!").
 
 - Now yours does too: "QUEEN SLAIN!" in holy gold and blue with the God King's face (white or black to match your side), while the boss thinks.
 - The boss waits for it to finish. Its minimum think time goes from 1.2 s to 2 s after you take its queen, in solo and online (the server holds the host's reply until then).
+
+## Motion trail, an option (Oct 5, 2026)
+
+Eric liked the cleaner fixed ghosts but missed seeing everyone "move their pieces". He asked for the motion back as a toggle, ending with every piece on the same spot.
+
+- **What was wrong before** was the fixed piece itself sliding (up to 25 mid-slide at once, stacked translucent copies). So the motion is now separate from the piece that stays.
+  - Each new pick launches a short-lived flyer from its piece's square. It's placed on the landing square and starts offset by whole squares (a GPU transform), so it ends exactly where the fixed ghost stands. It has two fading echoes behind it (the trail), lasts 0.42 s, and fades out as it lands.
+  - The fixed ghost then appears (a new square) or pops (one more pick), so pieces only ever stop on one spot.
+- **Limits that keep it clean.** At most one flyer per move is in the air at a time (a popular move otherwise stacked into a streak, as a first try showed), and at most 14 overall; any extra pick just pops. In a 50-player round, at most 7 were in the air at once.
+- Measured in a phone browser during a full round with the trail on: every fixed ghost's centre was within 0.02 px of its square at every sample.
+- **Settings.** "Motion trail" sits under Animations on the home screen (needs Animations on), and `?trail=1` turns it on. It's **off by default** for now, since Eric may make it the default once he's seen it. Reduced-motion devices never show the flyers.
+
+## One name per square (Oct 5, 2026)
+
+Eric suggested one name over each picked square, "You" when it's your move, plus the count.
+
+- Each square shows one name pill: "You" if you picked it, otherwise the best-placed player who did. The pill is never wider than the square.
+- "+N" (everyone else) is now an orange badge on the piece's top-right corner, inside the square.
+- Before, up to three names plus "+N" stacked above each square, and neighbouring columns overlapped. Now nothing on one square can cover another's.

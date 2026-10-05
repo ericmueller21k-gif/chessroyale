@@ -7,7 +7,7 @@ import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
 import { myTeam, type GameView, type VoteView } from "../game.ts";
 import { play } from "../sound.ts";
-import { useCrowdAnimations } from "./Crowd.tsx";
+import { useCrowdAnimations, useCrowdTrail } from "./Crowd.tsx";
 
 const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 
@@ -47,6 +47,7 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
   const def = PREGAME_VOTES[vote.index]!;
   const now = useFrameNow();
   const animate = useCrowdAnimations();
+  const trail = useCrowdTrail();
   const side = myTeam(match) ?? "w";
   const orientation = side === "w" ? "white" : "black";
   const fen = `${START} ${side} KQkq - 0 1`;
@@ -122,7 +123,7 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
                 );
               })}
             </div>
-            <CrowdGhosts fen={fen} picks={ghosts} orientation={orientation} animate={animate} faint tags={false} />
+            <CrowdGhosts fen={fen} picks={ghosts} orientation={orientation} animate={animate} trail={trail} faint tags={false} />
             {mine && myMove && hat !== "none" && <VoteHat square={myMove.slice(2, 4)} orientation={orientation} hat={hat} />}
             {winner && (
               <div class="vote-banner" role="status">
