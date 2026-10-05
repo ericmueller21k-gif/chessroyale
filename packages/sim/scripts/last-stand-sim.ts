@@ -176,6 +176,13 @@ function summary() {
     const [kind, elo] = key.split(" ");
     lines.push(`| ${kind} | ${elo} | ${rs.length} | ${hit.length} (${Math.round((100 * hit.length) / rs.length)}%) | ${hit.sort((a, b) => a - b).join(", ") || "-"} | ${Math.round(rs.reduce((n, r) => n + r.moves.length, 0) / rs.length)} | ${big} |`);
   }
+  // Why the floor and its pace barely matter: while the crowd isn't lost yet, its moves are mostly fine or a
+  // piece-sized disaster; the in-between mistakes (12-30) mostly tip the position under lastStandFrom at once.
+  const live = rows.flatMap((r) => r.moves.filter((m) => !m.king && m.best * 100 >= settings.lastStandFrom));
+  const bands: [string, (l: number) => boolean][] = [["under 5", (l) => l < 5], ["5-12", (l) => l >= 5 && l < 12], ["12-20", (l) => l >= 12 && l < 20], ["20-30", (l) => l >= 20 && l < 30], ["30 or more", (l) => l >= 30]];
+  lines.push("", "## The crowd's moves while it wasn't lost (best move worth 40+), by points given away", "");
+  lines.push("| " + bands.map(([n]) => n).join(" | ") + " |", "|" + bands.map(() => "---").join("|") + "|");
+  lines.push("| " + bands.map(([, f]) => `${live.filter((m) => f(m.loss)).length} (${((100 * live.filter((m) => f(m.loss)).length) / live.length).toFixed(1)}%)`).join(" | ") + " |");
   writeFileSync(root + "reports/last-stand.md", lines.join("\n") + "\n");
   console.log(lines.join("\n"));
 }

@@ -184,11 +184,11 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
 test("the God King's Last Stand (solo raid, ?laststand=1): he takes the blow, falls, and you pick again without that move", async ({ page }) => {
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&pace=quick&clock=20&bossMoves=3&laststand=1");
+  // (?boss=1600 skips the boss menu.)
+  await page.goto("/?debug&pace=quick&clock=20&bossMoves=3&boss=1600&laststand=1");
   await page.getByRole("radio", { name: /Boss raid/ }).click();
   await page.getByLabel("Your name").fill("T");
   await page.getByRole("button", { name: "Take on the boss alone" }).click();
-  await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Iron Bishop, 1600/ }).click();
   await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen);
   // Your move (the test switch makes this one call for him, whatever it is).

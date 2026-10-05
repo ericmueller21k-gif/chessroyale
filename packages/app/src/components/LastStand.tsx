@@ -16,12 +16,16 @@ const clamp01 = (p: number) => Math.max(0, Math.min(1, p));
  */
 function blow(i: number, at: { x: number; y: number }) {
   const angle = (i * 137.5 + 20) % 180;
-  const side = at.x > 560 ? -1 : at.x < 240 ? 1 : i % 2 === 0 ? -1 : 1;
-  const up = at.y > 160 ? -1 : 1;
-  const x = Math.max(40, Math.min(760, at.x + side * (14 + ((i * 29) % 58))));
-  const y = Math.max(40, Math.min(770, at.y + up * (16 + ((i * 17) % 52))));
+  // Around him on a golden-angle spiral, so numbers that are up together sit apart; mirrored back inside the board.
+  const a = ((i * 137.5 - 90) * Math.PI) / 180;
+  const r = 62 + (i % 3) * 18;
+  let x = at.x + Math.cos(a) * r * 1.15;
+  let y = at.y - 12 + Math.sin(a) * r * 0.85;
+  if (x < 40 || x > 760) x = 2 * at.x - x;
+  if (y < 36 || y > 772) y = 2 * (at.y - 12) - y;
   return { angle, x, y };
 }
+
 /** How long the piece takes to slide back to its square. */
 export const SLIDE_MS = 450;
 /** Slashes that send a stylised red drop flying (a few, no more). */
@@ -160,7 +164,7 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
       )}
       {Array.from({ length: L.slashes }, (_, i) => {
         const age = t - (L.slashAt + i * L.slashEveryMs);
-        if (age < 0 || age > 760) return null;
+        if (age < 0 || age > 620) return null;
         const b = blow(i, to);
         return (
           <span key={i} class="ls-dmg" style={{ left: pct(b.x), top: pct(b.y) }}>

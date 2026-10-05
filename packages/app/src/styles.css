@@ -5641,7 +5641,7 @@ button.history-label {
   color: #ff5252;
   text-shadow: 2px 2px 0 #2a0000, -1px -1px 0 #2a0000, 1px -1px 0 #2a0000, -1px 1px 0 #2a0000;
   white-space: nowrap;
-  animation: ls-dmg 760ms ease-out both;
+  animation: ls-dmg 620ms ease-out both;
 }
 @keyframes ls-dmg {
   0% {
@@ -5657,7 +5657,7 @@ button.history-label {
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -190%) scale(1);
+    transform: translate(-50%, -150%) scale(1);
   }
 }
 .ls-drop {

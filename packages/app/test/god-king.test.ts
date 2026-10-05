@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { KING_LINES, SPEECH_MS, kingLine, kingSay, kingTurn, resetKingSpeech } from "../src/godKing.ts";
+import { KING_LINES, SPEECH_MS, kingLine, kingSay, kingTurn, lastStandLine, resetKingSpeech, setKingFallen } from "../src/godKing.ts";
 
 describe("the God King's lines", () => {
   beforeEach(() => resetKingSpeech());
@@ -74,5 +74,21 @@ describe("the God King's lines", () => {
       expect(line).not.toBe(last);
       last = line;
     }
+  });
+
+  it("his Last Stand: the same banner line on every screen for a move; fallen, he says nothing but his last words and his return", () => {
+    const line = lastStandLine("fen-e2e4");
+    expect(KING_LINES.lastStand).toContain(line);
+    expect(lastStandLine("fen-e2e4")).toBe(line);
+    expect(new Set(["a", "b", "c", "d", "e", "f", "g", "h"].map((x) => lastStandLine(x))).size).toBeGreaterThan(1);
+    const t = 1_000_000;
+    setKingFallen(true);
+    expect(kingSay("queenDanger", "q", t, () => 0)).toBeNull();
+    expect(kingSay("idle", "i", t + 20_000, () => 0)).toBeNull();
+    expect(kingSay("lastWords", "last", t + 30_000, () => 0)).toBe("Finish… it… for me.");
+    expect(kingSay("rise", "rise", t + 31_000, () => 0)).toBe("A god does not stay down.");
+    // A new battle: he's back.
+    resetKingSpeech();
+    expect(kingSay("intro", "intro", t + 60_000, () => 0)).not.toBeNull();
   });
 });
