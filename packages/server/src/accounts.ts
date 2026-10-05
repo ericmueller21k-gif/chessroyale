@@ -6,6 +6,8 @@
  * so it can be tested with an in-memory SQLite.
  */
 
+import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, shopItem, starterItem, type ShopSlot, type ShopState } from "@chessroyale/core";
+
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
   first<T>(sql: string, ...params: unknown[]): Promise<T | null>;
@@ -67,6 +69,23 @@ const SCHEMA = [
     played_at INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS results_user ON results (user_id, played_at)`,
+  // The shop: what each player owns and has equipped, and their coins.
+  `CREATE TABLE IF NOT EXISTS inventory (
+    user_id TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    acquired_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, item_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS equipped (
+    user_id TEXT NOT NULL,
+    slot TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, slot)
+  )`,
+  `CREATE TABLE IF NOT EXISTS wallets (
+    user_id TEXT PRIMARY KEY,
+    coins INTEGER NOT NULL DEFAULT 0
+  )`,
 ];
 
 const ready = new WeakSet<object>();
@@ -93,7 +112,32 @@ export async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** The emoji icons from before the icon builder (still accepted for older accounts). */
 export const ICONS = ["♟", "♞", "♝", "♜", "♛", "♚", "🦁", "🦊", "🐺", "🦅", "🐉", "🔥", "⚡", "👑", "🎯", "🧠"] as const;
+
+/**
+ * A player's drawn icon: a 48 × 48 PNG as a data URL, at most 16 KB. The PNG's
+ * signature and its header's size are checked, so nothing else gets stored.
+ */
+export const PIXEL_ICON_SIZE = 48;
+const MAX_ICON_CHARS = 16_000;
+export function isPixelIcon(icon: unknown): icon is string {
+  const prefix = "data:image/png;base64,";
+  if (typeof icon !== "string" || !icon.startsWith(prefix) || icon.length > MAX_ICON_CHARS) return false;
+  const b64 = icon.slice(prefix.length);
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return false;
+  let head: string;
+  try {
+    head = atob(b64.slice(0, 32));
+  } catch {
+    return false;
+  }
+  const byte = (i: number) => head.charCodeAt(i);
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => byte(i) === b);
+  const ihdr = head.slice(12, 16) === "IHDR";
+  const u32 = (i: number) => ((byte(i) << 24) | (byte(i + 1) << 16) | (byte(i + 2) << 8) | byte(i + 3)) >>> 0;
+  return signature && ihdr && u32(16) === PIXEL_ICON_SIZE && u32(20) === PIXEL_ICON_SIZE;
+}
 
 /** A display name: trimmed, 1-16 visible characters, no control characters. */
 export function cleanName(name: unknown): string | null {
@@ -153,7 +197,8 @@ export async function userFromToken(sql: Sql, token: string | null | undefined, 
 export async function updateProfile(sql: Sql, userId: string, patch: { name?: unknown; icon?: unknown }): Promise<User> {
   const name = patch.name === undefined ? null : cleanName(patch.name);
   if (name) await sql.run("UPDATE users SET name = ? WHERE id = ?", name, userId);
-  if (typeof patch.icon === "string" && (ICONS as readonly string[]).includes(patch.icon)) {
+  // A drawn icon (the icon builder), or one of the old emoji icons.
+  if (isPixelIcon(patch.icon) || (typeof patch.icon === "string" && (ICONS as readonly string[]).includes(patch.icon))) {
     await sql.run("UPDATE users SET icon = ? WHERE id = ?", patch.icon, userId);
   }
   return (await getUser(sql, userId))!;
@@ -179,6 +224,7 @@ export async function signInWithIdentity(
     if (current && current.id !== owner.id && !current.email && !current.google_sub) {
       // A guest signing in to an existing account: bring the guest's matches along.
       await sql.run("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id);
+      await moveShop(sql, current.id, owner.id);
       await sql.run("DELETE FROM sessions WHERE user_id = ?", current.id);
       await sql.run("DELETE FROM users WHERE id = ?", current.id);
     }
@@ -294,6 +340,7 @@ export interface ModeStats {
 
 export interface Profile {
   user: Pick<User, "id" | "name" | "icon"> & { signedIn: boolean; email: string | null; google: boolean };
+  shop: ShopState;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
@@ -314,6 +361,7 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
   });
   return {
     user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub },
+    shop: await shopState(sql, user.id),
     stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
     rating: rows.find((r) => r.rating !== null)?.rating ?? null,
     recent: rows.slice(0, 10).map((r) => ({
@@ -325,4 +373,57 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
       playedAt: r.played_at,
     })),
   };
+}
+
+// ---------------- The shop ----------------
+
+/** Coins, items owned (starters included) and what's equipped in each slot. */
+export async function shopState(sql: Sql, userId: string): Promise<ShopState> {
+  const owned = (await sql.all<{ item_id: string }>("SELECT item_id FROM inventory WHERE user_id = ?", userId)).map((r) => r.item_id).filter((id) => shopItem(id));
+  const starters = SHOP_ITEMS.filter((i) => i.starter).map((i) => i.id);
+  const all = [...new Set([...starters, ...owned])];
+  const rows = await sql.all<{ slot: string; item_id: string }>("SELECT slot, item_id FROM equipped WHERE user_id = ?", userId);
+  const equipped = Object.fromEntries(SHOP_CATEGORIES.map((c) => [c.slot, starterItem(c.slot).id])) as Record<ShopSlot, string>;
+  for (const r of rows) {
+    const item = shopItem(r.item_id);
+    if (item && item.slot === r.slot && all.includes(item.id)) equipped[item.slot] = item.id;
+  }
+  const wallet = await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", userId);
+  return { coins: wallet?.coins ?? 0, owned: all, equipped };
+}
+
+/** Gets an item (free while SHOP_FREE is on, otherwise paid in coins). */
+export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: number): Promise<{ ok: true; shop: ShopState } | { ok: false; message: string }> {
+  const item = typeof itemId === "string" ? shopItem(itemId) : undefined;
+  if (!item) return { ok: false, message: "That item isn't in the shop." };
+  const state = await shopState(sql, userId);
+  if (state.owned.includes(item.id)) return { ok: true, shop: state };
+  const price = SHOP_FREE ? 0 : item.price;
+  if (price > state.coins) return { ok: false, message: "Not enough coins." };
+  if (price > 0) await sql.run("UPDATE wallets SET coins = coins - ? WHERE user_id = ?", price, userId);
+  await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)", userId, item.id, now);
+  return { ok: true, shop: await shopState(sql, userId) };
+}
+
+/** Equips an item you own in its slot. */
+export async function equipItem(sql: Sql, userId: string, itemId: unknown): Promise<{ ok: true; shop: ShopState } | { ok: false; message: string }> {
+  const item = typeof itemId === "string" ? shopItem(itemId) : undefined;
+  if (!item) return { ok: false, message: "That item isn't in the shop." };
+  const state = await shopState(sql, userId);
+  if (!state.owned.includes(item.id)) return { ok: false, message: "Get it first." };
+  await sql.run("INSERT INTO equipped (user_id, slot, item_id) VALUES (?, ?, ?) ON CONFLICT (user_id, slot) DO UPDATE SET item_id = excluded.item_id", userId, item.slot, item.id);
+  return { ok: true, shop: await shopState(sql, userId) };
+}
+
+/** A guest's items, equipped choices and coins join the account they sign in to (the account's own choices win). */
+async function moveShop(sql: Sql, from: string, to: string): Promise<void> {
+  await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from);
+  await sql.run("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from);
+  const coins = (await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", from))?.coins ?? 0;
+  if (coins > 0) {
+    await sql.run("INSERT INTO wallets (user_id, coins) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins", to, coins);
+  }
+  await sql.run("DELETE FROM inventory WHERE user_id = ?", from);
+  await sql.run("DELETE FROM equipped WHERE user_id = ?", from);
+  await sql.run("DELETE FROM wallets WHERE user_id = ?", from);
 }

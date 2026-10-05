@@ -2,6 +2,14 @@ import { useEffect } from "preact/hooks";
 import { useFrameNow } from "./Countdown.tsx";
 import { pieceAt } from "@chessroyale/chess";
 import { play, type SoundName } from "../sound.ts";
+import { equippedLook } from "@chessroyale/core";
+import { account } from "../account.ts";
+
+/** Your equipped God King effect (from the shop) as CSS colours for his bolts, beam and glow. */
+function kingEffectStyle(): Record<string, string> {
+  const look = equippedLook(account().profile?.shop, "king");
+  return { "--ks-bolt": look.bolt!, "--ks-glow": look.glow!, "--ks-beam": look.beam! };
+}
 
 /**
  * The God King: a chess piece of our own, drawn in parts so he can move. A
@@ -180,16 +188,16 @@ export function KingSummon({
   const pct = (v: number) => `${v / 8}%`;
   const hideClass = present ? ` hide-king-${side}` : "";
   return (
-    <div class={`king-summon ${mode}${hideClass}`} aria-label={mode === "move" ? "The God King plays the move" : "The God King strikes the boss"}>
+    <div class={`king-summon ${mode}${hideClass}`} style={kingEffectStyle()} aria-label={mode === "move" ? "The God King plays the move" : "The God King strikes the boss"}>
       <svg class="ks-fx" viewBox="0 0 800 800" preserveAspectRatio="none" aria-hidden="true">
         <defs>
           <radialGradient id="ks-glow">
             <stop offset="0" stop-color="#fffbe6" stop-opacity="1" />
-            <stop offset="1" stop-color="#ffe08a" stop-opacity="0" />
+            <stop offset="1" style={{ stopColor: "var(--ks-glow, #ffe08a)" }} stop-opacity="0" />
           </radialGradient>
           <linearGradient id="ks-beam" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0" stop-color="#fffbe6" stop-opacity="0" />
-            <stop offset="1" stop-color="#fff3c4" stop-opacity="0.95" />
+            <stop offset="1" style={{ stopColor: "var(--ks-beam, #fff3c4)" }} stop-opacity="0.95" />
           </linearGradient>
         </defs>
         {/* A dozen thin bolts converging on your king, faster and faster. */}

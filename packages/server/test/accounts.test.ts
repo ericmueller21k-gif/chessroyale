@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import {
+  isPixelIcon,
+  buyItem,
   createGuest,
+  equipItem,
+  shopState,
   ensureSchema,
   profile,
   recordResult,
@@ -195,5 +199,59 @@ describe("account API", () => {
   it("without a database, only the config answers", async () => {
     expect((await call({}, "/api/auth/config")).body).toEqual({ accounts: false, google: false, email: false, onlineNeedsSignIn: false });
     expect((await call({}, "/api/me")).res.status).toBe(503);
+  });
+
+  it("the shop: starters for everyone, get (free while testing) and equip, and a guest's items follow them when they sign in", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user: guest } = await createGuest(sql, 1000, "Guest");
+    // Everyone starts with the starters, equipped.
+    let shop = await shopState(sql, guest.id);
+    expect(shop.equipped).toEqual({ king: "king-holy", hat: "hat-none" });
+    expect(shop.owned).toEqual(expect.arrayContaining(["king-holy", "hat-none"]));
+    expect(shop.coins).toBe(0);
+    // You can't equip what you don't own, or anything not in the shop.
+    expect(await equipItem(sql, guest.id, "hat-crown")).toEqual({ ok: false, message: "Get it first." });
+    expect((await buyItem(sql, guest.id, "hat-nope", 1100)).ok).toBe(false);
+    // Get it (free while testing), then equip it.
+    const bought = await buyItem(sql, guest.id, "hat-crown", 1100);
+    expect(bought.ok && bought.shop.owned).toContain("hat-crown");
+    const eq = await equipItem(sql, guest.id, "hat-crown");
+    expect(eq.ok && eq.shop.equipped.hat).toBe("hat-crown");
+    await buyItem(sql, guest.id, "king-storm", 1200);
+    await equipItem(sql, guest.id, "king-storm");
+    // The profile carries it, so a match knows your look.
+    expect((await profile(sql, guest)).shop.equipped).toEqual({ king: "king-storm", hat: "hat-crown" });
+    // An existing account keeps its own choices; the guest's items join it.
+    const account = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, 1300);
+    await buyItem(sql, account.id, "king-hellfire", 1300);
+    await equipItem(sql, account.id, "king-hellfire");
+    const merged = await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, 1400);
+    expect(merged.id).toBe(account.id);
+    shop = await shopState(sql, account.id);
+    expect(shop.owned).toEqual(expect.arrayContaining(["hat-crown", "king-storm", "king-hellfire"]));
+    expect(shop.equipped).toEqual({ king: "king-hellfire", hat: "hat-crown" });
+    expect((await shopState(sql, guest.id)).owned).not.toContain("hat-crown");
+  });
+
+  it("icons: a drawn 48 × 48 PNG is accepted; other sizes, other formats and junk are not", async () => {
+    // Real PNG headers: 48 × 48 and 32 × 32 (signature, IHDR, then a little data).
+    const png = (w: number, h: number) => {
+      const bytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, w, 0, 0, 0, h, 8, 6, 0, 0, 0, 1, 2, 3];
+      return "data:image/png;base64," + btoa(String.fromCharCode(...bytes));
+    };
+    expect(isPixelIcon(png(48, 48))).toBe(true);
+    expect(isPixelIcon(png(32, 32))).toBe(false);
+    expect(isPixelIcon("data:image/jpeg;base64,/9j/4AAQ")).toBe(false);
+    expect(isPixelIcon("data:image/png;base64,<script>")).toBe(false);
+    expect(isPixelIcon(png(48, 48) + "A".repeat(20_000))).toBe(false);
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Artist");
+    expect((await updateProfile(sql, user.id, { icon: png(48, 48) })).icon).toBe(png(48, 48));
+    // A bad one leaves the icon as it was.
+    expect((await updateProfile(sql, user.id, { icon: png(64, 64) })).icon).toBe(png(48, 48));
+    // The old emoji still work for older accounts.
+    expect((await updateProfile(sql, user.id, { icon: "🐉" })).icon).toBe("🐉");
   });
 });

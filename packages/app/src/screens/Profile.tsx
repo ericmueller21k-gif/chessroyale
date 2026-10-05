@@ -1,8 +1,8 @@
 import { useEffect, useState } from "preact/hooks";
 import { ordinal } from "./StageBreak.tsx";
 import { SignIn } from "../components/SignIn.tsx";
+import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import {
-  ICONS,
   account,
   onAccountChange,
   signOut,
@@ -46,6 +46,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState(profile?.user.name ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   useEffect(() => setName(profile?.user.name ?? ""), [profile?.user.name]);
   if (!profile) {
     return (
@@ -74,9 +75,10 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
   return (
     <div class="screen profile">
       <div class="profile-head">
-        <span class="profile-icon" aria-hidden="true">
-          {u.icon}
-        </span>
+        <button type="button" class="profile-icon" onClick={() => setEditing(true)} aria-label="Edit your icon">
+          <UserIcon icon={u.icon} />
+          <span class="profile-icon-edit">Edit</span>
+        </button>
         <div class="profile-name">
           <input
             aria-label="Your name"
@@ -88,13 +90,18 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
           <span class="muted small">{u.signedIn ? (u.google ? `Google · ${u.email ?? ""}` : u.email) : "Guest: sign in to keep this profile on any device"}</span>
         </div>
       </div>
-      <div class="icon-pick" role="radiogroup" aria-label="Profile icon">
-        {ICONS.map((i) => (
-          <button type="button" role="radio" aria-checked={u.icon === i} key={i} class={u.icon === i ? "on" : ""} onClick={() => void run(() => updateProfile({ icon: i }))}>
-            {i}
-          </button>
-        ))}
-      </div>
+      {editing && (
+        <IconEditor
+          initial={u.icon}
+          onCancel={() => setEditing(false)}
+          onSave={(png) =>
+            run(async () => {
+              await updateProfile({ icon: png });
+              setEditing(false);
+            }, "Icon saved.")
+          }
+        />
+      )}
       <div class="mode-pick small-pick profile-tabs" role="tablist">
         {(["all", "classic", "crowd", "boss"] as const).map((t) => (
           <button type="button" role="tab" aria-selected={tab === t} key={t} class={tab === t ? "on" : ""} onClick={() => setTab(t)}>

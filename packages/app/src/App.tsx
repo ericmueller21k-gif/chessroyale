@@ -17,6 +17,7 @@ import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
 import { SoundLab } from "./screens/SoundLab.tsx";
 import { ProfileScreen } from "./screens/Profile.tsx";
+import { ShopScreen } from "./screens/Shop.tsx";
 import { account, loadAccount, mustSignInToPlayOnline, recordSoloResult } from "./account.ts";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
@@ -93,6 +94,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [soundLab, setSoundLab] = useState(() => new URLSearchParams(location.search).has("soundlab"));
   const [showProfile, setShowProfile] = useState(() => location.pathname === "/profile");
+  const [showShop, setShowShop] = useState(() => location.pathname === "/shop");
   const [legal, setLegal] = useState<"privacy" | "terms" | null>(() =>
     location.pathname === "/privacy" ? "privacy" : location.pathname === "/terms" ? "terms" : null,
   );
@@ -257,6 +259,16 @@ export function App() {
       />
     );
   }
+  if (!match && showShop) {
+    return (
+      <ShopScreen
+        onBack={() => {
+          setShowShop(false);
+          if (location.pathname === "/shop") history.replaceState(null, "", "/");
+        }}
+      />
+    );
+  }
   if (!match && showProfile) {
     return (
       <ProfileScreen
@@ -311,6 +323,7 @@ export function App() {
         onSignIn={() => chooseGuest(false)}
         onSoundLab={() => setSoundLab(true)}
         onProfile={() => setShowProfile(true)}
+        onShop={() => setShowShop(true)}
       />
     );
   }

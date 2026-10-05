@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteMoves, voteOptionOf, type Settings } from "@chessroyale/core";
+import { BOSS_TIERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteMoves, voteOptionOf, type Settings } from "@chessroyale/core";
 import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
@@ -248,10 +248,11 @@ describe("Crowd mode", () => {
     runner.finishBossBattle();
     expect(runner.state.players.map((p) => p.placement).sort()).toEqual([1, 2, 3, 4, 5, 6]);
     // The boss tiers: the weakest stronger than the group's average.
-    expect(raidBossElo([1500, 1700])).toBe(1700);
-    expect(raidBossElo([1650, 1650])).toBe(1700);
-    expect(raidBossElo([null])).toBe(1700);
-    expect(raidBossElo([3100])).toBe(2900);
+    expect(raidBossElo([1500, 1700])).toBe(1800);
+    expect(raidBossElo([1650, 1650])).toBe(1800);
+    expect(raidBossElo([null])).toBe(1600);
+    expect(raidBossElo([3100])).toBe(3190);
+    expect(raidBossElo([3300])).toBe(3190);
   });
 
   it("the boss battle's start: even (0.50-0.60 for White) nearest move 8, else nearest even still for White, else the start", () => {
@@ -272,8 +273,13 @@ describe("Crowd mode", () => {
     expect(bossElo([null, null], s)).toBe(1650);
     expect(bossElo([400], s)).toBe(1320);
     expect(bossElo([3300], s)).toBe(3000);
-    expect(bossInfo(1400).threat).toBe(1);
-    expect(bossInfo(2900).threat).toBe(5);
+    // Ten bosses, one per tier, two to a skull.
+    expect(BOSS_TIERS).toHaveLength(10);
+    expect(BOSS_TIERS.at(-1)).toBe(3190);
+    expect(new Set(BOSS_TIERS.map((t) => bossInfo(t).name)).size).toBe(10);
+    expect(BOSS_TIERS.map((t) => bossInfo(t).threat)).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+    expect(bossInfo(1400).name).toBe("The Pawn Golem");
+    expect(bossInfo(3190).name).toBe("The Engine Eternal");
   });
 
   it("everyone moves: all alive pick every ply, cut by overall standings", async () => {

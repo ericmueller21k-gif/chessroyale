@@ -5,6 +5,7 @@ import { account, updateProfile } from "../account.ts";
 import { useAccount } from "./Profile.tsx";
 import { crowdAnimations, setCrowdAnimations } from "../prefs.ts";
 import { MuteButton } from "../components/MuteButton.tsx";
+import { UserIcon } from "../components/PixelIcon.tsx";
 
 const OPENING_KEY = "brc.openingMoves";
 const MODE_KEY = "brc.mode";
@@ -85,6 +86,7 @@ export function HomeScreen({
   error,
   onSoundLab,
   onProfile,
+  onShop,
   onlineLocked,
   onSignIn,
   onPlayNow,
@@ -97,6 +99,7 @@ export function HomeScreen({
   error?: string | null;
   onSoundLab?: () => void;
   onProfile?: () => void;
+  onShop?: () => void;
   /** Online play needs signing in, and you're a guest. */
   onlineLocked?: boolean;
   onSignIn?: () => void;
@@ -172,12 +175,17 @@ export function HomeScreen({
           ♚
         </span>
         HunChess
+        {profile && onShop && (
+          <button type="button" class="home-shop-btn" onClick={onShop}>
+            🛍️ Shop
+          </button>
+        )}
         <MuteButton />
       </h1>
       {profile && onProfile && (
         <button type="button" class="account-chip" onClick={onProfile} aria-label="Your profile">
           <span class="account-icon" aria-hidden="true">
-            {profile.user.icon}
+            <UserIcon icon={profile.user.icon} />
           </span>
           <span class="account-name">{profile.user.name}</span>
           <span class="muted small">
@@ -214,7 +222,7 @@ export function HomeScreen({
             there.
           </li>
           <li>
-            <strong>The boss is always a step above you.</strong> Six bosses from {BOSS_TIERS[0]} to {BOSS_TIERS[BOSS_TIERS.length - 1]}{" "}
+            <strong>The boss is always a step above you.</strong> Ten bosses from {BOSS_TIERS[0]} to {BOSS_TIERS[BOSS_TIERS.length - 1]}{" "}
             strength; you get the weakest one that's stronger than your group's average rating. Every {S.bossKillEvery} moves it
             strikes down whoever played worst, down to half the group.
           </li>

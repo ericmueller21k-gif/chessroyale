@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { PREGAME_VOTES, VOTE_ZONE_FILES, allVoteMoves, voteMoves, voteOptionOf } from "@chessroyale/core";
+import { PREGAME_VOTES, VOTE_ZONE_FILES, allVoteMoves, equippedLook, voteMoves, voteOptionOf } from "@chessroyale/core";
+import { account } from "../account.ts";
+import { PawnHat } from "../components/Cosmetics.tsx";
 import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
@@ -14,6 +16,19 @@ function zoneBox(option: number, orientation: "white" | "black") {
   const files = VOTE_ZONE_FILES[option]!;
   const cols = files.map((f) => f.charCodeAt(0) - 97).map((c) => (orientation === "white" ? c : 7 - c));
   return { left: Math.min(...cols) * 12.5, top: 37.5, width: 25, height: 25 };
+}
+
+/** Your pawn's hat, on the square it was pushed to. */
+function VoteHat({ square, orientation, hat }: { square: string; orientation: "white" | "black"; hat: string }) {
+  const f = square.charCodeAt(0) - 97;
+  const r = Number(square[1]) - 1;
+  const col = orientation === "white" ? f : 7 - f;
+  const row = orientation === "white" ? 7 - r : r;
+  return (
+    <span class="vote-hat" style={{ left: `${col * 12.5}%`, top: `${row * 12.5}%` }}>
+      <PawnHat hat={hat} />
+    </span>
+  );
 }
 
 /** A stable pick of which of the zone's two pawns a voter pushed (for the ghosts). */
@@ -58,6 +73,8 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
     setMyMove(move ?? voteMoves(side, option)[0]!);
     match.castVote(option);
   };
+  // Your hat from the shop, on the pawn you pushed.
+  const hat = equippedLook(account().profile?.shop, "hat").hat ?? "none";
   const nextLabel = vote.index + 1 < vote.count ? PREGAME_VOTES[vote.index + 1]!.title : "The game begins";
   const nextIn = vote.nextAt ? Math.max(0, Math.ceil((vote.nextAt - now) / 1000)) : null;
 
@@ -106,6 +123,7 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
               })}
             </div>
             <CrowdGhosts fen={fen} picks={ghosts} orientation={orientation} animate={animate} faint tags={false} />
+            {mine && myMove && hat !== "none" && <VoteHat square={myMove.slice(2, 4)} orientation={orientation} hat={hat} />}
             {winner && (
               <div class="vote-banner" role="status">
                 <span class="vote-banner-icon">{winner.icon}</span>
