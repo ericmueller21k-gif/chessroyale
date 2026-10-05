@@ -38,9 +38,9 @@ export function crowdTrail(): boolean {
   const q = new URLSearchParams(location.search).get("trail");
   if (q !== null) return q !== "0";
   try {
-    return localStorage.getItem(TRAIL_KEY) === "1";
+    return localStorage.getItem(TRAIL_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 

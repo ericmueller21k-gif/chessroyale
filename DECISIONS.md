@@ -801,7 +801,7 @@ Eric liked the cleaner fixed ghosts but missed seeing everyone "move their piece
   - The fixed ghost then appears (a new square) or pops (one more pick), so pieces only ever stop on one spot.
 - **Limits that keep it clean.** At most one flyer per move is in the air at a time (a popular move otherwise stacked into a streak, as a first try showed), and at most 14 overall; any extra pick just pops. In a 50-player round, at most 7 were in the air at once.
 - Measured in a phone browser during a full round with the trail on: every fixed ghost's centre was within 0.02 px of its square at every sample.
-- **Settings.** "Motion trail" sits under Animations on the home screen (needs Animations on), and `?trail=1` turns it on. It's **off by default** for now, since Eric may make it the default once he's seen it. Reduced-motion devices never show the flyers.
+- **Settings.** "Motion trail" sits under Animations on the home screen (needs Animations on), and `?trail=1` turns it on. It was off by default at first. Eric tried it on his phone and made it the default (Oct 5): on unless switched off on this device. Reduced-motion devices never show the flyers.
 
 ## One name per square (Oct 5, 2026)
 
