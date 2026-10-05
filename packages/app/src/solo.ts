@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS, allowedMs, botVotes, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs } from "@chessroyale/chess";
+import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, LAST_STAND_MS } from "@chessroyale/chess";
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
@@ -37,6 +37,8 @@ export class SoloMatch implements GameView {
   hint: Hint[] | null = null;
   readonly seen = new Map<string, number>();
   private progress = new RoundProgress(() => this.emit());
+  /** Test switch (?laststand=1): the boss battle's first crowd move calls for the God King's Last Stand, whatever it is. */
+  forceLastStand = typeof location !== "undefined" && new URLSearchParams(location.search).get("laststand") === "1";
 
   constructor(
     private readonly engines: UciEngine[],
@@ -181,6 +183,7 @@ export class SoloMatch implements GameView {
         ...(this.settings.raid ? [] : botRoster(this.rng, this.settings.lobbySize - 1, this.settings)),
       ],
     });
+    this.runner.forceLastStand = this.forceLastStand;
     if (pregameVotes(this.settings).length) return this.startVote(0);
     // Boss raid: straight to the boss's intro, which replays the opening from the starting position itself.
     if (this.settings.raid) return this.nextRound();
@@ -343,6 +346,7 @@ export class SoloMatch implements GameView {
     if (this.timer) clearTimeout(this.timer);
     const { board, allowedMs: allowed } = this.phase;
     if (move !== null && Date.now() < this.playStartedAt - 300) return; // Before the clock starts.
+    if (move !== null && move === this.runner.boss?.barred) return; // The move the God King took back.
     const now = Date.now();
     if (move !== null && this.frozen && now < this.frozen.until) return; // While the King strikes.
     const frozen = this.frozen ? Math.max(0, Math.min(now, this.frozen.until) - this.frozen.at) : 0;
@@ -372,7 +376,8 @@ export class SoloMatch implements GameView {
     const record = moveRecordFrom(report.stage, report.round, mine, (id) => id === HUMAN);
     if (record) this.moves.push(record);
     if (inFinal) return this.showFinalMove(report);
-    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? KING_FX_MS : 0);
+    // The God King's Last Stand plays out in the reveal; the next move's clock starts after it (nobody loses time).
+    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? KING_FX_MS : 0) + (mine.lastStand ? LAST_STAND_MS : 0);
     this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
   }

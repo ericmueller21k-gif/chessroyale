@@ -8,6 +8,9 @@ light from the top left, outlined, with golden sparks.
 
 Two versions, one per side: the same picture, his armour recoloured (white steel
 for White, blackened steel for Black). Nothing else changes.
+
+Also his battle-worn portrait for the Last Stand's banner (god-king-portrait-hurt-w.png and -b.png): cracked,
+chipped, the cape torn, a few red drops; in both colours the same way.
 """
 import json, math, random, subprocess
 W, H = 64, 60
@@ -112,17 +115,57 @@ for y in range(-3, 0): pass
 for y in range(0, 3): put(32, y, "g4"); put(31, y, "g3")
 for x in range(30, 34): put(x, 0, "g4")
 for (x, c) in [(25, "b3"), (31, "r3"), (38, "b3")]: put(x, 8, c); put(x + 1, 8, c[0] + "2")
-# Outline everything.
-src = [r[:] for r in grid]
-for y in range(H):
-    for x in range(W):
-        if src[y][x] is None and any(0 <= x + dx < W and 0 <= y + dy < H and src[y + dy][x + dx] for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-            grid[y][x] = "K"
-# Golden sparks around him.
-random.seed(4)
-for _ in range(26):
-    x, y = random.randrange(W), random.randrange(H)
-    if grid[y][x] is None: grid[y][x] = random.choice(["p1", "p2"])
+# Battle-worn (his Last Stand's banner): the same king, cracked and chipped but unbowed. Cracks across the helm,
+# a cheek plate, a pauldron and the chest plate; a crown spike broken off; the cape's hem in tatters; a few
+# stylised red drops. Only damage: the gold, the burning eyes and the cape's colour stay as they are.
+def crack(g, pts):
+    """A jagged crack through the armour: a dark split, shadow on one side, a bright chipped edge on the other."""
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        n = max(abs(x2 - x1), abs(y2 - y1), 1)
+        for i in range(n + 1):
+            x = round(x1 + (x2 - x1) * i / n); y = round(y1 + (y2 - y1) * i / n)
+            if not (0 <= x < W and 0 <= y < H and g[y][x]): continue
+            g[y][x] = "K"
+            if x - 1 >= 0 and g[y][x - 1] and g[y][x - 1][0] == "s": g[y][x - 1] = "s1"
+            if x + 1 < W and g[y][x + 1] and g[y][x + 1][0] in "sg" and g[y][x + 1] != "K": g[y][x + 1] = g[y][x + 1][0] + "4"
+
+def drop(g, x, y):
+    """A stylised red drop: a bright top, a dark round bottom."""
+    for (dx, dy, c) in [(0, 0, "r3"), (0, 1, "r3"), (-1, 1, "r2"), (1, 1, "r3"), (0, 2, "r2"), (-1, 2, "r2"), (1, 2, "r2")]:
+        if 0 <= x + dx < W and 0 <= y + dy < H: g[y + dy][x + dx] = c
+    g[y + 1][x] = "c4"
+
+def damaged(src):
+    g = [r[:] for r in src]
+    crack(g, [(42, 10), (39, 12), (41, 14), (37, 17)])            # helm, over the right brow
+    crack(g, [(21, 23), (24, 26), (22, 29), (25, 33)])            # left cheek plate
+    crack(g, [(46, 33), (50, 36), (48, 40), (53, 43), (51, 48)])  # right pauldron
+    crack(g, [(38, 39), (35, 43), (37, 46), (33, 50), (35, 55)])  # chest plate, through the cross
+    crack(g, [(14, 36), (17, 40), (14, 44)])                     # left pauldron
+    for (x, y) in [(12, 45), (13, 46), (19, 47), (45, 38), (55, 45), (56, 46), (24, 52), (40, 56), (28, 14), (29, 14)]:   # dents
+        if g[y][x] and g[y][x][0] == "s": g[y][x] = "s1"
+    for y in range(0, 6):                                         # a crown spike broken off
+        for x in range(42, 47): g[y][x] = None
+    for x in (4, 5, 10, 11, 12, 17, 47, 48, 53, 54, 55, 59):      # the cape's hem, torn
+        for y in range(56 if x % 2 else 57, H):
+            if g[y][x] and g[y][x][0] == "c": g[y][x] = None
+    for (x, y) in [(25, 34), (36, 56), (54, 49)]:                 # a few red drops, from the cracks
+        drop(g, x, y)
+    return g
+
+def outline(src, seed, sparks):
+    """Outline everything, then sparks around him."""
+    g = [r[:] for r in src]
+    for y in range(H):
+        for x in range(W):
+            if src[y][x] is None and any(0 <= x + dx < W and 0 <= y + dy < H and src[y + dy][x + dx] for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                g[y][x] = "K"
+    random.seed(seed)
+    for _ in range(26):
+        x, y = random.randrange(W), random.randrange(H)
+        if g[y][x] is None: g[y][x] = random.choice(sparks)
+    return g
+
 PALETTE = {
     "K": "#0b0b14", "k1": "#0b0b14",
     "s4": "#f4f7fb", "s3": "#c3ccd9", "s2": "#8692a5", "s1": "#4a5366",
@@ -132,15 +175,18 @@ PALETTE = {
     "e4": "#fffbe0", "e3": "#ffd54a", "e2": "#f59e0b",
     "r3": "#ef4444", "r2": "#991b1b", "b3": "#60a5fa", "b2": "#1d4ed8",
     "p1": "#ffe08a", "p2": "#fbbf24",
+    # Embers (the battle-worn portrait's sparks).
+    "x1": "#ff7a3d", "x2": "#ffb347",
 }
 # Black: the same pixels, the steel blackened (gold, eyes, cape and sparks unchanged).
 BLACK_STEEL = {"s4": "#7b8494", "s3": "#4a515f", "s2": "#2c313b", "s1": "#171a20"}
-for side, palette in (("w", PALETTE), ("b", {**PALETTE, **BLACK_STEEL})):
-    rgba = bytearray()
-    for row in grid:
-        for c in row:
-            h = palette[c] if c else None
-            rgba += bytes([int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16), 255]) if h else bytes(4)
-    out = f"packages/app/public/sprites/god-king-portrait-{side}.png"
-    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-i", "-", "-frames:v", "1", out], input=bytes(rgba), check=True)
-    print("wrote", out)
+for name, picture in (("god-king-portrait", outline(grid, 4, ["p1", "p2"])), ("god-king-portrait-hurt", outline(damaged(grid), 9, ["p1", "x1", "x2"]))):
+    for side, palette in (("w", PALETTE), ("b", {**PALETTE, **BLACK_STEEL})):
+        rgba = bytearray()
+        for row in picture:
+            for c in row:
+                h = palette[c] if c else None
+                rgba += bytes([int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16), 255]) if h else bytes(4)
+        out = f"packages/app/public/sprites/{name}-{side}.png"
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-i", "-", "-frames:v", "1", out], input=bytes(rgba), check=True)
+        print("wrote", out)
