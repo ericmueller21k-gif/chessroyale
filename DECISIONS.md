@@ -753,3 +753,41 @@ Eric: mid-round the crowd's pieces looked misaligned and sloppy; every piece sho
 - **Cause, measured.** Every pick slid from its square to the target over 0.55 s. With up to 50 picks arriving in quick succession, up to 25 were between squares at once, smearing into streaks, with dozens of translucent copies stacked. Chessground also rounds its board to whole device pixels, so overlays drifted by up to 1 px.
 - **Now.** Each picked square has exactly one ghost piece on it, and it never slides. It pops in place when a pick arrives (a 0.2 s pulse), and it gets bolder the more players picked it. The name tags still show who and how many.
 - Overlays are sized to chessground's exact board (`--cg-size`, measured from `cg-container`). A browser check during a 50-player round: every crowd piece sat 0.00 px from its square at every moment.
+
+## Bosses never throw pieces away (Oct 5, 2026)
+
+Eric: the Iron Bishop (the 1600 boss) just blundered its queen. "It's boss mode, not idiot mode."
+
+- **Two causes, measured.**
+  - Below 2100 the boss "stumbled" on up to 1 move in 4 (25% at 1600). A stumble was a *random legal move*, so it hung queens.
+  - Stockfish's own limited strength (UCI_Elo) is also loose at the low end. A probe at 1600, with no stumbles, gave away more than 20 points of expected score on 13% of its moves (63 of 480), mostly by hanging a piece.
+- **Now, a blunder guard on every boss move** (`bossMoveFrom`; settings `bossMaxLoss` 10 and `bossMaxLogitLoss` 1).
+  - Each move is checked against the engine's top 8.
+  - A move that gives away more than 10 points (about a pawn, from an even position) is swapped for a slip. So is one that loses more than 1 in log-odds, which is the same guard in a position that's already won or lost, where points shrink.
+- **A stumble is now a slip.** It's a small deliberate inaccuracy from the top moves, losing 2–7 points (`bossSlipLoss`), never a random move. Weak bosses stay beatable by out-playing them, not by waiting for a free queen.
+- The King's strike (stagger) stays within its own 5–15 point range, but can no longer fall back to bigger losses.
+- **One more check before any move but the best.** The 8-line search spreads its effort thin and now and then misjudges a move. So any move other than the best is re-scored head to head with the best in one focused search, and if it fails the guard there, the boss plays its best move.
+- Cost: one 8-line search per boss move, plus one or two focused ones.
+- **Measured** (`packages/sim/scripts/boss-blunders.ts`: 240 to 480 boss moves per run, judged by a separate search):
+
+  | Moves that give away | 1600 before | 1600 now | 1400 now |
+  | --- | --- | --- | --- |
+  | more than 20 points | 13% | 1.3% (worst 23, in already-worse positions) | 0.8% |
+  | more than 30 points (a piece or worse) | 9.4% | 0 | 0.4% (1 move) |
+
+  The one left at 1400 was the engine's own top choice misjudging a deep tactic within its search budget, which no guard on top of the engine can catch. The low bosses are now noticeably more solid; they lose on accumulated inaccuracies.
+- The only random boss move left is the server's emergency fallback, when no device in the lobby can run the engine at all.
+
+## Pick your boss (Oct 5, 2026)
+
+Eric wants to choose which boss to fight.
+
+- Boss raid shows a row of boss cards (name, skulls, strength), weakest first, plus "Match me" (the old behaviour: a step above your rating, the default).
+- The choice is saved on the device and used for solo ("Take on the boss alone") and for raids you create. The server takes `?boss=<tier>` and keeps the pick for rematches; an unpicked raid still matches the group.
+
+## A banner when you take the boss's queen (Oct 5, 2026)
+
+Only the boss's capture had a banner ("QUEEN DOWN!").
+
+- Now yours does too: "QUEEN SLAIN!" in holy gold and blue with the God King's face (white or black to match your side), while the boss thinks.
+- The boss waits for it to finish. Its minimum think time goes from 1.2 s to 2 s after you take its queen, in solo and online (the server holds the host's reply until then).

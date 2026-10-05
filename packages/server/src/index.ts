@@ -1,4 +1,4 @@
-import { CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 import { randomCode } from "./codes.ts";
@@ -56,6 +56,11 @@ export default {
           ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2, drawnMoveSeconds: 1.2 } : PACE_SETTINGS.quick) : {}),
           // Playtest overrides and the creator's choices: only the ones that are set.
           ...definedOnly({
+            // Boss raid: the boss the creator picked (one of the tiers), else one a step above the group.
+            ...(() => {
+              const b = Number(url.searchParams.get("boss"));
+              return raid && BOSS_TIERS.includes(b) ? { bossFixedElo: b, bossPicked: b } : {};
+            })(),
             roundsPerStage: n("rounds"),
             firstStageRounds: n("rounds"),
             moveClockSeconds: n("clock"),

@@ -4,6 +4,8 @@ import {
   botRoster,
   bossIntroTimeline,
   bossShowMs,
+  bossThinkMs,
+  lastMoveTookQueen,
   legalMoves,
   netBoard,
   boardSlots,
@@ -46,6 +48,7 @@ interface Human {
 }
 
 type Timer =
+  | "bossPlay"
   | "startRound"
   | "lock"
   | "afterReveal"
@@ -91,6 +94,8 @@ export interface LobbyRecord {
   /** Per-lobby settings: the mode and its options, opening length, plus playtest overrides (rounds, clock, pace, draw rule). */
   overrides?: Partial<Settings> & {
     drawRuleByStage?: DrawRule[];
+    /** Boss raid: the creator picked this boss (its strength), so it isn't matched to the group. */
+    bossPicked?: number;
   };
   /** Signed-in players' account ids (by player id), so results go on their profiles. */
   accounts?: Record<string, string>;
@@ -113,6 +118,9 @@ export interface LobbyRecord {
   bossKey?: string;
   bossStumble?: boolean;
   bossKind?: "elo" | "stumble" | "stagger";
+  /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
+  bossPending?: string;
+  bossMinAt?: number;
   bossIntroDone?: boolean;
   /** Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. */
   auto?: { fillAt: number };
@@ -363,8 +371,8 @@ export class LobbyCore {
   /** Fills the empty seats with bots and starts: the pre-game votes (Crowd 50 v 50) or the opening. */
   private startMatch() {
     if (this.r.phase !== "lobby") return;
-    if (this.settings.raid) {
-      // Boss raid: no bots; the boss is the weakest that's stronger than the group's average rating.
+    if (this.settings.raid && !this.r.overrides?.bossPicked) {
+      // Boss raid: no bots; the boss is the one the creator picked, else the weakest that's stronger than the group's average rating.
       const patch = { bossFixedElo: raidBossElo(this.r.humans.map((h) => h.rating ?? null)) };
       this.r.overrides = { ...(this.r.overrides ?? {}), ...patch } as LobbyRecord["overrides"];
       this.settings = { ...this.settings, ...patch };
@@ -414,6 +422,9 @@ export class LobbyCore {
         return this.r.vote && this.r.vote.index + 1 < pregameVotes(this.settings).length ? this.startVote(this.r.vote.index + 1) : this.nextRound();
       case "bossTimeout":
         return this.bossTimeout();
+      case "bossPlay":
+        this.r.bossMinAt = undefined;
+        return this.r.bossPending ? this.playBoss(this.r.bossPending) : undefined;
       case "autoStart":
         // Matchmade: time's up, bots fill the rest (if anyone is still here).
         if (this.r.phase === "lobby" && this.r.humans.some((h) => h.connected)) this.startMatch();
@@ -506,6 +517,9 @@ export class LobbyCore {
     this.r.phase = "boss";
     this.r.bossKey = `b-${++this.r.counter}`;
     this.r.bossKind = this.runner!.bossMoveKind();
+    // You just took its queen: the boss's reply waits for your banner (otherwise it shows as soon as it's ready).
+    const history = this.runner!.boards.get(this.runner!.state.boards[0]!)!.history;
+    this.r.bossMinAt = lastMoveTookQueen(history) ? this.io.now() + bossThinkMs(history) : undefined;
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.r.hostId && this.human(this.r.hostId)?.connected ? this.r.hostId : this.pickHost();
     this.r.hostId = host;
@@ -528,6 +542,12 @@ export class LobbyCore {
 
   private playBoss(move: string) {
     this.r.bossKey = undefined;
+    // Too soon (your queen banner is still up): hold the move until then.
+    if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
+      this.r.bossPending = move;
+      return this.setTimer("bossPlay", this.r.bossMinAt);
+    }
+    this.r.bossPending = undefined;
     this.runner!.applyBossMove(move);
     const until = this.io.now() + bossShowMs(this.runner!.bossView()?.lastMove);
     this.broadcast(this.bossMessage(until));

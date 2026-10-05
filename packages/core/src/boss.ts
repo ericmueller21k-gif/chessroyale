@@ -26,7 +26,9 @@ export function bossElo(ratings: readonly (number | null)[], s: Pick<Settings, "
  * Stockfish can't play weaker than UCI_Elo 1320, and even a boss set a little
  * below a weaker crowd's rating beat it nearly every time in calibration (see
  * reports/boss-calibration.md). Below bossStumbleBelow the
- * boss "stumbles" now and then instead: it plays a random legal move.
+ * boss "slips" now and then instead: a small deliberate inaccuracy from its top
+ * moves (bossSlipLoss), never a blunder (it used to be any random move, which
+ * threw away queens).
  */
 export function bossStumbleChance(elo: number, s: Pick<Settings, "bossStumbleBelow" | "bossStumbleMax">): number {
   return Math.max(0, Math.min(s.bossStumbleMax, (s.bossStumbleBelow - elo) / 1000));

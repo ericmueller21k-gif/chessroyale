@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { BOSS_TIERS, CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, type ModeChoiceId } from "@chessroyale/core";
+import { BOSS_TIERS, bossInfo, CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, type ModeChoiceId } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { account, updateProfile } from "../account.ts";
 import { useAccount } from "./Profile.tsx";
@@ -64,6 +64,23 @@ export function chosenOpeningMoves(): number {
   return S.openingMoves;
 }
 
+const BOSS_KEY = "brc.boss";
+
+/** Boss raid: the boss you picked (its strength), or 0 for one a step above you. ?boss=N, else this device's choice. */
+export function chosenBoss(): number {
+  const q = new URLSearchParams(location.search).get("boss");
+  let v = q;
+  if (v === null) {
+    try {
+      v = localStorage.getItem(BOSS_KEY);
+    } catch {
+      v = null;
+    }
+  }
+  const n = Number(v);
+  return BOSS_TIERS.includes(n) ? n : 0;
+}
+
 function remember(name: string): string {
   const n = name.trim() || "Player";
   try {
@@ -75,6 +92,35 @@ function remember(name: string): string {
   const p = account().profile;
   if (p && p.user.name !== n) void updateProfile({ name: n }).catch(() => undefined);
   return n;
+}
+
+/** Boss raid: pick the boss to fight (weakest first), or let it match your rating. */
+function BossPicker({ value, onChange }: { value: number; onChange: (elo: number) => void }) {
+  return (
+    <div class="boss-picker" role="radiogroup" aria-label="Boss">
+      <button type="button" role="radio" aria-checked={value === 0} class={value === 0 ? "on" : ""} onClick={() => onChange(0)}>
+        <span class="bp-icon" aria-hidden="true">
+          🎯
+        </span>
+        <strong>Match me</strong>
+        <span class="bp-sub">a step above you</span>
+      </button>
+      {BOSS_TIERS.map((elo) => {
+        const b = bossInfo(elo);
+        return (
+          <button type="button" role="radio" key={elo} aria-checked={value === elo} class={value === elo ? "on" : ""} onClick={() => onChange(elo)}>
+            <span class="bp-icon" aria-hidden="true">
+              {b.icon}
+            </span>
+            <strong>{b.name.replace(/^The /, "")}</strong>
+            <span class="bp-sub">
+              {"💀".repeat(b.threat)} {elo}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function HomeScreen({
@@ -138,6 +184,15 @@ export function HomeScreen({
   };
   const crowd = modeChoice.mode === "crowd";
   const raid = modeChoice.mode === "raid";
+  const [boss, setBoss] = useState(chosenBoss);
+  const changeBoss = (elo: number) => {
+    setBoss(elo);
+    try {
+      localStorage.setItem(BOSS_KEY, String(elo));
+    } catch {
+      // Not important.
+    }
+  };
   const [anim, setAnim] = useState(crowdAnimations);
   const [openingMoves, setOpeningMoves] = useState(chosenOpeningMoves);
   const changeOpeningMoves = (n: number) => {
@@ -211,6 +266,7 @@ export function HomeScreen({
           </button>
         </div>
       )}
+      {raid && !joinCode && <BossPicker value={boss} onChange={changeBoss} />}
       {raid && !joinCode ? (
         <ol class="rules">
           <li>
@@ -222,9 +278,9 @@ export function HomeScreen({
             there.
           </li>
           <li>
-            <strong>The boss is always a step above you.</strong> Ten bosses from {BOSS_TIERS[0]} to {BOSS_TIERS[BOSS_TIERS.length - 1]}{" "}
-            strength; you get the weakest one that's stronger than your group's average rating. Every {S.bossKillEvery} moves it
-            strikes down whoever played worst, down to half the group.
+            <strong>Pick your boss</strong> above, or let it match you: ten bosses from {BOSS_TIERS[0]} to{" "}
+            {BOSS_TIERS[BOSS_TIERS.length - 1]} strength, and "Match me" gets the weakest one that's stronger than your group's
+            average rating. Every {S.bossKillEvery} moves it strikes down whoever played worst, down to half the group.
           </li>
           <li>
             <strong>👑 The King</strong> fights for you {S.kingChargesMax} times: call him to play a move at full strength (instead of
@@ -232,7 +288,8 @@ export function HomeScreen({
             you all pick as usual). More than half of you have to call.
           </li>
         </ol>
-      ) : crowd && !joinCode ? (
+      ) : null}
+      {raid && !joinCode ? null : crowd && !joinCode ? (
         <ol class="rules">
           <li>
             <strong>{C.lobbySize} players, one game, from the first move.</strong>{" "}

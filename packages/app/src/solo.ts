@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS, allowedMs, botVotes, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { botRoster, bossIntroTimeline, bossShowMs } from "@chessroyale/chess";
+import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs } from "@chessroyale/chess";
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
@@ -10,7 +10,6 @@ export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
 const FINAL_SHOW_MS = 3200;
 /** Boss battle: how long the boss's move shows, how long it thinks at least, and how long a strike shows. */
-const BOSS_THINK_MS = 1200;
 const BOSS_KILL_MS = 3800;
 /** The God King's summoning, cut-in banner and bolt, added to a reveal where he plays the move. */
 const KING_FX_MS = 5400;
@@ -274,8 +273,9 @@ export class SoloMatch implements GameView {
 
   /** The boss's turn: it thinks (for a moment at least), then its move shows before the crowd picks again. */
   private async bossTurn() {
-    this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, thinking: true });
-    await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, BOSS_THINK_MS))]);
+    const snap = this.bossSnapshot();
+    this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
+    await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history)))]);
     const showMs = bossShowMs(this.runner.bossView()?.lastMove);
     const until = Date.now() + showMs;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until });

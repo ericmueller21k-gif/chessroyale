@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { bossIntroTimeline, fenAfter, inCheck } from "@chessroyale/chess";
+import { bossIntroTimeline, fenAfter, inCheck, lastMoveTookQueen } from "@chessroyale/chess";
 import { kingSay, resetKingSpeech, type KingCue } from "../godKing.ts";
 import { FightBanner } from "../components/FightBanner.tsx";
+import { GodKingPortrait } from "../components/GodKing.tsx";
 import { Board } from "../components/Board.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
@@ -121,6 +122,8 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   }, [boss.board.fen, thinking]);
   // The boss takes your queen: its banner, face and roar.
   const tookQueen = !intro && !thinking && !victim && boss.lastMove?.captured === "q";
+  // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
+  const slewQueen = !intro && !!thinking && !victim && lastMoveTookQueen(history);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   const youStruck = victim !== null && match.isYou(victim);
   useEffect(() => {
@@ -139,6 +142,9 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
           <Board fen={introFen} orientation={boss.crowdSide === "w" ? "white" : "black"} lastMove={introLast}>
             {!thinking && !victim && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={boss.crowdSide === "w" ? "white" : "black"} />}
             {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
+            {slewQueen && (
+              <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="bannerStart" />
+            )}
             {tookQueen && <FightBanner tone="boss" face={boss.icon} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} sound="bossRoar" />}
             {showCard && (
               <div class={`boss-intro${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
