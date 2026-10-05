@@ -63,6 +63,58 @@ export interface EngineLike {
   scoreMoves(fen: string, moves: readonly string[]): Promise<MoveScore[]>;
   /** A move at a limited strength (the boss); engines without it play their top move. */
   playAtElo?(fen: string, elo: number, nodes?: number): Promise<string>;
+  /** A deeper search over a few moves (the re-check); engines without it skip the re-check. */
+  scoreMovesAt?(fen: string, moves: readonly string[], nodes: number): Promise<MoveScore[]>;
+}
+
+/** The re-check's settings (see recheckLoss, recheckMax and recheckNodes in settings). */
+export interface RecheckSettings {
+  recheckLoss: readonly [number, number];
+  recheckMax: number;
+  recheckNodes: number;
+}
+
+/**
+ * Re-checks the close calls before they cost anyone. The top-8 search gives each move only an eighth of the
+ * budget, so a good move is now and then marked a mistake (reports/judge-accuracy.md). Picked moves that lose
+ * between recheckLoss[0] and [1] points (the most picked first, up to recheckMax) are searched again with the
+ * best move, in one search restricted to them at recheckNodes, and those numbers replace the first ones. Big
+ * losses are rechecked too (up to [1]): a sacrifice the quick search called a blunder is the worst miss.
+ */
+export async function recheckCloseCalls(
+  engine: EngineLike,
+  fen: string,
+  evaluation: { bestMove: string; bestExpected: number; expectedAfter: Record<string, number> },
+  picks: readonly (string | null)[],
+  s: RecheckSettings,
+): Promise<{ bestMove: string; bestExpected: number; expectedAfter: Record<string, number>; rechecked: string[] }> {
+  const none = { ...evaluation, rechecked: [] as string[] };
+  if (!engine.scoreMovesAt || s.recheckMax <= 0) return none;
+  const best = Math.max(evaluation.bestExpected, ...picks.flatMap((m) => (m && evaluation.expectedAfter[m] !== undefined ? [evaluation.expectedAfter[m]!] : [])));
+  const count = new Map<string, number>();
+  for (const m of picks) if (m) count.set(m, (count.get(m) ?? 0) + 1);
+  const [lo, hi] = s.recheckLoss;
+  const flagged = [...count.keys()]
+    .filter((m) => {
+      const e = evaluation.expectedAfter[m];
+      const loss = e === undefined ? 0 : (best - e) * 100;
+      return m !== evaluation.bestMove && loss >= lo && loss <= hi;
+    })
+    .sort((a, b) => count.get(b)! - count.get(a)!)
+    .slice(0, s.recheckMax);
+  if (!flagged.length) return none;
+  const deep = await engine.scoreMovesAt(fen, [evaluation.bestMove, ...flagged], s.recheckNodes);
+  const deepBest = deep.find((m) => m.move === evaluation.bestMove);
+  if (!deepBest) return none;
+  // Re-anchor: the deep numbers for the rechecked moves, measured against the deep number for the best move.
+  const shift = evaluation.bestExpected - deepBest.expected;
+  const expectedAfter = { ...evaluation.expectedAfter };
+  for (const m of deep) if (m.move !== evaluation.bestMove && flagged.includes(m.move)) expectedAfter[m.move] = Math.min(1, Math.max(0, m.expected + shift));
+  // A rechecked move that turns out better than the best: it becomes the best.
+  let bestMove = evaluation.bestMove;
+  let bestExpected = evaluation.bestExpected;
+  for (const m of flagged) if ((expectedAfter[m] ?? 0) > bestExpected) [bestMove, bestExpected] = [m, expectedAfter[m]!];
+  return { bestMove, bestExpected, expectedAfter, rechecked: flagged };
 }
 
 export interface Entrant {
@@ -435,10 +487,14 @@ export class MatchRunner {
     const known = new Map(top.map((m) => [m.move, m.expected]));
     const missing = Object.values(picks).flatMap((m) => (m && !known.has(m) ? [m] : []));
     if (missing.length) for (const m of await engine.scoreMoves(board.fen, missing)) known.set(m.move, m.expected);
+    // Close calls are re-checked where a person is playing (a group of bots affects nobody real).
+    const people = playerIds.some((id) => !this.player(id).isBot && humanPicks.get(id)?.move);
+    const evaluation = { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter: Object.fromEntries(known) };
+    const checked = people ? await recheckCloseCalls(engine, board.fen, evaluation, Object.values(picks), this.settings) : evaluation;
     return this.resolveBoard(boardId, playerIds, picks, {
-      bestMove: top[0]!.move,
-      bestExpected: top[0]!.expected,
-      expectedAfter: Object.fromEntries(known),
+      bestMove: checked.bestMove,
+      bestExpected: checked.bestExpected,
+      expectedAfter: checked.expectedAfter,
     });
   }
 
@@ -533,6 +589,8 @@ export class MatchRunner {
     for (const r of results) for (const p of r.playerIds) think[p] ??= this.botThink.get(p) ?? 0;
     const used = new Set([...usedPowerUp, ...this.botPowerUps]);
     this.botPowerUps = new Set();
+    // Marked on the results (sent to every screen): a pick made with a power-up is never brilliant.
+    for (const r of results) for (const p of r.result.players) if (used.has(p.playerId)) p.usedPowerUp = true;
     const outcomes = results.flatMap((r) => outcomesFromGroup(r.result, think, used));
     const kingPlayed = results.some((r) => r.king);
     this.state = applyRound(this.state, this.groups, outcomes, this.settings);

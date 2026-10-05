@@ -110,14 +110,14 @@ export class UciEngine {
   }
 
   /** One fixed-budget search with a cleared hash. Returns the last score per line. */
-  private async search(fen: string, multipv: number, searchMoves?: readonly string[]): Promise<MoveScore[]> {
+  private async search(fen: string, multipv: number, searchMoves?: readonly string[], nodes = this.options.nodes): Promise<MoveScore[]> {
     this.transport.send("ucinewgame");
     this.transport.send(`setoption name MultiPV value ${multipv}`);
     await this.ready();
     this.transport.send(`position fen ${fen}`);
     const done = this.until((l) => l.startsWith("bestmove"));
     this.transport.send(
-      `go nodes ${this.options.nodes}` + (searchMoves?.length ? ` searchmoves ${searchMoves.join(" ")}` : ""),
+      `go nodes ${nodes}` + (searchMoves?.length ? ` searchmoves ${searchMoves.join(" ")}` : ""),
     );
     const lines = await done;
     const last = new Map<number, InfoLine>();
@@ -143,6 +143,15 @@ export class UciEngine {
       for (const m of unique) if (!have.has(m)) found.push({ move: m, expected: await this.scoreAfter(fen, m) });
       return found;
     });
+  }
+
+  /**
+   * A deeper look at a few moves: one search restricted to them at `nodes` (every move gets far more of the
+   * budget than in the top-8 search). Used to re-check close calls before they cost anyone.
+   */
+  scoreMovesAt(fen: string, moves: readonly string[], nodes: number): Promise<MoveScore[]> {
+    const unique = [...new Set(moves)].sort();
+    return this.serial(async () => (unique.length ? this.search(fen, unique.length, unique, nodes) : []));
   }
 
   /** Mover's expected score after `move`, from a search of the resulting position (or the game result if it ends). */

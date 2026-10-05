@@ -5,7 +5,7 @@ import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool } from "./engine.ts";
-import { cutLabel, isCrowd, roundLive, towerView, type GameView } from "./game.ts";
+import { cutLabel, elimination, isCrowd, roundLive, towerView, type GameView } from "./game.ts";
 import { NetMatch } from "./net.ts";
 import { SoloMatch } from "./solo.ts";
 import { FinalScreen } from "./screens/Final.tsx";
@@ -45,7 +45,7 @@ function overridesFromUrl(): Partial<Settings> {
     ...(raid
       ? { ...RAID_SETTINGS, bossFixedElo: chosenBoss() || raidBossElo([account().profile?.rating ?? null]) }
       : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { crowdTeams: mode.crowdTeams, augments: mode.augments })),
-    ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2 } : PACE_SETTINGS.quick) : {}),
+    ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
     ...definedOnly({
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),
@@ -172,6 +172,7 @@ export function App() {
   const use = (m: AnyMatch) => {
     match?.dispose();
     resetBoardsStrip();
+    elimination.current = null;
     setMatch(m);
     if (debug) (window as unknown as { match: GameView }).match = m;
   };

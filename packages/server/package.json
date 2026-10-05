@@ -4,5 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Lobby server: a Cloudflare Worker with one Durable Object per lobby.",
-  "dependencies": { "@chessroyale/core": "*", "@chessroyale/chess": "*" }
+  "dependencies": {
+    "@chessroyale/chess": "*",
+    "@chessroyale/core": "*",
+    "@cloudflare/containers": "^0.3.7"
+  }
 }

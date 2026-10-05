@@ -29,6 +29,8 @@ export interface PlayerRoundResult {
   roundScore: number;
   /** Called the King (boss battle) instead of picking: no score either way, and not a miss. */
   abstained?: boolean;
+  /** Used a power-up (saw the engine's top moves) this round: the pick can't count as brilliant. */
+  usedPowerUp?: boolean;
 }
 
 export interface GroupResult {
@@ -136,4 +138,31 @@ export function isDeadRound(result: GroupResult, margin = 1): boolean {
   const losses = result.players.flatMap((p) => (p.loss === null ? [] : [p.loss]));
   if (losses.length < 2) return false;
   return Math.max(...losses) - Math.min(...losses) <= margin;
+}
+
+/**
+ * A brilliant move: one that separated the field. Among at least `minPickers` picks, the moves within
+ * `nearBest` points of the best were found by at most `maxShare` of the pickers, and everyone else gave away
+ * `minGap` points or more on average. The players who found it (without a power-up, which shows the engine's
+ * moves) played brilliantly. Null when nothing separated the field.
+ */
+export function brilliance(
+  players: readonly { playerId: string; move: string | null; loss: number | null; usedPowerUp?: boolean }[],
+  opts: { minPickers?: number; nearBest?: number; maxShare?: number; minGap?: number } = {},
+): { moves: string[]; players: string[]; found: number; total: number; othersLoss: number } | null {
+  const { minPickers = 6, nearBest = 1.5, maxShare = 0.2, minGap = 8 } = opts;
+  const picked = players.filter((p) => p.move !== null && p.loss !== null);
+  if (picked.length < minPickers) return null;
+  const good = picked.filter((p) => p.loss! <= nearBest);
+  const rest = picked.filter((p) => p.loss! > nearBest);
+  if (!good.length || !rest.length || good.length > maxShare * picked.length) return null;
+  const othersLoss = rest.reduce((s, p) => s + p.loss!, 0) / rest.length;
+  if (othersLoss < minGap) return null;
+  return {
+    moves: [...new Set(good.map((p) => p.move!))],
+    players: good.filter((p) => !p.usedPowerUp).map((p) => p.playerId),
+    found: good.length,
+    total: picked.length,
+    othersLoss,
+  };
 }

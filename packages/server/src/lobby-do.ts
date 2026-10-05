@@ -5,6 +5,8 @@ import { LobbyCore, newLobbyRecord, type LobbyRecord } from "./lobby.ts";
 import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, recordResult } from "./accounts.ts";
 import type { Env } from "./index.ts";
+import { serverRecheck, warmEngine } from "./engine.ts";
+import { DEFAULT_SETTINGS } from "@chessroyale/core";
 
 const library = openings as unknown as Opening[];
 
@@ -16,6 +18,8 @@ const library = openings as unknown as Opening[];
  */
 export class Lobby extends DurableObject<Env> {
   private record: LobbyRecord | null = null;
+  /** The engine server answered its wake-up ping (only then does the host skip its own re-check). */
+  private engineUp = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -28,6 +32,7 @@ export class Lobby extends DurableObject<Env> {
     this.record ??= newLobbyRecord(code, Date.now());
     return new LobbyCore(this.record, {
       now: () => Date.now(),
+      serverEngine: this.engineUp,
       send: (playerId, msg) => {
         const text = JSON.stringify({ ...msg, now: Date.now() } as ServerMessage);
         for (const ws of this.socketsOf(playerId)) {
@@ -39,6 +44,24 @@ export class Lobby extends DurableObject<Env> {
         }
       },
     }, library);
+  }
+
+  /** Re-checks each board's close calls on the engine server (the host's numbers stand where it can't). */
+  private async recheckOnServer(boards: Extract<ClientMessage, { t: "scores" }>["boards"]) {
+    const jobs = this.record?.scoreRequest?.jobs ?? [];
+    return Promise.all(
+      boards.map(async (b) => {
+        const job = jobs.find((j) => j.boardId === b.boardId);
+        // Only where a person picked (a group of bots affects nobody real).
+        if (!job || !Object.values(job.humanPicks).some((m) => !!m)) return b;
+        const picks = [...Object.values(job.humanPicks), ...Object.values(b.botPicks ?? {})];
+        const t = Date.now();
+        const out = await serverRecheck(this.env, job.fen, { bestMove: b.bestMove, bestExpected: b.bestExpected, expectedAfter: b.expectedAfter }, picks, DEFAULT_SETTINGS, jobs.length);
+        const changed = Object.keys(out.expectedAfter).filter((m) => out.expectedAfter[m] !== b.expectedAfter[m]);
+        if (changed.length) console.log(`engine re-check: ${changed.length} moves in ${Date.now() - t} ms`);
+        return { ...b, ...out };
+      }),
+    );
   }
 
   /** Sockets belonging to a player (identified after "hello" via the socket's attachment). */
@@ -108,9 +131,16 @@ export class Lobby extends DurableObject<Env> {
     } catch {
       return;
     }
-    const core = this.core(this.record!.code);
     const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean } | null;
+    // The host's scores: the engine server re-checks the close calls first (before the lobby is touched, so
+    // nothing changes under it while it waits), and its numbers are the ones used.
+    if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId) {
+      msg = { ...msg, boards: await this.recheckOnServer(msg.boards) };
+    }
+    const core = this.core(this.record!.code);
     if (msg.t === "hello") {
+      // Someone's joining: wake the engine server so it's up by the first re-check.
+      this.ctx.waitUntil(warmEngine(this.env).then((up) => void (this.engineUp = up)));
       if (attached?.guest) {
         ws.send(JSON.stringify({ t: "error", message: SIGN_IN_TO_PLAY, now: Date.now() }));
         ws.close(1008, "Sign in to play online");

@@ -34,6 +34,8 @@ type Outgoing = ServerMessage extends infer M ? (M extends { now: number } ? Omi
 export interface LobbyIO {
   send(playerId: string, msg: Outgoing): void;
   now(): number;
+  /** The engine server re-checks the host's close calls (so the host needn't). */
+  serverEngine?: boolean;
 }
 
 interface Human {
@@ -792,7 +794,7 @@ export class LobbyCore {
     for (const h of this.r.humans) this.io.send(h.id, { t: "locked", key: this.r.round.key });
     const host = this.r.hostId && this.human(this.r.hostId)?.connected ? this.r.hostId : this.pickHost();
     this.r.hostId = host;
-    if (host) this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest });
+    if (host) this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest, ...(this.io.serverEngine ? { serverRecheck: true } : {}) });
     this.setTimer("scoreTimeout", this.io.now() + SCORE_TIMEOUT_MS);
   }
 
@@ -802,7 +804,7 @@ export class LobbyCore {
     if (next && next !== this.r.hostId) {
       this.r.hostId = next;
       this.broadcast(this.lobbyMessage(), false);
-      this.io.send(next, { t: "scoreRequest", ...this.r.scoreRequest });
+      this.io.send(next, { t: "scoreRequest", ...this.r.scoreRequest, ...(this.io.serverEngine ? { serverRecheck: true } : {}) });
       this.setTimer("scoreTimeout", this.io.now() + SCORE_TIMEOUT_MS);
       return;
     }
@@ -889,7 +891,7 @@ export class LobbyCore {
         fenBefore: mine?.fenBefore ?? null,
         bestMove: mine?.bestMove ?? null,
         playedMove: mine?.result.playedMove ?? null,
-        picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, roundScore: p.roundScore })) ?? [],
+        picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, roundScore: p.roundScore, ...(p.usedPowerUp ? { usedPowerUp: true } : {}) })) ?? [],
         drawRule: mine?.result.drawRule ?? "random",
         ...(mine?.king !== undefined ? { king: mine.king, kingCalls: mine.kingCalls } : {}),
         expectedAfter: score?.expectedAfter ?? {},

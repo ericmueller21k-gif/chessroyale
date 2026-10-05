@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { applyMove, inCheck, pieceAt, sideToMove, toSan } from "@chessroyale/chess";
 import type { KingCue } from "../godKing.ts";
-import type { Augment } from "@chessroyale/core";
+import { brilliance, equippedLook, type Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
@@ -12,7 +12,11 @@ import { KING_CUT_MS, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossHeading } from "./Play.tsx";
 import { crowdAnimations, crowdTrail, onPrefsChange } from "../prefs.ts";
-import { finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { GavelPiece } from "../components/Gavel.tsx";
+import { HattedPawn } from "../components/Cosmetics.tsx";
+import { Breakdown } from "../components/Breakdown.tsx";
+import { account } from "../account.ts";
 import { seenKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
@@ -226,6 +230,10 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   }, [mine]);
   const top = rows[0]?.votes ?? 1;
   const me = picks.find((p) => match.isYou(p.playerId));
+  // A move that separated the field (never one found with a power-up, which shows the engine's moves).
+  const bril = useMemo(() => brilliance(picks), [mine]);
+  const youBrilliant = !!me && !!bril?.players.includes(me.playerId);
+  const youHelped = !!me && !!bril && !youBrilliant && bril.moves.includes(me.move ?? "");
   const yours = me?.move ?? null;
   const yourRow = yours && !rows.some((r) => r.move === yours) ? { move: yours, votes: picks.filter((p) => p.move === yours).length, you: true } : null;
 
@@ -345,6 +353,16 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             <span class="poll-votes">{Math.round((mine.kingCalls ?? 0) * grow)}</span>
           </div>
         )}
+        {landed && bril && (
+          <div class={`brilliant-line${youBrilliant ? " you" : ""}`} role="status">
+            <span class="brilliant-mark" aria-hidden="true">‼</span>
+            <span>
+              <strong>{youBrilliant ? "Brilliant! " : "Brilliant move: "}</strong>
+              {bril.moves.map((m) => toSan(fen, m)).join(" / ")} · only {bril.found} of {bril.total} found it
+              {youHelped ? " (with a power-up: it doesn't count)" : ""}
+            </span>
+          </div>
+        )}
         <div class="poll-result">
           {me ? (
             <>
@@ -370,9 +388,15 @@ const AUGMENTS: { choice: Augment; title: string; step: number }[] = [
   { choice: "less", title: "Less time", step: -1 },
 ];
 
+const BOT_HATS = ["none", "none", "none", "party", "crown", "wizard", "top", "viking"];
+const hash = (s: string) => [...s].reduce((a, c) => Math.imul(a ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+/** The judge strikes this long after the screen opens. */
+const GAVEL_AT = 1500;
+
 /**
- * Crowd's cut: who went out, whether you're through, and (with augments) a
- * vote on the next round's move clock, as three cards.
+ * Crowd's cut, as a judgement: every player is a pawn in a grid (White's team on the left, Black's on the
+ * right, everyone in a fixed seat; bots in random hats, you in yours), the judge, a gavel piece, swings down,
+ * and the players cut fade out. Then: who went out, whether you're through, and if not, why (the breakdown).
  */
 export function CrowdCut({
   match,
@@ -394,6 +418,14 @@ export function CrowdCut({
   moveClock?: number;
 }) {
   const now = useFrameNow();
+  const [start] = useState(Date.now());
+  const [why, setWhy] = useState(false);
+  const t = now - start;
+  const slammed = t >= GAVEL_AT;
+  useEffect(() => {
+    const timer = setTimeout(() => play("gavel"), GAVEL_AT - 120);
+    return () => clearTimeout(timer);
+  }, []);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   const aliveAfter = standings.filter((s) => !s.out).length - knockedOut.length;
   // The last cut: what comes next (team final, boss battle, duel, or the final four).
@@ -402,32 +434,90 @@ export function CrowdCut({
   const s = match.settings;
   const clock = moveClock ?? s.moveClockSeconds;
   const at = (step: number) => Math.max(s.clockRange[0], Math.min(s.clockRange[1], clock + step * s.clockStepSeconds));
+  const cutNow = new Set(knockedOut.map((k) => k.id));
+  const myHat = equippedLook(account().profile?.shop, "hat").hat ?? "none";
+  // Fixed seats: by team (White left, Black right), then by id.
+  const seats = useMemo(() => {
+    const byId = (a: Standing, b: Standing) => (a.id < b.id ? -1 : 1);
+    const teams = standings.some((p) => p.team);
+    if (!teams) return [...standings].sort(byId);
+    const w = standings.filter((p) => p.team !== "b").sort(byId);
+    const b = standings.filter((p) => p.team === "b").sort(byId);
+    // Rows of ten: five of White's, then five of Black's.
+    const out: Standing[] = [];
+    for (let r = 0; r < Math.ceil(Math.max(w.length, b.length) / 5); r++) out.push(...w.slice(r * 5, r * 5 + 5), ...b.slice(r * 5, r * 5 + 5));
+    return out;
+  }, [stage]);
+  // Your score and the line (the last player through) when you go out, for the breakdown.
+  const me = standings.find((p) => p.isYou);
+  const through = standings.filter((p) => !p.out && !cutNow.has(p.id));
+  const line = through.length ? Math.min(...through.map((p) => p.points)) : 0;
+  useEffect(() => {
+    if (youOut && me) elimination.current = { stage, you: me.points, line, placement: match.placement, out: knockedOut.length, left: aliveAfter };
+  }, [stage]);
   return (
-    <div class="screen crowd-cut" onClick={() => !match.serverPaced && !augments && match.continueFromBreak()}>
+    <div class={`screen crowd-cut judge${slammed ? " slammed" : ""}`} onClick={() => !match.serverPaced && !augments && !why && match.continueFromBreak()}>
       <div class="cut-head">
         <span class="cut-badge">CUT</span>
         <span>
           {knockedOut.length} out · {aliveAfter} left{final ? ` · the ${next.toLowerCase()} is next` : ""}
         </span>
       </div>
-      <p class={youOut ? "out-msg" : "safe-msg"}>
-        {youOut
-          ? `You're out, in ${match.placement}${ordinal(match.placement ?? 0)} place.`
-          : final
-            ? next === "Boss battle"
-              ? "You face the boss!"
-              : next === "Duel"
-                ? "You're in the duel!"
-                : `You made the ${next.toLowerCase()}!`
-            : "You're through."}
-      </p>
-      <div class="cut-out" aria-label="Knocked out">
-        {knockedOut.map((k) => (
-          <span key={k.id} class={`cut-name${k.isYou ? " you" : ""}`}>
-            {k.isYou ? "You" : k.name}
-          </span>
-        ))}
+      <div class="judge-stage">
+        <GavelPiece slam={slammed} />
       </div>
+      <div class="pawn-grid" role="img" aria-label={`${aliveAfter} players through, ${knockedOut.length} cut`}>
+        {seats.map((p) => {
+          const side = p.team === "b" ? "b" : "w";
+          const hat = p.isYou ? myHat : p.isBot ? BOT_HATS[hash(p.id) % BOT_HATS.length]! : "none";
+          const state = cutNow.has(p.id) ? (slammed ? " cut-now" : " doomed") : p.out ? " gone" : "";
+          return (
+            <span key={p.id} class={`grid-pawn${state}${p.isYou ? " you" : ""}`} title={p.isYou ? "You" : p.name}>
+              <HattedPawn hat={hat} side={side} />
+            </span>
+          );
+        })}
+      </div>
+      {slammed && (
+        <>
+          <p class={youOut ? "out-msg" : "safe-msg"}>
+            {youOut
+              ? `You're out, in ${match.placement}${ordinal(match.placement ?? 0)} place.`
+              : final
+                ? next === "Boss battle"
+                  ? "You face the boss!"
+                  : next === "Duel"
+                    ? "You're in the duel!"
+                    : `You made the ${next.toLowerCase()}!`
+                : "You're through."}
+          </p>
+          {youOut && (
+            <button
+              type="button"
+              class="btn btn-primary why-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setWhy(true);
+              }}
+            >
+              Why was I cut?
+            </button>
+          )}
+          <div class="cut-out" aria-label="Knocked out">
+            {knockedOut.slice(0, 12).map((k) => (
+              <span key={k.id} class={`cut-name${k.isYou ? " you" : ""}`}>
+                {k.isYou ? "You" : k.name}
+              </span>
+            ))}
+            {knockedOut.length > 12 && <span class="cut-name more">+{knockedOut.length - 12}</span>}
+          </div>
+        </>
+      )}
+      {why && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Breakdown moves={match.moves} you={me?.points} line={line} placement={match.placement} onClose={() => setWhy(false)} />
+        </div>
+      )}
       {augments && !youOut && (
         <>
           <h2 class="cut-vote-title">

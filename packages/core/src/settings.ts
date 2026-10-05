@@ -83,6 +83,13 @@ export interface Settings {
    */
   bossMaxLoss: number;
   bossMaxLogitLoss: number;
+  /**
+   * The re-check (reports/judge-accuracy.md): picked moves that lose between these many points are searched
+   * again, deeper, before they cost anyone (the most picked first, up to recheckMax, at recheckNodes).
+   */
+  recheckLoss: readonly [number, number];
+  recheckMax: number;
+  recheckNodes: number;
   /** Augments: seconds added or taken per vote, and the clock's limits. */
   clockStepSeconds: number;
   clockRange: readonly [number, number];
@@ -188,6 +195,9 @@ export const DEFAULT_SETTINGS: Settings = {
   bossSlipLoss: [2, 7],
   bossMaxLoss: 10,
   bossMaxLogitLoss: 1,
+  recheckLoss: [5, 60],
+  recheckMax: 3,
+  recheckNodes: 700_000,
   clockStepSeconds: 5,
   clockRange: [10, 40],
   lobbySize: 64,
@@ -278,7 +288,8 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   // Most of the show happens live (picks appear as they're made), so the reveal itself is short.
   revealSeconds: 2.5,
   drawnMoveSeconds: 1.5,
-  stageBreakSeconds: 4,
+  // The cut is a judgement (the gavel and every player's pawn): 10 s, as Eric asked.
+  stageBreakSeconds: 10,
   botThinkSeconds: [2, 14],
 };
 

@@ -810,3 +810,54 @@ Eric suggested one name over each picked square, "You" when it's your move, plus
 - Each square shows one name pill: "You" if you picked it, otherwise the best-placed player who did. The pill is never wider than the square.
 - "+N" (everyone else) is now an orange badge on the piece's top-right corner, inside the square.
 - Before, up to three names plus "+N" stacked above each square, and neighbouring columns overlapped. Now nothing on one square can cover another's.
+
+## The engine server: a hybrid (Oct 5, 2026)
+
+Eric agreed the judge must be strong and put the account on Workers Paid. He asked about cost if the game got popular, and whether players' computers could help.
+
+- **Hybrid, not "the server does everything".** Players' devices still do the routine scoring, as before. The server re-checks only the close calls that decide cuts. Lichess's fishnet is the precedent for using players' machines; the catch, cheating, is handled by never letting a device's number decide a close call.
+- **The server:** native Stockfish 17.1 (the full network) in a Cloudflare Container (`engine/Dockerfile`, `standard-2`: 1 vCPU, 6 GiB). One shared instance, asleep after 3 idle minutes, woken when someone joins a lobby or starts a solo game.
+  - Measured: about 700k nodes/s on one core. A re-check (the best move plus up to 3 disputed picks, 2M nodes) takes about 3 s at depth ~30. With 8 boards (Classic), the depth is shared (at least 400k each), so a round stays a few seconds.
+- **Online:** the lobby Durable Object re-checks the host's close calls on the server before the lobby uses them, so the server's numbers decide. The host's phone skips its own re-check only when the server answered its wake-up ping.
+- The lobby remembers "the server answered" in memory only; if the lobby object sleeps and wakes mid-match, the host's own re-check is used until the next player joins (safe, rare during an active match).
+- **Solo:** re-checks go to `POST /api/engine/score` first, falling back to the device's own re-check (lite at 700k nodes).
+- **Cost:** Cloudflare's published rates are $5/month plus usage. A cap of 3000 re-checks a day (`ENGINE_DAILY_SEARCHES`) keeps the worst case around $25/month; past it, devices' numbers stand. A whole-match-on-server design would have been about 3.5¢ a match (memory while awake); the hybrid is well under 1¢.
+- **Later, if traffic grows:** cache analysed positions (crowd games share their openings), spot-check devices' numbers against the server, and run more instances.
+- **Verified locally:** with the container running under `wrangler dev`, an online Classic match made 17 server re-checks (0.6–3 s), and solo games 35 (median 1.2 s).
+
+## The re-check of close calls (Oct 5, 2026)
+
+The top-8 search gives each move about an eighth of 250k nodes, which is why close calls are noisy (`reports/judge-accuracy.md`).
+
+- Picked moves that lose 5–60 points are searched again, the most picked first (up to 3), together with the best move, in one search restricted to them: 700k nodes on a device, 2M on the server. Those numbers replace the first ones.
+- The range goes up to 60 so a sacrifice the quick search called a blunder gets a second look. If a rechecked move beats the best, it becomes the best.
+- In the simulation (`judge-cuts.ts`), re-checking roughly halves the strong players cut unfairly with a device's engine, and the server-grade version cuts it about 7 times.
+
+## Brilliant moves (Oct 5, 2026)
+
+- A move is brilliant when, among at least 6 picks, the moves within 1.5 points of the best were found by at most 20% of the pickers, and everyone else gave away 8+ points on average (`brilliance` in `core/scoring.ts`).
+- **Never with a power-up** (Eric): a power-up shows the engine's top moves, so those picks are flagged (`usedPowerUp` on the round's results, sent online too) and never count. The reveal still shows the move, noting that a power-up pick doesn't count.
+- The reveal shows "‼ Brilliant move: Nxf7 · only 3 of 40 found it", in brighter colours if you found it.
+
+## Elimination breakdown (Oct 5, 2026)
+
+Eric wants eliminated players to see why, so they can learn rather than argue.
+
+- **On the cut screen,** "Why was I cut?" opens it; on the results screen, "Why you went out" (or "Your game, move by move" for anyone).
+- **It shows:**
+  - your score against the last player through
+  - the three moves that cost you most: your move, the best, how many found it, and your score for it
+  - every move
+  - any brilliant moves you made
+- Tap a move to see the position with your move (red arrow) and the best (green).
+- It's built from each reveal on your own device (solo and online alike), so no new server messages were needed.
+
+## The cut as a judgement (Oct 5, 2026)
+
+Eric's design:
+- **The pawns:** every player is a pawn in a 10 × 10 grid, White's team on the left five columns and Black's on the right, in fixed seats so you can find yourself (gold ring). You wear your equipped hat; bots wear random ones (a hint of the shop); other online players have none for now.
+- **The judge:** a gavel piece in the board's own piece style, on a wooden sound block.
+- **The sequence:** the doomed pawns glow red, the gavel raises and slams at 1.5 s (two heavy wooden knocks, the piece sounds pitched down, and a small shake), and the cut pawns fade to grey. Pawns cut earlier stay faint.
+- **Then:** the verdict, "Why was I cut?" if you're out, and the names.
+- **Length:** 10 s (Crowd's `stageBreakSeconds`, was 4); quick pace (tests) keeps 4.
+- **Eric asked whether a whole side could be wiped out:** not in 50 v 50, since every cut takes the same number from each team.
