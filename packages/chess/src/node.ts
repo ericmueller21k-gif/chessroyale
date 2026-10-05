@@ -9,8 +9,11 @@ const require = createRequire(import.meta.url);
 /** The single-threaded lite build: the same file the browser loads. */
 export const STOCKFISH_BUILD = join(dirname(require.resolve("stockfish/package.json")), "bin", "stockfish-19-lite-single.js");
 
-export function nodeTransport(): UciTransport {
-  const child = spawn(process.execPath, [STOCKFISH_BUILD], { stdio: ["pipe", "pipe", "inherit"] });
+/** The full-network build (about 100 MB): far stronger, too big for phones; used as a reference in simulations. */
+export const STOCKFISH_FULL_BUILD = join(dirname(require.resolve("stockfish/package.json")), "bin", "stockfish-19-single.js");
+
+export function nodeTransport(build = STOCKFISH_BUILD): UciTransport {
+  const child = spawn(process.execPath, [build], { stdio: ["pipe", "pipe", "inherit"] });
   let buffer = "";
   const listeners: ((line: string) => void)[] = [];
   child.stdout.on("data", (chunk: Buffer) => {
@@ -29,8 +32,8 @@ export function nodeTransport(): UciTransport {
   };
 }
 
-export async function createNodeEngine(options: EngineOptions): Promise<UciEngine> {
-  const engine = new UciEngine(nodeTransport(), options);
+export async function createNodeEngine(options: EngineOptions, build = STOCKFISH_BUILD): Promise<UciEngine> {
+  const engine = new UciEngine(nodeTransport(build), options);
   await engine.init();
   return engine;
 }
