@@ -1,13 +1,16 @@
 import {
+  buyItem,
   cleanEmail,
   createGuest,
   createSession,
   d1Sql,
   endSession,
   ensureSchema,
+  equipItem,
   profile,
   randomToken,
   recordResult,
+  shopState,
   signInWithIdentity,
   startEmailCode,
   updateProfile,
@@ -87,7 +90,7 @@ export async function accountOf(request: Request, env: AccountEnv): Promise<User
 export async function handleAccountApi(request: Request, env: AccountEnv, fetcher: typeof fetch = fetch): Promise<Response | null> {
   const url = new URL(request.url);
   const path = url.pathname;
-  if (!path.startsWith("/api/me") && !path.startsWith("/api/auth/") && path !== "/api/results") return null;
+  if (!path.startsWith("/api/me") && !path.startsWith("/api/auth/") && path !== "/api/results" && !path.startsWith("/api/shop")) return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
   const email = !!env.RESEND_API_KEY;
   if (path === "/api/auth/config") return json({ accounts: !!env.DB, google, email, onlineNeedsSignIn: !!env.DB && signInRequired(env) });
@@ -124,6 +127,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/me" && request.method === "PATCH") {
     const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown };
     return json(await profile(sql, await updateProfile(sql, current.id, body)));
+  }
+
+  // The shop. GET /api/shop: your coins, items and what's equipped. POST /api/shop/buy {item}, /api/shop/equip {item}.
+  if (path === "/api/shop" && request.method === "GET") return json(await shopState(sql, current.id));
+  if ((path === "/api/shop/buy" || path === "/api/shop/equip") && request.method === "POST") {
+    const { item } = (await request.json().catch(() => ({}))) as { item?: unknown };
+    const r = path === "/api/shop/buy" ? await buyItem(sql, current.id, item, now) : await equipItem(sql, current.id, item);
+    return r.ok ? json(r.shop) : json({ message: r.message }, 400);
   }
 
   // POST /api/results: a solo match's result, from the browser.

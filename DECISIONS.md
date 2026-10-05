@@ -715,3 +715,41 @@ Eric: the replay arrows' row was empty space, so the status box moves between th
   - "Crowd plays e4 · 6/10" / "You: e4 (+0.4) · best d4"
   - "🤖 Boss plays a5" / "Your move in 2"
   - "👑 He strikes the boss!" / "Clock stopped."
+
+## Ten boss tiers (Oct 5, 2026)
+
+- `BOSS_TIERS` is now 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3190. 3190 is the strongest Stockfish plays with its strength limited; full, unlimited strength is deliberately not a tier.
+- One boss per tier, with placeholder names (Eric will rename them): Pawn Golem, Iron Bishop, Bone Archer, Black Knight, Storm Witch, Tower Tyrant, Frost Dragon, Grandmaster Wraith, Demon Lord, Engine Eternal. Two bosses per skull, 1–5.
+- A raid still meets the weakest boss above the group's average rating. An unrated player (1500) now meets the 1600 boss (was 1700).
+
+## The shop (Oct 5, 2026)
+
+Eric wants a shop to test with (designs and prices to come). Everything is free while `SHOP_FREE` is on.
+
+- **Catalog** (`core/shop.ts`, shared by app and server). Each category fills one slot. You own any number of its items and equip one, and every slot has a free starter.
+  - God King effects: Holy Light (starter), Stormcaller, Hellfire, Voidborn, Emerald Oath. They recolour his lightning, beam and glow through CSS variables.
+  - Pawn hats: none (starter), Party Hat, Little Crown, Wizard Hat, Top Hat, Viking Helm. They're SVG hats on your pawn in the pre-game votes.
+  - Kill moves and other animations are listed as coming later.
+- **Server.** Three D1 tables: `inventory`, `equipped`, and `wallets` (coins, for later).
+  - `GET /api/shop`, `POST /api/shop/buy {item}`, `POST /api/shop/equip {item}`. Buying checks coins unless `SHOP_FREE`; equipping requires owning the item.
+  - The profile carries the shop state, so the app knows your look in a match.
+  - A guest's items, choices and coins join the account they sign in to; the account's own choices win.
+- **App.** A Shop button beside the logo on the home screen opens the shop (also at `/shop`): category tabs and item cards with previews, Get · Free / Equip / Equipped.
+- Cosmetics are what *you* see. In a crowd game, each player sees their own King effect for now; showing the caller's (or the winner's) look to everyone is for later.
+
+## The pixel icon builder (Oct 5, 2026)
+
+Eric asked for something like the old Call of Duty emblem editor.
+
+- Player icons are now 48 × 48 pixel drawings (close to the suggested 50 × 50, and a cleaner size for scaling). The emoji picker is gone.
+- Tap your icon on your profile ("Edit") to open the builder. The tools are deliberately few: pencil, eraser, fill bucket, colour picker, 1/2/3 px brushes, undo, clear, a 24-colour palette and a custom colour.
+- It saves a PNG data URL (well under 1 KB for most drawings) in the existing `users.icon` column. The server only accepts a real 48 × 48 PNG (signature, IHDR size, base64 only, at most 16 KB). The old emoji stay valid for older accounts.
+- No moderation yet (Eric: worry about that later).
+
+## Crowd pieces: one spot per square (Oct 5, 2026)
+
+Eric: mid-round the crowd's pieces looked misaligned and sloppy; every piece should snap to one rigid spot per square.
+
+- **Cause, measured.** Every pick slid from its square to the target over 0.55 s. With up to 50 picks arriving in quick succession, up to 25 were between squares at once, smearing into streaks, with dozens of translucent copies stacked. Chessground also rounds its board to whole device pixels, so overlays drifted by up to 1 px.
+- **Now.** Each picked square has exactly one ghost piece on it, and it never slides. It pops in place when a pick arrives (a 0.2 s pulse), and it gets bolder the more players picked it. The name tags still show who and how many.
+- Overlays are sized to chessground's exact board (`--cg-size`, measured from `cg-container`). A browser check during a 50-player round: every crowd piece sat 0.00 px from its square at every moment.

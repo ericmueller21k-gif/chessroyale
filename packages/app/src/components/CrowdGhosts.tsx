@@ -1,4 +1,3 @@
-import { useEffect, useState } from "preact/hooks";
 import { pieceAt } from "@chessroyale/chess";
 
 const NAMES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
@@ -20,30 +19,42 @@ export interface GhostPick {
   rank: number;
 }
 
-/** One see-through piece that slides from its square to the picked square once it appears. */
-function Ghost({ fen, move, orientation, you, instant }: { fen: string; move: string; orientation: "white" | "black"; you: boolean; instant?: boolean }) {
-  const [landed, setLanded] = useState(!!instant);
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => requestAnimationFrame(() => setLanded(true)));
-    return () => cancelAnimationFrame(raf);
-  }, []);
+/**
+ * One see-through piece on its picked square. Every picked square has exactly
+ * one: it never slides across the board (dozens of pieces sliding at once
+ * smeared into streaks), it pops in where it lands, a little bolder for every
+ * extra pick and with a pulse each time one more arrives.
+ */
+function Ghost({ fen, move, orientation, count, you, instant, chosenCls }: { fen: string; move: string; orientation: "white" | "black"; count: number; you: boolean; instant: boolean; chosenCls: string }) {
   const piece = pieceAt(fen, move.slice(0, 2));
   if (!piece) return null;
-  const p = at(landed ? move.slice(2, 4) : move.slice(0, 2), orientation);
+  const p = at(move.slice(2, 4), orientation);
+  // 1 pick: faint; more picks: bolder (the stack reads at a glance), up to a cap.
+  const weight = Math.min(1, 0.55 + 0.15 * Math.log2(count));
   return (
     <piece
-      class={`${piece.color === "w" ? "white" : "black"} ${NAMES[piece.type]} crowd-ghost${you ? " you" : ""}`}
-      style={{ left: `${p.left}%`, top: `${p.top}%` }}
+      key={instant ? "still" : `n${count}`}
+      class={`${piece.color === "w" ? "white" : "black"} ${NAMES[piece.type]} crowd-ghost${you ? " you" : ""}${instant ? "" : " pop"}${chosenCls}`}
+      style={{ left: `${p.left}%`, top: `${p.top}%`, "--ghost-weight": String(weight) }}
     />
   );
 }
 
+/** A ghost with animations off: one still piece per picked move. */
+function StillGhost({ fen, move, orientation, chosenCls }: { fen: string; move: string; orientation: "white" | "black"; chosenCls: string }) {
+  const piece = pieceAt(fen, move.slice(0, 2));
+  if (!piece) return null;
+  const to = at(move.slice(2, 4), orientation);
+  return <piece class={`${piece.color === "w" ? "white" : "black"} ${NAMES[piece.type]} crowd-ghost still${chosenCls}`} style={{ left: `${to.left}%`, top: `${to.top}%` }} />;
+}
+
 /**
  * Crowd picks on the board. Every move picked gets a tag over its square: the
- * top three names (by leaderboard) and "+N" for the rest. With animations on,
- * every single pick is a ghost piece sliding to its square as it comes in (20
- * knight picks are 20 knights in quick succession); with them off, each move
- * gets one still ghost. `chosen` fades the others and lights the winner.
+ * top three names (by leaderboard) and "+N" for the rest, and one ghost piece
+ * on the square it moves to (one spot per square, however many picked it).
+ * With animations on, each new pick pops that ghost (20 knight picks are 20
+ * quick pulses on one knight); with them off, the ghosts just stand there.
+ * `chosen` fades the others and lights the winner.
  */
 export function CrowdGhosts({
   fen,
@@ -72,24 +83,22 @@ export function CrowdGhosts({
   const cls = (move: string) => (chosen ? (move === chosen ? " chosen" : " not-chosen") : "");
   return (
     <div class={`cg-wrap shade-layer crowd-layer${faint ? " faint" : ""}`} aria-hidden="true">
-      {animate
-        ? picks.map((p) => (
-            <div key={p.id} class={`ghost-wrap${cls(p.move)}`}>
-              <Ghost fen={fen} move={p.move} orientation={orientation} you={p.you} instant={instant?.has(p.id)} />
-            </div>
-          ))
-        : [...byMove.keys()].map((move) => {
-            const piece = pieceAt(fen, move.slice(0, 2));
-            if (!piece) return null;
-            const to = at(move.slice(2, 4), orientation);
-            return (
-              <piece
-                key={move}
-                class={`${piece.color === "w" ? "white" : "black"} ${NAMES[piece.type]} crowd-ghost still${cls(move)}`}
-                style={{ left: `${to.left}%`, top: `${to.top}%` }}
-              />
-            );
-          })}
+      {[...byMove].map(([move, ps]) =>
+        animate ? (
+          <Ghost
+            key={move}
+            fen={fen}
+            move={move}
+            orientation={orientation}
+            count={ps.length}
+            you={ps.some((p) => p.you)}
+            instant={ps.every((p) => instant?.has(p.id))}
+            chosenCls={cls(move)}
+          />
+        ) : (
+          <StillGhost key={move} fen={fen} move={move} orientation={orientation} chosenCls={cls(move)} />
+        ),
+      )}
       {tags && [...byMove].map(([move, ps]) => {
         const to = at(move.slice(2, 4), orientation);
         const ranked = [...ps].sort((a, b) => Number(b.you) - Number(a.you) || a.rank - b.rank);

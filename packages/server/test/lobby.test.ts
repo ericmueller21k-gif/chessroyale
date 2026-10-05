@@ -428,7 +428,7 @@ describe("lobby: Crowd mode", () => {
     L.core.connect(undefined, "Bo", "phone", false, 1900);
     L.core.message("p1", { t: "start" });
     expect(L.core.record.bots).toHaveLength(0);
-    expect(L.core.record.overrides?.bossFixedElo).toBe(2000);
+    expect(L.core.record.overrides?.bossFixedElo).toBe(1800);
     L.advance(1000);
     const intro = L.last("p2", "boss")!;
     expect(intro.intro).toBe(true);

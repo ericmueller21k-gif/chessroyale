@@ -97,7 +97,16 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
       premovable: { enabled: false },
       drawable: { enabled: false, visible: true },
     });
-    const resize = new ResizeObserver(() => api.current?.redrawAll());
+    // Chessground sizes its board to whole device pixels (a hair smaller than the wrap): overlays use its exact size.
+    const syncSize = () => {
+      const c = el.current?.querySelector("cg-container");
+      if (c) el.current!.parentElement!.style.setProperty("--cg-size", `${c.getBoundingClientRect().width}px`);
+    };
+    const resize = new ResizeObserver(() => {
+      api.current?.redrawAll();
+      syncSize();
+    });
+    syncSize();
     resize.observe(el.current!);
     return () => {
       resize.disconnect();

@@ -1,3 +1,5 @@
+import type { ShopState } from "@chessroyale/core";
+
 /**
  * Your account, as the screens see it: a guest account made the first time
  * you open the site, which signing in with Google or an emailed code turns
@@ -16,6 +18,8 @@ export interface ModeStats {
 
 export interface Profile {
   user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean };
+  /** The shop: coins, items owned and what's equipped (missing from an older server). */
+  shop?: ShopState;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
@@ -26,8 +30,6 @@ export interface AccountState {
   config: { accounts: boolean; google: boolean; email: boolean; onlineNeedsSignIn?: boolean } | null;
   profile: Profile | null;
 }
-
-export const ICONS = ["♟", "♞", "♝", "♜", "♛", "♚", "🦁", "🦊", "🐺", "🦅", "🐉", "🔥", "⚡", "👑", "🎯", "🧠"];
 
 let state: AccountState = { config: null, profile: null };
 const listeners = new Set<() => void>();
@@ -66,6 +68,20 @@ export async function loadAccount(name?: string): Promise<void> {
 export async function updateProfile(patch: { name?: string; icon?: string }): Promise<void> {
   if (!state.profile) return;
   set({ profile: await api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify(patch) }) });
+}
+
+/** Gets a shop item (free while testing). */
+export async function buyShopItem(item: string): Promise<void> {
+  if (!state.profile) return;
+  const shop = await api<ShopState>("/api/shop/buy", { method: "POST", body: JSON.stringify({ item }) });
+  set({ profile: { ...state.profile, shop } });
+}
+
+/** Equips a shop item you own. */
+export async function equipShopItem(item: string): Promise<void> {
+  if (!state.profile) return;
+  const shop = await api<ShopState>("/api/shop/equip", { method: "POST", body: JSON.stringify({ item }) });
+  set({ profile: { ...state.profile, shop } });
 }
 
 /** Off to Google; it sends you back to `next` (this page by default). */

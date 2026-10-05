@@ -1282,7 +1282,11 @@ p {
 
 .shade-layer {
   position: absolute !important;
-  inset: 0;
+  /* Exactly chessground's board (it rounds its size to whole device pixels), so overlay pieces sit on its squares. */
+  top: 0;
+  left: 0;
+  width: var(--cg-size, 100%);
+  height: var(--cg-size, 100%);
   pointer-events: none;
   z-index: 3;
 }
@@ -2463,20 +2467,18 @@ button.history-label {
 
 /* ---- Crowd: every pick as a ghost piece ---- */
 
+/* One ghost per picked square, fixed on it (never sliding); bolder the more picked it. */
 .crowd-layer piece.crowd-ghost {
   position: absolute;
   width: 12.5%;
   height: 12.5%;
   background-size: cover;
-  opacity: 0.38;
-  transition:
-    left 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
-    top 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 0.3s;
+  opacity: calc(0.62 * var(--ghost-weight, 0.6));
+  transition: opacity 0.3s;
   filter: drop-shadow(0 0 4px rgba(244, 183, 64, 0.7));
 }
 .crowd-layer piece.crowd-ghost.you {
-  opacity: 0.7;
+  opacity: max(0.7, calc(0.9 * var(--ghost-weight, 0.6)));
   filter: drop-shadow(0 0 5px var(--accent));
 }
 .crowd-layer piece.crowd-ghost.still {
@@ -2484,7 +2486,17 @@ button.history-label {
   animation: fade 250ms ease-out;
 }
 .crowd-layer.faint piece.crowd-ghost {
-  opacity: 0.22;
+  opacity: calc(0.42 * var(--ghost-weight, 0.6));
+}
+/* A new pick on the square: the ghost pops where it stands. */
+.crowd-layer piece.crowd-ghost.pop {
+  animation: ghost-pop 200ms ease-out;
+}
+@keyframes ghost-pop {
+  from {
+    scale: 1.18;
+    filter: drop-shadow(0 0 8px rgba(244, 183, 64, 0.95));
+  }
 }
 .crowd-layer.faint piece.crowd-ghost.you,
 .crowd-layer.faint piece.crowd-ghost.still {
@@ -2555,6 +2567,13 @@ button.history-label {
 .account-icon {
   grid-row: 1 / 3;
   font-size: 28px;
+  display: grid;
+  place-items: center;
+}
+.account-icon .user-icon.pixel {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
 }
 .account-name {
   font-weight: 800;
@@ -2574,8 +2593,34 @@ button.history-label {
   gap: 12px;
 }
 .profile-icon {
-  font-size: 48px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 44px;
   line-height: 1;
+  cursor: pointer;
+}
+.profile-icon .user-icon.pixel {
+  width: 56px;
+  height: 56px;
+}
+.profile-icon-edit {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #d4a531;
+  color: #1a1406;
+  font-size: 10px;
+  font-weight: 800;
 }
 .profile-name {
   display: grid;
@@ -2592,23 +2637,6 @@ button.history-label {
   background: transparent;
   color: var(--text);
   padding: 2px 0;
-}
-.icon-pick {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
-}
-.icon-pick button {
-  aspect-ratio: 1;
-  border: 2px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  font-size: 20px;
-  cursor: pointer;
-}
-.icon-pick button.on {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 .profile-tabs {
   grid-template-columns: repeat(4, 1fr);
@@ -3397,11 +3425,12 @@ button.history-label {
 }
 .ks-bolt {
   fill: none;
-  stroke: #fffdf0;
+  /* His colours: the equipped King effect from the shop (Holy Light by default). */
+  stroke: var(--ks-bolt, #fffdf0);
   stroke-width: 3.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 3px #ffe066) drop-shadow(0 0 8px #ffd23f);
+  filter: drop-shadow(0 0 3px var(--ks-glow, #ffe066)) drop-shadow(0 0 8px var(--ks-glow, #ffd23f));
 }
 .ks-bolt.strike {
   stroke-width: 3;
@@ -4150,4 +4179,259 @@ button.history-label {
     opacity: 1;
     scale: 1;
   }
+}
+
+/* ---- Shop cosmetics ---- */
+.pawn-hat {
+  position: absolute;
+  inset: -9% 0 auto 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.hatted-pawn {
+  position: relative;
+  display: inline-block;
+  width: 64px;
+  height: 64px;
+}
+.hatted-pawn piece {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+}
+.vote-hat {
+  position: absolute;
+  z-index: 3;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  transition: left 0.25s, top 0.25s;
+}
+.king-effect-preview {
+  position: relative;
+  display: inline-block;
+  width: 72px;
+  height: 72px;
+}
+.kep-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.kep-king {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 34px;
+  height: 52px;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 0 6px var(--ks-glow));
+}
+
+/* ---- The shop ---- */
+.screen.shop {
+  gap: 12px;
+}
+.shop-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.shop-head h1 {
+  margin: 0;
+  text-align: center;
+}
+.shop-coins {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.shop-note {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #d4a531 16%, var(--surface));
+  font-size: 13px;
+  font-weight: 600;
+}
+.shop-tabs {
+  display: flex;
+  gap: 6px;
+}
+.shop-tabs button {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.shop-tabs button.on {
+  border-color: #d4a531;
+  background: color-mix(in srgb, #d4a531 14%, var(--surface));
+}
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.shop-item {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+  padding: 12px 10px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  text-align: center;
+}
+.shop-item.equipped {
+  border-color: #d4a531;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #d4a531 30%, transparent);
+}
+.shop-preview {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 84px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1e3a8a, #312e81);
+}
+.btn.btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+  min-height: 0;
+}
+.shop-tag {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #d4a531;
+  color: #1a1406;
+  font-size: 12px;
+  font-weight: 800;
+}
+.shop-error {
+  color: var(--bad);
+  font-weight: 600;
+}
+.shop-soon {
+  text-align: center;
+}
+.home-shop-btn {
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 2px solid #d4a531;
+  background: color-mix(in srgb, #d4a531 14%, var(--surface));
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* ---- Player icons and the icon builder ---- */
+.user-icon.pixel {
+  display: block;
+  image-rendering: pixelated;
+}
+.icon-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.icon-canvas-wrap {
+  justify-self: center;
+  width: min(100%, 336px);
+  aspect-ratio: 1;
+  border-radius: 6px;
+  /* A checkerboard shows which pixels are clear. */
+  background: repeating-conic-gradient(#e5e7eb 0 25%, #ffffff 0 50%) 0 0 / 14px 14px;
+  box-shadow: 0 0 0 2px var(--line);
+}
+.icon-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  touch-action: none;
+  cursor: crosshair;
+}
+.icon-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+.icon-tools button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 36px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  font-size: 16px;
+  color: var(--text);
+  cursor: pointer;
+}
+.icon-tools button.on {
+  border-color: #d4a531;
+  background: color-mix(in srgb, #d4a531 18%, var(--surface));
+}
+.icon-tools-sep {
+  width: 1px;
+  background: var(--line);
+}
+.icon-brush {
+  display: block;
+  background: var(--text);
+}
+.icon-palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(26px, 1fr));
+  gap: 5px;
+}
+.icon-palette button,
+.icon-custom span {
+  display: block;
+  aspect-ratio: 1;
+  min-height: 26px;
+  border-radius: 6px;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.icon-palette button.on {
+  outline: 3px solid #d4a531;
+  outline-offset: 1px;
+}
+.icon-custom {
+  position: relative;
+}
+.icon-custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.icon-custom span {
+  background-image: linear-gradient(135deg, transparent 55%, rgba(255, 255, 255, 0.85) 55% 70%, transparent 70%);
+}
+.icon-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

@@ -6,3 +6,4 @@ export * from "./rating.ts";
 export * from "./votes.ts";
 export * from "./boss.ts";
 export { RATING_CURVE } from "./rating-curve.ts";
+export * from "./shop.ts";
