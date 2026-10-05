@@ -1018,10 +1018,11 @@ the 50 v 50 final is ten bots with two charges, which the bots spend whenever th
 - **About 0.5 per game overall** (53%): once every other raid for most crowds, more for casual players (who hang pieces
   early), less for a strong ten-player crowd (whose popular move rarely blunders while it's still in the game).
 - **The floor and its pace barely matter here.** While the crowd isn't lost yet, its moves are almost all either
-  fine or a piece-sized disaster: 92% gave away under 5 points, 3.4% gave away 30 or more, and only 2.5% fell between 12 and 30. A mid-sized mistake (12 to 30 points, half a pawn to a pawn) mostly
-  tips the position under 40 at once, after which nothing sets it off. Any floor from 10 to 18 and any pace from 15 to
-  30 moves gave 52 to 55% (the table in the report), so 13 and 22 sit in the middle of Eric's ranges. The lever
-  that would change it is `lastStandFrom` (or the starting bar), which Eric set.
+  fine or a piece-sized disaster: 92% gave away under 5 points, 3.4% gave away 30 or more, and only 2.5% fell
+  between 12 and 30. A mid-sized mistake (12 to 30 points, half a pawn to a pawn) mostly tips the position under 40
+  at once, after which nothing sets it off. Any floor from 10 to 18 and any pace from 15 to 30 moves gave 52 to 55%
+  (the grid in the report), so 13 and 22 sit in the middle of Eric's ranges. The lever that would change it is
+  `lastStandFrom` (or the starting bar), which Eric set.
 
 **Art, sounds and lines:**
 - **Sprite:** his figure is now drawn from parts (body, crown, sword), so there is a cracked variant (three levels,
