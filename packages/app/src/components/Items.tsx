@@ -6,8 +6,9 @@ import { PawnHat } from "./Cosmetics.tsx";
 /**
  * Crate items, drawn. Every item is drawn once, on a pawn's 100 × 100 square (head centred at 50, 20), with its
  * *paint regions* marked: those get the item's colour automatically, then its blemish (dark blotches over exactly
- * that share of the colour, shaped by the item's seed) and, under 10% blemish, a sweeping shine. Outlines and
- * fixed parts (white fur, coal, ice) stay as drawn. A new item is one drawing; every colour comes free.
+ * that share of the colour, shaped by the item's seed; at 0% purity, all of it, a darker shade) and, at 90%+
+ * purity, a sweeping shine. Outlines and fixed parts (white fur, coal, ice) stay as drawn. A new item is one
+ * drawing; every colour comes free.
  */
 
 export interface Finish {
@@ -66,11 +67,17 @@ export function blotchPath(seed: number, blemish: number): string {
       const bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * s(fx);
       values.push({ x, y, v: top + (bottom - top) * s(fy) + (rng() - 0.5) * 0.18 });
     }
-  const count = Math.round((values.length * Math.max(0, Math.min(49, blemish))) / 100);
-  const chosen = [...values].sort((a, b) => a.v - b.v).slice(0, count);
+  const count = Math.round((values.length * Math.max(0, Math.min(100, blemish))) / 100);
+  const chosen = new Set([...values].sort((a, b) => a.v - b.v).slice(0, count).map(({ x, y }) => y * N + x));
+  // Items reach a little past the square (antler tips, flames): two rings of cells around it copy the nearest cell
+  // inside, so blotches run on to the item's edge, and at 0% purity they cover all of it.
+  const PAD = 2;
+  const inside = (i: number) => Math.max(0, Math.min(N - 1, i));
+  const cells: { x: number; y: number }[] = [];
+  for (let y = -PAD; y < N + PAD; y++) for (let x = -PAD; x < N + PAD; x++) if (chosen.has(inside(y) * N + inside(x))) cells.push({ x, y });
   const cell = 100 / N;
   const r = cell * 0.78;
-  const d = chosen
+  const d = cells
     .map(({ x, y }) => {
       const cx = (x + 0.5) * cell;
       const cy = (y + 0.5) * cell;
@@ -268,7 +275,8 @@ function Present({ p, p2 }: { p: Paint; p2: Paint }) {
       <Region p={p} name="box" d={["M37 22 L63 22 L63 38 Q63 39.5 61.5 39.5 L38.5 39.5 Q37 39.5 37 38 Z", "M35 15.5 Q35 14.5 36 14.5 L64 14.5 Q65 14.5 65 15.5 L65 22 L35 22 Z"]} />
       <Region p={p2} name="ribbon" d={["M47 14.5 L53 14.5 L53 39.5 L47 39.5 Z", "M50 14.5 C44 4 34 7 40 14.5 Z", "M50 14.5 C56 4 66 7 60 14.5 Z"]} />
       <path d="M47 22 H53" fill="none" {...LINE} {...lw(2)} />
-      <circle cx="50" cy="13.6" r="2.6" fill={p2.fill} {...LINE} {...lw(2)} />
+      <Region p={p2} name="knot" d={["M47.4 13.6 a2.6 2.6 0 1 0 5.2 0 a2.6 2.6 0 1 0 -5.2 0 Z"]} outline={false} />
+      <circle cx="50" cy="13.6" r="2.6" fill="none" {...LINE} {...lw(2)} />
     </g>
   );
 }
