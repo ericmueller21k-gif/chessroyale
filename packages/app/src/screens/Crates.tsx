@@ -4,6 +4,7 @@ import {
   CRATES_FREE,
   FISCHER,
   ITEM_COLORS,
+  PURITY_BANDS,
   SLOT_NAMES,
   TIERS,
   crateDef,
@@ -116,12 +117,19 @@ function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
       </div>
       <details class="odds-more">
         <summary>Colours and purity</summary>
-        <p class="small">Every item also rolls a colour and a purity (51-100%). Under 10% blemish it's shiny ✨ (about 1 in 40).</p>
+        <p class="small">Every item also rolls a colour and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250).</p>
         <div class="color-odds">
           {ITEM_COLORS.map((c) => (
             <span key={c.id} class="color-chip">
               <i style={{ background: c.hex2 ? `linear-gradient(135deg, ${c.hex}, ${c.hex2}, ${c.hex})` : c.hex }} />
               {c.name} {c.weight}%
+            </span>
+          ))}
+        </div>
+        <div class="color-odds">
+          {PURITY_BANDS.map((b) => (
+            <span key={b.low} class="color-chip">
+              Purity {b.low}-{b.high}%{b.low >= 90 ? " ✨" : ""}: {b.weight}%
             </span>
           ))}
         </div>
@@ -163,6 +171,7 @@ function pickWeighted<T extends { weight: number }>(list: readonly T[]): T {
   return list[list.length - 1]!;
 }
 
+/** A decoy's look, by the real colour and purity odds (so the strip doesn't make a shiny look common). */
 const decoyFinish = () => ({ color: pickWeighted(ITEM_COLORS).id, color2: pickWeighted(ITEM_COLORS).id, blemish: rollBlemish(Math.random), seed: Math.floor(Math.random() * 2 ** 31) });
 
 /** A strip of tiles: decoys by the odds (Fischer Random a little more often than it lands, to tease), the result at `land`. */

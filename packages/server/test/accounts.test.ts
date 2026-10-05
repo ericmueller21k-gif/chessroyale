@@ -285,6 +285,25 @@ describe("account API", () => {
     expect(st.items.find((i) => i.def !== "present")?.color2).toBeUndefined();
   });
 
+  it("items rolled under the old purity odds (51-100%) keep their purity", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Guest");
+    const old = (id: string, blemish: number) =>
+      sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES (?, ?, 'santa-hat', 'red', ?, 7, 'winter-1', 900)", id, user.id, blemish);
+    await old("old-rough", 49);
+    await old("old-shiny", 9.5);
+    const eq = await equipLocker(sql, user.id, "head", "old-shiny");
+    expect(eq.ok && eq.locker.look.head?.blemish).toBe(9.5);
+    const st = await lockerState(sql, user.id);
+    expect(Object.fromEntries(st.items.map((i) => [i.id, i.blemish]))).toEqual({ "old-rough": 49, "old-shiny": 9.5 });
+    // New rolls use the whole range, 100% down to 0%.
+    const r = await openCrate(sql, user.id, "winter-1", {}, 1100);
+    if (!r.ok) throw new Error(r.message);
+    expect(r.item.blemish).toBeGreaterThanOrEqual(0);
+    expect(r.item.blemish).toBeLessThanOrEqual(100);
+  });
+
   it("icons: a drawn 48 × 48 PNG is accepted; other sizes, other formats and junk are not", async () => {
     // Real PNG headers: 48 × 48 and 32 × 32 (signature, IHDR, then a little data).
     const png = (w: number, h: number) => {

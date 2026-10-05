@@ -5,8 +5,8 @@ import type { Rng } from "./rng.ts";
  *   1. its tier, which decides the item (Novice to Sublime from the strip; Exalted and Transcendent only through
  *      Fischer Random),
  *   2. its colour (red and yellow common, Pearl the rarest), and
- *   3. its purity: 100% minus a blemish of 0-49% (blotches over that share of its colour). Under 10% blemish
- *      (90%+ purity) it's shiny.
+ *   3. its purity: 100% minus a blemish of 0-100% (blotches over that share of its colour). At 90%+ purity it's
+ *      shiny; at 0% it's blotched all over, a darker shade of its colour.
  * Nothing here changes how a match is played or scored. The tier names honour Puzzle Pirates.
  */
 
@@ -120,8 +120,8 @@ export const crateDef = (id: string) => CRATES.find((c) => c.id === id);
 export const CRATES_FREE = true;
 
 /**
- * One item a player owns: which item, its colour (and a second colour for two-colour items), its blemish (0-49)
- * and the seed that shapes its blotches.
+ * One item a player owns: which item, its colour (and a second colour for two-colour items), its blemish (0-100,
+ * to one decimal place; items rolled before Oct 5, 2026 are all 0-49) and the seed that shapes its blotches.
  */
 export interface ItemInstance {
   id: string;
@@ -135,16 +135,34 @@ export interface ItemInstance {
 /** Purity as shown: 100% minus the blemish, to one decimal place. */
 export const purity = (blemish: number) => Math.round((100 - blemish) * 10) / 10;
 
-/** Shiny: under 10% blemish. */
-export const isShiny = (blemish: number) => blemish < 10;
+/** Shiny: 90% purity or more (as shown). */
+export const isShiny = (blemish: number) => purity(blemish) >= 90;
 
 /**
- * The blemish roll, 0 to 49: 49 × u^0.431, so most items are well blemished and a shiny one (under 10) is
- * about 2.5% of rolls; under 1 is about 1 in 8,000.
+ * The purity roll: the chance of each band of purity (`low` to `high`, as shown, to one decimal place), even within
+ * a band. Most items land between 30% and 70%; shiny (90%+) is 1 in 250, and 99%+ 1 in 25,000; under 5% (blotched
+ * nearly all over) is 1 in 100. The bands run from 100% down to 0% with no gaps, and the weights add up to 100.
  */
-export const BLEMISH_POWER = 0.431;
+export const PURITY_BANDS: readonly { low: number; high: number; weight: number }[] = [
+  { low: 99, high: 100, weight: 0.004 },
+  { low: 90, high: 98.9, weight: 0.396 },
+  { low: 70, high: 89.9, weight: 9.6 },
+  { low: 30, high: 69.9, weight: 80 },
+  { low: 5, high: 29.9, weight: 9 },
+  { low: 0, high: 4.9, weight: 1 },
+];
+
+/** A blemish (0-100, to one decimal place) by the purity bands. One draw of `rng`. */
 export function rollBlemish(rng: Rng): number {
-  return Math.round(49 * Math.pow(rng(), BLEMISH_POWER) * 10) / 10;
+  let r = rng() * PURITY_BANDS.reduce((s, b) => s + b.weight, 0);
+  let i = 0;
+  while (i < PURITY_BANDS.length - 1 && r >= PURITY_BANDS[i]!.weight) r -= PURITY_BANDS[i++]!.weight;
+  const b = PURITY_BANDS[i]!;
+  // Purity in tenths, evenly over the band's values (from its top down, so a lower draw is always purer).
+  const high = Math.round(b.high * 10);
+  const steps = high - Math.round(b.low * 10) + 1;
+  const tenths = high - Math.min(steps - 1, Math.floor((r / b.weight) * steps));
+  return (1000 - tenths) / 10;
 }
 
 function pick<T extends { weight: number }>(rng: Rng, list: readonly T[]): T {
@@ -200,7 +218,7 @@ export function cleanLook(raw: unknown): ItemLook {
     if (!v || typeof v !== "object") continue;
     const d = itemDef(String(v.def));
     if (!d || d.slot !== slot) continue;
-    const blemish = Math.max(0, Math.min(49, Number(v.blemish) || 0));
+    const blemish = Math.max(0, Math.min(100, Number(v.blemish) || 0));
     const item: NonNullable<ItemLook[typeof slot]> = { def: d.id, color: itemColor(String(v.color)).id, blemish, seed: Math.abs(Math.floor(Number(v.seed) || 0)) % 2 ** 31 };
     if (d.colors === 2) item.color2 = itemColor(String(v.color2 ?? v.color)).id;
     out[slot] = item;
