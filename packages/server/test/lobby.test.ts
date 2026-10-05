@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
-import { bossIntroTimeline, legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { LAST_STAND_MS, bossIntroTimeline, legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -461,5 +461,56 @@ describe("lobby: Crowd mode", () => {
     expect(L.hostScores("p1")).toBe(true);
     const v = L.last("p1", "reveal")!;
     expect(v.picks.every((p) => p.move)).toBe(true);
+  });
+  it("the God King's Last Stand online: everyone sees it, the clock waits for it, then the crowd picks again without the blunder", () => {
+    const L = setup({ ...RAID_SETTINGS });
+    L.core.connect(undefined, "Ann", "computer", false, 1500);
+    L.core.connect(undefined, "Bo", "phone", false, 1500);
+    L.core.message("p1", { t: "start" });
+    L.advance(1000);
+    L.advance(bossIntroTimeline(10).total);
+    const r = L.last("p1", "round")!;
+    expect(r.boss?.kingCharges).toBe(3);
+    const fen = r.board!.fen;
+    const legal = legalMoves(fen);
+    const [best, blunder] = [legal[0]!, legal[1]!];
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: r.key, move: blunder });
+    // The host's judge: the blunder throws the game away from a level position.
+    const req = L.last("p1", "scoreRequest")!;
+    const expectedAfter = Object.fromEntries(legal.map((m) => [m, m === best ? 0.55 : m === blunder ? 0.06 : 0.5]));
+    L.core.message("p1", { t: "scores", key: req.key, boards: [{ boardId: req.jobs[0]!.boardId, bestMove: best, bestExpected: 0.55, expectedAfter, botPicks: {}, botThinkMs: {} }] });
+    // Everyone's reveal carries it, and lasts LAST_STAND_MS longer; the board isn't changed and he has fallen.
+    for (const id of ["p1", "p2"]) {
+      const v = L.last(id, "reveal")!;
+      expect(v.playedMove).toBe(blunder);
+      expect(v.lastStand).toEqual({ move: blunder, loss: 49, bar: 35 });
+      expect(v.until - v.now).toBe((RAID_SETTINGS.revealSeconds! + RAID_SETTINGS.drawnMoveSeconds!) * 1000 + LAST_STAND_MS);
+      expect(v.board!.fen).toBe(fen);
+      expect(v.boss).toMatchObject({ kingCharges: 0, barred: blunder, lastStand: { atMove: 1, move: blunder } });
+    }
+    // Scores stand: both lost 49 on the move.
+    for (const p of L.core.save().runner!.state.players) expect(p.finalLosses.map((x) => Math.round(x))).toEqual([49]);
+    // Through the reveal: the crowd picks again, same position, the blunder barred, a fresh clock.
+    L.advance(RAID_SETTINGS.revealSeconds! * 1000 + RAID_SETTINGS.drawnMoveSeconds! * 1000 + LAST_STAND_MS);
+    const again = L.last("p1", "round")!;
+    expect(again.key).not.toBe(r.key);
+    expect(again.board!.fen).toBe(fen);
+    expect(again.boss).toMatchObject({ barred: blunder, kingCharges: 0, crowdMoves: 0 });
+    expect(again.deadline - again.startsAt).toBe(r.deadline - r.startsAt);
+    L.core.message("p1", { t: "king", key: again.key, strike: true });
+    expect(L.last("p1", "strike")).toBeUndefined();
+    // The barred move can't be picked; another can.
+    L.core.message("p1", { t: "pick", key: again.key, move: blunder });
+    expect(L.core.record.round!.picks.p1).toBeUndefined();
+    L.core.message("p1", { t: "pick", key: again.key, move: best });
+    L.core.message("p2", { t: "pick", key: again.key, move: best });
+    const req2 = L.last("p1", "scoreRequest")!;
+    expect(req2.jobs[0]!.barred).toBe(blunder);
+    L.core.message("p1", { t: "scores", key: req2.key, boards: [{ boardId: req2.jobs[0]!.boardId, bestMove: best, bestExpected: 0.55, expectedAfter, botPicks: {}, botThinkMs: {} }] });
+    const v2 = L.last("p2", "reveal")!;
+    expect(v2.lastStand).toBeUndefined();
+    expect(v2.playedMove).toBe(best);
+    expect(v2.board!.fen).not.toBe(fen);
+    expect(v2.boss).toMatchObject({ barred: null, crowdMoves: 1, lastStand: { atMove: 1 } });
   });
 });

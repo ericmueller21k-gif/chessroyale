@@ -5,6 +5,7 @@ import {
   bossIntroTimeline,
   bossShowMs,
   bossThinkMs,
+  LAST_STAND_MS,
   lastMoveTookQueen,
   legalMoves,
   netBoard,
@@ -625,6 +626,7 @@ export class LobbyCore {
     const alive = new Set(runner.alive().map((p) => p.id));
     const inRound = new Set(playing.map((h) => h.id));
     const crowd = this.settings.mode === "crowd";
+    const bossNow = runner.boss ? runner.bossView()! : undefined;
     for (const h of this.r.humans) {
       // Crowd 50 v 50: the team not picking still gets the board, to watch the vote come in.
       const watching = crowd && !final && alive.has(h.id) && !inRound.has(h.id);
@@ -644,6 +646,7 @@ export class LobbyCore {
         slots: this.slots(),
         ...(watching ? { watching: true } : {}),
         moveClock: this.settings.moveClockSeconds,
+        ...(bossNow ? { boss: bossNow } : {}),
       });
       if (final) this.send(h.id, { t: "final", final: runner.finalView()!, standings: st, slots: this.slots() }, !inRound.has(h.id));
       else if (!alive.has(h.id)) this.sendSpectate(h.id);
@@ -653,9 +656,10 @@ export class LobbyCore {
       const skills = new Map(this.r.bots.map((b) => [b.id, b.skill]));
       const ids = [...runner.groups.values()][0] ?? [];
       // Crowd: the host decides the bots' picks now, so everyone who has picked can watch them come in.
+      const barred = runner.boss?.barred;
       const plan =
         crowd && !final
-          ? { key, fen: fens[0]!, bots: ids.filter((id) => skills.has(id)).map((id) => ({ id, skill: skills.get(id)!, powerUps: runner.player(id).powerUps })) }
+          ? { key, fen: fens[0]!, bots: ids.filter((id) => skills.has(id)).map((id) => ({ id, skill: skills.get(id)!, powerUps: runner.player(id).powerUps })), ...(barred ? { barred } : {}) }
           : undefined;
       this.send(this.r.hostId, { t: "prefetch", fens, ...(plan ? { plan } : {}) }, false);
     }
@@ -743,6 +747,8 @@ export class LobbyCore {
     if (now < round.startedAt - 500) return; // Before the clock starts.
     const board = this.runner?.boardOf(playerId);
     if (!board || !legalMoves(board.fen).includes(move)) return;
+    // The re-pick after the God King's Last Stand: the move he took back can't be picked.
+    if (move === this.runner?.boss?.barred) return;
     round.picks[playerId] = { move, thinkMs: Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline)) };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     this.sendTally();
@@ -793,6 +799,7 @@ export class LobbyCore {
         .filter((id) => skills.has(id))
         .map((id) => ({ id, skill: skills.get(id)!, powerUps: this.runner!.player(id).powerUps })),
       ...(this.r.round!.botPlan ? { botPlan: this.r.round!.botPlan.picks, botPlanPowerUps: this.r.round!.botPlan.powerUps } : {}),
+      ...(this.runner!.boss?.barred ? { barred: this.runner!.boss.barred } : {}),
     }));
     this.r.scoreRequest = { key: this.r.round.key, jobs };
     for (const h of this.r.humans) this.io.send(h.id, { t: "locked", key: this.r.round.key });
@@ -843,7 +850,8 @@ export class LobbyCore {
       const s = byBoard.get(job.boardId);
       const ids = runner.groups.get(job.boardId)!;
       const picks: Record<string, string | null> = { ...job.humanPicks };
-      const legal = legalMoves(job.fen);
+      // (The re-pick after the God King's Last Stand: no bot takes the move he took back.)
+      const legal = legalMoves(job.fen).filter((m) => m !== job.barred);
       for (const b of job.bots) {
         const m = s?.botPicks[b.id];
         picks[b.id] = m && legal.includes(m) ? m : legal[0]!;
@@ -878,7 +886,10 @@ export class LobbyCore {
     }
     this.r.phase = "reveal";
     const kingActs = report.boards.some((b) => b.king);
-    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? KING_FX_MS : 0);
+    // The God King's Last Stand plays out in the reveal (the next move's clock starts after it: nobody loses time).
+    const stand = report.boards.some((b) => b.lastStand);
+    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? KING_FX_MS : 0) + (stand ? LAST_STAND_MS : 0);
+    const bossNow = runner.boss ? runner.bossView()! : undefined;
     const st = this.standings();
     const cutoff = this.cutoff();
     const slots = this.slots();
@@ -898,6 +909,8 @@ export class LobbyCore {
         picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, roundScore: p.roundScore, ...(p.usedPowerUp ? { usedPowerUp: true } : {}) })) ?? [],
         drawRule: mine?.result.drawRule ?? "random",
         ...(mine?.king !== undefined ? { king: mine.king, kingCalls: mine.kingCalls } : {}),
+        ...(mine?.lastStand ? { lastStand: mine.lastStand } : {}),
+        ...(bossNow ? { boss: bossNow } : {}),
         expectedAfter: score?.expectedAfter ?? {},
         bestExpected: score?.bestExpected ?? null,
         standings: st,

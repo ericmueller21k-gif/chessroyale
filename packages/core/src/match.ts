@@ -111,6 +111,13 @@ export interface BossState {
   kingStrikes?: number[];
   /** Strikes stop with this many left (boss raid: half the group; 50 v 50: bossMinSurvivors). */
   minSurvivors?: number;
+  /**
+   * The God King's Last Stand (once per game): the crowd's disastrous move he took back, during which crowd move
+   * (1-based, like kingMoves), what it gave away and the bar it crossed. Set, he has fallen: no charges, no menu.
+   */
+  lastStand?: { atMove: number; move: string; loss: number; bar: number };
+  /** The re-pick after his Last Stand: this move (the one he took back) can't be picked. Cleared once it's played. */
+  barred?: string;
 }
 
 /** The King's charges: the ten's leftover power-ups, one charge per kingPowerUpsPerCharge (rounded), 1 to kingChargesMax. */
@@ -558,9 +565,12 @@ export function finishFinal(state: MatchState, rng: Rng, winningTeam: 0 | 1 | nu
 
 // ---- Boss battle ----
 
-/** The boss strikes after every bossKillEvery crowd moves, while more than bossMinSurvivors are left. */
+/**
+ * The boss strikes after every bossKillEvery crowd moves, while more than bossMinSurvivors are left. Not between
+ * the God King's Last Stand and the re-pick: the strike waits until the re-pick is played (and counts both rounds).
+ */
 export const bossKillDue = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
-  !!state.boss && state.boss.sinceKill >= settings.bossKillEvery && alivePlayers(state).length > (state.boss.minSurvivors ?? settings.bossMinSurvivors);
+  !!state.boss && !state.boss.barred && state.boss.sinceKill >= settings.bossKillEvery && alivePlayers(state).length > (state.boss.minSurvivors ?? settings.bossMinSurvivors);
 
 /**
  * The boss strikes down the player with the worst moves since its last strike

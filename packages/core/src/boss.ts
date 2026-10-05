@@ -95,3 +95,27 @@ export function bossInfo(elo: number): BossInfo {
   // Two bosses to a skull: 1 to 5.
   return { name: b.name, icon: b.icon, threat: Math.floor(i / 2) + 1 };
 }
+
+/** The settings behind the God King's Last Stand. */
+export type LastStandSettings = Pick<Settings, "lastStandLoss" | "lastStandChargedExtra" | "lastStandLossFloor" | "lastStandDecayMoves" | "lastStandFrom">;
+
+/**
+ * The God King's Last Stand: how big a mistake it takes (points of expected score given away against the best
+ * move) after `crowdMoves` crowd moves without one. It starts at lastStandLoss, a little higher while he still has
+ * charges, and falls in a straight line to lastStandLossFloor over lastStandDecayMoves crowd moves, so a long game
+ * without a disaster still sees him step in for a smaller one.
+ */
+export function lastStandBar(crowdMoves: number, charges: number, s: LastStandSettings): number {
+  const decay = Math.max(0, 1 - crowdMoves / Math.max(1, s.lastStandDecayMoves));
+  const bar = s.lastStandLossFloor + (s.lastStandLoss - s.lastStandLossFloor) * decay;
+  return bar + (charges > 0 ? s.lastStandChargedExtra : 0);
+}
+
+/**
+ * Whether the crowd's played move calls for the Last Stand: it gave away at least the bar (`loss`, in points),
+ * and the position wasn't already lost (the best move was worth at least lastStandFrom, `best` being the mover's
+ * expected score after it, 0-1). Once per game: the caller checks he hasn't fallen already.
+ */
+export function lastStandDue(loss: number, best: number, crowdMoves: number, charges: number, s: LastStandSettings): boolean {
+  return best * 100 >= s.lastStandFrom && loss >= lastStandBar(crowdMoves, charges, s);
+}

@@ -45,6 +45,8 @@ import {
   teamFinalStep,
   finalToTheEnd,
   interleave,
+  lastStandBar,
+  lastStandDue,
 } from "@chessroyale/core";
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
 import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
@@ -142,6 +144,12 @@ export interface BoardRound {
   /** All moves scored this round, best first, with loss in points. */
   scored: { move: string; expected: number; loss: number }[];
   bestMove: string;
+  /**
+   * Boss battle: the God King's Last Stand. The crowd's move (`move`, the played move) gave away `loss` points,
+   * over the bar of `bar`: he takes the blow, the move is taken back and the crowd picks again without it.
+   * The round's scores stand.
+   */
+  lastStand?: { move: string; loss: number; bar: number };
 }
 
 export interface RoundReport {
@@ -451,9 +459,12 @@ export class MatchRunner {
   /** Picks for every player on a board: humans as given, bots from the engine's top moves. */
   botPicksFor(boardId: number, playerIds: readonly string[], top: readonly MoveScore[]): Record<string, string> {
     const board = this.boards.get(boardId)!;
-    const legal = legalMoves(board.fen);
-    const best = top[0]!.expected;
-    const candidates = top.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
+    // The re-pick after the God King's Last Stand: the move he took back is off the table.
+    const barred = this.state.boss?.barred;
+    const legal = legalMoves(board.fen).filter((m) => m !== barred);
+    const open = top.filter((m) => m.move !== barred);
+    const best = open[0]?.expected ?? top[0]!.expected;
+    const candidates = open.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
     const out: Record<string, string> = {};
     for (const id of playerIds) {
       const p = this.player(id);
@@ -480,7 +491,10 @@ export class MatchRunner {
   ): Promise<BoardRound> {
     void rng;
     const board = this.boards.get(boardId)!;
-    const top = await this.top.get(engine, board.fen);
+    // The re-pick after the God King's Last Stand: the move he took back is no option, so it isn't the best either.
+    const barred = this.state.boss?.barred;
+    const all = await this.top.get(engine, board.fen);
+    const top = barred && all.some((m) => m.move !== barred) ? all.filter((m) => m.move !== barred) : all;
     const botPicks = this.botPicksFor(boardId, playerIds, top);
     const picks: Record<string, string | null> = {};
     for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
@@ -505,10 +519,11 @@ export class MatchRunner {
   resolveBoard(
     boardId: number,
     playerIds: readonly string[],
-    picks: Readonly<Record<string, string | null>>,
-    evaluation: GroupEvaluation,
+    rawPicks: Readonly<Record<string, string | null>>,
+    rawEvaluation: GroupEvaluation,
   ): BoardRound {
     const board = this.boards.get(boardId)!;
+    const { picks, evaluation } = this.withoutBarred(rawPicks, rawEvaluation);
     // Boss battle: humans who called the King instead of picking abstain: no score, not a miss.
     const abstained = new Set(this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && this.kingCallers.has(id)) : []);
     const result = scoreGroup(
@@ -529,6 +544,7 @@ export class MatchRunner {
     for (const id of abstained) result.players.push({ playerId: id, move: null, loss: null, roundScore: 0, abstained: true });
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
+    const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored);
     return {
       boardId,
       fenBefore: board.fen,
@@ -537,7 +553,47 @@ export class MatchRunner {
       scored,
       bestMove: evaluation.bestMove,
       ...(this.state.boss ? { king: king.plays, kingCalls: king.calls } : {}),
+      ...(lastStand ? { lastStand } : {}),
     };
+  }
+
+  /**
+   * Boss battle, the re-pick after the God King's Last Stand: a pick of the move he took back (which the screens
+   * and the server don't allow) counts as no move, and the move isn't the best on offer either.
+   */
+  private withoutBarred(picks: Readonly<Record<string, string | null>>, evaluation: GroupEvaluation) {
+    const barred = this.state.boss?.barred;
+    if (!barred) return { picks, evaluation };
+    const clean = Object.fromEntries(Object.entries(picks).map(([id, m]) => [id, m === barred ? null : m]));
+    const expectedAfter = { ...evaluation.expectedAfter };
+    delete expectedAfter[barred];
+    let { bestMove, bestExpected } = evaluation;
+    if (bestMove === barred) {
+      const next = Object.entries(expectedAfter).sort((a, b) => b[1] - a[1])[0];
+      if (next) [bestMove, bestExpected] = next;
+    }
+    return { picks: clean, evaluation: { ...evaluation, bestMove, bestExpected, expectedAfter } };
+  }
+
+  /**
+   * Boss battle: the test switch (?laststand=1 in solo) makes the next crowd move call for the God King's Last
+   * Stand, whatever it gives away.
+   */
+  forceLastStand = false;
+
+  /**
+   * Boss battle: whether the God King makes his Last Stand on the crowd's played move. Once per game, whether or
+   * not he has charges left: the move gave away at least the bar (lastStandBar: it falls the longer the battle
+   * goes without one), and the crowd wasn't already lost (lastStandFrom). The judge's numbers decide, as given.
+   */
+  private lastStandFor(fen: string, played: string, best: number, scored: readonly { move: string; loss: number }[]): BoardRound["lastStand"] {
+    const b = this.state.boss;
+    if (!b || b.lastStand || b.barred || legalMoves(fen).length < 2) return undefined;
+    const loss = scored.find((m) => m.move === played)?.loss ?? 0;
+    const charges = b.kingCharges ?? 0;
+    const bar = Math.round(lastStandBar(b.crowdMoves, charges, this.settings) * 10) / 10;
+    if (!this.forceLastStand && !lastStandDue(loss, best, b.crowdMoves, charges, this.settings)) return undefined;
+    return { move: played, loss: Math.round(loss * 10) / 10, bar };
   }
 
   /**
@@ -593,6 +649,7 @@ export class MatchRunner {
     for (const r of results) for (const p of r.result.players) if (used.has(p.playerId)) p.usedPowerUp = true;
     const outcomes = results.flatMap((r) => outcomesFromGroup(r.result, think, used));
     const kingPlayed = results.some((r) => r.king);
+    const stand = results.find((r) => r.lastStand)?.lastStand;
     this.state = applyRound(this.state, this.groups, outcomes, this.settings);
     if (kingPlayed && this.state.boss) {
       const b = this.state.boss;
@@ -605,7 +662,19 @@ export class MatchRunner {
         },
       };
     }
+    if (this.state.boss) {
+      const { barred: _done, ...b } = this.state.boss;
+      // The God King's Last Stand: the scores stand, but the move is taken back (it isn't a move on the board, so
+      // the move count goes back one; the boss's strike waits for the re-pick). He falls: his charges are gone.
+      // Otherwise a re-pick that's been played clears the bar on the move he took back.
+      this.state = {
+        ...this.state,
+        boss: stand ? { ...b, crowdMoves: b.crowdMoves - 1, kingCharges: 0, lastStand: { atMove: b.crowdMoves, ...stand }, barred: stand.move } : b,
+      };
+      if (stand) this.forceLastStand = false;
+    }
     for (const r of results) {
+      if (r.lastStand) continue;
       const board = this.boards.get(r.boardId)!;
       const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
       this.boards.set(r.boardId, playOnBoard(board, r.result.playedMove, moverExpected));
@@ -759,6 +828,8 @@ export class MatchRunner {
       openingName: this.settings.raid ? netBoard(this.boards.get(this.state.boards[0]!)!).openingName : null,
       lastMove: this.bossLast,
       justKilled,
+      lastStand: b.lastStand ?? null,
+      barred: b.barred ?? null,
       ...(b.result ? { result: b.result } : {}),
     };
   }

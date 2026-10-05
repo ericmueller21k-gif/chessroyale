@@ -96,6 +96,8 @@ export interface ScoreJob {
   /** Crowd: bot picks decided at the start of the round (shown live); use these instead of choosing again. */
   botPlan?: Record<string, string>;
   botPlanPowerUps?: string[];
+  /** Boss battle, the re-pick after the God King's Last Stand: the move he took back (no bot picks it; it isn't the best). */
+  barred?: string;
 }
 
 /** A pick shown live in Crowd once you've picked (or while your team watches): visible from `at` (server time). */
@@ -159,6 +161,13 @@ export interface NetBoss {
   /** `captured`: the piece it took ("q" for a queen: its banner). */
   lastMove: null | { move: string; san: string; staggered?: boolean; captured?: string };
   justKilled?: string | null;
+  /**
+   * The God King's Last Stand, once it has happened (he has fallen): the crowd's move he took back, during which
+   * crowd move, what it gave away and the bar it crossed.
+   */
+  lastStand?: { atMove: number; move: string; loss: number; bar: number } | null;
+  /** The re-pick after his Last Stand: the move he took back can't be picked. */
+  barred?: string | null;
   /** Set when the battle is over. */
   result?: "crowd" | "boss" | "draw";
 }
@@ -233,6 +242,8 @@ export type ServerMessage = { now: number } & (
       watching?: boolean;
       /** The move clock this round (seconds), which augment votes can change. */
       moveClock?: number;
+      /** Boss battle: the battle as it stands (the God King's charges, a Last Stand's barred move). */
+      boss?: NetBoss;
     }
   /** A human has made their move this round (sent to everyone, for the leaderboard). */
   | { t: "moved"; key: string; playerId: string }
@@ -244,7 +255,7 @@ export type ServerMessage = { now: number } & (
       t: "prefetch";
       fens: string[];
       /** Crowd: the bots picking this round, so the host can decide their picks now (sent back as botPlan). */
-      plan?: { key: string; fen: string; bots: { id: string; skill: number; powerUps: number }[] };
+      plan?: { key: string; fen: string; bots: { id: string; skill: number; powerUps: number }[]; barred?: string };
     }
   /** Crowd: the picks so far (bots appear at their thinking time), to players who've picked and to the watching team. */
   | { t: "tally"; key: string; picks: LivePick[] }
@@ -269,6 +280,13 @@ export type ServerMessage = { now: number } & (
       /** Boss battle: the King played the move, and how many called him; or he struck the boss. */
       king?: boolean;
       kingCalls?: number;
+      /**
+       * Boss battle: the God King's Last Stand on this move. The played move is shown, then taken back (it isn't on
+       * `board`); the clock stands still through it (lastStandMs, already in `until`), then the crowd picks again.
+       */
+      lastStand?: { move: string; loss: number; bar: number };
+      /** Boss battle: the battle after this move (his charges, whether he has fallen). */
+      boss?: NetBoss;
       /** For the cross-check: the group's evaluation as the host computed it. */
       expectedAfter: Record<string, number>;
       bestExpected: number | null;
