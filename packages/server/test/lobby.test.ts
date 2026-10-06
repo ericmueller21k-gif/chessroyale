@@ -484,6 +484,18 @@ describe("lobby: Crowd mode", () => {
     expect(L.core.record.humans.map((h) => h.name)).toEqual(["Cy"]);
   });
 
+  it("standings carry a person's account id (a tap on their name opens their profile); bots have none", () => {
+    const L = setup();
+    L.core.connect(undefined, "Ann", "computer", false, null, undefined, "user-ann");
+    L.core.connect(undefined, "Bo", "phone");
+    L.core.message("p1", { t: "start" });
+    L.advance(6000);
+    const st = L.last("p2", "round")!.standings;
+    expect(st.find((s) => s.id === "p1")!.uid).toBe("user-ann");
+    expect(st.find((s) => s.id === "p2")!.uid).toBeUndefined();
+    expect(st.filter((s) => s.isBot).every((s) => s.uid === undefined)).toBe(true);
+  });
+
   it("boss raid: humans only, the boss a step above the group's average rating, from a named opening", () => {
     const L = setup({ ...RAID_SETTINGS });
     L.core.connect(undefined, "Ann", "computer", false, 1500);

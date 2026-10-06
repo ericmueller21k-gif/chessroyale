@@ -1,4 +1,5 @@
 import type { Standing } from "../game.ts";
+import { PlayerName } from "./PlayerName.tsx";
 import { LiveNumber } from "./LiveNumber.tsx";
 
 const pts = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(1);
@@ -110,7 +111,7 @@ export function RaceTower({
               <span class="t-pos">{r.out ? `${r.placement ?? "✕"}` : r.rank}</span>
               <span class="t-name">
                 {done?.has(r.id) && <span class="t-check">✓ </span>}
-                {r.name}
+                {mini ? r.name : <PlayerName name={r.name} uid={r.uid} you={r.isYou} bot={r.isBot} />}
                 {r.practice && <span title="Practice mode (unlimited power-ups)"> 💡</span>}
               </span>
               <span class="t-pts">{r.out ? "out" : <LiveNumber value={r.points} format={pts} />}</span>

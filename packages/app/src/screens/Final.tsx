@@ -6,6 +6,17 @@ import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { FinalView, GameView } from "../game.ts";
 import { seenKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
+import { PlayerName } from "../components/PlayerName.tsx";
+
+/** A finalist's name ("You" for you): a tap opens their profile. */
+function Name({ match, id }: { match: GameView; id: string }) {
+  const s = match.standings().find((x) => x.id === id);
+  return (
+    <PlayerName name={match.nameOf(id)} uid={s?.uid} you={match.isYou(id)} bot={s?.isBot}>
+      {match.isYou(id) ? "You" : match.nameOf(id)}
+    </PlayerName>
+  );
+}
 
 /** Which colour each team has: teams[0] had the move when the final started. */
 export function teamSides(f: FinalView): ["w" | "b", "w" | "b"] {
@@ -112,7 +123,7 @@ export function FinalScreen({ match, final }: { match: GameView; final: FinalVie
                 <div key={id} class={`final-player${match.isYou(id) ? " you" : ""}${final.mover === id ? " to-move" : ""}`}>
                   <span class="final-name">
                     {leader === id && <span title="Lowest average loss so far">👑 </span>}
-                    {match.isYou(id) ? "You" : match.nameOf(id)}
+                    <Name match={match} id={id} />
                   </span>
                   <span class="final-avg" title={whole ? "Average loss per move over the whole match (lower is better)" : "Average loss per move in the final (lower is better)"}>
                     {avgText(quality(id))}
@@ -130,7 +141,7 @@ export function FinalScreen({ match, final }: { match: GameView; final: FinalVie
             <span class="muted small">Out:</span>
             {final.out!.map((o) => (
               <span key={o.id} class={`final-out-name${match.isYou(o.id) ? " you" : ""}`}>
-                {match.isYou(o.id) ? "You" : match.nameOf(o.id)}
+                <Name match={match} id={o.id} />
               </span>
             ))}
           </div>

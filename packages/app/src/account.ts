@@ -185,7 +185,23 @@ export interface PublicProfile {
   boss: { raids: number; bossesBeaten: number; strikesSurvived: number | null; lastStands: number | null; survivedPct: number | null; brilliant: number | null };
   ratingHistory: number[];
   bossesBeaten: number[];
-  recent: { mode: string; online: boolean; placement: number; players: number; won: boolean | null; bestMove: string | null; bossElo: number | null; playedAt: number }[];
+  recent: {
+    mode: string;
+    online: boolean;
+    placement: number;
+    players: number;
+    team: "w" | "b" | null;
+    won: boolean | null;
+    survived: boolean | null;
+    bestMove: string | null;
+    bossElo: number | null;
+    playedAt: number;
+  }[];
+}
+
+/** Reports a player (the profile's Report button), for a person to read. */
+export async function reportPlayer(target: string, reason: string): Promise<void> {
+  await api("/api/report", { method: "POST", body: JSON.stringify({ target, reason }) });
 }
 
 export async function fetchProfile(id: string): Promise<PublicProfile> {

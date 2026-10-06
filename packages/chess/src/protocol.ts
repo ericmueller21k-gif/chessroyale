@@ -67,6 +67,8 @@ export interface NetStanding {
   team?: "w" | "b" | null;
   /** A person's crate items (shown on the cut screen). */
   look?: ItemLook;
+  /** A person's account (a tap on their name opens /api/profile/UID). */
+  uid?: string;
 }
 
 export interface NetPick {

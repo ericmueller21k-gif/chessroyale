@@ -6767,3 +6767,303 @@ button.fd-logo {
     transform: scale(0.4);
   }
 }
+
+/* -- Profiles (docs/mockups/front-door/Profile.dc.html): one structure for everyone -- */
+.fd-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: var(--fd-panel);
+  border-radius: 22px;
+  padding: 18px;
+}
+.fd-card-name {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.fd-seen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--fd-sub);
+  text-align: center;
+}
+.fd-dot.small {
+  width: 9px;
+  height: 9px;
+  box-shadow: none;
+}
+.fd-pills,
+.fd-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.fd-card-actions {
+  margin-top: 8px;
+}
+.fd-pill {
+  background: var(--fd-panel-2);
+  color: var(--fd-off);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.fd-pill.tier {
+  --fd-tier-ink: var(--tier);
+  background: color-mix(in srgb, var(--tier) 20%, var(--fd-panel));
+  color: var(--fd-tier-ink);
+  font-weight: 800;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .fd-pill.tier {
+    --fd-tier-ink: color-mix(in srgb, var(--tier) 55%, #000);
+  }
+}
+.fd-center-text {
+  text-align: center;
+}
+.fd-item,
+.fd-match {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--fd-panel);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.fd-swatch {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 10px;
+  border: 2px solid var(--fd-line);
+}
+.fd-swatch.shop {
+  display: grid;
+  place-items: center;
+  background: var(--fd-panel-2);
+  font-size: 18px;
+}
+.fd-item-text,
+.fd-match-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.fd-item-text strong {
+  font-weight: 800;
+  font-size: 15px;
+}
+.fd-match-text strong {
+  font-weight: 600;
+  font-size: 15px;
+}
+.fd-item-text span,
+.fd-match-text span {
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.fd-tier {
+  flex: none;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #14161b;
+}
+.fd-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  background: var(--fd-panel);
+  border-radius: 12px;
+  padding: 4px;
+}
+.fd-tabs button {
+  border: 0;
+  border-radius: 9px;
+  min-height: 44px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--fd-off);
+  font: 600 13px Archivo, system-ui, sans-serif;
+  cursor: pointer;
+}
+.fd-tabs button.on {
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-weight: 800;
+}
+.fd-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.fd-stat {
+  background: var(--fd-panel);
+  border-radius: 14px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.fd-stat strong {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-weight: 400;
+  font-size: 20px;
+}
+.fd-stat span {
+  font-size: 12px;
+  color: var(--fd-sub);
+}
+.fd-chart {
+  background: var(--fd-panel);
+  border-radius: 14px;
+  padding: 12px;
+}
+.fd-chart-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fd-sub);
+  margin-bottom: 6px;
+}
+.fd-chart-title span {
+  color: var(--fd-dim);
+}
+.fd-chart svg {
+  display: block;
+}
+.fd-bosses {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.fd-boss {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: var(--fd-panel);
+  color: var(--fd-dim);
+  border: 1px solid var(--fd-seat);
+}
+.fd-boss strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+.fd-boss span {
+  font-size: 10px;
+}
+.fd-boss.won {
+  background: var(--fd-gold-soft);
+  color: var(--fd-gold-text);
+  border-color: var(--fd-gold);
+}
+.fd-place {
+  min-width: 52px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  padding: 0 6px;
+}
+.fd-place.gold {
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+}
+.fd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fd-field span {
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.fd-field input {
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--fd-line);
+  background: var(--fd-bg);
+  color: var(--fd-text);
+  font: 600 16px Archivo, system-ui, sans-serif;
+  padding: 0 12px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.fd-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fd-icon-row .fd-sub {
+  flex: 1;
+  font-size: 13px;
+}
+.fd-icon-now {
+  width: 48px;
+  height: 48px;
+  flex: none;
+}
+/* A profile opened during a match: over the game, the same page. */
+.fd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.fd-overlay .fd-root {
+  min-height: 100%;
+}
+/* A name you can tap for a profile, anywhere: it looks like the text around it. */
+.player-name {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 3px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: inherit;
+}
+.player-name:hover,
+.player-name:focus-visible {
+  text-decoration-color: currentColor;
+}
+/* A person's pawn in the queue opens their profile. */
+button.fd-seat {
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}

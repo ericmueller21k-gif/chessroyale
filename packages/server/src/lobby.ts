@@ -256,7 +256,9 @@ export class LobbyCore {
 
   private standings(): NetStanding[] {
     const looks = new Map(this.r.humans.flatMap((h) => (h.look && Object.keys(h.look).length ? [[h.id, h.look] as const] : [])));
-    return (this.runner?.leaderboard() ?? []).map((s) => (looks.has(s.id) ? { ...s, look: looks.get(s.id)! } : s));
+    // A person's account, so a tap on their name opens their profile.
+    const uid = (id: string) => this.r.accounts?.[id];
+    return (this.runner?.leaderboard() ?? []).map((s) => ({ ...s, ...(looks.has(s.id) ? { look: looks.get(s.id)! } : {}), ...(uid(s.id) ? { uid: uid(s.id) } : {}) }));
   }
 
   private cutoff(): number {

@@ -5,6 +5,7 @@ import { BackButton, DressedPawn, myHat } from "../components/FrontDoor.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { account } from "../account.ts";
 import { play } from "../sound.ts";
+import { openProfile } from "../profile-nav.ts";
 import type { NetMatch } from "../net.ts";
 
 /** How far apart pops start when several pawns arrive at once (people; bots cascade faster, see below). */
@@ -55,10 +56,18 @@ function Seats({ seats, size, me, myLook, hat, looks, bots }: { seats: LobbyPlay
         if (!p) return <span key={`empty-${i}`} class="fd-seat empty" />;
         const you = p.id === me;
         const delay = pop(p.id, p.isBot, p.isBot ? botGap : STAGGER_MS);
-        return (
-          <span key={p.id} class={`fd-seat pop${you ? " you" : ""}${p.isBot ? " bot" : ""}`} style={{ "--pop-delay": `${Math.round(delay)}ms` }} title={you ? "You" : p.name}>
-            <DressedPawn size="seat" look={you ? myLook : looks.get(p.id)} hat={you ? hat : "none"} />
+        const pawn = <DressedPawn size="seat" look={you ? myLook : looks.get(p.id)} hat={you ? hat : "none"} />;
+        const cls = `fd-seat pop${you ? " you" : ""}${p.isBot ? " bot" : ""}`;
+        const style = { "--pop-delay": `${Math.round(delay)}ms` };
+        // A person's pawn opens their profile; bots are just bots.
+        return p.isBot ? (
+          <span key={p.id} class={cls} style={style}>
+            {pawn}
           </span>
+        ) : (
+          <button type="button" key={p.id} class={cls} style={style} title={you ? "You" : p.name} aria-label={`${you ? "Your" : `${p.name}'s`} profile`} onClick={() => openProfile({ uid: p.uid, name: p.name, you })}>
+            {pawn}
+          </button>
         );
       })}
     </div>

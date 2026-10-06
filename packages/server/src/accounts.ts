@@ -92,6 +92,15 @@ const SCHEMA = [
   ...LOCKER_SCHEMA,
   // The live line: running lobbies, queue waits (live.ts).
   ...LIVE_SCHEMA,
+  // Reports about players (the profile's Report button), for a person to read.
+  `CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter TEXT NOT NULL,
+    target TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS reports_reporter ON reports (reporter, at)`,
 ];
 
 /**
@@ -523,12 +532,26 @@ export interface PublicProfile {
   ratingHistory: number[];
   /** Boss tiers (their strengths) beaten in raids. */
   bossesBeaten: number[];
-  recent: { mode: string; online: boolean; placement: number; players: number; won: boolean | null; bestMove: string | null; bossElo: number | null; playedAt: number }[];
+  recent: {
+    mode: string;
+    online: boolean;
+    placement: number;
+    players: number;
+    /** Crowd: the side played (50 v 50), or null (everyone moves). */
+    team: "w" | "b" | null;
+    won: boolean | null;
+    /** A boss battle: still standing at the end. */
+    survived: boolean | null;
+    bestMove: string | null;
+    bossElo: number | null;
+    playedAt: number;
+  }[];
 }
 
 interface ResultRow {
   mode: string;
   online: number;
+  team: string | null;
   placement: number;
   players: number;
   team_won: number | null;
@@ -584,7 +607,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
   );
   if (!u) return null;
   const rows = await sql.all<ResultRow>(
-    `SELECT mode, online, placement, players, team_won, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes,
+    `SELECT mode, online, placement, players, team, team_won, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes,
        strikes_survived, survived, last_stand, boss_elo
      FROM results WHERE user_id = ? ORDER BY played_at DESC, id DESC`,
     userId,
@@ -624,12 +647,35 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
       online: !!r.online,
       placement: r.placement,
       players: r.players,
+      team: r.team === "w" || r.team === "b" ? r.team : null,
       won: r.team_won === null ? null : r.team_won === 1,
+      survived: r.survived === null ? null : r.survived === 1,
       bestMove: r.best_move,
       bossElo: r.boss_elo,
       playedAt: r.played_at,
     })),
   };
+}
+
+// ---------------- Reports ----------------
+
+export const REPORT_REASONS = ["Cheating (an engine)", "Name", "Something else"] as const;
+const REPORTS_PER_DAY = 20;
+
+/**
+ * A report about a player, for a person to read (nobody else sees them): who, why, by whom, when. One per player per
+ * reporter a day, and 20 a day per reporter. Read them in D1: SELECT * FROM reports ORDER BY at DESC.
+ */
+export async function reportPlayer(sql: Sql, reporter: string, target: unknown, reason: unknown, now: number): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (typeof target !== "string" || target === reporter || !(await sql.first("SELECT id FROM users WHERE id = ?", target))) return { ok: false, message: "No such player." };
+  const why = REPORT_REASONS.find((r) => r === reason);
+  if (!why) return { ok: false, message: "Pick a reason." };
+  const day = now - 86_400_000;
+  if (await sql.first("SELECT id FROM reports WHERE reporter = ? AND target = ? AND at > ?", reporter, target, day)) return { ok: true };
+  const n = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM reports WHERE reporter = ? AND at > ?", reporter, day))?.n ?? 0;
+  if (n >= REPORTS_PER_DAY) return { ok: false, message: "That's a lot of reports today. Try again tomorrow." };
+  await sql.run("INSERT INTO reports (reporter, target, reason, at) VALUES (?, ?, ?, ?)", reporter, target, why, now);
+  return { ok: true };
 }
 
 // ---------------- The shop ----------------

@@ -10,10 +10,11 @@ import { CratesPanel, LockerPanel } from "./Crates.tsx";
  * The shop: cosmetics by category. Get an item (free while we test), then
  * equip it; one equipped per category. Your choices are saved to your account.
  */
-export function ShopScreen({ onBack }: { onBack: () => void }) {
+export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: "shop" | "crates" | "locker" }) {
   const { profile, config } = useAccount();
   const [slot, setSlot] = useState<ShopSlot>("king");
-  const [area, setArea] = useState<"shop" | "crates" | "locker">(() => (new URLSearchParams(location.search).has("crates") ? "crates" : "shop"));
+  // (A profile's "Open locker" opens it on the locker.)
+  const [area, setArea] = useState<"shop" | "crates" | "locker">(() => initial ?? (new URLSearchParams(location.search).has("crates") ? "crates" : "shop"));
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const shop = profile?.shop;
