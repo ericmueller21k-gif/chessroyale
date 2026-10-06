@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HunChess profile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&amp;family=Archivo+Black&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Archivo,system-ui,sans-serif}
+a{color:#f2c14e;text-decoration:none}a:hover{color:#ffd978}
+</style>
+</helmet>
+<div style="width: 390px; min-height: 1380px; box-sizing: border-box; background: #14161b; color: #eef0f4; display: flex; flex-direction: column; padding: 20px 18px 28px; gap: 16px; font-family: Archivo, system-ui, sans-serif">
+  <div style="display: flex; align-items: center; justify-content: space-between">
+    <a href="Main.dc.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 12px; background: #232731; display: flex; align-items: center; justify-content: center; color: #eef0f4">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+    <div role="radiogroup" aria-label="Mockup: view as" style="display: flex; gap: 4px; background: #1b1e25; border-radius: 12px; padding: 4px">
+      <sc-for list="{{views}}" as="v" hint-placeholder-count="2">
+        <button role="radio" aria-checked="{{v.on}}" onClick="{{v.pick}}" style="{{v.style}}">{{v.label}}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: #1b1e25; border-radius: 22px; padding: 18px">
+    <svg viewBox="-12 -10 124 112" width="150" height="136" aria-hidden="true">
+      <ellipse cx="50" cy="94" rx="30" ry="5" fill="#000" opacity="0.35"></ellipse>
+      <circle cx="50" cy="69" r="20" fill="#f8fafc" stroke="#1d1d1f" stroke-width="3"></circle>
+      <circle cx="50" cy="44" r="14" fill="#f8fafc" stroke="#1d1d1f" stroke-width="3"></circle>
+      <circle cx="50" cy="20" r="10.5" fill="#f8fafc" stroke="#1d1d1f" stroke-width="3"></circle>
+      <circle cx="46" cy="18" r="1.6" fill="#1d1d1f"></circle><circle cx="54" cy="18" r="1.6" fill="#1d1d1f"></circle>
+      <path d="M50 21 L59 23.2 L50 24.6 Z" fill="#f97316"></path>
+      <path d="M38 29 Q50 35 62 29 L63 35 Q50 41 37 35 Z" fill="#2352c9" stroke="#1d1d1f" stroke-width="2.5"></path>
+      <g transform="translate(0 -8)"><path d="M37 21 Q39 6 54 5 Q67 5 72 15 L67 18 Q62 12 56 12 Q61 16 63 21 Z" fill="#d6342f" stroke="#1d1d1f" stroke-width="3"></path><rect x="33" y="18" width="34" height="8" rx="4" fill="#f8fafc" stroke="#1d1d1f" stroke-width="3"></rect><circle cx="70" cy="18" r="4.6" fill="#f8fafc" stroke="#1d1d1f" stroke-width="3"></circle></g>
+    </svg>
+    <div style="font-size: 24px; font-weight: 800">PawnStorm</div>
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #b9bec9">
+      <span style="width: 9px; height: 9px; border-radius: 50%; background: #4ade80"></span> Online now · joined Oct 2026
+    </div>
+    <div style="display: flex; gap: 8px; margin-top: 4px">
+      <div style="background: #3a2f12; color: #f2c14e; border-radius: 999px; padding: 6px 12px; font-weight: 800; font-size: 14px">Gold II · 1612</div>
+      <div style="background: #232731; color: #d7dbe3; border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 14px">Top 18%</div>
+    </div>
+    <sc-if value="{{own}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; gap: 8px; margin-top: 8px">
+        <button style="height: 44px; padding: 0 16px; border-radius: 12px; border: 0; background: #f2c14e; color: #1a1406; font: 800 14px Archivo, sans-serif">Edit name &amp; icon</button>
+        <button style="height: 44px; padding: 0 16px; border-radius: 12px; border: 0; background: #232731; color: #eef0f4; font: 600 14px Archivo, sans-serif">Open locker</button>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <div style="font-size: 13px; font-weight: 800; letter-spacing: 1px; color: #9aa0ac">WEARING</div>
+    <sc-for list="{{items}}" as="it" hint-placeholder-count="3">
+      <div style="display: flex; align-items: center; gap: 12px; background: #1b1e25; border-radius: 14px; padding: 10px 12px">
+        <div style="{{it.swatch}}"></div>
+        <div style="display: flex; flex-direction: column; flex-grow: 1">
+          <div style="font-weight: 800; font-size: 15px">{{it.name}}</div>
+          <div style="font-size: 13px; color: #b9bec9">{{it.detail}}</div>
+        </div>
+        <div style="{{it.tierStyle}}">{{it.tier}}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div role="tablist" aria-label="Mode" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; background: #1b1e25; border-radius: 12px; padding: 4px">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="2">
+        <button role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+      </sc-for>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <sc-for list="{{stats}}" as="s" hint-placeholder-count="6">
+        <div style="background: #1b1e25; border-radius: 14px; padding: 12px 10px; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-family: 'Archivo Black', Archivo, sans-serif; font-size: 20px">{{s.value}}</div>
+          <div style="font-size: 12px; color: #b9bec9">{{s.label}}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="background: #1b1e25; border-radius: 14px; padding: 12px">
+      <div style="font-size: 13px; color: #b9bec9; margin-bottom: 6px">Rating, last 30 games</div>
+      <svg viewBox="0 0 330 80" width="100%" height="80" aria-label="Rating chart, rising from 1480 to 1612">
+        <polyline points="0,62 22,58 44,64 66,52 88,55 110,47 132,50 154,40 176,44 198,36 220,38 242,28 264,31 286,22 308,24 330,14" fill="none" stroke="#f2c14e" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"></polyline>
+      </svg>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <div style="font-size: 13px; font-weight: 800; letter-spacing: 1px; color: #9aa0ac">BOSSES BEATEN · 4 / 10</div>
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px">
+      <sc-for list="{{bosses}}" as="b" hint-placeholder-count="10">
+        <div style="{{b.style}}"><div style="font-size: 12px; font-weight: 800">{{b.elo}}</div><div style="font-size: 10px">{{b.mark}}</div></div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <div style="font-size: 13px; font-weight: 800; letter-spacing: 1px; color: #9aa0ac">RECENT MATCHES</div>
+    <sc-for list="{{matches}}" as="m" hint-placeholder-count="4">
+      <div style="display: flex; align-items: center; gap: 12px; background: #1b1e25; border-radius: 14px; padding: 10px 12px">
+        <div style="{{m.placeStyle}}">{{m.place}}</div>
+        <div style="display: flex; flex-direction: column; flex-grow: 1">
+          <div style="font-weight: 600; font-size: 15px">{{m.mode}}</div>
+          <div style="font-size: 13px; color: #b9bec9">Best move {{m.best}} · {{m.when}}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{other}}" hint-placeholder-val="{{ true }}">
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <button disabled style="height: 48px; border-radius: 14px; border: 0; background: #232731; color: #7d8390; font: 600 14px Archivo, sans-serif">Add friend (later)</button>
+      <button style="height: 48px; border-radius: 14px; border: 1px solid #5b2a2a; background: transparent; color: #f2a3a3; font: 600 14px Archivo, sans-serif">Report</button>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1380}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { view: 'other', tab: 'crowd' }; }
+  renderVals() {
+    const pill = (on) => on
+      ? 'border: 0; border-radius: 9px; min-height: 40px; padding: 0 12px; background: #f2c14e; color: #1a1406; font: 800 13px Archivo, sans-serif'
+      : 'border: 0; border-radius: 9px; min-height: 40px; padding: 0 12px; background: transparent; color: #d7dbe3; font: 600 13px Archivo, sans-serif';
+    const tier = (c) => 'font-size: 12px; font-weight: 800; padding: 5px 9px; border-radius: 999px; color: #14161b; background: ' + c;
+    const sw = (c) => 'width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; border: 2px solid #2d313b; background: ' + c;
+    const crowd = [['48', 'games'], ['6', 'wins'], ['14th', 'avg place'], ['1st', 'best finish'], ['71%', 'cuts survived'], ['9', 'brilliant']];
+    const boss = [['22', 'raids'], ['4', 'bosses beaten'], ['31', 'strikes'], ['2', 'Last Stands'], ['64%', 'survived'], ['3', 'brilliant']];
+    const elos = [1400, 1600, 1700, 1900, 2100, 2300, 2500, 2700, 2900, 3190];
+    return {
+      own: this.state.view === 'own',
+      other: this.state.view === 'other',
+      views: [['other', "Someone's"], ['own', 'Yours']].map(([id, label]) => ({ label, on: String(this.state.view === id), style: pill(this.state.view === id), pick: () => this.setState({ view: id }) })),
+      tabs: [['crowd', 'Crowd'], ['boss', 'Boss raid']].map(([id, label]) => ({ label, on: String(this.state.tab === id), style: pill(this.state.tab === id), pick: () => this.setState({ tab: id }) })),
+      stats: (this.state.tab === 'crowd' ? crowd : boss).map(([value, label]) => ({ value, label })),
+      items: [
+        { name: 'Snowman', detail: 'Skin · Cobalt · 63.2% pure', tier: 'Sublime', tierStyle: tier('#c084fc'), swatch: sw('#2352c9') },
+        { name: 'Santa Hat', detail: 'Head · Red · 47.9% pure', tier: 'Paragon', tierStyle: tier('#60a5fa'), swatch: sw('#d6342f') },
+        { name: 'Candy Cane', detail: 'Weapon · Emerald · 92.4% pure · Shiny', tier: 'Exalted', tierStyle: tier('#fbbf24'), swatch: sw('#0f9d58') },
+      ],
+      bosses: elos.map((e, i) => ({
+        elo: String(e),
+        mark: i < 4 ? 'beaten' : '—',
+        style: 'aspect-ratio: 1; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; ' + (i < 4 ? 'background: #3a2f12; color: #f2c14e; border: 1px solid #f2c14e' : 'background: #1b1e25; color: #6b7280; border: 1px solid #262a33'),
+      })),
+      matches: [
+        { place: '1st', mode: 'Crowd · 50 v 50', best: 'Nxe5', when: 'today' },
+        { place: '23rd', mode: 'Crowd · 50 v 50', best: 'Bb5', when: 'today' },
+        { place: 'Won', mode: 'Boss raid · The Storm Witch 2100', best: 'Qh5', when: 'yesterday' },
+        { place: '8th', mode: 'Crowd · 50 v 50', best: 'd4', when: 'yesterday' },
+      ].map((m, i) => ({ ...m, placeStyle: 'min-width: 52px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; ' + (i === 0 || i === 2 ? 'background: #f2c14e; color: #1a1406' : 'background: #232731; color: #eef0f4') })),
+    };
+  }
+}
+</script>
+</body>
+</html>
