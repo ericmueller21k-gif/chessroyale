@@ -26,28 +26,43 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
     .filter((s) => s.rating !== null)
     .sort((a, b) => b.rating! - a.rating!)
     .slice(0, 3);
+  // A boss battle is won or lost against the boss: your place is only your rank in the crowd. (Alone, you're always
+  // "1st of 1", which used to read "You won the match!" right above "The Iron Bishop won.")
+  const alone = !!bossResult && match.totalPlayers === 1;
+  const topName = (() => {
+    const w = standings.find((s) => s.placement === 1);
+    return w ? <PlayerName name={winner} uid={w.uid} bot={w.isBot} /> : winner;
+  })();
   return (
     <div class="screen results">
       <div class="trophy" aria-hidden="true">
-        {placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
+        {bossResult ? (bossResult === "crowd" ? "🏆" : bossResult === "boss" ? "💀" : "🤝") : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
       </div>
       <h1>
-        {placement}
-        {ordinal(placement)} of {match.totalPlayers}
-      </h1>
-      <p class="muted">
-        {placement === 1 ? (
-          "You won the match!"
+        {alone ? (
+          bossResult === "crowd" ? "Victory!" : bossResult === "boss" ? "Defeated" : "A draw"
         ) : (
           <>
-            {(() => {
-              const w = standings.find((s) => s.placement === 1);
-              return w ? <PlayerName name={winner} uid={w.uid} bot={w.isBot} /> : winner;
-            })()}{" "}
-            won the match.
+            {placement}
+            {ordinal(placement)} of {match.totalPlayers}
           </>
         )}
-      </p>
+      </h1>
+      {!alone && (
+        <p class="muted">
+          {bossResult ? (
+            placement === 1 ? (
+              "You were the best in the crowd."
+            ) : (
+              <>{topName} was the best in the crowd.</>
+            )
+          ) : placement === 1 ? (
+            "You won the match!"
+          ) : (
+            <>{topName} won the match.</>
+          )}
+        </p>
+      )}
       {bossResult && match.boss && (
         <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
           {match.boss.icon}{" "}
