@@ -10,10 +10,11 @@ on Eric's account.
 2. **Accounts and profiles.** Done (Google and email codes). Online play needs signing in; guests play bots. Play as a guest at once (an account tied to the device), then link a sign-in to keep it
    across devices. Profile: name, icon, games played, wins (the 2v2 final, and the team's game result in Crowd),
    average placement, rating and its history, best moves, recent matches. Storage: Cloudflare D1 (SQL).
-3. **Matchmaking.** Done for 50 v 50 (unranked): "Play now" fills a lobby for 60 s, then bots take the empty seats.
-   Next: bots matched to the players' ratings, a ranked queue by rating, a live "N playing now" count on the landing
-   page, and a live 50 v 50 in place of the demo video once there are enough games.
-   Private lobbies with a code stay as they are.
+3. **Matchmaking.** Done for 50 v 50 and boss raids (unranked): PLAY fills a lobby for 60 s on the queue screen,
+   then bots take the empty seats (a raid starts with whoever's there). The home screen shows who's online, matches
+   running and the queue (the front door, Oct 6). Next: bots matched to the players' ratings, a ranked queue by
+   rating, the live count on the landing page, watching a match from outside, and a live 50 v 50 in place of the demo
+   video once there are enough games. Private lobbies with a code stay as they are.
 4. **Ranked.** A rating per mode, moved by finishing position (beating everyone you outplace, like a big multiplayer
    Elo) and shown as tiers. Rated matches have mostly real players. Seasons with a soft reset, later. Unranked quick
    play stays for practice.
@@ -23,7 +24,7 @@ on Eric's account.
    strength with real players (see reports/boss-calibration.md).
 6. **Fair play.** Accounts are the first wall. Next: flag players whose engine-match rate (how often their pick is
    Stockfish's top move) and speed are out of line with their rating, for review; ban by account; block disposable email
-   domains; Cloudflare Turnstile (free) on email sign-in against scripted sign-ups; a report button. Crowd needs this
+   domains; Cloudflare Turnstile (free) on email sign-in against scripted sign-ups. (A Report button is on every profile since Oct 6; reports land in D1 for a person to read.) Crowd needs this
    most: one cheater can't steer the board, but can top the leaderboard.
 7. **Coins, icons and emotes.** Coins for doing well (placement, surviving cuts, a good move streak, daily first match),
    spent on cosmetic things only: profile icons, emotes to send during a match, board and piece themes, name colours.

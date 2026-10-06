@@ -1,3 +1,4 @@
+import { Component } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FRONT_DOOR, type ItemLook } from "@chessroyale/core";
 import type { LobbyPlayer } from "@chessroyale/chess";
@@ -18,20 +19,21 @@ const SOUND_GAP_MS = 70;
  * together), and a pop sound unless one played less than SOUND_GAP_MS ago. Mute is respected by play().
  */
 function usePops() {
-  const at = useRef(new Map<string, number>());
+  /** Each seat's delay, fixed the first time it's seen (its animation-delay must never change while it runs). */
+  const delays = useRef(new Map<string, number>());
   const last = useRef(0);
   const lastSound = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   /** The delay (ms) before this seat's pop, decided the first time it's seen. */
   return (id: string, bot: boolean, gap: number): number => {
-    const known = at.current.get(id);
+    const known = delays.current.get(id);
+    if (known !== undefined) return known;
     const now = performance.now();
-    if (known !== undefined) return Math.max(0, known - now);
     const start = Math.max(now, last.current + gap);
     last.current = start;
-    at.current.set(id, start);
     const delay = start - now;
+    delays.current.set(id, delay);
     timers.current.push(
       setTimeout(() => {
         const t = performance.now();
@@ -42,6 +44,16 @@ function usePops() {
     );
     return delay;
   };
+}
+
+/** A seat's pawn, drawn again only when its look changes (the grid re-renders whenever someone arrives). */
+class SeatPawn extends Component<{ look?: ItemLook; hat: string }> {
+  shouldComponentUpdate(next: { look?: ItemLook; hat: string }) {
+    return next.look !== this.props.look || next.hat !== this.props.hat;
+  }
+  render() {
+    return <DressedPawn size="seat" look={this.props.look} hat={this.props.hat} />;
+  }
 }
 
 /** The grid of seats: filled ones in order, then empty ones. Re-rendered only when someone arrives or leaves. */
@@ -56,7 +68,7 @@ function Seats({ seats, size, me, myLook, hat, looks, bots }: { seats: LobbyPlay
         if (!p) return <span key={`empty-${i}`} class="fd-seat empty" />;
         const you = p.id === me;
         const delay = pop(p.id, p.isBot, p.isBot ? botGap : STAGGER_MS);
-        const pawn = <DressedPawn size="seat" look={you ? myLook : looks.get(p.id)} hat={you ? hat : "none"} />;
+        const pawn = <SeatPawn look={you ? myLook : looks.get(p.id)} hat={you ? hat : "none"} />;
         const cls = `fd-seat pop${you ? " you" : ""}${p.isBot ? " bot" : ""}`;
         const style = { "--pop-delay": `${Math.round(delay)}ms` };
         // A person's pawn opens their profile; bots are just bots.

@@ -16,13 +16,15 @@ export async function named(page: Page, name: string) {
 
 /** Home → Play with friends → Solo vs bots (in the mode the URL or the picker chose). */
 export async function soloFromHome(page: Page) {
-  await page.getByRole("button", { name: "Play with friends" }).click();
+  // (The home screen's button: on a computer the side menu has one too.)
+  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
   await page.getByRole("button", { name: /^Solo vs \d+ bots$/ }).click();
 }
 
 /** Home → Play with friends → Create a lobby (or a raid). */
 export async function createLobbyFromHome(page: Page) {
-  await page.getByRole("button", { name: "Play with friends" }).click();
+  // (The home screen's button: on a computer the side menu has one too.)
+  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
   await page.getByRole("button", { name: /^Create a (lobby|raid|Classic lobby)$/ }).click();
 }
 

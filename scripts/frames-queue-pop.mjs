@@ -46,9 +46,9 @@ async function frames(ms, label) {
 }
 // Your own pawn pops first.
 await frames(4500, "you");
-// One joins, then two at once.
+// One joins, then two at once, then three (each arrival redraws the grid while the others wait their turn).
 const others = [];
-for (const group of [[1], [2, 3]]) {
+for (const group of [[1], [2, 3], [4, 5, 6]]) {
   await Promise.all(
     group.map(async () => {
       const o = await (await b.newContext()).newPage();
@@ -57,7 +57,7 @@ for (const group of [[1], [2, 3]]) {
       others.push(o);
     }),
   );
-  await frames(5000, group.length > 1 ? "two" : "one");
+  await frames(5000, ["", "one", "two", "three"][group.length]);
 }
 // The fill: bots cascade in. The server begins the match 1.8 s later whatever the animations do, so this part runs
 // at real speed: frames as fast as they can be taken until the queue gives way to the match.

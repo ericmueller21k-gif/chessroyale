@@ -7067,3 +7067,222 @@ button.fd-seat {
   cursor: pointer;
   color: inherit;
 }
+
+/* -- The computer's frame (1024 px and wider): a side menu, the centre, a side panel (live line, playing now) -- */
+.fd-side,
+.fd-right {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .fd-root.framed {
+    --fd-menu: 232px;
+    display: grid;
+    grid-template-columns: var(--fd-menu) minmax(0, 1fr) 320px;
+    align-items: start;
+  }
+  .fd-root.framed.wide {
+    grid-template-columns: var(--fd-menu) minmax(0, 1fr);
+  }
+  .fd-root.framed .fd-center {
+    width: 100%;
+    max-width: 920px;
+    justify-self: center;
+    /* Other screens in the frame (the shop) take the centre's width, not the window's. */
+    --col: 100%;
+  }
+  .fd-root.framed.wide .fd-center {
+    max-width: none;
+  }
+  .fd-side {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: 24px 14px;
+    border-right: 1px solid var(--fd-line);
+    background: var(--fd-bg);
+  }
+  .fd-side .fd-logo {
+    font-size: 26px;
+    padding: 0 10px;
+    text-align: left;
+  }
+  .fd-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .fd-menu-end {
+    margin-top: auto;
+  }
+  .fd-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--fd-off);
+    font: 600 15px Archivo, system-ui, sans-serif;
+    text-align: left;
+    cursor: pointer;
+    position: relative;
+  }
+  .fd-menu-item:hover {
+    background: var(--fd-panel);
+    color: var(--fd-text);
+  }
+  .fd-menu-item.on {
+    background: var(--fd-panel-2);
+    color: var(--fd-text);
+    font-weight: 800;
+  }
+  .fd-menu-item.on::before {
+    content: "";
+    position: absolute;
+    left: -14px;
+    top: 10px;
+    bottom: 10px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--fd-gold);
+  }
+  .fd-menu-icon {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    color: var(--fd-gold-text);
+  }
+  .fd-right {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 30px 22px;
+    border-left: 1px solid var(--fd-line);
+  }
+  .fd-right .fd-live {
+    background: var(--fd-panel);
+    border-radius: 14px;
+    padding: 12px 14px;
+    align-items: flex-start;
+    line-height: 1.45;
+  }
+  .fd-right .fd-live .fd-dot {
+    margin-top: 5px;
+  }
+  .fd-live-lines {
+    display: flex;
+    flex-direction: column;
+  }
+  .fd-live-lines strong {
+    font-size: 16px;
+  }
+  .fd-playing {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--fd-panel);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+  .fd-playing-mode {
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--fd-panel-2);
+    font-size: 18px;
+  }
+  /* Home: the logo and the live line live in the side columns; your pawn and PLAY side by side. */
+  .fd-root.framed .fd-home .fd-top .fd-logo,
+  .fd-root.framed .fd-home > .fd-live {
+    visibility: hidden;
+  }
+  .fd-root.framed .fd-home > .fd-live {
+    display: none;
+  }
+  .fd-root.framed .fd-home {
+    padding: 28px 32px;
+    min-height: 100dvh;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  /* Pages (profile, settings) and the private lobby: a readable column in the centre. */
+  .fd-root.framed .fd-page {
+    padding: 28px 32px 40px;
+  }
+}
+/* Wide enough for both: your pawn and PLAY side by side. */
+@media (min-width: 1280px) {
+  .fd-root.framed .fd-home {
+    max-width: none;
+  }
+  .fd-root.framed .fd-home-main {
+    flex-direction: row;
+    align-items: center;
+    gap: 24px;
+  }
+  .fd-root.framed .fd-hero {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: min(600px, calc(100dvh - 160px));
+    align-self: center;
+  }
+  .fd-root.framed .fd-hero .fd-pawn-hero {
+    width: 240px;
+    height: 218px;
+  }
+  .fd-root.framed .fd-hero-name {
+    font-size: 26px;
+  }
+  .fd-root.framed .fd-play-col {
+    flex: 0 1 360px;
+    min-width: 290px;
+    justify-content: center;
+  }
+  .fd-root.framed .fd-play {
+    height: 88px;
+    font-size: 32px;
+  }
+}
+@media (min-width: 1400px) {
+  .fd-root.framed .fd-hero .fd-pawn-hero {
+    width: 290px;
+    height: 263px;
+  }
+}
+
+/* A profile on a wide computer: two columns (who they are and what they wear; their numbers). */
+.fd-profile-col {
+  display: contents;
+}
+@media (min-width: 1280px) {
+  .fd-root.framed .fd-profile {
+    display: grid;
+    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+    column-gap: 20px;
+    row-gap: 16px;
+    align-items: start;
+  }
+  .fd-root.framed .fd-profile > .fd-page-head {
+    grid-column: 1 / -1;
+  }
+  .fd-root.framed .fd-profile-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+}

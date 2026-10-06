@@ -1217,6 +1217,9 @@ every number on it comes from the server.
     twice or jumps);
   - two arriving together start apart (the second a frame behind);
   - when time's up, the bots' cascade runs row by row in about 1.2 s, and the votes begin 1.8 s after the fill.
+  - (Found and fixed in step 4: a pop still waiting its turn could jump ahead if someone else arrived meanwhile, as
+    the grid redrew with a shorter delay. Each pawn's delay is now fixed when it arrives; checked with three arriving
+    at once.)
 
 ### Built, step 3: profiles (Oct 6, 2026)
 
@@ -1254,3 +1257,20 @@ every number on it comes from the server.
 - **Someone else's only:** Report (Cheating, Name or Something else), stored in D1's `reports` for a person to read
   (`SELECT * FROM reports ORDER BY at DESC`); one per player per reporter a day, 20 a day per reporter. "Add friend"
   is there, greyed out "(later)".
+
+### Built, step 4: the computer's frame (Oct 6, 2026)
+
+- **At 1024 px and wider, three columns** (front-door pages: home, profile, settings, the shop):
+  - **Left, the side menu:** the logo, Play, Boss alone, Play with friends, Shop & crates, Profile (with your
+    pawn), and Settings at the bottom. The page you're on is marked with a gold bar. Play is the home screen (PLAY
+    lives there); Boss alone and Play with friends open the home screen's boss menu and sheet.
+  - **The centre:** the page. Your pawn and PLAY sit side by side from 1280 px (stacked, as on a phone, from 1024 to
+    1279, where they don't both fit); a profile goes to two columns from 1280 px.
+  - **Right, the live panel:** the live line (one number to a line) and **Playing now**: each running match's mode
+    (and the raid's boss), players left and how long it's been going. No names, nothing a stranger couldn't see from
+    outside.
+  - **No watch links yet:** nobody outside a match can watch it (only knocked-out players inside it can), so the
+    list says watching comes later. A leaderboard can join the panel once ranked exists.
+- **The queue keeps the whole window** (no menu or panel): the grid is the show, and a menu click there would have to
+  mean leaving the queue. Private lobbies and every game screen keep their own layouts.
+- **Phones** (below 1024 px) never see the menu or the panel: one column, as in the mockups.

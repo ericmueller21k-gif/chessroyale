@@ -132,7 +132,7 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=6");
-  await page.getByRole("button", { name: "Boss alone" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   // First, the boss menu: all ten bosses, each with its strength against yours. Pick one and it starts.
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
@@ -182,7 +182,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): he takes the blow, fa
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // (?boss=1600 skips the boss menu.)
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3&boss=1600&laststand=1");
-  await page.getByRole("button", { name: "Boss alone" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen);
   // Your move (the test switch makes this one call for him, whatever it is).

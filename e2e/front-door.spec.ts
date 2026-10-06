@@ -14,7 +14,8 @@ test("home: the live line comes from the server, the mode picker changes the lin
   await expect(line).toBeVisible();
   const before = await live(page);
   expect(before.online).toBeGreaterThanOrEqual(1);
-  await expect(line).toContainText(`${before.online} online`);
+  // (Other tests' players come and go, so the number itself can move between two looks.)
+  await expect(line).toContainText(/[1-9]\d* online/);
   // Someone else waiting in the queue shows up in the count within a few seconds.
   const other = await (await browser.newContext()).newPage();
   await other.goto(`/?pool=home-${test.info().project.name}`);
@@ -33,18 +34,18 @@ test("home: the live line comes from the server, the mode picker changes the lin
   // No sideways scrolling, and big tap targets.
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   for (const name of ["Play with friends", "Boss alone", "Shop & crates", "Profile"]) {
-    const box = (await page.getByRole("button", { name, exact: true }).boundingBox())!;
+    const box = (await page.getByRole("main").getByRole("button", { name, exact: true }).boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
 });
 
 test("home: Boss alone opens the boss menu; Play with friends offers lobbies and solo practice", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Boss alone" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu.locator(".boss-row")).toHaveCount(10);
   await menu.getByRole("button", { name: "Close" }).click();
-  await page.getByRole("button", { name: "Play with friends" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
   const sheet = page.getByRole("dialog", { name: "Play with friends" });
   await expect(sheet.getByRole("button", { name: "Create a lobby" })).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Join lobby" })).toBeDisabled();
@@ -114,4 +115,41 @@ test("the queue: your pawn first and ringed, others pop in, Cancel frees the sea
   await ann.evaluate(() => localStorage.setItem("brc.muted", "0"));
   // No sideways scroll; the grid fits.
   expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+});
+
+test("computer: a side menu, the centre and a live panel; the phone keeps one column", async ({ page, browser }) => {
+  test.setTimeout(2 * 60_000);
+  await page.goto("/");
+  const menu = page.getByRole("navigation", { name: "Menu" });
+  const panel = page.getByRole("complementary", { name: "Live" });
+  if (test.info().project.name !== "desktop") {
+    await expect(menu).toBeHidden();
+    await expect(panel).toBeHidden();
+    return;
+  }
+  await expect(menu).toBeVisible();
+  await expect(panel.getByRole("status")).toContainText("online");
+  // The menu goes where the home screen's buttons go.
+  await menu.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-current", "page");
+  await menu.getByRole("button", { name: "Profile" }).click();
+  await expect(page.locator(".fd-card")).toBeVisible();
+  await menu.getByRole("button", { name: "Boss alone" }).click();
+  await expect(page.getByRole("dialog", { name: "Choose your boss" })).toBeVisible();
+  await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: "Close" }).click();
+  await menu.getByRole("button", { name: "Play with friends" }).click();
+  await expect(page.getByRole("dialog", { name: "Play with friends" })).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  // Your pawn and PLAY side by side.
+  const hero = (await page.locator(".fd-hero").boundingBox())!;
+  const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
+  expect(play.x).toBeGreaterThan(hero.x + hero.width - 1);
+  // A match being played shows on the panel's list (no names, just the mode and who's left).
+  const other = await (await browser.newContext()).newPage();
+  await other.goto("/?pool=panel");
+  await other.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect(panel.locator(".fd-playing").filter({ hasText: "Crowd · 50 v 50" }).first()).toBeVisible({ timeout: 40_000 });
+  await other.close();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });

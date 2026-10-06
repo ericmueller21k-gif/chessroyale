@@ -108,7 +108,7 @@ export function FdButton({
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
 /** "● 214 online · 9 matches running · 31 in queue", from the server (an empty line of the same height until then). */
-export function LiveLine({ live, compact }: { live: LiveCounts | null; compact?: boolean }) {
+export function LiveLine({ live, stacked }: { live: LiveCounts | null; stacked?: boolean }) {
   if (!live) {
     return (
       <div class="fd-live" aria-hidden="true">
@@ -117,8 +117,22 @@ export function LiveLine({ live, compact }: { live: LiveCounts | null; compact?:
       </div>
     );
   }
+  const label = `${live.online} online, ${live.matches} matches running, ${live.queue} in queue`;
+  // (The computer's side panel: one number to a line.)
+  if (stacked) {
+    return (
+      <div class="fd-live stacked" role="status" aria-label={label}>
+        <span class="fd-dot" />
+        <span class="fd-live-lines">
+          <strong>{live.online.toLocaleString("en-US")} online</strong>
+          <span>{plural(live.matches, "match", "matches")} running</span>
+          <span>{live.queue.toLocaleString("en-US")} in queue</span>
+        </span>
+      </div>
+    );
+  }
   return (
-    <div class={`fd-live${compact ? " compact" : ""}`} role="status" aria-label={`${live.online} online, ${live.matches} matches running, ${live.queue} in queue`}>
+    <div class="fd-live" role="status" aria-label={label}>
       <span class="fd-dot" />
       <span>
         <strong>{live.online.toLocaleString("en-US")} online</strong> · {plural(live.matches, "match", "matches")} running · {live.queue.toLocaleString("en-US")} in queue
@@ -159,11 +173,3 @@ export function BackButton({ onClick, label = "Back" }: { onClick: () => void; l
   );
 }
 
-/** The front door's frame: the page's background and its centre column (on a computer, the side menu and panel too). */
-export function FrontFrame({ children, wide }: { children: ComponentChildren; wide?: boolean }) {
-  return (
-    <div class={`fd-root${wide ? " wide" : ""}`}>
-      <main class="fd-center">{children}</main>
-    </div>
-  );
-}
