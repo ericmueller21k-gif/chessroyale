@@ -46,15 +46,22 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
    needs `SHINE_BOX` in its own coordinates.
 5. **Fit it.**
    - Head and face items: `ATTACH[id]` is the line in the drawing that meets the slot's anchor (a hat's brim, a beard's
-     top edge, a helmet drawn for the pawn = 25).
-   - Skins: `SKIN_ANCHORS[id] = { head, face }`. `head` is a few points below the top of the head; `face` is where a
-     beard starts. A skin that shows the pawn uses `PAWN_ANCHORS`.
+     top edge, a helmet drawn for the pawn = 25). An item worn somewhere else names that anchor in `ATTACH_TO`
+     (goggles: `eyes`).
+   - Skins: `SKIN_ANCHORS[id] = { head, face, eyes }`. `head` is a few points below the top of the head; `face` is where
+     a beard starts; `eyes` is the eye line. A skin that shows the pawn uses `PAWN_ANCHORS`.
+   - Worn items are drawn face, then head (a box covers a beard), then the weapon. A face item worn over a hat
+     (goggles) goes in `OVER_HAT`.
    - Items may rise at most about 9 points above the square (a clip caps them).
 6. **Look at it.** Run `npm run preview:items -- <scratchpad>/sheet.png items=<id>[,<id>]` and read the PNG. Add
    `color=…&color2=…` to try colours, and always try Pearl (nearly white) and Midnight (nearly black).
    The sheet shows the item on white and black pawns, on every skin, and as cards from shiny to 0% purity (pick them
    with `purities=95,50,0`). At 0% the painted parts are blotched all over, so check any part painted outside a
-   `Region` (it won't darken).
+   `Region` (it won't darken). `with=beanie` wears other items too, to check two together.
+   - Judge the fit at avatar size, not just on the cards: a thin part (a goggle frame) can vanish under the usual
+     3-point outline. Use thinner lines (`lw(1.6)`) for small parts.
+   - A hole in a painted part (a visor) is a sub-path wound the other way, inside the part. If it reaches past the
+     part's edge, split the part instead: a hole wider than its part fills in.
    Fix anything clipped, floating, misaligned or unreadable before going on. Keep the PNG out of the repo.
 7. **Test it.** Update the odds assertions in `crates.test.ts` and add a test for anything new (a new roll, a new field).
    A new stored field needs a column: add an `ALTER TABLE` to `LOCKER_MIGRATIONS` in `locker.ts` (it runs once and

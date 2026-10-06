@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
+import { itemDef } from "@chessroyale/core";
 import {
   isPixelIcon,
   buyItem,
@@ -282,7 +283,8 @@ describe("account API", () => {
     const eq = await equipLocker(sql, user.id, "head", present.id);
     expect(eq.ok && eq.locker.look.head?.color2).toBe(present.color2);
     const st = await lockerState(sql, user.id);
-    expect(st.items.find((i) => i.def !== "present")?.color2).toBeUndefined();
+    // One-colour items have none (goggles, like the present, have two).
+    for (const i of st.items) if (itemDef(i.def)?.colors !== 2) expect(i.color2).toBeUndefined();
   });
 
   it("items rolled under the old purity odds (51-100%) keep their purity", async () => {

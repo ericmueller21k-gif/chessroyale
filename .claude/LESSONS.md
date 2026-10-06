@@ -34,3 +34,19 @@ later it moves again. It feels like the app froze.
 - Look for any piece that moves twice, jumps back or flickers.
 - Do this for the most common path (one plain move), not only for the new feature: a feature can be perfect and
   the plain move next to it still broken.
+
+## Purity that didn't match the item (Oct 6, 2026)
+
+**Eric saw:** an Exalted Gift-Wrap Tube at 41.4% purity was almost fully blotched. It should have been about 59%.
+
+**The cause:**
+- The blotch pattern was cut so the right share of the *whole 100 × 100 square* was blotched. An item got whatever
+  share of the pattern it happened to sit on.
+- Wide items averaged out. Thin or small ones swung wildly: the tube from 11% to 100%, a beard from 0% to 100%.
+- Every test passed, and the fitting sheet looked fine: it shows one pattern per purity, and one pattern can be lucky.
+
+**How it was found:** a script drew each item's blotches for 120 patterns, filled them on a canvas, and counted the
+pixels inside the item. That turned "looks off" into numbers, before and after the fix.
+
+**The rule:** when a number on screen describes a drawing (a purity, a meter, a share), measure the drawing against
+the number over many cases, not one preview. Then add a test that does the same.

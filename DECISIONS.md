@@ -881,13 +881,13 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
 
     | Tier | Item | Slot | Chance |
     | --- | --- | --- | --- |
-    | Novice | Santa Beard | face | 42% |
-    | Broad | Antlers | head | 26% |
-    | Paragon | Santa Hat | head | 16% |
+    | Novice | Santa Beard, Beanie, Ski Goggles, Christmas Tree Tee | face, head, face, skin | 64% in all (16% each) |
+    | Broad | Antlers | head | 12% |
+    | Paragon | Santa Hat | head | 8% |
     | Sublime | Snowman, Present, Gingerbread Man, Chimney | skin, head, skin, skin | 14% in all (3.5% each) |
     | Fischer Random (a second spin) | Exalted Gift-Wrap Tube (weapon, 40%) or Candy Cane (weapon, 40%), Transcendent Fire & Ice Crown (head, 20%) | | 2% |
 
-    So the crown is 0.4%.
+    So the crown is 0.4%. (Odds as of Oct 6; the beard, antlers and hat were 42/26/16% before the three new commons.)
   - **Colour:** Red 30%, Yellow 30%, Sage 14%, Opal 9%, Cobalt 7%, Midnight 4.5%, Emerald 3%, Oceanic 2%, Pearl 0.5%. Opal, Oceanic and Pearl have a two-tone sheen.
   - **Purity:** 100% minus a blemish of 0–100%, rolled by bands (retuned Oct 5, below). Shiny (90%+) is 1 in 250; under 5% is 1 in 100; 80% of items land between 30% and 70%.
   - **Stacked:** a shiny Pearl crown is about 1 in 12.5 million; a Pearl crown at 99%+ about 1 in 1.25 billion. A test of 100,000 rolls checks the proportions.
@@ -943,6 +943,16 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - Now the cut is measured on each painted part itself: the app samples the part's area (one point per square unit, once per item drawing) and cuts the same pattern where it covers exactly that share. The last blotch is drawn partway (a spot growing from its centre or, in a clean spot already ringed by blotches, closing in from the edge), so the share is exact rather than a whole blotch at a time. Now every item lands within about 3 points of its purity, usually within 1.
   - Same patterns, so owned items keep their look in shape; only how much of them is blotched now matches the purity shown. About 1 ms a pawn, as before.
   - A test checks the coverage on a thin tube over many patterns.
+- **Three commons and two redesigns (Eric, Oct 6):**
+  - **Odds.** Eric: make the three new items commons, "there should be more commons", and keep the odds worked out. Novice now has four items at 16% each (64%). Each tier must stay rarer per item than the one below, so the antlers went from 26% to 12% and the Santa hat from 16% to 8%. Sublime stays at 14% (3.5% each) and Fischer Random at 2%. Per item: 16, 12, 8, 3.5, 0.8 (Exalted) and 0.4% (Transcendent). A test checks that ladder.
+  - **Beanie** (head): a plain knit beanie, crown and ribbed cuff, in its colour. No bobble, so it doesn't compete with the Santa hat.
+  - **Ski Goggles** (face, two colours like the present): the frame and strap in the colour, the lens in a second colour at 60% opacity, so the face shows through, with a glint. Outlines are thinner than usual (1.6, not 3): at the usual width they swallowed the frame on a pawn-sized avatar.
+    - Goggles go at the eyes, which no anchor marked (the face anchor is where a beard starts, well below the eyes on the pawn). Pieces now have an `eyes` anchor too (pawn 29, snowman 18, gingerbread 21), and an item can name the anchor it meets (`ATTACH_TO`).
+    - They're a face item so they can be worn with a beanie, and they're drawn over a hat (`OVER_HAT`). Other face items still go under it: the present's box covers the top of a beard.
+  - **Christmas Tree Tee** (a skin): the pawn in a T-shirt with a printed tree. Only the bulbs take the colour. The shirt is white on the white side and charcoal on the black side (pure black disappeared on the black pawn). A skin, like the chimney, because a shirt fitted to the pawn wouldn't fit the snowman or the gingerbread man. So it doesn't combine with them; a separate "body" slot could do that later.
+  - **Present: a visor.** An oval cut out of the box's front at face height, with a hint of glass and a glint. The ribbon stops above and below it. You see the face through it: the pawn's head, the snowman's eyes and nose, the gingerbread face.
+  - **Chimney: bricks in the colour.** The bricks and the cap take the colour. The mortar is a shade of it (lighter on dark colours, darker on light ones such as yellow and Pearl), so the bricks still read. The whole chimney now blotches. Owned chimneys change with it.
+  - The fitting sheet takes `with=` to wear other items too (goggles over a beanie).
 
 ## The God King's Last Stand (Oct 5, 2026; built)
 
