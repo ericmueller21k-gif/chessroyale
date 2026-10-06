@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { Chessground } from "chessground";
 import type { Api } from "chessground/api";
 import type { DrawShape } from "chessground/draw";
@@ -81,7 +81,9 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
     play(captured ? "capture" : castled ? "castle" : "move");
   }, [fen]);
 
-  useEffect(() => {
+  // The board is built, and kept in step, before the browser paints (layout effects): a plain effect runs after the
+  // first paint, so every new board (each phase of a match is its own screen) showed one frame with no board at all.
+  useLayoutEffect(() => {
     api.current = Chessground(el.current!, {
       fen,
       orientation,
@@ -114,7 +116,7 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const color = sideToMove(fen) === "w" ? "white" : "black";
     const only = moves;
     api.current?.set({

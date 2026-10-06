@@ -101,6 +101,11 @@ p {
     opacity: 0.4;
   }
 }
+/* No fade between a match's own screens (play, reveal, boss, watching…): each phase is a new screen, so the fade ran
+   two or three times a move and washed the whole screen out (white in light mode). */
+.screen.game {
+  animation: none;
+}
 
 /* ---- Buttons and fields ---- */
 

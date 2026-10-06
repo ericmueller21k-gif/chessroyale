@@ -63,6 +63,8 @@ await cdp.send("Page.startScreencast", { format: "jpeg", quality: 70, everyNthFr
 for (let m = 0; m < moves; m++) {
   if (!(await waitPlay())) break;
   await p.waitForTimeout(800);
+  // (Moves are possible once a new board's "Round start" countdown is over.)
+  await p.locator(".cc-banner", { hasText: "Round start" }).waitFor({ state: "detached", timeout: 15000 }).catch(() => undefined);
   const fen = await p.evaluate(() => window.match.phase.board.fen);
   const c = new Chess(fen);
   const all = c.moves({ verbose: true });
