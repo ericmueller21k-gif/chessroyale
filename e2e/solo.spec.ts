@@ -32,9 +32,11 @@ async function bestMove(page: Page): Promise<string> {
   return page.evaluate(async () => {
     const m = (window as any).match;
     const fen = m.phase.board.fen;
-    // The same search the round is scored with, so this really is the best move.
-    const [top] = await m.runner.topMovesFor(fen);
-    return top.move;
+    // The same search the round is scored with, and its highest-scoring line, so this really is the best move (the
+    // judge rates each pick by its line's score). That's usually the first line, but not always: when the node budget
+    // runs out partway through a depth, lines not yet searched again keep the last depth's score.
+    const top: { move: string; expected: number }[] = await m.runner.topMovesFor(fen);
+    return top.reduce((best, line) => (line.expected > best.expected ? line : best)).move;
   });
 }
 

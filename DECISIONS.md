@@ -1341,5 +1341,8 @@ The cause and how it was found are in `.claude/LESSONS.md`. The calls made:
 - **Strong play's move is searched before the clock starts:** during the stage's last reveal and the stage break,
   using the game's own `prefetch()` (the round scores with the same searches, so it's still exactly the best move).
   Stopping the page's clock with Playwright's fake clock was tried and dropped: it slows the whole page.
+- **Strong play plays the highest-scoring line**, not the engine's first line: the judge rates picks by score, and in
+  about 2% of positions a later line scores higher. Left as it is in the game, and passed on: the reveal's "Best was"
+  and the bots' and power-up's idea of the best move follow the first line (the engine lane's to decide).
 - **Strong play keeps its 240 s limit.** With the leftover pages closed it takes about 3.5 minutes in a full run; the
   match's own pacing (the final's bot turns most of all) is about 200 s of that.
