@@ -1083,3 +1083,65 @@ Eric: in a solo boss raid, a moved piece jumped back to where it was, then moved
   before; a Last Stand now starts from the piece already on its square.
 - Crowds of more than one are unchanged.
 - How it was found, and the rule that follows: `.claude/LESSONS.md`.
+
+## The front door: home, queue, profiles (design, Oct 6, 2026; to build)
+
+Eric approved the mockup as drawn ("I like exactly how you have it"): the canvas "HunChess front door" in his
+Artifacts. Its source is in `docs/mockups/front-door/`: `Main.dc.html` (home), `Queue.dc.html`, `Profile.dc.html`.
+The `hub` delegate builds it. Phone layouts as in the mockup; desktop as below.
+
+**Home**
+- **Top bar:** the "Hun**Chess**" logo ("Chess" in gold), the coin balance, and your dressed pawn in a gold ring. The
+  pawn opens your profile.
+- **Live line:** a green dot, "N online · M matches running · Q in queue", from the server and refreshed every few
+  seconds. Online = connected in the last minute, anywhere in the app.
+- **Your dressed pawn**, large, with your name, rank and what you're wearing.
+- **Mode picker** (Crowd 50 v 50 / Boss raid / Classic "coming", while Classic is being reworked). The line under
+  PLAY changes with it, e.g. the typical wait.
+- **PLAY**, big and gold, joins the queue for that mode.
+- **Four smaller buttons:** Play with friends (the private code lobbies), Boss alone, Shop & crates, Profile.
+
+**Queue (no lobby screen for matchmade games)**
+- PLAY puts you in the queue: the existing "Play now" matchmaker underneath. The waiting screen replaces the lobby
+  screen for matchmade games. Private code games keep the lobby.
+- **Shows:** "38 / 100", a progress bar, "Finding players · N s, then bots fill the rest", and a 10 × 10 grid of seats.
+  Each joined player's dressed pawn pops into the next seat. Yours is first, ringed in gold, with "You're in · seat 1"
+  below.
+- **The pop (Eric):** each new pawn scales up past full size, then settles (about 0.35 s, a springy overshoot), with a
+  short soft "pop" sound. When many join at once, the pops are staggered about 40 ms apart and the sound is
+  rate-limited, so 30 joins never become 30 overlapping sounds. Respect the mute switch.
+- **When the 60 s runs out,** bots fill the empty seats as plain pawns: a quick cascade, quieter pops.
+- **Cancel** leaves the queue and goes home.
+- **Phone:** the grid fills the panel's width, so pawns are about 30 px. **Desktop (Eric):** the grid gets most of the
+  screen, so pawns are 60–80 px. The joining is the show.
+
+**Profile:** one structure for everyone, opened by tapping your pawn or any name (leaderboards, cut screen, results).
+- **Header:** dressed pawn (large), name, online now or last seen, joined month, rank tier and rating, percentile.
+- **Wearing:** each equipped item with its colour swatch, slot, colour, purity (and "Shiny"), and a tier pill in its
+  tier colour.
+- **Stats:**
+  - Mode tabs (Crowd / Boss raid).
+  - Crowd: games, wins, average place, best finish, cuts survived %, brilliant moves.
+  - Boss raid: raids, bosses beaten, strikes, Last Stands, survived %, brilliant moves.
+  - Only stats the server really records. Add what's missing, or leave it out.
+- **Rating chart:** the last 30 games.
+- **Bosses beaten:** the 10 tiers, lit gold once beaten.
+- **Recent matches:** place, mode, best move, when.
+- **Yours only:** Edit name & icon, Open locker (and settings and sign-in where they live now).
+- **Someone else's only:** Report, and "Add friend" greyed out until friends exist.
+- **Never shown to others:** email, sign-in method, anything private.
+
+**Desktop (Eric: "similar to the chess sites, our own style")**
+- At 1024 px and wider, a three-column frame:
+  - a **left side menu**: logo, Play, Boss alone, Play with friends, Shop & crates, Profile, then settings
+  - the **centre** for the screen itself
+  - a **right panel**: the live line, a "playing now" list of running matches (mode, players left, a watch link
+    where spectating exists), and later a leaderboard
+- The home screen's centre: your pawn and PLAY, side by side.
+- The game screens keep their current desktop layout; only the front door changes.
+
+**Phone or app store?** The website is the app.
+- It already installs to the home screen like an app (manifest, icons, offline shell, install prompt) and runs full
+  screen. No app-store app is needed now.
+- Later, an app-store listing can wrap the same site for discovery or push notifications, with no rewrite.
+- Keep everything working in the browser first.
