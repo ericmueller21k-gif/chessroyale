@@ -12,7 +12,9 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
   await expect(chip).toBeVisible();
   await expect(page.locator(".fd-hero")).toContainText("No rating yet");
   await chip.click();
-  // Draw an icon: fill the canvas with a colour, add a stroke, save.
+  // Your profile: Edit name & icon. Draw an icon: fill the canvas with a colour, add a stroke, save.
+  await expect(page.locator(".fd-card")).toContainText("No rating yet");
+  await page.getByRole("button", { name: "Edit name & icon" }).click();
   await page.getByRole("button", { name: "Edit your icon" }).click();
   const canvas = page.getByLabel("Your icon, 48 by 48 pixels");
   await page.getByRole("button", { name: "Fill" }).click();
@@ -28,7 +30,8 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
     .toBe("data:image/png;base64,");
   const nameBox = page.getByLabel("Your name");
   await nameBox.fill("Hunter");
-  await nameBox.blur();
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(page.getByRole("heading", { name: "Hunter" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.name))).toBe("Hunter");
   // Without Google or Resend secrets, no sign-in buttons are offered.
   await expect(page.locator(".signin")).toHaveCount(0);
