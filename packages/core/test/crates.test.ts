@@ -11,8 +11,9 @@ describe("crates", () => {
     const total = ITEM_DEFS.reduce((s, d) => s + itemChance(crate, d.id), 0);
     expect(total).toBeCloseTo(1);
     expect(itemChance(crate, "fire-ice-crown")).toBeCloseTo(0.004);
-    // A present's chance, shared evenly by its items: Novice 40% over four.
-    expect(itemChance(crate, "beanie")).toBeCloseTo(0.1);
+    // A present's chance, shared evenly by its items: Novice 40% over three, Paragon 18% over two.
+    expect(itemChance(crate, "beanie")).toBeCloseTo(0.4 / 3);
+    expect(itemChance(crate, "ski-goggles")).toBeCloseTo(0.09);
     expect(itemChance(crate, "antlers")).toBeCloseTo(0.26);
   });
 
@@ -49,14 +50,18 @@ describe("crates", () => {
       expect(r.blemish).toBeGreaterThanOrEqual(0);
       expect(r.blemish).toBeLessThanOrEqual(100);
     }
-    // The Novice present (four items, evenly) about 40% in all, 10% each.
-    const novice = ["santa-beard", "beanie", "ski-goggles", "tree-tee"];
+    // The Novice present (three items, evenly) about 40% in all, a third each; Paragon (two items) 18%, 9% each.
+    const novice = ["santa-beard", "beanie", "tree-tee"];
     const noviceShare = novice.reduce((s, d) => s + (count[d] ?? 0), 0) / n;
     expect(noviceShare).toBeGreaterThan(0.39);
     expect(noviceShare).toBeLessThan(0.41);
     for (const d of novice) {
-      expect(count[d]! / n).toBeGreaterThan(0.095);
-      expect(count[d]! / n).toBeLessThan(0.105);
+      expect(count[d]! / n).toBeGreaterThan(0.128);
+      expect(count[d]! / n).toBeLessThan(0.139);
+    }
+    for (const d of ["santa-hat", "ski-goggles"]) {
+      expect(count[d]! / n).toBeGreaterThan(0.085);
+      expect(count[d]! / n).toBeLessThan(0.095);
     }
     expect(count["antlers"]! / n).toBeCloseTo(0.26, 1);
     // Sublime (four items) about 14% in all, 3.5% each.
@@ -97,7 +102,7 @@ describe("crates", () => {
       } else expect(r.color2).toBeUndefined();
     }
     expect(twos["present"]).toBeGreaterThan(100);
-    expect(twos["ski-goggles"]).toBeGreaterThan(500);
+    expect(twos["ski-goggles"]).toBeGreaterThan(300);
     expect(cleanLook({ head: { def: "present", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBe("cobalt");
     expect(cleanLook({ head: { def: "santa-hat", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBeUndefined();
   });

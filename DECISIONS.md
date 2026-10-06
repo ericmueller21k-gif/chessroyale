@@ -881,9 +881,9 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
 
     | Present | Chance | Items inside (slot) | Each |
     | --- | --- | --- | --- |
-    | Novice (grey) | 40% | Santa Beard (face), Beanie (head), Ski Goggles (face), Christmas Tree Tee (skin) | 10% |
+    | Novice (grey) | 40% | Santa Beard (face), Beanie (head), Christmas Tree Tee (skin) | 13.3% |
     | Broad (green) | 26% | Antlers (head) | 26% |
-    | Paragon (blue) | 18% | Santa Hat (head) | 18% |
+    | Paragon (blue) | 18% | Santa Hat (head), Ski Goggles (face) | 9% |
     | Sublime (purple) | 14% | Snowman (skin), Present (head), Gingerbread Man (skin), Chimney (skin) | 3.5% |
     | Fischer Random (a gold crown, not a present; a second spin) | 2% | Exalted Gift-Wrap Tube (weapon, 40%) or Candy Cane (weapon, 40%), Transcendent Fire & Ice Crown (head, 20%) | 0.8%, 0.8%, 0.4% |
 
@@ -955,7 +955,8 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - The fitting sheet takes `with=` to wear other items too (goggles over a beanie).
 - **Presents by tier (Eric, Oct 6):** "the crate opens thematic": the strip holds colour-coded presents, one per tier, and Fischer Random (2%, the only tile that isn't a present). A present opens to one of its tier's items, split evenly.
   - **The present odds** (40/26/18/14/2): Eric said the rest of the 98% is "split between the other rarities". I read that as a ladder, each colour rarer than the one below (an even split would make a purple present as common as a grey one). Sublime stays at Eric's earlier "12–15%" (14%, so its four items keep 3.5% each), and Novice, Broad and Paragon step down from there.
-  - **A side effect to know:** Broad and Paragon hold one item each, so the antlers (26%) and the Santa hat (18%) are now likelier than any single Novice item (10%). Adding Broad and Paragon items spreads that out.
+  - **A side effect to know:** Broad holds one item, so the antlers (26%) are likelier than any single Novice item (13.3%). Adding Broad items spreads that out.
+  - **Ski Goggles moved to Paragon (Eric, Oct 6),** next to the Santa hat: 9% each. The Novice present now holds three items, 13.3% each.
   - **Opening:** the strip spins to a present; the present shakes and bursts ("Novice present", in its colour, 1.1 s); then, if it holds more than one item, a second, shorter spin (3.4 s) among them; then the reveal. A one-item present goes straight to the reveal. Fischer Random is unchanged (banner, a 4.8 s spin). The strip still shows Fischer Random three times as often as it lands, to tease; second-spin decoys are drawn evenly from the present's items.
   - **The crate page** lists the presents with their odds (and how many items each holds), then every item with its own chance.
   - Server rolls: the tier, then an item evenly from that tier's present (`presentItems`). Nothing stored changes.

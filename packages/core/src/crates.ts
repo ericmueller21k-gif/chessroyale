@@ -67,10 +67,10 @@ export const behindPiece = (def: string) => itemDef(def)?.layer === "back";
 export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "santa-beard", name: "Santa Beard", tier: "novice", slot: "face", description: "Ho ho ho." },
   { id: "beanie", name: "Beanie", tier: "novice", slot: "head", description: "A plain knit beanie. Keeps the thinking warm." },
-  { id: "ski-goggles", name: "Ski Goggles", tier: "novice", slot: "face", colors: 2, description: "Frame in one colour, see-through lenses in another. For black-diamond lines." },
   { id: "tree-tee", name: "Christmas Tree Tee", tier: "novice", slot: "skin", description: "Your pawn in a festive T-shirt. The bulbs are the only part that's lit." },
   { id: "antlers", name: "Antlers", tier: "broad", slot: "head", description: "Guides the sleigh through the endgame." },
   { id: "santa-hat", name: "Santa Hat", tier: "paragon", slot: "head", description: "Knows who's been naughty in the opening." },
+  { id: "ski-goggles", name: "Ski Goggles", tier: "paragon", slot: "face", colors: 2, description: "Frame in one colour, see-through lenses in another. For black-diamond lines." },
   { id: "snowman", name: "Snowman", tier: "sublime", slot: "skin", description: "Your pawn, built of snow, with a scarf." },
   { id: "present", name: "Present", tier: "sublime", slot: "head", colors: 2, description: "Worn as a helmet. Box in one colour, ribbon in another. Now with a visor, for peeking." },
   { id: "gingerbread", name: "Gingerbread Man", tier: "sublime", slot: "skin", description: "Run, run, as fast as you can. Iced, with gumdrop buttons." },
@@ -114,7 +114,7 @@ export const CRATES: readonly CrateDef[] = [
       { tier: "sublime", weight: 14 },
       { tier: FISCHER, weight: 2 },
     ],
-    items: ["santa-beard", "beanie", "ski-goggles", "tree-tee", "antlers", "santa-hat", "snowman", "present", "gingerbread", "chimney"],
+    items: ["santa-beard", "beanie", "tree-tee", "antlers", "santa-hat", "ski-goggles", "snowman", "present", "gingerbread", "chimney"],
     fischer: [
       { item: "gift-tube", weight: 40 },
       { item: "candy-cane", weight: 40 },
