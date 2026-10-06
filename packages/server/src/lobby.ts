@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, cleanLook, type ItemLook, allowedMs, botVotes, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FRONT_DOOR, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, allowedMs, botVotes, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -16,6 +16,7 @@ import {
   type NetFinal,
   type NetStanding,
   type Opening,
+  type RoundReport,
   type RunnerSnapshot,
   type LivePick,
   type NetVote,
@@ -50,6 +51,8 @@ interface Human {
   rating?: number | null;
   /** The crate items they wear. */
   look?: ItemLook;
+  /** When they took their seat (the queue's wait). */
+  joinedAt?: number;
 }
 
 type Timer =
@@ -62,7 +65,8 @@ type Timer =
   | "voteEnd"
   | "voteNext"
   | "bossTimeout"
-  | "autoStart";
+  | "autoStart"
+  | "autoGo";
 
 export interface LobbyRecord {
   code: string;
@@ -127,8 +131,16 @@ export interface LobbyRecord {
   bossPending?: string;
   bossMinAt?: number;
   bossIntroDone?: boolean;
-  /** Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. */
-  auto?: { fillAt: number };
+  /**
+   * Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. `filledAt`: the seats
+   * were filled then (bots pop in on the queue screen) and the match begins FRONT_DOOR.fillShowMs later; `waitMs`:
+   * how long its people had waited on average, and how many (for the typical wait under PLAY).
+   */
+  auto?: { fillAt: number; filledAt?: number; waitMs?: number; waiters?: number; waitSaved?: boolean };
+  /** Each person's brilliant moves and their moves (SAN and round score) for the best one, for their profile. */
+  feats?: Record<string, { brilliant: number; best: { san: string; score: number } | null }>;
+  /** When the match began (after any pre-start show). */
+  startedAt?: number;
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"]): LobbyRecord {
@@ -215,23 +227,31 @@ export class LobbyCore {
     return this.human(id)?.name ?? this.r.bots.find((b) => b.id === id)?.name ?? id;
   }
 
-  private lobbyMessage(): Outgoing {
+  /**
+   * The lobby: everyone in it, in the order they took their seats. Looks are big, so they go out only with `looks`:
+   * everyone's to a player who (re)joins, only the newcomer's to the others.
+   */
+  private lobbyMessage(looks: "all" | string | null = null): Outgoing {
+    const uid = (id: string) => this.r.accounts?.[id];
     return {
       t: "lobby",
       players: [
-        ...this.r.humans.map((h) => ({ id: h.id, name: h.name, isBot: false, connected: h.connected })),
+        ...this.r.humans.map((h) => {
+          const withLook = (looks === "all" || looks === h.id) && h.look && Object.keys(h.look).length;
+          return { id: h.id, name: h.name, isBot: false, connected: h.connected, ...(uid(h.id) ? { uid: uid(h.id) } : {}), ...(withLook ? { look: h.look } : {}) };
+        }),
         ...this.r.bots.map((b) => ({ id: b.id, name: b.name, isBot: true, connected: true })),
       ],
       hostId: this.r.hostId,
-      started: this.r.phase !== "lobby",
+      started: this.r.phase !== "lobby" || !!this.r.auto?.filledAt,
       lobbySize: this.settings.lobbySize,
-      ...(this.r.auto ? { auto: true, fillAt: this.r.auto.fillAt } : {}),
+      ...(this.r.auto ? { auto: true, fillAt: this.r.auto.fillAt, ...(this.r.auto.filledAt ? { filledAt: this.r.auto.filledAt } : {}) } : {}),
     };
   }
 
   /** Matchmaking: this lobby still takes players (open, not full, a few seconds left before it fills with bots). */
   joinable(): boolean {
-    return this.r.phase === "lobby" && !!this.r.auto && this.r.humans.length < this.settings.lobbySize && this.io.now() < this.r.auto.fillAt - 2000;
+    return this.r.phase === "lobby" && !!this.r.auto && !this.r.auto.filledAt && this.r.humans.length < this.settings.lobbySize && this.io.now() < this.r.auto.fillAt - 2000;
   }
 
   private standings(): NetStanding[] {
@@ -258,28 +278,48 @@ export class LobbyCore {
 
   // ---------------- Connections ----------------
 
-  connect(token: string | undefined, name: string | undefined, device: "phone" | "computer" = "computer", practice = false, rating: number | null = null, look: unknown = undefined) {
+  connect(
+    token: string | undefined,
+    name: string | undefined,
+    device: "phone" | "computer" = "computer",
+    practice = false,
+    rating: number | null = null,
+    look: unknown = undefined,
+    userId?: string,
+  ) {
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
     if (existing) {
       existing.connected = true;
       if (look !== undefined) existing.look = cleanLook(look);
+      if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [existing.id]: userId };
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
-      this.broadcast(this.lobbyMessage(), false);
+      this.broadcast(this.lobbyMessage(existing.id), false);
       const last = this.r.last[existing.id];
       if (last) this.send(existing.id, last, false);
       this.resendHostWork();
       return { ok: true as const, playerId: existing.id };
     }
-    if (this.r.phase !== "lobby") return { ok: false as const, message: "This match has already started." };
+    if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: "This match has already started." };
     if (this.r.humans.length >= this.settings.lobbySize) return { ok: false as const, message: "This lobby is full." };
     const clean = (name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || `Player ${this.r.humans.length + 1}`;
     const id = `p${++this.r.counter}`;
     const newToken = Array.from({ length: 24 }, () => Math.floor(this.rng() * 16).toString(16)).join("");
-    this.r.humans.push({ id, name: clean, token: newToken, connected: true, device, practice, rating: typeof rating === "number" && Number.isFinite(rating) ? Math.max(400, Math.min(3400, rating)) : null, look: cleanLook(look) });
+    this.r.humans.push({
+      id,
+      name: clean,
+      token: newToken,
+      connected: true,
+      device,
+      practice,
+      rating: typeof rating === "number" && Number.isFinite(rating) ? Math.max(400, Math.min(3400, rating)) : null,
+      look: cleanLook(look),
+      joinedAt: this.io.now(),
+    });
+    if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [id]: userId };
     if (!this.r.hostId) this.r.hostId = id;
     this.send(id, { t: "welcome", playerId: id, token: newToken, code: this.r.code }, false);
-    this.broadcast(this.lobbyMessage(), false);
+    this.broadcast(this.lobbyMessage(id), false);
     // Matchmade and full: start now.
     if (this.r.auto && this.r.humans.length >= this.settings.lobbySize) this.startMatch();
     return { ok: true as const, playerId: id };
@@ -290,7 +330,7 @@ export class LobbyCore {
     const h = this.human(playerId);
     if (!h) return;
     this.io.send(playerId, { t: "welcome", playerId, token: h.token, code: this.r.code });
-    this.io.send(playerId, this.lobbyMessage());
+    this.io.send(playerId, this.lobbyMessage("all"));
     const last = this.r.last[playerId];
     if (last) this.io.send(playerId, last);
     if (playerId === this.r.hostId) this.resendHostWork();
@@ -304,6 +344,19 @@ export class LobbyCore {
       this.r.hostId = this.pickHost(playerId) ?? playerId;
       this.resendHostWork();
     }
+    this.broadcast(this.lobbyMessage(), false);
+  }
+
+  /** Leaving before the match starts (Cancel in the queue, Leave in a lobby): the seat is free again. */
+  leave(playerId: string) {
+    if (this.r.phase !== "lobby" || this.r.auto?.filledAt || !this.human(playerId)) return;
+    this.r.humans = this.r.humans.filter((h) => h.id !== playerId);
+    delete this.r.last[playerId];
+    if (this.r.accounts?.[playerId]) {
+      const { [playerId]: _gone, ...rest } = this.r.accounts;
+      this.r.accounts = rest;
+    }
+    if (this.r.hostId === playerId) this.r.hostId = this.pickHost(playerId);
     this.broadcast(this.lobbyMessage(), false);
   }
 
@@ -363,6 +416,8 @@ export class LobbyCore {
       case "bossMove":
         if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key) this.playBoss(msg.move);
         return;
+      case "leave":
+        return this.leave(playerId);
       case "hello":
         return;
     }
@@ -375,9 +430,13 @@ export class LobbyCore {
     this.startMatch();
   }
 
-  /** Fills the empty seats with bots and starts: the pre-game votes (Crowd 50 v 50) or the opening. */
+  /**
+   * Fills the empty seats with bots and starts: the pre-game votes (Crowd 50 v 50) or the opening. A matchmade
+   * lobby first shows the full lobby for FRONT_DOOR.fillShowMs (the bots popping into their seats on the queue
+   * screen), then begins.
+   */
   private startMatch() {
-    if (this.r.phase !== "lobby") return;
+    if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return;
     if (this.settings.raid && !this.r.overrides?.bossPicked) {
       // Boss raid: no bots; the boss is the one the creator picked, else the weakest that's stronger than the group's average rating.
       const patch = { bossFixedElo: raidBossElo(this.r.humans.map((h) => h.rating ?? null)) };
@@ -395,15 +454,32 @@ export class LobbyCore {
       entrants: [...this.r.humans.map((h) => ({ id: h.id, name: h.name, isBot: false, practice: !!h.practice })), ...bots],
     });
     const now = this.io.now();
+    if (this.r.auto) {
+      const waiting = this.r.humans.filter((h) => h.connected && h.joinedAt !== undefined);
+      this.r.auto.filledAt = now;
+      this.r.auto.waiters = waiting.length;
+      this.r.auto.waitMs = waiting.length ? waiting.reduce((a, h) => a + (now - h.joinedAt!), 0) / waiting.length : 0;
+      this.broadcast(this.lobbyMessage(), false);
+      this.setTimer("autoGo", now + FRONT_DOOR.fillShowMs);
+      return;
+    }
+    this.begin();
+  }
+
+  /** The match begins: the pre-game votes, the boss's intro (a raid) or the opening. */
+  private begin() {
+    const runner = this.runner!;
+    const now = this.io.now();
     const voting = pregameVotes(this.settings).length > 0;
     this.r.phase = voting ? "vote" : "opening";
+    this.r.startedAt = now;
     this.broadcast(this.lobbyMessage(), false);
     if (voting) return this.startVote(0);
     // Boss raid: straight to the boss's intro, which replays the opening from the starting position itself.
     if (this.settings.raid) return this.setTimer("startRound", now + 300);
     this.broadcast({
       t: "opening",
-      boards: [...this.runner.boards.values()].map((b) => netBoard(b, true)),
+      boards: [...runner.boards.values()].map((b) => netBoard(b, true)),
       until: now + this.settings.openingShowSeconds * 1000,
     });
     this.setTimer("startRound", now + this.settings.openingShowSeconds * 1000);
@@ -435,6 +511,9 @@ export class LobbyCore {
       case "autoStart":
         // Matchmade: time's up, bots fill the rest (if anyone is still here).
         if (this.r.phase === "lobby" && this.r.humans.some((h) => h.connected)) this.startMatch();
+        return;
+      case "autoGo":
+        if (this.r.phase === "lobby" && this.runner) this.begin();
         return;
     }
   }
@@ -869,6 +948,7 @@ export class LobbyCore {
     // A miss uses the whole of the player's time for the move.
     for (const h of this.roundHumans()) think[h.id] ??= this.thinkTime(round, round.deadlines?.[h.id] ?? round.deadline);
     const report = runner.finishRound(results, think, new Set(Object.keys(round.powerUps ?? {})));
+    this.noteFeats(report);
     this.r.scoreRequest = null;
     if (runner.final) {
       // The final: everyone sees the move just played and its loss, then the next turn.
@@ -970,13 +1050,41 @@ export class LobbyCore {
 
   // ---------------- Results ----------------
 
+  /** After each round: people's brilliant moves and best picks, for their profiles. */
+  private noteFeats(report: RoundReport) {
+    const humans = new Set(this.r.humans.map((h) => h.id));
+    for (const b of report.boards) {
+      const bril = brilliance(b.result.players);
+      for (const p of b.result.players) {
+        if (!humans.has(p.playerId) || !p.move) continue;
+        const f = ((this.r.feats ??= {})[p.playerId] ??= { brilliant: 0, best: null });
+        const brilliant = !!bril?.players.includes(p.playerId);
+        if (brilliant) f.brilliant++;
+        // The best: a brilliant move, else the pick that beat the field by most (the later of equals; see bestMoveOf).
+        const score = p.roundScore + (brilliant ? 1e6 : 0);
+        if (!f.best || score >= f.best.score) f.best = { san: toSan(b.fenBefore, p.move), score };
+      }
+    }
+  }
+
   /** Each human's result once the match is over (for their profiles). */
-  humanResults(): { playerId: string; placement: number; players: number; team: "w" | "b" | null; teamWon: boolean | null; avgScore: number | null; rating: number | null }[] {
+  humanResults(): ({
+    playerId: string;
+    placement: number;
+    players: number;
+    team: "w" | "b" | null;
+    teamWon: boolean | null;
+    avgScore: number | null;
+    rating: number | null;
+    brilliant: number;
+    bestMove: string | null;
+  } & MatchFeats)[] {
     const runner = this.runner;
     if (!runner || this.r.phase !== "results") return [];
     const st = this.standings();
     const winner = this.settings.mode === "crowd" ? runner.gameWinner() : null;
     const boss = runner.boss;
+    const stages = this.settings.knockoutsPerStage.length;
     return this.r.humans.flatMap((h) => {
       const row = st.find((s) => s.id === h.id);
       const placement = this.r.placements[h.id];
@@ -984,11 +1092,39 @@ export class LobbyCore {
       const team = row.team ?? null;
       // Boss battle: those still standing at the end share the result.
       const p = runner.player(h.id);
-      const reachedBoss = p.outInStage === null || p.outInStage >= this.settings.knockoutsPerStage.length;
+      const reachedBoss = p.outInStage === null || p.outInStage >= stages;
       const survived = !!boss && reachedBoss && !boss.kills.some((k) => k.id === h.id);
       const teamWon = boss?.result ? (survived && boss.result !== "draw" ? boss.result === "crowd" : null) : team && winner ? team === winner : null;
-      return [{ playerId: h.id, placement, players: runner.state.players.length, team, teamWon, avgScore: row.avg ?? null, rating: row.rating ?? null }];
+      const f = this.r.feats?.[h.id];
+      return [
+        {
+          playerId: h.id,
+          placement,
+          players: runner.state.players.length,
+          team,
+          teamWon,
+          avgScore: row.avg ?? null,
+          rating: row.rating ?? null,
+          brilliant: f?.brilliant ?? 0,
+          bestMove: f?.best?.san ?? null,
+          ...matchFeats(p, stages, boss, !!this.settings.raid),
+        },
+      ];
     });
+  }
+
+  /** What the live line and the "playing now" list need to know about this lobby. */
+  liveSummary(): { phase: "waiting" | "playing" | "over"; humans: number; alive: number | null; total: number | null; bossElo: number | null; startedAt: number | null } {
+    const runner = this.runner;
+    const phase = this.r.phase === "results" ? "over" : this.r.phase === "lobby" && !this.r.auto?.filledAt ? "waiting" : "playing";
+    return {
+      phase,
+      humans: this.r.humans.filter((h) => h.connected).length,
+      alive: runner && phase === "playing" ? runner.alive().length : null,
+      total: runner ? runner.state.players.length : null,
+      bossElo: this.settings.raid ? (this.settings.bossFixedElo ?? null) : null,
+      startedAt: this.r.startedAt ?? this.r.auto?.filledAt ?? null,
+    };
   }
 
   private finishMatch() {

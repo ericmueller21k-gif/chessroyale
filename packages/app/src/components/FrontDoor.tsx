@@ -1,0 +1,169 @@
+import type { ComponentChildren } from "preact";
+import { equippedLook, itemDef, ratingTier, shopItem, type ItemLook, type ItemSlot, type ShopState } from "@chessroyale/core";
+import { Avatar } from "./Items.tsx";
+import { account, type Profile } from "../account.ts";
+import type { LiveCounts } from "../live.ts";
+
+/**
+ * The front door's shared pieces (home, queue, profiles, the desktop frame), in the approved look: dark ground,
+ * two panel shades, gold, green for online, Archivo and Archivo Black. Dressed pawns are always the item-builder's
+ * Avatar; nothing here draws an item.
+ */
+
+/** "Hun" + "Chess" in gold. */
+export function Logo({ onClick }: { onClick?: () => void }) {
+  const inner = (
+    <>
+      Hun<span>Chess</span>
+    </>
+  );
+  return onClick ? (
+    <button type="button" class="fd-logo" onClick={onClick} aria-label="HunChess home">
+      {inner}
+    </button>
+  ) : (
+    <div class="fd-logo">{inner}</div>
+  );
+}
+
+/** Your coin balance, as the server has it (hidden without an account). */
+export function Coins({ coins }: { coins: number | null }) {
+  if (coins === null) return null;
+  return (
+    <div class="fd-coins" aria-label={`${coins} coins`}>
+      <span aria-hidden="true">●</span> {coins.toLocaleString("en-US")} coins
+    </div>
+  );
+}
+
+/** The shop hat you wear (shown when no crate item is on your head). */
+export const myHat = (profile: Profile | null | undefined) => equippedLook(profile?.shop, "hat").hat ?? "none";
+
+/**
+ * A dressed pawn (the item-builder's Avatar) in a box with room for what sticks out (a weapon, a crown), and an
+ * optional shadow under it. `size` picks the box from the stylesheet.
+ */
+export function DressedPawn({
+  look,
+  hat = "none",
+  size,
+  shadow,
+  side = "w",
+}: {
+  look?: ItemLook;
+  hat?: string;
+  size: "hero" | "profile" | "ring" | "card" | "seat" | "side";
+  shadow?: boolean;
+  side?: "w" | "b";
+}) {
+  return (
+    <span class={`fd-pawn fd-pawn-${size}${shadow ? " shadow" : ""}`} aria-hidden="true">
+      <span class="fd-pawn-box">
+        <Avatar look={look} side={side} hat={hat} />
+      </span>
+    </span>
+  );
+}
+
+/** Your pawn in a gold ring: it opens your profile. */
+export function MyPawnButton({ onClick }: { onClick: () => void }) {
+  const p = account().profile;
+  return (
+    <button type="button" class="fd-ring" aria-label="Your profile" onClick={onClick}>
+      <DressedPawn look={p?.locker?.look} hat={myHat(p)} size="ring" />
+    </button>
+  );
+}
+
+export function FdButton({
+  children,
+  primary,
+  danger,
+  disabled,
+  onClick,
+  label,
+  class: cls,
+}: {
+  children: ComponentChildren;
+  primary?: boolean;
+  danger?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+  label?: string;
+  class?: string;
+}) {
+  return (
+    <button
+      type="button"
+      class={`fd-btn${primary ? " primary" : ""}${danger ? " danger" : ""}${cls ? ` ${cls}` : ""}`}
+      disabled={disabled}
+      aria-label={label}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+
+/** "● 214 online · 9 matches running · 31 in queue", from the server (an empty line of the same height until then). */
+export function LiveLine({ live, compact }: { live: LiveCounts | null; compact?: boolean }) {
+  if (!live) {
+    return (
+      <div class="fd-live" aria-hidden="true">
+        <span class="fd-dot off" />
+        <span class="fd-live-wait">&nbsp;</span>
+      </div>
+    );
+  }
+  return (
+    <div class={`fd-live${compact ? " compact" : ""}`} role="status" aria-label={`${live.online} online, ${live.matches} matches running, ${live.queue} in queue`}>
+      <span class="fd-dot" />
+      <span>
+        <strong>{live.online.toLocaleString("en-US")} online</strong> · {plural(live.matches, "match", "matches")} running · {live.queue.toLocaleString("en-US")} in queue
+      </span>
+    </div>
+  );
+}
+
+/** "Gold II · 1612", or that there's no rating yet. */
+export function rankLine(rating: number | null): string {
+  const t = ratingTier(rating);
+  return t && rating !== null ? `${t.label} · ${Math.round(rating)}` : "No rating yet";
+}
+
+/** The order worn items are listed in. */
+export const WORN_ORDER: readonly ItemSlot[] = ["skin", "head", "face", "weapon"];
+
+/** What you wear, by name: crate items, then a shop hat if no crate item is on the head. */
+export function wearingNames(look: ItemLook | undefined, shop: Pick<ShopState, "equipped"> | null | undefined): string {
+  const names = WORN_ORDER.flatMap((slot) => {
+    const it = look?.[slot];
+    const d = it && itemDef(it.def);
+    return d ? [d.name] : [];
+  });
+  const hat = shopItem(shop?.equipped?.hat ?? "");
+  if (!look?.head && hat && hat.look.hat && hat.look.hat !== "none") names.splice(look?.skin ? 1 : 0, 0, hat.name);
+  return names.join(", ");
+}
+
+/** The 44 px back button at the top left of a front-door page. */
+export function BackButton({ onClick, label = "Back" }: { onClick: () => void; label?: string }) {
+  return (
+    <button type="button" class="fd-back" aria-label={label} onClick={onClick}>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M15 5l-7 7 7 7" />
+      </svg>
+    </button>
+  );
+}
+
+/** The front door's frame: the page's background and its centre column (on a computer, the side menu and panel too). */
+export function FrontFrame({ children }: { children: ComponentChildren }) {
+  return (
+    <div class="fd-root">
+      <main class="fd-center">{children}</main>
+    </div>
+  );
+}

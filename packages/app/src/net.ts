@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, botChoose, botThinkMs as thinkMs, type Augment, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botChoose, botThinkMs as thinkMs, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -51,6 +51,10 @@ export class NetMatch implements GameView {
   /** Matchmade lobby ("Play now"): starts by itself at fillAt (local time). */
   auto = false;
   fillAt: number | null = null;
+  /** Matchmade: when the seats were filled (bots in the empty ones; local time), just before the match begins. */
+  filledAt: number | null = null;
+  /** What each person in the lobby wears (sent once each, so kept here). */
+  readonly looks = new Map<string, ItemLook>();
   readonly serverPaced = true;
   private voteState: VoteView | null = null;
 
@@ -173,6 +177,18 @@ export class NetMatch implements GameView {
     };
   }
 
+  /** Leaves before the match starts (Cancel in the queue): the seat is freed, and this device forgets it. */
+  leave() {
+    this.send({ t: "leave" });
+    try {
+      localStorage.removeItem(this.tokenKey());
+      localStorage.removeItem(`brc.queue.${this.code}`);
+    } catch {
+      // No storage.
+    }
+    this.dispose();
+  }
+
   dispose() {
     this.closed = true;
     this.progress.reset();
@@ -207,10 +223,12 @@ export class NetMatch implements GameView {
         return this.emit();
       case "lobby":
         this.players = m.players;
+        for (const p of m.players) if (p.look) this.looks.set(p.id, p.look);
         this.hostId = m.hostId;
         this.started = m.started;
         this.auto = !!m.auto;
         this.fillAt = m.fillAt ? this.local(m.fillAt) : null;
+        this.filledAt = m.filledAt ? this.local(m.filledAt) : null;
         if (!m.started && this.phase.kind !== "lobby") this.phase = { kind: "lobby" };
         return this.emit();
       case "opening":

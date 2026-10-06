@@ -1,4 +1,5 @@
 import { equipLocker, lockerState, openCrate } from "./locker.ts";
+import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import {
   buyItem,
   cleanEmail,
@@ -9,11 +10,13 @@ import {
   ensureSchema,
   equipItem,
   profile,
+  publicProfile,
   randomToken,
   recordResult,
   shopState,
   signInWithIdentity,
   startEmailCode,
+  touchSession,
   updateProfile,
   userFromToken,
   verifyEmailCode,
@@ -30,6 +33,8 @@ export interface AccountEnv {
   RESEND_API_KEY?: string;
   /** Sender for sign-in codes, e.g. "HunChess <login@hunchess.com>". */
   EMAIL_FROM?: string;
+  /** Seconds a matchmade lobby waits for players before bots fill it (the live line shows it). */
+  MATCH_FILL_SECONDS?: string;
 }
 
 const SECRET_KEYS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY", "EMAIL_FROM"] as const;
@@ -87,11 +92,25 @@ export async function accountOf(request: Request, env: AccountEnv): Promise<User
   return userFromToken(sql, readCookie(request, SESSION_COOKIE), Date.now());
 }
 
-/** Handles /api/me, /api/results and /api/auth/*; returns null for other paths. */
+/** The live line's numbers, shared by every request to this Worker instance for a few seconds. */
+let liveCache: { at: number; body: LiveCounts } | null = null;
+let prunedAt = 0;
+const LIVE_CACHE_MS = 3_000;
+
+/** Handles /api/me, /api/results, /api/live, /api/profile/* and /api/auth/*; returns null for other paths. */
 export async function handleAccountApi(request: Request, env: AccountEnv, fetcher: typeof fetch = fetch): Promise<Response | null> {
   const url = new URL(request.url);
   const path = url.pathname;
-  if (!path.startsWith("/api/me") && !path.startsWith("/api/auth/") && path !== "/api/results" && !path.startsWith("/api/shop") && !path.startsWith("/api/locker")) return null;
+  if (
+    !path.startsWith("/api/me") &&
+    !path.startsWith("/api/auth/") &&
+    path !== "/api/results" &&
+    path !== "/api/live" &&
+    !path.startsWith("/api/profile/") &&
+    !path.startsWith("/api/shop") &&
+    !path.startsWith("/api/locker")
+  )
+    return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
   const email = !!env.RESEND_API_KEY;
   if (path === "/api/auth/config") return json({ accounts: !!env.DB, google, email, onlineNeedsSignIn: !!env.DB && signInRequired(env) });
@@ -100,6 +119,28 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   await ensureSchema(sql, env.DB);
   const now = Date.now();
   const token = readCookie(request, SESSION_COOKIE);
+
+  // GET /api/live: the live line (online, matches running, in queue, the playing-now list, typical waits). Polled by
+  // the front door every few seconds and by matches every 30 s, so it also marks you as online.
+  if (path === "/api/live" && request.method === "GET") {
+    await touchSession(sql, token, now);
+    if (!liveCache || now - liveCache.at > LIVE_CACHE_MS) {
+      if (now - prunedAt > 10 * 60_000) {
+        prunedAt = now;
+        await pruneLive(sql, now);
+      }
+      liveCache = { at: now, body: await liveCounts(sql, now) };
+    }
+    return json({ ...liveCache.body, fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)) });
+  }
+
+  // GET /api/profile/ID: anyone's public profile (what any player can see; nothing private).
+  const pm = path.match(/^\/api\/profile\/([A-Za-z0-9_-]{1,64})$/);
+  if (pm && request.method === "GET") {
+    const p = await publicProfile(sql, pm[1]!, now);
+    return p ? json(p) : json({ message: "No such player." }, 404);
+  }
+
   const current = await userFromToken(sql, token, now);
 
   /** Switches the browser to `user` (a new session) and answers with `body` or a redirect. */

@@ -15,9 +15,7 @@ const b = await chromium.launch();
 const p = await b.newPage({ ...devices["iPhone 13"] });
 p.on("pageerror", (e) => console.log("pageerror", e.message));
 await p.goto(url + "?debug&clock=30&nolanding");
-await p.getByRole("radio", { name: /Boss raid/ }).click();
-await p.getByLabel("Your name").fill("T");
-await p.getByRole("button", { name: "Take on the boss alone" }).click();
+await p.getByRole("button", { name: "Boss alone" }).click();
 await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: new RegExp(bossName) }).click();
 for (let i = 0; i < 200; i++) {
   if ((await p.evaluate(() => window.match?.phase.kind)) === "play") break;

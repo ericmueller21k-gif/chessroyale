@@ -3,7 +3,8 @@ import type { ClientMessage, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, newLobbyRecord, type LobbyRecord } from "./lobby.ts";
 import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired, withSecrets } from "./api.ts";
-import { d1Sql, recordResult } from "./accounts.ts";
+import { d1Sql, ensureSchema, recordResult } from "./accounts.ts";
+import { recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { serverRecheck, warmEngine } from "./engine.ts";
 import { DEFAULT_SETTINGS } from "@chessroyale/core";
@@ -20,6 +21,8 @@ export class Lobby extends DurableObject<Env> {
   private record: LobbyRecord | null = null;
   /** The engine server answered its wake-up ping (only then does the host skip its own re-check). */
   private engineUp = false;
+  /** What this lobby last told the live line, and when (it reports changes, and at least once a minute). */
+  private reported: { key: string; at: number } | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -75,7 +78,7 @@ export class Lobby extends DurableObject<Env> {
     if (this.record.phase === "results" && !this.record.resultsSaved && this.env.DB) {
       this.record.resultsSaved = true;
       const sql = d1Sql(this.env.DB);
-      const mode = this.record.overrides?.raid ? "boss" : this.record.overrides?.mode === "crowd" ? "crowd" : "classic";
+      const mode = this.mode();
       for (const r of core.humanResults()) {
         const userId = this.record.accounts?.[r.playerId];
         if (userId) await recordResult(sql, userId, { ...r, mode, online: true }, Date.now()).catch(() => undefined);
@@ -85,6 +88,34 @@ export class Lobby extends DurableObject<Env> {
     const at = core.nextAlarm;
     if (at) await this.ctx.storage.setAlarm(at);
     else await this.ctx.storage.deleteAlarm();
+    // The live line hears about it in the background (it never holds up the match).
+    void this.reportLive(core).catch(() => undefined);
+  }
+
+  private mode(): LiveMode {
+    return this.record?.overrides?.raid ? "boss" : this.record?.overrides?.mode === "crowd" ? "crowd" : "classic";
+  }
+
+  /** Tells the live line (D1) about this lobby when something it shows changed, or a minute has passed. */
+  private async reportLive(core: LobbyCore) {
+    const rec = this.record;
+    if (!rec || !this.env.DB) return;
+    const s = core.liveSummary();
+    const kind = rec.auto ? "queue" : "private";
+    const key = `${s.phase}:${s.humans}:${s.alive}`;
+    const now = Date.now();
+    const waitDue = rec.auto?.filledAt && !rec.auto.waitSaved;
+    if (!waitDue && this.reported?.key === key && (s.phase === "over" || now - this.reported.at < 60_000)) return;
+    if (s.phase === "waiting" && kind === "private" && !this.reported) return;
+    this.reported = { key, at: now };
+    const sql = d1Sql(this.env.DB);
+    await ensureSchema(sql, this.env.DB);
+    await reportLobby(sql, { code: rec.code, mode: this.mode(), kind, ...s }, now);
+    if (waitDue && rec.auto) {
+      rec.auto.waitSaved = true;
+      await this.ctx.storage.put("lobby", rec);
+      await recordWait(sql, this.mode(), rec.auto.waiters ?? 0, rec.auto.waitMs ?? 0, now);
+    }
   }
 
   async exists(): Promise<boolean> {
@@ -146,18 +177,13 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, "Sign in to play online");
         return;
       }
-      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null, msg.look);
+      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null, msg.look, attached?.userId);
       if (!result.ok) {
         ws.send(JSON.stringify({ t: "error", message: result.message, now: Date.now() }));
         ws.close(1008, result.message);
         return;
       }
       ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId });
-      if (attached?.userId) {
-        // (core.save() returns the record the core works on, so this sticks.)
-        const rec = core.save();
-        rec.accounts = { ...(rec.accounts ?? {}), [result.playerId]: attached.userId };
-      }
       // connect() sent the welcome before the socket was attached; send it again now it can be found.
       core.resendTo(result.playerId);
       await this.persist(core);

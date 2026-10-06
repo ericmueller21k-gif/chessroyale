@@ -6,8 +6,9 @@
  * so it can be tested with an in-memory SQLite.
  */
 
-import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, shopItem, starterItem, type ShopSlot, type ShopState } from "@chessroyale/core";
+import { BOSS_TIERS, FRONT_DOOR, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, equippedLook, ratingTier, shopItem, starterItem, topPercent, type ItemLook, type ShopSlot, type ShopState } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
+import { LIVE_SCHEMA } from "./live.ts";
 
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
@@ -89,7 +90,34 @@ const SCHEMA = [
   )`,
   // Crate items and what's equipped (locker.ts).
   ...LOCKER_SCHEMA,
+  // The live line: running lobbies, queue waits (live.ts).
+  ...LIVE_SCHEMA,
 ];
+
+/**
+ * Columns added after a table first shipped: [table, column, type]. Each is added once (the table's columns are
+ * read first); `then` runs right after a column is added, to fill it in from what's already stored.
+ */
+const COLUMNS: { table: string; column: string; type: string; then?: string[] }[] = [
+  // The profile's stats (Oct 6, 2026): recorded from then on; older results leave them empty.
+  { table: "results", column: "brilliant", type: "INTEGER" },
+  { table: "results", column: "best_move", type: "TEXT" },
+  { table: "results", column: "cuts", type: "INTEGER" },
+  { table: "results", column: "cuts_survived", type: "INTEGER" },
+  { table: "results", column: "strikes", type: "INTEGER" },
+  { table: "results", column: "strikes_survived", type: "INTEGER" },
+  { table: "results", column: "survived", type: "INTEGER" },
+  { table: "results", column: "last_stand", type: "INTEGER" },
+  { table: "results", column: "boss_elo", type: "INTEGER" },
+  // Each account's latest rating, for the percentile (filled in from the results already stored).
+  { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
+];
+const AFTER_COLUMNS = [`CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`];
+
+/** The latest rating among a user's results (SQL). */
+function LATEST_RATING(userId: string) {
+  return `(SELECT r.rating FROM results r WHERE r.user_id = ${userId} AND r.rating IS NOT NULL ORDER BY r.played_at DESC, r.id DESC LIMIT 1)`;
+}
 
 const ready = new WeakSet<object>();
 /** Creates the tables if they don't exist yet (once per connection; cheap and idempotent). */
@@ -100,6 +128,23 @@ export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
     await sql.run(s).catch((e: unknown) => {
       if (!/duplicate column/i.test(String(e))) throw e;
     });
+  const have = new Map<string, Set<string> | null>();
+  for (const c of COLUMNS) {
+    if (!have.has(c.table)) {
+      const cols = await sql.all<{ name: string }>(`PRAGMA table_info(${c.table})`).catch(() => null);
+      have.set(c.table, cols ? new Set(cols.map((r) => r.name)) : null);
+    }
+    if (have.get(c.table)?.has(c.column)) continue;
+    const added = await sql.run(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`).then(
+      () => true,
+      (e: unknown) => {
+        if (!/duplicate column/i.test(String(e))) throw e;
+        return false;
+      },
+    );
+    if (added) for (const t of c.then ?? []) await sql.run(t);
+  }
+  for (const s of AFTER_COLUMNS) await sql.run(s);
   ready.add(key);
 }
 
@@ -197,8 +242,20 @@ export async function userFromToken(sql: Sql, token: string | null | undefined, 
   if (!token) return null;
   const s = await sql.first<{ user_id: string; expires_at: number }>("SELECT user_id, expires_at FROM sessions WHERE token_hash = ?", await sha256(token));
   if (!s || s.expires_at < now) return null;
-  await sql.run("UPDATE users SET last_seen = ? WHERE id = ?", now, s.user_id);
+  await touchUser(sql, s.user_id, now);
   return getUser(sql, s.user_id);
+}
+
+/** Marks an account as seen now (what "online" counts). Written at most every 15 s per account. */
+export async function touchUser(sql: Sql, userId: string, now: number): Promise<void> {
+  await sql.run("UPDATE users SET last_seen = ? WHERE id = ? AND last_seen < ?", now, userId, now - 15_000);
+}
+
+/** The heartbeat: marks the session's account as seen, without loading it. */
+export async function touchSession(sql: Sql, token: string | null | undefined, now: number): Promise<void> {
+  if (!token) return;
+  const s = await sql.first<{ user_id: string; expires_at: number }>("SELECT user_id, expires_at FROM sessions WHERE token_hash = ?", await sha256(token));
+  if (s && s.expires_at >= now) await touchUser(sql, s.user_id, now);
 }
 
 export async function updateProfile(sql: Sql, userId: string, patch: { name?: unknown; icon?: unknown }): Promise<User> {
@@ -231,6 +288,7 @@ export async function signInWithIdentity(
     if (current && current.id !== owner.id && !current.email && !current.google_sub) {
       // A guest signing in to an existing account: bring the guest's matches along.
       await sql.run("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id);
+      await sql.run(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id);
       await moveShop(sql, current.id, owner.id);
       await sql.run("DELETE FROM sessions WHERE user_id = ?", current.id);
       await sql.run("DELETE FROM users WHERE id = ?", current.id);
@@ -318,22 +376,54 @@ export interface MatchResult {
   teamWon?: boolean | null;
   avgScore?: number | null;
   rating?: number | null;
+  /** The profile's stats (recorded from Oct 6, 2026; see MatchFeats in core). */
+  brilliant?: number | null;
+  bestMove?: string | null;
+  cuts?: number | null;
+  cutsSurvived?: number | null;
+  strikes?: number | null;
+  strikesSurvived?: number | null;
+  survived?: boolean | null;
+  lastStand?: boolean | null;
+  bossElo?: number | null;
 }
 
+/** A count from a result (0-500), or null. */
+const count = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Math.max(0, Math.min(500, Math.round(n))) : null);
+const flag = (b: unknown) => (b === true ? 1 : b === false ? 0 : null);
+/** A move in SAN (e.g. Nxe5, O-O-O, e8=Q+), or null. */
+export const cleanSan = (m: unknown) => (typeof m === "string" && /^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/.test(m) ? m : null);
+
 export async function recordResult(sql: Sql, userId: string, r: MatchResult, now: number): Promise<void> {
+  const rating = typeof r.rating === "number" && Number.isFinite(r.rating) ? Math.round(r.rating) : null;
+  const cuts = count(r.cuts);
+  const strikes = count(r.strikes);
+  const mode = r.mode === "crowd" || r.mode === "boss" ? r.mode : "classic";
   await sql.run(
-    "INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
+       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     userId,
-    r.mode === "crowd" || r.mode === "boss" ? r.mode : "classic",
+    mode,
     r.online ? 1 : 0,
     Math.max(1, Math.round(r.placement)),
     Math.max(1, Math.round(r.players)),
     r.team ?? null,
     r.teamWon === undefined || r.teamWon === null ? null : r.teamWon ? 1 : 0,
     r.avgScore ?? null,
-    r.rating ?? null,
+    rating,
     now,
+    count(r.brilliant),
+    cleanSan(r.bestMove),
+    cuts,
+    cuts === null ? null : Math.min(cuts, count(r.cutsSurvived) ?? 0),
+    strikes,
+    strikes === null ? null : Math.min(strikes, count(r.strikesSurvived) ?? 0),
+    flag(r.survived),
+    flag(r.lastStand),
+    mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
   );
+  if (rating !== null) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
 }
 
 export interface ModeStats {
@@ -379,6 +469,164 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
       placement: r.placement,
       players: r.players,
       teamWon: r.team_won === null ? null : r.team_won === 1,
+      playedAt: r.played_at,
+    })),
+  };
+}
+
+// ---------------- Public profiles ----------------
+
+/** Crowd stats on a profile. A stat is null when none of the results it counts has it recorded. */
+export interface CrowdStats {
+  games: number;
+  wins: number;
+  avgPlace: number | null;
+  best: number | null;
+  /** Cuts survived out of cuts faced, as a percentage. */
+  cutsSurvivedPct: number | null;
+  brilliant: number | null;
+}
+
+export interface RaidStats {
+  raids: number;
+  /** Different bosses (tiers) beaten. */
+  bossesBeaten: number;
+  /** The boss's strikes you lived through (it struck someone else). */
+  strikesSurvived: number | null;
+  /** Raids in which the God King made his Last Stand. */
+  lastStands: number | null;
+  /** Raids you were still standing at the end of, as a percentage. */
+  survivedPct: number | null;
+  brilliant: number | null;
+}
+
+/**
+ * What anyone can see of a player: no email, no sign-in method, no icon, nothing about the account itself.
+ * The same structure for your own profile and everyone else's.
+ */
+export interface PublicProfile {
+  id: string;
+  name: string;
+  /** What they wear: crate items, and the shop hat (shown when no crate item is on the head). */
+  look: ItemLook;
+  hat: string;
+  joinedAt: number;
+  lastSeen: number | null;
+  online: boolean;
+  rating: number | null;
+  tier: { label: string; color: string } | null;
+  /** "Top 18%" among rated players (null until enough players have a rating). */
+  topPercent: number | null;
+  crowd: CrowdStats;
+  boss: RaidStats;
+  /** The rating after each of the last 30 rated matches, oldest first. */
+  ratingHistory: number[];
+  /** Boss tiers (their strengths) beaten in raids. */
+  bossesBeaten: number[];
+  recent: { mode: string; online: boolean; placement: number; players: number; won: boolean | null; bestMove: string | null; bossElo: number | null; playedAt: number }[];
+}
+
+interface ResultRow {
+  mode: string;
+  online: number;
+  placement: number;
+  players: number;
+  team_won: number | null;
+  rating: number | null;
+  played_at: number;
+  brilliant: number | null;
+  best_move: string | null;
+  cuts: number | null;
+  cuts_survived: number | null;
+  strikes: number | null;
+  strikes_survived: number | null;
+  survived: number | null;
+  last_stand: number | null;
+  boss_elo: number | null;
+}
+
+/** The sum of a column over the rows that have it (null if none do). */
+const sumOf = (rows: ResultRow[], pick: (r: ResultRow) => number | null) => {
+  const xs = rows.map(pick).filter((x): x is number => x !== null);
+  return xs.length ? xs.reduce((a, b) => a + b, 0) : null;
+};
+const pct = (part: number | null, whole: number | null) => (part === null || !whole ? null : Math.round((100 * part) / whole));
+
+export function crowdStats(rows: ResultRow[]): CrowdStats {
+  const cuts = sumOf(rows, (r) => r.cuts);
+  return {
+    games: rows.length,
+    wins: rows.filter((r) => r.placement === 1).length,
+    avgPlace: rows.length ? Math.round((rows.reduce((a, r) => a + r.placement, 0) / rows.length) * 10) / 10 : null,
+    best: rows.length ? Math.min(...rows.map((r) => r.placement)) : null,
+    cutsSurvivedPct: pct(sumOf(rows.filter((r) => r.cuts !== null), (r) => r.cuts_survived), cuts),
+    brilliant: sumOf(rows, (r) => r.brilliant),
+  };
+}
+
+export function raidStats(rows: ResultRow[]): RaidStats {
+  const standing = rows.filter((r) => r.survived !== null);
+  return {
+    raids: rows.length,
+    bossesBeaten: new Set(rows.filter((r) => r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo)).size,
+    strikesSurvived: sumOf(rows, (r) => r.strikes_survived),
+    lastStands: sumOf(rows, (r) => r.last_stand),
+    survivedPct: standing.length ? pct(standing.filter((r) => r.survived === 1).length, standing.length) : null,
+    brilliant: sumOf(rows, (r) => r.brilliant),
+  };
+}
+
+/** Anyone's profile by account id (null if there's no such account). */
+export async function publicProfile(sql: Sql, userId: string, now: number): Promise<PublicProfile | null> {
+  const u = await sql.first<{ id: string; name: string; created_at: number; last_seen: number | null; rating: number | null }>(
+    "SELECT id, name, created_at, last_seen, rating FROM users WHERE id = ?",
+    userId,
+  );
+  if (!u) return null;
+  const rows = await sql.all<ResultRow>(
+    `SELECT mode, online, placement, players, team_won, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes,
+       strikes_survived, survived, last_stand, boss_elo
+     FROM results WHERE user_id = ? ORDER BY played_at DESC, id DESC`,
+    userId,
+  );
+  const rating = u.rating ?? rows.find((r) => r.rating !== null)?.rating ?? null;
+  let top: number | null = null;
+  if (rating !== null) {
+    const total = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE rating IS NOT NULL"))?.n ?? 0;
+    if (total >= FRONT_DOOR.percentileMinPlayers) {
+      const above = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE rating > ?", rating))?.n ?? 0;
+      top = topPercent(above + 1, total);
+    }
+  }
+  const raids = rows.filter((r) => r.mode === "boss");
+  const tier = ratingTier(rating);
+  return {
+    id: u.id,
+    name: u.name,
+    look: (await lockerState(sql, u.id)).look,
+    hat: equippedLook(await shopState(sql, u.id), "hat").hat ?? "none",
+    joinedAt: u.created_at,
+    lastSeen: u.last_seen,
+    online: u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
+    rating,
+    tier: tier ? { label: tier.label, color: tier.color } : null,
+    topPercent: top,
+    crowd: crowdStats(rows.filter((r) => r.mode === "crowd")),
+    boss: raidStats(raids),
+    ratingHistory: rows
+      .filter((r) => r.rating !== null)
+      .slice(0, 30)
+      .map((r) => r.rating!)
+      .reverse(),
+    bossesBeaten: [...new Set(raids.filter((r) => r.team_won === 1 && r.boss_elo !== null).map((r) => r.boss_elo!))].sort((a, b) => a - b),
+    recent: rows.slice(0, 10).map((r) => ({
+      mode: r.mode,
+      online: !!r.online,
+      placement: r.placement,
+      players: r.players,
+      won: r.team_won === null ? null : r.team_won === 1,
+      bestMove: r.best_move,
+      bossElo: r.boss_elo,
       playedAt: r.played_at,
     })),
   };

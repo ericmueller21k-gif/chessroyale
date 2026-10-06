@@ -1,4 +1,5 @@
 import { devices, expect, test, type Page } from "@playwright/test";
+import { createLobbyFromHome, joinFromInvite, named } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -21,16 +22,16 @@ test("two players in a lobby with 30 bots play a whole match; a reload rejoins t
   const host = await hostCtx.newPage();
   const guest = await guestCtx.newPage();
 
+  await named(host, "Hosty");
+  await named(guest, "Guesty");
   await host.goto("/?debug&mode=classic&rounds=1&clock=12&pace=quick");
-  await host.getByLabel("Your name").fill("Hosty");
-  await host.getByRole("button", { name: "Create a lobby" }).click();
+  await createLobbyFromHome(host);
   await expect(host.getByRole("heading", { name: /^Lobby / })).toBeVisible();
   const code = (await host.locator(".invite-code").textContent())!.trim();
   expect(code).toMatch(/^[A-Z2-9]{5}$/);
 
   await guest.goto(`/lobby/${code}?debug`);
-  await guest.getByLabel("Your name").fill("Guesty");
-  await guest.getByRole("button", { name: "Join lobby" }).click();
+  await joinFromInvite(guest);
   await expect(guest.getByText("Waiting for the host to start")).toBeVisible();
   await expect(host.locator(".lobby-players li")).toHaveCount(2);
 

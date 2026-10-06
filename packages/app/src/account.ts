@@ -138,6 +138,16 @@ export async function recordSoloResult(r: {
   teamWon?: boolean | null;
   avgScore?: number | null;
   rating?: number | null;
+  /** The profile's stats: brilliant moves, the best move, cuts and strikes faced and survived, the boss. */
+  brilliant?: number | null;
+  bestMove?: string | null;
+  cuts?: number | null;
+  cutsSurvived?: number | null;
+  strikes?: number | null;
+  strikesSurvived?: number | null;
+  survived?: boolean | null;
+  lastStand?: boolean | null;
+  bossElo?: number | null;
 }): Promise<void> {
   if (!state.profile) return;
   try {
@@ -146,4 +156,38 @@ export async function recordSoloResult(r: {
   } catch {
     // Not important enough to bother the player.
   }
+}
+
+/** The name you play under: your profile's, else this device's, else "Player". */
+export function playerName(): string {
+  const n = state.profile?.user.name;
+  if (n) return n;
+  try {
+    return localStorage.getItem("brc.name") || "Player";
+  } catch {
+    return "Player";
+  }
+}
+
+/** Anyone's profile, as anyone sees it (GET /api/profile/ID): nothing private. See the server's accounts.ts. */
+export interface PublicProfile {
+  id: string;
+  name: string;
+  look: ItemLook;
+  hat: string;
+  joinedAt: number;
+  lastSeen: number | null;
+  online: boolean;
+  rating: number | null;
+  tier: { label: string; color: string } | null;
+  topPercent: number | null;
+  crowd: { games: number; wins: number; avgPlace: number | null; best: number | null; cutsSurvivedPct: number | null; brilliant: number | null };
+  boss: { raids: number; bossesBeaten: number; strikesSurvived: number | null; lastStands: number | null; survivedPct: number | null; brilliant: number | null };
+  ratingHistory: number[];
+  bossesBeaten: number[];
+  recent: { mode: string; online: boolean; placement: number; players: number; won: boolean | null; bestMove: string | null; bossElo: number | null; playedAt: number }[];
+}
+
+export async function fetchProfile(id: string): Promise<PublicProfile> {
+  return api<PublicProfile>(`/api/profile/${encodeURIComponent(id)}`);
 }

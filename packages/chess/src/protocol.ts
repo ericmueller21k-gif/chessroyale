@@ -11,6 +11,10 @@ export interface LobbyPlayer {
   name: string;
   isBot: boolean;
   connected: boolean;
+  /** A person's account (their public profile: /api/profile/UID). */
+  uid?: string;
+  /** What they wear (sent once per player: keep the last one seen). */
+  look?: ItemLook;
 }
 
 export interface NetBoard {
@@ -206,7 +210,9 @@ export type ClientMessage =
   /** A pre-game vote (Crowd 50 v 50): the option this player pushed a pawn into. */
   | { t: "vote"; key: string; option: number }
   /** Boss battle, host only: the boss's move. */
-  | { t: "bossMove"; key: string; move: string };
+  | { t: "bossMove"; key: string; move: string }
+  /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
+  | { t: "leave" };
 
 export type ServerMessage = { now: number } & (
   | { t: "welcome"; playerId: string; token: string; code: string }
@@ -219,6 +225,8 @@ export type ServerMessage = { now: number } & (
       /** Matchmade ("Play now"): no host start; the match starts when full or at `fillAt` (server time), bots filling the rest. */
       auto?: boolean;
       fillAt?: number | null;
+      /** Matchmade: the seats were filled then (bots in the empty ones); the match begins a moment later. */
+      filledAt?: number;
     }
   | { t: "error"; message: string }
   | { t: "opening"; boards: NetBoard[]; until: number }
