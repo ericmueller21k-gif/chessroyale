@@ -30,6 +30,24 @@ on Eric's account.
    Nothing that changes play: no power-ups, no hints, no extra time. Earned only, not bought, unless Eric decides
    otherwise later.
 
+8. **Showing off your look** (Eric, Oct 6; ideas, not started). The game board stays standard chess pieces. Your crate
+   look appears around it, in places where people notice:
+   - **Your pick wears your look.** In Crowd, when your pick is a pawn move, its ghost on the board is your dressed
+     pawn (skin, hat, beard, weapon). In the reveal, the top pickers' ghosts show theirs.
+   - **The waiting room fills with pawns.** Instead of only a number counting up, your dressed pawn stands in the
+     middle and others drop in around it as they join (the cut screen's 10 × 10 grid, filling up). Bots fill the
+     last seats in plain pawns when the 60 s runs out.
+   - **The podium.** The results screen puts the top three's dressed pawns on a podium, the winner's biggest.
+   - **Tap a name** (leaderboard, cut screen, podium) for a card: their pawn, each item's tier, colour and purity.
+   - **A small head** (pawn plus hat) beside each name on the leaderboard.
+   - **The moment's star.** The brilliant-move badge, the queen-kill banner and the boss raid's victory shot feature
+     the player's dressed pawn.
+   - **A share card.** A results image with your pawn, place and best move, to post.
+   - **Rare drops,** later: "X opened a Shiny Pearl Crown" in the waiting room. Social, but only once crates matter
+     more, and with care if crates ever involve money.
+   - Who builds it: the `item-builder` delegate (it owns `Avatar`), briefed screen by screen. The waiting room and
+     the podium first.
+
 ## Needs Eric
 
 - **privacy@hunchess.com:** forward it to yourself with Cloudflare Email Routing (free), or name another address.
