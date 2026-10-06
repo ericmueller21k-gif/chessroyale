@@ -32,7 +32,7 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   await expect(page.getByRole("radio", { name: /Crowd/ })).toHaveAttribute("aria-checked", "true");
   // PLAY plays 99 bots; lobbies ask you to sign in.
   await expect(page.locator(".fd-hint")).toContainText("Solo vs 99 bots");
-  await page.getByRole("button", { name: "Play with friends" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
   await expect(page.getByRole("button", { name: "Create a lobby" })).toHaveCount(0);
   await expect(page.getByRole("dialog").getByRole("button", { name: "Sign in to play online" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();

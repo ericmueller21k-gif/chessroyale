@@ -105,7 +105,7 @@ export function RightPanel() {
   const now = Date.now();
   return (
     <aside class="fd-right" aria-label="Live">
-      <LiveLine live={live} />
+      <LiveLine live={live} stacked />
       <section class="fd-section">
         <h2 class="fd-label">PLAYING NOW</h2>
         {live && !live.playing.length && <p class="fd-note">No matches running right now. PLAY starts one.</p>}
@@ -126,5 +126,20 @@ export function RightPanel() {
         {live && live.playing.length > 0 && <p class="fd-note">Watching a match from outside comes later.</p>}
       </section>
     </aside>
+  );
+}
+
+/**
+ * The front door's frame: the page's background and its centre column. On a computer (1024 px and wider) with `nav`,
+ * the side menu on the left and the live panel on the right (not for `wide` pages, like the queue, which take the
+ * whole width); on a phone, just the centre.
+ */
+export function FrontFrame({ children, wide, page, nav }: { children: ComponentChildren; wide?: boolean; page?: FrontPage; nav?: FrontNav }) {
+  return (
+    <div class={`fd-root${wide ? " wide" : ""}${nav ? " framed" : ""}`}>
+      {nav && <SideMenu page={page} nav={nav} />}
+      <main class="fd-center">{children}</main>
+      {nav && !wide && <RightPanel />}
+    </div>
   );
 }

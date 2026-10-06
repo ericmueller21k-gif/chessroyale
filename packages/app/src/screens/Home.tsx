@@ -304,6 +304,7 @@ function FriendsSheet({
  * line, your dressed pawn, the mode picker, PLAY and the line under it, and four smaller buttons.
  */
 export function HomeScreen({
+  intent,
   loading,
   error,
   joinCode,
@@ -316,6 +317,8 @@ export function HomeScreen({
   onShop,
   onSignIn,
 }: {
+  /** The computer's side menu asked for the boss menu or Play with friends. */
+  intent?: { kind: "boss" | "friends"; n: number } | null;
   loading: boolean;
   error?: string | null;
   /** An invite link's code: the join form opens with it. */
@@ -350,6 +353,10 @@ export function HomeScreen({
     if (forRaid) onCreateLobby("raid");
     else onSolo("raid");
   };
+  useEffect(() => {
+    if (intent?.kind === "boss") bossAlone();
+    if (intent?.kind === "friends") setFriends(true);
+  }, [intent?.n]);
   const play = () => {
     if (mode === "classic") return;
     if (!onlineLocked) return onPlay(mode);

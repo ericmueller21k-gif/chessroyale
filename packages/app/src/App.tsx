@@ -23,7 +23,8 @@ import { ShopScreen } from "./screens/Shop.tsx";
 import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
 import { startLive } from "./live.ts";
 import { SettingsScreen } from "./screens/Settings.tsx";
-import { FrontFrame, Logo } from "./components/FrontDoor.tsx";
+import { Logo } from "./components/FrontDoor.tsx";
+import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
 import { LegalScreen } from "./screens/Legal.tsx";
@@ -106,6 +107,8 @@ export function App() {
   const profileOpen = useProfileTarget();
   const [showShop, setShowShop] = useState<false | "shop" | "locker">(() => (location.pathname === "/shop" ? "shop" : false));
   const [showSettings, setShowSettings] = useState(() => location.pathname === "/settings");
+  /** The computer's side menu: open the home screen's boss menu or Play with friends. */
+  const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(null);
   const [legal, setLegal] = useState<"privacy" | "terms" | null>(() =>
     location.pathname === "/privacy" ? "privacy" : location.pathname === "/terms" ? "terms" : null,
   );
@@ -311,6 +314,40 @@ export function App() {
     history.replaceState(null, "", "/");
   };
 
+  /** Where the computer's side menu goes (front-door pages only, outside a match). */
+  const goHome = () => {
+    closeProfile();
+    setShowSettings(false);
+    setShowShop(false);
+    if (location.pathname !== "/") history.replaceState(null, "", "/");
+  };
+  const nav: FrontNav = {
+    home: () => {
+      goHome();
+      setHomeIntent(null);
+    },
+    bossAlone: () => {
+      goHome();
+      setHomeIntent({ kind: "boss", n: Date.now() });
+    },
+    friends: () => {
+      goHome();
+      setHomeIntent({ kind: "friends", n: Date.now() });
+    },
+    shop: () => {
+      goHome();
+      setShowShop("shop");
+    },
+    profile: () => {
+      goHome();
+      openProfile({ you: true, name: account().profile?.user.name ?? "" });
+    },
+    settings: () => {
+      goHome();
+      setShowSettings(true);
+    },
+  };
+
   if (!match && soundLab) return <SoundLab onBack={() => setSoundLab(false)} />;
   if (!match && legal) {
     return (
@@ -325,7 +362,7 @@ export function App() {
   }
   if (!match && showSettings) {
     return (
-      <FrontFrame>
+      <FrontFrame page="settings" nav={nav}>
         <SettingsScreen
           onBack={() => {
             setShowSettings(false);
@@ -338,7 +375,7 @@ export function App() {
   }
   if (!match && profileOpen) {
     return (
-      <FrontFrame>
+      <FrontFrame page={profileOpen.you || profileOpen.uid === account().profile?.user.id ? "profile" : undefined} nav={nav}>
         <ProfilePage
           target={profileOpen}
           onLocker={() => {
@@ -355,6 +392,7 @@ export function App() {
   }
   if (!match && showShop) {
     return (
+      <FrontFrame page="shop" nav={nav}>
       <ShopScreen
         initial={showShop === "locker" ? "locker" : undefined}
         onBack={() => {
@@ -362,6 +400,7 @@ export function App() {
           if (location.pathname === "/shop") history.replaceState(null, "", "/");
         }}
       />
+      </FrontFrame>
     );
   }
   // Still finding out who you are: a plain splash rather than a flash of the wrong screen.
@@ -391,8 +430,9 @@ export function App() {
   }
   if (!match) {
     return (
-      <FrontFrame>
+      <FrontFrame page="home" nav={nav}>
       <HomeScreen
+        intent={homeIntent}
         loading={loading}
         error={error}
         joinCode={mustSignInToPlayOnline() ? undefined : linkCode}

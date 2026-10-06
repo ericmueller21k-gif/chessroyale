@@ -410,6 +410,8 @@ export function PlayerProfileScreen({
   return (
     <div class="fd-page fd-profile">
       {head}
+      {/* Two columns on a computer: who they are and what they wear; then their numbers. One column on a phone. */}
+      <div class="fd-profile-col">
       <div class="fd-card">
         <DressedPawn size="profile" shadow look={p.look} hat={p.hat} />
         <h1 class="fd-card-name">{p.name}</h1>
@@ -418,7 +420,7 @@ export function PlayerProfileScreen({
           {seenLine(p)} · joined {joined}
         </div>
         <div class="fd-pills">
-          <span class="fd-pill tier" style={{ "--tier": p.tier?.color ?? "var(--fd-gold)" }}>
+          <span class={`fd-pill${p.tier ? " tier" : ""}`} style={p.tier ? { "--tier": p.tier.color } : undefined}>
             {p.tier && p.rating !== null ? `${p.tier.label} · ${p.rating}` : "No rating yet"}
           </span>
           {p.topPercent !== null && <span class="fd-pill">Top {p.topPercent}%</span>}
@@ -437,6 +439,8 @@ export function PlayerProfileScreen({
         )}
       </div>
       <Wearing look={p.look} hat={p.hat} own={own} />
+      </div>
+      <div class="fd-profile-col">
       <Stats p={p} own={own} />
       <Bosses beaten={p.bossesBeaten} />
       <Recent p={p} />
@@ -465,6 +469,7 @@ export function PlayerProfileScreen({
           </FdButton>
         </div>
       )}
+      </div>
       {sheet === "edit" && <EditSheet onClose={() => setSheet(null)} />}
       {sheet === "report" && <ReportSheet p={p} onClose={() => setSheet(null)} />}
     </div>
