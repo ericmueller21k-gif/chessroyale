@@ -877,15 +877,15 @@ Eric's design:
 Eric's design, a fun bonus for now: free and unlimited while testing, and fully compliant (odds shown, regional rules) if it ever involves money.
 
 - **Three independent layers of rarity** (`core/crates.ts`):
-  - **Tier, which decides the item.** The strip lands on a tier's present (colour-coded), which opens to one of that tier's items, each as likely as the others; or on Fischer Random (Eric, Oct 6). The tier names honour Puzzle Pirates:
+  - **Tier, which decides the item.** The strip lands on a tier's present (colour-coded), which opens to one of that tier's items, each as likely as the others; or on Fischer Random (Eric, Oct 6). The tiers run Common to Mythic (renamed Oct 6 from the Puzzle Pirates names, which went to player ranks; entries below written before then use the old names):
 
     | Present | Chance | Items inside (slot) | Each |
     | --- | --- | --- | --- |
-    | Novice (grey) | 40% | Santa Beard (face), Beanie (head), Christmas Tree Tee (skin) | 13.3% |
-    | Broad (green) | 26% | Antlers (head) | 26% |
-    | Paragon (blue) | 18% | Santa Hat (head), Ski Goggles (face) | 9% |
-    | Sublime (purple) | 14% | Snowman (skin), Present (head), Gingerbread Man (skin), Chimney (skin) | 3.5% |
-    | Fischer Random (a gold crown, not a present; a second spin) | 2% | Exalted Gift-Wrap Tube (weapon, 40%) or Candy Cane (weapon, 40%), Transcendent Fire & Ice Crown (head, 20%) | 0.8%, 0.8%, 0.4% |
+    | Common (grey) | 40% | Santa Beard (face), Beanie (head), Christmas Tree Tee (skin) | 13.3% |
+    | Uncommon (green) | 26% | Antlers (head) | 26% |
+    | Rare (blue) | 18% | Santa Hat (head), Ski Goggles (face) | 9% |
+    | Epic (purple) | 14% | Snowman (skin), Present (head), Gingerbread Man (skin), Chimney (skin) | 3.5% |
+    | Fischer Random (a gold crown, not a present; a second spin) | 2% | Legendary Gift-Wrap Tube (weapon, 40%) or Candy Cane (weapon, 40%), Mythic Fire & Ice Crown (head, 20%) | 0.8%, 0.8%, 0.4% |
 
     So the crown is 0.4%. (Before the presents, odds were per item: 16% each for the commons, 12% antlers, 8% hat.)
   - **Colour:** Red 30%, Yellow 30%, Sage 14%, Opal 9%, Cobalt 7%, Midnight 4.5%, Emerald 3%, Oceanic 2%, Pearl 0.5%. Opal, Oceanic and Pearl have a two-tone sheen.
@@ -901,7 +901,7 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
 - **Opening:**
   - A CS:GO-style strip: decoy tiles by the odds, with Fischer Random shown three times as often as it lands to tease.
   - It eases out over 6.2 s with a click per passing tile, so the clicks slow as it lands.
-  - Landing on Fischer Random shows a gold crown with "?", the "FISCHER RANDOM!" banner, and a second spin among Exalted and Transcendent items.
+  - Landing on Fischer Random shows a gold crown with "?", the "FISCHER RANDOM!" banner, and a second spin among Legendary and Mythic items.
   - The reveal is an FF-style window (the God King's menu style) with the tier, name, colour, purity and "Shiny!".
 - **Where:** Shop → Crates (with each crate's page of odds) and Shop → Locker (avatar preview, items rarest first, tap to wear or take off).
 - **Shine, after Eric's first look:** the sparkle sat off to the side. Now a broad soft band of light rolls slowly across each painted region of a shiny item (CSS-animated, 4.2 s, then a pause), sized to the item itself so thin items like the tube get it too.
@@ -960,6 +960,25 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - **Opening:** the strip spins to a present; the present shakes and bursts ("Novice present", in its colour, 1.1 s); then, if it holds more than one item, a second, shorter spin (3.4 s) among them; then the reveal. A one-item present goes straight to the reveal. Fischer Random is unchanged (banner, a 4.8 s spin). The strip still shows Fischer Random three times as often as it lands, to tease; second-spin decoys are drawn evenly from the present's items.
   - **The crate page** lists the presents with their odds (and how many items each holds), then every item with its own chance.
   - Server rolls: the tier, then an item evenly from that tier's present (`presentItems`). Nothing stored changes.
+- **Tier names: Common to Mythic (Eric, Oct 6):** "I kind of just want to revert to a common, uncommon, rare, etc.
+  style." The Puzzle Pirates names move to the player rank ladder (the hub's work), so the items no longer use them.
+
+  | Was | Now | Colour (unchanged) |
+  | --- | --- | --- |
+  | Novice | Common | grey |
+  | Broad | Uncommon | green |
+  | Paragon | Rare | blue |
+  | Sublime | Epic | purple |
+  | Exalted (Fischer Random) | Legendary | gold |
+  | Transcendent (Fischer Random) | Mythic | red |
+
+  - **Legendary and Mythic for the two Fischer Random tiers,** not Eric's "mythic and unknown": "Unknown" on a tier pill
+    ("Head · Red · 80% pure · Unknown") reads like missing data. Legendary then Mythic is the ladder players already
+    know, and keeps his "Mythic" at the very top. Swapping in "Unknown" is a one-line change in `TIERS` if he prefers it.
+  - **The ids changed too** (`common` … `mythic`), so the code doesn't keep names that are now player ranks. Nothing
+    stores a tier: the locker stores the item (`def`) and the tier comes from `ITEM_DEFS`, as do looks sent to others
+    online. No migration; owned items show the new names at once.
+  - Odds, items and art are unchanged. A test pins the six names, their order (the locker sorts by it) and colours.
 
 ## The God King's Last Stand (Oct 5, 2026; built)
 

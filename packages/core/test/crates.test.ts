@@ -11,7 +11,7 @@ describe("crates", () => {
     const total = ITEM_DEFS.reduce((s, d) => s + itemChance(crate, d.id), 0);
     expect(total).toBeCloseTo(1);
     expect(itemChance(crate, "fire-ice-crown")).toBeCloseTo(0.004);
-    // A present's chance, shared evenly by its items: Novice 40% over three, Paragon 18% over two.
+    // A present's chance, shared evenly by its items: Common 40% over three, Rare 18% over two.
     expect(itemChance(crate, "beanie")).toBeCloseTo(0.4 / 3);
     expect(itemChance(crate, "ski-goggles")).toBeCloseTo(0.09);
     expect(itemChance(crate, "antlers")).toBeCloseTo(0.26);
@@ -19,15 +19,28 @@ describe("crates", () => {
 
   it("the strip: a present per tier, each rarer than the one below, then Fischer Random at 2%", () => {
     const tiers = crate.strip.map((x) => x.tier);
-    expect(tiers).toEqual(["novice", "broad", "paragon", "sublime", FISCHER]);
+    expect(tiers).toEqual(["common", "uncommon", "rare", "epic", FISCHER]);
     for (let i = 1; i < crate.strip.length; i++) expect(crate.strip[i]!.weight).toBeLessThan(crate.strip[i - 1]!.weight);
     expect(presentChance(crate, FISCHER)).toBeCloseTo(0.02);
     // Every present holds something, and every item in the presents is of a present's tier.
     for (const t of tiers.filter((t) => t !== FISCHER)) expect(presentItems(crate, t).length).toBeGreaterThan(0);
     for (const id of crate.items) expect(tiers).toContain(itemDef(id)?.tier);
-    // Exalted and Transcendent come only through Fischer Random.
-    for (const d of ITEM_DEFS.filter((d) => d.tier === "exalted" || d.tier === "transcendent")) expect(crate.fischer.map((x) => x.item)).toContain(d.id);
+    // Legendary and Mythic come only through Fischer Random.
+    for (const d of ITEM_DEFS.filter((d) => d.tier === "legendary" || d.tier === "mythic")) expect(crate.fischer.map((x) => x.item)).toContain(d.id);
     expect(TIERS.length).toBe(6);
+  });
+
+  it("the tiers: Common to Mythic, commonest first, each in its colour", () => {
+    // The order sorts the locker (rarest first). The Puzzle Pirates names are player ranks now (Oct 6, 2026).
+    expect(TIERS.map((t) => `${t.name} ${t.color}`)).toEqual([
+      "Common #9ca3af",
+      "Uncommon #4ade80",
+      "Rare #60a5fa",
+      "Epic #c084fc",
+      "Legendary #fbbf24",
+      "Mythic #f43f5e",
+    ]);
+    for (const t of TIERS) expect(t.id).toBe(t.name.toLowerCase());
   });
 
   it("rolls land in the right proportions (100,000 opens)", () => {
@@ -50,12 +63,12 @@ describe("crates", () => {
       expect(r.blemish).toBeGreaterThanOrEqual(0);
       expect(r.blemish).toBeLessThanOrEqual(100);
     }
-    // The Novice present (three items, evenly) about 40% in all, a third each; Paragon (two items) 18%, 9% each.
-    const novice = ["santa-beard", "beanie", "tree-tee"];
-    const noviceShare = novice.reduce((s, d) => s + (count[d] ?? 0), 0) / n;
-    expect(noviceShare).toBeGreaterThan(0.39);
-    expect(noviceShare).toBeLessThan(0.41);
-    for (const d of novice) {
+    // The Common present (three items, evenly) about 40% in all, a third each; Rare (two items) 18%, 9% each.
+    const common = ["santa-beard", "beanie", "tree-tee"];
+    const commonShare = common.reduce((s, d) => s + (count[d] ?? 0), 0) / n;
+    expect(commonShare).toBeGreaterThan(0.39);
+    expect(commonShare).toBeLessThan(0.41);
+    for (const d of common) {
       expect(count[d]! / n).toBeGreaterThan(0.128);
       expect(count[d]! / n).toBeLessThan(0.139);
     }
@@ -64,10 +77,10 @@ describe("crates", () => {
       expect(count[d]! / n).toBeLessThan(0.095);
     }
     expect(count["antlers"]! / n).toBeCloseTo(0.26, 1);
-    // Sublime (four items) about 14% in all, 3.5% each.
-    const sublime = ["snowman", "present", "gingerbread", "chimney"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
-    expect(sublime).toBeGreaterThan(0.13);
-    expect(sublime).toBeLessThan(0.15);
+    // Epic (four items) about 14% in all, 3.5% each.
+    const epic = ["snowman", "present", "gingerbread", "chimney"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
+    expect(epic).toBeGreaterThan(0.13);
+    expect(epic).toBeLessThan(0.15);
     expect(fischer / n).toBeGreaterThan(0.015);
     expect(fischer / n).toBeLessThan(0.025);
     // Shiny (90%+) about 1 in 250; most between 30% and 70% (80%); under 5% about 1 in 100. Pearl about 0.5%.
