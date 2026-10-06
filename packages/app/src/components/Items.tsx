@@ -360,12 +360,24 @@ function FireIceCrown({ p }: { p: Paint }) {
   );
 }
 
-/** A present, worn as a helmet: the box over the head down to the neck, its ribbon and bow in the second colour. */
+/** The present's visor: an oval cut out of the box (wound the other way, so it's a hole); the ribbon stops at it. */
+const VISOR = "M41 30.5 a9 4 0 1 0 18 0 a9 4 0 1 0 -18 0 Z";
+/**
+ * A present, worn as a helmet: the box over the head down to the neck, with a visor to see the face through; its
+ * ribbon and bow in the second colour.
+ */
 function Present({ p, p2 }: { p: Paint; p2: Paint }) {
   return (
     <g>
-      <Region p={p} name="box" d={["M37 22 L63 22 L63 38 Q63 39.5 61.5 39.5 L38.5 39.5 Q37 39.5 37 38 Z", "M35 15.5 Q35 14.5 36 14.5 L64 14.5 Q65 14.5 65 15.5 L65 22 L35 22 Z"]} />
-      <Region p={p2} name="ribbon" d={["M47 14.5 L53 14.5 L53 39.5 L47 39.5 Z", "M50 14.5 C44 4 34 7 40 14.5 Z", "M50 14.5 C56 4 66 7 60 14.5 Z"]} />
+      <Region p={p} name="box" d={[`M37 22 L63 22 L63 38 Q63 39.5 61.5 39.5 L38.5 39.5 Q37 39.5 37 38 Z ${VISOR}`, "M35 15.5 Q35 14.5 36 14.5 L64 14.5 Q65 14.5 65 15.5 L65 22 L35 22 Z"]} />
+      <Region
+        p={p2}
+        name="ribbon"
+        d={["M47 14.5 H53 V26.73 A9 4 0 0 0 47 26.73 Z", "M47 39.5 V34.27 A9 4 0 0 0 53 34.27 V39.5 Z", "M50 14.5 C44 4 34 7 40 14.5 Z", "M50 14.5 C56 4 66 7 60 14.5 Z"]}
+      />
+      {/* A hint of glass, and a glint. */}
+      <path d={VISOR} fill="#fff" opacity="0.12" />
+      <path d="M44 28.6 Q46.5 27.4 49 27.3" fill="none" stroke="#fff" opacity="0.7" stroke-linecap="round" {...lw(1.3)} />
       <path d="M47 22 H53" fill="none" {...LINE} {...lw(2)} />
       <Region p={p2} name="knot" d={["M47.4 13.6 a2.6 2.6 0 1 0 5.2 0 a2.6 2.6 0 1 0 -5.2 0 Z"]} outline={false} />
       <circle cx="50" cy="13.6" r="2.6" fill="none" {...LINE} {...lw(2)} />
@@ -427,28 +439,120 @@ function Gingerbread({ p, side }: { p: Paint; side: "w" | "b" }) {
 const PAWN_PATH =
   "m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z";
 
-/** A chimney (a skin): the pawn sitting in a red-brick chimney up to its chest; the cap takes the colour. */
+/** Whether a colour is light (so lines on it should be darker, not lighter). */
+const isLight = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.6;
+};
+
+/**
+ * A chimney (a skin): the pawn sitting in a brick chimney up to its chest. The bricks and the cap take the colour;
+ * the mortar is a shade of it (lighter on a dark colour, darker on a light one), so the bricks still read.
+ */
 function Chimney({ p, side }: { p: Paint; side: "w" | "b" }) {
   const bricks = [];
   for (let row = 0, y = 64; y < 96; row++, y += 6.5) {
     bricks.push(<path key={`h${y}`} d={`M24 ${y} H76`} />);
     for (let x = row % 2 ? 31 : 37.5; x < 76; x += 13) bricks.push(<path key={`v${y}-${x}`} d={`M${x} ${y} v6.5`} />);
   }
+  const mortar = isLight(p.hex) ? darken(p.hex, 0.3) : lighten(p.hex, 0.55);
   return (
     <g>
       <g transform="scale(2.2222)">
         <path d={PAWN_PATH} fill={side === "w" ? "#fff" : "#000"} stroke="#000" stroke-width="1.5" stroke-linecap="round" />
       </g>
       <ellipse cx="50" cy="95" rx="30" ry="3" fill="#000" opacity="0.12" />
-      <clipPath id={`${p.id}-brick`}>
-        <rect x="24" y="61" width="52" height="33" />
-      </clipPath>
-      <rect x="24" y="61" width="52" height="33" fill="#b3322b" />
-      <g clip-path={`url(#${p.id}-brick)`} fill="none" stroke="#f3eee6" {...lw(1.5)}>
-        {bricks}
-      </g>
-      <rect x="24" y="61" width="52" height="33" fill="none" {...LINE} />
+      <Region
+        p={p}
+        name="bricks"
+        d={["M24 61 H76 V94 H24 Z"]}
+        over={
+          <g fill="none" stroke={mortar} {...lw(1.5)}>
+            {bricks}
+          </g>
+        }
+      />
       <Region p={p} name="cap" d={["M19 55 Q19 53.5 20.5 53.5 L79.5 53.5 Q81 53.5 81 55 L81 62.5 L19 62.5 Z"]} />
+    </g>
+  );
+}
+
+/** A plain knit beanie: the crown and a ribbed cuff, snug on the head. */
+function Beanie({ p }: { p: Paint }) {
+  const ribs = [];
+  for (let x = 42.5; x < 58; x += 2.5) ribs.push(<path key={x} d={`M${x} 22.5 V26.5`} />);
+  return (
+    <g>
+      <Region p={p} name="crown" d={["M41 23 C41 11.5 59 11.5 59 23 Z"]} />
+      <Region
+        p={p}
+        name="cuff"
+        d={["M42.5 21.5 H57.5 Q60.5 21.5 60.5 24.25 Q60.5 27 57.5 27 H42.5 Q39.5 27 39.5 24.25 Q39.5 21.5 42.5 21.5 Z"]}
+        over={
+          <g stroke="#000" opacity="0.22" {...lw(1)}>
+            {ribs}
+          </g>
+        }
+      />
+    </g>
+  );
+}
+
+/**
+ * Ski goggles: the frame (and its strap) in the colour, a see-through lens in the second colour. Thinner outlines
+ * than usual, so the frame still shows on a pawn-sized avatar.
+ */
+const LENS = "M43 25.6 Q39.8 25.6 39.8 28.4 V29.7 Q39.8 32.4 43 32.4 H46.6 Q47.5 32.4 48.2 31.2 Q50 28.9 51.8 31.2 Q52.5 32.4 53.4 32.4 H57 Q60.2 32.4 60.2 29.7 V28.4 Q60.2 25.6 57 25.6 Z";
+const GOGGLES =
+  "M42.5 23.2 H57.5 Q62.8 23.2 62.8 28 V30 Q62.8 34.8 57.5 34.8 H54 Q52.3 34.8 51.4 33.2 Q50 31.4 48.6 33.2 Q47.7 34.8 46 34.8 H42.5 Q37.2 34.8 37.2 30 V28 Q37.2 23.2 42.5 23.2 Z";
+function SkiGoggles({ p, p2 }: { p: Paint; p2: Paint }) {
+  const thin = { ...LINE, ...lw(1.6) };
+  return (
+    <g>
+      <Region p={p} name="strap" d={["M34 27.2 H66 V30.8 H34 Z"]} outline={false} />
+      <path d="M34 27.2 H66 V30.8 H34 Z" fill="none" {...thin} />
+      <g opacity="0.6">
+        <Region p={p2} name="lens" d={[LENS]} outline={false} />
+      </g>
+      <path d="M43.2 31 L47 26.7 M46.4 31 L48.8 28.4" fill="none" stroke="#fff" opacity="0.7" stroke-linecap="round" {...lw(1.2)} />
+      <Region p={p} name="frame" d={[`${GOGGLES} ${LENS}`]} outline={false} />
+      <path d={`${GOGGLES} ${LENS}`} fill="none" {...thin} />
+    </g>
+  );
+}
+
+/**
+ * A Christmas tree T-shirt (a skin): the pawn in a T-shirt, white on the white side and nearly black on the black
+ * side, printed with a tree whose bulbs take the colour.
+ */
+function TreeTee({ p, side }: { p: Paint; side: "w" | "b" }) {
+  const shirt = side === "w" ? "#fbfbf8" : "#2e323b";
+  const bulbs = [
+    [49.5, 52.5],
+    [53, 58.2],
+    [46.4, 59],
+    [56.4, 64.8],
+    [50, 64.2],
+    [43.4, 65.4],
+  ].map(([x, y]) => `M${x! - 1.9} ${y} a1.9 1.9 0 1 0 3.8 0 a1.9 1.9 0 1 0 -3.8 0 Z`);
+  return (
+    <g>
+      <g transform="scale(2.2222)">
+        <path d={PAWN_PATH} fill={side === "w" ? "#fff" : "#000"} stroke="#000" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <path
+        d="M44.5 37 Q50 41.5 55.5 37 L61.5 38.8 L71 46 L67.5 52 L63.6 49.5 L73.5 76 Q50 78.5 26.5 76 L36.4 49.5 L32.5 52 L29 46 L38.5 38.8 Z"
+        fill={shirt}
+        {...LINE}
+      />
+      <path d="M63.6 49.5 L64.8 46.2 M36.4 49.5 L35.2 46.2" fill="none" {...LINE} {...lw(1.6)} />
+      <path d="M50 46.5 L56 54.5 L53.5 54.5 L59 61 L56 61 L61.5 68 L38.5 68 L44 61 L41 61 L46.5 54.5 L44 54.5 Z" fill="#1f8a4c" stroke="#14532d" stroke-linejoin="round" {...lw(1.2)} />
+      <rect x="47.5" y="68" width="5" height="4.5" fill="#7a4a24" stroke="#3b230f" {...lw(1)} />
+      <path d="M50 42.6 L51 45.2 L53.7 45.3 L51.6 47 L52.3 49.6 L50 48.1 L47.7 49.6 L48.4 47 L46.3 45.3 L49 45.2 Z" fill="#f5c542" stroke="#8a6a12" stroke-linejoin="round" {...lw(0.8)} />
+      <Region p={p} name="bulbs" d={bulbs} outline={false} />
+      {bulbs.map((b) => (
+        <path key={b} d={b} fill="none" stroke="#1d1d1f" {...lw(1)} />
+      ))}
     </g>
   );
 }
@@ -464,6 +568,9 @@ const ITEM_ART: Record<string, (p: { p: Paint; p2: Paint; side: "w" | "b" }) => 
   "candy-cane": CandyCane,
   gingerbread: Gingerbread,
   chimney: Chimney,
+  beanie: Beanie,
+  "ski-goggles": SkiGoggles,
+  "tree-tee": TreeTee,
 };
 
 /** The shine's box where an item is drawn in its own coordinates (the tube is drawn tilted, in a group). */
@@ -484,30 +591,42 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   "candy-cane": [60, 12, 38, 88],
   gingerbread: [14, 8, 72, 86],
   chimney: [16, 14, 68, 84],
+  beanie: [38, 10, 24, 18],
+  "ski-goggles": [33, 22, 34, 14],
+  "tree-tee": [20, 15, 60, 76],
 };
 
 /**
  * Fitting items to the piece. A piece (the pawn, or a skin) has anchor points on its 100 × 100 square: where a
- * hat's brim sits (a few points below the top of its head, like a real hat) and where a beard starts (just below
- * the middle of its head). Each item names the line in its own drawing that meets its slot's anchor (a hat's brim,
- * a beard's top edge), and the avatar lines them up. A new item needs only that one number; a new skin, its anchors.
- * (The cburnett pawn's head: top at y 20, centre 29, radius 9.)
+ * hat's brim sits (a few points below the top of its head, like a real hat), where a beard starts (just below the
+ * middle of its head) and its eye line. Each item names the line in its own drawing that meets its anchor (a hat's
+ * brim, a beard's top edge, goggles' lens line), and the avatar lines them up. A head or face item meets its slot's
+ * anchor, unless `ATTACH_TO` names another (goggles are a face item worn at the eyes). A new item needs only that
+ * number; a new skin, its anchors. (The cburnett pawn's head: top at y 20, centre 29, radius 9.)
  */
-const PAWN_ANCHORS = { head: 25, face: 40 };
-const SKIN_ANCHORS: Record<string, { head: number; face: number }> = {
-  snowman: { head: 14, face: 22 },
-  gingerbread: { head: 15, face: 26 },
-  // The chimney shows the pawn itself, so its anchors are the pawn's.
+type Anchors = { head: number; face: number; eyes: number };
+const PAWN_ANCHORS: Anchors = { head: 25, face: 40, eyes: 29 };
+const SKIN_ANCHORS: Record<string, Anchors> = {
+  snowman: { head: 14, face: 22, eyes: 18 },
+  gingerbread: { head: 15, face: 26, eyes: 21 },
+  // The chimney and the T-shirt show the pawn itself, so their anchors are the pawn's.
   chimney: PAWN_ANCHORS,
+  "tree-tee": PAWN_ANCHORS,
 };
-/** The line in each item's drawing that meets its slot's anchor (head and face items). */
+/** The line in each item's drawing that meets its anchor (head and face items). */
 const ATTACH: Record<string, number> = {
   "santa-hat": 22,
   antlers: 16,
   "fire-ice-crown": 24,
   "santa-beard": 23,
   present: 25,
+  beanie: 25,
+  "ski-goggles": 29,
 };
+/** Items that meet another anchor than their slot's. */
+const ATTACH_TO: Record<string, keyof Anchors> = { "ski-goggles": "eyes" };
+/** Face items worn over a hat (goggles); other face items go under it (a beard under a present's box). */
+const OVER_HAT = new Set(["ski-goggles"]);
 /** How far a piece's anchors sit from the pawn's (for the old shop hats, drawn for the pawn). */
 export const anchorsFor = (skin?: string) => (skin && SKIN_ANCHORS[skin]) || PAWN_ANCHORS;
 
@@ -550,14 +669,19 @@ export function ItemArt({ def, finish, side = "w", class: cls }: { def: string; 
 export function Avatar({ look, side = "w", hat = "none" }: { look?: ItemLook; side?: "w" | "b"; hat?: string }) {
   const at = (slot: ItemSlot) => look?.[slot];
   const skin = at("skin");
-  // Worn items in drawing order (face, head, then a weapon), split by layer: behind the piece or in front of it.
-  const worn = (["face", "head", "weapon"] as const).flatMap((slot) => {
-    const it = at(slot);
-    return it ? [{ slot, it }] : [];
-  });
+  // Worn items in drawing order (face, head, then a weapon; goggles go over a hat), split by layer: behind the
+  // piece or in front of it.
+  const order = (slot: ItemSlot, def: string) => (slot === "face" ? (OVER_HAT.has(def) ? 2 : 0) : slot === "head" ? 1 : 3);
+  const worn = (["face", "head", "weapon"] as const)
+    .flatMap((slot) => {
+      const it = at(slot);
+      return it ? [{ slot, it }] : [];
+    })
+    .sort((a, b) => order(a.slot, a.it.def) - order(b.slot, b.it.def));
   const anchors = anchorsFor(skin?.def);
-  /** How far to move an item so its attach line meets its slot's anchor on this piece. */
-  const shift = (slot: ItemSlot, def: string) => (slot === "head" || slot === "face") && ATTACH[def] !== undefined ? anchors[slot] - ATTACH[def]! : 0;
+  /** How far to move an item so its attach line meets its anchor on this piece. */
+  const shift = (slot: ItemSlot, def: string) =>
+    (slot === "head" || slot === "face") && ATTACH[def] !== undefined ? anchors[ATTACH_TO[def] ?? slot] - ATTACH[def]! : 0;
   const layer = (back: boolean) => (
     // (Items may rise a little above the square, never more: the clip caps their height.)
     <svg class={`avatar-items ${back ? "back" : "front"}`} viewBox="0 0 100 100">

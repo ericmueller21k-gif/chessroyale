@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CRATES, ITEM_COLORS, ITEM_DEFS, PURITY_BANDS, cleanLook, isShiny, itemChance, mulberry32, purity, rollBlemish, rollCrate } from "../src/index.ts";
+import { CRATES, ITEM_COLORS, ITEM_DEFS, PURITY_BANDS, TIERS, cleanLook, isShiny, itemChance, itemDef, mulberry32, purity, rollBlemish, rollCrate } from "../src/index.ts";
 
 const crate = CRATES[0]!;
 
@@ -11,6 +11,12 @@ describe("crates", () => {
     const total = ITEM_DEFS.reduce((s, d) => s + itemChance(crate, d.id), 0);
     expect(total).toBeCloseTo(1);
     expect(itemChance(crate, "fire-ice-crown")).toBeCloseTo(0.004);
+    expect(itemChance(crate, "beanie")).toBeCloseTo(0.16);
+  });
+
+  it("each tier is rarer per item than the tier below it", () => {
+    const perItem = TIERS.map((t) => ITEM_DEFS.filter((d) => d.tier === t.id).map((d) => itemChance(crate, d.id)));
+    for (let i = 1; i < perItem.length; i++) expect(Math.max(...perItem[i]!)).toBeLessThan(Math.min(...perItem[i - 1]!));
   });
 
   it("rolls land in the right proportions (100,000 opens)", () => {
@@ -33,7 +39,11 @@ describe("crates", () => {
       expect(r.blemish).toBeGreaterThanOrEqual(0);
       expect(r.blemish).toBeLessThanOrEqual(100);
     }
-    expect(count["santa-beard"]! / n).toBeCloseTo(0.42, 1);
+    // Novice (four items) about 64% in all, 16% each.
+    expect(count["santa-beard"]! / n).toBeCloseTo(0.16, 1);
+    const novice = ["santa-beard", "beanie", "ski-goggles", "tree-tee"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
+    expect(novice).toBeGreaterThan(0.63);
+    expect(novice).toBeLessThan(0.65);
     // Sublime (four items) about 14% in all, 3.5% each.
     const sublime = ["snowman", "present", "gingerbread", "chimney"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
     expect(sublime).toBeGreaterThan(0.13);
@@ -61,17 +71,18 @@ describe("crates", () => {
     }
   });
 
-  it("a present rolls a second colour; one-colour items don't", () => {
+  it("two-colour items (a present, goggles) roll a second colour; one-colour items don't", () => {
     const rng = mulberry32(3);
-    let presents = 0;
+    const twos: Record<string, number> = {};
     for (let i = 0; i < 5000; i++) {
       const r = rollCrate(rng, crate);
-      if (r.def === "present") {
-        presents++;
+      if (itemDef(r.def)?.colors === 2) {
+        twos[r.def] = (twos[r.def] ?? 0) + 1;
         expect(ITEM_COLORS.map((c) => c.id)).toContain(r.color2);
       } else expect(r.color2).toBeUndefined();
     }
-    expect(presents).toBeGreaterThan(100);
+    expect(twos["present"]).toBeGreaterThan(100);
+    expect(twos["ski-goggles"]).toBeGreaterThan(500);
     expect(cleanLook({ head: { def: "present", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBe("cobalt");
     expect(cleanLook({ head: { def: "santa-hat", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBeUndefined();
   });

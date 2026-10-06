@@ -1,5 +1,5 @@
 // The item fitting sheet as a PNG: every crate item (or some) on white and black pawns, on each skin, and as cards.
-//   npm run preview:items -- out.png [items=present,chimney] [color=red] [color2=emerald] [purities=95,50,0]
+//   npm run preview:items -- out.png [items=present,chimney] [color=red] [color2=emerald] [purities=95,50,0] [with=beanie]
 // Starts the app's dev server, screenshots /items-preview.html, stops. Look at the PNG before shipping an item.
 import { chromium } from "@playwright/test";
 import { createServer } from "vite";

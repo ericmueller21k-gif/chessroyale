@@ -66,12 +66,15 @@ export const behindPiece = (def: string) => itemDef(def)?.layer === "back";
 
 export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "santa-beard", name: "Santa Beard", tier: "novice", slot: "face", description: "Ho ho ho." },
+  { id: "beanie", name: "Beanie", tier: "novice", slot: "head", description: "A plain knit beanie. Keeps the thinking warm." },
+  { id: "ski-goggles", name: "Ski Goggles", tier: "novice", slot: "face", colors: 2, description: "Frame in one colour, see-through lenses in another. For black-diamond lines." },
+  { id: "tree-tee", name: "Christmas Tree Tee", tier: "novice", slot: "skin", description: "Your pawn in a festive T-shirt. The bulbs are the only part that's lit." },
   { id: "antlers", name: "Antlers", tier: "broad", slot: "head", description: "Guides the sleigh through the endgame." },
   { id: "santa-hat", name: "Santa Hat", tier: "paragon", slot: "head", description: "Knows who's been naughty in the opening." },
   { id: "snowman", name: "Snowman", tier: "sublime", slot: "skin", description: "Your pawn, built of snow, with a scarf." },
-  { id: "present", name: "Present", tier: "sublime", slot: "head", colors: 2, description: "Worn as a helmet. Box in one colour, ribbon in another. No peeking." },
+  { id: "present", name: "Present", tier: "sublime", slot: "head", colors: 2, description: "Worn as a helmet. Box in one colour, ribbon in another. Now with a visor, for peeking." },
   { id: "gingerbread", name: "Gingerbread Man", tier: "sublime", slot: "skin", description: "Run, run, as fast as you can. Iced, with gumdrop buttons." },
-  { id: "chimney", name: "Chimney", tier: "sublime", slot: "skin", description: "Your pawn, sitting in a brick chimney. Came down the wrong one." },
+  { id: "chimney", name: "Chimney", tier: "sublime", slot: "skin", description: "Your pawn, sitting in a brick chimney, bricks and all in its colour. Came down the wrong one." },
   { id: "gift-tube", name: "Gift-Wrap Tube", tier: "exalted", slot: "weapon", description: "Wrapping-paper tube, tri-blend stripes. Swing responsibly." },
   { id: "candy-cane", name: "Candy Cane", tier: "exalted", slot: "weapon", description: "White, striped in its colour. Sharpened at one end (allegedly)." },
   { id: "fire-ice-crown", name: "Fire & Ice Crown", tier: "transcendent", slot: "head", description: "A crown of winter ice, burning in its own colour." },
@@ -96,10 +99,14 @@ export const CRATES: readonly CrateDef[] = [
     id: "winter-1",
     name: "Winter Crate · Series 1",
     strip: [
-      // Each tier rarer than the one before; Sublime, 14% in all, split evenly over its four items.
-      { item: "santa-beard", weight: 42 },
-      { item: "antlers", weight: 26 },
-      { item: "santa-hat", weight: 16 },
+      // Each tier rarer per item than the one before: Novice 16% each (64% over four), Broad 12%, Paragon 8%,
+      // Sublime 3.5% each (14% over four).
+      { item: "santa-beard", weight: 16 },
+      { item: "beanie", weight: 16 },
+      { item: "ski-goggles", weight: 16 },
+      { item: "tree-tee", weight: 16 },
+      { item: "antlers", weight: 12 },
+      { item: "santa-hat", weight: 8 },
       { item: "snowman", weight: 3.5 },
       { item: "present", weight: 3.5 },
       { item: "gingerbread", weight: 3.5 },
