@@ -8,6 +8,8 @@
  * every four or five moves (5 to 10 lines in a typical boss battle).
  */
 
+import { applyMove, inCheck, pieceAt } from "@chessroyale/chess";
+
 export type KingCue =
   | "intro"
   | "idle"
@@ -158,4 +160,16 @@ export function resetKingSpeech() {
   lastLine.clear();
   spoken.clear();
   turns.clear();
+}
+
+/** The God King's word on the crowd's move once it lands: how good it was (points lost against the best move), a check, a capture. */
+export function crowdMoveCues(fen: string, played: string, loss: number | null): { cue: KingCue; key: string }[] {
+  const key = `crowd-${fen}`;
+  const out: { cue: KingCue; key: string }[] = [];
+  if (loss !== null && loss >= 12) out.push({ cue: "badMove", key });
+  if (inCheck(applyMove(fen, played))) out.push({ cue: "crowdCheck", key });
+  if (pieceAt(fen, played.slice(2, 4))) out.push({ cue: "crowdCapture", key });
+  if (loss !== null && loss <= 1) out.push({ cue: "greatMove", key });
+  else if (loss !== null && loss <= 4) out.push({ cue: "goodMove", key });
+  return out;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { applyMove, inCheck, pieceAt, sideToMove, toSan } from "@chessroyale/chess";
-import type { KingCue } from "../godKing.ts";
+import { crowdMoveCues, type KingCue } from "../godKing.ts";
 import { brilliance, equippedLook, type Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
@@ -229,15 +229,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     if (!match.boss || stand) return [];
     if (mine.king) return [{ cue: "kingPlays" as KingCue, key: `kingplays-${fen}` }];
     const played = mine.result.playedMove;
-    const loss = picks.find((p) => p.move === played)?.loss ?? null;
-    const key = `crowd-${fen}`;
-    const out: { cue: KingCue; key: string }[] = [];
-    if (loss !== null && loss >= 12) out.push({ cue: "badMove", key });
-    if (inCheck(applyMove(fen, played))) out.push({ cue: "crowdCheck", key });
-    if (pieceAt(fen, played.slice(2, 4))) out.push({ cue: "crowdCapture", key });
-    if (loss !== null && loss <= 1) out.push({ cue: "greatMove", key });
-    else if (loss !== null && loss <= 4) out.push({ cue: "goodMove", key });
-    return out;
+    return crowdMoveCues(fen, played, picks.find((p) => p.move === played)?.loss ?? null);
   }, [mine]);
   const team = myTeam(match);
   const orientation = (team ?? sideToMove(fen)) === "w" ? "white" : "black";
@@ -263,8 +255,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const yourRow = yours && !rows.some((r) => r.move === yours) ? { move: yours, votes: picks.filter((p) => p.move === yours).length, you: true } : null;
 
   // The ghosts come in silently; the winner gets three tones as it blinks.
+  // (Not when you're the whole crowd: your move was simply played.)
   useEffect(() => {
-    if (landed) play("select");
+    if (landed && !alone) play("select");
   }, [landed]);
 
   return (
@@ -295,7 +288,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               chosen={landed ? mine.result.playedMove : null}
             />
           )}
-          {played && (!stand || ts < LAST_STAND.crashAt) && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
+          {played && !alone && (!stand || ts < LAST_STAND.crashAt) && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
           {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
           {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} />}
         </Board>

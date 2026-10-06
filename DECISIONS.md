@@ -1408,3 +1408,29 @@ The cause and how it was found are in `.claude/LESSONS.md`. The calls made:
   and the bots' and power-up's idea of the best move follow the first line (the engine lane's to decide).
 - **Strong play keeps its 240 s limit.** With the leftover pages closed it takes about 3.5 minutes in a full run; the
   match's own pacing (the final's bot turns most of all) is about 200 s of that.
+
+## A solo boss raid flows like a chess site (Oct 6, 2026)
+
+Eric: "when you do solo versus boss, you don't need the green confirmation highlighting on the tiles and you don't need
+the beeping sound. It should just be you play your move and it's played", unless the God King steps in. Smooth, like
+chess.com, for any solo mode (the solo boss raid is the only one where you're the whole crowd).
+
+- **Before** (about 8 s a move): your move, "Move in. Waiting", a 4 s reveal ("Crowd plays Bb5 · 1/1") with a green
+  ring on your piece and three tones, the boss thinking, its move with another green ring, then "Your move in 2… 1…"
+  with ticks before your clock started.
+- **Now:** you move and it stays played. The dock says "The boss is thinking…" while your move is scored, the boss's
+  move slides in (the usual last-move squares, no ring), and your clock starts as it lands. About 3.5–4.5 s from your
+  tap to your turn on the test machine, most of it the engine scoring your move (the boss's minimum think time now
+  counts from your move, so the two overlap).
+- **What still stops the game:** the God King's Last Stand (it plays out, about 9 s, then you pick again), a move he
+  plays for you (his cut-in), the boss taking your queen (its banner), and running out of time (the reveal shows the
+  move made for you).
+- **The God King still comments on your move** (great move, bad move, a check, a capture): the reveal used to trigger it,
+  so the same lines now fire straight from the solo game (`crowdMoveCues` in `godKing.ts`, shared with the reveal).
+- **Only alone.** Raids with friends and the 50 v 50 boss final keep the reveal, the rings and the countdown: there,
+  the crowd's choice is news. An online raid of one still has the old flow (the server runs its timing); solo is what
+  Eric plays.
+- **Later (Eric):** the Last Stand's own flashes (the freeze and the crash) are on purpose, but Eric thinks they need
+  changing too. Not touched here.
+- An e2e case checks it: a plain move goes play → scoring → boss → play, with no reveal, no ring and no countdown.
+

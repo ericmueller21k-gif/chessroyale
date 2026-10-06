@@ -81,6 +81,7 @@ export function PlayScreen({
   // (Crowd keeps the position on screen and shows everyone's picks over it instead, unless you're the whole crowd,
   // as in a solo boss raid: then your pick is the move, so it stays where you put it.)
   const crowd = match.settings.mode === "crowd" && alive.length > 1;
+  const alone = !!match.boss && alive.length === 1;
   const moved = waiting && picked && !crowd ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
   const doneCount = alive.filter((s) => match.done.has(s.id)).length;
   // Boss battle, the re-pick after the God King's Last Stand: the move he took back is greyed out and can't be played.
@@ -145,7 +146,7 @@ export function PlayScreen({
           {match.final ? (
             <FinalTurnLabel match={match} side={side} />
           ) : match.boss ? (
-            <BossHeading side={side} note={`${doneCount}/${alive.length} picked`} />
+            <BossHeading side={side} note={alone && waiting ? "the boss is thinking" : `${doneCount}/${alive.length} picked`} />
           ) : match.settings.mode === "crowd" ? (
             <>
               Your pick for <strong>{side === "w" ? "White" : "Black"}</strong> ·{" "}
@@ -194,6 +195,11 @@ export function PlayScreen({
             striking ? (
               <span>
                 <strong>👑 He strikes the boss!</strong> <span class="muted">Clock stopped.</span>
+              </span>
+            ) : waiting && alone && picked ? (
+              // Alone, your move is simply played: the boss is already thinking about its reply.
+              <span>
+                <Dots /> <strong>The boss</strong> is thinking…
               </span>
             ) : waiting ? (
               <span>
