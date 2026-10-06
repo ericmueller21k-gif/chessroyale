@@ -7,6 +7,7 @@ import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
 import { warmEngineServer, withServerRecheck } from "./engine.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
+import { crowdMoveCues, kingSay } from "./godKing.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -34,6 +35,8 @@ export class SoloMatch implements GameView {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private rng = Math.random;
   private playStartedAt = 0;
+  /** When your last move went in (alone, the boss's thinking time counts from there). */
+  private movedAt = 0;
   hint: Hint[] | null = null;
   readonly seen = new Map<string, number>();
   private progress = new RoundProgress(() => this.emit());
@@ -281,12 +284,23 @@ export class SoloMatch implements GameView {
     return { ...v, board: v.board };
   }
 
+  /**
+   * A boss raid alone: you against the boss, so the game flows like any chess site. Your move is simply played (no
+   * reveal), the boss replies, and your clock starts as its move lands. Only the God King interrupts: his Last Stand,
+   * or a move he plays for you.
+   */
+  private get alone(): boolean {
+    return !!this.runner.boss && this.runner.alive().length === 1;
+  }
+
   /** The boss's turn: it thinks (for a moment at least), then its move shows before the crowd picks again. */
   private async bossTurn() {
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
-    await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history)))]);
-    const showMs = bossShowMs(this.runner.bossView()?.lastMove);
+    // (Alone, it has been "thinking" since your move went in: scoring your move counts towards it.)
+    const minThink = bossThinkMs(snap.board.history) - (this.alone ? Date.now() - this.movedAt : 0);
+    await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
+    const showMs = bossShowMs(this.runner.bossView()?.lastMove, this.alone);
     const until = Date.now() + showMs;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until });
     this.timer = setTimeout(() => this.nextRound(), showMs);
@@ -327,8 +341,8 @@ export class SoloMatch implements GameView {
     this.frozen = null;
     this.runner.prefetch();
     if (!this.runner.boardOf(HUMAN)) return this.watchTurn();
-    // The move clock starts after a short settling-in countdown on the new board.
-    const intro = this.settings.boardIntroSeconds * 1000;
+    // The move clock starts after a short settling-in countdown on the new board (alone, at once: nothing to settle).
+    const intro = this.alone ? 0 : this.settings.boardIntroSeconds * 1000;
     this.progress.start(this.runner.botThinkTimes(), intro);
     this.startLive(Date.now() + intro, this.runner.botThinkTimes());
     const board = this.runner.boardOf(HUMAN)!;
@@ -356,6 +370,7 @@ export class SoloMatch implements GameView {
     const thinkMs = Math.max(0, Math.min(now - this.playStartedAt - frozen, allowed));
     const usedPowerUp = this.hint !== null;
     const inFinal = !!this.runner.final;
+    this.movedAt = now;
     this.progress.mark(HUMAN);
     if (this.live) {
       // Your pick shows straight away; the bots still thinking finish quickly (as they do on the leaderboard).
@@ -379,6 +394,19 @@ export class SoloMatch implements GameView {
     const record = moveRecordFrom(report.stage, report.round, mine, (id) => id === HUMAN);
     if (record) this.moves.push(record);
     if (inFinal) return this.showFinalMove(report);
+    if (this.alone && !mine.king && move !== null) {
+      // Alone, your move is already on the board: no reveal, straight to the boss's reply. Only a Last Stand stops
+      // the game (and the clock): it plays out, then you pick again. (Out of time, the reveal shows the move made.)
+      if (!mine.lastStand) {
+        const played = mine.result.playedMove;
+        for (const c of crowdMoveCues(mine.fenBefore, played, mine.result.players.find((p) => p.move === played)?.loss ?? null)) if (kingSay(c.cue, c.key)) break;
+        return this.afterReveal();
+      }
+      const standMs = LAST_STAND_MS + 400;
+      this.set({ kind: "reveal", mine, board, until: Date.now() + standMs });
+      this.timer = setTimeout(() => this.afterReveal(), standMs);
+      return;
+    }
     // The God King's Last Stand plays out in the reveal; the next move's clock starts after it (nobody loses time).
     const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? KING_FX_MS : 0) + (mine.lastStand ? LAST_STAND_MS : 0);
     this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });

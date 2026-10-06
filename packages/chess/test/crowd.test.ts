@@ -184,6 +184,10 @@ describe("Crowd mode", () => {
     expect(bossIntroTimeline(0).total).toBe(2600 + 250 + 1500);
     expect(bossShowMs({ captured: "q" })).toBeGreaterThan(bossShowMs({ captured: "b" }));
     expect(bossShowMs(null)).toBe(1800);
+    // Alone (a solo raid), the boss's move just lands and it's your turn, unless it took your queen (the banner plays).
+    expect(bossShowMs(null, true)).toBeLessThan(600);
+    expect(bossShowMs({ captured: "b" }, true)).toBeLessThan(600);
+    expect(bossShowMs({ captured: "q" }, true)).toBe(bossShowMs({ captured: "q" }));
     // The boss's move records what it took.
     const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000 } as Settings;
     const lib: Opening[] = [{ ...library[0]!, moves: sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]), expected: { 10: 0.52 } }];

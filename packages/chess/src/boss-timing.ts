@@ -19,9 +19,15 @@ export function bossIntroTimeline(plies: number) {
 }
 
 /** How long the boss's move stays on screen: longer when it takes your queen (its banner and roar). */
-export function bossShowMs(lastMove: { captured?: string } | null | undefined): number {
+export function bossShowMs(lastMove: { captured?: string } | null | undefined, alone = false): number {
+  // Alone (a solo boss raid), the game flows like any chess site: the boss's move animates and it's your turn,
+  // unless it took your queen (its banner plays first).
+  if (alone && lastMove?.captured !== "q") return BOSS_MOVE_ALONE_MS;
   return 1800 + (lastMove?.captured === "q" ? 1300 : 0);
 }
+
+/** Alone: how long the boss's move shows before your turn (the piece's slide, and a beat). */
+export const BOSS_MOVE_ALONE_MS = 450;
 
 /** The last move in a game (from the starting position) took a queen. */
 export function lastMoveTookQueen(history: readonly string[]): boolean {

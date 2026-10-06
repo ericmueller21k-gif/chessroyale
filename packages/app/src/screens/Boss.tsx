@@ -125,6 +125,8 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
   const slewQueen = !intro && !!thinking && !victim && lastMoveTookQueen(history);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
+  // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
+  const alone = match.standings().length === 1;
   const youStruck = victim !== null && match.isYou(victim);
   useEffect(() => {
     match.seen.set(seenKey(boss.board), boss.board.ply);
@@ -140,7 +142,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
         <div class="board-row">
           <EvalBar fen={boss.board.fen} orientation={boss.crowdSide} evaluate={(f) => match.evaluate(f)} />
           <Board fen={introFen} orientation={boss.crowdSide === "w" ? "white" : "black"} lastMove={introLast}>
-            {!thinking && !victim && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={boss.crowdSide === "w" ? "white" : "black"} />}
+            {!thinking && !victim && !alone && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={boss.crowdSide === "w" ? "white" : "black"} />}
             {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
             {slewQueen && (
               <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="bannerStart" />
@@ -209,7 +211,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
                     : "Worst moves since its last strike."
                   : boss.lastMove?.staggered && !thinking
                     ? "Staggered: a weaker move."
-                    : left !== null && left > 0
+                    : left !== null && left > 0 && !alone
                       ? `Your move in ${left}`
                       : boss.kills.length
                         ? `Struck down: ${boss.kills.map((k) => name(k.id)).join(", ")}`

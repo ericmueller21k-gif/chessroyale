@@ -179,6 +179,44 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   await expect(page.locator(".results h1")).toHaveText({ crowd: "Victory!", boss: "Defeated", draw: "A draw" }[end.result as "crowd" | "boss" | "draw"]);
 });
 
+test("boss raid alone flows like a chess site: your move is played, the boss replies, your turn (no reveal, no ring, no countdown)", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  await page.goto("/?debug&clock=30&boss=1600");
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
+  // The engine's best move (never a blunder, so no Last Stand), then every phase on the way back to your move, and
+  // any ring or countdown seen meanwhile.
+  const seen = await page.evaluate(
+    async () => {
+      const m = (window as any).match;
+      const [top] = await m.runner.topMovesFor(m.phase.board.fen);
+      return new Promise<{ phases: string[]; ring: boolean; countdown: boolean; ms: number }>((resolve) => {
+        const t0 = Date.now();
+        const phases: string[] = [];
+        let ring = false;
+        let countdown = false;
+        const tick = () => {
+          const k = m.phase.kind;
+          if (phases[phases.length - 1] !== k) phases.push(k);
+          ring ||= !!document.querySelector(".square-ring");
+          countdown ||= /Your move in|Get ready/.test(document.body.innerText);
+          if (k === "play" && phases.length > 1) return resolve({ phases, ring, countdown, ms: Date.now() - t0 });
+          if (Date.now() - t0 > 60_000) return resolve({ phases, ring, countdown, ms: -1 });
+          requestAnimationFrame(tick);
+        };
+        m.submit(top.move);
+        tick();
+      });
+    },
+  );
+  expect(seen.phases).toEqual(["scoring", "boss", "play"]);
+  expect(seen.ring).toBe(false);
+  expect(seen.countdown).toBe(false);
+  // Your clock starts as the boss's move lands.
+  expect(await page.evaluate(() => (window as any).match.phase.startsAt <= Date.now())).toBe(true);
+});
+
 test("the God King's Last Stand (solo raid, ?laststand=1): he takes the blow, falls, and you pick again without that move", async ({ page }) => {
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
