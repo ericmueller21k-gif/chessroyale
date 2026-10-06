@@ -175,6 +175,8 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   expect(end.kingStrikes).toEqual([1]);
   expect(["crowd", "boss", "draw"]).toContain(end.result);
   await expect(page.locator(".team-result")).toBeVisible();
+  // Alone, the headline is the result against the boss, never "1st of 1 · You won the match!" after a loss.
+  await expect(page.locator(".results h1")).toHaveText({ crowd: "Victory!", boss: "Defeated", draw: "A draw" }[end.result as "crowd" | "boss" | "draw"]);
 });
 
 test("the God King's Last Stand (solo raid, ?laststand=1): he takes the blow, falls, and you pick again without that move", async ({ page }) => {

@@ -16,6 +16,14 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
       body: JSON.stringify({ mode: "crowd", placement: 3, players: 100, team: "w", rating: 1612, brilliant: 1, bestMove: "Nxe5", cuts: 11, cutsSurvived: 11 }),
     }),
   );
+  // Something to wear: a crate item, worn in its slot.
+  await page.evaluate(async () => {
+    const post = (path: string, body: object) =>
+      fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    await post("/api/locker/open", { crate: "winter-1" });
+    const { items } = await fetch("/api/locker").then((r) => r.json());
+    for (const slot of ["head", "face", "skin", "weapon"]) if ((await post("/api/locker/equip", { slot, item: items[0].id })).ok) break;
+  });
   await page.reload();
   // Home names the rank under your name, in the rank's colour.
   await expect(page.locator(".fd-hero-sub")).toContainText("Weighty · 1612");
@@ -27,6 +35,8 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open locker" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Report" })).toHaveCount(0);
+  // Wearing shows the item itself (its drawing, in its colour), not a colour swatch.
+  await expect(page.locator(".fd-item .fd-thumb .item-art svg")).toHaveCount(1);
   // Stats: Crowd and Boss raid tabs, real numbers.
   const tiles = page.locator(".fd-stat");
   await expect(tiles.filter({ hasText: "games" })).toContainText("1");
