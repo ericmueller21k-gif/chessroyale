@@ -743,6 +743,21 @@ export function FischerArt() {
   );
 }
 
+/** A tier's present (the crate's strip): a gift box in the tier's colour, the lid a shade darker, a white ribbon. */
+export function PresentArt({ color }: { color: string }) {
+  return (
+    <span class="item-art present-art">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <rect x="19" y="44" width="62" height="42" rx="4" fill={color} {...LINE} />
+        <rect x="14" y="31" width="72" height="15" rx="4" fill={darken(color, 0.18)} {...LINE} />
+        <path d="M45 31 H55 V86 H45 Z" fill="#fbfbf8" stroke="#1d1d1f" {...lw(2)} />
+        <path d="M50 31 C40 12 22 17 33 30 Z M50 31 C60 12 78 17 67 30 Z" fill="#fbfbf8" {...LINE} {...lw(2.4)} />
+        <circle cx="50" cy="30" r="5" fill="#fbfbf8" {...LINE} {...lw(2.4)} />
+      </svg>
+    </span>
+  );
+}
+
 /** A Winter Crate: a frosted box with a ribbon and a snowflake. */
 export function CrateArt() {
   return (

@@ -877,17 +877,17 @@ Eric's design:
 Eric's design, a fun bonus for now: free and unlimited while testing, and fully compliant (odds shown, regional rules) if it ever involves money.
 
 - **Three independent layers of rarity** (`core/crates.ts`):
-  - **Tier, which decides the item.** The tier names honour Puzzle Pirates:
+  - **Tier, which decides the item.** The strip lands on a tier's present (colour-coded), which opens to one of that tier's items, each as likely as the others; or on Fischer Random (Eric, Oct 6). The tier names honour Puzzle Pirates:
 
-    | Tier | Item | Slot | Chance |
+    | Present | Chance | Items inside (slot) | Each |
     | --- | --- | --- | --- |
-    | Novice | Santa Beard, Beanie, Ski Goggles, Christmas Tree Tee | face, head, face, skin | 64% in all (16% each) |
-    | Broad | Antlers | head | 12% |
-    | Paragon | Santa Hat | head | 8% |
-    | Sublime | Snowman, Present, Gingerbread Man, Chimney | skin, head, skin, skin | 14% in all (3.5% each) |
-    | Fischer Random (a second spin) | Exalted Gift-Wrap Tube (weapon, 40%) or Candy Cane (weapon, 40%), Transcendent Fire & Ice Crown (head, 20%) | | 2% |
+    | Novice (grey) | 40% | Santa Beard (face), Beanie (head), Christmas Tree Tee (skin) | 13.3% |
+    | Broad (green) | 26% | Antlers (head) | 26% |
+    | Paragon (blue) | 18% | Santa Hat (head), Ski Goggles (face) | 9% |
+    | Sublime (purple) | 14% | Snowman (skin), Present (head), Gingerbread Man (skin), Chimney (skin) | 3.5% |
+    | Fischer Random (a gold crown, not a present; a second spin) | 2% | Exalted Gift-Wrap Tube (weapon, 40%) or Candy Cane (weapon, 40%), Transcendent Fire & Ice Crown (head, 20%) | 0.8%, 0.8%, 0.4% |
 
-    So the crown is 0.4%. (Odds as of Oct 6; the beard, antlers and hat were 42/26/16% before the three new commons.)
+    So the crown is 0.4%. (Before the presents, odds were per item: 16% each for the commons, 12% antlers, 8% hat.)
   - **Colour:** Red 30%, Yellow 30%, Sage 14%, Opal 9%, Cobalt 7%, Midnight 4.5%, Emerald 3%, Oceanic 2%, Pearl 0.5%. Opal, Oceanic and Pearl have a two-tone sheen.
   - **Purity:** 100% minus a blemish of 0–100%, rolled by bands (retuned Oct 5, below). Shiny (90%+) is 1 in 250; under 5% is 1 in 100; 80% of items land between 30% and 70%.
   - **Stacked:** a shiny Pearl crown is about 1 in 12.5 million; a Pearl crown at 99%+ about 1 in 1.25 billion. A test of 100,000 rolls checks the proportions.
@@ -953,6 +953,13 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - **Present: a visor.** An oval cut out of the box's front at face height, with a hint of glass and a glint. The ribbon stops above and below it. You see the face through it: the pawn's head, the snowman's eyes and nose, the gingerbread face.
   - **Chimney: bricks in the colour.** The bricks and the cap take the colour. The mortar is a shade of it (lighter on dark colours, darker on light ones such as yellow and Pearl), so the bricks still read. The whole chimney now blotches. Owned chimneys change with it.
   - The fitting sheet takes `with=` to wear other items too (goggles over a beanie).
+- **Presents by tier (Eric, Oct 6):** "the crate opens thematic": the strip holds colour-coded presents, one per tier, and Fischer Random (2%, the only tile that isn't a present). A present opens to one of its tier's items, split evenly.
+  - **The present odds** (40/26/18/14/2): Eric said the rest of the 98% is "split between the other rarities". I read that as a ladder, each colour rarer than the one below (an even split would make a purple present as common as a grey one). Sublime stays at Eric's earlier "12–15%" (14%, so its four items keep 3.5% each), and Novice, Broad and Paragon step down from there.
+  - **A side effect to know:** Broad holds one item, so the antlers (26%) are likelier than any single Novice item (13.3%). Adding Broad items spreads that out.
+  - **Ski Goggles moved to Paragon (Eric, Oct 6),** next to the Santa hat: 9% each. The Novice present now holds three items, 13.3% each.
+  - **Opening:** the strip spins to a present; the present shakes and bursts ("Novice present", in its colour, 1.1 s); then, if it holds more than one item, a second, shorter spin (3.4 s) among them; then the reveal. A one-item present goes straight to the reveal. Fischer Random is unchanged (banner, a 4.8 s spin). The strip still shows Fischer Random three times as often as it lands, to tease; second-spin decoys are drawn evenly from the present's items.
+  - **The crate page** lists the presents with their odds (and how many items each holds), then every item with its own chance.
+  - Server rolls: the tier, then an item evenly from that tier's present (`presentItems`). Nothing stored changes.
 
 ## The God King's Last Stand (Oct 5, 2026; built)
 

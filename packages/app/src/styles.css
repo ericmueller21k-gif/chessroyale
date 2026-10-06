@@ -5342,6 +5342,63 @@ button.history-label {
   text-overflow: ellipsis;
   max-width: 100%;
 }
+/* A tier's present unwrapping between the two spins: a shake, then a burst. */
+.present-stage {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px 0 14px;
+  overflow: hidden;
+  border: 3px solid #f4f4f4;
+  border-radius: 8px;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--tier) 30%, #0a1150) 0%, #0a1150 62%);
+  box-shadow: 0 0 0 2px #0b0b1a, inset 0 0 24px rgba(0, 0, 0, 0.6);
+}
+.present-stage-art {
+  width: 150px;
+  height: 150px;
+  animation:
+    present-shake 0.75s ease-in-out,
+    present-burst 0.35s ease-in 0.75s forwards;
+}
+.present-stage strong {
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--tier);
+  text-shadow: 0 2px 0 #000;
+}
+@keyframes present-shake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  15% {
+    transform: rotate(-8deg) scale(1.03);
+  }
+  30% {
+    transform: rotate(7deg);
+  }
+  45% {
+    transform: rotate(-6deg) scale(1.05);
+  }
+  60% {
+    transform: rotate(5deg);
+  }
+  80% {
+    transform: rotate(-3deg) scale(1.08);
+  }
+}
+@keyframes present-burst {
+  to {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .present-stage-art {
+    animation: none;
+  }
+}
 .spin-tile.fischer {
   --tier: #fbbf24;
   background: linear-gradient(180deg, #4a3500, #1f1600);

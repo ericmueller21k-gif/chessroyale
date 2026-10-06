@@ -11,6 +11,8 @@ import {
   equippedLook,
   isShiny,
   itemChance,
+  presentChance,
+  presentItems,
   itemColor,
   itemDef,
   purity,
@@ -20,9 +22,10 @@ import {
   type CrateRoll,
   type ItemInstance,
   type ItemSlot,
+  type PresentTier,
 } from "@chessroyale/core";
 import { account, equipLockerItem, openCrate } from "../account.ts";
-import { Avatar, CrateArt, FischerArt, ItemArt, KeyArt } from "../components/Items.tsx";
+import { Avatar, CrateArt, FischerArt, ItemArt, KeyArt, PresentArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { play, unlockAudio } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
@@ -79,7 +82,7 @@ function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
   const [forceFischer, setForceFischer] = useState(q.get("fischer") === "1");
   const [forceShiny, setForceShiny] = useState(q.get("shiny") === "1");
   const [opening, setOpening] = useState(false);
-  const items = [...new Set([...crate.strip.map((s) => s.item), ...crate.fischer.map((s) => s.item)])].filter((i) => i !== FISCHER);
+  const items = [...crate.items, ...crate.fischer.map((s) => s.item)];
   if (opening) return <CrateOpening crate={crate} force={{ fischer: forceFischer, shiny: forceShiny }} onClose={() => setOpening(false)} />;
   return (
     <div class="crate-page">
@@ -91,6 +94,39 @@ function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
           <CrateArt />
         </span>
         <strong>{crate.name}</strong>
+      </div>
+      <h3 class="ff-title">Presents</h3>
+      <p class="small muted">The crate holds a present for each tier, in its colour. A present opens to one of its tier's items, each as likely as the others.</p>
+      <div class="odds-list">
+        {crate.strip.map(({ tier }) => {
+          if (tier === FISCHER)
+            return (
+              <div key={tier} class="odds-row" style={{ "--tier": "#fbbf24" }}>
+                <span class="odds-art">
+                  <FischerArt />
+                </span>
+                <span class="odds-text">
+                  <strong>Fischer Random</strong>
+                  <span class="odds-tier">A second spin: Exalted or Transcendent</span>
+                </span>
+                <span class="odds-pct">{pct(presentChance(crate, tier))}</span>
+              </div>
+            );
+          const t = tierInfo(tier);
+          const n = presentItems(crate, tier).length;
+          return (
+            <div key={tier} class="odds-row" style={{ "--tier": t.color }}>
+              <span class="odds-art">
+                <PresentArt color={t.color} />
+              </span>
+              <span class="odds-text">
+                <strong>{t.name} present</strong>
+                <span class="odds-tier">{n === 1 ? "1 item" : `${n} items, ${pct(presentChance(crate, tier) / n)} each`}</span>
+              </span>
+              <span class="odds-pct">{pct(presentChance(crate, tier))}</span>
+            </div>
+          );
+        })}
       </div>
       <h3 class="ff-title">Possible items</h3>
       <div class="odds-list">
@@ -163,7 +199,10 @@ function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
 
 // ---------------- Opening ----------------
 
-type Tile = { kind: "item"; def: string; finish: { color: string; color2?: string; blemish: number; seed: number } } | { kind: "fischer" };
+type Tile =
+  | { kind: "item"; def: string; finish: { color: string; color2?: string; blemish: number; seed: number } }
+  | { kind: "present"; tier: PresentTier }
+  | { kind: "fischer" };
 
 function pickWeighted<T extends { weight: number }>(list: readonly T[]): T {
   let r = Math.random() * list.reduce((s, x) => s + x.weight, 0);
@@ -174,15 +213,18 @@ function pickWeighted<T extends { weight: number }>(list: readonly T[]): T {
 /** A decoy's look, by the real colour and purity odds (so the strip doesn't make a shiny look common). */
 const decoyFinish = () => ({ color: pickWeighted(ITEM_COLORS).id, color2: pickWeighted(ITEM_COLORS).id, blemish: rollBlemish(Math.random), seed: Math.floor(Math.random() * 2 ** 31) });
 
-/** A strip of tiles: decoys by the odds (Fischer Random a little more often than it lands, to tease), the result at `land`. */
-function stripTiles(list: readonly { item: string; weight: number }[], landTile: Tile, length: number, land: number): Tile[] {
-  const shown = list.map((x) => (x.item === FISCHER ? { ...x, weight: x.weight * 3 } : x));
-  return Array.from({ length }, (_, i) => {
-    if (i === land) return landTile;
-    const it = pickWeighted(shown).item;
-    return it === FISCHER ? { kind: "fischer" as const } : { kind: "item" as const, def: it, finish: decoyFinish() };
-  });
+/** A strip of tiles: decoys drawn by `pick`, the result at `land`. */
+function stripTiles(pick: () => Tile, landTile: Tile, length: number, land: number): Tile[] {
+  return Array.from({ length }, (_, i) => (i === land ? landTile : pick()));
 }
+
+/** The crate's strip: presents by the odds, Fischer Random a little more often than it lands (to tease). */
+const presentTile = (crate: CrateDef) => (): Tile => {
+  const { tier } = pickWeighted(crate.strip.map((x) => (x.tier === FISCHER ? { ...x, weight: x.weight * 3 } : x)));
+  return tier === FISCHER ? { kind: "fischer" } : { kind: "present", tier };
+};
+/** A second spin's decoys: items by their odds. */
+const itemTile = (list: readonly { item: string; weight: number }[]) => (): Tile => ({ kind: "item", def: pickWeighted(list).item, finish: decoyFinish() });
 
 function TileView({ tile }: { tile: Tile }) {
   if (tile.kind === "fischer") {
@@ -190,6 +232,15 @@ function TileView({ tile }: { tile: Tile }) {
       <span class="spin-tile fischer">
         <FischerArt />
         <span class="spin-tile-name">Fischer Random</span>
+      </span>
+    );
+  }
+  if (tile.kind === "present") {
+    const t = tierInfo(tile.tier);
+    return (
+      <span class="spin-tile present" style={{ "--tier": t.color }}>
+        <PresentArt color={t.color} />
+        <span class="spin-tile-name">{t.name}</span>
       </span>
     );
   }
@@ -246,11 +297,14 @@ function Spin({ tiles, land, ms, onDone }: { tiles: Tile[]; land: number; ms: nu
   );
 }
 
-/** Opening a crate: the server rolls, the strip spins to it (and a second spin for Fischer Random), then the reveal. */
+/**
+ * Opening a crate: the server rolls, the strip spins to a tier's present (or Fischer Random), the present unwraps,
+ * a second spin picks among its tier's items (when it holds more than one), then the reveal.
+ */
 function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fischer?: boolean; shiny?: boolean }; onClose: () => void }) {
   const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stage, setStage] = useState<"spin" | "fischer" | "spin2" | "reveal">("spin");
+  const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">("spin");
   const [round, setRound] = useState(0);
   useEffect(() => {
     setResult(null);
@@ -263,17 +317,24 @@ function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fis
     if (!result) return null;
     const { roll, item } = result;
     const finish = { color: item.color, color2: item.color2 ?? undefined, blemish: item.blemish, seed: item.seed };
-    const first: Tile = roll.fischer ? { kind: "fischer" } : { kind: "item", def: item.def, finish };
+    const tier = itemDef(item.def)!.tier as PresentTier;
+    const inside = roll.fischer ? crate.fischer : presentItems(crate, tier).map((def) => ({ item: def, weight: 1 }));
     return {
-      one: stripTiles(crate.strip, first, 46, 38),
-      two: stripTiles(crate.fischer, { kind: "item", def: item.def, finish }, 30, 24),
+      tier,
+      many: inside.length > 1,
+      one: stripTiles(presentTile(crate), roll.fischer ? { kind: "fischer" } : { kind: "present", tier }, 46, 38),
+      two: stripTiles(itemTile(inside), { kind: "item", def: item.def, finish }, 30, 24),
     };
   }, [result]);
   const afterFirst = () => {
+    if (!strips) return;
     if (result?.roll.fischer) {
       setStage("fischer");
       setTimeout(() => setStage("spin2"), 1700);
-    } else setStage("reveal");
+    } else {
+      setStage("unwrap");
+      setTimeout(() => setStage(strips.many ? "spin2" : "reveal"), 1150);
+    }
   };
   return (
     <div class="crate-opening">
@@ -286,7 +347,10 @@ function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fis
           <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub="Exalted or Transcendent" sound="bannerStart" />
         </div>
       )}
-      {strips && stage === "spin2" && <Spin key={`b${round}`} tiles={strips.two} land={24} ms={4800} onDone={() => setStage("reveal")} />}
+      {strips && stage === "unwrap" && <Unwrap tier={strips.tier} />}
+      {strips && stage === "spin2" && (
+        <Spin key={`b${round}`} tiles={strips.two} land={24} ms={result?.roll.fischer ? 4800 : 3400} onDone={() => setStage("reveal")} />
+      )}
       {result && stage === "reveal" && (
         <Reveal
           item={result.item}
@@ -294,6 +358,22 @@ function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fis
           onClose={onClose}
         />
       )}
+    </div>
+  );
+}
+
+/** A present unwrapping: it shakes, then bursts open. */
+function Unwrap({ tier }: { tier: PresentTier }) {
+  const t = tierInfo(tier);
+  useEffect(() => {
+    play("select");
+  }, []);
+  return (
+    <div class="present-stage" style={{ "--tier": t.color }}>
+      <span class="present-stage-art">
+        <PresentArt color={t.color} />
+      </span>
+      <strong>{t.name} present</strong>
     </div>
   );
 }
