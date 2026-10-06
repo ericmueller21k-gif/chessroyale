@@ -107,7 +107,7 @@ function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
                 </span>
                 <span class="odds-text">
                   <strong>Fischer Random</strong>
-                  <span class="odds-tier">A second spin: Exalted or Transcendent</span>
+                  <span class="odds-tier">A second spin: Legendary or Mythic</span>
                 </span>
                 <span class="odds-pct">{pct(presentChance(crate, tier))}</span>
               </div>
@@ -133,7 +133,7 @@ function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
         {items.map((def) => {
           const d = itemDef(def)!;
           const t = tierInfo(d.tier);
-          const special = d.tier === "exalted" || d.tier === "transcendent";
+          const special = d.tier === "legendary" || d.tier === "mythic";
           return (
             <div key={def} class="odds-row" style={{ "--tier": t.color }}>
               <span class="odds-art">
@@ -344,7 +344,7 @@ function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fis
       {strips && stage === "spin" && <Spin key={`a${round}`} tiles={strips.one} land={38} ms={6200} onDone={afterFirst} />}
       {strips && stage === "fischer" && (
         <div class="fischer-stage">
-          <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub="Exalted or Transcendent" sound="bannerStart" />
+          <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub="Legendary or Mythic" sound="bannerStart" />
         </div>
       )}
       {strips && stage === "unwrap" && <Unwrap tier={strips.tier} />}
@@ -383,7 +383,7 @@ function Reveal({ item, onAgain, onClose }: { item: ItemInstance; onAgain: () =>
   const d = itemDef(item.def)!;
   const t = tierInfo(d.tier);
   const shiny = isShiny(item.blemish);
-  const special = d.tier === "exalted" || d.tier === "transcendent";
+  const special = d.tier === "legendary" || d.tier === "mythic";
   const [worn, setWorn] = useState(false);
   useEffect(() => {
     play(special || shiny ? "bannerStart" : "select");

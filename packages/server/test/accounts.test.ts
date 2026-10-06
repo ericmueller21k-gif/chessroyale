@@ -242,7 +242,7 @@ describe("account API", () => {
     const { user: guest } = await createGuest(sql, 1000, "Guest");
     expect((await lockerState(sql, guest.id)).items).toEqual([]);
     expect((await openCrate(sql, guest.id, "nope", {}, 1100)).ok).toBe(false);
-    // The test switch lands on Fischer Random: an Exalted or Transcendent item, shiny when asked.
+    // The test switch lands on Fischer Random: a Legendary or Mythic item, shiny when asked.
     const r = await openCrate(sql, guest.id, "winter-1", { fischer: true, shiny: true }, 1100);
     if (!r.ok) throw new Error(r.message);
     expect(r.roll.fischer).toBe(true);

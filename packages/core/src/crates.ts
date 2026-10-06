@@ -2,23 +2,24 @@ import type { Rng } from "./rng.ts";
 
 /**
  * Crates: cosmetic items in stacked layers of rarity. Every drop rolls three things independently:
- *   1. its tier, which decides the item: the strip lands on a tier's present (Novice to Sublime), which opens to one
- *      of that tier's items evenly, or on Fischer Random (Exalted and Transcendent items only),
+ *   1. its tier, which decides the item: the strip lands on a tier's present (Common to Epic), which opens to one
+ *      of that tier's items evenly, or on Fischer Random (Legendary and Mythic items only),
  *   2. its colour (red and yellow common, Pearl the rarest), and
  *   3. its purity: 100% minus a blemish of 0-100% (blotches over that share of its colour). At 90%+ purity it's
  *      shiny; at 0% it's blotched all over, a darker shade of its colour.
- * Nothing here changes how a match is played or scored. The tier names honour Puzzle Pirates.
+ * Nothing here changes how a match is played or scored. The tiers run Common to Mythic, the ladder players know (the
+ * Puzzle Pirates names went to player ranks, Oct 6, 2026).
  */
 
-export type ItemTier = "novice" | "broad" | "paragon" | "sublime" | "exalted" | "transcendent";
+export type ItemTier = "common" | "uncommon" | "rare" | "epic" | "legendary" | "mythic";
 
 export const TIERS: readonly { id: ItemTier; name: string; color: string }[] = [
-  { id: "novice", name: "Novice", color: "#9ca3af" },
-  { id: "broad", name: "Broad", color: "#4ade80" },
-  { id: "paragon", name: "Paragon", color: "#60a5fa" },
-  { id: "sublime", name: "Sublime", color: "#c084fc" },
-  { id: "exalted", name: "Exalted", color: "#fbbf24" },
-  { id: "transcendent", name: "Transcendent", color: "#f43f5e" },
+  { id: "common", name: "Common", color: "#9ca3af" },
+  { id: "uncommon", name: "Uncommon", color: "#4ade80" },
+  { id: "rare", name: "Rare", color: "#60a5fa" },
+  { id: "epic", name: "Epic", color: "#c084fc" },
+  { id: "legendary", name: "Legendary", color: "#fbbf24" },
+  { id: "mythic", name: "Mythic", color: "#f43f5e" },
 ];
 
 export const tierInfo = (id: ItemTier) => TIERS.find((t) => t.id === id)!;
@@ -65,28 +66,28 @@ export interface ItemDef {
 export const behindPiece = (def: string) => itemDef(def)?.layer === "back";
 
 export const ITEM_DEFS: readonly ItemDef[] = [
-  { id: "santa-beard", name: "Santa Beard", tier: "novice", slot: "face", description: "Ho ho ho." },
-  { id: "beanie", name: "Beanie", tier: "novice", slot: "head", description: "A plain knit beanie. Keeps the thinking warm." },
-  { id: "tree-tee", name: "Christmas Tree Tee", tier: "novice", slot: "skin", description: "Your pawn in a festive T-shirt. The bulbs are the only part that's lit." },
-  { id: "antlers", name: "Antlers", tier: "broad", slot: "head", description: "Guides the sleigh through the endgame." },
-  { id: "santa-hat", name: "Santa Hat", tier: "paragon", slot: "head", description: "Knows who's been naughty in the opening." },
-  { id: "ski-goggles", name: "Ski Goggles", tier: "paragon", slot: "face", colors: 2, description: "Frame in one colour, see-through lenses in another. For black-diamond lines." },
-  { id: "snowman", name: "Snowman", tier: "sublime", slot: "skin", description: "Your pawn, built of snow, with a scarf." },
-  { id: "present", name: "Present", tier: "sublime", slot: "head", colors: 2, description: "Worn as a helmet. Box in one colour, ribbon in another. Now with a visor, for peeking." },
-  { id: "gingerbread", name: "Gingerbread Man", tier: "sublime", slot: "skin", description: "Run, run, as fast as you can. Iced, with gumdrop buttons." },
-  { id: "chimney", name: "Chimney", tier: "sublime", slot: "skin", description: "Your pawn, sitting in a brick chimney, bricks and all in its colour. Came down the wrong one." },
-  { id: "gift-tube", name: "Gift-Wrap Tube", tier: "exalted", slot: "weapon", description: "Wrapping-paper tube, tri-blend stripes. Swing responsibly." },
-  { id: "candy-cane", name: "Candy Cane", tier: "exalted", slot: "weapon", description: "White, striped in its colour. Sharpened at one end (allegedly)." },
-  { id: "fire-ice-crown", name: "Fire & Ice Crown", tier: "transcendent", slot: "head", description: "A crown of winter ice, burning in its own colour." },
+  { id: "santa-beard", name: "Santa Beard", tier: "common", slot: "face", description: "Ho ho ho." },
+  { id: "beanie", name: "Beanie", tier: "common", slot: "head", description: "A plain knit beanie. Keeps the thinking warm." },
+  { id: "tree-tee", name: "Christmas Tree Tee", tier: "common", slot: "skin", description: "Your pawn in a festive T-shirt. The bulbs are the only part that's lit." },
+  { id: "antlers", name: "Antlers", tier: "uncommon", slot: "head", description: "Guides the sleigh through the endgame." },
+  { id: "santa-hat", name: "Santa Hat", tier: "rare", slot: "head", description: "Knows who's been naughty in the opening." },
+  { id: "ski-goggles", name: "Ski Goggles", tier: "rare", slot: "face", colors: 2, description: "Frame in one colour, see-through lenses in another. For black-diamond lines." },
+  { id: "snowman", name: "Snowman", tier: "epic", slot: "skin", description: "Your pawn, built of snow, with a scarf." },
+  { id: "present", name: "Present", tier: "epic", slot: "head", colors: 2, description: "Worn as a helmet. Box in one colour, ribbon in another. Now with a visor, for peeking." },
+  { id: "gingerbread", name: "Gingerbread Man", tier: "epic", slot: "skin", description: "Run, run, as fast as you can. Iced, with gumdrop buttons." },
+  { id: "chimney", name: "Chimney", tier: "epic", slot: "skin", description: "Your pawn, sitting in a brick chimney, bricks and all in its colour. Came down the wrong one." },
+  { id: "gift-tube", name: "Gift-Wrap Tube", tier: "legendary", slot: "weapon", description: "Wrapping-paper tube, tri-blend stripes. Swing responsibly." },
+  { id: "candy-cane", name: "Candy Cane", tier: "legendary", slot: "weapon", description: "White, striped in its colour. Sharpened at one end (allegedly)." },
+  { id: "fire-ice-crown", name: "Fire & Ice Crown", tier: "mythic", slot: "head", description: "A crown of winter ice, burning in its own colour." },
 ];
 
 export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);
 
-/** The strip's special slot: Fischer Random, a second spin for an Exalted or Transcendent item. */
+/** The strip's special slot: Fischer Random, a second spin for a Legendary or Mythic item. */
 export const FISCHER = "fischer";
 
-/** The tiers that come in presents; Exalted and Transcendent come only through Fischer Random. */
-export type PresentTier = "novice" | "broad" | "paragon" | "sublime";
+/** The tiers that come in presents; Legendary and Mythic come only through Fischer Random. */
+export type PresentTier = "common" | "uncommon" | "rare" | "epic";
 
 export interface CrateDef {
   id: string;
@@ -96,7 +97,7 @@ export interface CrateDef {
    * rarer than the one below. A present opens to one of its tier's items, evenly.
    */
   strip: readonly { tier: PresentTier | typeof FISCHER; weight: number }[];
-  /** What the presents hold: the Novice to Sublime items. */
+  /** What the presents hold: the Common to Epic items. */
   items: readonly string[];
   /** Fischer Random's odds out of 100. */
   fischer: readonly { item: string; weight: number }[];
@@ -106,12 +107,12 @@ export const CRATES: readonly CrateDef[] = [
   {
     id: "winter-1",
     name: "Winter Crate · Series 1",
-    // Eric (Oct 6): the strip holds presents by tier, Fischer Random 2%. Sublime stays at his 12-15% (14%).
+    // Eric (Oct 6): the strip holds presents by tier, Fischer Random 2%. Epic stays at his 12-15% (14%).
     strip: [
-      { tier: "novice", weight: 40 },
-      { tier: "broad", weight: 26 },
-      { tier: "paragon", weight: 18 },
-      { tier: "sublime", weight: 14 },
+      { tier: "common", weight: 40 },
+      { tier: "uncommon", weight: 26 },
+      { tier: "rare", weight: 18 },
+      { tier: "epic", weight: 14 },
       { tier: FISCHER, weight: 2 },
     ],
     items: ["santa-beard", "beanie", "tree-tee", "antlers", "santa-hat", "ski-goggles", "snowman", "present", "gingerbread", "chimney"],
