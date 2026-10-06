@@ -894,7 +894,7 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
 - **Slots:** head, face, skin and weapon (new: held at the pawn's side). Skins replace the pawn and combine with the rest (a Snowman in a Santa Hat). They show in the votes and on the cut screen, not on the game board. Other online players see your look (sent on joining, cleaned by the server). The old shop hats still show when no crate item is on the head.
 - **Paint system** (`components/Items.tsx`), Eric's suggestion:
   - Each item is drawn once on the pawn's square with marked paint regions. Those get the colour automatically, then the blemish, then the shine; outlines and fixed parts (white fur, coal, ice) stay as drawn.
-  - **Blemish:** a seeded noise field cut so exactly that share of cells is blotched; overlapping dark round blotches in one path, so even 100 pawns are cheap.
+  - **Blemish:** a seeded noise field, cut so exactly that share of the item itself is blotched (measured on its painted parts; see the fix below); overlapping dark round blotches in one path, so even 100 pawns are cheap.
   - **Shine:** a sweeping highlight plus a sparkle.
   - The Fire & Ice Crown's flames burn in its rolled colour. The tube has tri-blend stripes (its colour, a light tint and white).
 - **Server-side rolls.** Crates open on the server (`POST /api/locker/open`), and each item is stored with its colour, blemish and seed (D1 tables `items`, `equipped_items`), so nobody can make themselves a Pearl crown. A guest's items follow them when they sign in.
@@ -938,6 +938,11 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - **Items people own keep their purity:** the stored blemish isn't touched (old rolls are all 51–100%), and their blotches keep their shape; only the parts past the square's edge and the Present's knot now pick up blotches too. Only the odds for new rolls changed.
   - **The strip's decoy tiles** already rolled their purity with the real roll, so they follow the new odds: about one shiny decoy every six opens, instead of about one per open (some 42 decoy items pass by in each open).
   - The fitting sheet (`npm run preview:items`) now shows cards at 95, 70, 50, 30, 5 and 0% purity (`purities=` to choose).
+- **Blotches match the purity on the item (Eric, Oct 6: a 41.4% Exalted tube was almost fully covered):**
+  - The blotch pattern was cut so that share of the *whole square* was blotched, so an item got whatever share of the pattern it happened to sit on. Measured over 120 patterns at 58.6% blemish: the tube was blotched anywhere from 11% to 100%, the beard, hat and scarf from 0% to 100%. Wide items averaged out; thin and small ones swung wildly. The old 51–100% range hid it.
+  - Now the cut is measured on each painted part itself: the app samples the part's area (one point per square unit, once per item drawing) and cuts the same pattern where it covers exactly that share. The last blotch is drawn partway (a spot growing from its centre or, in a clean spot already ringed by blotches, closing in from the edge), so the share is exact rather than a whole blotch at a time. Now every item lands within about 3 points of its purity, usually within 1.
+  - Same patterns, so owned items keep their look in shape; only how much of them is blotched now matches the purity shown. About 1 ms a pawn, as before.
+  - A test checks the coverage on a thin tube over many patterns.
 
 ## The God King's Last Stand (Oct 5, 2026; built)
 
