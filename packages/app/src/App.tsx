@@ -17,7 +17,8 @@ import { PlayScreen } from "./screens/Play.tsx";
 import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
 import { SoundLab } from "./screens/SoundLab.tsx";
-import { ProfileScreen } from "./screens/Profile.tsx";
+import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
+import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
 import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
 import { startLive } from "./live.ts";
@@ -97,8 +98,13 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [soundLab, setSoundLab] = useState(() => new URLSearchParams(location.search).has("soundlab"));
-  const [showProfile, setShowProfile] = useState(() => location.pathname === "/profile");
-  const [showShop, setShowShop] = useState(() => location.pathname === "/shop");
+  // A profile from the address: /profile is yours, /profile/ID someone's.
+  useState(() => {
+    const m = location.pathname.match(/^\/profile(?:\/([A-Za-z0-9_-]{1,64}))?\/?$/);
+    if (m) openProfile(m[1] ? { uid: m[1], name: "" } : { you: true, name: "" });
+  });
+  const profileOpen = useProfileTarget();
+  const [showShop, setShowShop] = useState<false | "shop" | "locker">(() => (location.pathname === "/shop" ? "shop" : false));
   const [showSettings, setShowSettings] = useState(() => location.pathname === "/settings");
   const [legal, setLegal] = useState<"privacy" | "terms" | null>(() =>
     location.pathname === "/privacy" ? "privacy" : location.pathname === "/terms" ? "terms" : null,
@@ -330,26 +336,30 @@ export function App() {
       </FrontFrame>
     );
   }
+  if (!match && profileOpen) {
+    return (
+      <FrontFrame>
+        <ProfilePage
+          target={profileOpen}
+          onLocker={() => {
+            closeProfile();
+            setShowShop("locker");
+          }}
+          onSettings={() => {
+            closeProfile();
+            setShowSettings(true);
+          }}
+        />
+      </FrontFrame>
+    );
+  }
   if (!match && showShop) {
     return (
       <ShopScreen
+        initial={showShop === "locker" ? "locker" : undefined}
         onBack={() => {
           setShowShop(false);
           if (location.pathname === "/shop") history.replaceState(null, "", "/");
-        }}
-      />
-    );
-  }
-  if (!match && showProfile) {
-    return (
-      <ProfileScreen
-        onBack={() => {
-          setShowProfile(false);
-          if (location.pathname === "/profile") history.replaceState(null, "", "/");
-        }}
-        onSettings={() => {
-          setShowProfile(false);
-          setShowSettings(true);
         }}
       />
     );
@@ -392,8 +402,8 @@ export function App() {
         onCreateLobby={(mode) => void createLobby(mode)}
         onJoinLobby={(code) => joinLobby(code)}
         onSignIn={() => chooseGuest(false)}
-        onProfile={() => setShowProfile(true)}
-        onShop={() => setShowShop(true)}
+        onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
+        onShop={() => setShowShop("shop")}
       />
       </FrontFrame>
     );
@@ -420,11 +430,26 @@ export function App() {
     leave,
     again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode) : leave()),
   });
+  // A name tapped during the match: their profile over the game (which goes on underneath).
+  const overlay = profileOpen && (
+    <div class="fd-overlay">
+      <FrontFrame>
+        <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+      </FrontFrame>
+    </div>
+  );
   // Computers get the leaderboard as a permanent sidebar during the knockout stages.
   const tower = ["play", "scoring", "reveal", "spectating", "final", "watching", "boss"].includes(match.phase.kind) && match.standings().length > 0;
-  if (!tower) return screen;
+  if (!tower)
+    return (
+      <>
+        {screen}
+        {overlay}
+      </>
+    );
   return (
     <div class="arena">
+      {overlay}
       <aside class="tower-side">
         {(() => {
           const v = towerView(match);
@@ -515,4 +540,23 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
         />
       );
   }
+}
+
+/** A profile as a page (outside a match): its address, and back to where you were. */
+function ProfilePage({ target, onLocker, onSettings }: { target: ProfileTarget; onLocker: () => void; onSettings: () => void }) {
+  useEffect(() => {
+    const path = target.you ? "/profile" : target.uid ? `/profile/${target.uid}` : null;
+    if (path && location.pathname !== path) history.replaceState(null, "", path);
+  }, [target]);
+  return (
+    <PlayerProfileScreen
+      target={target}
+      onBack={() => {
+        closeProfile();
+        if (location.pathname.startsWith("/profile")) history.replaceState(null, "", "/");
+      }}
+      onLocker={onLocker}
+      onSettings={onSettings}
+    />
+  );
 }

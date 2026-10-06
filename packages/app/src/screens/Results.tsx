@@ -5,6 +5,7 @@ import { useState } from "preact/hooks";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { GodKingEpilogue } from "../components/LastStand.tsx";
+import { PlayerName } from "../components/PlayerName.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
   const played = match.moves.filter((m) => m.move !== null);
@@ -34,7 +35,19 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
         {placement}
         {ordinal(placement)} of {match.totalPlayers}
       </h1>
-      <p class="muted">{placement === 1 ? "You won the match!" : `${winner} won the match.`}</p>
+      <p class="muted">
+        {placement === 1 ? (
+          "You won the match!"
+        ) : (
+          <>
+            {(() => {
+              const w = standings.find((s) => s.placement === 1);
+              return w ? <PlayerName name={winner} uid={w.uid} bot={w.isBot} /> : winner;
+            })()}{" "}
+            won the match.
+          </>
+        )}
+      </p>
       {bossResult && match.boss && (
         <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
           {match.boss.icon}{" "}
@@ -78,7 +91,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           <ol>
             {scariest.map((s) => (
               <li key={s.id} class={s.isYou ? "you" : ""}>
-                <span>{s.name}</span>
+                <PlayerName name={s.name} uid={s.uid} you={s.isYou} bot={s.isBot} />
                 <strong>{s.rating}</strong>
               </li>
             ))}

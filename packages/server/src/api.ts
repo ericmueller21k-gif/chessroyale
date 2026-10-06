@@ -12,6 +12,7 @@ import {
   profile,
   publicProfile,
   randomToken,
+  reportPlayer,
   recordResult,
   shopState,
   signInWithIdentity,
@@ -106,6 +107,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     !path.startsWith("/api/auth/") &&
     path !== "/api/results" &&
     path !== "/api/live" &&
+    path !== "/api/report" &&
     !path.startsWith("/api/profile/") &&
     !path.startsWith("/api/shop") &&
     !path.startsWith("/api/locker")
@@ -191,6 +193,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const b = (await request.json().catch(() => ({}))) as { slot?: unknown; item?: unknown };
     const r = await equipLocker(sql, current.id, b.slot, b.item ?? null);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
+  }
+
+  // POST /api/report {target, reason}: a report about a player (the profile's Report button).
+  if (path === "/api/report" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { target?: unknown; reason?: unknown };
+    const r = await reportPlayer(sql, current.id, b.target, b.reason, now);
+    return r.ok ? json({ ok: true }) : json({ message: r.message }, 400);
   }
 
   // POST /api/results: a solo match's result, from the browser.

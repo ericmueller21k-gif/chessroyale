@@ -17,6 +17,7 @@ import { crowdAnimations, crowdTrail, onPrefsChange } from "../prefs.ts";
 import { elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
+import { PlayerName } from "../components/PlayerName.tsx";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { account } from "../account.ts";
 import { seenKey } from "../hooks.ts";
@@ -550,9 +551,9 @@ export function CrowdCut({
           )}
           <div class="cut-out" aria-label="Knocked out">
             {knockedOut.slice(0, 12).map((k) => (
-              <span key={k.id} class={`cut-name${k.isYou ? " you" : ""}`}>
+              <PlayerName key={k.id} class={`cut-name${k.isYou ? " you" : ""}`} name={k.name} uid={k.uid} you={k.isYou} bot={k.isBot}>
                 {k.isYou ? "You" : k.name}
-              </span>
+              </PlayerName>
             ))}
             {knockedOut.length > 12 && <span class="cut-name more">+{knockedOut.length - 12}</span>}
           </div>

@@ -1217,3 +1217,40 @@ every number on it comes from the server.
     twice or jumps);
   - two arriving together start apart (the second a frame behind);
   - when time's up, the bots' cascade runs row by row in about 1.2 s, and the votes begin 1.8 s after the fill.
+
+### Built, step 3: profiles (Oct 6, 2026)
+
+- **One screen for everyone**, the mockup's structure. It opens from your pawn or Profile on the home screen, and
+  from any name: the leaderboard beside the board and the full leaderboard sheet, the cut screen's list, the results
+  (the winner, the most dangerous players), the final, a private lobby's list, and a person's pawn in the queue.
+  - The small leaderboard under a phone's board keeps its own tap (it opens the full sheet, where names work).
+  - Outside a match a profile is a page (`/profile` for yours, `/profile/ID` for anyone's). During a match it opens
+    over the game, which goes on underneath.
+  - A bot's name opens a bot's card: bots fill empty seats and have no profile.
+- **What anyone can see** (`GET /api/profile/ID`): name, what they wear, online now or last seen, the month they
+  joined, tier and rating, "Top N%", the stats, the rating line, bosses beaten and recent matches. **Never**: email,
+  sign-in method, whether they're a guest, or their pixel icon. Profiles are found by account id, which other players
+  only see in a lobby or match they share (ids are random, so profiles can't be listed by guessing).
+- **Top N%** ranks your latest rating among every account's latest rating. It shows once 10 or more accounts have a
+  rating (`FRONT_DOOR.percentileMinPlayers`), so the first players don't see "Top 100%".
+- **Stats, all from stored results:**
+  - Crowd: games, wins, average place (shown rounded, as a place), best finish: from results, as before. **New:**
+    cuts survived (%) and brilliant moves.
+  - Boss raid: raids. **New:** bosses beaten (different tiers won), strikes survived (the boss's strikes that took
+    someone else while you stood; I read the mockup's "strikes" this way and labelled it so), Last Stands (raids in
+    which the God King made his Last Stand), survived (% of raids you were still standing at the end) and brilliant
+    moves.
+  - The new ones are recorded from today on. A stat counts only results that have it, and shows "—" when none do,
+    so nothing is invented for older matches. Bosses beaten likewise counts only raids recorded with their boss.
+  - Online, the server records them: the lobby notes each person's brilliant moves and best pick every round. Solo
+    games are recorded by the browser, as before.
+  - **Best move** in a match: a brilliant one if any, else the pick that beat the field by most (the highest round
+    score).
+- **The rating line:** the rating after each of the last 30 rated matches, any mode: the same number as the header's.
+- **Recent matches:** the place (Won, Lost, Out or Draw for a raid), the mode ("solo" for games against bots, the
+  boss's name and strength for a raid), the best move and when.
+- **Yours only:** Edit name & icon (your name, and the pixel icon builder), Open locker (the shop's locker tab), the
+  settings (the gear, and a link at the bottom), and signing in for a guest.
+- **Someone else's only:** Report (Cheating, Name or Something else), stored in D1's `reports` for a person to read
+  (`SELECT * FROM reports ORDER BY at DESC`); one per player per reporter a day, 20 a day per reporter. "Add friend"
+  is there, greyed out "(later)".

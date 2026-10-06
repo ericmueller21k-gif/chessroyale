@@ -1,5 +1,6 @@
 import type { NetMatch } from "../net.ts";
 import { QueueScreen } from "./Queue.tsx";
+import { PlayerName } from "../components/PlayerName.tsx";
 
 export function LobbyScreen({ match, onLeave }: { match: NetMatch; onLeave: () => void }) {
   // Matchmade (PLAY): the queue, not a lobby.
@@ -30,7 +31,7 @@ export function LobbyScreen({ match, onLeave }: { match: NetMatch; onLeave: () =
         {humans.map((p) => (
           <li key={p.id} class={match.isYou(p.id) ? "you" : ""}>
             <span class={`dot ${p.connected ? "on" : ""}`} aria-label={p.connected ? "connected" : "disconnected"} />
-            <span>{p.name}</span>
+            <PlayerName name={p.name} uid={p.uid} you={match.isYou(p.id)} />
             {p.id === match.hostId && <span class="host-badge">host</span>}
           </li>
         ))}
