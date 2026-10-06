@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { BOSS_TIERS, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, shopItem, tierInfo, type ItemLook } from "@chessroyale/core";
-import { BackButton, DressedPawn, FdButton, WORN_ORDER, myHat } from "../components/FrontDoor.tsx";
+import { BackButton, DressedPawn, FdButton, RankPill, WORN_ORDER, myHat } from "../components/FrontDoor.tsx";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { account, fetchProfile, onAccountChange, reportPlayer, updateProfile, type PublicProfile } from "../account.ts";
@@ -420,9 +420,7 @@ export function PlayerProfileScreen({
           {seenLine(p)} · joined {joined}
         </div>
         <div class="fd-pills">
-          <span class={`fd-pill${p.tier ? " tier" : ""}`} style={p.tier ? { "--tier": p.tier.color } : undefined}>
-            {p.tier && p.rating !== null ? `${p.tier.label} · ${p.rating}` : "No rating yet"}
-          </span>
+          <RankPill tier={p.tier} rating={p.rating} />
           {p.topPercent !== null && <span class="fd-pill">Top {p.topPercent}%</span>}
         </div>
         {own && (

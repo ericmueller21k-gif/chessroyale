@@ -6,7 +6,8 @@ const live = (p: import("@playwright/test").Page) => p.evaluate(() => fetch("/ap
 test("home: the live line comes from the server, the mode picker changes the line under PLAY, Classic is coming", async ({ page, browser }) => {
   await named(page, "Eric");
   await page.goto("/");
-  await expect(page.locator(".fd-logo")).toHaveText("HunChess");
+  // The logo you can see: the top bar's on a phone, the side menu's on a computer (both are in the page).
+  await expect(page.locator(".fd-logo").filter({ visible: true })).toHaveText("HunChess");
   await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
   await expect(page.locator(".fd-hero-name")).toHaveText("Eric");
   // The live line: you're online (the app told the server you're here).

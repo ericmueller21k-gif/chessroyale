@@ -29,8 +29,8 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
    little humour, and `layer: "back"` only if it sits behind the piece (capes, wings). `colors: 2` rolls a second colour
    (`color2`), as the Present does.
 2. **Odds.** Put it in a crate. A crate opens to a colour-coded present per tier (its `strip`, with Fischer Random at
-   2%, adding up to 100), and a present opens to one of its tier's items, evenly (Eric, Oct 6). So a Novice to Sublime
-   item goes in the crate's `items`, and an Exalted or Transcendent one in its `fischer` list (adding up to 100).
+   2%, adding up to 100), and a present opens to one of its tier's items, evenly (Eric, Oct 6). So a Common to Epic
+   item goes in the crate's `items`, and a Legendary or Mythic one in its `fischer` list (adding up to 100).
    Keep the ladder: each tier's present rarer than the one below. A new item lowers the chance of the others in its
    present: tell Eric the new numbers in one line.
 3. **Draw it** in `Items.tsx`: one component, added to `ITEM_ART`. Conventions:

@@ -1,5 +1,5 @@
 import type { ShopState } from "@chessroyale/core";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect } from "@chessroyale/core";
 
 /**
  * Your account, as the screens see it: a guest account made the first time
@@ -179,7 +179,7 @@ export interface PublicProfile {
   lastSeen: number | null;
   online: boolean;
   rating: number | null;
-  tier: { label: string; color: string } | null;
+  tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   topPercent: number | null;
   crowd: { games: number; wins: number; avgPlace: number | null; best: number | null; cutsSurvivedPct: number | null; brilliant: number | null };
   boss: { raids: number; bossesBeaten: number; strikesSurvived: number | null; lastStands: number | null; survivedPct: number | null; brilliant: number | null };

@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { equippedLook, itemDef, ratingTier, shopItem, type ItemLook, type ItemSlot, type ShopState } from "@chessroyale/core";
+import { equippedLook, itemDef, ratingTier, shopItem, type ItemLook, type ItemSlot, type RankEffect, type ShopState } from "@chessroyale/core";
 import { Avatar } from "./Items.tsx";
 import { account, type Profile } from "../account.ts";
 import type { LiveCounts } from "../live.ts";
@@ -141,10 +141,33 @@ export function LiveLine({ live, stacked }: { live: LiveCounts | null; stacked?:
   );
 }
 
-/** "Gold II · 1612", or that there's no rating yet. */
-export function rankLine(rating: number | null): string {
+/** What a rank needs to be drawn: its name, colour and (the top ranks) effect. */
+export type RankLook = { label: string; color: string; effect: RankEffect | null };
+
+const rankClass = (t: RankLook) => `tier${t.effect ? ` rank-${t.effect}` : ""}`;
+
+/** The rank pill on a profile: "Weighty · 1612" in the rank's colour (the top three dressed up), or "No rating yet". */
+export function RankPill({ tier, rating }: { tier: RankLook | null; rating: number | null }) {
+  if (!tier || rating === null) return <span class="fd-pill">No rating yet</span>;
+  return (
+    <span class={`fd-pill ${rankClass(tier)}`} style={{ "--tier": tier.color }}>
+      {`${tier.label} · ${Math.round(rating)}`}
+    </span>
+  );
+}
+
+/** The rank line under your name on home: the rank's name in its colour, then the rating ("Weighty · 1612"). */
+export function RankLine({ rating }: { rating: number | null }) {
   const t = ratingTier(rating);
-  return t && rating !== null ? `${t.label} · ${Math.round(rating)}` : "No rating yet";
+  if (!t || rating === null) return <>No rating yet</>;
+  return (
+    <>
+      <span class={`fd-rank ${rankClass(t)}`} style={{ "--tier": t.color }}>
+        {t.label}
+      </span>
+      {` · ${Math.round(rating)}`}
+    </>
+  );
 }
 
 /** The order worn items are listed in. */

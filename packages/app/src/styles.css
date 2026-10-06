@@ -6817,15 +6817,63 @@ button.fd-logo {
   font-weight: 600;
   font-size: 14px;
 }
-.fd-pill.tier {
+/* A rank: its colour on a tint of it (dark), or darkened on a tint of white (light). core's profile test checks each
+   rank's colour stays 4.5:1 through these mixes, so change them together. */
+.fd-pill.tier,
+.fd-rank {
   --fd-tier-ink: var(--tier);
+  --fd-prism: linear-gradient(100deg, #ff9a9a, #fcd34d, #86efac, #7dd3fc, #c4b5fd, #f9a8d4, #ff9a9a);
+  --fd-prism-ink: linear-gradient(100deg, #e0607a, #f2c14e, #4ade80, #38bdf8, #a78bfa, #f472b6);
+}
+.fd-pill.tier {
   background: color-mix(in srgb, var(--tier) 20%, var(--fd-panel));
   color: var(--fd-tier-ink);
   font-weight: 800;
 }
+.fd-rank {
+  color: var(--fd-tier-ink);
+  font-weight: 700;
+}
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .fd-pill.tier {
+  :root:not([data-theme="dark"]) :is(.fd-pill.tier, .fd-rank) {
     --fd-tier-ink: color-mix(in srgb, var(--tier) 55%, #000);
+    --fd-prism-ink: linear-gradient(100deg, #be123c, #854d0e, #15803d, #0369a1, #6d28d9, #be185d);
+  }
+}
+/* The top three ranks. Revered: a gold ring and a sheen. Exalted: a ring and a glow. Transcendent: a rainbow. */
+.fd-pill.rank-gilt {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 24%, var(--fd-panel)), color-mix(in srgb, var(--tier) 12%, var(--fd-panel)));
+  box-shadow: inset 0 0 0 1.5px var(--tier);
+}
+.fd-pill.rank-glow {
+  box-shadow:
+    inset 0 0 0 1.5px var(--tier),
+    0 0 14px color-mix(in srgb, var(--tier) 55%, transparent);
+}
+.fd-pill.rank-prism {
+  background: var(--fd-prism);
+  background-size: 200% 100%;
+  color: #14161b;
+  box-shadow: 0 0 16px color-mix(in srgb, #f472b6 45%, transparent);
+  animation: fd-prism 6s linear infinite;
+}
+.fd-rank.rank-prism {
+  background: var(--fd-prism-ink);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.fd-rank.rank-glow {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--tier) 60%, transparent);
+}
+@keyframes fd-prism {
+  to {
+    background-position: 200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-pill.rank-prism {
+    animation: none;
   }
 }
 .fd-center-text {

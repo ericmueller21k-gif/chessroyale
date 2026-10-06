@@ -877,15 +877,15 @@ Eric's design:
 Eric's design, a fun bonus for now: free and unlimited while testing, and fully compliant (odds shown, regional rules) if it ever involves money.
 
 - **Three independent layers of rarity** (`core/crates.ts`):
-  - **Tier, which decides the item.** The strip lands on a tier's present (colour-coded), which opens to one of that tier's items, each as likely as the others; or on Fischer Random (Eric, Oct 6). The tier names honour Puzzle Pirates:
+  - **Tier, which decides the item.** The strip lands on a tier's present (colour-coded), which opens to one of that tier's items, each as likely as the others; or on Fischer Random (Eric, Oct 6). The tiers run Common to Mythic (renamed Oct 6 from the Puzzle Pirates names, which went to player ranks; entries below written before then use the old names):
 
     | Present | Chance | Items inside (slot) | Each |
     | --- | --- | --- | --- |
-    | Novice (grey) | 40% | Santa Beard (face), Beanie (head), Christmas Tree Tee (skin) | 13.3% |
-    | Broad (green) | 26% | Antlers (head) | 26% |
-    | Paragon (blue) | 18% | Santa Hat (head), Ski Goggles (face) | 9% |
-    | Sublime (purple) | 14% | Snowman (skin), Present (head), Gingerbread Man (skin), Chimney (skin) | 3.5% |
-    | Fischer Random (a gold crown, not a present; a second spin) | 2% | Exalted Gift-Wrap Tube (weapon, 40%) or Candy Cane (weapon, 40%), Transcendent Fire & Ice Crown (head, 20%) | 0.8%, 0.8%, 0.4% |
+    | Common (grey) | 40% | Santa Beard (face), Beanie (head), Christmas Tree Tee (skin) | 13.3% |
+    | Uncommon (green) | 26% | Antlers (head) | 26% |
+    | Rare (blue) | 18% | Santa Hat (head), Ski Goggles (face) | 9% |
+    | Epic (purple) | 14% | Snowman (skin), Present (head), Gingerbread Man (skin), Chimney (skin) | 3.5% |
+    | Fischer Random (a gold crown, not a present; a second spin) | 2% | Legendary Gift-Wrap Tube (weapon, 40%) or Candy Cane (weapon, 40%), Mythic Fire & Ice Crown (head, 20%) | 0.8%, 0.8%, 0.4% |
 
     So the crown is 0.4%. (Before the presents, odds were per item: 16% each for the commons, 12% antlers, 8% hat.)
   - **Colour:** Red 30%, Yellow 30%, Sage 14%, Opal 9%, Cobalt 7%, Midnight 4.5%, Emerald 3%, Oceanic 2%, Pearl 0.5%. Opal, Oceanic and Pearl have a two-tone sheen.
@@ -901,7 +901,7 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
 - **Opening:**
   - A CS:GO-style strip: decoy tiles by the odds, with Fischer Random shown three times as often as it lands to tease.
   - It eases out over 6.2 s with a click per passing tile, so the clicks slow as it lands.
-  - Landing on Fischer Random shows a gold crown with "?", the "FISCHER RANDOM!" banner, and a second spin among Exalted and Transcendent items.
+  - Landing on Fischer Random shows a gold crown with "?", the "FISCHER RANDOM!" banner, and a second spin among Legendary and Mythic items.
   - The reveal is an FF-style window (the God King's menu style) with the tier, name, colour, purity and "Shiny!".
 - **Where:** Shop → Crates (with each crate's page of odds) and Shop → Locker (avatar preview, items rarest first, tap to wear or take off).
 - **Shine, after Eric's first look:** the sparkle sat off to the side. Now a broad soft band of light rolls slowly across each painted region of a shiny item (CSS-animated, 4.2 s, then a pause), sized to the item itself so thin items like the tube get it too.
@@ -960,6 +960,25 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - **Opening:** the strip spins to a present; the present shakes and bursts ("Novice present", in its colour, 1.1 s); then, if it holds more than one item, a second, shorter spin (3.4 s) among them; then the reveal. A one-item present goes straight to the reveal. Fischer Random is unchanged (banner, a 4.8 s spin). The strip still shows Fischer Random three times as often as it lands, to tease; second-spin decoys are drawn evenly from the present's items.
   - **The crate page** lists the presents with their odds (and how many items each holds), then every item with its own chance.
   - Server rolls: the tier, then an item evenly from that tier's present (`presentItems`). Nothing stored changes.
+- **Tier names: Common to Mythic (Eric, Oct 6):** "I kind of just want to revert to a common, uncommon, rare, etc.
+  style." The Puzzle Pirates names move to the player rank ladder (the hub's work), so the items no longer use them.
+
+  | Was | Now | Colour (unchanged) |
+  | --- | --- | --- |
+  | Novice | Common | grey |
+  | Broad | Uncommon | green |
+  | Paragon | Rare | blue |
+  | Sublime | Epic | purple |
+  | Exalted (Fischer Random) | Legendary | gold |
+  | Transcendent (Fischer Random) | Mythic | red |
+
+  - **Legendary and Mythic for the two Fischer Random tiers,** not Eric's "mythic and unknown": "Unknown" on a tier pill
+    ("Head · Red · 80% pure · Unknown") reads like missing data. Legendary then Mythic is the ladder players already
+    know, and keeps his "Mythic" at the very top. Swapping in "Unknown" is a one-line change in `TIERS` if he prefers it.
+  - **The ids changed too** (`common` … `mythic`), so the code doesn't keep names that are now player ranks. Nothing
+    stores a tier: the locker stores the item (`def`) and the tier comes from `ITEM_DEFS`, as do looks sent to others
+    online. No migration; owned items show the new names at once.
+  - Odds, items and art are unchanged. A test pins the six names, their order (the locker sorts by it) and colours.
 
 ## The God King's Last Stand (Oct 5, 2026; built)
 
@@ -1171,12 +1190,11 @@ every number on it comes from the server.
   60 s, no bots, and the boss is the weakest that's stronger than the group's average rating.
 - **Guests, where online play needs signing in:** PLAY plays 99 bots (Crowd) or opens the boss menu (Boss raid), and
   the line under PLAY says so, with "Sign in to play online".
-- **Under your pawn:** your tier and rating ("Gold II · 1612") and what you wear. "No rating yet" until a match
+- **Under your pawn:** your rank and rating ("Weighty · 1612") and what you wear. "No rating yet" until a match
   gives you one.
-  - There's no ranked rating yet, so the tier comes from the engine rating your profile already has (the one the
-    boss raid uses). The bands are in `FRONT_DOOR.ratingTiers`: Bronze, Silver, Gold (1500), Platinum, Diamond, each
-    with divisions III to I of 100 points, then Master (2400) and Grandmaster (2700). Ranked can swap the number
-    underneath later.
+  - There's no ranked rating yet, so the rank comes from the engine rating your profile already has (the one the
+    boss raid uses). Ranked can swap the number underneath later.
+  - (Built first as Bronze to Grandmaster with divisions; replaced the same day by the rank ladder, below.)
 - **Where the old home's parts went:**
   - The name box is gone: you play under your profile's name.
   - The options (practice, pace, 50 v 50 or everyone moves, animations, motion trail, pre-game votes, opening moves,
@@ -1274,6 +1292,43 @@ every number on it comes from the server.
 - **The queue keeps the whole window** (no menu or panel): the grid is the show, and a menu click there would have to
   mean leaving the queue. Private lobbies and every game screen keep their own layouts.
 - **Phones** (below 1024 px) never see the menu or the panel: one column, as in the mockups.
+
+### The rank ladder (Eric, Oct 6, 2026)
+
+- **Fourteen ranks, Puzzle Pirates' skill ladder** (the names honour it): Novice, Neophyte, Apprentice, Narrow,
+  Broad, Solid, Weighty, Expert, Paragon, Illustrious, Sublime, Revered, Exalted, Transcendent. No divisions: the
+  label is the name ("Weighty · 1612"). They replace Bronze to Grandmaster, on home and on profiles.
+- **Fixed cutoffs, in 50s** (`RATING_RANKS` in settings.ts), aimed at the spread Eric asked for. The assumption: our
+  ratings spread like chess ratings, centred on 1500 with an SD of 350. Nothing better exists yet: the sim reports
+  model bot crowds, not people, and a new player's rating starts at 1500 and is pulled towards it for the first
+  moves. Once real ratings are stored in numbers, refit the cutoffs to them (change `from` in settings.ts).
+
+  | Rank | From | Asked | Gets (1500 ± 350) |
+  | --- | --- | --- | --- |
+  | Novice | 0 | 5% | 5.8% |
+  | Neophyte | 950 | 7% | 6.9% |
+  | Apprentice | 1100 | 9% | 11.1% |
+  | Narrow | 1250 | 10% | 9.7% |
+  | Broad | 1350 | 11% | 10.9% |
+  | Solid | 1450 | 12% | 11.4% |
+  | Weighty | 1550 | 11% | 10.9% |
+  | Expert | 1650 | 10% | 9.7% |
+  | Paragon | 1750 | 9% | 7.9% |
+  | Illustrious | 1850 | 7% | 5.9% |
+  | Sublime | 1950 | 5% | 5.6% |
+  | Revered | 2100 | 2.5% | 2.7% |
+  | Exalted | 2250 | 1.2% | 1.3% |
+  | Transcendent | 2450 | 0.3% | 0.3% |
+
+  A band of 50 holds about 5.7% of players near the middle, so the middle ranks can't land closer than a point or
+  two; the cutoffs are the set of 50s nearest the ideal that fits best overall. A unit test holds the shares near
+  these, so a change to the cutoffs or the assumption is a deliberate one.
+- **Colours climb:** dull grey and stone at the bottom, then clay and copper, olive, greens, teal, sky blue, periwinkle
+  and violet. The top three stand out: **Revered** is gold with a gold ring and a sheen, **Exalted** fire orange with
+  a ring and a glow, **Transcendent** a slowly moving rainbow with dark text (held still for anyone who asks for reduced motion). On home
+  the rank's name takes its colour. Every pill reads at 4.5:1 or better in both themes, and a unit test checks it.
+- **Item tiers get their own names** (Common to Mythic, the item-builder's change alongside this one), so a rank never
+  reads like an item's rarity.
 
 ## e2e: two flaky solo tests (Oct 6, 2026)
 
