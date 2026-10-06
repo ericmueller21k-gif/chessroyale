@@ -1,20 +1,64 @@
 import { describe, expect, it } from "vitest";
-import { bestMoveOf, matchFeats, ratingTier, topPercent, type BossState } from "../src/index.ts";
+import { RATING_RANKS, bestMoveOf, matchFeats, ratingTier, topPercent, type BossState } from "../src/index.ts";
+
+/** The error function (Abramowitz and Stegun 7.1.26, good to 1.5e-7). */
+function erf(x: number): number {
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return x >= 0 ? y : -y;
+}
 
 describe("profile helpers", () => {
-  it("rating tiers: bands, divisions counting down to the next tier, none without a rating", () => {
+  it("ranks: the Puzzle Pirates ladder, no divisions, none without a rating", () => {
+    expect(RATING_RANKS.map((r) => r.name)).toEqual([
+      "Novice", "Neophyte", "Apprentice", "Narrow", "Broad", "Solid", "Weighty",
+      "Expert", "Paragon", "Illustrious", "Sublime", "Revered", "Exalted", "Transcendent",
+    ]);
     expect(ratingTier(null)).toBeNull();
-    expect(ratingTier(1612)?.label).toBe("Gold II");
-    expect(ratingTier(1500)?.label).toBe("Gold III");
-    expect(ratingTier(1599)?.label).toBe("Gold III");
-    expect(ratingTier(1600)?.label).toBe("Gold II");
-    expect(ratingTier(1700)?.label).toBe("Gold I");
-    expect(ratingTier(1799)?.label).toBe("Gold I");
-    expect(ratingTier(1800)?.label).toBe("Platinum III");
-    expect(ratingTier(640)?.label).toBe("Bronze III");
-    expect(ratingTier(1150)?.label).toBe("Bronze I");
-    expect(ratingTier(2550)?.label).toBe("Master");
-    expect(ratingTier(3300)?.label).toBe("Grandmaster");
+    expect(ratingTier(undefined)).toBeNull();
+    expect(ratingTier(Number.NaN)).toBeNull();
+    expect(ratingTier(1612)).toEqual({ name: "Weighty", label: "Weighty", level: 6, color: "#3fc28e", effect: null });
+    expect(ratingTier(400)?.label).toBe("Novice");
+    expect(ratingTier(949)?.label).toBe("Novice");
+    expect(ratingTier(950)?.label).toBe("Neophyte");
+    expect(ratingTier(1549)?.label).toBe("Solid");
+    expect(ratingTier(1550)?.label).toBe("Weighty");
+    expect(ratingTier(2449)?.label).toBe("Exalted");
+    expect(ratingTier(2450)?.label).toBe("Transcendent");
+    expect(ratingTier(3400)?.label).toBe("Transcendent");
+    // The top three stand out, and only they do.
+    expect(RATING_RANKS.map((r) => r.effect ?? null)).toEqual([...Array(11).fill(null), "gilt", "glow", "prism"]);
+  });
+
+  it("ranks: fixed cutoffs in 50s that spread a chess-like field (1500 ± 350) about as Eric asked", () => {
+    const share = [5, 7, 9, 10, 11, 12, 11, 10, 9, 7, 5, 2.5, 1.2, 0.3];
+    expect(RATING_RANKS[0]!.from).toBe(0);
+    const cdf = (x: number) => 0.5 * (1 + erf((x - 1500) / (350 * Math.SQRT2)));
+    RATING_RANKS.forEach((r, i) => {
+      if (i > 0) expect(r.from).toBeGreaterThan(RATING_RANKS[i - 1]!.from);
+      expect(r.from % 50).toBe(0);
+      const next = RATING_RANKS[i + 1];
+      const got = 100 * ((next ? cdf(next.from) : 1) - (i > 0 ? cdf(r.from) : 0));
+      // Bands of 50 are ~5.7% wide at the middle, so the middle ranks land within a couple of points; the rare top ranks within a fifth.
+      if (share[i]! >= 5) expect(Math.abs(got - share[i]!)).toBeLessThanOrEqual(2.2);
+      else expect(Math.abs(got - share[i]!) / share[i]!).toBeLessThanOrEqual(0.2);
+    });
+  });
+
+  it("ranks: every pill reads at 4.5:1 or better on both themes (the pill's colour mixes in styles.css)", () => {
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v * t + b[i]! * (1 - t));
+    const lum = (c: number[]) => {
+      const [r, g, b] = c.map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+    };
+    const contrast = (a: number[], b: number[]) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+    for (const r of RATING_RANKS.filter((r) => r.effect !== "prism")) {
+      const c = rgb(r.color);
+      // Dark: the colour on a 20% tint of the panel (#1b1e25). Light: the colour darkened (55% with black) on a 20% tint of white.
+      expect(contrast(c, mix(c, rgb("#1b1e25"), 0.2)), `${r.name} dark`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(mix(c, [0, 0, 0], 0.55), mix(c, [255, 255, 255], 0.2)), `${r.name} light`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("top percent: rank among rated players, rounded up, at least 1%", () => {

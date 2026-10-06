@@ -17,10 +17,13 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
     }),
   );
   await page.reload();
+  // Home names the rank under your name, in the rank's colour.
+  await expect(page.locator(".fd-hero-sub")).toContainText("Weighty · 1612");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Weighty");
   await page.getByRole("button", { name: "Your profile" }).click();
   await expect(page.getByRole("heading", { name: "Eric" })).toBeVisible();
   await expect(page.getByText("Online now")).toBeVisible();
-  await expect(page.getByText("Gold II · 1612")).toBeVisible();
+  await expect(page.getByText("Weighty · 1612")).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open locker" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Report" })).toHaveCount(0);

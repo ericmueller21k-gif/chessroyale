@@ -145,7 +145,7 @@ describe("profiles", () => {
     expect(p.bossesBeaten).toEqual([2000]);
     expect(p.ratingHistory).toEqual([1500, 1560, 1612]);
     expect(p.rating).toBe(1612);
-    expect(p.tier).toEqual({ label: "Gold II", color: "#f2c14e" });
+    expect(p.tier).toEqual({ label: "Weighty", level: 6, color: "#3fc28e", effect: null });
     expect(p.recent[0]).toMatchObject({ mode: "boss", bestMove: null, bossElo: null, won: true, survived: null });
     expect(p.recent[1]).toMatchObject({ mode: "boss", won: null, survived: false });
     expect(p.recent[2]).toMatchObject({ mode: "boss", bestMove: "Qh5", bossElo: 2000, survived: true });
