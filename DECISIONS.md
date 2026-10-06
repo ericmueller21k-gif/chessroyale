@@ -1049,3 +1049,15 @@ the 50 v 50 final is ten bots with two charges, which the bots spend whenever th
 - **Test switches** (solo): `?laststand=1` makes the battle's next crowd move set it off whatever it is (unless the
   God King plays it), for screenshots and the e2e test; Eric can just blunder a piece instead. `?side=b` plays a solo
   raid as Black, to see the black God King.
+
+## A crowd of one keeps its move on the board (Oct 6, 2026)
+
+Eric: in a solo boss raid, a moved piece jumped back to where it was, then moved again about 1.5 s later.
+
+- In Crowd mode your pick is a vote, shown as a ghost over the unchanged position until the reveal moves the winner.
+  With a crowd of one (a solo raid), your pick *is* the move, so the snap-back and the second move were pointless.
+- Now, when you're the only one picking, the piece stays where you put it, and the reveal starts with the move
+  already played: no ghost and no vote count. The God King's lines, the boss's reply and a Last Stand all play as
+  before; a Last Stand now starts from the piece already on its square.
+- Crowds of more than one are unchanged.
+- How it was found, and the rule that follows: `.claude/LESSONS.md`.

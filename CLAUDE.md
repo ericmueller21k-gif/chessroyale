@@ -35,6 +35,11 @@ record it in `DECISIONS.md`.
   non-production branches, not a code failure. Only `check` (and the e2e run) decide whether a PR is green. Production
   builds from `main` deploy as usual.
 
+## Lessons
+
+Read `.claude/LESSONS.md` before changing anything a player sees, and add to it when something slips past the tests.
+Above all: watch any board, move or animation change frame by frame with real taps (`npm run frames:boss`).
+
 ## Delegates
 
 Specialist agents live in `.claude/agents/` (one file each: a name, when to use it, its instructions). The main session

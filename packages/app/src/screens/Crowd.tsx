@@ -167,9 +167,12 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const shown = animate ? Math.min(ghosts.length, seen + Math.floor(t / step) + (unseen ? 1 : 0)) : ghosts.length;
   const countEnd = animate ? (unseen ? unseen * step + 350 : 150) : seen === ghosts.length ? 150 : 600;
   const grow = ghosts.length ? (animate ? shown / ghosts.length : Math.min(1, t / countEnd)) : 1;
-  const landAt = countEnd + 250;
+  // A crowd of one (a solo boss raid): your pick is the move and it's already on the board, so it stays there; no
+  // ghost, no count, no second move of the piece.
+  const alone = !mine.king && picks.length === 1 && match.isYou(picks[0]!.playerId) && picks[0]!.move === mine.result.playedMove;
+  const landAt = alone ? 0 : countEnd + 250;
   // The God King playing the move: his summoning, his cut-in banner and his bolt come first, then the piece moves.
-  const playAt = landAt + (mine.king ? 2100 + KING_CUT_MS : 750);
+  const playAt = alone ? 0 : landAt + (mine.king ? 2100 + KING_CUT_MS : 750);
   const landed = t >= landAt;
   const played = t >= playAt;
   useEffect(() => {
