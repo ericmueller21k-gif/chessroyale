@@ -1330,6 +1330,49 @@ every number on it comes from the server.
 - **Item tiers get their own names** (Common to Mythic, the item-builder's change alongside this one), so a rank never
   reads like an item's rarity.
 
+## Quick chat in matches (design, Oct 6, 2026; to build)
+
+Eric: a chat in 50 v 50, preset messages only (no typing), some unlockable, each with the sender's icon and name.
+Roomy on desktop, closed but expandable on a phone. The `social` delegate builds it. My calls:
+
+- **Where:** online 50 v 50 matches and multiplayer boss raids. Not solo (nobody to talk to), and not Classic while
+  it's being reworked. The front-door queue can come later.
+- **Preset messages only.** No typing anywhere, so there's nothing to moderate. A message is a phrase id; the server
+  relays only known phrases the sender owns.
+- **The phrases.** About 16 free to start, in four groups:
+  - **Hello:** "Good luck!", "Have fun!", "Hi all!", "Let's go!"
+  - **Reactions:** "Nice move!", "Wow!", "Oops…", "So close!"
+  - **Plans:** "Trust the crowd", "Defend the king!", "Push the pawns!", "Go for mate!"
+  - **Sporting:** "GG", "Well played", "Thanks!", "Rematch?"
+- **Unlockable phrase packs** in the shop for coins (no money), each a few lines:
+  - a God King pack ("For the crown!", "Not while I stand!")
+  - a Winter pack ("Ho ho ho!", "Snow way!")
+  - a Spicy pack ("Calculated.", "Was that a sacrifice?")
+  - Later, packs can come from crates or achievements. The list lives in one file (`core/chat.ts`), so a new pack is a
+    few lines.
+- **Who hears it.** In 50 v 50, **your team** by default. The Hello and Sporting phrases can also go to **everyone**
+  (one switch: Team / All), so plans stay inside the team. In a raid, everyone is one team.
+- **Each message shows:** the sender's pixel icon, their name (in the leaderboard's colour for their team) and the
+  phrase. Tapping the name opens their profile once the hub's profiles exist.
+- **Limits** (server-enforced, in settings.ts): one message every 3 s, at most 5 in 30 s; repeats of the same phrase
+  are dropped. Over the limit, the buttons grey out briefly.
+- **Muting.**
+  - Tap a name to mute that player for the match.
+  - A "Chat off" switch hides it all, remembered on the device.
+  - Report stays on profiles.
+- **Bots chat a little,** so a lobby with bots doesn't feel dead: an occasional "Good luck!" at the start, "Nice move!"
+  after a great crowd move, "GG" at the end. At most a few lines a minute across all bots.
+- **Desktop (1024 px+):** a chat panel at the right of the game screen. The feed shows the last ~30 messages, with the
+  phrase buttons below it in their groups.
+- **Phone:**
+  - **Closed by default.** A chat button in the top bar shows an unread count.
+  - **New messages:** the newest shows for about 2 s as a small one-line bubble under the top bar (icon, name,
+    phrase), never over the board. The bubble can be switched off.
+  - **Tapping the button** opens a bottom sheet over the leaderboard area: the feed on top, the phrase buttons below.
+    It closes with a tap outside or a swipe down.
+  - Making a move is never blocked: the board stays tappable with the sheet open.
+- **Sound:** a soft tick for a team message, never louder than a move, and none when muted.
+
 ## e2e: two flaky solo tests (Oct 6, 2026)
 
 The cause and how it was found are in `.claude/LESSONS.md`. The calls made:
