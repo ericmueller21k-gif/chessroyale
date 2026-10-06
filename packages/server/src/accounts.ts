@@ -6,7 +6,7 @@
  * so it can be tested with an in-memory SQLite.
  */
 
-import { BOSS_TIERS, FRONT_DOOR, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, equippedLook, ratingTier, shopItem, starterItem, topPercent, type ItemLook, type ShopSlot, type ShopState } from "@chessroyale/core";
+import { BOSS_TIERS, FRONT_DOOR, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, equippedLook, ratingTier, shopItem, starterItem, topPercent, type ItemLook, type RankEffect, type ShopSlot, type ShopState } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 
@@ -523,7 +523,8 @@ export interface PublicProfile {
   lastSeen: number | null;
   online: boolean;
   rating: number | null;
-  tier: { label: string; color: string } | null;
+  /** The rank ("Weighty"), its place on the ladder (0 = Novice), its colour and a top rank's pill effect. */
+  tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   /** "Top 18%" among rated players (null until enough players have a rating). */
   topPercent: number | null;
   crowd: CrowdStats;
@@ -632,7 +633,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     lastSeen: u.last_seen,
     online: u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
     rating,
-    tier: tier ? { label: tier.label, color: tier.color } : null,
+    tier: tier ? { label: tier.label, level: tier.level, color: tier.color, effect: tier.effect } : null,
     topPercent: top,
     crowd: crowdStats(rows.filter((r) => r.mode === "crowd")),
     boss: raidStats(raids),

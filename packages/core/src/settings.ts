@@ -363,8 +363,44 @@ export function clockAfterVote(clock: number, votes: readonly Augment[], s: Pick
   return Math.max(s.clockRange[0], Math.min(s.clockRange[1], clock + step));
 }
 
+/** How a top rank's pill stands out: a gold ring and sheen, a glow, or a prismatic fill. */
+export type RankEffect = "gilt" | "glow" | "prism";
+
+export interface RankDef {
+  name: string;
+  /** The lowest rating in this rank (on the engine rating's scale). */
+  from: number;
+  /** Its pill colour (a prism pill paints a rainbow instead; this is its colour elsewhere). */
+  color: string;
+  effect?: RankEffect;
+}
+
 /**
- * The front door (home, queue, profiles): the live line's timing, the queue's show, and the rating tiers' bands.
+ * The player ranks, lowest first. The names honour Puzzle Pirates, whose skill ladder they are (Eric, Oct 6, 2026).
+ * Cutoffs are fixed and rounded to 50, set so a chess-like spread of ratings (centre 1500, SD 350) lands about
+ * 5 / 7 / 9 / 10 / 11 / 12 / 11 / 10 / 9 / 7 / 5 / 2.5 / 1.2 / 0.3 % in each, lowest first; the shares these cutoffs
+ * actually give are in DECISIONS.md ("The rank ladder"). Colours climb from dull grey through earth, green and sky to
+ * violet, and the top three are special. Each colour keeps its pill readable on both themes (4.5:1 or better).
+ */
+export const RATING_RANKS: readonly RankDef[] = [
+  { name: "Novice", from: 0, color: "#a2a6ad" },
+  { name: "Neophyte", from: 950, color: "#b0a590" },
+  { name: "Apprentice", from: 1100, color: "#c0a180" },
+  { name: "Narrow", from: 1250, color: "#d3996f" },
+  { name: "Broad", from: 1350, color: "#a3b053" },
+  { name: "Solid", from: 1450, color: "#6cbd5e" },
+  { name: "Weighty", from: 1550, color: "#3fc28e" },
+  { name: "Expert", from: 1650, color: "#35bfc6" },
+  { name: "Paragon", from: 1750, color: "#52abf1" },
+  { name: "Illustrious", from: 1850, color: "#91a1fa" },
+  { name: "Sublime", from: 1950, color: "#bc93f8" },
+  { name: "Revered", from: 2100, color: "#f2c14e", effect: "gilt" },
+  { name: "Exalted", from: 2250, color: "#ff7e4a", effect: "glow" },
+  { name: "Transcendent", from: 2450, color: "#f472b6", effect: "prism" },
+];
+
+/**
+ * The front door (home, queue, profiles): the live line's timing, the queue's show, and the rank ladder.
  * See DECISIONS.md, "The front door".
  */
 export const FRONT_DOOR = {
@@ -382,16 +418,6 @@ export const FRONT_DOOR = {
   waitSamples: 20,
   /** Players with a rating needed before a profile shows its percentile ("Top 18%"). */
   percentileMinPlayers: 10,
-  /** Rating tiers (on the engine rating's scale), lowest first: a tier from `from`, three divisions of `step` each. */
-  ratingTiers: [
-    { name: "Bronze", from: 0, color: "#d08b52", divisions: true },
-    { name: "Silver", from: 1200, color: "#c3cad6", divisions: true },
-    { name: "Gold", from: 1500, color: "#f2c14e", divisions: true },
-    { name: "Platinum", from: 1800, color: "#5fd4c8", divisions: true },
-    { name: "Diamond", from: 2100, color: "#8fb4ff", divisions: true },
-    { name: "Master", from: 2400, color: "#c084fc", divisions: false },
-    { name: "Grandmaster", from: 2700, color: "#f87171", divisions: false },
-  ],
-  /** Divisions count down to the next tier: I is its top this-many points, II the band below, III the rest. */
-  divisionStep: 100,
+  /** The rank ladder (RATING_RANKS) a rating is named by. */
+  ratingRanks: RATING_RANKS,
 } as const;

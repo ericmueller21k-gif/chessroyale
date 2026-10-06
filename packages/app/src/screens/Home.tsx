@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BOSS_TIERS, bossInfo, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, PRIOR_RATING, raidBossElo, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
-import { Coins, DressedPawn, FdButton, LiveLine, Logo, MyPawnButton, myHat, rankLine, wearingNames } from "../components/FrontDoor.tsx";
+import { Coins, DressedPawn, FdButton, LiveLine, Logo, MyPawnButton, RankLine, myHat, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 
 export const OPENING_KEY = "brc.openingMoves";
@@ -385,7 +385,7 @@ export function HomeScreen({
     );
   const look = profile?.locker?.look;
   const name = profile?.user.name ?? "Player";
-  const sub = [rankLine(profile?.rating ?? null), wearingNames(look, profile?.shop)].filter(Boolean).join(" · ");
+  const wearing = wearingNames(look, profile?.shop);
   return (
     <div class="fd-home">
       <header class="fd-top">
@@ -401,7 +401,10 @@ export function HomeScreen({
           <DressedPawn look={look} hat={myHat(profile)} size="hero" shadow />
           <div class="fd-hero-text">
             <div class="fd-hero-name">{name}</div>
-            {sub && <div class="fd-hero-sub">{sub}</div>}
+            <div class="fd-hero-sub">
+              <RankLine rating={profile?.rating ?? null} />
+              {wearing && ` · ${wearing}`}
+            </div>
           </div>
         </section>
         <div class="fd-play-col">

@@ -1190,12 +1190,11 @@ every number on it comes from the server.
   60 s, no bots, and the boss is the weakest that's stronger than the group's average rating.
 - **Guests, where online play needs signing in:** PLAY plays 99 bots (Crowd) or opens the boss menu (Boss raid), and
   the line under PLAY says so, with "Sign in to play online".
-- **Under your pawn:** your tier and rating ("Gold II · 1612") and what you wear. "No rating yet" until a match
+- **Under your pawn:** your rank and rating ("Weighty · 1612") and what you wear. "No rating yet" until a match
   gives you one.
-  - There's no ranked rating yet, so the tier comes from the engine rating your profile already has (the one the
-    boss raid uses). The bands are in `FRONT_DOOR.ratingTiers`: Bronze, Silver, Gold (1500), Platinum, Diamond, each
-    with divisions III to I of 100 points, then Master (2400) and Grandmaster (2700). Ranked can swap the number
-    underneath later.
+  - There's no ranked rating yet, so the rank comes from the engine rating your profile already has (the one the
+    boss raid uses). Ranked can swap the number underneath later.
+  - (Built first as Bronze to Grandmaster with divisions; replaced the same day by the rank ladder, below.)
 - **Where the old home's parts went:**
   - The name box is gone: you play under your profile's name.
   - The options (practice, pace, 50 v 50 or everyone moves, animations, motion trail, pre-game votes, opening moves,
@@ -1293,3 +1292,40 @@ every number on it comes from the server.
 - **The queue keeps the whole window** (no menu or panel): the grid is the show, and a menu click there would have to
   mean leaving the queue. Private lobbies and every game screen keep their own layouts.
 - **Phones** (below 1024 px) never see the menu or the panel: one column, as in the mockups.
+
+### The rank ladder (Eric, Oct 6, 2026)
+
+- **Fourteen ranks, Puzzle Pirates' skill ladder** (the names honour it): Novice, Neophyte, Apprentice, Narrow,
+  Broad, Solid, Weighty, Expert, Paragon, Illustrious, Sublime, Revered, Exalted, Transcendent. No divisions: the
+  label is the name ("Weighty · 1612"). They replace Bronze to Grandmaster, on home and on profiles.
+- **Fixed cutoffs, in 50s** (`RATING_RANKS` in settings.ts), aimed at the spread Eric asked for. The assumption: our
+  ratings spread like chess ratings, centred on 1500 with an SD of 350. Nothing better exists yet: the sim reports
+  model bot crowds, not people, and a new player's rating starts at 1500 and is pulled towards it for the first
+  moves. Once real ratings are stored in numbers, refit the cutoffs to them (change `from` in settings.ts).
+
+  | Rank | From | Asked | Gets (1500 ± 350) |
+  | --- | --- | --- | --- |
+  | Novice | 0 | 5% | 5.8% |
+  | Neophyte | 950 | 7% | 6.9% |
+  | Apprentice | 1100 | 9% | 11.1% |
+  | Narrow | 1250 | 10% | 9.7% |
+  | Broad | 1350 | 11% | 10.9% |
+  | Solid | 1450 | 12% | 11.4% |
+  | Weighty | 1550 | 11% | 10.9% |
+  | Expert | 1650 | 10% | 9.7% |
+  | Paragon | 1750 | 9% | 7.9% |
+  | Illustrious | 1850 | 7% | 5.9% |
+  | Sublime | 1950 | 5% | 5.6% |
+  | Revered | 2100 | 2.5% | 2.7% |
+  | Exalted | 2250 | 1.2% | 1.3% |
+  | Transcendent | 2450 | 0.3% | 0.3% |
+
+  A band of 50 holds about 5.7% of players near the middle, so the middle ranks can't land closer than a point or
+  two; the cutoffs are the set of 50s nearest the ideal that fits best overall. A unit test holds the shares near
+  these, so a change to the cutoffs or the assumption is a deliberate one.
+- **Colours climb:** dull grey and stone at the bottom, then clay and copper, olive, greens, teal, sky blue, periwinkle
+  and violet. The top three stand out: **Revered** is gold with a gold ring and a sheen, **Exalted** fire orange with
+  a ring and a glow, **Transcendent** a slowly moving rainbow with dark text (held still for anyone who asks for reduced motion). On home
+  the rank's name takes its colour. Every pill reads at 4.5:1 or better in both themes, and a unit test checks it.
+- **Item tiers get their own names** (Common to Mythic, the item-builder's change alongside this one), so a rank never
+  reads like an item's rarity.
