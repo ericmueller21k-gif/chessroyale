@@ -65,9 +65,10 @@ for (let m = 0; m < moves; m++) {
   await p.waitForTimeout(800);
   // (Moves are possible once a new board's "Round start" countdown is over.)
   await p.locator(".cc-banner", { hasText: "Round start" }).waitFor({ state: "detached", timeout: 15000 }).catch(() => undefined);
-  const fen = await p.evaluate(() => window.match.phase.board.fen);
+  const { fen, barred } = await p.evaluate(() => ({ fen: window.match.phase.board.fen, barred: window.match.boss?.barred ?? null }));
   const c = new Chess(fen);
-  const all = c.moves({ verbose: true });
+  // (Not the move a Last Stand took back: it can't be picked again.)
+  const all = c.moves({ verbose: true }).filter((x) => x.from + x.to + (x.promotion ?? "") !== barred);
   const mv = all.find((x) => x.piece === "n" || x.piece === "b") ?? all[0];
   const box = await p.locator("cg-board").first().boundingBox();
   const black = await p.evaluate(() => !!document.querySelector(".cg-wrap.orientation-black"));

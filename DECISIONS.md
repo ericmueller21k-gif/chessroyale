@@ -1372,3 +1372,22 @@ Roomy on desktop, closed but expandable on a phone. The `social` delegate builds
     It closes with a tap outside or a swipe down.
   - Making a move is never blocked: the board stays tappable with the sheet open.
 - **Sound:** a soft tick for a team message, never louder than a move, and none when muted.
+
+## No flash between a match's screens (Oct 6, 2026)
+
+Eric: in a solo boss raid on his phone, the screen flashed white between moves.
+
+- **The cause:** each phase of a match (play, reveal, boss, watching…) is a new screen. Every screen faded in from 40%
+  opacity, and its board was built only after the first paint. So two or three times a move, for about 50 ms, the board
+  vanished and the screen washed out: white in light mode, a dark blink in dark mode. Every mode had it. Details and
+  the rule that follows are in `.claude/LESSONS.md`.
+- **The fix:** a match's screens (play, reveal, boss, watching, votes, final, the cut, the stage break, spectating, the
+  opening grid, the results) appear at once, with no fade. Screens outside a match keep theirs. The board is built
+  before the paint.
+- **Checked** with a new tool, `npm run frames:flash`, which records every painted frame on an iPhone-sized screen and
+  flags brightness jumps: boss, Crowd and Classic, light and dark. No flagged frame at any phase change after the fix.
+- **A boss battle's results headline follows the result.** Alone, it read "1st of 1 · You won the match!" right above
+  "The Iron Bishop won." Now a solo raid's headline is **Victory!**, **Defeated** or **A draw**, with 🏆, 💀 or 🤝. With
+  several players it still shows your place in the crowd, as "You were the best in the crowd" rather than "You won the
+  match".
+
