@@ -1136,8 +1136,9 @@ The `hub` delegate builds it. Phone layouts as in the mockup; desktop as below.
 
 **Profile:** one structure for everyone, opened by tapping your pawn or any name (leaderboards, cut screen, results).
 - **Header:** dressed pawn (large), name, online now or last seen, joined month, rank tier and rating, percentile.
-- **Wearing:** each equipped item with its colour swatch, slot, colour, purity (and "Shiny"), and a tier pill in its
-  tier colour.
+- **Wearing:** each equipped item drawn as it looks (crates' `ItemArt`: its colour, blotches and shine), slot,
+  colour, purity (and "Shiny"), and a tier pill in its tier colour. (Eric, Oct 6: the mockup's plain colour swatch
+  read as "just coloured shapes, not the item itself". A shop hat shows on its pawn.)
 - **Stats:**
   - Mode tabs (Crowd / Boss raid).
   - Crowd: games, wins, average place, best finish, cuts survived %, brilliant moves.
