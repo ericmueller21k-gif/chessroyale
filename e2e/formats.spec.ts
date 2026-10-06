@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { createLobbyFromHome, named, soloFromHome } from "./helpers.ts";
+import { expect, type Page } from "@playwright/test";
+import { createLobbyFromHome, named, soloFromHome, test } from "./helpers.ts";
 
 /** page.evaluate that shrugs off a dropped execution context (seen under heavy load while the page carries on). */
 async function safely<T>(f: () => Promise<T>, fallback: T): Promise<T> {

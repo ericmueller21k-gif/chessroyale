@@ -1274,3 +1274,17 @@ every number on it comes from the server.
 - **The queue keeps the whole window** (no menu or panel): the grid is the show, and a menu click there would have to
   mean leaving the queue. Private lobbies and every game screen keep their own layouts.
 - **Phones** (below 1024 px) never see the menu or the panel: one column, as in the mockups.
+
+## e2e: two flaky solo tests (Oct 6, 2026)
+
+The cause and how it was found are in `.claude/LESSONS.md`. The calls made:
+
+- **Fixed in the tests, not the game.** Less thinking time breaking an exact tie at a cut is the rule as decided above.
+  What was wrong was the test charging its own engine lookup to the player.
+- **Every context a test opens is closed when the test ends**, by the `test` exported from `e2e/helpers.ts` (pass or
+  fail), rather than a `close()` at the end of each test, which a failure would skip.
+- **Strong play's move is searched before the clock starts:** during the stage's last reveal and the stage break,
+  using the game's own `prefetch()` (the round scores with the same searches, so it's still exactly the best move).
+  Stopping the page's clock with Playwright's fake clock was tried and dropped: it slows the whole page.
+- **Strong play keeps its 240 s limit.** With the leftover pages closed it takes about 3.5 minutes in a full run; the
+  match's own pacing (the final's bot turns most of all) is about 200 s of that.

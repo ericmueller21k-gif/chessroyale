@@ -1,5 +1,5 @@
-import { devices, expect, test, type Page } from "@playwright/test";
-import { createLobbyFromHome, joinFromInvite, named } from "./helpers.ts";
+import { devices, expect, type Page } from "@playwright/test";
+import { createLobbyFromHome, joinFromInvite, named, test } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 

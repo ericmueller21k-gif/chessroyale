@@ -1,4 +1,21 @@
-import { expect, type Page } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
+
+/**
+ * Playwright's `test`, plus: every browser context a test opens itself (`browser.newContext()`, e.g. a second
+ * player) is closed when the test ends, pass or fail. Playwright leaves them open until the worker exits, and a page
+ * left in a live match keeps playing it (a host's page runs its engines), slowing every later test in that worker.
+ * Use this `test` in any file that opens contexts.
+ */
+export const test = base.extend<{ closeOwnContexts: void }>({
+  closeOwnContexts: [
+    async ({ browser }, use) => {
+      const before = new Set(browser.contexts());
+      await use();
+      await Promise.all(browser.contexts().filter((c) => !before.has(c)).map((c) => c.close()));
+    },
+    { auto: true },
+  ],
+});
 
 /**
  * The front door, as a player uses it. Your name is your profile's: `named` sets the one a fresh device's guest
