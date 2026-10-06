@@ -2,8 +2,8 @@ import type { Rng } from "./rng.ts";
 
 /**
  * Crates: cosmetic items in stacked layers of rarity. Every drop rolls three things independently:
- *   1. its tier, which decides the item (Novice to Sublime from the strip; Exalted and Transcendent only through
- *      Fischer Random),
+ *   1. its tier, which decides the item: the strip lands on a tier's present (Novice to Sublime), which opens to one
+ *      of that tier's items evenly, or on Fischer Random (Exalted and Transcendent items only),
  *   2. its colour (red and yellow common, Pearl the rarest), and
  *   3. its purity: 100% minus a blemish of 0-100% (blotches over that share of its colour). At 90%+ purity it's
  *      shiny; at 0% it's blotched all over, a darker shade of its colour.
@@ -85,11 +85,19 @@ export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);
 /** The strip's special slot: Fischer Random, a second spin for an Exalted or Transcendent item. */
 export const FISCHER = "fischer";
 
+/** The tiers that come in presents; Exalted and Transcendent come only through Fischer Random. */
+export type PresentTier = "novice" | "broad" | "paragon" | "sublime";
+
 export interface CrateDef {
   id: string;
   name: string;
-  /** The strip's odds out of 100: the Novice to Sublime items and Fischer Random. */
-  strip: readonly { item: string; weight: number }[];
+  /**
+   * The strip's odds out of 100: a present for each tier, in its colour, and Fischer Random. Each tier's present is
+   * rarer than the one below. A present opens to one of its tier's items, evenly.
+   */
+  strip: readonly { tier: PresentTier | typeof FISCHER; weight: number }[];
+  /** What the presents hold: the Novice to Sublime items. */
+  items: readonly string[];
   /** Fischer Random's odds out of 100. */
   fischer: readonly { item: string; weight: number }[];
 }
@@ -98,21 +106,15 @@ export const CRATES: readonly CrateDef[] = [
   {
     id: "winter-1",
     name: "Winter Crate · Series 1",
+    // Eric (Oct 6): the strip holds presents by tier, Fischer Random 2%. Sublime stays at his 12-15% (14%).
     strip: [
-      // Each tier rarer per item than the one before: Novice 16% each (64% over four), Broad 12%, Paragon 8%,
-      // Sublime 3.5% each (14% over four).
-      { item: "santa-beard", weight: 16 },
-      { item: "beanie", weight: 16 },
-      { item: "ski-goggles", weight: 16 },
-      { item: "tree-tee", weight: 16 },
-      { item: "antlers", weight: 12 },
-      { item: "santa-hat", weight: 8 },
-      { item: "snowman", weight: 3.5 },
-      { item: "present", weight: 3.5 },
-      { item: "gingerbread", weight: 3.5 },
-      { item: "chimney", weight: 3.5 },
-      { item: FISCHER, weight: 2 },
+      { tier: "novice", weight: 40 },
+      { tier: "broad", weight: 26 },
+      { tier: "paragon", weight: 18 },
+      { tier: "sublime", weight: 14 },
+      { tier: FISCHER, weight: 2 },
     ],
+    items: ["santa-beard", "beanie", "ski-goggles", "tree-tee", "antlers", "santa-hat", "snowman", "present", "gingerbread", "chimney"],
     fischer: [
       { item: "gift-tube", weight: 40 },
       { item: "candy-cane", weight: 40 },
@@ -120,6 +122,9 @@ export const CRATES: readonly CrateDef[] = [
     ],
   },
 ];
+
+/** The items a tier's present can hold in a crate. */
+export const presentItems = (crate: CrateDef, tier: string) => crate.items.filter((id) => itemDef(id)?.tier === tier);
 
 export const crateDef = (id: string) => CRATES.find((c) => c.id === id);
 
@@ -189,11 +194,15 @@ export interface CrateRoll {
   seed: number;
 }
 
-/** Opens a crate. `force` (testing only): land on Fischer Random, and/or a shiny purity. */
+/**
+ * Opens a crate: the strip lands on a tier's present (which opens to one of its items, evenly) or Fischer Random.
+ * `force` (testing only): land on Fischer Random, and/or a shiny purity.
+ */
 export function rollCrate(rng: Rng, crate: CrateDef, force: { fischer?: boolean; shiny?: boolean } = {}): CrateRoll {
-  const first = force.fischer ? FISCHER : pick(rng, crate.strip).item;
+  const first = force.fischer ? FISCHER : pick(rng, crate.strip).tier;
   const fischer = first === FISCHER;
-  const def = fischer ? pick(rng, crate.fischer).item : first;
+  const inside = fischer ? [] : presentItems(crate, first);
+  const def = fischer ? pick(rng, crate.fischer).item : inside[Math.min(inside.length - 1, Math.floor(rng() * inside.length))]!;
   const color = pick(rng, ITEM_COLORS).id;
   const blemish = force.shiny ? Math.round(rng() * 99) / 10 : rollBlemish(rng);
   const seed = Math.floor(rng() * 2 ** 31);
@@ -202,15 +211,19 @@ export function rollCrate(rng: Rng, crate: CrateDef, force: { fischer?: boolean;
   return roll;
 }
 
-/** Chance of a drop's item, out of 1 (for the crate page). */
-export function itemChance(crate: CrateDef, def: string): number {
+/** Chance of landing on a tier's present (or Fischer Random), out of 1. */
+export function presentChance(crate: CrateDef, tier: string): number {
   const total = crate.strip.reduce((s, x) => s + x.weight, 0);
-  const direct = crate.strip.find((x) => x.item === def);
-  if (direct) return direct.weight / total;
-  const fischer = (crate.strip.find((x) => x.item === FISCHER)?.weight ?? 0) / total;
+  return (crate.strip.find((x) => x.tier === tier)?.weight ?? 0) / total;
+}
+
+/** Chance of a drop's item, out of 1 (for the crate page): its present's chance, shared evenly, or via Fischer Random. */
+export function itemChance(crate: CrateDef, def: string): number {
+  const tier = itemDef(def)?.tier;
+  if (tier && crate.items.includes(def)) return presentChance(crate, tier) / presentItems(crate, tier).length;
   const ft = crate.fischer.reduce((s, x) => s + x.weight, 0);
   const inner = crate.fischer.find((x) => x.item === def);
-  return inner ? (fischer * inner.weight) / ft : 0;
+  return inner ? (presentChance(crate, FISCHER) * inner.weight) / ft : 0;
 }
 
 /** What a player wears (votes and the cut screen): an item instance per slot, as sent to others online. */

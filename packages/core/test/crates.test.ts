@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CRATES, ITEM_COLORS, ITEM_DEFS, PURITY_BANDS, TIERS, cleanLook, isShiny, itemChance, itemDef, mulberry32, purity, rollBlemish, rollCrate } from "../src/index.ts";
+import { CRATES, FISCHER, ITEM_COLORS, ITEM_DEFS, PURITY_BANDS, TIERS, cleanLook, isShiny, itemChance, itemDef, mulberry32, presentChance, presentItems, purity, rollBlemish, rollCrate } from "../src/index.ts";
 
 const crate = CRATES[0]!;
 
@@ -11,12 +11,22 @@ describe("crates", () => {
     const total = ITEM_DEFS.reduce((s, d) => s + itemChance(crate, d.id), 0);
     expect(total).toBeCloseTo(1);
     expect(itemChance(crate, "fire-ice-crown")).toBeCloseTo(0.004);
-    expect(itemChance(crate, "beanie")).toBeCloseTo(0.16);
+    // A present's chance, shared evenly by its items: Novice 40% over four.
+    expect(itemChance(crate, "beanie")).toBeCloseTo(0.1);
+    expect(itemChance(crate, "antlers")).toBeCloseTo(0.26);
   });
 
-  it("each tier is rarer per item than the tier below it", () => {
-    const perItem = TIERS.map((t) => ITEM_DEFS.filter((d) => d.tier === t.id).map((d) => itemChance(crate, d.id)));
-    for (let i = 1; i < perItem.length; i++) expect(Math.max(...perItem[i]!)).toBeLessThan(Math.min(...perItem[i - 1]!));
+  it("the strip: a present per tier, each rarer than the one below, then Fischer Random at 2%", () => {
+    const tiers = crate.strip.map((x) => x.tier);
+    expect(tiers).toEqual(["novice", "broad", "paragon", "sublime", FISCHER]);
+    for (let i = 1; i < crate.strip.length; i++) expect(crate.strip[i]!.weight).toBeLessThan(crate.strip[i - 1]!.weight);
+    expect(presentChance(crate, FISCHER)).toBeCloseTo(0.02);
+    // Every present holds something, and every item in the presents is of a present's tier.
+    for (const t of tiers.filter((t) => t !== FISCHER)) expect(presentItems(crate, t).length).toBeGreaterThan(0);
+    for (const id of crate.items) expect(tiers).toContain(itemDef(id)?.tier);
+    // Exalted and Transcendent come only through Fischer Random.
+    for (const d of ITEM_DEFS.filter((d) => d.tier === "exalted" || d.tier === "transcendent")) expect(crate.fischer.map((x) => x.item)).toContain(d.id);
+    expect(TIERS.length).toBe(6);
   });
 
   it("rolls land in the right proportions (100,000 opens)", () => {
@@ -39,11 +49,16 @@ describe("crates", () => {
       expect(r.blemish).toBeGreaterThanOrEqual(0);
       expect(r.blemish).toBeLessThanOrEqual(100);
     }
-    // Novice (four items) about 64% in all, 16% each.
-    expect(count["santa-beard"]! / n).toBeCloseTo(0.16, 1);
-    const novice = ["santa-beard", "beanie", "ski-goggles", "tree-tee"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
-    expect(novice).toBeGreaterThan(0.63);
-    expect(novice).toBeLessThan(0.65);
+    // The Novice present (four items, evenly) about 40% in all, 10% each.
+    const novice = ["santa-beard", "beanie", "ski-goggles", "tree-tee"];
+    const noviceShare = novice.reduce((s, d) => s + (count[d] ?? 0), 0) / n;
+    expect(noviceShare).toBeGreaterThan(0.39);
+    expect(noviceShare).toBeLessThan(0.41);
+    for (const d of novice) {
+      expect(count[d]! / n).toBeGreaterThan(0.095);
+      expect(count[d]! / n).toBeLessThan(0.105);
+    }
+    expect(count["antlers"]! / n).toBeCloseTo(0.26, 1);
     // Sublime (four items) about 14% in all, 3.5% each.
     const sublime = ["snowman", "present", "gingerbread", "chimney"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
     expect(sublime).toBeGreaterThan(0.13);

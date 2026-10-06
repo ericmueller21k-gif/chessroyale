@@ -28,10 +28,11 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
 1. **Define it** in `ITEM_DEFS`: `id`, `name`, `tier`, `slot` (head, face, skin, weapon), a one-line `description` with a
    little humour, and `layer: "back"` only if it sits behind the piece (capes, wings). `colors: 2` rolls a second colour
    (`color2`), as the Present does.
-2. **Odds.** Put it in a crate. A crate's `strip` must add up to 100 and its `fischer` list to 100. Exalted and
-   Transcendent items come only from Fischer Random. Keep the ladder: each tier is rarer *per item* than the tier below
-   it. Items in the same tier share that tier's total evenly, unless Eric says otherwise. If Eric's numbers break the
-   ladder, pick the reading that keeps it, and tell him in one line.
+2. **Odds.** Put it in a crate. A crate opens to a colour-coded present per tier (its `strip`, with Fischer Random at
+   2%, adding up to 100), and a present opens to one of its tier's items, evenly (Eric, Oct 6). So a Novice to Sublime
+   item goes in the crate's `items`, and an Exalted or Transcendent one in its `fischer` list (adding up to 100).
+   Keep the ladder: each tier's present rarer than the one below. A new item lowers the chance of the others in its
+   present: tell Eric the new numbers in one line.
 3. **Draw it** in `Items.tsx`: one component, added to `ITEM_ART`. Conventions:
    - Draw on the pawn's 100 × 100 square. The cburnett pawn: head top y 20, head centre (50, 29), radius 9, the neck
      about y 35–38, collar to about y 47, base about y 88, body width about x 25–75. `PAWN_PATH` is the pawn itself.
