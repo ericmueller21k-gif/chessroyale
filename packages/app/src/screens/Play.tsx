@@ -75,12 +75,13 @@ export function PlayScreen({
   // Power-ups you hold (one in use this move already counts as spent).
   const held = match.practice ? Infinity : (match.standings().find((s) => s.isYou)?.powerUps ?? 0);
   const powerUps = hint !== null ? Math.max(0, held - 1) : held;
-  // Once you've moved, your move stays on the board while the others finish.
-  // (Crowd keeps the position on screen and shows everyone's picks over it instead.)
-  const crowd = match.settings.mode === "crowd";
-  const moved = waiting && picked && !crowd ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
   // Crowd 50 v 50: only your team is picking this turn.
   const alive = match.standings().filter((s) => !s.out && (s.team == null || s.team === side));
+  // Once you've moved, your move stays on the board while the others finish.
+  // (Crowd keeps the position on screen and shows everyone's picks over it instead, unless you're the whole crowd,
+  // as in a solo boss raid: then your pick is the move, so it stays where you put it.)
+  const crowd = match.settings.mode === "crowd" && alive.length > 1;
+  const moved = waiting && picked && !crowd ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
   const doneCount = alive.filter((s) => match.done.has(s.id)).length;
   // Boss battle, the re-pick after the God King's Last Stand: the move he took back is greyed out and can't be played.
   const barred = match.boss?.barred && legalMoves(board.fen).includes(match.boss.barred) ? match.boss.barred : null;
