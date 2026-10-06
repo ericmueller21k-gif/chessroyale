@@ -160,9 +160,9 @@ export function BackButton({ onClick, label = "Back" }: { onClick: () => void; l
 }
 
 /** The front door's frame: the page's background and its centre column (on a computer, the side menu and panel too). */
-export function FrontFrame({ children }: { children: ComponentChildren }) {
+export function FrontFrame({ children, wide }: { children: ComponentChildren; wide?: boolean }) {
   return (
-    <div class="fd-root">
+    <div class={`fd-root${wide ? " wide" : ""}`}>
       <main class="fd-center">{children}</main>
     </div>
   );

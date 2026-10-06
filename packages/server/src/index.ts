@@ -50,7 +50,10 @@ export default {
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
       const raid = url.searchParams.get("mode") === "raid";
       const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true });
-      const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(raid ? "raid-unranked" : "crowd-unranked"));
+      // ?pool=NAME: a queue of its own (tests run several queues at once without meeting).
+      const pool = url.searchParams.get("pool");
+      const name = `${raid ? "raid" : "crowd"}-unranked${pool && /^[a-z0-9-]{1,24}$/.test(pool) ? `-${pool}` : ""}`;
+      const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(name));
       try {
         return json(await mm.next(JSON.parse(JSON.stringify(overrides)), fill * 1000));
       } catch {

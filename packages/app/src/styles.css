@@ -6552,3 +6552,218 @@ button.fd-logo {
 .fd-rules strong {
   color: var(--fd-text);
 }
+
+/* -- The queue (docs/mockups/front-door/Queue.dc.html) -- */
+.fd-queue {
+  gap: 14px;
+}
+.fd-queue-mode {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--fd-sub);
+}
+.fd-queue-mute {
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+.fd-queue-mute .mute-btn {
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-panel-2);
+  font-size: 18px;
+}
+.fd-queue-info {
+  text-align: center;
+}
+.fd-queue-count {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 34px;
+  line-height: 1.2;
+}
+.fd-count-of {
+  color: var(--fd-dim);
+}
+.fd-queue-line {
+  font-size: 14px;
+  color: var(--fd-sub);
+}
+.fd-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fd-panel-2);
+  overflow: hidden;
+}
+.fd-bar i {
+  display: block;
+  height: 100%;
+  background: var(--fd-gold);
+  border-radius: 3px;
+  transition: width 300ms ease-out;
+}
+.fd-queue-panel {
+  flex: 1 1 auto;
+  background: var(--fd-panel);
+  border-radius: 22px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fd-seats {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+}
+.fd-seat {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.fd-seat.empty::before {
+  content: "";
+  width: 40%;
+  height: 40%;
+  border-radius: 50%;
+  background: var(--fd-seat);
+}
+.fd-seat.you {
+  outline: 2px solid var(--fd-gold);
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+/* The pop: scale up past full size, then settle (about 0.35 s, a springy overshoot). */
+.fd-seat.pop .fd-pawn {
+  animation: fd-pop 350ms cubic-bezier(0.25, 0.6, 0.35, 1) both;
+  animation-delay: var(--pop-delay, 0ms);
+}
+@keyframes fd-pop {
+  0% {
+    transform: scale(0.15);
+    opacity: 0;
+  }
+  45% {
+    transform: scale(1.24);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.92);
+  }
+  86% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-seat.pop .fd-pawn {
+    animation-duration: 1ms;
+  }
+}
+.fd-queue-you {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--fd-panel-2);
+  border-radius: 16px;
+  padding: 10px 12px;
+  margin-top: auto;
+}
+.fd-you-title {
+  font-weight: 800;
+  font-size: 16px;
+}
+.fd-you-sub {
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.fd-cancel {
+  min-height: 56px;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 800;
+}
+/* The queue on a computer: the grid gets most of the screen (pawns about 60-80 px), the count and Cancel beside it. */
+@media (min-width: 1024px) {
+  .fd-root.wide .fd-center {
+    width: 100%;
+  }
+  .fd-queue {
+    --q-side: 340px;
+    --q-grid: min(calc(100dvh - 150px), calc(100vw - var(--fd-menu, 0px) - var(--q-side) - 72px));
+    display: grid;
+    grid-template-columns: var(--q-grid) minmax(260px, var(--q-side));
+    grid-template-rows: auto auto auto auto auto 1fr;
+    grid-template-areas:
+      "head head"
+      "seats info"
+      "seats bar"
+      "seats you"
+      "seats cancel"
+      "seats .";
+    column-gap: 28px;
+    row-gap: 18px;
+    justify-content: center;
+    align-content: start;
+    padding-top: calc(env(safe-area-inset-top) + 24px);
+  }
+  .fd-queue .fd-page-head {
+    grid-area: head;
+  }
+  .fd-queue .fd-queue-info {
+    grid-area: info;
+    text-align: left;
+    align-self: end;
+  }
+  .fd-queue .fd-queue-count {
+    font-size: 56px;
+  }
+  .fd-queue .fd-bar {
+    grid-area: bar;
+  }
+  .fd-queue .fd-queue-panel {
+    display: contents;
+  }
+  .fd-queue .fd-seats {
+    grid-area: seats;
+    width: var(--q-grid);
+    background: var(--fd-panel);
+    border-radius: 22px;
+    padding: 14px;
+    gap: 4px;
+    align-self: start;
+  }
+  .fd-queue .fd-queue-you {
+    grid-area: you;
+    margin-top: 0;
+  }
+  .fd-queue .fd-cancel {
+    grid-area: cancel;
+  }
+}
+/* An empty seat's dot stays until its pawn pops in, then fades. */
+.fd-seat.pop::before {
+  content: "";
+  position: absolute;
+  width: 40%;
+  height: 40%;
+  border-radius: 50%;
+  background: var(--fd-seat);
+  animation: fd-dot-out 140ms linear both;
+  animation-delay: var(--pop-delay, 0ms);
+}
+.fd-seat .fd-pawn {
+  z-index: 1;
+}
+@keyframes fd-dot-out {
+  to {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}

@@ -160,6 +160,27 @@ function tap(at: number, freq: number, level: number) {
 }
 
 /**
+ * A soft, short "pop": a sine that drops in pitch fast (like a bubble), with a tiny tap on top. Its pitch wanders a
+ * little so a run of them doesn't sound mechanical.
+ */
+function bubblePop(at: number, level: number) {
+  const c = ctx!;
+  const f = 520 + Math.random() * 160;
+  const o = c.createOscillator();
+  o.type = "sine";
+  o.frequency.setValueAtTime(f, at);
+  o.frequency.exponentialRampToValueAtTime(f * 0.42, at + 0.07);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(0.32 * level, at + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.09);
+  o.connect(g).connect(master!);
+  o.start(at);
+  o.stop(at + 0.11);
+  tap(at, 1800, 0.05 * level);
+}
+
+/**
  * Voices for the reveal's "selecting move" roulette, to audition in the sound
  * lab (?soundlab). Each plays one note; the roulette climbs a major arpeggio
  * from `base` (C, E, G, C), and the winner is three of the same note.
@@ -249,7 +270,9 @@ export type SoundName =
   | "menuOpen"
   | "menuClose"
   | "menuSelect"
-  | "gavel";
+  | "gavel"
+  | "pop"
+  | "popSoft";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -295,6 +318,9 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
       sample("move", t + dt, level * 0.8, 0.45);
     }
   },
+  // The queue: a pawn pops into its seat (a short soft "pop"), and a bot's, quieter.
+  pop: (t) => bubblePop(t, 1),
+  popSoft: (t) => bubblePop(t, 0.45),
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));

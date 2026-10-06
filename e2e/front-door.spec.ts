@@ -17,7 +17,7 @@ test("home: the live line comes from the server, the mode picker changes the lin
   await expect(line).toContainText(`${before.online} online`);
   // Someone else waiting in the queue shows up in the count within a few seconds.
   const other = await (await browser.newContext()).newPage();
-  await other.goto("/");
+  await other.goto(`/?pool=home-${test.info().project.name}`);
   await other.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(async () => (await live(page)).queue, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
   await expect(line).toContainText(/[1-9]\d* in queue/, { timeout: 10_000 });
@@ -66,4 +66,52 @@ test("settings: the old home's options live here and stick", async ({ page }) =>
   await expect(page.getByRole("radio", { name: /Everyone moves/ })).toHaveAttribute("aria-checked", "true");
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+});
+
+test("the queue: your pawn first and ringed, others pop in, Cancel frees the seat, then bots fill the rest (rate-limited pops)", async ({ browser }) => {
+  test.setTimeout(2 * 60_000);
+  const opts = test.info().project.use;
+  const ann = await (await browser.newContext({ ...opts })).newPage();
+  const bo = await (await browser.newContext({ ...opts })).newPage();
+  await named(ann, "Ann");
+  await named(bo, "Bo");
+  await ann.addInitScript(() => ((window as any).__soundLog = []));
+  // A queue of its own, so other tests' players don't land in it.
+  for (const p of [ann, bo]) await p.goto(`/?debug&pool=queue-${test.info().project.name}`);
+  await ann.getByRole("button", { name: "PLAY", exact: true }).click();
+  // The queue screen, not a lobby: the count, the line, the grid.
+  await expect(ann.locator(".fd-seats .fd-seat")).toHaveCount(100);
+  await expect(ann.locator(".fd-queue-line")).toContainText(/Finding players · \d+ s, then bots fill the rest/);
+  await expect(ann.getByText("You're in · seat 1")).toBeVisible();
+  await expect(ann.locator(".fd-seat").first()).toHaveClass(/you/);
+  await bo.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect(ann.locator(".fd-count-n")).toHaveText("2");
+  await expect(ann.locator(".fd-seat:not(.empty)")).toHaveCount(2);
+  // Each sees themself in seat 1.
+  await expect(bo.locator(".fd-seat.you")).toHaveCount(1);
+  await expect(bo.locator(".fd-seat").first()).toHaveClass(/you/);
+  // The mute switch in the queue's corner: the pops from here on are silent.
+  const before: string[] = await ann.evaluate(() => (window as any).__soundLog);
+  expect(before.some((l) => l.startsWith("pop:") && !l.endsWith(":muted"))).toBe(true);
+  await ann.getByRole("button", { name: "Turn sound off" }).click();
+  // Bo cancels: home again, and Ann's count drops.
+  await bo.getByRole("button", { name: "Cancel" }).click();
+  await expect(bo.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(ann.locator(".fd-count-n")).toHaveText("1");
+  // Time's up (8 s locally): bots pop into the empty seats, then the match begins.
+  await expect(ann.locator(".fd-count-n")).toHaveText("100", { timeout: 20_000 });
+  await expect(ann.locator(".fd-queue-line")).toContainText("Bots fill the rest");
+  await expect(ann.locator(".fd-seat.bot")).toHaveCount(99);
+  await expect.poll(() => ann.evaluate(() => (window as any).match?.phase.kind), { timeout: 20_000 }).toBe("vote");
+  // Pops: one for each person, and the bots' 99 pops rate-limited to a handful, quieter.
+  const log: string[] = await ann.evaluate(() => (window as any).__soundLog);
+  const pops = log.filter((l) => l.startsWith("pop:")).length;
+  const soft = log.filter((l) => l.startsWith("popSoft:")).length;
+  expect(pops).toBeGreaterThanOrEqual(1);
+  expect(soft).toBeGreaterThan(3);
+  expect(soft).toBeLessThan(30);
+  expect(log.filter((l) => l.startsWith("popSoft:")).every((l) => l.endsWith(":muted"))).toBe(true);
+  await ann.evaluate(() => localStorage.setItem("brc.muted", "0"));
+  // No sideways scroll; the grid fits.
+  expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
