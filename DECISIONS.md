@@ -1145,3 +1145,45 @@ The `hub` delegate builds it. Phone layouts as in the mockup; desktop as below.
   screen. No app-store app is needed now.
 - Later, an app-store listing can wrap the same site for discovery or push notifications, with no rewrite.
 - Keep everything working in the browser first.
+
+### Built, step 1: home and the live line (Oct 6, 2026)
+
+The `hub` delegate's calls while building the home screen. The layout, sizes, colours and copy are the mockup's;
+every number on it comes from the server.
+
+- **Online** means an account the server heard from in the last minute (`FRONT_DOOR.onlineWindowMs`).
+  - Any request from the app counts. A front-door screen asks for the live line every 5 s; every other screen (a
+    match) says "still here" every 30 s; a hidden tab says nothing.
+  - It's stored as `users.last_seen` in D1 (indexed, and written at most every 15 s per account). No new Durable
+    Object: nothing runs, or bills, between requests.
+- **Matches running** are online lobbies (Play now and private) in a match with someone still connected. Each lobby
+  reports itself to a D1 table, `live_lobbies`, when something on the line changes (a join, the start, a cut, the
+  end) and at least once a minute while it runs. A lobby silent for 3 minutes drops out.
+  - Solo games against bots aren't counted: no server sees them. Their players still count as online.
+- **In queue** is the people waiting in Play now lobbies, both modes.
+- **The line under PLAY:**
+  - Crowd: "Usually about N s to find a match", the median wait of the last 20 matchmade starts in the past week
+    (each lobby records its people's average wait when it fills). Until there's any history: "Starts within 60 s;
+    bots fill any empty seats".
+  - Boss raid: the mockup's "Join a raid; the boss matches the group".
+  - Classic: "Classic is being reworked", and PLAY is greyed out.
+- **PLAY in Boss raid joins a raid queue** (new): the same matchmaker as 50 v 50, a lobby of up to 50 that fills for
+  60 s, no bots, and the boss is the weakest that's stronger than the group's average rating.
+- **Guests, where online play needs signing in:** PLAY plays 99 bots (Crowd) or opens the boss menu (Boss raid), and
+  the line under PLAY says so, with "Sign in to play online".
+- **Under your pawn:** your tier and rating ("Gold II · 1612") and what you wear. "No rating yet" until a match
+  gives you one.
+  - There's no ranked rating yet, so the tier comes from the engine rating your profile already has (the one the
+    boss raid uses). The bands are in `FRONT_DOOR.ratingTiers`: Bronze, Silver, Gold (1500), Platinum, Diamond, each
+    with divisions III to I of 100 points, then Master (2400) and Grandmaster (2700). Ranked can swap the number
+    underneath later.
+- **Where the old home's parts went:**
+  - The name box is gone: you play under your profile's name.
+  - The options (practice, pace, 50 v 50 or everyone moves, animations, motion trail, pre-game votes, opening moves,
+    sound, the sound lab) moved to **Settings** (`/settings`), with the rules ("How to play"), the install card,
+    sign-in and the Stockfish credit.
+  - Lobbies with a code, and solo practice against 99 bots, are in **Play with friends** ("or practise alone"). An
+    invite link opens it with the code filled in.
+- **Fonts:** Archivo and Archivo Black are self-hosted (`public/fonts`, OFL).
+- **The profile's new stats start recording now** (more in step 3), so there's real data by the time the profile
+  shows them.

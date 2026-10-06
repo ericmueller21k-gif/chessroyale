@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { soloFromHome } from "./helpers.ts";
 
 /** Clicks a move on the main board (tap the piece, then the target square). */
 async function clickMove(page: Page, uci: string) {
@@ -36,8 +37,7 @@ async function phase(page: Page): Promise<string> {
 
 async function start(page: Page, query: string) {
   await page.goto(`/?debug&mode=classic&${query}`);
-  await page.getByLabel("Your name").fill("Tester");
-  await page.getByRole("button", { name: /Play solo/ }).click();
+  await soloFromHome(page);
   await expect(page.getByRole("heading", { name: "Today's openings" })).toBeVisible();
 }
 

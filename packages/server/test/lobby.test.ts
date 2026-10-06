@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { LAST_STAND_MS, bossIntroTimeline, legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -400,6 +400,23 @@ describe("lobby: Crowd mode", () => {
     const res = L.last("p1", "results")!;
     expect(["crowd", "boss", "draw"]).toContain(res.bossResult);
     expect(Object.keys(res.placements)).toHaveLength(100);
+    // What goes on their profiles: cuts faced and survived, brilliant moves, the best move, the boss battle if reached.
+    const stages = CROWD_KNOCKOUTS.boss.length;
+    const mine = L.core.humanResults();
+    expect(mine).toHaveLength(2);
+    for (const r of mine) {
+      expect(r.cuts).toBeGreaterThan(0);
+      expect(r.cuts).toBeLessThanOrEqual(stages);
+      expect(r.cutsSurvived).toBe(r.cuts === stages && r.placement <= 10 ? stages : r.cuts! - 1);
+      expect(r.brilliant).toBeGreaterThanOrEqual(0);
+      expect(r.bestMove).toMatch(/^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/);
+      expect(r.bossElo).toBeNull();
+      if (r.placement <= 10) {
+        expect(r.strikes).toBeGreaterThanOrEqual(r.strikesSurvived!);
+        expect(r.survived).not.toBeNull();
+        expect(r.lastStand).not.toBeNull();
+      } else expect(r.strikes).toBeNull();
+    }
   });
 
   it("matchmade lobbies start by themselves: at the fill time with bots, or as soon as they're full", () => {
@@ -414,14 +431,57 @@ describe("lobby: Crowd mode", () => {
     L.advance(59_000);
     expect(L.core.joinable()).toBe(false);
     L.advance(1_000);
-    expect(L.core.record.phase).toBe("vote");
+    // The seats fill (bots pop in on the queue screen), then the match begins a moment later.
+    expect(L.core.record.phase).toBe("lobby");
     expect(L.core.record.bots).toHaveLength(99);
+    const filled = L.last("p1", "lobby")!;
+    expect(filled).toMatchObject({ started: true, filledAt: L.now });
+    expect(filled.players.filter((p) => p.isBot)).toHaveLength(99);
+    expect(L.core.connect(undefined, "Late").ok).toBe(false);
+    expect(L.core.liveSummary()).toMatchObject({ phase: "playing", humans: 1, alive: 100, total: 100 });
+    L.advance(FRONT_DOOR.fillShowMs);
+    expect(L.core.record.phase).toBe("vote");
 
     const F = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), lobbySize: 3 });
     F.core.setAuto(F.now + 60_000);
     for (const n of ["A", "B", "C"]) F.core.connect(undefined, n, "phone");
+    expect(F.core.record.phase).toBe("lobby");
+    F.advance(FRONT_DOOR.fillShowMs);
     expect(F.core.record.phase).toBe("opening");
     expect(F.core.record.bots).toHaveLength(0);
+  });
+
+  it("the queue: join order, looks sent once, account ids, Cancel frees the seat, waits are measured", () => {
+    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }) });
+    L.core.setAuto(L.now + 60_000);
+    const hat = { head: { def: "santa-hat", color: "red", blemish: 10, seed: 3 } };
+    L.core.connect(undefined, "Ann", "phone", false, null, hat, "user-ann");
+    expect(L.core.liveSummary()).toMatchObject({ phase: "waiting", humans: 1, alive: null });
+    L.advance(10_000);
+    L.take("p1");
+    L.core.connect(undefined, "Bo", "phone", false, null, {}, "user-bo");
+    // Ann hears about Bo (and Bo's look, if any) but isn't sent her own look again.
+    const toAnn = L.last("p1", "lobby")!;
+    expect(toAnn.players.map((p) => [p.name, p.uid])).toEqual([["Ann", "user-ann"], ["Bo", "user-bo"]]);
+    expect(toAnn.players[0]!.look).toBeUndefined();
+    // A newcomer (or someone reconnecting) gets everyone's looks.
+    L.core.resendTo("p2");
+    expect(L.last("p2", "lobby")!.players[0]!.look).toEqual(hat);
+    L.core.connect(undefined, "Cy", "phone");
+    expect(L.last("p1", "lobby")!.players.map((p) => p.name)).toEqual(["Ann", "Bo", "Cy"]);
+    // Cancel: Bo's seat is free, Cy moves up; the host passes on if the host leaves.
+    L.core.message("p2", { t: "leave" });
+    expect(L.last("p1", "lobby")!.players.map((p) => p.name)).toEqual(["Ann", "Cy"]);
+    expect(L.core.record.accounts).toEqual({ p1: "user-ann" });
+    L.core.message("p1", { t: "leave" });
+    expect(L.core.record.hostId).toBe("p3");
+    expect(L.core.liveSummary().humans).toBe(1);
+    // Cy waited 50 s when the bots filled the rest.
+    L.advance(50_000);
+    expect(L.core.record.auto).toMatchObject({ waiters: 1, waitMs: 50_000 });
+    // After the start nobody can leave: the seat stays (they're just disconnected).
+    L.core.message("p3", { t: "leave" });
+    expect(L.core.record.humans.map((h) => h.name)).toEqual(["Cy"]);
   });
 
   it("boss raid: humans only, the boss a step above the group's average rating, from a named opening", () => {

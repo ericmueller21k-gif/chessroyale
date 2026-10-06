@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { soloFromHome } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -6,8 +7,7 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&clock=20&augments=0&finalTurns=12");
-  await page.getByLabel("Your name").fill("T");
-  await page.getByRole("button", { name: /Play solo vs 99 bots/ }).click();
+  await soloFromHome(page);
   const seen = new Set<string>();
   const stopAt = Date.now() + 9 * 60_000;
   while (Date.now() < stopAt) {
@@ -46,8 +46,7 @@ test("the board never moves or resizes during a turn (Crowd and Classic)", async
   test.setTimeout(3 * 60_000);
   for (const mode of ["crowd", "classic"]) {
     await page.goto(`/?debug&pace=quick&mode=${mode}&augments=0`);
-    await page.getByLabel("Your name").fill("T");
-    await page.getByRole("button", { name: /Play solo/ }).click();
+    await soloFromHome(page);
     await expect.poll(() => phase(page), { timeout: 30_000 }).toMatch(/play|watching/);
     const rects = new Map<string, Set<string>>();
     const stopAt = Date.now() + 25_000;

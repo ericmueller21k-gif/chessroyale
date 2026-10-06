@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { createLobbyFromHome, named, soloFromHome } from "./helpers.ts";
 
 /** page.evaluate that shrugs off a dropped execution context (seen under heavy load while the page carries on). */
 async function safely<T>(f: () => Promise<T>, fallback: T): Promise<T> {
@@ -57,8 +58,7 @@ test("pre-game votes: a pawn push and a card both vote; the winners set the endi
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&mode=crowd&turns=teams&augments=1");
-  await page.getByLabel("Your name").fill("T");
-  await page.getByRole("button", { name: /Play solo vs 99 bots/ }).click();
+  await soloFromHome(page);
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible();
   await expect(page.locator(".vote-zone")).toHaveCount(3);
@@ -90,8 +90,7 @@ test("team final: the top 8 play 4v4, the weakest on each side go out, everyone 
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&rounds=1&clock=20&finalTurns=30");
-  await page.getByLabel("Your name").fill("T");
-  await page.getByRole("button", { name: /Play solo vs 99 bots/ }).click();
+  await soloFromHome(page);
   const seen = new Set<string>();
   await playToResults(page, seen, 9);
   expect(await phase(page)).toBe("results");
@@ -108,8 +107,7 @@ test("boss battle (solo): the boss replies, strikes every 3 moves, and the resul
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=1&clock=20&bossMoves=7");
-  await page.getByLabel("Your name").fill("T");
-  await page.getByRole("button", { name: /Play solo vs 99 bots/ }).click();
+  await soloFromHome(page);
   const seen = new Set<string>();
   await playToResults(page, seen, 9);
   expect(await phase(page)).toBe("results");
@@ -134,9 +132,7 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=6");
-  await page.getByRole("radio", { name: /Boss raid/ }).click();
-  await page.getByLabel("Your name").fill("T");
-  await page.getByRole("button", { name: "Take on the boss alone" }).click();
+  await page.getByRole("button", { name: "Boss alone" }).click();
   // First, the boss menu: all ten bosses, each with its strength against yours. Pick one and it starts.
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
@@ -186,9 +182,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): he takes the blow, fa
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // (?boss=1600 skips the boss menu.)
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3&boss=1600&laststand=1");
-  await page.getByRole("radio", { name: /Boss raid/ }).click();
-  await page.getByLabel("Your name").fill("T");
-  await page.getByRole("button", { name: "Take on the boss alone" }).click();
+  await page.getByRole("button", { name: "Boss alone" }).click();
   await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen);
   // Your move (the test switch makes this one call for him, whatever it is).
@@ -234,8 +228,7 @@ test("boss battle (online): the host's browser plays the boss", async ({ page })
   test.setTimeout(12 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=boss&rounds=1&clock=15&bossMoves=6");
-  await page.getByLabel("Your name").fill("Host");
-  await page.getByRole("button", { name: "Create a lobby" }).click();
+  await createLobbyFromHome(page);
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   const seen = new Set<string>();
   await playToResults(page, seen, 11);
@@ -249,9 +242,9 @@ test("Play now: players land in the same lobby, the count climbs, bots fill it a
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   const pages = await Promise.all([0, 1].map(async () => (await browser.newContext({ viewport: { width: 420, height: 860 } })).newPage()));
   for (const [i, p] of pages.entries()) {
+    await named(p, `P${i}`);
     await p.goto("/?debug");
-    await p.getByLabel("Your name").fill(`P${i}`);
-    await p.getByRole("button", { name: /Play now/ }).click();
+    await p.getByRole("button", { name: "PLAY", exact: true }).click();
     await expect(p.getByRole("heading", { name: "Finding players…" })).toBeVisible();
   }
   const codes = await Promise.all(pages.map((p) => p.evaluate(() => (window as any).match.code)));
@@ -263,7 +256,7 @@ test("Play now: players land in the same lobby, the count climbs, bots fill it a
   // A new player now gets a new lobby.
   const late = await (await browser.newContext()).newPage();
   await late.goto("/?debug");
-  await late.getByRole("button", { name: /Play now/ }).click();
+  await late.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(late.getByRole("heading", { name: "Finding players…" })).toBeVisible();
   expect(await late.evaluate(() => (window as any).match.code)).not.toBe(codes[0]);
 });

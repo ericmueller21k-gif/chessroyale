@@ -43,12 +43,14 @@ export default {
     if (url.pathname === "/api/engine/ping") {
       return json({ ok: await warmEngine(env) });
     }
-    // POST /api/play → { code }: "Play now", the 50 v 50 lobby that's filling up (unranked).
+    // POST /api/play[?mode=raid] → { code }: "Play now", the queue: the 50 v 50 lobby that's filling up (bots fill
+    // the rest at the fill time), or a boss raid's (no bots; the boss matches the group). Unranked.
     if (url.pathname === "/api/play" && request.method === "POST") {
       if (env.DB && signInRequired(env) && !isSignedIn(await accountOf(request, env))) return json({ message: SIGN_IN_TO_PLAY }, 401);
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
-      const overrides = modeSettings("crowd", { crowdTeams: true, augments: true });
-      const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName("crowd-unranked"));
+      const raid = url.searchParams.get("mode") === "raid";
+      const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true });
+      const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(raid ? "raid-unranked" : "crowd-unranked"));
       try {
         return json(await mm.next(JSON.parse(JSON.stringify(overrides)), fill * 1000));
       } catch {

@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { soloFromHome } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
 test("only piece sounds, clock ticks and the reveal reel play, and muting silences them", async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/?debug&mode=classic&pace=quick");
-  await page.getByLabel("Your name").fill("T");
-  await page.getByRole("button", { name: /Play solo/ }).click();
+  await soloFromHome(page);
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   // The round opens with the "Round start" 3-2-1 on the board, then the clock bar runs.
   await expect(page.locator(".cc-banner")).toHaveText("Round start");

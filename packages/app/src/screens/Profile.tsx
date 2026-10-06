@@ -40,7 +40,7 @@ function Stats({ s }: { s: ModeStats }) {
 }
 
 /** Your profile: icon, name, stats, recent matches, and signing in to keep it across devices. */
-export function ProfileScreen({ onBack }: { onBack: () => void }) {
+export function ProfileScreen({ onBack, onSettings }: { onBack: () => void; onSettings?: () => void }) {
   const { config, profile } = useAccount();
   const [tab, setTab] = useState<"all" | "classic" | "crowd" | "boss">("all");
   const [name, setName] = useState(profile?.user.name ?? "");
@@ -144,6 +144,11 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
         <button type="button" class="btn btn-secondary" onClick={onBack}>
           Back
         </button>
+        {onSettings && (
+          <button type="button" class="btn btn-secondary" onClick={onSettings}>
+            Settings
+          </button>
+        )}
         {u.signedIn && (
           <button type="button" class="btn btn-secondary" disabled={busy} onClick={() => void run(signOut)}>
             Sign out

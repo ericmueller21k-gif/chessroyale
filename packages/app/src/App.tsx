@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, definedOnly, modeSettings, type DrawRule, type FinalFormat, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -18,7 +18,10 @@ import { RevealScreen } from "./screens/Reveal.tsx";
 import { SoundLab } from "./screens/SoundLab.tsx";
 import { ProfileScreen } from "./screens/Profile.tsx";
 import { ShopScreen } from "./screens/Shop.tsx";
-import { account, loadAccount, mustSignInToPlayOnline, recordSoloResult } from "./account.ts";
+import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
+import { startLive } from "./live.ts";
+import { SettingsScreen } from "./screens/Settings.tsx";
+import { FrontFrame, Logo } from "./components/FrontDoor.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
 import { LegalScreen } from "./screens/Legal.tsx";
@@ -29,11 +32,11 @@ import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
 
 /** Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). */
-function overridesFromUrl(): Partial<Settings> {
+function overridesFromUrl(modeId?: ModeChoiceId): Partial<Settings> {
   const q = new URLSearchParams(location.search);
   const n = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
   const draw = q.get("draw") as DrawRule | null;
-  const mode = chosenMode();
+  const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
   const raid = mode.mode === "raid";
   const crowd = mode.mode === "crowd" || raid;
   // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
@@ -95,6 +98,7 @@ export function App() {
   const [soundLab, setSoundLab] = useState(() => new URLSearchParams(location.search).has("soundlab"));
   const [showProfile, setShowProfile] = useState(() => location.pathname === "/profile");
   const [showShop, setShowShop] = useState(() => location.pathname === "/shop");
+  const [showSettings, setShowSettings] = useState(() => location.pathname === "/settings");
   const [legal, setLegal] = useState<"privacy" | "terms" | null>(() =>
     location.pathname === "/privacy" ? "privacy" : location.pathname === "/terms" ? "terms" : null,
   );
@@ -116,6 +120,10 @@ export function App() {
     q.delete("signin");
     history.replaceState(null, "", `${location.pathname}${q.size ? `?${q}` : ""}`);
   }, []);
+  // The live line's heartbeat (and "online"), once you have an account here.
+  useEffect(() => {
+    if (config?.accounts && profile) startLive();
+  }, [config?.accounts, !!profile]);
   // Your account (a guest one the first time).
   useEffect(() => {
     let name: string | undefined;
@@ -131,14 +139,28 @@ export function App() {
     if (!(match instanceof SoloMatch) || match.phase.kind !== "results" || savedResult.current === match) return;
     savedResult.current = match;
     const me = match.standings().find((s) => s.isYou);
+    const runner = match.runner;
+    const raid = !!match.settings.raid;
+    // A boss battle shares its result among those still standing (as online); otherwise the team's game.
+    const feats = me ? matchFeats(runner.player(me.id), match.settings.knockoutsPerStage.length, runner.boss, raid) : null;
+    const bossResult = match.phase.bossResult;
     void recordSoloResult({
-      mode: match.settings.raid ? "boss" : match.settings.mode,
+      mode: raid ? "boss" : match.settings.mode,
       placement: match.phase.placement,
       players: match.totalPlayers,
       team: me?.team ?? null,
-      teamWon: match.phase.gameWinner === undefined || !me?.team ? null : match.phase.gameWinner === me.team,
+      teamWon: bossResult
+        ? feats?.survived && bossResult !== "draw"
+          ? bossResult === "crowd"
+          : null
+        : match.phase.gameWinner === undefined || !me?.team
+          ? null
+          : match.phase.gameWinner === me.team,
       avgScore: me?.avg ?? null,
       rating: me?.rating ?? null,
+      brilliant: match.moves.filter((m) => m.brilliant).length,
+      bestMove: bestMoveOf(match.moves),
+      ...feats,
     });
   });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
@@ -160,9 +182,7 @@ export function App() {
   useEffect(() => {
     if (!linkCode) return;
     try {
-      if (localStorage.getItem(`brc.lobby.${linkCode}`)) {
-        joinLobby(localStorage.getItem("brc.name") ?? "Player", linkCode, localStorage.getItem("brc.practice") === "1");
-      }
+      if (localStorage.getItem(`brc.lobby.${linkCode}`)) joinLobby(linkCode);
     } catch {
       // No storage: show the join form.
     }
@@ -177,34 +197,57 @@ export function App() {
     if (debug) (window as unknown as { match: GameView }).match = m;
   };
 
-  const startSolo = async (name: string, practice: boolean) => {
+  const practiceOn = () => {
+    try {
+      return localStorage.getItem("brc.practice") === "1";
+    } catch {
+      return false;
+    }
+  };
+
+  /** Solo against bots (or a boss, for a raid), in the mode given or the one picked. */
+  const startSolo = async (mode?: ModeChoiceId) => {
     unlockAudio();
     setLoading(true);
     const engines = await enginePool();
     setLoading(false);
-    const m = new SoloMatch(engines, name, { ...DEFAULT_SETTINGS, ...overridesFromUrl() }, practice);
+    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode) }, practiceOn());
     use(m);
     m.start();
   };
 
-  const joinLobby = (name: string, code: string, practice: boolean, fromPlayNow = false) => {
-    if (!fromPlayNow) playNowTries.current = 0;
+  /**
+   * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
+   * code for a reload); a lobby you made, the mode you made it in.
+   */
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId } = {}) => {
+    const key = `brc.queue.${code.toUpperCase()}`;
+    let queue = opts.queue;
+    try {
+      if (queue) localStorage.setItem(key, queue);
+      else queue = (localStorage.getItem(key) as "crowd" | "raid" | null) ?? undefined;
+    } catch {
+      // No storage.
+    }
+    if (!opts.queue) playNowTries.current = 0;
     unlockAudio();
     setError(null);
-    const m = new NetMatch(code.toUpperCase(), name, enginePool, practice);
-    m.settings = { ...DEFAULT_SETTINGS, ...overridesFromUrl() };
+    const m = new NetMatch(code.toUpperCase(), playerName(), enginePool, queue ? false : practiceOn());
+    m.settings = queue
+      ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true })) }
+      : { ...DEFAULT_SETTINGS, ...overridesFromUrl(opts.mode) };
     use(m);
     history.replaceState(null, "", `/lobby/${m.code}${location.search}`);
     m.connect();
   };
 
-  const createLobby = async (name: string, practice: boolean) => {
+  const createLobby = async (modeId?: ModeChoiceId) => {
     setLoading(true);
     try {
       const params = new URLSearchParams(location.search);
       params.delete("debug");
       if (quickPace()) params.set("pace", "quick");
-      const mode = chosenMode();
+      const mode = { ...chosenMode(), ...(modeId ? { mode: modeId } : {}) };
       params.set("mode", mode.mode);
       if (mode.mode === "raid") {
         // (The server sets up the raid: the boss picked, else one a step above the group.)
@@ -216,7 +259,7 @@ export function App() {
       const res = await fetch(`/api/lobby?${params}`, { method: "POST" });
       const body = (await res.json()) as { code?: string; message?: string };
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");
-      joinLobby(name, body.code, practice);
+      joinLobby(body.code, { mode: mode.mode });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -224,18 +267,21 @@ export function App() {
     }
   };
 
-  /** "Play now": into the 50 v 50 lobby that's filling up. */
+  /** PLAY: the queue for a mode (the 50 v 50 lobby that's filling up, or a raid's). */
   const playNowTries = useRef(0);
+  const playNowMode = useRef<"crowd" | "raid">("crowd");
   const retriedFor = useRef<AnyMatch | null>(null);
-  const playNow = async (name: string, retry = false) => {
+  const playNow = async (mode: "crowd" | "raid", retry = false) => {
     playNowTries.current = retry ? playNowTries.current + 1 : 1;
+    playNowMode.current = mode;
+    unlockAudio();
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/play", { method: "POST" });
+      const res = await fetch(`/api/play${mode === "raid" ? "?mode=raid" : ""}`, { method: "POST" });
       const body = (await res.json()) as { code?: string; message?: string };
       if (!body.code) throw new Error(body.message ?? "Couldn't find a match.");
-      joinLobby(name, body.code, false, true);
+      joinLobby(body.code, { queue: mode });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -244,7 +290,9 @@ export function App() {
   };
 
   const leave = () => {
-    match?.dispose();
+    // Leaving a lobby before it starts (Cancel in the queue) frees the seat.
+    if (match instanceof NetMatch && match.phase.kind === "lobby") match.leave();
+    else match?.dispose();
     setMatch(null);
     history.replaceState(null, "", "/");
   };
@@ -259,6 +307,19 @@ export function App() {
           history.replaceState(null, "", "/");
         }}
       />
+    );
+  }
+  if (!match && showSettings) {
+    return (
+      <FrontFrame>
+        <SettingsScreen
+          onBack={() => {
+            setShowSettings(false);
+            if (location.pathname === "/settings") history.replaceState(null, "", "/");
+          }}
+          onSoundLab={() => setSoundLab(true)}
+        />
+      </FrontFrame>
     );
   }
   if (!match && showShop) {
@@ -278,19 +339,18 @@ export function App() {
           setShowProfile(false);
           if (location.pathname === "/profile") history.replaceState(null, "", "/");
         }}
+        onSettings={() => {
+          setShowProfile(false);
+          setShowSettings(true);
+        }}
       />
     );
   }
   // Still finding out who you are: a plain splash rather than a flash of the wrong screen.
   if (!match && (config === null || (config.accounts && !profile))) {
     return (
-      <div class="screen center">
-        <h1 class="logo splash-logo">
-          <span class="logo-crown" aria-hidden="true">
-            ♚
-          </span>
-          HunChess
-        </h1>
+      <div class="fd-splash">
+        <Logo />
       </div>
     );
   }
@@ -313,28 +373,28 @@ export function App() {
   }
   if (!match) {
     return (
+      <FrontFrame>
       <HomeScreen
-        onStart={(n, p) => void startSolo(n, p)}
-        onCreateLobby={(n, p) => void createLobby(n, p)}
-        onPlayNow={(n) => void playNow(n)}
-        onJoinLobby={joinLobby}
         loading={loading}
-        joinCode={mustSignInToPlayOnline() ? undefined : linkCode}
         error={error}
+        joinCode={mustSignInToPlayOnline() ? undefined : linkCode}
         onlineLocked={mustSignInToPlayOnline()}
+        onPlay={(mode) => void playNow(mode)}
+        onSolo={(mode) => void startSolo(mode)}
+        onCreateLobby={(mode) => void createLobby(mode)}
+        onJoinLobby={(code) => joinLobby(code)}
         onSignIn={() => chooseGuest(false)}
-        onSoundLab={() => setSoundLab(true)}
         onProfile={() => setShowProfile(true)}
         onShop={() => setShowShop(true)}
       />
+      </FrontFrame>
     );
   }
 
   // Play now: the lobby started a moment before we got in, so get the next one.
   if (match instanceof NetMatch && match.error && /already started|full/.test(match.error) && playNowTries.current > 0 && playNowTries.current < 3 && retriedFor.current !== match) {
     retriedFor.current = match;
-    const name = match.playerName;
-    queueMicrotask(() => void playNow(name, true));
+    queueMicrotask(() => void playNow(playNowMode.current, true));
   }
   if (match instanceof NetMatch && match.error) {
     return (
@@ -350,7 +410,7 @@ export function App() {
 
   const screen = renderPhase(match, {
     leave,
-    again: () => (match instanceof SoloMatch ? void startSolo(match.playerName, match.practice) : leave()),
+    again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode) : leave()),
   });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages.
   const tower = ["play", "scoring", "reveal", "spectating", "final", "watching", "boss"].includes(match.phase.kind) && match.standings().length > 0;

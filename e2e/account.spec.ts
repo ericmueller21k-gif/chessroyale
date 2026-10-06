@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { soloFromHome } from "./helpers.ts";
 
 test("a guest profile: icon and name stick, a solo match goes on it", async ({ page }) => {
   test.setTimeout(4 * 60_000);
@@ -9,7 +10,7 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
   // A guest account is made on the first visit.
   const chip = page.getByRole("button", { name: "Your profile" });
   await expect(chip).toBeVisible();
-  await expect(chip).toContainText("No matches yet");
+  await expect(page.locator(".fd-hero")).toContainText("No rating yet");
   await chip.click();
   // Draw an icon: fill the canvas with a colour, add a stroke, save.
   await page.getByRole("button", { name: "Edit your icon" }).click();
@@ -34,12 +35,10 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
   await page.getByRole("button", { name: "Back" }).click();
   // It's still there after a reload (the session cookie).
   await page.reload();
-  await expect(chip).toContainText("Hunter");
-  await expect(chip.locator(".account-icon img")).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect(page.locator(".fd-hero-name")).toHaveText("Hunter");
   // A quick solo match (missing every move) lands on the profile.
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&augments=0");
-  await page.getByLabel("Your name").fill("Hunter");
-  await page.getByRole("button", { name: /Play solo/ }).click();
+  await soloFromHome(page);
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind), { timeout: 3 * 60_000 }).toBe("results");
   await expect
     .poll(() => page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.stats.crowd.matches)), { timeout: 10_000 })

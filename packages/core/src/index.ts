@@ -8,3 +8,4 @@ export * from "./boss.ts";
 export { RATING_CURVE } from "./rating-curve.ts";
 export * from "./shop.ts";
 export * from "./crates.ts";
+export * from "./profile.ts";

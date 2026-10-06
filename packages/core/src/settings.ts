@@ -362,3 +362,36 @@ export function clockAfterVote(clock: number, votes: readonly Augment[], s: Pick
   const step = more > less && more > same ? s.clockStepSeconds : less > more && less > same ? -s.clockStepSeconds : 0;
   return Math.max(s.clockRange[0], Math.min(s.clockRange[1], clock + step));
 }
+
+/**
+ * The front door (home, queue, profiles): the live line's timing, the queue's show, and the rating tiers' bands.
+ * See DECISIONS.md, "The front door".
+ */
+export const FRONT_DOOR = {
+  /** Online = seen (any request from the app) within this long. */
+  onlineWindowMs: 60_000,
+  /** The live line refreshes this often while a front-door screen is open… */
+  livePollMs: 5_000,
+  /** …and the app says "still here" this often everywhere else (a match), so players in matches count as online. */
+  heartbeatMs: 30_000,
+  /** A running match counts while its lobby has reported within this long (it reports at least once a minute). */
+  matchStaleMs: 3 * 60_000,
+  /** The queue: after the fill time, bots pop into the empty seats for this long before the match begins. */
+  fillShowMs: 1_800,
+  /** The typical wait shown under PLAY: the median of the last this-many matchmade starts (within a week). */
+  waitSamples: 20,
+  /** Players with a rating needed before a profile shows its percentile ("Top 18%"). */
+  percentileMinPlayers: 10,
+  /** Rating tiers (on the engine rating's scale), lowest first: a tier from `from`, three divisions of `step` each. */
+  ratingTiers: [
+    { name: "Bronze", from: 0, color: "#d08b52", divisions: true },
+    { name: "Silver", from: 1200, color: "#c3cad6", divisions: true },
+    { name: "Gold", from: 1500, color: "#f2c14e", divisions: true },
+    { name: "Platinum", from: 1800, color: "#5fd4c8", divisions: true },
+    { name: "Diamond", from: 2100, color: "#8fb4ff", divisions: true },
+    { name: "Master", from: 2400, color: "#c084fc", divisions: false },
+    { name: "Grandmaster", from: 2700, color: "#f87171", divisions: false },
+  ],
+  /** Divisions count down to the next tier: I is its top this-many points, II the band below, III the rest. */
+  divisionStep: 100,
+} as const;
