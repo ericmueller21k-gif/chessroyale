@@ -54,6 +54,8 @@ directs; a delegate does one kind of work and reports back. Eric can also open a
   portrait, banners, lines, sounds, the boss dock and its animations.
 - `hub`: the front door: home, queue, online count, profiles (later leaderboards, ranked, friends), phone and desktop,
   front end and the server pieces behind them.
+- `social`: how players talk to each other: quick chat (preset messages) now; emotes, friends, parties and muting
+  later. Its panel sits in the game screens only where its design says.
 - Lanes keep sessions out of each other's files. Run one delegate per lane at a time. In `DECISIONS.md`, add to your
   own sections rather than rewriting others'.
 
