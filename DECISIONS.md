@@ -1187,3 +1187,33 @@ every number on it comes from the server.
 - **Fonts:** Archivo and Archivo Black are self-hosted (`public/fonts`, OFL).
 - **The profile's new stats start recording now** (more in step 3), so there's real data by the time the profile
   shows them.
+
+### Built, step 2: the queue (Oct 6, 2026)
+
+- **PLAY goes straight to the queue screen** (no lobby screen): "38 / 100", the bar, "Finding players · N s, then
+  bots fill the rest", and a 10 × 10 grid of seats (10 × 5 for a raid, "then the raid begins"). Private lobbies with
+  a code keep the lobby screen.
+- **Seats:** yours is seat 1, ringed in gold, then everyone else in the order they joined, then the bots. Each
+  person's dressed pawn arrives with them (the lobby sends each look once; the item-builder's `Avatar` draws it).
+- **The pop:** a pawn scales from small up to 124%, back to 92%, a touch over 100%, and settles, in 0.35 s.
+  - Pawns arriving together start 40 ms apart; the pop sound plays at most every 70 ms however many arrive, and
+    only with sound on (the mute switch sits in the header's empty corner).
+  - The sound is synthesised: a short sine that drops in pitch, like a bubble, with a little tap; its pitch varies
+    a little so a run of them isn't mechanical. Bots get the same at under half the volume.
+  - Your own pawn pops first when you arrive, then everyone already there, 40 ms apart.
+- **When time's up,** the server fills the empty seats with bots and holds the full grid for 1.8 s
+  (`FRONT_DOOR.fillShowMs`) before the votes begin, so the bots' cascade (spread over that moment) is seen on every
+  phone. A raid has no bots: it begins.
+- **Cancel** (and the back arrow) leaves the queue and frees the seat.
+- **Phone:** the grid fills the panel's width: about 30 px pawns on a 390 px phone. **Computer:** the grid takes the
+  height of the window beside a column with the count, the bar, your seat and Cancel: 65-75 px pawns at 1280-1440
+  px wide.
+- **Empty seats** are small dots; a seat's dot stays until its pawn pops in, then fades.
+- **Tests run separate queues:** `?pool=NAME` on the page sends PLAY to a queue of its own (any lowercase name), so
+  e2e tests running side by side don't land in each other's lobbies.
+- **Checked frame by frame** with `npm run frames:queue` (`scripts/frames-queue-pop.mjs`; the Worker must be running).
+  It slows the animations 10×, saves the grid every ~100 ms and logs every seat's scale per frame:
+  - each pawn grows from 0.15 to 1.24, dips to 0.92, rises to 1.04 and settles at exactly 1, once (no pawn pops
+    twice or jumps);
+  - two arriving together start apart (the second a frame behind);
+  - when time's up, the bots' cascade runs row by row in about 1.2 s, and the votes begin 1.8 s after the fill.

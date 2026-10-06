@@ -11,6 +11,7 @@ import { SoloMatch } from "./solo.ts";
 import { FinalScreen } from "./screens/Final.tsx";
 import { HomeScreen } from "./screens/Home.tsx";
 import { LobbyScreen } from "./screens/Lobby.tsx";
+import { QueueScreen } from "./screens/Queue.tsx";
 import { OpeningGrid } from "./screens/OpeningGrid.tsx";
 import { PlayScreen } from "./screens/Play.tsx";
 import { ResultsScreen } from "./screens/Results.tsx";
@@ -236,6 +237,8 @@ export function App() {
     m.settings = queue
       ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true })) }
       : { ...DEFAULT_SETTINGS, ...overridesFromUrl(opts.mode) };
+    // The queue shows at once (not "Connecting…"); the lobby confirms it.
+    if (queue) m.auto = true;
     use(m);
     history.replaceState(null, "", `/lobby/${m.code}${location.search}`);
     m.connect();
@@ -278,7 +281,12 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/play${mode === "raid" ? "?mode=raid" : ""}`, { method: "POST" });
+      const q = new URLSearchParams();
+      if (mode === "raid") q.set("mode", "raid");
+      // (?pool=NAME: a queue of its own, for tests.)
+      const pool = new URLSearchParams(location.search).get("pool");
+      if (pool) q.set("pool", pool);
+      const res = await fetch(`/api/play${q.size ? `?${q}` : ""}`, { method: "POST" });
       const body = (await res.json()) as { code?: string; message?: string };
       if (!body.code) throw new Error(body.message ?? "Couldn't find a match.");
       joinLobby(body.code, { queue: mode });
@@ -291,7 +299,7 @@ export function App() {
 
   const leave = () => {
     // Leaving a lobby before it starts (Cancel in the queue) frees the seat.
-    if (match instanceof NetMatch && match.phase.kind === "lobby") match.leave();
+    if (match instanceof NetMatch && (match.phase.kind === "lobby" || match.phase.kind === "loading")) match.leave();
     else match?.dispose();
     setMatch(null);
     history.replaceState(null, "", "/");
@@ -439,13 +447,26 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
   const p = match.phase;
   switch (p.kind) {
     case "loading":
+      if (match instanceof NetMatch && match.auto)
+        return (
+          <FrontFrame wide>
+            <QueueScreen match={match} onCancel={actions.leave} />
+          </FrontFrame>
+        );
       return (
         <div class="screen center">
           <p class="muted">Connecting…</p>
         </div>
       );
     case "lobby":
-      return match instanceof NetMatch ? <LobbyScreen match={match} onLeave={actions.leave} /> : null;
+      if (!(match instanceof NetMatch)) return null;
+      return match.auto ? (
+        <FrontFrame wide>
+          <LobbyScreen match={match} onLeave={actions.leave} />
+        </FrontFrame>
+      ) : (
+        <LobbyScreen match={match} onLeave={actions.leave} />
+      );
     case "opening":
       return <OpeningGrid boards={p.boards} title="Today's openings" />;
     case "spectating":

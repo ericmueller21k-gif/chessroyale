@@ -243,20 +243,20 @@ test("Play now: players land in the same lobby, the count climbs, bots fill it a
   const pages = await Promise.all([0, 1].map(async () => (await browser.newContext({ viewport: { width: 420, height: 860 } })).newPage()));
   for (const [i, p] of pages.entries()) {
     await named(p, `P${i}`);
-    await p.goto("/?debug");
+    await p.goto("/?debug&pool=formats");
     await p.getByRole("button", { name: "PLAY", exact: true }).click();
-    await expect(p.getByRole("heading", { name: "Finding players…" })).toBeVisible();
+    await expect(p.locator(".fd-seats")).toBeVisible();
   }
   const codes = await Promise.all(pages.map((p) => p.evaluate(() => (window as any).match.code)));
   expect(codes[0]).toBe(codes[1]);
-  await expect(pages[0]!.locator(".finding-count strong")).toHaveText("2");
+  await expect(pages[0]!.locator(".fd-count-n")).toHaveText("2");
   // MATCH_FILL_SECONDS is 8 locally: then bots fill the seats and the pre-game votes start.
   for (const p of pages) await expect(p.locator(".vote-screen")).toBeVisible({ timeout: 20_000 });
   expect(await pages[0]!.evaluate(() => (window as any).match.players.length)).toBe(100);
   // A new player now gets a new lobby.
   const late = await (await browser.newContext()).newPage();
-  await late.goto("/?debug");
+  await late.goto("/?debug&pool=formats");
   await late.getByRole("button", { name: "PLAY", exact: true }).click();
-  await expect(late.getByRole("heading", { name: "Finding players…" })).toBeVisible();
+  await expect(late.locator(".fd-seats")).toBeVisible();
   expect(await late.evaluate(() => (window as any).match.code)).not.toBe(codes[0]);
 });

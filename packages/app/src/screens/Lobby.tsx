@@ -1,37 +1,9 @@
-import { useFrameNow } from "../components/Countdown.tsx";
 import type { NetMatch } from "../net.ts";
-
-/** "Play now": the count climbs as players join; at the fill time (or when full) bots take the empty seats and it starts. */
-function FindingScreen({ match, onLeave }: { match: NetMatch; onLeave: () => void }) {
-  const now = useFrameNow();
-  const humans = match.players.filter((p) => !p.isBot).length;
-  const size = match.settings.lobbySize;
-  const left = match.fillAt ? Math.max(0, Math.ceil((match.fillAt - now) / 1000)) : null;
-  return (
-    <div class="screen center finding">
-      <h1>Finding players…</h1>
-      <div class="finding-count" aria-live="polite">
-        <strong>{humans}</strong>
-        <span>/ {size}</span>
-      </div>
-      <div class="finding-bar" aria-hidden="true">
-        <i style={{ width: `${(100 * humans) / size}%` }} />
-      </div>
-      <p class="muted">
-        {left !== null && left > 0
-          ? `Starting in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}. Bots fill any empty seats.`
-          : "Starting…"}
-      </p>
-      <p class="muted small">50 v 50 · unranked</p>
-      <button type="button" class="btn btn-secondary btn-wide" onClick={onLeave}>
-        Leave
-      </button>
-    </div>
-  );
-}
+import { QueueScreen } from "./Queue.tsx";
 
 export function LobbyScreen({ match, onLeave }: { match: NetMatch; onLeave: () => void }) {
-  if (match.auto) return <FindingScreen match={match} onLeave={onLeave} />;
+  // Matchmade (PLAY): the queue, not a lobby.
+  if (match.auto) return <QueueScreen match={match} onCancel={onLeave} />;
   const humans = match.players.filter((p) => !p.isBot);
   const share = async () => {
     try {
