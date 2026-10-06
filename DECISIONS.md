@@ -1392,3 +1392,19 @@ Eric: in a solo boss raid on his phone, the screen flashed white between moves.
   several players it still shows your place in the crowd, as "You were the best in the crowd" rather than "You won the
   match".
 
+## e2e: two flaky solo tests (Oct 6, 2026)
+
+The cause and how it was found are in `.claude/LESSONS.md`. The calls made:
+
+- **Fixed in the tests, not the game.** Less thinking time breaking an exact tie at a cut is the rule as decided above.
+  What was wrong was the test charging its own engine lookup to the player.
+- **Every context a test opens is closed when the test ends**, by the `test` exported from `e2e/helpers.ts` (pass or
+  fail), rather than a `close()` at the end of each test, which a failure would skip.
+- **Strong play's move is searched before the clock starts:** during the stage's last reveal and the stage break,
+  using the game's own `prefetch()` (the round scores with the same searches, so it's still exactly the best move).
+  Stopping the page's clock with Playwright's fake clock was tried and dropped: it slows the whole page.
+- **Strong play plays the highest-scoring line**, not the engine's first line: the judge rates picks by score, and in
+  about 2% of positions a later line scores higher. Left as it is in the game, and passed on: the reveal's "Best was"
+  and the bots' and power-up's idea of the best move follow the first line (the engine lane's to decide).
+- **Strong play keeps its 240 s limit.** With the leftover pages closed it takes about 3.5 minutes in a full run; the
+  match's own pacing (the final's bot turns most of all) is about 200 s of that.

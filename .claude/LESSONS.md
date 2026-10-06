@@ -93,3 +93,58 @@ the board is built and kept in step in layout effects, before the paint.
 - No opacity entrance on screens that replace each other during play.
 - Check a change to screens or transitions with `npm run frames:flash` in light **and** dark mode: a blink that's
   invisible in one scheme is glaring in the other.
+
+## Two flaky solo tests: leftover pages, the test's own thinking, the engine's first line (Oct 6, 2026)
+
+**Seen:** "strong play survives…" and "missing every move…" (`e2e/solo.spec.ts`) sometimes failed in a full
+`npm run e2e` and passed when run alone, on `main` too.
+
+**The cause:**
+- Tests that open their own browser context (a second player: `browser.newContext()`) never closed it, and Playwright
+  doesn't until the worker exits. A page left in a live match keeps playing it, and a host's page runs its engines every
+  round. By the time the solo tests ran, the desktop worker had five such pages (from "Play now", "home → queue → match"
+  and the queue test). The stages before the final took 224 s instead of 75 s.
+- So strong play ran out of its 240 s. The match's own pacing is already about 200 s of that (the final's 15 bot turns
+  are 7 s each).
+- Strong play asked the engine for its move after the clock had started, so the lookup counted as the player's
+  thinking time: up to 10 s on the busy worker. Late cuts are often exact ties (several players find the best move),
+  broken by less thinking time, and bots think 3–20 s. In one run, strong play kept its place at the stage 6 cut only
+  because it thought less than 7.3 s.
+- "Missing every move" looked for the results 200 times (about 50 s). Once you're out, the rest of the match is played
+  out at the engines' speed, which took 33 s of that: 3 s spare.
+- Both tests tapped through the reveal 3.6 s in, only about 100 ms after it starts taking taps. A late frame would cost
+  a 3.7 s retry.
+- Found after the first fix, in one run of five: strong play played the engine's first line, but the judge rates a pick
+  by its line's score, and the first line isn't always the highest. When the node budget runs out partway through a
+  depth, the lines not yet searched again keep the last depth's score: in 2% of balanced positions a later line scores
+  higher (by up to 5 points). Four bots played that line (Qg4, rated best), strong play the first (Qf6, −1.0, while
+  the reveal said "Best was Qf6"), and it fell at the last cut.
+
+**How it was found:**
+- The failing test's trace listed five other live pages, with the earlier tests' URLs (`pool=formats`,
+  `pool=profile`), still drawing a match throughout.
+- Logging in the tests over full runs: time per phase, the engine lookup, the player's thinking time, and everyone tied
+  with you at each cut.
+- The first line: the failing run's trace showed the reveal's picks and losses. Then 720 top-8 searches of match-like
+  positions (library openings plus a few good moves) counted how often the first line isn't the highest.
+- Tried and dropped: Playwright's fake clock (`page.clock`), to stop the player's clock during the lookup. On a busy
+  page it runs up to 40% slower than real time (8 s behind after a minute), which stretched the whole match.
+
+**The fix (tests only; no game code changed):**
+- `e2e/helpers.ts` exports a `test` that closes every context a test opened, pass or fail. The files that open contexts
+  use it.
+- Strong play has the next stage's boards searched during the reveal and the stage break (no clock runs; the break waits
+  for your tap). The round reuses those searches to score with, so the move is known when the clock starts.
+- Strong play plays the highest-scoring line of that search, and taps the piece again if the board wasn't taking moves
+  yet. Both tests tap through the reveal when it says "Tap to continue".
+- "Missing every move" waits for the results to a deadline, not a count of looks.
+
+**The rule:**
+- A test that opens a context uses `test` from `e2e/helpers.ts`. A page left open keeps playing.
+- The player's clock is part of what's tested: do the test's own work (engine lookups) before the clock starts, not on
+  it.
+- Wait for what the screen says (a prompt, a phase), with a deadline for slow machines. Not a fixed pause, not a count of
+  looks.
+- When a test passes alone and fails in the full suite, look at what else is running in that worker (the trace lists
+  every live context).
+- "The engine's best move" is the line with the highest score, not the first line.

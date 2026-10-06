@@ -1,7 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { soloFromHome } from "./helpers.ts";
 
-/** Clicks a move on the main board (tap the piece, then the target square). */
+/**
+ * Clicks a move on the main board: tap the piece (again if nothing was picked up: the board takes moves a moment
+ * after its countdown ends), then the target square.
+ */
 async function clickMove(page: Page, uci: string) {
   const wrap = page.locator(".board-area .cg-wrap").first();
   const box = (await wrap.boundingBox())!;
@@ -15,7 +18,11 @@ async function clickMove(page: Page, uci: string) {
   };
   const from = at(uci.slice(0, 2));
   const to = at(uci.slice(2, 4));
-  await page.mouse.click(from.x, from.y);
+  const picked = page.locator(".board-area .cg-wrap square.selected");
+  await expect(async () => {
+    if (!(await picked.count())) await page.mouse.click(from.x, from.y);
+    await expect(picked).toHaveCount(1, { timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
   await page.mouse.click(to.x, to.y);
   if (uci.length === 5) await page.getByRole("button", { name: "Queen" }).click();
 }
@@ -25,10 +32,34 @@ async function bestMove(page: Page): Promise<string> {
   return page.evaluate(async () => {
     const m = (window as any).match;
     const fen = m.phase.board.fen;
-    // The same search the round is scored with, so this really is the best move.
-    const [top] = await m.runner.topMovesFor(fen);
-    return top.move;
+    // The same search the round is scored with, and its highest-scoring line, so this really is the best move (the
+    // judge rates each pick by its line's score). That's usually the first line, but not always: when the node budget
+    // runs out partway through a depth, lines not yet searched again keep the last depth's score.
+    const top: { move: string; expected: number }[] = await m.runner.topMovesFor(fen);
+    return top.reduce((best, line) => (line.expected > best.expected ? line : best)).move;
   });
+}
+
+/**
+ * Starts the engine's searches of the boards as they stand after a round (MatchRunner.prefetch: the next round reuses
+ * them to score with), and with `wait`, waits for those of the boards still in play. Started in a stage's last reveal
+ * and waited for at the stage break, while no clock runs (the break waits for your tap), they make the best move known
+ * when the next round's clock starts: the test's engine lookup isn't the player's thinking time. (A cut drops boards,
+ * never swaps them, so these are the next stage's boards and positions.)
+ */
+async function searchBoards(page: Page, wait = false) {
+  await page.evaluate(async (wait) => {
+    const r = (window as any).match.runner;
+    r.prefetch();
+    if (wait) await Promise.all(r.state.boards.map((id: number) => r.topMovesFor(r.boards.get(id).fen)));
+  }, wait);
+}
+
+/** In a reveal, a tap moves on once the chosen move has played (the screen says so); else it moves on by itself. */
+async function tapThroughReveal(page: Page) {
+  const prompt = page.locator(".reveal").getByText("Tap to continue");
+  await expect.poll(async () => (await prompt.isVisible()) || (await phase(page)) !== "reveal", { intervals: [100], timeout: 10_000 }).toBe(true);
+  if (await prompt.isVisible()) await page.locator(".screen").click();
 }
 
 async function phase(page: Page): Promise<string> {
@@ -55,10 +86,14 @@ test("strong play survives every stage, plays the 2v2 final, and sees results", 
       await clickMove(page, await bestMove(page));
       await expect.poll(() => phase(page)).not.toBe("play");
     } else if (p === "reveal") {
-      await page.waitForTimeout(3600);
-      await page.locator(".screen").click();
+      // (One round a stage: every reveal ends one.)
+      await searchBoards(page);
+      await tapThroughReveal(page);
     } else if (p === "stageBreak") {
       await expect(page.locator(".tower-row").first()).toBeVisible();
+      // Strong play wins exact ties at a cut by thinking less, as a strong player does; bots think 3 s or more. So
+      // the test has its next moves found now, not on the player's clock (on a busy machine that took up to 10 s).
+      await searchBoards(page, true);
       await page.getByRole("button", { name: /Next stage|See how it ends/ }).click();
     } else if (p === "final") {
       // Watching the final shows the teams (unless your turn has already come up meanwhile).
@@ -78,13 +113,15 @@ test("strong play survives every stage, plays the 2v2 final, and sees results", 
 
 test("missing every move gets you knocked out; the match plays out and shows results", async ({ page }) => {
   await start(page, "rounds=2&clock=3&pace=quick");
-  for (let i = 0; i < 200; i++) {
+  // Once you're out, the rest of the match (every stage and the final) is played out at the engines' speed: about
+  // 30 s here, more on a busy machine. So the loop runs to a deadline, not a count of looks (200 left about 3 s over).
+  const stopAt = Date.now() + 4 * 60_000;
+  while (Date.now() < stopAt) {
     const p = await phase(page);
     if (p === "results") break;
     if (p === "reveal") {
       await expect(page.locator(".round-score")).toContainText("-25");
-      await page.waitForTimeout(3600);
-      await page.locator(".screen").click();
+      await tapThroughReveal(page);
     } else if (p === "stageBreak") {
       await expect(page.locator(".out-msg")).toBeVisible();
       await page.getByRole("button", { name: "See how it ends" }).click();
