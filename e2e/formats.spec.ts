@@ -181,6 +181,55 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   await expect(page.locator(".team-result")).toBeVisible();
 });
 
+test("the God King's Last Stand (solo raid, ?laststand=1): he takes the blow, falls, and you pick again without that move", async ({ page }) => {
+  test.setTimeout(8 * 60_000);
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  // (?boss=1600 skips the boss menu.)
+  await page.goto("/?debug&pace=quick&clock=20&bossMoves=3&boss=1600&laststand=1");
+  await page.getByRole("radio", { name: /Boss raid/ }).click();
+  await page.getByLabel("Your name").fill("T");
+  await page.getByRole("button", { name: "Take on the boss alone" }).click();
+  await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
+  const fen = await page.evaluate(() => (window as any).match.phase.board.fen);
+  // Your move (the test switch makes this one call for him, whatever it is).
+  const move: string = await page.evaluate(async () => {
+    const m = (window as any).match;
+    const top = await m.runner.topMovesFor(m.phase.board.fen);
+    const mv = top[top.length - 1].move;
+    m.submit(mv);
+    return mv;
+  });
+  // On everyone's screen: he crashes onto the square, his banner, the blow, and he falls into the dock.
+  await expect(page.getByRole("alert", { name: /The God King's Last Stand/ })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("alert", { name: /^Last stand:/ })).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator(".ls-dmg").first()).toBeVisible({ timeout: 6_000 });
+  await expect(page.getByRole("img", { name: "The God King has fallen" })).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByRole("status", { name: "Finish… it… for me." })).toBeVisible({ timeout: 3_000 });
+  // Then the same position again, a full clock, his charges gone, the move he took back barred.
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe("play");
+  const again = await page.evaluate(() => {
+    const m = (window as any).match;
+    return { fen: m.phase.board.fen, allowed: m.phase.allowedMs, barred: m.boss.barred, stand: m.boss.lastStand, charges: m.boss.kingCharges };
+  });
+  expect(again.fen).toBe(fen);
+  expect(again.allowed).toBe(20_000);
+  expect(again.barred).toBe(move);
+  expect(again.charges).toBe(0);
+  expect(again.stand).toMatchObject({ atMove: 1, move, charges: 3 });
+  // He can't be called any more, and the barred move can't be played.
+  await expect(page.getByRole("button", { name: /God King: tap to summon/ })).toHaveCount(0);
+  await page.evaluate((mv) => (window as any).match.submit(mv), move);
+  expect(await phase(page)).toBe("play");
+  const seen = new Set<string>();
+  await playToResults(page, seen, 5);
+  expect(await phase(page)).toBe("results");
+  const end = await page.evaluate(() => (window as any).match.runner.state.boss);
+  expect(end.lastStand.atMove).toBe(1);
+  expect(["crowd", "boss", "draw"]).toContain(end.result);
+  // The result screen: he rises if the crowd won, otherwise he stays down.
+  await expect(page.locator(end.result === "crowd" ? ".gk-epilogue.rises" : ".gk-epilogue.down")).toBeVisible();
+});
+
 test("boss battle (online): the host's browser plays the boss", async ({ page }) => {
   test.setTimeout(12 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");

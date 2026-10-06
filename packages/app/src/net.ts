@@ -218,6 +218,8 @@ export class NetMatch implements GameView {
       case "round":
         this.key = m.key;
         this.kingCalled = false;
+        // Boss battle: the battle as it stands (his charges; after his Last Stand, the move he took back).
+        if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
         this.tally = null;
         this.myPick = null;
         this.hint = null;
@@ -347,6 +349,7 @@ export class NetMatch implements GameView {
     this.roundsPlayed = m.roundsPlayed;
     this.standingsList = m.standings;
     this.cutoff = m.cutoff;
+    if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
     if (!m.fenBefore || !this.currentBoard) return this.emit();
     const mine: GroupReveal = {
       fenBefore: m.fenBefore,
@@ -354,6 +357,7 @@ export class NetMatch implements GameView {
       playerIds: m.picks.map((p) => p.playerId),
       result: { players: m.picks, playedMove: m.playedMove!, drawRule: m.drawRule ?? "random" },
       ...(m.king !== undefined ? { king: m.king, kingCalls: m.kingCalls } : {}),
+      ...(m.lastStand ? { lastStand: m.lastStand } : {}),
     };
     const record = moveRecordFrom(m.stage, m.roundsPlayed - 1, mine, (id) => id === this.myId);
     if (record) this.moves.push(record);
@@ -403,10 +407,11 @@ export class NetMatch implements GameView {
   private async planBots(plan: NonNullable<Extract<ServerMessage, { t: "prefetch" }>["plan"]>) {
     try {
       const engines = await this.engines();
-      const top = await this.top.get(engines[0]!, plan.fen);
+      // (The re-pick after the God King's Last Stand: the move he took back is off the table.)
+      const top = (await this.top.get(engines[0]!, plan.fen)).filter((mv) => mv.move !== plan.barred);
       const best = top[0]!.expected;
       const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
-      const legal = legalMoves(plan.fen);
+      const legal = legalMoves(plan.fen).filter((mv) => mv !== plan.barred);
       const picks: Record<string, string> = {};
       const powerUps: string[] = [];
       for (const b of plan.bots) {
@@ -430,10 +435,12 @@ export class NetMatch implements GameView {
         while (next < jobs.length) {
           const i = next++;
           const job = jobs[i]!;
-          const top = await this.top.get(engine, job.fen);
+          // The re-pick after the God King's Last Stand: the move he took back is no option (nor the best).
+          const all = await this.top.get(engine, job.fen);
+          const top = job.barred && all.some((mv) => mv.move !== job.barred) ? all.filter((mv) => mv.move !== job.barred) : all;
           const best = top[0]!.expected;
           const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
-          const legal = legalMoves(job.fen);
+          const legal = legalMoves(job.fen).filter((mv) => mv !== job.barred);
           const botPicks: Record<string, string> = {};
           const botThinkMs: Record<string, number> = {};
           const botPowerUps: string[] = [];
@@ -476,6 +483,7 @@ export class NetMatch implements GameView {
 
   submit(move: string | null) {
     if (this.phase.kind !== "play" || !this.key || !move) return;
+    if (move === this.boss?.barred) return; // The move the God King took back.
     if (Date.now() < this.phase.startsAt - 300) return; // Before the clock starts.
     if (this.phase.strike?.until && Date.now() < this.phase.strike.until) return; // While the King strikes.
     this.myPick = move;

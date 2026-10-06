@@ -33,6 +33,13 @@ const SAMPLE_FILES = {
   gkLeave: "/sounds/god-king/leave.mp3",
   gkSlash: "/sounds/god-king/slash.mp3",
   gkCutIn: "/sounds/god-king/cutin.mp3",
+  // His Last Stand (same packs, see the credits).
+  gkLastLeap: "/sounds/god-king/last-leap.mp3",
+  gkLastCrash: "/sounds/god-king/last-crash.mp3",
+  gkLastSlashes: "/sounds/god-king/last-slashes.mp3",
+  gkLastGrunt1: "/sounds/god-king/last-grunt1.mp3",
+  gkLastGrunt2: "/sounds/god-king/last-grunt2.mp3",
+  gkLastGroan: "/sounds/god-king/last-groan.mp3",
   bannerStart: "/sounds/banner/start.mp3",
   bossRoar: "/sounds/banner/boss-roar.mp3",
   menuOpen: "/sounds/menu/open.mp3",
@@ -231,6 +238,12 @@ export type SoundName =
   | "gkLeave"
   | "gkSlash"
   | "gkCutIn"
+  | "gkLastLeap"
+  | "gkLastCrash"
+  | "gkLastSlashes"
+  | "gkLastGrunt1"
+  | "gkLastGrunt2"
+  | "gkLastGroan"
   | "bannerStart"
   | "bossRoar"
   | "menuOpen"
@@ -263,6 +276,12 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gkHit: (t) => sample("gkHit", t, 0.8),
   gkSlash: (t) => sample("gkSlash", t, 0.85),
   gkCutIn: (t) => sample("gkCutIn", t, 0.85),
+  gkLastLeap: (t) => sample("gkLastLeap", t, 0.8),
+  gkLastCrash: (t) => sample("gkLastCrash", t, 0.95),
+  gkLastSlashes: (t) => sample("gkLastSlashes", t, 0.7),
+  gkLastGrunt1: (t) => sample("gkLastGrunt1", t, 0.9),
+  gkLastGrunt2: (t) => sample("gkLastGrunt2", t, 0.9),
+  gkLastGroan: (t) => sample("gkLastGroan", t, 0.95),
   bannerStart: (t) => sample("bannerStart", t, 0.9),
   bossRoar: (t) => sample("bossRoar", t, 0.9),
   menuOpen: (t) => sample("menuOpen", t, 0.7),

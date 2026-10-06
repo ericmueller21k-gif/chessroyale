@@ -95,7 +95,7 @@ export type VoteView = NetVote;
 export type BossView = Omit<NetBoss, "board"> & { board: BoardView };
 
 /** The reveal: your group's picks and scores (same shape the server sends). */
-export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls"> & {
+export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls" | "lastStand"> & {
   result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule">;
 };
 

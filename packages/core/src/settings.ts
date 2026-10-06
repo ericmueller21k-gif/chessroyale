@@ -71,6 +71,18 @@ export interface Settings {
   /** Bots call the King when the crowd's popular move loses at least this many points, and back a human's call with this chance. */
   kingBotLoss: number;
   kingBotFollow: number;
+  /**
+   * Boss battle, the God King's Last Stand (once per game): when the crowd's played move gives away at least the
+   * bar (points of expected score against the best move), he takes the blow and the move is undone. The bar starts
+   * at lastStandLoss (plus lastStandChargedExtra while he still has charges) and falls linearly with every crowd
+   * move to lastStandLossFloor, reached after lastStandDecayMoves crowd moves. Never when the best move was worth
+   * less than lastStandFrom (a position that's already lost isn't saved).
+   */
+  lastStandLoss: number;
+  lastStandChargedExtra: number;
+  lastStandLossFloor: number;
+  lastStandDecayMoves: number;
+  lastStandFrom: number;
   /** Boss battle: below this strength the boss sometimes slips (up to this chance): a small deliberate inaccuracy, never a blunder. */
   bossStumbleBelow: number;
   bossStumbleMax: number;
@@ -190,6 +202,11 @@ export const DEFAULT_SETTINGS: Settings = {
   kingChargesMax: 3,
   kingBotLoss: 6,
   kingBotFollow: 0.6,
+  lastStandLoss: 30,
+  lastStandChargedExtra: 5,
+  lastStandLossFloor: 13,
+  lastStandDecayMoves: 22,
+  lastStandFrom: 40,
   bossStumbleBelow: 2100,
   bossStumbleMax: 0.25,
   bossSlipLoss: [2, 7],

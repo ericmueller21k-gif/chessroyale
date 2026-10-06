@@ -26,7 +26,10 @@ export type KingCue =
   | "kingPlays"
   | "winning"
   | "losing"
-  | "spent";
+  | "spent"
+  | "lastStand"
+  | "lastWords"
+  | "rise";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
   intro: ["My blade is yours. Tap me when it counts.", "A boss? I've toppled taller towers.", "Steel's ready. Say the word.", "I'll be watching. Call me if it gets ugly."],
@@ -47,6 +50,10 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   winning: ["The tide is ours.", "Victory is close. Don't get careless."],
   losing: ["Dark days. I'm here if you need me.", "We're behind. A charge might turn it."],
   spent: ["My strength is spent. The rest is yours.", "No charges left. I believe in you."],
+  // His Last Stand: one of these in its banner (lastStandLine), his last words as he falls, and his return.
+  lastStand: ["Fall back! This blow is mine.", "Not while I stand!", "Retreat — I'll hold the line!", "Go! I'll take it from here."],
+  lastWords: ["Finish… it… for me."],
+  rise: ["A god does not stay down."],
 };
 
 /**
@@ -72,6 +79,9 @@ const CUE_RULES: Record<KingCue, { chance: number; urgent?: boolean; paced?: boo
   winning: { chance: 0.1, paced: true },
   losing: { chance: 0.1, paced: true },
   spent: { chance: 1 },
+  lastStand: { chance: 1, urgent: true },
+  lastWords: { chance: 1, urgent: true },
+  rise: { chance: 1, urgent: true },
 };
 
 /** How long a line stays up, and the least time between two lines that aren't urgent. */
@@ -84,6 +94,17 @@ const PER_QUIET_MOVE = 0.3;
 let current: { text: string; at: number; until: number } | null = null;
 let lastAt = 0;
 let quietMoves = 0;
+/** He has fallen (his Last Stand): silent for the rest of the battle, but for his last words and his return. */
+let fallen = false;
+export function setKingFallen(on: boolean) {
+  fallen = on;
+}
+
+/** The line in his Last Stand's banner: the same on every screen for the same move. */
+export function lastStandLine(seed: string): string {
+  const h = [...seed].reduce((a, c) => Math.imul(a ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+  return KING_LINES.lastStand[h % KING_LINES.lastStand.length]!;
+}
 const turns = new Set<string>();
 
 /** A new move for the crowd (`key` names it, so a screen drawn twice counts once): one more quiet move. */
@@ -101,6 +122,7 @@ const spoken = new Set<string>();
  * say otherwise). `key` names the moment, so a screen drawn twice speaks once.
  */
 export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => number = Math.random): string | null {
+  if (fallen && cue !== "lastWords" && cue !== "rise") return null;
   if (spoken.has(key)) return null;
   spoken.add(key);
   if (spoken.size > 300) spoken.clear();
@@ -130,6 +152,7 @@ export function kingLine(now = Date.now()): { text: string; at: number; until: n
 /** For tests: forget everything said. */
 export function resetKingSpeech() {
   current = null;
+  fallen = false;
   lastAt = 0;
   quietMoves = 0;
   lastLine.clear();

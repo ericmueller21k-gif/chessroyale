@@ -939,46 +939,113 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - **The strip's decoy tiles** already rolled their purity with the real roll, so they follow the new odds: about one shiny decoy every six opens, instead of about one per open (some 42 decoy items pass by in each open).
   - The fitting sheet (`npm run preview:items`) now shows cards at 95, 70, 50, 30, 5 and 0% purity (`purities=` to choose).
 
-## The God King's Last Stand (design, Oct 5, 2026; to build)
+## The God King's Last Stand (Oct 5, 2026; built)
 
 Eric's idea: when the God King has nothing left to give, he still has himself. Once per game, if the crowd plays a
-disastrous move, he dives onto the board, takes the blow meant for that piece, and dies. The move is undone. Below
-are the calls I made as director; the `god-king` delegate builds it.
+disastrous move, he dives onto the board, takes the blow meant for that piece, and falls. The move is undone. The
+director's design (Oct 5) set the beats; Eric then changed the rule: always armed, a bar that eases off as the game
+goes on, and an early hung queen or piece in a solo raid must set it off.
 
+**The rule** (`lastStandBar` and `lastStandDue` in `core/boss.ts`, the runner's `lastStandFor`; numbers in settings.ts):
 - **Where:** every boss battle (the 50 v 50 boss final and the boss raid), solo and online.
-- **When it triggers.** All of these must hold:
-  - He has **no charges left** (all spent, or none to begin with), and the Last Stand hasn't happened yet this game.
-  - The crowd's played move is a **disaster** by the judge's own numbers for that round: it gives away at least
-    `lastStandLoss` (30) points of expected score compared with the best move.
-  - The crowd **wasn't already lost** before it: the best move was worth at least `lastStandFrom` (40). A position
-    that's already gone isn't saved.
-  - This is "a massive blunder", not "the game is decided anyway": a lost endgame never triggers it.
-- **What it does.**
-  - The disastrous move is taken back.
-  - That round's scores **stand**: players who picked the blunder still lose for it, and those who didn't still
-    score. The judge's verdict is never changed.
-  - The crowd then **picks again** from the same position with a fresh clock. The blunder is barred: shown greyed,
-    and it can't be picked. Bots pick again too. The re-pick is an ordinary scored round.
-  - The boss doesn't move until the re-pick is played.
-- **Afterwards he's fallen.** His fallen figure lies in the dock for the rest of the game: on his side, armour
-  cracked, greyed. No lines, no menu, no crowns.
-  - If the crowd **wins**, he rises again on the result screen in holy light with a line ("A god does not stay
-    down."). If it loses, he stays down.
-- **The moment** (the clock stands still throughout, `lastStandMs`, about 8–9 s; the delegate tunes the exact
-  timings), on everyone's screen:
-  1. The blunder lands on the board, and everything freezes.
-  2. From the dock, he leaps up out of view, then crashes down onto the blundered piece's square: impact flash,
-     board shake, dust.
-  3. A cut-in banner: "LAST STAND" with his portrait and one of his lines. Lines include "Fall back! This blow is
-     mine.", "Not while I stand!", "Retreat — I'll hold the line!" and "Go! I'll take it from here."
-  4. The piece slides back to the square it came from. He stands alone where it was.
-  5. The hit: about 25 rapid slashes, in the same style as his strike on the boss but on him, each with a red damage
-     number floating off (−7, −12, −9, …). Grunts of agony; his armour cracks; a few stylised red drops.
-  6. He staggers, collapses, and fades from the board. The dock now shows his fallen figure. A last line: "Finish…
-     it… for me."
-  7. The clock resumes and the crowd re-picks.
-- **New art:** a cracked-armour variant and a collapse/fallen pose of his sprite, and a battle-damaged portrait for
-  the banner. Each needs white and black versions. New sounds: a leap, a crash, rapid slashes, grunts of agony and a
-  death groan, all CC0 and credited.
-- **Testing switch:** `?laststand=1` in solo makes the next crowd move trigger it (with his charges spent), so Eric
-  can see it on demand.
+- **Always armed, once per game,** whether or not he still has charges. If he falls with charges left, they go with
+  him: no menu, no crowns (Eric). The charges he fell with are recorded on the battle (`lastStand.charges`).
+- **A disaster:** the crowd's played move gives away at least the bar, in points of expected score against the best
+  move, by the judge's own numbers for that round (after the re-check; the same numbers that score the picks).
+- **The bar eases off:** `lastStandLoss` 30 on the first crowd move, plus `lastStandChargedExtra` 5 while he still
+  has charges, falling in a straight line to `lastStandLossFloor` 13, reached after `lastStandDecayMoves` 22 crowd
+  moves without one. So 35 → 18 with charges, 30 → 13 without.
+- **Not when it's already lost:** the best move was worth at least `lastStandFrom` 40. A lost endgame never sets it off.
+- **Not when the God King plays the move himself** (he plays the best move).
+- **Fair:** the round's scores stand (whoever picked the blunder still loses for it; the judge's verdict is never
+  changed), and the re-pick is an ordinary scored round.
+
+**What happens:**
+- The move isn't played. The board, the crowd's move count and the boss's turn are as before it: it's still the same
+  crowd move. The boss's strike waits until the re-pick has been played (then it weighs both rounds' picks), so
+  nothing comes between his fall and the re-pick.
+- The crowd picks again from the same position with a fresh clock. The move he took back is barred: a grey arrow
+  with ✕ on the board and "✕ Nxe5" in the status; the board won't play it, the server rejects it, no bot picks it,
+  and it isn't the best move on offer in the re-pick either.
+- He has fallen: his figure lies in the dock for the rest of the battle, toppled on his side like a beaten chess piece,
+  armour cracked, crown and sword on the ground, greyed. No menu, no crowns, no more lines.
+- On the result screen he rises again in holy light ("A god does not stay down.") if the crowd won. If it lost or
+  drew, he stays down, without a word.
+- Online, the reveal carries the Last Stand and the battle as it now stands (`lastStand`, `boss`), so every screen
+  plays it at once; each round message carries the battle too (the barred move); the host's bot picks and scoring
+  leave the barred move out.
+
+**The moment** (`LAST_STAND` in `chess/boss-timing.ts`, ms after the blunder lands on the board; the reveal lasts
+`LAST_STAND_MS` = 8,600 ms longer, solo and online, and the next move's clock only starts after it, so nobody loses
+any time):
+
+| Beat | From (ms) | What |
+| --- | --- | --- |
+| 1. Freeze | 250 | A flash; the board goes cold and grey. |
+| 2. Leap and crash | 650 / 1,150 / 1,400 | He leaps up out of the dock (450 ms), falls onto the piece's square in a streak of light (250 ms), and lands at 1,400: impact flash, shockwave, dust, the board shakes (450 ms). The piece is knocked aside. |
+| 3. Banner | 1,950, for 2,100 | "LAST STAND", his battle-worn portrait and one of his lines (the same on every screen for the move). His usual cut-in is 1,500 ms; this one is held longer so the line can be read. |
+| 4. Slide back | 4,150, for 450 | The piece slides back to its square; he stands alone where it was. |
+| 5. The blow | 4,650 to 6,650 | 25 slashes, one every 80 ms, each a red-white cut with a red damage number (6 to 14, seeded by the move) spiralling off around him; his armour cracks at 5,050, 5,650 and 6,250; grunts of agony at the 2nd, 11th and 20th slash; four stylised red drops. |
+| 6. Fall | 6,800 / 7,250 / 7,800 | He staggers, collapses onto his side with a death groan, and fades from the board (500 ms). His fallen figure appears in the dock with his last words: "Finish… it… for me." |
+| 7. Re-pick | 8,600 | The reveal ends; the crowd picks again. |
+
+**Measured: an early hung piece sets it off** (`packages/sim/scripts/last-stand-blunders.ts`). 30 real raid starts
+(named openings, 10 plies in), a few sensible moves played on to crowd moves 1 to 10, then a move that hangs the
+queen or a minor piece, judged as a phone judges (top 8 at 250k nodes, re-checked at 700k): 30 of 30 crossed the bar.
+The judge gave a hung queen 50 to 62 points and a hung minor piece 47 to 53, against a bar of at most 35. Unit tests
+do the same with the real engine for three of them (Qg4 in the Open Sicilian, Ne4 in the QGD Exchange, Bh6 in the
+King's Indian Fianchetto) against the 3190 boss on crowd move 1. Online, a one-player raid lobby: Bb5, hanging the
+bishop to a pawn on move 1, was scored 52.6 by the host's engine, and he made his Last Stand.
+
+**Measured: how often** (`packages/sim/scripts/last-stand-sim.ts`, `reports/last-stand.md`). Bot crowds against the
+real boss (its strength, slips and blunder guard), every crowd move judged as the game judges it, the rule tried
+afterwards (once per game, so a game up to its first one is the game as played). Solo crowds are one player
+(strong, club or casual: a skill and a share of random moves) who keeps all three charges (the higher bar all game);
+the 50 v 50 final is ten bots with two charges, which the bots spend whenever the popular move loses 6+.
+
+| Crowd | Boss | Games | With a Last Stand | Crowd moves it came on |
+| --- | --- | --- | --- | --- |
+| One casual player (solo raid) | 1400 | 8 | 5 (63%) | 1, 1, 3, 7, 22 |
+| One casual player | 1800 | 8 | 6 (75%) | 2, 2, 3, 3, 5, 7 |
+| One club player | 1800 | 8 | 4 (50%) | 4, 8, 15, 40 |
+| One club player | 2200 | 8 | 4 (50%) | 6, 7, 9, 16 |
+| One club player | 2600 | 8 | 4 (50%) | 10, 10, 19, 59 |
+| One strong player | 2600 | 6 | 3 (50%) | 2, 8, 12 |
+| Ten club bots (50 v 50 final) | 2000 | 8 | 5 (63%) | 25, 29, 29, 32, 52 |
+| Ten expert bots (50 v 50 final) | 2600 | 6 | 1 (17%) | 42 |
+| **All** | | **60** | **32 (53%)** | |
+
+- **About 0.5 per game overall** (53%): once every other raid for most crowds, more for casual players (who hang pieces
+  early), less for a strong ten-player crowd (whose popular move rarely blunders while it's still in the game).
+- **The floor and its pace barely matter here.** While the crowd isn't lost yet, its moves are almost all either
+  fine or a piece-sized disaster: 92% gave away under 5 points, 3.4% gave away 30 or more, and only 2.5% fell
+  between 12 and 30. A mid-sized mistake (12 to 30 points, half a pawn to a pawn) mostly tips the position under 40
+  at once, after which nothing sets it off. Any floor from 10 to 18 and any pace from 15 to 30 moves gave 52 to 55%
+  (the grid in the report), so 13 and 22 sit in the middle of Eric's ranges. The lever that would change it is
+  `lastStandFrom` (or the starting bar), which Eric set.
+
+**Art, sounds and lines:**
+- **Sprite:** his figure is now drawn from parts (body, crown, sword), so there is a cracked variant (three levels,
+  dark jagged splits with a bright chipped edge) and a fallen pose (the same figure toppled on its side, crown knocked
+  off, sword on the ground). White and black, armour only, like the rest of him. A dev sheet shows them all:
+  `node scripts/preview-god-king.mjs out.png banner=1 epilogue=rise`.
+- **Portrait:** `god-king-portrait-hurt-w.png` and `-b.png` (from `scripts/god-king-portrait.py`; the usual portraits
+  are unchanged byte for byte): cracks across the helm, a cheek plate, both pauldrons and the chest, a crown spike
+  broken off, the cape's hem torn, embers among the sparks, and three small stylised red drops.
+- **Sounds** (`public/sounds/god-king/last-*.mp3`, CC0, credited there; cut by `scripts/god-king-last-stand-sounds.py`):
+  the leap (a heavy jump into a falling whistle), the crash, the 25 slashes (one 2 s flurry of sword swishes landing
+  with hits), two grunts of agony and the death groan, from the same two packs as his other sounds.
+- **Lines** (`godKing.ts`): the banner's "Fall back! This blow is mine.", "Not while I stand!", "Retreat — I'll hold
+  the line!" and "Go! I'll take it from here."; his last words "Finish… it… for me."; and "A god does not stay down."
+
+**Calls I made:**
+- **The taken-back move doesn't count as a crowd move,** and the boss's strike waits for the re-pick: otherwise the
+  move counter jumps by two and a strike could land between his fall and the re-pick.
+- **The eval bar holds still** through it (no dip for a move that never stands), in keeping with Eric's "the bar only
+  moves when a move lands".
+- **His crowns stay on screen until he leaps,** although the charges are already gone: losing them is part of his fall.
+- **A king move taken back** just slides back (the king is never taken off the board, even for a moment).
+- **The re-pick can be brilliant** like any round: it's the crowd's own choice, not a power-up.
+- **Test switches** (solo): `?laststand=1` makes the battle's next crowd move set it off whatever it is (unless the
+  God King plays it), for screenshots and the e2e test; Eric can just blunder a piece instead. `?side=b` plays a solo
+  raid as Black, to see the black God King.
