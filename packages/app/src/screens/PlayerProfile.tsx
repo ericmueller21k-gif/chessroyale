@@ -1,6 +1,9 @@
+import { Fragment } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { BOSS_TIERS, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, shopItem, tierInfo, type ItemLook } from "@chessroyale/core";
 import { BackButton, DressedPawn, FdButton, RankPill, WORN_ORDER, myHat } from "../components/FrontDoor.tsx";
+import { HattedPawn } from "../components/Cosmetics.tsx";
+import { ItemArt } from "../components/Items.tsx";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { account, fetchProfile, onAccountChange, reportPlayer, updateProfile, type PublicProfile } from "../account.ts";
@@ -31,7 +34,7 @@ function when(at: number, now = Date.now()): string {
   return new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/** What they wear, one row per item: its colour, slot, colour name, purity and tier. */
+/** What they wear, one row per item: the item itself (as it looks on them), slot, colour, purity and tier. */
 function Wearing({ look, hat, own }: { look: ItemLook; hat: string; own: boolean }) {
   const rows = WORN_ORDER.flatMap((slot) => {
     const it = look[slot];
@@ -51,12 +54,19 @@ function Wearing({ look, hat, own }: { look: ItemLook; hat: string; own: boolean
         const tier = tierInfo(d.tier);
         return (
           <div key={slot} class="fd-item">
-            <span class="fd-swatch" style={{ background: c2 ? `linear-gradient(135deg, ${c.hex} 50%, ${c2.hex} 50%)` : c.hex }} aria-hidden="true" />
+            <span class="fd-thumb" aria-hidden="true">
+              <ItemArt def={it.def} finish={it} />
+            </span>
             <span class="fd-item-text">
               <strong>{d.name}</strong>
               <span>
-                {SLOT_NAMES[slot]} · {c.name}
-                {c2 ? ` & ${c2.name}` : ""} · {purity(it.blemish)}% pure{isShiny(it.blemish) ? " · Shiny" : ""}
+                {/* Each detail stays whole; a narrow row breaks between them. */}
+                {[SLOT_NAMES[slot], c2 ? `${c.name} & ${c2.name}` : c.name, `${purity(it.blemish)}% pure`, ...(isShiny(it.blemish) ? ["Shiny"] : [])].map((t, i) => (
+                  <Fragment key={i}>
+                    {i > 0 && " · "}
+                    <span class="fd-nowrap">{t}</span>
+                  </Fragment>
+                ))}
               </span>
             </span>
             <span class="fd-tier" style={{ background: tier.color }}>
@@ -67,8 +77,8 @@ function Wearing({ look, hat, own }: { look: ItemLook; hat: string; own: boolean
       })}
       {shopHat && (
         <div class="fd-item">
-          <span class="fd-swatch shop" aria-hidden="true">
-            🎩
+          <span class="fd-thumb" aria-hidden="true">
+            <HattedPawn hat={hat} />
           </span>
           <span class="fd-item-text">
             <strong>{shopItem(`hat-${hat}`)!.name}</strong>

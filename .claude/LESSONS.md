@@ -50,3 +50,16 @@ pixels inside the item. That turned "looks off" into numbers, before and after t
 
 **The rule:** when a number on screen describes a drawing (a purity, a meter, a share), measure the drawing against
 the number over many cases, not one preview. Then add a test that does the same.
+
+## Coloured squares instead of the item (Oct 6, 2026)
+
+**Eric saw:** the profile's Wearing list showed a plain coloured square beside each item, "not the item itself".
+
+**The cause:** the mockup drew a colour swatch there, and it was built exactly as drawn. On a real profile, a swatch
+next to an item's name reads as a missing picture. Every test passed: none looked at what stood in for the item.
+
+**The fix:** each row draws the item with the crates' `ItemArt` (the same drawing as the locker and the reveal), and
+`e2e/profile.spec.ts` checks the row holds an item drawing.
+
+**The rule:** wherever an item is named on screen, show the item, drawn by `ItemArt` or `Avatar`, never a stand-in
+(a swatch, an emoji, an icon). When a mockup uses a placeholder for real art, build it with the real art.
