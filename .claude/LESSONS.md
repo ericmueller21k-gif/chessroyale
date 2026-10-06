@@ -37,7 +37,7 @@ later it moves again. It feels like the app froze.
 
 ## Purity that didn't match the item (Oct 6, 2026)
 
-**Eric saw:** an Exalted Gift-Wrap Tube at 41.4% purity was almost fully blotched. It should have been about 59%.
+**Eric saw:** a Legendary (then called Exalted) Gift-Wrap Tube at 41.4% purity was almost fully blotched. It should have been about 59%.
 
 **The cause:**
 - The blotch pattern was cut so the right share of the *whole 100 × 100 square* was blotched. An item got whatever
