@@ -2646,6 +2646,9 @@ button.history-label {
 .clock-note {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  /* (The ⏱ comes from the emoji font, taller than the text's: without this, on a computer the line grew 1 px on your
+     move and the board moved down with it.) */
+  line-height: 1;
 }
 .clock-note.up {
   position: relative;

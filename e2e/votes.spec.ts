@@ -76,7 +76,12 @@ test("the vote board: find your pawn, drag it into a zone, the count goes up; th
   await expect(page.locator(".vote-zone.mine")).toHaveCount(1);
   await expect.poll(async () => Number(await page.locator(".vote-zone-count").nth(1).textContent())).toBeGreaterThan(before);
   // The tally bubbles up: a count that goes up pops.
-  expect(await page.locator(".vote-zone-count").nth(1).evaluate((e) => (e.classList.contains("pop") ? getComputedStyle(e).animationName : "none"))).toBe("count-pop");
+  // (Read in one go: each new count is a new element, so a located one can be gone a moment later.)
+  const pop = await page.evaluate(() => {
+    const e = document.querySelectorAll(".vote-zone-count")[1]!;
+    return e.classList.contains("pop") ? getComputedStyle(e).animationName : "none";
+  });
+  expect(pop).toBe("count-pop");
   // It stays in the zone, settling on your side's half (the near one, at the bottom).
   const zone = (await page.locator(".vote-zone").nth(1).boundingBox())!;
   await expect

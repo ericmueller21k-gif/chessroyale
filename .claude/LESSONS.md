@@ -219,3 +219,7 @@ the frame of the tap showed the green.
   bar's slot, the sidebar) and measure the board's box on both, on a phone and a computer. Don't trust a screenshot.
 - Don't transition or animate between colours made with `color-mix(…, transparent)`. Switch them, or fade a layer's
   opacity, or animate a shadow.
+- Also caught (by `e2e/crowd.spec.ts`, "the board never moves", on the computer only): the move's clock added to the
+  line above the board ("⏱ 10 s") made that line 1 px taller on your move, so the board moved. The emoji's font is
+  taller than the text's, and the line's height was `normal` (a phone's is fixed). An emoji or symbol in a line
+  above the board gets `line-height: 1`.
