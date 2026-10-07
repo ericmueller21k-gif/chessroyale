@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, botVotes, castPregameVote, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, LAST_STAND_MS } from "@chessroyale/chess";
@@ -217,7 +217,7 @@ export class SoloMatch implements GameView {
       count: votes.length,
       startsAt: now,
       until: now + ms,
-      votes: botVotes(this.rng, bots.map((b) => b.id), votes[index]!.options.length, ms).map((v) => ({ playerId: v.id, option: v.option, at: now + v.atMs, side: side.get(v.id)! })),
+      votes: botVotes(this.rng, bots.map((b) => b.id), votes[index]!.options.length, ms, this.settings.voteBotSkip).map((v) => ({ playerId: v.id, option: v.option, at: now + v.atMs, side: side.get(v.id)! })),
       result: null,
       ...(this.settings.voteChangeAllowed ? { changeAllowed: true } : {}),
     };
@@ -238,10 +238,14 @@ export class SoloMatch implements GameView {
   private endVote() {
     const v = this.voteState!;
     const def = pregameVotes(this.settings)[v.index]!;
-    const result = tallyVotes(v.votes.map((x) => x.option), def.options.length, def.defaultOption, this.rng);
+    // The winner, then everyone who didn't vote (you, and the bots that didn't) joins it: they walk there now.
+    const at = Date.now();
+    const side = new Map(this.runner.state.players.map((p) => [p.id, p.colour ?? "w"]));
+    const everyone = this.runner.state.players.map((p) => p.id);
+    const { result, votes } = closePregameVote(v.votes, everyone, def, this.rng, (playerId, option) => ({ playerId, option, at, side: side.get(playerId)!, joined: true as const }));
     this.runner.patchSettings(def.options[result]!.patch);
-    const nextAt = Date.now() + this.settings.voteResultSeconds * 1000;
-    this.voteState = { ...v, result, nextAt };
+    const nextAt = at + this.settings.voteResultSeconds * 1000;
+    this.voteState = { ...v, votes, result, nextAt };
     this.set({ kind: "vote", vote: this.voteState });
     this.timer = setTimeout(() => (v.index + 1 < v.count ? this.startVote(v.index + 1) : this.nextRound()), nextAt - Date.now());
   }

@@ -212,6 +212,26 @@ export function tallyVotes(choices: readonly number[], options: number, defaultO
 }
 
 /**
+ * Closes a vote when its time runs out. The winner first: most votes, a tie drawn among the tied, nobody voting gives
+ * the default (`tallyVotes`). Then everyone who didn't vote, people and bots alike, joins the winner ("Didn't vote?
+ * You're with the crowd", Eric: "when not moved it defaults to the most popular one"). They're added after the count,
+ * so they never change the outcome, only the final counts (and their pawns walk to the winner). `join` makes a
+ * non-voter's entry. The one rule for solo and the lobby server; the app shows what they send.
+ */
+export function closePregameVote<V extends { playerId: string; option: number }>(
+  votes: readonly V[],
+  everyone: readonly string[],
+  vote: Pick<PregameVote, "options" | "defaultOption">,
+  rng: Rng,
+  join: (playerId: string, option: number) => V,
+): { result: number; votes: V[]; joined: string[] } {
+  const result = tallyVotes(votes.map((v) => v.option), vote.options.length, vote.defaultOption, rng);
+  const voted = new Set(votes.map((v) => v.playerId));
+  const joined = [...new Set(everyone)].filter((id) => !voted.has(id));
+  return { result, votes: [...votes, ...joined.map((id) => join(id, result))], joined };
+}
+
+/**
  * Records a player's vote: their first one counts. With voteChangeAllowed (off: Eric's call, one vote each), a later
  * vote replaces it. Returns the votes as they now stand, or null if the vote doesn't count.
  */
@@ -231,16 +251,19 @@ export interface BotVote {
 /**
  * Bots' votes: each vote gets its own random lean (so results differ from
  * game to game and a few humans can swing it), and each bot votes for an
- * option with that lean's odds, at a random moment in the window.
+ * option with that lean's odds, at a random moment in the window. A share of
+ * them (`skip`, the voteBotSkip setting) don't vote: when time's up they join
+ * the winner, with everyone else who didn't vote (closePregameVote).
  */
-export function botVotes(rng: Rng, ids: readonly string[], options: number, windowMs: number): BotVote[] {
+export function botVotes(rng: Rng, ids: readonly string[], options: number, windowMs: number, skip = 0): BotVote[] {
   const lean = Array.from({ length: options }, () => 0.4 + rng());
   const total = lean.reduce((s, x) => s + x, 0);
-  return ids.map((id) => {
+  return ids.flatMap((id) => {
     let r = rng() * total;
     let option = 0;
     while (option < options - 1 && (r -= lean[option]!) > 0) option++;
-    return { id, option, atMs: Math.round((0.1 + 0.8 * rng()) * windowMs) };
+    const atMs = Math.round((0.1 + 0.8 * rng()) * windowMs);
+    return skip > 0 && rng() < skip ? [] : [{ id, option, atMs }];
   });
 }
 

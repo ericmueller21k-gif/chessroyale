@@ -33,6 +33,8 @@ const RESET_MS = 650;
 const LEAVE_MS = 950;
 /** …and the real pieces drop into the starting position (they're down by the time the game's screen takes over). */
 const DROP_MS = 700;
+/** Time's up: "Didn't vote? You're with the crowd" shows above the board this long after the last of them lands. */
+const CROWD_LINE_MS = 1100;
 
 type Orientation = "white" | "black";
 
@@ -72,11 +74,12 @@ function PopCount({ n, class: cls }: { n: number; class: string }) {
 
 /**
  * A pre-game vote. The board is empty but for the players: everyone is their own pawn, dressed in their look,
- * White's scattered over ranks 1-2 and Black's over ranks 7-8. Yours is solid, ringed and tagged "You"; everyone
- * else's is a faint ghost. Drag your pawn into one of the three zones (or tap it, then a zone, or tap a card) to
- * vote. Everyone's pawn glides into the zone they vote for as the votes come in, and each zone's count pops as it
- * goes up. When time's up the winning zone lights up; between the votes everyone walks back to their spot, and
- * after the last one the pawns fade and the real pieces drop into place for the game.
+ * White's scattered over ranks 1-2 and Black's over ranks 7-8. Yours is solid and a little bigger (voteYouScale);
+ * everyone else's is a faint ghost. Drag your pawn into one of the three zones (or tap it, then a zone, or tap a
+ * card) to vote. Everyone's pawn glides into the zone they vote for as the votes come in, and each zone's count pops
+ * as it goes up. When time's up the winning zone lights up and everyone who didn't vote walks into it ("Didn't vote?
+ * You're with the crowd"), then the banner names the winner; between the votes everyone walks back to their spot,
+ * and after the last one the pawns fade and the real pieces drop into place for the game.
  */
 export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView }) {
   const def = PREGAME_VOTES[vote.index]!;
@@ -106,8 +109,14 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
   const visible = vote.votes.filter((v) => v.at <= now || match.isYou(v.playerId));
   const votedIds = new Set(visible.map((v) => v.playerId));
   const mine = visible.find((v) => match.isYou(v.playerId)) ?? null;
-  // A vote counts (and its count pops) as its pawn lands in the zone; yours at once; all of them once it's counted.
-  const landed = (v: VoteView["votes"][number]) => !animate || !counting || match.isYou(v.playerId) || v.at + GLIDE_MS <= now;
+  // Time's up: everyone who didn't vote joins the winner (closePregameVote). They walk there, and the banner waits
+  // until they've landed: it covers the zones.
+  const joined = vote.votes.filter((v) => v.joined);
+  const youJoined = joined.some((v) => match.isYou(v.playerId));
+  const walkedAt = joined.length && animate ? Math.max(...joined.map((v) => v.at)) + GLIDE_MS : -Infinity;
+  // A vote counts (and its count pops) as its pawn lands in the zone; yours at once; all of them once it's counted
+  // (but those who join the winner as they land).
+  const landed = (v: VoteView["votes"][number]) => !animate || (!counting && !v.joined) || match.isYou(v.playerId) || v.at + GLIDE_MS <= now;
   const counts = def.options.map((_, i) => visible.filter((v) => v.option === i && landed(v)).length);
   const canAct = open && (!mine || !!vote.changeAllowed);
 
@@ -197,10 +206,10 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
   };
 
   // Your pawn's place: under your finger while dragging (a little above it, so you can see it), in your zone once
-  // you've voted, else your starting spot.
-  // (Yours is bigger than the others: its spot keeps it, ring and all, inside the board's edge.)
+  // you've voted (or joined the winner), else your starting spot.
+  // (Yours is a little bigger than the others: its spot keeps it inside the board's edge.)
   const seeded = me ? spots.get(me.id) : undefined;
-  const myHome = seeded && { x: Math.min(7.45, Math.max(0.55, seeded.x)), y: side === "w" ? Math.min(1.45, Math.max(0.62, seeded.y)) : Math.min(7.38, Math.max(6.55, seeded.y)) };
+  const myHome = seeded && { x: Math.min(7.64, Math.max(0.36, seeded.x)), y: seeded.y };
   const myVoted = mine && !home ? (myDrop?.key === vote.key && myDrop.option === mine.option ? myDrop.spot : voteZoneCentre(mine.option, side)) : null;
   const myAt = dragAt ? { x: dragAt.x, y: dragAt.y + (orientation === "white" ? 0.3 : -0.3) } : (myVoted ?? myHome);
   const myLook = me ? looks.get(me.id)! : pawnLook({ id: "", isYou: true, isBot: false });
@@ -209,7 +218,11 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
   const nextLabel = vote.index + 1 < vote.count ? PREGAME_VOTES[vote.index + 1]!.title : "The game begins";
   const nextIn = vote.nextAt ? Math.max(0, Math.ceil((vote.nextAt - now) / 1000)) : null;
   const hint = winner
-    ? `${nextLabel}${nextIn ? ` in ${nextIn}…` : "…"}`
+    ? joined.length && now < Math.max(walkedAt, vote.until) + CROWD_LINE_MS
+      ? youJoined
+        ? "You didn't vote, so you're with the crowd."
+        : "Didn't vote? You're with the crowd."
+      : `${nextLabel}${nextIn ? ` in ${nextIn}…` : "…"}`
     : !open
       ? "Counting the votes…"
       : mine
@@ -244,6 +257,7 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
             <div
               ref={layer}
               class={`vote-layer${animate ? " animate" : ""}${leaving ? " leaving" : ""}${selected ? " picking" : ""}${dragAt ? " dragging" : ""}`}
+              style={{ "--vp-me": `calc(var(--vp) * ${match.settings.voteYouScale ?? 1})` }}
               onClick={() => selected && setSelected(false)}
             >
               <div class="vote-zones" aria-hidden="true">
@@ -314,13 +328,11 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
                   onPointerCancel={onCancel}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <span class="vote-me-ring" aria-hidden="true" />
                   <Avatar look={myLook.look} side={side} hat={myLook.hat} />
-                  <span class="vote-me-tag">You</span>
                 </span>
               )}
             </div>
-            {winner && (
+            {winner && now >= walkedAt && (
               <div class={`vote-banner${resetting || leaving ? " leaving" : ""}`} role="status">
                 <span class="vote-banner-icon">{winner.icon}</span>
                 <strong>{winner.label}</strong>

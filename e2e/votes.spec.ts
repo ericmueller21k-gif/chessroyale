@@ -40,7 +40,7 @@ async function drag(page: Page, from: { x: number; y: number }, to: { x: number;
   await cdp.detach();
 }
 
-test("the vote board: find your pawn, drag it into a zone, the count goes up; the second vote starts from home; the game begins with the pieces", async ({ page }) => {
+test("the vote board: your pawn is solid, drag it into a zone, the count goes up; the second vote starts from home; the game begins with the pieces", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   const touch = test.info().project.name === "phone";
   await page.goto("/?debug&mode=crowd&turns=teams&augments=1");
@@ -50,17 +50,35 @@ test("the vote board: find your pawn, drag it into a zone, the count goes up; th
   // An empty board: no pieces, only the players' pawns, both teams on their own two ranks.
   await expect(page.locator("cg-board piece")).toHaveCount(0);
   await expect(page.locator(".vote-pawn")).toHaveCount(100);
-  // Yours: solid, tagged "You", on top of everyone else's (which are faint).
+  // Yours: the same pawn, fully solid and a little bigger (voteYouScale), on top of everyone else's (which are faint).
+  // No tag, no ring, no glow, no bob (Eric: tapping a card works too, so nobody loses their pawn).
   const me = page.locator(".vote-me");
   await expect(me).toBeVisible();
-  await expect(me).toContainText("You");
+  await expect(me).toHaveText("");
+  await expect(page.locator(".vote-me-tag, .vote-me-ring")).toHaveCount(0);
   const looks = await page.evaluate(() => {
-    const mine = document.querySelector(".vote-me")!;
-    const others = [...document.querySelectorAll(".vote-pawn:not(.vote-me)")];
-    return { mine: Number(getComputedStyle(mine).opacity), others: Math.max(...others.map((e) => Number(getComputedStyle(e).opacity))), z: getComputedStyle(mine).zIndex };
+    const mine = document.querySelector<HTMLElement>(".vote-me")!;
+    const others = [...document.querySelectorAll<HTMLElement>(".vote-pawn:not(.vote-me)")];
+    const r = mine.getBoundingClientRect();
+    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    const avatar = getComputedStyle(mine.querySelector(".avatar")!);
+    return {
+      mine: Number(getComputedStyle(mine).opacity),
+      others: Math.max(...others.map((e) => Number(getComputedStyle(e).opacity))),
+      scale: r.width / others[0]!.getBoundingClientRect().width,
+      onTop: !!top?.closest(".vote-me"),
+      filter: avatar.filter,
+      animation: avatar.animationName,
+      want: (window as any).match.settings.voteYouScale,
+    };
   });
   expect(looks.mine).toBe(1);
   expect(looks.others).toBeLessThan(0.6);
+  expect(looks.want).toBeGreaterThan(1);
+  expect(looks.scale).toBeCloseTo(looks.want, 1);
+  expect(looks.onTop).toBe(true);
+  expect(looks.filter).toBe("none");
+  expect(looks.animation).toBe("none");
   const start = await centre(page, ".vote-me");
   const homes = await pawns(page);
   // Your pawn starts on your own side, at the bottom of the board (from Black's side the board is flipped).
@@ -82,7 +100,8 @@ test("the vote board: find your pawn, drag it into a zone, the count goes up; th
     return e.classList.contains("pop") ? getComputedStyle(e).animationName : "none";
   });
   expect(pop).toBe("count-pop");
-  // It stays in the zone, settling on your side's half (the near one, at the bottom).
+  // It stays in the zone, settling on your side's half (the near one, at the bottom), still solid.
+  expect(await me.evaluate((e) => Number(getComputedStyle(e).opacity))).toBe(1);
   const zone = (await page.locator(".vote-zone").nth(1).boundingBox())!;
   await expect
     .poll(async () => {
@@ -117,11 +136,14 @@ test("the vote board: find your pawn, drag it into a zone, the count goes up; th
       return back > 30 ? "home" : `only ${back} to compare`;
     })
     .toBe("home");
-  // Vote by a tap on your pawn, then a tap on a zone.
+  // Vote by a tap on your pawn, then a tap on a zone. (A tap beside it picks it up too: the pawn is small, the
+  // area that takes the touch isn't.)
   await page.waitForTimeout(400);
   const home = await centre(page, ".vote-me");
-  if (touch) await page.touchscreen.tap(home.x, home.y);
-  else await page.mouse.click(home.x, home.y);
+  const size = (await me.boundingBox())!.width;
+  const beside = { x: home.x + size * 0.85, y: home.y };
+  if (touch) await page.touchscreen.tap(beside.x, beside.y);
+  else await page.mouse.click(beside.x, beside.y);
   await expect(page.locator(".vote-me.selected")).toBeVisible();
   const right = await centre(page, ".vote-zone", 2);
   if (touch) await page.touchscreen.tap(right.x, right.y);
@@ -137,6 +159,61 @@ test("the vote board: find your pawn, drag it into a zone, the count goes up; th
   // The clock is the voted speed's: Normal 20 s, Variable 10 s on move 1, Bullet 10 s.
   const clock = await page.evaluate(() => (window as any).match.runner.moveClock());
   expect([10, 20]).toContain(clock);
+});
+
+test("time's up: whoever didn't vote (you, and a few bots) walks to the winner, then the banner names it", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  await page.goto("/?debug&mode=crowd&turns=teams&augments=1");
+  await soloFromHome(page);
+  await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
+  // 8 seconds to vote (settings.voteSeconds), on screen as the timer bar's whole length.
+  const voting = await page.evaluate(() => {
+    const v = (window as any).match.phase.vote;
+    return { ms: v.until - v.startsAt, want: (window as any).match.settings.voteSeconds * 1000 };
+  });
+  expect(voting.ms).toBe(8000);
+  expect(voting.want).toBe(8000);
+  const home = await centre(page, ".vote-me");
+  // Don't vote. The moment time's up: the winner is counted, and the banner waits for the walk (it covers the zones).
+  await page.waitForFunction(() => (window as any).match.phase.kind === "vote" && (window as any).match.phase.vote.result !== null, null, { polling: "raf", timeout: 15_000 });
+  const atEnd = await page.evaluate(() => {
+    const v = (window as any).match.phase.vote;
+    return {
+      result: v.result as number,
+      banner: !!document.querySelector(".vote-banner"),
+      joined: v.votes.filter((x: any) => x.joined).map((x: any) => ({ id: x.playerId, option: x.option })) as { id: string; option: number }[],
+      total: new Set(v.votes.map((x: any) => x.playerId)).size,
+    };
+  });
+  expect(atEnd.banner).toBe(false);
+  expect(atEnd.total).toBe(100);
+  // You, and the bots that didn't vote, all join the winner.
+  expect(atEnd.joined.map((j) => j.id)).toContain("you");
+  expect(atEnd.joined.length).toBeGreaterThan(1);
+  expect(atEnd.joined.every((j) => j.option === atEnd.result)).toBe(true);
+  await expect(page.locator(".vote-hint")).toHaveText("You didn't vote, so you're with the crowd.");
+  // Everyone walks there: your pawn lands in the winning zone (on your half), and so does each bot that didn't vote.
+  const win = (await page.locator(".vote-zone.win").boundingBox())!;
+  const inside = (c: { x: number; y: number }) => c.x > win.x && c.x < win.x + win.width && c.y > win.y && c.y < win.y + win.height;
+  await expect.poll(async () => inside(await centre(page, ".vote-me"))).toBe(true);
+  const mine = await centre(page, ".vote-me");
+  expect(mine.y).toBeGreaterThan(win.y + win.height / 2);
+  expect(Math.hypot(mine.x - home.x, mine.y - home.y)).toBeGreaterThan(40);
+  await expect
+    .poll(async () => {
+      const now = await pawns(page);
+      return atEnd.joined.filter((j) => j.id !== "you").every((j) => now[j.id]!.in && inside(now[j.id]!));
+    })
+    .toBe(true);
+  // The counts show them: every one of the 100 is in a zone, the winner's count is everyone who voted for it or joined.
+  await expect
+    .poll(async () => (await page.locator(".vote-zone-count").allTextContents()).map(Number).reduce((a, b) => a + b, 0))
+    .toBe(100);
+  // Then the banner, and the line goes back to what's next.
+  await expect(page.locator(".vote-banner")).toBeVisible();
+  await expect(page.locator(".vote-hint")).toHaveText(/How fast\? in \d…|How fast\?…/, { timeout: 5_000 });
+  expect(await page.evaluate(() => (window as any).match.myVote)).toBe(atEnd.result);
 });
 
 test("the Variable speed: 10 s a move for moves 1-5, then 15 s from move 6, shown above the board", async ({ page }) => {
