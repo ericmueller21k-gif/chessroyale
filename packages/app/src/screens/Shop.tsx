@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, type ShopSlot } from "@chessroyale/core";
+import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, type ShopSlot } from "@chessroyale/core";
 import { buyShopItem, equipShopItem } from "../account.ts";
 import { HattedPawn, KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play } from "../sound.ts";
@@ -72,13 +72,30 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           <div class="shop-grid">
             {SHOP_ITEMS.filter((i) => i.slot === slot).map((item) => {
               const owned = shop.owned.includes(item.id);
-              const equipped = shop.equipped[item.slot] === item.id;
+              const equipped = item.slot !== "chat" && shop.equipped[item.slot] === item.id;
+              // Chat packs: their lines are the preview, and owning one is all it takes (nothing to equip).
+              const pack = item.slot === "chat" ? chatPack(item.look.pack ?? "") : undefined;
               return (
-                <div key={item.id} class={`shop-item${equipped ? " equipped" : ""}`}>
-                  <div class="shop-preview">{item.slot === "king" ? <KingEffectPreview look={item.look} /> : <HattedPawn hat={item.look.hat!} />}</div>
+                <div key={item.id} class={`shop-item${equipped ? " equipped" : ""}${pack ? " chat-pack" : ""}`}>
+                  <div class="shop-preview">
+                    {pack ? (
+                      <div class={`chat-pack-lines${pack.kind === "emoji" ? " emoji" : ""}`} aria-label={`${pack.name}: ${pack.lines.map((l) => l.text).join(", ")}`}>
+                        {pack.lines.slice(0, pack.kind === "emoji" ? 8 : 4).map((l) => (
+                          <span key={l.id}>{l.text}</span>
+                        ))}
+                        {pack.kind !== "emoji" && pack.lines.length > 4 && <span class="more">+{pack.lines.length - 4} more</span>}
+                      </div>
+                    ) : item.slot === "king" ? (
+                      <KingEffectPreview look={item.look} />
+                    ) : (
+                      <HattedPawn hat={item.look.hat!} />
+                    )}
+                  </div>
                   <strong>{item.name}</strong>
                   <span class="muted small">{item.description}</span>
-                  {equipped ? (
+                  {pack && owned ? (
+                    <span class="shop-tag">{item.starter ? "Free · yours" : "Yours"}</span>
+                  ) : equipped ? (
                     <span class="shop-tag">Equipped</span>
                   ) : owned ? (
                     <button type="button" class="btn btn-small" disabled={busy !== null} onClick={() => void act(item.id, equipShopItem)}>
@@ -93,7 +110,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
               );
             })}
           </div>
-          <p class="muted small shop-soon">Coming later: King kill moves and more animations.</p>
+          <p class="muted small shop-soon">{slot === "chat" ? "Quick chat is in online 50 v 50 matches and boss raids: preset lines only, no typing." : "Coming later: King kill moves and more animations."}</p>
         </>
       )}
         </>

@@ -1,6 +1,7 @@
 import { cutLabel, type BoardView, type GameView } from "../game.ts";
 import { MiniBoard } from "../components/MiniBoard.tsx";
 import { RaceTower } from "../components/RaceTower.tsx";
+import { ChatSection } from "../components/QuickChat.tsx";
 
 /** For knocked-out players: the boards in play and the live standings. */
 export function SpectateScreen({ match, boards, note }: { match: GameView; boards: BoardView[]; note?: string }) {
@@ -16,7 +17,9 @@ export function SpectateScreen({ match, boards, note }: { match: GameView; board
           ))}
         </div>
       )}
-      <RaceTower standings={st} cutoff={match.cutoff} cutLabel={cutLabel(match)} />
+      {/* Out of the match, still on the team: quick chat (online). */}
+      <ChatSection match={match} />
+      <RaceTower standings={st} cutoff={match.cutoff} cutLabel={cutLabel(match)} floats={match.chat?.floats()} />
     </div>
   );
 }

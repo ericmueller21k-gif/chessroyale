@@ -427,3 +427,50 @@ export const FRONT_DOOR = {
   /** The rank ladder (RATING_RANKS) a rating is named by. */
   ratingRanks: RATING_RANKS,
 } as const;
+
+/**
+ * Quick chat in matches (preset phrases and emoji only; see DECISIONS.md, "Quick chat in matches"). The server
+ * enforces the limits; the app mirrors them to grey out its buttons.
+ */
+export const QUICK_CHAT = {
+  /** One message every this long… */
+  minGapMs: 3_000,
+  /** …and at most this many in this long. */
+  burstMax: 5,
+  burstWindowMs: 30_000,
+  /** The same line as your last one, again within this long, is dropped. */
+  repeatMs: 30_000,
+  /** The feed keeps the last this-many messages (the computer's panel shows them all; a phone's split the newest few). */
+  feedSize: 30,
+  /** The server keeps this many lines (both teams together) to send a player who reconnects. */
+  logSize: 60,
+  /** Phone: the newest message shows this long as a one-line bubble under the top bar, while chat is hidden. */
+  bubbleMs: 2_000,
+  /** An emoji floats above its sender's row on the scoreboard this long. */
+  emojiFloatMs: 2_400,
+  /** The soft tick for a team message, at most this often; its level is a fraction of the clock's tick (itself softer than a move). */
+  tickGapMs: 400,
+  tickLevel: 0.25,
+  /** Bots chat a little: at most this many lines a minute across every bot in the lobby. */
+  botMaxPerMinute: 3,
+  /** "Good luck!" as the match begins: the odds, and how many bots at most. */
+  botStartChance: 0.9,
+  botStartMax: 2,
+  /** "Nice move!" after a great crowd move (the move played lost at most this many points): the odds. */
+  botGreatMoveChance: 0.3,
+  botGreatMoveLoss: 1,
+  /** "GG" at the end: the odds, and how many bots at most. */
+  botEndChance: 0.9,
+  botEndMax: 2,
+  /** A bot's line comes this long after the moment (ms, random in the range), like a person typing. */
+  botDelayMs: [1_500, 6_000] as readonly [number, number],
+  /** Shop prices of the packs, in coins (everything is free while SHOP_FREE is on). */
+  packPrices: {
+    godking: 300,
+    winter: 200,
+    spicy: 250,
+    "emoji-chess": 200,
+    "emoji-winter": 200,
+    "emoji-royal": 300,
+  } as Readonly<Record<string, number>>,
+} as const;

@@ -1,0 +1,124 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QUICK_CHAT } from "@chessroyale/core";
+import type { ClientMessage, NetChatLine } from "@chessroyale/chess";
+import { MatchChat } from "../src/chat.ts";
+
+/** A chat whose match is "p1" on a team, with the server's clock equal to ours. */
+function setup(teams = true) {
+  const sent: ClientMessage[] = [];
+  let emits = 0;
+  const chat = new MatchChat({
+    code: () => "ABCDE",
+    me: () => "p1",
+    send: (m) => sent.push(m),
+    emit: () => emits++,
+    local: (t) => t,
+    teams: () => teams,
+  });
+  const line = (n: number, from: string, say: string, extra: Partial<NetChatLine> = {}): NetChatLine => ({ n, from, say, to: "team", team: "w", at: Date.now(), ...extra });
+  return { chat, sent, line, emits: () => emits };
+}
+
+describe("quick chat in the app", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("opens with the server's log; lines that came with it aren't news", () => {
+    const { chat, line } = setup();
+    expect(chat.enabled).toBe(false);
+    chat.onLog([line(1, "p2", "gg", { icon: "♞" })], ["basics", "emoji-basics", "godking"]);
+    expect(chat.enabled).toBe(true);
+    expect(chat.packs).toContain("godking");
+    expect(chat.icons.get("p2")).toBe("♞");
+    expect(chat.unread()).toBe(0);
+    chat.onLine(line(2, "p2", "wow"));
+    // Duplicates (a rejoin's log after a live line) show once.
+    chat.onLine(line(2, "p2", "wow"));
+    expect(chat.lines().map((l) => l.say)).toEqual(["gg", "wow"]);
+    expect(chat.unread()).toBe(1);
+  });
+
+  it("while a panel is on screen nothing is unread and no bubble shows; hidden, the newest shows for a moment", () => {
+    const { chat, line } = setup();
+    chat.onLog([], ["basics", "emoji-basics"]);
+    const panel = {};
+    chat.shown(panel, true);
+    chat.onLine(line(1, "p2", "nice-move"));
+    expect(chat.unread()).toBe(0);
+    expect(chat.bubble()).toBeNull();
+    chat.shown(panel, false);
+    // Seen on screen: it doesn't bubble up again when the panel goes.
+    expect(chat.bubble()).toBeNull();
+    chat.onLine(line(2, "p3", "wow"));
+    expect(chat.bubble()?.say).toBe("wow");
+    expect(chat.unread()).toBe(1);
+    vi.advanceTimersByTime(QUICK_CHAT.bubbleMs);
+    expect(chat.bubble()).toBeNull();
+    // Your own lines never bubble or count.
+    chat.onLine(line(3, "p1", "gg"));
+    expect(chat.bubble()).toBeNull();
+    expect(chat.unread()).toBe(1);
+  });
+
+  it("a bot's line waits for its moment", () => {
+    const { chat, line } = setup();
+    chat.onLog([], []);
+    chat.onLine(line(1, "bot4", "good-luck", { to: "all", at: Date.now() + 3000 }));
+    expect(chat.lines()).toEqual([]);
+    vi.advanceTimersByTime(3000);
+    expect(chat.lines().map((l) => l.from)).toEqual(["bot4"]);
+  });
+
+  it("mirrors the limits: the buttons grey out after a send, the same line for longer; All allows only Hello and Sporting", () => {
+    const { chat, sent } = setup();
+    chat.onLog([], ["basics", "emoji-basics"]);
+    expect(chat.canSay("gk-crown")).toBe(false); // a pack you don't own
+    chat.say("push-pawns");
+    expect(sent.at(-1)).toEqual({ t: "chat", say: "push-pawns", to: "team" });
+    expect(chat.canSay("wow")).toBe(false);
+    vi.advanceTimersByTime(QUICK_CHAT.minGapMs);
+    expect(chat.canSay("wow")).toBe(true);
+    expect(chat.canSay("push-pawns")).toBe(false);
+    chat.setTo("all");
+    expect(chat.canSay("trust-crowd")).toBe(false);
+    expect(chat.canSay("e-thumbs")).toBe(false);
+    chat.say("gg");
+    expect(sent.at(-1)).toEqual({ t: "chat", say: "gg", to: "all" });
+    // The server said wait: the buttons wait too.
+    vi.advanceTimersByTime(QUICK_CHAT.minGapMs);
+    chat.onRefused("hi-all", "burst", Date.now() + 20_000);
+    expect(chat.canSay("hi-all")).toBe(false);
+    vi.advanceTimersByTime(20_000);
+    expect(chat.canSay("hi-all")).toBe(true);
+  });
+
+  it("without teams there's no All: everything goes to everyone as 'team'", () => {
+    const { chat, sent } = setup(false);
+    chat.onLog([], ["basics", "emoji-basics"]);
+    chat.setTo("all");
+    expect(chat.canSay("push-pawns")).toBe(true);
+    chat.say("push-pawns");
+    expect(sent.at(-1)).toEqual({ t: "chat", say: "push-pawns", to: "team" });
+  });
+
+  it("muting hides a player's lines and emoji and tells the server", () => {
+    const { chat, sent, line } = setup();
+    chat.onLog([], ["basics", "emoji-basics"]);
+    chat.onLine(line(1, "p2", "e-fire"));
+    expect(chat.floats().get("p2")?.text).toBe("🔥");
+    chat.mute("p2", true);
+    expect(sent.at(-1)).toEqual({ t: "chatPrefs", muted: ["p2"] });
+    expect(chat.lines()).toEqual([]);
+    expect(chat.floats().size).toBe(0);
+    chat.mute("p1", true); // not yourself
+    expect(chat.mutedIds()).toEqual(["p2"]);
+    chat.mute("p2", false);
+    expect(chat.lines().map((l) => l.say)).toEqual(["e-fire"]);
+    // An emoji floats for a moment only.
+    vi.advanceTimersByTime(QUICK_CHAT.emojiFloatMs);
+    expect(chat.floats().size).toBe(0);
+  });
+});

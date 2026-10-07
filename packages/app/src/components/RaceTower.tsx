@@ -22,6 +22,7 @@ export function RaceTower({
   keep: keepOnly,
   done,
   cutLabel = "Cut line",
+  floats,
 }: {
   standings: readonly Standing[];
   cutoff: number;
@@ -34,6 +35,8 @@ export function RaceTower({
   done?: ReadonlySet<string>;
   /** Text on the cut line, e.g. "Cut after round 8". */
   cutLabel?: string;
+  /** Quick chat: an emoji someone just sent, floating up from their row for a moment. */
+  floats?: ReadonlyMap<string, { text: string; key: number }>;
 }) {
   const ROW = mini ? 22 : 30;
   const alive = standings.filter((s) => !s.out);
@@ -119,6 +122,11 @@ export function RaceTower({
               <span class={`t-elo${r.rating !== null && r.rating === topRating ? " top" : ""}`}>{r.rating ?? "—"}</span>
               <span class="t-bank">{r.out ? "" : clockText(r.bankMs)}</span>
               <span class="t-pu">{r.out ? "" : r.practice ? "∞" : r.powerUps}</span>
+              {floats?.get(r.id) && (
+                <span key={floats.get(r.id)!.key} class="t-float" aria-hidden="true">
+                  {floats.get(r.id)!.text}
+                </span>
+              )}
             </div>
           );
         })}

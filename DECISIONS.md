@@ -1334,7 +1334,7 @@ every number on it comes from the server.
 - **Item tiers get their own names** (Common to Mythic, the item-builder's change alongside this one), so a rank never
   reads like an item's rarity.
 
-## Quick chat in matches (design, Oct 6, 2026; to build)
+## Quick chat in matches (design, Oct 6, 2026; built Oct 7, 2026)
 
 Eric: a chat in 50 v 50, preset messages only (no typing), some unlockable, each with the sender's icon and name.
 Roomy on desktop, closed but expandable on a phone. The `social` delegate builds it. My calls:
@@ -1393,6 +1393,90 @@ Roomy on desktop, closed but expandable on a phone. The `social` delegate builds
   - Packs live in the same `core/chat.ts` list as the phrases, so a new pack is a few lines. Custom pixel emotes can
     replace system emoji later.
 - **Sound:** a soft tick for a team message, never louder than a move, and none when muted.
+
+### Built (Oct 7, 2026)
+
+The `social` delegate built it as designed. The lines and packs are in `core/chat.ts`, every number in
+`QUICK_CHAT` (settings.ts), the relay in `server/lobby.ts`, the app's side in `app/chat.ts` and
+`components/QuickChat.tsx`. My calls where the design left room:
+
+- **Where the panel is.**
+  - Phone: the split under the board on every screen that has the scoreboard (your move, watching the other team,
+    the reveal, the boss).
+  - Computer: the column beside the board, under the move's panel, from 1100 px (not 1024), where the leaderboard
+    moves to the side of the screen. From 900 to 1099 px the scoreboard is still in that column, so it keeps the
+    phone's split there.
+  - Pages: the results (so the GGs work), a boss raid's "watching" page, and the cut screen once you're out
+    (knocked-out players stay on it until the results, and can keep cheering their team).
+  - The pre-game votes and the final's own screen have no panel (their space is the vote and the final's teams): new
+    lines come as the bubble there.
+  - No chat button in the top bar: the revised design puts the unread count on the scoreboard's header.
+- **The split.**
+  - Half and half.
+  - In the split, the Team / All switch takes the "Chat" title's place (there's no room for both).
+  - It shows only whole lines (no half-cut line at the top).
+  - The scoreboard's old ▾ now folds both panels to their headers and grows the board, as before (same remembered
+    choice).
+  - The unread count's tap brings chat back beside the scoreboard.
+- **Tapping a name** opens a small menu in place of the buttons, with Profile and Mute for this match. The design
+  asked for both on the same tap, and nothing pops up over the board.
+- **Team / All.**
+  - Emoji stay in your team, like the reactions (a 😂 to the other team after their blunder is a taunt).
+  - Each pack phrase joins one of the four groups, so the rule stays one sentence: "Hello and Sporting lines go to
+    both teams".
+  - With All on, the team-only buttons grey out and the feed says why.
+  - There's no switch where everyone is one team: a raid, "everyone moves", and a 50 v 50's boss battle.
+- **Team colours.** A white or black chip before the name, only on lines sent to everyone. A team line is always
+  your team's, and a black name can't be read on the dark panel.
+- **Limits.**
+  - "Repeats are dropped" means the same line as your last one, within 30 s; other lines still go.
+  - Over the limit the buttons grey out until they work again. At the 5-in-30-s limit, the feed says when.
+  - The server checks everything and tells the sender why it dropped a line. Free text, unknown ids and pack lines
+    you don't own never reach anyone.
+- **Muting.**
+  - A mute is for this match, on this device. It's kept with the lobby's code, so a reload keeps it. The server
+    stops sending that player's lines to you.
+  - Chat off is per device. The server sends you nothing, you can't send, and the panel says so with "Turn chat on".
+  - Both switches are in the panel's ⋯ menu and in Settings (Quick chat, and the bubble).
+- **The packs.**
+  - Each has Eric's two lines and two more in the same spirit:
+    - God King: "Call the King!", "Long live the King!"
+    - Winter: "Ice cold.", "Happy holidays!"
+    - Spicy: "Spicy!", "All in!"
+  - Prices are in coins (`QUICK_CHAT.packPrices`): phrase packs 300 / 200 / 250, emoji packs 200 / 200 / 300.
+    They're free while `SHOP_FREE` is on.
+  - They're shop items in a "Chat packs" tab. You own them, there's nothing to equip, and the free ones show as
+    "Free · yours".
+  - The server reads what you own from your account when you join. A pack bought during a match works from the
+    next one (or after a reload).
+- **Icons.**
+  - Each line shows the sender's pixel icon, as Eric asked. Profiles still don't show it to others (the hub's call).
+  - An icon goes out once per sender per player, with their first line.
+  - Icons are stored beside the lobby's record, not in it (Durable Object values are limited to 128 KB).
+  - Bots, and people without a drawing, get a pawn.
+- **Bots.**
+  - "Good luck!"-type lines at the start: 90% of matches, from one or two bots, to everyone.
+  - "Nice move!" or "Wow!": 30% of the time after a crowd move that lost at most 1 point, from a bot on that team.
+  - "GG" or "Well played" at the end: 90%, from one or two bots.
+  - Each comes 1.5-6 s after the moment. Across all bots there are at most 3 lines a minute.
+  - They use their own randomness, so chat never changes how a match plays out.
+- **Sound.** A tick at a quarter of the clock's tick, for team lines from others only, at most every 0.4 s. It
+  follows the mute switch.
+- **Looks.**
+  - The panel is dark in both themes, like the scoreboard beside it. A page's chat follows the theme.
+  - The bubble is a dark pill on light pages and a lighter pill with an edge in dark mode.
+  - The bubble shows whenever no chat panel is on screen (scoreboard full, folded, a reveal too short for the
+    split's feed, the votes). It sits between the top bar and the board. If there's no room it rides up over the bar,
+    never over the board, and it takes no taps.
+- **Classic has no chat** (server and app), and neither does the queue.
+- **Checked frame by frame** with `npm run frames:chat -- <dir> [moves] [dark|light] [split|chat|board]`
+  (`scripts/frames-chat-move.mjs`, Worker running). It plays real taps on a phone while another player's lines
+  arrive, records every painted frame, the board's box, the bubble's box and each change of the pieces.
+  - In all three layouts and both themes: one board box throughout, every tap's move picked, no bubble ever over
+    the board, and no flash.
+  - The only brightness jumps were the reveal's poll appearing.
+  - The pieces' frames match the same run on `main`: after a pick, Crowd's piece slides back and your pick shows as
+    a vote. That's unchanged.
 
 ## No flash between a match's screens (Oct 6, 2026)
 

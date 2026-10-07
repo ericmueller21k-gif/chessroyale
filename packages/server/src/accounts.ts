@@ -6,7 +6,7 @@
  * so it can be tested with an in-memory SQLite.
  */
 
-import { BOSS_TIERS, FRONT_DOOR, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, equippedLook, ratingTier, shopItem, starterItem, topPercent, type ItemLook, type RankEffect, type ShopSlot, type ShopState } from "@chessroyale/core";
+import { BOSS_TIERS, FRONT_DOOR, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, equippedLook, ratingTier, shopItem, starterItem, topPercent, type ItemLook, type RankEffect, type EquipSlot, type ShopState } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 
@@ -687,10 +687,10 @@ export async function shopState(sql: Sql, userId: string): Promise<ShopState> {
   const starters = SHOP_ITEMS.filter((i) => i.starter).map((i) => i.id);
   const all = [...new Set([...starters, ...owned])];
   const rows = await sql.all<{ slot: string; item_id: string }>("SELECT slot, item_id FROM equipped WHERE user_id = ?", userId);
-  const equipped = Object.fromEntries(SHOP_CATEGORIES.map((c) => [c.slot, starterItem(c.slot).id])) as Record<ShopSlot, string>;
+  const equipped = Object.fromEntries(SHOP_CATEGORIES.filter((c) => !c.ownOnly).map((c) => [c.slot, starterItem(c.slot).id])) as Record<EquipSlot, string>;
   for (const r of rows) {
     const item = shopItem(r.item_id);
-    if (item && item.slot === r.slot && all.includes(item.id)) equipped[item.slot] = item.id;
+    if (item && item.slot !== "chat" && item.slot === r.slot && all.includes(item.id)) equipped[item.slot] = item.id;
   }
   const wallet = await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", userId);
   return { coins: wallet?.coins ?? 0, owned: all, equipped };
@@ -715,6 +715,8 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown): Prom
   if (!item) return { ok: false, message: "That item isn't in the shop." };
   const state = await shopState(sql, userId);
   if (!state.owned.includes(item.id)) return { ok: false, message: "Get it first." };
+  // Chat packs aren't equipped: every one you own is yours to use.
+  if (item.slot === "chat") return { ok: true, shop: state };
   await sql.run("INSERT INTO equipped (user_id, slot, item_id) VALUES (?, ?, ?) ON CONFLICT (user_id, slot) DO UPDATE SET item_id = excluded.item_id", userId, item.slot, item.id);
   return { ok: true, shop: await shopState(sql, userId) };
 }

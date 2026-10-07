@@ -1,6 +1,7 @@
 import { toSan, type BoardRound, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetStanding, type NetVote } from "@chessroyale/chess";
 import { brilliance } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
+import type { MatchChat } from "./chat.ts";
 
 /**
  * What the screens need from a match, whether it runs in this browser (solo)
@@ -200,6 +201,8 @@ export interface GameView {
   callKing(strike?: boolean): void;
   /** You called the King to play this move. */
   readonly kingCalled: boolean;
+  /** Quick chat (online matches only; see `enabled`). */
+  readonly chat?: MatchChat;
 }
 
 /** Crowd 50 v 50: your team (the side you play all match), if you have one. */

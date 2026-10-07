@@ -7,6 +7,8 @@
  * choice is remembered on the device.
  */
 
+import { QUICK_CHAT } from "@chessroyale/core";
+
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 const samples = new Map<string, AudioBuffer>();
@@ -274,7 +276,8 @@ export type SoundName =
   | "menuSelect"
   | "gavel"
   | "pop"
-  | "popSoft";
+  | "popSoft"
+  | "chat";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -324,6 +327,11 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   // The queue: a pawn pops into its seat (a short soft "pop"), and a bot's, quieter.
   pop: (t) => bubblePop(t, 1),
   popSoft: (t) => bubblePop(t, 0.45),
+  // Quick chat: a team message arrives. A soft, short tick, well under a move's knock.
+  chat: (t) => {
+    clockTick(t, 0.5 * QUICK_CHAT.tickLevel);
+    tap(t + 0.012, 2600, 0.2 * QUICK_CHAT.tickLevel);
+  },
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));

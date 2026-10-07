@@ -23,6 +23,7 @@ import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
 import { RoundProgress } from "./progress.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
+import { MatchChat } from "./chat.ts";
 
 /**
  * A multiplayer match: the lobby server runs the clock and the draw; this
@@ -58,6 +59,15 @@ export class NetMatch implements GameView {
   readonly looks = new Map<string, ItemLook>();
   readonly serverPaced = true;
   private voteState: VoteView | null = null;
+  /** Quick chat (online Crowd matches and boss raids; on once the server opens it). */
+  readonly chat = new MatchChat({
+    code: () => this.code,
+    me: () => this.myId,
+    send: (m) => this.send(m),
+    emit: () => this.emit(),
+    local: (t) => this.local(t),
+    teams: () => !this.boss && this.standingsList.some((s) => !!s.team),
+  });
 
   private ws: WebSocket | null = null;
   private listeners = new Set<() => void>();
@@ -192,6 +202,7 @@ export class NetMatch implements GameView {
 
   dispose() {
     this.closed = true;
+    this.chat.dispose();
     this.progress.reset();
     this.ws?.close();
     this.listeners.clear();
@@ -217,6 +228,7 @@ export class NetMatch implements GameView {
           // Reconnecting from this device won't keep the seat.
         }
         if (this.phase.kind === "loading") this.setPhase({ kind: "lobby" });
+        this.chat.onWelcome();
         return;
       case "error":
         this.error = m.message;
@@ -346,6 +358,12 @@ export class NetMatch implements GameView {
         return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro });
       case "bossRequest":
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo");
+      case "chat":
+        return this.chat.onLine(m.line);
+      case "chatLog":
+        return this.chat.onLog(m.lines, m.packs);
+      case "chatNo":
+        return this.chat.onRefused(m.say, m.reason, m.retryAt);
       case "results":
         if (this.myId) {
           this.placement = m.placements[this.myId] ?? this.placement;

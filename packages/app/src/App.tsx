@@ -33,6 +33,7 @@ import { VoteScreen } from "./screens/Vote.tsx";
 import { BossScreen } from "./screens/Boss.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
+import { ChatBubble } from "./components/QuickChat.tsx";
 
 /** Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). */
 function overridesFromUrl(modeId?: ModeChoiceId): Partial<Settings> {
@@ -480,10 +481,13 @@ export function App() {
   );
   // Computers get the leaderboard as a permanent sidebar during the knockout stages.
   const tower = ["play", "scoring", "reveal", "spectating", "final", "watching", "boss"].includes(match.phase.kind) && match.standings().length > 0;
+  // Quick chat's bubble: the newest message for a moment while no chat is on screen (it lets every tap through).
+  const bubble = <ChatBubble match={match} />;
   if (!tower)
     return (
       <>
         {screen}
+        {bubble}
         {overlay}
       </>
     );
@@ -496,12 +500,13 @@ export function App() {
           return (
             <>
               {v.teamLabel && <div class="tower-team">{v.teamLabel}</div>}
-              <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
+              <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={match.chat?.floats()} />
             </>
           );
         })()}
       </aside>
       {screen}
+      {bubble}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { DEFAULT_SETTINGS, FRONT_DOOR, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, allowedMs, botVotes, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
@@ -19,6 +20,8 @@ import {
   type RoundReport,
   type RunnerSnapshot,
   type LivePick,
+  type ChatRefusal,
+  type NetChatLine,
   type NetVote,
   type ScoreJob,
   type ServerMessage,
@@ -38,6 +41,26 @@ export interface LobbyIO {
   now(): number;
   /** The engine server re-checks the host's close calls (so the host needn't). */
   serverEngine?: boolean;
+  /** Quick chat: a person's pixel icon (kept outside the record: icons are up to 16 KB each). */
+  icon?(playerId: string): string | undefined;
+}
+
+/** Quick chat's state in a lobby. */
+interface ChatRecord {
+  /** Lines said so far (the last QUICK_CHAT.logSize, both teams), to send a player who (re)joins. */
+  n: number;
+  lines: NetChatLine[];
+  /** What each person has sent lately (the limits). */
+  sent: Record<string, ChatSent>;
+  /** The shop items each person's account owns (their chat packs), read when they join. */
+  owned: Record<string, string[]>;
+  /** Whose icons each player has been sent (an icon goes with a sender's first line to each player). */
+  iconTo: Record<string, string[]>;
+  /** Players with chat off (nothing is sent to them), and who each player has muted for the match. */
+  off: Record<string, true>;
+  muted: Record<string, string[]>;
+  /** When the bots' lines are said (to keep them to a few a minute). */
+  bots: number[];
 }
 
 interface Human {
@@ -141,6 +164,8 @@ export interface LobbyRecord {
   feats?: Record<string, { brilliant: number; best: { san: string; score: number } | null }>;
   /** When the match began (after any pre-start show). */
   startedAt?: number;
+  /** Quick chat (Crowd matches and boss raids, once the match has begun). */
+  chat?: ChatRecord;
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"]): LobbyRecord {
@@ -336,6 +361,7 @@ export class LobbyCore {
     const last = this.r.last[playerId];
     if (last) this.io.send(playerId, last);
     if (playerId === this.r.hostId) this.resendHostWork();
+    this.sendChatLog(playerId);
   }
 
   disconnect(playerId: string) {
@@ -420,6 +446,10 @@ export class LobbyCore {
         return;
       case "leave":
         return this.leave(playerId);
+      case "chat":
+        return this.chatSay(playerId, msg.say, msg.to);
+      case "chatPrefs":
+        return this.chatPrefs(playerId, msg.off, msg.muted);
       case "hello":
         return;
     }
@@ -476,6 +506,9 @@ export class LobbyCore {
     this.r.phase = voting ? "vote" : "opening";
     this.r.startedAt = now;
     this.broadcast(this.lobbyMessage(), false);
+    // Quick chat opens with the match (and a bot or two wishes everyone luck).
+    for (const h of this.r.humans) this.sendChatLog(h.id);
+    this.botChat({ kind: "start" });
     if (voting) return this.startVote(0);
     // Boss raid: straight to the boss's intro, which replays the opening from the starting position itself.
     if (this.settings.raid) return this.setTimer("startRound", now + 300);
@@ -968,6 +1001,13 @@ export class LobbyCore {
       return;
     }
     this.r.phase = "reveal";
+    // Crowd: a bot on the team that made a great move may say so.
+    const crowdBoard = this.settings.mode === "crowd" ? report.boards[0] : undefined;
+    const playedLoss = crowdBoard?.result.players.find((p) => p.move === crowdBoard.result.playedMove)?.loss;
+    if (crowdBoard && playedLoss != null) {
+      const bots = new Set(this.r.bots.map((b) => b.id));
+      this.botChat({ kind: "greatMove", loss: playedLoss }, crowdBoard.playerIds.filter((id) => bots.has(id) && runner.player(id).alive));
+    }
     const kingActs = report.boards.some((b) => b.king);
     // The God King's Last Stand plays out in the reveal (the next move's clock starts after it: nobody loses time).
     const stand = report.boards.some((b) => b.lastStand);
@@ -1146,5 +1186,125 @@ export class LobbyCore {
       ...(runner.boss?.result ? { bossResult: runner.boss.result } : {}),
     };
     this.broadcast(msg);
+    this.botChat({ kind: "end" });
+  }
+
+  // ---------------- Quick chat ----------------
+
+  private get chat(): ChatRecord {
+    return (this.r.chat ??= { n: 0, lines: [], sent: {}, owned: {}, iconTo: {}, off: {}, muted: {}, bots: [] });
+  }
+
+  /** Chat is on in Crowd matches (50 v 50, everyone moves) and boss raids, once the match has begun (not in the queue, not Classic). */
+  chatOpen(): boolean {
+    return this.settings.mode === "crowd" && this.r.phase !== "lobby";
+  }
+
+  /** A player's side in a 50 v 50 (null when there are no teams). */
+  private chatSide(id: string): "w" | "b" | null {
+    if (!this.runner || !this.settings.crowdTeams) return null;
+    return this.runner.state.players.find((p) => p.id === id)?.colour ?? null;
+  }
+
+  /** The team a line goes to: the sender's side, or null (everyone) when everyone is one team, as in a boss battle. */
+  private chatTeam(id: string): "w" | "b" | null {
+    return this.runner?.boss ? null : this.chatSide(id);
+  }
+
+  /** Whether a player is sent a line: chat on, sender not muted, and the line to everyone or to their team. */
+  private chatHears(id: string, line: NetChatLine): boolean {
+    const c = this.chat;
+    if (c.off[id]) return false;
+    if (line.from === id) return true;
+    if (c.muted[id]?.includes(line.from)) return false;
+    return line.to === "all" || line.team === null || this.chatSide(id) === line.team;
+  }
+
+  /** The line with its sender's icon, if this player hasn't been sent that icon yet. */
+  private withIcon(to: string, line: NetChatLine): NetChatLine {
+    const icon = this.io.icon?.(line.from);
+    if (!icon) return line;
+    const has = (this.chat.iconTo[to] ??= []);
+    if (has.includes(line.from)) return line;
+    has.push(line.from);
+    return { ...line, icon };
+  }
+
+  /** Quick chat: what this person's account owns (shop item ids), so the packs they bought work. */
+  chatOwned(playerId: string, owned: readonly string[]) {
+    this.chat.owned[playerId] = owned.filter((x) => typeof x === "string").slice(0, 200);
+  }
+
+  /** The recent lines this player can see, and their packs (chat has opened, or they're back). */
+  private sendChatLog(id: string) {
+    if (!this.chatOpen() || !this.human(id)) return;
+    const c = this.chat;
+    c.iconTo[id] = [];
+    const lines = c.lines.filter((l) => this.chatHears(id, l)).slice(-QUICK_CHAT.feedSize);
+    this.io.send(id, { t: "chatLog", lines: lines.map((l) => this.withIcon(id, l)), packs: ownedChatPacks(c.owned[id]) });
+  }
+
+  private chatPost(line: Omit<NetChatLine, "n">) {
+    const c = this.chat;
+    const full: NetChatLine = { n: ++c.n, ...line };
+    c.lines = [...c.lines, full].slice(-QUICK_CHAT.logSize);
+    for (const h of this.r.humans) {
+      // (Someone away gets the recent lines when they're back.)
+      if (h.connected && this.chatHears(h.id, full)) this.io.send(h.id, { t: "chat", line: this.withIcon(h.id, full) });
+    }
+  }
+
+  /**
+   * A person says a line. Only known lines they own, Hello and Sporting lines alone to everyone, within the limits
+   * (one every 3 s, 5 in 30 s, no repeats): anything else is dropped and the sender told why.
+   */
+  private chatSay(playerId: string, say: unknown, to: unknown) {
+    const now = this.io.now();
+    const c = this.chat;
+    const refuse = (reason: ChatRefusal, retryAt = now) => this.io.send(playerId, { t: "chatNo", say: String(say).slice(0, 40), reason, retryAt });
+    if (!this.chatOpen() || !this.human(playerId)) return refuse("closed");
+    if (c.off[playerId]) return refuse("off");
+    const line = chatSay(say);
+    if (!line) return refuse("unknown");
+    if (!canSay(line.id, c.owned[playerId])) return refuse("locked");
+    const toAll = to === "all";
+    if (toAll && !canSayToAll(line.id)) return refuse("team");
+    const sent = c.sent[playerId] ?? noChatSent();
+    const check = chatCheck(sent, line.id, now);
+    if (!check.ok) return refuse(check.limit, check.retryAt);
+    c.sent[playerId] = chatSent(sent, line.id, now);
+    this.chatPost({ from: playerId, say: line.id, to: toAll ? "all" : "team", team: this.chatTeam(playerId), at: now });
+  }
+
+  /** This device's chat choices: chat off, and who it muted for the match (their lines aren't sent to it). */
+  private chatPrefs(playerId: string, off: unknown, muted: unknown) {
+    if (!this.human(playerId)) return;
+    const c = this.chat;
+    const wasOff = !!c.off[playerId];
+    if (off === true) c.off[playerId] = true;
+    else if (off === false) delete c.off[playerId];
+    if (Array.isArray(muted)) {
+      const ids = new Set([...this.r.humans.map((h) => h.id), ...this.r.bots.map((b) => b.id)]);
+      c.muted[playerId] = [...new Set(muted.filter((m): m is string => typeof m === "string" && m !== playerId && ids.has(m)))].slice(0, 100);
+    }
+    // Back on: the lines missed meanwhile.
+    if (wasOff && !c.off[playerId]) this.sendChatLog(playerId);
+  }
+
+  /** Bots chat a little (see botChatLines): their lines are sent now, shown a moment later (`at`). */
+  private botChat(moment: BotChatMoment, from?: string[]) {
+    if (!this.chatOpen() || !this.r.bots.length) return;
+    const c = this.chat;
+    const now = this.io.now();
+    // Their own randomness, so chat never changes how the match plays out.
+    let seed = 0;
+    for (const ch of this.r.code) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
+    const rng = mulberry32((seed ^ Math.imul(this.r.counter + 1, 2654435761) ^ Math.imul(c.n + c.bots.length + 1, 40503)) >>> 0);
+    const lines = botChatLines(rng, moment, from ?? this.r.bots.map((b) => b.id), c.bots, now);
+    for (const l of lines) {
+      const at = now + l.delayMs;
+      c.bots = [...c.bots.filter((t) => t > now - 120_000), at];
+      this.chatPost({ from: l.from, say: l.say, to: l.to, team: this.chatTeam(l.from), at });
+    }
   }
 }

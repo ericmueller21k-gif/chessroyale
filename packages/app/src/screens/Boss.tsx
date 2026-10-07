@@ -6,7 +6,7 @@ import { GodKingPortrait } from "../components/GodKing.tsx";
 import { Board } from "../components/Board.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
-import { MiniTower } from "../components/MiniTower.tsx";
+import { UnderBoard } from "../components/QuickChat.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import type { BossView, GameView } from "../game.ts";
 import { seenKey } from "../hooks.ts";
@@ -220,7 +220,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
           </>
         }
       />
-      <MiniTower match={match} />
+      <UnderBoard match={match} />
     </div>
   );
 }
