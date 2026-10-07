@@ -20,8 +20,8 @@ const TOKEN_CACHE_MS = 10 * 60_000;
 const TOKEN_CACHE_MAX = 50_000;
 const tokens = new Map<string, { userId: string; until: number }>();
 
-function flush(env: Pick<Env, "LIVE">): Promise<unknown> {
-  flushedAt = Date.now();
+function flush(env: Pick<Env, "LIVE">, now: number): Promise<unknown> {
+  flushedAt = now;
   if (!pending.size) return Promise.resolve();
   const ids = [...pending.keys()];
   const at = Math.max(...pending.values());
@@ -34,7 +34,7 @@ export function markSeen(env: Pick<Env, "LIVE">, userId: string, now: number, wa
   pending.set(userId, now);
   const since = now - flushedAt;
   if (since >= CAPACITY.presence.flushMs || pending.size >= 500) {
-    waitUntil(flush(env));
+    waitUntil(flush(env, now));
     return;
   }
   if (flushTimer) return;
@@ -42,7 +42,7 @@ export function markSeen(env: Pick<Env, "LIVE">, userId: string, now: number, wa
   waitUntil(
     new Promise((r) => setTimeout(r, CAPACITY.presence.flushMs - since)).then(() => {
       flushTimer = false;
-      return flush(env);
+      return flush(env, now + (CAPACITY.presence.flushMs - since));
     }),
   );
 }

@@ -162,3 +162,43 @@ export function QueueScreen({ match, onCancel }: { match: NetMatch; onCancel: ()
     </div>
   );
 }
+
+/**
+ * Servers busy (the matchmaker's overload line): no seat yet, so no grid of people. The same header and Cancel as the
+ * queue, with "Servers are busy, you're in line: about N s" (the server's estimate, refreshed every few seconds).
+ */
+export function QueueLine({ raid, waitSeconds, onCancel }: { raid: boolean; waitSeconds: number; onCancel: () => void }) {
+  const size = raid ? 50 : 100;
+  return (
+    <div class={`fd-page fd-queue${raid ? " raid" : ""}`}>
+      <header class="fd-page-head">
+        <BackButton onClick={onCancel} label="Leave the queue" />
+        <h1 class="fd-queue-mode">{raid ? "Boss raid · up to 50" : "Crowd · 50 v 50"}</h1>
+        <span class="fd-queue-mute">
+          <MuteButton />
+        </span>
+      </header>
+      <div class="fd-queue-info">
+        <div class="fd-queue-line fd-queue-busy" role="status" aria-live="polite">
+          Servers are busy, you're in line: about {waitSeconds} s
+        </div>
+      </div>
+      <div class="fd-bar" aria-hidden="true">
+        <i style={{ width: "0%" }} />
+      </div>
+      <div class="fd-queue-panel">
+        <Seats seats={[]} size={size} me={null} hat="none" looks={new Map()} bots={0} />
+        <div class="fd-queue-you">
+          <DressedPawn size="card" look={account().profile?.locker?.look} hat={myHat(account().profile)} />
+          <div>
+            <div class="fd-you-title">You're in line</div>
+            <div class="fd-you-sub">You'll get a seat as soon as one is free</div>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  );
+}
