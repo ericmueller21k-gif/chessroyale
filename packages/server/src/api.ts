@@ -1,5 +1,7 @@
 import { equipLocker, lockerState, openCrate } from "./locker.ts";
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
+import { liveHub, type LiveHub } from "./live-hub.ts";
+import { cachedUserId, forgetToken, markSeen } from "./presence.ts";
 import {
   buyItem,
   cleanEmail,
@@ -37,7 +39,16 @@ export interface AccountEnv {
   EMAIL_FROM?: string;
   /** Seconds a matchmade lobby waits for players before bots fill it (the live line shows it). */
   MATCH_FILL_SECONDS?: string;
+  /** The live hub (live-hub.ts): presence and the live line in memory. Without it, both go through D1 as before. */
+  LIVE?: DurableObjectNamespace<LiveHub>;
 }
+
+/** Keeps background work (presence batches) running after the response: the Worker's or a Durable Object's. */
+export type WaitUntil = (p: Promise<unknown>) => void;
+
+/** How a request marks its account as seen: the live hub's batches where there is one, else D1 (userFromToken's default). */
+export const presenceTouch = (env: AccountEnv, waitUntil?: WaitUntil) =>
+  env.LIVE && waitUntil ? (userId: string) => markSeen(env as Required<Pick<AccountEnv, "LIVE">>, userId, Date.now(), waitUntil) : undefined;
 
 const SECRET_KEYS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY", "EMAIL_FROM"] as const;
 let secretCache: { at: number; values: Partial<Record<(typeof SECRET_KEYS)[number], string>> } | null = null;
@@ -87,11 +98,11 @@ export const SIGN_IN_TO_PLAY = "Sign in to play online. Guests can play solo aga
 const safeNext = (next: string | null) => (next && /^\/(?!\/)[\w\-/]*$/.test(next) ? next : "/");
 
 /** The account behind a request's session cookie (for the lobby server). */
-export async function accountOf(request: Request, env: AccountEnv): Promise<User | null> {
+export async function accountOf(request: Request, env: AccountEnv, waitUntil?: WaitUntil): Promise<User | null> {
   if (!env.DB) return null;
   const sql = d1Sql(env.DB);
   await ensureSchema(sql, env.DB);
-  return userFromToken(sql, readCookie(request, SESSION_COOKIE), Date.now());
+  return userFromToken(sql, readCookie(request, SESSION_COOKIE), Date.now(), presenceTouch(env, waitUntil));
 }
 
 /** The live line's numbers, shared by every request to this Worker instance for a few seconds. */
@@ -100,7 +111,7 @@ let prunedAt = 0;
 const LIVE_CACHE_MS = 3_000;
 
 /** Handles /api/me, /api/results, /api/live, /api/profile/* and /api/auth/*; returns null for other paths. */
-export async function handleAccountApi(request: Request, env: AccountEnv, fetcher: typeof fetch = fetch): Promise<Response | null> {
+export async function handleAccountApi(request: Request, env: AccountEnv, fetcher: typeof fetch = fetch, waitUntil?: WaitUntil): Promise<Response | null> {
   const url = new URL(request.url);
   const path = url.pathname;
   if (
@@ -126,13 +137,21 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // GET /api/live: the live line (online, matches running, in queue, the playing-now list, typical waits). Polled by
   // the front door every few seconds and by matches every 30 s, so it also marks you as online.
   if (path === "/api/live" && request.method === "GET") {
-    await touchSession(sql, token, now);
+    const touch = presenceTouch(env, waitUntil);
+    if (touch) {
+      // The live hub: presence in batches (the session lookup cached), the numbers from its memory.
+      const uid = await cachedUserId(sql, token, now);
+      if (uid) touch(uid);
+    } else await touchSession(sql, token, now);
     if (!liveCache || now - liveCache.at > LIVE_CACHE_MS) {
-      if (now - prunedAt > 10 * 60_000) {
-        prunedAt = now;
-        await pruneLive(sql, now);
+      if (env.LIVE) liveCache = { at: now, body: await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).counts() };
+      else {
+        if (now - prunedAt > 10 * 60_000) {
+          prunedAt = now;
+          await pruneLive(sql, now);
+        }
+        liveCache = { at: now, body: await liveCounts(sql, now) };
       }
-      liveCache = { at: now, body: await liveCounts(sql, now) };
     }
     return json({ ...liveCache.body, fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)) });
   }
@@ -141,10 +160,16 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   const pm = path.match(/^\/api\/profile\/([A-Za-z0-9_-]{1,64})$/);
   if (pm && request.method === "GET") {
     const p = await publicProfile(sql, pm[1]!, now);
-    return p ? json(p) : json({ message: "No such player." }, 404);
+    if (!p) return json({ message: "No such player." }, 404);
+    // Online now, from the live hub (D1's last_seen is written once a minute).
+    if (env.LIVE) {
+      const live = await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).presence(p.id).catch(() => null);
+      if (live?.lastSeen && live.lastSeen > (p.lastSeen ?? 0)) Object.assign(p, { lastSeen: live.lastSeen, online: live.online });
+    }
+    return json(p);
   }
 
-  const current = await userFromToken(sql, token, now);
+  const current = await userFromToken(sql, token, now, presenceTouch(env, waitUntil));
 
   /** Switches the browser to `user` (a new session) and answers with `body` or a redirect. */
   const signInAs = async (user: User, redirect?: string) => {
@@ -219,7 +244,10 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
 
   // POST /api/auth/logout: a fresh guest account on this device.
   if (path === "/api/auth/logout" && request.method === "POST") {
-    if (token) await endSession(sql, token);
+    if (token) {
+      forgetToken(token);
+      await endSession(sql, token);
+    }
     const g = await createGuest(sql, now, "Player");
     return json(await profile(sql, g.user), 200, { "set-cookie": sessionCookie(g.token) });
   }

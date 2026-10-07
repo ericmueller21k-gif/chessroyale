@@ -6,6 +6,7 @@
  * so it can be tested with an in-memory SQLite.
  */
 
+import { countD1 } from "./ops.ts";
 import {
   BOSS_TIERS,
   FRONT_DOOR,
@@ -42,12 +43,15 @@ export interface Sql {
 export function d1Sql(db: D1Database): Sql {
   return {
     async run(sql, ...params) {
+      countD1(sql);
       await db.prepare(sql).bind(...params).run();
     },
     async first(sql, ...params) {
+      countD1(sql);
       return (await db.prepare(sql).bind(...params).first()) as never;
     },
     async all(sql, ...params) {
+      countD1(sql);
       return (await db.prepare(sql).bind(...params).all()).results as never;
     },
   };
@@ -278,11 +282,16 @@ export const getUser = (sql: Sql, id: string) =>
   sql.first<User>("SELECT id, name, icon, email, google_sub, created_at FROM users WHERE id = ?", id);
 
 /** The user a session token belongs to (null if unknown or expired). */
-export async function userFromToken(sql: Sql, token: string | null | undefined, now: number): Promise<User | null> {
+/**
+ * `touch` marks the account as seen: by default a D1 write (at most every 15 s); the Worker passes the live hub's
+ * presence instead (presence.ts), which writes D1 at most once a minute.
+ */
+export async function userFromToken(sql: Sql, token: string | null | undefined, now: number, touch?: (userId: string) => unknown): Promise<User | null> {
   if (!token) return null;
   const s = await sql.first<{ user_id: string; expires_at: number }>("SELECT user_id, expires_at FROM sessions WHERE token_hash = ?", await sha256(token));
   if (!s || s.expires_at < now) return null;
-  await touchUser(sql, s.user_id, now);
+  if (touch) touch(s.user_id);
+  else await touchUser(sql, s.user_id, now);
   return getUser(sql, s.user_id);
 }
 

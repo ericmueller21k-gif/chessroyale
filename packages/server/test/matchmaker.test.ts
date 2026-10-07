@@ -1,60 +1,153 @@
 import { describe, expect, it } from "vitest";
-import { Matchmaker } from "../src/matchmaker.ts";
+import { Matchmaker, type PlayAnswer } from "../src/matchmaker.ts";
 import { openLobbyCode, randomCode } from "../src/codes.ts";
+import { QueueCore, queueName, regionOf, type MatchRules, type QueueConfig } from "../src/queue.ts";
 
 /**
- * "Play now" never hands out a used code: a lobby still open (a match, or its results) refuses to be created again,
- * and the matchmaker tries another code.
+ * "Play now": tickets seated in batches, never a used code, never an overfilled lobby, and a surge past the
+ * admission rate or the overload limit told "busy, you're in line" (DECISIONS.md, "Capacity: built").
  */
 
 /**
  * Lobbies by code. Codes are random, so the first `inUse` codes tried stand for lobbies that are still open (a match,
- * or its results): creating one again is refused.
+ * or its results): creating one again is refused. Each lobby has `size` seats and gives out reservations.
  */
-function lobbies(inUse: number) {
-  const open = new Map<string, { joinable: boolean }>();
+function lobbies(inUse: number, size = 100) {
+  const open = new Map<string, { joinable: boolean; seats: number }>();
   const tried: string[] = [];
+  let calls = 0;
   const ns = {
     idFromName: (name: string) => name,
     get: (code: string) => ({
-      async create(c: string) {
+      async create(c: string, _o: unknown, auto?: { reserve?: number }) {
+        calls++;
         tried.push(c);
         if (tried.length <= inUse || open.has(c)) return false;
-        open.set(c, { joinable: true });
-        return true;
+        const give = Math.min(auto?.reserve ?? 0, size);
+        open.set(c, { joinable: true, seats: give });
+        return auto?.reserve ? give : true;
       },
       async joinable() {
         return open.get(code)?.joinable ?? false;
       },
+      async reserve(n: number) {
+        calls++;
+        const l = open.get(code);
+        if (!l?.joinable) return 0;
+        const give = Math.min(n, size - l.seats);
+        l.seats += give;
+        return give;
+      },
     }),
   };
-  return { open, tried, ns };
+  return { open, tried, ns, calls: () => calls };
 }
 
-function matchmaker(ns: unknown) {
+class TestMatchmaker extends Matchmaker {
+  constructor(ctx: DurableObjectState, env: never, q?: QueueCore, rules?: MatchRules) {
+    super(ctx, env);
+    this.holdMs = 60;
+    if (q) this.q = q;
+    if (rules) this.rules = rules;
+  }
+}
+
+function matchmaker(ns: unknown, opts: { q?: QueueCore; players?: number; rules?: MatchRules } = {}) {
   const store = new Map<string, unknown>();
   const ctx = {
     storage: { get: async (k: string) => store.get(k), put: async (k: string, v: unknown) => void store.set(k, v) },
     blockConcurrencyWhile: <T>(fn: () => Promise<T>) => fn(),
   };
-  return new Matchmaker(ctx as unknown as DurableObjectState, { LOBBIES: ns } as never);
+  const live = opts.players === undefined ? undefined : { idFromName: () => "g", get: () => ({ players: async () => opts.players }) };
+  return new TestMatchmaker(ctx as unknown as DurableObjectState, { LOBBIES: ns, LIVE: live } as never, opts.q, opts.rules);
 }
+
+const codeOf = (a: PlayAnswer) => ("code" in a ? a.code : null);
+const cfg = (patch: Partial<QueueConfig> = {}): QueueConfig => ({ admitPerSecond: 300, admitBurst: 600, ticketTtlMs: 15_000, placedKeepMs: 60_000, retryMs: 3_000, maxPlayers: 20_000, ...patch });
 
 describe("matchmaker", () => {
   it("never hands out a code whose lobby is still open: it tries another", async () => {
     const L = lobbies(2);
     const mm = matchmaker(L.ns);
-    const { code } = await mm.next({}, 60_000);
+    const code = codeOf(await mm.next({}, 60_000))!;
     expect(L.tried).toHaveLength(3);
     expect(code).toBe(L.tried[2]);
-    expect(L.open.get(code)).toEqual({ joinable: true });
+    expect(L.open.get(code)).toMatchObject({ joinable: true, seats: 1 });
     // The next player joins the same lobby while it fills.
-    expect((await mm.next({}, 60_000)).code).toBe(code);
+    expect(codeOf(await mm.next({}, 60_000))).toBe(code);
     expect(L.tried).toHaveLength(3);
     // Once it can't take more, the next player gets a new lobby (never the old code).
     L.open.get(code)!.joinable = false;
-    const next = (await mm.next({}, 60_000)).code;
+    const next = codeOf(await mm.next({}, 60_000));
     expect(next).not.toBe(code);
+  });
+
+  it("a surge of 250 at once: seated in batches, 100 a lobby, never more, a handful of calls", async () => {
+    const L = lobbies(0);
+    const mm = matchmaker(L.ns);
+    const answers = await Promise.all(Array.from({ length: 250 }, () => mm.next({}, 60_000)));
+    const per = new Map<string, number>();
+    for (const a of answers) per.set(codeOf(a)!, (per.get(codeOf(a)!) ?? 0) + 1);
+    expect([...per.values()].sort((a, b) => b - a)).toEqual([100, 100, 50]);
+    for (const [code, n] of per) expect(L.open.get(code)!.seats).toBe(n);
+    // One call for the first player's lobby, then a few per batch: not one (or two) per player.
+    expect(L.calls()).toBeLessThan(15);
+  });
+
+  it("a seat freed in the filling lobby (someone cancelled) goes to the next player", async () => {
+    const L = lobbies(0, 3);
+    const mm = matchmaker(L.ns);
+    const first = await Promise.all([mm.next({}, 60_000), mm.next({}, 60_000), mm.next({}, 60_000)]);
+    const code = codeOf(first[0]!)!;
+    expect(first.every((a) => codeOf(a) === code)).toBe(true);
+    L.open.get(code)!.seats--;
+    expect(codeOf(await mm.next({}, 60_000))).toBe(code);
+    expect(codeOf(await mm.next({}, 60_000))).not.toBe(code);
+  });
+
+  it("past the admission rate: busy, in line with a ticket, about N s; asking again keeps the place, then a seat", async () => {
+    const L = lobbies(0);
+    const q = new QueueCore(cfg({ admitPerSecond: 0.001, admitBurst: 2 }), Date.now());
+    const mm = matchmaker(L.ns, { q });
+    const answers = await Promise.all(Array.from({ length: 5 }, () => mm.next({}, 60_000)));
+    const seated = answers.filter((a) => "code" in a);
+    const busy = answers.filter((a): a is Extract<PlayAnswer, { busy: true }> => "busy" in a);
+    expect(seated).toHaveLength(2);
+    expect(busy).toHaveLength(3);
+    expect(busy.map((b) => b.position).sort()).toEqual([1, 2, 3]);
+    for (const b of busy) {
+      expect(b.message).toBe(`Servers are busy, you're in line: about ${b.waitSeconds} s`);
+      expect(b.waitSeconds).toBeGreaterThanOrEqual(5);
+      expect(b.retryMs).toBeGreaterThan(0);
+    }
+    // Asking again with the ticket keeps the place in line.
+    const again = await mm.next({}, 60_000, busy[2]!.ticket);
+    expect("busy" in again && again.ticket).toBe(busy[2]!.ticket);
+  });
+
+  it("past the overload limit: nobody new is let in until people finish; players already seated are unaffected", async () => {
+    const L = lobbies(0);
+    const full = matchmaker(L.ns, { players: 20_000 });
+    const a = await full.next({}, 60_000);
+    expect("busy" in a && a.busy).toBe(true);
+    expect(L.calls()).toBe(0);
+    const fine = matchmaker(L.ns, { players: 19_000 });
+    expect(codeOf(await fine.next({}, 60_000))).toMatch(/^[A-Z2-9]{5}$/);
+  });
+
+  it("matching rules (ranked's hook): groups never share a lobby; tickets left out wait", async () => {
+    const L = lobbies(0);
+    const rules: MatchRules = {
+      group: (tickets) => [
+        { key: "low", tickets: tickets.filter((t) => (t.info?.skill as number) < 1500) },
+        { key: "high", tickets: tickets.filter((t) => (t.info?.skill as number) >= 1500 && (t.info?.skill as number) < 2500) },
+      ],
+    };
+    const mm = matchmaker(L.ns, { rules });
+    const [a, b, c, d] = await Promise.all([1200, 1800, 1300, 2600].map((skill) => mm.next({}, 60_000, null, { skill })));
+    expect(codeOf(a!)).toBe(codeOf(c!));
+    expect(codeOf(b!)).not.toBe(codeOf(a!));
+    expect("busy" in d!).toBe(true);
   });
 
   it("openLobbyCode: skips codes in use, gives up after its tries", async () => {
@@ -69,5 +162,60 @@ describe("matchmaker", () => {
     expect(await openLobbyCode(create, 3, () => codes[i++]!)).toBeNull();
     expect(made).toEqual(["CCCCC"]);
     expect(randomCode()).toMatch(/^[A-HJKMNP-Z2-9]{5}$/);
+  });
+});
+
+describe("the queue (pure)", () => {
+  it("admits at the rate, oldest first; the rest keep their places and are told about how long", () => {
+    let now = 0;
+    let n = 0;
+    const q = new QueueCore(cfg({ admitPerSecond: 10, admitBurst: 10 }), now, () => `t${++n}`);
+    const ts = Array.from({ length: 25 }, () => q.enqueue(null, now));
+    expect(q.admit(now, 0)[0]!.tickets.map((t) => t.id)).toEqual(ts.slice(0, 10).map((t) => t.id));
+    expect(q.position("t11")).toBe(1);
+    expect(q.estimateSeconds("t25", now, 0)).toBe(5); // 15th in line at 10 a second: 1.5 s, shown as about 5
+    now += 500;
+    expect(q.admit(now, 0)[0]!.tickets).toHaveLength(5);
+    // Asking again keeps the place.
+    expect(q.enqueue("t16", now).id).toBe("t16");
+    expect(q.position("t16")).toBe(1);
+  });
+
+  it("a ticket nobody asks about expires; a placed one is remembered for a retry", () => {
+    let now = 0;
+    let n = 0;
+    const q = new QueueCore(cfg({ admitPerSecond: 1, admitBurst: 1, ticketTtlMs: 10_000 }), now, () => `t${++n}`);
+    q.enqueue(null, now);
+    q.enqueue(null, now);
+    const [g] = q.admit(now, 0);
+    q.place(g!.tickets, "ABCDE", now);
+    expect(q.placedIn("t1")).toBe("ABCDE");
+    now += 11_000;
+    expect(q.admit(now, 0)).toEqual([]);
+    expect(q.waiting).toBe(0);
+    expect(q.placedIn("t1")).toBe("ABCDE");
+    now += 60_000;
+    q.expire(now);
+    expect(q.placedIn("t1")).toBeUndefined();
+  });
+
+  it("at the player cap nobody is admitted; the estimate follows how fast people actually got in", () => {
+    let n = 0;
+    const q = new QueueCore(cfg({ maxPlayers: 100 }), 0, () => `t${++n}`);
+    for (let i = 0; i < 30; i++) q.enqueue(null, 0);
+    expect(q.admit(0, 95)[0]!.tickets).toHaveLength(5);
+    expect(q.admit(1, 100)).toEqual([]);
+    // 5 got in during the last minute: 25th in line → about 300 s.
+    expect(q.estimateSeconds("t30", 2, 100)).toBe(300);
+  });
+
+  it("queue names: per mode, a test pool, and a region only when that's on", () => {
+    expect(queueName("crowd", null, null)).toBe("crowd-unranked");
+    expect(queueName("raid", "e2e-a", null)).toBe("raid-unranked-e2e-a");
+    expect(queueName("crowd", "Bad Pool!", null)).toBe("crowd-unranked");
+    expect(regionOf({ continent: "EU" })).toBeNull();
+    expect(regionOf({ continent: "EU" }, true)).toBe("EU");
+    expect(queueName("crowd", null, regionOf({ continent: "EU" }, true))).toBe("crowd-unranked@EU");
+    expect(regionOf({ continent: "XX" }, true)).toBeNull();
   });
 });

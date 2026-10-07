@@ -309,6 +309,11 @@ export class LobbyCore {
     return this.r.phase === "lobby" && !!this.r.auto && !this.r.auto.filledAt && this.r.humans.length < this.settings.lobbySize && this.io.now() < this.r.auto.fillAt - 2000;
   }
 
+  /** Matchmaking: seats still free for new players (0 once it no longer takes players). */
+  seatsLeft(): number {
+    return this.joinable() ? this.settings.lobbySize - this.r.humans.length : 0;
+  }
+
   private standings(): NetStanding[] {
     const looks = new Map(this.r.humans.flatMap((h) => (h.look && Object.keys(h.look).length ? [[h.id, h.look] as const] : [])));
     // A person's account, so a tap on their name opens their profile.

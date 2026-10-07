@@ -6,8 +6,10 @@ import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired, withSecrets } f
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
+import { countCall } from "./ops.ts";
+import { liveHub } from "./live-hub.ts";
 import { serverRecheck, warmEngine } from "./engine.ts";
-import { DEFAULT_SETTINGS } from "@chessroyale/core";
+import { CAPACITY, DEFAULT_SETTINGS } from "@chessroyale/core";
 
 const library = openings as unknown as Opening[];
 
@@ -29,12 +31,30 @@ export class Lobby extends DurableObject<Env> {
   private reported: { key: string; at: number } | null = null;
   /** Quick chat: each person's pixel icon (stored apart from the lobby record, as "icon:<player id>"). */
   private icons = new Map<string, string>();
+  /**
+   * Each person's last phase message (the record's `last`, re-sent on reconnect) as last stored, as "last:<player id>".
+   * Stored apart from the record, and only when it changes: with 100 people they are 96% of the record (2.4 MB), and
+   * the record is stored after every message. See DECISIONS.md, "Capacity: built".
+   */
+  private lastStored = new Map<string, unknown>();
+  /** Matchmaking: seats promised to players on their way (expiry times), so a surge never overfills the lobby. */
+  private reservations: number[] = [];
+  /** A live-line report held back by the 2 s limit is on its way. */
+  private reportQueued = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
       this.record = (await ctx.storage.get<LobbyRecord>("lobby")) ?? null;
       for (const [key, icon] of await ctx.storage.list<string>({ prefix: "icon:" })) this.icons.set(key.slice(5), icon);
+      if (this.record) {
+        this.record.last ??= {};
+        for (const [key, msg] of await ctx.storage.list<LobbyRecord["last"][string]>({ prefix: "last:" })) {
+          const id = key.slice(5);
+          this.record.last[id] ??= msg;
+          this.lastStored.set(id, this.record.last[id]);
+        }
+      }
     });
   }
 
@@ -109,7 +129,7 @@ export class Lobby extends DurableObject<Env> {
   private async persist(core: LobbyCore, closing?: WebSocket) {
     this.record = core.save();
     await this.saveResults(core, this.record);
-    await this.ctx.storage.put("lobby", this.record);
+    await this.store(this.record);
     // The alarm: the match's next event, or when the lobby closes, whichever comes first.
     const close = lobbyClosing(this.record, this.connectedNow(closing));
     const times = [core.nextAlarm, close?.at].filter((t): t is number => typeof t === "number");
@@ -117,6 +137,30 @@ export class Lobby extends DurableObject<Env> {
     else await this.ctx.storage.deleteAlarm();
     // The live line hears about it in the background (it never holds up the match).
     void this.reportLive(core).catch(() => undefined);
+  }
+
+  /**
+   * Stores the record: everything but `last` under "lobby", and each person's last message under "last:<id>" only when
+   * it changed (most messages change none: a pick, a vote, a chat line).
+   */
+  private async store(rec: LobbyRecord) {
+    const { last, ...rest } = rec;
+    const changed: Record<string, unknown> = {};
+    for (const [id, msg] of Object.entries(last ?? {})) {
+      if (this.lastStored.get(id) === msg) continue;
+      changed[`last:${id}`] = msg;
+      this.lastStored.set(id, msg);
+    }
+    const gone = [...this.lastStored.keys()].filter((id) => !(last && id in last));
+    for (const id of gone) this.lastStored.delete(id);
+    await this.ctx.storage.put("lobby", { ...rest, last: {} });
+    const keys = Object.keys(changed);
+    for (let i = 0; i < keys.length; i += 100) await this.ctx.storage.put(Object.fromEntries(keys.slice(i, i + 100).map((k) => [k, changed[k]])));
+    if (gone.length) await this.ctx.storage.delete(gone.map((id) => `last:${id}`));
+    if (this.env.OPS_STATS) {
+      countCall("lobby.persist");
+      countCall("lobby.persistBytes", JSON.stringify(rest).length + keys.reduce((n, k) => n + JSON.stringify(changed[k]).length, 0));
+    }
   }
 
   /** Closes the lobby now if its time has come (its alarm hasn't run yet, or it's from before lobbies closed). */
@@ -142,7 +186,8 @@ export class Lobby extends DurableObject<Env> {
         try {
           await ensureSchema(sql, this.env.DB);
           await this.saveResults(this.core(rec.code), rec);
-          await forgetLobby(sql, rec.code);
+          if (this.env.LIVE) await liveHub(this.env).forget(rec.code);
+          else await forgetLobby(sql, rec.code);
         } catch (e) {
           console.log(`lobby ${rec.code}: closing without D1 (${String(e)})`);
         }
@@ -158,6 +203,8 @@ export class Lobby extends DurableObject<Env> {
       }
       this.record = null;
       this.icons.clear();
+      this.lastStored.clear();
+      this.reservations = [];
       this.reported = null;
       await this.ctx.storage.deleteAlarm();
       await this.ctx.storage.deleteAll();
@@ -169,7 +216,10 @@ export class Lobby extends DurableObject<Env> {
     return this.record?.overrides?.raid ? "boss" : this.record?.overrides?.mode === "crowd" ? "crowd" : "classic";
   }
 
-  /** Tells the live line (D1) about this lobby when something it shows changed, or a minute has passed. */
+  /**
+   * Tells the live line about this lobby when something it shows changed, or a minute has passed: the live hub (at
+   * most every CAPACITY.presence.lobbyReportMs, the latest state following when that's up), or D1 without one.
+   */
   private async reportLive(core: LobbyCore) {
     const rec = this.record;
     if (!rec || !this.env.DB) return;
@@ -180,10 +230,26 @@ export class Lobby extends DurableObject<Env> {
     const waitDue = rec.auto?.filledAt && !rec.auto.waitSaved;
     if (!waitDue && this.reported?.key === key && (s.phase === "over" || now - this.reported.at < 60_000)) return;
     if (s.phase === "waiting" && kind === "private" && !this.reported) return;
+    const gap = CAPACITY.presence.lobbyReportMs;
+    if (this.env.LIVE && this.reported && now - this.reported.at < gap && s.phase !== "over" && !waitDue) {
+      // Too soon after the last: the state as it is then follows (the object stays up for it).
+      if (!this.reportQueued) {
+        this.reportQueued = true;
+        this.ctx.waitUntil(
+          new Promise((r) => setTimeout(r, gap - (now - this.reported!.at))).then(() => {
+            this.reportQueued = false;
+            if (this.record) return this.reportLive(this.core(this.record.code)).catch(() => undefined);
+          }),
+        );
+      }
+      return;
+    }
     this.reported = { key, at: now };
+    countCall("live.report");
     const sql = d1Sql(this.env.DB);
     await ensureSchema(sql, this.env.DB);
-    await reportLobby(sql, { code: rec.code, mode: this.mode(), kind, ...s }, now);
+    if (this.env.LIVE) await liveHub(this.env).report({ code: rec.code, mode: this.mode(), kind, ...s });
+    else await reportLobby(sql, { code: rec.code, mode: this.mode(), kind, ...s }, now);
     if (waitDue && rec.auto) {
       rec.auto.waitSaved = true;
       await this.ctx.storage.put("lobby", rec);
@@ -207,15 +273,19 @@ export class Lobby extends DurableObject<Env> {
    * A new lobby under this code: false if the code is in use (a lobby that hasn't closed), so the caller tries
    * another. `keepMs`: how long its results stay up (playtests).
    */
-  async create(code: string, overrides?: LobbyRecord["overrides"], auto?: { fillAt: number }, keepMs?: number): Promise<boolean> {
+  async create(code: string, overrides?: LobbyRecord["overrides"], auto?: { fillAt: number; reserve?: number; reserveMs?: number }, keepMs?: number): Promise<boolean | number> {
     if (this.record && !(await this.closeIfDue())) return false;
     this.record = newLobbyRecord(code, Date.now(), overrides);
+    this.lastStored.clear();
+    this.reservations = [];
     if (keepMs) this.record.keepMs = keepMs;
     const core = this.core(code);
     // Matchmade: it starts by itself at fillAt (or when full).
     if (auto) core.setAuto(auto.fillAt);
     // (Stored with its alarm: the fill time, or when it closes if nobody ever starts it.)
     await this.persist(core);
+    // Matchmaking in batches: seats for the players on their way (how many it could give).
+    if (auto?.reserve) return this.reserveSeats(core, auto.reserve, auto.reserveMs ?? CAPACITY.queue.reservationMs);
     return true;
   }
 
@@ -225,13 +295,30 @@ export class Lobby extends DurableObject<Env> {
     return this.core(this.record.code).joinable();
   }
 
+  /**
+   * Matchmaking: up to `n` seats for players on their way (each held `ms` for them to connect); how many it gave.
+   * None once it no longer takes players.
+   */
+  async reserve(n: number, ms: number): Promise<number> {
+    if (!this.record || (await this.closeIfDue())) return 0;
+    return this.reserveSeats(this.core(this.record.code), n, ms);
+  }
+
+  private reserveSeats(core: LobbyCore, n: number, ms: number): number {
+    const now = Date.now();
+    this.reservations = this.reservations.filter((t) => t > now);
+    const give = Math.max(0, Math.min(n, core.seatsLeft() - this.reservations.length));
+    for (let i = 0; i < give; i++) this.reservations.push(now + ms);
+    return give;
+  }
+
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 });
     if (!this.record || (await this.closeIfDue())) return new Response("No such lobby", { status: 404 });
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     // The player id is attached to the socket after "hello"; the account (from the session cookie) now.
-    const account = await accountOf(request, this.env).catch(() => null);
+    const account = await accountOf(request, this.env, (p) => this.ctx.waitUntil(p)).catch(() => null);
     this.ctx.acceptWebSocket(server);
     // Online play needs a signed-in account (once sign-in is set up); a guest is told so on "hello".
     const guest = !!this.env.DB && signInRequired(await withSecrets(this.env)) && !isSignedIn(account);
@@ -266,7 +353,10 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, "Sign in to play online");
         return;
       }
+      const before = this.record.humans.length;
       const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null, msg.look, attached?.userId);
+      // A new player took a seat: one held for the players on their way is theirs (the oldest).
+      if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {
         ws.send(JSON.stringify({ t: "error", message: result.message, ...("ended" in result ? { ended: true } : {}), now: Date.now() }));
         ws.close(1008, result.message);

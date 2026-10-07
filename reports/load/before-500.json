@@ -1,0 +1,183 @@
+{
+  "base": "http://localhost:8787",
+  "players": 500,
+  "rampS": 20,
+  "opts": {
+    "base": "http://localhost:8787",
+    "mode": "crowd",
+    "pool": "loadmuyot0ln",
+    "homeDwellMs": 5000,
+    "chatChance": 0.1,
+    "maxSessionMs": 200000,
+    "heartbeatMs": 30000
+  },
+  "generatorCpuMax": 0.4612991706640813,
+  "minutes": 3.960183333333333,
+  "startedAt": 1791412594763,
+  "seconds": 237.687,
+  "timings": {
+    "http me": {
+      "n": 500,
+      "p50": 860.4137329999994,
+      "p90": 6836.780019,
+      "p99": 7793.087224000001,
+      "max": 7988.990610000001,
+      "mean": 2679.00505816
+    },
+    "server me": {
+      "n": 500,
+      "p50": 302,
+      "p90": 1645,
+      "p99": 1651,
+      "max": 1653,
+      "mean": 647.126
+    },
+    "http live": {
+      "n": 785,
+      "p50": 764.6768020000009,
+      "p90": 6631.865321999998,
+      "p99": 9010.601563000004,
+      "max": 9463.258729999998,
+      "mean": 1728.4769902866244
+    },
+    "server live": {
+      "n": 785,
+      "p50": 123,
+      "p90": 1317,
+      "p99": 1329,
+      "max": 1351,
+      "mean": 368.84585987261147
+    },
+    "http play": {
+      "n": 500,
+      "p50": 1256.9536989999979,
+      "p90": 3802.112105,
+      "p99": 8075.7706910000015,
+      "max": 9086.466281000005,
+      "mean": 1670.919551886
+    },
+    "server play": {
+      "n": 496,
+      "p50": 122,
+      "p90": 734,
+      "p99": 1314,
+      "max": 1550,
+      "mean": 285.1350806451613
+    },
+    "playToCode": {
+      "n": 496,
+      "p50": 1264.823798999998,
+      "p90": 3802.1672419999995,
+      "p99": 8075.813239000003,
+      "max": 9086.509127999998,
+      "mean": 1682.130564947582
+    },
+    "wsOpen": {
+      "n": 1431,
+      "p50": 1980.3447639999977,
+      "p90": 3697.5153190000274,
+      "p99": 6875.211969000004,
+      "max": 8899.747655999996,
+      "mean": 1939.6338717016101
+    },
+    "playToLobby": {
+      "n": 373,
+      "p50": 2707.2423099999996,
+      "p90": 9998.637788999997,
+      "p99": 11330.286431999997,
+      "max": 11505.793658999999,
+      "mean": 3801.132994453083
+    },
+    "queueWait": {
+      "n": 373,
+      "p50": 7644,
+      "p90": 58598,
+      "p99": 58709,
+      "max": 58713,
+      "mean": 16033.565683646113
+    },
+    "http heartbeat": {
+      "n": 2238,
+      "p50": 373.2019849999924,
+      "p90": 6781.652283000003,
+      "p99": 11624.172366999992,
+      "max": 12329.117136999994,
+      "mean": 1954.3639790138498
+    },
+    "server heartbeat": {
+      "n": 2238,
+      "p50": 25,
+      "p90": 320,
+      "p99": 459,
+      "max": 7569,
+      "mean": 90.50268096514745
+    },
+    "pickRtt": {
+      "n": 1644,
+      "p50": 194.66511300002458,
+      "p90": 2495.7811109999893,
+      "p99": 4510.452249000009,
+      "max": 6083.411962999999,
+      "mean": 640.9759012493922
+    },
+    "chatRtt": {
+      "n": 170,
+      "p50": 277.9462000000058,
+      "p90": 4247.119824000023,
+      "p99": 7141.721263000014,
+      "max": 8604.484907999999,
+      "mean": 1064.6376800294117
+    }
+  },
+  "counts": {
+    "msgsOut": 4379,
+    "msgsIn": 432138,
+    "end error": 123,
+    "playersFailed": 4,
+    "hostScores": 208,
+    "wsDropped": 1018,
+    "end timeUp": 373
+  },
+  "errors": {
+    "lobby error: This match has already started.": 123,
+    "play 500 ": 4,
+    "ws error WebSocket was closed before the connection was established": 4
+  },
+  "server": {
+    "since": 0,
+    "d1": {
+      "CREATE schema": 21,
+      "ALTER schema": 1,
+      "PRAGMA schema": 2,
+      "INSERT live_lobbies": 197,
+      "SELECT sessions": 266,
+      "UPDATE users": 266,
+      "SELECT users": 455,
+      "SELECT inventory": 189,
+      "SELECT equipped": 189,
+      "SELECT wallets": 189,
+      "SELECT chat_picks": 189,
+      "DELETE live_lobbies": 1,
+      "DELETE queue_waits": 1,
+      "SELECT live_lobbies": 146,
+      "SELECT queue_waits": 146
+    },
+    "d1Reads": 1771,
+    "d1Writes": 487,
+    "routes": {
+      "GET /api/lobby/:code/ws": {
+        "n": 193,
+        "ms": 93919
+      },
+      "GET /api/live": {
+        "n": 73,
+        "ms": 28308
+      }
+    },
+    "calls": {
+      "lobby.persist": 533,
+      "lobby.persistBytes": 1309379385,
+      "live.report": 197
+    }
+  }
+}
