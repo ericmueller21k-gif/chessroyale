@@ -5,8 +5,8 @@ import { LeaderboardSheet } from "./LeaderboardSheet.tsx";
 import { RaceTower } from "./RaceTower.tsx";
 import { pickRows } from "../pick-rows.ts";
 import type { ChatFloat } from "../chat.ts";
+import { foldUnderBoard, onPrefsChange, underBoardView } from "../prefs.ts";
 
-const KEY = "brc.miniTower";
 const ROW = 22;
 const HEAD = 18;
 
@@ -25,11 +25,13 @@ function towerHeight(keep: Set<number>, cutoff: number, n: number): number {
  * The phone's scoreboard under the board. It never scrolls: it shows as many
  * players as fit (you, the leaders, your neighbours and the cut line first),
  * with position, name, points, average, rating and power-ups. Tap it for the
- * full leaderboard; the header's arrow minimises it (remembered on the device).
+ * full leaderboard; the header's arrow folds it to that header (the space under the board's one remembered view,
+ * prefs.ts: underBoardView).
  *
- * With quick chat on, it shares the space under the board with chat (components/QuickChat.tsx, UnderBoard), which
- * passes `narrow` (place, name and points only, side by side with chat), `head` (its split buttons and the unread
- * count), `open` (it minimises both together) and `floats` (emoji just sent, floating above their senders' rows, or from the header when the row isn't shown).
+ * It's placed by the space under the board (components/QuickChat.tsx, UnderBoard), which passes `open` (that view's)
+ * and `head` (the fold arrow; with chat, the split buttons and the unread count too), and with chat beside it
+ * `narrow` (place, name and points only) and `floats` (emoji just sent, floating above their senders' rows, or from
+ * the header when the row isn't shown).
  */
 export function MiniTower({
   match,
@@ -44,14 +46,10 @@ export function MiniTower({
   open?: boolean;
   floats?: ReadonlyMap<string, ChatFloat>;
 }) {
-  const [openOwn, setOpen] = useState(() => {
-    try {
-      return localStorage.getItem(KEY) !== "0";
-    } catch {
-      return true;
-    }
-  });
-  const open = openProp ?? openOwn;
+  // (Without `open` from its place, the space under the board's view, kept in step.)
+  const [own, setOwn] = useState(() => underBoardView().open);
+  useEffect(() => (openProp === undefined ? onPrefsChange(() => setOwn(underBoardView().open)) : undefined), [openProp === undefined]);
+  const open = openProp ?? own;
   const [sheet, setSheet] = useState(false);
   const [space, setSpace] = useState(0);
   const body = useRef<HTMLDivElement>(null);
@@ -74,12 +72,7 @@ export function MiniTower({
 
   const toggle = (e: Event) => {
     e.stopPropagation();
-    setOpen(!open);
-    try {
-      localStorage.setItem(KEY, open ? "0" : "1");
-    } catch {
-      // Not important.
-    }
+    foldUnderBoard(!open);
   };
 
   return (
