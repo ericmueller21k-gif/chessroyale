@@ -2153,8 +2153,10 @@ ranking can't change". The `hub` delegate's calls:
 - **In words:** the queue says "Unranked: more than 25% bots" once the bots are in (Solo: "Unranked: solo games don't
   count for ranking"), the results say why the match didn't change your ranking, and a profile's recent matches say
   "unranked".
-- **With today's numbers almost no match is ranked:** it needs 75 people in a 50 v 50. The ranked draft suggests a
-  minimum of 30 people in 100 instead. That's Eric's call when ranked is built; it's one setting.
+- **With today's numbers almost no match is ranked:** it needs 75 people in a 50 v 50.
+- **Open question for Eric:** his rule (more than 25% bots and your ranking can't change) stands as built. The ranked
+  draft ("Ranked, ratings and matchmaking") says a ranked match needs a minimum of 30 real players in 100 instead.
+  Eric is deciding; either way it's one setting (`RANKING.rankedMaxBotShare`).
 
 **Back in from a fresh start** (the brief's item 7)
 - **Remembered:** the match you're seated in (`brc.current`). It's set when you join a lobby, and forgotten when you
