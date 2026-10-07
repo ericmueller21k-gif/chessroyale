@@ -43,6 +43,11 @@ export function gameEnd(startFen: string, uciHistory: readonly string[]): GameEn
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+/** The move number in a position ("Move 6" on the top bar: White's and Black's moves share one), from its FEN. */
+export function moveNumber(fen: string): number {
+  return Number(fen.split(" ")[5]) || 1;
+}
+
 /** Replays SAN moves from the start position; returns UCI moves. */
 export function sanLineToUci(sans: readonly string[]): string[] {
   const chess = new Chess();

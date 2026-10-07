@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_TIERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteMoves, voteOptionOf, type Settings } from "@chessroyale/core";
-import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
+import { BOSS_TIERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, VARIABLE_CLOCK, type Settings } from "@chessroyale/core";
+import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
   let h = 2166136261;
@@ -313,15 +313,45 @@ describe("Crowd mode", () => {
     }
   });
 
-  it("pre-game votes: pawn pushes into three zones, most votes wins, ties drawn, none gives the default", () => {
-    expect(voteMoves("w", 0)).toEqual(["b2b4", "c2c4"]);
-    expect(voteMoves("b", 2)).toEqual(["f7f5", "g7g5"]);
-    expect(voteOptionOf("d2d4")).toBe(1);
-    expect(voteOptionOf("e7e5")).toBe(1);
-    expect(voteOptionOf("g2g4")).toBe(2);
-    expect(voteOptionOf("a2a4")).toBeNull();
-    expect(voteOptionOf("e2e3")).toBeNull();
-    for (const move of [...voteMoves("w", 0), ...voteMoves("w", 1), ...voteMoves("w", 2)]) expect(legalMoves(START_FEN)).toContain(move);
+  it("the Variable speed: each move's clock follows the move number, bots think within it, and the boss battle counts on", async () => {
+    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4, moveClockSteps: VARIABLE_CLOCK };
+    const runner = new MatchRunner({
+      settings,
+      rng: mulberry32(11),
+      engines: [fake],
+      library,
+      entrants: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 1 + (i % 20) })),
+    });
+    const seen = new Map<number, number>();
+    while (!runner.isFinal()) {
+      runner.deal();
+      const move = moveNumber(runner.boards.get(runner.state.boards[0]!)!.fen);
+      const clock = runner.moveClock();
+      seen.set(move, clock);
+      expect(runner.allowedMsFor([...runner.groups.values()][0]![0]!)).toBe(clock * 1000);
+      // Bots spread out within 85% of this move's clock (on 10 s: 2 to 8.5 s, never piling up on the buzzer).
+      const think = Object.values(runner.botThinkTimes());
+      expect(Math.max(...think)).toBeLessThanOrEqual(0.85 * clock * 1000 + 1);
+      await runner.score(new Map());
+      if (runner.stageComplete()) runner.endStage();
+    }
+    // The knockouts end after move 20 (40 plies).
+    expect([1, 5, 6, 10, 11, 15, 16, 20].map((m) => seen.get(m))).toEqual([10, 10, 15, 15, 20, 20, 25, 25]);
+    // The boss battle goes back to a position from moves 5-12, but its clock counts on from where the game was: 30 s.
+    expect(runner.boss!.clockFromMove).toBe(21);
+    runner.deal();
+    expect(runner.clockMove()).toBe(21);
+    expect(runner.moveClock()).toBe(30);
+  });
+
+  it("pre-game votes: three zones on b-c, d-e and f-g, ranks 4-5; most votes wins, ties drawn, none gives the default", () => {
+    // Points in squares from White's side (x across, y up): the middle of d4 is (3.5, 3.5).
+    expect(voteZoneAt({ x: 1.5, y: 3.5 })).toBe(0);
+    expect(voteZoneAt({ x: 4.5, y: 4.5 })).toBe(1);
+    expect(voteZoneAt({ x: 6.2, y: 3.1 })).toBe(2);
+    expect(voteZoneAt({ x: 0.5, y: 3.5 })).toBeNull(); // the a-file
+    expect(voteZoneAt({ x: 3.5, y: 2.5 })).toBeNull(); // rank 3
+    expect(voteZoneAt({ x: 7.5, y: 4.5 })).toBeNull(); // the h-file
     const rng = mulberry32(9);
     expect(tallyVotes([0, 1, 1, 2], 3, 0, rng)).toBe(1);
     expect(tallyVotes([], 3, 1, rng)).toBe(1);

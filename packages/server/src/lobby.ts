@@ -1,5 +1,5 @@
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
-import { DEFAULT_SETTINGS, FRONT_DOOR, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, allowedMs, botVotes, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FRONT_DOOR, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -209,7 +209,7 @@ export class LobbyCore {
     private settings: Settings = DEFAULT_SETTINGS,
   ) {
     this.settings = { ...settings, ...(record.overrides ?? {}) };
-    if (record.moveClock) this.settings = { ...this.settings, moveClockSeconds: record.moveClock };
+    if (record.moveClock) this.settings = { ...this.settings, moveClockSeconds: record.moveClock, moveClockSteps: [] };
     if (record.runner) {
       this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library });
     }
@@ -576,6 +576,7 @@ export class LobbyCore {
       ],
       result: v.result,
       ...(v.nextAt ? { nextAt: v.nextAt } : {}),
+      ...(this.settings.voteChangeAllowed ? { changeAllowed: true } : {}),
     };
   }
 
@@ -601,9 +602,12 @@ export class LobbyCore {
 
   private castVote(playerId: string, key: string, option: number) {
     const v = this.r.vote;
-    if (this.r.phase !== "vote" || !v || v.key !== key || v.result !== null || v.votes[playerId]) return;
+    if (this.r.phase !== "vote" || !v || v.key !== key || v.result !== null) return;
     const now = this.io.now();
     if (now > v.until + this.settings.lateGraceMs || !Number.isInteger(option) || option < 0 || option > 2 || !this.runner?.player(playerId)) return;
+    // One vote each (a later one replaces it only with voteChangeAllowed on).
+    const had = v.votes[playerId];
+    if (!castPregameVote(had ? [{ playerId, option: had.option }] : [], { playerId, option }, this.settings.voteChangeAllowed)) return;
     v.votes[playerId] = { option, at: now };
     const side = this.runner.player(playerId).colour ?? "w";
     for (const h of this.r.humans) this.send(h.id, { t: "voteCast", key, playerId, option, at: now, side }, false);
@@ -717,10 +721,10 @@ export class LobbyCore {
     }
     if (this.r.augmentVotes) {
       // Crowd augments: the cut's vote sets the move clock from now on.
-      const clock = clockAfterVote(this.settings.moveClockSeconds, Object.values(this.r.augmentVotes), this.settings);
+      const clock = clockAfterVote(runner.moveClock(), Object.values(this.r.augmentVotes), this.settings);
       this.r.augmentVotes = undefined;
       this.r.moveClock = clock;
-      this.settings = { ...this.settings, moveClockSeconds: clock };
+      this.settings = { ...this.settings, moveClockSeconds: clock, moveClockSteps: [] };
       runner.setMoveClock(clock);
     }
     runner.deal();
@@ -731,7 +735,7 @@ export class LobbyCore {
     // Each human's deadline comes from their own time bank.
     const deadlines: Record<string, number> = {};
     const playing = this.roundHumans();
-    for (const h of playing) deadlines[h.id] = now + allowedMs(runner.player(h.id), this.settings);
+    for (const h of playing) deadlines[h.id] = now + runner.allowedMsFor(h.id);
     const deadline = Math.max(now, ...Object.values(deadlines));
     this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {}, ...(final ? {} : { botsDoneIn: runner.botThinkTimes() }) };
     this.r.phase = "play";
@@ -759,7 +763,8 @@ export class LobbyCore {
         botsDoneIn: final ? {} : runner.botThinkTimes(),
         slots: this.slots(),
         ...(watching ? { watching: true } : {}),
-        moveClock: this.settings.moveClockSeconds,
+        // This move's clock (the Variable speed's rises as the game goes on).
+        moveClock: runner.moveClock(),
         ...(bossNow ? { boss: bossNow } : {}),
       });
       if (final) this.send(h.id, { t: "final", final: runner.finalView()!, standings: st, slots: this.slots() }, !inRound.has(h.id));
@@ -780,7 +785,7 @@ export class LobbyCore {
     if (!playing.length) {
       // Only bots this round: in the final a bot "thinks" for its recorded time first; in Crowd the watching team sees
       // the vote come in for a few seconds.
-      if (crowd && !final) return this.setTimer("lock", now + Math.min(this.settings.moveClockSeconds * 1000, 5000));
+      if (crowd && !final) return this.setTimer("lock", now + Math.min(runner.moveClock() * 1000, 5000));
       if (!final) return this.lock();
       const mover = [...runner.groups.values()][0]![0]!;
       return this.setTimer("lock", this.io.now() + Math.min(6000, Math.max(1500, runner.botThinkTimes()[mover] ?? 2500)));
@@ -1086,7 +1091,7 @@ export class LobbyCore {
       until,
       placements: { ...this.r.placements },
       slots: this.slots(),
-      ...(augments ? { augments: true, moveClock: this.settings.moveClockSeconds } : {}),
+      ...(augments ? { augments: true, moveClock: runner.moveClock() } : {}),
     });
     this.setTimer("nextRound", until);
   }

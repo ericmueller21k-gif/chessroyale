@@ -1,6 +1,6 @@
 import { randomInt, shuffle, weightedIndex, type Rng } from "./rng.ts";
 import type { GroupResult } from "./scoring.ts";
-import { DEFAULT_SETTINGS, roundsInStage, type Settings } from "./settings.ts";
+import { DEFAULT_SETTINGS, moveClockAt, roundsInStage, type Settings } from "./settings.ts";
 
 /**
  * Match structure from buildspec.md: knockout stages scored on move quality,
@@ -96,6 +96,11 @@ export interface BossState {
   crowdSide: Side;
   /** The battle starts from this many moves (plies) into the game just played. */
   startPly?: number;
+  /**
+   * The move number the game had reached when the battle began (50 v 50). The board goes back to an earlier
+   * position, but the clock doesn't: the battle's moves count on from here (see moveClockAt).
+   */
+  clockFromMove?: number;
   /** Crowd moves made, and since the boss last struck. */
   crowdMoves: number;
   sinceKill: number;
@@ -305,9 +310,12 @@ export interface RoundPlayerOutcome {
   neutralLoss?: number;
 }
 
-/** How long this player may think about the next move: the bank plus the increment, capped by the move clock. */
-export function allowedMs(p: Pick<PlayerState, "bankMs">, settings: Settings = DEFAULT_SETTINGS): number {
-  return Math.min(settings.moveClockSeconds * 1000, p.bankMs + settings.timeIncrementSeconds * 1000);
+/**
+ * How long this player may think about the next move: the bank plus the increment, capped by the move clock on that
+ * move number (see moveClockAt: the Variable speed's clock rises as the game goes on).
+ */
+export function allowedMs(p: Pick<PlayerState, "bankMs">, settings: Settings = DEFAULT_SETTINGS, move = 1): number {
+  return Math.min(moveClockAt(settings, move) * 1000, p.bankMs + settings.timeIncrementSeconds * 1000);
 }
 
 /** What the standings rank by: the stage score (move quality only; time and power-ups don't count). */
@@ -692,7 +700,12 @@ export function botChoose(
   return { move: botPick(rng, candidates, bot.skill ?? 5, legalMoves, settings), usedPowerUp: false };
 }
 
-export function botThinkMs(rng: Rng, settings: Settings = DEFAULT_SETTINGS): number {
-  const [lo, hi] = settings.botThinkSeconds;
+/**
+ * A bot's thinking time: somewhere in botThinkSeconds, but within 85% of the move clock on that move, so on a short
+ * clock (Bullet, the Variable speed's first moves) bots spread out over it instead of piling up on the buzzer.
+ */
+export function botThinkMs(rng: Rng, settings: Settings = DEFAULT_SETTINGS, move = 1): number {
+  const [lo, top] = settings.botThinkSeconds;
+  const hi = Math.max(lo, Math.min(top, 0.85 * moveClockAt(settings, move)));
   return Math.round((lo + rng() * (hi - lo)) * 1000);
 }

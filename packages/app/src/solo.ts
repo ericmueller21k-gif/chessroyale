@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, allowedMs, botVotes, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botVotes, castPregameVote, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, LAST_STAND_MS } from "@chessroyale/chess";
@@ -219,6 +219,7 @@ export class SoloMatch implements GameView {
       until: now + ms,
       votes: botVotes(this.rng, bots.map((b) => b.id), votes[index]!.options.length, ms).map((v) => ({ playerId: v.id, option: v.option, at: now + v.atMs, side: side.get(v.id)! })),
       result: null,
+      ...(this.settings.voteChangeAllowed ? { changeAllowed: true } : {}),
     };
     this.set({ kind: "vote", vote: this.voteState });
     this.timer = setTimeout(() => this.endVote(), ms);
@@ -226,8 +227,11 @@ export class SoloMatch implements GameView {
 
   castVote(option: number) {
     const v = this.voteState;
-    if (this.phase.kind !== "vote" || !v || v.result !== null || this.myVote !== null || Date.now() > v.until) return;
-    v.votes = [...v.votes, { playerId: HUMAN, option, at: Date.now(), side: this.you.colour ?? "w" }];
+    if (this.phase.kind !== "vote" || !v || v.result !== null || Date.now() > v.until) return;
+    // One vote each (a later one replaces it only with voteChangeAllowed on).
+    const votes = castPregameVote(v.votes, { playerId: HUMAN, option, at: Date.now(), side: this.you.colour ?? "w" }, this.settings.voteChangeAllowed);
+    if (!votes) return;
+    v.votes = votes;
     this.set({ kind: "vote", vote: { ...v } });
   }
 
@@ -348,8 +352,8 @@ export class SoloMatch implements GameView {
     const board = this.runner.boardOf(HUMAN)!;
     this.playStartedAt = Date.now() + intro;
     this.hint = null;
-    const allowed = allowedMs(this.you, this.settings);
-    this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed });
+    const allowed = this.runner.allowedMsFor(HUMAN);
+    this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
     this.timer = setTimeout(() => this.submit(null), intro + allowed + this.settings.lateGraceMs);
   }
 
@@ -416,7 +420,7 @@ export class SoloMatch implements GameView {
   /** Crowd 50 v 50: the other team's turn. You watch their vote come in, then see it. */
   private watchTurn() {
     const board = this.runner.boards.get(this.runner.state.boards[0]!)!;
-    const think = Math.min(this.settings.moveClockSeconds * 1000, 5000);
+    const think = Math.min(this.runner.moveClock() * 1000, 5000);
     // The bots' thinking is squeezed into the few seconds you watch.
     const scale = think / (this.settings.botThinkSeconds[1] * 1000);
     const times = Object.fromEntries(Object.entries(this.runner.botThinkTimes()).map(([id, ms]) => [id, ms * scale]));
@@ -468,7 +472,7 @@ export class SoloMatch implements GameView {
       cutoff,
       youOut: outIds.has(HUMAN),
       nextBoards: this.runner.state.boards.map((id) => boardView(this.runner.boards.get(id)!)),
-      ...(crowd ? { until: Date.now() + breakMs, augments: this.settings.cutClockVote && !outIds.has(HUMAN), moveClock: this.settings.moveClockSeconds } : {}),
+      ...(crowd ? { until: Date.now() + breakMs, augments: this.settings.cutClockVote && !outIds.has(HUMAN), moveClock: this.runner.moveClock() } : {}),
     });
   }
 
@@ -477,7 +481,7 @@ export class SoloMatch implements GameView {
     if (this.timer) clearTimeout(this.timer);
     if (this.phase.augments) {
       // Your vote is the lobby's (the bots don't vote).
-      this.runner.setMoveClock(clockAfterVote(this.settings.moveClockSeconds, this.augmentVote ? [this.augmentVote] : [], this.settings));
+      this.runner.setMoveClock(clockAfterVote(this.runner.moveClock(), this.augmentVote ? [this.augmentVote] : [], this.settings));
     }
     this.augmentVote = null;
     this.nextRound();
@@ -506,8 +510,8 @@ export class SoloMatch implements GameView {
       this.hint = null;
       const board = this.runner.boardOf(HUMAN)!;
       this.playStartedAt = Date.now();
-      const allowed = allowedMs(this.you, this.settings);
-      this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed });
+      const allowed = this.runner.allowedMsFor(HUMAN);
+      this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
       this.timer = setTimeout(() => this.submit(null), allowed + this.settings.lateGraceMs);
       return;
     }

@@ -44,17 +44,7 @@ async function playToResults(page: Page, seen: Set<string>, minutes: number) {
   }
 }
 
-/** Pixel centre of a square on the big board. */
-async function squareAt(page: Page, square: string, orientation: "white" | "black") {
-  const box = (await page.locator(".board-wrap .board").first().boundingBox())!;
-  const f = square.charCodeAt(0) - 97;
-  const r = Number(square[1]) - 1;
-  const col = orientation === "white" ? f : 7 - f;
-  const row = orientation === "white" ? 7 - r : r;
-  return { x: box.x + ((col + 0.5) * box.width) / 8, y: box.y + ((row + 0.5) * box.height) / 8 };
-}
-
-test("pre-game votes: a pawn push and a card both vote; the winners set the ending and the clock", async ({ page }) => {
+test("pre-game votes: the cards vote too; the winners set the ending and the clock", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&mode=crowd&turns=teams&augments=1");
@@ -62,16 +52,12 @@ test("pre-game votes: a pawn push and a card both vote; the winners set the endi
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible();
   await expect(page.locator(".vote-zone")).toHaveCount(3);
-  // Vote 1: push the d- or e-pawn two squares (the middle zone: Boss battle).
-  const team = await page.evaluate(() => (window as any).match.standings().find((s: any) => s.isYou).team);
-  const orientation = team === "w" ? "white" : "black";
-  const [from, to] = team === "w" ? ["d2", "d4"] : ["d7", "d5"];
-  const a = await squareAt(page, from, orientation);
-  const b = await squareAt(page, to, orientation);
-  await page.mouse.click(a.x, a.y);
-  await page.mouse.click(b.x, b.y);
+  // Vote 1: tap the middle card (Boss battle). (Dragging your pawn is in votes.spec.ts.)
+  await page.getByRole("radio", { name: /Boss battle/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(1);
   await expect(page.locator(".vote-card.on")).toContainText("Boss battle");
+  // Your pawn walks into that zone.
+  await expect(page.locator(".vote-me.in")).toBeVisible();
   // Votes come in live; then the result.
   await expect.poll(async () => Number(await page.locator(".vote-zone-count").nth(1).textContent())).toBeGreaterThan(1);
   await expect(page.locator(".vote-banner")).toBeVisible({ timeout: 15_000 });
@@ -81,9 +67,15 @@ test("pre-game votes: a pawn push and a card both vote; the winners set the endi
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("radio", { name: /Bullet/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(2);
+  await expect.poll(() => page.evaluate(() => (window as any).match.phase.vote?.result ?? null), { timeout: 15_000 }).not.toBeNull();
+  const result: number = await page.evaluate(() => (window as any).match.phase.vote.result);
   await expect.poll(() => phase(page), { timeout: 20_000 }).toMatch(/play|watching/);
-  const clock = await page.evaluate(() => (window as any).match.settings.moveClockSeconds);
-  expect([10, 20, 30]).toContain(clock);
+  // The game's clock is the winning speed's: Normal 20 s, Variable 10 s on move 1 (then rising), Bullet 10 s.
+  const clock = await page.evaluate(() => {
+    const r = (window as any).match.runner;
+    return { now: r.moveClock(), steps: r.settings.moveClockSteps.length };
+  });
+  expect(clock).toEqual([{ now: 20, steps: 0 }, { now: 10, steps: 5 }, { now: 10, steps: 0 }][result]);
 });
 
 test("team final: the top 8 play 4v4, the weakest on each side go out, everyone is placed", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { BOSS_TIERS, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 import { randomCode } from "./codes.ts";
@@ -99,6 +99,8 @@ export default {
             const f = url.searchParams.get("format") as FinalFormat | null;
             return mode === "crowd" && f && f in CROWD_KNOCKOUTS ? { finalFormat: f, knockoutsPerStage: CROWD_KNOCKOUTS[f], augments: false } : {};
           })(),
+          // ?speed=normal|variable|bullet: that speed (for testing, with ?format=; a stale "slow" is Normal).
+          ...(mode === "crowd" ? (speedOption(url.searchParams.get("speed"))?.patch ?? {}) : {}),
         };
         await stub.create(code, JSON.parse(JSON.stringify(overrides)));
         return json({ code });

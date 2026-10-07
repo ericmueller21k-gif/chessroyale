@@ -2642,6 +2642,52 @@ button.history-label {
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+/* This move's clock, above the board; lit for the move when it goes up (the Variable speed). */
+.clock-note {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.clock-note.up {
+  position: relative;
+  isolation: isolate;
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--good) 22%, transparent);
+  color: var(--good);
+  font-weight: 800;
+  /* A flash as it appears (not a bump: the line above the board clips anything taller than itself). The solid
+     layer fades rather than the colours mixing (Chrome mixes color-mix() colours into odd ones on the way). */
+  animation: clock-up-text 900ms ease-out;
+}
+.clock-note.up::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--good);
+  opacity: 0;
+  animation: clock-up 900ms ease-out;
+}
+@keyframes clock-up {
+  0%,
+  35% {
+    opacity: 1;
+  }
+}
+@keyframes clock-up-text {
+  0%,
+  35% {
+    color: #fff;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clock-note.up,
+  .clock-note.up::before {
+    animation: none;
+  }
+}
 
 /* ---- Account chip and profile ---- */
 
@@ -2999,49 +3045,122 @@ button.history-label {
   flex: 1 0 auto;
 }
 
-/* ---- Pre-game votes ---- */
-.vote-head {
+/* ---- Pre-game votes ----
+   The same frame as the game's screens (top line, the line above the board, the board beside its eval bar), so the
+   board never moves when the game begins. On the board: the three zones, everyone's pawn, the counts. */
+/* (Two lines that fit the top line's height on a phone, 36 px, so the board starts where the game's does.) */
+.hud-row .vote-title {
   display: grid;
-  gap: 2px;
-  text-align: center;
+  gap: 0;
+  align-content: center;
+  justify-items: start;
+  cursor: default;
 }
-.vote-head h1 {
+.vote-title h1 {
   margin: 0;
-  font-size: 24px;
-}
-.vote-head p {
-  margin: 0;
-  min-height: 1.4em;
+  max-width: 100%;
+  font-size: 18px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .vote-step {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 1px;
+  line-height: 1.2;
   text-transform: uppercase;
   color: var(--accent);
 }
-.vote-zones {
+/* The eval bar keeps its place (and the board its size) but only shows as the pieces come in. */
+.vote-board-row .eval-bar {
+  visibility: hidden;
+}
+.vote-board-row.dropping .eval-bar {
+  visibility: visible;
+  animation: vote-fade-in 320ms ease-out both;
+}
+@keyframes vote-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+/* The hand-off: the real pieces drop into place, pawns first. (`translate`, not `transform`: chessground places
+   pieces with transform.) */
+.vote-board-row.dropping cg-board piece {
+  animation: piece-drop 380ms cubic-bezier(0.25, 0.9, 0.35, 1.12) both;
+}
+.vote-board-row.dropping cg-board piece:not(.pawn) {
+  animation-delay: 110ms;
+}
+@keyframes piece-drop {
+  from {
+    opacity: 0;
+    translate: 0 -38%;
+  }
+}
+
+.vote-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  /* Everyone else's pawn, and yours (a share of the board's width: a square is 12.5%). */
+  --vp: 7.8%;
+  --vp-me: 11.6%;
+}
+/* Your pawn picked up with a tap: a tap anywhere else puts it down. */
+.vote-layer.picking {
+  pointer-events: auto;
+}
+.vote-zones,
+.vote-pawns,
+.vote-labels {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  transition: opacity 280ms ease-in;
+}
+.vote-zones {
+  z-index: 1;
+}
+.vote-pawns {
   z-index: 2;
+}
+.vote-labels {
+  z-index: 4;
 }
 .vote-zone {
   position: absolute;
   box-sizing: border-box;
   border: 3px solid color-mix(in srgb, var(--accent) 80%, transparent);
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  transition: opacity 300ms, background 300ms, transform 300ms;
+  /* (No colour transitions: Chrome mixes these color-mix() colours into a vivid green on the way.) */
+  transition:
+    opacity 300ms,
+    transform 200ms;
 }
 .vote-zone.mine {
   border-color: #3b82f6;
-  background: color-mix(in srgb, #3b82f6 22%, transparent);
+  background: color-mix(in srgb, #3b82f6 20%, transparent);
+}
+/* Dragging your pawn over a zone, or a zone ready for a tap. */
+.vote-zone.over {
+  border-color: #3b82f6;
+  background: color-mix(in srgb, #3b82f6 34%, transparent);
+  transform: scale(1.04);
+}
+.vote-layer.picking .vote-zone {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.22);
+  animation: zone-ready 800ms ease-in-out infinite alternate;
+}
+@keyframes zone-ready {
+  to {
+    box-shadow: 0 0 12px 2px rgba(59, 130, 246, 0.85);
+  }
 }
 .vote-zone.win {
   border-color: var(--good);
@@ -3057,26 +3176,172 @@ button.history-label {
     box-shadow: 0 0 18px var(--good);
   }
 }
+.vote-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: opacity 300ms;
+}
+.vote-label.lose {
+  opacity: 0.35;
+}
 .vote-zone-icon {
-  font-size: clamp(18px, 6vw, 30px);
+  font-size: clamp(16px, 5.4vw, 28px);
   line-height: 1;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 .vote-zone-count {
+  display: inline-block;
   font-weight: 900;
   font-size: clamp(13px, 3.6vw, 18px);
   font-variant-numeric: tabular-nums;
   color: #fff;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
   border-radius: 8px;
   padding: 0 6px;
+}
+/* The tally bubbling up: each vote that lands gives its count a quick bump (small: a hundred votes come in). */
+.vote-zone-count.pop,
+.vote-card-count.pop {
+  animation: count-pop 240ms ease-out;
+}
+@keyframes count-pop {
+  40% {
+    transform: scale(1.2);
+  }
+}
+
+/* Everyone's pawn: a faint ghost of them, dressed as they are, centred on its spot. */
+.vote-pawn {
+  position: absolute;
+  width: var(--vp);
+  height: var(--vp);
+  transform: translate(-50%, -55%);
+  opacity: 0.4;
+  pointer-events: none;
+}
+.vote-pawn.in {
+  opacity: 0.55;
+}
+/* Gliding into a zone (or back home): across with a soft landing, up a little faster, so it curves. */
+.vote-layer.animate .vote-pawn {
+  transition:
+    left 700ms cubic-bezier(0.3, 0.7, 0.25, 1),
+    top 700ms cubic-bezier(0.5, 0, 0.3, 1),
+    opacity 300ms;
+}
+
+/* Yours: solid, ringed, tagged, on top of everyone else's, with a big area to grab. */
+.vote-pawn.vote-me {
+  z-index: 3;
+  width: var(--vp-me);
+  height: var(--vp-me);
+  opacity: 1;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: opacity 280ms ease-in;
+}
+.vote-layer.animate .vote-pawn.vote-me {
+  transition:
+    left 450ms cubic-bezier(0.3, 0.7, 0.25, 1),
+    top 450ms cubic-bezier(0.5, 0, 0.3, 1),
+    opacity 280ms ease-in;
+}
+.vote-pawn.vote-me.can {
+  pointer-events: auto;
+  cursor: grab;
+}
+.vote-pawn.vote-me.can::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+}
+.vote-me .avatar {
+  filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 4px #3b82f6);
+}
+/* Before you vote, it bobs gently: here I am, move me. */
+.vote-me.can:not(.in):not(.lifted):not(.selected) .avatar {
+  animation: me-bob 1.5s ease-in-out infinite;
+}
+@keyframes me-bob {
+  50% {
+    translate: 0 -7%;
+  }
+}
+.vote-me-ring {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 96%;
+  height: 34%;
+  transform: translate(-50%, 30%);
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: radial-gradient(closest-side, rgba(59, 130, 246, 0.85), rgba(59, 130, 246, 0.35));
+  box-shadow: 0 0 8px 2px rgba(59, 130, 246, 0.9);
+}
+.vote-me-tag {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translate(-50%, 6%);
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+/* In its zone the tag goes under your pawn, just outside the zone (above it, it would sit under the zone's count). */
+.vote-me.in .vote-me-tag {
+  bottom: auto;
+  top: 100%;
+  transform: translate(-50%, 22%);
+}
+/* Picked up (a tap) or held (a drag): it rises. Held, it follows your finger exactly, above everything. */
+.vote-me.selected .avatar {
+  translate: 0 -12%;
+}
+.vote-me.selected .vote-me-ring {
+  box-shadow: 0 0 12px 4px rgba(59, 130, 246, 1);
+}
+.vote-layer .vote-pawn.vote-me.lifted {
+  z-index: 6;
+  scale: 1.12;
+  cursor: grabbing;
+  transition: none;
+}
+/* Tap a zone, with your pawn picked up. */
+.vote-zone-hit {
+  position: absolute;
+  z-index: 5;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* After the last vote: the pawns, zones and cards fade as the pieces come in. */
+.vote-layer.leaving .vote-zones,
+.vote-layer.leaving .vote-pawns,
+.vote-layer.leaving .vote-labels,
+.vote-layer.leaving .vote-pawn.vote-me {
+  opacity: 0;
 }
 .vote-banner {
   position: absolute;
   left: 8%;
   right: 8%;
-  top: 30%;
-  z-index: 4;
+  top: 28%;
+  z-index: 7;
   display: grid;
   justify-items: center;
   gap: 2px;
@@ -3086,6 +3351,10 @@ button.history-label {
   color: #fff;
   text-align: center;
   animation: banner-in 280ms ease-out;
+  transition: opacity 250ms ease-in;
+}
+.vote-banner.leaving {
+  opacity: 0;
 }
 .vote-banner strong {
   font-size: 22px;
@@ -3093,6 +3362,10 @@ button.history-label {
 .vote-banner span {
   font-size: 13px;
   opacity: 0.85;
+}
+.vote-banner .vote-banner-detail {
+  font-size: 11px;
+  opacity: 0.75;
 }
 .vote-banner .vote-banner-icon {
   font-size: 40px;
@@ -3108,6 +3381,10 @@ button.history-label {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
+  transition: opacity 300ms ease-in;
+}
+.vote-cards.leaving {
+  opacity: 0;
 }
 .vote-card {
   display: grid;
@@ -3162,9 +3439,41 @@ button.history-label {
   transition: width 200ms;
 }
 .vote-card-count {
+  display: inline-block;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vote-layer.animate .vote-pawn,
+  .vote-layer.animate .vote-pawn.vote-me {
+    transition: opacity 280ms ease-in;
+  }
+  .vote-me.can .avatar {
+    animation: none !important;
+  }
+  .vote-board-row.dropping cg-board piece {
+    animation: vote-fade-in 300ms ease-out both;
+  }
+  .vote-zone-count.pop,
+  .vote-card-count.pop {
+    animation: none;
+  }
+}
+/* Phones: the scoreboard minimised makes the game's board bigger; the vote's board matches it. */
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game.vote-screen.tower-closed .board-row .eval-bar ~ .board-wrap {
+    width: min(calc(100% - 48px), calc(100dvh - 255px));
+  }
+}
+/* Computers: the cards in the column beside the board, where the game's panel goes. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game.vote-screen .vote-cards {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    margin-top: 24px;
+  }
 }
 
 /* ---- Boss battle ---- */
@@ -4298,14 +4607,6 @@ button.history-label {
   width: 100%;
   height: 100%;
   background-size: cover;
-}
-.vote-hat {
-  position: absolute;
-  z-index: 3;
-  width: 12.5%;
-  height: 12.5%;
-  pointer-events: none;
-  transition: left 0.25s, top 0.25s;
 }
 .king-effect-preview {
   position: relative;
@@ -5605,10 +5906,6 @@ button.history-label {
   font-size: 10px;
   font-weight: 800;
 }
-.vote-avatar .avatar {
-  width: 100%;
-  height: 100%;
-}
 /* A shiny item's shine rolls across it: slowly over, then a pause. */
 .item-shine {
   mix-blend-mode: screen;
@@ -6857,6 +7154,32 @@ button.fd-logo {
 }
 .fd-rules strong {
   color: var(--fd-text);
+}
+/* The Variable speed's clock, move by move. */
+.fd-clock-steps {
+  margin: 6px 0;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.fd-clock-steps th,
+.fd-clock-steps td {
+  padding: 2px 14px 2px 0;
+  text-align: left;
+}
+.fd-clock-steps th {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fd-sub);
+}
+.fd-clock-steps td {
+  color: var(--fd-text);
+  font-weight: 700;
+}
+.fd-clock-steps tbody tr + tr td {
+  border-top: 1px solid color-mix(in srgb, var(--fd-sub) 25%, transparent);
 }
 
 /* -- The queue (docs/mockups/front-door/Queue.dc.html) -- */

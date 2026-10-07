@@ -26,6 +26,27 @@ function useNow(ms = 200) {
   return now;
 }
 
+/** The last move clock each match showed you (to tell when it goes up). */
+const clockSeen = new WeakMap<object, number>();
+
+/**
+ * This move's clock, above the board ("⏱ 15 s"). When it has gone up since your last move (the Variable speed: 10 s
+ * for moves 1-5, then 5 s more every 5 moves), it's lit for that move, with a ▲, so the change is noticed without
+ * anything over the board.
+ */
+export function ClockNote({ match, seconds }: { match: GameView; seconds: number }) {
+  const [up] = useState(() => {
+    const before = clockSeen.get(match);
+    clockSeen.set(match, seconds);
+    return before !== undefined && seconds > before;
+  });
+  return (
+    <span class={`clock-note${up ? " up" : ""}`} title={up ? `More time now: ${seconds} s a move` : `${seconds} s a move`}>
+      ⏱ {seconds} s{up ? " ▲" : ""}
+    </span>
+  );
+}
+
 /** In the final: whose side you're moving for, and with whom. */
 function FinalTurnLabel({ match, side }: { match: GameView; side: "w" | "b" }) {
   const f = match.final!;
@@ -45,6 +66,7 @@ export function PlayScreen({
   startsAt = 0,
   deadline,
   allowedMs,
+  clock,
   picked,
   strike,
 }: {
@@ -53,6 +75,8 @@ export function PlayScreen({
   startsAt?: number;
   deadline: number;
   allowedMs?: number;
+  /** This move's clock in seconds (see ClockNote). */
+  clock?: number;
   picked?: string | null;
   strike?: StrikeState;
 }) {
@@ -150,6 +174,11 @@ export function PlayScreen({
           ) : match.settings.mode === "crowd" ? (
             <>
               Your pick for <strong>{side === "w" ? "White" : "Black"}</strong> ·{" "}
+              {clock !== undefined && !waiting && (
+                <>
+                  <ClockNote match={match} seconds={clock} /> ·{" "}
+                </>
+              )}
               <span class="pick-count">
                 {doneCount}/{alive.length} picked
               </span>

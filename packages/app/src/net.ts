@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, botChoose, botThinkMs as thinkMs, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -261,7 +261,8 @@ export class NetMatch implements GameView {
         this.roundsPlayed = m.round;
         this.standingsList = m.standings;
         this.cutoff = m.cutoff;
-        if (m.moveClock) this.settings = { ...this.settings, moveClockSeconds: m.moveClock };
+        // This move's clock (the server works it out move by move: the Variable speed's rises as the game goes on).
+        if (m.moveClock) this.settings = { ...this.settings, moveClockSeconds: m.moveClock, moveClockSteps: [] };
         if (m.board && m.watching) {
           // Crowd 50 v 50: the other team is choosing.
           this.currentBoard = m.board;
@@ -273,7 +274,7 @@ export class NetMatch implements GameView {
           const startsAt = this.local(m.startsAt ?? m.now);
           this.playStartedAt = startsAt;
           const deadline = this.local(m.deadline);
-          return this.setPhase({ kind: "play", board: this.toView(m.board), startsAt, deadline, allowedMs: Math.max(0, deadline - startsAt) });
+          return this.setPhase({ kind: "play", board: this.toView(m.board), startsAt, deadline, allowedMs: Math.max(0, deadline - startsAt), ...(m.moveClock ? { clock: m.moveClock } : {}) });
         }
         return this.emit();
       case "moved":
@@ -349,8 +350,11 @@ export class NetMatch implements GameView {
       }
       case "voteCast": {
         const v = this.voteState;
-        if (!v || v.key !== m.key || v.votes.some((x) => x.playerId === m.playerId)) return;
-        this.voteState = { ...v, votes: [...v.votes, { playerId: m.playerId, option: m.option, at: this.local(m.at), side: m.side }] };
+        if (!v || v.key !== m.key) return;
+        // (One vote each: a second one only replaces the first when changing is allowed.)
+        const votes = castPregameVote(v.votes, { playerId: m.playerId, option: m.option, at: this.local(m.at), side: m.side }, !!v.changeAllowed);
+        if (!votes) return;
+        this.voteState = { ...v, votes };
         return this.setPhase({ kind: "vote", vote: this.voteState });
       }
       case "boss":
@@ -561,12 +565,15 @@ export class NetMatch implements GameView {
   private myVoteLocal: { key: string; entry: VoteView["votes"][number] } | null = null;
   castVote(option: number) {
     const v = this.voteState;
-    if (this.phase.kind !== "vote" || !v || v.result !== null || !this.myId || v.votes.some((x) => x.playerId === this.myId) || Date.now() > v.until) return;
+    if (this.phase.kind !== "vote" || !v || v.result !== null || !this.myId || Date.now() > v.until) return;
     const side = this.standingsList.find((s) => s.id === this.myId)?.team ?? "w";
     const entry = { playerId: this.myId, option, at: Date.now(), side };
+    // One vote each (a later one replaces it only when changing is allowed).
+    const votes = castPregameVote(v.votes, entry, !!v.changeAllowed);
+    if (!votes) return;
     this.myVoteLocal = { key: v.key, entry };
     this.send({ t: "vote", key: v.key, option });
-    this.voteState = { ...v, votes: [...v.votes, entry] };
+    this.voteState = { ...v, votes };
     this.setPhase({ kind: "vote", vote: this.voteState });
   }
 

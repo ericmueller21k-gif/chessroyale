@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -46,6 +46,8 @@ function overridesFromUrl(modeId?: ModeChoiceId): Partial<Settings> {
   // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
   const format = q.get("format") as FinalFormat | null;
   const forced = crowd && format && format in CROWD_KNOCKOUTS ? { finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format], augments: false } : {};
+  // ?speed=normal|variable|bullet: that speed (for testing, with ?format=; a stale "slow" is Normal).
+  const speed = crowd ? (speedOption(q.get("speed"))?.patch ?? {}) : {};
   return {
     // The mode's own rules and pace first, then pace and playtest overrides on top (only the ones that are set).
     // The boss raid: its own settings, and (solo) a boss a step above your rating.
@@ -64,6 +66,7 @@ function overridesFromUrl(modeId?: ModeChoiceId): Partial<Settings> {
       openingMoves: crowd ? undefined : chosenOpeningMoves(),
     }),
     ...forced,
+    ...speed,
   };
 }
 
@@ -483,8 +486,9 @@ export function App() {
       </FrontFrame>
     </div>
   );
-  // Computers get the leaderboard as a permanent sidebar during the knockout stages.
-  const tower = ["play", "scoring", "reveal", "spectating", "final", "watching", "boss"].includes(match.phase.kind) && match.standings().length > 0;
+  // Computers get the leaderboard as a permanent sidebar during the knockout stages (and the pre-game votes, so the
+  // board is in the same place when the game begins).
+  const tower = ["vote", "play", "scoring", "reveal", "spectating", "final", "watching", "boss"].includes(match.phase.kind) && match.standings().length > 0;
   // Quick chat's bubble: the newest message for a moment while no chat is on screen (it lets every tap through).
   const bubble = <ChatBubble match={match} />;
   if (!tower)
@@ -551,7 +555,7 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
         />
       );
     case "play":
-      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={p.startsAt} deadline={p.deadline} allowedMs={p.allowedMs} strike={p.strike} />;
+      return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={p.startsAt} deadline={p.deadline} allowedMs={p.allowedMs} clock={p.clock} strike={p.strike} />;
     case "scoring":
       if (p.watched) return <WatchScreen key={boardKey(p.board)} match={match} board={p.board} startsAt={0} deadline={0} counting />;
       return <PlayScreen key={boardKey(p.board)} match={match} board={p.board} deadline={0} picked={p.move} strike={p.strike} />;

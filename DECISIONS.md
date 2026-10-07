@@ -478,7 +478,7 @@ Eric's brief (voice, late at night, "make the calls"): the 50 v 50 becomes the m
 - **Counting.** Most votes wins. A tie is drawn at random; no votes gives the default (Team final, Standard).
 - **Bots.** Each vote gets a fresh random lean, so results vary from game to game and a few humans can swing a close one.
 - **Easy to change.** Options, names, icons and what each one sets are plain data in `PREGAME_VOTES`.
-- **Speeds.** Slow is 30 s a move, Standard 20 s, Bullet 10 s.
+- **Speeds.** Now Normal (20 s), Variable (10 s rising to 30 s) and Bullet (10 s); Slow is gone. See "Pre-game vote overhaul (Oct 7, 2026)".
 - **The toggle.** The old "augments" switch now turns these votes on and off. Off means Team final at Standard. The vote after each cut (more / same / less time) is replaced; it's still in the code behind `cutClockVote`, which is off.
 - **Board orientation.** From Black's side the board is flipped, so the cards are mirrored to match the zones.
 
@@ -1713,3 +1713,84 @@ Five things the quick-chat build noticed, and one found on the way. My calls:
   - In 59 of 202 Classic start positions, a top-8 search repeated a move. In 9 the repeat was in the top 3, so the
     power-up showed the same move twice and missed a good one.
   - The bots' candidates and the judge's top 8 have the same gap. Not fixed here: it's the judge's code (`uci.ts`).
+
+## Pre-game vote overhaul (Oct 7, 2026)
+
+Eric: keep the three zones; replace Slow with a Variable speed (Normal on the left, Variable in the middle, Bullet on
+the right); and start the votes on a board wiped of pieces, with every player shown as their own dressed pawn,
+everyone else's faint, yours easy to find. The calls he made: the schedule below, one vote each (he may let players
+change it later: "we will consider it"), and Variable when nobody votes. Mine:
+
+**The speeds.**
+- **The schedule is data**: `VARIABLE_CLOCK` in settings.ts, one step per entry (moves 1–5: 10 s, 6–10: 15 s, 11–15:
+  20 s, 16–20: 25 s, 21 on: 30 s). One function, `moveClockAt(settings, move)`, gives the clock on a move, and every
+  clock goes through it: solo, the lobby server, the finals, the boss battle, the time you're allowed (`allowedMs`)
+  and the bots' thinking. A speed is a patch: Normal and Bullet set `moveClockSeconds` and no steps; Variable sets
+  `moveClockSteps`.
+- **"Move" is the number on the top bar** ("Move 6"): White's move and Black's reply share it, so both teams get 10 s
+  for their first five moves. The runner works it out from the board (`clockMove`), the server sends each move's
+  clock with the round, and the screens show what they're sent.
+- **The finals.** The team final and the duel play on the same board, so they carry on counting (they start after
+  move 20, so 30 s). The boss battle goes back to a position from moves 5–12 of the game, but its clock doesn't: it
+  counts on from the move the game had reached (`clockFromMove`), so it's 30 s too. Starting the boss at 10 s, right
+  after the whole game earned the most time, would be backwards for "more time as the game goes on".
+- **Votes off** is Normal (20 s), as before. **Nobody votes** is Variable, the middle option. Raids have no speed
+  vote (20 s).
+- **The bots' timing.** A bot now thinks within 85% of the move's clock. On a long clock nothing changes (Crowd's 2–14 s
+  fits inside 17 s); on 10 s, a third of the bots used to finish exactly on the buzzer, a pile of ghosts at the end.
+- **On screen.** Your move's line above the board says the clock ("Your pick for White · ⏱ 10 s · 3/50 picked"). On
+  the move it goes up it's lit green with a ▲ ("⏱ 15 s ▲", a short flash), and plain again on your next move. Nothing
+  covers the board. The watching screen doesn't show it (solo squeezes the other team's turn into 5 s). The timer bar
+  is full at each move's own clock. The "cut in N" count is moves, not seconds, so it's unaffected. The last-10-seconds
+  ticks are unchanged: on a 10 s clock they tick all move, as Bullet always has.
+- **Explained** on the Variable card ("10 s, rising to 30 s"), in full in the result banner when Variable wins, and as
+  a table in How to play (Settings), with what a move is.
+- **Nothing old says Slow.** `?speed=normal|variable|bullet` (new, solo and lobby creation, for tests, with
+  `?format=`) maps a stale `slow` (and `standard`, the old name) to Normal. No preference ever stored a speed. A lobby
+  mid-vote at the deploy: results are indexes, so an old Slow win reads as Normal and Standard as Variable; a match
+  already voted keeps its seconds.
+
+**The vote board.**
+- **Everyone is their own pawn**, the cut screen's drawing (`Avatar`): you in your shop hat and crate items, others in
+  the crate items they sent, bots in a hat seeded by their id (the cut screen's rule, now shared: `pawnLook` in
+  looks.ts). Nothing on: a plain pawn in your team's colour. No chess pieces while the votes run.
+- **Starting spots** (`voteHomeSpots`): White's team spread over ranks 1–2, Black's over 7–8. Even, with no clumps or
+  holes at 50 a side (a low-discrepancy sequence plus a little jitter), not on squares, overlapping a little. Who
+  stands where is seeded by the player's id, so a pawn keeps its spot between renders and between the two votes.
+  Pawns lower on the screen stand in front.
+- **Sizes.** Everyone else's pawn is 0.62 of a square (22 px on a 360 px phone), faint (40%; 55% once in a zone).
+  Yours is 0.93 of a square, solid, with a white edge and a blue glow, a blue ring at its feet and a "You" tag, above
+  everyone else's, and it bobs gently until you vote. Checked at 360 px in light and dark, as White and Black.
+- **Voting.** Drag your pawn into a zone (it lands where you let go across the zone, on your side's half), or tap it
+  (it rises, the zones pulse blue) and then tap a zone, or tap a card. Anywhere else, it walks back. A big invisible
+  area around it takes the touch, with no scrolling or zooming while you drag (`touch-action: none`).
+- **In the zones.** White's votes land on the zone's rank-4 half and Black's on its rank-5 half, so the sides stay
+  apart; each lands on the next free spot, in the order the votes arrive. The icon and the count sit in one row on
+  the far half (the other team's), so your team's votes and your pawn are in full view; in a zone your "You" tag
+  moves under your pawn. Everyone else's pawn glides in (0.7 s, on a slight curve) as their vote arrives.
+- **The tally bubbles up.** Each vote that lands bumps its zone's count and its card's count (a 240 ms, 1.2× pop: small,
+  as a hundred votes come in) while the card's bar grows. A count goes up as the pawn lands, not as it sets off (0.7 s
+  later; yours at once; all of them once the vote is counted).
+- **One vote each** stays, as a setting: `voteChangeAllowed` (off). On, your pawn and the cards stay live after you
+  vote and a new zone replaces your vote; the server, solo and the online client all go through one rule
+  (`castPregameVote`), and the vote tells the screen (`changeAllowed`).
+- **Between the votes**, over the result's last 0.65 s, everyone walks back to their spot and the banner fades, so
+  the second vote opens with everyone home.
+- **The hand-off.** Over the last vote's final 0.95 s, the zones, pawns, counts, banner and cards fade (0.28 s); then
+  the real pieces drop into the starting position (pawns first, the rest 0.11 s later; 0.38 s), and the eval bar
+  appears. The game's first screen takes over with the same pieces in the same place: no flash (checked frame by
+  frame, light and dark), and the board's box is the same to the pixel.
+- **The board's box.** It used to move: on a phone the vote's board was 20 px wider and 8 px lower than the game's, and
+  on a computer the vote had no leaderboard beside it. The vote now uses the game screens' frame: the title in the
+  top line ("Vote 1 of 2" over "How does it end?", the sound button beside it), the hint in the line above the board,
+  and the eval bar's slot (hidden until the pieces come). On a computer the leaderboard sits beside it as in the
+  game (from 1100 px), and the cards take the panel's place. With the scoreboard minimised (its own setting), a
+  phone's game board is bigger, and so is the vote's. Checked at 360 and 390 px and at 1000 and 1280 px.
+- **Board orientation** as before: from Black's side the board, the zones and the cards are mirrored, and Black's
+  pawns are at the bottom.
+- **Animations off** (the Crowd setting): pawns jump instead of gliding. Reduced motion: fades only.
+- **Gone:** the pawn pushes (`voteMoves`, `voteOptionOf`).
+- **Checking it.** `npm run frames:vote -- <dir> [light|dark] [width] [w|b]` records every frame of both votes on a
+  narrow phone with a real finger (a drag in the first vote, a tap and a tap in the second) and the hand-off, flags
+  flashes and says whether the board's box moved. `e2e/votes.spec.ts` drags with real touch on the phone (a mouse on
+  the computer), and checks the Variable clock (10 s on move 1, 15 s on move 6).

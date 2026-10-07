@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, BOSS_TIERS } from "@chessroyale/core";
+import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, BOSS_TIERS, VARIABLE_CLOCK, clockStepRanges, speedOption } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
@@ -39,10 +39,34 @@ function store(key: string, value: string) {
   }
 }
 
+/** The Variable speed's clock, move by move: one row per step of VARIABLE_CLOCK. */
+export function ClockBreakdown() {
+  return (
+    <table class="fd-clock-steps" aria-label="The Variable speed's clock">
+      <thead>
+        <tr>
+          <th scope="col">Moves</th>
+          <th scope="col">Time a move</th>
+        </tr>
+      </thead>
+      <tbody>
+        {clockStepRanges(VARIABLE_CLOCK).map((r) => (
+          <tr key={r.from}>
+            <td>{r.to === null ? `${r.from} on` : r.to === r.from ? `${r.from}` : `${r.from}–${r.to}`}</td>
+            <td>{r.seconds} s</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 /** How each mode works, in plain words (moved here from the old home screen). */
 export function HowToPlay() {
   const LOW = BOSS_TIERS[0]!;
   const HIGH = BOSS_TIERS[BOSS_TIERS.length - 1]!;
+  const normal = speedOption("normal")!.patch.moveClockSeconds;
+  const bullet = speedOption("bullet")!.patch.moveClockSeconds;
   return (
     <div class="fd-rules">
       <h3>Crowd · 50 v 50</h3>
@@ -63,9 +87,16 @@ export function HowToPlay() {
           <strong>⚡ {C.powerUpsAtStart} power-ups</strong> show the engine's top 3 moves. That's all you get, so pick your moments.
         </li>
         <li>
-          <strong>You vote on the ending.</strong> Before the first move everyone pushes a pawn into a zone: a team final (top 8 play 4v4, 3v3,
-          then 2v2 to the end), a boss battle (top 10 against a Stockfish boss) or a duel (the best of each side, 1v1). Then the speed: slow,
-          standard or bullet. Winning the game goes on your record; your own move quality places you.
+          <strong>You vote on the ending.</strong> Before the first move everyone drags their own pawn into a zone (or taps a card): a team
+          final (top 8 play 4v4, 3v3, then 2v2 to the end), a boss battle (top 10 against a Stockfish boss) or a duel (the best of each side,
+          1v1). Winning the game goes on your record; your own move quality places you.
+        </li>
+        <li>
+          <strong>Then the speed.</strong> Normal: {normal} s a move. Bullet: {bullet} s a move. Variable: the clock starts short and grows as
+          the game goes on, so the quick opening moves are quick and the hard ones later get more time. A move is the number at the top of the
+          screen (White's move and Black's reply are the same move):
+          <ClockBreakdown />
+          Nobody votes? Variable.
         </li>
       </ol>
       <h3>Boss raid</h3>
@@ -196,7 +227,7 @@ export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onS
           Watch every pick fly from its piece to its square.
         </Toggle>
         <Toggle title="Pre-game votes" checked={mode.augments} onChange={(on) => changeMode({ augments: on })}>
-          Before the first move, everyone votes on how the match ends and how fast it is. Off: a team final at the standard speed.
+          Before the first move, everyone votes on how the match ends and how fast it is. Off: a team final at Normal speed (20 s a move).
         </Toggle>
       </section>
 

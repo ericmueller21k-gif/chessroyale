@@ -114,6 +114,13 @@ export interface Settings {
   groupSize: number;
   /** The longest a single move may take (seconds), so a round never waits long for anyone. */
   moveClockSeconds: number;
+  /**
+   * A move clock that changes with the move number instead (the Variable speed: VARIABLE_CLOCK). Empty: every move
+   * gets moveClockSeconds. Read the clock with moveClockAt, never one of these two directly.
+   */
+  moveClockSteps: readonly ClockStep[];
+  /** Pre-game votes: whether a player may move their pawn to another zone after voting (Eric: one vote each, for now). */
+  voteChangeAllowed: boolean;
   /** Each player's time bank for the whole match (seconds). Thinking time comes out of it. */
   timeBankSeconds: number;
   /** Added to the bank at the start of every move (seconds), so even an empty bank leaves this long to move. */
@@ -175,6 +182,48 @@ export interface Settings {
   finalMissLoss: number;
 }
 
+/**
+ * One step of a move clock that rises as the game goes on: from this move on, this many seconds a move. "Move" is the
+ * move number the top bar shows ("Move 6"): White's and Black's first moves are both move 1.
+ */
+export interface ClockStep {
+  fromMove: number;
+  seconds: number;
+}
+
+/**
+ * The Variable speed (Crowd 50 v 50's speed vote; Eric's schedule, Oct 7, 2026): 10 s a move for moves 1-5, then 5 s
+ * more every 5 moves, up to 30 s from move 21 on. One entry per step, in order; the vote's card, the rules and the
+ * clock all read it from here.
+ */
+export const VARIABLE_CLOCK: readonly ClockStep[] = [
+  { fromMove: 1, seconds: 10 },
+  { fromMove: 6, seconds: 15 },
+  { fromMove: 11, seconds: 20 },
+  { fromMove: 16, seconds: 25 },
+  { fromMove: 21, seconds: 30 },
+];
+
+/**
+ * The move clock (seconds) on a move number: the step that move falls in (the first step before the schedule
+ * starts), or moveClockSeconds when there's no schedule. Every place that sets a clock (solo, the lobby server, the
+ * finals, the bots' timing, the timer on screen) goes through this.
+ */
+export function moveClockAt(s: Pick<Settings, "moveClockSeconds" | "moveClockSteps">, move: number): number {
+  const steps = s.moveClockSteps ?? [];
+  if (!steps.length) return s.moveClockSeconds;
+  const sorted = [...steps].sort((a, b) => a.fromMove - b.fromMove);
+  let seconds = sorted[0]!.seconds;
+  for (const step of sorted) if (move >= step.fromMove) seconds = step.seconds;
+  return seconds;
+}
+
+/** A schedule as the rules show it: moves 1-5 10 s, 6-10 15 s, …, 21 on 30 s (`to` is null for the last step). */
+export function clockStepRanges(steps: readonly ClockStep[]): { from: number; to: number | null; seconds: number }[] {
+  const sorted = [...steps].sort((a, b) => a.fromMove - b.fromMove);
+  return sorted.map((s, i) => ({ from: s.fromMove, to: i + 1 < sorted.length ? sorted[i + 1]!.fromMove - 1 : null, seconds: s.seconds }));
+}
+
 /** "Relaxed" is the default; "quick" shortens the reveal and the settling-in time on a new board. */
 export type Pace = "relaxed" | "quick";
 export const PACE_SETTINGS: Record<Pace, Partial<Settings>> = {
@@ -226,6 +275,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lobbySize: 64,
   groupSize: 8,
   moveClockSeconds: 30,
+  moveClockSteps: [],
+  voteChangeAllowed: false,
   timeBankSeconds: 600,
   timeIncrementSeconds: 5,
   powerUpsAtStart: 3,
