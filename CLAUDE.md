@@ -42,9 +42,14 @@ Above all: watch any board, move or animation change frame by frame with real ta
 
 ## Delegates
 
-Specialist agents live in `.claude/agents/` (one file each: a name, when to use it, its instructions). The main session
-directs; a delegate does one kind of work and reports back. Eric can also open a new session and talk to one directly
-("use the item-builder agent to add …"). Each session works on its own branch and opens its own PR.
+Specialist agents live in `.claude/agents/` (one file each: a name, when to use it, its instructions).
+- **One director at a time:** the window Eric is using for the app as a whole. It designs, hands work to delegates,
+  reviews what comes back and merges.
+- **How the director runs a delegate:** it can run the delegate itself as a sub-agent in its own window (the Agent
+  tool, with the agent's name), which is simplest for Eric. Or Eric can open a window for a delegate and paste a brief.
+- **Any other window works only in its own lane** and doesn't act as the director.
+- **Before starting,** check `git log origin/main` and open PRs for work already in flight.
+- Each piece of work goes on its own branch and PR.
 
 - `item-builder`: crate items and shop cosmetics (definition, art, fit, odds, tests, shipping). Its fitting sheet:
   `npm run preview:items -- out.png items=<id>`.
