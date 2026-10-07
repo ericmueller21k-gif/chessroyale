@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MATCHMAKING, RAID_SETTINGS, RANKING, isRankedMatch, modeSettings, type Settings } from "@chessroyale/core";
+import { MATCHMAKING, RAID_SETTINGS, RANKING, isRankedMatch, modeSettings, rankedMinHumans, type Settings } from "@chessroyale/core";
 import { setup } from "./lobby-fixture.ts";
 
 /** Matchmaking types in a lobby (Default, Bots off), and which matches count for ranking. Solo is the browser's. */
@@ -100,13 +100,39 @@ describe("lobby: matchmaking types", () => {
   });
 });
 
-describe("ranking: more than 25% bots doesn't count", () => {
-  it(`the rule: at most ${RANKING.rankedMaxBotShare * 100}% bots`, () => {
-    expect(isRankedMatch(0, 100)).toBe(true);
-    expect(isRankedMatch(25, 100)).toBe(true);
-    expect(isRankedMatch(26, 100)).toBe(false);
-    expect(isRankedMatch(99, 100)).toBe(false);
+describe("ranking: a match needs at least 30% real players", () => {
+  it(`the rule: real players fill at least ${RANKING.rankedMinHumanShare * 100}% of the mode's seats`, () => {
+    expect(rankedMinHumans(100)).toBe(30);
+    expect(rankedMinHumans(50)).toBe(15);
+    expect(rankedMinHumans(64)).toBe(20);
+    expect(isRankedMatch(30, 100)).toBe(true);
+    expect(isRankedMatch(29, 100)).toBe(false);
+    expect(isRankedMatch(15, 50)).toBe(true);
+    expect(isRankedMatch(14, 50)).toBe(false);
+    expect(isRankedMatch(20, 64)).toBe(true);
+    expect(isRankedMatch(19, 64)).toBe(false);
     expect(isRankedMatch(0, 0)).toBe(false);
+  });
+
+  it("a raid counts its seats, not just who came: Bots off with 10 people is unranked, with 15 ranked", () => {
+    for (const [people, ranked] of [
+      [MATCHMAKING.raidBotsOffMinPlayers, false],
+      [15, true],
+    ] as const) {
+      const L = setup({ ...RAID_SETTINGS });
+      L.core.setAuto(L.now + 60_000, true);
+      join(L, people);
+      L.advance(60_000);
+      expect(L.core.record.auto?.filledAt).toBe(L.now);
+      expect(L.core.record.bots).toHaveLength(0);
+      expect(L.core.ranked()).toBe(ranked);
+    }
+    // A Default raid of one: 49 bots, unranked.
+    const D = setup({ ...RAID_SETTINGS });
+    D.core.setAuto(D.now + 60_000);
+    join(D, 1);
+    D.advance(60_000);
+    expect(D.core.ranked()).toBe(false);
   });
 
   it("a lobby's results say whether it counted, and each person's too (practice never does)", () => {
@@ -117,23 +143,29 @@ describe("ranking: more than 25% bots doesn't count", () => {
       }
       expect(L.core.record.phase).toBe("results");
     };
-    // 48 people and 16 bots (Classic's 64 seats): exactly 25% bots, ranked. One of them practising (unlimited hints).
+    // 20 people and 44 bots (Classic's 64 seats): exactly 30% real players, ranked. One of them practising.
     const L = setup();
-    join(L, 47);
+    join(L, 19);
     L.core.connect(undefined, "Practice", "phone", true);
     L.core.message("p1", { t: "start" });
-    expect(L.core.record.bots).toHaveLength(16);
+    expect(L.core.record.bots).toHaveLength(44);
     // (Nobody here scores: with everyone gone, rounds time out and the match plays itself out.)
     for (const h of L.core.record.humans) L.core.disconnect(h.id);
     playOut(L);
     expect(L.core.ranked()).toBe(true);
     const mine = L.core.humanResults();
-    expect(mine.filter((r) => r.ranked)).toHaveLength(47);
-    expect(mine.find((r) => r.playerId === "p48")!.ranked).toBe(false);
+    expect(mine.filter((r) => r.ranked)).toHaveLength(19);
+    expect(mine.find((r) => r.playerId === "p20")!.ranked).toBe(false);
     L.core.connect(L.core.record.humans[0]!.token, "P0", "phone");
     expect(L.last("p1", "results")!.ranked).toBe(true);
 
-    // One person and 63 bots: unranked.
+    // 19 people and 45 bots: one short, unranked.
+    const S = setup();
+    join(S, 19);
+    S.core.message("p1", { t: "start" });
+    expect(S.core.ranked()).toBe(false);
+
+    // One person and 63 bots: unranked, and the results say so.
     const B = setup();
     B.core.connect(undefined, "Ann", "computer");
     B.core.message("p1", { t: "start" });

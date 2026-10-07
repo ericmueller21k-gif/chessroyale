@@ -2089,12 +2089,12 @@ points would choke first, and we've never load-tested it.
 - **Fail gracefully:** a "servers are busy, you're in line" message rather than errors.
 - **Per-player rate limits** on the API.
 
-## Matchmaking types, and bots don't rank (Oct 7, 2026)
+## Matchmaking types, and when a match counts for ranking (Oct 7, 2026)
 
 Eric: three clean options for every mode instead of a separate "play with bots": **Default** (bots after 60 s, with an
 ⓘ), **Bots off** (people only, with a warning) and **Solo** (you plus bots, at once); the 100 (or 50, or 64) seats
 always fill on screen, quickly when they're all bots; and "anytime more than say 25% of a lobby is bots, your
-ranking can't change". The `hub` delegate's calls:
+ranking can't change" (since replaced: see Ranking below). The `hub` delegate's calls:
 
 **The home screen**
 - **A Matchmaking row under the mode picker,** in the same shape with a word under each option ("bots at 60 s",
@@ -2143,20 +2143,26 @@ ranking can't change". The `hub` delegate's calls:
 **Ranking**
 - **What "ranking" is today:** the rating on your profile (the rank under your pawn), its chart and "Top N%". There's no
   ranked mode yet (see "Ranked, ratings and matchmaking").
-- **The rule:** a match counts for ranking when no more than 25% of its players are bots (`RANKING.rankedMaxBotShare`,
-  `isRankedMatch`; exactly 25% counts). **Solo never counts** (all bots, and its result comes from the browser).
-  **Practice never counts** either (unlimited hints, online too).
+- **The rule: a match counts for ranking only if at least 30% of its seats are real players**
+  (`RANKING.rankedMinHumanShare: 0.3`, `isRankedMatch`, `rankedMinHumans`). Exactly 30% counts.
+  - **Eric chose the ranked draft's 30-of-100 minimum over his earlier 25% bots rule (Oct 7).**
+  - **My call: it's a share of the mode's seats,** so it scales: 30 of a 50 v 50's 100, 15 of a raid's 50, 20 of
+    Classic's 64. A match that starts short counts its empty seats too: a Bots off raid that begins with 10 people is
+    unranked.
+  - **Solo never counts** (all bots, and its result comes from the browser).
+  - **Practice never counts** either (unlimited hints, online too).
+  - Leaving bot seats out of the rating maths is the `ranked` lane's job, later. This only stores the flag and shows it.
 - **Stored with each result** (`results.ranked`: 1, 0, or NULL for results from before the rule). Only ranked results
   move your rating, its chart and Top N%. Every result still counts in your stats.
 - **From now on, not backwards:** older results count as before, so nobody's rank disappears overnight (ratings that
   older solo games set stay until a ranked match replaces them).
-- **In words:** the queue says "Unranked: more than 25% bots" once the bots are in (Solo: "Unranked: solo games don't
-  count for ranking"), the results say why the match didn't change your ranking, and a profile's recent matches say
-  "unranked".
-- **With today's numbers almost no match is ranked:** it needs 75 people in a 50 v 50.
-- **Open question for Eric:** his rule (more than 25% bots and your ranking can't change) stands as built. The ranked
-  draft ("Ranked, ratings and matchmaking") says a ranked match needs a minimum of 30 real players in 100 instead.
-  Eric is deciding; either way it's one setting (`RANKING.rankedMaxBotShare`).
+- **In words:**
+  - the queue says "Unranked: fewer than 30 real players" once the bots are in (15 in a raid); Solo says "Unranked:
+    solo games don't count for ranking";
+  - the results say why the match didn't change your ranking;
+  - a profile's recent matches say "unranked";
+  - the ⓘ says what a match needs.
+- **With today's numbers almost no match is ranked:** it needs 30 people in a 50 v 50.
 
 **Back in from a fresh start** (the brief's item 7)
 - **Remembered:** the match you're seated in (`brc.current`). It's set when you join a lobby, and forgotten when you
@@ -2168,7 +2174,7 @@ ranking can't change". The `hub` delegate's calls:
 **Checking it**
 - Unit tests:
   - `lobby-types.test.ts`: Default and raid fills, Bots off waiting and its raid rule, the switch's hand-back and its
-    "a minute after you joined", ranked flags for 25% bots, 1 player, and practice;
+    "a minute after you joined", the 30% boundary in each mode, a raid that starts short, and practice;
   - `matchmaker.test.ts`: one queue per mode and type, Bots off lobbies with no fill, a switcher's wait;
   - `live.test.ts`: only ranked results move a rating; solo never does; older results count;
   - `solo-fill.test.ts`: the fill climbs, uses the match's bots, holds, starts; a raid's 49; Cancel.

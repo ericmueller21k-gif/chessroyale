@@ -515,16 +515,23 @@ export const MATCHMAKING = {
 } as const;
 
 /**
- * Ranking (the rating and rank on your profile, its chart and "Top N%"): a match changes them only if no more than this
- * share of its players were bots (Eric, Oct 7, 2026). Solo games are never ranked (all bots, and no server saw them).
+ * Ranking (the rating and rank on your profile, its chart and "Top N%"): a match counts toward it only if at least this
+ * share of its seats are real players (Eric, Oct 7, 2026: the ranked draft's 30 of 100, over his earlier "more than 25%
+ * bots" rule). Scaled to each mode's seats: 30 of a 50 v 50's 100, 15 of a raid's 50, 20 of Classic's 64. Solo games
+ * never count (all bots, and no server saw them).
  */
 export const RANKING = {
-  rankedMaxBotShare: 0.25,
+  rankedMinHumanShare: 0.3,
 } as const;
 
-/** A match counts for your ranking when no more than RANKING.rankedMaxBotShare of its players are bots. */
-export function isRankedMatch(bots: number, players: number, maxBotShare: number = RANKING.rankedMaxBotShare): boolean {
-  return players > 0 && bots / players <= maxBotShare;
+/** The real players a match needs to count for ranking, in a mode with this many seats (30 of 100; 15 of a raid's 50). */
+export function rankedMinHumans(seats: number, share: number = RANKING.rankedMinHumanShare): number {
+  return Math.ceil(seats * share - 1e-9);
+}
+
+/** A match counts for ranking when its real players fill at least RANKING.rankedMinHumanShare of its seats. */
+export function isRankedMatch(humans: number, seats: number, share: number = RANKING.rankedMinHumanShare): boolean {
+  return seats > 0 && humans >= rankedMinHumans(seats, share);
 }
 
 /**

@@ -4,7 +4,7 @@ import { named, test } from "./helpers.ts";
 /**
  * Matchmaking types (DECISIONS.md, "Matchmaking types"): Default (bots after the fill time; 8 s locally), Bots off
  * (people only, until full; one tap switches to Default keeping your place) and Solo (you and bots, the seats fill
- * fast). More than 25% bots, or Solo: unranked, said in words. Opening the app from scratch during a live match puts
+ * fast). Fewer than 30% real players (30 of 100), or Solo: unranked, said in words. Opening the app from scratch during a live match puts
  * you back in it, unless you left on purpose.
  */
 
@@ -23,7 +23,7 @@ test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warn
   // The ⓘ: Default adds bots after 60 seconds.
   await page.getByRole("button", { name: "About matchmaking" }).click();
   await expect(page.locator(".fd-types-info")).toContainText("Default adds bots after 60 seconds to keep the wait short.");
-  await expect(page.locator(".fd-types-info")).toContainText("doesn't change your ranking");
+  await expect(page.locator(".fd-types-info")).toContainText("Your ranking changes only in a match with at least 30 real players (15 in a raid).");
   await page.getByRole("button", { name: "About matchmaking" }).click();
   await expect(page.locator(".fd-types-info")).toHaveCount(0);
   // Bots off: a warning that the wait may be much longer.
@@ -95,7 +95,7 @@ test("Bots off: people only, it waits; one tap switches to Default, keeping your
   await expect(page.locator(".fd-seat.you")).toHaveCount(1);
   // The bots fill in, and it says this one won't count.
   await expect(page.locator(".fd-count-n")).toHaveText("100", { timeout: 15_000 });
-  await expect(page.locator(".fd-queue-rank")).toHaveText("Unranked: more than 25% bots");
+  await expect(page.locator(".fd-queue-rank")).toHaveText("Unranked: fewer than 30 real players");
   await expect.poll(() => phase(page), { timeout: 15_000 }).toBe("vote");
   // The other one is still waiting, people only, in their lobby.
   await expect(other.locator(".fd-count-n")).toHaveText("1");

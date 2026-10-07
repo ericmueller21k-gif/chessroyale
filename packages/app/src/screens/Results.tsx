@@ -7,7 +7,7 @@ import { ordinal } from "./StageBreak.tsx";
 import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection } from "../components/QuickChat.tsx";
-import { RANKING } from "@chessroyale/core";
+import { rankedMinHumans } from "@chessroyale/core";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
   const played = match.moves.filter((m) => m.move !== null);
@@ -92,7 +92,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
       {match.ranked === false && (
         <p class="results-unranked">
           {match.serverPaced
-            ? `Unranked: more than ${Math.round(RANKING.rankedMaxBotShare * 100)}% of the players were bots, so your ranking didn't change.`
+            ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`
             : "Unranked: solo games don't change your ranking."}
         </p>
       )}

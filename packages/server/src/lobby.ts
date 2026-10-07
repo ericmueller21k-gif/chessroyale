@@ -1233,7 +1233,7 @@ export class LobbyCore {
     rating: number | null;
     brilliant: number;
     bestMove: string | null;
-    /** It counts for their ranking: not too many bots (isRankedMatch), and they weren't practising (unlimited hints). */
+    /** It counts for their ranking: enough real players (isRankedMatch), and they weren't practising (unlimited hints). */
     ranked: boolean;
   } & MatchFeats)[] {
     const runner = this.runner;
@@ -1271,10 +1271,13 @@ export class LobbyCore {
     });
   }
 
-  /** The match counts for ranking: no more than RANKING.rankedMaxBotShare of its players are bots. */
+  /**
+   * The match counts for ranking: real players fill at least RANKING.rankedMinHumanShare of the mode's seats (30 of a
+   * 50 v 50's 100, 15 of a raid's 50). A match that started short (a raid with Bots off) counts its empty seats too.
+   */
   ranked(): boolean {
     const players = this.runner?.state.players ?? [];
-    return isRankedMatch(players.filter((p) => p.isBot).length, players.length);
+    return isRankedMatch(players.filter((p) => !p.isBot).length, Math.max(this.settings.lobbySize, players.length));
   }
 
   /** What the live line and the "playing now" list need to know about this lobby. */

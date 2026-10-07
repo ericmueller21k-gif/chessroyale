@@ -149,7 +149,7 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "boss_elo", type: "INTEGER" },
   // An online match's lobby code (Oct 7, 2026), so a closed lobby's link can offer "See your result". Never shown on a profile.
   { table: "results", column: "lobby", type: "TEXT" },
-  // Whether a result counts for ranking (Oct 7, 2026): 1 ranked, 0 not (over 25% bots, solo, practice), NULL from
+  // Whether a result counts for ranking (Oct 7, 2026): 1 ranked, 0 not (under 30% real players, solo, practice), NULL from
   // before the rule (counted as before). Ranking is the rating, its chart, "Top N%" and the rank.
   { table: "results", column: "ranked", type: "INTEGER" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
@@ -609,7 +609,7 @@ export interface PublicProfile {
     bestMove: string | null;
     bossElo: number | null;
     playedAt: number;
-    /** It counted for ranking (false: over 25% bots, solo or practice; null: from before the rule). */
+    /** It counted for ranking (false: under 30% real players, solo or practice; null: from before the rule). */
     ranked: boolean | null;
   }[];
 }

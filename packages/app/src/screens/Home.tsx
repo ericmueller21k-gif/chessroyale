@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, bossInfo, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RANKING, raidBossElo, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
+import { BOSS_TIERS, bossInfo, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { Coins, DressedPawn, FdButton, LiveLine, Logo, MyPawnButton, RankLine, myHat, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
@@ -315,7 +315,9 @@ const TYPES: { id: MatchmakingType; label: string; sub: string }[] = [
 
 /** What each way of being matched does, for the ⓘ. */
 function TypesInfo({ raid }: { raid: boolean }) {
-  const pct = Math.round(RANKING.rankedMaxBotShare * 100);
+  // (The real players a match needs to count: 30 of a 50 v 50's 100, 15 of a raid's 50.)
+  const crowdMin = rankedMinHumans(CROWD_SETTINGS.lobbySize ?? 100);
+  const raidMin = rankedMinHumans(RAID_SETTINGS.lobbySize ?? 50);
   return (
     <div class="fd-types-info" id="fd-types-info">
       <p>
@@ -327,7 +329,9 @@ function TypesInfo({ raid }: { raid: boolean }) {
       <p>
         <strong>Solo</strong> is you and bots, starting at once.
       </p>
-      <p class="fd-types-rank">A match with more than {pct}% bots, and every Solo game, doesn't change your ranking.</p>
+      <p class="fd-types-rank">
+        Your ranking changes only in a match with at least {crowdMin} real players ({raidMin} in a raid). Solo games never change it.
+      </p>
     </div>
   );
 }

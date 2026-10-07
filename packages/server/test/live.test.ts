@@ -237,7 +237,7 @@ describe("profiles", () => {
     await sql.run("UPDATE results SET ranked = NULL");
     await sql.run("UPDATE users SET rating = 1400 WHERE id = ?", user.id);
     await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 2, players: 100, rating: 1700, ranked: true }, 3000);
-    // Over 25% bots: on your record, not your ranking.
+    // Fewer than 30% real players: on your record, not your ranking.
     await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 1, players: 100, rating: 2300, ranked: false }, 4000);
     // Solo, even if the browser says otherwise: never ranked.
     await recordResult(sql, user.id, { mode: "crowd", online: false, placement: 1, players: 100, rating: 2600, ranked: true }, 5000);

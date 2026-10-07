@@ -1,6 +1,6 @@
 import { Component } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { FRONT_DOOR, MATCHMAKING, RANKING, isRankedMatch, type ItemLook, type MatchmakingType, type Settings } from "@chessroyale/core";
+import { FRONT_DOOR, MATCHMAKING, isRankedMatch, rankedMinHumans, type ItemLook, type MatchmakingType, type Settings } from "@chessroyale/core";
 import type { LobbyPlayer } from "@chessroyale/chess";
 import { BackButton, DressedPawn, myHat } from "../components/FrontDoor.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
@@ -177,8 +177,8 @@ export function QueueScreen({ match, onCancel, onLetBotsFill }: { match: QueueVi
   const unranked =
     type === "solo"
       ? "Unranked: solo games don't count for ranking"
-      : (filled || bots > 0) && !isRankedMatch(bots, seats.length)
-        ? `Unranked: more than ${Math.round(RANKING.rankedMaxBotShare * 100)}% bots`
+      : (filled || bots > 0) && !isRankedMatch(seats.length - bots, size)
+        ? `Unranked: fewer than ${rankedMinHumans(size)} real players`
         : null;
   const modeName = raid ? "Boss raid · up to 50" : match.settings.mode === "classic" ? `Classic · ${size} players` : "Crowd · 50 v 50";
   return (

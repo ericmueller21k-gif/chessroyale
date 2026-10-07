@@ -416,7 +416,7 @@ export type ServerMessage = { now: number } & (
       gameWinner?: "w" | "b" | null;
       /** Boss battle: who won it. */
       bossResult?: "crowd" | "boss" | "draw";
-      /** It counted for ranking (no more than RANKING.rankedMaxBotShare of the players were bots). Missing: an older server. */
+      /** It counted for ranking (real players filled at least RANKING.rankedMinHumanShare of the seats). Missing: an older server. */
       ranked?: boolean;
     }
 );
