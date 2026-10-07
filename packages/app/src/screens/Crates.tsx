@@ -298,8 +298,8 @@ function Spin({ tiles, land, ms, onDone }: { tiles: Tile[]; land: number; ms: nu
 }
 
 /**
- * Opening a crate: the server rolls, the strip spins to a tier's present (or Fischer Random), the present unwraps,
- * a second spin picks among its tier's items (when it holds more than one), then the reveal.
+ * Opening a crate: the server rolls, the strip spins to a tier's present, which unwraps straight to the reveal; or
+ * to Fischer Random, which gets its banner and a second spin among its items before the reveal.
  */
 function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fischer?: boolean; shiny?: boolean }; onClose: () => void }) {
   const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(null);
@@ -318,12 +318,11 @@ function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fis
     const { roll, item } = result;
     const finish = { color: item.color, color2: item.color2 ?? undefined, blemish: item.blemish, seed: item.seed };
     const tier = itemDef(item.def)!.tier as PresentTier;
-    const inside = roll.fischer ? crate.fischer : presentItems(crate, tier).map((def) => ({ item: def, weight: 1 }));
     return {
       tier,
-      many: inside.length > 1,
       one: stripTiles(presentTile(crate), roll.fischer ? { kind: "fischer" } : { kind: "present", tier }, 46, 38),
-      two: stripTiles(itemTile(inside), { kind: "item", def: item.def, finish }, 30, 24),
+      // Only Fischer Random spins again; a present opens straight to its item (Eric, Oct 7).
+      two: roll.fischer ? stripTiles(itemTile(crate.fischer), { kind: "item", def: item.def, finish }, 30, 24) : [],
     };
   }, [result]);
   const afterFirst = () => {
@@ -333,7 +332,7 @@ function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fis
       setTimeout(() => setStage("spin2"), 1700);
     } else {
       setStage("unwrap");
-      setTimeout(() => setStage(strips.many ? "spin2" : "reveal"), 1150);
+      setTimeout(() => setStage("reveal"), 1150);
     }
   };
   return (
@@ -349,7 +348,7 @@ function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fis
       )}
       {strips && stage === "unwrap" && <Unwrap tier={strips.tier} />}
       {strips && stage === "spin2" && (
-        <Spin key={`b${round}`} tiles={strips.two} land={24} ms={result?.roll.fischer ? 4800 : 3400} onDone={() => setStage("reveal")} />
+        <Spin key={`b${round}`} tiles={strips.two} land={24} ms={4800} onDone={() => setStage("reveal")} />
       )}
       {result && stage === "reveal" && (
         <Reveal
