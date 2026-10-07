@@ -26,7 +26,7 @@ test("home: the live line comes from the server, the mode picker changes the lin
   await other.close();
   // The line under PLAY follows the mode; Classic can't be queued for yet.
   await page.getByRole("radio", { name: /Boss raid/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText("Join a raid; the boss matches the group");
+  await expect(page.locator(".fd-hint")).toHaveText(/^Join a raid; bots fill the crowd after \d+ s$/);
   await page.getByRole("radio", { name: /Classic/ }).click();
   await expect(page.locator(".fd-hint")).toHaveText("Classic is being reworked");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeDisabled();
@@ -40,7 +40,7 @@ test("home: the live line comes from the server, the mode picker changes the lin
   }
 });
 
-test("home: Boss alone opens the boss menu; Play with friends offers lobbies and solo practice", async ({ page }) => {
+test("home: Boss alone opens the boss menu; Play with friends offers lobbies (practice is Solo, on the home screen)", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
@@ -53,7 +53,7 @@ test("home: Boss alone opens the boss menu; Play with friends offers lobbies and
   await sheet.getByLabel("Lobby code").fill("abcde");
   await expect(sheet.getByLabel("Lobby code")).toHaveValue("ABCDE");
   await expect(sheet.getByRole("button", { name: "Join lobby" })).toBeEnabled();
-  await expect(sheet.getByRole("button", { name: "Solo vs 99 bots" })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: /Solo vs/ })).toHaveCount(0);
 });
 
 test("settings: the old home's options live here and stick", async ({ page }) => {

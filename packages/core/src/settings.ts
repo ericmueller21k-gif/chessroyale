@@ -492,6 +492,54 @@ export const FRONT_DOOR = {
 } as const;
 
 /**
+ * How you're matched (the home screen's "Matchmaking", for every mode; see DECISIONS.md, "Matchmaking types"):
+ *   - default: real players; bots fill the empty seats once the queue has waited a minute;
+ *   - botsoff: real players only; the lobby waits until it's full (a raid: see raidBotsOff*);
+ *   - solo: you and bots, starting at once (played in your browser, like solo before).
+ */
+export type MatchmakingType = "default" | "botsoff" | "solo";
+export const MATCHMAKING_TYPES: readonly MatchmakingType[] = ["default", "botsoff", "solo"];
+
+export const MATCHMAKING = {
+  /** Solo: the bots pop into their seats over this long, then the seats stay full this long before the match begins. */
+  soloFillMs: 2_200,
+  soloHoldMs: 900,
+  /**
+   * Bots off, a boss raid: it starts when 50 have joined, or once it has waited the queue's usual minute with at least
+   * this many people (a raid of 10 is a real crowd: the same size as the Crowd's boss battle). A 50 v 50 waits until
+   * it's full.
+   */
+  raidBotsOffMinPlayers: 10,
+  /** Bots off → Default ("let bots fill"): your wait so far counts, but the bots never fill sooner than this. */
+  switchMinWaitMs: 5_000,
+  /**
+   * Bots off: a seat whose person has been gone this long is freed before anyone else joins (or a raid begins), so the
+   * count is real and a full lobby never starts with people who left. Back while it still waits: a new seat.
+   */
+  botsOffSeatHoldMs: 120_000,
+} as const;
+
+/**
+ * Ranking (the rating and rank on your profile, its chart and "Top N%"): a match counts toward it only if at least this
+ * share of its seats are real players (Eric, Oct 7, 2026: the ranked draft's 30 of 100, over his earlier "more than 25%
+ * bots" rule). Scaled to each mode's seats: 30 of a 50 v 50's 100, 15 of a raid's 50, 20 of Classic's 64. Solo games
+ * never count (all bots, and no server saw them).
+ */
+export const RANKING = {
+  rankedMinHumanShare: 0.3,
+} as const;
+
+/** The real players a match needs to count for ranking, in a mode with this many seats (30 of 100; 15 of a raid's 50). */
+export function rankedMinHumans(seats: number, share: number = RANKING.rankedMinHumanShare): number {
+  return Math.ceil(seats * share - 1e-9);
+}
+
+/** A match counts for ranking when its real players fill at least RANKING.rankedMinHumanShare of its seats. */
+export function isRankedMatch(humans: number, seats: number, share: number = RANKING.rankedMinHumanShare): boolean {
+  return seats > 0 && humans >= rankedMinHumans(seats, share);
+}
+
+/**
  * What bots wear on the vote board and the cut screen (core/bot-looks.ts), seeded by the bot's name so a bot always
  * looks the same. Mostly one thing, rarely two, plenty plain (Eric: nothing "crazy decked out"). Only items that
  * already exist: the shop's hats, and the crates' head, face and weapon pieces (no skins: they hide the team's

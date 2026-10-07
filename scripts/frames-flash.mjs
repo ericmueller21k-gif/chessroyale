@@ -24,8 +24,9 @@ if (mode === "boss") {
   await p.getByRole("button", { name: "Boss alone" }).click();
   await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Iron Bishop/ }).click();
 } else {
-  await p.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
-  await p.getByRole("button", { name: /^Solo vs \d+ bots$/ }).click();
+  // Matchmaking: Solo, then PLAY (the seats fill with bots, then the match).
+  await p.getByRole("radio", { name: /^Solo/ }).click();
+  await p.getByRole("button", { name: "PLAY", exact: true }).click();
 }
 const phase = () => p.evaluate(() => window.match?.phase.kind ?? "none").catch(() => "?");
 const waitPlay = async () => {

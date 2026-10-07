@@ -1,5 +1,5 @@
-import { DEFAULT_SETTINGS, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
-import { MatchRunner, boardSlots, netBoard, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
+import { DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
+import { MatchRunner, boardSlots, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, LAST_STAND_MS } from "@chessroyale/chess";
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
@@ -23,11 +23,22 @@ export function boardView(b: BoardState): BoardView {
 }
 
 /**
- * One human against 31 bots, entirely in the browser. Drives the shared
- * MatchRunner round by round.
+ * You against bots, entirely in the browser (Solo; and Boss alone, you against the boss). Drives the shared
+ * MatchRunner round by round. Solo starts on the queue screen: you in seat 1, then the bots who'll play pop into their
+ * seats (`fill`), then the match.
  */
 export class SoloMatch implements GameView {
   phase: Phase = { kind: "loading" };
+  /** Solo games never count for your ranking (all bots, and no server sees them). */
+  readonly ranked = false;
+  /** The queue screen (Solo): who has a seat so far, and when they're all in. */
+  readonly queueType: MatchmakingType = "solo";
+  auto = false;
+  readonly myId = HUMAN;
+  players: LobbyPlayer[] = [];
+  readonly looks = new Map<string, ItemLook>();
+  readonly fillAt: number | null = null;
+  filledAt: number | null = null;
   runner!: MatchRunner;
   moves: MoveRecord[] = [];
   scoringMs: number[] = [];
@@ -50,6 +61,8 @@ export class SoloMatch implements GameView {
     readonly playerName: string,
     private readonly baseSettings: Settings = DEFAULT_SETTINGS,
     readonly practice = false,
+    /** A boss raid with bots in the crowd (Solo); without, it's you against the boss (Boss alone). Other modes always have bots. */
+    private readonly raidBots = false,
   ) {}
 
   /** The match's settings (the move clock can change with Crowd augment votes). */
@@ -174,7 +187,44 @@ export class SoloMatch implements GameView {
     return this.runner.player(HUMAN);
   }
 
+  /** Starts at once (Boss alone; and tests). */
   start() {
+    this.createRunner();
+    this.begin();
+  }
+
+  /**
+   * Solo: the queue screen first. You're in seat 1, then the bots who'll play pop into their seats over
+   * MATCHMAKING.soloFillMs, the full lobby shows for a moment, and the match begins.
+   */
+  fill(fillMs: number = MATCHMAKING.soloFillMs, holdMs: number = MATCHMAKING.soloHoldMs) {
+    this.createRunner();
+    const bots = this.runner.state.players.filter((p) => p.isBot).map((p): LobbyPlayer => ({ id: p.id, name: p.name, isBot: true, connected: true }));
+    const me: LobbyPlayer = { id: HUMAN, name: this.playerName, isBot: false, connected: true };
+    this.auto = true;
+    this.players = [me];
+    this.set({ kind: "lobby" });
+    const t0 = Date.now();
+    const tick = () => {
+      // Easing in and out: a few, a rush, the last few.
+      const t = Math.min(1, (Date.now() - t0) / fillMs);
+      const n = Math.round(bots.length * (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2));
+      if (n > this.players.length - 1) {
+        this.players = [me, ...bots.slice(0, n)];
+        this.emit();
+      }
+      if (n < bots.length) return void (this.timer = setTimeout(tick, 40));
+      this.filledAt = Date.now();
+      this.emit();
+      this.timer = setTimeout(() => {
+        this.auto = false;
+        this.begin();
+      }, holdMs);
+    };
+    tick();
+  }
+
+  private createRunner() {
     warmEngineServer();
     this.runner = new MatchRunner({
       settings: this.settings,
@@ -183,13 +233,17 @@ export class SoloMatch implements GameView {
       engines: this.engines.map((e) => withServerRecheck(e, () => this.runner?.state.boards.length ?? 1)),
       library,
       raidSide: this.raidSide,
-      // A boss raid alone is just you against the boss.
+      // Boss alone is just you against the boss; a Solo raid has bots in the crowd.
       entrants: [
         { id: HUMAN, name: this.playerName, isBot: false, practice: this.practice },
-        ...(this.settings.raid ? [] : botRoster(this.rng, this.settings.lobbySize - 1, this.settings)),
+        ...(this.settings.raid && !this.raidBots ? [] : botRoster(this.rng, this.settings.lobbySize - 1, this.settings)),
       ],
     });
     this.runner.forceLastStand = this.forceLastStand;
+  }
+
+  /** The match begins: the pre-game votes, the boss's intro (a raid) or the opening. */
+  private begin() {
     if (pregameVotes(this.settings).length) return this.startVote(0);
     // Boss raid: straight to the boss's intro, which replays the opening from the starting position itself.
     if (this.settings.raid) return this.nextRound();
