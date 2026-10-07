@@ -4,7 +4,7 @@ import { QUICK_CHAT, chatSay, type ChatSay } from "@chessroyale/core";
 import { onAccountChange } from "../account.ts";
 import type { ChatLine, MatchChat } from "../chat.ts";
 import type { GameView } from "../game.ts";
-import { chatBubbles, onPrefsChange, setChatBubbles, setUnderBoardMode, underBoardMode, type UnderBoardMode } from "../prefs.ts";
+import { chatBubbles, foldUnderBoard, onPrefsChange, setChatBubbles, showUnderBoard, underBoardView, type UnderBoardView } from "../prefs.ts";
 import { openProfile } from "../profile-nav.ts";
 import { MiniTower } from "./MiniTower.tsx";
 import { UserIcon } from "./PixelIcon.tsx";
@@ -404,23 +404,19 @@ function ChatOptions({ match, chat, bubbles, onDone }: { match: GameView; chat: 
 
 /**
  * The space under the board. With chat on (online Crowd and raids), a phone splits it: the scoreboard on the left,
- * chat on the right. Either can go full width (its header's expand button), and back (split). The choice, and
- * minimising both, are remembered on the device. A computer shows chat in the column beside the board instead (the
- * leaderboard has the side of the screen). Without chat it's just the scoreboard.
+ * chat on the right. Either can go full width (its header's expand button), and back (split); the arrow folds it to
+ * its header bar. It's one remembered view (prefs.ts, underBoardView), so the buttons can't disagree: making a panel
+ * bigger or splitting again always opens it, and folding keeps the layout. A computer shows chat in the column beside
+ * the board instead (the leaderboard has the side of the screen). Without chat (solo, Classic) or with chat off,
+ * it's the scoreboard alone, full width, with no split buttons.
  */
 export function UnderBoard({ match }: { match: GameView }) {
   const chat = chatOf(match);
   const wide = useMedia(WIDE);
-  const [mode, setMode] = useState<UnderBoardMode>(underBoardMode);
-  const [open, setOpen] = useState(() => {
-    try {
-      return localStorage.getItem("brc.miniTower") !== "0";
-    } catch {
-      return true;
-    }
-  });
-  useEffect(() => onPrefsChange(() => setMode(underBoardMode())), []);
-  if (!chat) return <MiniTower match={match} />;
+  const [view, setView] = useState<UnderBoardView>(underBoardView);
+  useEffect(() => onPrefsChange(() => setView(underBoardView())), []);
+  // (Its own fold arrow, on the same view.)
+  if (!chat || chat.off) return <MiniTower match={match} />;
   if (wide) {
     return (
       <div class="under-board side">
@@ -428,52 +424,47 @@ export function UnderBoard({ match }: { match: GameView }) {
       </div>
     );
   }
-  const pick = (m: UnderBoardMode) => {
-    setMode(m);
-    setUnderBoardMode(m);
-  };
-  const toggle = () => {
-    setOpen(!open);
-    try {
-      localStorage.setItem("brc.miniTower", open ? "0" : "1");
-    } catch {
-      // Not important.
-    }
-  };
-  const fold = <FoldButton open={open} onToggle={toggle} />;
+  const { layout, open } = view;
+  const fold = <FoldButton open={open} onToggle={() => foldUnderBoard(!open)} />;
   const unread = chat.unread();
+  // (The classes are ub-…: a bare "board" would pick up the chessboard's own rules.)
   return (
-    <div class={`under-board ${mode}${open ? "" : " closed"}`}>
-      {mode !== "chat" && (
+    <div class={`under-board ub-${layout}${open ? "" : " closed"}`}>
+      {layout !== "chat" && (
         <MiniTower
           match={match}
-          narrow={mode === "split"}
+          narrow={layout === "split"}
           open={open}
           floats={chat.floats()}
           head={
             <>
-              {!chat.visible && unread > 0 && !chat.off && (
+              {!chat.visible && unread > 0 && (
                 <button
                   type="button"
                   class="qunread"
                   aria-label={`${unread} new in chat: show chat`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (mode === "board") pick("split");
-                    if (!open) toggle();
+                    showUnderBoard("split");
                   }}
                 >
                   💬 {unread}
                 </button>
               )}
-              <SplitButton full={mode === "board"} what="Leaderboard" onClick={() => pick(mode === "board" ? "split" : "board")} />
-              {mode === "board" && fold}
+              <SplitButton full={layout === "board"} what="Leaderboard" onClick={() => showUnderBoard(layout === "board" ? "split" : "board")} />
+              {layout === "board" && fold}
             </>
           }
         />
       )}
-      {mode !== "board" && (
-        <ChatPanel match={match} chat={chat} variant={mode === "chat" ? "full" : "split"} head={<SplitButton full={mode === "chat"} what="Chat" onClick={() => pick(mode === "chat" ? "split" : "chat")} />} fold={fold} />
+      {layout !== "board" && (
+        <ChatPanel
+          match={match}
+          chat={chat}
+          variant={layout === "chat" ? "full" : "split"}
+          head={<SplitButton full={layout === "chat"} what="Chat" onClick={() => showUnderBoard(layout === "chat" ? "split" : "chat")} />}
+          fold={fold}
+        />
       )}
     </div>
   );

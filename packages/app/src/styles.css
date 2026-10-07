@@ -8312,6 +8312,11 @@ img.qicon {
   }
 }
 
+/* Folded, the scoreboard keeps its share of the width beside chat (or all of it): only its height folds. */
+.screen.game .under-board > .mini-tower.closed {
+  flex: 1 1 0;
+}
+
 /* Computers: the column beside the board. 900-1099 px keeps the phone's split (the scoreboard is there); from
    1100 px the leaderboard has the side of the screen and chat gets the column under the panel. */
 @media (min-width: 900px) and (min-height: 600px) {

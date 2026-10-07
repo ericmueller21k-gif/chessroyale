@@ -24,7 +24,7 @@ for (const [pg, name] of [[p, "Framey"], [other, "Chatty"]]) {
   pg.on("pageerror", (e) => console.log("pageerror", name, e.message));
   await pg.addInitScript(([n, l]) => {
     if (!localStorage.getItem("brc.name")) localStorage.setItem("brc.name", n);
-    localStorage.setItem("brc.underBoard", l);
+    localStorage.setItem("brc.underBoardView", JSON.stringify({ layout: l, open: true }));
   }, [name, layout]);
 }
 const pool = `frames${Date.now()}`;

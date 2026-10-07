@@ -173,3 +173,26 @@ against its width, and the cut pill against the sound button. Then `e2e/crowd.sp
   scores). Measure it; don't only look at a screenshot at the test phone's size.
 - A fixed-height box with `overflow: hidden` hides what doesn't fit, and no test fails. Show whole items and count
   the rest instead.
+
+## An empty box under the board (Oct 7, 2026)
+
+**Eric saw:** on his iPhone, the scoreboard under the board was a tall black box with nothing in it, about two thirds
+of the screen wide.
+
+**The cause:**
+- Two buttons each kept half of the view: the layout (side by side, or one panel full width) and the fold. Folding,
+  then making the scoreboard full width, left "full width, folded".
+- That layout's class was the bare word `board`, so the chessboard's `.board { width: 100%; height: 100% }` applied
+  to the panel. Open, its flex sizing hid that. Folded, the panel took the screen's full height, with only the
+  folded header inside.
+- Every test passed: none folded the panel and then changed its layout, and none looked for an empty box.
+
+**How it was found:** a script loaded an online match on an emulated iPhone with each saved combination and measured
+the panel (height, rows, chat). Then it listed every CSS rule matching the empty panel, and `.board` was among them.
+
+**The rule:**
+- Give state classes a prefix (`ub-board`, not `board`). A plain word can already be another component's rule.
+- One state per view, changed only by named actions, not one setting per button. When a control makes something
+  bigger, it shows its content.
+- For a panel with several controls, test every button from every state, with a reload after each, and assert the
+  panel is never an empty box (`e2e/panel.spec.ts`).
