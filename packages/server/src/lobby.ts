@@ -66,6 +66,8 @@ export interface LobbyIO {
    * answer comes back through serverScored(id, …), null if the server couldn't answer (down, out of budget, slow).
    */
   serverScore?(req: ServerScoreRequest): void;
+  /** Many judges: how each of the round's jobs was settled, as the round's scores go in (the harness measures with it). */
+  settled?(jobs: { id: string; boardId: number; how: JudgeHow; judges: string[]; board: JudgedBoard }[]): void;
 }
 
 /** A deep search the lobby asks of the engine server (a verdict, a re-check of close calls, a spot check). */
@@ -221,8 +223,13 @@ export interface JudgesRecord {
   tasks?: Record<string, JudgeTask>;
   /** Second opinions after a disagreement (a third device; blame only, nothing waits for them), by job id. */
   referees?: Record<string, { job: JudgeJob; by: string; boards: Record<string, JudgedBoard | null>; at: number }>;
-  /** Spot checks of jobs one judge answered alone, waiting on the engine server. */
-  spots?: Record<string, { job: JudgeJob; judge: string; board: JudgedBoard }>;
+  /**
+   * Checks on the engine server afterwards, by request id: a spot check of a job one judge answered alone (one board),
+   * or a late second answer that disagreed with the one used (two boards).
+   */
+  spots?: Record<string, { job: JudgeJob; boards: Record<string, JudgedBoard> }>;
+  /** Jobs settled on one answer while another judge was still searching: its answer is compared when it comes. */
+  late?: Record<string, { job: JudgeJob; judge: string; board: JudgedBoard; pending: string[]; at: number }>;
   stats: JudgeStats;
 }
 
@@ -1321,6 +1328,7 @@ export class LobbyCore {
     const tasks: Record<string, JudgeTask> = {};
     // Old second opinions nobody answered.
     for (const [id, ref] of Object.entries(this.jr.referees ?? {})) if (now - ref.at > 60_000) delete this.jr.referees![id];
+    for (const [id, l] of Object.entries(this.jr.late ?? {})) if (now - l.at > 60_000) this.lateGone(id);
     for (const sj of this.r.scoreRequest!.jobs) {
       const job: JudgeJob = {
         id: `${round.key}/${sj.boardId}`,
@@ -1369,6 +1377,7 @@ export class LobbyCore {
 
   /** A judge disconnected: anything it owed goes to another device (or the other judge's answer stands). */
   private judgeGone(playerId: string) {
+    for (const [id, l] of Object.entries(this.r.judges?.late ?? {})) if (l.pending.includes(playerId)) this.lateGone(id, playerId);
     const tasks = this.r.judges?.tasks;
     if (this.r.phase !== "scoring" || !tasks) return;
     for (const t of Object.values(tasks)) {
@@ -1411,6 +1420,8 @@ export class LobbyCore {
     if (typeof id !== "string") return;
     const ref = this.r.judges?.referees?.[id];
     if (ref) return this.refereeAnswer(playerId, id, report);
+    const late = this.r.judges?.late?.[id];
+    if (late?.pending.includes(playerId)) return this.lateAnswer(playerId, id, report);
     const t = this.r.judges?.tasks?.[id];
     if (this.r.phase !== "scoring" || this.r.round?.key !== key || !t || t.done || t.server || !t.judges.includes(playerId) || playerId in t.reports) return;
     t.reports[playerId] = report;
@@ -1448,11 +1459,16 @@ export class LobbyCore {
     }
     if (valid.length === 1 && (!pending.length || (t.waitUntil !== undefined && now >= t.waitUntil))) {
       const [a] = valid as [string];
-      if (pending.length) console.log(`judge late: ${this.r.code} job ${t.job.id}: ${pending.join(", ")} (using ${a}'s answer)`);
+      if (pending.length) {
+        console.log(`judge late: ${this.r.code} job ${t.job.id}: ${pending.join(", ")} (using ${a}'s answer)`);
+        // Its answer still counts for blame: compared with the one used when it comes.
+        (this.jr.late ??= {})[t.job.id] = { job: t.job, judge: a, board: t.boards[a]!, pending, at: now };
+      }
       t.judges = [a];
       this.jr.stats.single++;
-      // One of two answered: a spot check on the engine server now and then (afterwards: the round doesn't wait).
-      if (t.want >= 2 && this.serverOn && this.jrng() < this.jcfg.spotCheckShare) this.spotCheck(t, a);
+      // The other judge is gone (dropped, timed out, or its answer didn't hold together): now and then a spot check
+      // on the engine server (afterwards: the round doesn't wait). A late one is checked against its answer instead.
+      if (t.want >= 2 && !pending.length) this.maybeSpotCheck(t.job, a, t.boards[a]!);
       return this.accept(t, t.boards[a]!, "single");
     }
     if (valid.length === 1) {
@@ -1530,12 +1546,23 @@ export class LobbyCore {
     t.done = { board: t.boards[pick]!, how: "fallback" };
   }
 
-  /** One judge's answer used alone: the engine server checks it afterwards (blame only). */
-  private spotCheck(t: JudgeTask, judge: string) {
-    const id = `spot:${t.job.id}`;
-    (this.jr.spots ??= {})[id] = { job: t.job, judge, board: t.boards[judge]! };
+  /** One judge's answer used alone, with no second answer to check it against: now and then the engine server checks it afterwards (blame only). */
+  private maybeSpotCheck(job: JudgeJob, judge: string, board: JudgedBoard) {
+    if (!this.serverOn || this.jrng() >= this.jcfg.spotCheckShare) return;
+    const id = `spot:${job.id}`;
+    (this.jr.spots ??= {})[id] = { job, boards: { [judge]: board } };
     this.jr.stats.serverSpot++;
-    this.askServer(id, t.job.fen, verdictMoves(t.job, [t.reports[judge]!], [t.boards[judge]!]));
+    this.askServer(id, job.fen, verdictMoves(job, [], [board]));
+  }
+
+  /** A late judge that will never answer (gone, or too long): the job it owed is as good as answered alone. */
+  private lateGone(id: string, judge?: string) {
+    const late = this.r.judges?.late?.[id];
+    if (!late) return;
+    late.pending = judge ? late.pending.filter((j) => j !== judge) : [];
+    if (late.pending.length) return;
+    delete this.r.judges!.late![id];
+    this.maybeSpotCheck(late.job, late.judge, late.board);
   }
 
   /** The engine server's answer (null: it couldn't). */
@@ -1544,11 +1571,16 @@ export class LobbyCore {
     if (spot) {
       delete this.r.judges!.spots![id];
       if (!moves) return void this.jr.stats.serverFailed++;
-      const verdict = verdictBoard(spot.job, moves, spot.board);
-      const d = verdict ? distanceFrom(verdict, spot.board) : 0;
-      if (d >= this.jcfg.soloBlame) {
+      const judges = Object.keys(spot.boards);
+      const boards = judges.map((j) => spot.boards[j]!);
+      const verdict = verdictBoard(spot.job, moves, boards[0]!);
+      if (!verdict) return;
+      // (A late answer's dispute with a second opinion pending: that decides instead.)
+      if (judges.length === 2 && this.r.judges?.referees?.[`${spot.job.id}~ref`]) return;
+      const { blamed, distances } = blameJudge(verdict, boards, this.jcfg.blameMargin, this.jcfg.soloBlame);
+      for (const i of blamed) {
         this.jr.stats.spotCaught++;
-        this.strike(spot.judge, `spot check of ${spot.job.id}: ${d.toFixed(1)} points off the engine server`);
+        this.strike(judges[i]!, `${judges.length === 1 ? "spot check" : "late answer's dispute"} on ${spot.job.id}: ${distances[i]!.toFixed(1)} points off the engine server`);
       }
       return;
     }
@@ -1580,13 +1612,46 @@ export class LobbyCore {
       return this.afterJudging();
     }
     const { blamed, distances } = blameJudge(first, [t.boards[a]!, t.boards[b]!], this.jcfg.blameMargin, this.jcfg.soloBlame);
-    const closer = distances[0]! <= distances[1]! ? a : b;
+    // (A tie: the judge with fewer strikes.)
+    const strikesOf = (j: string) => this.jr.devices[j]?.strikes ?? 0;
+    const closer = distances[0]! < distances[1]! || (distances[0] === distances[1] && strikesOf(a) <= strikesOf(b)) ? a : b;
     t.done = { board: closer === a ? first : verdictBoard(t.job, moves, t.boards[b]!)!, how: "verdict" };
     const refereed = !!this.r.judges?.referees?.[`${t.job.id}~ref`];
     console.log(`judges: verdict for ${t.job.id} in ${this.r.code}: ${a} ${distances[0]!.toFixed(1)} and ${b} ${distances[1]!.toFixed(1)} points off${refereed ? " (a third device decides who's to blame)" : ""}`);
     // A third device will say exactly who was off; without one, blame goes by distance from the verdict.
     if (!refereed) for (const i of blamed) this.strike(i === 0 ? a : b, `${distances[i]!.toFixed(1)} points off the engine server's verdict on ${t.job.id}`);
     this.afterJudging();
+  }
+
+  /**
+   * A judge's answer that came after the job was settled on the other's: compared now. Agreement: nothing to do.
+   * Disagreement: a dispute after the fact (blame only; the round's scores stand): a third device's second opinion,
+   * and the engine server.
+   */
+  private lateAnswer(playerId: string, id: string, report: JudgeReport) {
+    const late = this.r.judges!.late![id]!;
+    late.pending = late.pending.filter((j) => j !== playerId);
+    if (!late.pending.length) delete this.r.judges!.late![id];
+    const mine = judgedBoard(late.job, report);
+    if (!mine) {
+      this.jr.stats.invalid++;
+      return this.strike(playerId, `late report for ${id} doesn't hold together`);
+    }
+    if (boardsAgree(late.board, mine, this.jcfg.tolerance).agree) return void this.jr.stats.lateAgreed++;
+    this.jr.stats.lateDisagreed++;
+    console.log(`judges disagree (late): ${this.r.code} job ${id} (${late.judge} v ${playerId}); the scores used stand`);
+    const [ref] = drawJudges(() => this.jrng(), this.judgeDevices(), 1, this.jcfg, new Map(), new Set([late.judge, playerId]));
+    if (ref) {
+      const rid = `${id}~ref`;
+      (this.jr.referees ??= {})[rid] = { job: { ...late.job, id: rid }, by: ref, boards: { [late.judge]: late.board, [playerId]: mine }, at: this.io.now() };
+      this.io.send(ref, { t: "judge", key: this.r.round?.key ?? "", jobs: [{ ...late.job, id: rid }] });
+    }
+    if (this.serverOn) {
+      const sid = `late:${id}`;
+      (this.jr.spots ??= {})[sid] = { job: late.job, boards: { [late.judge]: late.board, [playerId]: mine } };
+      this.jr.stats.serverSpot++;
+      this.askServer(sid, late.job.fen, verdictMoves(late.job, [], [late.board, mine]));
+    }
   }
 
   /** A third device's second opinion on a dispute: whichever judge it doesn't match exactly gets a strike. */
@@ -1658,13 +1723,14 @@ export class LobbyCore {
         mates: b.mates,
       };
     });
-    // Crowd: the early bot picks someone sent must be what the job worked out (from the same seed).
+    // Crowd: the early bot picks someone sent must be what two agreeing judges worked out (from the same seed).
     const plan = round.botPlan;
     const first = boards[0];
     const firstHow = Object.values(tasks)[0]?.done?.how;
-    if (plan?.by && first && (firstHow === "agreed" || firstHow === "verdict") && Object.entries(plan.picks).some(([id, m]) => first.botPicks[id] !== undefined && first.botPicks[id] !== m)) {
+    if (plan?.by && first && firstHow === "agreed" && Object.entries(plan.picks).some(([id, m]) => first.botPicks[id] !== undefined && first.botPicks[id] !== m)) {
       this.strike(plan.by, `bot picks it planned for ${round.key} don't follow from the position`);
     }
+    this.io.settled?.(Object.values(tasks).map((t) => ({ id: t.job.id, boardId: t.boardId, how: t.done!.how, judges: [...t.judges], board: t.done!.board })));
     this.jr.tasks = undefined;
     this.r.timer = null;
     this.applyScores(boards, true);

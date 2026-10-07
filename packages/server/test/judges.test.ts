@@ -208,25 +208,59 @@ describe("many judges: the lobby", () => {
     expect(L.core.record.judges!.stats).toMatchObject({ disagreed: 1, fallback: 1, serverVerdict: 0 });
   });
 
-  it("a late judge: the first answer is used after the grace time, and some such jobs get a spot check afterwards", async () => {
-    const L = setup({ server: true, judges: { spotCheckShare: 1, graceMs: 1500, graceFactor: 1 } });
-    L.begin(3);
-    L.pickAll(3);
+  it("a late judge: the first answer is used after the grace time; the late answer is still compared, and a judge that never answers brings a spot check now and then", async () => {
+    const L = setup({ server: true, judges: { spotCheckShare: 1, graceMs: 300, graceFactor: 0.5 } });
+    L.begin(4);
+    L.pickAll(4);
     const [first, late] = L.judgesOf() as [string, string];
-    L.advance(400);
+    L.advance(1000);
     await L.answer(first);
     expect(L.core.record.phase).toBe("scoring");
-    L.advance(1400);
+    // Grace: the longer of 300 ms and half the first's time (500 ms).
+    L.advance(450);
     expect(L.core.record.phase).toBe("scoring");
-    L.advance(200);
-    // Spot check asked; the round didn't wait for it (only close calls' re-check might hold it).
+    L.advance(100);
+    L.serve(); // (any re-check of close calls)
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats).toMatchObject({ single: 1, serverSpot: 0 });
+    // The late answer arrives after all: compared (it agrees), and the reveal stands.
+    expect(await L.answer(late)).toBe(1);
+    expect(L.core.record.judges!.stats.lateAgreed).toBe(1);
+    expect(L.core.record.phase).toBe("reveal");
+    // Next round: the late judge drops out without answering: a spot check (share 1 here) on the one answer used.
+    for (let i = 0; i < 60 && L.core.record.phase !== "play"; i++) L.advance(500);
+    L.pickAll(4);
+    const [f2, l2] = L.judgesOf() as [string, string];
+    L.advance(1000);
+    await L.answer(f2);
+    L.advance(600);
+    L.serve();
+    expect(L.serverAsks.some((r) => r.id.startsWith("spot:"))).toBe(false);
+    L.core.disconnect(l2);
     expect(L.serverAsks.some((r) => r.id.startsWith("spot:"))).toBe(true);
     L.serve();
-    expect(L.core.record.phase).toBe("reveal");
-    expect(L.core.record.judges!.stats).toMatchObject({ single: 1, serverSpot: 1 });
-    // The late answer arrives after all: ignored.
-    expect(await L.answer(late)).toBe(1);
-    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats.serverSpot).toBe(1);
+  });
+
+  it("a cheater whose honest partner was late is caught when the late answer comes", async () => {
+    const L = setup({ server: true, judges: { spotCheckShare: 0 } });
+    L.begin(3);
+    L.pickAll(3);
+    const [liar, honestOne] = L.judgesOf() as [string, string];
+    const job = L.last(liar, "judge")!.jobs[0]!;
+    // The liar lifts the worst pick to the best.
+    const worst = [...job.picks].sort((x, y) => truth(job.fen, x) - truth(job.fen, y))[0]!;
+    await L.answer(liar, cheat(worst));
+    L.advance(5000);
+    L.serve(); // (any re-check of close calls)
+    expect(L.core.record.phase).not.toBe("scoring");
+    await L.answer(honestOne);
+    expect(L.core.record.judges!.stats.lateDisagreed).toBe(1);
+    // The third device's second opinion, and the server, settle the blame.
+    for (const id of ["p1", "p2", "p3"]) await L.answer(id);
+    L.serve();
+    expect(L.core.record.judges!.devices[liar]!.strikes).toBe(1);
+    expect(L.core.record.judges!.devices[honestOne]!.strikes).toBe(0);
   });
 
   it("a judge that drops before answering is replaced; one whose answer doesn't hold together is struck and replaced", async () => {

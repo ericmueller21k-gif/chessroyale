@@ -60,6 +60,9 @@ export interface JudgeStats {
   /** Referee answers (a third device on a disagreement) and spot checks that found a judge off. */
   refereed: number;
   spotCaught: number;
+  /** Late second answers (after the job was settled on the first): matching it, or not. */
+  lateAgreed: number;
+  lateDisagreed: number;
 }
 
 export const emptyStats = (): JudgeStats => ({
@@ -78,6 +81,8 @@ export const emptyStats = (): JudgeStats => ({
   benched: 0,
   refereed: 0,
   spotCaught: 0,
+  lateAgreed: 0,
+  lateDisagreed: 0,
 });
 
 /** A device's weight when judges are drawn: faster devices more often, and less once it has jobs this round. */

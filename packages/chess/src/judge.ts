@@ -166,7 +166,7 @@ export function verdictMoves(job: JudgeJob, reports: readonly (JudgeReport | nul
   const legal = new Set(legalMoves(job.fen));
   const moves = new Set<string>(job.picks);
   for (const r of reports) for (const m of [...(Array.isArray(r?.top) ? r!.top : []), ...(Array.isArray(r?.extra) ? r!.extra : [])]) if (m && legal.has(m.move)) moves.add(m.move);
-  for (const b of boards) for (const m of b?.botPicks ?? []) moves.add(m);
+  for (const b of boards) for (const m of [...(b?.botPicks ?? []), ...Object.keys(b?.expectedAfter ?? {})]) moves.add(m);
   if (job.barred && moves.size > 1) moves.delete(job.barred);
   return [...moves].filter((m) => legal.has(m)).sort();
 }
@@ -209,22 +209,33 @@ export function boardLosses(b: Pick<JudgedBoard, "bestExpected" | "expectedAfter
  * How far a judge's board is from the verdict: the worst difference in any move's loss (points), over the moves
  * both scored. A report that didn't hold together (null) is infinitely far.
  */
-export function distanceFrom(verdict: JudgedBoard, b: JudgedBoard | null): number {
+export function distanceFrom(verdict: JudgedBoard, b: JudgedBoard | null, only?: ReadonlySet<string>): number {
   if (!b) return Infinity;
   const v = boardLosses(verdict);
   const mine = boardLosses(b);
   let worst = 0;
-  for (const [m, loss] of Object.entries(mine)) if (v[m] !== undefined) worst = Math.max(worst, Math.abs(loss - v[m]!));
+  for (const [m, loss] of Object.entries(mine)) if (v[m] !== undefined && (!only || only.has(m))) worst = Math.max(worst, Math.abs(loss - v[m]!));
   return worst;
 }
 
+/** The moves two boards disagree on (their losses differ, or only one scored it). */
+export function disputedMoves(a: JudgedBoard, b: JudgedBoard): Set<string> {
+  const la = boardLosses(a);
+  const lb = boardLosses(b);
+  const out = new Set<string>();
+  for (const m of new Set([...Object.keys(la), ...Object.keys(lb)])) if (la[m] === undefined || lb[m] === undefined || Math.abs(la[m]! - lb[m]!) > 1e-6) out.add(m);
+  return out;
+}
+
 /**
- * After a verdict: which judge to blame (index), if either. Of two, the further one, when it's further by at least
- * `margin` points; a lone judge (a spot check), when it's at least `soloMargin` away. A report that didn't hold
- * together is always blamed.
+ * After a verdict: which judge to blame (index), if either. Of two, the further one on the moves they disagree about
+ * (the engine-to-engine noise on the rest is the same for both), when it's further by at least `margin` points; a
+ * lone judge (a spot check), when it's at least `soloMargin` away anywhere. A report that didn't hold together is
+ * always blamed.
  */
 export function blameJudge(verdict: JudgedBoard, boards: readonly (JudgedBoard | null)[], margin: number, soloMargin = margin): { blamed: number[]; distances: number[] } {
-  const distances = boards.map((b) => distanceFrom(verdict, b));
+  const disputed = boards.length === 2 && boards[0] && boards[1] ? disputedMoves(boards[0], boards[1]) : undefined;
+  const distances = boards.map((b) => distanceFrom(verdict, b, disputed?.size ? disputed : undefined));
   const blamed = new Set<number>();
   distances.forEach((d, i) => d === Infinity && blamed.add(i));
   if (distances.length === 2 && !blamed.size) {

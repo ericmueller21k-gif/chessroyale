@@ -562,19 +562,23 @@ export const JUDGES: JudgeConfig = {
    * is at least this many points off the server's: beyond the worst honest difference measured (see
    * reports/judge-determinism.md), so only a gross lie is caught this way.
    */
-  soloBlame: 35,
+  soloBlame: 50,
   /** Strikes before a device is given no more jobs this match. */
   strikes: 2,
-  /** Share of jobs answered by one judge only (the other late or gone) that the engine server checks afterwards. */
+  /**
+   * Share of jobs answered by one judge only, the other gone without answering (dropped, timed out), that the engine
+   * server checks afterwards. (A late judge's answer is compared with the one used when it comes, instead.)
+   */
   spotCheckShare: 0.25,
   /**
-   * After the first judge answers, how long the lobby waits for the second (ms), at least, or this many times as
-   * long as the first took, whichever is longer, before using the first answer alone.
+   * After the first judge answers, how long the lobby waits for the second (ms), at least, or this fraction of the
+   * time the first took, whichever is longer, before using the first answer alone (so a round is never held up by a
+   * slow phone). The late answer is still compared when it comes, for blame (the scores used stand).
    */
-  graceMs: 1500,
-  graceFactor: 1,
+  graceMs: 150,
+  graceFactor: 0.25,
   /** Choosing judges: weight = (nodes per second) ^ speedWeight, so a computer judges more often than a phone. */
-  speedWeight: 1.5,
+  speedWeight: 3,
   /** A device's speed check on joining: one search of this many nodes, timed. */
   benchNodes: 150_000,
   /** A device that hasn't reported its speed yet counts as this fast (nodes/s): a typical phone. */
