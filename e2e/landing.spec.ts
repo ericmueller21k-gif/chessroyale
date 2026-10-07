@@ -41,7 +41,14 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   await expect(page.locator(".fd-hint")).toContainText("Solo vs 99 bots");
   await page.getByRole("button", { name: "Sign in to play online" }).click();
   await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();
-  // An invite link asks a guest to sign in to join, and Google brings them back to the lobby.
+  // An old link to a lobby that has closed: the landing says so, and doesn't offer to join it.
+  await page.goto("/lobby/ZZZZ9");
+  await expect(page.getByRole("status").filter({ hasText: "That match has ended." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/");
+  // An invite link (to a lobby that's open: the server's answer, faked) asks a guest to sign in to join, and Google
+  // brings them back to the lobby.
+  await page.route("**/api/lobby/ABCDE", (r) => r.fulfill({ json: { open: true, phase: "waiting" } }));
   await page.goto("/lobby/ABCDE");
   await expect(page.getByRole("heading", { name: "Sign in to join lobby ABCDE" })).toBeVisible();
   await page.getByRole("button", { name: "Continue with Google" }).click();

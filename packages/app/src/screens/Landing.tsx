@@ -43,12 +43,15 @@ export function LandingScreen({
   google,
   email,
   joinCode,
+  notice,
   failed,
   onGuest,
 }: {
   google: boolean;
   email: boolean;
   joinCode?: string;
+  /** An old link's lobby has closed ("That match has ended."). */
+  notice?: string;
   failed?: boolean;
   onGuest: () => void;
 }) {
@@ -72,6 +75,11 @@ export function LandingScreen({
           <figcaption class="muted small">A 50 v 50 match</figcaption>
         </figure>
         <div class="landing-actions">
+          {notice && (
+            <p class="landing-notice" role="status">
+              {notice}
+            </p>
+          )}
           <section class="signin landing-signin">
             <h2>{joinCode ? `Sign in to join lobby ${joinCode}` : "Sign in to play online"}</h2>
             <SignIn google={google} email={email} next={joinCode ? `/lobby/${joinCode}` : "/"} failed={failed} />

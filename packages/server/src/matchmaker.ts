@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { LobbyRecord } from "./lobby.ts";
-import { randomCode } from "./codes.ts";
+import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
 
 /**
@@ -18,15 +18,11 @@ export class Matchmaker extends DurableObject<Env> {
         const stub = this.env.LOBBIES.get(this.env.LOBBIES.idFromName(current));
         if (await stub.joinable()) return { code: current };
       }
-      for (let i = 0; i < 5; i++) {
-        const code = randomCode();
-        const stub = this.env.LOBBIES.get(this.env.LOBBIES.idFromName(code));
-        if (await stub.exists()) continue;
-        await stub.create(code, overrides, { fillAt: Date.now() + fillMs });
-        await this.ctx.storage.put("current", code);
-        return { code };
-      }
-      throw new Error("Couldn't open a lobby.");
+      // A fresh code: one whose lobby is still open (a match, or its results) is never handed out.
+      const code = await openLobbyCode((c) => this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, overrides, { fillAt: Date.now() + fillMs }));
+      if (!code) throw new Error("Couldn't open a lobby.");
+      await this.ctx.storage.put("current", code);
+      return { code };
     });
   }
 }

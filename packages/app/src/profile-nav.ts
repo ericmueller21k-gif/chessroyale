@@ -14,6 +14,8 @@ export interface ProfileTarget {
   bot?: boolean;
   /** Your own profile, opened at a section (the shop's "Pick these in your profile": Quick chat and emoji). */
   section?: "chat";
+  /** Your own profile, opened at one of your recent matches (when it was played): "See your result" for a closed lobby. */
+  match?: number;
 }
 
 let target: ProfileTarget | null = null;

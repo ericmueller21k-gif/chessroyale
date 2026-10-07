@@ -299,15 +299,45 @@ function FriendsSheet({
   );
 }
 
+/** A short note at the top of the home screen ("That match has ended"), with "See your result" when there is one. */
+export interface HomeNotice {
+  text: string;
+  /** Your result in it: opens your profile at that match. */
+  onSeeResult?: () => void;
+  onDismiss: () => void;
+}
+
+function Notice({ notice }: { notice: HomeNotice }) {
+  return (
+    <div class="fd-notice" role="status">
+      <svg class="fd-notice-flag" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path d="M5 21V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
+        <path d="M5 4h13l-2.5 4.5L18 13H5z" fill="currentColor" />
+      </svg>
+      <span class="fd-notice-text">{notice.text}</span>
+      {notice.onSeeResult && (
+        <FdButton primary class="small fd-notice-go" onClick={notice.onSeeResult}>
+          See your result
+        </FdButton>
+      )}
+      <button type="button" class="fd-icon-btn fd-notice-x" aria-label="Dismiss" onClick={notice.onDismiss}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
 /**
  * Home (the approved mockup, docs/mockups/front-door/Main.dc.html): the top bar (logo, coins, your pawn), the live
- * line, your dressed pawn, the mode picker, PLAY and the line under it, and four smaller buttons.
+ * line, your dressed pawn, the mode picker, PLAY and the line under it, and four smaller buttons. A note goes under the
+ * live line when a lobby you opened has closed.
  */
 export function HomeScreen({
   intent,
   loading,
   error,
   joinCode,
+  notice,
   onlineLocked,
   onPlay,
   onSolo,
@@ -323,6 +353,8 @@ export function HomeScreen({
   error?: string | null;
   /** An invite link's code: the join form opens with it. */
   joinCode?: string;
+  /** A lobby you opened has closed: the note (and your result, if you played). */
+  notice?: HomeNotice;
   /** Online play needs signing in, and you're a guest: PLAY plays bots. */
   onlineLocked?: boolean;
   /** PLAY: the queue for a mode. */
@@ -357,6 +389,10 @@ export function HomeScreen({
     if (intent?.kind === "boss") bossAlone();
     if (intent?.kind === "friends") setFriends(true);
   }, [intent?.n]);
+  // (An invite's code can arrive once its lobby is known to be open.)
+  useEffect(() => {
+    if (joinCode) setFriends(true);
+  }, [joinCode]);
   const play = () => {
     if (mode === "classic") return;
     if (!onlineLocked) return onPlay(mode);
@@ -396,6 +432,7 @@ export function HomeScreen({
         </div>
       </header>
       <LiveLine live={live} />
+      {notice && <Notice notice={notice} />}
       <div class="fd-home-main">
         <section class="fd-hero" aria-label="You">
           <DressedPawn look={look} hat={myHat(profile)} size="hero" shadow />
