@@ -15,7 +15,7 @@ export interface JudgeDevice {
 }
 
 /** How a board's scores were settled. */
-export type JudgeHow = "agreed" | "verdict" | "single" | "fallback" | "none";
+export type JudgeHow = "agreed" | "verdict" | "majority" | "single" | "fallback" | "none";
 
 /** One board's scoring job in progress (online, many judges). */
 export interface JudgeTask {
@@ -36,9 +36,14 @@ export interface JudgeTask {
   boards: Record<string, JudgedBoard | null>;
   /** After the first answer: how long the second has (then the first is used alone). */
   waitUntil?: number;
-  /** Waiting on the engine server: a verdict on a disagreement, or a re-check of close calls (and since when). */
-  server?: { kind: "verdict" | "recheck"; id: string; at: number };
+  /**
+   * Waiting on the engine server (a verdict on a disagreement, or a re-check of close calls), or with no server, on a
+   * third device's second opinion (two of three decide); since when.
+   */
+  server?: { kind: "verdict" | "recheck" | "referee"; id: string; at: number };
   done?: { board: JudgedBoard; how: JudgeHow };
+  /** A dispute that went to a third device too (its second opinion decides the blame, not distance from the verdict). */
+  refereed?: boolean;
 }
 
 /** Counts for the logs and the harness (reports/many-judges.md). */
@@ -55,6 +60,8 @@ export interface JudgeStats {
   serverSpot: number;
   serverRecheck: number;
   serverFailed: number;
+  /** Disputes settled by two of three devices (no engine server). */
+  majority: number;
   strikes: number;
   benched: number;
   /** Referee answers (a third device on a disagreement) and spot checks that found a judge off. */
@@ -77,6 +84,7 @@ export const emptyStats = (): JudgeStats => ({
   serverSpot: 0,
   serverRecheck: 0,
   serverFailed: 0,
+  majority: 0,
   strikes: 0,
   benched: 0,
   refereed: 0,

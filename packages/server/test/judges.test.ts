@@ -208,6 +208,25 @@ describe("many judges: the lobby", () => {
     expect(L.core.record.judges!.stats).toMatchObject({ disagreed: 1, fallback: 1, serverVerdict: 0 });
   });
 
+  it("with no engine server, a disagreement waits for a third device: two of three decide, and the odd one out is struck", async () => {
+    const L = setup({ server: false });
+    L.begin(3);
+    L.pickAll(3);
+    const [liar, honestOne] = L.judgesOf() as [string, string];
+    const job = L.last(liar, "judge")!.jobs[0]!;
+    const worst = [...job.picks].sort((x, y) => truth(job.fen, x) - truth(job.fen, y))[0]!;
+    await L.answer(liar, cheat(worst));
+    await L.answer(honestOne);
+    expect(L.core.record.phase).toBe("scoring");
+    const third = ["p1", "p2", "p3"].find((x) => x !== liar && x !== honestOne)!;
+    await L.answer(third);
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats).toMatchObject({ disagreed: 1, majority: 1, fallback: 0 });
+    expect(L.core.record.judges!.devices[liar]!.strikes).toBe(1);
+    const rev = L.last(third, "reveal")!;
+    expect(rev.expectedAfter[worst]).toBeCloseTo(truth(job.fen, worst), 9);
+  });
+
   it("a late judge: the first answer is used after the grace time; the late answer is still compared, and a judge that never answers brings a spot check now and then", async () => {
     const L = setup({ server: true, judges: { spotCheckShare: 1, graceMs: 300, graceFactor: 0.5 } });
     L.begin(4);

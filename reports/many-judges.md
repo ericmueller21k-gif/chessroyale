@@ -7,7 +7,7 @@ would take at its speed (computer 1.1M nodes/s, phone 350k, old phone 90k), the 
 Cheaters claim 3M nodes/s, so they're drawn as judges as often as the lobby allows. Each scenario also runs the old
 way (one host scores every round, the engine server re-checking its close calls) with the same devices.
 
-Scenarios: **inflate**: 1 cheater (a computer) scores its own pick as the best; 5 honest.
+Scenarios: **honest**: 6 honest devices (2 computers, 4 phones).
 
 ## Do the scores match the truth?
 
@@ -17,8 +17,8 @@ with no server). *Worst shift*: the most any pick's loss moved from the honest d
 
 | Scenario | Way | Jobs | Agreed | Server verdict | One judge | Fallback | Honest numbers | Cheater's numbers used | Worst shift |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| inflate | judges | 200 | 7 | 2 | 191 | 0 | 198 | 0 | 0.0 |
-| inflate | old (host) | 47 | 0 | 0 | 0 | 0 | 32 | 15 | 47.8 |
+| honest | judges | 254 | 209 | 0 | 45 | 0 | 254 | 0 | 0.0 |
+| honest | old (host) | 95 | 0 | 0 | 0 | 0 | 95 | 0 | 0.0 |
 
 (A job settled by the server's verdict differs from the honest devices' by the server's deeper view, not by any
 cheater: its numbers are the server's own, for every pick.)
@@ -30,8 +30,6 @@ they picked in. A positive gain is points the cheat was worth.
 
 | Scenario | Way | Rounds | True loss | Applied loss | Gain |
 |---|---|---:|---:|---:|---:|
-| inflate | judges | 198 (+2 verdicts) | 123.6 | 123.6 | 0.0 |
-| inflate | old (host) | 47 | 235.9 | 0.3 | 235.7 |
 
 (Rounds settled by a verdict are left out of the sums: there the applied numbers are the server's, which differ
 from the lite engine's for everyone alike.)
@@ -42,7 +40,7 @@ Strikes per match (two strikes: no more jobs that match), and the round the chea
 
 | Scenario | Matches | Cheater's strikes (each match) | Benched at round | Honest devices struck |
 |---|---:|---|---|---:|
-| inflate | 1 | 3 | p1@6 | 1 |
+| honest | 2 | –, – | –, – | 0 |
 
 ## Timing: never slower
 
@@ -50,12 +48,12 @@ Lock to reveal (ms, simulated), per round.
 
 | Scenario | Way | Rounds | Median | 95th | Max |
 |---|---|---:|---:|---:|---:|
-| inflate | judges | 200 | 587 | 3647 | 3834 |
-| inflate | old (host) | 47 | 287 | 3347 | 3347 |
+| honest | judges | 254 | 287 | 3347 | 3497 |
+| honest | old (host) | 95 | 287 | 3347 | 3347 |
 
 ## Engine server calls per match
 
 | Scenario | Way | Matches | Rounds/match | Verdicts | Spot checks | Close-call re-checks | All calls/match |
 |---|---|---:|---:|---:|---:|---:|---:|
-| inflate | judges | 1 | 200.0 | 2.0 | 51.0 | 17.0 | 70.0 |
-| inflate | old (host) | 1 | 47.0 | – | – | 22.0 | 22.0 |
+| honest | judges | 2 | 127.0 | 0.0 | 0.0 | 15.0 | 15.0 |
+| honest | old (host) | 1 | 95.0 | – | – | 20.0 | 20.0 |

@@ -1,6 +1,5 @@
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
-import { JUDGES, type JudgeConfig } from "@chessroyale/core";
-import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LOBBY_LIFE, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -80,6 +79,9 @@ export interface ServerScoreRequest {
 
 /** How long the lobby waits for the engine server before going on without it (its own timeout is 12 s). */
 const SERVER_WAIT_MS = 14_000;
+/** With no engine server, how long a dispute waits for a third device's second opinion. */
+const REFEREE_WAIT_MS = 5_000;
+const waitFor = (kind: "verdict" | "recheck" | "referee") => (kind === "referee" ? REFEREE_WAIT_MS : SERVER_WAIT_MS);
 
 /** Quick chat's state in a lobby. */
 interface ChatRecord {
@@ -227,7 +229,7 @@ export interface JudgesRecord {
    * Checks on the engine server afterwards, by request id: a spot check of a job one judge answered alone (one board),
    * or a late second answer that disagreed with the one used (two boards).
    */
-  spots?: Record<string, { job: JudgeJob; boards: Record<string, JudgedBoard> }>;
+  spots?: Record<string, { job: JudgeJob; boards: Record<string, JudgedBoard>; refereed?: boolean }>;
   /** Jobs settled on one answer while another judge was still searching: its answer is compared when it comes. */
   late?: Record<string, { job: JudgeJob; judge: string; board: JudgedBoard; pending: string[]; at: number }>;
   stats: JudgeStats;
@@ -1281,8 +1283,17 @@ export class LobbyCore {
   /** People whose picks can decide this stage's cut (near the cut line). */
   private cutPriority(): Set<string> {
     const runner = this.runner;
-    if (!runner || runner.final || runner.boss || !(this.settings.knockoutsPerStage[runner.state.stage] ?? 0)) return new Set();
-    return cutBubble(runner.leaderboard(), this.cutoff(), this.settings.recheckCutPoints);
+    const k = runner ? (this.settings.knockoutsPerStage[runner.state.stage] ?? 0) : 0;
+    if (!runner || runner.final || runner.boss || !k) return new Set();
+    const rows = runner.leaderboard();
+    if (!isTeamMatch(this.settings)) return cutBubble(rows, this.cutoff(), this.settings.recheckCutPoints);
+    // Crowd 50 v 50: each team's bottom goes (half the knockouts each), so each team has its own cut line.
+    const out = new Set<string>();
+    for (const side of ["w", "b"] as const) {
+      const team = rows.filter((r) => r.team === side && !r.out);
+      for (const id of cutBubble(team, team.length - Math.floor(k / 2), this.settings.recheckCutPoints)) out.add(id);
+    }
+    return out;
   }
 
   /**
@@ -1522,6 +1533,7 @@ export class LobbyCore {
     t.waitUntil = undefined;
     const [ref] = drawJudges(() => this.jrng(), this.judgeDevices(), 1, this.jcfg, new Map(), new Set(t.tried));
     if (ref) {
+      t.refereed = true;
       const id = `${t.job.id}~ref`;
       (this.jr.referees ??= {})[id] = { job: { ...t.job, id }, by: ref, boards: { [a]: t.boards[a]!, [b]: t.boards[b]! }, at: this.io.now() };
       this.io.send(ref, { t: "judge", key: this.r.round?.key ?? "", jobs: [{ ...t.job, id }] });
@@ -1532,7 +1544,12 @@ export class LobbyCore {
       this.askServer(t.server.id, t.job.fen, verdictMoves(t.job, [t.reports[a]!, t.reports[b]!], [t.boards[a]!, t.boards[b]!]));
       return;
     }
-    this.fallback(t, "no engine server");
+    // No engine server: the third device's second opinion settles it (two of three), if it comes in time.
+    if (ref) {
+      t.server = { kind: "referee", id: `${t.job.id}~ref`, at: this.io.now() };
+      return;
+    }
+    this.fallback(t, "no engine server, and no third device");
   }
 
   /** A dispute with no verdict: the judge with fewer strikes stands (then the faster device), as the host's did. */
@@ -1575,8 +1592,8 @@ export class LobbyCore {
       const boards = judges.map((j) => spot.boards[j]!);
       const verdict = verdictBoard(spot.job, moves, boards[0]!);
       if (!verdict) return;
-      // (A late answer's dispute with a second opinion pending: that decides instead.)
-      if (judges.length === 2 && this.r.judges?.referees?.[`${spot.job.id}~ref`]) return;
+      // (A late answer's dispute that went to a third device too: its second opinion decides the blame instead.)
+      if (spot.refereed) return;
       const { blamed, distances } = blameJudge(verdict, boards, this.jcfg.blameMargin, this.jcfg.soloBlame);
       for (const i of blamed) {
         this.jr.stats.spotCaught++;
@@ -1616,7 +1633,7 @@ export class LobbyCore {
     const strikesOf = (j: string) => this.jr.devices[j]?.strikes ?? 0;
     const closer = distances[0]! < distances[1]! || (distances[0] === distances[1] && strikesOf(a) <= strikesOf(b)) ? a : b;
     t.done = { board: closer === a ? first : verdictBoard(t.job, moves, t.boards[b]!)!, how: "verdict" };
-    const refereed = !!this.r.judges?.referees?.[`${t.job.id}~ref`];
+    const refereed = !!t.refereed;
     console.log(`judges: verdict for ${t.job.id} in ${this.r.code}: ${a} ${distances[0]!.toFixed(1)} and ${b} ${distances[1]!.toFixed(1)} points off${refereed ? " (a third device decides who's to blame)" : ""}`);
     // A third device will say exactly who was off; without one, blame goes by distance from the verdict.
     if (!refereed) for (const i of blamed) this.strike(i === 0 ? a : b, `${distances[i]!.toFixed(1)} points off the engine server's verdict on ${t.job.id}`);
@@ -1648,7 +1665,7 @@ export class LobbyCore {
     }
     if (this.serverOn) {
       const sid = `late:${id}`;
-      (this.jr.spots ??= {})[sid] = { job: late.job, boards: { [late.judge]: late.board, [playerId]: mine } };
+      (this.jr.spots ??= {})[sid] = { job: late.job, boards: { [late.judge]: late.board, [playerId]: mine }, ...(ref ? { refereed: true } : {}) };
       this.jr.stats.serverSpot++;
       this.askServer(sid, late.job.fen, verdictMoves(late.job, [], [late.board, mine]));
     }
@@ -1666,6 +1683,16 @@ export class LobbyCore {
     }
     const matches = Object.entries(ref.boards).filter(([, b]) => b && boardsAgree(mine, b, this.jcfg.tolerance).agree).map(([j]) => j);
     this.jr.stats.refereed++;
+    // A dispute waiting on this (no engine server): two of three decide the scores.
+    const t = Object.values(this.r.judges?.tasks ?? {}).find((x) => x.server?.kind === "referee" && x.server.id === id);
+    if (t && this.r.phase === "scoring") {
+      t.server = undefined;
+      if (matches.length === 1) {
+        this.jr.stats.majority++;
+        t.done = { board: ref.boards[matches[0]!]!, how: "majority" };
+      } else this.fallback(t, "the second opinion matched neither judge");
+      this.afterJudging();
+    }
     if (matches.length !== 1) return void console.log(`judges: second opinion on ${id} in ${this.r.code} matched ${matches.length ? "both" : "neither"}: no blame`);
     for (const j of Object.keys(ref.boards)) if (j !== matches[0]) this.strike(j, `differed from two others on ${ref.job.id.replace(/~ref$/, "")}`);
   }
@@ -1676,8 +1703,9 @@ export class LobbyCore {
     if (this.r.phase !== "scoring" || !tasks) return;
     const now = this.io.now();
     for (const t of Object.values(tasks)) {
-      if (t.server && now >= t.server.at + SERVER_WAIT_MS) {
-        this.serverScored(t.server.id, null);
+      if (t.server && now >= t.server.at + waitFor(t.server.kind)) {
+        if (t.server.kind === "referee") this.fallback(t, "no second opinion in time");
+        else this.serverScored(t.server.id, null);
         continue;
       }
       if (t.done || t.server) continue;
@@ -1695,7 +1723,7 @@ export class LobbyCore {
   private armJudgeTimer() {
     const times: number[] = [];
     for (const t of Object.values(this.r.judges?.tasks ?? {})) {
-      if (t.server) times.push(t.server.at + SERVER_WAIT_MS);
+      if (t.server) times.push(t.server.at + waitFor(t.server.kind));
       if (t.done || t.server) continue;
       if (t.waitUntil !== undefined) times.push(t.waitUntil);
       for (const j of t.judges) if (!(j in t.reports)) times.push((t.sent[j] ?? t.sentAt) + SCORE_TIMEOUT_MS);
