@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { LAST_STAND, lastStandHits, pieceAt } from "@chessroyale/chess";
+import { LAST_STAND, lastStandHits, pieceAt, toSan, type NetBoss } from "@chessroyale/chess";
 import { useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingPortrait, GodKingSprite, squareXY } from "./GodKing.tsx";
 import { play, type SoundName } from "../sound.ts";
-import { KING_LINES, kingSay, lastStandLine } from "../godKing.ts";
+import { KING_LINES, blunderLabel, blunderWords, chancesWords, kingSay, lastStandLine, replyWords } from "../godKing.ts";
+import { MiniBoard } from "./MiniBoard.tsx";
 
 const PIECE_NAMES = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" } as const;
 const pct = (v: number) => `${v / 8}%`;
@@ -54,11 +55,13 @@ export function lastStandBoard(t: number): "after" | "pushed" | "back" | "before
 
 /**
  * The God King's Last Stand, over the board, from the moment the crowd's disastrous move lands (`startAt`):
- * everything freezes; he leaps out of the dock (the dock plays that part) and crashes down onto the piece's
- * square (flash, dust; the screen shakes); his cut-in banner with a line; the piece slides back to where it came
- * from; the blow meant for it lands on him instead, 25 rapid slashes with red damage numbers while his armour
- * cracks; he staggers, collapses and fades. Timings: LAST_STAND (boss-timing.ts). `fen` is the position before
- * the move. The board itself (what it shows when) follows lastStandBoard.
+ * first the warning, a red "??" badge on the piece's square, the square pulsing red and a danger sting (the eval
+ * bar and the dock say the rest); then everything freezes under a dark red pulse; he leaps out of the dock (the
+ * dock plays that part) and crashes down onto the piece's square (a dark shockwave, dust; the screen shakes); his
+ * cut-in banner with a line; the piece slides back to where it came from; the blow meant for it lands on him
+ * instead, 25 rapid slashes with red damage numbers while his armour cracks; he staggers, collapses and fades.
+ * Nothing in it flashes white. Timings: LAST_STAND (boss-timing.ts). `fen` is the position before the move. The
+ * board itself (what it shows when) follows lastStandBoard.
  */
 export function LastStand({ side, orientation, fen, move, startAt }: { side: "w" | "b"; orientation: "white" | "black"; fen: string; move: string; startAt: number }) {
   const now = useFrameNow();
@@ -75,6 +78,7 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
     const at = (ms: number) => startAt + ms;
     const blowAt = (i: number) => at(L.slashAt + i * L.slashEveryMs);
     const cues: [SoundName, number][] = [
+      ["gkWarn", at(L.badgeAt)],
       ["gkLastLeap", at(L.leapAt)],
       ["gkLastCrash", at(L.crashAt)],
       ["gkCutIn", at(L.bannerAt + 60)],
@@ -115,16 +119,25 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
   const py = t < L.slideAt ? to.y + (pushed.y - to.y) * knock : pushed.y + (from.y - pushed.y) * slide;
   const showPiece = piece && piece.type !== "k" && t >= L.crashAt && t < L.slideAt + SLIDE_MS;
   const crash = t - L.crashAt;
+  // 0. The warning: the "??" badge pops on the square's corner until he lands on it. (The square itself pulses red
+  // under the piece: the board's own highlight, `ls-blunder`, set by the reveal.)
+  const warnFade = t > L.crashAt ? clamp01(1 - (t - L.crashAt) / 160) : 1;
+  const badge = { x: Math.min(782, to.x + 34), y: Math.max(18, to.y - 34) };
   return (
     <div class="last-stand" role="alert" aria-label={`The God King's Last Stand: ${line}`}>
-      {/* 1. Everything freezes: a flash, and the board goes cold and grey until he lands. */}
+      {t >= L.badgeAt && t < L.crashAt + 160 && (
+        <span class="ls-badge" role="img" aria-label="Blunder" style={{ left: pct(badge.x), top: pct(badge.y), opacity: warnFade }}>
+          ??
+        </span>
+      )}
+      {/* 1. Everything freezes: a dark red pulse, and the board goes cold and grey until he lands. */}
       {t >= L.freezeAt && t < L.crashAt + 200 && <div class="ls-freeze" style={{ opacity: Math.min(1, (t - L.freezeAt) / 120) * (t > L.crashAt ? 1 - (t - L.crashAt) / 200 : 1) }} />}
-      {t >= L.freezeAt && t < L.freezeAt + 260 && <div class="ls-flash" style={{ opacity: 0.7 * (1 - (t - L.freezeAt) / 260) }} />}
+      {t >= L.freezeAt && t < L.freezeAt + 320 && <div class="ls-flash" style={{ opacity: 0.75 * (1 - (t - L.freezeAt) / 320) }} />}
       <svg class="ls-fx" viewBox="0 0 800 800" preserveAspectRatio="none" aria-hidden="true">
         {t >= L.freezeAt && t < L.freezeAt + 500 && <circle class="ls-frost" cx={to.x} cy={to.y} r={30 + (t - L.freezeAt) / 3} style={{ opacity: 1 - (t - L.freezeAt) / 500 }} />}
         {/* 2. His fall: a streak of light above him. */}
         {falling && <rect class="ls-streak" x={to.x - 22} y={-40} width={44} height={Math.max(0, godY + 10)} style={{ opacity: 0.85 }} />}
-        {/* The crash: a flash, a shockwave and dust. */}
+        {/* The crash: a dark red shockwave and dust (no white flash). */}
         {crash >= 0 && crash < 380 && <circle class="ls-impact" cx={to.x} cy={to.y + 20} r={40 + crash / 2.2} style={{ opacity: 1 - crash / 380 }} />}
         {crash >= 0 && crash < 560 && <circle class="ls-ring" cx={to.x} cy={to.y + 30} r={30 + crash / 1.6} style={{ opacity: 1 - crash / 560 }} />}
         {crash >= 0 &&
@@ -237,5 +250,73 @@ export function GodKingEpilogue({ side, rises }: { side: "w" | "b"; rises: boole
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * The result screen's card for his Last Stand: one line ("Move 7: Nb5?? · loses your knight"); tap it open for
+ * your move, the boss's reply and what it won, the best move instead, your chances before and after, and the
+ * position with your blunder (red arrow) and the best move (green).
+ */
+export function LastStandCard({ stand, side }: { stand: NonNullable<NetBoss["lastStand"]>; side: "w" | "b" }) {
+  const [open, setOpen] = useState(false);
+  const fen = stand.fen;
+  if (!fen) return null;
+  const reply = replyWords(fen, stand);
+  const chances = chancesWords(stand);
+  const best = stand.bestMove && stand.bestMove !== stand.move ? stand.bestMove : null;
+  return (
+    <section class={`ls-card${open ? " open" : ""}`} aria-label="The God King's Last Stand">
+      <button type="button" class="ls-card-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span class="ls-card-title">👑 The God King's Last Stand</span>
+        <span class="ls-card-line">
+          <span class="ls-card-move">{blunderLabel(fen, stand.move)}</span> · {blunderWords(fen, stand)}
+        </span>
+        <span class="ls-card-chev" aria-hidden="true" />
+      </button>
+      {open && (
+        <div class="ls-card-body">
+          <dl class="ls-card-facts">
+            <div>
+              <dt>Your move</dt>
+              <dd>
+                <strong>{toSan(fen, stand.move)}</strong>
+                <span class="ls-qq">??</span>
+              </dd>
+            </div>
+            {reply && (
+              <div>
+                <dt>The boss's reply</dt>
+                <dd>
+                  <strong>{reply.san}</strong>
+                  {reply.note && <> · {reply.note}</>}
+                </dd>
+              </div>
+            )}
+            {best && (
+              <div>
+                <dt>Best instead</dt>
+                <dd>
+                  <strong class="ls-best">{toSan(fen, best)}</strong>
+                </dd>
+              </div>
+            )}
+            {chances && (
+              <div>
+                <dt>Your chances</dt>
+                <dd>
+                  <strong>{chances}</strong>
+                </dd>
+              </div>
+            )}
+          </dl>
+          <MiniBoard
+            fen={fen}
+            orientation={side === "w" ? "white" : "black"}
+            arrows={[{ move: stand.move, brush: "red" }, ...(best ? [{ move: best, brush: "green" as const }] : [])]}
+          />
+        </div>
+      )}
+    </section>
   );
 }

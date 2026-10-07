@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, lastStandBar, lastStandDue, mulberry32, type Settings } from "@chessroyale/core";
-import { LAST_STAND, LAST_STAND_MS, MatchRunner, fenAfter, lastStandHits, legalMoves, sanLineToUci, toSan, type EngineLike, type Opening, type UciEngine } from "../src/index.ts";
+import { LAST_STAND, LAST_STAND_MS, MatchRunner, blunderCost, fenAfter, lastStandHits, legalMoves, sanLineToUci, toSan, type EngineLike, type Opening, type UciEngine } from "../src/index.ts";
 import { createNodeEngine } from "../src/node.ts";
 
 /** A raid from the Ruy Lopez, 10 plies in, White (the crowd) to move. */
@@ -15,22 +15,29 @@ const hash = (s: string) => {
 
 /**
  * A scripted judge: in every position the crowd's `best` move is worth `bestExpected`, the `blunder` (when legal)
- * `blunderExpected`, and every other move a little less than the best.
+ * `blunderExpected`, and every other move a little less than the best. The blunder's line can carry the boss's
+ * best reply and a mate (from the mover's side), as a real search's does.
  */
-function judge(script: { best?: string; bestExpected: number; blunder: string; blunderExpected: number }): EngineLike {
+function judge(script: { best?: string; bestExpected: number; blunder: string; blunderExpected: number; reply?: string; mate?: number }): EngineLike {
   const exp = (fen: string, move: string) =>
     move === script.blunder ? script.blunderExpected : move === script.best ? script.bestExpected : script.bestExpected - 0.02 - 0.05 * hash(fen + move);
+  const line = (fen: string, move: string, expected = exp(fen, move)) => ({
+    move,
+    expected,
+    ...(move === script.blunder && script.reply ? { reply: script.reply } : {}),
+    ...(move === script.blunder && script.mate !== undefined ? { mate: script.mate } : {}),
+  });
   return {
     async topMoves(fen, n) {
       const legal = legalMoves(fen);
       const best = script.best && legal.includes(script.best) ? script.best : null;
       return legal
-        .map((move) => ({ move, expected: best || move !== legal[0] ? exp(fen, move) : script.bestExpected }))
+        .map((move) => line(fen, move, best || move !== legal[0] ? exp(fen, move) : script.bestExpected))
         .sort((a, b) => b.expected - a.expected)
         .slice(0, n);
     },
     async scoreMoves(fen, moves) {
-      return moves.map((move) => ({ move, expected: exp(fen, move) }));
+      return moves.map((move) => line(fen, move));
     },
   };
 }
@@ -73,14 +80,14 @@ describe("the God King's Last Stand: the rule", () => {
     const r = await runner.score(pick(BLUNDER));
     const b = r.boards[0]!;
     expect(b.result.playedMove).toBe(BLUNDER);
-    expect(b.lastStand).toEqual({ move: BLUNDER, loss: 47, bar: 35 });
+    expect(b.lastStand).toEqual({ move: BLUNDER, loss: 47, bar: 35, before: 0.55, after: 0.08 });
     // Taken back: the board is as it was, the crowd still to move, and it's still crowd move 1.
     expect(runner.boards.get(0)!.fen).toBe(before);
     expect(runner.bossToMove()).toBe(false);
     expect(runner.boss!.crowdMoves).toBe(0);
     // His charges are gone with him; he has fallen.
     expect(runner.boss!.kingCharges).toBe(0);
-    expect(runner.boss!.lastStand).toEqual({ atMove: 1, move: BLUNDER, loss: 47, bar: 35, charges: 3 });
+    expect(runner.boss!.lastStand).toEqual({ atMove: 1, move: BLUNDER, loss: 47, bar: 35, charges: 3, fen: before, bestMove: b.bestMove, before: 0.55, after: 0.08 });
     expect(runner.bossView()!.barred).toBe(BLUNDER);
     // The scores stand: the loss is on your record.
     expect(runner.player("h0").finalLosses).toEqual([47]);
@@ -197,10 +204,68 @@ describe("the God King's Last Stand: the rule", () => {
     expect(runner.bossKillDue()).toBe(true);
   });
 
-  it("its timeline: about 8–9 s, every beat in order, 25 slashes with damage numbers the same on every screen", () => {
-    expect(LAST_STAND_MS).toBeGreaterThanOrEqual(8000);
-    expect(LAST_STAND_MS).toBeLessThanOrEqual(9000);
-    const beats = [LAST_STAND.freezeAt, LAST_STAND.leapAt, LAST_STAND.fallAt, LAST_STAND.crashAt, LAST_STAND.bannerAt, LAST_STAND.bannerAt + LAST_STAND.bannerMs, LAST_STAND.slideAt, LAST_STAND.slashAt, LAST_STAND.slashAt + LAST_STAND.slashes * LAST_STAND.slashEveryMs, LAST_STAND.staggerAt, LAST_STAND.collapseAt, LAST_STAND.fadeAt, LAST_STAND.fadeAt + LAST_STAND.fadeMs, LAST_STAND.endMs];
+  it("what it loses: the boss's best reply from the judge's own search, and a mate it allows, on the record", async () => {
+    // The scripted search's line for the blunder: the boss answers h6, and mates in 7.
+    const reply = "h7h6";
+    const runner = raid(judge({ bestExpected: 0.55, blunder: BLUNDER, blunderExpected: 0.08, reply, mate: -7 }));
+    runner.deal();
+    const b = (await runner.score(pick(BLUNDER))).boards[0]!;
+    expect(b.lastStand).toMatchObject({ move: BLUNDER, reply, mateIn: 7, before: 0.55, after: 0.08 });
+    expect(runner.boss!.lastStand).toMatchObject({ reply, mateIn: 7, fen: b.fenBefore, bestMove: b.bestMove });
+    // A reply that isn't legal after the move is dropped; a mate for the crowd isn't one it allows.
+    const odd = raid(judge({ bestExpected: 0.55, blunder: BLUNDER, blunderExpected: 0.08, reply: "e2e4", mate: 4 }));
+    odd.deal();
+    const o = (await odd.score(pick(BLUNDER))).boards[0]!.lastStand!;
+    expect(o.reply).toBeUndefined();
+    expect(o.mateIn).toBeUndefined();
+  });
+
+  it("his leftover charges become power-ups for everyone still in: the engine's top 3, never brilliant", async () => {
+    const engine = judge({ bestExpected: 0.55, blunder: BLUNDER, blunderExpected: 0.08 });
+    const runner = raid(engine, {}, 3);
+    expect(runner.state.players.map((p) => p.powerUps)).toEqual([0, 0, 0]);
+    runner.deal();
+    await runner.score(new Map(["h0", "h1", "h2"].map((id) => [id, { move: BLUNDER, thinkMs: 1000 }])));
+    // He fell with 3 charges: 3 power-ups each (lastStandPowerUps per charge), and they're on the leaderboard.
+    expect(runner.boss!.lastStand!.charges).toBe(3);
+    expect(runner.state.players.map((p) => p.powerUps)).toEqual([3, 3, 3]);
+    expect(runner.leaderboard().map((s) => s.powerUps)).toEqual([3, 3, 3]);
+    // The re-pick: h0 uses one and plays the engine's best. It's an ordinary pick, marked as a power-up move (so it
+    // can never count as brilliant: see brilliance), and it costs one power-up.
+    runner.deal();
+    const best = (await engine.topMoves(runner.boards.get(0)!.fen, 8)).find((m) => m.move !== BLUNDER)!.move;
+    const r = await runner.score(
+      new Map([
+        ["h0", { move: best, thinkMs: 1000, usedPowerUp: true }],
+        ["h1", { move: legalMoves(runner.boards.get(0)!.fen).find((m) => m !== best && m !== BLUNDER)!, thinkMs: 1000 }],
+        ["h2", { move: null, thinkMs: 20000 }],
+      ]),
+    );
+    const mine = r.boards[0]!.result.players.find((p) => p.playerId === "h0")!;
+    expect(mine.usedPowerUp).toBe(true);
+    expect(runner.player("h0").powerUps).toBe(2);
+    expect(runner.player("h0").powerUpsUsed).toBe(1);
+    expect(runner.player("h1").powerUps).toBe(3);
+  });
+
+  it("no charges left when he falls: no power-ups", async () => {
+    const runner = raid(judge({ bestExpected: 0.55, blunder: BLUNDER, blunderExpected: 0.08 }));
+    runner.state = { ...runner.state, boss: { ...runner.state.boss!, kingCharges: 0 } };
+    runner.deal();
+    expect((await runner.score(pick(BLUNDER))).boards[0]!.lastStand).toBeDefined();
+    expect(runner.boss!.lastStand!.charges).toBe(0);
+    expect(runner.player("h0").powerUps).toBe(0);
+  });
+
+  it("its timeline: about 10 s, the warning first (1.2–1.5 s), every beat in order, 25 slashes with damage numbers the same on every screen", () => {
+    expect(LAST_STAND_MS).toBeGreaterThanOrEqual(9200);
+    expect(LAST_STAND_MS).toBeLessThanOrEqual(10500);
+    expect(LAST_STAND.warnMs).toBeGreaterThanOrEqual(1200);
+    expect(LAST_STAND.warnMs).toBeLessThanOrEqual(1500);
+    // The warning only adds to it: everything after starts warnMs later than it used to (the freeze at 250 ms, the end at 8.6 s).
+    expect(LAST_STAND.freezeAt - LAST_STAND.warnMs).toBe(250);
+    expect(LAST_STAND.endMs - LAST_STAND.warnMs).toBe(8600);
+    const beats = [0, LAST_STAND.badgeAt, LAST_STAND.warnMs, LAST_STAND.freezeAt, LAST_STAND.leapAt, LAST_STAND.fallAt, LAST_STAND.crashAt, LAST_STAND.bannerAt, LAST_STAND.bannerAt + LAST_STAND.bannerMs, LAST_STAND.slideAt, LAST_STAND.slashAt, LAST_STAND.slashAt + LAST_STAND.slashes * LAST_STAND.slashEveryMs, LAST_STAND.staggerAt, LAST_STAND.collapseAt, LAST_STAND.fadeAt, LAST_STAND.fadeAt + LAST_STAND.fadeMs, LAST_STAND.endMs];
     expect([...beats].sort((a, b) => a - b)).toEqual(beats);
     const hits = lastStandHits("e2e4");
     expect(hits).toHaveLength(25);
@@ -220,12 +285,12 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
 
   // Real raid starts (named openings, 10 plies in, White to move), and an early blunder in each, on crowd move 1
   // with all three of his charges: the highest the bar ever is.
-  const cases: [string, string[], string][] = [
-    ["hangs the queen: Sicilian, Open", sanLineToUci(["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "Nc6"]), "Qg4"],
-    ["hangs a knight to a pawn: Queen's Gambit Declined, Exchange", sanLineToUci(["d4", "d5", "c4", "e6", "Nc3", "Nf6", "cxd5", "exd5", "Bg5", "c6"]), "Ne4"],
-    ["hangs a bishop: King's Indian, Fianchetto", sanLineToUci(["d4", "Nf6", "c4", "g6", "Nc3", "Bg7", "Nf3", "d6", "g3", "O-O"]), "Bh6"],
+  const cases: [string, string[], string, "q" | "n" | "b"][] = [
+    ["hangs the queen: Sicilian, Open", sanLineToUci(["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "Nc6"]), "Qg4", "q"],
+    ["hangs a knight to a pawn: Queen's Gambit Declined, Exchange", sanLineToUci(["d4", "d5", "c4", "e6", "Nc3", "Nf6", "cxd5", "exd5", "Bg5", "c6"]), "Ne4", "n"],
+    ["hangs a bishop: King's Indian, Fianchetto", sanLineToUci(["d4", "Nf6", "c4", "g6", "Nc3", "Bg7", "Nf3", "d6", "g3", "O-O"]), "Bh6", "b"],
   ];
-  for (const [name, moves, san] of cases) {
+  for (const [name, moves, san, piece] of cases) {
     it(`${name}: ${san} calls for the Last Stand from move 1`, async () => {
       const runner = new MatchRunner({
         settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 3190 } as Settings,
@@ -244,6 +309,10 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
       expect(stand!.bar).toBe(lastStandBar(0, 3, runner.settings));
       expect(stand!.loss).toBeGreaterThan(stand!.bar + 5);
       expect(runner.boards.get(0)!.fen).toBe(fen);
+      // What it loses, from the judge's own search: the boss's best reply takes the piece.
+      expect(stand!.reply, "the boss's reply").toBeDefined();
+      expect(blunderCost(fen, blunder, stand!.reply, stand!.mateIn)).toEqual({ kind: "piece", piece });
+      expect(stand!.before! - stand!.after!).toBeCloseTo(stand!.loss / 100, 2);
     }, 60_000);
   }
 });

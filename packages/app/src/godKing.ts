@@ -8,7 +8,7 @@
  * every four or five moves (5 to 10 lines in a typical boss battle).
  */
 
-import { applyMove, inCheck, pieceAt } from "@chessroyale/chess";
+import { applyMove, blunderCost, inCheck, pieceAt, toSan, type BlunderCost } from "@chessroyale/chess";
 
 export type KingCue =
   | "intro"
@@ -173,3 +173,60 @@ export function crowdMoveCues(fen: string, played: string, loss: number | null):
   else if (loss !== null && loss <= 4) out.push({ cue: "goodMove", key });
   return out;
 }
+
+/** The Last Stand's record, as far as the words need it. */
+export interface StandFacts {
+  move: string;
+  reply?: string;
+  mateIn?: number;
+  before?: number;
+  after?: number;
+}
+
+const PIECE_WORD = { n: "knight", b: "bishop", r: "rook", q: "queen" } as const;
+const pctOf = (x: number) => `${Math.round(x * 100)}%`;
+
+/** What the blunder cost (from the boss's best reply and any mate it allows), for the words below. */
+export function standCost(fen: string, s: StandFacts): BlunderCost {
+  return blunderCost(fen, s.move, s.reply, s.mateIn);
+}
+
+/**
+ * The Last Stand's warning and results card, in plain words instead of numbers: "loses your knight", "allows
+ * mate", or (the boss's reply wins nothing a player could name) "your chances 52% → 9%".
+ */
+export function blunderWords(fen: string, s: StandFacts): string {
+  const c = standCost(fen, s);
+  if (c.kind === "piece") return `loses your ${PIECE_WORD[c.piece]}`;
+  if (c.kind === "mate") return "allows mate";
+  if (s.before !== undefined && s.after !== undefined) return `your chances ${pctOf(s.before)} → ${pctOf(s.after)}`;
+  return "throws the game away";
+}
+
+/** The crowd's chances before and after the blunder ("52% → 9%"), if known. */
+export function chancesWords(s: StandFacts): string | null {
+  return s.before !== undefined && s.after !== undefined ? `${pctOf(s.before)} → ${pctOf(s.after)}` : null;
+}
+
+/** The boss's best reply to the blunder (SAN) and what it wins: "wins your knight", "checkmate", "mate in 3" or nothing. */
+export function replyWords(fen: string, s: StandFacts): { san: string; note: string } | null {
+  if (!s.reply) return null;
+  const after = applyMove(fen, s.move);
+  let san: string;
+  try {
+    san = toSan(after, s.reply);
+  } catch {
+    return null;
+  }
+  const c = standCost(fen, s);
+  const note = c.kind === "piece" ? `wins your ${PIECE_WORD[c.piece]}` : c.kind === "mate" ? (c.in === 1 ? "checkmate" : `mate in ${c.in}`) : "";
+  return { san, note };
+}
+
+/** "Move 7: Nb5??" (or "Move 7: …Nb5??" for Black): the blunder as the results card names it. */
+export function blunderLabel(fen: string, move: string): string {
+  const [, side, , , , full] = fen.split(" ");
+  return `Move ${full ?? "1"}: ${side === "b" ? "…" : ""}${toSan(fen, move)}??`;
+}
+
+export const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

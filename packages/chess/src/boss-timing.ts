@@ -46,34 +46,44 @@ export function bossThinkMs(history: readonly string[]): number {
  * where it happens lasts LAST_STAND_MS longer, solo and online; the next move's clock only starts after it, so
  * nobody loses any time.
  *
- * 1. The move lands and everything freezes (`freezeAt`).
+ * 0. The warning (`warnMs` long): a red "??" badge pops on the piece's square (`badgeAt`), the square pulses red,
+ *    a danger sting plays, the eval bar plunges to the crowd's chances after the move, and the dock says in plain
+ *    words what it loses ("?? Blunder: Nb5 / Loses your knight").
+ * 1. Everything freezes (`freezeAt`): the board goes cold and grey, under a dark red pulse.
  * 2. He leaps up out of the dock (`leapAt`), out of view, and crashes down onto the piece's square (`fallAt`,
- *    landing at `crashAt`): an impact flash, the board shakes, dust.
+ *    landing at `crashAt`): a dark red shockwave, dust, the board shakes.
  * 3. The "LAST STAND" cut-in with his battle-worn portrait and one of his lines (`bannerAt`, for `bannerMs`).
- * 4. The piece slides back to the square it came from (`slideAt`); he stands alone where it was.
+ * 4. The piece slides back to the square it came from (`slideAt`); he stands alone where it was. The eval bar
+ *    goes back to what it was before the move.
  * 5. The blow meant for it: `slashes` rapid slashes, one every `slashEveryMs` from `slashAt`, each with a red
  *    damage number; his armour cracks (`crackAt`), grunts of agony, a few stylised red drops.
  * 6. He staggers (`staggerAt`), collapses (`collapseAt`) and fades from the board (`fadeAt`, for `fadeMs`);
- *    his fallen figure lies in the dock from then on, with his last words.
+ *    his fallen figure lies in the dock from then on, with his last words (and his leftover charges, as power-ups).
  * 7. At `endMs` the reveal ends: the crowd picks again with a fresh clock.
+ *
+ * Beats 1 to 7 are as they were before the warning, all `warnMs` later.
  */
+const LS_WARN_MS = 1300;
+const after = (ms: number) => LS_WARN_MS + ms;
 export const LAST_STAND = {
-  freezeAt: 250,
-  leapAt: 650,
-  fallAt: 1150,
-  crashAt: 1400,
-  bannerAt: 1950,
+  badgeAt: 80,
+  warnMs: LS_WARN_MS,
+  freezeAt: after(250),
+  leapAt: after(650),
+  fallAt: after(1150),
+  crashAt: after(1400),
+  bannerAt: after(1950),
   bannerMs: 2100,
-  slideAt: 4150,
-  slashAt: 4650,
+  slideAt: after(4150),
+  slashAt: after(4650),
   slashes: 25,
   slashEveryMs: 80,
-  crackAt: [5050, 5650, 6250] as readonly number[],
-  staggerAt: 6800,
-  collapseAt: 7250,
-  fadeAt: 7800,
+  crackAt: [after(5050), after(5650), after(6250)] as readonly number[],
+  staggerAt: after(6800),
+  collapseAt: after(7250),
+  fadeAt: after(7800),
   fadeMs: 500,
-  endMs: 8600,
+  endMs: after(8600),
 } as const;
 
 /** How much longer the reveal lasts when the God King makes his Last Stand. */

@@ -719,6 +719,13 @@ p {
   background: #f2f2f2;
   transition: height 0.4s ease;
 }
+/* The God King's Last Stand: the bar plunges to the crowd's chances after the blunder, ringed red, then goes back. */
+.eval-bar.plunged {
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.9), 0 0 10px rgba(239, 68, 68, 0.55);
+}
+.eval-bar.plunged .eval-white {
+  transition: height 0.6s cubic-bezier(0.55, 0, 0.75, 0.2);
+}
 .eval-label {
   position: absolute;
   left: 0;
@@ -5567,18 +5574,56 @@ button.history-label {
   z-index: 7;
   pointer-events: none;
 }
-/* 1. Everything freezes: the board goes cold and grey, after a flash. */
+/* 0. The warning: the blundered piece's square pulses red under it (three beats, then a steady red), and a red
+   "??" badge pops on its corner (like a chess site's blunder mark). */
+.board-wrap cg-board square.ls-blunder {
+  background: rgba(222, 38, 38, 0.62);
+  animation: ls-blunder-pulse 433ms ease-in-out 3;
+}
+@keyframes ls-blunder-pulse {
+  50% {
+    background: rgba(222, 38, 38, 0.22);
+  }
+}
+.ls-badge {
+  position: absolute;
+  z-index: 4;
+  width: 5.6%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #d62a2a;
+  color: #fff;
+  font: 900 2.9cqw/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: -0.04em;
+  box-shadow: 0 0 0 0.35cqw #fff, 0 0.4cqw 0.9cqw rgba(0, 0, 0, 0.55);
+  animation: ls-badge-pop 340ms cubic-bezier(0.3, 1.7, 0.5, 1) both;
+}
+@keyframes ls-badge-pop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/* 1. Everything freezes: the board goes cold and grey, under a dark red pulse (never a white flash). */
 .ls-freeze {
   position: absolute;
   inset: 0;
-  background: rgba(120, 165, 230, 0.2);
-  backdrop-filter: grayscale(0.9) brightness(0.9);
-  -webkit-backdrop-filter: grayscale(0.9) brightness(0.9);
+  background: rgba(60, 70, 110, 0.22);
+  backdrop-filter: grayscale(0.9) brightness(0.85);
+  -webkit-backdrop-filter: grayscale(0.9) brightness(0.85);
 }
 .ls-flash {
   position: absolute;
   inset: 0;
-  background: #f4f9ff;
+  background: radial-gradient(circle at 50% 50%, rgba(150, 18, 28, 0.55), rgba(30, 0, 6, 0.75));
 }
 .ls-fx {
   position: absolute;
@@ -5593,18 +5638,18 @@ button.history-label {
   stroke-width: 5;
   filter: drop-shadow(0 0 6px #93c5fd);
 }
-/* 2. His fall onto the square, the crash, the dust. */
+/* 2. His fall onto the square (a gold streak), the crash (a dark red shockwave, an orange ring), the dust. */
 .ls-streak {
-  fill: #fff7d6;
+  fill: #ffc93d;
   filter: blur(6px);
 }
 .ls-impact {
-  fill: rgba(255, 250, 225, 0.95);
-  filter: drop-shadow(0 0 12px #ffd84d);
+  fill: rgba(96, 10, 16, 0.6);
+  filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.8));
 }
 .ls-ring {
   fill: none;
-  stroke: #fff3c4;
+  stroke: #ff6a3d;
   stroke-width: 6;
 }
 .ls-dust {
@@ -5745,6 +5790,10 @@ button.history-label {
   border-color: #f2c14e;
   box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(220, 38, 38, 0.5), 0 10px 30px rgba(0, 0, 0, 0.6);
 }
+/* Its flash is dark red, not white. */
+.fight-banner.last-stand-cut .fb-flash {
+  background: #3b0309;
+}
 .fight-banner.last-stand-cut .fb-flash,
 .fight-banner.last-stand-cut .fb-band,
 .fight-banner.last-stand-cut .fb-text,
@@ -5811,10 +5860,195 @@ button.history-label {
 .gk-fallen-shadow {
   fill: rgba(0, 0, 0, 0.22);
 }
+/* The power-ups he left: a ⚡ pill above his fallen figure, the whole column its button. */
+.gk-unit.fallen.has-power {
+  grid-template-rows: 24px 1fr;
+}
+.gk-unit.fallen.has-power .gk-unit-btn {
+  grid-row: 2;
+  height: 38px;
+}
+.gk-power {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  background: none;
+  color: inherit;
+  cursor: default;
+}
+.gk-power-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 40px;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  justify-content: center;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: color-mix(in srgb, var(--text) 45%, transparent);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+}
+.gk-power-pill svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+.gk-power.ready {
+  cursor: pointer;
+}
+.gk-power.ready .gk-power-pill {
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+  animation: gk-power-ready 1.6s ease-in-out infinite;
+}
+.gk-power.in-use .gk-power-pill {
+  background: transparent;
+  color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  animation: breathe 1.1s ease-in-out infinite;
+}
+@keyframes gk-power-ready {
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+}
+/* The Last Stand's warning in the dock: the blunder in red, what it loses in plain words. */
+.boss-dock-status .blunder-mark {
+  color: #e03131;
+}
+.dock-line.blunder-words {
+  font-size: 12px;
+  font-weight: 600;
+}
+.dock-line.blunder-words .narrow-only {
+  display: none;
+}
+@media (max-width: 359px) {
+  .dock-line.blunder-words .wide-only {
+    display: none;
+  }
+  .dock-line.blunder-words .narrow-only {
+    display: inline;
+  }
+}
 @keyframes gk-fallen-in {
   from {
     opacity: 0;
     transform: translateY(-4px);
+  }
+}
+/* The result screen's Last Stand card: one line, tap for the blunder, the boss's reply, the best move, the chances. */
+.ls-card {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+  overflow: hidden;
+}
+.ls-card-head {
+  width: 100%;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  column-gap: 8px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 9px 12px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ls-card-title {
+  grid-column: 1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.ls-card-line {
+  grid-column: 1;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.ls-card-move {
+  font-weight: 800;
+}
+.ls-card-chev {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  justify-self: center;
+  width: 9px;
+  height: 9px;
+  margin-top: -4px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform 0.2s;
+}
+.ls-card.open .ls-card-chev {
+  margin-top: 4px;
+  transform: rotate(-135deg);
+}
+.ls-card-body {
+  display: grid;
+  gap: 12px;
+  padding: 2px 12px 12px;
+}
+.ls-card-facts {
+  margin: 0;
+  display: grid;
+  gap: 7px;
+}
+.ls-card-facts > div {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+.ls-card-facts dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ls-card-facts dd {
+  margin: 0;
+  font-size: 14px;
+}
+.ls-qq {
+  margin-left: 1px;
+  font-weight: 900;
+  color: #e03131;
+}
+.ls-best {
+  color: var(--good);
+}
+.ls-card .mini {
+  width: min(100%, 220px);
+  justify-self: center;
+}
+@media (min-width: 420px) {
+  .ls-card-body {
+    grid-template-columns: minmax(0, 1fr) 150px;
+    align-items: center;
+  }
+  .ls-card .mini {
+    width: 150px;
   }
 }
 /* The result screen: he rises again in holy light if the crowd won, or stays down. */

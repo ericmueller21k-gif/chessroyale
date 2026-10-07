@@ -13,6 +13,7 @@ same name to change it; the game plays them at these moments of the God King's a
 | cutin.mp3 | his cut-in banner sweeps in | A synthesised whoosh into Junkala's `sfx_wpn_sword2` |
 | slash.mp3 | each of his three slashes on the boss | Made for the game (a bright noise swish with a metallic ring, synthesised with ffmpeg; no licence needed) |
 | leave.mp3 | holy light: he vanishes | Made for the game (a falling three-tone shimmer, synthesised with ffmpeg; no licence needed) |
+| warn.mp3 | his Last Stand: the blundered move lands (the red "??" warning) | Junkala, `sfx_lowhealth_alarmloop3` (two beeps, pitched down, light crunch) over `sfx_sounds_impact12` (pitched down, cut short) |
 | last-leap.mp3 | his Last Stand: he leaps out of the dock and falls onto the board | Junkala, `sfx_movement_jump19`, then `sfx_sounds_falling3` (sped up, shortened) |
 | last-crash.mp3 | he crashes down on the piece's square | Junkala, `sfx_exp_short_hard2` and `sfx_sounds_impact12`, pitched down |
 | last-slashes.mp3 | the 25 slashes he takes for the piece | Junkala, `sfx_wpn_sword1` and `sfx_wpn_sword2` (pitch varied) landing with `sfx_damage_hit3`, `5`, `8` and `10` |

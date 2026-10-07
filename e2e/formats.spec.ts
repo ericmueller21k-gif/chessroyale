@@ -217,7 +217,7 @@ test("boss raid alone flows like a chess site: your move is played, the boss rep
   expect(await page.evaluate(() => (window as any).match.phase.startsAt <= Date.now())).toBe(true);
 });
 
-test("the God King's Last Stand (solo raid, ?laststand=1): he takes the blow, falls, and you pick again without that move", async ({ page }) => {
+test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he takes the blow, falls, leaves his charges as power-ups, and you pick again without that move", async ({ page }) => {
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // (?boss=1600 skips the boss menu.)
@@ -233,9 +233,20 @@ test("the God King's Last Stand (solo raid, ?laststand=1): he takes the blow, fa
     m.submit(mv);
     return mv;
   });
-  // On everyone's screen: he crashes onto the square, his banner, the blow, and he falls into the dock.
+  // On everyone's screen: first the warning (the ?? badge on the piece's square, the dock in plain words), then he
+  // crashes onto the square, his banner, the blow, and he falls into the dock.
   await expect(page.getByRole("alert", { name: /The God King's Last Stand/ })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("alert", { name: /^Last stand:/ })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("img", { name: "Blunder" })).toBeVisible({ timeout: 2_000 });
+  const san = await page.evaluate(() => {
+    const m = (window as any).match;
+    return m.phase.kind === "reveal" ? m.phase.mine.lastStand.move : null;
+  });
+  expect(san).toBe(move);
+  await expect(page.locator(".boss-dock-status")).toContainText("?? Blunder:");
+  await expect(page.locator(".boss-dock-status .blunder-words")).toHaveText(/^(Loses your (knight|bishop|rook|queen)|Allows mate|(Your c|C)hances \d+% → \d+%)/);
+  // The eval bar plunges to your chances after the move (ringed red) while the warning is up.
+  await expect(page.locator(".eval-bar.plunged")).toBeVisible();
+  await expect(page.getByRole("alert", { name: /^Last stand:/ })).toBeVisible({ timeout: 8_000 });
   await expect(page.locator(".ls-dmg").first()).toBeVisible({ timeout: 6_000 });
   await expect(page.getByRole("img", { name: "The God King has fallen" })).toBeVisible({ timeout: 8_000 });
   await expect(page.getByRole("status", { name: "Finish… it… for me." })).toBeVisible({ timeout: 3_000 });
@@ -254,14 +265,35 @@ test("the God King's Last Stand (solo raid, ?laststand=1): he takes the blow, fa
   await expect(page.getByRole("button", { name: /God King: tap to summon/ })).toHaveCount(0);
   await page.evaluate((mv) => (window as any).match.submit(mv), move);
   expect(await phase(page)).toBe("play");
+  // He fell with his 3 charges: they're your power-ups, a ⚡ button beside his fallen figure. One shows the engine's
+  // top 3 moves as arrows (and the barred move keeps its grey ✕ arrow).
+  const power = page.getByRole("button", { name: /Use a power-up: the engine's top 3 moves \(3 left\)/ });
+  await expect(power).toBeVisible();
+  await power.click();
+  await expect.poll(() => page.evaluate(() => (window as any).match.hint?.length ?? 0), { timeout: 15_000 }).toBe(3);
+  await expect(page.getByRole("button", { name: /Power-up in use/ })).toBeVisible();
+  await expect.poll(() => page.locator(".board-row cg-container svg.cg-shapes line").count()).toBe(4);
   const seen = new Set<string>();
   await playToResults(page, seen, 5);
   expect(await phase(page)).toBe("results");
   const end = await page.evaluate(() => (window as any).match.runner.state.boss);
   expect(end.lastStand.atMove).toBe(1);
   expect(["crowd", "boss", "draw"]).toContain(end.result);
-  // The result screen: he rises if the crowd won, otherwise he stays down.
+  // The power-up move counted as one (an ordinary pick, marked as a power-up move: never brilliant).
+  const record = await page.evaluate(() => (window as any).match.moves.find((m: any) => m.usedPowerUp));
+  expect(record).toBeTruthy();
+  expect(record.brilliant).toBe(false);
+  // The result screen: he rises if the crowd won, otherwise he stays down. Beside him, the Last Stand's card: one
+  // line, and tapped open, your move, the best move, your chances and the position with both arrows.
   await expect(page.locator(end.result === "crowd" ? ".gk-epilogue.rises" : ".gk-epilogue.down")).toBeVisible();
+  const card = page.getByRole("button", { name: /The God King's Last Stand/ });
+  await expect(card).toContainText(/Move \d+: \S+\?\? · /);
+  await card.click();
+  await expect(card).toHaveAttribute("aria-expanded", "true");
+  const facts = page.locator(".ls-card-facts");
+  await expect(facts).toContainText("Your move");
+  await expect(facts).toContainText("Your chances");
+  await expect(page.locator(".ls-card .mini cg-container svg.cg-shapes line").first()).toBeAttached();
 });
 
 test("boss battle (online): the host's browser plays the boss", async ({ page }) => {

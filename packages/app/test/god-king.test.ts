@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { KING_LINES, SPEECH_MS, kingLine, kingSay, kingTurn, lastStandLine, resetKingSpeech, setKingFallen } from "../src/godKing.ts";
+import { KING_LINES, SPEECH_MS, blunderLabel, blunderWords, capitalised, chancesWords, kingLine, kingSay, kingTurn, lastStandLine, replyWords, resetKingSpeech, setKingFallen } from "../src/godKing.ts";
 
 describe("the God King's lines", () => {
   beforeEach(() => resetKingSpeech());
@@ -90,5 +90,27 @@ describe("the God King's lines", () => {
     // A new battle: he's back.
     resetKingSpeech();
     expect(kingSay("intro", "intro", t + 60_000, () => 0)).not.toBeNull();
+  });
+});
+
+describe("his Last Stand in plain words (the warning and the results card)", () => {
+  // QGD Exchange, White to move (move 6): Ne4?? hangs the knight to dxe4.
+  const qgd = "rnbqkb1r/pp3ppp/2p2n2/3p2B1/3P4/2N5/PP2PPPP/R2QKBNR w KQkq - 0 6";
+  it("names the piece the boss's reply wins, a mate it allows, or else the chances", () => {
+    expect(blunderWords(qgd, { move: "c3e4", reply: "d5e4", before: 0.52, after: 0.09 })).toBe("loses your knight");
+    expect(blunderWords(qgd, { move: "c3e4", reply: "d5e4", mateIn: 2, before: 0.52, after: 0 })).toBe("allows mate");
+    expect(blunderWords(qgd, { move: "a2a3", reply: "h7h6", before: 0.52, after: 0.09 })).toBe("your chances 52% → 9%");
+    expect(chancesWords({ move: "a2a3", before: 0.524, after: 0.086 })).toBe("52% → 9%");
+    expect(capitalised("loses your knight")).toBe("Loses your knight");
+  });
+
+  it("the results card: the move as 'Move 6: Ne4??', and the boss's reply with what it won", () => {
+    expect(blunderLabel(qgd, "c3e4")).toBe("Move 6: Ne4??");
+    expect(blunderLabel("rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "d8h4")).toBe("Move 2: …Qh4??");
+    expect(replyWords(qgd, { move: "c3e4", reply: "d5e4" })).toEqual({ san: "dxe4", note: "wins your knight" });
+    expect(replyWords("rnbqkbnr/pppp1ppp/8/4p3/8/5P2/PPPPP1PP/RNBQKBNR w KQkq - 0 2", { move: "g2g4", reply: "d8h4", mateIn: 1 })).toEqual({ san: "Qh4#", note: "checkmate" });
+    expect(replyWords(qgd, { move: "a2a3", reply: "h7h6", mateIn: 5 })).toEqual({ san: "h6", note: "mate in 5" });
+    expect(replyWords(qgd, { move: "a2a3", reply: "h7h6" })).toEqual({ san: "h6", note: "" });
+    expect(replyWords(qgd, { move: "a2a3" })).toBeNull();
   });
 });

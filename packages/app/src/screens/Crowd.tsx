@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { applyMove, inCheck, pieceAt, sideToMove, toSan } from "@chessroyale/chess";
-import { crowdMoveCues, type KingCue } from "../godKing.ts";
+import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKing.ts";
 import { brilliance, equippedLook, type Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
@@ -233,6 +233,13 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   }, [mine]);
   const team = myTeam(match);
   const orientation = (team ?? sideToMove(fen)) === "w" ? "white" : "black";
+  // The Last Stand's warning: the eval bar plunges to the crowd's chances after the blunder (White's side of it),
+  // and goes back as the piece slides back. In the dock, what it loses in plain words.
+  const crowdSide = sideToMove(fen);
+  const plunge = stand && played && stand.after !== undefined && ts >= LAST_STAND.badgeAt && ts < LAST_STAND.slideAt ? (crowdSide === "w" ? stand.after : 1 - stand.after) : null;
+  const verdict = useMemo(() => (stand ? capitalised(blunderWords(fen, stand)) : ""), [mine]);
+  // (On the narrowest phones, "Your chances 52% → 9%" is shortened to "Chances 52% → 9%" to fit the dock.)
+  const shortVerdict = verdict.replace(/^Your chances/, "Chances");
   const voters = picks.filter((p) => p.move).length;
   const rows = useMemo(() => {
     const byMove = new Map<string, { move: string; votes: number; you: boolean }>();
@@ -266,7 +273,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
       <div class={`board-area${stand && ts >= LAST_STAND.crashAt && ts < LAST_STAND.crashAt + 450 ? " ls-shake" : ""}`}>
         <div class="opening-name">
           {match.boss ? (
-            <BossHeading side={sideToMove(fen)} note={mine.king ? "the God King's move" : stand && ts >= LAST_STAND.freezeAt ? "the God King's Last Stand" : `${voters} ${voters === 1 ? "vote" : "votes"}`} />
+            <BossHeading side={sideToMove(fen)} note={mine.king ? "the God King's move" : stand && played ? (ts < LAST_STAND.freezeAt ? "a blunder" : "the God King's Last Stand") : `${voters} ${voters === 1 ? "vote" : "votes"}`} />
           ) : (
             <>
               <strong>{sideName(sideToMove(fen))}</strong> · {voters} {voters === 1 ? "vote" : "votes"}
@@ -275,8 +282,13 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
         </div>
         {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
         <div class="board-row">
-        <EvalBar fen={played && !stand ? applyMove(fen, mine.result.playedMove) : fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-        <Board fen={onBoard.fen} orientation={orientation} lastMove={onBoard.lastMove}>
+        <EvalBar
+          fen={played && !stand ? applyMove(fen, mine.result.playedMove) : fen}
+          orientation={orientation === "white" ? "w" : "b"}
+          evaluate={(f) => match.evaluate(f)}
+          override={plunge}
+        />
+        <Board fen={onBoard.fen} orientation={orientation} lastMove={onBoard.lastMove} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined}>
           {!played && (
             <CrowdGhosts
               fen={fen}
@@ -288,7 +300,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               chosen={landed ? mine.result.playedMove : null}
             />
           )}
-          {played && !alone && (!stand || ts < LAST_STAND.crashAt) && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
+          {played && !alone && !stand && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
           {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
           {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} />}
         </Board>
@@ -304,19 +316,34 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           charges={stand && ts < LAST_STAND.leapAt ? (match.boss?.lastStand?.charges ?? 0) : undefined}
           fallen={stand ? ts >= LAST_STAND.fadeAt : undefined}
           status={
-            stand && ts >= LAST_STAND.freezeAt ? (
-              <>
-                <span class="dock-line">
-                  <strong class="gold">{ts < LAST_STAND.slideAt ? "👑 Last Stand!" : ts < LAST_STAND.fadeAt ? "👑 He takes the blow!" : "👑 The God King has fallen"}</strong>
-                </span>
-                <span class="dock-line muted">
-                  {ts < LAST_STAND.slideAt
-                    ? `${toSan(fen, stand.move)}: −${stand.loss.toFixed(0)} · best ${toSan(fen, mine.bestMove)}`
-                    : ts < LAST_STAND.fadeAt
+            stand && played ? (
+              ts < LAST_STAND.slideAt ? (
+                // The warning: the blunder, and what it loses, in plain words (no numbers but the chances).
+                <>
+                  <span class="dock-line">
+                    <strong class="bad blunder-mark">?? Blunder: {toSan(fen, stand.move)}</strong>
+                  </span>
+                  <span class="dock-line blunder-words">
+                    <span class="wide-only">{verdict}</span>
+                    <span class="narrow-only">{shortVerdict}</span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span class="dock-line">
+                    <strong class="gold">{ts < LAST_STAND.fadeAt ? "👑 He takes the blow!" : "👑 The God King has fallen"}</strong>
+                  </span>
+                  <span class="dock-line muted">
+                    {ts < LAST_STAND.fadeAt
                       ? `${toSan(fen, stand.move)} is taken back`
-                      : "The crowd picks again"}
-                </span>
-              </>
+                      : (match.boss?.lastStand?.charges ?? 0) * match.settings.lastStandPowerUps > 0
+                        ? `He leaves you ⚡×${(match.boss?.lastStand?.charges ?? 0) * match.settings.lastStandPowerUps}`
+                        : alone
+                          ? "Pick again"
+                          : "The crowd picks again"}
+                  </span>
+                </>
+              )
             ) : (
             <>
               <span class="dock-line">
@@ -350,7 +377,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                         ? `${mine.kingCalls} of ${picks.length} called him · no score`
                         : "You called him · no score"
                       : "No move from you."
-                    : `You: ${toSan(fen, me.move)} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`}
+                    : `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`}
               </span>
             </>
             )
