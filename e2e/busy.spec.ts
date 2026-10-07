@@ -29,7 +29,7 @@ test("servers busy: you're told you're in line and about how long, then the queu
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   const line = page.locator(".fd-queue-busy");
   await expect(line).toHaveText("Servers are busy, you're in line: about 20 s");
-  await expect(page.getByText("You're in line")).toBeVisible();
+  await expect(page.getByText("You're in line", { exact: true })).toBeVisible();
   await expect(line).toHaveText("Servers are busy, you're in line: about 15 s");
   // A seat: the usual queue.
   await expect(page.locator(".fd-queue-line")).toContainText(/Finding players · \d+ s, then bots fill the rest/);
@@ -54,6 +54,12 @@ test("servers busy: Cancel while in line goes home and stops asking", async ({ p
   await page.goto(`/?pool=busy2-${test.info().project.name}`);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-queue-busy")).toHaveText("Servers are busy, you're in line: about 45 s");
+  // On a narrow phone (360 px) the whole line shows, with nothing off the side.
+  await page.setViewportSize({ width: 360, height: 740 });
+  const box = (await page.locator(".fd-queue-busy").boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(360);
+  expect(await page.locator(".fd-queue-busy").evaluate((el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight + 1)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
