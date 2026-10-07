@@ -148,3 +148,28 @@ the board is built and kept in step in layout effects, before the paint.
 - When a test passes alone and fails in the full suite, look at what else is running in that worker (the trace lists
   every live context).
 - "The engine's best move" is the line with the highest score, not the first line.
+
+## Cut names that lost their chips, and a top bar too wide for phones (Oct 7, 2026)
+
+**Seen** (by the quick-chat build): on the Crowd cut screen, the last row of knocked-out names was cut in half. On
+narrow phones, the sound button sat over the top bar's "CUT".
+
+**The cause:**
+- When names became tappable (`PlayerName`), its `.player-name` style replaced the cut screen's `.cut-name` chips:
+  it comes later in `styles.css` with the same specificity. The names became 16 px plain text in a 120 px box with
+  `overflow: hidden`, which hid the last row's bottom half and the "+N".
+- The top bar's items never shrink. On most phones they're wider than the bar once scores have a few digits, so the
+  line ran under the sound button and off the screen.
+- Every test passed: the names were all in the page, just not all visible, and the tests' phone (390 px) had small
+  scores.
+
+**How it was found:** a script played a solo Crowd match on 360 and 375 px phones, light and dark, with the longest
+real bot names and the widest scores. It measured each name's box against the list's, the bar's `scrollWidth`
+against its width, and the cut pill against the sound button. Then `e2e/crowd.spec.ts` did the same.
+
+**The rule:**
+- When a screen adopts a shared component, check its own styles still apply: computed styles, not only the markup.
+- Check anything kept to one line on a phone at 360 px with its widest real content (long names, six-character
+  scores). Measure it; don't only look at a screenshot at the test phone's size.
+- A fixed-height box with `overflow: hidden` hides what doesn't fit, and no test fails. Show whole items and count
+  the rest instead.

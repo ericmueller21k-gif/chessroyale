@@ -1673,3 +1673,43 @@ brilliant.
 - **The test switch** is still `?laststand=1` (and `?side=b` for Black): the first crowd move sets it off whatever it
   is, so the warning may name a small loss ("Your chances 52% → 49%"). Blunder a piece for the real thing.
 
+## Match screen fixes (Oct 7, 2026)
+
+Five things the quick-chat build noticed, and one found on the way. My calls:
+
+- **A later cut, once you're out (online Crowd).** Knocked-out players stay on the cut screen until the results, so
+  they see every later cut, and those said "You're through."
+  - Now they say "You went out earlier, in 37th place." There's no "Why was I cut?" there (the results have "Why you
+    went out"), and no clock vote (the server ignores the vote of a player who's out).
+  - Each later cut is now its own judgement. The screen used to be reused, so the gavel never fell again and the
+    newly cut pawns went straight to grey, with no sound.
+  - Classic has the same bug online ("You're through to stage 3" for players already out). Not fixed: Classic is
+    being reworked.
+- **The cut screen's names.**
+  - When names became tappable (they open profiles), the shared name style replaced the chips: plain 16 px text, not
+    struck through, in a box that cut its last row in half and hid "+N". The chips are back.
+  - The list shows only whole rows (four on a phone, at most 12 names). Names that don't fit join "+N", so long names
+    or a narrow phone just show fewer. You come first, so the list never hides you. "+N" isn't struck through.
+- **The top bar on phones.**
+  - On most phones its line was wider than the bar, by up to 100 px at 360 px with wide scores, so the cut pill ran
+    under the sound button and off the screen.
+  - Under 480 px: Crowd's label is two short lines ("Move 34" over "cut in 2"), with a little less space between
+    items, the rank at 15 px (its "/50" at 12 px) and your score at 18 px.
+  - The numbers never shrink. On a screen narrower than 360 px, only the label is shortened, with "…".
+  - Checked at 360 and 375 px, light and dark, with the widest real values: move 34, −112.5, a cut line of −120, and
+    "P100/100" in Everyone moves. Classic's and the boss's labels are unchanged.
+- **The iPhone SE's cut screen** is still a few pixels taller than the screen (7 px, was 21). Not changed here.
+- **Two tests that failed now and then.** Both were test bugs; the game is right in each.
+  - The Crowd test played one round a stage, so each stage was a single ply. At the first cut, the team that hadn't
+    moved yet was all tied on 0, and its cut was a coin flip: in about 1 run in 12 you went out before ever playing.
+    A real stage is a move for each team, so the test now plays two rounds a stage (about 5 minutes).
+  - The sound test: in about 1 solo Classic match in 170, your first board is a Caro-Kann line ending 5.Nxf6+.
+    Black is in check with only two legal moves, so the power-up rightly shows two. The test now expects the top 3,
+    or every legal move when there are fewer.
+  - For the Classic rework: some library lines start the board in check with one or two replies.
+- **Found and passed on to the engine lane:** a top-N search can list one move twice and leave out another.
+  - When the node budget runs out mid-search, Stockfish marks the line it was searching as a bound. `parseInfo`
+    skips bound lines, so that slot keeps the previous depth's move, often one that's also in another slot.
+  - In 59 of 202 Classic start positions, a top-8 search repeated a move. In 9 the repeat was in the top 3, so the
+    power-up showed the same move twice and missed a good one.
+  - The bots' candidates and the judge's top 8 have the same gap. Not fixed here: it's the judge's code (`uci.ts`).
