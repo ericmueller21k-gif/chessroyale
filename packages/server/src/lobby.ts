@@ -77,6 +77,8 @@ interface Human {
   look?: ItemLook;
   /** When they took their seat (the queue's wait). */
   joinedAt?: number;
+  /** When they dropped (not connected since). */
+  goneAt?: number;
 }
 
 type Timer =
@@ -187,6 +189,8 @@ export interface LobbyRecord {
   endedAt?: number;
   /** How long the results stay up, if not LOBBY_LIFE's (playtests: ?keep=SECONDS on a lobby you create). */
   keepMs?: number;
+  /** Bots off: the tokens of seats freed while their people were gone (they get a new seat if they come back). */
+  freed?: string[];
 }
 
 /** What someone is told when they open a match that's over (results still up, or long gone). */
@@ -325,6 +329,22 @@ export class LobbyCore {
     return !!a.botsOff || (a.fillAt !== null && this.io.now() < a.fillAt - 2000);
   }
 
+  /**
+   * Bots off, still waiting: frees the seats of people gone longer than MATCHMAKING.botsOffSeatHoldMs (`keep`: one who's
+   * just come back), so the count is real and a full lobby never starts with people who left.
+   */
+  private freeGoneSeats(keep?: string) {
+    const a = this.r.auto;
+    if (!a?.botsOff || a.filledAt || this.r.phase !== "lobby") return;
+    const now = this.io.now();
+    const gone = this.r.humans.filter((h) => h.id !== keep && !h.connected && h.goneAt !== undefined && now - h.goneAt >= MATCHMAKING.botsOffSeatHoldMs);
+    if (!gone.length) return;
+    for (const h of gone) {
+      this.leave(h.id);
+      this.r.freed = [...(this.r.freed ?? []), h.token].slice(-100);
+    }
+  }
+
   /** Bots off: enough people to begin (full; or a raid that has waited its minute with enough for a crowd). */
   private botsOffReady(): boolean {
     const a = this.r.auto;
@@ -404,8 +424,11 @@ export class LobbyCore {
   ) {
     this.r.activeAt = this.io.now();
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
+    // (Bots off: seats of people long gone are freed first, so the count and "full" are real. Not the arriving one's.)
+    this.freeGoneSeats(existing?.id);
     if (existing) {
       existing.connected = true;
+      delete existing.goneAt;
       if (look !== undefined) existing.look = cleanLook(look);
       if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [existing.id]: userId };
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
@@ -418,14 +441,17 @@ export class LobbyCore {
       if (!this.r.timer && this.dueToStart()) this.startMatch();
       return { ok: true as const, playerId: existing.id };
     }
+    // Bots off: someone whose seat was freed while they were gone, back while it still waits: a new seat, same token.
+    const reseat = !!token && !!this.r.freed?.includes(token) && this.joinable();
+    if (reseat) this.r.freed = this.r.freed!.filter((t) => t !== token);
     // A seat this lobby never gave out: from an older lobby that had this code (it has closed since), so that match is over.
-    if (token) return { ok: false as const, message: MATCH_ENDED, ended: true as const };
+    else if (token) return { ok: false as const, message: MATCH_ENDED, ended: true as const };
     if (this.r.phase === "results") return { ok: false as const, message: MATCH_ENDED, ended: true as const };
     if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: "This match has already started." };
     if (this.r.humans.length >= this.settings.lobbySize) return { ok: false as const, message: "This lobby is full." };
     const clean = (name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || `Player ${this.r.humans.length + 1}`;
     const id = `p${++this.r.counter}`;
-    const newToken = Array.from({ length: 24 }, () => Math.floor(this.rng() * 16).toString(16)).join("");
+    const newToken = reseat ? token! : Array.from({ length: 24 }, () => Math.floor(this.rng() * 16).toString(16)).join("");
     this.r.humans.push({
       id,
       name: clean,
@@ -462,6 +488,7 @@ export class LobbyCore {
     const h = this.human(playerId);
     if (!h) return;
     h.connected = false;
+    h.goneAt = this.io.now();
     this.r.activeAt = this.io.now();
     if (this.r.hostId === playerId) {
       this.r.hostId = this.pickHost(playerId) ?? playerId;
@@ -620,6 +647,7 @@ export class LobbyCore {
   }
 
   alarm() {
+    this.freeGoneSeats();
     const timer = this.r.timer;
     if (!timer || timer.at > this.io.now() + 50) return;
     this.r.timer = null;

@@ -12,7 +12,12 @@ const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ??
 const code = (p: Page) => p.evaluate(() => (window as any).match?.code as string | undefined).catch(() => undefined);
 const seats = (p: Page) => p.evaluate(() => (window as any).match?.players.length ?? 0).catch(() => 0);
 const path = (p: Page) => new URL(p.url()).pathname;
-const pool = (name: string) => `${name}-${test.info().project.name}`;
+/**
+ * A queue of this test's own, for this run only (a Bots off lobby keeps waiting after a test, so a fixed name would
+ * meet an earlier run's). The server takes up to 24 characters.
+ */
+const run = Date.now().toString(36).slice(-5);
+const pool = (name: string) => `${name}-${test.info().project.name[0]}${run}`;
 
 test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warns; Solo fills its seats fast and starts", async ({ page }) => {
   await named(page, "Typer");

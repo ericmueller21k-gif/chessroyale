@@ -512,6 +512,11 @@ export const MATCHMAKING = {
   raidBotsOffMinPlayers: 10,
   /** Bots off → Default ("let bots fill"): your wait so far counts, but the bots never fill sooner than this. */
   switchMinWaitMs: 5_000,
+  /**
+   * Bots off: a seat whose person has been gone this long is freed before anyone else joins (or a raid begins), so the
+   * count is real and a full lobby never starts with people who left. Back while it still waits: a new seat.
+   */
+  botsOffSeatHoldMs: 120_000,
 } as const;
 
 /**

@@ -45,6 +45,38 @@ describe("lobby: matchmaking types", () => {
     expect(L.core.joinable()).toBe(false);
   });
 
+  it("Bots off: a seat whose person has been gone two minutes is freed (the count is real); back while it waits: a new seat", () => {
+    const L = setup({ ...crowd(), lobbySize: 3 });
+    L.core.setAuto(null, true);
+    L.core.connect(undefined, "Ann", "phone");
+    const ann = L.core.record.humans[0]!.token;
+    L.core.disconnect("p1");
+    // Gone a minute: still hers.
+    L.advance(60_000);
+    L.core.connect(undefined, "Bo", "phone");
+    expect(L.core.record.humans.map((h) => h.name)).toEqual(["Ann", "Bo"]);
+    // Gone past the hold: freed when the next person arrives, so two people don't fill "three" with a ghost.
+    L.advance(MATCHMAKING.botsOffSeatHoldMs);
+    L.core.connect(undefined, "Cy", "phone");
+    expect(L.core.record.humans.map((h) => h.name)).toEqual(["Bo", "Cy"]);
+    expect(L.core.record.auto?.filledAt).toBeUndefined();
+    expect(L.last("p2", "lobby")!.players.map((p) => p.name)).toEqual(["Bo", "Cy"]);
+    // Ann's back: a new seat with her own token, and that fills it.
+    expect(L.core.connect(ann, "Ann", "phone")).toMatchObject({ ok: true });
+    expect(L.core.record.humans.map((h) => h.name)).toEqual(["Bo", "Cy", "Ann"]);
+    expect(L.core.record.auto?.filledAt).toBe(L.now);
+    // (Someone who's only been away a moment keeps their seat.)
+    const D = setup({ ...crowd() });
+    D.core.setAuto(null, true);
+    D.core.connect(undefined, "Dee", "phone");
+    D.core.disconnect("p1");
+    D.advance(30_000);
+    D.core.connect(D.core.record.humans[0]!.token, "Dee", "phone");
+    D.advance(MATCHMAKING.botsOffSeatHoldMs * 2);
+    D.core.connect(undefined, "Ed", "phone");
+    expect(D.core.record.humans.map((h) => h.name)).toEqual(["Dee", "Ed"]);
+  });
+
   it(`Bots off, a raid: full, or once its minute is up with ${MATCHMAKING.raidBotsOffMinPlayers} people`, () => {
     const L = setup({ ...RAID_SETTINGS });
     L.core.setAuto(L.now + 60_000, true);

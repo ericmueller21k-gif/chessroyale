@@ -2126,6 +2126,10 @@ ranking can't change" (since replaced: see Ranking below). The `hub` delegate's 
 - **One queue per mode and type** (`queueName`: crowd-default, crowd-botsoff, raid-default, raid-botsoff), so Default
   and Bots off never share a lobby.
 - **Bots off, 50 v 50:** never any bots; it waits until 100 people have joined.
+- **Bots off frees the seats of people who left:** after 2 minutes gone (`botsOffSeatHoldMs`), the next arrival (or a
+  raid's start) frees their seat. The count is then real, and a "full" lobby never starts with people who left (the
+  100/100 problem again). Back while it still waits: a new seat with the same token. Found by the e2e suite meeting an
+  earlier run's Bots off lobby, which was still waiting with its people long gone.
 - **Bots off, raid:** starts at 50, or once its minute is up with at least 10 people
   (`MATCHMAKING.raidBotsOffMinPlayers`). Raids already started with whoever was there, and 10 is the size of the
   Crowd's boss battle: a real crowd.
@@ -2183,6 +2187,9 @@ ranking can't change" (since replaced: see Ranking below). The `hub` delegate's 
   - Solo full in under 5 s and into the vote;
   - Bots off waiting past the fill time, a Default player in another lobby, the switch, then bots and "Unranked";
   - a Solo raid to its results ("Unranked");
+  - `profile.spec.ts`: a solo result leaves "No rating yet". Its rank display then uses a rating served in the
+    server's answers, since an e2e can't seat 30 people; the server's side of the rule is in `live.test.ts`.
+  - `sound.spec.ts`: Solo's queue pops come first, then the match's sounds, and nothing else;
   - the app closed and opened again during a live match, and Cancel then opened again (home).
 - `npm run frames:matchmaking -- <dir> [dark|light]` (Worker running): every frame through taps on the types and the
   ⓘ, a Solo fill into the vote, Bots off then the switch, and a fresh open rejoining. It flags blinks, the count going
