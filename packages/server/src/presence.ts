@@ -1,4 +1,4 @@
-import { CAPACITY } from "@chessroyale/core";
+import { CAPACITY, FRONT_DOOR } from "@chessroyale/core";
 import { sha256, type Sql } from "./accounts.ts";
 import { liveHub } from "./live-hub.ts";
 import type { Env } from "./index.ts";
@@ -60,6 +60,20 @@ export async function cachedUserId(sql: Sql, token: string | null | undefined, n
   if (tokens.size >= TOKEN_CACHE_MAX) tokens.delete(tokens.keys().next().value!);
   tokens.set(token, { userId: s.user_id, until: Math.min(s.expires_at, now + TOKEN_CACHE_MS) });
   return s.user_id;
+}
+
+const fresh = new Map<string, number>();
+/**
+ * Whether this is the first this instance has heard from the account in the last online window (then the caller
+ * tells the hub at once and skips the cached numbers, so "you" count the moment the home screen loads).
+ */
+export function firstSighting(userId: string, now: number): boolean {
+  const at = fresh.get(userId);
+  if (at !== undefined && now - at < FRONT_DOOR.onlineWindowMs) return false;
+  if (fresh.size >= TOKEN_CACHE_MAX) fresh.delete(fresh.keys().next().value!);
+  fresh.delete(userId);
+  fresh.set(userId, now);
+  return true;
 }
 
 /** Signing out: this instance forgets the token at once (others within their 10 minutes; it only marks presence). */

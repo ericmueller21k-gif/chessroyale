@@ -1,7 +1,7 @@
 import { equipLocker, lockerState, openCrate } from "./locker.ts";
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
-import { cachedUserId, forgetToken, markSeen } from "./presence.ts";
+import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.ts";
 import {
   buyItem,
   cleanEmail,
@@ -141,7 +141,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (touch) {
       // The live hub: presence in batches (the session lookup cached), the numbers from its memory.
       const uid = await cachedUserId(sql, token, now);
-      if (uid) touch(uid);
+      if (uid && firstSighting(uid, now)) {
+        // Just arrived: the hub hears at once, and the numbers include you.
+        await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).seen([uid], now).catch(() => undefined);
+        liveCache = null;
+      } else if (uid) touch(uid);
     } else await touchSession(sql, token, now);
     if (!liveCache || now - liveCache.at > LIVE_CACHE_MS) {
       if (env.LIVE) liveCache = { at: now, body: await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).counts() };
