@@ -213,6 +213,25 @@ export interface NetVote {
   nextAt?: number;
 }
 
+/**
+ * Quick chat: one line said in the match (a phrase or emoji id from core/chat.ts; never free text). `team` is the
+ * sender's team when they said it (null: everyone is one team, as in a raid). `at` (server time) is when to show it
+ * (a bot's line comes a moment after what it reacts to). `icon` is the sender's pixel icon, sent with their first
+ * line to each player (keep it).
+ */
+export interface NetChatLine {
+  n: number;
+  from: string;
+  say: string;
+  to: "team" | "all";
+  team: "w" | "b" | null;
+  at: number;
+  icon?: string;
+}
+
+/** Why the server dropped a chat line (the app mirrors the limits, so this is rare). */
+export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "repeat" | "closed" | "off";
+
 export type ClientMessage =
   /** `look`: the crate items you wear (others see them on the cut screen). */
   | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; rating?: number | null; look?: unknown }
@@ -235,7 +254,14 @@ export type ClientMessage =
   /** Boss battle, host only: the boss's move. */
   | { t: "bossMove"; key: string; move: string }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
-  | { t: "leave" };
+  | { t: "leave" }
+  /** Quick chat: say a line (a phrase or emoji id) to your team or, for Hello and Sporting lines, to everyone. */
+  | { t: "chat"; say: string; to?: "team" | "all" }
+  /**
+   * Quick chat, this device's choices: chat off (nothing is sent to it, and it can't send), and the players muted
+   * for this match (their lines aren't sent to it).
+   */
+  | { t: "chatPrefs"; off?: boolean; muted?: string[] };
 
 export type ServerMessage = { now: number } & (
   | { t: "welcome"; playerId: string; token: string; code: string }
@@ -352,6 +378,15 @@ export type ServerMessage = { now: number } & (
   | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean }
   /** To the host: play the boss's move. */
   | { t: "bossRequest"; key: string; fen: string; elo: number; nodes: number; stumble?: boolean; stagger?: boolean }
+  /** Quick chat: a line for you (your own included, echoed back). */
+  | { t: "chat"; line: NetChatLine }
+  /**
+   * Quick chat, on (re)joining a started match: the recent lines you can see, and the chat packs the server knows
+   * you own (the buttons to show).
+   */
+  | { t: "chatLog"; lines: NetChatLine[]; packs: string[] }
+  /** Quick chat: your line was dropped; `retryAt` (server time) is when it (or anything, for the gap and burst limits) could go. */
+  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number }
   | {
       t: "results";
       placements: Record<string, number>;

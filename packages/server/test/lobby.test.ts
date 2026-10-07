@@ -23,7 +23,7 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
 type Msg = ServerMessage;
 
 /** A fake lobby: clock, outboxes per player, and a fake host that scores with a hash "engine". */
-function setup(settings: Partial<Settings> = {}) {
+function setup(settings: Partial<Settings> = {}, icons: Record<string, string> = {}) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const core = new LobbyCore(
@@ -31,6 +31,7 @@ function setup(settings: Partial<Settings> = {}) {
     {
       now: () => now,
       send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
+      icon: (id) => icons[id],
     },
     library,
     mulberry32(7),
@@ -598,5 +599,165 @@ describe("lobby: Crowd mode", () => {
     expect(v2.playedMove).toBe(best);
     expect(v2.board!.fen).not.toBe(fen);
     expect(v2.boss).toMatchObject({ barred: null, crowdMoves: 1, lastStand: { atMove: 1 } });
+  });
+});
+
+describe("lobby: quick chat", () => {
+  /** A 50 v 50 with three people (two on one team, one on the other), the match begun. */
+  function chatLobby(icons: Record<string, string> = {}) {
+    const L = setup({ ...modeSettings("crowd"), augments: false, boardIntroSeconds: 0 }, icons);
+    for (const n of ["Ann", "Bo", "Cy"]) L.core.connect(undefined, n, "computer");
+    // Before the match: chat is closed (the queue comes later).
+    L.core.message("p1", { t: "chat", say: "good-luck" });
+    expect(L.last("p1", "chatNo")).toMatchObject({ reason: "closed" });
+    L.core.message("p1", { t: "start" });
+    L.advance(DEFAULT_SETTINGS.openingShowSeconds * 1000);
+    const team = (id: string) => L.last(id, "round")!.standings.find((s) => s.id === id)!.team!;
+    const ids = ["p1", "p2", "p3"];
+    const side = ids.map(team);
+    // The seed puts two on one side; find who's with whom.
+    const a = ids.find((id, i) => side.filter((x) => x === side[i]).length === 2)!;
+    const mate = ids.find((id) => id !== a && team(id) === team(a))!;
+    const other = ids.find((id) => team(id) !== team(a))!;
+    expect(other).toBeTruthy();
+    const said = (id: string) => (L.inbox.get(id) ?? []).filter((m): m is Extract<Msg, { t: "chat" }> => m.t === "chat").map((m) => m.line);
+    const humanLines = (id: string) => said(id).filter((l) => l.from.startsWith("p"));
+    const clear = () => ids.forEach((id) => L.take(id));
+    return { L, a, mate, other, said, humanLines, clear, team };
+  }
+
+  it("opens with the match: everyone gets the log and their packs", () => {
+    const { L, a } = chatLobby();
+    const log = L.last(a, "chatLog")!;
+    expect(log.packs).toEqual(["basics", "emoji-basics"]);
+    expect(L.core.chatOpen()).toBe(true);
+  });
+
+  it("team lines reach only your team (and you); Hello and Sporting can go to everyone", () => {
+    const { L, a, mate, other, humanLines, clear } = chatLobby();
+    clear();
+    L.core.message(a, { t: "chat", say: "push-pawns" });
+    expect(humanLines(a).map((l) => l.say)).toEqual(["push-pawns"]);
+    expect(humanLines(mate)).toEqual([expect.objectContaining({ from: a, say: "push-pawns", to: "team" })]);
+    expect(humanLines(other)).toEqual([]);
+    // Plans can't go to everyone.
+    L.advance(3_000);
+    L.core.message(a, { t: "chat", say: "go-mate", to: "all" });
+    expect(L.last(a, "chatNo")).toMatchObject({ say: "go-mate", reason: "team" });
+    expect(humanLines(other)).toEqual([]);
+    // A Sporting line can.
+    L.core.message(a, { t: "chat", say: "gg", to: "all" });
+    expect(humanLines(other)).toEqual([expect.objectContaining({ from: a, say: "gg", to: "all" })]);
+    expect(humanLines(mate).map((l) => l.say)).toEqual(["push-pawns", "gg"]);
+  });
+
+  it("drops anything not on the list, and pack lines the sender doesn't own", () => {
+    const { L, a, mate, humanLines, clear } = chatLobby();
+    clear();
+    for (const say of ["you all stink", "", 42, { id: "gg" }]) L.core.message(a, { t: "chat", say } as never);
+    expect(L.last(a, "chatNo")!.reason).toBe("unknown");
+    L.core.message(a, { t: "chat", say: "gk-crown" });
+    expect(L.last(a, "chatNo")).toMatchObject({ say: "gk-crown", reason: "locked" });
+    expect(humanLines(mate)).toEqual([]);
+    // Once their account owns the God King pack, it goes.
+    L.core.chatOwned(a, ["king-holy", "chat-godking"]);
+    L.core.message(a, { t: "chat", say: "gk-crown" });
+    expect(humanLines(mate).map((l) => l.say)).toEqual(["gk-crown"]);
+  });
+
+  it("enforces the limits: one every 3 s, 5 in 30 s, no repeats", () => {
+    const { L, a, mate, humanLines, clear } = chatLobby();
+    clear();
+    const t0 = L.now;
+    L.core.message(a, { t: "chat", say: "nice-move" });
+    L.core.message(a, { t: "chat", say: "wow" });
+    expect(L.last(a, "chatNo")).toMatchObject({ reason: "gap", retryAt: t0 + 3_000 });
+    L.advance(3_000);
+    L.core.message(a, { t: "chat", say: "nice-move" });
+    expect(L.last(a, "chatNo")).toMatchObject({ reason: "repeat" });
+    for (const say of ["wow", "oops", "so-close", "lets-go"]) {
+      L.core.message(a, { t: "chat", say });
+      L.advance(3_000);
+    }
+    L.core.message(a, { t: "chat", say: "thanks" });
+    expect(L.last(a, "chatNo")).toMatchObject({ reason: "burst", retryAt: t0 + 30_000 });
+    expect(humanLines(mate).map((l) => l.say)).toEqual(["nice-move", "wow", "oops", "so-close", "lets-go"]);
+    L.advance(30_000 - (L.now - t0));
+    L.core.message(a, { t: "chat", say: "thanks" });
+    expect(humanLines(mate).map((l) => l.say)).toContain("thanks");
+  });
+
+  it("muting a player stops their lines reaching you; chat off stops everything, and back on brings the missed lines", () => {
+    const { L, a, mate, humanLines, clear } = chatLobby();
+    clear();
+    L.core.message(mate, { t: "chatPrefs", muted: [a, "nobody", mate] });
+    expect(L.core.record.chat!.muted[mate]).toEqual([a]);
+    L.core.message(a, { t: "chat", say: "push-pawns" });
+    expect(humanLines(mate)).toEqual([]);
+    L.core.message(mate, { t: "chatPrefs", muted: [] });
+    L.core.message(mate, { t: "chatPrefs", off: true });
+    L.advance(3_000);
+    L.core.message(a, { t: "chat", say: "defend-king" });
+    expect(humanLines(mate)).toEqual([]);
+    // Off: they can't send either.
+    L.core.message(mate, { t: "chat", say: "wow" });
+    expect(L.last(mate, "chatNo")).toMatchObject({ reason: "off" });
+    L.core.message(mate, { t: "chatPrefs", off: false });
+    expect(L.last(mate, "chatLog")!.lines.filter((l) => l.from === a).map((l) => l.say)).toEqual(["push-pawns", "defend-king"]);
+  });
+
+  it("names come from the lobby; a sender's icon goes with their first line to each player, and again after a rejoin", () => {
+    const { L, a, mate, said, clear } = chatLobby({ p1: "♞", p2: "🦊", p3: "🐉" });
+    clear();
+    L.core.message(a, { t: "chat", say: "wow" });
+    L.advance(3_000);
+    L.core.message(a, { t: "chat", say: "oops" });
+    const lines = said(mate).filter((l) => l.from === a);
+    expect(lines.map((l) => l.icon)).toEqual([{ p1: "♞", p2: "🦊", p3: "🐉" }[a], undefined]);
+    expect(Object.keys(lines[0]!).sort()).toEqual(["at", "from", "icon", "n", "say", "team", "to"]);
+    // A rejoin: the log carries the icon again.
+    L.core.disconnect(mate);
+    L.core.resendTo(mate);
+    const log = L.last(mate, "chatLog")!;
+    expect(log.lines.find((l) => l.from === a)!.icon).toBeTruthy();
+  });
+
+  it("bots chat a little: hello at the start and GG at the end, from bots, never more than a few a minute", () => {
+    const { L, a, team } = chatLobby();
+    // The match is over: play it out with nobody picking.
+    const st = L.core.record;
+    for (let i = 0; i < 400 && st.phase !== "results"; i++) {
+      L.hostScores("p1");
+      L.advance(5_000);
+    }
+    expect(st.phase).toBe("results");
+    const lines = st.chat!.lines.filter((l) => !l.from.startsWith("p"));
+    expect(lines.length).toBeGreaterThan(0);
+    const bots = new Set(st.bots.map((b) => b.id));
+    for (const l of lines) expect(bots.has(l.from)).toBe(true);
+    const at = lines.map((l) => l.at).sort((x, y) => x - y);
+    for (const t of at) expect(at.filter((u) => u >= t && u < t + 60_000).length).toBeLessThanOrEqual(3);
+    // What each person was sent: lines to everyone, and team lines from their own team's bots.
+    for (const m of L.inbox.get(a) ?? []) {
+      if (m.t !== "chat" || m.line.from.startsWith("p")) continue;
+      expect(m.line.to === "all" || m.line.team === team(a) || m.line.team === null).toBe(true);
+      expect(m.line.at).toBeGreaterThan(m.now);
+    }
+    expect(lines.some((l) => ["gg", "well-played"].includes(l.say))).toBe(true);
+  });
+
+  it("boss raid: everyone is one team; Classic has no chat", () => {
+    const R = setup({ ...RAID_SETTINGS, bossIntroSeconds: 0 } as Partial<Settings>);
+    R.core.connect(undefined, "Ann", "computer");
+    R.core.connect(undefined, "Bo", "phone");
+    R.core.message("p1", { t: "start" });
+    R.core.message("p1", { t: "chat", say: "push-pawns" });
+    expect(R.last("p2", "chat")!.line).toMatchObject({ from: "p1", say: "push-pawns", team: null });
+    const C = setup();
+    C.core.connect(undefined, "Ann", "computer");
+    C.core.message("p1", { t: "start" });
+    C.core.message("p1", { t: "chat", say: "gg" });
+    expect(C.last("p1", "chatNo")).toMatchObject({ reason: "closed" });
+    expect(C.last("p1", "chatLog")).toBeUndefined();
   });
 });

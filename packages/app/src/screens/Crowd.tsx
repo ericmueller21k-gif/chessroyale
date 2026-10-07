@@ -5,7 +5,7 @@ import { brilliance, equippedLook, type Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
-import { MiniTower } from "../components/MiniTower.tsx";
+import { ChatSection, UnderBoard } from "../components/QuickChat.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
 import { KING_CUT_MS, KingSummon, kingSquare } from "../components/GodKing.tsx";
@@ -127,7 +127,7 @@ export function WatchScreen({
           )}
         </div>
       </div>
-      <MiniTower match={match} />
+      <UnderBoard match={match} />
     </div>
   );
 }
@@ -441,7 +441,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
         </div>
       </div>
       )}
-      <MiniTower match={match} />
+      <UnderBoard match={match} />
     </div>
   );
 }
@@ -577,6 +577,8 @@ export function CrowdCut({
             ))}
             {knockedOut.length > 12 && <span class="cut-name more">+{knockedOut.length - 12}</span>}
           </div>
+          {/* Out, you stay here until the results: quick chat with your team (online). */}
+          {(youOut || me?.out) && <ChatSection match={match} />}
         </>
       )}
       {why && (

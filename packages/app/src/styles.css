@@ -7583,3 +7583,677 @@ button.fd-seat {
     min-width: 0;
   }
 }
+
+/* ---- Quick chat (components/QuickChat.tsx) ---- */
+
+/* The panel matches the scoreboard beside it: dark in both themes (a page's chat follows the theme, below). */
+.qchat {
+  text-align: left;
+  --qc-bg: #101216;
+  --qc-head: #181b21;
+  --qc-text: #eef0f4;
+  --qc-muted: #8a93a3;
+  --qc-name: #c9d1dd;
+  --qc-chip: #23272f;
+  --qc-edge: #343946;
+  --qc-rule: #1f232b;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--qc-bg);
+  color: var(--qc-text);
+}
+.qhead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding-left: 10px;
+  background: var(--qc-head);
+}
+.qhead-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.qhead-gap {
+  flex: 1;
+}
+.qhead-btn,
+.mini-tower-head .qhead-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #9aa2b1;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.qhead-btn.on {
+  color: var(--accent);
+}
+.qhead-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.qto {
+  display: flex;
+  height: 20px;
+  margin-left: 6px;
+  border: 1px solid var(--qc-edge);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.qto button {
+  border: 0;
+  padding: 0 7px;
+  background: none;
+  color: #9aa2b1;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.qto button.on {
+  background: var(--accent);
+  color: #1a1406;
+}
+.qunread {
+  flex: none;
+  align-self: center;
+  height: 20px;
+  margin-right: 2px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #1a1406;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* The feed: newest at the bottom. A phone's split shows the newest that fit; the others scroll. */
+.qfeed-wrap {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+}
+.qfeed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1px;
+  padding: 4px 8px;
+  overflow: hidden;
+}
+.qfeed.fit {
+  flex-direction: column-reverse;
+  flex-wrap: wrap;
+  /* (Lines that don't fit wrap into a next column, well out of sight.) */
+  column-gap: 40px;
+  justify-content: flex-start;
+  align-content: flex-start;
+}
+.qfeed.fit > * {
+  width: 100%;
+}
+.qfeed.scroll {
+  justify-content: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.qfeed.scroll > :first-child {
+  margin-top: auto;
+}
+.qline {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 22px;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.qicon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+  background: #23272f;
+  overflow: hidden;
+}
+img.qicon {
+  image-rendering: pixelated;
+}
+.qline-who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qline-name {
+  flex: 0 4 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 60%;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--qc-name);
+  font: inherit;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.qline.you .qline-name {
+  color: var(--accent);
+}
+.qline .team-chip,
+.qbubble .team-chip {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin: 0;
+  border-width: 1px;
+  border-color: #8a93a3;
+}
+.qline-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 66%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qline.emoji .qline-text {
+  font-size: 17px;
+}
+.qline-to {
+  flex: none;
+  padding: 0 3px;
+  border: 1px solid var(--qc-edge);
+  border-radius: 4px;
+  color: var(--qc-muted);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 13px;
+  text-transform: uppercase;
+}
+.qfeed-empty,
+.qfeed-hint {
+  flex: none;
+  margin: 2px 0;
+  color: var(--qc-muted);
+  font-size: 11px;
+  line-height: 14px;
+  white-space: normal;
+}
+.qfeed-hint {
+  color: #d9b45c;
+}
+
+/* The buttons: a phone's two sideways rows, or a computer's groups. */
+.qbuttons {
+  flex: none;
+  border-top: 1px solid var(--qc-rule);
+}
+.qbuttons.rows {
+  display: grid;
+  gap: 5px;
+  padding: 5px 0 6px;
+}
+.qrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+.qrow::-webkit-scrollbar {
+  display: none;
+}
+.qrow-group {
+  flex: none;
+  padding-left: 4px;
+  color: var(--qc-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.qrow-group:first-child {
+  padding-left: 0;
+}
+.qchip {
+  flex: none;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--qc-edge);
+  border-radius: 17px;
+  background: var(--qc-chip);
+  color: var(--qc-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 80ms, opacity 160ms;
+}
+.qchip.emoji {
+  min-width: 38px;
+  padding: 0 6px;
+  font-size: 19px;
+  line-height: 1;
+}
+.qchip:active:not(:disabled) {
+  transform: scale(0.94);
+  background: color-mix(in srgb, var(--accent) 35%, var(--qc-chip));
+}
+.qchip:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+.qchip.quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--qc-muted);
+}
+.qbuttons.groups {
+  display: grid;
+  gap: 7px;
+  padding: 8px 10px 10px;
+}
+.qgroup {
+  display: grid;
+  gap: 4px;
+}
+.qgroup-name {
+  color: var(--qc-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.qgroup-lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.qbuttons.groups .qchip {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+.qbuttons.groups .qchip.emoji {
+  min-width: 34px;
+  padding: 0 5px;
+  font-size: 18px;
+}
+@media (hover: hover) {
+  .qchip:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+}
+
+/* A name's menu (profile, mute) and the options take the buttons' place: nothing pops over the board. */
+.qmenu,
+.qoptions,
+.qoff {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--qc-rule);
+}
+.qmenu-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.qoptions,
+.qoff {
+  flex: 1 1 0;
+  align-content: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.qoff p {
+  color: var(--qc-muted);
+  font-size: 12px;
+}
+.qopt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.qopt input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.qopt-muted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.qopt-muted .muted {
+  color: var(--qc-muted);
+}
+
+/* The newest message for a moment under the top bar (phone, chat hidden). It never takes a tap. */
+.qbubble {
+  position: fixed;
+  z-index: 45;
+  top: 0;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  max-width: calc(100vw - 24px);
+  padding: 0 11px 0 4px;
+  border: 1px solid #4a5160;
+  border-radius: 13px;
+  background: #2f3440;
+  color: #eef0f4;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: qbubble 2s linear forwards;
+}
+.qbubble strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #c9d1dd;
+}
+.qbubble > span:not(.qline-to) {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qbubble .emoji {
+  font-size: 16px;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .qbubble {
+    border-color: transparent;
+    background: rgba(16, 18, 22, 0.93);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+}
+:root[data-theme="light"] .qbubble {
+  border-color: transparent;
+  background: rgba(16, 18, 22, 0.93);
+}
+@keyframes qbubble {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+  7% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* An emoji floats up from its sender's row on the scoreboard. */
+.t-float {
+  position: absolute;
+  top: 1px;
+  right: 34%;
+  z-index: 2;
+  font-size: 17px;
+  line-height: 1;
+  pointer-events: none;
+  animation: t-float 2.4s ease-out forwards;
+}
+@keyframes t-float {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-float,
+  .qbubble {
+    animation-timing-function: steps(1, end);
+  }
+}
+
+/* The scoreboard's narrow form beside chat: place, name and points. */
+.mini-tower.narrow .tower-mini .tower-head,
+.mini-tower.narrow .tower-mini .tower-row {
+  grid-template-columns: 24px minmax(0, 1fr) 44px;
+}
+.mini-tower.narrow .tower-mini .tower-head span:nth-child(n + 4),
+.mini-tower.narrow .tower-mini .t-avg,
+.mini-tower.narrow .tower-mini .t-elo,
+.mini-tower.narrow .tower-mini .t-bank,
+.mini-tower.narrow .tower-mini .t-pu {
+  display: none;
+}
+.mini-tower.narrow .t-pts {
+  padding-right: 6px;
+}
+.mini-tower.narrow .mini-tower-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding-right: 2px;
+}
+
+/* A page's chat (results, watching, the cut once you're out): a box in the page's own colours. */
+.qchat-page {
+  flex: none;
+  align-self: center;
+  width: 100%;
+  max-width: 640px;
+  border: 1px solid var(--qc-edge);
+  text-align: left;
+}
+.qchat-page .qfeed-wrap {
+  flex: none;
+  height: 132px;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .qchat-page {
+    --qc-bg: var(--surface);
+    --qc-head: var(--surface-2);
+    --qc-text: var(--text);
+    --qc-muted: var(--muted);
+    --qc-name: #3b4150;
+    --qc-chip: var(--surface-2);
+    --qc-edge: var(--line);
+    --qc-rule: var(--line);
+  }
+  :root:not([data-theme="dark"]) .qchat-page .qicon {
+    background: var(--surface-2);
+  }
+  :root:not([data-theme="dark"]) .qchat-page .qto button,
+  :root:not([data-theme="dark"]) .qchat-page .qhead-btn {
+    color: var(--muted);
+  }
+  :root:not([data-theme="dark"]) .qchat-page .qto button.on {
+    color: #1a1406;
+  }
+  :root:not([data-theme="dark"]) .qchat-page .qfeed-hint {
+    color: #8a6100;
+  }
+}
+:root[data-theme="light"] .qchat-page {
+  --qc-bg: var(--surface);
+  --qc-head: var(--surface-2);
+  --qc-text: var(--text);
+  --qc-muted: var(--muted);
+  --qc-name: #3b4150;
+  --qc-chip: var(--surface-2);
+  --qc-edge: var(--line);
+  --qc-rule: var(--line);
+}
+
+/* Phones: the space under the board, split between the scoreboard and chat (or one of them full width). */
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game .under-board {
+    flex: 1 1 0;
+    display: flex;
+    gap: 6px;
+    min-height: 28px;
+    margin: 0 10px;
+  }
+  .screen.game .under-board > * {
+    flex: 1 1 0;
+    min-width: 0;
+    margin: 0;
+  }
+  .screen.game .under-board.closed {
+    flex: none;
+  }
+  .screen.game .under-board.closed .qchat {
+    flex-basis: 0;
+    height: 28px;
+  }
+  .screen.game:has(.under-board.closed) .board-area .board-wrap {
+    width: min(100%, calc(100dvh - 255px));
+  }
+  .screen.game:has(.under-board.closed) .board-row .eval-bar ~ .board-wrap {
+    width: min(calc(100% - 48px), calc(100dvh - 255px));
+  }
+}
+
+/* Computers: the column beside the board. 900-1099 px keeps the phone's split (the scoreboard is there); from
+   1100 px the leaderboard has the side of the screen and chat gets the column under the panel. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game .under-board {
+    grid-column: 2;
+    grid-row: 4;
+    align-self: start;
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+    margin-top: 12px;
+  }
+  .screen.game .under-board > * {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-top: 0;
+  }
+  .screen.game .under-board > .qchat {
+    height: 328px;
+  }
+  .screen.game .under-board.closed > .qchat {
+    height: 28px;
+  }
+  .screen.game .under-board.side {
+    align-self: stretch;
+    position: relative;
+    min-height: 360px;
+  }
+  .screen.game .under-board.side > .qchat {
+    position: absolute;
+    inset: 0;
+    height: auto;
+  }
+}
+
+/* The shop: a chat pack's preview is its lines (a phrase pack's first few, an emoji pack's all). */
+.shop-item.chat-pack .shop-preview {
+  width: 100%;
+  height: auto;
+  min-height: 84px;
+  padding: 8px 6px;
+}
+.chat-pack-lines {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  gap: 4px;
+}
+.chat-pack-lines span {
+  padding: 3px 8px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 15px;
+  white-space: nowrap;
+}
+.chat-pack-lines span.more {
+  background: none;
+  color: #c7d2fe;
+}
+.chat-pack-lines.emoji {
+  gap: 2px 6px;
+}
+.chat-pack-lines.emoji span {
+  padding: 0;
+  background: none;
+  font-size: 22px;
+  line-height: 28px;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
-import { itemDef } from "@chessroyale/core";
+import { itemDef, ownedChatPacks } from "@chessroyale/core";
 import {
   isPixelIcon,
   buyItem,
@@ -234,6 +234,25 @@ describe("account API", () => {
     expect(shop.owned).toEqual(expect.arrayContaining(["hat-crown", "king-storm", "king-hellfire"]));
     expect(shop.equipped).toEqual({ king: "king-hellfire", hat: "hat-crown" });
     expect((await shopState(sql, guest.id)).owned).not.toContain("hat-crown");
+  });
+
+  it("chat packs: the free ones everyone has; a pack you get is yours to use (nothing to equip) and follows you when you sign in", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user: guest } = await createGuest(sql, 1000, "Guest");
+    let shop = await shopState(sql, guest.id);
+    expect(shop.owned).toEqual(expect.arrayContaining(["chat-basics", "chat-emoji-basics"]));
+    expect(shop.owned).not.toContain("chat-godking");
+    expect(ownedChatPacks(shop.owned)).toEqual(["basics", "emoji-basics"]);
+    const got = await buyItem(sql, guest.id, "chat-godking", 1100);
+    expect(got.ok && got.shop.owned).toContain("chat-godking");
+    // Equipping a pack changes nothing: the equipped slots are the King's and the hat's.
+    const eq = await equipItem(sql, guest.id, "chat-godking");
+    expect(eq.ok && eq.shop.equipped).toEqual({ king: "king-holy", hat: "hat-none" });
+    shop = await shopState(sql, guest.id);
+    expect(ownedChatPacks(shop.owned)).toEqual(["basics", "emoji-basics", "godking"]);
+    const account = await signInWithIdentity(sql, guest, "email", "chatty@example.com", {}, 1200);
+    expect(ownedChatPacks((await shopState(sql, account.id)).owned)).toContain("godking");
   });
 
   it("the locker: crates open on the server (free while testing), items equip by slot, and a guest's items follow them", async () => {

@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { cutLabel, roundLive, towerView, type GameView } from "../game.ts";
 import { LeaderboardSheet } from "./LeaderboardSheet.tsx";
@@ -24,15 +25,32 @@ function towerHeight(keep: Set<number>, cutoff: number, n: number): number {
  * players as fit (you, the leaders, your neighbours and the cut line first),
  * with position, name, points, average, rating and power-ups. Tap it for the
  * full leaderboard; the header's arrow minimises it (remembered on the device).
+ *
+ * With quick chat on, it shares the space under the board with chat (components/QuickChat.tsx, UnderBoard), which
+ * passes `narrow` (place, name and points only, side by side with chat), `head` (its split buttons and the unread
+ * count), `open` (it minimises both together) and `floats` (emoji just sent, floating above their senders' rows).
  */
-export function MiniTower({ match }: { match: GameView }) {
-  const [open, setOpen] = useState(() => {
+export function MiniTower({
+  match,
+  narrow = false,
+  head,
+  open: openProp,
+  floats,
+}: {
+  match: GameView;
+  narrow?: boolean;
+  head?: ComponentChildren;
+  open?: boolean;
+  floats?: ReadonlyMap<string, { text: string; key: number }>;
+}) {
+  const [openOwn, setOpen] = useState(() => {
     try {
       return localStorage.getItem(KEY) !== "0";
     } catch {
       return true;
     }
   });
+  const open = openProp ?? openOwn;
   const [sheet, setSheet] = useState(false);
   const [space, setSpace] = useState(0);
   const body = useRef<HTMLDivElement>(null);
@@ -64,18 +82,22 @@ export function MiniTower({ match }: { match: GameView }) {
   };
 
   return (
-    <section class={`mini-tower${open ? "" : " closed"}`} aria-label="Leaderboard">
+    <section class={`mini-tower${open ? "" : " closed"}${narrow ? " narrow" : ""}`} aria-label="Leaderboard">
       <div class="mini-tower-head">
         <button type="button" class="mini-tower-title" onClick={() => setSheet(true)}>
-          {view.teamLabel ?? "Leaderboard"} <span class="muted">· tap for all {alive.length}</span>
+          {view.teamLabel ?? "Leaderboard"}
+          {!narrow && <span class="muted"> · tap for all {alive.length}</span>}
         </button>
-        <button type="button" class="mini-tower-toggle" onClick={toggle} aria-expanded={open} aria-label={open ? "Minimise the leaderboard" : "Show the leaderboard"}>
-          {open ? "▾" : "▴"}
-        </button>
+        {head}
+        {openProp === undefined && (
+          <button type="button" class="mini-tower-toggle" onClick={toggle} aria-expanded={open} aria-label={open ? "Minimise the leaderboard" : "Show the leaderboard"}>
+            {open ? "▾" : "▴"}
+          </button>
+        )}
       </div>
       {open && (
         <div class="mini-tower-body" ref={body} onClick={() => setSheet(true)}>
-          <RaceTower standings={standings} cutoff={cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} />
+          <RaceTower standings={standings} cutoff={cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={floats} />
         </div>
       )}
       {sheet && <LeaderboardSheet match={match} onClose={() => setSheet(false)} />}

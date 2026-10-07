@@ -6,6 +6,7 @@ import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
+import { ChatSection } from "../components/QuickChat.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
   const played = match.moves.filter((m) => m.move !== null);
@@ -86,6 +87,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
               : "The game was a draw."}
         </p>
       )}
+      {/* Online: quick chat, for the GGs. */}
+      <ChatSection match={match} />
       {me && (
         <div class="stat-tiles">
           <div class="stat-tile">

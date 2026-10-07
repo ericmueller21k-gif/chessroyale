@@ -3,7 +3,7 @@ import type { ClientMessage, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, newLobbyRecord, type LobbyRecord } from "./lobby.ts";
 import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired, withSecrets } from "./api.ts";
-import { d1Sql, ensureSchema, recordResult } from "./accounts.ts";
+import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { serverRecheck, warmEngine } from "./engine.ts";
@@ -23,12 +23,23 @@ export class Lobby extends DurableObject<Env> {
   private engineUp = false;
   /** What this lobby last told the live line, and when (it reports changes, and at least once a minute). */
   private reported: { key: string; at: number } | null = null;
+  /** Quick chat: each person's pixel icon (stored apart from the lobby record, as "icon:<player id>"). */
+  private icons = new Map<string, string>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
       this.record = (await ctx.storage.get<LobbyRecord>("lobby")) ?? null;
+      for (const [key, icon] of await ctx.storage.list<string>({ prefix: "icon:" })) this.icons.set(key.slice(5), icon);
     });
+  }
+
+  /** Quick chat: a person's icon and the shop items they own (their chat packs), from their account. */
+  private async chatProfileOf(userId: string): Promise<{ icon: string | null; owned: string[] }> {
+    const sql = d1Sql(this.env.DB!);
+    const row = await sql.first<{ icon: string }>("SELECT icon FROM users WHERE id = ?", userId);
+    const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
+    return { icon, owned: (await shopState(sql, userId)).owned };
   }
 
   private core(code: string): LobbyCore {
@@ -36,6 +47,7 @@ export class Lobby extends DurableObject<Env> {
     return new LobbyCore(this.record, {
       now: () => Date.now(),
       serverEngine: this.engineUp,
+      icon: (playerId) => this.icons.get(playerId),
       send: (playerId, msg) => {
         const text = JSON.stringify({ ...msg, now: Date.now() } as ServerMessage);
         for (const ws of this.socketsOf(playerId)) {
@@ -168,6 +180,8 @@ export class Lobby extends DurableObject<Env> {
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId) {
       msg = { ...msg, boards: await this.recheckOnServer(msg.boards) };
     }
+    // Quick chat: who's joining (their icon and chat packs), read before the lobby is touched, as above.
+    const chatProfile = msg.t === "hello" && this.env.DB && attached?.userId && !attached.guest ? await this.chatProfileOf(attached.userId).catch(() => null) : null;
     const core = this.core(this.record!.code);
     if (msg.t === "hello") {
       // Someone's joining: wake the engine server so it's up by the first re-check.
@@ -184,6 +198,13 @@ export class Lobby extends DurableObject<Env> {
         return;
       }
       ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId });
+      if (chatProfile) {
+        core.chatOwned(result.playerId, chatProfile.owned);
+        if (chatProfile.icon && this.icons.get(result.playerId) !== chatProfile.icon) {
+          this.icons.set(result.playerId, chatProfile.icon);
+          await this.ctx.storage.put(`icon:${result.playerId}`, chatProfile.icon);
+        }
+      }
       // connect() sent the welcome before the socket was attached; send it again now it can be found.
       core.resendTo(result.playerId);
       await this.persist(core);

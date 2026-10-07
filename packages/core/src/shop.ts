@@ -7,17 +7,30 @@
  * Every category has a free default that everyone owns.
  */
 
-export type ShopSlot = "king" | "hat";
+import { CHAT_PACKS, chatPackItem } from "./chat.ts";
+import { QUICK_CHAT } from "./settings.ts";
+
+export type ShopSlot = "king" | "hat" | "chat";
+/** The slots you equip one item in (chat packs aren't equipped: you use every one you own). */
+export type EquipSlot = Exclude<ShopSlot, "chat">;
 
 export interface ShopCategory {
   slot: ShopSlot;
   name: string;
   blurb: string;
+  /** Nothing to equip: everything you own in it is yours to use (quick chat packs). */
+  ownOnly?: boolean;
 }
 
 export const SHOP_CATEGORIES: readonly ShopCategory[] = [
   { slot: "king", name: "God King effects", blurb: "The colour of his lightning, beam and halo when he answers your call." },
   { slot: "hat", name: "Pawn hats", blurb: "A hat for your pawn in the pre-game votes." },
+  {
+    slot: "chat",
+    name: "Chat packs",
+    blurb: "More lines and emoji for quick chat in online matches. A pack is yours to use as soon as you get it.",
+    ownOnly: true,
+  },
 ];
 
 export interface ShopItem {
@@ -29,7 +42,7 @@ export interface ShopItem {
   price: number;
   /** Everyone owns it from the start (one per slot, equipped until you choose another). */
   starter?: boolean;
-  /** How it looks, for the app: colours for King effects, a hat's id for hats. */
+  /** How it looks, for the app: colours for King effects, a hat's id for hats, a chat pack's id. */
   look: Record<string, string>;
 }
 
@@ -47,6 +60,16 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   { id: "hat-wizard", slot: "hat", name: "Wizard Hat", description: "Knows things.", price: 250, look: { hat: "wizard" } },
   { id: "hat-top", slot: "hat", name: "Top Hat", description: "A pawn of means.", price: 250, look: { hat: "top" } },
   { id: "hat-viking", slot: "hat", name: "Viking Helm", description: "Pushes into any zone.", price: 300, look: { hat: "viking" } },
+  // Quick chat packs (core/chat.ts holds their lines; prices are in settings.ts). The free ones everyone has.
+  ...CHAT_PACKS.map((p) => ({
+    id: chatPackItem(p.id),
+    slot: "chat" as const,
+    name: p.name,
+    description: p.blurb,
+    price: p.free ? 0 : (QUICK_CHAT.packPrices[p.id] ?? 0),
+    ...(p.free ? { starter: true } : {}),
+    look: { pack: p.id },
+  })),
 ];
 
 /** While testing: every item costs nothing. */
@@ -65,11 +88,11 @@ export function starterItem(slot: ShopSlot): ShopItem {
 export interface ShopState {
   coins: number;
   owned: string[];
-  equipped: Record<ShopSlot, string>;
+  equipped: Record<EquipSlot, string>;
 }
 
 /** The look of what's equipped in a slot (the starter if nothing valid is). */
-export function equippedLook(state: Pick<ShopState, "equipped"> | null | undefined, slot: ShopSlot): Record<string, string> {
+export function equippedLook(state: Pick<ShopState, "equipped"> | null | undefined, slot: EquipSlot): Record<string, string> {
   const item = shopItem(state?.equipped?.[slot] ?? "");
   return (item && item.slot === slot ? item : starterItem(slot)).look;
 }

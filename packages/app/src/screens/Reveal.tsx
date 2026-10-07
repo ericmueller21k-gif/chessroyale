@@ -3,7 +3,7 @@ import { applyMove, sideToMove, toSan } from "@chessroyale/chess";
 import type { DrawRule } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
-import { MiniTower } from "../components/MiniTower.tsx";
+import { UnderBoard } from "../components/QuickChat.tsx";
 import { ShadeMoves, SquareRing, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { type BoardView, type GameView, type GroupReveal } from "../game.ts";
 import { seenKey } from "../hooks.ts";
@@ -169,7 +169,7 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
           </span>
         </div>
       </div>
-      <MiniTower match={match} />
+      <UnderBoard match={match} />
     </div>
   );
 }

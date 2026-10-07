@@ -6,7 +6,7 @@ import { EvalBar, knownEval } from "../components/EvalBar.tsx";
 import { kingTurn, type KingCue } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
-import { MiniTower } from "../components/MiniTower.tsx";
+import { UnderBoard } from "../components/QuickChat.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { KingSummon, kingSquare } from "../components/GodKing.tsx";
@@ -268,7 +268,7 @@ export function PlayScreen({
         )}
       </div>
       )}
-      <MiniTower match={match} />
+      <UnderBoard match={match} />
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { InstallCard } from "../components/InstallCard.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut } from "../account.ts";
-import { crowdAnimations, crowdTrail, setCrowdAnimations, setCrowdTrail } from "../prefs.ts";
+import { chatBubbles, chatOff, crowdAnimations, crowdTrail, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail } from "../prefs.ts";
 import { isMuted, onMuteChange, setMuted, unlockAudio } from "../sound.ts";
 import { OPENING_KEY, chosenMode, chosenOpeningMoves, saveMode } from "./Home.tsx";
 import { useAccount } from "./Profile.tsx";
@@ -100,6 +100,8 @@ export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onS
   const [mode, setMode] = useState(chosenMode);
   const [anim, setAnim] = useState(crowdAnimations);
   const [trail, setTrail] = useState(crowdTrail);
+  const [chatOn, setChatOn] = useState(() => !chatOff());
+  const [bubbles, setBubbles] = useState(chatBubbles);
   const [openingMoves, setOpeningMoves] = useState(chosenOpeningMoves);
   const [busy, setBusy] = useState(false);
   const changeMode = (patch: Partial<typeof mode>) => {
@@ -195,6 +197,31 @@ export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onS
         </Toggle>
         <Toggle title="Pre-game votes" checked={mode.augments} onChange={(on) => changeMode({ augments: on })}>
           Before the first move, everyone votes on how the match ends and how fast it is. Off: a team final at the standard speed.
+        </Toggle>
+      </section>
+
+      <section class="fd-section">
+        <h2 class="fd-label">QUICK CHAT</h2>
+        <Toggle
+          title="Quick chat"
+          checked={chatOn}
+          onChange={(on) => {
+            setChatOn(on);
+            setChatOff(!on);
+          }}
+        >
+          Preset lines and emoji with your team in online matches (no typing). Off: no messages show, and you send none.
+        </Toggle>
+        <Toggle
+          title="New-message bubble"
+          checked={chatOn && bubbles}
+          disabled={!chatOn}
+          onChange={(on) => {
+            setBubbles(on);
+            setChatBubbles(on);
+          }}
+        >
+          On a phone, while chat is hidden, the newest message shows for a moment under the top bar (never over the board).
         </Toggle>
       </section>
 
