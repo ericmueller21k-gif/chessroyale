@@ -26,7 +26,7 @@ test("home: the live line comes from the server, the mode picker changes the lin
   await other.close();
   // The line under PLAY follows the mode; Classic can't be queued for yet.
   await page.getByRole("radio", { name: /Boss raid/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText("Join a raid; the boss matches the group");
+  await expect(page.locator(".fd-hint")).toHaveText(/^Join a raid; bots fill the crowd after \d+ s$/);
   await page.getByRole("radio", { name: /Classic/ }).click();
   await expect(page.locator(".fd-hint")).toHaveText("Classic is being reworked");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeDisabled();

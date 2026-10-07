@@ -266,7 +266,7 @@ export function App() {
   useEffect(() => {
     if (!rejoinCode) return;
     void lobbyStatus(rejoinCode).then((s) => {
-      if (s?.open && s.phase !== "over") joinLobby(rejoinCode);
+      if (s?.open && s.phase !== "over") joinLobby(rejoinCode, { resume: s.phase === "playing" });
       else if (s) setCurrentMatch(null);
       setRejoining(false);
     });
@@ -336,7 +336,7 @@ export function App() {
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -356,6 +356,11 @@ export function App() {
     if (queue) m.auto = true;
     // A code typed into Join that leads nowhere is "Can't join", not the note.
     m.typed = !!opts.typed;
+    // Back into a match already being played: no queue screen on the way.
+    if (opts.resume) {
+      m.resuming = true;
+      m.auto = false;
+    }
     use(m);
     // Seated here: opening the app from scratch comes back to it (until you leave on purpose or it ends).
     setCurrentMatch(m.code);
@@ -677,6 +682,13 @@ const boardKey = (b: { id: number; generation: number; ply: number }) => `${b.id
 
 function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void; letBotsFill: () => void }) {
   const p = match.phase;
+  // Going back into a match already being played: the splash until its screen comes (not the queue it started in).
+  if (match instanceof NetMatch && match.resuming && (p.kind === "loading" || (p.kind === "lobby" && match.started)))
+    return (
+      <div class="fd-splash">
+        <Logo />
+      </div>
+    );
   switch (p.kind) {
     case "loading":
       if (match instanceof NetMatch && match.auto)
@@ -699,9 +711,10 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
           </FrontFrame>
         );
       if (!(match instanceof NetMatch)) return null;
+      // (The queue, drawn exactly as while connecting, so the same screen carries on: your seat never pops twice.)
       return match.auto ? (
         <FrontFrame wide>
-          <LobbyScreen match={match} onLeave={actions.leave} onLetBotsFill={actions.letBotsFill} />
+          <QueueScreen match={match} onCancel={actions.leave} onLetBotsFill={actions.letBotsFill} />
         </FrontFrame>
       ) : (
         <LobbyScreen match={match} onLeave={actions.leave} />

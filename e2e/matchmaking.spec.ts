@@ -110,7 +110,7 @@ test("Boss raid: the three types too; a Solo raid is you and 49 bots against a b
   await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots off/ }).click();
   await expect(page.locator(".fd-hint")).toHaveText("People only: starts at 50, or 10 after a minute");
   await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Default/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText("Join a raid; the boss matches the group");
+  await expect(page.locator(".fd-hint")).toHaveText(/^Join a raid; bots fill the crowd after \d+ s$/);
   // Boss alone is still here (you against a boss you pick).
   await expect(page.getByRole("main").getByRole("button", { name: "Boss alone" })).toBeVisible();
   await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();

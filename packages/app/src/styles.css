@@ -7314,13 +7314,10 @@ button.fd-logo {
   font-size: 13px;
   font-weight: 600;
 }
-.fd-queue-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
 /* Bots off → Default: one tap, your place kept. */
 .fd-letbots {
+  width: 100%;
+  margin-top: 10px;
   min-height: 56px;
   display: flex;
   flex-direction: column;
@@ -7462,7 +7459,7 @@ button.fd-logo {
       "seats info"
       "seats bar"
       "seats you"
-      "seats actions"
+      "seats cancel"
       "seats .";
     column-gap: 28px;
     row-gap: 18px;
@@ -7500,8 +7497,8 @@ button.fd-logo {
     grid-area: you;
     margin-top: 0;
   }
-  .fd-queue .fd-queue-actions {
-    grid-area: actions;
+  .fd-queue .fd-cancel {
+    grid-area: cancel;
   }
 }
 /* An empty seat's dot stays until its pawn pops in, then fades. */

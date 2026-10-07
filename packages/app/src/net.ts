@@ -105,6 +105,8 @@ export class NetMatch implements GameView {
   goneResult?: LobbyResult | null;
   /** Joined by typing a code (not a link, a reload or PLAY). */
   typed = false;
+  /** Back into a match that's already being played (the app opened from scratch): the splash until it shows. */
+  resuming = false;
   stage = 0;
   roundsPlayed = 0;
   cutoff = 0;

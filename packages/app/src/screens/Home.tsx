@@ -460,7 +460,7 @@ export function HomeScreen({
     ) : type === "botsoff" ? (
       mode === "raid" ? `People only: starts at 50, or ${MATCHMAKING.raidBotsOffMinPlayers} after a minute` : "People only: starts when 100 have joined"
     ) : mode === "raid" ? (
-      "Join a raid; the boss matches the group"
+      `Join a raid; bots fill the crowd after ${fill} s`
     ) : wait ? (
       `Usually about ${wait} s to find a match`
     ) : (

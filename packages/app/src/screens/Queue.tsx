@@ -91,19 +91,22 @@ function Seats({ seats, size, me, myLook, hat, looks, bots, trickle }: { seats: 
       {Array.from({ length: size }, (_, i) => {
         const p = seats[i];
         if (!p) return <span key={`empty-${i}`} class="fd-seat empty" />;
-        const you = p.id === me;
-        const delay = pop(p.id, p.isBot, p.isBot ? botGap : STAGGER_MS);
+        // Your seat is always the first, under one key whatever your id (none yet, or a new lobby's after a switch), so
+        // it never pops twice or blinks out.
+        const you = i === 0 && (p.id === me || p.id === SELF);
+        const key = you ? SELF : p.id;
+        const delay = pop(key, p.isBot, p.isBot ? botGap : STAGGER_MS);
         const dress = you ? { look: myLook, hat } : p.isBot ? botLook(p) : { look: looks.get(p.id), hat: "none" };
         const pawn = <SeatPawn look={dress.look} hat={dress.hat} />;
         const cls = `fd-seat pop${you ? " you" : ""}${p.isBot ? " bot" : ""}`;
         const style = { "--pop-delay": `${Math.round(delay)}ms` };
         // A person's pawn opens their profile; bots are just bots.
         return p.isBot ? (
-          <span key={p.id} class={cls} style={style}>
+          <span key={key} class={cls} style={style}>
             {pawn}
           </span>
         ) : (
-          <button type="button" key={p.id} class={cls} style={style} title={you ? "You" : p.name} aria-label={`${you ? "Your" : `${p.name}'s`} profile`} onClick={() => openProfile({ uid: p.uid, name: p.name, you })}>
+          <button type="button" key={key} class={cls} style={style} title={you ? "You" : p.name} aria-label={`${you ? "Your" : `${p.name}'s`} profile`} onClick={() => openProfile({ uid: p.uid, name: p.name, you })}>
             {pawn}
           </button>
         );
@@ -121,6 +124,9 @@ function useNow(ms = 250) {
   }, []);
   return now;
 }
+
+/** Your own seat, drawn from the tap on PLAY (before the server has said who you are). */
+const SELF = "\u0000you";
 
 /** "1:05": how long you've been waiting. */
 const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
@@ -140,10 +146,12 @@ export function QueueScreen({ match, onCancel, onLetBotsFill }: { match: QueueVi
   const size = match.settings.lobbySize;
   const me = match.myId;
   const players = match.players;
-  // Your seat first, then everyone else in the order they joined, then the bots.
+  // Your seat first (even before the server has said so: you're in from the tap), then everyone else in the order they
+  // joined, then the bots.
   const seats = useMemo(() => {
     const people = players.filter((p) => !p.isBot);
-    return [...people.filter((p) => p.id === me), ...people.filter((p) => p.id !== me), ...players.filter((p) => p.isBot)].slice(0, size);
+    const mine = people.find((p) => p.id === me) ?? ({ id: SELF, name: "You", isBot: false, connected: true } as LobbyPlayer);
+    return [mine, ...people.filter((p) => p !== mine), ...players.filter((p) => p.isBot)].slice(0, size);
   }, [players, me, size]);
   const bots = seats.filter((p) => p.isBot).length;
   const left = match.fillAt ? Math.max(0, Math.ceil((match.fillAt - now) / 1000)) : null;
@@ -191,6 +199,13 @@ export function QueueScreen({ match, onCancel, onLetBotsFill }: { match: QueueVi
         </div>
         <div class="fd-queue-line">{line}</div>
         {unranked && <div class="fd-queue-rank">{unranked}</div>}
+        {/* Bots off: one tap to Default, right under the wait (in view on any phone). */}
+        {type === "botsoff" && !filled && onLetBotsFill && (
+          <button type="button" class="fd-btn fd-letbots" onClick={onLetBotsFill}>
+            Switch to Default
+            <span>Bots fill the rest · you keep your place</span>
+          </button>
+        )}
       </div>
       <div class="fd-bar" aria-hidden="true">
         <i style={{ width: `${(100 * seats.length) / size}%` }} />
@@ -205,17 +220,9 @@ export function QueueScreen({ match, onCancel, onLetBotsFill }: { match: QueueVi
           </div>
         </div>
       </div>
-      <div class="fd-queue-actions">
-        {type === "botsoff" && !filled && onLetBotsFill && (
-          <button type="button" class="fd-btn fd-letbots" onClick={onLetBotsFill}>
-            Switch to Default
-            <span>Bots fill the rest · you keep your place</span>
-          </button>
-        )}
-        <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
+      <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
+        Cancel
+      </button>
     </div>
   );
 }
