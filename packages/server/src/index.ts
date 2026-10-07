@@ -5,6 +5,7 @@ import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
 import { d1Sql, lobbyResult } from "./accounts.ts";
 import { SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, signInRequired, withSecrets, type AccountEnv } from "./api.ts";
+import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 
 export { Lobby } from "./lobby-do.ts";
@@ -18,6 +19,8 @@ export interface Env extends AccountEnv, EngineEnv {
   ASSETS: Fetcher;
   /** Seconds a matchmade lobby waits for players before bots fill it (default 60; shorter for local tests). */
   MATCH_FILL_SECONDS?: string;
+  /** Load-test counters at /api/ops/stats, for requests with this as their x-ops-key (unset in production). */
+  OPS_STATS?: string;
 }
 
 const json = (body: unknown, status = 200) =>
@@ -26,6 +29,25 @@ const json = (body: unknown, status = 200) =>
 export default {
   async fetch(request: Request, rawEnv: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (!url.pathname.startsWith("/api/")) return rawEnv.ASSETS.fetch(request);
+    // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
+    if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
+      return json(opsStats(url.searchParams.get("reset") === "1"));
+    }
+    const t = Date.now();
+    const res = await route(request, rawEnv, url);
+    const ms = Date.now() - t;
+    countRoute(routeOf(request.method, url.pathname), ms);
+    // How long the Worker took (the load test reads it; browsers show it in their network panel).
+    if (res.status === 101 || res.webSocket) return res;
+    const out = new Response(res.body, res);
+    out.headers.append("server-timing", `app;dur=${ms}`);
+    return out;
+  },
+} satisfies ExportedHandler<Env>;
+
+async function route(request: Request, rawEnv: Env, url: URL): Promise<Response> {
+  {
     // (The sign-in secrets may live in the Secrets Store: read them as strings.)
     const env = url.pathname.startsWith("/api/") ? await withSecrets(rawEnv) : rawEnv;
     // Accounts: /api/me, /api/results, /api/auth/*
@@ -138,7 +160,6 @@ export default {
       if (!(await stub.exists())) return json({ message: "We couldn't find that lobby." }, 404);
       return stub.fetch(request);
     }
-    if (url.pathname.startsWith("/api/")) return json({ message: "Not found" }, 404);
-    return env.ASSETS.fetch(request);
-  },
-} satisfies ExportedHandler<Env>;
+    return json({ message: "Not found" }, 404);
+  }
+}

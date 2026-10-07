@@ -28,7 +28,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9",
-    "wrangler": "^4.147.0"
+    "wrangler": "^4.147.0",
+    "ws": "^8.21.0"
   },
   "dependencies": {
     "chess.js": "^1.4.0",

@@ -6,6 +6,7 @@ import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired, withSecrets } f
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
+import { countCall } from "./ops.ts";
 import { serverRecheck, warmEngine } from "./engine.ts";
 import { DEFAULT_SETTINGS } from "@chessroyale/core";
 
@@ -110,6 +111,10 @@ export class Lobby extends DurableObject<Env> {
     this.record = core.save();
     await this.saveResults(core, this.record);
     await this.ctx.storage.put("lobby", this.record);
+    if (this.env.OPS_STATS) {
+      countCall("lobby.persist");
+      countCall("lobby.persistBytes", JSON.stringify(this.record).length);
+    }
     // The alarm: the match's next event, or when the lobby closes, whichever comes first.
     const close = lobbyClosing(this.record, this.connectedNow(closing));
     const times = [core.nextAlarm, close?.at].filter((t): t is number => typeof t === "number");
@@ -182,6 +187,7 @@ export class Lobby extends DurableObject<Env> {
     if (!waitDue && this.reported?.key === key && (s.phase === "over" || now - this.reported.at < 60_000)) return;
     if (s.phase === "waiting" && kind === "private" && !this.reported) return;
     this.reported = { key, at: now };
+    countCall("live.report");
     const sql = d1Sql(this.env.DB);
     await ensureSchema(sql, this.env.DB);
     await reportLobby(sql, { code: rec.code, mode: this.mode(), kind, ...s }, now);

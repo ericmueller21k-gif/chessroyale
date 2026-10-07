@@ -3,6 +3,7 @@ import { MATCHMAKING, type MatchmakingType } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
+import { countCall } from "./ops.ts";
 
 /**
  * The queue's name: one matchmaker per mode and type, so Default and Bots off never share a lobby (Bots off players
@@ -24,8 +25,10 @@ export class Matchmaker extends DurableObject<Env> {
    * latest (their wait counts).
    */
   async next(overrides: LobbyRecord["overrides"], fillMs: number, opts: { botsOff?: boolean; crowdWaitsForFull?: boolean; since?: number } = {}): Promise<{ code: string }> {
+    countCall("mm.next");
     // One request at a time, so two players arriving together don't open two lobbies.
     return this.ctx.blockConcurrencyWhile(async () => {
+      countCall("mm.serialised");
       const now = Date.now();
       const current = await this.ctx.storage.get<string>("current");
       if (current) {
