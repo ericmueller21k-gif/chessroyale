@@ -155,6 +155,17 @@ describe("presence", () => {
   });
 });
 
+describe("the schema check", () => {
+  it("a new Worker instance on an up-to-date database makes one read, not the whole schema", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql, {});
+    const first = sql.statements.length;
+    expect(first).toBeGreaterThan(20);
+    await ensureSchema(sql, {}); // another instance
+    expect(sql.statements.length - first).toBe(1);
+  });
+});
+
 describe("rate limits", () => {
   it("counts per key per window and says when to try again", () => {
     const l = new RateLimiter(3, 60_000);

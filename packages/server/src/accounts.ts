@@ -164,9 +164,26 @@ function LATEST_RATING(userId: string) {
 }
 
 const ready = new WeakSet<object>();
-/** Creates the tables if they don't exist yet (once per connection; cheap and idempotent). */
+/** Every schema statement, as one fingerprint: a database that has it recorded needs none of them run again. */
+const SCHEMA_VERSION = (() => {
+  const text = JSON.stringify([SCHEMA, LOCKER_MIGRATIONS, COLUMNS, AFTER_COLUMNS]);
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return `${text.length}-${(h >>> 0).toString(36)}`;
+})();
+
+/**
+ * Creates the tables if they don't exist yet (once per Worker instance, cheap and idempotent). A database already
+ * at this schema answers one read (`meta.schema`) instead of the ~35 statements: in a surge, every new Worker
+ * instance runs this once, so it mustn't be a burst of statements into the one database (DECISIONS.md, "Capacity").
+ */
 export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
   if (ready.has(key)) return;
+  const at = await sql.first<{ value: string }>("SELECT value FROM meta WHERE key = 'schema'").catch(() => null);
+  if (at?.value === SCHEMA_VERSION) {
+    ready.add(key);
+    return;
+  }
   for (const s of SCHEMA) await sql.run(s);
   for (const s of LOCKER_MIGRATIONS)
     await sql.run(s).catch((e: unknown) => {
@@ -189,6 +206,8 @@ export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
     if (added) for (const t of c.then ?? []) await sql.run(t);
   }
   for (const s of AFTER_COLUMNS) await sql.run(s);
+  await sql.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+  await sql.run("INSERT INTO meta (key, value) VALUES ('schema', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", SCHEMA_VERSION);
   ready.add(key);
 }
 
