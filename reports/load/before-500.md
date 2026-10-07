@@ -1,56 +1,64 @@
 # Load test: before-500
 
-2026-10-07T22:36:34.832Z · http://localhost:8787 · 500 players over 20 s · crowd · session 200 s · 4.0 min
-Generator CPU peak (one Node process): 46%
+2026-10-07T22:55:44.752Z · http://localhost:8787 · 500 players over 20 s · crowd · session 200 s · 4.0 min
+Generator: 1 Node process, CPU peak 23% of a core (each)
 
 ## Players
 
 | Measure | n | p50 | p90 | p99 | max |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| chatRtt | 170 | 278 ms | 4247 ms | 7142 ms | 8604 ms |
-| http heartbeat | 2238 | 373 ms | 6782 ms | 11.6 s | 12.3 s |
-| http live | 785 | 765 ms | 6632 ms | 9011 ms | 9463 ms |
-| http me | 500 | 860 ms | 6837 ms | 7793 ms | 7989 ms |
-| http play | 500 | 1257 ms | 3802 ms | 8076 ms | 9086 ms |
-| pickRtt | 1644 | 195 ms | 2496 ms | 4510 ms | 6083 ms |
-| playToCode | 496 | 1265 ms | 3802 ms | 8076 ms | 9087 ms |
-| playToLobby | 373 | 2707 ms | 9999 ms | 11.3 s | 11.5 s |
-| queueWait | 373 | 7644 ms | 58.6 s | 58.7 s | 58.7 s |
-| server heartbeat | 2238 | 25 ms | 320 ms | 459 ms | 7569 ms |
-| server live | 785 | 123 ms | 1317 ms | 1329 ms | 1351 ms |
-| server me | 500 | 302 ms | 1645 ms | 1651 ms | 1653 ms |
-| server play | 496 | 122 ms | 734 ms | 1314 ms | 1550 ms |
-| wsOpen | 1431 | 1980 ms | 3698 ms | 6875 ms | 8900 ms |
+| chatRtt | 173 | 34 ms | 135 ms | 2436 ms | 3377 ms |
+| http heartbeat | 1848 | 70 ms | 1278 ms | 7839 ms | 9743 ms |
+| http live | 682 | 1918 ms | 5355 ms | 10.0 s | 10.8 s |
+| http me | 500 | 3558 ms | 10.1 s | 11.0 s | 11.2 s |
+| http play | 500 | 1385 ms | 4346 ms | 7778 ms | 9821 ms |
+| pickRtt | 1737 | 47 ms | 138 ms | 2369 ms | 2762 ms |
+| playToCode | 432 | 1495 ms | 4807 ms | 7778 ms | 9821 ms |
+| playToLobby | 308 | 3310 ms | 11.1 s | 14.9 s | 16.7 s |
+| queueWait | 308 | 2760 ms | 10.8 s | 53.4 s | 53.4 s |
+| server heartbeat | 1848 | 10 ms | 50 ms | 199 ms | 737 ms |
+| server live | 682 | 313 ms | 2092 ms | 2558 ms | 2560 ms |
+| server me | 500 | 1330 ms | 2898 ms | 2921 ms | 2922 ms |
+| server play | 432 | 655 ms | 1713 ms | 2725 ms | 2737 ms |
+| wsOpen | 432 | 1485 ms | 4629 ms | 7522 ms | 9628 ms |
 
-Counts: msgsOut 4379 · msgsIn 432138 · end error 123 · playersFailed 4 · hostScores 208 · wsDropped 1018 · end timeUp 373
+Counts: msgsOut 3095 · msgsIn 407871 · end error 124 · playersFailed 68 · hostScores 53 · chatNo repeat 3 · end timeUp 308
 
-Errors: lobby error: This match has already started. (123) · play 500  (4) · ws error WebSocket was closed before the connection was established (4)
+Errors: lobby error: This match has already started. (124) · play 500  (68)
 
 ## Server counters
 
-D1 statements: 1771 reads, 487 writes (0.25 writes per player per minute; 2.0 writes/s)
+D1 statements: 11661 reads, 4636 writes (2.29 writes per player per minute; 19.1 writes/s)
 
 | D1 statement | count | per player per min |
 | --- | ---: | ---: |
-| SELECT users | 455 | 0.23 |
-| SELECT sessions | 266 | 0.13 |
-| UPDATE users | 266 | 0.13 |
-| INSERT live_lobbies | 197 | 0.10 |
-| SELECT inventory | 189 | 0.10 |
-| SELECT equipped | 189 | 0.10 |
-| SELECT wallets | 189 | 0.10 |
-| SELECT chat_picks | 189 | 0.10 |
-| SELECT live_lobbies | 146 | 0.07 |
-| SELECT queue_waits | 146 | 0.07 |
+| UPDATE users | 2963 | 1.46 |
+| SELECT sessions | 2962 | 1.46 |
+| SELECT users | 1785 | 0.88 |
+| SELECT inventory | 932 | 0.46 |
+| SELECT equipped | 932 | 0.46 |
+| SELECT wallets | 932 | 0.46 |
+| SELECT chat_picks | 932 | 0.46 |
+| SELECT live_lobbies | 842 | 0.42 |
+| SELECT queue_waits | 842 | 0.42 |
+| INSERT live_lobbies | 634 | 0.31 |
+| INSERT users | 500 | 0.25 |
+| INSERT sessions | 500 | 0.25 |
+| SELECT results | 500 | 0.25 |
+| SELECT items | 500 | 0.25 |
+| SELECT equipped_items | 500 | 0.25 |
 | CREATE schema | 21 | 0.01 |
+| ALTER schema | 12 | 0.01 |
+| INSERT queue_waits | 4 | 0.00 |
 | PRAGMA schema | 2 | 0.00 |
-| ALTER schema | 1 | 0.00 |
 | DELETE live_lobbies | 1 | 0.00 |
 | DELETE queue_waits | 1 | 0.00 |
 
 | Route | requests | mean ms |
 | --- | ---: | ---: |
-| GET /api/lobby/:code/ws | 193 | 486.6 |
-| GET /api/live | 73 | 387.8 |
+| GET /api/live | 2530 | 215.3 |
+| GET /api/me | 500 | 1413.6 |
+| POST /api/play | 432 | 707.1 |
+| GET /api/lobby/:code/ws | 432 | 554.9 |
 
-Calls: lobby.persist 533 · lobby.persistBytes 1309379385 · live.report 197
+Calls: mm.next 432 · mm.serialised 432 · lobby.persist 3377 · lobby.persistBytes 7957605807 · live.report 634

@@ -32,9 +32,9 @@ export class Lobby extends DurableObject<Env> {
   /** Quick chat: each person's pixel icon (stored apart from the lobby record, as "icon:<player id>"). */
   private icons = new Map<string, string>();
   /**
-   * Each person's last phase message (the record's `last`, re-sent on reconnect) as last stored, as "last:<player id>".
-   * Stored apart from the record, and only when it changes: with 100 people they are 96% of the record (2.4 MB), and
-   * the record is stored after every message. See DECISIONS.md, "Capacity: built".
+   * Each person's last phase message (the record's `last`, re-sent on reconnect) as last stored, under its own key
+   * "last" and only when one changes: it's half the stored record (with 100 people, 77 of 157 KB), and most messages
+   * (a pick, a vote, a chat line) change none of it. One value, so the standings the messages share are stored once.
    */
   private lastStored = new Map<string, unknown>();
   /** Matchmaking: seats promised to players on their way (expiry times), so a surge never overfills the lobby. */
@@ -47,13 +47,11 @@ export class Lobby extends DurableObject<Env> {
     ctx.blockConcurrencyWhile(async () => {
       this.record = (await ctx.storage.get<LobbyRecord>("lobby")) ?? null;
       for (const [key, icon] of await ctx.storage.list<string>({ prefix: "icon:" })) this.icons.set(key.slice(5), icon);
-      if (this.record) {
-        this.record.last ??= {};
-        for (const [key, msg] of await ctx.storage.list<LobbyRecord["last"][string]>({ prefix: "last:" })) {
-          const id = key.slice(5);
-          this.record.last[id] ??= msg;
-          this.lastStored.set(id, this.record.last[id]);
-        }
+      // (A record from before "last" had its own key keeps its own; the next store moves it out.)
+      const last = await ctx.storage.get<LobbyRecord["last"]>("last");
+      if (this.record && last && !Object.keys(this.record.last ?? {}).length) {
+        this.record.last = last;
+        this.lastStored = new Map(Object.entries(last));
       }
     });
   }
@@ -139,28 +137,14 @@ export class Lobby extends DurableObject<Env> {
     void this.reportLive(core).catch(() => undefined);
   }
 
-  /**
-   * Stores the record: everything but `last` under "lobby", and each person's last message under "last:<id>" only when
-   * it changed (most messages change none: a pick, a vote, a chat line).
-   */
+  /** Stores the record: everything but `last` under "lobby", and `last` under "last" when any of it changed. */
   private async store(rec: LobbyRecord) {
     const { last, ...rest } = rec;
-    const changed: Record<string, unknown> = {};
-    for (const [id, msg] of Object.entries(last ?? {})) {
-      if (this.lastStored.get(id) === msg) continue;
-      changed[`last:${id}`] = msg;
-      this.lastStored.set(id, msg);
-    }
-    const gone = [...this.lastStored.keys()].filter((id) => !(last && id in last));
-    for (const id of gone) this.lastStored.delete(id);
-    await this.ctx.storage.put("lobby", { ...rest, last: {} });
-    const keys = Object.keys(changed);
-    for (let i = 0; i < keys.length; i += 100) await this.ctx.storage.put(Object.fromEntries(keys.slice(i, i + 100).map((k) => [k, changed[k]])));
-    if (gone.length) await this.ctx.storage.delete(gone.map((id) => `last:${id}`));
-    if (this.env.OPS_STATS) {
-      countCall("lobby.persist");
-      countCall("lobby.persistBytes", JSON.stringify(rest).length + keys.reduce((n, k) => n + JSON.stringify(changed[k]).length, 0));
-    }
+    const entries = Object.entries(last ?? {});
+    const changed = entries.length !== this.lastStored.size || entries.some(([id, msg]) => this.lastStored.get(id) !== msg);
+    await this.ctx.storage.put(changed ? { lobby: { ...rest, last: {} }, last: last ?? {} } : { lobby: { ...rest, last: {} } });
+    if (changed) this.lastStored = new Map(entries);
+    countCall(changed ? "lobby.persistWithLast" : "lobby.persist");
   }
 
   /** Closes the lobby now if its time has come (its alarm hasn't run yet, or it's from before lobbies closed). */

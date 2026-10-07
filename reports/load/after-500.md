@@ -1,54 +1,62 @@
 # Load test: after-500
 
-2026-10-07T22:49:53.089Z · http://localhost:8787 · 500 players over 20 s · crowd · session 200 s · 3.9 min
-Generator CPU peak (one Node process): 51%
+2026-10-07T22:59:52.506Z · http://localhost:8787 · 500 players over 20 s · crowd · session 200 s · 3.9 min
+Generator: 1 Node process, CPU peak 37% of a core (each)
 
 ## Players
 
 | Measure | n | p50 | p90 | p99 | max |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| chatRtt | 170 | 20 ms | 109 ms | 2811 ms | 5313 ms |
-| http heartbeat | 2700 | 40 ms | 2969 ms | 8736 ms | 8766 ms |
-| http live | 807 | 527 ms | 3800 ms | 7462 ms | 8193 ms |
-| http me | 500 | 817 ms | 3845 ms | 4603 ms | 4698 ms |
-| http play | 500 | 691 ms | 3340 ms | 6660 ms | 7424 ms |
-| pickRtt | 1763 | 30 ms | 208 ms | 3577 ms | 5350 ms |
-| playToCode | 450 | 672 ms | 2791 ms | 6368 ms | 6726 ms |
-| playToLobby | 450 | 2944 ms | 8344 ms | 15.5 s | 17.1 s |
-| queueWait | 450 | 4621 ms | 51.1 s | 55.6 s | 55.6 s |
-| server heartbeat | 2700 | 0 ms | 57 ms | 141 ms | 308 ms |
-| server live | 807 | 17 ms | 193 ms | 223 ms | 225 ms |
-| server me | 500 | 203 ms | 817 ms | 834 ms | 835 ms |
-| server play | 450 | 39 ms | 55 ms | 118 ms | 119 ms |
-| wsOpen | 1297 | 1263 ms | 1794 ms | 4136 ms | 7788 ms |
+| chatRtt | 191 | 23 ms | 111 ms | 1309 ms | 2413 ms |
+| http heartbeat | 2718 | 37 ms | 344 ms | 4309 ms | 5467 ms |
+| http live | 799 | 294 ms | 4492 ms | 9044 ms | 9535 ms |
+| http me | 500 | 548 ms | 3268 ms | 5935 ms | 6094 ms |
+| http play | 500 | 524 ms | 5017 ms | 8724 ms | 9226 ms |
+| pickRtt | 2305 | 30 ms | 152 ms | 1531 ms | 2971 ms |
+| playToCode | 453 | 571 ms | 5017 ms | 8724 ms | 9226 ms |
+| playToLobby | 453 | 2006 ms | 9894 ms | 13.3 s | 14.0 s |
+| queueWait | 453 | 3665 ms | 53.8 s | 55.1 s | 56.3 s |
+| server heartbeat | 2718 | 0 ms | 1 ms | 11 ms | 15 ms |
+| server live | 799 | 12 ms | 104 ms | 130 ms | 131 ms |
+| server me | 500 | 185 ms | 488 ms | 634 ms | 637 ms |
+| server play | 453 | 21 ms | 55 ms | 95 ms | 101 ms |
+| wsOpen | 453 | 618 ms | 3003 ms | 5119 ms | 5121 ms |
 
-Counts: msgsOut 4471 · msgsIn 467297 · wsDropped 847 · playersFailed 50 · hostScores 247 · end timeUp 450
+Counts: msgsOut 4023 · msgsIn 543773 · playersFailed 47 · hostScores 49 · chatNo repeat 4 · end timeUp 453
 
-Errors: play 503  (50)
+Errors: play 500  (47)
 
 ## Server counters
 
-D1 statements: 3607 reads, 26 writes (0.01 writes per player per minute; 0.1 writes/s)
+D1 statements: 7682 reads, 1044 writes (0.54 writes per player per minute; 4.5 writes/s)
 
 | D1 statement | count | per player per min |
 | --- | ---: | ---: |
-| SELECT users | 901 | 0.47 |
-| SELECT sessions | 900 | 0.47 |
-| SELECT inventory | 450 | 0.23 |
-| SELECT equipped | 450 | 0.23 |
-| SELECT wallets | 450 | 0.23 |
-| SELECT chat_picks | 450 | 0.23 |
+| SELECT users | 1407 | 0.73 |
+| SELECT inventory | 953 | 0.49 |
+| SELECT equipped | 953 | 0.49 |
+| SELECT wallets | 953 | 0.49 |
+| SELECT chat_picks | 953 | 0.49 |
+| SELECT sessions | 953 | 0.49 |
+| INSERT users | 500 | 0.26 |
+| INSERT sessions | 500 | 0.26 |
+| SELECT results | 500 | 0.26 |
+| SELECT items | 500 | 0.26 |
+| SELECT equipped_items | 500 | 0.26 |
 | CREATE schema | 21 | 0.01 |
-| SELECT queue_waits | 4 | 0.00 |
+| ALTER schema | 12 | 0.01 |
+| SELECT queue_waits | 8 | 0.00 |
+| INSERT queue_waits | 5 | 0.00 |
+| UPDATE users | 4 | 0.00 |
 | PRAGMA schema | 2 | 0.00 |
-| UPDATE users | 2 | 0.00 |
-| ALTER schema | 1 | 0.00 |
 | DELETE live_lobbies | 1 | 0.00 |
 | DELETE queue_waits | 1 | 0.00 |
 
 | Route | requests | mean ms |
 | --- | ---: | ---: |
-| GET /api/live | 1552 | 7.7 |
-| GET /api/lobby/:code/ws | 450 | 626.9 |
+| GET /api/live | 3517 | 8.4 |
+| GET /api/me | 500 | 240.4 |
+| POST /api/play | 453 | 26.0 |
+| GET /api/lobby/:code/ws | 453 | 105.9 |
 
-Calls: hub.seen 23 · hub.counts 122 · lobby.persist 2574 · lobby.persistBytes 518247538 · live.report 76 · hub.report 76
+Calls: hub.seen 56 · hub.counts 293 · mm.next 453 · mm.batch 157 · mm.create 5 · lobby.persist 4596 · lobby.persistBytes 2945086427 · live.report 62 · hub.report 62 · mm.reserve 156
