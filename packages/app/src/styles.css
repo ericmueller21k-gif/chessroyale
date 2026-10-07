@@ -285,6 +285,64 @@ p {
   text-transform: uppercase;
   opacity: 0.8;
 }
+/* The numbers never shrink or run under the sound button. On a phone, Crowd's "Move 12 · cut in 2" is two short
+   lines, the gaps and your score a little smaller, so wide scores fit at 360 px; past that, only the label gives way. */
+.hud-rank,
+.hud-score,
+.hud-cut {
+  flex: none;
+}
+.hud-stage-text > span {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .screen .hud-row {
+    gap: 6px;
+  }
+  .hud-row .hud {
+    gap: 5px;
+  }
+  .hud-row .hud-rank {
+    font-size: 15px;
+  }
+  .hud-row .hud-rank .muted {
+    font-size: 12px;
+  }
+  .hud-row .hud-score {
+    font-size: 18px;
+  }
+  .hud-row .hud-cut {
+    padding: 2px 6px;
+  }
+  .hud-stage:has(.hud-stage-text) {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .hud-stage .team-chip {
+    flex: none;
+  }
+  .hud-stage-text {
+    display: grid;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.15;
+  }
+  /* (It only pushes empty space to the end; here its gap is worth more.) */
+  .hud-row .hud-spacer {
+    display: none;
+  }
+  .hud-stage-text > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hud-stage-text > .muted {
+    font-size: 11px;
+  }
+  .hud-dot {
+    display: none;
+  }
+}
 
 .board-area {
   display: grid;
@@ -2388,15 +2446,18 @@ button.history-label {
   max-height: 120px;
   overflow: hidden;
 }
-.cut-name {
+/* (Under .cut-out, so the chip outranks .player-name's plain-text look: the names are tappable.) */
+.cut-out .cut-name {
+  max-width: 100%;
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--surface);
   color: var(--muted);
   font-size: 13px;
+  white-space: nowrap;
   text-decoration: line-through;
 }
-.cut-name.you {
+.cut-out .cut-name.you {
   color: #ff4d4d;
   text-decoration: none;
   font-weight: 800;
@@ -5048,7 +5109,8 @@ button.history-label {
   min-height: 0;
   padding: 10px 22px;
 }
-.cut-name.more {
+.cut-out .cut-name.more {
+  text-decoration: none;
   background: var(--accent);
   color: var(--accent-text);
 }
