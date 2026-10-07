@@ -79,6 +79,11 @@ export async function reportLobby(sql: Sql, s: LobbySummary, now: number): Promi
   );
 }
 
+/** A lobby closed (deleted itself): it's off the live line and the "playing now" list. */
+export async function forgetLobby(sql: Sql, code: string): Promise<void> {
+  await sql.run("DELETE FROM live_lobbies WHERE code = ?", code);
+}
+
 /** A matchmade lobby started: how long its people had waited, on average. */
 export async function recordWait(sql: Sql, mode: LiveMode, players: number, waitMs: number, now: number): Promise<void> {
   if (players < 1 || !Number.isFinite(waitMs)) return;

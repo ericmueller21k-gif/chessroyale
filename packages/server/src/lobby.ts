@@ -1,5 +1,5 @@
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
-import { DEFAULT_SETTINGS, FRONT_DOOR, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -25,6 +25,7 @@ import {
   type NetVote,
   type ScoreJob,
   type ServerMessage,
+  type LobbyCloseReason,
 } from "@chessroyale/chess";
 
 /**
@@ -166,6 +167,33 @@ export interface LobbyRecord {
   startedAt?: number;
   /** Quick chat (Crowd matches and boss raids, once the match has begun). */
   chat?: ChatRecord;
+  /** The last time a person did anything here (joined, left, connected, dropped, sent anything): when it closes. */
+  activeAt?: number;
+  /** When the match ended (its results came up). */
+  endedAt?: number;
+  /** How long the results stay up, if not LOBBY_LIFE's (playtests: ?keep=SECONDS on a lobby you create). */
+  keepMs?: number;
+}
+
+/** What someone is told when they open a match that's over (results still up, or long gone). */
+export const MATCH_ENDED = "That match has ended.";
+
+/**
+ * When a lobby closes and why (null: not while a match is on with someone connected). Then its Durable Object
+ * deletes everything it stored, and its code is free again.
+ *   - The match is over: `lobbyResultsKeepMinutes` after it ended (a lobby that ended before this rule existed: now).
+ *   - It never started (a private lobby nobody started, a queue everyone left): `lobbyIdleMinutes` after anyone last
+ *     did anything in it.
+ *   - A match in progress: never while anyone is connected; with nobody connected, `lobbyAbandonedMinutes` after anyone
+ *     was last heard from (a safety cap: a match left to itself reaches its results long before; see LOBBY_LIFE).
+ * `connected`: anyone is connected right now (the Durable Object counts its open sockets).
+ */
+export function lobbyClosing(r: LobbyRecord, connected: boolean, life = LOBBY_LIFE): { at: number; reason: LobbyCloseReason } | null {
+  const min = 60_000;
+  if (r.phase === "results") return { at: (r.endedAt ?? 0) + (r.keepMs ?? life.lobbyResultsKeepMinutes * min), reason: "ended" };
+  if (r.phase === "lobby" && !r.auto?.filledAt) return { at: (r.activeAt ?? r.createdAt) + life.lobbyIdleMinutes * min, reason: "idle" };
+  if (connected) return null;
+  return { at: (r.activeAt ?? r.startedAt ?? r.createdAt) + life.lobbyAbandonedMinutes * min, reason: "abandoned" };
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"]): LobbyRecord {
@@ -314,6 +342,7 @@ export class LobbyCore {
     look: unknown = undefined,
     userId?: string,
   ) {
+    this.r.activeAt = this.io.now();
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
     if (existing) {
       existing.connected = true;
@@ -325,8 +354,13 @@ export class LobbyCore {
       const last = this.r.last[existing.id];
       if (last) this.send(existing.id, last, false);
       this.resendHostWork();
+      // Matchmade, and its fill time passed while nobody was here (nothing started it): bots fill the rest now.
+      if (this.r.auto && !this.r.auto.filledAt && this.r.phase === "lobby" && !this.r.timer && this.io.now() >= this.r.auto.fillAt) this.startMatch();
       return { ok: true as const, playerId: existing.id };
     }
+    // A seat this lobby never gave out: from an older lobby that had this code (it has closed since), so that match is over.
+    if (token) return { ok: false as const, message: MATCH_ENDED, ended: true as const };
+    if (this.r.phase === "results") return { ok: false as const, message: MATCH_ENDED, ended: true as const };
     if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: "This match has already started." };
     if (this.r.humans.length >= this.settings.lobbySize) return { ok: false as const, message: "This lobby is full." };
     const clean = (name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || `Player ${this.r.humans.length + 1}`;
@@ -368,6 +402,7 @@ export class LobbyCore {
     const h = this.human(playerId);
     if (!h) return;
     h.connected = false;
+    this.r.activeAt = this.io.now();
     if (this.r.hostId === playerId) {
       this.r.hostId = this.pickHost(playerId) ?? playerId;
       this.resendHostWork();
@@ -378,6 +413,7 @@ export class LobbyCore {
   /** Leaving before the match starts (Cancel in the queue, Leave in a lobby): the seat is free again. */
   leave(playerId: string) {
     if (this.r.phase !== "lobby" || this.r.auto?.filledAt || !this.human(playerId)) return;
+    this.r.activeAt = this.io.now();
     this.r.humans = this.r.humans.filter((h) => h.id !== playerId);
     delete this.r.last[playerId];
     if (this.r.accounts?.[playerId]) {
@@ -401,6 +437,7 @@ export class LobbyCore {
   // ---------------- Messages ----------------
 
   message(playerId: string, msg: ClientMessage) {
+    if (this.human(playerId)) this.r.activeAt = this.io.now();
     switch (msg.t) {
       case "start":
         return this.start(playerId);
@@ -1180,6 +1217,7 @@ export class LobbyCore {
     for (const p of runner.state.players) this.r.placements[p.id] = p.placement!;
     this.r.phase = "results";
     this.r.timer = null;
+    this.r.endedAt = this.io.now();
     const winner = runner.state.players.find((p) => p.placement === 1);
     const msg: Outgoing = {
       t: "results",

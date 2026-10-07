@@ -6,7 +6,7 @@ import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool } from "./engine.ts";
 import { cutLabel, elimination, isCrowd, roundLive, towerView, type GameView } from "./game.ts";
-import { NetMatch } from "./net.ts";
+import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { SoloMatch } from "./solo.ts";
 import { FinalScreen } from "./screens/Final.tsx";
 import { HomeScreen } from "./screens/Home.tsx";
@@ -80,8 +80,16 @@ function quickPace(): boolean {
   }
 }
 
-/** An invite link (/lobby/ABCDE) opens the join form with the code filled in. */
+/** An invite link (/lobby/ABCDE) opens the join form with the code filled in (once we know the lobby is still open). */
 const linkCode = location.pathname.match(/^\/lobby\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
+
+/** A lobby that has closed (a stale tab, an old link, or the match on screen): the note on the home screen. */
+interface EndedNote {
+  code: string;
+  why: LobbyGone;
+  /** Your result in it, if you played it (the server keeps it on your profile). */
+  result: LobbyResult | null;
+}
 
 /** Back from Google: ?signin=google (or failed). Read once, then tidied out of the address bar. */
 const signinParam = new URLSearchParams(location.search).get("signin");
@@ -119,6 +127,22 @@ export function App() {
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
+  /**
+   * An invite link's lobby: being checked (a moment's splash), still open (the join form opens with its code), or
+   * gone (null: home with the note instead). A device with a seat in it rejoins straight away.
+   */
+  const [invite, setInvite] = useState<"checking" | "open" | null>(() => (!linkCode ? null : hasSeat(linkCode) ? "open" : "checking"));
+  const [ended, setEnded] = useState<EndedNote | null>(null);
+  /**
+   * The lobby has closed: home (the address too, so reopening the app lands there) with a note, and your result if
+   * you played (from the server, asked before this so the note shows whole, never growing a button a moment later).
+   */
+  const showEnded = (code: string, why: LobbyGone, result: LobbyResult | null) => {
+    forgetSeat(code);
+    setInvite(null);
+    if (location.pathname !== "/") history.replaceState(null, "", "/");
+    setEnded({ code, why, result });
+  };
   const chooseGuest = (on: boolean) => {
     setGuest(on);
     try {
@@ -192,19 +216,45 @@ export function App() {
     void enginePool();
   }, []);
 
-  // Back on a lobby link this device already has a seat in (a reload or a dropped connection): rejoin straight away.
+  // Back on a lobby link this device already has a seat in (a reload, the app reopened, a dropped connection):
+  // rejoin straight away (if the lobby has closed since, the connection is refused and the note shows). Otherwise
+  // (an invite) ask first: a match that's over, or a lobby that's gone, is a note on the home screen, not a join form.
   useEffect(() => {
     if (!linkCode) return;
-    try {
-      if (localStorage.getItem(`brc.lobby.${linkCode}`)) joinLobby(linkCode);
-    } catch {
-      // No storage: show the join form.
-    }
+    if (hasSeat(linkCode)) return joinLobby(linkCode);
+    void lobbyStatus(linkCode).then((s) => {
+      if (s && (!s.open || s.phase === "over")) {
+        setInvite(null);
+        showEnded(linkCode, s.open ? "ended" : "unknown", s.result ?? null);
+      } else setInvite("open");
+    });
   }, []);
+  // The lobby on screen has closed (or the server has no such lobby): home, with the note (your result first, if the
+  // server hasn't been asked yet; the screen stays as it is meanwhile).
+  const goingHome = useRef<AnyMatch | null>(null);
+  const onScreen = useRef<AnyMatch | null>(null);
+  onScreen.current = match;
+  useEffect(() => {
+    if (!(match instanceof NetMatch) || !match.gone || goingHome.current === match) return;
+    goingHome.current = match;
+    const m = match;
+    const go = (result: LobbyResult | null) => {
+      // (Already left it meanwhile: nothing to do.)
+      if (onScreen.current !== m) return;
+      m.dispose();
+      setMatch(null);
+      showEnded(m.code, m.gone!, result);
+    };
+    if (m.goneResult !== undefined) go(m.goneResult);
+    else void lobbyStatus(m.code, 3000).then((s) => go(s?.result ?? null));
+  });
 
   const debug = new URLSearchParams(location.search).has("debug");
   const use = (m: AnyMatch) => {
     match?.dispose();
+    setEnded(null);
+    // (An invite link is used up once you're in: back home, its join form doesn't open again.)
+    setInvite(null);
     resetBoardsStrip();
     elimination.current = null;
     setMatch(m);
@@ -234,7 +284,7 @@ export function App() {
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -252,6 +302,8 @@ export function App() {
       : { ...DEFAULT_SETTINGS, ...overridesFromUrl(opts.mode) };
     // The queue shows at once (not "Connecting…"); the lobby confirms it.
     if (queue) m.auto = true;
+    // A code typed into Join that leads nowhere is "Can't join", not the note.
+    m.typed = !!opts.typed;
     use(m);
     history.replaceState(null, "", `/lobby/${m.code}${location.search}`);
     m.connect();
@@ -314,6 +366,8 @@ export function App() {
     // Leaving a lobby before it starts (Cancel in the queue) frees the seat.
     if (match instanceof NetMatch && (match.phase.kind === "lobby" || match.phase.kind === "loading")) match.leave();
     else match?.dispose();
+    // Done with a match that's over: this device forgets its seat (its old link then says it has ended).
+    if (match instanceof NetMatch && match.phase.kind === "results") forgetSeat(match.code);
     setMatch(null);
     history.replaceState(null, "", "/");
   };
@@ -411,8 +465,9 @@ export function App() {
       </FrontFrame>
     );
   }
-  // Still finding out who you are: a plain splash rather than a flash of the wrong screen.
-  if (!match && (config === null || (config.accounts && !profile))) {
+  // Still finding out who you are (or whether an invite's lobby is still open): a plain splash rather than a flash of
+  // the wrong screen.
+  if (!match && (config === null || (config.accounts && !profile) || invite === "checking")) {
     return (
       <div class="fd-splash">
         <Logo />
@@ -421,17 +476,20 @@ export function App() {
   }
   // Not signed in, where online play needs it: the landing page (an invite link shows it even to guests).
   const noLanding = new URLSearchParams(location.search).has("nolanding");
-  if (!match && !noLanding && config?.onlineNeedsSignIn && profile && !profile.user.signedIn && (!guest || (linkCode && !inviteSkipped))) {
+  const inviteCode = invite === "open" ? linkCode : undefined;
+  const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : "That match has ended.") : undefined;
+  if (!match && !noLanding && config?.onlineNeedsSignIn && profile && !profile.user.signedIn && (!guest || (inviteCode && !inviteSkipped))) {
     return (
       <LandingScreen
         google={config.google}
         email={config.email}
-        joinCode={linkCode}
+        joinCode={inviteCode}
+        notice={notice}
         failed={signinParam === "failed"}
         onGuest={() => {
           chooseGuest(true);
           setInviteSkipped(true);
-          if (linkCode) history.replaceState(null, "", "/");
+          if (inviteCode) history.replaceState(null, "", "/");
         }}
       />
     );
@@ -443,12 +501,27 @@ export function App() {
         intent={homeIntent}
         loading={loading}
         error={error}
-        joinCode={mustSignInToPlayOnline() ? undefined : linkCode}
+        joinCode={mustSignInToPlayOnline() ? undefined : inviteCode}
+        notice={
+          ended && notice
+            ? {
+                text: notice,
+                onDismiss: () => setEnded(null),
+                onSeeResult: ended.result
+                  ? () => {
+                      const playedAt = ended.result!.playedAt;
+                      setEnded(null);
+                      openProfile({ you: true, name: account().profile?.user.name ?? "", match: playedAt });
+                    }
+                  : undefined,
+              }
+            : undefined
+        }
         onlineLocked={mustSignInToPlayOnline()}
         onPlay={(mode) => void playNow(mode)}
         onSolo={(mode) => void startSolo(mode)}
         onCreateLobby={(mode) => void createLobby(mode)}
-        onJoinLobby={(code) => joinLobby(code)}
+        onJoinLobby={(code) => joinLobby(code, { typed: code !== inviteCode })}
         onSignIn={() => chooseGuest(false)}
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
         onShop={() => setShowShop("shop")}

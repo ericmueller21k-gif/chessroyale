@@ -147,6 +147,8 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "survived", type: "INTEGER" },
   { table: "results", column: "last_stand", type: "INTEGER" },
   { table: "results", column: "boss_elo", type: "INTEGER" },
+  // An online match's lobby code (Oct 7, 2026), so a closed lobby's link can offer "See your result". Never shown on a profile.
+  { table: "results", column: "lobby", type: "TEXT" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
 ];
@@ -424,6 +426,8 @@ export interface MatchResult {
   survived?: boolean | null;
   lastStand?: boolean | null;
   bossElo?: number | null;
+  /** An online match: its lobby's code (the server sets it; a solo result has none). */
+  lobby?: string | null;
 }
 
 /** A count from a result (0-500), or null. */
@@ -439,8 +443,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   const mode = r.mode === "crowd" || r.mode === "boss" ? r.mode : "classic";
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -460,8 +464,27 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     flag(r.survived),
     flag(r.lastStand),
     mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
+    r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null,
   );
   if (rating !== null) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
+}
+
+/** Your result in an online match, by its lobby's code (the latest, if a code was used again): for "See your result". */
+export interface LobbyResult {
+  mode: string;
+  placement: number;
+  players: number;
+  /** When it was recorded: the same as the profile's recent match. */
+  playedAt: number;
+}
+
+export async function lobbyResult(sql: Sql, userId: string, code: string): Promise<LobbyResult | null> {
+  const row = await sql.first<{ mode: string; placement: number; players: number; played_at: number }>(
+    "SELECT mode, placement, players, played_at FROM results WHERE user_id = ? AND lobby = ? AND online = 1 ORDER BY played_at DESC, id DESC LIMIT 1",
+    userId,
+    code,
+  );
+  return row ? { mode: row.mode, placement: row.placement, players: row.players, playedAt: row.played_at } : null;
 }
 
 export interface ModeStats {

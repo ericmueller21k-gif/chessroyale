@@ -17,7 +17,8 @@
     "frames:queue": "node scripts/frames-queue-pop.mjs",
     "frames:flash": "node scripts/frames-flash.mjs",
     "frames:chat": "node scripts/frames-chat-move.mjs",
-    "frames:vote": "node scripts/frames-vote.mjs"
+    "frames:vote": "node scripts/frames-vote.mjs",
+    "frames:close": "node scripts/frames-lobby-close.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261002.1",

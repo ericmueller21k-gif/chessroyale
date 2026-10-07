@@ -12,6 +12,7 @@ import {
   type ScoreJob,
   type ServerMessage,
   type UciEngine,
+  type LobbyCloseReason,
   TopMovesCache,
   bossGuardFrom,
   recheckCloseCalls,
@@ -24,6 +25,58 @@ import { account } from "./account.ts";
 import { RoundProgress } from "./progress.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { MatchChat } from "./chat.ts";
+
+/** Your result in a lobby's match (once it's over), from the server: for "See your result". */
+export interface LobbyResult {
+  mode: string;
+  placement: number;
+  players: number;
+  /** When it was recorded (the profile's recent match). */
+  playedAt: number;
+}
+
+/** Whether a lobby is still open (`over`: its results are up), and your result in it once it's over. */
+export interface LobbyStatus {
+  open: boolean;
+  phase?: "waiting" | "playing" | "over";
+  result?: LobbyResult;
+}
+
+/** GET /api/lobby/CODE. Null when it can't tell (offline, no server): carry on as if it's open. */
+export async function lobbyStatus(code: string, timeoutMs = 5000): Promise<LobbyStatus | null> {
+  try {
+    const res = await fetch(`/api/lobby/${encodeURIComponent(code)}`, { signal: AbortSignal.timeout(timeoutMs) });
+    if (res.status !== 200 && res.status !== 404) return null;
+    const body = (await res.json()) as LobbyStatus;
+    return typeof body.open === "boolean" ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+/** This device's seat in a lobby (and its queue mode): kept to rejoin it, forgotten once you're done with it. */
+export const seatKey = (code: string) => `brc.lobby.${code.toUpperCase()}`;
+export function hasSeat(code: string): boolean {
+  try {
+    return !!localStorage.getItem(seatKey(code));
+  } catch {
+    return false;
+  }
+}
+export function forgetSeat(code: string) {
+  try {
+    localStorage.removeItem(seatKey(code));
+    localStorage.removeItem(`brc.queue.${code.toUpperCase()}`);
+  } catch {
+    // No storage.
+  }
+}
+
+/**
+ * Why a lobby is gone: it closed (its results had been up long enough, it never started, or it was abandoned), or
+ * the server has no lobby under that code (closed a while ago, or never was).
+ */
+export type LobbyGone = LobbyCloseReason | "unknown";
 
 /**
  * A multiplayer match: the lobby server runs the clock and the draw; this
@@ -43,6 +96,15 @@ export class NetMatch implements GameView {
   myId: string | null = null;
   started = false;
   error: string | null = null;
+  /**
+   * The lobby is gone (closed, or no such lobby): the app goes home with a note. For a code typed into Join, it's an
+   * error ("Can't join") instead.
+   */
+  gone: LobbyGone | null = null;
+  /** Once gone: your result in it, if the server was asked already (null: none), so the note shows complete at once. */
+  goneResult?: LobbyResult | null;
+  /** Joined by typing a code (not a link, a reload or PLAY). */
+  typed = false;
   stage = 0;
   roundsPlayed = 0;
   cutoff = 0;
@@ -163,14 +225,40 @@ export class NetMatch implements GameView {
   }
 
   private tokenKey() {
-    return `brc.lobby.${this.code}`;
+    return seatKey(this.code);
   }
+
+  /** The lobby has gone (closed, or never was): no more reconnecting. */
+  private goneNow(why: LobbyGone, status?: LobbyStatus) {
+    if (this.closed && (this.gone || this.error)) return;
+    if (status) this.goneResult = status.result ?? null;
+    this.closed = true;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    if (this.typed) this.error = why === "unknown" ? "We couldn't find a lobby with that code." : "That match has ended.";
+    else this.gone = why;
+    this.emit();
+  }
+
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Back in view (the app reopened from the background): reconnect now rather than at the end of the backoff. */
+  private onVisible = () => {
+    if (document.visibilityState !== "visible" || this.closed || !this.retryTimer) return;
+    clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+    this.connect();
+  };
 
   connect() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${proto}://${location.host}/api/lobby/${this.code}/ws`);
     this.ws = ws;
+    let opened = false;
+    if (!this.watchingVisibility) {
+      this.watchingVisibility = true;
+      document.addEventListener("visibilitychange", this.onVisible);
+    }
     ws.onopen = () => {
+      opened = true;
       this.retry = 0;
       let token: string | undefined;
       try {
@@ -185,25 +273,32 @@ export class NetMatch implements GameView {
     ws.onclose = () => {
       if (this.closed) return;
       // Reconnect with backoff; the token brings us back to the same seat.
-      const delay = Math.min(8000, 500 * 2 ** this.retry++);
-      setTimeout(() => !this.closed && this.connect(), delay);
+      const retry = () => {
+        if (this.closed) return;
+        const delay = Math.min(8000, 500 * 2 ** this.retry++);
+        this.retryTimer = setTimeout(() => {
+          this.retryTimer = null;
+          if (!this.closed) this.connect();
+        }, delay);
+      };
+      if (opened) return retry();
+      // Refused before it opened: a lobby that's gone (closed, or never was) refuses every connection, so ask.
+      void lobbyStatus(this.code).then((s) => (s && !s.open ? this.goneNow("unknown", s) : retry()));
     };
   }
+  private watchingVisibility = false;
 
   /** Leaves before the match starts (Cancel in the queue): the seat is freed, and this device forgets it. */
   leave() {
     this.send({ t: "leave" });
-    try {
-      localStorage.removeItem(this.tokenKey());
-      localStorage.removeItem(`brc.queue.${this.code}`);
-    } catch {
-      // No storage.
-    }
+    forgetSeat(this.code);
     this.dispose();
   }
 
   dispose() {
     this.closed = true;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    document.removeEventListener("visibilitychange", this.onVisible);
     this.chat.dispose();
     this.progress.reset();
     this.ws?.close();
@@ -233,9 +328,13 @@ export class NetMatch implements GameView {
         this.chat.onWelcome();
         return;
       case "error":
+        // (The match is over: results gone, or a seat from an older lobby that had this code.)
+        if (m.ended) return this.goneNow("ended");
         this.error = m.message;
         this.closed = true;
         return this.emit();
+      case "closed":
+        return this.goneNow(m.reason);
       case "lobby":
         this.players = m.players;
         for (const p of m.players) if (p.look) this.looks.set(p.id, p.look);

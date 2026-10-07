@@ -265,6 +265,9 @@ export type ClientMessage =
    */
   | { t: "chatPrefs"; off?: boolean; muted?: string[] };
 
+/** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
+export type LobbyCloseReason = "ended" | "idle" | "abandoned";
+
 export type ServerMessage = { now: number } & (
   | { t: "welcome"; playerId: string; token: string; code: string }
   | {
@@ -279,7 +282,14 @@ export type ServerMessage = { now: number } & (
       /** Matchmade: the seats were filled then (bots in the empty ones); the match begins a moment later. */
       filledAt?: number;
     }
-  | { t: "error"; message: string }
+  /** Can't join (or play on). `ended`: the match is over (or long gone), so the app goes home with a note. */
+  | { t: "error"; message: string; ended?: true }
+  /**
+   * The lobby is closing: its results have been up long enough (`ended`), it never started and nothing happened in it
+   * for a long time (`idle`), or nobody had been in its match for hours (`abandoned`). The socket closes next, and
+   * the lobby's code is free again. The app goes home with a note.
+   */
+  | { t: "closed"; reason: LobbyCloseReason }
   | { t: "opening"; boards: NetBoard[]; until: number }
   | {
       t: "round";

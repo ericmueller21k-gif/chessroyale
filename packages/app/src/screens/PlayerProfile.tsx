@@ -1,5 +1,5 @@
 import { Fragment } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOSS_TIERS, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, shopItem, tierInfo, type ItemLook } from "@chessroyale/core";
 import { BackButton, DressedPawn, FdButton, RankPill, WORN_ORDER, myHat } from "../components/FrontDoor.tsx";
 import { HattedPawn } from "../components/Cosmetics.tsx";
@@ -191,7 +191,10 @@ function Bosses({ beaten }: { beaten: number[] }) {
   );
 }
 
-function Recent({ p }: { p: PublicProfile }) {
+/** `mark`: one match to point out (when it was played), scrolled to: "See your result" for a lobby that has closed. */
+function Recent({ p, mark }: { p: PublicProfile; mark?: number }) {
+  const marked = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => marked.current?.scrollIntoView({ block: "center" }), [p, mark]);
   return (
     <section class="fd-section">
       <h2 class="fd-label">RECENT MATCHES</h2>
@@ -207,7 +210,12 @@ function Recent({ p }: { p: PublicProfile }) {
               ? `Boss raid · ${r.bossElo ? `${bossInfo(r.bossElo).name} ${r.bossElo}` : "a boss"}`
               : `Classic · ${r.players} players`;
         return (
-          <div key={`${r.playedAt}-${i}`} class="fd-match">
+          <div
+            key={`${r.playedAt}-${i}`}
+            class={`fd-match${mark !== undefined && r.playedAt === mark ? " marked" : ""}`}
+            ref={mark !== undefined && r.playedAt === mark ? marked : undefined}
+            aria-current={mark !== undefined && r.playedAt === mark ? "true" : undefined}
+          >
             <span class={`fd-place${gold ? " gold" : ""}`}>{place}</span>
             <span class="fd-match-text">
               <strong>
@@ -457,7 +465,7 @@ export function PlayerProfileScreen({
       <div class="fd-profile-col">
       <Stats p={p} own={own} />
       <Bosses beaten={p.bossesBeaten} />
-      <Recent p={p} />
+      <Recent p={p} mark={own ? target.match : undefined} />
       {own ? (
         <>
           {me && !me.user.signedIn && config && (config.google || config.email) && (

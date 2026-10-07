@@ -1829,3 +1829,86 @@ change it later: "we will consider it"), and Variable when nobody votes. Mine:
   narrow phone with a real finger (a drag in the first vote, a tap and a tap in the second) and the hand-off, flags
   flashes and says whether the board's box moved. `e2e/votes.spec.ts` drags with real touch on the phone (a mouse on
   the computer), and checks the Variable clock (10 s on move 1, 15 s on move 6).
+
+## Closing finished lobbies (Oct 7, 2026)
+
+Eric opened the app hours after a match and got its results screen again ("100/100 place") at
+`hunchess.com/lobby/RY8UB`: "Shouldn't we be removing these urls or something once the game has ended?" The `hub`
+delegate's calls.
+
+**Why it happened**
+- A lobby's Durable Object kept its record for ever. Nothing deleted it after the results, so `/lobby/CODE` (a stale
+  tab, the app reopened from the background) reconnected to the seat and the server re-sent the results.
+- A lobby that's gone (or a code that never existed) refuses the WebSocket, and the app just retried with backoff, for
+  ever: a typed unknown code sat on "Connecting…" with no way to tell.
+- Codes were never freed. The matchmaker did already check `exists()` before `create()` (that part of the report was
+  wrong), but as two calls; `create()` now refuses a code in use itself and returns false, and the matchmaker and
+  POST /api/lobby try another (`openLobbyCode`). A lobby whose time is up is closed right there, so its code is
+  reused.
+
+**How long a lobby lives** (`LOBBY_LIFE` in settings.ts; the rule is `lobbyClosing` in lobby.ts, unit-tested)
+- **Results: 15 minutes after the match ends** (`lobbyResultsKeepMinutes`): time to see your place, say GG and share.
+  People still on the results screen don't keep it open.
+- **A lobby that never started: 60 minutes after anyone last did anything in it** (`lobbyIdleMinutes`): joined, left,
+  connected, dropped, sent anything. A private lobby nobody started, or a queue everyone left.
+- **A match in progress is never cut short while anyone is connected.** With nobody connected, a safety cap of
+  **180 minutes** after anyone was last heard from (`lobbyAbandonedMinutes`). Why 180: a match whose people all left
+  plays itself out (each move waits out its clock, scoring times out after 15 s and every pick counts the same), so it
+  reaches its results by itself. The unit test plays each ending out that way: team final 83 min (to its 160-turn
+  cap), duel 86, boss battle 61, boss raid 51. So the cap is about twice the longest: it only ever clears a match
+  that's stuck, and a match left to itself still records everyone's results first.
+- **`?keep=SECONDS`** on a lobby you create (5 s up to the 15 minutes) shortens the results for tests.
+
+**What closing does** (the Durable Object, from its alarm: its one alarm is the match's next event or the lobby's
+closing time, whichever is first)
+1. Results are on profiles (saved when the match ended; again here if that hadn't happened) and the live line has
+   forgotten the lobby.
+2. Anyone still connected gets `closed` (with the reason) and the socket closes.
+3. Everything it stored goes (`deleteAlarm()`, `deleteAll()`: the lobby, the quick chat icons). The code is free.
+It runs with nothing else let in meanwhile (`blockConcurrencyWhile`), so a new lobby can't take the code halfway.
+The same check runs whenever the lobby is touched (a connection, `exists()`, a status), so a lobby whose alarm hasn't
+run yet, or one from before this change, closes on first touch: results with no end time close at once; a match
+nobody's been in for 3 hours, likewise. (Locally, 36 old test lobbies closed as the Worker started.)
+
+**What players see**
+- **Opening a closed or unknown lobby** (a stale tab, an old invite): the home screen with a short note, "That match
+  has ended.", and the address goes back to `/`. If your account played it, **"See your result"** opens your profile at
+  that match (outlined in gold, scrolled to). The server knows from the result itself: online results now store their
+  lobby code (`results.lobby`, never shown on a profile, never set for solo games), and `GET /api/lobby/CODE` answers
+  `{ open, phase }`, or 404 with your result in it. The note is whole when it appears (the result is asked for first;
+  the frames check caught a version where the button arrived a moment later and pushed the screen down). A guest who
+  isn't signed in gets the landing page with the same line instead of "Sign in to join lobby …".
+- **An invite link** is checked before the join form opens (a moment's splash). A match that's over shows the note to
+  anyone who wasn't in it, instead of "Can't join · This match has already started."
+- **Results while the lobby is open:** a reload, the app reopened or brought back from the background shows them as
+  before. When the 15 minutes run out with the results on screen, the app goes home with the note. A tab coming back
+  into view now reconnects at once instead of waiting out its backoff.
+- **Home or Play again from results** go to `/` (as before) and this device forgets its seat, so reopening the app
+  (the installed one starts at `/`) lands home, and the old link shows the note.
+- **A code typed into Join that leads nowhere:** "Can't join · We couldn't find a lobby with that code." (or "That
+  match has ended.") instead of "Connecting…" for ever.
+- **A seat from an older lobby that had the same code** (codes are reused now) is told the match has ended; it never
+  joins the new lobby as a stranger.
+- **Mid-match rejoin** is unchanged: a reload or the app reopened at the match's address puts you back in it.
+
+**The "100/100"** was Eric's real place. Reproduced in a unit test: a player who closes the app as the match begins
+misses every move (each counts as a 25-point loss), goes out at the first cut, last, and comes back to "100th of 100",
+the same place his profile records. Someone who wasn't in it used to get "Can't join · This match has already
+started."; now the note.
+
+**Also fixed on the way**
+- A queue whose fill time passed while nobody was connected never started, and anyone coming back sat on the queue
+  screen at "0 s". Now it starts (bots fill the rest) when someone comes back; if nobody does, it closes after the hour.
+- A private boss raid's start button said "+ 49 bots" (a raid has none): now "Start with N players".
+
+**Checking it:** unit tests (`lobby-life.test.ts`: the keep time, the idle hour, an in-progress match never closed and
+each ending played out inside the cap, the true place on return, strangers and old seats; `matchmaker.test.ts`: a
+used code is never handed out; `live.test.ts`: results by lobby code, never on a profile). e2e
+(`lobby-close.spec.ts`, phone and computer): a short online raid, a reload mid-match rejoins, a reload on the results
+shows them, a stranger's link shows the note, the keep time runs out: home, the note, `/`, "See your result"; Home from
+results; a typed unknown code. `npm run frames:close -- <dir> [dark|light]` (Worker running) records every frame
+from the results to home and on to the profile with a real tap, flags blinks and logs any layout jump.
+
+**Later (Eric's call):** reopening the installed app cold during a live match lands home, not in the match (it
+rejoins only from the match's address, as before). Chess sites put you straight back into your game; we could too,
+from the seat this device keeps.
