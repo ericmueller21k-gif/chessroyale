@@ -1,5 +1,5 @@
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
-import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, MATCHMAKING, isRankedMatch, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -160,7 +160,19 @@ export interface LobbyRecord {
    * were filled then (bots pop in on the queue screen) and the match begins FRONT_DOOR.fillShowMs later; `waitMs`:
    * how long its people had waited on average, and how many (for the typical wait under PLAY).
    */
-  auto?: { fillAt: number; filledAt?: number; waitMs?: number; waiters?: number; waitSaved?: boolean };
+  auto?: {
+    /** When bots fill the empty seats (null: Bots off in a 50 v 50, which waits until it's full). */
+    fillAt: number | null;
+    /**
+     * Bots off: no bots, ever. A 50 v 50 waits until it's full; a raid also starts once `fillAt` has passed with
+     * MATCHMAKING.raidBotsOffMinPlayers people in it.
+     */
+    botsOff?: boolean;
+    filledAt?: number;
+    waitMs?: number;
+    waiters?: number;
+    waitSaved?: boolean;
+  };
   /** Each person's brilliant moves and their moves (SAN and round score) for the best one, for their profile. */
   feats?: Record<string, { brilliant: number; best: { san: string; score: number } | null }>;
   /** When the match began (after any pre-start show). */
@@ -298,13 +310,59 @@ export class LobbyCore {
       hostId: this.r.hostId,
       started: this.r.phase !== "lobby" || !!this.r.auto?.filledAt,
       lobbySize: this.settings.lobbySize,
-      ...(this.r.auto ? { auto: true, fillAt: this.r.auto.fillAt, ...(this.r.auto.filledAt ? { filledAt: this.r.auto.filledAt } : {}) } : {}),
+      ...(this.r.auto
+        ? { auto: true, fillAt: this.r.auto.fillAt, ...(this.r.auto.botsOff ? { botsOff: true } : {}), ...(this.r.auto.filledAt ? { filledAt: this.r.auto.filledAt } : {}) }
+        : {}),
     };
   }
 
-  /** Matchmaking: this lobby still takes players (open, not full, a few seconds left before it fills with bots). */
+  /** Matchmaking: this lobby still takes players (open, not full, and, unless Bots off, a few seconds left before bots fill it). */
   joinable(): boolean {
-    return this.r.phase === "lobby" && !!this.r.auto && !this.r.auto.filledAt && this.r.humans.length < this.settings.lobbySize && this.io.now() < this.r.auto.fillAt - 2000;
+    const a = this.r.auto;
+    if (this.r.phase !== "lobby" || !a || a.filledAt || this.r.humans.length >= this.settings.lobbySize) return false;
+    return !!a.botsOff || (a.fillAt !== null && this.io.now() < a.fillAt - 2000);
+  }
+
+  /** Bots off: enough people to begin (full; or a raid that has waited its minute with enough for a crowd). */
+  private botsOffReady(): boolean {
+    const a = this.r.auto;
+    const people = this.r.humans.length;
+    if (people >= this.settings.lobbySize) return true;
+    return !!this.settings.raid && a?.fillAt != null && this.io.now() >= a.fillAt && people >= MATCHMAKING.raidBotsOffMinPlayers;
+  }
+
+  /** Matchmade and still waiting, and its time has come: Default once the fill time has passed; Bots off once ready. */
+  private dueToStart(): boolean {
+    const a = this.r.auto;
+    if (!a || a.filledAt || this.r.phase !== "lobby") return false;
+    if (a.botsOff) return this.botsOffReady();
+    return a.fillAt !== null && this.io.now() >= a.fillAt;
+  }
+
+  /**
+   * Bots off → Default ("let bots fill"): this person leaves this Bots off lobby for a Default one, keeping their wait
+   * (when they joined here). Null if they can't any more (it started meanwhile).
+   */
+  release(token: string): { joinedAt: number } | null {
+    const h = this.r.humans.find((x) => x.token === token);
+    if (!h || !this.r.auto?.botsOff || this.r.auto.filledAt || this.r.phase !== "lobby") return null;
+    const joinedAt = h.joinedAt ?? this.io.now();
+    this.leave(h.id);
+    return { joinedAt };
+  }
+
+  /**
+   * Someone arrived from Bots off having already waited: bots fill no later than `at` (a minute after they first
+   * joined), but not sooner than MATCHMAKING.switchMinWaitMs from now.
+   */
+  hurry(at: number) {
+    const a = this.r.auto;
+    if (!a || a.botsOff || a.filledAt || a.fillAt === null || this.r.phase !== "lobby") return;
+    const fillAt = Math.max(this.io.now() + MATCHMAKING.switchMinWaitMs, Math.min(a.fillAt, at));
+    if (fillAt >= a.fillAt) return;
+    a.fillAt = fillAt;
+    this.setTimer("autoStart", fillAt);
+    this.broadcast(this.lobbyMessage(), false);
   }
 
   private standings(): NetStanding[] {
@@ -354,8 +412,8 @@ export class LobbyCore {
       const last = this.r.last[existing.id];
       if (last) this.send(existing.id, last, false);
       this.resendHostWork();
-      // Matchmade, and its fill time passed while nobody was here (nothing started it): bots fill the rest now.
-      if (this.r.auto && !this.r.auto.filledAt && this.r.phase === "lobby" && !this.r.timer && this.io.now() >= this.r.auto.fillAt) this.startMatch();
+      // Matchmade, and its time came while nobody was here (nothing started it): start now (bots fill the rest unless Bots off).
+      if (!this.r.timer && this.dueToStart()) this.startMatch();
       return { ok: true as const, playerId: existing.id };
     }
     // A seat this lobby never gave out: from an older lobby that had this code (it has closed since), so that match is over.
@@ -381,8 +439,8 @@ export class LobbyCore {
     if (!this.r.hostId) this.r.hostId = id;
     this.send(id, { t: "welcome", playerId: id, token: newToken, code: this.r.code }, false);
     this.broadcast(this.lobbyMessage(id), false);
-    // Matchmade and full: start now.
-    if (this.r.auto && this.r.humans.length >= this.settings.lobbySize) this.startMatch();
+    // Matchmade and full (or, Bots off, ready): start now.
+    if (this.r.auto && (this.r.humans.length >= this.settings.lobbySize || (this.r.auto.botsOff && this.botsOffReady()))) this.startMatch();
     return { ok: true as const, playerId: id };
   }
 
@@ -512,7 +570,9 @@ export class LobbyCore {
       this.r.overrides = { ...(this.r.overrides ?? {}), ...patch } as LobbyRecord["overrides"];
       this.settings = { ...this.settings, ...patch };
     }
-    const empty = this.settings.raid ? 0 : this.settings.lobbySize - this.r.humans.length;
+    // Bots fill the empty seats, except with Bots off, and in a private raid (people only, as before). A matchmade
+    // raid's bots join the crowd.
+    const empty = this.r.auto?.botsOff || (this.settings.raid && !this.r.auto) ? 0 : this.settings.lobbySize - this.r.humans.length;
     const bots = botRoster(this.rng, empty, this.settings);
     this.r.bots = bots.map((b) => ({ id: b.id, name: b.name, skill: b.skill ?? 5 }));
     this.runner = new MatchRunner({
@@ -581,8 +641,8 @@ export class LobbyCore {
         this.r.bossMinAt = undefined;
         return this.r.bossPending ? this.playBoss(this.r.bossPending) : undefined;
       case "autoStart":
-        // Matchmade: time's up, bots fill the rest (if anyone is still here).
-        if (this.r.phase === "lobby" && this.r.humans.some((h) => h.connected)) this.startMatch();
+        // Matchmade: time's up, bots fill the rest (if anyone is still here). Bots off: a raid with enough people begins.
+        if (this.r.humans.some((h) => h.connected) && this.dueToStart()) this.startMatch();
         return;
       case "autoGo":
         if (this.r.phase === "lobby" && this.runner) this.begin();
@@ -590,10 +650,13 @@ export class LobbyCore {
     }
   }
 
-  /** Arms the matchmaking timer (called once when the lobby is made for "Play now"). */
-  setAuto(fillAt: number) {
-    this.r.auto = { fillAt };
-    this.setTimer("autoStart", fillAt);
+  /**
+   * Arms the matchmaking timer (called once when the lobby is made for PLAY). `fillAt`: when bots fill the empty seats;
+   * Bots off: when a raid may begin with fewer than 50 (null: a 50 v 50, which waits until it's full).
+   */
+  setAuto(fillAt: number | null, botsOff = false) {
+    this.r.auto = { fillAt, ...(botsOff ? { botsOff: true } : {}) };
+    if (fillAt !== null) this.setTimer("autoStart", fillAt);
   }
 
   // ---------------- Pre-game votes ----------------
@@ -1163,6 +1226,8 @@ export class LobbyCore {
     rating: number | null;
     brilliant: number;
     bestMove: string | null;
+    /** It counts for their ranking: not too many bots (isRankedMatch), and they weren't practising (unlimited hints). */
+    ranked: boolean;
   } & MatchFeats)[] {
     const runner = this.runner;
     if (!runner || this.r.phase !== "results") return [];
@@ -1192,10 +1257,17 @@ export class LobbyCore {
           rating: row.rating ?? null,
           brilliant: f?.brilliant ?? 0,
           bestMove: f?.best?.san ?? null,
+          ranked: this.ranked() && !h.practice,
           ...matchFeats(p, stages, boss, !!this.settings.raid),
         },
       ];
     });
+  }
+
+  /** The match counts for ranking: no more than RANKING.rankedMaxBotShare of its players are bots. */
+  ranked(): boolean {
+    const players = this.runner?.state.players ?? [];
+    return isRankedMatch(players.filter((p) => p.isBot).length, players.length);
   }
 
   /** What the live line and the "playing now" list need to know about this lobby. */
@@ -1227,6 +1299,8 @@ export class LobbyCore {
       standings: this.standings(),
       ...(this.settings.mode === "crowd" ? { gameWinner: runner.gameWinner() } : {}),
       ...(runner.boss?.result ? { bossResult: runner.boss.result } : {}),
+      // Whether it counted for ranking (the results say so in words).
+      ranked: this.ranked(),
     };
     this.broadcast(msg);
     this.botChat({ kind: "end" });

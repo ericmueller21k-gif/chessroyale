@@ -480,6 +480,42 @@ export const FRONT_DOOR = {
 } as const;
 
 /**
+ * How you're matched (the home screen's "Matchmaking", for every mode; see DECISIONS.md, "Matchmaking types"):
+ *   - default: real players; bots fill the empty seats once the queue has waited a minute;
+ *   - botsoff: real players only; the lobby waits until it's full (a raid: see raidBotsOff*);
+ *   - solo: you and bots, starting at once (played in your browser, like solo before).
+ */
+export type MatchmakingType = "default" | "botsoff" | "solo";
+export const MATCHMAKING_TYPES: readonly MatchmakingType[] = ["default", "botsoff", "solo"];
+
+export const MATCHMAKING = {
+  /** Solo: the bots pop into their seats over this long, then the seats stay full this long before the match begins. */
+  soloFillMs: 2_200,
+  soloHoldMs: 900,
+  /**
+   * Bots off, a boss raid: it starts when 50 have joined, or once it has waited the queue's usual minute with at least
+   * this many people (a raid of 10 is a real crowd: the same size as the Crowd's boss battle). A 50 v 50 waits until
+   * it's full.
+   */
+  raidBotsOffMinPlayers: 10,
+  /** Bots off → Default ("let bots fill"): your wait so far counts, but the bots never fill sooner than this. */
+  switchMinWaitMs: 5_000,
+} as const;
+
+/**
+ * Ranking (the rating and rank on your profile, its chart and "Top N%"): a match changes them only if no more than this
+ * share of its players were bots (Eric, Oct 7, 2026). Solo games are never ranked (all bots, and no server saw them).
+ */
+export const RANKING = {
+  rankedMaxBotShare: 0.25,
+} as const;
+
+/** A match counts for your ranking when no more than RANKING.rankedMaxBotShare of its players are bots. */
+export function isRankedMatch(bots: number, players: number, maxBotShare: number = RANKING.rankedMaxBotShare): boolean {
+  return players > 0 && bots / players <= maxBotShare;
+}
+
+/**
  * How long a lobby lives (see DECISIONS.md, "Closing finished lobbies"). When a lobby closes, its Durable Object
  * deletes everything it stored and its code is free again; a link to it then opens the home screen with a note.
  */

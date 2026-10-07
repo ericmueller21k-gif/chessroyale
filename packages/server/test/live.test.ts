@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { FRONT_DOOR, itemDef } from "@chessroyale/core";
-import { createGuest, ensureSchema, lobbyResult, publicProfile, recordResult, reportPlayer, signInWithIdentity, touchSession, userFromToken, type Sql } from "../src/accounts.ts";
+import { createGuest, ensureSchema, lobbyResult, profile, publicProfile, recordResult, reportPlayer, signInWithIdentity, touchSession, userFromToken, type Sql } from "../src/accounts.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
 import { liveCounts, recordWait, reportLobby, typicalWait, type LobbySummary } from "../src/live.ts";
@@ -128,12 +128,12 @@ describe("profiles", () => {
     const { user } = await createGuest(sql, 1000, "Eric");
     // An older result, recorded before these stats existed: it counts as a game, nothing more.
     await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 30, players: 100 }, 2000);
-    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 1, players: 100, rating: 1500, brilliant: 2, bestMove: "Nxe5", cuts: 11, cutsSurvived: 11 }, 3000);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 1, players: 100, rating: 1500, brilliant: 2, bestMove: "Nxe5", cuts: 11, cutsSurvived: 11, ranked: true }, 3000);
     await recordResult(sql, user.id, { mode: "crowd", online: false, placement: 23, players: 100, rating: 1560, brilliant: 0, bestMove: "Bb5", cuts: 6, cutsSurvived: 5 }, 4000);
     await recordResult(
       sql,
       user.id,
-      { mode: "boss", online: true, placement: 1, players: 8, teamWon: true, rating: 1612, brilliant: 1, bestMove: "Qh5", strikes: 4, strikesSurvived: 4, survived: true, lastStand: true, bossElo: 2000 },
+      { mode: "boss", online: true, placement: 1, players: 8, teamWon: true, rating: 1612, brilliant: 1, bestMove: "Qh5", strikes: 4, strikesSurvived: 4, survived: true, lastStand: true, bossElo: 2000, ranked: true },
       5000,
     );
     await recordResult(sql, user.id, { mode: "boss", online: true, placement: 6, players: 8, teamWon: null, strikes: 2, strikesSurvived: 1, survived: false, lastStand: false, bossElo: 2200 }, 6000);
@@ -143,7 +143,8 @@ describe("profiles", () => {
     expect(p.crowd).toEqual({ games: 3, wins: 1, avgPlace: 18, best: 1, cutsSurvivedPct: 94, brilliant: 2 });
     expect(p.boss).toEqual({ raids: 3, bossesBeaten: 1, strikesSurvived: 5, lastStands: 1, survivedPct: 50, brilliant: 1 });
     expect(p.bossesBeaten).toEqual([2000]);
-    expect(p.ratingHistory).toEqual([1500, 1560, 1612]);
+    // The rating chart: ranked matches only (the solo game's 1560 isn't one).
+    expect(p.ratingHistory).toEqual([1500, 1612]);
     expect(p.rating).toBe(1612);
     expect(p.tier).toEqual({ label: "Weighty", level: 6, color: "#3fc28e", effect: null });
     expect(p.recent[0]).toMatchObject({ mode: "boss", bestMove: null, bossElo: null, won: true, survived: null });
@@ -164,9 +165,9 @@ describe("profiles", () => {
     await equipLocker(sql, signed.id, itemDef(r.item.def)!.slot, r.item.id);
     for (let i = 0; i < 12; i++) {
       const g = await createGuest(sql, 1000, `P${i}`);
-      await recordResult(sql, g.user.id, { mode: "crowd", online: true, placement: 5, players: 100, rating: 1000 + i * 100 }, 4000);
+      await recordResult(sql, g.user.id, { mode: "crowd", online: true, placement: 5, players: 100, rating: 1000 + i * 100, ranked: true }, 4000);
     }
-    await recordResult(sql, signed.id, { mode: "crowd", online: true, placement: 5, players: 100, rating: 1950 }, 5000);
+    await recordResult(sql, signed.id, { mode: "crowd", online: true, placement: 5, players: 100, rating: 1950, ranked: true }, 5000);
     const p = (await publicProfile(sql, signed.id, 5000))!;
     const text = JSON.stringify(p);
     expect(text).not.toContain("eric@example.com");
@@ -225,6 +226,30 @@ describe("profiles", () => {
     const p = (await publicProfile(sql, user.id, 5000))!;
     expect(p.recent.find((r) => r.playedAt === 2000)).toMatchObject({ placement: 100, online: true });
     expect(JSON.stringify(p)).not.toContain("RY8UB");
+  });
+
+  it("ranking: only ranked matches move your rating, its chart and Top N%; solo never does; older results count as before", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Eric");
+    // From before the rule (no flag): counts, as it did.
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 9, players: 100, rating: 1400 }, 2000);
+    await sql.run("UPDATE results SET ranked = NULL");
+    await sql.run("UPDATE users SET rating = 1400 WHERE id = ?", user.id);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 2, players: 100, rating: 1700, ranked: true }, 3000);
+    // Over 25% bots: on your record, not your ranking.
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 1, players: 100, rating: 2300, ranked: false }, 4000);
+    // Solo, even if the browser says otherwise: never ranked.
+    await recordResult(sql, user.id, { mode: "crowd", online: false, placement: 1, players: 100, rating: 2600, ranked: true }, 5000);
+    const u = await sql.first<{ rating: number }>("SELECT rating FROM users WHERE id = ?", user.id);
+    expect(u!.rating).toBe(1700);
+    const p = (await publicProfile(sql, user.id, 6000))!;
+    expect(p.rating).toBe(1700);
+    expect(p.ratingHistory).toEqual([1400, 1700]);
+    expect(p.recent.map((r) => r.ranked)).toEqual([false, false, true, null]);
+    // Stats still count every match.
+    expect(p.crowd.games).toBe(4);
+    expect((await profile(sql, { ...user, email: null, google_sub: null } as never)).rating).toBe(1700);
   });
 
   it("reports: stored for a person to read, one per player a day, never about yourself or nobody", async () => {

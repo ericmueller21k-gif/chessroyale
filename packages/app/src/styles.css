@@ -6908,6 +6908,83 @@ button.fd-logo {
   font-weight: 400;
   opacity: 0.8;
 }
+/*
+ * Matchmaking (Default, Bots off, Solo): the mode picker's shape, quieter when picked (a gold edge, not a gold fill),
+ * so the mode stays the main choice. The ⓘ beside it says what each does.
+ */
+.fd-types-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.fd-types {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fd-modes.fd-types button {
+  min-height: 48px;
+  font-size: 14px;
+}
+.fd-modes.fd-types button.on {
+  background: var(--fd-panel-2);
+  color: var(--fd-gold-text);
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+}
+.fd-modes.fd-types button.off {
+  opacity: 0.4;
+  cursor: default;
+}
+.fd-info-btn {
+  flex: none;
+  width: 44px;
+  align-self: center;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--fd-line);
+  background: var(--fd-panel);
+  color: var(--fd-sub);
+  font: italic 800 18px Georgia, "Times New Roman", serif;
+  cursor: pointer;
+}
+.fd-info-btn.open {
+  border-color: var(--fd-gold);
+  color: var(--fd-gold-text);
+}
+.fd-types-info {
+  background: var(--fd-panel);
+  border: 1px solid var(--fd-line);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--fd-sub);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: -8px;
+}
+.fd-types-info p {
+  margin: 0;
+}
+.fd-types-info strong {
+  color: var(--fd-text);
+}
+.fd-types-info .fd-types-rank {
+  color: var(--fd-muted);
+  font-size: 13px;
+}
+.fd-warn {
+  margin: -8px 0 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--fd-gold-soft);
+  color: var(--fd-text);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.fd-warn span {
+  color: var(--fd-gold-text);
+  font-weight: 800;
+}
 .fd-play {
   display: flex;
   align-items: center;
@@ -7273,6 +7350,51 @@ button.fd-logo {
   font-size: 14px;
   color: var(--fd-sub);
 }
+/* "Unranked: more than 25% bots": whether the match will count for ranking. */
+.fd-queue-rank {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--fd-panel-2);
+  color: var(--fd-sub);
+  font-size: 13px;
+  font-weight: 600;
+}
+.fd-queue-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Bots off → Default: one tap, your place kept. */
+.fd-letbots {
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: var(--fd-panel);
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+  color: var(--fd-gold-text);
+  font-size: 16px;
+  font-weight: 800;
+}
+.fd-letbots span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fd-sub);
+}
+/* Results: the match didn't count for ranking. */
+.results-unranked {
+  margin: 0 auto;
+  max-width: 34em;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 14px;
+}
 .fd-bar {
   height: 6px;
   border-radius: 3px;
@@ -7387,7 +7509,7 @@ button.fd-logo {
       "seats info"
       "seats bar"
       "seats you"
-      "seats cancel"
+      "seats actions"
       "seats .";
     column-gap: 28px;
     row-gap: 18px;
@@ -7425,8 +7547,8 @@ button.fd-logo {
     grid-area: you;
     margin-top: 0;
   }
-  .fd-queue .fd-cancel {
-    grid-area: cancel;
+  .fd-queue .fd-queue-actions {
+    grid-area: actions;
   }
 }
 /* An empty seat's dot stays until its pawn pops in, then fades. */

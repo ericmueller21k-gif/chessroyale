@@ -1,13 +1,29 @@
 import { Component } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { FRONT_DOOR, type ItemLook } from "@chessroyale/core";
+import { FRONT_DOOR, MATCHMAKING, RANKING, isRankedMatch, type ItemLook, type MatchmakingType, type Settings } from "@chessroyale/core";
 import type { LobbyPlayer } from "@chessroyale/chess";
 import { BackButton, DressedPawn, myHat } from "../components/FrontDoor.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { account } from "../account.ts";
 import { play } from "../sound.ts";
 import { openProfile } from "../profile-nav.ts";
-import type { NetMatch } from "../net.ts";
+import { pawnLook } from "../looks.ts";
+
+/**
+ * What the queue screen shows: an online queue (NetMatch: Default or Bots off) or Solo filling with its bots
+ * (SoloMatch). Times are local.
+ */
+export interface QueueView {
+  readonly settings: Settings;
+  readonly myId: string | null;
+  readonly players: LobbyPlayer[];
+  readonly looks: ReadonlyMap<string, ItemLook>;
+  /** Default: when bots fill the empty seats (Bots off, a raid: when it may begin with enough people). */
+  readonly fillAt: number | null;
+  /** The seats were filled then; the match begins a moment later. */
+  readonly filledAt: number | null;
+  readonly queueType: MatchmakingType;
+}
 
 /** How far apart pops start when several pawns arrive at once (people; bots cascade faster, see below). */
 const STAGGER_MS = 40;
@@ -57,10 +73,18 @@ class SeatPawn extends Component<{ look?: ItemLook; hat: string }> {
 }
 
 /** The grid of seats: filled ones in order, then empty ones. Re-rendered only when someone arrives or leaves. */
-function Seats({ seats, size, me, myLook, hat, looks, bots }: { seats: LobbyPlayer[]; size: number; me: string | null; myLook?: ItemLook; hat: string; looks: Map<string, ItemLook>; bots: number }) {
+function Seats({ seats, size, me, myLook, hat, looks, bots, trickle }: { seats: LobbyPlayer[]; size: number; me: string | null; myLook?: ItemLook; hat: string; looks: ReadonlyMap<string, ItemLook>; bots: number; trickle?: boolean }) {
   const pop = usePops();
-  // Bots cascade into their seats within the moment before the match begins.
-  const botGap = Math.max(8, Math.min(STAGGER_MS, (FRONT_DOOR.fillShowMs - 600) / Math.max(1, bots)));
+  // Bots wear what they wear in the match (looks.ts), worked out once each so their pawns aren't redrawn.
+  const botLooks = useRef(new Map<string, { look?: ItemLook; hat: string }>());
+  const botLook = (p: LobbyPlayer) => {
+    let l = botLooks.current.get(p.id);
+    if (!l) botLooks.current.set(p.id, (l = pawnLook({ id: p.id, isYou: false, isBot: true, look: undefined })));
+    return l;
+  };
+  // Bots cascade into their seats within the moment before the match begins (all at once, from the server). Solo's
+  // arrive a few at a time already, so each pops as it comes and the count never runs ahead of the grid.
+  const botGap = trickle ? 8 : Math.max(8, Math.min(STAGGER_MS, (FRONT_DOOR.fillShowMs - 600) / Math.max(1, bots)));
   return (
     <div class={`fd-seats${size <= 50 ? " half" : ""}`} role="img" aria-label={`${seats.length} of ${size} seats filled`}>
       {Array.from({ length: size }, (_, i) => {
@@ -68,7 +92,8 @@ function Seats({ seats, size, me, myLook, hat, looks, bots }: { seats: LobbyPlay
         if (!p) return <span key={`empty-${i}`} class="fd-seat empty" />;
         const you = p.id === me;
         const delay = pop(p.id, p.isBot, p.isBot ? botGap : STAGGER_MS);
-        const pawn = <SeatPawn look={you ? myLook : looks.get(p.id)} hat={you ? hat : "none"} />;
+        const dress = you ? { look: myLook, hat } : p.isBot ? botLook(p) : { look: looks.get(p.id), hat: "none" };
+        const pawn = <SeatPawn look={dress.look} hat={dress.hat} />;
         const cls = `fd-seat pop${you ? " you" : ""}${p.isBot ? " bot" : ""}`;
         const style = { "--pop-delay": `${Math.round(delay)}ms` };
         // A person's pawn opens their profile; bots are just bots.
@@ -96,14 +121,21 @@ function useNow(ms = 250) {
   return now;
 }
 
+/** "1:05": how long you've been waiting. */
+const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+
 /**
  * The queue (docs/mockups/front-door/Queue.dc.html): "38 / 100", a bar, the seconds left, and a seat for everyone.
  * Each person's dressed pawn pops into the next seat as they join, yours first and ringed in gold. When time's up,
- * bots pop into the empty seats (plain pawns, quieter pops) and the match begins.
+ * bots pop into the empty seats (quieter pops) and the match begins. The same screen for each way of being matched:
+ * Default (bots after a minute), Bots off (people only, until it's full; one tap lets bots fill instead) and Solo
+ * (your bots pop in at once). It says when a match won't count for ranking.
  */
-export function QueueScreen({ match, onCancel }: { match: NetMatch; onCancel: () => void }) {
+export function QueueScreen({ match, onCancel, onLetBotsFill }: { match: QueueView; onCancel: () => void; onLetBotsFill?: () => void }) {
   const now = useNow();
+  const since = useRef(Date.now());
   const raid = !!match.settings.raid;
+  const type = match.queueType;
   const size = match.settings.lobbySize;
   const me = match.myId;
   const players = match.players;
@@ -118,21 +150,36 @@ export function QueueScreen({ match, onCancel }: { match: NetMatch; onCancel: ()
   const myLook = account().profile?.locker?.look;
   const hat = myHat(account().profile);
   const grid = useMemo(
-    () => <Seats seats={seats} size={size} me={me} myLook={myLook} hat={hat} looks={match.looks} bots={bots} />,
+    () => <Seats seats={seats} size={size} me={me} myLook={myLook} hat={hat} looks={match.looks} bots={bots} trickle={type === "solo"} />,
     [seats, size, me, myLook, hat, bots],
   );
   const line = filled
     ? raid
       ? "Here we go: the raid begins"
       : bots
-        ? "Bots fill the rest · here we go"
+        ? `${type === "solo" ? "Full" : "Bots fill the rest"} · here we go`
         : "Full · here we go"
-    : `Finding players · ${left ?? "…"} s, then ${raid ? "the raid begins" : "bots fill the rest"}`;
+    : type === "solo"
+      ? "Solo · your bots are taking their seats"
+      : type === "botsoff"
+        ? `No bots · waiting ${clock(now - since.current)} for ${raid ? `50 (or ${MATCHMAKING.raidBotsOffMinPlayers} after a minute)` : `all ${size}`}`
+        : `Finding players · ${left ?? "…"} s, then bots fill the rest`;
+  // Whether it will count for your ranking, in words: Solo never does; online, once the bots are in.
+  const unranked =
+    type === "solo"
+      ? "Unranked: solo games don't count for ranking"
+      : (filled || bots > 0) && !isRankedMatch(bots, seats.length)
+        ? `Unranked: more than ${Math.round(RANKING.rankedMaxBotShare * 100)}% bots`
+        : null;
+  const modeName = raid ? "Boss raid · up to 50" : match.settings.mode === "classic" ? `Classic · ${size} players` : "Crowd · 50 v 50";
   return (
     <div class={`fd-page fd-queue${raid ? " raid" : ""}`}>
       <header class="fd-page-head">
         <BackButton onClick={onCancel} label="Leave the queue" />
-        <h1 class="fd-queue-mode">{raid ? "Boss raid · up to 50" : "Crowd · 50 v 50"}</h1>
+        <h1 class="fd-queue-mode">
+          {modeName}
+          {type === "solo" ? " · Solo" : type === "botsoff" ? " · Bots off" : ""}
+        </h1>
         <span class="fd-queue-mute">
           <MuteButton />
         </span>
@@ -142,6 +189,7 @@ export function QueueScreen({ match, onCancel }: { match: NetMatch; onCancel: ()
           <span class="fd-count-n">{seats.length}</span> <span class="fd-count-of">/ {size}</span>
         </div>
         <div class="fd-queue-line">{line}</div>
+        {unranked && <div class="fd-queue-rank">{unranked}</div>}
       </div>
       <div class="fd-bar" aria-hidden="true">
         <i style={{ width: `${(100 * seats.length) / size}%` }} />
@@ -156,9 +204,17 @@ export function QueueScreen({ match, onCancel }: { match: NetMatch; onCancel: ()
           </div>
         </div>
       </div>
-      <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
-        Cancel
-      </button>
+      <div class="fd-queue-actions">
+        {type === "botsoff" && !filled && onLetBotsFill && (
+          <button type="button" class="fd-btn fd-letbots" onClick={onLetBotsFill}>
+            Switch to Default
+            <span>Bots fill the rest · you keep your place</span>
+          </button>
+        )}
+        <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

@@ -207,6 +207,8 @@ export interface PublicProfile {
     bestMove: string | null;
     bossElo: number | null;
     playedAt: number;
+    /** It counted for ranking (false: more than 25% bots, solo or practice; null: from before the rule). */
+    ranked?: boolean | null;
   }[];
 }
 

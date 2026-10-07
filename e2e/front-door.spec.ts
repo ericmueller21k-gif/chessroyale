@@ -40,7 +40,7 @@ test("home: the live line comes from the server, the mode picker changes the lin
   }
 });
 
-test("home: Boss alone opens the boss menu; Play with friends offers lobbies and solo practice", async ({ page }) => {
+test("home: Boss alone opens the boss menu; Play with friends offers lobbies (practice is Solo, on the home screen)", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
@@ -53,7 +53,7 @@ test("home: Boss alone opens the boss menu; Play with friends offers lobbies and
   await sheet.getByLabel("Lobby code").fill("abcde");
   await expect(sheet.getByLabel("Lobby code")).toHaveValue("ABCDE");
   await expect(sheet.getByRole("button", { name: "Join lobby" })).toBeEnabled();
-  await expect(sheet.getByRole("button", { name: "Solo vs 99 bots" })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: /Solo vs/ })).toHaveCount(0);
 });
 
 test("settings: the old home's options live here and stick", async ({ page }) => {

@@ -220,7 +220,7 @@ function Recent({ p, mark }: { p: PublicProfile; mark?: number }) {
             <span class="fd-match-text">
               <strong>
                 {mode}
-                {r.online ? "" : " · solo"}
+                {r.online ? (r.ranked === false ? " · unranked" : "") : " · solo"}
               </strong>
               <span>{[r.bestMove ? `Best move ${r.bestMove}` : null, when(r.playedAt)].filter(Boolean).join(" · ")}</span>
             </span>

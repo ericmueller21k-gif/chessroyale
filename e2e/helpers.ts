@@ -31,11 +31,10 @@ export async function named(page: Page, name: string) {
   }, name);
 }
 
-/** Home → Play with friends → Solo vs bots (in the mode the URL or the picker chose). */
+/** Home → Matchmaking: Solo → PLAY (in the mode the URL or the picker chose): you and bots, after the seats fill. */
 export async function soloFromHome(page: Page) {
-  // (The home screen's button: on a computer the side menu has one too.)
-  await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
-  await page.getByRole("button", { name: /^Solo vs \d+ bots$/ }).click();
+  await page.getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
 }
 
 /** Home → Play with friends → Create a lobby (or a raid). */
