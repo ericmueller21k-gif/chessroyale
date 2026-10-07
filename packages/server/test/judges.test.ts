@@ -1,0 +1,302 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_SETTINGS, JUDGES, modeSettings, mulberry32, type JudgeConfig, type Settings } from "@chessroyale/core";
+import { judgedBoard, legalMoves, runJudgeJob, sanLineToUci, type EngineLike, type JudgeJob, type JudgeReport, type MoveScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { LobbyCore, newLobbyRecord, type ServerScoreRequest } from "../src/lobby.ts";
+import { assignJudges, cutBubble, drawJudges, seedFor } from "../src/judges.ts";
+
+const hash = (s: string) => {
+  let h = 2166136261;
+  for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return (h >>> 0) / 4294967296;
+};
+const line = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1", "b5", "Bb3", "d6", "c3", "O-O", "h3", "Nb8", "d4", "Nbd7", "c4"]);
+const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
+  id: `o${i}`,
+  eco: "C95",
+  name: `Opening ${i}`,
+  family: `Family ${i}`,
+  unusual: false,
+  moves: line,
+  namedPlies: 21,
+  expected: Object.fromEntries(Array.from({ length: 22 }, (_, n) => [n, 0.5])),
+}));
+
+/** The honest engine: each move's score a hash of the position and the move. */
+const truth = (fen: string, m: string) => 0.3 + 0.4 * hash(fen + m);
+const honest: EngineLike = {
+  topMoves: async (fen, n) =>
+    legalMoves(fen)
+      .map((move) => ({ move, expected: truth(fen, move) }))
+      .sort((a, b) => b.expected - a.expected)
+      .slice(0, n),
+  scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((move) => ({ move, expected: truth(fen, move) })),
+  scoreMovesAt: async (fen, moves) => [...new Set(moves)].sort().map((move) => ({ move, expected: truth(fen, move) })),
+};
+/** The engine server: the truth, with a little noise (a deeper search never matches a phone's exactly). */
+const deep = (fen: string, moves: readonly string[]): MoveScore[] => moves.map((move) => ({ move, expected: Math.min(1, truth(fen, move) + 0.01 * (hash("d" + move) - 0.5)) }));
+/** A cheater: its own pick (it knows it) scored as good as the best. */
+function cheat(own: string | undefined): (job: JudgeJob, r: JudgeReport) => JudgeReport {
+  return (job, r) => {
+    const best = Math.max(...r.top.map((m) => m.expected));
+    const lift = (list: MoveScore[]) => list.map((m) => (m.move === own ? { ...m, expected: best } : m));
+    return { ...r, top: lift(r.top), extra: lift(r.extra), ...(r.deep ? { deep: lift(r.deep) } : {}) };
+  };
+}
+
+type Msg = ServerMessage;
+
+function setup(opts: { judges?: Partial<JudgeConfig>; server?: boolean; settings?: Partial<Settings> } = {}) {
+  let now = 1_000_000;
+  const inbox = new Map<string, Msg[]>();
+  const serverAsks: ServerScoreRequest[] = [];
+  const core = new LobbyCore(
+    newLobbyRecord("JUDGE", now),
+    {
+      now: () => now,
+      send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
+      judges: { ...JUDGES, ...opts.judges },
+      judgeRng: mulberry32(3),
+      serverEngine: !!opts.server,
+      serverScore: (req) => void serverAsks.push(req),
+    },
+    library,
+    mulberry32(7),
+    // Crowd, everyone moves: one board, every person picks every move.
+    { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: false, augments: false }), roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...opts.settings },
+  );
+  const take = (id: string, t: Msg["t"]) => {
+    const all = inbox.get(id) ?? [];
+    inbox.set(id, all.filter((m) => m.t !== t));
+    return all.filter((m) => m.t === t);
+  };
+  const last = <T extends Msg["t"]>(id: string, t: T) => [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === t) as Extract<Msg, { t: T }> | undefined;
+  const advance = (ms: number) => {
+    now += ms;
+    while (core.nextAlarm && core.nextAlarm <= now) core.alarm();
+  };
+  /** A device answers its judge jobs (honestly unless `lie` changes the report). */
+  const answer = async (id: string, lie?: (job: JudgeJob, r: JudgeReport) => JudgeReport) => {
+    const jobs = (take(id, "judge") as Extract<Msg, { t: "judge" }>[]).flatMap((m) => m.jobs.map((job) => ({ job, key: m.key })));
+    for (const { job, key } of jobs) {
+      const r = await runJudgeJob(honest, job);
+      core.message(id, { t: "judged", key, id: job.id, report: lie ? lie(job, r) : r });
+    }
+    return jobs.length;
+  };
+  /** The engine server answers what it was asked (null: it's down). */
+  const serve = (down = false) => {
+    for (const req of serverAsks.splice(0)) core.serverScored(req.id, down ? null : deep(req.fen, req.moves));
+  };
+  /** n people join (each reporting its speed unless `old`), the match starts, the first round begins. */
+  const begin = (n: number, nps: number[] = [], old: number[] = []) => {
+    for (let i = 0; i < n; i++) {
+      core.connect(undefined, `P${i + 1}`, i === 0 ? "computer" : "phone");
+      if (!old.includes(i)) core.message(`p${i + 1}`, { t: "speed", nps: nps[i] ?? 400_000 });
+    }
+    core.message("p1", { t: "start" });
+    for (let i = 0; i < 40 && core.record.phase !== "play"; i++) advance(1000);
+    expect(core.record.phase).toBe("play");
+  };
+  /** Everyone picks: the first legal move unless told otherwise. */
+  const pickAll = (n: number, moves: Record<string, string> = {}) => {
+    for (let i = 1; i <= n; i++) {
+      const id = `p${i}`;
+      const r = last(id, "round");
+      if (!r?.board || r.watching) continue;
+      core.message(id, { t: "pick", key: r.key, move: moves[id] ?? legalMoves(r.board.fen)[0]! });
+    }
+  };
+  const judgesOf = () => Object.values(core.record.judges?.tasks ?? {})[0]?.judges ?? [];
+  return { core, take, last, advance, answer, serve, begin, pickAll, judgesOf, serverAsks, inbox, get now() { return now; } };
+}
+
+describe("many judges: the lobby", () => {
+  it("helpers: draws favour fast devices, never repeat, spread the load; the cut bubble; stable seeds", () => {
+    const rng = mulberry32(1);
+    const devices = [{ id: "pc", nps: 1_500_000 }, { id: "phone", nps: 250_000 }, { id: "old", nps: 120_000 }];
+    const counts: Record<string, number> = { pc: 0, phone: 0, old: 0 };
+    for (let i = 0; i < 2000; i++) {
+      const two = drawJudges(rng, devices, 2, JUDGES);
+      expect(new Set(two).size).toBe(2);
+      for (const j of two) counts[j]!++;
+    }
+    expect(counts.pc).toBeGreaterThan(counts.phone!);
+    expect(counts.phone).toBeGreaterThan(counts.old!);
+    const plan = assignJudges(rng, Array.from({ length: 8 }, (_, i) => ({ boardId: i, cost: 8 })), devices, 2, JUDGES);
+    expect([...plan.values()].every((j) => j.length === 2)).toBe(true);
+    const per = [...plan.values()].flat().reduce<Record<string, number>>((a, j) => ({ ...a, [j]: (a[j] ?? 0) + 1 }), {});
+    expect(Object.keys(per)).toHaveLength(3);
+    const st = [10, 8, 6, 5, 4, -20].map((points, i) => ({ id: `x${i}`, points, out: false }));
+    expect([...cutBubble(st, 3, 1)].sort()).toEqual(["x2", "x3"]);
+    expect(cutBubble(st, 0, 5).size).toBe(0);
+    expect(seedFor("1-1-5", 0)).toBe(seedFor("1-1-5", 0));
+    expect(seedFor("1-1-5", 0)).not.toBe(seedFor("1-1-6", 0));
+  });
+
+  it("two honest judges agree: their numbers are used, nobody else is asked, and the host isn't sent the old score request", async () => {
+    const L = setup();
+    L.begin(3, [1_000_000, 300_000, 300_000]);
+    // The round's judges were drawn as it started, and told to search the board while players think.
+    const plan = L.core.record.judges!.plan!;
+    const planned = Object.values(plan.byBoard)[0]!;
+    expect(planned).toHaveLength(2);
+    for (const id of planned) expect(L.last(id, "prefetch")?.plan?.seed).toBeTypeOf("number");
+    L.pickAll(3);
+    expect(L.core.record.phase).toBe("scoring");
+    expect(L.last("p1", "scoreRequest")).toBeUndefined();
+    expect(L.judgesOf()).toEqual(planned);
+    // The job names nobody.
+    const job = L.last(planned[0]!, "judge")!.jobs[0]!;
+    expect(JSON.stringify(job)).not.toMatch(/"p\d"/);
+    expect(job.picks).toHaveLength(3);
+    for (const id of planned) await L.answer(id);
+    expect(L.core.record.phase).toBe("reveal");
+    const rev = L.last("p3", "reveal")!;
+    expect(rev.judged).toBe(true);
+    for (const [m, e] of Object.entries(rev.expectedAfter)) expect(e).toBeCloseTo(truth(job.fen, m), 9);
+    expect(L.core.record.judges!.stats).toMatchObject({ jobs: 1, agreed: 1, disagreed: 0, serverVerdict: 0, strikes: 0 });
+    expect(L.serverAsks).toHaveLength(0);
+  });
+
+  it("a cheater on one of two judges never changes the result: the engine server decides, and the cheater is struck, then benched", async () => {
+    const L = setup({ server: true, settings: { firstStageRounds: 12 } });
+    L.begin(3, [1_000_000, 900_000, 800_000]);
+    let rounds = 0;
+    for (let i = 0; i < 400 && rounds < 8 && L.core.record.judges!.devices.p1!.strikes < 2 && L.core.record.phase !== "results"; i++) {
+      if (L.core.record.phase !== "play") {
+        L.advance(500);
+        continue;
+      }
+      const r = L.last("p1", "round")!;
+      if (!r.board) break; // p1 is out
+      const fen = r.board.fen;
+      // p1 (the fastest, so often a judge) picks a middling move and scores it as the best.
+      const ranked = legalMoves(fen).sort((a, b) => truth(fen, b) - truth(fen, a));
+      const mine = ranked[4]!;
+      L.pickAll(3, { p1: mine });
+      const judges = L.judgesOf();
+      for (const id of judges) await L.answer(id, id === "p1" ? cheat(mine) : undefined);
+      L.serve();
+      // Any second opinion (the third device) answers honestly.
+      for (const id of ["p1", "p2", "p3"].filter((x) => !judges.includes(x))) await L.answer(id);
+      expect(L.core.record.phase).toBe("reveal");
+      const rev = L.last("p2", "reveal")!;
+      const p1 = rev.picks.find((p) => p.playerId === "p1")!;
+      // Never the cheater's number: p1's pick keeps its true loss (to within the server's noise).
+      const best = Math.max(...Object.values(rev.expectedAfter));
+      expect(p1.loss!).toBeGreaterThan(1);
+      expect(Math.abs(p1.loss! - (best - truth(fen, mine)) * 100)).toBeLessThan(1.5);
+      rounds++;
+    }
+    const stats = L.core.record.judges!.stats;
+    expect(rounds).toBeGreaterThanOrEqual(2);
+    expect(L.core.record.judges!.devices.p1!.strikes).toBe(2);
+    expect(stats.benched).toBe(1);
+    expect(stats.disagreed).toBe(stats.serverVerdict);
+    expect(L.core.record.judges!.devices.p2!.strikes + L.core.record.judges!.devices.p3!.strikes).toBe(0);
+  });
+
+  it("with only two devices and no engine server, a disagreement falls back to the more trusted judge, and the round goes on", async () => {
+    const L = setup({ server: false });
+    L.begin(2, [1_000_000, 300_000]);
+    L.pickAll(2);
+    const job = L.last("p1", "judge")!.jobs[0]!;
+    expect(job.recheck).toBeTruthy(); // no server: the devices re-check close calls themselves
+    await L.answer("p1");
+    await L.answer("p2", cheat(job.picks[0]));
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats).toMatchObject({ disagreed: 1, fallback: 1, serverVerdict: 0 });
+  });
+
+  it("a late judge: the first answer is used after the grace time, and some such jobs get a spot check afterwards", async () => {
+    const L = setup({ server: true, judges: { spotCheckShare: 1, graceMs: 1500, graceFactor: 1 } });
+    L.begin(3);
+    L.pickAll(3);
+    const [first, late] = L.judgesOf() as [string, string];
+    L.advance(400);
+    await L.answer(first);
+    expect(L.core.record.phase).toBe("scoring");
+    L.advance(1400);
+    expect(L.core.record.phase).toBe("scoring");
+    L.advance(200);
+    // Spot check asked; the round didn't wait for it (only close calls' re-check might hold it).
+    expect(L.serverAsks.some((r) => r.id.startsWith("spot:"))).toBe(true);
+    L.serve();
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats).toMatchObject({ single: 1, serverSpot: 1 });
+    // The late answer arrives after all: ignored.
+    expect(await L.answer(late)).toBe(1);
+    expect(L.core.record.phase).toBe("reveal");
+  });
+
+  it("a judge that drops before answering is replaced; one whose answer doesn't hold together is struck and replaced", async () => {
+    const L = setup();
+    L.begin(4);
+    L.pickAll(4);
+    const [a, b] = L.judgesOf() as [string, string];
+    L.core.disconnect(a);
+    const now = L.judgesOf();
+    expect(now).not.toContain(a);
+    expect(now).toHaveLength(2);
+    const fresh = now.find((x) => x !== b)!;
+    await L.answer(b, (_job, r) => ({ ...r, top: [] }));
+    expect(L.core.record.judges!.devices[b]!.strikes).toBe(1);
+    expect(L.core.record.phase).toBe("scoring");
+    for (const id of L.judgesOf()) await L.answer(id);
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.judgesOf()).toEqual([]);
+    expect(fresh).toBeTruthy();
+    expect(L.core.record.judges!.stats.replaced).toBeGreaterThanOrEqual(2);
+  });
+
+  it("one device that can judge (or an old app that never reported its speed): the host scores as before", () => {
+    const L = setup();
+    L.begin(2, [], [1]);
+    L.pickAll(2);
+    expect(L.last("p1", "scoreRequest")).toBeTruthy();
+    expect(L.last("p1", "judge")).toBeUndefined();
+    const solo = setup();
+    solo.begin(1);
+    solo.pickAll(1);
+    expect(solo.last("p1", "scoreRequest")).toBeTruthy();
+  });
+
+  it("the switch: judges off, the host scores", () => {
+    const L = setup({ judges: { on: false } });
+    L.begin(3);
+    L.pickAll(3);
+    expect(L.last("p1", "scoreRequest")).toBeTruthy();
+    expect(L.core.record.judges?.tasks).toBeUndefined();
+  });
+
+  it("the host can't slip its own scores in while judges are at work", async () => {
+    const L = setup();
+    L.begin(3);
+    L.pickAll(3);
+    const key = L.core.record.round!.key;
+    L.core.message("p1", { t: "scores", key, boards: [{ boardId: 0, bestMove: "a2a3", bestExpected: 0.5, expectedAfter: {}, botPicks: {}, botThinkMs: {} }] });
+    expect(L.core.record.phase).toBe("scoring");
+    for (const id of L.judgesOf()) await L.answer(id);
+    expect(L.core.record.phase).toBe("reveal");
+  });
+
+  it("a Crowd bot plan that doesn't follow from the seed earns its sender a strike", async () => {
+    const L = setup();
+    L.begin(3);
+    const prefetch = Object.values(L.core.record.judges!.plan!.byBoard)[0]!;
+    const sender = prefetch[0]!;
+    const plan = L.last(sender, "prefetch")!.plan!;
+    const r = L.last(sender, "round")!;
+    const wrong = Object.fromEntries(plan.bots.map((b) => [b.id, legalMoves(r.board!.fen).at(-1)!]));
+    L.core.message(sender, { t: "botPlan", key: plan.key, picks: wrong, powerUps: [] });
+    L.pickAll(3);
+    for (const id of L.judgesOf()) await L.answer(id);
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.devices[sender]!.strikes).toBe(plan.bots.length ? 1 : 0);
+  });
+
+  it("judgedBoard on a report from the honest stand-in holds together (sanity for the fakes above)", async () => {
+    const j: JudgeJob = { id: "x", fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", picks: ["e2e4"], bots: [{ skill: 4, powerUps: 0 }], seed: 1, rules: { botCandidateMoves: 8, botRandomMoveChance: 0.02, botPowerUpLoss: 15 } };
+    expect(judgedBoard(j, await runJudgeJob(honest, j))).toBeTruthy();
+  });
+});
