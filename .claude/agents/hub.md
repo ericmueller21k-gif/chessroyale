@@ -1,6 +1,6 @@
 ---
 name: hub
-description: Owns HunChess's front door - the home screen, the queue and its waiting screen, the online-players count, profiles (yours and anyone's), and later leaderboards, ranked and friends - on phone and desktop, front end and the server pieces behind them. Use for "change the home screen", "the queue", "profiles", "online count", "desktop layout".
+description: Owns HunChess's front door - the home screen, the queue and its waiting screen, the online-players count, profiles (yours and anyone's), and later showing leaderboards and ranks (their numbers come from `ranked`) and friends - on phone and desktop, front end and the server pieces behind them. Use for "change the home screen", "the queue", "profiles", "online count", "desktop layout".
 model: inherit
 ---
 

@@ -1975,3 +1975,116 @@ from the results to home and on to the profile with a real tap, flags blinks and
 **Later (Eric's call):** reopening the installed app cold during a live match lands home, not in the match (it
 rejoins only from the match's address, as before). Chess sites put you straight back into your game; we could too,
 from the seat this device keeps.
+
+## Ranked, ratings and matchmaking (draft, Oct 7, 2026; for Eric's review)
+
+Eric: if real players arrive, how do we decide points after each match, a fair curve, ranks, ranked matchmaking that
+widens its search when few are online? This draft follows what the big multiplayer games do, adapted to 100-player
+matches. The `ranked` delegate builds it once Eric agrees.
+
+**Two numbers per player, per mode**
+
+1. **Hidden skill (matchmaking rating).**
+   - A Bayesian rating built for many-player free-for-alls: the Weng–Lin method ("OpenSkill", the Plackett–Luce
+     model; Weng & Lin, *Journal of Machine Learning Research*, 2011). It's the open, patent-free cousin of
+     Microsoft's TrueSkill (Herbrich et al., 2006).
+   - Each player has a skill estimate (μ) and an uncertainty (σ). After a match, everyone's estimate moves by how
+     their finishing place compared with what their skill predicted against everyone else in that match:
+     - Beating stronger players moves you up a lot; beating weaker ones moves you a little.
+     - A new player's σ is large, so their first matches move them fast. It shrinks as the system learns, so a settled
+       player's rating is steady.
+   - Unlike chess Elo, which compares two players, it handles 100 placements at once in one update, and it's quick.
+   - Only real players count. Bot seats are left out of the update entirely, so bots can't be farmed and can't drag
+     anyone down.
+   - A new player's starting estimate comes from their existing engine rating (how good their moves are), so placement
+     isn't a long grind.
+2. **Visible rank: what players see and chase.** Chess-themed tiers, each with divisions:
+   - Pawn, Knight, Bishop, Rook, Queen, King (III, II, I), then Grandmaster for the top 500.
+   - **Rank points (RP), 0–100 per division.** Each match adds or removes RP by your finishing place as a share of the
+     match (so it works for 30 or 100 players), minus an entry cost that rises with your tier:
+     - Starting point (to tune by simulation): top 1% +40, top 10% +25, top 25% +15, top half +5, bottom half −5 to
+       −15, then less the tier's entry cost.
+     - A small catch-up term moves rank toward hidden skill: if you're ranked below your skill, you gain more and lose
+       less, so good new players climb quickly and rank can't be bought by grinding alone.
+   - **Placement:** the first 5 ranked matches show "Placing…", then a rank is given from hidden skill.
+   - **Protection:** no demotion for 3 matches after a promotion, and none in the lowest division.
+- **The engine rating stays as its own stat,** "Chess strength": how good your moves are, shown on profiles. Rank is
+  about winning matches; strength is about move quality.
+
+**Seasons**
+- About three months each.
+- Ranks soft-reset to about a tier lower, and σ widens a little so everyone re-proves themselves.
+- Season rewards are cosmetic only: a season border, an exclusive item.
+
+**Who gets a ranked match**
+- Signed in, and at least 10 unranked matches played (against throwaway accounts).
+- A ranked match needs a minimum of real players (start at 30 of 100). Bots fill the rest and don't count.
+- If a ranked queue can't reach the minimum, the players are told and offered an unranked match. A match never quietly
+  becomes ranked with mostly bots.
+- Leaving a ranked match counts as last place.
+
+**Matchmaking that widens**
+- One queue per mode (later per region). A player in the queue is a ticket: their skill, their uncertainty, and when
+  they joined.
+- About once a second the matchmaker forms lobbies:
+  - Start from the longest-waiting ticket and gather tickets within ±150 of its skill.
+  - The window widens by 50 every 5 s waited, and after 45 s anyone is accepted.
+  - At 60 s the lobby starts, bots filling the empty seats.
+  - With few players online, the windows widen quickly and everyone lands in the same lobby. With many, lobbies are
+    tight.
+- We log each lobby's skill spread and wait time, and tune the numbers from real data.
+- Unranked "Play now" keeps today's fast fill and doesn't care about skill.
+
+**One must-do before ranked: trustworthy scoring.**
+- Today the host's browser scores everyone's moves, which is fine for fun matches.
+- With ranks at stake, a modified browser could fake scores.
+- For ranked matches, two players' devices score each round independently, and the server compares the results. Any
+  disagreement is re-checked by the engine server, and that verdict stands.
+- That costs almost nothing extra. The alternative, the engine server scoring everything, is fully trustworthy but
+  costs real money at scale (about 3.5¢ a match).
+- This is the `engine` delegate's job, before ranked opens.
+
+**Leaderboards**
+- Per mode and season: the top 100, your position, and friends later.
+- Computed from the rank table and cached, so they're cheap to show. The `hub` shows them.
+
+## Capacity: what if 10,000 players arrived? (assessment, Oct 7, 2026)
+
+Eric asked whether the servers could take 10,000 players at once. Short answer: the design scales, but three single
+points would choke first, and we've never load-tested it.
+
+**What already scales**
+- **Matches:** each match is its own Durable Object, and Cloudflare spreads them over its machines. 10,000 players is
+  about 100 Crowd matches at once, which is no problem in principle.
+- **Scoring:** today it runs on players' own devices, so it grows with the player base for free.
+- **The app itself:** files served from Cloudflare's edge.
+
+**What would choke first**
+1. **The matchmaker is one object for the whole world.** It handles one "Play" press at a time and waits on lobby
+   objects inside each, so thousands pressing Play in the same minute would queue up behind each other.
+   - Fix: keep queue tickets in memory, form lobbies on a one-second timer, and split the matchmaker by mode and
+     region.
+2. **The database (D1) is one SQLite database.**
+   - Every request updates "last seen", and every running match reports itself at least once a minute. At 10,000
+     players that's hundreds of writes a second into one database, near what a single D1 database handles.
+   - Fix: write "last seen" at most once a minute per player, and keep live counts in memory (a Durable Object) instead
+     of database rows.
+3. **The engine server** runs on at most 2 containers with a cap of 3,000 deep searches a day. At scale the cap runs
+   out early each day.
+   - Then phones take over the re-checks: the game keeps working, but cuts are slightly less fair.
+   - Raising the cap costs money (Eric's call).
+
+**Rough cost at that scale**
+- Cloudflare charges by use (about $0.15 per million Durable Object requests, and about $12.50 per million GB-seconds
+  of object time).
+- 100 matches running around the clock is very roughly $100–500 a month; real traffic peaks for a few hours a day, so
+  far less in practice.
+- The load test below would give a real number. Set a billing alert first.
+
+**What to do before any launch push** (the `ops` delegate):
+- **A load test:** a staging copy of the site and simulated players (scripted connections that join, pick moves and
+  chat) at 1,000, then 5,000, then 10,000. Measure where it breaks.
+- **Fix the three choke points** above.
+- **Monitoring and alerts:** errors, object CPU, database latency, queue waits and spend.
+- **Fail gracefully:** a "servers are busy, you're in line" message rather than errors.
+- **Per-player rate limits** on the API.
