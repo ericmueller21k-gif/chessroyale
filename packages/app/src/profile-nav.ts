@@ -12,6 +12,8 @@ export interface ProfileTarget {
   /** Your own profile. */
   you?: boolean;
   bot?: boolean;
+  /** Your own profile, opened at a section (the shop's "Pick these in your profile": Quick chat and emoji). */
+  section?: "chat";
 }
 
 let target: ProfileTarget | null = null;

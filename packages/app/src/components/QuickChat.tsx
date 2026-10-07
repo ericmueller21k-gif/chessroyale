@@ -1,6 +1,7 @@
-import { Fragment, type ComponentChildren } from "preact";
+import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { QUICK_CHAT, chatButtonsOf, chatSay, type ChatSay } from "@chessroyale/core";
+import { QUICK_CHAT, chatSay, type ChatSay } from "@chessroyale/core";
+import { onAccountChange } from "../account.ts";
 import type { ChatLine, MatchChat } from "../chat.ts";
 import type { GameView } from "../game.ts";
 import { chatBubbles, onPrefsChange, setChatBubbles, setUnderBoardMode, underBoardMode, type UnderBoardMode } from "../prefs.ts";
@@ -121,7 +122,7 @@ function SayButton({ chat, say, now }: { chat: MatchChat; say: ChatSay; now: num
       type="button"
       class={`qchip${say.kind === "emoji" ? " emoji" : ""}`}
       disabled={!ok}
-      aria-label={say.kind === "emoji" ? `Send ${say.text}` : undefined}
+      aria-label={say.kind === "emoji" ? `Send ${say.text}${say.name ? ` (${say.name})` : ""}` : undefined}
       onClick={(e) => {
         e.stopPropagation();
         chat.say(say.id);
@@ -133,51 +134,45 @@ function SayButton({ chat, say, now }: { chat: MatchChat; say: ChatSay; now: num
 }
 
 /**
- * The buttons. "rows": a phone's two rows that scroll sideways (phrases by group, then emoji); "groups": each
- * group under its name, wrapping (a computer).
+ * The buttons: the lines and emoji this player picked in their profile, in their order. "rows": a phone's row of
+ * lines that scrolls sideways, then the emoji (`fit`: in one row the panel's width, no scrolling; else sideways
+ * too); "groups": the lines wrapping, then the emoji (a computer).
  */
-function ChatButtons({ chat, layout, now }: { chat: MatchChat; layout: "rows" | "groups"; now: number }) {
-  const { groups, emoji } = chatButtonsOf(chat.packs);
+function ChatButtons({ chat, layout, fit, now }: { chat: MatchChat; layout: "rows" | "groups"; fit: boolean; now: number }) {
+  const { lines, emoji } = chat.picked();
+  const none = !lines.length && !emoji.length && <p class="qbuttons-none">Nothing picked. Choose your lines and emoji in your profile, under Quick chat and emoji.</p>;
+  const lineButtons = lines.map((s) => <SayButton key={s.id} chat={chat} say={s} now={now} />);
+  const emojiButtons = emoji.map((s) => <SayButton key={s.id} chat={chat} say={s} now={now} />);
   if (layout === "groups") {
     return (
       <div class="qbuttons groups">
-        {groups.map((g) => (
-          <div key={g.group.id} class="qgroup" role="group" aria-label={g.group.name}>
-            <span class="qgroup-name">{g.group.name}</span>
-            <div class="qgroup-lines">
-              {g.lines.map((s) => (
-                <SayButton key={s.id} chat={chat} say={s} now={now} />
-              ))}
-            </div>
+        {none}
+        {lines.length > 0 && (
+          <div class="qgroup-lines" role="group" aria-label="Lines">
+            {lineButtons}
           </div>
-        ))}
-        <div class="qgroup" role="group" aria-label="Emoji">
-          <div class="qgroup-lines emoji">
-            {emoji.map((s) => (
-              <SayButton key={s.id} chat={chat} say={s} now={now} />
-            ))}
+        )}
+        {emoji.length > 0 && (
+          <div class="qgroup-lines emoji" role="group" aria-label="Emoji">
+            {emojiButtons}
           </div>
-        </div>
+        )}
       </div>
     );
   }
   return (
     <div class="qbuttons rows">
-      <div class="qrow" role="group" aria-label="Phrases">
-        {groups.map((g) => (
-          <Fragment key={g.group.id}>
-            <span class="qrow-group">{g.group.name}</span>
-            {g.lines.map((s) => (
-              <SayButton key={s.id} chat={chat} say={s} now={now} />
-            ))}
-          </Fragment>
-        ))}
-      </div>
-      <div class="qrow emoji" role="group" aria-label="Emoji">
-        {emoji.map((s) => (
-          <SayButton key={s.id} chat={chat} say={s} now={now} />
-        ))}
-      </div>
+      {none}
+      {lines.length > 0 && (
+        <div class="qrow" role="group" aria-label="Lines">
+          {lineButtons}
+        </div>
+      )}
+      {emoji.length > 0 && (
+        <div class={`qrow emoji${fit ? " fit" : ""}`} role="group" aria-label="Emoji" style={fit ? { "--n": emoji.length } : undefined}>
+          {emojiButtons}
+        </div>
+      )}
     </div>
   );
 }
@@ -227,7 +222,7 @@ function FoldButton({ open, onToggle }: { open: boolean; onToggle: () => void })
   );
 }
 
-/** Team / All: who your Hello and Sporting lines go to (plans, reactions and emoji always stay in your team). */
+/** Team / All: who your Hello and Sporting lines and emoji go to (plans and reactions always stay in your team). */
 function ToSwitch({ chat }: { chat: MatchChat }) {
   return (
     <div class="qto" role="group" aria-label="Send to">
@@ -262,6 +257,9 @@ export function ChatPanel({ match, chat, variant, head, fold }: { match: GameVie
   const [options, setOptions] = useState(false);
   const self = useRef({});
   const feed = useRef<HTMLDivElement>(null);
+  // (The buttons are the profile's picks: redraw if they change, e.g. picked in your profile during the match.)
+  const [, redraw] = useState(0);
+  useEffect(() => onAccountChange(() => redraw((n) => n + 1)), []);
   const teams = chat.hasTeams();
   const now = Date.now();
   // On screen while its feed has room to show something (a minimised panel is only its header).
@@ -287,7 +285,7 @@ export function ChatPanel({ match, chat, variant, head, fold }: { match: GameVie
     waitS > 3
       ? `Easy: one message every ${QUICK_CHAT.minGapMs / 1000} s, ${QUICK_CHAT.burstMax} in ${QUICK_CHAT.burstWindowMs / 1000} s. Next in ${waitS} s.`
       : teams && chat.to === "all"
-        ? "All: Hello and Sporting lines go to both teams. Plans, reactions and emoji stay in your team."
+        ? "All: Hello and Sporting lines and emoji go to both teams. Plans and reactions stay in your team."
         : null;
   const target = menu ? sender(match, menu) : null;
   return (
@@ -364,7 +362,7 @@ export function ChatPanel({ match, chat, variant, head, fold }: { match: GameVie
               </button>
             </div>
           ) : (
-            <ChatButtons chat={chat} layout={layout} now={now} />
+            <ChatButtons chat={chat} layout={layout} fit={variant === "full" || (variant === "page" && !roomy)} now={now} />
           )}
         </>
       )}

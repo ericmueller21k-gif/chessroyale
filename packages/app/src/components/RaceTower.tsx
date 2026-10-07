@@ -1,4 +1,5 @@
 import type { Standing } from "../game.ts";
+import type { ChatFloat } from "../chat.ts";
 import { PlayerName } from "./PlayerName.tsx";
 import { LiveNumber } from "./LiveNumber.tsx";
 
@@ -35,8 +36,12 @@ export function RaceTower({
   done?: ReadonlySet<string>;
   /** Text on the cut line, e.g. "Cut after round 8". */
   cutLabel?: string;
-  /** Quick chat: an emoji someone just sent, floating up from their row for a moment. */
-  floats?: ReadonlyMap<string, { text: string; key: number }>;
+  /**
+   * Quick chat: an emoji someone just sent, floating up from their row for a moment. One whose sender has no row
+   * here (the other team's, sent to everyone, or a teammate not shown) floats from the header, with a team chip
+   * when it went to everyone.
+   */
+  floats?: ReadonlyMap<string, ChatFloat>;
 }) {
   const ROW = mini ? 22 : 30;
   const alive = standings.filter((s) => !s.out);
@@ -77,6 +82,8 @@ export function RaceTower({
     y += ROW;
   });
   if (knockouts && line === null && rows.length && !compact && !keepOnly) line = y;
+  const shown = new Set(rows.map((r) => r.id));
+  const away = floats ? [...floats].filter(([id]) => !shown.has(id)).map(([, f]) => f).slice(-3) : [];
 
   return (
     <div class={`tower${compact ? " tower-compact" : ""}${mini ? " tower-mini" : ""}`} style={{ "--row": `${ROW}px` }}>
@@ -131,6 +138,16 @@ export function RaceTower({
           );
         })}
       </div>
+      {away.length > 0 && (
+        <div class="tower-floats" aria-hidden="true">
+          {away.map((f) => (
+            <span key={f.key} class="t-float away">
+              {f.team && <span class={`team-chip ${f.team}`} />}
+              {f.text}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

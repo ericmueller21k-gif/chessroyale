@@ -1421,7 +1421,8 @@ The `social` delegate built it as designed. The lines and packs are in `core/cha
 - **Tapping a name** opens a small menu in place of the buttons, with Profile and Mute for this match. The design
   asked for both on the same tap, and nothing pops up over the board.
 - **Team / All.**
-  - Emoji stay in your team, like the reactions (a 😂 to the other team after their blunder is a taunt).
+  - Emoji stay in your team, like the reactions (a 😂 to the other team after their blunder is a taunt). (Changed
+    by Eric the same day: emoji can go to All. See "Emoji to All, and your picks in the profile" below.)
   - Each pack phrase joins one of the four groups, so the rule stays one sentence: "Hello and Sporting lines go to
     both teams".
   - With All on, the team-only buttons grey out and the feed says why.
@@ -1477,6 +1478,77 @@ The `social` delegate built it as designed. The lines and packs are in `core/cha
   - The only brightness jumps were the reveal's poll appearing.
   - The pieces' frames match the same run on `main`: after a pick, Crowd's piece slides back and your pick shows as
     a vote. That's unchanged.
+
+### Emoji to All, and your picks in the profile (Eric, Oct 7, 2026)
+
+Eric: "we can add emojis to all chat that's fine. In profile players can select up to 10 quick chats which are the
+ones they see in their games, for the total list it can just be a clean dropdown menu with a search function in the
+profile under quick chat and emoji selection." My calls:
+
+- **Emoji follow the Team / All switch,** like Hello and Sporting lines (`canSayToAll`). The server checks them the
+  same way: ownership, the limits, mute and chat off. Reactions and plans still stay in the team.
+  - The panel's All note now reads "Hello and Sporting lines and emoji go to both teams. Plans and reactions stay in
+    your team."
+  - **On the other team's screen,** the scoreboard shows only their own team, so the sender has no row to float
+    from. An emoji whose sender has no row floats from the scoreboard's header instead, in a small dark pill with
+    the sender's white or black chip (when it went to everyone). The same goes for a teammate whose row a phone's
+    short scoreboard isn't showing. It's in the feed (with the chip) and the bubble as before.
+  - There's still no tick for lines to everyone, emoji included.
+- **The profile section "Quick chat and emoji"** is the social lane's, on your own profile only, under Wearing (your
+  look, then your voice; it also balances the computer's two columns). Its code is `components/ChatPicks.tsx`; the
+  profile screen only places it.
+  - Two blocks, Lines (n/10) and Emoji (n/8). Your picks show as chips in your order; tapping one takes it out.
+  - Each has a "Choose lines" / "Choose emoji" dropdown. It opens in place (no popup) with a search box at the top
+    (16 px, so iOS doesn't zoom), then the whole list by pack: yours first, then the shop's. Picked rows have a
+    gold check. Rows are 50 px tall; emoji are 56 px squares.
+  - The search matches a line's words, its group (so "plans" finds the plans), an emoji's name ("fire") and the
+    pack's own name. Every pack's name ends in "pack" or "emoji", so those words are left out, or "pa" would match
+    them all. Emoji got names for this (and for screen readers).
+  - A new pick goes at the end. There's no drag to reorder: take one out and add it again. At the cap, the
+    unpicked rows grey out and the menu says "10/10 picked. Take one out to add another."
+  - Lines from packs you don't own show locked, with a 🔒 and the pack's name ("God King pack ›"). A tap opens the
+    shop on its Chat packs tab. In a match (your profile opened over the game) the shop isn't one tap away, so they
+    show locked without the link.
+  - Each change saves to your account at once, with no Save button. "Back to the defaults" shows once a list
+    differs from them.
+  - You can take every line out. Then the match panel says to pick some in your profile.
+- **The caps, in `QUICK_CHAT`:** 10 lines (Eric) and **8 emoji**. Eight is what the free Basics pack has, so the
+  defaults are all the free emoji and nobody's emoji row changes. Eight fit one row of a phone's full-width chat
+  without scrolling (about 37 px each on a 390 px phone; the row is a grid of equal columns). In the narrow split
+  they scroll sideways, as before.
+- **The defaults** (`QUICK_CHAT.defaultLines`, `defaultEmoji`) are for everyone who hasn't chosen, new and
+  existing players alike. They're stored as "not chosen", not copied, so a change to the defaults reaches them.
+  - Lines: Good luck!, Have fun!, Nice move!, Wow!, Oops…, Trust the crowd, Defend the king!, Go for mate!, GG,
+    Thanks!. Two of each group and three reactions and plans, all free. Five go to All, so the switch still does
+    something.
+  - Left out: Hi all! and Let's go! (Good luck! and Have fun! say it), So close!, Push the pawns!, Well played
+    (GG says it), Rematch? (a 100-player match has no rematch). Thanks! stays, to answer a "Nice move!".
+  - Emoji: the eight free ones, in their order.
+  - Someone who owns a pack sees the defaults too until they pick its lines. Ten slots can't hold everything, and
+    while the shop is free most testers own every pack.
+- **Lines and emoji are chosen apart.** Picking lines leaves your emoji on the defaults, and the other way round.
+- **In the match** the buttons are your picks in your order. They replace the four fixed groups: a phone's sideways
+  row of lines and a row of emoji, and the computer's lines wrapping with the emoji under them. There are no group
+  headings any more. With All on, the lines that can't go to everyone grey out, as before.
+- **Getting a pack:** its lines go into any empty slots, in the pack's order, up to the cap. This happens on the
+  server, as part of the purchase. Most players are full (the defaults are 10/10 and 8/8), so the shop then shows
+  "Your quick chat lines are full (10/10), so nothing changed in your games yet." with **Pick these in your
+  profile ›**. If only some went in, it names what went in and offers the same button. The button opens your
+  profile at Quick chat and emoji, and closing it goes back to the shop.
+- **The shop's Chat packs text** says to choose your 10 lines and 8 emoji in your profile (the numbers come from
+  settings). The tab ends with a "Choose your lines and emoji in your profile ›" button. Settings' Quick chat
+  switch says the same.
+- **Where the picks live:** with the shop's state in D1, in a `chat_picks` table (one row per player: each kind a
+  JSON list, or NULL for the defaults). `shopState` returns them as `chat`, so they come with your profile, like
+  your equipped items. `POST /api/shop/chat {lines?, emoji?}` saves them; null puts a kind back to the defaults.
+  - The server cleans what it's sent: known lines of that kind, from packs you own, no repeats, at most the cap.
+  - Signing in to an existing account brings a guest's picks along, unless the account has its own (as with
+    equipped items).
+- **The server doesn't enforce picks, only ownership.** Picks only decide which buttons show. Any line you own is
+  still yours to say, so an old tab or a pack just got never has a line refused.
+  - The app reads the picks from your account, which is loaded before any match. A change made in your profile
+    during a match shows at once.
+- **Bots keep their own full list** (`botChatLines` is unchanged).
 
 ## No flash between a match's screens (Oct 6, 2026)
 

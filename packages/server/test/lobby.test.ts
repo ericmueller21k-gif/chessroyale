@@ -651,6 +651,48 @@ describe("lobby: quick chat", () => {
     expect(humanLines(mate).map((l) => l.say)).toEqual(["push-pawns", "gg"]);
   });
 
+  it("emoji can go to everyone (Eric, Oct 7): the other team gets them, with the same checks as any line", () => {
+    const { L, a, mate, other, humanLines, clear } = chatLobby();
+    clear();
+    // To the team, as before: the other team doesn't see it.
+    L.core.message(a, { t: "chat", say: "e-laugh" });
+    expect(humanLines(other)).toEqual([]);
+    expect(humanLines(mate).map((l) => l.say)).toEqual(["e-laugh"]);
+    // To everyone: both teams, marked with the sender's side.
+    L.advance(3_000);
+    L.core.message(a, { t: "chat", say: "e-fire", to: "all" });
+    expect(L.last(a, "chatNo")).toBeUndefined();
+    expect(humanLines(other)).toEqual([expect.objectContaining({ from: a, say: "e-fire", to: "all", team: L.core.record.chat!.lines.at(-1)!.team })]);
+    expect(humanLines(other)[0]!.team).not.toBeNull();
+    expect(humanLines(mate).map((l) => l.say)).toEqual(["e-laugh", "e-fire"]);
+    // A pack's emoji still needs the pack.
+    L.advance(3_000);
+    L.core.message(a, { t: "chat", say: "e-dragon", to: "all" });
+    expect(L.last(a, "chatNo")).toMatchObject({ say: "e-dragon", reason: "locked" });
+    // The limits: too soon after the last, and a repeat.
+    L.core.message(a, { t: "chat", say: "e-clap", to: "all" });
+    L.core.message(a, { t: "chat", say: "e-wow", to: "all" });
+    expect(L.last(a, "chatNo")).toMatchObject({ say: "e-wow", reason: "gap" });
+    L.advance(3_000);
+    L.core.message(a, { t: "chat", say: "e-clap", to: "all" });
+    expect(L.last(a, "chatNo")).toMatchObject({ say: "e-clap", reason: "repeat" });
+    expect(humanLines(other).map((l) => l.say)).toEqual(["e-fire", "e-clap"]);
+    // Muted by the other team's player, or their chat off: it doesn't reach them.
+    L.core.message(other, { t: "chatPrefs", muted: [a] });
+    L.core.message(a, { t: "chat", say: "e-grimace", to: "all" });
+    expect(humanLines(other).map((l) => l.say)).toEqual(["e-fire", "e-clap"]);
+    L.core.message(other, { t: "chatPrefs", muted: [], off: true });
+    L.advance(3_000);
+    L.core.message(a, { t: "chat", say: "e-party", to: "all" });
+    expect(humanLines(other).map((l) => l.say)).toEqual(["e-fire", "e-clap"]);
+    expect(humanLines(mate).map((l) => l.say)).toEqual(["e-laugh", "e-fire", "e-clap", "e-grimace", "e-party"]);
+    // Chat off for the sender: they can't send to anyone.
+    L.core.message(a, { t: "chatPrefs", off: true });
+    L.advance(3_000);
+    L.core.message(a, { t: "chat", say: "e-wow", to: "all" });
+    expect(L.last(a, "chatNo")).toMatchObject({ say: "e-wow", reason: "off" });
+  });
+
   it("drops anything not on the list, and pack lines the sender doesn't own", () => {
     const { L, a, mate, humanLines, clear } = chatLobby();
     clear();

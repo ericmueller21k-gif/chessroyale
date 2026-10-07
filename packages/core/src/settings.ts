@@ -464,6 +464,15 @@ export const QUICK_CHAT = {
   botEndMax: 2,
   /** A bot's line comes this long after the moment (ms, random in the range), like a person typing. */
   botDelayMs: [1_500, 6_000] as readonly [number, number],
+  /**
+   * The profile's picks (Quick chat and emoji): the lines and emoji a player sees in their games, in their order.
+   * At most this many lines, and this many emoji (one row on a phone's full-width chat, no scrolling).
+   */
+  maxLines: 10,
+  maxEmoji: 8,
+  /** Everyone's picks until they choose their own (new and existing players alike): free lines and emoji only. */
+  defaultLines: ["good-luck", "have-fun", "nice-move", "wow", "oops", "trust-crowd", "defend-king", "go-mate", "gg", "thanks"] as readonly string[],
+  defaultEmoji: ["e-thumbs", "e-clap", "e-laugh", "e-wow", "e-grimace", "e-fire", "e-skull", "e-party"] as readonly string[],
   /** Shop prices of the packs, in coins (everything is free while SHOP_FREE is on). */
   packPrices: {
     godking: 300,

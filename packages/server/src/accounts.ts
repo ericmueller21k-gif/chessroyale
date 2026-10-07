@@ -6,7 +6,29 @@
  * so it can be tested with an in-memory SQLite.
  */
 
-import { BOSS_TIERS, FRONT_DOOR, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, equippedLook, ratingTier, shopItem, starterItem, topPercent, type ItemLook, type RankEffect, type EquipSlot, type ShopState } from "@chessroyale/core";
+import {
+  BOSS_TIERS,
+  FRONT_DOOR,
+  SHOP_CATEGORIES,
+  SHOP_FREE,
+  SHOP_ITEMS,
+  chatPack,
+  chatPicks,
+  chatPicksAfterGetting,
+  cleanChatPickList,
+  equippedLook,
+  ownedChatPacks,
+  ratingTier,
+  shopItem,
+  starterItem,
+  topPercent,
+  type ChatPickKind,
+  type ItemLook,
+  type RankEffect,
+  type EquipSlot,
+  type ShopState,
+  type StoredChatPicks,
+} from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 
@@ -87,6 +109,13 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS wallets (
     user_id TEXT PRIMARY KEY,
     coins INTEGER NOT NULL DEFAULT 0
+  )`,
+  // Quick chat: the lines and emoji each player picked to see in their games (JSON lists of line ids; NULL: never
+  // chosen, so the defaults in settings.ts).
+  `CREATE TABLE IF NOT EXISTS chat_picks (
+    user_id TEXT PRIMARY KEY,
+    lines TEXT,
+    emoji TEXT
   )`,
   // Crate items and what's equipped (locker.ts).
   ...LOCKER_SCHEMA,
@@ -693,7 +722,42 @@ export async function shopState(sql: Sql, userId: string): Promise<ShopState> {
     if (item && item.slot !== "chat" && item.slot === r.slot && all.includes(item.id)) equipped[item.slot] = item.id;
   }
   const wallet = await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", userId);
-  return { coins: wallet?.coins ?? 0, owned: all, equipped };
+  return { coins: wallet?.coins ?? 0, owned: all, equipped, chat: chatPicks(await storedChatPicks(sql, userId), all) };
+}
+
+/** Quick chat picks as stored (each kind a list, or null for the defaults). */
+async function storedChatPicks(sql: Sql, userId: string): Promise<StoredChatPicks> {
+  const row = await sql.first<{ lines: string | null; emoji: string | null }>("SELECT lines, emoji FROM chat_picks WHERE user_id = ?", userId);
+  const list = (v: string | null | undefined): string[] | null => {
+    if (v === null || v === undefined) return null;
+    try {
+      const x = JSON.parse(v) as unknown;
+      return Array.isArray(x) ? x.filter((id): id is string => typeof id === "string") : null;
+    } catch {
+      return null;
+    }
+  };
+  return { lines: list(row?.lines), emoji: list(row?.emoji) };
+}
+
+async function storeChatPicks(sql: Sql, userId: string, kind: ChatPickKind, ids: readonly string[] | null): Promise<void> {
+  const v = ids === null ? null : JSON.stringify(ids);
+  await sql.run("INSERT OR IGNORE INTO chat_picks (user_id) VALUES (?)", userId);
+  await sql.run(`UPDATE chat_picks SET ${kind === "lines" ? "lines" : "emoji"} = ? WHERE user_id = ?`, v, userId);
+}
+
+/**
+ * Quick chat: the lines and/or emoji a player picked in their profile, in their order. Each is cleaned (known lines
+ * of that kind, from packs they own, no repeats, at most the cap); null puts that kind back to the defaults.
+ */
+export async function setChatPicks(sql: Sql, userId: string, body: { lines?: unknown; emoji?: unknown }): Promise<ShopState> {
+  const packs = ownedChatPacks((await shopState(sql, userId)).owned);
+  for (const kind of ["lines", "emoji"] as const) {
+    const v = body[kind];
+    if (v === null) await storeChatPicks(sql, userId, kind, null);
+    else if (Array.isArray(v)) await storeChatPicks(sql, userId, kind, cleanChatPickList(v, kind, packs));
+  }
+  return shopState(sql, userId);
 }
 
 /** Gets an item (free while SHOP_FREE is on, otherwise paid in coins). */
@@ -706,6 +770,12 @@ export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: nu
   if (price > state.coins) return { ok: false, message: "Not enough coins." };
   if (price > 0) await sql.run("UPDATE wallets SET coins = coins - ? WHERE user_id = ?", price, userId);
   await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)", userId, item.id, now);
+  // A chat pack's lines go into any empty slots of the player's quick chat (the rest they pick in their profile).
+  if (item.slot === "chat" && item.look.pack) {
+    const { picks, added } = chatPicksAfterGetting(state.chat, item.look.pack);
+    const kind: ChatPickKind = chatPack(item.look.pack)?.kind === "emoji" ? "emoji" : "lines";
+    if (added.length) await storeChatPicks(sql, userId, kind, picks[kind]);
+  }
   return { ok: true, shop: await shopState(sql, userId) };
 }
 
@@ -729,8 +799,10 @@ async function moveShop(sql: Sql, from: string, to: string): Promise<void> {
   if (coins > 0) {
     await sql.run("INSERT INTO wallets (user_id, coins) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins", to, coins);
   }
+  await sql.run("INSERT OR IGNORE INTO chat_picks (user_id, lines, emoji) SELECT ?, lines, emoji FROM chat_picks WHERE user_id = ?", to, from);
   await sql.run("DELETE FROM inventory WHERE user_id = ?", from);
   await sql.run("DELETE FROM equipped WHERE user_id = ?", from);
   await sql.run("DELETE FROM wallets WHERE user_id = ?", from);
+  await sql.run("DELETE FROM chat_picks WHERE user_id = ?", from);
   await moveLocker(sql, from, to);
 }

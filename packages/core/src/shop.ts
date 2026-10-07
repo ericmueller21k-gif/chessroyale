@@ -7,7 +7,7 @@
  * Every category has a free default that everyone owns.
  */
 
-import { CHAT_PACKS, chatPackItem } from "./chat.ts";
+import { CHAT_PACKS, chatPackItem, type ChatPicks } from "./chat.ts";
 import { QUICK_CHAT } from "./settings.ts";
 
 export type ShopSlot = "king" | "hat" | "chat";
@@ -28,7 +28,7 @@ export const SHOP_CATEGORIES: readonly ShopCategory[] = [
   {
     slot: "chat",
     name: "Chat packs",
-    blurb: "More lines and emoji for quick chat in online matches. A pack is yours to use as soon as you get it.",
+    blurb: `More lines and emoji for quick chat in online matches. Choose the ${QUICK_CHAT.maxLines} lines and ${QUICK_CHAT.maxEmoji} emoji you see in your games in your profile, under Quick chat and emoji.`,
     ownOnly: true,
   },
 ];
@@ -89,6 +89,8 @@ export interface ShopState {
   coins: number;
   owned: string[];
   equipped: Record<EquipSlot, string>;
+  /** Quick chat: the lines and emoji they picked to see in their games (the defaults until they choose). */
+  chat: ChatPicks;
 }
 
 /** The look of what's equipped in a slot (the starter if nothing valid is). */
