@@ -1,45 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
-import { sanLineToUci, type Opening, type ServerMessage } from "@chessroyale/chess";
-import { LobbyCore, MATCH_ENDED, lobbyClosing, newLobbyRecord } from "../src/lobby.ts";
+import { CROWD_KNOCKOUTS, FRONT_DOOR, LOBBY_LIFE, RAID_SETTINGS, modeSettings, type Settings } from "@chessroyale/core";
+import { MATCH_ENDED, lobbyClosing } from "../src/lobby.ts";
+import { setup } from "./lobby-fixture.ts";
 
 /**
  * When a lobby closes (LOBBY_LIFE; the Durable Object then deletes it and frees its code). In a file of its own: a
  * few of these play whole matches out on the lobby's own clock, which takes a while, and files run side by side.
  */
-
-const line = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1", "b5", "Bb3", "d6", "c3", "O-O", "h3", "Nb8", "d4", "Nbd7", "c4"]);
-const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
-  id: `o${i}`,
-  eco: "C95",
-  name: `Opening ${i}`,
-  family: `Family ${i}`,
-  unusual: i >= 25,
-  moves: line,
-  namedPlies: 21,
-  expected: Object.fromEntries(Array.from({ length: 22 }, (_, n) => [n, 0.5])),
-}));
-
-/** A lobby on a fake clock, with an outbox per player. Nobody scores: rounds time out and every pick counts the same. */
-function setup(settings: Partial<Settings> = {}) {
-  let now = 1_000_000;
-  const inbox = new Map<string, ServerMessage[]>();
-  const core = new LobbyCore(
-    newLobbyRecord("ABCDE", now),
-    { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as ServerMessage]) },
-    library,
-    mulberry32(7),
-    { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...settings },
-  );
-  const take = (id: string) => inbox.set(id, []);
-  const last = <T extends ServerMessage["t"]>(id: string, t: T) =>
-    [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === t) as Extract<ServerMessage, { t: T }> | undefined;
-  const advance = (ms: number) => {
-    now += ms;
-    if (core.nextAlarm && core.nextAlarm <= now) core.alarm();
-  };
-  return { core, take, last, advance, inbox, get now() { return now; } };
-}
 
 describe("lobby: closing (LOBBY_LIFE)", () => {
   const MIN = 60_000;

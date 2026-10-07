@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Matchmaker, type PlayAnswer } from "../src/matchmaker.ts";
+import { MATCHMAKING } from "@chessroyale/core";
+import { Matchmaker, queueName, type PlayAnswer } from "../src/matchmaker.ts";
 import { openLobbyCode, randomCode } from "../src/codes.ts";
-import { QueueCore, queueName, regionOf, type MatchRules, type QueueConfig } from "../src/queue.ts";
+import { QueueCore, regionOf, type MatchRules, type QueueConfig } from "../src/queue.ts";
 
 /**
  * "Play now": tickets seated in batches, never a used code, never an overfilled lobby, and a surge past the
@@ -13,19 +14,23 @@ import { QueueCore, queueName, regionOf, type MatchRules, type QueueConfig } fro
  * or its results): creating one again is refused. Each lobby has `size` seats and gives out reservations.
  */
 function lobbies(inUse: number, size = 100) {
-  const open = new Map<string, { joinable: boolean; seats: number }>();
+  const open = new Map<string, { joinable: boolean; seats: number; auto?: { fillAt: number | null; botsOff?: boolean }; hurried?: number }>();
   const tried: string[] = [];
   let calls = 0;
   const ns = {
     idFromName: (name: string) => name,
     get: (code: string) => ({
-      async create(c: string, _o: unknown, auto?: { reserve?: number }) {
+      async create(c: string, _o: unknown, auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number }) {
         calls++;
         tried.push(c);
         if (tried.length <= inUse || open.has(c)) return false;
         const give = Math.min(auto?.reserve ?? 0, size);
-        open.set(c, { joinable: true, seats: give });
+        open.set(c, { joinable: true, seats: give, auto: auto && { fillAt: auto.fillAt, botsOff: auto.botsOff } });
         return auto?.reserve ? give : true;
+      },
+      async hurry(at: number) {
+        calls++;
+        open.get(code)!.hurried = at;
       },
       async joinable() {
         return open.get(code)?.joinable ?? false;
@@ -121,7 +126,7 @@ describe("matchmaker", () => {
       expect(b.retryMs).toBeGreaterThan(0);
     }
     // Asking again with the ticket keeps the place in line.
-    const again = await mm.next({}, 60_000, busy[2]!.ticket);
+    const again = await mm.next({}, 60_000, {}, busy[2]!.ticket);
     expect("busy" in again && again.ticket).toBe(busy[2]!.ticket);
   });
 
@@ -144,10 +149,46 @@ describe("matchmaker", () => {
       ],
     };
     const mm = matchmaker(L.ns, { rules });
-    const [a, b, c, d] = await Promise.all([1200, 1800, 1300, 2600].map((skill) => mm.next({}, 60_000, null, { skill })));
+    const [a, b, c, d] = await Promise.all([1200, 1800, 1300, 2600].map((skill) => mm.next({}, 60_000, {}, null, { skill })));
     expect(codeOf(a!)).toBe(codeOf(c!));
     expect(codeOf(b!)).not.toBe(codeOf(a!));
     expect("busy" in d!).toBe(true);
+  });
+
+  it("one queue per mode and type: Default and Bots off never share a lobby", () => {
+    const names = [queueName("crowd", "default"), queueName("crowd", "botsoff"), queueName("raid", "default"), queueName("raid", "botsoff")];
+    expect(new Set(names).size).toBe(4);
+    expect(queueName("crowd", "botsoff", "tests-1")).toBe("crowd-botsoff-tests-1");
+    // A pool that isn't a plain name is ignored.
+    expect(queueName("crowd", "default", "../x")).toBe("crowd-default");
+  });
+
+  it("Bots off: a 50 v 50 lobby has no fill time (it waits until full); a raid's minute is when it may begin with enough people", async () => {
+    const L = lobbies(0);
+    const t0 = Date.now();
+    const crowd = codeOf(await matchmaker(L.ns).next({}, 60_000, { botsOff: true, crowdWaitsForFull: true }))!;
+    expect(L.open.get(crowd)!.auto).toEqual({ fillAt: null, botsOff: true });
+    const raid = codeOf(await matchmaker(L.ns).next({}, 60_000, { botsOff: true }))!;
+    expect(L.open.get(raid)!.auto!.botsOff).toBe(true);
+    expect(L.open.get(raid)!.auto!.fillAt).toBeGreaterThanOrEqual(t0 + 60_000);
+  });
+
+  it("Bots off → Default keeps your wait: bots fill a minute after you first joined (into a new lobby, or the one filling)", async () => {
+    const L = lobbies(0);
+    const mm = matchmaker(L.ns);
+    const now = Date.now();
+    // Waited 40 s: a new Default lobby fills in about 20 s.
+    const a = codeOf(await mm.next({}, 60_000, { since: now - 40_000 }))!;
+    const at = L.open.get(a)!.auto!.fillAt!;
+    expect(at).toBeGreaterThanOrEqual(now + 19_000);
+    expect(at).toBeLessThanOrEqual(Date.now() + 21_000);
+    // Someone else switching while it fills: it's told to fill a minute after their start.
+    await mm.next({}, 60_000, { since: now - 300_000 });
+    expect(L.open.get(a)!.hurried).toBe(now - 300_000 + 60_000);
+    // Waited ages, new lobby: soon, but not at once.
+    L.open.get(a)!.joinable = false;
+    const b = codeOf(await mm.next({}, 60_000, { since: now - 600_000 }))!;
+    expect(L.open.get(b)!.auto!.fillAt! - Date.now()).toBeGreaterThan(MATCHMAKING.switchMinWaitMs - 1000);
   });
 
   it("openLobbyCode: skips codes in use, gives up after its tries", async () => {
@@ -209,13 +250,13 @@ describe("the queue (pure)", () => {
     expect(q.estimateSeconds("t30", 2, 100)).toBe(300);
   });
 
-  it("queue names: per mode, a test pool, and a region only when that's on", () => {
-    expect(queueName("crowd", null, null)).toBe("crowd-unranked");
-    expect(queueName("raid", "e2e-a", null)).toBe("raid-unranked-e2e-a");
-    expect(queueName("crowd", "Bad Pool!", null)).toBe("crowd-unranked");
+  it("queue names: per mode and type, a test pool, and a region only when that's on", () => {
+    expect(queueName("crowd", "default")).toBe("crowd-default");
+    expect(queueName("raid", "default", "e2e-a")).toBe("raid-default-e2e-a");
+    expect(queueName("crowd", "default", "Bad Pool!")).toBe("crowd-default");
     expect(regionOf({ continent: "EU" })).toBeNull();
     expect(regionOf({ continent: "EU" }, true)).toBe("EU");
-    expect(queueName("crowd", null, regionOf({ continent: "EU" }, true))).toBe("crowd-unranked@EU");
+    expect(queueName("crowd", "botsoff", null, regionOf({ continent: "EU" }, true))).toBe("crowd-botsoff@EU");
     expect(regionOf({ continent: "XX" }, true)).toBeNull();
   });
 });

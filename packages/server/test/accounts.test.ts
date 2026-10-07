@@ -70,13 +70,14 @@ describe("accounts", () => {
     await ensureSchema(sql);
     const { user } = await createGuest(sql, 1000);
     await recordResult(sql, user.id, { mode: "classic", online: false, placement: 1, players: 64, rating: 1700 }, 2000);
-    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 30, players: 100, team: "w", teamWon: true }, 3000);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 30, players: 100, team: "w", teamWon: true, rating: 1650, ranked: true }, 3000);
     await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 3, players: 100, team: "w", teamWon: false }, 4000);
     const p = await profile(sql, user);
     expect(p.stats.all).toMatchObject({ matches: 3, wins: 1, finals: 2, best: 1, avgPlacement: 11.3, teamWins: 1 });
     expect(p.stats.crowd.matches).toBe(2);
     expect(p.recent[0]!.placement).toBe(3);
-    expect(p.rating).toBe(1700);
+    // Your rating is your latest ranked one: the solo game (all bots) counts in the stats, not for ranking.
+    expect(p.rating).toBe(1650);
   });
 
   it("signing in: attaches to the guest, or switches to the existing account and brings the guest's results", async () => {

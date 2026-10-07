@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
-import { chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
+import { type MatchmakingType, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { bossInUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
@@ -35,8 +35,11 @@ import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
 import { ChatBubble } from "./components/QuickChat.tsx";
 
-/** Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). */
-function overridesFromUrl(modeId?: ModeChoiceId): Partial<Settings> {
+/**
+ * Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). `matchBoss`: a raid's
+ * boss is matched to you (a Solo raid, like an online one), not the one last picked from the boss menu (Boss alone).
+ */
+function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Settings> {
   const q = new URLSearchParams(location.search);
   const n = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
   const draw = q.get("draw") as DrawRule | null;
@@ -52,7 +55,7 @@ function overridesFromUrl(modeId?: ModeChoiceId): Partial<Settings> {
     // The mode's own rules and pace first, then pace and playtest overrides on top (only the ones that are set).
     // The boss raid: its own settings, and (solo) a boss a step above your rating.
     ...(raid
-      ? { ...RAID_SETTINGS, bossFixedElo: chosenBoss() || raidBossElo([account().profile?.rating ?? null]) }
+      ? { ...RAID_SETTINGS, bossFixedElo: (matchBoss && !bossInUrl() ? 0 : chosenBoss()) || raidBossElo([account().profile?.rating ?? null]) }
       : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { crowdTeams: mode.crowdTeams, augments: mode.augments })),
     ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
     ...definedOnly({
@@ -82,6 +85,33 @@ function quickPace(): boolean {
 
 /** An invite link (/lobby/ABCDE) opens the join form with the code filled in (once we know the lobby is still open). */
 const linkCode = location.pathname.match(/^\/lobby\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
+
+/**
+ * The online match this device is seated in (its lobby code), so opening the app from scratch puts you back in it, as
+ * chess sites do. Forgotten when you leave on purpose (Leave, Cancel, Home), when it ends, or when it's gone.
+ */
+const CURRENT_KEY = "brc.current";
+function currentMatch(): string | null {
+  try {
+    return localStorage.getItem(CURRENT_KEY);
+  } catch {
+    return null;
+  }
+}
+function setCurrentMatch(code: string | null) {
+  try {
+    if (code) localStorage.setItem(CURRENT_KEY, code);
+    else localStorage.removeItem(CURRENT_KEY);
+  } catch {
+    // No storage: no rejoining from a fresh start.
+  }
+}
+/** Opened from scratch at home (not a link) with a seat in a match: check it's still on, and go back in. */
+const rejoinCode = (() => {
+  if (linkCode || location.pathname !== "/") return null;
+  const code = currentMatch();
+  return code && /^[A-Z2-9]{5}$/.test(code) && hasSeat(code) ? code : null;
+})();
 
 /** A lobby that has closed (a stale tab, an old link, or the match on screen): the note on the home screen. */
 interface EndedNote {
@@ -133,12 +163,15 @@ export function App() {
    */
   const [invite, setInvite] = useState<"checking" | "open" | null>(() => (!linkCode ? null : hasSeat(linkCode) ? "open" : "checking"));
   const [ended, setEnded] = useState<EndedNote | null>(null);
+  /** Opened from scratch with a seat in a match: a moment's splash while we check it's still on. */
+  const [rejoining, setRejoining] = useState(!!rejoinCode);
   /**
    * The lobby has closed: home (the address too, so reopening the app lands there) with a note, and your result if
    * you played (from the server, asked before this so the note shows whole, never growing a button a moment later).
    */
   const showEnded = (code: string, why: LobbyGone, result: LobbyResult | null) => {
     forgetSeat(code);
+    if (currentMatch() === code) setCurrentMatch(null);
     setInvite(null);
     if (location.pathname !== "/") history.replaceState(null, "", "/");
     setEnded({ code, why, result });
@@ -229,6 +262,19 @@ export function App() {
       } else setInvite("open");
     });
   }, []);
+  // Opened from scratch with a seat in a match that's still on (waiting or playing): back in. Not if it's over.
+  useEffect(() => {
+    if (!rejoinCode) return;
+    void lobbyStatus(rejoinCode).then((s) => {
+      if (s?.open && s.phase !== "over") joinLobby(rejoinCode, { resume: s.phase === "playing" });
+      else if (s) setCurrentMatch(null);
+      setRejoining(false);
+    });
+  }, []);
+  // A match that has ended isn't one to come back to.
+  useEffect(() => {
+    if (match instanceof NetMatch && match.phase.kind === "results" && currentMatch() === match.code) setCurrentMatch(null);
+  });
   // The lobby on screen has closed (or the server has no such lobby): home, with the note (your result first, if the
   // server hasn't been asked yet; the screen stays as it is meanwhile).
   const goingHome = useRef<AnyMatch | null>(null);
@@ -269,22 +315,28 @@ export function App() {
     }
   };
 
-  /** Solo against bots (or a boss, for a raid), in the mode given or the one picked. */
-  const startSolo = async (mode?: ModeChoiceId) => {
+  /**
+   * Against bots in your browser, in the mode given or the one picked. Solo (`fill`): the queue screen fills with your
+   * bots first, and a raid has 49 of them in the crowd with a boss matched to you. Boss alone: you against the boss
+   * picked from the menu, at once.
+   */
+  const startSolo = async (mode?: ModeChoiceId, opts: { fill?: boolean } = {}) => {
     unlockAudio();
     setLoading(true);
     const engines = await enginePool();
     setLoading(false);
-    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode) }, practiceOn());
+    const fill = !!opts.fill;
+    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill) }, practiceOn(), fill);
     use(m);
-    m.start();
+    if (fill) m.fill();
+    else m.start();
   };
 
   /**
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -304,7 +356,14 @@ export function App() {
     if (queue) m.auto = true;
     // A code typed into Join that leads nowhere is "Can't join", not the note.
     m.typed = !!opts.typed;
+    // Back into a match already being played: no queue screen on the way.
+    if (opts.resume) {
+      m.resuming = true;
+      m.auto = false;
+    }
     use(m);
+    // Seated here: opening the app from scratch comes back to it (until you leave on purpose or it ends).
+    setCurrentMatch(m.code);
     history.replaceState(null, "", `/lobby/${m.code}${location.search}`);
     m.connect();
   };
@@ -337,14 +396,14 @@ export function App() {
 
   /** PLAY: the queue for a mode (the 50 v 50 lobby that's filling up, or a raid's). */
   const playNowTries = useRef(0);
-  const playNowMode = useRef<"crowd" | "raid">("crowd");
+  const playNowMode = useRef<{ mode: "crowd" | "raid"; type: Exclude<MatchmakingType, "solo"> }>({ mode: "crowd", type: "default" });
   const retriedFor = useRef<AnyMatch | null>(null);
   /** Servers busy: in line for a seat (the queue screen says so, with about how long). */
   const [inLine, setInLine] = useState<{ mode: "crowd" | "raid"; waitSeconds: number } | null>(null);
   const lineRun = useRef(0);
-  const playNow = async (mode: "crowd" | "raid", retry = false) => {
+  const playNow = async (mode: "crowd" | "raid", type: Exclude<MatchmakingType, "solo"> = "default", retry = false, ticket?: string) => {
     playNowTries.current = retry ? playNowTries.current + 1 : 1;
-    playNowMode.current = mode;
+    playNowMode.current = { mode, type };
     const run = ++lineRun.current;
     unlockAudio();
     setLoading(true);
@@ -352,9 +411,12 @@ export function App() {
     try {
       const q = new URLSearchParams();
       if (mode === "raid") q.set("mode", "raid");
+      if (type === "botsoff") q.set("type", "botsoff");
       // (?pool=NAME: a queue of its own, for tests.)
       const pool = new URLSearchParams(location.search).get("pool");
       if (pool) q.set("pool", pool);
+      // (Already in line: from "let bots fill" when the servers were busy.)
+      if (ticket) q.set("ticket", ticket);
       for (;;) {
         const res = await fetch(`/api/play${q.size ? `?${q}` : ""}`, { method: "POST" });
         const body = (await res.json()) as { code?: string; message?: string; busy?: boolean; ticket?: string; waitSeconds?: number; retryMs?: number };
@@ -394,7 +456,42 @@ export function App() {
     setLoading(false);
   };
 
+  /**
+   * Bots off → Default, from the queue: this seat is handed back and you're in Default's queue at once, your wait so
+   * far counting (bots fill a minute after you first joined). If the lobby filled meanwhile, you just stay in it.
+   */
+  const letBotsFill = async () => {
+    if (!(match instanceof NetMatch) || !match.botsOff) return;
+    const from = match;
+    const q = new URLSearchParams({ type: "default", from: from.code });
+    if (from.settings.raid) q.set("mode", "raid");
+    const pool = new URLSearchParams(location.search).get("pool");
+    if (pool) q.set("pool", pool);
+    try {
+      const res = await fetch(`/api/play?${q}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ seat: from.seat }) });
+      const body = (await res.json()) as { code?: string; busy?: boolean; ticket?: string };
+      if (!res.ok || onScreen.current !== from) return;
+      // Servers busy: the seat is already handed back, so wait in Default's line (your wait still counts).
+      if (body.busy && body.ticket) {
+        forgetSeat(from.code);
+        setCurrentMatch(null);
+        from.dispose();
+        setMatch(null);
+        void playNow(from.settings.raid ? "raid" : "crowd", "default", false, body.ticket);
+        history.replaceState(null, "", `/${location.search}`);
+        return;
+      }
+      if (!body.code) return;
+      forgetSeat(from.code);
+      joinLobby(body.code, { queue: from.settings.raid ? "raid" : "crowd" });
+    } catch {
+      // Offline: stay where you are.
+    }
+  };
+
   const leave = () => {
+    // On purpose: opening the app again doesn't bring you back to this match.
+    setCurrentMatch(null);
     // Leaving a lobby before it starts (Cancel in the queue) frees the seat.
     if (match instanceof NetMatch && (match.phase.kind === "lobby" || match.phase.kind === "loading")) match.leave();
     else match?.dispose();
@@ -499,7 +596,7 @@ export function App() {
   }
   // Still finding out who you are (or whether an invite's lobby is still open): a plain splash rather than a flash of
   // the wrong screen.
-  if (!match && (config === null || (config.accounts && !profile) || invite === "checking")) {
+  if (!match && (config === null || (config.accounts && !profile) || invite === "checking" || rejoining)) {
     return (
       <div class="fd-splash">
         <Logo />
@@ -557,8 +654,8 @@ export function App() {
             : undefined
         }
         onlineLocked={mustSignInToPlayOnline()}
-        onPlay={(mode) => void playNow(mode)}
-        onSolo={(mode) => void startSolo(mode)}
+        onPlay={(mode, type) => void playNow(mode, type)}
+        onSolo={(mode, opts) => void startSolo(mode, opts)}
         onCreateLobby={(mode) => void createLobby(mode)}
         onJoinLobby={(code) => joinLobby(code, { typed: code !== inviteCode })}
         onSignIn={() => chooseGuest(false)}
@@ -572,7 +669,7 @@ export function App() {
   // Play now: the lobby started a moment before we got in, so get the next one.
   if (match instanceof NetMatch && match.error && /already started|full/.test(match.error) && playNowTries.current > 0 && playNowTries.current < 3 && retriedFor.current !== match) {
     retriedFor.current = match;
-    queueMicrotask(() => void playNow(playNowMode.current, true));
+    queueMicrotask(() => void playNow(playNowMode.current.mode, playNowMode.current.type, true));
   }
   if (match instanceof NetMatch && match.error) {
     return (
@@ -588,7 +685,9 @@ export function App() {
 
   const screen = renderPhase(match, {
     leave,
-    again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode) : leave()),
+    // (Solo again as it was: through the queue screen, or Boss alone straight in.)
+    again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0 }) : leave()),
+    letBotsFill: () => void letBotsFill(),
   });
   // A name tapped during the match: their profile over the game (which goes on underneath).
   const overlay = profileOpen && (
@@ -633,14 +732,21 @@ export function App() {
 
 const boardKey = (b: { id: number; generation: number; ply: number }) => `${b.id}:${b.generation}:${b.ply}`;
 
-function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void }) {
+function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void; letBotsFill: () => void }) {
   const p = match.phase;
+  // Going back into a match already being played: the splash until its screen comes (not the queue it started in).
+  if (match instanceof NetMatch && match.resuming && (p.kind === "loading" || (p.kind === "lobby" && match.started)))
+    return (
+      <div class="fd-splash">
+        <Logo />
+      </div>
+    );
   switch (p.kind) {
     case "loading":
       if (match instanceof NetMatch && match.auto)
         return (
           <FrontFrame wide>
-            <QueueScreen match={match} onCancel={actions.leave} />
+            <QueueScreen match={match} onCancel={actions.leave} onLetBotsFill={actions.letBotsFill} />
           </FrontFrame>
         );
       return (
@@ -649,10 +755,18 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
         </div>
       );
     case "lobby":
+      // Solo: the queue screen while your bots take their seats.
+      if (match instanceof SoloMatch)
+        return (
+          <FrontFrame wide>
+            <QueueScreen match={match} onCancel={actions.leave} />
+          </FrontFrame>
+        );
       if (!(match instanceof NetMatch)) return null;
+      // (The queue, drawn exactly as while connecting, so the same screen carries on: your seat never pops twice.)
       return match.auto ? (
         <FrontFrame wide>
-          <LobbyScreen match={match} onLeave={actions.leave} />
+          <QueueScreen match={match} onCancel={actions.leave} onLetBotsFill={actions.letBotsFill} />
         </FrontFrame>
       ) : (
         <LobbyScreen match={match} onLeave={actions.leave} />

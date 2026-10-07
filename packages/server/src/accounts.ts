@@ -153,15 +153,20 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "boss_elo", type: "INTEGER" },
   // An online match's lobby code (Oct 7, 2026), so a closed lobby's link can offer "See your result". Never shown on a profile.
   { table: "results", column: "lobby", type: "TEXT" },
+  // Whether a result counts for ranking (Oct 7, 2026): 1 ranked, 0 not (under 30% real players, solo, practice), NULL from
+  // before the rule (counted as before). Ranking is the rating, its chart, "Top N%" and the rank.
+  { table: "results", column: "ranked", type: "INTEGER" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
 ];
 const AFTER_COLUMNS = [`CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`];
 
-/** The latest rating among a user's results (SQL). */
+/** The latest rating among a user's results that count for ranking (ranked, or from before the rule), in SQL. */
 function LATEST_RATING(userId: string) {
-  return `(SELECT r.rating FROM results r WHERE r.user_id = ${userId} AND r.rating IS NOT NULL ORDER BY r.played_at DESC, r.id DESC LIMIT 1)`;
+  return `(SELECT r.rating FROM results r WHERE r.user_id = ${userId} AND r.rating IS NOT NULL AND (r.ranked IS NULL OR r.ranked = 1) ORDER BY r.played_at DESC, r.id DESC LIMIT 1)`;
 }
+/** A result row counts for ranking (ranked, or from before the rule). */
+const countsForRanking = (r: { ranked: number | null }) => r.ranked !== 0;
 
 const ready = new WeakSet<object>();
 /** Every schema statement, as one fingerprint: a database that has it recorded needs none of them run again. */
@@ -456,6 +461,8 @@ export interface MatchResult {
   bossElo?: number | null;
   /** An online match: its lobby's code (the server sets it; a solo result has none). */
   lobby?: string | null;
+  /** It counts for ranking (the lobby decides: isRankedMatch). Solo results never do. */
+  ranked?: boolean | null;
 }
 
 /** A count from a result (0-500), or null. */
@@ -469,10 +476,12 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   const cuts = count(r.cuts);
   const strikes = count(r.strikes);
   const mode = r.mode === "crowd" || r.mode === "boss" ? r.mode : "classic";
+  // Only an online match the lobby judged ranked counts (a solo result, posted by the browser, never does).
+  const ranked = r.online && r.ranked === true;
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -493,8 +502,10 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     flag(r.lastStand),
     mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
     r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null,
+    ranked ? 1 : 0,
   );
-  if (rating !== null) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
+  // Only a ranked match moves your ranking.
+  if (rating !== null && ranked) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
 }
 
 /** Your result in an online match, by its lobby's code (the latest, if a code was used again): for "See your result". */
@@ -534,8 +545,8 @@ export interface Profile {
 }
 
 export async function profile(sql: Sql, user: User): Promise<Profile> {
-  const rows = await sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number }>(
-    "SELECT mode, online, placement, players, team_won, rating, played_at FROM results WHERE user_id = ? ORDER BY played_at DESC",
+  const rows = await sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null }>(
+    "SELECT mode, online, placement, players, team_won, rating, played_at, ranked FROM results WHERE user_id = ? ORDER BY played_at DESC",
     user.id,
   );
   const stats = (rs: typeof rows): ModeStats => ({
@@ -551,7 +562,7 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
     shop: await shopState(sql, user.id),
     locker: await lockerState(sql, user.id),
     stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
-    rating: rows.find((r) => r.rating !== null)?.rating ?? null,
+    rating: rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null,
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,
       online: !!r.online,
@@ -626,6 +637,8 @@ export interface PublicProfile {
     bestMove: string | null;
     bossElo: number | null;
     playedAt: number;
+    /** It counted for ranking (false: under 30% real players, solo or practice; null: from before the rule). */
+    ranked: boolean | null;
   }[];
 }
 
@@ -647,6 +660,7 @@ interface ResultRow {
   survived: number | null;
   last_stand: number | null;
   boss_elo: number | null;
+  ranked: number | null;
 }
 
 /** The sum of a column over the rows that have it (null if none do). */
@@ -689,11 +703,11 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
   if (!u) return null;
   const rows = await sql.all<ResultRow>(
     `SELECT mode, online, placement, players, team, team_won, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes,
-       strikes_survived, survived, last_stand, boss_elo
+       strikes_survived, survived, last_stand, boss_elo, ranked
      FROM results WHERE user_id = ? ORDER BY played_at DESC, id DESC`,
     userId,
   );
-  const rating = u.rating ?? rows.find((r) => r.rating !== null)?.rating ?? null;
+  const rating = u.rating ?? rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null;
   let top: number | null = null;
   if (rating !== null) {
     const total = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE rating IS NOT NULL"))?.n ?? 0;
@@ -718,7 +732,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     crowd: crowdStats(rows.filter((r) => r.mode === "crowd")),
     boss: raidStats(raids),
     ratingHistory: rows
-      .filter((r) => r.rating !== null)
+      .filter((r) => r.rating !== null && countsForRanking(r))
       .slice(0, 30)
       .map((r) => r.rating!)
       .reverse(),
@@ -734,6 +748,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
       bestMove: r.best_move,
       bossElo: r.boss_elo,
       playedAt: r.played_at,
+      ranked: r.ranked === null ? null : r.ranked === 1,
     })),
   };
 }

@@ -1,4 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
+import { ratingTier } from "@chessroyale/core";
 import { named, soloFromHome, test } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
@@ -24,6 +25,19 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
     const { items } = await fetch("/api/locker").then((r) => r.json());
     for (const slot of ["head", "face", "skin", "weapon"]) if ((await post("/api/locker/equip", { slot, item: items[0].id })).ok) break;
   });
+  await page.reload();
+  // A solo game counts in your stats, never your ranking: that takes a match with 30% real players.
+  await expect(page.locator(".fd-hero-sub")).toContainText("No rating yet");
+  // A ranked rating, as a ranked match would leave it. (An e2e can't seat 30 people, so from here the server's answers
+  // carry one; the server's side of the rule is in its unit tests, live.test.ts.)
+  const tier = ratingTier(1612)!;
+  const ranked = { rating: 1612, tier: { label: tier.label, level: tier.level, color: tier.color, effect: tier.effect } };
+  for (const url of [/\/api\/me(\?|$)/, /\/api\/profile\/[\w-]+$/]) {
+    await page.route(url, async (route) => {
+      const res = await route.fetch();
+      await route.fulfill({ response: res, json: { ...(await res.json()), ...ranked } });
+    });
+  }
   await page.reload();
   // Home names the rank under your name, in the rank's colour.
   await expect(page.locator(".fd-hero-sub")).toContainText("Weighty · 1612");
@@ -76,7 +90,8 @@ test("home → queue → match, then tap a name for that player's profile (phone
   }
   await expect(desk.locator(".fd-seats .fd-seat")).toHaveCount(50);
   await expect(desk.locator(".fd-seat:not(.empty)")).toHaveCount(2);
-  await expect(desk.locator(".fd-queue-line")).toContainText("then the raid begins");
+  // (A Default raid: bots fill the crowd when its minute is up.)
+  await expect(desk.locator(".fd-queue-line")).toContainText("then bots fill the rest");
   // A pawn in the queue opens that player's profile too.
   await desk.getByRole("button", { name: "Phoney's profile" }).click();
   await expect(desk.locator(".fd-overlay").getByRole("heading", { name: "Phoney" })).toBeVisible();

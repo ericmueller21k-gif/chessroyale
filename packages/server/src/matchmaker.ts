@@ -1,10 +1,12 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY } from "@chessroyale/core";
+import { CAPACITY, DEFAULT_SETTINGS, MATCHMAKING } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { FILL_IN_ORDER, QueueCore, type MatchRules, type Ticket } from "./queue.ts";
+
+export { queueName } from "./queue.ts";
 import { liveHub } from "./live-hub.ts";
 
 /** What POST /api/play answers: a lobby, or "busy, you're in line" with the ticket to ask again with. */
@@ -16,10 +18,20 @@ export const busyMessage = (seconds: number) => `Servers are busy, you're in lin
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** How a queue's lobbies start (the same for every press to one queue), and a switcher's wait so far. */
+export interface PlayOptions {
+  /** Bots off: people only (a raid may begin after the fill time with enough people; a 50 v 50 waits until full). */
+  botsOff?: boolean;
+  crowdWaitsForFull?: boolean;
+  /** Bots off → Default: waiting since then, so bots fill a minute after that at the latest (never sooner than switchMinWaitMs). */
+  since?: number;
+}
+
 /**
- * "Play now": one Durable Object per queue (mode, and region when CAPACITY.queue.byRegion is on). Players join the
- * lobby that's filling until it's full or a minute has passed since it opened, then it starts with bots in the empty
- * seats and the next players get a new lobby. Unranked; ranked queues plug their rules into `rules` (queue.ts).
+ * PLAY: one Durable Object per queue (mode and matchmaking type, and region when CAPACITY.queue.byRegion is on).
+ * Default: players join the lobby that's filling until it's full or a minute has passed since it opened, then it
+ * starts with bots in the empty seats and the next players get a new lobby. Bots off: it waits until full (a raid: see
+ * MATCHMAKING). Solo never comes here. Unranked; ranked queues plug their rules into `rules` (queue.ts).
  *
  * Built for surges (DECISIONS.md, "Capacity: built"): PLAY presses are tickets in memory, seated in batches with one
  * seat reservation per lobby per batch, never one cross-object call per player inside a lock. A surge past the
@@ -35,7 +47,12 @@ export class Matchmaker extends DurableObject<Env> {
   private current = new Map<string, string>();
   private forming: Promise<void> | null = null;
   private again: ReturnType<typeof setTimeout> | null = null;
-  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number } = { overrides: {}, fillMs: 60_000 };
+  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean } = {
+    overrides: {},
+    fillMs: 60_000,
+    botsOff: false,
+    crowdWaitsForFull: false,
+  };
   private players: { at: number; n: number } = { at: 0, n: 0 };
   /** The matching rules (ranked replaces these). */
   protected rules: MatchRules = FILL_IN_ORDER;
@@ -50,12 +67,12 @@ export class Matchmaker extends DurableObject<Env> {
     });
   }
 
-  /** PLAY (or a player in line asking again with their ticket). */
-  async next(overrides: LobbyRecord["overrides"], fillMs: number, ticketId?: string | null, info?: Record<string, unknown>): Promise<PlayAnswer> {
+  /** PLAY (or a player in line asking again with their ticket). `info`: for matching rules (ranked). */
+  async next(overrides: LobbyRecord["overrides"], fillMs: number, opts: PlayOptions = {}, ticketId?: string | null, info?: Record<string, unknown>): Promise<PlayAnswer> {
     countCall("mm.next");
-    this.lobbyOptions = { overrides, fillMs };
+    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull };
     const now = Date.now();
-    const t = this.q.enqueue(ticketId, now, info);
+    const t = this.q.enqueue(ticketId, now, opts.since !== undefined ? { ...info, since: opts.since } : info);
     const done = this.q.placedIn(t.id);
     if (done) return { code: done, ticket: t.id };
     const seated = new Promise<string>((resolve) => this.waiters.set(t.id, resolve));
@@ -121,18 +138,33 @@ export class Matchmaker extends DurableObject<Env> {
         .reserve(rest.length, CAPACITY.queue.reservationMs)
         .catch(() => 0);
       if (got > 0) {
-        this.placeAll(rest.slice(0, got), code);
+        const placed = rest.slice(0, got);
+        // Someone switching from Bots off: bots fill a minute after they first joined, at the latest.
+        const since = earliestSince(placed);
+        if (since !== undefined) await this.lobby(code).hurry(since + this.lobbyOptions.fillMs).catch(() => undefined);
+        this.placeAll(placed, code);
         rest = rest.slice(got);
       }
     }
     while (rest.length) {
-      const { overrides, fillMs } = this.lobbyOptions;
+      const { overrides, fillMs, botsOff, crowdWaitsForFull } = this.lobbyOptions;
       let granted: number | boolean = false;
       countCall("mm.create");
-      // A fresh code: one whose lobby is still open (a match, or its results) is never handed out.
       const want = rest.length;
+      // When bots fill (Default), or when a raid may begin with fewer (Bots off); a Bots off 50 v 50 waits until full.
+      // A switcher among those it will seat brings the fill time forward (their wait counts).
+      const now = Date.now();
+      const since = earliestSince(rest.slice(0, Number(overrides?.lobbySize ?? DEFAULT_SETTINGS.lobbySize)));
+      const fillAt = botsOff
+        ? crowdWaitsForFull
+          ? null
+          : now + fillMs
+        : since !== undefined
+          ? Math.min(now + fillMs, Math.max(now + MATCHMAKING.switchMinWaitMs, since + fillMs))
+          : now + fillMs;
+      // A fresh code: one whose lobby is still open (a match, or its results) is never handed out.
       const fresh = await openLobbyCode(async (c) => {
-        granted = await this.lobby(c).create(c, overrides, { fillAt: Date.now() + fillMs, reserve: want, reserveMs: CAPACITY.queue.reservationMs });
+        granted = await this.lobby(c).create(c, overrides, { fillAt, botsOff, reserve: want, reserveMs: CAPACITY.queue.reservationMs });
         return granted !== false;
       });
       if (!fresh || !granted) {
@@ -158,4 +190,10 @@ export class Matchmaker extends DurableObject<Env> {
   private lobby(code: string) {
     return this.env.LOBBIES.get(this.env.LOBBIES.idFromName(code));
   }
+}
+
+/** The earliest Bots-off wait among these tickets (players switching to Default), if any. */
+function earliestSince(tickets: Ticket[]): number | undefined {
+  const xs = tickets.map((t) => t.info?.since).filter((x): x is number => typeof x === "number");
+  return xs.length ? Math.min(...xs) : undefined;
 }
