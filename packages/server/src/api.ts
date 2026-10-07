@@ -14,6 +14,7 @@ import {
   randomToken,
   reportPlayer,
   recordResult,
+  setChatPicks,
   shopState,
   signInWithIdentity,
   startEmailCode,
@@ -179,6 +180,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const { item } = (await request.json().catch(() => ({}))) as { item?: unknown };
     const r = path === "/api/shop/buy" ? await buyItem(sql, current.id, item, now) : await equipItem(sql, current.id, item);
     return r.ok ? json(r.shop) : json({ message: r.message }, 400);
+  }
+  // POST /api/shop/chat {lines?, emoji?}: the quick chat lines and emoji you see in your games (your profile's
+  // "Quick chat and emoji"), in your order; null puts one back to the defaults. Answers with your shop.
+  if (path === "/api/shop/chat" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { lines?: unknown; emoji?: unknown };
+    return json(await setChatPicks(sql, current.id, b && typeof b === "object" ? b : {}));
   }
 
   // The locker. GET /api/locker; POST /api/locker/open {crate, fischer?, shiny?} (the test switches work only while

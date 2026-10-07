@@ -1,10 +1,35 @@
-import { QUICK_CHAT, canSayToAll, chatCheck, chatReadyAt, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent, type ChatTo } from "@chessroyale/core";
+import {
+  QUICK_CHAT,
+  canSayToAll,
+  chatCheck,
+  chatPicksOf,
+  chatReadyAt,
+  chatSay,
+  chatSays,
+  chatSent,
+  noChatSent,
+  ownedChatPacks,
+  type ChatSay,
+  type ChatSent,
+  type ChatTo,
+  type StoredChatPicks,
+} from "@chessroyale/core";
 import type { ChatRefusal, ClientMessage, NetChatLine } from "@chessroyale/chess";
 import { chatBubbles, chatOff, onPrefsChange, setChatOff } from "./prefs.ts";
 import { play } from "./sound.ts";
 
 /** A chat line as this device keeps it: `at` is local time (when it shows). */
 export type ChatLine = NetChatLine;
+
+/**
+ * An emoji floating on the scoreboard: from its sender's row, or from the header when the sender has no row there.
+ * `team`: it went to everyone, from that side (the header's float shows their chip).
+ */
+export interface ChatFloat {
+  text: string;
+  key: number;
+  team?: "w" | "b";
+}
 
 /** What the chat needs from its match. */
 export interface ChatHost {
@@ -16,6 +41,8 @@ export interface ChatHost {
   local: (serverTime: number) => number;
   /** Two teams talking separately (a 50 v 50, before any boss battle): the Team / All switch shows. */
   teams: () => boolean;
+  /** The lines and emoji this player picked in their profile (their account's; missing: the defaults). */
+  picks: () => StoredChatPicks | null | undefined;
 }
 
 /**
@@ -28,7 +55,7 @@ export class MatchChat {
   enabled = false;
   /** The packs the server knows this player owns (their buttons). */
   packs: string[] = ownedChatPacks([]);
-  /** Who this player's lines go to (Hello and Sporting lines only can go to everyone). */
+  /** Who this player's lines go to (only Hello and Sporting lines, and emoji, can go to everyone). */
   to: ChatTo = "team";
   /** Senders' icons, kept as they come with their first line. */
   readonly icons = new Map<string, string>();
@@ -100,6 +127,15 @@ export class MatchChat {
   }
 
   // ---------------- Saying things ----------------
+
+  /**
+   * The buttons: the lines and emoji this player picked in their profile, in their order (the defaults until they
+   * choose), among the packs the server knows they own.
+   */
+  picked(): { lines: ChatSay[]; emoji: ChatSay[] } {
+    const p = chatPicksOf(this.host.picks(), this.packs);
+    return { lines: chatSays(p.lines), emoji: chatSays(p.emoji) };
+  }
 
   /** When anything can be sent again (local time). */
   readyAt(): number {
@@ -203,13 +239,18 @@ export class MatchChat {
   /** Lines seen on screen before the panel was hidden don't bubble up again. */
   private seenBeforeBubble = 0;
 
-  /** Emoji floating above their senders' rows on the scoreboard right now (by sender). */
-  floats(now = Date.now()): Map<string, { text: string; key: number }> {
-    const out = new Map<string, { text: string; key: number }>();
+  /**
+   * Emoji floating above their senders' rows on the scoreboard right now (by sender). `team` marks one sent to
+   * everyone (with the sender's side): a scoreboard without the sender's row (the other team's) floats it from its
+   * header, with their team's chip.
+   */
+  floats(now = Date.now()): Map<string, ChatFloat> {
+    const out = new Map<string, ChatFloat>();
     if (chatOff()) return out;
     for (const l of this.lines(now)) {
       const say = chatSay(l.say);
-      if (say?.kind === "emoji" && now - l.at < QUICK_CHAT.emojiFloatMs) out.set(l.from, { text: say.text, key: l.n });
+      if (say?.kind === "emoji" && now - l.at < QUICK_CHAT.emojiFloatMs)
+        out.set(l.from, { text: say.text, key: l.n, ...(l.to === "all" && l.team && this.host.teams() ? { team: l.team } : {}) });
     }
     return out;
   }

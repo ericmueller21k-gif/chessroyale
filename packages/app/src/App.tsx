@@ -106,7 +106,7 @@ export function App() {
     if (m) openProfile(m[1] ? { uid: m[1], name: "" } : { you: true, name: "" });
   });
   const profileOpen = useProfileTarget();
-  const [showShop, setShowShop] = useState<false | "shop" | "locker">(() => (location.pathname === "/shop" ? "shop" : false));
+  const [showShop, setShowShop] = useState<false | "shop" | "locker" | "chat">(() => (location.pathname === "/shop" ? "shop" : false));
   const [showSettings, setShowSettings] = useState(() => location.pathname === "/settings");
   /** The computer's side menu: open the home screen's boss menu or Play with friends. */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(null);
@@ -387,6 +387,10 @@ export function App() {
             closeProfile();
             setShowSettings(true);
           }}
+          onShop={() => {
+            closeProfile();
+            setShowShop("chat");
+          }}
         />
       </FrontFrame>
     );
@@ -395,7 +399,7 @@ export function App() {
     return (
       <FrontFrame page="shop" nav={nav}>
       <ShopScreen
-        initial={showShop === "locker" ? "locker" : undefined}
+        initial={showShop === "locker" || showShop === "chat" ? showShop : undefined}
         onBack={() => {
           setShowShop(false);
           if (location.pathname === "/shop") history.replaceState(null, "", "/");
@@ -589,7 +593,7 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
 }
 
 /** A profile as a page (outside a match): its address, and back to where you were. */
-function ProfilePage({ target, onLocker, onSettings }: { target: ProfileTarget; onLocker: () => void; onSettings: () => void }) {
+function ProfilePage({ target, onLocker, onSettings, onShop }: { target: ProfileTarget; onLocker: () => void; onSettings: () => void; onShop: () => void }) {
   useEffect(() => {
     const path = target.you ? "/profile" : target.uid ? `/profile/${target.uid}` : null;
     if (path && location.pathname !== path) history.replaceState(null, "", path);
@@ -603,6 +607,7 @@ function ProfilePage({ target, onLocker, onSettings }: { target: ProfileTarget; 
       }}
       onLocker={onLocker}
       onSettings={onSettings}
+      onShop={onShop}
     />
   );
 }

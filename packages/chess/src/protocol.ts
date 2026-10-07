@@ -255,7 +255,7 @@ export type ClientMessage =
   | { t: "bossMove"; key: string; move: string }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
-  /** Quick chat: say a line (a phrase or emoji id) to your team or, for Hello and Sporting lines, to everyone. */
+  /** Quick chat: say a line (a phrase or emoji id) to your team or, for Hello and Sporting lines and emoji, to everyone. */
   | { t: "chat"; say: string; to?: "team" | "all" }
   /**
    * Quick chat, this device's choices: chat off (nothing is sent to it, and it can't send), and the players muted

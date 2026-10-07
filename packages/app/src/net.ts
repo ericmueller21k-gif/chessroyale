@@ -67,6 +67,8 @@ export class NetMatch implements GameView {
     emit: () => this.emit(),
     local: (t) => this.local(t),
     teams: () => !this.boss && this.standingsList.some((s) => !!s.team),
+    // (The profile's picks, from the account: they follow the player like the rest of the profile.)
+    picks: () => account().profile?.shop?.chat,
   });
 
   private ws: WebSocket | null = null;

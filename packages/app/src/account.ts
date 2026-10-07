@@ -1,4 +1,4 @@
-import type { ShopState } from "@chessroyale/core";
+import type { ChatPicks, ShopState } from "@chessroyale/core";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect } from "@chessroyale/core";
 
 /**
@@ -78,6 +78,17 @@ export async function buyShopItem(item: string): Promise<void> {
   if (!state.profile) return;
   const shop = await api<ShopState>("/api/shop/buy", { method: "POST", body: JSON.stringify({ item }) });
   set({ profile: { ...state.profile, shop } });
+}
+
+/**
+ * Quick chat: the lines and/or emoji you see in your games, in your order (your profile's "Quick chat and emoji");
+ * null puts one back to the defaults. The server cleans them (owned lines only, at most the caps) and answers.
+ */
+export async function saveChatPicks(picks: { [K in keyof ChatPicks]?: ChatPicks[K] | null }): Promise<ChatPicks> {
+  if (!state.profile) throw new Error("Quick chat needs your account.");
+  const shop = await api<ShopState>("/api/shop/chat", { method: "POST", body: JSON.stringify(picks) });
+  set({ profile: { ...state.profile, shop } });
+  return shop.chat;
 }
 
 /** Equips a shop item you own. */

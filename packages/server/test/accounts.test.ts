@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
-import { itemDef, ownedChatPacks } from "@chessroyale/core";
+import { QUICK_CHAT, defaultChatPicks, itemDef, ownedChatPacks } from "@chessroyale/core";
 import {
   isPixelIcon,
   buyItem,
+  setChatPicks,
   createGuest,
   equipItem,
   shopState,
@@ -152,6 +153,21 @@ describe("account API", () => {
     expect((await call(env, "/api/me", { cookie: ok.cookie })).body.stats.crowd.matches).toBe(1);
   });
 
+  it("POST /api/shop/chat: your quick chat picks, saved to your account and on your profile", async () => {
+    const env = { DB: memoryD1() };
+    const me = await call(env, "/api/me?name=Chatty");
+    expect(me.body.shop.chat).toEqual(defaultChatPicks());
+    const post = (body: unknown) => call(env, "/api/shop/chat", { method: "POST", body: JSON.stringify(body), cookie: me.cookie });
+    const r = await post({ lines: ["push-pawns", "gg", "gk-crown"], emoji: ["e-fire"] });
+    expect(r.res.status).toBe(200);
+    expect(r.body.chat).toEqual({ lines: ["push-pawns", "gg"], emoji: ["e-fire"] });
+    expect((await call(env, "/api/me", { cookie: me.cookie })).body.shop.chat).toEqual({ lines: ["push-pawns", "gg"], emoji: ["e-fire"] });
+    expect((await post({ emoji: null })).body.chat.emoji).toEqual(defaultChatPicks().emoji);
+    expect((await post("junk")).body.chat.lines).toEqual(["push-pawns", "gg"]);
+    // Only for someone with an account on this device.
+    expect((await call(env, "/api/shop/chat", { method: "POST", body: "{}" })).res.status).toBe(401);
+  });
+
   it("Google: start redirects with state; the callback checks it and signs in", async () => {
     const env = { DB: memoryD1(), GOOGLE_CLIENT_ID: "cid", GOOGLE_CLIENT_SECRET: "secret" };
     const me = await call(env, "/api/me");
@@ -253,6 +269,52 @@ describe("account API", () => {
     expect(ownedChatPacks(shop.owned)).toEqual(["basics", "emoji-basics", "godking"]);
     const account = await signInWithIdentity(sql, guest, "email", "chatty@example.com", {}, 1200);
     expect(ownedChatPacks((await shopState(sql, account.id)).owned)).toContain("godking");
+  });
+
+  it("quick chat picks: the defaults until chosen; cleaned, in order, capped; a pack fills empty slots; they follow you when you sign in", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user: guest } = await createGuest(sql, 1000, "Guest");
+    // New (and existing) players: the defaults, in the shop state the profile and the match read.
+    expect((await shopState(sql, guest.id)).chat).toEqual(defaultChatPicks());
+    expect((await profile(sql, guest)).shop.chat).toEqual(defaultChatPicks());
+    // Chosen: kept in their order; unknown ids, the other kind, repeats and lines from packs they don't own dropped.
+    let shop = await setChatPicks(sql, guest.id, { lines: ["rematch", "gg", "free text!", "e-fire", "gg", "gk-crown", "push-pawns"] });
+    expect(shop.chat.lines).toEqual(["rematch", "gg", "push-pawns"]);
+    expect(shop.chat.emoji).toEqual(defaultChatPicks().emoji);
+    // At most the caps.
+    shop = await setChatPicks(sql, guest.id, { emoji: ["e-fire", "e-skull"] });
+    expect(shop.chat).toEqual({ lines: ["rematch", "gg", "push-pawns"], emoji: ["e-fire", "e-skull"] });
+    const tooMany = await setChatPicks(sql, guest.id, { lines: defaultChatPicks().lines.concat(["rematch", "hi-all", "lets-go"]) });
+    expect(tooMany.chat.lines).toHaveLength(QUICK_CHAT.maxLines);
+    // Junk changes nothing; null puts a kind back to the defaults.
+    expect((await setChatPicks(sql, guest.id, { lines: "gg", emoji: 3 })).chat).toEqual(tooMany.chat);
+    shop = await setChatPicks(sql, guest.id, { lines: ["gg", "wow"] });
+    expect(shop.chat.lines).toEqual(["gg", "wow"]);
+    // Getting a pack: its lines go into the empty slots (in its order, up to the cap).
+    let got = await buyItem(sql, guest.id, "chat-godking", 1100);
+    expect(got.ok && got.shop.chat.lines).toEqual(["gg", "wow", "gk-crown", "gk-stand", "gk-call", "gk-long-live"]);
+    got = await buyItem(sql, guest.id, "chat-emoji-royal", 1150);
+    expect(got.ok && got.shop.chat.emoji).toEqual(["e-fire", "e-skull", "e-prince", "e-princess", "e-gem", "e-trophy", "e-fleur", "e-dragon"]);
+    // A pack's lines can be picked once it's owned.
+    shop = await setChatPicks(sql, guest.id, { lines: ["gk-crown", "gg"] });
+    expect(shop.chat.lines).toEqual(["gk-crown", "gg"]);
+    // Full picks (the defaults are 10/10 and 8/8): getting a pack changes nothing in them.
+    const { user: other } = await createGuest(sql, 1200, "Other");
+    got = await buyItem(sql, other.id, "chat-winter", 1200);
+    expect(got.ok && got.shop.chat).toEqual(defaultChatPicks());
+    got = await buyItem(sql, other.id, "chat-emoji-chess", 1200);
+    expect(got.ok && got.shop.chat).toEqual(defaultChatPicks());
+    // Signing in to an existing account: the guest's picks come along unless the account has its own.
+    const fresh = await signInWithIdentity(sql, null, "email", "fresh@example.com", {}, 1300);
+    const merged = await signInWithIdentity(sql, guest, "email", "fresh@example.com", {}, 1400);
+    expect(merged.id).toBe(fresh.id);
+    expect((await shopState(sql, fresh.id)).chat.lines).toEqual(["gk-crown", "gg"]);
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, 1500);
+    await setChatPicks(sql, owner.id, { lines: ["thanks"] });
+    await setChatPicks(sql, other.id, { lines: ["wow"] });
+    await signInWithIdentity(sql, other, "email", "owner@example.com", {}, 1600);
+    expect((await shopState(sql, owner.id)).chat.lines).toEqual(["thanks"]);
   });
 
   it("the locker: crates open on the server (free while testing), items equip by slot, and a guest's items follow them", async () => {

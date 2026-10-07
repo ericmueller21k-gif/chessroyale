@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { QUICK_CHAT } from "@chessroyale/core";
+import { QUICK_CHAT, defaultChatPicks, type StoredChatPicks } from "@chessroyale/core";
 import type { ClientMessage, NetChatLine } from "@chessroyale/chess";
 import { MatchChat } from "../src/chat.ts";
 
 /** A chat whose match is "p1" on a team, with the server's clock equal to ours. */
-function setup(teams = true) {
+function setup(teams = true, picks: StoredChatPicks | null = null) {
   const sent: ClientMessage[] = [];
   let emits = 0;
+  const host = { picks };
   const chat = new MatchChat({
     code: () => "ABCDE",
     me: () => "p1",
@@ -14,9 +15,10 @@ function setup(teams = true) {
     emit: () => emits++,
     local: (t) => t,
     teams: () => teams,
+    picks: () => host.picks,
   });
   const line = (n: number, from: string, say: string, extra: Partial<NetChatLine> = {}): NetChatLine => ({ n, from, say, to: "team", team: "w", at: Date.now(), ...extra });
-  return { chat, sent, line, emits: () => emits };
+  return { chat, sent, line, host, emits: () => emits };
 }
 
 describe("quick chat in the app", () => {
@@ -72,7 +74,7 @@ describe("quick chat in the app", () => {
     expect(chat.lines().map((l) => l.from)).toEqual(["bot4"]);
   });
 
-  it("mirrors the limits: the buttons grey out after a send, the same line for longer; All allows only Hello and Sporting", () => {
+  it("mirrors the limits: the buttons grey out after a send, the same line for longer; All allows only Hello and Sporting lines and emoji", () => {
     const { chat, sent } = setup();
     chat.onLog([], ["basics", "emoji-basics"]);
     expect(chat.canSay("gk-crown")).toBe(false); // a pack you don't own
@@ -84,7 +86,6 @@ describe("quick chat in the app", () => {
     expect(chat.canSay("push-pawns")).toBe(false);
     chat.setTo("all");
     expect(chat.canSay("trust-crowd")).toBe(false);
-    expect(chat.canSay("e-thumbs")).toBe(false);
     chat.say("gg");
     expect(sent.at(-1)).toEqual({ t: "chat", say: "gg", to: "all" });
     // The server said wait: the buttons wait too.
@@ -120,5 +121,38 @@ describe("quick chat in the app", () => {
     // An emoji floats for a moment only.
     vi.advanceTimersByTime(QUICK_CHAT.emojiFloatMs);
     expect(chat.floats().size).toBe(0);
+  });
+
+  it("emoji go to everyone with All on; one from the other team floats from the scoreboard's header with their chip", () => {
+    const { chat, sent, line } = setup();
+    chat.onLog([], ["basics", "emoji-basics"]);
+    chat.setTo("all");
+    expect(chat.canSay("e-thumbs")).toBe(true);
+    chat.say("e-thumbs");
+    expect(sent.at(-1)).toEqual({ t: "chat", say: "e-thumbs", to: "all" });
+    // A pack's emoji still needs the pack.
+    expect(chat.canSay("e-dragon")).toBe(false);
+    // Their team's emoji to everyone carries their side (no row of theirs on this scoreboard); a team one doesn't.
+    chat.onLine(line(1, "p9", "e-fire", { to: "all", team: "b" }));
+    chat.onLine(line(2, "p2", "e-clap"));
+    expect(chat.floats().get("p9")).toEqual({ text: "🔥", key: 1, team: "b" });
+    expect(chat.floats().get("p2")).toEqual({ text: "👏", key: 2 });
+    expect(chat.lines().find((l) => l.from === "p9")).toMatchObject({ to: "all", team: "b" });
+  });
+
+  it("the buttons are the profile's picks, in the player's order, among the packs the server knows they own", () => {
+    const { chat, host } = setup();
+    chat.onLog([], ["basics", "emoji-basics"]);
+    // Never chosen: the defaults.
+    expect(chat.picked().lines.map((s) => s.id)).toEqual(defaultChatPicks().lines);
+    expect(chat.picked().emoji.map((s) => s.id)).toEqual(defaultChatPicks().emoji);
+    // Their own, in their order; a pack the server doesn't know they own doesn't show (yet).
+    host.picks = { lines: ["rematch", "gk-crown", "push-pawns"], emoji: ["e-skull", "e-dragon"] };
+    expect(chat.picked().lines.map((s) => s.text)).toEqual(["Rematch?", "Push the pawns!"]);
+    expect(chat.picked().emoji.map((s) => s.text)).toEqual(["💀"]);
+    chat.onLog([], ["basics", "emoji-basics", "godking"]);
+    expect(chat.picked().lines.map((s) => s.text)).toEqual(["Rematch?", "For the crown!", "Push the pawns!"]);
+    // A line that isn't picked can still be said (picks are which buttons show; the server checks ownership).
+    expect(chat.canSay("gg")).toBe(true);
   });
 });
