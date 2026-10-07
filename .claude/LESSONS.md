@@ -196,3 +196,30 @@ the panel (height, rows, chat). Then it listed every CSS rule matching the empty
   bigger, it shows its content.
 - For a panel with several controls, test every button from every state, with a reload after each, and assert the
   panel is never an empty box (`e2e/panel.spec.ts`).
+
+## A vote board that jumped, and zones that pulsed green (Oct 7, 2026)
+
+**Seen** (by the vote overhaul, before it shipped):
+- The board moved when the game began. On a phone the vote's board was 20 px wider and 8 px lower than the game's: the
+  vote had its own big heading and no eval bar beside the board. On a computer the game has the leaderboard down the
+  side and the vote didn't. It had been so since the votes were built, and every test passed.
+- With your pawn picked up, the three zones were meant to pulse blue. They showed vivid green.
+
+**The cause:**
+- Each screen built its own frame around the board, so the board's box depended on what was above and beside it.
+- Chrome animates between a `color-mix(in srgb, X 80%, transparent)` colour and a plain one through values far out
+  of range (its computed border read `oklab(1 129 245 / 1)`), drawn as bright green.
+
+**How it was found:** a script measured the board's box (and the rows above it) on the vote and on the game's first
+screen, at 360 and 390 px and on a computer; then `npm run frames:vote` recorded every frame with a real finger, and
+the frame of the tap showed the green.
+
+**The rule:**
+- When one screen hands a board to the next, give both the same frame (top line, the line above the board, the eval
+  bar's slot, the sidebar) and measure the board's box on both, on a phone and a computer. Don't trust a screenshot.
+- Don't transition or animate between colours made with `color-mix(…, transparent)`. Switch them, or fade a layer's
+  opacity, or animate a shadow.
+- Also caught (by `e2e/crowd.spec.ts`, "the board never moves", on the computer only): the move's clock added to the
+  line above the board ("⏱ 10 s") made that line 1 px taller on your move, so the board moved. The emoji's font is
+  taller than the text's, and the line's height was `normal` (a phone's is fixed). An emoji or symbol in a line
+  above the board gets `line-height: 1`.

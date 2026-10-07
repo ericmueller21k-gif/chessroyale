@@ -47,11 +47,12 @@ import {
   interleave,
   lastStandBar,
   lastStandDue,
+  moveClockAt,
 } from "@chessroyale/core";
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
 import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { applyMove, legalMoves, pieceAt, sideToMove, toSan } from "./rules.ts";
+import { applyMove, legalMoves, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 
 /**
@@ -322,9 +323,37 @@ export class MatchRunner {
     return this.opts.settings;
   }
 
-  /** Crowd augments: the move clock for the rounds from now on. */
+  /** Crowd augments: the move clock for the rounds from now on (a fixed one: it replaces a rising schedule). */
   setMoveClock(seconds: number): void {
-    this.opts.settings = { ...this.opts.settings, moveClockSeconds: seconds };
+    this.opts.settings = { ...this.opts.settings, moveClockSeconds: seconds, moveClockSteps: [] };
+  }
+
+  /**
+   * The move number this round's clock goes by: the top bar's "Move N" on the board in play (the team final and the
+   * duel play on the same board, so they carry on counting). A boss battle rewinds the board to an earlier position
+   * of the game, but not the clock: its moves count on from the move the game had reached.
+   */
+  clockMove(boardId?: number): number {
+    const b = this.state.boss;
+    if (b?.clockFromMove !== undefined) return b.clockFromMove + b.crowdMoves;
+    const board = this.boards.get(boardId ?? this.state.boards[0]!);
+    return board ? moveNumber(board.fen) : 1;
+  }
+
+  /** This round's move clock in seconds (see moveClockAt): the same everywhere a clock is set. */
+  moveClock(boardId?: number): number {
+    return moveClockAt(this.settings, this.clockMove(boardId));
+  }
+
+  /** How long a player may think this round: their bank plus the increment, capped by this move's clock. */
+  allowedMsFor(playerId: string): number {
+    const board = [...this.groups].find(([, ids]) => ids.includes(playerId))?.[0];
+    return allowedMs(this.player(playerId), this.settings, this.clockMove(board));
+  }
+
+  /** The settings with this round's clock fixed in moveClockSeconds (for the bots' timing and capping think times). */
+  private roundSettings(): Settings {
+    return { ...this.settings, moveClockSeconds: this.moveClock(), moveClockSteps: [] };
   }
 
   /** Pre-game votes: settings from the winning options (how it ends, the clock) for the rest of the match. */
@@ -396,10 +425,11 @@ export class MatchRunner {
     }
     // Bots' thinking times are drawn now, so a screen can show each bot finishing at its moment.
     const picking = new Set([...this.groups.values()].flat());
+    const round = this.roundSettings();
     this.botThink = new Map(
       this.alive()
         .filter((p) => p.isBot && picking.has(p.id))
-        .map((p) => [p.id, Math.min(botThinkMs(this.opts.rng, this.settings), allowedMs(p, this.settings))]),
+        .map((p) => [p.id, Math.min(botThinkMs(this.opts.rng, round), allowedMs(p, round))]),
     );
     return this.groups;
   }
@@ -511,7 +541,7 @@ export class MatchRunner {
         out[id] = plannedMove;
         continue;
       }
-      if (!this.botThink.has(id)) this.botThink.set(id, botThinkMs(this.opts.rng, this.settings));
+      if (!this.botThink.has(id)) this.botThink.set(id, botThinkMs(this.opts.rng, this.roundSettings()));
       const choice = botChoose(this.opts.rng, candidates, p, legal, this.settings);
       if (choice.usedPowerUp) this.botPowerUps.add(id);
       out[id] = choice.move;
@@ -710,7 +740,8 @@ export class MatchRunner {
     const outcomes = results.flatMap((r) => outcomesFromGroup(r.result, think, used));
     const kingPlayed = results.some((r) => r.king);
     const stand = results.find((r) => r.lastStand)?.lastStand;
-    this.state = applyRound(this.state, this.groups, outcomes, this.settings);
+    // (With this round's clock, worked out before the move count moves on.)
+    this.state = applyRound(this.state, this.groups, outcomes, this.roundSettings());
     if (kingPlayed && this.state.boss) {
       const b = this.state.boss;
       this.state = {
@@ -922,6 +953,7 @@ export class MatchRunner {
         elo,
         crowdSide: "w",
         startPly,
+        clockFromMove: moveNumber(old.fen),
         crowdMoves: 0,
         sinceKill: 0,
         kills: [],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, PREGAME_VOTES, RAID_SETTINGS, VARIABLE_CLOCK, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { LAST_STAND_MS, applyMove, bossIntroTimeline, legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -353,8 +353,54 @@ describe("lobby: Crowd mode", () => {
     L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
     const speed = PREGAME_VOTES[1]!.options[L.last("p1", "vote")!.vote.result!]!;
     L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
-    // The game starts with the voted clock.
-    expect(L.last("p1", "round")!.moveClock).toBe(speed.patch.moveClockSeconds);
+    // The game starts with the voted clock: Normal 20 s, Variable's first step (10 s) or Bullet 10 s.
+    expect(L.last("p1", "round")!.moveClock).toBe({ normal: 20, variable: 10, bullet: 10 }[speed.id]);
+    expect(L.core.record.overrides?.moveClockSteps ?? []).toEqual(speed.patch.moveClockSteps);
+  });
+
+  it("pre-game votes: one vote each (a second is ignored); with voteChangeAllowed it replaces the first", () => {
+    for (const allowed of [false, true]) {
+      const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }), boardIntroSeconds: 0, voteChangeAllowed: allowed });
+      L.core.connect(undefined, "Ann", "computer");
+      L.core.connect(undefined, "Bo", "phone");
+      L.core.message("p1", { t: "start" });
+      const v = L.last("p2", "vote")!.vote;
+      expect(!!v.changeAllowed).toBe(allowed);
+      L.core.message("p1", { t: "vote", key: v.key, option: 0 });
+      L.core.message("p1", { t: "vote", key: v.key, option: 2 });
+      const casts = L.take("p2").filter((m) => m.t === "voteCast");
+      expect(casts.map((c) => (c as { option: number }).option)).toEqual(allowed ? [0, 2] : [0]);
+      L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+      const mine = L.last("p1", "vote")!.vote.votes.filter((x) => x.playerId === "p1");
+      expect(mine.map((x) => x.option)).toEqual([allowed ? 2 : 0]);
+    }
+  });
+
+  it("the Variable speed online: each move's deadline follows the schedule (10 s on move 1, 15 s on move 6)", () => {
+    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), firstStageRounds: 20, roundsPerStage: 2, boardIntroSeconds: 0, moveClockSteps: VARIABLE_CLOCK });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone");
+    L.core.message("p1", { t: "start" });
+    const clocks = new Map<number, number>();
+    for (let i = 0; i < 400 && clocks.size < 7; i++) {
+      if (L.core.record.phase === "play") {
+        for (const id of ["p1", "p2"]) {
+          const r = L.last(id, "round");
+          if (!r?.board) continue;
+          const move = Number(r.board.fen.split(" ")[5]);
+          clocks.set(move, r.moveClock!);
+          // The deadline is this move's clock (a fresh time bank never cuts it shorter).
+          if (!r.watching) expect(r.deadline - r.startsAt!).toBe(r.moveClock! * 1000);
+          if (!r.watching && r.alive) L.core.message(id, { t: "pick", key: r.key, move: legalMoves(r.board.fen)[0]! });
+        }
+        L.take("p1");
+        L.take("p2");
+        L.advance(20_000);
+      }
+      if (L.core.record.phase === "scoring") L.hostScores("p1") || L.hostScores("p2");
+      L.advance(4000);
+    }
+    expect([1, 2, 5, 6, 7].map((m) => clocks.get(m))).toEqual([10, 10, 10, 15, 15]);
   });
 
   it("boss battle online: the host plays the boss's moves, the boss strikes every 3 crowd moves, results carry the outcome", () => {

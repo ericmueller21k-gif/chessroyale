@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { applyMove, inCheck, pieceAt, sideToMove, toSan } from "@chessroyale/chess";
 import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKing.ts";
-import { brilliance, equippedLook, type Augment } from "@chessroyale/core";
+import { brilliance, type Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
@@ -19,7 +19,7 @@ import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { Breakdown } from "../components/Breakdown.tsx";
-import { account } from "../account.ts";
+import { pawnLook } from "../looks.ts";
 import { seenKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
@@ -452,8 +452,6 @@ const AUGMENTS: { choice: Augment; title: string; step: number }[] = [
   { choice: "less", title: "Less time", step: -1 },
 ];
 
-const BOT_HATS = ["none", "none", "none", "party", "crown", "wizard", "top", "viking"];
-const hash = (s: string) => [...s].reduce((a, c) => Math.imul(a ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 /** The judge strikes this long after the screen opens. */
 const GAVEL_AT = 1500;
 /** The cut screen names at most this many of the players who went out (then "+N"). */
@@ -536,8 +534,6 @@ export function CrowdCut({
   const clock = moveClock ?? s.moveClockSeconds;
   const at = (step: number) => Math.max(s.clockRange[0], Math.min(s.clockRange[1], clock + step * s.clockStepSeconds));
   const cutNow = new Set(knockedOut.map((k) => k.id));
-  const myHat = equippedLook(account().profile?.shop, "hat").hat ?? "none";
-  const myLook = account().profile?.locker?.look;
   // Fixed seats: by team (White left, Black right), then by id.
   const seats = useMemo(() => {
     const byId = (a: Standing, b: Standing) => (a.id < b.id ? -1 : 1);
@@ -573,8 +569,7 @@ export function CrowdCut({
       <div class="pawn-grid" role="img" aria-label={`${aliveAfter} players through, ${knockedOut.length} cut`}>
         {seats.map((p) => {
           const side = p.team === "b" ? "b" : "w";
-          const hat = p.isYou ? myHat : p.isBot ? BOT_HATS[hash(p.id) % BOT_HATS.length]! : "none";
-          const look = p.isYou ? myLook : p.look;
+          const { look, hat } = pawnLook(p);
           const state = cutNow.has(p.id) ? (slammed ? " cut-now" : " doomed") : p.out ? " gone" : "";
           return (
             <span key={p.id} class={`grid-pawn${state}${p.isYou ? " you" : ""}`} title={p.isYou ? "You" : p.name}>

@@ -211,6 +211,8 @@ export interface NetVote {
   /** The winning option once counted (then shown until `nextAt`). */
   result: number | null;
   nextAt?: number;
+  /** A player may move their pawn to another zone after voting (voteChangeAllowed; off: one vote each). */
+  changeAllowed?: boolean;
 }
 
 /**
