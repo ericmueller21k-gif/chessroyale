@@ -1368,13 +1368,30 @@ Roomy on desktop, closed but expandable on a phone. The `social` delegate builds
   after a great crowd move, "GG" at the end. At most a few lines a minute across all bots.
 - **Desktop (1024 px+):** a chat panel at the right of the game screen. The feed shows the last ~30 messages, with the
   phrase buttons below it in their groups.
-- **Phone:**
-  - **Closed by default.** A chat button in the top bar shows an unread count.
-  - **New messages:** the newest shows for about 2 s as a small one-line bubble under the top bar (icon, name,
-    phrase), never over the board. The bubble can be switched off.
-  - **Tapping the button** opens a bottom sheet over the leaderboard area: the feed on top, the phrase buttons below.
-    It closes with a tap outside or a swipe down.
-  - Making a move is never blocked: the board stays tappable with the sheet open.
+- **Phone (revised by Eric, Oct 7): chat and the scoreboard share the space under the board.**
+  - **Split, the default:** the scoreboard on the left and chat on the right, side by side, each in its own panel.
+    The scoreboard's narrow form shows place, name and points. Chat shows the last few messages with their icons,
+    and a row of phrase and emoji buttons.
+  - **Each panel has an expand button** (⤢) in its header. Tapping it makes that panel full width and hides the other
+    entirely, header and all.
+  - **The full panel's button turns into "split"** (⇆), which brings both back side by side.
+  - So: split → scoreboard full → split → chat full → split. You can't open both full, and you're never more than one
+    tap from seeing both.
+  - **The choice is remembered** on the device, so people who only want the scoreboard (or only chat) keep it that way.
+  - **Unread messages:** while chat is hidden, the scoreboard's header shows an unread count, and the newest message
+    shows for about 2 s as a small one-line bubble under the top bar (icon, name, phrase), never over the board. The
+    bubble can be switched off.
+  - The board is never covered, and moves are never blocked.
+- **Emoji packs (Eric, Oct 7).** Alongside the phrases, players can send a single emoji: a quick reaction, shown in the
+  feed with the sender's icon and name, and floating briefly above their row on the scoreboard.
+  - **Free to start, "Basics":** 👍 👏 😂 😮 😬 🔥 💀 🎉.
+  - **Unlockable packs for coins** in the shop, like the phrase packs:
+    - "Chess": ♟️ 👑 🏰 🐴 ⚔️ 🛡️
+    - "Winter": ❄️ ⛄ 🎄 🎁 🦌 🍪
+    - "Royal": 🤴 👸 💎 🏆 ⚜️ 🐉
+  - The same limits as phrases (one every 3 s, 5 in 30 s). Muting a player hides their emoji too.
+  - Packs live in the same `core/chat.ts` list as the phrases, so a new pack is a few lines. Custom pixel emotes can
+    replace system emoji later.
 - **Sound:** a soft tick for a team message, never louder than a move, and none when muted.
 
 ## No flash between a match's screens (Oct 6, 2026)
