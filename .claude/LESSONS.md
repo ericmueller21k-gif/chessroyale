@@ -244,3 +244,26 @@ unknown code: the socket's 404 never reaches the page.
   each way it ends, including "nobody is there any more".
 - Test the stale case: the old link, the tab reopened later, the app back from the background.
 - A refused WebSocket says nothing about why: ask the server (an ordinary request) before retrying.
+
+## Tests that leaned on a lucky seed, and names that looked short (Oct 7, 2026)
+
+**Seen** (by the vote tweaks, before they shipped):
+- Eight quick-chat lobby tests failed when the bot name list grew from 68 to 140. Nothing about chat had changed.
+- Six of the new bot names, all 16 characters or fewer, were cut short with "…" on a 360 px phone's scoreboard.
+
+**The cause:**
+- The tests' lobby is seeded (`mulberry32(7)`), and the chat helper needed two people on one team and one on the
+  other. Teams are a random draw. Shuffling a longer name list takes more draws from the same random source, so
+  seed 7 then put all three on one team. The tests had depended on what one seed happened to give, not on the rules.
+- Characters aren't widths: in the column's bold 12 px, "Woodpusher Woody" (16 characters) is 120 px and "Pawn Island
+  Isla" (also 16) is 94 px.
+
+**How it was found:** the failing helper read `team(undefined)`: no one was alone on a team. For the names, a script
+read the scoreboard's name column (103 px at 360 px) and measured every name in its own font with a canvas.
+
+**The rule:**
+- A test that needs a particular random outcome looks for a seed that gives it (and says what it needs), rather than
+  trusting that a fixed seed always will. Anything new that draws from the match's random source moves everything
+  drawn after it.
+- Check text that must fit by measuring it in the real font and box, with some room for other fonts (an iPhone's runs
+  wider than headless Chrome's), not by counting characters.

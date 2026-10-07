@@ -89,7 +89,8 @@ export function HowToPlay() {
         <li>
           <strong>You vote on the ending.</strong> Before the first move everyone drags their own pawn into a zone (or taps a card): a team
           final (top 8 play 4v4, 3v3, then 2v2 to the end), a boss battle (top 10 against a Stockfish boss) or a duel (the best of each side,
-          1v1). Winning the game goes on your record; your own move quality places you.
+          1v1). You have {S.voteSeconds} seconds; if you don't vote, you go with the crowd (the most popular choice). Winning the game goes on
+          your record; your own move quality places you.
         </li>
         <li>
           <strong>Then the speed.</strong> Normal: {normal} s a move. Bullet: {bullet} s a move. Variable: the clock starts short and grows as

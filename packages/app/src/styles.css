@@ -3118,9 +3118,10 @@ button.history-label {
   inset: 0;
   z-index: 3;
   pointer-events: none;
-  /* Everyone else's pawn, and yours (a share of the board's width: a square is 12.5%). */
+  /* Everyone else's pawn (a share of the board's width: a square is 12.5%). Yours is this times voteYouScale (set
+     on the layer from settings.ts). */
   --vp: 7.8%;
-  --vp-me: 11.6%;
+  --vp-me: calc(var(--vp) * 1.12);
 }
 /* Your pawn picked up with a tap: a tap anywhere else puts it down. */
 .vote-layer.picking {
@@ -3245,8 +3246,10 @@ button.history-label {
     opacity 300ms;
 }
 
-/* Yours: solid, ringed, tagged, on top of everyone else's, with a big area to grab. */
-.vote-pawn.vote-me {
+/* Yours: the same pawn, a little bigger and fully solid (no ring, tag or glow: Eric), on top of everyone else's,
+   with a big invisible area to grab. */
+.vote-pawn.vote-me,
+.vote-pawn.vote-me.in {
   z-index: 3;
   width: var(--vp-me);
   height: var(--vp-me);
@@ -3270,59 +3273,12 @@ button.history-label {
 .vote-pawn.vote-me.can::before {
   content: "";
   position: absolute;
-  inset: -40%;
-}
-.vote-me .avatar {
-  filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 4px #3b82f6);
-}
-/* Before you vote, it bobs gently: here I am, move me. */
-.vote-me.can:not(.in):not(.lifted):not(.selected) .avatar {
-  animation: me-bob 1.5s ease-in-out infinite;
-}
-@keyframes me-bob {
-  50% {
-    translate: 0 -7%;
-  }
-}
-.vote-me-ring {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 96%;
-  height: 34%;
-  transform: translate(-50%, 30%);
-  border-radius: 50%;
-  border: 2px solid #fff;
-  background: radial-gradient(closest-side, rgba(59, 130, 246, 0.85), rgba(59, 130, 246, 0.35));
-  box-shadow: 0 0 8px 2px rgba(59, 130, 246, 0.9);
-}
-.vote-me-tag {
-  position: absolute;
-  left: 50%;
-  bottom: 100%;
-  transform: translate(-50%, 6%);
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: #2563eb;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.4;
-  white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-}
-/* In its zone the tag goes under your pawn, just outside the zone (above it, it would sit under the zone's count). */
-.vote-me.in .vote-me-tag {
-  bottom: auto;
-  top: 100%;
-  transform: translate(-50%, 22%);
+  /* (About 55 px on a 360 px phone: an easy target, though the pawn is small.) */
+  inset: -60%;
 }
 /* Picked up (a tap) or held (a drag): it rises. Held, it follows your finger exactly, above everything. */
 .vote-me.selected .avatar {
   translate: 0 -12%;
-}
-.vote-me.selected .vote-me-ring {
-  box-shadow: 0 0 12px 4px rgba(59, 130, 246, 1);
 }
 .vote-layer .vote-pawn.vote-me.lifted {
   z-index: 6;
@@ -3460,9 +3416,6 @@ button.history-label {
   .vote-layer.animate .vote-pawn,
   .vote-layer.animate .vote-pawn.vote-me {
     transition: opacity 280ms ease-in;
-  }
-  .vote-me.can .avatar {
-    animation: none !important;
   }
   .vote-board-row.dropping cg-board piece {
     animation: vote-fade-in 300ms ease-out both;

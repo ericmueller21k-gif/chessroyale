@@ -207,7 +207,11 @@ export interface NetVote {
   count: number;
   startsAt: number;
   until: number;
-  votes: { playerId: string; option: number; at: number; side: "w" | "b" }[];
+  /**
+   * Everyone's votes, each shown from `at`. Once counted, everyone who didn't vote joins the winner (`joined`: added
+   * when time ran out, see closePregameVote), so the final counts and the pawns show them.
+   */
+  votes: { playerId: string; option: number; at: number; side: "w" | "b"; joined?: true }[];
   /** The winning option once counted (then shown until `nextAt`). */
   result: number | null;
   nextAt?: number;

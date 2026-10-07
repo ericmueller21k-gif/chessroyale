@@ -75,11 +75,12 @@ class SeatPawn extends Component<{ look?: ItemLook; hat: string }> {
 /** The grid of seats: filled ones in order, then empty ones. Re-rendered only when someone arrives or leaves. */
 function Seats({ seats, size, me, myLook, hat, looks, bots, trickle }: { seats: LobbyPlayer[]; size: number; me: string | null; myLook?: ItemLook; hat: string; looks: ReadonlyMap<string, ItemLook>; bots: number; trickle?: boolean }) {
   const pop = usePops();
-  // Bots wear what they wear in the match (looks.ts), worked out once each so their pawns aren't redrawn.
+  // Bots wear what they wear in the match (looks.ts: seeded by their name, the same outfit on the vote board), worked
+  // out once each so their pawns aren't redrawn.
   const botLooks = useRef(new Map<string, { look?: ItemLook; hat: string }>());
   const botLook = (p: LobbyPlayer) => {
     let l = botLooks.current.get(p.id);
-    if (!l) botLooks.current.set(p.id, (l = pawnLook({ id: p.id, isYou: false, isBot: true, look: undefined })));
+    if (!l) botLooks.current.set(p.id, (l = pawnLook({ id: p.id, name: p.name, isYou: false, isBot: true, look: undefined })));
     return l;
   };
   // Bots cascade into their seats within the moment before the match begins (all at once, from the server). Solo's

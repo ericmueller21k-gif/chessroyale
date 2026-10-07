@@ -1830,6 +1830,69 @@ change it later: "we will consider it"), and Variable when nobody votes. Mine:
   flashes and says whether the board's box moved. `e2e/votes.spec.ts` drags with real touch on the phone (a mouse on
   the computer), and checks the Variable clock (10 s on move 1, 15 s on move 6).
 
+### Vote board follow-ups (Eric, Oct 7, 2026)
+
+Eric, after seeing the vote board: no halo or "You" banner under your pawn; the same size as everyone else's, "maybe
+just 10-15% bigger if that"; "fully solid and not a ghost" (a card tap works too, so finding your pawn isn't a worry);
+8 seconds a vote; and "when not moved it defaults to the most popular one". Also more variety in the bots' names and
+outfits. Mine:
+
+**Your pawn.**
+- Everyone else's size times `voteYouScale` (1.12, settings.ts): 0.70 of a square, 25 px on a 360 px phone (theirs
+  22 px). Fully solid; no ring, "You" tag, blue glow, white edge or bob. Still drawn above everyone else's.
+- Kept: it rises a little when you tap it (the zones pulse), and grows slightly while it's under your finger. That's
+  feedback while you move it, not a marker.
+- The area that takes your touch is invisible and 2.2 times the pawn (about 55 px on a 360 px phone), so a tap just
+  beside it picks it up (`e2e/votes.spec.ts` taps off its edge).
+- Its starting spot is your seeded spot, kept inside the board's edge; it's no longer pulled in to fit a ring and tag.
+
+**8 seconds.** `voteSeconds` was already 8. Checked on screen: the timer bar's window is 8000 ms solo
+(`e2e/votes.spec.ts`) and online (`e2e/formats.spec.ts`, "Play now"). Left as it was.
+
+**Not moved means most popular.**
+- One rule, `closePregameVote` (votes.ts), used by solo and the lobby server; the app shows what they send. When
+  time's up the winner is counted first (a tie drawn among the tied, as before; nobody voting gives the default:
+  Team final, Variable), then everyone who didn't vote, people and bots alike, is added to the winner. They're added
+  after the count, so they never change the outcome; the final counts and the pawns show them. Each one is marked
+  `joined` in the vote (protocol `NetVote`), so the app can tell them apart.
+- **A few bots don't vote** (`voteBotSkip`, 10%), as a real crowd wouldn't all vote. That way the rule shows in every
+  match, not only when you sit one out. It doesn't sway results: the lean is drawn the same way and the abstainers join
+  the winner afterwards.
+- **On screen.** At time's up the winning zone lights and the non-voters walk into it (the usual 0.7 s glide),
+  each count popping as they land. The banner waits until they've landed, because it covers the zones and would hide
+  the walk. So the result shows for 3.2 s (`voteResultSeconds`, was 2.5): the walk plus the banner's time as before.
+  The line above the board says "You didn't vote, so you're with the crowd." if you didn't, else "Didn't vote?
+  You're with the crowd." for about 1.8 s, then the countdown to what's next. Nothing new covers the board. How to play
+  says it too: "You have 8 seconds; if you don't vote, you go with the crowd (the most popular choice)."
+- Online, a vote that reaches the server after time's up doesn't count, as before: the server joins you to the winner
+  and your pawn walks there from where you put it.
+
+**Bot names.** 72 more (140 in all), so a 100-player lobby (99 bots) never repeats one; past 140 the numbered
+fallback ("Queenie 2") stays. Same style: chess terms, openings, mates and puns, most with an alliterative first name
+("Zeitnot Zelda", "Ladder Lola", "J'adoube Jade", "Rook and Roll"). None is a real player.
+- **Measured, not counted.** On a 360 px phone the scoreboard's name column is 103 px (bold 12 px). Every new name
+  fits it with room to spare: 97 px at most in Arial's widths, since an iPhone's font runs a little wider. The first
+  list had six that didn't fit ("Woodpusher Woody", 120 px) and five near the edge; they were swapped for shorter ones.
+- Three of the older names don't fit and show with "…" ("Queen's Gambit Quinn", "Trompowsky Trina", "Zwischenzug
+  Zak"). They're left as they are; `e2e/crowd.spec.ts` uses them as the longest real names.
+
+**Bot outfits** (`botLook`, core/bot-looks.ts; odds `BOT_LOOKS` in settings.ts).
+- Out of 100: 42 plain; 24 a shop hat; 11 a crate head piece (beanie, antlers, Santa hat, present); 11 a face piece
+  (Santa beard, ski goggles); 5 a weapon (gift-wrap tube, candy cane); 7 two things (a hat, then a face piece, or now
+  and then a weapon). Never more than two.
+- **Seeded by the bot's name**, not its id. Bot ids are `bot0` to `bot98` in every match while the names are shuffled,
+  so seeding by id would give the same seats the same clothes each match and a name a new outfit every time. By name,
+  "Gambit Gus" always looks like Gambit Gus.
+- Only items that already exist, drawn by the usual `Avatar`. No skins (they replace the pawn, and with it the team's
+  colour, which the vote board and the cut screen read by). Not the Mythic Fire & Ice Crown (the rarest item stays
+  the players'). Colours by the crates' odds. Purity evenly 55-88%: clean enough to read on a 22 px pawn, and never
+  shiny (90%+), which stays the players'.
+- Checked on a 360 px phone on the vote board, the cut screen and the scoreboard (the scoreboard shows names only).
+
+**Checking it.** `npm run frames:vote -- <dir> [light|dark] [width] [w|b] [plan]` now takes a plan per vote
+(`drag`, `tap` or `none`; default `drag,tap`). `none,tap` records you sitting out the first vote and walking to the
+winner. Its timeline logs the line above the board, the banner and how many joined.
+
 ## Closing finished lobbies (Oct 7, 2026)
 
 Eric opened the app hours after a match and got its results screen again ("100/100 place") at
@@ -1912,3 +1975,116 @@ from the results to home and on to the profile with a real tap, flags blinks and
 **Later (Eric's call):** reopening the installed app cold during a live match lands home, not in the match (it
 rejoins only from the match's address, as before). Chess sites put you straight back into your game; we could too,
 from the seat this device keeps.
+
+## Ranked, ratings and matchmaking (draft, Oct 7, 2026; for Eric's review)
+
+Eric: if real players arrive, how do we decide points after each match, a fair curve, ranks, ranked matchmaking that
+widens its search when few are online? This draft follows what the big multiplayer games do, adapted to 100-player
+matches. The `ranked` delegate builds it once Eric agrees.
+
+**Two numbers per player, per mode**
+
+1. **Hidden skill (matchmaking rating).**
+   - A Bayesian rating built for many-player free-for-alls: the Weng–Lin method ("OpenSkill", the Plackett–Luce
+     model; Weng & Lin, *Journal of Machine Learning Research*, 2011). It's the open, patent-free cousin of
+     Microsoft's TrueSkill (Herbrich et al., 2006).
+   - Each player has a skill estimate (μ) and an uncertainty (σ). After a match, everyone's estimate moves by how
+     their finishing place compared with what their skill predicted against everyone else in that match:
+     - Beating stronger players moves you up a lot; beating weaker ones moves you a little.
+     - A new player's σ is large, so their first matches move them fast. It shrinks as the system learns, so a settled
+       player's rating is steady.
+   - Unlike chess Elo, which compares two players, it handles 100 placements at once in one update, and it's quick.
+   - Only real players count. Bot seats are left out of the update entirely, so bots can't be farmed and can't drag
+     anyone down.
+   - A new player's starting estimate comes from their existing engine rating (how good their moves are), so placement
+     isn't a long grind.
+2. **Visible rank: what players see and chase.** Chess-themed tiers, each with divisions:
+   - Pawn, Knight, Bishop, Rook, Queen, King (III, II, I), then Grandmaster for the top 500.
+   - **Rank points (RP), 0–100 per division.** Each match adds or removes RP by your finishing place as a share of the
+     match (so it works for 30 or 100 players), minus an entry cost that rises with your tier:
+     - Starting point (to tune by simulation): top 1% +40, top 10% +25, top 25% +15, top half +5, bottom half −5 to
+       −15, then less the tier's entry cost.
+     - A small catch-up term moves rank toward hidden skill: if you're ranked below your skill, you gain more and lose
+       less, so good new players climb quickly and rank can't be bought by grinding alone.
+   - **Placement:** the first 5 ranked matches show "Placing…", then a rank is given from hidden skill.
+   - **Protection:** no demotion for 3 matches after a promotion, and none in the lowest division.
+- **The engine rating stays as its own stat,** "Chess strength": how good your moves are, shown on profiles. Rank is
+  about winning matches; strength is about move quality.
+
+**Seasons**
+- About three months each.
+- Ranks soft-reset to about a tier lower, and σ widens a little so everyone re-proves themselves.
+- Season rewards are cosmetic only: a season border, an exclusive item.
+
+**Who gets a ranked match**
+- Signed in, and at least 10 unranked matches played (against throwaway accounts).
+- A ranked match needs a minimum of real players (start at 30 of 100). Bots fill the rest and don't count.
+- If a ranked queue can't reach the minimum, the players are told and offered an unranked match. A match never quietly
+  becomes ranked with mostly bots.
+- Leaving a ranked match counts as last place.
+
+**Matchmaking that widens**
+- One queue per mode (later per region). A player in the queue is a ticket: their skill, their uncertainty, and when
+  they joined.
+- About once a second the matchmaker forms lobbies:
+  - Start from the longest-waiting ticket and gather tickets within ±150 of its skill.
+  - The window widens by 50 every 5 s waited, and after 45 s anyone is accepted.
+  - At 60 s the lobby starts, bots filling the empty seats.
+  - With few players online, the windows widen quickly and everyone lands in the same lobby. With many, lobbies are
+    tight.
+- We log each lobby's skill spread and wait time, and tune the numbers from real data.
+- Unranked "Play now" keeps today's fast fill and doesn't care about skill.
+
+**One must-do before ranked: trustworthy scoring.**
+- Today the host's browser scores everyone's moves, which is fine for fun matches.
+- With ranks at stake, a modified browser could fake scores.
+- For ranked matches, two players' devices score each round independently, and the server compares the results. Any
+  disagreement is re-checked by the engine server, and that verdict stands.
+- That costs almost nothing extra. The alternative, the engine server scoring everything, is fully trustworthy but
+  costs real money at scale (about 3.5¢ a match).
+- This is the `engine` delegate's job, before ranked opens.
+
+**Leaderboards**
+- Per mode and season: the top 100, your position, and friends later.
+- Computed from the rank table and cached, so they're cheap to show. The `hub` shows them.
+
+## Capacity: what if 10,000 players arrived? (assessment, Oct 7, 2026)
+
+Eric asked whether the servers could take 10,000 players at once. Short answer: the design scales, but three single
+points would choke first, and we've never load-tested it.
+
+**What already scales**
+- **Matches:** each match is its own Durable Object, and Cloudflare spreads them over its machines. 10,000 players is
+  about 100 Crowd matches at once, which is no problem in principle.
+- **Scoring:** today it runs on players' own devices, so it grows with the player base for free.
+- **The app itself:** files served from Cloudflare's edge.
+
+**What would choke first**
+1. **The matchmaker is one object for the whole world.** It handles one "Play" press at a time and waits on lobby
+   objects inside each, so thousands pressing Play in the same minute would queue up behind each other.
+   - Fix: keep queue tickets in memory, form lobbies on a one-second timer, and split the matchmaker by mode and
+     region.
+2. **The database (D1) is one SQLite database.**
+   - Every request updates "last seen", and every running match reports itself at least once a minute. At 10,000
+     players that's hundreds of writes a second into one database, near what a single D1 database handles.
+   - Fix: write "last seen" at most once a minute per player, and keep live counts in memory (a Durable Object) instead
+     of database rows.
+3. **The engine server** runs on at most 2 containers with a cap of 3,000 deep searches a day. At scale the cap runs
+   out early each day.
+   - Then phones take over the re-checks: the game keeps working, but cuts are slightly less fair.
+   - Raising the cap costs money (Eric's call).
+
+**Rough cost at that scale**
+- Cloudflare charges by use (about $0.15 per million Durable Object requests, and about $12.50 per million GB-seconds
+  of object time).
+- 100 matches running around the clock is very roughly $100–500 a month; real traffic peaks for a few hours a day, so
+  far less in practice.
+- The load test below would give a real number. Set a billing alert first.
+
+**What to do before any launch push** (the `ops` delegate):
+- **A load test:** a staging copy of the site and simulated players (scripted connections that join, pick moves and
+  chat) at 1,000, then 5,000, then 10,000. Measure where it breaks.
+- **Fix the three choke points** above.
+- **Monitoring and alerts:** errors, object CPU, database latency, queue waits and spend.
+- **Fail gracefully:** a "servers are busy, you're in line" message rather than errors.
+- **Per-player rate limits** on the API.

@@ -38,9 +38,19 @@ export interface Settings {
   cutClockVote: boolean;
   /** Crowd 50 v 50: how the match ends (set by the pre-game vote). */
   finalFormat: FinalFormat;
-  /** Pre-game votes: seconds to vote, and how long each result shows. */
+  /**
+   * Pre-game votes: seconds to vote, and how long each result shows (it starts with everyone who didn't vote walking
+   * to the winner, then the winner's banner).
+   */
   voteSeconds: number;
   voteResultSeconds: number;
+  /**
+   * Pre-game votes: the share of bots that don't vote. When time's up they join the winner with everyone else who
+   * didn't vote (people too: "Didn't vote? You're with the crowd").
+   */
+  voteBotSkip: number;
+  /** Pre-game votes: your pawn on the vote board, this many times the size of everyone else's (Eric: "10-15% bigger if that"). */
+  voteYouScale: number;
   /** Team final: players per side at each step (the last step plays to the end of the game). */
   teamFinalSizes: readonly number[];
   /** Team final: moves each player makes before a step's weakest player on each side goes out. */
@@ -238,7 +248,9 @@ export const DEFAULT_SETTINGS: Settings = {
   cutClockVote: false,
   finalFormat: "team",
   voteSeconds: 8,
-  voteResultSeconds: 2.5,
+  voteResultSeconds: 3.2,
+  voteBotSkip: 0.1,
+  voteYouScale: 1.12,
   teamFinalSizes: [4, 3, 2],
   teamFinalMovesPerStep: 3,
   finalMaxTurns: 160,
@@ -514,6 +526,25 @@ export const RANKING = {
 export function isRankedMatch(bots: number, players: number, maxBotShare: number = RANKING.rankedMaxBotShare): boolean {
   return players > 0 && bots / players <= maxBotShare;
 }
+
+/**
+ * What bots wear on the vote board and the cut screen (core/bot-looks.ts), seeded by the bot's name so a bot always
+ * looks the same. Mostly one thing, rarely two, plenty plain (Eric: nothing "crazy decked out"). Only items that
+ * already exist: the shop's hats, and the crates' head, face and weapon pieces (no skins: they hide the team's
+ * colour; not the Mythic crown: that one stays the players'). See DECISIONS.md, "Vote board follow-ups".
+ */
+export const BOT_LOOKS = {
+  /** Out of 100: nothing on; one shop hat; one crate head piece; one face piece; one weapon; two things. */
+  odds: { plain: 42, shopHat: 24, head: 11, face: 11, weapon: 5, two: 7 },
+  shopHats: ["party", "crown", "wizard", "top", "viking"],
+  head: ["beanie", "antlers", "santa-hat", "present"],
+  face: ["santa-beard", "ski-goggles"],
+  weapon: ["gift-tube", "candy-cane"],
+  /** Two things: a hat (a shop hat or a crate head piece, evenly) and then a face piece, or now and then a weapon. */
+  twoWeaponShare: 0.3,
+  /** A crate item's purity (%), evenly in this range: clean enough to read on a small pawn, never shiny (90%+). */
+  purity: [55, 88],
+} as const;
 
 /**
  * How long a lobby lives (see DECISIONS.md, "Closing finished lobbies"). When a lobby closes, its Durable Object
