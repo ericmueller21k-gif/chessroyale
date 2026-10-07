@@ -1,5 +1,5 @@
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
-import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, tallyVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -142,7 +142,9 @@ export interface LobbyRecord {
     key: string;
     startsAt: number;
     until: number;
-    votes: Record<string, { option: number; at: number }>;
+    /** People's votes, and (once counted) everyone who didn't vote, joined to the winner (`joined`). */
+    votes: Record<string, { option: number; at: number; joined?: true }>;
+    /** The bots' votes (a few bots don't vote: settings.voteBotSkip). */
     bots: { id: string; option: number; at: number }[];
     result: number | null;
     nextAt?: number;
@@ -609,7 +611,7 @@ export class LobbyCore {
       until: v.until,
       votes: [
         ...v.bots.map((b) => ({ playerId: b.id, option: b.option, at: b.at, side: side(b.id) })),
-        ...Object.entries(v.votes).map(([playerId, x]) => ({ playerId, option: x.option, at: x.at, side: side(playerId) })),
+        ...Object.entries(v.votes).map(([playerId, x]) => ({ playerId, option: x.option, at: x.at, side: side(playerId), ...(x.joined ? { joined: true as const } : {}) })),
       ],
       result: v.result,
       ...(v.nextAt ? { nextAt: v.nextAt } : {}),
@@ -629,7 +631,7 @@ export class LobbyCore {
       startsAt: now,
       until: now + ms,
       votes: {},
-      bots: botVotes(this.rng, bots, def.options.length, ms).map((b) => ({ id: b.id, option: b.option, at: now + b.atMs })),
+      bots: botVotes(this.rng, bots, def.options.length, ms, this.settings.voteBotSkip).map((b) => ({ id: b.id, option: b.option, at: now + b.atMs })),
       result: null,
     };
     this.r.phase = "vote";
@@ -656,8 +658,13 @@ export class LobbyCore {
     const v = this.r.vote;
     if (this.r.phase !== "vote" || !v || v.result !== null) return;
     const def = pregameVotes(this.settings)[v.index]!;
-    const choices = [...v.bots.map((b) => b.option), ...Object.values(v.votes).map((x) => x.option)];
-    v.result = tallyVotes(choices, def.options.length, def.defaultOption, this.rng);
+    // The winner, then everyone who didn't vote (people and bots) joins it: they walk there now.
+    const cast = [...v.bots.map((b) => ({ playerId: b.id, option: b.option })), ...Object.entries(v.votes).map(([playerId, x]) => ({ playerId, option: x.option }))];
+    const everyone = this.runner!.state.players.map((p) => p.id);
+    const { result, joined } = closePregameVote(cast, everyone, def, this.rng, (playerId, option) => ({ playerId, option }));
+    v.result = result;
+    const now = this.io.now();
+    for (const id of joined) v.votes[id] = { option: result, at: now, joined: true };
     const patch = def.options[v.result]!.patch;
     // Kept in the overrides, so the settings survive the Durable Object sleeping.
     this.r.overrides = { ...(this.r.overrides ?? {}), ...patch } as LobbyRecord["overrides"];

@@ -1,7 +1,8 @@
 // Frame-by-frame check of the pre-game votes (Crowd 50 v 50), the way a player votes on a phone: a real touch drag
 // of your pawn into a zone in the first vote, a tap on your pawn then a tap on a zone in the second, then the hand-off
-// to the game's real pieces.
-//   npm run frames:vote -- <out-dir> [scheme=light|dark] [width=360] [side=any|w|b]
+// to the game's real pieces. `plan` picks how you vote in each (drag, tap, or none: you don't, and when time's up
+// your pawn walks to the winner with everyone else who didn't).
+//   npm run frames:vote -- <out-dir> [scheme=light|dark] [width=360] [side=any|w|b] [plan=drag,tap]
 // Records every painted frame (Chrome's screencast) on a narrow phone and writes f<ms>.jpg for each, then prints a
 // timeline: phases, your pawn's spot, the zone counts, frames that flash (a jump in brightness), and the board's box
 // on the vote and on the game's first screen (it must not move). See .claude/LESSONS.md.
@@ -10,7 +11,8 @@ import { chromium, devices } from "@playwright/test";
 import { createServer } from "vite";
 import sharp from "sharp";
 
-const [out = ".", scheme = "light", widthArg = "360", want = "any"] = process.argv.slice(2);
+const [out = ".", scheme = "light", widthArg = "360", want = "any", planArg = "drag,tap"] = process.argv.slice(2);
+const plan = planArg.split(",");
 const width = Number(widthArg);
 mkdirSync(out, { recursive: true });
 // (Not one of the ports the other scripts share: vite takes the next free one if it's busy.)
@@ -59,7 +61,10 @@ const poll = (async () => {
         return {
           kind: m?.phase.kind,
           vote: m?.phase.kind === "vote" ? `${m.phase.vote.index}${m.phase.vote.result === null ? "" : "=" + m.phase.vote.result}` : "",
-          me: r ? `${Math.round(r.x + r.width / 2)},${Math.round(r.y + r.height / 2)}` : "-",
+          joined: m?.phase.kind === "vote" ? m.phase.vote.votes.filter((v) => v.joined).length : 0,
+          hint: document.querySelector(".vote-hint")?.textContent ?? "",
+          banner: !!document.querySelector(".vote-banner"),
+          me: r ? `${Math.round(r.x + r.width / 2)},${Math.round(r.y + r.height / 2)} ${Math.round(r.width)}px` : "-",
           counts: [...document.querySelectorAll(".vote-zone-count")].map((e) => e.textContent).join("/"),
           pieces: document.querySelectorAll("cg-board piece").length,
           box: wrap ? `${wrap.x.toFixed(1)},${wrap.y.toFixed(1)} ${wrap.width.toFixed(1)}` : "-",
@@ -67,9 +72,9 @@ const poll = (async () => {
       })
       .catch(() => null);
     if (s) {
-      const key = `${s.kind}|${s.vote}|${s.me}|${s.pieces}`;
+      const key = `${s.kind}|${s.vote}|${s.me}|${s.pieces}|${s.hint}|${s.banner}|${s.counts}`;
       if (key !== lastKey) {
-        note(`phase=${s.kind} vote=${s.vote} you@${s.me} counts=${s.counts} pieces=${s.pieces} board=${s.box}`);
+        note(`phase=${s.kind} vote=${s.vote} you@${s.me} counts=${s.counts} joined=${s.joined} pieces=${s.pieces}${s.banner ? " BANNER" : ""} "${s.hint}" board=${s.box}`);
         lastKey = key;
       }
       boxes.push({ kind: s.kind, box: s.box });
@@ -94,29 +99,35 @@ const centre = async (sel, nth = 0) => {
   return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 };
 
-// Vote 1: drag your pawn into the middle zone.
-await p.waitForTimeout(1200);
-const me = await centre(".vote-me");
-const zone = await centre(".vote-zone", 1);
-note(`drag from ${Math.round(me.x)},${Math.round(me.y)} to ${Math.round(zone.x)},${Math.round(zone.y)}`);
-await drag(me, zone);
-note(`myVote=${await p.evaluate(() => window.match.myVote)}`);
-// Vote 2: tap your pawn, then a zone (the left one).
+/** Votes the way `how` says: a drag into the middle zone, a tap on your pawn then the left zone, or nothing. */
+async function vote(how) {
+  await p.waitForTimeout(1200);
+  if (how === "drag") {
+    const me = await centre(".vote-me");
+    const zone = await centre(".vote-zone", 1);
+    note(`drag from ${Math.round(me.x)},${Math.round(me.y)} to ${Math.round(zone.x)},${Math.round(zone.y)}`);
+    await drag(me, zone);
+  } else if (how === "tap") {
+    const me = await centre(".vote-me");
+    note("tap your pawn");
+    await p.touchscreen.tap(me.x, me.y);
+    await p.waitForTimeout(400);
+    const left = await centre(".vote-zone", 0);
+    note("tap a zone");
+    await p.touchscreen.tap(left.x, left.y);
+    await p.waitForTimeout(200);
+  } else note("no vote: your pawn stays home");
+  note(`myVote=${await p.evaluate(() => window.match.myVote)}`);
+}
+// Vote 1.
+await vote(plan[0]);
+// Vote 2.
 for (let i = 0; i < 400; i++) {
   const v = await p.evaluate(() => (window.match.phase.kind === "vote" ? window.match.phase.vote : null));
   if (v && v.index === 1 && v.result === null) break;
   await p.waitForTimeout(50);
 }
-await p.waitForTimeout(1200);
-const me2 = await centre(".vote-me");
-note("tap your pawn");
-await p.touchscreen.tap(me2.x, me2.y);
-await p.waitForTimeout(400);
-const left = await centre(".vote-zone", 0);
-note("tap a zone");
-await p.touchscreen.tap(left.x, left.y);
-await p.waitForTimeout(200);
-note(`myVote=${await p.evaluate(() => window.match.myVote)}`);
+await vote(plan[1] ?? "tap");
 // Until the game has begun, and a moment more.
 for (let i = 0; i < 600 && !/play|watching/.test(await phase()); i++) await p.waitForTimeout(50);
 await p.waitForTimeout(1200);

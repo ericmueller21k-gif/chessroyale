@@ -317,6 +317,20 @@ test("Play now: players land in the same lobby, the count climbs, bots fill it a
   // MATCH_FILL_SECONDS is 8 locally: then bots fill the seats and the pre-game votes start.
   for (const p of pages) await expect(p.locator(".vote-screen")).toBeVisible({ timeout: 20_000 });
   expect(await pages[0]!.evaluate(() => (window as any).match.players.length)).toBe(100);
+  // Online too: 8 seconds to vote. Neither of them votes, so when time's up both go with the crowd: counted with the
+  // winner, their pawns in its zone, and a line above the board says so.
+  expect(await pages[0]!.evaluate(() => (window as any).match.phase.vote.until - (window as any).match.phase.vote.startsAt)).toBe(8000);
+  for (const p of pages) {
+    await expect(p.locator(".vote-hint")).toHaveText("You didn't vote, so you're with the crowd.", { timeout: 15_000 });
+    const end = await p.evaluate(() => {
+      const m = (window as any).match;
+      const v = m.phase.vote;
+      return { result: v.result, mine: v.votes.find((x: any) => x.playerId === m.myId), all: new Set(v.votes.map((x: any) => x.playerId)).size };
+    });
+    expect(end.mine).toMatchObject({ option: end.result, joined: true });
+    expect(end.all).toBe(100);
+    await expect(p.locator(".vote-me.in")).toBeVisible();
+  }
   // A new player now gets a new lobby.
   const late = await (await browser.newContext()).newPage();
   await late.goto("/?debug&pool=formats");

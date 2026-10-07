@@ -7,8 +7,10 @@ import {
   VOTE_SPOT_MARGIN,
   allowedMs,
   botThinkMs,
+  botVotes,
   castPregameVote,
   clampToZone,
+  closePregameVote,
   clockScheduleLine,
   clockStepRanges,
   modeSettings,
@@ -113,6 +115,76 @@ describe("the speed vote", () => {
     expect(castPregameVote(first, { playerId: "me", option: 2 }, true)).toEqual([{ playerId: "me", option: 2 }]);
     expect(castPregameVote(first, { playerId: "me", option: 0 }, true)).toBeNull();
     expect(castPregameVote(first, { playerId: "you", option: 1 }, false)).toHaveLength(2);
+  });
+});
+
+describe("time's up: everyone who didn't vote joins the winner", () => {
+  const format = PREGAME_VOTES.find((v) => v.id === "format")!;
+  const join = (playerId: string, option: number) => ({ playerId, option, joined: true as const });
+  const everyone = ["ann", "bo", "cy", "di", "ed"];
+
+  it("a tie is broken first (the same draw as the count alone), then the non-voters join the winner", () => {
+    const seen = new Set<number>();
+    for (let seed = 1; seed <= 60; seed++) {
+      const cast = [
+        { playerId: "ann", option: 0 },
+        { playerId: "bo", option: 2 },
+      ];
+      const { result, votes, joined } = closePregameVote(cast, everyone, format, mulberry32(seed), join);
+      // The non-voters never change the outcome: it's the tie's own draw.
+      expect(result).toBe(tallyVotes([0, 2], 3, format.defaultOption, mulberry32(seed)));
+      expect([0, 2]).toContain(result);
+      seen.add(result);
+      expect(joined).toEqual(["cy", "di", "ed"]);
+      // The voters keep their votes; each non-voter is counted once, with the winner.
+      expect(votes.slice(0, 2)).toEqual(cast);
+      expect(votes.slice(2)).toEqual(joined.map((id) => ({ playerId: id, option: result, joined: true })));
+      expect(votes.filter((v) => v.option === result)).toHaveLength(4);
+      expect(votes.filter((v) => v.option !== result)).toHaveLength(1);
+    }
+    // Either side of the tie can win.
+    expect([...seen].sort()).toEqual([0, 2]);
+  });
+
+  it("a clear winner stays the winner, however many didn't vote", () => {
+    const cast = [
+      { playerId: "ann", option: 1 },
+      { playerId: "bo", option: 1 },
+      { playerId: "cy", option: 2 },
+    ];
+    const many = [...everyone, ...Array.from({ length: 95 }, (_, i) => `bot${i}`)];
+    const { result, votes } = closePregameVote(cast, many, format, mulberry32(5), join);
+    expect(result).toBe(1);
+    expect(votes).toHaveLength(100);
+    expect(votes.filter((v) => v.option === 1)).toHaveLength(99);
+  });
+
+  it("nobody votes: the option's default wins (Team final, Variable) and everyone goes there", () => {
+    const labels = PREGAME_VOTES.map((vote) => {
+      const { result, votes, joined } = closePregameVote([], everyone, vote, mulberry32(3), join);
+      expect(result).toBe(vote.defaultOption);
+      expect(joined).toEqual(everyone);
+      expect(votes.map((v) => v.option)).toEqual(everyone.map(() => vote.defaultOption));
+      return vote.options[result]!.label;
+    });
+    expect(labels).toEqual(["Team final", "Variable"]);
+  });
+
+  it("everyone voted: nobody joins", () => {
+    const cast = everyone.map((playerId, i) => ({ playerId, option: i % 3 }));
+    const { votes, joined } = closePregameVote(cast, everyone, format, mulberry32(8), join);
+    expect(joined).toEqual([]);
+    expect(votes).toEqual(cast);
+  });
+
+  it("a few bots don't vote (voteBotSkip); none skip with it at 0", () => {
+    const ids = Array.from({ length: 99 }, (_, i) => `bot${i}`);
+    expect(DEFAULT_SETTINGS.voteBotSkip).toBeGreaterThan(0);
+    let skipped = 0;
+    for (let seed = 1; seed <= 20; seed++) skipped += 99 - botVotes(mulberry32(seed), ids, 3, 8000, DEFAULT_SETTINGS.voteBotSkip).length;
+    expect(skipped / (20 * 99)).toBeCloseTo(DEFAULT_SETTINGS.voteBotSkip, 1);
+    expect(botVotes(mulberry32(1), ids, 3, 8000, 0)).toHaveLength(99);
+    expect(botVotes(mulberry32(1), ids, 3, 8000)).toHaveLength(99);
   });
 });
 

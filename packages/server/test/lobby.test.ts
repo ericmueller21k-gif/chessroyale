@@ -23,7 +23,7 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
 type Msg = ServerMessage;
 
 /** A fake lobby: clock, outboxes per player, and a fake host that scores with a hash "engine". */
-function setup(settings: Partial<Settings> = {}, icons: Record<string, string> = {}) {
+function setup(settings: Partial<Settings> = {}, icons: Record<string, string> = {}, seed = 7) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const core = new LobbyCore(
@@ -34,7 +34,7 @@ function setup(settings: Partial<Settings> = {}, icons: Record<string, string> =
       icon: (id) => icons[id],
     },
     library,
-    mulberry32(7),
+    mulberry32(seed),
     { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...settings },
   );
   const take = (id: string) => {
@@ -334,7 +334,11 @@ describe("lobby: Crowd mode", () => {
     const v = L.last("p2", "vote")!.vote;
     expect(v.index).toBe(0);
     expect(v.count).toBe(PREGAME_VOTES.length);
-    expect(v.votes).toHaveLength(98);
+    // The bots' votes, all decided as it opens: most of the 98 bots vote (a few don't: voteBotSkip).
+    const botsVoting = v.votes.length;
+    expect(v.votes.every((x) => x.playerId.startsWith("bot") && !x.joined)).toBe(true);
+    expect(botsVoting).toBeLessThan(98);
+    expect(botsVoting).toBeGreaterThan(98 * (1 - 3 * DEFAULT_SETTINGS.voteBotSkip));
     expect(v.result).toBeNull();
     // A vote shows up for everyone at once; a second vote from the same player doesn't count.
     L.core.message("p1", { t: "vote", key: v.key, option: 1 });
@@ -345,6 +349,16 @@ describe("lobby: Crowd mode", () => {
     L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
     const done = L.last("p1", "vote")!.vote;
     expect(done.result).not.toBeNull();
+    // Time's up: everyone who didn't vote (Bo, and the bots that didn't) joins the winner, so all 100 are counted,
+    // once each; the votes cast are as they were.
+    expect(new Set(done.votes.map((x) => x.playerId)).size).toBe(100);
+    expect(done.votes).toHaveLength(100);
+    const joined = done.votes.filter((x) => x.joined);
+    expect(joined).toHaveLength(100 - botsVoting - 1);
+    expect(joined.map((x) => x.playerId)).toContain("p2");
+    expect(joined.every((x) => x.option === done.result && x.at === L.now)).toBe(true);
+    expect(done.votes.find((x) => x.playerId === "p1")).toMatchObject({ option: 1 });
+    expect(done.votes.filter((x) => !x.joined)).toEqual(expect.arrayContaining(v.votes));
     const format = PREGAME_VOTES[0]!.options[done.result!]!;
     expect(L.core.record.overrides?.finalFormat).toBe(format.patch.finalFormat);
     L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
@@ -356,6 +370,26 @@ describe("lobby: Crowd mode", () => {
     // The game starts with the voted clock: Normal 20 s, Variable's first step (10 s) or Bullet 10 s.
     expect(L.last("p1", "round")!.moveClock).toBe({ normal: 20, variable: 10, bullet: 10 }[speed.id]);
     expect(L.core.record.overrides?.moveClockSteps ?? []).toEqual(speed.patch.moveClockSteps);
+  });
+
+  it("pre-game votes: nobody votes, so the default wins (Team final, then Variable) and everyone joins it", () => {
+    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }), boardIntroSeconds: 0, voteBotSkip: 1 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone");
+    L.core.message("p1", { t: "start" });
+    for (const [index, want] of [[0, "team"], [1, "variable"]] as const) {
+      const v = L.last("p1", "vote")!.vote;
+      expect(v.index).toBe(index);
+      expect(v.votes).toEqual([]);
+      L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+      const done = L.last("p2", "vote")!.vote;
+      expect(PREGAME_VOTES[index]!.options[done.result!]!.id).toBe(want);
+      expect(done.votes).toHaveLength(100);
+      expect(done.votes.every((x) => x.joined && x.option === done.result)).toBe(true);
+      L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    }
+    expect(L.core.record.overrides?.finalFormat).toBe("team");
+    expect(L.core.record.overrides?.moveClockSteps).toEqual(VARIABLE_CLOCK);
   });
 
   it("pre-game votes: one vote each (a second is ignored); with voteChangeAllowed it replaces the first", () => {
@@ -651,17 +685,25 @@ describe("lobby: Crowd mode", () => {
 describe("lobby: quick chat", () => {
   /** A 50 v 50 with three people (two on one team, one on the other), the match begun. */
   function chatLobby(icons: Record<string, string> = {}) {
-    const L = setup({ ...modeSettings("crowd"), augments: false, boardIntroSeconds: 0 }, icons);
-    for (const n of ["Ann", "Bo", "Cy"]) L.core.connect(undefined, n, "computer");
-    // Before the match: chat is closed (the queue comes later).
-    L.core.message("p1", { t: "chat", say: "good-luck" });
-    expect(L.last("p1", "chatNo")).toMatchObject({ reason: "closed" });
-    L.core.message("p1", { t: "start" });
-    L.advance(DEFAULT_SETTINGS.openingShowSeconds * 1000);
-    const team = (id: string) => L.last(id, "round")!.standings.find((s) => s.id === id)!.team!;
     const ids = ["p1", "p2", "p3"];
+    // Teams are drawn at random: the first seed (from 7) that puts two people on one side and one on the other.
+    // (Not whatever seed 7 gives: anything else that draws from the match's random source moves the teams.)
+    for (let seed = 7; ; seed++) {
+      const L = setup({ ...modeSettings("crowd"), augments: false, boardIntroSeconds: 0 }, icons, seed);
+      for (const n of ["Ann", "Bo", "Cy"]) L.core.connect(undefined, n, "computer");
+      // Before the match: chat is closed (the queue comes later).
+      L.core.message("p1", { t: "chat", say: "good-luck" });
+      expect(L.last("p1", "chatNo")).toMatchObject({ reason: "closed" });
+      L.core.message("p1", { t: "start" });
+      L.advance(DEFAULT_SETTINGS.openingShowSeconds * 1000);
+      const team = (id: string) => L.last(id, "round")!.standings.find((s) => s.id === id)!.team!;
+      if (new Set(ids.map(team)).size === 2) return chatTeams(L, ids, team);
+      expect(seed).toBeLessThan(40);
+    }
+  }
+  function chatTeams(L: ReturnType<typeof setup>, ids: string[], team: (id: string) => "w" | "b") {
     const side = ids.map(team);
-    // The seed puts two on one side; find who's with whom.
+    // Two on one side; find who's with whom.
     const a = ids.find((id, i) => side.filter((x) => x === side[i]).length === 2)!;
     const mate = ids.find((id) => id !== a && team(id) === team(a))!;
     const other = ids.find((id) => team(id) !== team(a))!;

@@ -1830,6 +1830,69 @@ change it later: "we will consider it"), and Variable when nobody votes. Mine:
   flashes and says whether the board's box moved. `e2e/votes.spec.ts` drags with real touch on the phone (a mouse on
   the computer), and checks the Variable clock (10 s on move 1, 15 s on move 6).
 
+### Vote board follow-ups (Eric, Oct 7, 2026)
+
+Eric, after seeing the vote board: no halo or "You" banner under your pawn; the same size as everyone else's, "maybe
+just 10-15% bigger if that"; "fully solid and not a ghost" (a card tap works too, so finding your pawn isn't a worry);
+8 seconds a vote; and "when not moved it defaults to the most popular one". Also more variety in the bots' names and
+outfits. Mine:
+
+**Your pawn.**
+- Everyone else's size times `voteYouScale` (1.12, settings.ts): 0.70 of a square, 25 px on a 360 px phone (theirs
+  22 px). Fully solid; no ring, "You" tag, blue glow, white edge or bob. Still drawn above everyone else's.
+- Kept: it rises a little when you tap it (the zones pulse), and grows slightly while it's under your finger. That's
+  feedback while you move it, not a marker.
+- The area that takes your touch is invisible and 2.2 times the pawn (about 55 px on a 360 px phone), so a tap just
+  beside it picks it up (`e2e/votes.spec.ts` taps off its edge).
+- Its starting spot is your seeded spot, kept inside the board's edge; it's no longer pulled in to fit a ring and tag.
+
+**8 seconds.** `voteSeconds` was already 8. Checked on screen: the timer bar's window is 8000 ms solo
+(`e2e/votes.spec.ts`) and online (`e2e/formats.spec.ts`, "Play now"). Left as it was.
+
+**Not moved means most popular.**
+- One rule, `closePregameVote` (votes.ts), used by solo and the lobby server; the app shows what they send. When
+  time's up the winner is counted first (a tie drawn among the tied, as before; nobody voting gives the default:
+  Team final, Variable), then everyone who didn't vote, people and bots alike, is added to the winner. They're added
+  after the count, so they never change the outcome; the final counts and the pawns show them. Each one is marked
+  `joined` in the vote (protocol `NetVote`), so the app can tell them apart.
+- **A few bots don't vote** (`voteBotSkip`, 10%), as a real crowd wouldn't all vote. That way the rule shows in every
+  match, not only when you sit one out. It doesn't sway results: the lean is drawn the same way and the abstainers join
+  the winner afterwards.
+- **On screen.** At time's up the winning zone lights and the non-voters walk into it (the usual 0.7 s glide),
+  each count popping as they land. The banner waits until they've landed, because it covers the zones and would hide
+  the walk. So the result shows for 3.2 s (`voteResultSeconds`, was 2.5): the walk plus the banner's time as before.
+  The line above the board says "You didn't vote, so you're with the crowd." if you didn't, else "Didn't vote?
+  You're with the crowd." for about 1.8 s, then the countdown to what's next. Nothing new covers the board. How to play
+  says it too: "You have 8 seconds; if you don't vote, you go with the crowd (the most popular choice)."
+- Online, a vote that reaches the server after time's up doesn't count, as before: the server joins you to the winner
+  and your pawn walks there from where you put it.
+
+**Bot names.** 72 more (140 in all), so a 100-player lobby (99 bots) never repeats one; past 140 the numbered
+fallback ("Queenie 2") stays. Same style: chess terms, openings, mates and puns, most with an alliterative first name
+("Zeitnot Zelda", "Ladder Lola", "J'adoube Jade", "Rook and Roll"). None is a real player.
+- **Measured, not counted.** On a 360 px phone the scoreboard's name column is 103 px (bold 12 px). Every new name
+  fits it with room to spare: 97 px at most in Arial's widths, since an iPhone's font runs a little wider. The first
+  list had six that didn't fit ("Woodpusher Woody", 120 px) and five near the edge; they were swapped for shorter ones.
+- Three of the older names don't fit and show with "…" ("Queen's Gambit Quinn", "Trompowsky Trina", "Zwischenzug
+  Zak"). They're left as they are; `e2e/crowd.spec.ts` uses them as the longest real names.
+
+**Bot outfits** (`botLook`, core/bot-looks.ts; odds `BOT_LOOKS` in settings.ts).
+- Out of 100: 42 plain; 24 a shop hat; 11 a crate head piece (beanie, antlers, Santa hat, present); 11 a face piece
+  (Santa beard, ski goggles); 5 a weapon (gift-wrap tube, candy cane); 7 two things (a hat, then a face piece, or now
+  and then a weapon). Never more than two.
+- **Seeded by the bot's name**, not its id. Bot ids are `bot0` to `bot98` in every match while the names are shuffled,
+  so seeding by id would give the same seats the same clothes each match and a name a new outfit every time. By name,
+  "Gambit Gus" always looks like Gambit Gus.
+- Only items that already exist, drawn by the usual `Avatar`. No skins (they replace the pawn, and with it the team's
+  colour, which the vote board and the cut screen read by). Not the Mythic Fire & Ice Crown (the rarest item stays
+  the players'). Colours by the crates' odds. Purity evenly 55-88%: clean enough to read on a 22 px pawn, and never
+  shiny (90%+), which stays the players'.
+- Checked on a 360 px phone on the vote board, the cut screen and the scoreboard (the scoreboard shows names only).
+
+**Checking it.** `npm run frames:vote -- <dir> [light|dark] [width] [w|b] [plan]` now takes a plan per vote
+(`drag`, `tap` or `none`; default `drag,tap`). `none,tap` records you sitting out the first vote and walking to the
+winner. Its timeline logs the line above the board, the banner and how many joined.
+
 ## Closing finished lobbies (Oct 7, 2026)
 
 Eric opened the app hours after a match and got its results screen again ("100/100 place") at
