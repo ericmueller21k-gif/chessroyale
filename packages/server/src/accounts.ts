@@ -6,6 +6,7 @@
  * so it can be tested with an in-memory SQLite.
  */
 
+import { countD1 } from "./ops.ts";
 import {
   BOSS_TIERS,
   FRONT_DOOR,
@@ -42,12 +43,15 @@ export interface Sql {
 export function d1Sql(db: D1Database): Sql {
   return {
     async run(sql, ...params) {
+      countD1(sql);
       await db.prepare(sql).bind(...params).run();
     },
     async first(sql, ...params) {
+      countD1(sql);
       return (await db.prepare(sql).bind(...params).first()) as never;
     },
     async all(sql, ...params) {
+      countD1(sql);
       return (await db.prepare(sql).bind(...params).all()).results as never;
     },
   };

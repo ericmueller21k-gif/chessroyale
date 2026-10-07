@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { LobbyRecord } from "./lobby.ts";
 import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
+import { countCall } from "./ops.ts";
 
 /**
  * "Play now": one Durable Object hands out the lobby that's filling up. Players
@@ -12,7 +13,9 @@ import type { Env } from "./index.ts";
 export class Matchmaker extends DurableObject<Env> {
   async next(overrides: LobbyRecord["overrides"], fillMs: number): Promise<{ code: string }> {
     // One request at a time, so two players arriving together don't open two lobbies.
+    countCall("mm.next");
     return this.ctx.blockConcurrencyWhile(async () => {
+      countCall("mm.serialised");
       const current = await this.ctx.storage.get<string>("current");
       if (current) {
         const stub = this.env.LOBBIES.get(this.env.LOBBIES.idFromName(current));
