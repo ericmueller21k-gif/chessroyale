@@ -8,6 +8,9 @@ export class Timings {
   get n() {
     return this.xs.length;
   }
+  raw(): number[] {
+    return this.xs;
+  }
   pct(p: number): number | null {
     if (!this.xs.length) return null;
     const s = [...this.xs].sort((a, b) => a - b);
@@ -44,6 +47,20 @@ export class Metrics {
   move(from: string | null, to: string) {
     if (from) this.states.set(from, (this.states.get(from) ?? 1) - 1);
     this.states.set(to, (this.states.get(to) ?? 0) + 1);
+  }
+
+  /** Everything measured, raw (a child process hands it to the parent, which merges). */
+  dump() {
+    return {
+      timings: Object.fromEntries([...this.timings].map(([k, t]) => [k, t.raw()])),
+      counts: Object.fromEntries(this.counts),
+      errors: Object.fromEntries(this.errors),
+    };
+  }
+  merge(d: ReturnType<Metrics["dump"]>) {
+    for (const [k, xs] of Object.entries(d.timings)) for (const x of xs) this.time(k, x);
+    for (const [k, n] of Object.entries(d.counts)) this.count(k, n);
+    for (const [k, n] of Object.entries(d.errors)) this.errors.set(k, (this.errors.get(k) ?? 0) + n);
   }
 
   line(): string {

@@ -6,3 +6,4 @@ playwright-report/
 *.log
 reports/demo/
 items-preview.png
+wrangler.staging.jsonc

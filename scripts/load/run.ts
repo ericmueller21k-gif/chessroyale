@@ -17,8 +17,10 @@
  *   --ops-key KEY      reads the server's counters (/api/ops/stats; the OPS_STATS variable) before and after
  *   --access           sends Cloudflare Access headers from CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET (staging)
  *   --until S          stop the whole run after this long (default: when every player is done)
+ *   --procs N          split the players over N Node processes (one core each; about 1,500 players a process)
  */
 import { writeFileSync, mkdirSync } from "node:fs";
+import { fork } from "node:child_process";
 import { Metrics } from "./metrics.ts";
 import { FakePlayer, type PlayerOptions } from "./player.ts";
 
@@ -67,9 +69,27 @@ async function stats(reset = false) {
   }
 }
 
+const procs = Math.max(1, Number(arg("procs", "1")));
+const child = arg("child");
 const m = new Metrics();
-await stats(true);
+if (!child) await stats(true);
 const t0 = Date.now();
+let childCpuMax = 0;
+if (procs > 1 && !child) {
+  // The parent: N children, each with every Nth player (so the ramp stays even), merged at the end.
+  await Promise.all(
+    Array.from({ length: procs }, (_, i) =>
+      new Promise<void>((resolve) => {
+        const c = fork(process.argv[1]!, [...args, "--child", String(i), "--pool", opts.pool!], { execArgv: process.execArgv });
+        c.on("message", (msg: { dump: ReturnType<Metrics["dump"]>; cpu: number }) => {
+          m.merge(msg.dump);
+          childCpuMax = Math.max(childCpuMax, msg.cpu);
+        });
+        c.on("exit", () => resolve());
+      }),
+    ),
+  );
+}
 const runs: Promise<void>[] = [];
 let lastUsage = process.cpuUsage();
 let lastAt = performance.now();
@@ -81,10 +101,12 @@ const progress = setInterval(() => {
   generatorCpuMax = Math.max(generatorCpuMax, cpu);
   lastUsage = process.cpuUsage();
   lastAt = now;
-  console.log(`${m.line()} | generator cpu ${(cpu * 100).toFixed(0)}%`);
+  if (procs === 1 || child !== undefined) console.log(`${child !== undefined ? `[${child}] ` : ""}${m.line()} | generator cpu ${(cpu * 100).toFixed(0)}%`);
 }, 10_000);
 
-for (let i = 0; i < players; i++) {
+const mine = (i: number) => procs === 1 || (child !== undefined && i % procs === Number(child));
+for (let i = 0; i < players && (procs === 1 || child !== undefined); i++) {
+  if (!mine(i)) continue;
   const due = t0 + (rampS * 1000 * i) / Math.max(1, players);
   const wait = due - Date.now();
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -93,6 +115,11 @@ for (let i = 0; i < players; i++) {
 const deadline = new Promise((r) => setTimeout(r, Math.max(0, untilS * 1000 - (Date.now() - t0))));
 await (untilS ? Promise.race([Promise.all(runs), deadline]) : Promise.all(runs));
 clearInterval(progress);
+if (child !== undefined) {
+  process.send!({ dump: m.dump(), cpu: generatorCpuMax }, () => process.exit(0));
+  await new Promise(() => undefined);
+}
+generatorCpuMax = Math.max(generatorCpuMax, childCpuMax);
 const server = await stats();
 console.log(m.line());
 
@@ -106,7 +133,7 @@ if (name) {
     `# Load test: ${name}`,
     "",
     `${new Date(t0).toISOString()} · ${base} · ${players} players over ${rampS} s · ${opts.mode} · session ${opts.maxSessionMs ? `${opts.maxSessionMs / 1000} s` : "to the results"} · ${minutes.toFixed(1)} min`,
-    `Generator CPU peak (one Node process): ${(generatorCpuMax * 100).toFixed(0)}%`,
+    `Generator: ${procs} Node process${procs > 1 ? "es" : ""}, CPU peak ${(generatorCpuMax * 100).toFixed(0)}% of a core (each)`,
     "",
     "## Players",
     "",
