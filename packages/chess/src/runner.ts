@@ -70,54 +70,77 @@ export interface EngineLike {
   scoreMovesAt?(fen: string, moves: readonly string[], nodes: number): Promise<MoveScore[]>;
 }
 
-/** The re-check's settings (see recheckLoss, recheckMax and recheckNodes in settings). */
+/** The re-check's settings (see recheckLoss, recheckMax, recheckNodes and recheckCut* in settings). */
 export interface RecheckSettings {
   recheckLoss: readonly [number, number];
   recheckMax: number;
   recheckNodes: number;
+  /** Picks that can decide a cut (`priority`): re-checked first, over this wider range of losses, up to this many. */
+  recheckCutLoss?: readonly [number, number];
+  recheckCutMax?: number;
+}
+
+type Evaluation = { bestMove: string; bestExpected: number; expectedAfter: Record<string, number> };
+
+/**
+ * Which picks the re-check searches again: those losing between recheckLoss[0] and [1] points, the most picked
+ * first, up to recheckMax. Picks that can decide a cut (`priority`, from the lobby: players near the cut line) come
+ * first, over the wider recheckCutLoss range, up to recheckCutMax of them; the rest fill up to recheckMax.
+ * The same choice on every device and on the server (it's how a judge's re-check is verified).
+ */
+export function recheckTargets(evaluation: Evaluation, picks: readonly (string | null)[], s: RecheckSettings, priority: readonly string[] = []): string[] {
+  if (s.recheckMax <= 0) return [];
+  const best = Math.max(evaluation.bestExpected, ...picks.flatMap((m) => (m && evaluation.expectedAfter[m] !== undefined ? [evaluation.expectedAfter[m]!] : [])));
+  const count = new Map<string, number>();
+  for (const m of picks) if (m) count.set(m, (count.get(m) ?? 0) + 1);
+  const lossOf = (m: string) => {
+    const e = evaluation.expectedAfter[m];
+    return e === undefined ? 0 : (best - e) * 100;
+  };
+  const byCount = (a: string, b: string) => count.get(b)! - count.get(a)! || (a < b ? -1 : a > b ? 1 : 0);
+  const inRange = (m: string, [lo, hi]: readonly [number, number]) => m !== evaluation.bestMove && lossOf(m) >= lo && lossOf(m) <= hi;
+  const wanted = new Set(priority);
+  const first = s.recheckCutMax && s.recheckCutLoss
+    ? [...count.keys()].filter((m) => wanted.has(m) && inRange(m, s.recheckCutLoss!)).sort(byCount).slice(0, s.recheckCutMax)
+    : [];
+  const rest = [...count.keys()].filter((m) => !first.includes(m) && inRange(m, s.recheckLoss)).sort(byCount).slice(0, Math.max(0, s.recheckMax - first.length));
+  return [...first, ...rest];
+}
+
+/** Puts a re-check's deep numbers in: re-anchored to the deep number for the best move; a move that beats the best becomes it. */
+export function applyRecheck(evaluation: Evaluation, flagged: readonly string[], deep: readonly MoveScore[]): Evaluation & { rechecked: string[] } {
+  const deepBest = deep.find((m) => m.move === evaluation.bestMove);
+  if (!flagged.length || !deepBest) return { ...evaluation, rechecked: [] };
+  const shift = evaluation.bestExpected - deepBest.expected;
+  const expectedAfter = { ...evaluation.expectedAfter };
+  for (const m of deep) if (m.move !== evaluation.bestMove && flagged.includes(m.move)) expectedAfter[m.move] = Math.min(1, Math.max(0, m.expected + shift));
+  let bestMove = evaluation.bestMove;
+  let bestExpected = evaluation.bestExpected;
+  for (const m of flagged) if ((expectedAfter[m] ?? 0) > bestExpected) [bestMove, bestExpected] = [m, expectedAfter[m]!];
+  return { bestMove, bestExpected, expectedAfter, rechecked: [...flagged] };
 }
 
 /**
  * Re-checks the close calls before they cost anyone. The top-8 search gives each move only an eighth of the
- * budget, so a good move is now and then marked a mistake (reports/judge-accuracy.md). Picked moves that lose
- * between recheckLoss[0] and [1] points (the most picked first, up to recheckMax) are searched again with the
- * best move, in one search restricted to them at recheckNodes, and those numbers replace the first ones. Big
- * losses are rechecked too (up to [1]): a sacrifice the quick search called a blunder is the worst miss.
+ * budget, so a good move is now and then marked a mistake (reports/judge-accuracy.md). The picks recheckTargets
+ * chooses are searched again with the best move, in one search restricted to them at recheckNodes, and those
+ * numbers replace the first ones. Big losses are rechecked too (up to recheckLoss[1]): a sacrifice the quick
+ * search called a blunder is the worst miss.
  */
 export async function recheckCloseCalls(
   engine: EngineLike,
   fen: string,
-  evaluation: { bestMove: string; bestExpected: number; expectedAfter: Record<string, number> },
+  evaluation: Evaluation,
   picks: readonly (string | null)[],
   s: RecheckSettings,
-): Promise<{ bestMove: string; bestExpected: number; expectedAfter: Record<string, number>; rechecked: string[] }> {
+  priority: readonly string[] = [],
+): Promise<Evaluation & { rechecked: string[] }> {
   const none = { ...evaluation, rechecked: [] as string[] };
-  if (!engine.scoreMovesAt || s.recheckMax <= 0) return none;
-  const best = Math.max(evaluation.bestExpected, ...picks.flatMap((m) => (m && evaluation.expectedAfter[m] !== undefined ? [evaluation.expectedAfter[m]!] : [])));
-  const count = new Map<string, number>();
-  for (const m of picks) if (m) count.set(m, (count.get(m) ?? 0) + 1);
-  const [lo, hi] = s.recheckLoss;
-  const flagged = [...count.keys()]
-    .filter((m) => {
-      const e = evaluation.expectedAfter[m];
-      const loss = e === undefined ? 0 : (best - e) * 100;
-      return m !== evaluation.bestMove && loss >= lo && loss <= hi;
-    })
-    .sort((a, b) => count.get(b)! - count.get(a)!)
-    .slice(0, s.recheckMax);
+  if (!engine.scoreMovesAt) return none;
+  const flagged = recheckTargets(evaluation, picks, s, priority);
   if (!flagged.length) return none;
   const deep = await engine.scoreMovesAt(fen, [evaluation.bestMove, ...flagged], s.recheckNodes);
-  const deepBest = deep.find((m) => m.move === evaluation.bestMove);
-  if (!deepBest) return none;
-  // Re-anchor: the deep numbers for the rechecked moves, measured against the deep number for the best move.
-  const shift = evaluation.bestExpected - deepBest.expected;
-  const expectedAfter = { ...evaluation.expectedAfter };
-  for (const m of deep) if (m.move !== evaluation.bestMove && flagged.includes(m.move)) expectedAfter[m.move] = Math.min(1, Math.max(0, m.expected + shift));
-  // A rechecked move that turns out better than the best: it becomes the best.
-  let bestMove = evaluation.bestMove;
-  let bestExpected = evaluation.bestExpected;
-  for (const m of flagged) if ((expectedAfter[m] ?? 0) > bestExpected) [bestMove, bestExpected] = [m, expectedAfter[m]!];
-  return { bestMove, bestExpected, expectedAfter, rechecked: flagged };
+  return applyRecheck(evaluation, flagged, deep);
 }
 
 export interface Entrant {

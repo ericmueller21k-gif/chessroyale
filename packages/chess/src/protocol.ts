@@ -1,6 +1,7 @@
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
 import type { LastStandRound } from "./runner.ts";
+import type { JudgeJob, JudgeReport, JudgeRules } from "./judge.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
  * lobby), sent as JSON over a WebSocket. Times are server milliseconds; each
@@ -111,6 +112,8 @@ export interface ScoreJob {
   botPlanPowerUps?: string[];
   /** Boss battle, the re-pick after the God King's Last Stand: the move he took back (no bot picks it; it isn't the best). */
   barred?: string;
+  /** Picks that can decide the cut (players near the cut line): re-checked first (recheckCut* in settings). */
+  priority?: string[];
 }
 
 /** A pick shown live in Crowd once you've picked (or while your team watches): visible from `at` (server time). */
@@ -267,7 +270,11 @@ export type ClientMessage =
    * Quick chat, this device's choices: chat off (nothing is sent to it, and it can't send), and the players muted
    * for this match (their lines aren't sent to it).
    */
-  | { t: "chatPrefs"; off?: boolean; muted?: string[] };
+  | { t: "chatPrefs"; off?: boolean; muted?: string[] }
+  /** Many judges: this device's engine speed (nodes per second), from its speed check on joining. */
+  | { t: "speed"; nps: number }
+  /** Many judges: this device's answer to one scoring job. */
+  | { t: "judged"; key: string; id: string; report: JudgeReport };
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
@@ -321,6 +328,11 @@ export type ServerMessage = { now: number } & (
   /** A human has made their move this round (sent to everyone, for the leaderboard). */
   | { t: "moved"; key: string; playerId: string }
   | { t: "locked"; key: string }
+  /**
+   * Many judges: scoring jobs for this device (positions and picks, no names). Answer each with "judged". A job
+   * with `referee` is a second opinion after two judges disagreed (it doesn't hold up the round).
+   */
+  | { t: "judge"; key: string; jobs: JudgeJob[] }
   /** `serverRecheck`: the engine server re-checks the close calls, so the host skips its own re-check. */
   | { t: "scoreRequest"; key: string; jobs: ScoreJob[]; serverRecheck?: boolean }
   /** To the host at the start of a round: every board, so it can search them while players think. */
@@ -328,7 +340,15 @@ export type ServerMessage = { now: number } & (
       t: "prefetch";
       fens: string[];
       /** Crowd: the bots picking this round, so the host can decide their picks now (sent back as botPlan). */
-      plan?: { key: string; fen: string; bots: { id: string; skill: number; powerUps: number }[]; barred?: string };
+      plan?: {
+        key: string;
+        fen: string;
+        bots: { id: string; skill: number; powerUps: number }[];
+        barred?: string;
+        /** Many judges: the bots pick from this seed and these rules (judgeBotPicks), so the scoring job agrees. */
+        seed?: number;
+        rules?: JudgeRules;
+      };
     }
   /** Crowd: the picks so far (bots appear at their thinking time), to players who've picked and to the watching team. */
   | { t: "tally"; key: string; picks: LivePick[] }
@@ -360,6 +380,8 @@ export type ServerMessage = { now: number } & (
       lastStand?: LastStandRound;
       /** Boss battle: the battle after this move (his charges, whether he has fallen). */
       boss?: NetBoss;
+      /** Scored by two judges (and the engine server where they disagreed): no cross-check needed. */
+      judged?: true;
       /** For the cross-check: the group's evaluation as the host computed it. */
       expectedAfter: Record<string, number>;
       bestExpected: number | null;
