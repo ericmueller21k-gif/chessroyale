@@ -47,6 +47,9 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
   reviews what comes back and merges.
 - **How the director runs a delegate:** it can run the delegate itself as a sub-agent in its own window (the Agent
   tool, with the agent's name), which is simplest for Eric. Or Eric can open a window for a delegate and paste a brief.
+- **Same model, always (Eric, Oct 7):** delegates and every other helper run on the director's own model (the agent
+  files say `model: inherit`). Never pick a smaller or cheaper model for any helper, built-in ones included: when
+  starting one, leave the model unset or set it to the director's. Eric pays for the top model and wants it on all work.
 - **Any other window works only in its own lane** and doesn't act as the director.
 - **Before starting,** check `git log origin/main` and open PRs for work already in flight.
 - Each piece of work goes on its own branch and PR.
