@@ -23,7 +23,9 @@ red", and "watch it frame by frame". Then read the `DECISIONS.md` sections marke
 
 **Where the panel goes in the game screens.** The match screens (`Crowd.tsx`, `Play.tsx`, `Hud.tsx`) are the
 director's. You may add the chat button and panel in the places the design names, and nothing else there: no change
-to the board, clock, picks or reveal. Anything more, ask.
+to the board, clock, picks or reveal. On a phone, the design splits the space under the board between the scoreboard
+and chat: you may wrap the scoreboard in that split container and give it the expand/split header and a narrow form,
+but don't change what it ranks or how. Anything more, ask.
 
 Not yours:
 - the home, queue and profiles (`hub`); show players with its name and icon components (`PlayerName`, `UserIcon`)
