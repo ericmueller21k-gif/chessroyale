@@ -113,7 +113,8 @@ const okScore = (m: MoveScore | undefined, legal: ReadonlySet<string>) =>
 function baseBoard(job: JudgeJob, report: JudgeReport, bots: { picks: string[]; powerUps: number[] }): JudgedBoard | null {
   const legal = new Set(legalMoves(job.fen));
   if (!Array.isArray(report.top) || !Array.isArray(report.extra) || !report.top.length) return null;
-  if (report.top.length > job.rules.botCandidateMoves) return null;
+  // (No legal position has more than 218 moves: anything longer is junk, and isn't worth the lobby's time.)
+  if (report.top.length > job.rules.botCandidateMoves || report.extra.length > 256 || (Array.isArray(report.deep) && report.deep.length > 256)) return null;
   if (![...report.top, ...report.extra].every((m) => okScore(m, legal))) return null;
   const top = judgeTop(job, report.top);
   const expectedAfter: Record<string, number> = Object.fromEntries(top.map((m) => [m.move, m.expected]));

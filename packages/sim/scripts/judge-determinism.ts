@@ -175,6 +175,11 @@ function summary() {
   const pct = (p: number) => dist[Math.min(dist.length - 1, Math.floor(p * dist.length))]!.toFixed(1);
   const searches = rows.reduce((s, r) => s + (r.searches as number), 0);
   const ms = rows.map((r) => r.ms as number).sort((x, y) => x - y);
+  // Relaxed-SIMD instructions (0xFD prefix, opcodes 0x100-0x113): the one WebAssembly feature whose results may
+  // differ between CPUs. A raw scan of the bytes (it can only over-count).
+  const wasm = readFileSync(STOCKFISH_BUILD.replace(/\.js$/, ".wasm"));
+  let relaxed = 0;
+  for (let i = 0; i + 2 < wasm.length; i++) if (wasm[i] === 0xfd && wasm[i + 2] === 0x02 && wasm[i + 1]! >= 0x80 && wasm[i + 1]! <= 0x93) relaxed++;
   const md = `# Judge determinism
 
 Many judges needs to know: do two honest devices give identical numbers for the same scoring job?
@@ -193,8 +198,9 @@ outside it, the 700k-node re-check) on separate engines, comparing the raw outpu
 
 ${n} jobs, ${searches} searches, every score, best reply and mate identical. Stockfish with one thread, a fixed node
 count and a cleared hash (\`ucinewgame\`) is deterministic, and the WebAssembly build is the same file everywhere.
-The build has no relaxed-SIMD instructions (a scan of the .wasm found none), the only WebAssembly feature whose
-results may differ between CPUs (x86 against a phone's ARM). Integer SIMD and the rest are exactly specified.
+The build has ${relaxed ? `${relaxed} possible` : "no"} relaxed-SIMD instructions (a scan of the .wasm's bytes), the only WebAssembly
+feature whose results may differ between CPUs (x86 against a phone's ARM). Integer SIMD and the rest are exactly
+specified, so the same file gives the same numbers on any device.
 
 So the lobby demands an **exact match** (\`JUDGES.tolerance = 0\` in settings.ts). Untested here: real ARM phones
 (this machine is x86). The lobby logs every disagreement with its size, so a platform difference would show up in
