@@ -19,6 +19,7 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { myTeam, type GameView, type VoteView } from "../game.ts";
 import { pawnLook } from "../looks.ts";
+import { underBoardView } from "../prefs.ts";
 import { play } from "../sound.ts";
 import { useCrowdAnimations } from "./Crowd.tsx";
 
@@ -93,14 +94,8 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
   const dropping = !counting && last && now >= nextAt - DROP_MS;
   // (After the last vote they fade where they stand.)
   const home = resetting;
-  // The game's screen makes its board bigger when the scoreboard under it is minimised (its own setting): so does this.
-  const [towerClosed] = useState(() => {
-    try {
-      return localStorage.getItem("brc.miniTower") === "0";
-    } catch {
-      return false;
-    }
-  });
+  // The game's screen makes its board bigger when the space under it is folded (that space's own setting): so does this.
+  const [towerClosed] = useState(() => !underBoardView().open);
 
   // Everyone in the match, their look, and their starting spot (seeded by id: the same in both votes).
   const players = useMemo(() => match.standings(), [vote.key]);

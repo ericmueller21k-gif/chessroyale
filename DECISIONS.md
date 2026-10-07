@@ -1550,6 +1550,41 @@ profile under quick chat and emoji selection." My calls:
     during a match shows at once.
 - **Bots keep their own full list** (`botChatLines` is unchanged).
 
+### The panel under the board: one view, never an empty box (Eric, Oct 7, 2026)
+
+Eric, on his iPhone: "the scoreboard can be both large like this and not showing because there's 2 buttons which
+control its view. If it's enlarged like so it should reset the other toggle or switch it". His screenshot showed a
+tall, empty black box about two thirds of the screen wide, under the header "White team · tap for all 50".
+
+- **The cause.** Two settings, one per button: the layout (`brc.underBoard`: split, board, chat) and the fold
+  (`brc.miniTower`). Folding side by side, then tapping the scoreboard's ⤢, gave "scoreboard full width, folded".
+  - Its class was `under-board board closed`, and `.board` is the chessboard's own rule
+    (`width: 100%; height: 100%`).
+  - Open, `flex: 1 1 0` overrode that height. Folded (`flex: none`), the panel took the screen's full height.
+  - The folded scoreboard inside it kept only its header's width (about 60%) and stretched to that height, with no
+    rows.
+  - Every saved combination was reproduced on an emulated iPhone. Only "full width + folded" was empty, with chat
+    on or off. Open, the same class collision also made the panel 20 px too wide.
+- **One view** (`prefs.ts`, `underBoardView`): `{ layout, open }`, kept in one setting (`brc.underBoardView`). Every
+  panel and the scoreboard read it and redraw together.
+  - Showing a layout always opens it: a panel's ⤢, "side by side" (□□), and the unread count's tap.
+  - The arrow folds or opens and keeps the layout. Folded, the panel is just its header bar, the full width (side by
+    side: both headers, half each).
+  - The layout classes are now `ub-split`, `ub-board` and `ub-chat`, so nothing of the chessboard's applies.
+- **Old settings fix themselves on load.** The two old keys become the one view and are removed. A full-width panel
+  that was folded opens: in the new view you can't fold one by making it bigger, and folded it was the empty box.
+  Side by side and folded stays folded, since it was always a small bar. Eric's phone shows the full scoreboard on
+  its next reload.
+- **No chat (solo, Classic) or chat off:** the scoreboard alone, full width, with its own fold arrow and no split
+  buttons. With chat off, the phone no longer shows a "Chat is off" panel; Settings turns chat back on, and the
+  remembered layout returns.
+- **Tested:**
+  - `e2e/panel.spec.ts` taps every button from every state, folded and open, and reloads after each tap. It also
+    loads each old-build combination, runs a match with chat off, and folds and opens a solo Crowd match. After
+    every step the panel shows rows, chat or a small bar, and fits the screen.
+  - On the old code it failed at the second tap, Eric's box (652 px tall, no rows).
+  - `app/test/under-board.test.ts` covers the view, the migration, and a device without storage.
+
 ## No flash between a match's screens (Oct 6, 2026)
 
 Eric: in a solo boss raid on his phone, the screen flashed white between moves.

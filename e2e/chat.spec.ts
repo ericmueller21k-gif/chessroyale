@@ -150,8 +150,8 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   const same = (await team(desk)) === (await team(phone));
 
   // Phone: chat shares the space under the board with the scoreboard (narrow), side by side. Never over the board.
-  await expect(phone.locator(".under-board.split .mini-tower.narrow")).toBeVisible();
-  const split = phone.locator(".under-board.split .qchat-split");
+  await expect(phone.locator(".under-board.ub-split .mini-tower.narrow")).toBeVisible();
+  const split = phone.locator(".under-board.ub-split .qchat-split");
   await expect(split).toBeVisible();
   expect(overlaps((await rect(phone, ".qchat-split"))!, (await rect(phone, ".board-area cg-board"))!)).toBe(false);
   // Exactly the lines picked in the profile, in that order; the emoji picked.
@@ -228,7 +228,7 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   // The phone, chat full width: the emoji in one row, no scrolling; the board still takes a move by two taps.
   const boardBefore = (await rect(phone, ".board-area cg-board"))!;
   await phone.getByRole("button", { name: "Chat full width" }).click();
-  await expect(phone.locator(".under-board.chat .qchat-full")).toBeVisible();
+  await expect(phone.locator(".under-board.ub-chat .qchat-full")).toBeVisible();
   await expect(phone.locator(".under-board .mini-tower")).toHaveCount(0);
   const emojiRow = phone.locator(".qchat-full .qrow.emoji");
   expect(await emojiRow.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
@@ -245,7 +245,7 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   // move made while it shows still lands.
   await phone.getByRole("button", { name: "Side by side" }).click();
   await phone.getByRole("button", { name: "Leaderboard full width" }).click();
-  await expect(phone.locator(".under-board.board .qchat")).toHaveCount(0);
+  await expect(phone.locator(".under-board.ub-board .qchat")).toHaveCount(0);
   await untilMyTurn(phone, desk);
   await desk.locator(".qto button", { hasText: "All" }).click();
   await desk.locator(".qchat-side .qchip", { hasText: "GG" }).click();
@@ -261,7 +261,7 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   const unread = phone.locator(".mini-tower-head .qunread");
   await expect(unread).toBeVisible();
   await unread.click();
-  await expect(phone.locator(".under-board.split .qchat-split")).toBeVisible();
+  await expect(phone.locator(".under-board.ub-split .qchat-split")).toBeVisible();
   await expect(phone.locator(".qchat-split .qline", { hasText: "GG" }).filter({ hasText: "Desky" })).toBeVisible();
   await expect(unread).toHaveCount(0);
   expect(await rect(phone, ".board-area cg-board")).toEqual(boardBefore);
