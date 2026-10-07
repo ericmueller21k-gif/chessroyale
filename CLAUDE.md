@@ -64,6 +64,9 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
   front end and the server pieces behind them.
 - `social`: how players talk to each other: quick chat (preset messages) now; emotes, friends, parties and muting
   later. Its panel sits in the game screens only where its design says.
+- `ranked`: hidden skill ratings, ranks and rank points, seasons, ranked queues and skill-based matchmaking,
+  leaderboard numbers (the `hub` shows them).
+- `ops`: capacity, load tests, scaling choke points, monitoring, rate limits, graceful overload, running costs.
 - Lanes keep sessions out of each other's files. Run one delegate per lane at a time. In `DECISIONS.md`, add to your
   own sections rather than rewriting others'.
 
