@@ -236,7 +236,7 @@ export class Lobby extends DurableObject<Env> {
     else await reportLobby(sql, { code: rec.code, mode: this.mode(), kind, ...s }, now);
     if (waitDue && rec.auto) {
       rec.auto.waitSaved = true;
-      await this.ctx.storage.put("lobby", rec);
+      await this.store(rec);
       await recordWait(sql, this.mode(), rec.auto.waiters ?? 0, rec.auto.waitMs ?? 0, now);
     }
   }
