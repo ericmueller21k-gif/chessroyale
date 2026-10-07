@@ -377,7 +377,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                         ? `${mine.kingCalls} of ${picks.length} called him · no score`
                         : "You called him · no score"
                       : "No move from you."
-                    : `You: ${toSan(fen, me.move)} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`}
+                    : `You: ${toSan(fen, me.move)}${me.usedPowerUp ? " ⚡" : ""} (${fmt(me.roundScore)}) · best ${toSan(fen, mine.bestMove)}`}
               </span>
             </>
             )
