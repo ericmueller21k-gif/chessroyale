@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { applyMove, inCheck, pieceAt, sideToMove, toSan } from "@chessroyale/chess";
 import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKing.ts";
 import { brilliance, equippedLook, type Augment } from "@chessroyale/core";
@@ -456,6 +456,43 @@ const BOT_HATS = ["none", "none", "none", "party", "crown", "wizard", "top", "vi
 const hash = (s: string) => [...s].reduce((a, c) => Math.imul(a ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 /** The judge strikes this long after the screen opens. */
 const GAVEL_AT = 1500;
+/** The cut screen names at most this many of the players who went out (then "+N"). */
+const CUT_NAMES_MAX = 12;
+
+/**
+ * Who went out, struck through (you first): as many names as fit the list's rows, never a row cut in half, and "+N"
+ * for the rest. Measured before the paint, so a narrow phone or long names just show fewer names.
+ */
+function CutNames({ knockedOut }: { knockedOut: Standing[] }) {
+  const [shown, setShown] = useState(CUT_NAMES_MAX);
+  const [width, setWidth] = useState(() => innerWidth);
+  const box = useRef<HTMLDivElement>(null);
+  const names = useMemo(() => [...knockedOut].sort((a, b) => Number(!!b.isYou) - Number(!!a.isYou)), [knockedOut]);
+  const more = names.length - Math.min(shown, names.length);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (el && shown > 0 && el.scrollHeight > el.clientHeight + 1) setShown(shown - 1);
+  }, [shown, names, width]);
+  useEffect(() => {
+    // A new width (a turned phone, a resized window): fit the names again.
+    const again = () => {
+      setWidth(innerWidth);
+      setShown(CUT_NAMES_MAX);
+    };
+    addEventListener("resize", again);
+    return () => removeEventListener("resize", again);
+  }, []);
+  return (
+    <div class="cut-out" ref={box} aria-label="Knocked out">
+      {names.slice(0, shown).map((k) => (
+        <PlayerName key={k.id} class={`cut-name${k.isYou ? " you" : ""}`} name={k.name} uid={k.uid} you={k.isYou} bot={k.isBot}>
+          {k.isYou ? "You" : k.name}
+        </PlayerName>
+      ))}
+      {more > 0 && <span class="cut-name more">+{more}</span>}
+    </div>
+  );
+}
 
 /**
  * Crowd's cut, as a judgement: every player is a pawn in a grid (White's team on the left, Black's on the
@@ -515,6 +552,8 @@ export function CrowdCut({
   }, [stage]);
   // Your score and the line (the last player through) when you go out, for the breakdown.
   const me = standings.find((p) => p.isYou);
+  // Online, once you're out you stay on this screen and see the later cuts too.
+  const outBefore = !youOut && !!me?.out;
   const through = standings.filter((p) => !p.out && !cutNow.has(p.id));
   const line = through.length ? Math.min(...through.map((p) => p.points)) : 0;
   useEffect(() => {
@@ -546,10 +585,12 @@ export function CrowdCut({
       </div>
       {slammed && (
         <>
-          <p class={youOut ? "out-msg" : "safe-msg"}>
+          <p class={youOut || outBefore ? "out-msg" : "safe-msg"}>
             {youOut
               ? `You're out, in ${match.placement}${ordinal(match.placement ?? 0)} place.`
-              : final
+              : outBefore
+                ? `You went out earlier, in ${match.placement}${ordinal(match.placement ?? 0)} place.`
+                : final
                 ? next === "Boss battle"
                   ? "You face the boss!"
                   : next === "Duel"
@@ -569,14 +610,7 @@ export function CrowdCut({
               Why was I cut?
             </button>
           )}
-          <div class="cut-out" aria-label="Knocked out">
-            {knockedOut.slice(0, 12).map((k) => (
-              <PlayerName key={k.id} class={`cut-name${k.isYou ? " you" : ""}`} name={k.name} uid={k.uid} you={k.isYou} bot={k.isBot}>
-                {k.isYou ? "You" : k.name}
-              </PlayerName>
-            ))}
-            {knockedOut.length > 12 && <span class="cut-name more">+{knockedOut.length - 12}</span>}
-          </div>
+          <CutNames knockedOut={knockedOut} />
           {/* Out, you stay here until the results: quick chat with your team (online). */}
           {(youOut || me?.out) && <ChatSection match={match} />}
         </>
@@ -586,7 +620,7 @@ export function CrowdCut({
           <Breakdown moves={match.moves} you={me?.points} line={line} placement={match.placement} onClose={() => setWhy(false)} />
         </div>
       )}
-      {augments && !youOut && (
+      {augments && !youOut && !outBefore && (
         <>
           <h2 class="cut-vote-title">
             Next round's clock{" "}

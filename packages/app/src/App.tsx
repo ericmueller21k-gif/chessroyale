@@ -561,7 +561,8 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
       if (isCrowd(match)) return <CrowdReveal key={`${p.board.id}:${p.board.ply}`} match={match} mine={p.mine} board={p.board} until={p.until} />;
       return <RevealScreen key={`${p.board.id}:${p.board.ply}`} match={match} mine={p.mine} board={p.board} until={p.until} />;
     case "stageBreak":
-      if (isCrowd(match)) return <CrowdCut match={match} {...p} />;
+      // (Keyed by the cut: once out, online, you stay on this screen, and each later cut is a judgement of its own.)
+      if (isCrowd(match)) return <CrowdCut key={p.stage} match={match} {...p} />;
       return <StageBreakScreen match={match} {...p} />;
     case "simulating":
       return (

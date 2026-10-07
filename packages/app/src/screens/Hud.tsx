@@ -86,8 +86,14 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
             ) : crowd ? (
               <>
                 {team && <span class={`team-chip ${team}`} title={view.teamLabel ?? ""} aria-label={view.teamLabel ?? ""} />}
-                {moveNo ? `Move ${moveNo}` : "Crowd"}
-                <span class="muted"> · {turnsLeft <= 1 ? "cut now" : `cut in ${turnsLeft}`}</span>
+                {/* (Two short lines on a phone, so the numbers beside it fit.) */}
+                <span class="hud-stage-text">
+                  <span>{moveNo ? `Move ${moveNo}` : "Crowd"}</span>
+                  <span class="muted">
+                    <span class="hud-dot"> · </span>
+                    {turnsLeft <= 1 ? "cut now" : `cut in ${turnsLeft}`}
+                  </span>
+                </span>
               </>
             ) : (
               <>
