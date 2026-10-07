@@ -6,6 +6,7 @@ import { HattedPawn } from "../components/Cosmetics.tsx";
 import { ItemArt } from "../components/Items.tsx";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
+import { QuickChatPicks } from "../components/ChatPicks.tsx";
 import { account, fetchProfile, onAccountChange, reportPlayer, updateProfile, type PublicProfile } from "../account.ts";
 import type { ProfileTarget } from "../profile-nav.ts";
 import { ordinal } from "./StageBreak.tsx";
@@ -340,11 +341,14 @@ export function PlayerProfileScreen({
   onBack,
   onLocker,
   onSettings,
+  onShop,
 }: {
   target: ProfileTarget;
   onBack: () => void;
   onLocker?: () => void;
   onSettings?: () => void;
+  /** The shop's chat packs (a locked line in Quick chat and emoji). */
+  onShop?: () => void;
 }) {
   const [, rerender] = useState(0);
   useEffect(() => onAccountChange(() => rerender((n) => n + 1)), []);
@@ -447,6 +451,8 @@ export function PlayerProfileScreen({
         )}
       </div>
       <Wearing look={p.look} hat={p.hat} own={own} />
+      {/* (The social lane's section: components/ChatPicks.tsx.) */}
+      {own && <QuickChatPicks onShop={onShop} focus={target.section === "chat"} />}
       </div>
       <div class="fd-profile-col">
       <Stats p={p} own={own} />

@@ -210,7 +210,7 @@ export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onS
             setChatOff(!on);
           }}
         >
-          Preset lines and emoji with your team in online matches (no typing). Off: no messages show, and you send none.
+          Preset lines and emoji in online matches (no typing): pick yours in your profile, under Quick chat and emoji. Off: no messages show, and you send none.
         </Toggle>
         <Toggle
           title="New-message bubble"

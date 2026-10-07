@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
-import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, type ShopSlot } from "@chessroyale/core";
-import { buyShopItem, equipShopItem } from "../account.ts";
+import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, shopItem, type ShopSlot } from "@chessroyale/core";
+import { account, buyShopItem, equipShopItem } from "../account.ts";
+import { openProfile } from "../profile-nav.ts";
 import { HattedPawn, KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
@@ -10,11 +11,16 @@ import { CratesPanel, LockerPanel } from "./Crates.tsx";
  * The shop: cosmetics by category. Get an item (free while we test), then
  * equip it; one equipped per category. Your choices are saved to your account.
  */
-export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: "shop" | "crates" | "locker" }) {
+export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: "shop" | "crates" | "locker" | "chat" }) {
   const { profile, config } = useAccount();
-  const [slot, setSlot] = useState<ShopSlot>("king");
+  // (A profile's locked quick chat line opens it on the chat packs.)
+  const [slot, setSlot] = useState<ShopSlot>(initial === "chat" ? "chat" : "king");
   // (A profile's "Open locker" opens it on the locker.)
-  const [area, setArea] = useState<"shop" | "crates" | "locker">(() => initial ?? (new URLSearchParams(location.search).has("crates") ? "crates" : "shop"));
+  const [area, setArea] = useState<"shop" | "crates" | "locker">(() =>
+    initial && initial !== "chat" ? initial : new URLSearchParams(location.search).has("crates") ? "crates" : "shop",
+  );
+  /** After getting a chat pack: which of its lines went into your quick chat's empty slots, and which didn't fit. */
+  const [gotPack, setGotPack] = useState<{ pack: string; added: string[]; left: number } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const shop = profile?.shop;
@@ -22,9 +28,19 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
   const act = async (id: string, fn: (id: string) => Promise<void>) => {
     setBusy(id);
     setError(null);
+    setGotPack(null);
+    const before = account().profile?.shop?.chat;
     try {
       await fn(id);
       play("menuSelect");
+      // A chat pack: its lines fill any empty slots in your quick chat; the rest you pick in your profile.
+      const pack = shopItem(id)?.slot === "chat" ? chatPack(shopItem(id)!.look.pack ?? "") : undefined;
+      const after = account().profile?.shop?.chat;
+      if (pack && before && after) {
+        const kind = pack.kind === "emoji" ? "emoji" : "lines";
+        const added = after[kind].filter((x) => !before[kind].includes(x));
+        setGotPack({ pack: pack.id, added, left: pack.lines.filter((l) => !after[kind].includes(l.id)).length });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -69,6 +85,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           </div>
           <p class="muted small">{category.blurb}</p>
           {error && <p class="shop-error">{error}</p>}
+          {slot === "chat" && gotPack && <GotPackNote got={gotPack} />}
           <div class="shop-grid">
             {SHOP_ITEMS.filter((i) => i.slot === slot).map((item) => {
               const owned = shop.owned.includes(item.id);
@@ -110,10 +127,50 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
               );
             })}
           </div>
-          <p class="muted small shop-soon">{slot === "chat" ? "Quick chat is in online 50 v 50 matches and boss raids: preset lines only, no typing." : "Coming later: King kill moves and more animations."}</p>
+          {slot === "chat" ? (
+            <div class="shop-soon shop-chat-foot">
+              <p class="muted small">Quick chat is in online 50 v 50 matches and boss raids: preset lines only, no typing.</p>
+              <button type="button" class="btn btn-small" onClick={pickInProfile}>
+                Choose your lines and emoji in your profile ›
+              </button>
+            </div>
+          ) : (
+            <p class="muted small shop-soon">Coming later: King kill moves and more animations.</p>
+          )}
         </>
       )}
         </>
+      )}
+    </div>
+  );
+}
+
+/** Your profile, at its Quick chat and emoji section (closing it comes back to the shop). */
+const pickInProfile = () => openProfile({ you: true, name: account().profile?.user.name ?? "", section: "chat" });
+
+/** After getting a chat pack: what went into your quick chat, and a way to pick the rest. */
+function GotPackNote({ got }: { got: { pack: string; added: string[]; left: number } }) {
+  const pack = chatPack(got.pack);
+  if (!pack) return null;
+  const kind = pack.kind === "emoji" ? "emoji" : "lines";
+  const cap = chatPickCap(kind);
+  const words = kind === "emoji" ? "emoji" : "lines";
+  return (
+    <div class="shop-note shop-got" role="status">
+      <p>
+        {got.added.length > 0 ? (
+          <>
+            Added to your quick chat: {chatSays(got.added).map((s) => (kind === "emoji" ? s.text : `“${s.text}”`)).join(kind === "emoji" ? " " : ", ")}.
+            {got.left > 0 && ` Your ${words} are full now (${cap}/${cap}).`}
+          </>
+        ) : (
+          `Your quick chat ${words} are full (${cap}/${cap}), so nothing changed in your games yet.`
+        )}
+      </p>
+      {(got.left > 0 || got.added.length === 0) && (
+        <button type="button" class="btn btn-small btn-primary" onClick={pickInProfile}>
+          Pick these in your profile ›
+        </button>
       )}
     </div>
   );

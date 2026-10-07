@@ -7,6 +7,9 @@ import { QUICK_CHAT } from "./settings.ts";
  *
  * Lines come in packs. The free packs everyone has; the others are sold in the shop (core/shop.ts lists them as
  * "chat" items). A new pack is a few lines here and a price in settings.ts (QUICK_CHAT.packPrices).
+ *
+ * Which of their lines a player sees in their games is their profile's picks (ChatPicks, below): up to
+ * QUICK_CHAT.maxLines lines and maxEmoji emoji, the defaults until they choose. Bots use the whole list.
  */
 
 /** The four groups the phrases come in. Pack phrases join one of them, so the panel keeps the same four rows. */
@@ -30,8 +33,10 @@ export interface ChatLineDef {
   /** What goes over the wire. Never reuse an id for a different line. */
   id: string;
   text: string;
-  /** Phrases only (emoji have no group: they're team reactions). */
+  /** Phrases only (emoji have no group, and can go to everyone). */
   group?: ChatGroup;
+  /** Emoji only: what it's called (the profile's search, and screen readers). */
+  name?: string;
 }
 
 export interface ChatPack {
@@ -78,14 +83,14 @@ export const CHAT_PACKS: readonly ChatPack[] = [
     free: true,
     blurb: "Eight quick reactions.",
     lines: [
-      { id: "e-thumbs", text: "👍" },
-      { id: "e-clap", text: "👏" },
-      { id: "e-laugh", text: "😂" },
-      { id: "e-wow", text: "😮" },
-      { id: "e-grimace", text: "😬" },
-      { id: "e-fire", text: "🔥" },
-      { id: "e-skull", text: "💀" },
-      { id: "e-party", text: "🎉" },
+      { id: "e-thumbs", text: "👍", name: "thumbs up" },
+      { id: "e-clap", text: "👏", name: "clap" },
+      { id: "e-laugh", text: "😂", name: "laugh" },
+      { id: "e-wow", text: "😮", name: "wow" },
+      { id: "e-grimace", text: "😬", name: "grimace" },
+      { id: "e-fire", text: "🔥", name: "fire" },
+      { id: "e-skull", text: "💀", name: "skull" },
+      { id: "e-party", text: "🎉", name: "party" },
     ],
   },
   {
@@ -130,12 +135,12 @@ export const CHAT_PACKS: readonly ChatPack[] = [
     kind: "emoji",
     blurb: "The pieces themselves.",
     lines: [
-      { id: "e-pawn", text: "♟️" },
-      { id: "e-crown", text: "👑" },
-      { id: "e-castle", text: "🏰" },
-      { id: "e-horse", text: "🐴" },
-      { id: "e-swords", text: "⚔️" },
-      { id: "e-shield", text: "🛡️" },
+      { id: "e-pawn", text: "♟️", name: "pawn" },
+      { id: "e-crown", text: "👑", name: "crown" },
+      { id: "e-castle", text: "🏰", name: "castle" },
+      { id: "e-horse", text: "🐴", name: "horse" },
+      { id: "e-swords", text: "⚔️", name: "swords" },
+      { id: "e-shield", text: "🛡️", name: "shield" },
     ],
   },
   {
@@ -144,12 +149,12 @@ export const CHAT_PACKS: readonly ChatPack[] = [
     kind: "emoji",
     blurb: "Snow, trees and cookies.",
     lines: [
-      { id: "e-snowflake", text: "❄️" },
-      { id: "e-snowman", text: "⛄" },
-      { id: "e-tree", text: "🎄" },
-      { id: "e-gift", text: "🎁" },
-      { id: "e-deer", text: "🦌" },
-      { id: "e-cookie", text: "🍪" },
+      { id: "e-snowflake", text: "❄️", name: "snowflake" },
+      { id: "e-snowman", text: "⛄", name: "snowman" },
+      { id: "e-tree", text: "🎄", name: "tree" },
+      { id: "e-gift", text: "🎁", name: "gift" },
+      { id: "e-deer", text: "🦌", name: "deer" },
+      { id: "e-cookie", text: "🍪", name: "cookie" },
     ],
   },
   {
@@ -158,12 +163,12 @@ export const CHAT_PACKS: readonly ChatPack[] = [
     kind: "emoji",
     blurb: "Fit for a court.",
     lines: [
-      { id: "e-prince", text: "🤴" },
-      { id: "e-princess", text: "👸" },
-      { id: "e-gem", text: "💎" },
-      { id: "e-trophy", text: "🏆" },
-      { id: "e-fleur", text: "⚜️" },
-      { id: "e-dragon", text: "🐉" },
+      { id: "e-prince", text: "🤴", name: "prince" },
+      { id: "e-princess", text: "👸", name: "princess" },
+      { id: "e-gem", text: "💎", name: "gem" },
+      { id: "e-trophy", text: "🏆", name: "trophy" },
+      { id: "e-fleur", text: "⚜️", name: "fleur-de-lis" },
+      { id: "e-dragon", text: "🐉", name: "dragon" },
     ],
   },
 ];
@@ -201,9 +206,10 @@ export function canSay(id: unknown, owned: readonly string[] | null | undefined)
 
 export type ChatTo = "team" | "all";
 
-/** Hello and Sporting phrases can go to everyone; reactions, plans and emoji stay inside your team. */
+/** Hello and Sporting phrases, and emoji, can go to everyone; reactions and plans stay inside your team. */
 export function canSayToAll(id: unknown): boolean {
   const say = chatSay(id);
+  if (say?.kind === "emoji") return true;
   return !!say?.group && !!CHAT_GROUPS.find((g) => g.id === say.group)?.all;
 }
 
@@ -221,6 +227,99 @@ export function chatButtonsOf(packIds: readonly string[]): { groups: { group: Ch
     emoji: mine.filter((s) => s.kind === "emoji"),
   };
 }
+
+// ---------------- Picks ----------------
+
+/**
+ * The lines and emoji a player sees in their games, in their order, chosen in their profile ("Quick chat and
+ * emoji"): at most QUICK_CHAT.maxLines lines and QUICK_CHAT.maxEmoji emoji. Bots keep the whole list.
+ */
+export interface ChatPicks {
+  lines: string[];
+  emoji: string[];
+}
+
+export type ChatPickKind = keyof ChatPicks;
+
+/** What's stored for a player: each kind their own list, or null (never chosen: the defaults). */
+export interface StoredChatPicks {
+  lines?: readonly string[] | null;
+  emoji?: readonly string[] | null;
+}
+
+export type ChatPickLimits = Pick<typeof QUICK_CHAT, "maxLines" | "maxEmoji" | "defaultLines" | "defaultEmoji">;
+
+export const chatPickCap = (kind: ChatPickKind, q: ChatPickLimits = QUICK_CHAT) => (kind === "lines" ? q.maxLines : q.maxEmoji);
+
+const kindOf = (kind: ChatPickKind): ChatSay["kind"] => (kind === "lines" ? "phrase" : "emoji");
+
+/** A list of picks made clean: known lines of the right kind, from packs in `packIds`, no repeats, in order, capped. */
+export function cleanChatPickList(raw: unknown, kind: ChatPickKind, packIds: readonly string[], q: ChatPickLimits = QUICK_CHAT): string[] {
+  if (!Array.isArray(raw)) return [];
+  const packs = new Set(packIds);
+  const out: string[] = [];
+  for (const id of raw) {
+    const say = chatSay(id);
+    if (!say || say.kind !== kindOf(kind) || !packs.has(say.pack) || out.includes(say.id)) continue;
+    out.push(say.id);
+    if (out.length >= chatPickCap(kind, q)) break;
+  }
+  return out;
+}
+
+/** Everyone's picks until they choose their own: QUICK_CHAT.defaultLines and defaultEmoji (free lines only). */
+export const defaultChatPicks = (q: ChatPickLimits = QUICK_CHAT): ChatPicks => ({
+  lines: cleanChatPickList(q.defaultLines, "lines", ownedChatPacks([]), q),
+  emoji: cleanChatPickList(q.defaultEmoji, "emoji", ownedChatPacks([]), q),
+});
+
+/** A player's picks, from what's stored (a kind never chosen gets the defaults) and the packs they own. */
+export function chatPicksOf(stored: StoredChatPicks | null | undefined, packIds: readonly string[], q: ChatPickLimits = QUICK_CHAT): ChatPicks {
+  const def = defaultChatPicks(q);
+  const one = (kind: ChatPickKind) => {
+    const s = stored?.[kind];
+    return Array.isArray(s) ? cleanChatPickList(s, kind, packIds, q) : def[kind];
+  };
+  return { lines: one("lines"), emoji: one("emoji") };
+}
+
+/** The same, from the shop items owned. */
+export const chatPicks = (stored: StoredChatPicks | null | undefined, owned: readonly string[] | null | undefined, q: ChatPickLimits = QUICK_CHAT) =>
+  chatPicksOf(stored, ownedChatPacks(owned), q);
+
+export type ChatPickResult = { ok: true; picks: ChatPicks } | { ok: false; reason: "unknown" | "locked" | "full"; picks: ChatPicks };
+
+/** Adds a line to the end of a player's picks, or takes it out if it's there (`on` forces one or the other). */
+export function toggleChatPick(picks: ChatPicks, id: string, packIds: readonly string[], on?: boolean, q: ChatPickLimits = QUICK_CHAT): ChatPickResult {
+  const say = chatSay(id);
+  if (!say) return { ok: false, reason: "unknown", picks };
+  const kind: ChatPickKind = say.kind === "emoji" ? "emoji" : "lines";
+  const list = picks[kind];
+  const has = list.includes(id);
+  if (on ?? !has) {
+    if (has) return { ok: true, picks };
+    if (!packIds.includes(say.pack)) return { ok: false, reason: "locked", picks };
+    if (list.length >= chatPickCap(kind, q)) return { ok: false, reason: "full", picks };
+    return { ok: true, picks: { ...picks, [kind]: [...list, id] } };
+  }
+  return { ok: true, picks: { ...picks, [kind]: list.filter((x) => x !== id) } };
+}
+
+/**
+ * A pack was just got: its lines go into any empty slots (in the pack's order, up to the cap). `added` are those
+ * that went in; the rest the player can pick in their profile.
+ */
+export function chatPicksAfterGetting(picks: ChatPicks, packId: string, q: ChatPickLimits = QUICK_CHAT): { picks: ChatPicks; added: string[] } {
+  const pack = chatPack(packId);
+  if (!pack) return { picks, added: [] };
+  const kind: ChatPickKind = pack.kind === "emoji" ? "emoji" : "lines";
+  const room = chatPickCap(kind, q) - picks[kind].length;
+  const added = pack.lines.map((l) => l.id).filter((id) => !picks[kind].includes(id)).slice(0, Math.max(0, room));
+  return { picks: added.length ? { ...picks, [kind]: [...picks[kind], ...added] } : picks, added };
+}
+
+/** Lines by id, in the given order (unknown ids dropped): the buttons for a player's picks. */
+export const chatSays = (ids: readonly string[]): ChatSay[] => ids.flatMap((id) => chatSay(id) ?? []);
 
 // ---------------- Limits ----------------
 

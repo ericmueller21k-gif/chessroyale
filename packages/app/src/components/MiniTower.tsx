@@ -4,6 +4,7 @@ import { cutLabel, roundLive, towerView, type GameView } from "../game.ts";
 import { LeaderboardSheet } from "./LeaderboardSheet.tsx";
 import { RaceTower } from "./RaceTower.tsx";
 import { pickRows } from "../pick-rows.ts";
+import type { ChatFloat } from "../chat.ts";
 
 const KEY = "brc.miniTower";
 const ROW = 22;
@@ -28,7 +29,7 @@ function towerHeight(keep: Set<number>, cutoff: number, n: number): number {
  *
  * With quick chat on, it shares the space under the board with chat (components/QuickChat.tsx, UnderBoard), which
  * passes `narrow` (place, name and points only, side by side with chat), `head` (its split buttons and the unread
- * count), `open` (it minimises both together) and `floats` (emoji just sent, floating above their senders' rows).
+ * count), `open` (it minimises both together) and `floats` (emoji just sent, floating above their senders' rows, or from the header when the row isn't shown).
  */
 export function MiniTower({
   match,
@@ -41,7 +42,7 @@ export function MiniTower({
   narrow?: boolean;
   head?: ComponentChildren;
   open?: boolean;
-  floats?: ReadonlyMap<string, { text: string; key: number }>;
+  floats?: ReadonlyMap<string, ChatFloat>;
 }) {
   const [openOwn, setOpen] = useState(() => {
     try {

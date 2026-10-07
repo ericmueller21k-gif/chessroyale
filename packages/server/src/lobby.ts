@@ -1255,8 +1255,9 @@ export class LobbyCore {
   }
 
   /**
-   * A person says a line. Only known lines they own, Hello and Sporting lines alone to everyone, within the limits
-   * (one every 3 s, 5 in 30 s, no repeats): anything else is dropped and the sender told why.
+   * A person says a line. Only known lines they own, Hello and Sporting lines and emoji alone to everyone, within the
+   * limits (one every 3 s, 5 in 30 s, no repeats): anything else is dropped and the sender told why. (Which of their
+   * lines show as buttons is their profile's picks: the app's business. Any line they own may go.)
    */
   private chatSay(playerId: string, say: unknown, to: unknown) {
     const now = this.io.now();

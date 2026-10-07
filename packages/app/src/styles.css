@@ -7844,17 +7844,24 @@ img.qicon {
 .qrow::-webkit-scrollbar {
   display: none;
 }
-.qrow-group {
-  flex: none;
-  padding-left: 4px;
-  color: var(--qc-muted);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+/* A phone's full-width chat: the emoji in one row the panel's width (QUICK_CHAT.maxEmoji fit), no scrolling. */
+.qrow.emoji.fit {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 52px));
+  gap: 4px;
+  overflow: visible;
+  touch-action: manipulation;
 }
-.qrow-group:first-child {
-  padding-left: 0;
+.qrow.emoji.fit .qchip.emoji {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0;
+}
+.qbuttons-none {
+  margin: 0;
+  padding: 6px 10px;
+  color: var(--qc-muted);
+  font-size: 12px;
 }
 .qchip {
   flex: none;
@@ -7894,17 +7901,6 @@ img.qicon {
   display: grid;
   gap: 7px;
   padding: 8px 10px 10px;
-}
-.qgroup {
-  display: grid;
-  gap: 4px;
-}
-.qgroup-name {
-  color: var(--qc-muted);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 .qgroup-lines {
   display: flex;
@@ -8076,6 +8072,75 @@ img.qicon {
   100% {
     opacity: 0;
     transform: translateY(-10px) scale(1);
+  }
+}
+/*
+ * An emoji whose sender has no row on this scoreboard (the other team's, sent to everyone; or a teammate not
+ * shown) floats from its header instead, with their team's chip when it went to everyone.
+ */
+.tower {
+  position: relative;
+}
+.tower-floats {
+  position: absolute;
+  top: 0;
+  left: 30px;
+  right: 0;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  z-index: 3;
+  pointer-events: none;
+}
+.tower-mini .tower-floats {
+  left: 26px;
+  height: 18px;
+}
+.t-float.away {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px 0 5px;
+  border-radius: 11px;
+  background: #2b303a;
+  box-shadow: 0 0 0 1px #3d4350;
+  font-size: 15px;
+  animation-name: t-float-away;
+}
+.tower-mini .t-float.away {
+  height: 17px;
+  padding: 0 5px 0 4px;
+  font-size: 13px;
+}
+.t-float.away .team-chip {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin: 0;
+  border-width: 1px;
+  border-color: #8a93a3;
+}
+@keyframes t-float-away {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  22% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -8256,4 +8321,393 @@ img.qicon {
   background: none;
   font-size: 22px;
   line-height: 28px;
+}
+/* The shop, after getting a chat pack: what went into your quick chat, and a way to pick the rest. */
+.shop-got {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+.shop-got p {
+  margin: 0;
+}
+.shop-chat-foot {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+.shop-chat-foot p {
+  margin: 0;
+}
+
+/* ---- Your profile's Quick chat and emoji (components/ChatPicks.tsx) ---- */
+.qp button {
+  touch-action: manipulation;
+}
+.qp-block {
+  gap: 12px;
+}
+.qp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+.qp-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+.qp-count {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--fd-panel-2);
+  color: var(--fd-sub);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.qp-count.full {
+  color: var(--fd-gold-text);
+}
+.qp-gap {
+  flex: 1;
+}
+.qp-reset {
+  min-height: 36px;
+  margin: -4px -4px -4px 0;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--fd-gold-text);
+  font: 700 13px Archivo, system-ui, sans-serif;
+  cursor: pointer;
+}
+.qp-picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.qp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 8px 0 13px;
+  border: 1px solid var(--fd-line);
+  border-radius: 20px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  font: 600 14px Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.qp-x {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--fd-seat);
+  color: var(--fd-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+/* Your emoji in one row, as in a match. */
+.qp-picked.emoji {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 50px));
+  gap: 6px;
+}
+.qp-picked.emoji .qp-chip {
+  position: relative;
+  justify-content: center;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  min-height: 0;
+  padding: 0;
+  border-radius: 12px;
+  font-size: 22px;
+}
+.qp-picked.emoji .qp-x {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  box-shadow: 0 0 0 2px var(--fd-panel);
+  font-size: 9px;
+}
+.qp-chip:active {
+  transform: scale(0.96);
+}
+.qp-drop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--fd-line);
+  border-radius: 12px;
+  background: var(--fd-bg);
+  color: var(--fd-text);
+  font: 700 15px Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.qp-drop-count {
+  margin-left: auto;
+  color: var(--fd-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.qp-drop svg {
+  flex: none;
+  color: var(--fd-muted);
+  transition: transform 150ms;
+}
+.qp-drop.open {
+  border-color: var(--fd-gold);
+}
+.qp-drop.open svg {
+  transform: rotate(180deg);
+}
+.qp-note {
+  margin: 0;
+  color: var(--fd-gold-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.qp-menu {
+  display: flex;
+  flex-direction: column;
+  margin-top: -4px;
+  border: 1px solid var(--fd-line);
+  border-radius: 12px;
+  background: var(--fd-bg);
+  overflow: hidden;
+}
+.qp-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 4px 0 14px;
+  border-bottom: 1px solid var(--fd-line);
+  color: var(--fd-muted);
+}
+.qp-search:focus-within {
+  color: var(--fd-gold-text);
+}
+/* 16 px: iOS doesn't zoom into it. */
+.qp-search input {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fd-text);
+  font: 500 16px Archivo, system-ui, sans-serif;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.qp-search input::placeholder {
+  color: var(--fd-dim);
+}
+.qp-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.qp-clear {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--fd-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.qp-menu-note {
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--fd-gold-soft);
+  color: var(--fd-gold-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.qp-list {
+  max-height: min(56vh, 440px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 6px;
+}
+.qp-pack-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px 6px;
+  background: var(--fd-bg);
+  color: var(--fd-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.qp-pack-head strong {
+  color: var(--fd-sub);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.qp-pack.locked .qp-pack-head span {
+  color: var(--fd-gold-text);
+}
+.qp-opts {
+  display: flex;
+  flex-direction: column;
+}
+.qp-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 0;
+  border-top: 1px solid var(--fd-line);
+  background: transparent;
+  color: var(--fd-text);
+  font: 600 15px Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.qp-opts > .qp-opt:first-child {
+  border-top: 0;
+}
+.qp-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--fd-line);
+  border-radius: 7px;
+  color: var(--fd-gold-ink);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+.qp-opt.on .qp-mark {
+  border-color: var(--fd-gold);
+  background: var(--fd-gold);
+}
+.qp-opt.locked .qp-mark {
+  border: 0;
+  font-size: 14px;
+}
+.qp-opt-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qp-opt-tag,
+.qp-opt-pack {
+  flex: none;
+  margin-left: auto;
+  color: var(--fd-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.qp-opt-pack {
+  color: var(--fd-gold-text);
+  font-weight: 700;
+}
+.qp-opt.locked {
+  color: var(--fd-muted);
+}
+.qp-opt:disabled:not(.locked) {
+  opacity: 0.4;
+  cursor: default;
+}
+.qp-opt.locked:disabled {
+  cursor: default;
+}
+.qp-opt:active:not(:disabled) {
+  background: var(--fd-panel-2);
+}
+@media (hover: hover) {
+  .qp-opt:hover:not(:disabled) {
+    background: var(--fd-panel);
+  }
+}
+.qp-opts.emoji {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+  gap: 6px;
+  padding: 2px 12px 8px;
+}
+.qp-opts.emoji .qp-opt {
+  position: relative;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0;
+  border: 1px solid var(--fd-line);
+  border-radius: 12px;
+  font-size: 26px;
+}
+.qp-opts.emoji .qp-opt-text {
+  overflow: visible;
+}
+.qp-opts.emoji .qp-mark {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+}
+.qp-opts.emoji .qp-opt:not(.on):not(.locked) .qp-mark {
+  display: none;
+}
+.qp-opts.emoji .qp-opt.on {
+  border-color: var(--fd-gold);
+  background: var(--fd-gold-soft);
+}
+.qp-opts.emoji .qp-opt.locked .qp-opt-text {
+  opacity: 0.4;
+}
+.qp-opts.emoji .qp-opt.locked .qp-mark {
+  font-size: 11px;
+}
+.qp-none {
+  margin: 0;
+  padding: 18px 14px;
+  color: var(--fd-muted);
+  font-size: 14px;
+}
+.qp-menu-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  border-top: 1px solid var(--fd-line);
+  color: var(--fd-sub);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
