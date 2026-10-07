@@ -13,19 +13,20 @@ export const BOT_NAMES: readonly string[] = [
   "Marshall Mo", "Ruy Rosa", "Italian Ivo", "Catalan Cat", "Slav Sasha", "Tarrasch Tom", "Alekhine Al",
   "Philidor Phil", "Petrov Pia", "Vienna Vic", "Evans Eve", "Smith-Morra Sid", "King's Indian Kip", "Nimzo Nina",
   "Queen's Gambit Quinn", "Trompowsky Trina", "Colle Cole", "Stonewall Stan",
-  // More (Oct 7, 2026), so a 100-player Crowd lobby never repeats a name.
-  "Checkmate Chet", "Castling Carl", "Promotion Pru", "Discovery Dee", "Double Check Dot", "Battery Bart",
-  "Overload Otto", "Decoy Dex", "Deflect Della", "Windmill Winnie", "Smothered Sol", "Perpetual Percy",
-  "Fortress Flo", "Zeitnot Zelda", "Flagfall Flora", "Blunder Bert", "Brilliancy Bree", "Book Move Brooke",
-  "Theory Theo", "Novelty Nell", "Tactics Tia", "Rook and Roll", "Knight Shift", "Pawn Shop Pam", "Open File Fiona",
-  "Half-Open Hal", "Passer Penny", "Desperado Dez", "Scholar Sally", "Fool's Mate Finn", "Gambiteer Gina",
-  "Hedgehog Hattie", "Hippo Hilda", "Orangutan Oona", "Budapest Buddy", "Latvian Lottie", "Danish Daisy",
-  "Scotch Scotty", "Two Knights Toby", "Berlin Wally", "English Emma", "Modern Molly", "Elephant Ellie",
-  "Halloween Holly", "Bad Bishop Bill", "Good Knight Gia", "Knightmare Nora", "Rookery Rory", "Queen Bee",
-  "Check Please", "O-O-O Olga", "Shuffle Shelly", "Premove Priya", "Bullet Bella", "Classical Clara", "Simul Simon",
-  "Blindfold Blair", "Touch Move Toni", "J'adoube Jade", "Kibitz Kiki", "Woodpusher Woody", "Coffeehouse Cleo",
-  "Royal Fork Roy", "Family Fork Fern", "X-Ray Xena", "Greek Gift Greta", "Quiet Quentin", "Pawn Island Isla",
-  "Middlegame Milo", "Nine Sixty Nia", "Armageddon Arlo", "Tiebreak Tilly",
+  // More (Oct 7, 2026), so a 100-player Crowd lobby never repeats a name. Each fits the scoreboard's name column on a
+  // 360 px phone (103 px) with room to spare (97 px at most, measured).
+  "Mate Mabel", "Castling Carl", "Promotion Pru", "Discovery Dee", "Ladder Lola", "Battery Bart", "Overload Otto",
+  "Decoy Dex", "Deflect Della", "Windmill Winnie", "Smothered Sol", "Perpetual Percy", "Fortress Flo",
+  "Zeitnot Zelda", "Flagfall Flora", "Blunder Bert", "Brilliancy Bree", "Arabian Ari", "Theory Theo", "Novelty Nell",
+  "Tactics Tia", "Rook and Roll", "Knight Shift", "Pawn Shop Pam", "Open File Fiona", "Half-Open Hal", "Passer Penny",
+  "Desperado Dez", "Scholar Sally", "Fool's Mate Finn", "Gambiteer Gina", "Hedgehog Hope", "Hippo Hilda",
+  "Orangutan Oona", "Budapest Buddy", "Latvian Lottie", "Danish Daisy", "Scotch Scotty", "Corridor Cora",
+  "Berlin Wally", "English Emma", "Modern Molly", "Elephant Ellie", "Halloween Holly", "Bad Bishop Bill",
+  "Good Knight Gia", "Knightmare", "Rookery Rory", "Queen Bee", "Check Please", "O-O-O Olga", "Shuffle Shelly",
+  "Premove Priya", "Bullet Bella", "Classical Clara", "Simul Simon", "Blindfold Blair", "Pin Pippa",
+  "J'adoube Jade", "Kibitz Kiki", "Woodpusher", "Coffeehouse", "Royal Fork Roy", "Family Fork Fern", "X-Ray Xena",
+  "Greek Gift Greta", "Quiet Quentin", "Pawn Island Isla", "Midgame Milo", "Nine Sixty Nia", "Epaulette Etta",
+  "Tiebreak Tilly",
 ];
 
 /**

@@ -1868,10 +1868,13 @@ outfits. Mine:
   and your pawn walks there from where you put it.
 
 **Bot names.** 72 more (140 in all), so a 100-player lobby (99 bots) never repeats one; past 140 the numbered
-fallback ("Queenie 2") stays. Same style: chess terms, openings and puns, most with an alliterative first name
-("Zeitnot Zelda", "Hedgehog Hattie", "J'adoube Jade", "Rook and Roll"). None is a real player. All are 16 characters
-or fewer, shorter than the longest already there ("Queen's Gambit Quinn", 20), which the 360 px checks in
-`e2e/crowd.spec.ts` already use.
+fallback ("Queenie 2") stays. Same style: chess terms, openings, mates and puns, most with an alliterative first name
+("Zeitnot Zelda", "Ladder Lola", "J'adoube Jade", "Rook and Roll"). None is a real player.
+- **Measured, not counted.** On a 360 px phone the scoreboard's name column is 103 px (bold 12 px). Every new name
+  fits it with room to spare: 97 px at most in Arial's widths, since an iPhone's font runs a little wider. The first
+  list had six that didn't fit ("Woodpusher Woody", 120 px) and five near the edge; they were swapped for shorter ones.
+- Three of the older names don't fit and show with "…" ("Queen's Gambit Quinn", "Trompowsky Trina", "Zwischenzug
+  Zak"). They're left as they are; `e2e/crowd.spec.ts` uses them as the longest real names.
 
 **Bot outfits** (`botLook`, core/bot-looks.ts; odds `BOT_LOOKS` in settings.ts).
 - Out of 100: 42 plain; 24 a shop hat; 11 a crate head piece (beanie, antlers, Santa hat, present); 11 a face piece
