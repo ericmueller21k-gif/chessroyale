@@ -282,6 +282,25 @@ describe("many judges: the lobby", () => {
     expect(L.core.record.judges!.devices[honestOne]!.strikes).toBe(0);
   });
 
+  it("a device with a strike is never trusted alone: the job waits for its partner; a benched host stops hosting", async () => {
+    const L = setup({ server: false });
+    L.begin(3);
+    L.pickAll(3);
+    const [a, b] = L.judgesOf() as [string, string];
+    L.core.record.judges!.devices[a]!.strikes = 1;
+    await L.answer(a);
+    L.advance(3000);
+    expect(L.core.record.phase).toBe("scoring");
+    await L.answer(b);
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats.agreed).toBe(1);
+    // Benched devices: the host's work goes to someone else.
+    for (const id of ["p1", "p2"]) L.core.record.judges!.devices[id]!.strikes = 2;
+    for (let i = 0; i < 60 && L.core.record.phase !== "play"; i++) L.advance(500);
+    L.pickAll(3);
+    expect(L.last("p3", "scoreRequest")).toBeTruthy();
+  });
+
   it("a judge that drops before answering is replaced; one whose answer doesn't hold together is struck and replaced", async () => {
     const L = setup();
     L.begin(4);

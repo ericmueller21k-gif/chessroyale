@@ -430,7 +430,7 @@ async function run(which: string, seeds: number, first: number) {
   const lazy = await createNodeEngine({ nodes: 5000, hashMb: 16 });
   const server = await createNodeEngine({ nodes: 1_000_000, hashMb: 64 }, STOCKFISH_FULL_BUILD);
   const honest = new Honest(pool);
-  for (const sc of SCENARIOS.filter((s) => which === "all" || s.name === which)) {
+  for (const sc of SCENARIOS.filter((s) => which === "all" || which.split(",").includes(s.name))) {
     for (let seed = first; seed < first + seeds; seed++) {
       for (const mode of (process.env.MODES ?? "judges,host").split(",") as ("judges" | "host")[]) {
         const t = Date.now();

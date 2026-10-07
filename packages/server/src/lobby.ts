@@ -394,6 +394,13 @@ export class LobbyCore {
     return (computer ?? candidates[0])?.id ?? null;
   }
 
+  /** The host for the engine work now: the current one, unless it's gone or was benched for wrong scores. */
+  private hostNow(): string | null {
+    const h = this.r.hostId;
+    if (h && this.human(h)?.connected && !this.benched(h)) return h;
+    return this.pickHost() ?? (h && this.human(h)?.connected ? h : null);
+  }
+
   // ---------------- Connections ----------------
 
   connect(
@@ -760,7 +767,7 @@ export class LobbyCore {
     const history = this.runner!.boards.get(this.runner!.state.boards[0]!)!.history;
     this.r.bossMinAt = lastMoveTookQueen(history) ? this.io.now() + bossThinkMs(history) : undefined;
     this.broadcast(this.bossMessage(0, { thinking: true }));
-    const host = this.r.hostId && this.human(this.r.hostId)?.connected ? this.r.hostId : this.pickHost();
+    const host = this.hostNow();
     this.r.hostId = host;
     if (host) this.sendBossRequest(host);
     this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
@@ -1045,7 +1052,7 @@ export class LobbyCore {
     for (const h of this.r.humans) this.io.send(h.id, { t: "locked", key: this.r.round.key });
     // Many judges: two devices score each board, and the lobby compares their answers.
     if (this.judging()) return this.startJudging();
-    const host = this.r.hostId && this.human(this.r.hostId)?.connected ? this.r.hostId : this.pickHost();
+    const host = this.hostNow();
     this.r.hostId = host;
     if (host) this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest, ...(this.io.serverEngine ? { serverRecheck: true } : {}) });
     this.setTimer("scoreTimeout", this.io.now() + SCORE_TIMEOUT_MS);
@@ -1468,7 +1475,10 @@ export class LobbyCore {
       console.log(`judges disagree: ${this.r.code} job ${t.job.id} (${a} v ${b}), worst difference ${(diff * 100).toFixed(1)} points`);
       return this.dispute(t, a, b);
     }
-    if (valid.length === 1 && (!pending.length || (t.waitUntil !== undefined && now >= t.waitUntil))) {
+    // (A device with a strike is never trusted alone while its partner is still searching: the job waits for both,
+    // up to the usual deadline.)
+    const trusted = valid.length === 1 && !(this.jr.devices[valid[0]!]?.strikes ?? 0);
+    if (valid.length === 1 && (!pending.length || (trusted && t.waitUntil !== undefined && now >= t.waitUntil))) {
       const [a] = valid as [string];
       if (pending.length) {
         console.log(`judge late: ${this.r.code} job ${t.job.id}: ${pending.join(", ")} (using ${a}'s answer)`);
@@ -1483,8 +1493,8 @@ export class LobbyCore {
       return this.accept(t, t.boards[a]!, "single");
     }
     if (valid.length === 1) {
-      // The first answer is in: the second has a little longer (as long again as the first took, at least graceMs).
-      if (t.waitUntil === undefined) {
+      // The first answer is in: the second has a little longer (graceMs, or graceFactor of the first's time).
+      if (t.waitUntil === undefined && trusted) {
         const took = now - (t.sent[valid[0]!] ?? t.sentAt);
         t.waitUntil = now + Math.max(this.jcfg.graceMs, this.jcfg.graceFactor * took);
       }
