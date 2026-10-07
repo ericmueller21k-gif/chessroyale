@@ -989,8 +989,9 @@ goes on, and an early hung queen or piece in a solo raid must set it off.
 
 **The rule** (`lastStandBar` and `lastStandDue` in `core/boss.ts`, the runner's `lastStandFor`; numbers in settings.ts):
 - **Where:** every boss battle (the 50 v 50 boss final and the boss raid), solo and online.
-- **Always armed, once per game,** whether or not he still has charges. If he falls with charges left, they go with
-  him: no menu, no crowns (Eric). The charges he fell with are recorded on the battle (`lastStand.charges`).
+- **Always armed, once per game,** whether or not he still has charges. If he falls with charges left, he leaves them
+  to the crowd: every player still in gets that many ⚡ power-ups (Eric, Oct 7; see "The Last Stand, after Eric played
+  it" below). No menu, no crowns. The charges he fell with are recorded on the battle (`lastStand.charges`).
 - **A disaster:** the crowd's played move gives away at least the bar, in points of expected score against the best
   move, by the judge's own numbers for that round (after the re-check; the same numbers that score the picks).
 - **The bar eases off:** `lastStandLoss` 30 on the first crowd move, plus `lastStandChargedExtra` 5 while he still
@@ -1009,7 +1010,8 @@ goes on, and an early hung queen or piece in a solo raid must set it off.
   with ✕ on the board and "✕ Nxe5" in the status; the board won't play it, the server rejects it, no bot picks it,
   and it isn't the best move on offer in the re-pick either.
 - He has fallen: his figure lies in the dock for the rest of the battle, toppled on his side like a beaten chess piece,
-  armour cracked, crown and sword on the ground, greyed. No menu, no crowns, no more lines.
+  armour cracked, crown and sword on the ground, greyed. No menu, no crowns, no more lines. Above him, a ⚡ button
+  with the power-ups he left (Oct 7).
 - On the result screen he rises again in holy light ("A god does not stay down.") if the crowd won. If it lost or
   drew, he stays down, without a word.
 - Online, the reveal carries the Last Stand and the battle as it now stands (`lastStand`, `boss`), so every screen
@@ -1017,18 +1019,19 @@ goes on, and an early hung queen or piece in a solo raid must set it off.
   leave the barred move out.
 
 **The moment** (`LAST_STAND` in `chess/boss-timing.ts`, ms after the blunder lands on the board; the reveal lasts
-`LAST_STAND_MS` = 8,600 ms longer, solo and online, and the next move's clock only starts after it, so nobody loses
-any time):
+`LAST_STAND_MS` = 9,900 ms longer, solo and online, and the next move's clock only starts after it, so nobody loses
+any time). Updated Oct 7: a 1,300 ms warning comes first, everything after it 1,300 ms later, and nothing flashes white.
 
 | Beat | From (ms) | What |
 | --- | --- | --- |
-| 1. Freeze | 250 | A flash; the board goes cold and grey. |
-| 2. Leap and crash | 650 / 1,150 / 1,400 | He leaps up out of the dock (450 ms), falls onto the piece's square in a streak of light (250 ms), and lands at 1,400: impact flash, shockwave, dust, the board shakes (450 ms). The piece is knocked aside. |
-| 3. Banner | 1,950, for 2,100 | "LAST STAND", his battle-worn portrait and one of his lines (the same on every screen for the move). His usual cut-in is 1,500 ms; this one is held longer so the line can be read. |
-| 4. Slide back | 4,150, for 450 | The piece slides back to its square; he stands alone where it was. |
-| 5. The blow | 4,650 to 6,650 | 25 slashes, one every 80 ms, each a red-white cut with a red damage number (6 to 14, seeded by the move) spiralling off around him; his armour cracks at 5,050, 5,650 and 6,250; grunts of agony at the 2nd, 11th and 20th slash; four stylised red drops. |
-| 6. Fall | 6,800 / 7,250 / 7,800 | He staggers, collapses onto his side with a death groan, and fades from the board (500 ms). His fallen figure appears in the dock with his last words: "Finish… it… for me." |
-| 7. Re-pick | 8,600 | The reveal ends; the crowd picks again. |
+| 0. Warning | 0, for 1,300 | A red "??" badge pops on the piece's square (80 ms), the square pulses red three times under the piece, a danger sting plays, the eval bar plunges to the crowd's chances after the move, and the dock says what it loses in plain words. |
+| 1. Freeze | 1,550 | A dark red pulse; the board goes cold and grey. |
+| 2. Leap and crash | 1,950 / 2,450 / 2,700 | He leaps up out of the dock (450 ms), falls onto the piece's square in a gold streak (250 ms), and lands at 2,700: a dark red shockwave with an orange ring, dust, the board shakes (450 ms). The piece is knocked aside; the badge goes. |
+| 3. Banner | 3,250, for 2,100 | "LAST STAND", his battle-worn portrait and one of his lines (the same on every screen for the move). His usual cut-in is 1,500 ms; this one is held longer so the line can be read. Its flash is dark red. |
+| 4. Slide back | 5,450, for 450 | The piece slides back to its square; he stands alone where it was. The eval bar goes back to what it was. |
+| 5. The blow | 5,950 to 7,950 | 25 slashes, one every 80 ms, each a red-white cut with a red damage number (6 to 14, seeded by the move) spiralling off around him; his armour cracks at 6,350, 6,950 and 7,550; grunts of agony at the 2nd, 11th and 20th slash; four stylised red drops. |
+| 6. Fall | 8,100 / 8,550 / 9,100 | He staggers, collapses onto his side with a death groan, and fades from the board (500 ms). His fallen figure appears in the dock with his last words: "Finish… it… for me.", and the ⚡ power-ups he left beside him. |
+| 7. Re-pick | 9,900 | The reveal ends; the crowd picks again. |
 
 **Measured: an early hung piece sets it off** (`packages/sim/scripts/last-stand-blunders.ts`). 30 real raid starts
 (named openings, 10 plies in), a few sensible moves played on to crowd moves 1 to 10, then a move that hangs the
@@ -1082,8 +1085,7 @@ the 50 v 50 final is ten bots with two charges, which the bots spend whenever th
 **Calls I made:**
 - **The taken-back move doesn't count as a crowd move,** and the boss's strike waits for the re-pick: otherwise the
   move counter jumps by two and a strike could land between his fall and the re-pick.
-- **The eval bar holds still** through it (no dip for a move that never stands), in keeping with Eric's "the bar only
-  moves when a move lands".
+- ~~**The eval bar holds still** through it~~: reversed on Oct 7 (Eric): it plunges during the warning, then goes back.
 - **His crowns stay on screen until he leaps,** although the charges are already gone: losing them is part of his fall.
 - **A king move taken back** just slides back (the king is never taken off the board, even for a moment).
 - **The re-pick can be brilliant** like any round: it's the crowd's own choice, not a power-up.
@@ -1433,4 +1435,67 @@ chess.com, for any solo mode (the solo boss raid is the only one where you're th
 - **Later (Eric):** the Last Stand's own flashes (the freeze and the crash) are on purpose, but Eric thinks they need
   changing too. Not touched here.
 - An e2e case checks it: a plain move goes play → scoring → boss → play, with no reveal, no ring and no countdown.
+
+## The Last Stand, after Eric played it (Oct 7, 2026)
+
+Eric played it live: "I played the piece, and then there's nothing, and then all of a sudden the king drops in, so we
+just need something there." He wanted a warning on the piece (red, an exclamation), the move's strength without
+numbers he doesn't know, details at the end of the game for anyone who taps, and no more white flashes. And his
+leftover charges shouldn't just vanish.
+
+**1. The warning beat** (the first 1,300 ms of the Last Stand; the timeline above):
+- A red **"??" badge** pops on the corner of the piece's square, like a chess site's blunder mark. The square pulses red
+  under the piece three times (the board's own highlight, so the piece stays plain to see), and a danger sting plays:
+  `warn.mp3`, two low-health beeps from the CC0 retro pack over a soft thud (credited in the God King sound credits;
+  cut by `scripts/god-king-last-stand-sounds.py <dir> warn`).
+- **The eval bar plunges** to the crowd's chances after the blunder (the judge's own number), ringed red, and goes back
+  as the piece slides back.
+- **The dock, in plain words:** "?? Blunder: Nb5" over "Loses your knight", "Allows mate", or, when the boss's reply
+  wins nothing a player could name, "Your chances 52% → 9%" ("Chances 52% → 9%" on phones under 360 px, to fit). It
+  stays until the piece slides back; then "He takes the blow!" and "The God King has fallen" as before, with "He leaves
+  you ⚡×3" when he had charges.
+- **Where "what it loses" comes from:** the judge's own searches, at no extra engine time. Every search line's second
+  move is the opponent's best reply, and `score mate` gives a forced mate; `uci.ts` now keeps both on each scored move
+  (the `scoreAfter` fallback keeps its best move as the reply). The runner (solo) and the host (online, in its scores)
+  pass them along; the Last Stand record carries the boss's reply (only if legal there), a mate it allows (`mateIn`),
+  and the crowd's chances after the best move and after the blunder (`before`, `after`), on the round and on the
+  battle, solo and online.
+- **The words** (`blunderCost` in `chess/rules.ts`, wording in `godKing.ts`): a mate in 3 or fewer first ("allows
+  mate"); then a piece the reply wins outright, a knight, bishop, rook or queen worth at least two pawns more than
+  whatever takes it back ("loses your queen" for a queen lost to a bishop, but not for a queen trade); then a longer
+  mate; otherwise the chances. A pawn is never named: a 30-point blunder that "loses a pawn" would mislead.
+- **No white flash anywhere in it:** the freeze's flash is a dark red pulse, the crash a dark red shockwave with an
+  orange ring and dust, the streak gold, the banner's flash dark red. Checked with `npm run frames:flash -- <dir> 2
+  light boss laststand=1` and the same in dark: no flagged frame; in light mode no frame of the Last Stand is brighter
+  than the screen's median, and the biggest frame-to-frame rise is 7 (the flag is 20).
+
+**2. The Last Stand card on the results screen** (`LastStandCard` in `LastStand.tsx`), under his epilogue figure,
+solo and online: one line, "Move 7: Nb5?? · loses your knight". Tapped open: your move with a red ??, the boss's
+reply and what it won ("dxe4 · wins your knight", "Qh4# · checkmate", "mate in 3"), the best move instead (green),
+your chances before and after ("52% → 9%"), and the position on a small board with your blunder as a red arrow and
+the best move as a green one. Stacked on phones, the board beside the facts from 420 px.
+
+**3. His leftover charges become power-ups.** When he falls, every player still in gets `lastStandPowerUps` (1) ⚡
+power-ups for each charge he had left: the same as Crowd's, the engine's top 3 moves at full strength with the usual
+hint arrows. It's done in the runner, so the solo raid (just you), online raids and the 50 v 50 boss final (bots too,
+who use them as bots do in Crowd) share it. The ⚡ button, with the count left, sits in the dock above his fallen
+figure, where his menu was (the whole column is the button; gold and glowing on your move, grey otherwise, ringed
+while one is in use). A power-up move is an ordinary pick, marked as a power-up move (⚡ in the move list) and never
+brilliant.
+
+**Calls I made:**
+- **The warning is 1,300 ms** (Eric said 1.2–1.5 s); everything after it moved 1,300 ms later, so the Last Stand is
+  9.9 s instead of 8.6 s. The clock stays frozen throughout, solo and online, as before.
+- **The badge and the red square stay until he lands on it** (2.7 s), not just the 1.3 s warning, so the danger is
+  still marked while he leaps.
+- **"Chances" are the judge's expected score** (a win plus half a draw), rounded to whole per cent: the same number the
+  eval bar shows.
+- **The words name a piece only when the reply wins it outright** (two pawns or more net), and never a pawn; anything
+  subtler gets the chances.
+- **The leaderboard shows the new power-ups as soon as the round is scored** (during the warning), since it shows
+  everyone's power-ups as they stand.
+- **One power-up per leftover charge** (`lastStandPowerUps`, a setting).
+- **In a crowd's reveal, the chosen move's green ring gives way to the red pulse** when the move is a Last Stand.
+- **The test switch** is still `?laststand=1` (and `?side=b` for Black): the first crowd move sets it off whatever it
+  is, so the warning may name a small loss ("Your chances 52% → 49%"). Blunder a piece for the real thing.
 

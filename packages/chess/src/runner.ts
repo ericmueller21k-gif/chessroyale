@@ -51,7 +51,7 @@ import {
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
 import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { legalMoves, pieceAt, sideToMove, toSan } from "./rules.ts";
+import { applyMove, legalMoves, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 
 /**
@@ -149,7 +149,41 @@ export interface BoardRound {
    * over the bar of `bar`: he takes the blow, the move is taken back and the crowd picks again without it.
    * The round's scores stand.
    */
-  lastStand?: { move: string; loss: number; bar: number };
+  lastStand?: LastStandRound;
+}
+
+/**
+ * The God King's Last Stand on a crowd move: the move he took back, what it gave away (`loss`, points of expected
+ * score against the best move) over the bar it crossed, and, for the warning and the results card, the crowd's
+ * chances (expected score, 0-1) after the best move (`before`) and after the blunder (`after`), the boss's best
+ * reply to it (from the judge's own search) and a forced mate it allowed (`mateIn`, the boss's moves to mate).
+ */
+export interface LastStandRound {
+  move: string;
+  loss: number;
+  bar: number;
+  before?: number;
+  after?: number;
+  reply?: string;
+  mateIn?: number;
+}
+
+/**
+ * A board's numbers from the judge (as scoring takes them), plus, from the same searches, each move's best reply
+ * and any forced mate in its line (moves, from the mover's side: negative when the mover gets mated).
+ */
+export type BoardEvaluation = GroupEvaluation & { replies?: Readonly<Record<string, string>>; mates?: Readonly<Record<string, number>> };
+
+/** Each move's best reply and mate score from a set of searches, for a BoardEvaluation (the first search of a move wins). */
+export function repliesFrom(searches: readonly (readonly MoveScore[])[]): { replies: Record<string, string>; mates: Record<string, number> } {
+  const replies: Record<string, string> = {};
+  const mates: Record<string, number> = {};
+  for (const list of searches)
+    for (const m of list) {
+      if (m.reply && replies[m.move] === undefined) replies[m.move] = m.reply;
+      if (m.mate !== undefined && mates[m.move] === undefined) mates[m.move] = m.mate;
+    }
+  return { replies, mates };
 }
 
 export interface RoundReport {
@@ -503,7 +537,8 @@ export class MatchRunner {
     for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
     const known = new Map(top.map((m) => [m.move, m.expected]));
     const missing = Object.values(picks).flatMap((m) => (m && !known.has(m) ? [m] : []));
-    if (missing.length) for (const m of await engine.scoreMoves(board.fen, missing)) known.set(m.move, m.expected);
+    const extra = missing.length ? await engine.scoreMoves(board.fen, missing) : [];
+    for (const m of extra) known.set(m.move, m.expected);
     // Close calls are re-checked where a person is playing (a group of bots affects nobody real).
     const people = playerIds.some((id) => !this.player(id).isBot && humanPicks.get(id)?.move);
     const evaluation = { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter: Object.fromEntries(known) };
@@ -512,6 +547,8 @@ export class MatchRunner {
       bestMove: checked.bestMove,
       bestExpected: checked.bestExpected,
       expectedAfter: checked.expectedAfter,
+      // (Kept from the same searches, for the God King's Last Stand: what a blunder loses. No extra engine time.)
+      ...repliesFrom([top, extra]),
     });
   }
 
@@ -523,7 +560,7 @@ export class MatchRunner {
     boardId: number,
     playerIds: readonly string[],
     rawPicks: Readonly<Record<string, string | null>>,
-    rawEvaluation: GroupEvaluation,
+    rawEvaluation: BoardEvaluation,
   ): BoardRound {
     const board = this.boards.get(boardId)!;
     const { picks, evaluation } = this.withoutBarred(rawPicks, rawEvaluation);
@@ -547,7 +584,7 @@ export class MatchRunner {
     for (const id of abstained) result.players.push({ playerId: id, move: null, loss: null, roundScore: 0, abstained: true });
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
-    const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored);
+    const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
     return {
       boardId,
       fenBefore: board.fen,
@@ -564,7 +601,7 @@ export class MatchRunner {
    * Boss battle, the re-pick after the God King's Last Stand: a pick of the move he took back (which the screens
    * and the server don't allow) counts as no move, and the move isn't the best on offer either.
    */
-  private withoutBarred(picks: Readonly<Record<string, string | null>>, evaluation: GroupEvaluation) {
+  private withoutBarred(picks: Readonly<Record<string, string | null>>, evaluation: BoardEvaluation) {
     const barred = this.state.boss?.barred;
     if (!barred) return { picks, evaluation };
     const clean = Object.fromEntries(Object.entries(picks).map(([id, m]) => [id, m === barred ? null : m]));
@@ -589,14 +626,34 @@ export class MatchRunner {
    * not he has charges left: the move gave away at least the bar (lastStandBar: it falls the longer the battle
    * goes without one), and the crowd wasn't already lost (lastStandFrom). The judge's numbers decide, as given.
    */
-  private lastStandFor(fen: string, played: string, best: number, scored: readonly { move: string; loss: number }[]): BoardRound["lastStand"] {
+  private lastStandFor(
+    fen: string,
+    played: string,
+    best: number,
+    scored: readonly { move: string; expected: number; loss: number }[],
+    evaluation: BoardEvaluation,
+  ): LastStandRound | undefined {
     const b = this.state.boss;
     if (!b || b.lastStand || b.barred || legalMoves(fen).length < 2) return undefined;
-    const loss = scored.find((m) => m.move === played)?.loss ?? 0;
+    const mine = scored.find((m) => m.move === played);
+    const loss = mine?.loss ?? 0;
     const charges = b.kingCharges ?? 0;
     const bar = Math.round(lastStandBar(b.crowdMoves, charges, this.settings) * 10) / 10;
     if (!this.forceLastStand && !lastStandDue(loss, best, b.crowdMoves, charges, this.settings)) return undefined;
-    return { move: played, loss: Math.round(loss * 10) / 10, bar };
+    // What it loses: the boss's best reply (only if it's a legal move there) and a mate it allows (the crowd mated).
+    const reply = evaluation.replies?.[played];
+    const mate = evaluation.mates?.[played];
+    const legalReply = !!reply && legalMoves(applyMove(fen, played)).includes(reply);
+    const round3 = (x: number) => Math.round(x * 1000) / 1000;
+    return {
+      move: played,
+      loss: Math.round(loss * 10) / 10,
+      bar,
+      before: round3(best),
+      after: round3(mine?.expected ?? best),
+      ...(legalReply ? { reply } : {}),
+      ...(mate !== undefined && mate < 0 ? { mateIn: -mate } : {}),
+    };
   }
 
   /**
@@ -668,11 +725,18 @@ export class MatchRunner {
     if (this.state.boss) {
       const { barred: _done, ...b } = this.state.boss;
       // The God King's Last Stand: the scores stand, but the move is taken back (it isn't a move on the board, so
-      // the move count goes back one; the boss's strike waits for the re-pick). He falls: his charges are gone.
-      // Otherwise a re-pick that's been played clears the bar on the move he took back.
+      // the move count goes back one; the boss's strike waits for the re-pick). He falls, and leaves his charges to
+      // the crowd: every player still in gets lastStandPowerUps power-ups for each (the engine's top 3 moves, as in
+      // Crowd). Otherwise a re-pick that's been played clears the bar on the move he took back.
+      const r = stand ? results.find((x) => x.lastStand)! : null;
+      const charges = b.kingCharges ?? 0;
+      const gift = charges * this.settings.lastStandPowerUps;
       this.state = {
         ...this.state,
-        boss: stand ? { ...b, crowdMoves: b.crowdMoves - 1, kingCharges: 0, lastStand: { atMove: b.crowdMoves, charges: b.kingCharges ?? 0, ...stand }, barred: stand.move } : b,
+        ...(stand && gift > 0 ? { players: this.state.players.map((p) => (p.alive ? { ...p, powerUps: p.powerUps + gift } : p)) } : {}),
+        boss: stand
+          ? { ...b, crowdMoves: b.crowdMoves - 1, kingCharges: 0, lastStand: { atMove: b.crowdMoves, charges, ...stand, fen: r!.fenBefore, bestMove: r!.bestMove }, barred: stand.move }
+          : b,
       };
       if (stand) this.forceLastStand = false;
     }

@@ -944,7 +944,8 @@ export class LobbyCore {
       for (const m of Object.values(picks)) if (m && expectedAfter[m] === undefined) expectedAfter[m] = bestExpected;
       const bestMove = s?.bestMove && legal.includes(s.bestMove) ? s.bestMove : legal[0]!;
       if (expectedAfter[bestMove] === undefined) expectedAfter[bestMove] = bestExpected;
-      return runner.resolveBoard(job.boardId, ids, picks, { bestMove, bestExpected, expectedAfter });
+      // (The host's replies and mates from the same searches: what a blunder loses, for the God King's Last Stand.)
+      return runner.resolveBoard(job.boardId, ids, picks, { bestMove, bestExpected, expectedAfter, ...(s?.replies ? { replies: s.replies } : {}), ...(s?.mates ? { mates: s.mates } : {}) });
     });
     const think = Object.fromEntries(Object.entries(round.picks).map(([id, p]) => [id, p.thinkMs]));
     // A miss uses the whole of the player's time for the move.

@@ -191,6 +191,8 @@ export function PlayScreen({
           nav={{ view: history, total: board.history.length }}
           canCall={!waiting && !intro && !shown.replaying && !striking}
           strike={strike}
+          // After his Last Stand: the power-ups he left you (the engine's top 3 moves, as in Crowd).
+          powerUp={{ enabled: canMove, inUse: hint !== null }}
           status={
             striking ? (
               <span>
@@ -220,7 +222,13 @@ export function PlayScreen({
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}
-                {barred ? <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span> : match.boss.staggerNext && <span class="muted">Boss staggered.</span>}
+                {hint !== null ? (
+                  <span class="muted">{hint.length ? "⚡ Top 3" : "⚡ Asking the engine…"}</span>
+                ) : barred ? (
+                  <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span>
+                ) : (
+                  match.boss.staggerNext && <span class="muted">Boss staggered.</span>
+                )}
               </span>
             )
           }

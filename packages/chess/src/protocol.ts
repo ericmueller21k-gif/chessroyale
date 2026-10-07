@@ -1,5 +1,6 @@
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
+import type { LastStandRound } from "./runner.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
  * lobby), sent as JSON over a WebSocket. Times are server milliseconds; each
@@ -91,6 +92,12 @@ export interface BoardScore {
   botThinkMs: Record<string, number>;
   /** Bots that used a power-up on this board. */
   botPowerUps?: string[];
+  /**
+   * From the same searches: each scored move's best reply, and a forced mate in its line (moves, from the mover's
+   * side). The God King's Last Stand names what a blunder loses with them.
+   */
+  replies?: Record<string, string>;
+  mates?: Record<string, number>;
 }
 
 export interface ScoreJob {
@@ -169,9 +176,23 @@ export interface NetBoss {
   justKilled?: string | null;
   /**
    * The God King's Last Stand, once it has happened (he has fallen): the crowd's move he took back, during which
-   * crowd move, what it gave away, the bar it crossed, and the charges he still had (they went with him).
+   * crowd move, what it gave away, the bar it crossed, and the charges he still had (each player still in got
+   * that many power-ups). For the results card: the position before the move, the best move, the crowd's chances
+   * after the best move and after the blunder (0-1), the boss's best reply and a mate it allowed (boss's moves).
    */
-  lastStand?: { atMove: number; move: string; loss: number; bar: number; charges: number } | null;
+  lastStand?: {
+    atMove: number;
+    move: string;
+    loss: number;
+    bar: number;
+    charges: number;
+    fen?: string;
+    bestMove?: string;
+    before?: number;
+    after?: number;
+    reply?: string;
+    mateIn?: number;
+  } | null;
   /** The re-pick after his Last Stand: the move he took back can't be picked. */
   barred?: string | null;
   /** Set when the battle is over. */
@@ -294,7 +315,7 @@ export type ServerMessage = { now: number } & (
        * Boss battle: the God King's Last Stand on this move. The played move is shown, then taken back (it isn't on
        * `board`); the clock stands still through it (lastStandMs, already in `until`), then the crowd picks again.
        */
-      lastStand?: { move: string; loss: number; bar: number };
+      lastStand?: LastStandRound;
       /** Boss battle: the battle after this move (his charges, whether he has fallen). */
       boss?: NetBoss;
       /** For the cross-check: the group's evaluation as the host computed it. */

@@ -6,6 +6,7 @@ import { play } from "../sound.ts";
 import { useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingSprite } from "./GodKing.tsx";
 import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
+import { Bolt } from "./PowerUpButton.tsx";
 
 /**
  * Boss battle: everything below the board, the same on every screen (your move,
@@ -18,6 +19,9 @@ import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
  *   charges at his feet. He says a few words now and then (`cues`). Tap him
  *   and his commands pop up above his head, like an old Final Fantasy battle
  *   menu: play this move, or strike the boss. Tap him again to close it.
+ *   After his Last Stand he lies there fallen, and the charges he had left are
+ *   the crowd's power-ups: a ⚡ button with the count, above his fallen figure,
+ *   where his menu was (the engine's top 3 moves, as in Crowd).
  */
 export function BossDock({
   match,
@@ -31,6 +35,7 @@ export function BossDock({
   leaping = false,
   fallen: fallenNow,
   charges: chargesShown,
+  powerUp,
 }: {
   match: GameView;
   /** Your move: step back through the game (the arrows are greyed out elsewhere). */
@@ -50,10 +55,20 @@ export function BossDock({
   fallen?: boolean;
   /** The crowns to show, if not the battle's (the reveal of his Last Stand shows the ones he had until he leaps). */
   charges?: number;
+  /**
+   * Your move, once he has fallen: the ⚡ power-ups he left you can be used (`enabled`), and whether one is in use
+   * this move (its arrows are on the board). Other screens just show how many you hold.
+   */
+  powerUp?: { enabled: boolean; inUse: boolean };
 }) {
   const boss = match.boss;
   const fallen = fallenNow ?? !!boss?.lastStand;
   const charges = fallen ? 0 : (chargesShown ?? boss?.kingCharges ?? 0);
+  // His leftover charges, as your power-ups (one in use this move already counts as spent).
+  const held = match.practice ? Infinity : (match.standings().find((s) => s.isYou)?.powerUps ?? 0);
+  const inUse = !!powerUp?.inUse;
+  const left = inUse ? Math.max(0, held - 1) : held;
+  const power = fallen && (left > 0 || inUse) ? { left, inUse, enabled: !!powerUp?.enabled && !inUse && left > 0 } : null;
   const [menu, setMenu] = useState(false);
   const view = nav?.view;
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
@@ -94,6 +109,11 @@ export function BossDock({
         away={away}
         leaping={leaping}
         fallen={fallen}
+        power={power}
+        onPower={() => {
+          play("menuSelect");
+          match.usePowerUp();
+        }}
         menu={
           menu && ready ? (
             <CommandMenu
@@ -124,6 +144,8 @@ function GodKingUnit({
   away,
   leaping,
   fallen,
+  power,
+  onPower,
   menu,
   onTap,
 }: {
@@ -133,20 +155,40 @@ function GodKingUnit({
   away: boolean;
   leaping: boolean;
   fallen: boolean;
+  power: { left: number; inUse: boolean; enabled: boolean } | null;
+  onPower: () => void;
   menu: ComponentChildren;
   onTap: () => void;
 }) {
   const now = useFrameNow();
   const line = kingLine(now);
   if (fallen) {
-    // After his Last Stand: his fallen figure, on his side, cracked and greyed. No menu, no crowns.
+    // After his Last Stand: his fallen figure, on his side, cracked and greyed. No menu, no crowns; the charges he
+    // had left are your power-ups, in a ⚡ button above him (the whole column is the button).
+    const count = power ? (power.left === Infinity ? "∞" : String(power.left)) : "";
     return (
-      <div class="gk-unit fallen">
+      <div class={`gk-unit fallen${power ? " has-power" : ""}`}>
         {line && <SpeechBubble key={line.at} text={line.text} at={line.at} until={line.until} now={now} />}
+        {power && (
+          <button
+            type="button"
+            class={`gk-power${power.enabled ? " ready" : ""}${power.inUse ? " in-use" : ""}`}
+            disabled={!power.enabled}
+            onClick={onPower}
+            aria-label={
+              power.inUse ? "Power-up in use: the engine's top 3 moves" : power.enabled ? `Use a power-up: the engine's top 3 moves (${count} left)` : `Power-ups: ${count}`
+            }
+          >
+            <span class="gk-power-pill">
+              <Bolt />
+              {count}
+            </span>
+          </button>
+        )}
         <span class="gk-unit-btn" role="img" aria-label="The God King has fallen">
           <GodKingFallen side={side} />
         </span>
-        <span class="gk-unit-charges" />
+        {!power && <span class="gk-unit-charges" />}
       </div>
     );
   }

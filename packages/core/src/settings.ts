@@ -83,6 +83,11 @@ export interface Settings {
   lastStandLossFloor: number;
   lastStandDecayMoves: number;
   lastStandFrom: number;
+  /**
+   * The Last Stand: he falls with his charges unspent, and leaves them to the crowd. Every player still in gets this
+   * many power-ups (the engine's top 3 moves, as in Crowd) for each charge he had left.
+   */
+  lastStandPowerUps: number;
   /** Boss battle: below this strength the boss sometimes slips (up to this chance): a small deliberate inaccuracy, never a blunder. */
   bossStumbleBelow: number;
   bossStumbleMax: number;
@@ -207,6 +212,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastStandLossFloor: 13,
   lastStandDecayMoves: 22,
   lastStandFrom: 40,
+  lastStandPowerUps: 1,
   bossStumbleBelow: 2100,
   bossStumbleMax: 0.25,
   bossSlipLoss: [2, 7],

@@ -3,7 +3,8 @@ import { useEffect, useState } from "preact/hooks";
 /** The count last shown, kept across rounds so newly earned power-ups light up with a flash. */
 let lastShown: number | null = null;
 
-const Bolt = () => (
+/** The power-up's lightning bolt. */
+export const Bolt = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path d="M13.5 2 5 13.5h6L9.5 22 19 9.5h-6.2L13.5 2Z" />
   </svg>

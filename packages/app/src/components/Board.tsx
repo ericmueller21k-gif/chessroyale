@@ -29,6 +29,8 @@ interface BoardProps {
   animate?: boolean;
   /** Drawn over the board (e.g. everyone's picks as see-through pieces). */
   children?: ComponentChildren;
+  /** Extra square highlights under the pieces: square → class (e.g. the God King's Last Stand marks the blunder). */
+  marks?: Readonly<Record<string, string>>;
 }
 
 const sq = (s: string) => s as Key;
@@ -55,7 +57,7 @@ function shapesFor(arrows: Arrow[] = []): DrawShape[] {
 }
 
 /** Chessground board. Tap a piece then a square, or drag. Pawns reaching the last rank open a promotion picker. */
-export function Board({ fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children }: BoardProps) {
+export function Board({ fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks }: BoardProps) {
   const el = useRef<HTMLDivElement>(null);
   const api = useRef<Api | null>(null);
   const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null);
@@ -126,6 +128,7 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
       selectable: { enabled: !!interactive },
       animation: { enabled: animate, duration: 220 },
       lastMove: lastMove ? [sq(lastMove.slice(0, 2)), sq(lastMove.slice(2, 4))] : undefined,
+      highlight: { lastMove: true, check: true, custom: new Map(Object.entries(marks ?? {}).map(([k, v]) => [sq(k), v])) },
       check: undefined,
       movable: {
         color: interactive ? color : undefined,
@@ -140,7 +143,7 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
       },
     });
     api.current?.setAutoShapes(shapesFor(arrows));
-  }, [fen, orientation, lastMove, interactive, arrows, animate, moves?.join()]);
+  }, [fen, orientation, lastMove, interactive, arrows, animate, moves?.join(), JSON.stringify(marks ?? null)]);
 
   const promote = (piece: string) => {
     if (!promotion) return;

@@ -83,3 +83,35 @@ export function queenInDanger(fen: string, color: "w" | "b"): boolean {
 export function inCheck(fen: string): boolean {
   return new Chess(fen).inCheck();
 }
+
+/** What a blunder costs, in words a player knows: a forced mate, a piece lost, or (neither) just the chances. */
+export type BlunderCost = { kind: "mate"; in: number } | { kind: "piece"; piece: "n" | "b" | "r" | "q" } | { kind: "chances" };
+
+const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 } as const;
+
+/**
+ * What the crowd's blunder `move` costs, from the opponent's best reply to it (`reply`, from the judge's own
+ * search) and any forced mate it allows (`mateIn`: the opponent mates in that many moves).
+ * - A quick mate (3 moves or fewer) comes first: "allows mate".
+ * - Then a piece the reply wins outright: it takes a knight, bishop, rook or queen, and that's worth at least two
+ *   pawns more than whatever recaptures it back (a queen for a bishop still "loses your queen"; a queen trade
+ *   doesn't).
+ * - Then a longer forced mate.
+ * - Otherwise the reply wins nothing a player could name (a fork, a pin, a slow squeeze): the chances say it.
+ */
+export function blunderCost(fen: string, move: string, reply?: string | null, mateIn?: number | null): BlunderCost {
+  if (mateIn && mateIn > 0 && mateIn <= 3) return { kind: "mate", in: mateIn };
+  const after = applyMove(fen, move);
+  if (reply && legalMoves(after).includes(reply)) {
+    const to = reply.slice(2, 4);
+    const taken = pieceAt(after, to);
+    const by = pieceAt(after, reply.slice(0, 2));
+    if (taken && by && taken.type !== "p" && taken.type !== "k") {
+      const back = legalMoves(applyMove(after, reply)).some((m) => m.slice(2, 4) === to);
+      const net = PIECE_VALUE[taken.type] - (back ? PIECE_VALUE[by.type] : 0);
+      if (net >= 2) return { kind: "piece", piece: taken.type };
+    }
+  }
+  if (mateIn && mateIn > 0) return { kind: "mate", in: mateIn };
+  return { kind: "chances" };
+}

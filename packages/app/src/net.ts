@@ -15,6 +15,7 @@ import {
   TopMovesCache,
   bossGuardFrom,
   recheckCloseCalls,
+  repliesFrom,
   bossMoveFrom,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
@@ -480,12 +481,15 @@ export class NetMatch implements GameView {
           const missing = [...Object.values(job.humanPicks), ...Object.values(botPicks)].filter(
             (mv): mv is string => !!mv && expectedAfter[mv] === undefined,
           );
-          if (missing.length) for (const s of await engine.scoreMoves(job.fen, missing)) expectedAfter[s.move] = s.expected;
+          const extra = missing.length ? await engine.scoreMoves(job.fen, missing) : [];
+          for (const s of extra) expectedAfter[s.move] = s.expected;
+          // Each move's best reply and mate score from the same searches (what a blunder loses, for the Last Stand).
+          const { replies, mates } = repliesFrom([top, extra]);
           const people = Object.values(job.humanPicks).some((m) => !!m);
           const checked = serverRecheck || !people
             ? { bestMove: top[0]!.move, bestExpected: best, expectedAfter }
             : await recheckCloseCalls(engine, job.fen, { bestMove: top[0]!.move, bestExpected: best, expectedAfter }, [...Object.values(job.humanPicks), ...Object.values(botPicks)], this.settings);
-          out[i] = { boardId: job.boardId, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, botPicks, botThinkMs, botPowerUps };
+          out[i] = { boardId: job.boardId, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, botPicks, botThinkMs, botPowerUps, replies, mates };
         }
       }),
     );

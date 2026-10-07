@@ -22,6 +22,13 @@ export interface MoveScore {
   move: string;
   /** Mover's expected score after this move, 0 to 1. */
   expected: number;
+  /**
+   * The opponent's best reply, from the same search (the line's second move; the God King's Last Stand names what
+   * a blunder loses with it). Missing when the line is cut short or the game ends.
+   */
+  reply?: string;
+  /** A forced mate in the line, in moves: positive if the mover mates, negative if the mover gets mated. */
+  mate?: number;
 }
 
 export interface Analysis {
@@ -41,19 +48,24 @@ interface InfoLine {
   multipv: number;
   move: string;
   expected: number;
+  reply?: string;
+  mate?: number;
 }
 
 export function parseInfo(line: string): InfoLine | null {
   if (!line.startsWith("info ") || !line.includes(" wdl ") || !line.includes(" pv ")) return null;
   if (line.includes(" lowerbound") || line.includes(" upperbound")) return null;
   const wdl = line.match(/ wdl (\d+) (\d+) (\d+)/);
-  const pv = line.match(/ pv (\S+)/);
+  const pv = line.match(/ pv (\S+)(?: (\S+))?/);
   const mpv = line.match(/ multipv (\d+)/);
+  const mate = line.match(/ score mate (-?\d+)/);
   if (!wdl || !pv) return null;
   return {
     multipv: mpv ? Number(mpv[1]) : 1,
     move: pv[1]!,
     expected: expectedFromWdl(Number(wdl[1]), Number(wdl[2]), Number(wdl[3])),
+    ...(pv[2] ? { reply: pv[2] } : {}),
+    ...(mate ? { mate: Number(mate[1]) } : {}),
   };
 }
 
@@ -125,7 +137,7 @@ export class UciEngine {
       const info = parseInfo(l);
       if (info) last.set(info.multipv, info);
     }
-    return [...last.values()].sort((a, b) => a.multipv - b.multipv).map(({ move, expected }) => ({ move, expected }));
+    return [...last.values()].sort((a, b) => a.multipv - b.multipv).map(({ multipv: _, ...score }) => score);
   }
 
   /**
@@ -140,7 +152,7 @@ export class UciEngine {
       if (!unique.length) return [];
       const found = await this.search(fen, unique.length, unique);
       const have = new Set(found.map((m) => m.move));
-      for (const m of unique) if (!have.has(m)) found.push({ move: m, expected: await this.scoreAfter(fen, m) });
+      for (const m of unique) if (!have.has(m)) found.push({ move: m, ...(await this.scoreAfter(fen, m)) });
       return found;
     });
   }
@@ -154,14 +166,18 @@ export class UciEngine {
     return this.serial(async () => (unique.length ? this.search(fen, unique.length, unique, nodes) : []));
   }
 
-  /** Mover's expected score after `move`, from a search of the resulting position (or the game result if it ends). */
-  private async scoreAfter(fen: string, move: string): Promise<number> {
+  /**
+   * Mover's expected score after `move`, from a search of the resulting position (or the game result if it ends).
+   * That search's best move is the opponent's best reply, kept with its mate score (seen from the mover's side).
+   */
+  private async scoreAfter(fen: string, move: string): Promise<Omit<MoveScore, "move">> {
     const next = applyMove(fen, move);
     const end = gameEnd(next, []);
-    if (end === "checkmate") return 1;
-    if (end) return 0.5;
+    if (end === "checkmate") return { expected: 1 };
+    if (end) return { expected: 0.5 };
     const [best] = await this.search(next, 1);
-    return best ? 1 - best.expected : 0.5;
+    if (!best) return { expected: 0.5 };
+    return { expected: 1 - best.expected, reply: best.move, ...(best.mate !== undefined ? { mate: -best.mate } : {}) };
   }
 
   /** Top N moves with the mover's expected score after each (for bots). */
@@ -182,7 +198,7 @@ export class UciEngine {
       const missing = [...new Set(moves)].filter((m) => !have.has(m)).sort();
       const extra = missing.length ? await this.search(fen, missing.length, missing) : [];
       const gotExtra = new Set(extra.map((m) => m.move));
-      for (const m of missing) if (!gotExtra.has(m)) extra.push({ move: m, expected: await this.scoreAfter(fen, m) });
+      for (const m of missing) if (!gotExtra.has(m)) extra.push({ move: m, ...(await this.scoreAfter(fen, m)) });
       const all = [...top, ...extra.filter((m) => !have.has(m.move))];
       return { best: top[0]!, moves: all.sort((a, b) => b.expected - a.expected) };
     });

@@ -21,15 +21,20 @@ const remember = (fen: string, w: number) => {
 /**
  * The evaluation bar: White's expected score in the position on screen, worked
  * out in this browser. `evaluate` lets a match reuse a search it already has.
+ * `override` shows another value for a moment (White's expected score): the God
+ * King's Last Stand plunges the bar to the crowd's chances after a blunder that
+ * never stands on the board, and lets it go back as the piece slides back.
  */
 export function EvalBar({
   fen,
   orientation,
   evaluate,
+  override = null,
 }: {
   fen: string;
   orientation: "w" | "b";
   evaluate?: (fen: string) => Promise<number | null>;
+  override?: number | null;
 }) {
   const [white, setWhite] = useState<number | null>(() => known.get(fen) ?? lastShown);
 
@@ -71,10 +76,11 @@ export function EvalBar({
     };
   }, [fen]);
 
-  const w = white ?? 0.5;
-  const label = white === null ? "…" : `${Math.round(w * 100)}%`;
+  const shown = override ?? white;
+  const w = shown ?? 0.5;
+  const label = shown === null ? "…" : `${Math.round(w * 100)}%`;
   return (
-    <div class={`eval-bar ${orientation === "b" ? "flipped" : ""}`} title="White's expected score">
+    <div class={`eval-bar ${orientation === "b" ? "flipped" : ""}${override !== null ? " plunged" : ""}`} title="White's expected score">
       <div class="eval-white" style={{ height: `${w * 100}%` }} />
       <span class="eval-label">{label}</span>
     </div>

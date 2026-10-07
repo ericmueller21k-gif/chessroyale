@@ -4,7 +4,7 @@ import { elimination, myTeam, type GameView } from "../game.ts";
 import { useState } from "preact/hooks";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
-import { GodKingEpilogue } from "../components/LastStand.tsx";
+import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
@@ -75,6 +75,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
       )}
       {/* After his Last Stand: he rises again if the crowd won; otherwise he stays down. */}
       {bossResult && match.boss?.lastStand && <GodKingEpilogue side={match.boss.crowdSide} rises={bossResult === "crowd"} />}
+      {/* What he saved you from: the blunder, the boss's reply, the best move, your chances (tap to open). */}
+      {bossResult && match.boss?.lastStand?.fen && <LastStandCard stand={match.boss.lastStand} side={match.boss.crowdSide} />}
       {team && !bossResult && (
         <p class={`team-result ${gameWinner === team ? "good" : gameWinner ? "bad" : ""}`}>
           {gameWinner === team
