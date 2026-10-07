@@ -27,7 +27,11 @@ test("only piece sounds, clock ticks and the reveal reel play, and muting silenc
   await page.evaluate(() => (window as any).match.submit((window as any).match.hint[0].move));
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("reveal");
   await page.waitForTimeout(4000);
-  const log: string[] = await page.evaluate(() => (window as any).__soundLog);
+  const all: string[] = await page.evaluate(() => (window as any).__soundLog);
+  // First the queue screen (Solo's seats filling): its soft pops, and nothing else. Then the match, without a pop.
+  const queue = all.findIndex((l) => !l.startsWith("pop"));
+  expect(all.slice(0, queue).every((l) => /^pop(Soft)?:/.test(l))).toBe(true);
+  const log = all.slice(queue);
   const names = log.map((l) => l.split(":")[0]);
   expect(names).toContain("tick");
   expect(names.some((n) => n === "move" || n === "capture")).toBe(true);

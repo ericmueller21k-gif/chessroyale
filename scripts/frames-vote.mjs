@@ -31,8 +31,9 @@ const phase = () => p.evaluate(() => window.match?.phase.kind ?? "none").catch((
 let side = null;
 for (let attempt = 0; attempt < 12; attempt++) {
   await p.goto(url + "?debug&nolanding&mode=crowd&turns=teams&augments=1&pace=quick");
-  await p.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
-  await p.getByRole("button", { name: /^Solo vs \d+ bots$/ }).click();
+  // Matchmaking: Solo, then PLAY (the seats fill with bots, then the match).
+  await p.getByRole("radio", { name: /^Solo/ }).click();
+  await p.getByRole("button", { name: "PLAY", exact: true }).click();
   for (let i = 0; i < 400 && (await phase()) !== "vote"; i++) await p.waitForTimeout(50);
   side = await p.evaluate(() => window.match.standings().find((s) => s.isYou).team);
   if (want === "any" || side === want) break;

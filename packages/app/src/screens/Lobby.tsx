@@ -2,9 +2,9 @@ import type { NetMatch } from "../net.ts";
 import { QueueScreen } from "./Queue.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 
-export function LobbyScreen({ match, onLeave }: { match: NetMatch; onLeave: () => void }) {
+export function LobbyScreen({ match, onLeave, onLetBotsFill }: { match: NetMatch; onLeave: () => void; onLetBotsFill?: () => void }) {
   // Matchmade (PLAY): the queue, not a lobby.
-  if (match.auto) return <QueueScreen match={match} onCancel={onLeave} />;
+  if (match.auto) return <QueueScreen match={match} onCancel={onLeave} onLetBotsFill={onLetBotsFill} />;
   const humans = match.players.filter((p) => !p.isBot);
   const share = async () => {
     try {

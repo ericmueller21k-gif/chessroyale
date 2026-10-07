@@ -206,6 +206,8 @@ export interface GameView {
   readonly kingCalled: boolean;
   /** Quick chat (online matches only; see `enabled`). */
   readonly chat?: MatchChat;
+  /** It counts for your ranking (at least 30% real players; never solo). Null or missing: not known (yet). */
+  readonly ranked?: boolean | null;
 }
 
 /** Crowd 50 v 50: your team (the side you play all match), if you have one. */
