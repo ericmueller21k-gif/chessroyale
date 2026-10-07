@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { Chess } from "chess.js";
 import { soloFromHome } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
@@ -19,7 +20,10 @@ test("only piece sounds, clock ticks and the reveal reel play, and muting silenc
   await expect(page.locator(".pu-dot.on")).toHaveCount(3);
   await page.getByRole("button", { name: /Use a power-up/ }).first().click();
   await expect(page.locator(".pu-dot.active")).toHaveCount(1);
-  await expect(page.locator(".hints li")).toHaveCount(3, { timeout: 15_000 });
+  // The engine's top 3 moves, or every legal move when there are fewer: one opening line deals Black in check with
+  // two replies (Caro-Kann 5.Nxf6+), in about 1 in 170 matches.
+  const legal = new Chess(await page.evaluate(() => (window as any).match.phase.board.fen)).moves().length;
+  await expect(page.locator(".hints li")).toHaveCount(Math.min(3, legal), { timeout: 15_000 });
   await page.evaluate(() => (window as any).match.submit((window as any).match.hint[0].move));
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("reveal");
   await page.waitForTimeout(4000);

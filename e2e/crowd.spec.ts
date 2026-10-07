@@ -109,7 +109,10 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
 test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives cuts, through the team final to results", async ({ page }) => {
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&clock=20&augments=0&finalTurns=12");
+  // Two rounds a stage, as in a real match (a cut after every move: one ply for each team). With one, a stage is a
+  // single ply, so at the first cut the team that hasn't moved yet is all tied on 0 and its cut is a coin flip: you
+  // could go out before ever playing.
+  await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=20&augments=0&finalTurns=12");
   await soloFromHome(page);
   const seen = new Set<string>();
   const stopAt = Date.now() + 9 * 60_000;
