@@ -142,13 +142,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       // The live hub: presence in batches (the session lookup cached), the numbers from its memory.
       const uid = await cachedUserId(sql, token, now);
       if (uid && firstSighting(uid, now)) {
-        // Just arrived: the hub hears at once, and the numbers include you.
-        await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).seen([uid], now).catch(() => undefined);
-        liveCache = null;
+        // Just arrived: the hub hears at once, and its numbers (which include you) refresh this instance's.
+        const counts = await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now).catch(() => null);
+        if (counts) liveCache = { at: now, body: counts };
       } else if (uid) touch(uid);
     } else await touchSession(sql, token, now);
     if (!liveCache || now - liveCache.at > LIVE_CACHE_MS) {
-      if (env.LIVE) liveCache = { at: now, body: await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).counts() };
+      if (env.LIVE) liveCache = { at: now, body: await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).liveCounts() };
       else {
         if (now - prunedAt > 10 * 60_000) {
           prunedAt = now;

@@ -53,6 +53,14 @@ export class LiveHub extends DurableObject<Env> {
     await this.keepAlarm();
   }
 
+  /** Someone just arrived (their first request to a Worker instance in a minute): counted at once, and the numbers. */
+  async arrive(id: string, at: number): Promise<LiveCounts> {
+    countCall("hub.arrive");
+    this.board.markSeen([id], Math.min(at, Date.now()));
+    await this.keepAlarm();
+    return this.counts();
+  }
+
   /** A lobby's report (a change, or its once-a-minute "still running"). */
   async report(s: LobbySummary): Promise<void> {
     countCall("hub.report");
@@ -69,7 +77,6 @@ export class LiveHub extends DurableObject<Env> {
   }
 
   async counts(): Promise<LiveCounts> {
-    countCall("hub.counts");
     const now = Date.now();
     if ((!this.waits || now - this.waits.at > 60_000) && this.env.DB) {
       const sql = d1Sql(this.env.DB);
@@ -81,6 +88,12 @@ export class LiveHub extends DurableObject<Env> {
       }
     }
     return this.board.counts(now, this.waits?.value ?? { crowd: null, boss: null });
+  }
+
+  /** The live line's numbers (each Worker instance asks at most every 3 s). */
+  async liveCounts(): Promise<LiveCounts> {
+    countCall("hub.counts");
+    return this.counts();
   }
 
   /** People in lobbies now (the overload limit). */
