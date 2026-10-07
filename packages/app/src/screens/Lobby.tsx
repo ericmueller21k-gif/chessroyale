@@ -25,7 +25,7 @@ export function LobbyScreen({ match, onLeave }: { match: NetMatch; onLeave: () =
         </button>
       </div>
       <h2 class="muted small">
-        Players ({humans.length} of {match.settings.lobbySize}) · empty seats fill with bots
+        Players ({humans.length} of {match.settings.lobbySize}){match.settings.raid ? "" : " · empty seats fill with bots"}
       </h2>
       <ul class="lobby-players">
         {humans.map((p) => (
@@ -39,7 +39,9 @@ export function LobbyScreen({ match, onLeave }: { match: NetMatch; onLeave: () =
       {match.isHost ? (
         <>
           <button type="button" class="btn btn-primary btn-wide" onClick={() => match.startMatch()}>
-            Start with {humans.length} {humans.length === 1 ? "player" : "players"} + {match.settings.lobbySize - humans.length} bots
+            Start with {humans.length} {humans.length === 1 ? "player" : "players"}
+            {/* (A boss raid has no bots.) */}
+            {match.settings.raid ? "" : ` + ${match.settings.lobbySize - humans.length} bots`}
           </button>
           <p class="muted small">
             You're the host: your browser scores every round with the chess engine, so keep this tab open. A computer works best.

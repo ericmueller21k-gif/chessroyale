@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { FRONT_DOOR, itemDef } from "@chessroyale/core";
-import { createGuest, ensureSchema, publicProfile, recordResult, reportPlayer, signInWithIdentity, touchSession, userFromToken, type Sql } from "../src/accounts.ts";
+import { createGuest, ensureSchema, lobbyResult, publicProfile, recordResult, reportPlayer, signInWithIdentity, touchSession, userFromToken, type Sql } from "../src/accounts.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
 import { liveCounts, recordWait, reportLobby, typicalWait, type LobbySummary } from "../src/live.ts";
@@ -205,6 +205,26 @@ describe("profiles", () => {
     expect(u!.rating).toBe(1720);
     const p = (await publicProfile(sql, "u1", 100))!;
     expect(p.crowd).toMatchObject({ games: 3, cutsSurvivedPct: null, brilliant: null });
+  });
+
+  it("an online result remembers its lobby's code (for \"See your result\" once the lobby closes); never on a profile, never for solo", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Eric");
+    const { user: other } = await createGuest(sql, 1000, "Bo");
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 100, players: 100, lobby: "RY8UB" }, 2000);
+    await recordResult(sql, other.id, { mode: "crowd", online: true, placement: 7, players: 100, lobby: "RY8UB" }, 2000);
+    // A solo game can't claim a lobby, nor can anything that isn't a code.
+    await recordResult(sql, user.id, { mode: "crowd", online: false, placement: 3, players: 100, lobby: "ABCDE" }, 3000);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 3, players: 100, lobby: "<b>" }, 4000);
+    expect(await lobbyResult(sql, user.id, "RY8UB")).toEqual({ mode: "crowd", placement: 100, players: 100, playedAt: 2000 });
+    expect(await lobbyResult(sql, other.id, "RY8UB")).toMatchObject({ placement: 7 });
+    expect(await lobbyResult(sql, user.id, "ABCDE")).toBeNull();
+    expect(await lobbyResult(sql, user.id, "NOPE2")).toBeNull();
+    // The profile's recent match is the same one (by when), and shows no code.
+    const p = (await publicProfile(sql, user.id, 5000))!;
+    expect(p.recent.find((r) => r.playedAt === 2000)).toMatchObject({ placement: 100, online: true });
+    expect(JSON.stringify(p)).not.toContain("RY8UB");
   });
 
   it("reports: stored for a person to read, one per player a day, never about yourself or nobody", async () => {

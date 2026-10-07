@@ -224,6 +224,27 @@ the frame of the tap showed the green.
   taller than the text's, and the line's height was `normal` (a phone's is fixed). An emoji or symbol in a line
   above the board gets `line-height: 1`.
 
+## A lobby that never closed (Oct 7, 2026)
+
+**Eric saw:** he opened the app hours after a match and got its results screen again, at the lobby's old address.
+
+**The cause:**
+- Every lobby's Durable Object kept its record for ever: nothing ended its life after the results, so its address
+  reconnected and replayed them.
+- A lobby that's gone refuses the WebSocket, and the app treated a refusal like a dropped connection: retry, for ever.
+  A typed unknown code sat on "Connecting…".
+- Every test passed: they all followed a match to its results and stopped there. None asked what happens after, to
+  the lobby, its code or an old link.
+
+**How it was found:** reading what the Durable Object does after `phase === "results"` (nothing), and opening an
+unknown code: the socket's 404 never reaches the page.
+
+**The rule:**
+- Anything the server starts (a lobby, a queue, a session) has an end, written down with its numbers, and a test for
+  each way it ends, including "nobody is there any more".
+- Test the stale case: the old link, the tab reopened later, the app back from the background.
+- A refused WebSocket says nothing about why: ask the server (an ordinary request) before retrying.
+
 ## Tests that leaned on a lucky seed, and names that looked short (Oct 7, 2026)
 
 **Seen** (by the vote tweaks, before they shipped):

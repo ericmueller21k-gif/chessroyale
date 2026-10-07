@@ -511,6 +511,24 @@ export const BOT_LOOKS = {
 } as const;
 
 /**
+ * How long a lobby lives (see DECISIONS.md, "Closing finished lobbies"). When a lobby closes, its Durable Object
+ * deletes everything it stored and its code is free again; a link to it then opens the home screen with a note.
+ */
+export const LOBBY_LIFE = {
+  /** After a match ends, its results stay up this long (see your place, say GG, share), then the lobby closes. */
+  lobbyResultsKeepMinutes: 15,
+  /** A lobby that never started (a private one nobody started, a queue everyone left) closes after this long with nothing happening in it. */
+  lobbyIdleMinutes: 60,
+  /**
+   * Safety cap for a match in progress that nobody is connected to: it closes after this long without hearing from
+   * anyone. A match left to itself still plays out (no move waits for long), and the longest, a team final to its
+   * 160-turn cap, takes about an hour and a half; so a running match always reaches its results first, and this only
+   * clears one that's stuck. Never while anyone is connected.
+   */
+  lobbyAbandonedMinutes: 180,
+} as const;
+
+/**
  * Quick chat in matches (preset phrases and emoji only; see DECISIONS.md, "Quick chat in matches"). The server
  * enforces the limits; the app mirrors them to grey out its buttons.
  */

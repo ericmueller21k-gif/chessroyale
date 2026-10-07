@@ -2957,6 +2957,15 @@ button.history-label {
   margin: -4px 0 0;
   text-align: center;
 }
+/* An old link's lobby has closed. */
+.landing-notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
 .faq {
   display: grid;
   gap: 6px;
@@ -6755,6 +6764,47 @@ button.fd-logo {
   flex-direction: column;
   gap: 16px;
 }
+/*
+ * A lobby you opened has closed (an old link, a stale tab, a match whose results had been up long enough): a note
+ * under the live line, and "See your result" if you played it. Phones: the button gets its own line.
+ */
+.fd-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  background: var(--fd-panel);
+  border: 1px solid var(--fd-line);
+  border-radius: 14px;
+  padding: 6px 6px 6px 14px;
+}
+.fd-notice-flag {
+  flex: none;
+  color: var(--fd-gold-text);
+}
+.fd-notice-text {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.fd-notice-x {
+  order: 2;
+  background: transparent;
+  color: var(--fd-muted);
+}
+.fd-notice-go {
+  order: 3;
+  flex: 1 1 100%;
+  margin: 0 0 4px;
+}
+@media (min-width: 520px) {
+  .fd-notice-go {
+    order: 1;
+    flex: none;
+    margin: 0;
+  }
+}
 .fd-hero {
   flex: 1 1 auto;
   min-height: 230px;
@@ -7630,6 +7680,10 @@ button.fd-logo {
 .fd-place.gold {
   background: var(--fd-gold);
   color: var(--fd-gold-ink);
+}
+/* The match "See your result" opened the profile at. */
+.fd-match.marked {
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
 }
 .fd-field {
   display: flex;
