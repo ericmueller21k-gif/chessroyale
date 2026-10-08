@@ -9666,6 +9666,14 @@ img.qicon {
   image-rendering: pixelated;
   pointer-events: none;
 }
+/* A boss power's effect sprite (BossEffect.tsx): fills the box it's given (a square, the board), pixel-sharp. */
+.fx-sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
 /* A phone: at the left of the boss bar above the board (the God King is under it, on the right). */
 .boss-bar.has-char {
   min-height: 56px;

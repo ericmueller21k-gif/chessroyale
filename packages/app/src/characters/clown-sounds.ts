@@ -1,49 +1,15 @@
 /**
  * Boingo's sounds, synthesised (no files, no licences): a pogo boing, a bulb-horn honk, a rubber squeak, a slide
- * whistle up and down, and a kazoo laugh (a clown's laugh with no voice). Each is a pure function of the sample rate,
+ * whistle up and down, a kazoo laugh (a clown's laugh with no voice), and for his powers a pie's splat and the
+ * funhouse's boing-flip. Each is a pure function of the sample rate,
  * so a test can measure it: every one stays quieter than a piece's move sound (peak and loudness; see
  * test/boss-character.test.ts).
  */
+import { bandpass, lowpass, noise, osc, render, saw, sine, soft, square } from "./synth.ts";
 
-export type ClownSound = "boing" | "honk" | "squeak" | "slideUp" | "slideDown" | "laugh";
+export type ClownSound = "boing" | "honk" | "squeak" | "slideUp" | "slideDown" | "laugh" | "splat" | "flip";
 
-/** The move sample's level (public/sounds/move.mp3, measured with ffmpeg): peak -3.9 dBFS, mean -21.3 dBFS. */
-export const MOVE_PEAK = 0.64;
-export const MOVE_MEAN_DB = -21.3;
-
-type Voice = (t: number) => number;
-
-/** Renders `dur` seconds of a voice, with a short fade at both ends so nothing clicks. */
-function render(rate: number, dur: number, voice: Voice): Float32Array {
-  const n = Math.ceil(rate * dur);
-  const out = new Float32Array(n);
-  const fade = Math.floor(rate * 0.004);
-  for (let i = 0; i < n; i++) {
-    const edge = Math.min(1, i / fade, (n - 1 - i) / fade);
-    out[i] = voice(i / rate) * edge;
-  }
-  return out;
-}
-
-/** An oscillator whose frequency follows `freq(t)` (phase accumulated, so sweeps stay smooth). */
-function osc(rate: number, freq: (t: number) => number, shape: (phase: number) => number): Voice {
-  // Called once per sample, in order.
-  let phase = 0;
-  return (t) => {
-    phase += freq(t) / rate;
-    return shape(phase % 1);
-  };
-}
-const sine = (p: number) => Math.sin(2 * Math.PI * p);
-const saw = (p: number) => 2 * p - 1;
-const square = (p: number) => (p < 0.5 ? 1 : -1);
-
-/** A one-pole low-pass, to take the edge off buzzy waves. */
-function lowpass(rate: number, cutoff: number, v: Voice): Voice {
-  const a = 1 - Math.exp((-2 * Math.PI * cutoff) / rate);
-  let y = 0;
-  return (t) => (y += a * (v(t) - y));
-}
+export { MOVE_MEAN_DB, MOVE_PEAK } from "./synth.ts";
 
 const SOUNDS: Record<ClownSound, (rate: number) => Float32Array> = {
   // A spring: a sine whose pitch wobbles fast and settles, dying away.
@@ -85,10 +51,25 @@ const SOUNDS: Record<ClownSound, (rate: number) => Float32Array> = {
       return 0.2 * env * v(t);
     });
   },
+  // A pie landing: a soft low thump that drops in pitch, under a wet, squelchy burst of noise.
+  splat: (rate) => {
+    const thump = osc(rate, (t) => 150 * Math.exp(-t / 0.08) + 55, sine);
+    const wet = bandpass(rate, (t) => 900 * Math.exp(-t / 0.12) + 250, 1.6, noise(7));
+    return render(rate, 0.42, (t) => 0.32 * Math.exp(-t / 0.07) * thump(t) + 0.55 * Math.exp(-t / 0.1) * Math.min(1, t / 0.006) * wet(t));
+  },
+  // The funhouse: a big spring boing as he lands, then a whoosh that sweeps up and over as the board flips.
+  flip: (rate) => {
+    const spring = osc(rate, (t) => 200 + 120 * Math.sin(2 * Math.PI * 12 * t) * Math.exp(-t / 0.25) + 140 * Math.exp(-t / 0.05), sine);
+    const air = bandpass(rate, (t) => 500 + 2200 * Math.sin(Math.PI * Math.min(1, Math.max(0, (t - 0.18) / 0.5))), 2.2, noise(11));
+    return render(rate, 0.75, (t) => {
+      const whoosh = t < 0.18 ? 0 : Math.sin(Math.PI * Math.min(1, (t - 0.18) / 0.55));
+      return 0.26 * Math.exp(-t / 0.16) * spring(t) + 0.5 * whoosh * whoosh * air(t);
+    });
+  },
 };
 
 /** Trims each to sit a little under a move's loudness (mean about -24 dBFS, peaks well under the move's). */
-const LEVEL: Record<ClownSound, number> = { boing: 0.78, honk: 0.66, squeak: 0.63, slideUp: 0.51, slideDown: 0.54, laugh: 1 };
+const LEVEL: Record<ClownSound, number> = { boing: 0.78, honk: 0.66, squeak: 0.63, slideUp: 0.51, slideDown: 0.54, laugh: 1, splat: 0.98, flip: 0.55 };
 
 const cache = new Map<string, Float32Array>();
 /** The samples for one of his sounds at a sample rate (made once, then reused). */
@@ -96,7 +77,8 @@ export function clownSound(name: ClownSound, rate: number): Float32Array {
   const key = `${name}@${rate}`;
   let s = cache.get(key);
   if (!s) {
-    s = SOUNDS[name](rate).map((v) => v * LEVEL[name]);
+    // His power sounds (a splat, the boing-flip) are loud transients: a soft ceiling keeps their peaks down.
+    s = SOUNDS[name](rate).map((v) => (name === "splat" || name === "flip" ? soft(v * LEVEL[name]) : v * LEVEL[name]));
     cache.set(key, s);
   }
   return s;

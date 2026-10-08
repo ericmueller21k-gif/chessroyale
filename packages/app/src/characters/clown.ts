@@ -218,7 +218,11 @@ const shadow: Part = (() => {
   return { grid: toGrid(cv), outline: false };
 })();
 
+/** A cream pie (his passive power), side on: a cherry, the cream, the crust and the tin. */
+const pie: Part = { grid: ["....rr....", "..wwEwww..", ".wwwwwwWW.", "oooooooooo", ".OSSSSSSO."] };
+
 const PARTS = {
+  pie,
   head: head("grin"),
   headLaugh: head("laugh"),
   headHurt: head("hurt"),
@@ -273,7 +277,7 @@ export interface ClownPose {
   hatDy?: number;
   hatDx?: number;
   /** A glove off the handlebar: to the chin (thinking), to the nose (a honk), out (pointing) or up (cheering). */
-  right?: "bar" | "chin" | "nose" | "point" | "up";
+  right?: "bar" | "chin" | "nose" | "point" | "up" | "back";
   left?: "bar" | "up";
   /** Shoes off the foot bar, kicked out to the sides (a big jump's split). */
   kick?: number;
@@ -299,8 +303,8 @@ export function clownLayers(p: ClownPose): Layer[] {
   const L = (part: keyof typeof PARTS, x: number, w: number, y: number, extra: Partial<Layer> = {}) => at(part, m(x, w), y, { flipX: p.flip, ...extra });
   const right = p.right ?? "bar";
   const left = p.left ?? "bar";
-  const gloveR: Record<string, [number, number]> = { bar: [30, 30 + top], chin: [26, 20 + b], nose: [24, 13 + hy], point: [39, 23 + b], up: [36, 8 + b] };
-  const sleeveR: Record<string, [number, number]> = { bar: [30, 26 + b], chin: [29, 23 + b], nose: [29, 22 + b], point: [34, 22 + b], up: [34, 16 + b] };
+  const gloveR: Record<string, [number, number]> = { bar: [30, 30 + top], chin: [26, 20 + b], nose: [24, 13 + hy], point: [39, 23 + b], up: [36, 8 + b], back: [40, 6 + b] };
+  const sleeveR: Record<string, [number, number]> = { bar: [30, 26 + b], chin: [29, 23 + b], nose: [29, 22 + b], point: [34, 22 + b], up: [34, 16 + b], back: [36, 15 + b] };
   const gloveL: Record<string, [number, number]> = { bar: [12, 30 + top], up: [6, 8 + b] };
   const sleeveL: Record<string, [number, number]> = { bar: [11, 26 + b], up: [7, 16 + b] };
   return [
@@ -562,6 +566,70 @@ const entrance: Anim = {
   ],
 };
 
+/** His pose with a pie held up at (x, y) (his drawing space). */
+const withPie = (ms: number, p: ClownPose, x: number, y: number, extra: Partial<Frame> = {}): Frame => ({ ms, layers: [...pose(p), at("pie", x, y)], ...extra });
+/** Speed lines where the pie flew off. */
+const whoosh: Speck[] = [0, 2, 4].flatMap((dy) => [0, 1, 2, 3].map((i): Speck => [OX + 46 + i + dy, OY + 16 + dy, i < 2 ? "W" : "w"]));
+
+/**
+ * His passive power, the pie: he pulls a pie up behind his head, winds up and throws it (the frame with the "throw"
+ * cue: the pie leaves his glove there, and the board's flying pie takes over), then laughs.
+ */
+const pieThrow: Anim = {
+  loop: false,
+  frames: [
+    f(90, { squeeze: 2, crouch: 1 }),
+    withPie(110, { right: "up", mood: "grin" }, 34, 2),
+    withPie(110, { right: "back", mood: "laugh", squeeze: 1 }, 38, 0, { cue: "squeak" }),
+    withPie(110, { right: "back", mood: "laugh", squeeze: 3, crouch: 2 }, 38, 3),
+    withPie(80, { right: "point", air: 3, crouch: -2 }, 40, 19, { cue: "throw" }),
+    f(80, { right: "point", air: 5 }, { specks: whoosh }),
+    f(90, { right: "point", air: 4, mood: "laugh" }),
+    ...Array.from({ length: 6 }, (_, i) => f(80, { mood: "laugh", headDy: -1, dx: i % 2 ? 1 : -1, air: [0, 2, 3, 2][i % 4], squeeze: i % 4 === 0 ? 2 : 0 }, i === 0 ? { cue: "laugh" } : {})),
+    f(140, { mood: "grin" }),
+  ],
+};
+
+/** A shadow on the ground, growing as he drops onto it from above. */
+const dropShadow = (r: number): Speck[] => {
+  const out: Speck[] = [];
+  for (let x = -r * 2; x <= r * 2; x++) for (const y of [-1, 0]) if ((x / (r * 2)) ** 2 + (y / 1.5) ** 2 <= 1) out.push([OX + 24 + x, OY + GROUND - 1 + y, "z"]);
+  return out;
+};
+/** A ring of dust where he lands. */
+const dust = (r: number): Speck[] =>
+  Array.from({ length: 10 }, (_, a): Speck[] => {
+    const x = OX + 24 + Math.round(Math.cos((a / 10) * Math.PI * 2) * r * 1.8);
+    const y = OY + GROUND - 3 + Math.round(Math.sin((a / 10) * Math.PI * 2) * r * 0.5);
+    return [[x, y, a % 2 ? "W" : "X"]];
+  }).flat();
+
+/**
+ * His ultimate, the funhouse, played on the board where he lands: his shadow grows, he drops in from above, lands
+ * with a boing, springs up into a spin (the frame with the "flip" cue: the board flips there) and lands laughing,
+ * pointing at the crowd's side. The last frame holds.
+ */
+const funhouse: Anim = {
+  loop: false,
+  frames: [
+    { ms: 100, layers: [], specks: dropShadow(2) },
+    { ms: 100, layers: [], specks: dropShadow(4) },
+    f(80, { air: 23, kick: 2, left: "up", right: "up", mood: "laugh" }),
+    f(80, { air: 12, kick: 1 }),
+    f(90, { squeeze: 4, crouch: 4 }, { cue: "boing", shake: [0, 1], specks: dust(5) }),
+    f(90, { squeeze: 2, crouch: 2 }, { specks: dust(8) }),
+    f(80, { air: 8, crouch: -2, mood: "laugh" }),
+    f(90, { air: 16, left: "up", right: "up", mood: "laugh", flip: true }, { cue: "flip", specks: confetti(0) }),
+    f(90, { air: 20, left: "up", right: "up", mood: "laugh" }, { specks: confetti(1) }),
+    f(90, { air: 20, left: "up", right: "up", mood: "laugh", flip: true }, { specks: confetti(2) }),
+    f(90, { air: 14, left: "up", right: "up", mood: "laugh" }, { specks: confetti(3) }),
+    f(80, { air: 6 }, { specks: confetti(4) }),
+    f(90, { squeeze: 4, crouch: 3, mood: "laugh" }, { cue: "laugh", specks: dust(5) }),
+    ...bounce(90, () => ({ mood: "laugh" }), 0.6),
+    f(400, { right: "point", mood: "grin" }),
+  ],
+};
+
 export const CLOWN: Character = {
   id: "clown",
   name: "Boingo the Clown",
@@ -571,7 +639,7 @@ export const CLOWN: Character = {
   palette: CLOWN_PALETTE,
   halo: "#2a2630",
   parts: PARTS,
-  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory },
+  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, pieThrow, funhouse },
 };
 
 /** The part of him a portrait shows (hat to ruff), in frame pixels. */
@@ -593,6 +661,9 @@ export const CLOWN_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonl
   defeat: ["Waaah! My pogo!", "Show's over…", "Not… funny…"],
   victory: ["Ta-da! Honk honk!", "Boingo wins! Hee hee!", "Send in the next clowns!"],
   strike: ["Pie in your face!", "Hee hee! Gotcha!"],
+  power: ["Pie time!", "Special delivery!", "Extra cream for you!", "Splat! Hee hee!"],
+  ultimateWarn: ["Something funny's coming…", "Get ready to laugh…", "Boingo's big finale…"],
+  ultimate: ["Welcome to the funhouse!", "Topsy-turvy!", "Boingo's turn! Hee hee!"],
 };
 export const CLOWN_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
   entrance: 1,
@@ -606,4 +677,7 @@ export const CLOWN_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number
   defeat: 1,
   victory: 1,
   strike: 0.8,
+  power: 0.5,
+  ultimateWarn: 1,
+  ultimate: 1,
 };
