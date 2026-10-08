@@ -14,7 +14,7 @@ const page = await browser.newPage({ viewport: { width: 820, height: 400 }, devi
 page.on("pageerror", (e) => console.error("page:", e.message));
 await page.goto(`${url}god-king-preview.html?${rest.join("&")}`);
 // Hold the banner mid-way (just after its text lands), and let the epilogue play out.
-await page.addStyleTag({ content: ".last-stand-cut, .last-stand-cut * { animation-delay: -0.9s !important; animation-play-state: paused !important; }" });
+await page.addStyleTag({ content: ".fight-banner, .fight-banner * { animation-delay: -0.9s !important; animation-play-state: paused !important; }" });
 await page.waitForTimeout(rest.some((r) => r.startsWith("epilogue")) ? 3600 : 1500);
 await page.screenshot({ path: out, fullPage: true });
 await browser.close();

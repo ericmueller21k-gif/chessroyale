@@ -815,6 +815,20 @@ const lastStand: Anim = (() => {
   return { loop: false, frames };
 })();
 
+/** His portraits for the banners: sword raised, eyes blazing; and battle-worn (cracked, eyes dim, a few red drops). */
+const portrait: Anim = { loop: true, frames: [f(1000, { ...RAISED, flick: 1, wave: 0 }, { specks: eyeFlare(RAISED) })] };
+const portraitHurt: Anim = {
+  loop: true,
+  frames: [
+    f(1000, { arm: "hold", wings: "half", flame: "dim", cracks: 3, eyes: "dim", bob: 1, wave: 0 }, {
+      specks: [[OX + 34, OY + 12, "r"], [OX + 34, OY + 13, "R"], [OX + 25, OY + 27, "r"], [OX + 26, OY + 28, "R"], [OX + 13, OY + 24, "r"]],
+    }),
+  ],
+};
+
+const ANIMS = { idle, appear, raise, raised, point, slash, leap, lastStand, fallen, rise, portrait, portraitHurt };
+export type GodKingAnim = keyof typeof ANIMS;
+
 export const GOD_KING: Character = {
   id: "god-king",
   name: "The God King",
@@ -825,13 +839,75 @@ export const GOD_KING: Character = {
   halo: "#3b3322",
   looks: { black: GOD_KING_BLACK },
   parts: PARTS,
-  anims: { idle, appear, raise, raised, point, slash, leap, lastStand, fallen, rise },
+  anims: ANIMS,
 };
 
 /** His drawing space on the frame: one board square (60 x 60), for placing him on the board and in the dock. */
 export const GOD_KING_BOX = { x: OX, y: OY, size: SIZE } as const;
 
-/** The part of him a portrait shows (crown to chest, with his wings), in frame pixels, and from which frame. */
-export const GOD_KING_PORTRAIT = { x: OX + 6, y: OY - 2, w: 48, h: 34 } as const;
+/** The part of him a portrait shows (sword, wings, crown to chest), in frame pixels. */
+export const GOD_KING_PORTRAIT = { x: OX + 5, y: OY - 7, w: 50, h: 37 } as const;
 
-export type GodKingAnim = keyof typeof GOD_KING.anims;
+
+// ---- Which frame shows when (pure, so the screens and the tests agree).
+
+const animLength = (a: Anim) => a.frames.reduce((t, fr) => t + fr.ms, 0);
+function frameIn(a: Anim, t: number): number {
+  let acc = 0;
+  for (let i = 0; i < a.frames.length; i++) if (t < (acc += a.frames[i]!.ms)) return i;
+  return a.frames.length - 1;
+}
+
+/**
+ * The frame of his that shows at `now`: a one-shot animation plays once from `since`, then `then` loops (or its last
+ * frame holds if there's no `then`); a loop runs by the clock, so every figure of him on screen is in step.
+ */
+export function kingFrameAt(anim: GodKingAnim, now: number, since = 0, then?: GodKingAnim): { anim: GodKingAnim; frame: number } {
+  const a = GOD_KING.anims[anim]!;
+  if (!a.loop) {
+    if (now - since < animLength(a) || !then) return { anim, frame: frameIn(a, Math.max(0, now - since)) };
+    anim = then;
+  }
+  const loop = GOD_KING.anims[anim]!;
+  const total = animLength(loop);
+  return { anim, frame: frameIn(loop, ((now % total) + total) % total) };
+}
+
+/** How long one of his animations runs. */
+export const kingAnimMs = (anim: GodKingAnim) => animLength(GOD_KING.anims[anim]!);
+
+/** When his summoned moments land (ms after the summon starts): mirrors KingSummon's timeline. */
+export interface SummonTimes {
+  appearAt: number;
+  raiseAt: number;
+  /** His bolt to the piece he moves, or the strike's slashes. */
+  boltAt?: number;
+  slashAt?: readonly number[];
+}
+
+/** How long an animation runs before its cue frame (the bolt leaving, the cut landing). */
+export function cueLead(anim: GodKingAnim): number {
+  const frames = GOD_KING.anims[anim]!.frames;
+  const i = frames.findIndex((fr) => fr.cue);
+  return frames.slice(0, Math.max(0, i)).reduce((t, fr) => t + fr.ms, 0);
+}
+
+/**
+ * What he does on the board at `t` ms into his summon: appear out of the beam, raise his sword (and hold it up
+ * through the cut-in), then point it as his bolt leaves the tip, or cut once for each of the strike's slashes. The
+ * frame with the bolt or the cut (its cue) lands exactly on the effect's time.
+ */
+export function summonMoment(times: SummonTimes, t: number): { anim: GodKingAnim; at: number; then: GodKingAnim } {
+  let best: { anim: GodKingAnim; at: number; then: GodKingAnim } = { anim: "appear", at: times.appearAt, then: "idle" };
+  if (t >= times.raiseAt) best = { anim: "raise", at: times.raiseAt, then: "raised" };
+  if (times.boltAt !== undefined && t >= times.boltAt - cueLead("point")) best = { anim: "point", at: times.boltAt - cueLead("point"), then: "raised" };
+  for (const at of times.slashAt ?? []) if (t >= at - cueLead("slash")) best = { anim: "slash", at: at - cueLead("slash"), then: "raised" };
+  return best;
+}
+
+/**
+ * Where his sword's tip is when his bolt leaves it (pointing) and when he holds it up (a strike's bolts), from the
+ * top-left of his square, in squares.
+ */
+const inSquares = ([x, y]: Pt): Pt => [x / SIZE, y / SIZE];
+export const KING_TIP = { point: inSquares(swordTip("point", "flare")), raised: inSquares(swordTip("raise", "flare")) };

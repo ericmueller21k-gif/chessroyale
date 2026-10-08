@@ -3768,22 +3768,26 @@ button.history-label {
   font-size: 12px;
 }
 
-/* ---- The God King ---- */
+/* ---- The God King (GodKing.tsx; his pixel art in characters/god-king.ts) ---- */
+/* The box is his drawing space, one board square: his frame (with room for wings, sword and cape) is placed so the
+   drawing space fills the box's height, his feet at its bottom centre. Nothing outside the box takes a tap. */
 .god-king {
+  position: relative;
   display: block;
   width: 100%;
-  height: auto;
-  overflow: visible;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  height: 100%;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
 }
-.god-king .gk-sword {
-  transform-box: fill-box;
-  transform-origin: 50% 30%;
-  transition: transform 300ms cubic-bezier(0.2, 1.4, 0.4, 1);
-}
-.god-king .gk-sword.raised {
-  /* Held up at his side, point to the sky. */
-  transform: translate(30px, -52px) rotate(200deg);
+.gk-canvas {
+  position: absolute;
+  left: 50%;
+  top: calc(-100% * var(--gk-oy) / var(--gk-s));
+  height: calc(100% * var(--gk-h) / var(--gk-s));
+  width: auto;
+  translate: calc(-100% * (var(--gk-ox) + var(--gk-s) / 2) / var(--gk-w)) 0;
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 .king-summon {
   position: absolute;
@@ -3830,7 +3834,7 @@ button.history-label {
   position: absolute;
   width: 12.5%;
   height: 12.5%;
-  /* Exactly one square, like the board's pieces. */
+  /* Exactly one square, like the board's pieces; he hovers a little. */
   animation: gk-bob 1.6s ease-in-out infinite;
 }
 .ks-god.leaving {
@@ -3839,7 +3843,6 @@ button.history-label {
 @keyframes gk-bob {
   50% {
     translate: 0 -3%;
-    rotate: 1.5deg;
   }
 }
 .ks-plain {
@@ -4011,7 +4014,7 @@ button.history-label {
   transition: opacity 200ms;
 }
 .gk-unit .god-king {
-  width: 33px;
+  width: 50px;
   height: 50px;
 }
 .gk-unit-charges {
@@ -4025,42 +4028,7 @@ button.history-label {
     box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.55), 0 0 14px rgba(242, 193, 78, 0.45);
   }
 }
-/* Idle, like a unit in an RPG: he breathes, his crown bobs, his sword sways. */
-.god-king.idle {
-  transform-origin: 50% 100%;
-  animation: gk-breathe 2.4s ease-in-out infinite;
-}
-.god-king.idle .gk-crown {
-  animation: gk-crown-bob 2.4s ease-in-out infinite;
-}
-.god-king.idle .gk-sword {
-  transform-box: fill-box;
-  transform-origin: 50% 20%;
-  animation: gk-sword-sway 3.2s ease-in-out infinite;
-}
-@keyframes gk-breathe {
-  0%,
-  100% {
-    transform: scale(1, 1);
-  }
-  50% {
-    transform: scale(1.015, 1.035);
-  }
-}
-@keyframes gk-crown-bob {
-  50% {
-    transform: translateY(-1.5px);
-  }
-}
-@keyframes gk-sword-sway {
-  0%,
-  100% {
-    transform: rotate(-2.5deg);
-  }
-  50% {
-    transform: rotate(2.5deg);
-  }
-}
+/* Idle, like a unit in an RPG: his own frames breathe, ripple his cape and flicker his flame (the `idle` animation). */
 
 /* His speech bubble: a pixel text box above him, over the board's corner. */
 .gk-bubble {
@@ -4599,8 +4567,8 @@ button.history-label {
   position: absolute;
   left: 50%;
   bottom: 2px;
-  width: 34px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   transform: translateX(-50%);
   filter: drop-shadow(0 0 6px var(--ks-glow));
 }
@@ -5010,10 +4978,11 @@ button.history-label {
   box-shadow: 0 0 0 4px #fde68a, 0 0 24px rgba(253, 224, 71, 0.9);
 }
 .fight-banner.hero .fb-face .gk-portrait {
-  width: 120%;
+  width: 150%;
+  max-width: none;
   height: auto;
   image-rendering: pixelated;
-  translate: 0 8%;
+  translate: 0 6%;
 }
 .fight-banner.hero .fb-text {
   font-size: 8.4cqw;
@@ -6098,45 +6067,14 @@ button.history-label {
   width: 12.5%;
   height: 12.5%;
 }
+/* His frames (the `lastStand` animation) do the rest: each blow's flash and jolt, the cracks, the stagger, the fall. */
 .ls-god .god-king {
   display: block;
   width: 100%;
   height: 100%;
-  transform-origin: 30% 96%;
 }
 .ls-god.falling .god-king {
   filter: brightness(1.8) drop-shadow(0 0 6px #fff3c4);
-}
-/* Each blow: a red-white flash on him. */
-.ls-god .god-king.hurt {
-  filter: brightness(1.6) sepia(1) saturate(5) hue-rotate(-28deg) drop-shadow(0 0 5px #ff3b3b);
-}
-/* 6. He staggers, then collapses onto his side. */
-.ls-god.stagger .god-king {
-  animation: ls-stagger 450ms ease-in-out 1;
-}
-.ls-god.collapse .god-king {
-  animation: ls-collapse 420ms cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
-  filter: saturate(0.4);
-}
-@keyframes ls-stagger {
-  25% {
-    rotate: -9deg;
-    translate: -4% 0;
-  }
-  60% {
-    rotate: 7deg;
-    translate: 3% 0;
-  }
-}
-@keyframes ls-collapse {
-  0% {
-    rotate: 6deg;
-  }
-  100% {
-    rotate: -86deg;
-    translate: -6% 8%;
-  }
 }
 /* The piece he takes the blow for: knocked aside, then sliding back. */
 .ls-piece {
@@ -6245,22 +6183,20 @@ button.history-label {
   animation: fb-sub 2.1s ease-out both;
 }
 /* In the dock: he leaps up out of view, onto the board. */
+/* (His frames crouch, then spring up with his sword raised: the `leap` animation.) */
 .gk-unit.leaping .god-king.leap {
-  transform-origin: 50% 100%;
   animation: gk-leap 450ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
 }
 @keyframes gk-leap {
-  0% {
-    transform: translateY(0) scale(1, 1);
-  }
+  0%,
   22% {
-    transform: translateY(3px) scale(1.12, 0.8);
+    transform: translateY(0);
   }
   45% {
     opacity: 1;
   }
   100% {
-    transform: translateY(-240px) scale(0.9, 1.2);
+    transform: translateY(-240px);
     opacity: 0;
   }
 }
@@ -6270,15 +6206,18 @@ button.history-label {
   background: none;
   place-items: end center;
 }
+/* Lying, he fills the lower half of his drawing space: a box as tall as he is long, standing on the button's floor and
+   reaching up past its top (empty there). */
 .gk-unit.fallen .god-king.fallen {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  translate: -50% 0;
   width: 58px;
-  height: 36px;
+  height: 58px;
   filter: grayscale(0.85) brightness(0.92) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
   opacity: 0.85;
   animation: gk-fallen-in 500ms ease-out both;
-}
-.gk-fallen-shadow {
-  fill: rgba(0, 0, 0, 0.22);
 }
 /* The power-ups he left: a ⚡ pill above his fallen figure, the whole column its button. */
 .gk-unit.fallen.has-power {
@@ -6480,23 +6419,24 @@ button.history-label {
   height: 84px;
   margin: 6px auto 10px;
 }
+/* Room above him for his raised sword, under his words. */
 .gk-epilogue.rises {
-  height: 156px;
+  height: 184px;
 }
 .gk-epilogue .god-king.fallen {
-  width: 120px;
-  height: 75px;
+  width: 100px;
+  height: 100px;
   filter: grayscale(0.85) brightness(0.9);
   opacity: 0.85;
 }
 .gk-epilogue.up .god-king {
-  width: 60px;
-  height: 90px;
+  width: 84px;
+  height: 84px;
   animation: gk-rise 600ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 @keyframes gk-rise {
   from {
-    transform: translateY(14px) scale(0.85);
+    transform: translateY(14px);
     filter: brightness(3);
     opacity: 0.4;
   }

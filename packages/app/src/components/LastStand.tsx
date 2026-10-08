@@ -101,14 +101,9 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
   const present = t >= L.fallAt && t < L.fadeAt + L.fadeMs;
   const drop = falling ? 1 - Math.pow(clamp01((t - L.fallAt) / (L.crashAt - L.fallAt)), 2) : 0;
   const godY = to.y - drop * (to.y + 160);
-  const blowsIn = t >= L.slashAt ? Math.floor((t - L.slashAt) / L.slashEveryMs) + 1 : 0;
-  const lastBlow = Math.min(L.slashes, blowsIn) - 1;
-  const sinceBlow = lastBlow >= 0 ? t - (L.slashAt + lastBlow * L.slashEveryMs) : Infinity;
-  const hurt = sinceBlow < 70;
-  const cracks = L.crackAt.filter((c) => t >= c).length;
+  // His own frames (the dive, the crash, his guard, each blow's flash and jolt, the cracks, the stagger and the
+  // collapse) come from his `lastStand` animation, built from the same timings.
   const fade = t >= L.fadeAt ? clamp01(1 - (t - L.fadeAt) / L.fadeMs) : 1;
-  const pose = t >= L.collapseAt ? " collapse" : t >= L.staggerAt ? " stagger" : "";
-  const jolt = hurt ? (lastBlow % 2 === 0 ? -1.2 : 1.2) : 0;
   // The piece he takes the blow for: knocked a little aside as he lands, then sliding back to where it came from.
   const len = Math.hypot(from.x - to.x, from.y - to.y) || 1;
   const push = Math.min(48, len * 0.6);
@@ -171,8 +166,8 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
         </span>
       )}
       {present && (
-        <div class={`ls-god${falling ? " falling" : ""}${pose}`} style={{ left: pct(to.x - 50), top: pct(godY - 50), opacity: fade, translate: `${jolt}% 0` }}>
-          <GodKingSprite side={side} cracks={cracks} class={hurt ? "hurt" : ""} />
+        <div class={`ls-god${falling ? " falling" : ""}`} style={{ left: pct(to.x - 50), top: pct(godY - 50), opacity: fade }}>
+          <GodKingSprite side={side} anim="lastStand" since={startAt + L.fallAt} />
         </div>
       )}
       {Array.from({ length: L.slashes }, (_, i) => {
@@ -240,7 +235,7 @@ export function GodKingEpilogue({ side, rises }: { side: "w" | "b"; rises: boole
   return (
     <div class={`gk-epilogue${rises ? " rises" : " down"}${up ? " up" : ""}`} aria-label={rises ? `The God King rises: ${words}` : "The God King stays down"}>
       {rises && t >= 600 && <span class="gk-epilogue-beam" aria-hidden="true" />}
-      {up ? <GodKingSprite side={side} class="idle" /> : <GodKingFallen side={side} />}
+      {up ? <GodKingSprite side={side} anim="rise" since={start + 1500} then="raised" /> : <GodKingFallen side={side} />}
       {shown > 0 && (
         <span class="gk-bubble gk-epilogue-bubble" role="status">
           <span aria-hidden="true">{words.slice(0, shown)}</span>

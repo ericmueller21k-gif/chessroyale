@@ -2,14 +2,15 @@ import { render } from "preact";
 import "chessground/assets/chessground.base.css";
 import "chessground/assets/chessground.cburnett.css";
 import "../styles.css";
-import { GodKingFallen, GodKingPortrait, GodKingSprite } from "../components/GodKing.tsx";
+import { FightBanner } from "../components/FightBanner.tsx";
+import { GodKingFallen, GodKingPortrait, GodKingSprite, KingCutIn } from "../components/GodKing.tsx";
 import { GodKingEpilogue, LastStandCutIn } from "../components/LastStand.tsx";
 import { KING_LINES } from "../godKing.ts";
 
 /**
  * Dev only: the God King's art, white and black, on a light and a dark ground (/god-king-preview.html on
- * `npm run dev`): standing, his armour cracking (1 to 3), fallen, his portraits (as usual and battle-worn), the
- * Last Stand's banner (`?banner=1` holds it mid-way), and the result screen's epilogue (`?epilogue=rise|down`).
+ * `npm run dev`): standing, sword raised, mid-Last Stand (cracking under the blows), fallen, his portraits (as usual and battle-worn), the
+ * Last Stand's banner, his cut-in and the QUEEN SLAIN! banner (`?banner=1` holds them mid-way), and the result screen's epilogue (`?epilogue=rise|down`).
  */
 const q = new URLSearchParams(location.search);
 const Cell = ({ label, children, w = 72 }: { label: string; children: preact.ComponentChildren; w?: number }) => (
@@ -21,10 +22,10 @@ const Cell = ({ label, children, w = 72 }: { label: string; children: preact.Com
 function Row({ side, dark }: { side: "w" | "b"; dark: boolean }) {
   return (
     <div style={`display:flex;gap:14px;align-items:end;flex-wrap:wrap;padding:12px;background:${dark ? "#16181d" : "#f3f1ea"};color:${dark ? "#eee" : "#222"}`}>
-      {[0, 1, 2, 3].map((c) => (
-        <Cell key={c} label={c ? `cracks ${c}` : side === "w" ? "White" : "Black"}>
-          <div style="width:56px;height:84px">
-            <GodKingSprite side={side} cracks={c} />
+      {(["idle", "raised", "lastStand"] as const).map((anim) => (
+        <Cell key={anim} label={anim === "idle" ? (side === "w" ? "White" : "Black") : anim} w={84}>
+          <div style="width:56px;height:56px">
+            <GodKingSprite side={side} anim={anim} since={Date.now() - (anim === "lastStand" ? 5200 : 0)} />
           </div>
         </Cell>
       ))}
@@ -60,6 +61,19 @@ function Banner({ side }: { side: "w" | "b" }) {
     </div>
   );
 }
+function CutIns({ side }: { side: "w" | "b" }) {
+  const box = "position:relative;width:min(390px,100vw);aspect-ratio:1;background:#b58863";
+  return (
+    <>
+      <div class="board-wrap" style={box}>
+        <KingCutIn mode="strike" side={side} bossIcon="🤡" />
+      </div>
+      <div class="board-wrap" style={box}>
+        <FightBanner tone="hero" face={<GodKingPortrait side={side} />} text="QUEEN SLAIN!" sub="You take the boss's queen" />
+      </div>
+    </>
+  );
+}
 const epilogue = q.get("epilogue");
 render(
   <div>
@@ -68,6 +82,8 @@ render(
       <div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px;background:#222">
         <Banner side="w" />
         <Banner side="b" />
+        <CutIns side="w" />
+        <CutIns side="b" />
       </div>
     )}
     {epilogue && (
