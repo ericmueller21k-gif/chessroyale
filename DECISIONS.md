@@ -2433,6 +2433,22 @@ container (4 cores) can drive about 5,000-6,000 simulated players; 10,000 needs 
 Worker requests ≈ $20 a day at that polling; D1 well inside the plan. Real traffic peaks a few hours a day, so a
 fraction of that. Set the billing alerts in DEPLOY.md first.
 
+**Staging results (Oct 8, 2026)** (`reports/load/staging-*.md`; staging torn down afterwards). **1,000 players**
+(60 s ramp, 5 min each), on a warm database: all 1,000 played, no errors and no dropped sockets. PLAY p50 71 ms /
+p95 ~0.5 s; heartbeat p50 37 ms; lobby moves (pick round trip) p50 228 ms / p90 734 ms; D1 0.3 writes/s. The
+strain was guest sign-in: `/api/me` p50 15.7 s / p90 19.9 s, which also made PLAY-to-lobby 12 s p50; `/api/live`
+p50 1.3 s. The first 1,000 run, on a brand-new database (`staging-1000-cold-db.md`), lost 596 players: every new
+request ran the whole schema migration (644 CREATE statements) into the one database and `/api/me` timed out.
+**5,000 players** (120 s ramp): only 1,177 got in. 3,823 failed at `/api/me` with 500s (plus 338 `/api/live` and
+370 heartbeat 500s). The players who got in played normally: PLAY p50 58 ms / p99 447 ms, moves p50 63 ms, chat
+48 ms. D1 2.1 writes/s. **The choke point is D1 on the sign-in path**, made worse by a feedback loop:
+`ensureSchema`'s `meta` read is `.catch(() => null)`, so a busy or timed-out D1 looks like "no schema" and the
+request runs the ~35-statement migration (383 CREATEs on a warm database at 5,000). Proposed fixes, for `ops`:
+(1) in `ensureSchema`, only migrate when `meta` is really missing (rethrow other errors) and share one in-flight
+promise per isolate; (2) make guest creation one `db.batch` (insert user, insert session, read profile) instead of
+~10 sequential round trips; (3) cache `/api/live` across isolates (KV or the LIVE Durable Object) rather than per
+isolate; (4) re-run 5,000 on staging, then 10,000 from two machines.
+
 ## Fair play (Oct 8, 2026)
 
 Eric: catch players copying an engine (a second screen or phone running Stockfish) with a high success rate, aggressive
