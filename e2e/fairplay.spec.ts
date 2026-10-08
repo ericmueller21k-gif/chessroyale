@@ -35,7 +35,8 @@ test("a banned account: PLAY, a new lobby and an invite show the ban notice with
   await expect(send).toBeDisabled();
   await notice.getByRole("textbox").fill("I play at a chess club and I didn't use an engine.");
   await send.click();
-  await expect(notice).toContainText("A person will read your appeal");
+  await expect(notice).toContainText("Your appeal is with us. A person will read it");
+  await expect(notice.getByRole("textbox")).toHaveCount(0);
   // Fits a phone: nothing wider than the screen, the button big enough to tap.
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
   await notice.getByRole("button", { name: "Close" }).click();

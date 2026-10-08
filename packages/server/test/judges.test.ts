@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, JUDGES, modeSettings, mulberry32, type JudgeConfig, type Settings } from "@chessroyale/core";
-import { judgedBoard, legalMoves, runJudgeJob, sanLineToUci, type EngineLike, type JudgeJob, type JudgeReport, type MoveScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { deepCheck, judgedBoard, legalMoves, runJudgeJob, runQuickJob, sanLineToUci, type EngineLike, type JudgeJob, type JudgeReport, type MoveScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type ServerScoreRequest } from "../src/lobby.ts";
 import { assignJudges, cutBubble, drawJudges, seedFor } from "../src/judges.ts";
 
@@ -83,14 +83,28 @@ function setup(opts: { judges?: Partial<JudgeConfig>; server?: boolean; settings
     }
     return jobs.length;
   };
+  /**
+   * A device answers its jobs as today's app does: the quick part, then (if the job carries one) its re-check.
+   * `deepLie` changes the re-check; `noDeep` never sends it.
+   */
+  const answerSplit = async (id: string, opts: { deepLie?: (d: MoveScore[]) => MoveScore[]; noDeep?: boolean } = {}) => {
+    const jobs = (take(id, "judge") as Extract<Msg, { t: "judge" }>[]).flatMap((m) => m.jobs.map((job) => ({ job, key: m.key })));
+    for (const { job, key } of jobs) {
+      const quick = await runQuickJob(honest, job);
+      core.message(id, { t: "judged", key, id: job.id, report: quick });
+      const deep = opts.noDeep ? null : await deepCheck(honest, job, quick);
+      if (deep) core.message(id, { t: "judgedDeep", key, id: job.id, deep: opts.deepLie ? opts.deepLie(deep) : deep });
+    }
+    return jobs.map((j) => j.job);
+  };
   /** The engine server answers what it was asked (null: it's down). */
   const serve = (down = false) => {
     for (const req of serverAsks.splice(0)) core.serverScored(req.id, down ? null : deep(req.fen, req.moves));
   };
   /** n people join (each reporting its speed unless `old`), the match starts, the first round begins. */
-  const begin = (n: number, nps: number[] = [], old: number[] = []) => {
+  const begin = (n: number, nps: number[] = [], old: number[] = [], computers: number[] = [0]) => {
     for (let i = 0; i < n; i++) {
-      core.connect(undefined, `P${i + 1}`, i === 0 ? "computer" : "phone");
+      core.connect(undefined, `P${i + 1}`, computers.includes(i) ? "computer" : "phone");
       if (!old.includes(i)) core.message(`p${i + 1}`, { t: "speed", nps: nps[i] ?? 400_000 });
     }
     core.message("p1", { t: "start" });
@@ -107,7 +121,7 @@ function setup(opts: { judges?: Partial<JudgeConfig>; server?: boolean; settings
     }
   };
   const judgesOf = () => Object.values(core.record.judges?.tasks ?? {})[0]?.judges ?? [];
-  return { core, take, last, advance, answer, serve, begin, pickAll, judgesOf, serverAsks, inbox, get now() { return now; } };
+  return { core, take, last, advance, answer, answerSplit, serve, begin, pickAll, judgesOf, serverAsks, inbox, get now() { return now; } };
 }
 
 describe("many judges: the lobby", () => {
@@ -158,7 +172,7 @@ describe("many judges: the lobby", () => {
     expect(L.serverAsks).toHaveLength(0);
   });
 
-  it("a cheater on one of two judges never changes the result: the engine server decides, and the cheater is struck, then benched", async () => {
+  it("a cheater on one of two judges never changes the result: the server's verdict (or two of three devices, if sooner) decides, and the cheater is struck, then benched", async () => {
     const L = setup({ server: true, settings: { firstStageRounds: 12 } });
     L.begin(3, [1_000_000, 900_000, 800_000]);
     let rounds = 0;
@@ -177,8 +191,9 @@ describe("many judges: the lobby", () => {
       const judges = L.judgesOf();
       for (const id of judges) await L.answer(id, id === "p1" ? cheat(mine) : undefined);
       L.serve();
-      // Any second opinion (the third device) answers honestly.
+      // Any second opinion (the third device) answers honestly; then the server's re-check or verdict.
       for (const id of ["p1", "p2", "p3"].filter((x) => !judges.includes(x))) await L.answer(id);
+      L.serve();
       expect(L.core.record.phase).toBe("reveal");
       const rev = L.last("p2", "reveal")!;
       const p1 = rev.picks.find((p) => p.playerId === "p1")!;
@@ -370,5 +385,129 @@ describe("many judges: the lobby", () => {
   it("judgedBoard on a report from the honest stand-in holds together (sanity for the fakes above)", async () => {
     const j: JudgeJob = { id: "x", fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", picks: ["e2e4"], bots: [{ skill: 4, powerUps: 0 }], seed: 1, rules: { botCandidateMoves: 8, botRandomMoveChance: 0.02, botPowerUpLoss: 15 } };
     expect(judgedBoard(j, await runJudgeJob(honest, j))).toBeTruthy();
+  });
+});
+
+describe("deep checks on players' computers (the switch on)", () => {
+  const on = { deepOnDevices: true };
+  /** A deep search that never matches a phone's exactly (as two different devices' re-checks would if one lied). */
+  const off = (d: MoveScore[]) => d.map((m, i) => (i === d.length - 1 ? { ...m, expected: Math.max(0, m.expected - 0.2) } : m));
+
+  it("two capable computers judge and re-check the close calls themselves: no engine server at all", async () => {
+    const L = setup({ server: true, judges: on });
+    L.begin(4, [1_000_000, 900_000, 300_000, 300_000], [], [0, 1]);
+    L.pickAll(4, { p3: legalMoves(L.last("p3", "round")!.board!.fen)[5]!, p4: legalMoves(L.last("p4", "round")!.board!.fen)[9]! });
+    expect([...L.judgesOf()].sort()).toEqual(["p1", "p2"]);
+    const job = L.last("p1", "judge")!.jobs[0]!;
+    // The depth both fit in 3 s with headroom: the slower does 900k x 0.85 x 3 = 2.3M, so the server's 2M.
+    expect(job.recheck?.recheckNodes).toBe(2_000_000);
+    for (const id of ["p1", "p2"]) await L.answerSplit(id);
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.serverAsks).toHaveLength(0);
+    const st = L.core.record.judges!.stats;
+    expect(st.deepJobs).toBe(1);
+    expect(st.serverRecheck).toBe(0);
+    if (st.deepAgreed) expect(L.last("p3", "reveal")!.judged).toBe(true);
+  });
+
+  it("the node count follows the slower computer: 500k nodes/s fits 1.2M in the window", () => {
+    const L = setup({ server: true, judges: on });
+    L.begin(3, [500_000, 2_000_000, 300_000], [], [0, 1]);
+    L.pickAll(3);
+    expect(L.last("p1", "judge")!.jobs[0]!.recheck?.recheckNodes).toBe(1_200_000);
+  });
+
+  it("phones never re-check, however fast; with one capable computer the engine server re-checks as before", async () => {
+    const L = setup({ server: true, judges: on });
+    L.begin(3, [1_000_000, 3_000_000, 3_000_000], [], [0]);
+    L.pickAll(3);
+    const job = L.last(L.judgesOf()[0]!, "judge")!.jobs[0]!;
+    expect(job.recheck).toBeUndefined();
+    expect(L.core.record.judges!.stats.deepJobs).toBe(0);
+  });
+
+  it("re-checks that disagree: the engine server re-checks, and the device further from it is struck", async () => {
+    const L = setup({ server: true, judges: on });
+    L.begin(4, [1_000_000, 1_000_000, 300_000, 300_000], [], [0, 1]);
+    // Picks that are close calls, so there's something to re-check.
+    const fen = L.last("p1", "round")!.board!.fen;
+    const ranked = legalMoves(fen).sort((a, b) => truth(fen, b) - truth(fen, a));
+    L.pickAll(4, { p1: ranked[3]!, p2: ranked[4]!, p3: ranked[5]!, p4: ranked[6]! });
+    await L.answerSplit("p1");
+    await L.answerSplit("p2", { deepLie: off });
+    const st = L.core.record.judges!.stats;
+    if (!st.deepJobs || L.core.record.phase === "reveal") return; // (nothing to re-check in this position)
+    expect(st.deepDisagreed).toBe(1);
+    expect(L.serverAsks.map((r) => r.id)).toEqual([expect.stringMatching(/^recheck:/)]);
+    L.serve();
+    expect(L.core.record.phase).toBe("reveal");
+  });
+
+  it("re-checks that don't come in time: the engine server re-checks", async () => {
+    const L = setup({ server: true, judges: on });
+    L.begin(4, [1_000_000, 1_000_000, 300_000, 300_000], [], [0, 1]);
+    const fen = L.last("p1", "round")!.board!.fen;
+    const ranked = legalMoves(fen).sort((a, b) => truth(fen, b) - truth(fen, a));
+    L.pickAll(4, { p1: ranked[3]!, p2: ranked[4]!, p3: ranked[5]!, p4: ranked[6]! });
+    await L.answerSplit("p1");
+    await L.answerSplit("p2", { noDeep: true });
+    if (L.core.record.phase === "reveal") return; // (nothing to re-check)
+    expect(L.serverAsks).toHaveLength(0);
+    L.advance(JUDGES.deepWaitMs + 10);
+    expect(L.core.record.judges!.stats.deepLate).toBe(1);
+    expect(L.serverAsks.map((r) => r.id)).toEqual([expect.stringMatching(/^recheck:/)]);
+    L.serve();
+    expect(L.core.record.phase).toBe("reveal");
+  });
+
+  it("a knocked-out player's device keeps judging (and re-checking) while its page is open", async () => {
+    const L = setup({ server: true, judges: on, settings: { firstStageRounds: 20 } });
+    L.begin(3, [1_000_000, 1_000_000, 1_000_000], [], [0, 1, 2]);
+    // p3 is out of the match (its page stays open, watching).
+    const runner = (L.core as unknown as { runner: { state: { players: { id: string; alive: boolean }[] } } }).runner;
+    runner.state.players.find((p) => p.id === "p3")!.alive = false;
+    let judged = false;
+    let lastKey = "";
+    for (let round = 0; round < 12 && !judged; round++) {
+      for (let i = 0; i < 120 && !(L.core.record.phase === "play" && L.core.record.round?.key !== lastKey); i++) L.advance(250);
+      lastKey = L.core.record.round!.key;
+      L.pickAll(3);
+      if (round > 0) {
+        expect(L.last("p3", "round")?.board ?? null).toBeNull();
+        judged = L.judgesOf().includes("p3");
+      }
+      for (const id of L.judgesOf()) await L.answerSplit(id);
+      L.serve();
+    }
+    expect(judged).toBe(true);
+  });
+
+  it("a disagreement with three capable devices: two of three settle score and strike before the server's verdict comes (asked at once, so never slower)", async () => {
+    const L = setup({ server: true });
+    L.begin(4, [1_000_000, 1_000_000, 1_000_000, 300_000], [], [0, 1, 2]);
+    L.pickAll(4);
+    const [liar, honestOne] = L.judgesOf() as [string, string];
+    const job = L.last(liar, "judge")!.jobs[0]!;
+    const worst = [...job.picks].sort((x, y) => truth(job.fen, x) - truth(job.fen, y))[0]!;
+    await L.answer(liar, cheat(worst));
+    await L.answer(honestOne);
+    expect(L.core.record.phase).toBe("scoring");
+    const third = ["p1", "p2", "p3"].find((x) => x !== liar && x !== honestOne)!;
+    await L.answerSplit(third);
+    L.serve();
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats).toMatchObject({ majority: 1, serverVerdict: 1 });
+    expect(L.core.record.judges!.devices[liar]!.strikes).toBe(1);
+    expect(L.last(third, "reveal")!.expectedAfter[worst]).toBeLessThan(truth(job.fen, worst) + 0.02);
+  });
+
+  it("two humans left, both judging their own picks: an honest pair agrees", async () => {
+    const L = setup({ server: false });
+    L.begin(2, [1_000_000, 300_000]);
+    L.pickAll(2);
+    expect([...L.judgesOf()].sort()).toEqual(["p1", "p2"]);
+    for (const id of ["p1", "p2"]) await L.answerSplit(id);
+    expect(L.core.record.phase).toBe("reveal");
+    expect(L.core.record.judges!.stats.agreed).toBe(1);
   });
 });
