@@ -4,7 +4,7 @@ import { createGuest, createSession, ensureSchema, publicProfile, recordResult, 
 import { appeal, banCheck, caseOf, decide, decideAppeal, eligibleForRanked, fairStatus, normalizeEmail, recordFairPlay, setCase, type CaseMailer } from "../src/fairplay.ts";
 import { caseEmail, caseMailer, fairplayFrom } from "../src/fairplay-mail.ts";
 import { handleAdmin, isAdmin } from "../src/admin.ts";
-import { handleAccountApi } from "../src/api.ts";
+import { forgetSecrets, handleAccountApi, withSecrets } from "../src/api.ts";
 import { memoryDb } from "./memory-db.ts";
 
 const DAY = 86_400_000;
@@ -250,6 +250,27 @@ describe("the review page's deep re-check button", () => {
     expect(res.status).toBe(303);
     expect(decodeURIComponent(res.headers.get("location")!)).toContain("Deep re-check: 12 searches, 1 matches done.");
     expect(searched).toHaveLength(12);
+  });
+});
+
+describe("admin settings kept in the Secrets Store", () => {
+  it("ADMIN_EMAILS and FAIRPLAY_REVIEW_TOKEN work as Secrets Store bindings ({ get() }) as well as plain values", async () => {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql, d1);
+    const eric = await player(sql, "Eric", "eric@example.com");
+    const cookie = `hc_session=${await createSession(sql, eric.id, Date.now())}`;
+    const raw = { DB: d1, ADMIN_EMAILS: { get: async () => "eric@example.com" }, FAIRPLAY_REVIEW_TOKEN: { get: async () => TOKEN } };
+    const page = (env: object) => handleAdmin(new Request("https://hunchess.test/admin/fairplay", { headers: { cookie } }), env as never);
+    const api = (env: object) => handleAdmin(new Request("https://hunchess.test/api/admin/fairplay/cases", { headers: { authorization: `Bearer ${TOKEN}` } }), env as never);
+    // Unread bindings never crash anything; they just don't count.
+    expect((await page(raw))!.status).toBe(404);
+    expect((await api(raw))!.status).toBe(404);
+    // Read the way the Worker reads every request's environment: both work.
+    forgetSecrets();
+    const env = await withSecrets(raw);
+    forgetSecrets();
+    expect((await page(env))!.status).toBe(200);
+    expect((await api(env))!.status).toBe(200);
   });
 });
 
