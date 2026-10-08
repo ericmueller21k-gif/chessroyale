@@ -3,7 +3,7 @@
 // leap, the crash, the banner, the blows, the fall, lying in the dock). Saves a full screenshot at each stage and a
 // strip of frames (as fast as the browser gives them) over the board and the dock, and prints a timeline of his
 // animations.
-//   npm run frames:god-king -- <out-dir> [w|b] [phone|desktop|both] [summon|laststand|all]
+//   npm run frames:god-king -- <out-dir> [w|b] [phone|desktop|both] [summon|laststand|all] [light|dark]
 // Read the frames before calling an animation done (.claude/LESSONS.md: watch it frame by frame).
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -11,7 +11,7 @@ import { chromium, devices } from "@playwright/test";
 import { createServer } from "vite";
 import { Chess } from "chess.js";
 
-const [out = "god-king-frames", side = "w", which = "both", what = "all"] = process.argv.slice(2);
+const [out = "god-king-frames", side = "w", which = "both", what = "all", scheme = "dark"] = process.argv.slice(2);
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
 process.chdir("packages/app");
@@ -21,7 +21,7 @@ const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();
 
 async function open(context, extra = "") {
-  const p = await browser.newPage(context);
+  const p = await browser.newPage({ ...context, colorScheme: scheme });
   p.on("pageerror", (e) => console.log("pageerror", e.message));
   await p.goto(`${url}?debug&clock=60&nolanding&boss=1600${side === "b" ? "&side=b" : ""}${extra}`);
   await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();

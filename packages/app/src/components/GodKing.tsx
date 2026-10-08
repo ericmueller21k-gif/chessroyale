@@ -133,13 +133,14 @@ const EDGE = Array.from({ length: 12 }, (_, i) => {
 
 /**
  * Summoning the God King on your king's square. A dozen thin bolts converge on
- * the square, a beam of light, a flash, and the God King stands there in your
- * king's place (the real king is hidden while he's on the board). He raises his
- * sword, then either a thin bolt strikes the piece he moves ("move", which then
- * plays at `moveAt`), or he slashes the boss's king three times ("strike", each
- * with its own sound and a yellow "−N" adding up to `hp`). At `exitAt` holy
- * light takes him away on whatever square he's on, and the plain king drops
- * back there. All times are Date.now() values.
+ * the square, a beam of light, a flash, and the God King lands there in your
+ * king's place, wings spread (the real king is hidden while he's on the board).
+ * He raises his flaming sword, then either points it and a thin bolt leaves its
+ * tip for the piece he moves ("move", which then plays at `moveAt`), or he cuts
+ * once for each of three slashes on the boss's king, a bolt from his raised
+ * blade before each ("strike", each with its own sound and a yellow "−N" adding
+ * up to `hp`). At `exitAt` holy light takes him away on whatever square he's
+ * on, and the plain king drops back there. All times are Date.now() values.
  */
 export function KingSummon({
   side,
@@ -306,7 +307,7 @@ export function GodKingPortrait({ side, hurt = false }: { side: "w" | "b"; hurt?
     const frame = GOD_KING.anims[hurt ? "portraitHurt" : "portrait"]!.frames[0]!;
     cv.current?.getContext("2d")?.putImageData(frameImage(side, frame), -p.x, -p.y, p.x, p.y, p.w, p.h);
   }, [side, hurt]);
-  return <canvas ref={cv} class="gk-portrait" width={p.w} height={p.h} role="img" aria-label={hurt ? "The God King, battle-worn" : "The God King"} />;
+  return <canvas ref={cv} class="gk-portrait" width={p.w} height={p.h} aria-hidden="true" />;
 }
 
 const PIECE_NAMES = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" } as const;

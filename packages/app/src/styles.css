@@ -6410,6 +6410,40 @@ button.history-label {
     width: 150px;
   }
 }
+/* A computer: the dock has room, so he stands at twice his size (his pixels doubled, like the boss across the board),
+   the status box keeping its height beside him. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game .boss-dock {
+    grid-template-columns: minmax(0, 1fr) 120px;
+    align-items: start;
+  }
+  .screen.game .gk-unit {
+    height: 134px;
+    grid-template-rows: 1fr 14px;
+  }
+  .screen.game .gk-unit-btn {
+    width: 120px;
+    height: 120px;
+  }
+  .screen.game .gk-unit .god-king {
+    width: 120px;
+    height: 120px;
+  }
+  .screen.game .gk-unit-charges {
+    font-size: 13px;
+    line-height: 14px;
+  }
+  .screen.game .gk-unit.fallen.has-power {
+    grid-template-rows: 28px 1fr;
+  }
+  .screen.game .gk-unit.fallen.has-power .gk-unit-btn {
+    height: 106px;
+  }
+  .screen.game .gk-unit.fallen .god-king.fallen {
+    width: 116px;
+    height: 116px;
+  }
+}
 /* The result screen: he rises again in holy light if the crowd won, or stays down. */
 .gk-epilogue {
   position: relative;
