@@ -8200,7 +8200,7 @@ button.fd-seat {
   .fd-root.framed .fd-home.queueing .fd-wait-side > .fd-hero {
     display: none;
   }
-  .fd-root.framed .fd-home.queueing .fd-wait-side:not(:has(.fd-wait-chat)) {
+  .fd-root.framed .fd-home.queueing .fd-wait-side:not(:has(.fd-wait-chat:not(:empty))) {
     display: none;
   }
   /* The lobby: the queue screen's parts in a grid (the seats on the panel; your seat and Cancel side by side). */
@@ -8328,7 +8328,7 @@ button.fd-seat {
     align-items: start;
   }
   .fd-root.framed .fd-home.queueing .fd-wait-side,
-  .fd-root.framed .fd-home.queueing .fd-wait-side:not(:has(.fd-wait-chat)) {
+  .fd-root.framed .fd-home.queueing .fd-wait-side:not(:has(.fd-wait-chat:not(:empty))) {
     order: 0;
     display: flex;
     flex-direction: column;
@@ -8376,12 +8376,15 @@ button.fd-seat {
     grid-template-columns: 300px minmax(0, 1fr);
   }
 }
-/* The lobby's chat, under your card (it fills the rest of the column). */
+/* The lobby's chat, under your card (it fills the rest of the column; under the lobby below 1280 px). */
 .fd-wait-chat {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
+}
+.fd-wait-chat:empty {
+  display: none;
 }
 
 /* A profile on a wide computer: two columns (who they are and what they wear; their numbers). */
