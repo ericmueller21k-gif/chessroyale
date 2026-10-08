@@ -18,7 +18,9 @@
     "bindings": [
       { "name": "LOBBIES", "class_name": "Lobby" },
       { "name": "MATCHMAKER", "class_name": "Matchmaker" },
-      { "name": "ENGINE", "class_name": "EngineServer" }
+      { "name": "ENGINE", "class_name": "EngineServer" },
+      // The live line and presence in memory (live-hub.ts): one object, so D1 isn't written on every request.
+      { "name": "LIVE", "class_name": "LiveHub" }
     ]
   },
   // The engine server: one vCPU (Stockfish is single-threaded here), asleep after 3 idle minutes.
@@ -26,7 +28,8 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Lobby"] },
     { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] },
-    { "tag": "v3", "new_sqlite_classes": ["EngineServer"] }
+    { "tag": "v3", "new_sqlite_classes": ["EngineServer"] },
+    { "tag": "v4", "new_sqlite_classes": ["LiveHub"] }
   ],
   // Accounts, profiles and match results (tables are created by the Worker on first use: see accounts.ts).
   "d1_databases": [{ "binding": "DB", "database_name": "hunchess", "database_id": "103097fd-f61b-4296-8b89-bd967ac33142" }],
@@ -42,5 +45,25 @@
   ],
   "observability": { "enabled": true },
   // Keep variables set in the dashboard when a deploy runs (otherwise each deploy would wipe plain-text ones).
-  "keep_vars": true
+  "keep_vars": true,
+  "env": {
+    // Staging, for load tests only (never load-test production): its own Worker (chessroyale-staging on workers.dev),
+    // Durable Objects and D1 database; no engine server, no sign-in (guests play online), the per-address rate
+    // limit off for a test from one machine. scripts/load/staging.sh creates it, deploys, and tears it down
+    // (DEPLOY.md, "Load testing"). The database id is filled in by that script.
+    "staging": {
+      "routes": [],
+      "workers_dev": true,
+      "durable_objects": {
+        "bindings": [
+          { "name": "LOBBIES", "class_name": "Lobby" },
+          { "name": "MATCHMAKER", "class_name": "Matchmaker" },
+          { "name": "LIVE", "class_name": "LiveHub" }
+        ]
+      },
+      "d1_databases": [{ "binding": "DB", "database_name": "hunchess-staging", "database_id": "STAGING_D1_ID" }],
+      "vars": { "ENGINE_OFF": "1", "LOAD_TEST": "1" },
+      "observability": { "enabled": true }
+    }
+  }
 }

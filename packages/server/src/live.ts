@@ -150,3 +150,126 @@ export async function pruneLive(sql: Sql, now: number): Promise<void> {
   await sql.run("DELETE FROM live_lobbies WHERE updated_at < ?", now - 60 * 60_000);
   await sql.run("DELETE FROM queue_waits WHERE at < ?", now - 8 * 86_400_000);
 }
+
+/**
+ * The live line kept in memory (the LiveHub Durable Object holds one; see live-hub.ts), so presence and lobby reports
+ * aren't D1 writes. Same numbers as liveCounts() above:
+ *   - online: accounts seen within FRONT_DOOR.onlineWindowMs (each Worker instance passes on who it has seen);
+ *   - matches, the queue and the playing-now list: what lobbies last reported, dropped after FRONT_DOOR.matchStaleMs.
+ * `users.last_seen` (profiles) is still written to D1, at most once per CAPACITY.presence.lastSeenWriteMs per account,
+ * in batches (lastSeenDue).
+ */
+export class LiveBoard {
+  private seen = new Map<string, number>();
+  private written = new Map<string, number>();
+  private lobbies = new Map<string, LobbySummary & { updatedAt: number }>();
+
+  markSeen(ids: readonly string[], at: number) {
+    for (const id of ids) if ((this.seen.get(id) ?? 0) < at) this.seen.set(id, at);
+  }
+
+  /** Seeds who was online from D1 (after the hub restarts): they were seen then, and that's already written. */
+  restoreSeen(rows: readonly { id: string; last_seen: number }[]) {
+    for (const r of rows) {
+      this.markSeen([r.id], r.last_seen);
+      this.written.set(r.id, r.last_seen);
+    }
+  }
+
+  /** A lobby's report; false if it changed nothing that's kept (results and private lobbies still waiting are dropped). */
+  report(s: LobbySummary, now: number): "kept" | "dropped" {
+    if (s.phase === "over" || (s.phase === "waiting" && s.kind === "private")) {
+      this.lobbies.delete(s.code);
+      return "dropped";
+    }
+    this.lobbies.set(s.code, { ...s, updatedAt: now });
+    return "kept";
+  }
+
+  forget(code: string) {
+    this.lobbies.delete(code);
+  }
+
+  lobby(code: string) {
+    return this.lobbies.get(code);
+  }
+
+  isOnline(id: string, now: number): boolean {
+    return now - (this.seen.get(id) ?? -Infinity) < FRONT_DOOR.onlineWindowMs;
+  }
+
+  lastSeen(id: string): number | null {
+    return this.seen.get(id) ?? null;
+  }
+
+  /** People in lobbies right now (queues and running matches): what the overload limit counts. */
+  players(now: number): number {
+    let n = 0;
+    for (const l of this.lobbies.values()) if (now - l.updatedAt < FRONT_DOOR.matchStaleMs && l.phase !== "over") n += l.humans;
+    return n;
+  }
+
+  counts(now: number, waits: LiveCounts["waits"]): LiveCounts {
+    let online = 0;
+    for (const at of this.seen.values()) if (now - at < FRONT_DOOR.onlineWindowMs) online++;
+    const fresh = now - FRONT_DOOR.matchStaleMs;
+    const playing = [...this.lobbies.values()]
+      .filter((l) => l.phase === "playing" && l.humans > 0 && l.updatedAt > fresh)
+      .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+    let queue = 0;
+    for (const l of this.lobbies.values()) if (l.phase === "waiting" && l.kind === "queue" && l.updatedAt > fresh) queue += l.humans;
+    return {
+      online,
+      matches: playing.length,
+      queue,
+      playing: playing.slice(0, 8).map((l) => ({ mode: l.mode, alive: l.alive, total: l.total, bossElo: l.bossElo, startedAt: l.startedAt })),
+      waits,
+    };
+  }
+
+  /** Accounts whose `last_seen` should be written now (seen since it was last written, at most once per `everyMs`). */
+  lastSeenDue(now: number, everyMs: number): { id: string; at: number }[] {
+    const due: { id: string; at: number }[] = [];
+    for (const [id, at] of this.seen) {
+      const w = this.written.get(id);
+      if (w === undefined || (at > w && now - w >= everyMs)) {
+        due.push({ id, at });
+        this.written.set(id, at);
+      }
+    }
+    return due;
+  }
+
+  /** Forgets presence long gone (already written) and lobbies silent for an hour. */
+  prune(now: number): string[] {
+    const gone: string[] = [];
+    for (const [id, at] of this.seen) {
+      if (now - at > 10 * 60_000 && (this.written.get(id) ?? 0) >= at) {
+        this.seen.delete(id);
+        this.written.delete(id);
+      }
+    }
+    for (const [code, l] of this.lobbies) {
+      if (now - l.updatedAt > 60 * 60_000) {
+        this.lobbies.delete(code);
+        gone.push(code);
+      }
+    }
+    return gone;
+  }
+
+  get size() {
+    return { seen: this.seen.size, lobbies: this.lobbies.size };
+  }
+}
+
+/** Writes many accounts' `last_seen` in one statement per 500 (never moving it backwards). */
+export async function writeLastSeen(sql: Sql, due: readonly { id: string; at: number }[]): Promise<void> {
+  for (let i = 0; i < due.length; i += 500) {
+    const chunk = Object.fromEntries(due.slice(i, i + 500).map((d) => [d.id, d.at]));
+    await sql.run(
+      "UPDATE users SET last_seen = MAX(COALESCE(last_seen, 0), j.value) FROM json_each(?) AS j WHERE users.id = j.key",
+      JSON.stringify(chunk),
+    );
+  }
+}

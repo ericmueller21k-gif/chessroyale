@@ -706,3 +706,60 @@ export const QUICK_CHAT = {
     "emoji-royal": 300,
   } as Readonly<Record<string, number>>,
 } as const;
+
+/**
+ * Capacity (the `ops` delegate): the matchmaker's batches and admission, overload, presence and the live line's
+ * write limits, and the API's rate limits. See DECISIONS.md, "Capacity: built".
+ */
+export const CAPACITY = {
+  queue: {
+    /**
+     * PLAY presses are placed in lobbies in batches: a batch starts as soon as the last one is done (so a lone press
+     * isn't held up), and again this often while anyone waits in line.
+     */
+    formEveryMs: 1_000,
+    /** POST /api/play waits up to this long for a seat; past it the answer is "busy, you're in line". */
+    holdMs: 2_500,
+    /** Players let into lobbies per second, per queue, with this much burst; a bigger surge waits in line. */
+    admitPerSecond: 300,
+    admitBurst: 600,
+    /** A ticket in line is dropped when its player stops asking for this long (they left). */
+    ticketTtlMs: 15_000,
+    /** A placed ticket's lobby is remembered this long, so a retried request gets the same lobby. */
+    placedKeepMs: 60_000,
+    /** A seat given to a ticket is held in its lobby this long for the player to connect. */
+    reservationMs: 20_000,
+    /** A player in line asks again this often. */
+    retryMs: 3_000,
+    /** Separate queues per region (continent), when there are players enough for it. Off: one queue per mode. */
+    byRegion: false,
+  },
+  overload: {
+    /**
+     * People in lobbies (queues and matches) past which new players wait in line ("Servers are busy, you're in
+     * line: about N s") until others finish. Players already in a lobby or a match are never affected.
+     */
+    maxPlayers: 20_000,
+  },
+  presence: {
+    /** `users.last_seen` (profiles' "last seen") is written to D1 at most this often per account. */
+    lastSeenWriteMs: 60_000,
+    /** Each Worker instance tells the live hub who it has seen at most this often. */
+    flushMs: 5_000,
+    /** A lobby tells the live hub about a change at most this often (and at least once a minute while it runs). */
+    lobbyReportMs: 2_000,
+  },
+  /**
+   * Requests per window, counted per Worker instance (a runaway client or script, not a person playing). Sized well
+   * above the app's own bursts: a match screen makes several calls each time it opens, so a phone reloading or
+   * reconnecting over and over can make a few hundred a minute.
+   */
+  rateLimits: {
+    /** Generous: a school or a mobile network puts many players behind one address. */
+    perIp: { limit: 10_000, windowMs: 60_000 },
+    /** Well above a burst of reloads; a script hammering in a loop makes hundreds a second. */
+    perUser: { limit: 1_200, windowMs: 60_000 },
+    /** PLAY and new lobbies (a player in line asks every 3 s). */
+    play: { limit: 40, windowMs: 60_000 },
+  },
+} as const;

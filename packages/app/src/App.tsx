@@ -11,7 +11,7 @@ import { SoloMatch } from "./solo.ts";
 import { FinalScreen } from "./screens/Final.tsx";
 import { HomeScreen } from "./screens/Home.tsx";
 import { LobbyScreen } from "./screens/Lobby.tsx";
-import { QueueScreen } from "./screens/Queue.tsx";
+import { QueueLine, QueueScreen } from "./screens/Queue.tsx";
 import { OpeningGrid } from "./screens/OpeningGrid.tsx";
 import { PlayScreen } from "./screens/Play.tsx";
 import { ResultsScreen } from "./screens/Results.tsx";
@@ -398,9 +398,13 @@ export function App() {
   const playNowTries = useRef(0);
   const playNowMode = useRef<{ mode: "crowd" | "raid"; type: Exclude<MatchmakingType, "solo"> }>({ mode: "crowd", type: "default" });
   const retriedFor = useRef<AnyMatch | null>(null);
-  const playNow = async (mode: "crowd" | "raid", type: Exclude<MatchmakingType, "solo"> = "default", retry = false) => {
+  /** Servers busy: in line for a seat (the queue screen says so, with about how long). */
+  const [inLine, setInLine] = useState<{ mode: "crowd" | "raid"; waitSeconds: number } | null>(null);
+  const lineRun = useRef(0);
+  const playNow = async (mode: "crowd" | "raid", type: Exclude<MatchmakingType, "solo"> = "default", retry = false, ticket?: string) => {
     playNowTries.current = retry ? playNowTries.current + 1 : 1;
     playNowMode.current = { mode, type };
+    const run = ++lineRun.current;
     unlockAudio();
     setLoading(true);
     setError(null);
@@ -411,15 +415,45 @@ export function App() {
       // (?pool=NAME: a queue of its own, for tests.)
       const pool = new URLSearchParams(location.search).get("pool");
       if (pool) q.set("pool", pool);
-      const res = await fetch(`/api/play${q.size ? `?${q}` : ""}`, { method: "POST" });
-      const body = (await res.json()) as { code?: string; message?: string };
-      if (!body.code) throw new Error(body.message ?? "Couldn't find a match.");
-      joinLobby(body.code, { queue: mode });
+      // (Already in line: from "let bots fill" when the servers were busy.)
+      if (ticket) q.set("ticket", ticket);
+      for (;;) {
+        const res = await fetch(`/api/play${q.size ? `?${q}` : ""}`, { method: "POST" });
+        const body = (await res.json()) as { code?: string; message?: string; busy?: boolean; ticket?: string; waitSeconds?: number; retryMs?: number };
+        if (run !== lineRun.current) return; // Cancelled while asking.
+        if (body.code) {
+          setInLine(null);
+          joinLobby(body.code, { queue: mode });
+          return;
+        }
+        // "Servers are busy, you're in line: about N s": wait as told, then ask again with the ticket (same place).
+        // A 429 while in line just means ask a little later.
+        if ((body.busy && body.ticket) || (res.status === 429 && inLineNow(run))) {
+          if (body.ticket) q.set("ticket", body.ticket);
+          setInLine((cur) => ({ mode, waitSeconds: body.waitSeconds ?? cur?.waitSeconds ?? 30 }));
+          setLoading(false);
+          await new Promise((r) => setTimeout(r, Math.max(1000, body.retryMs ?? 3000)));
+          if (run !== lineRun.current) return;
+          continue;
+        }
+        throw new Error(body.message ?? "Couldn't find a match.");
+      }
     } catch (e) {
+      if (run !== lineRun.current) return;
+      setInLine(null);
       setError((e as Error).message);
     } finally {
-      setLoading(false);
+      if (run === lineRun.current) setLoading(false);
     }
+  };
+  /** Whether PLAY run `run` is already waiting in line (a 429 then means "ask later", not an error). */
+  const lineState = useRef(inLine);
+  lineState.current = inLine;
+  const inLineNow = (run: number) => run === lineRun.current && !!lineState.current;
+  const leaveLine = () => {
+    lineRun.current++;
+    setInLine(null);
+    setLoading(false);
   };
 
   /**
@@ -435,8 +469,19 @@ export function App() {
     if (pool) q.set("pool", pool);
     try {
       const res = await fetch(`/api/play?${q}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ seat: from.seat }) });
-      const body = (await res.json()) as { code?: string };
-      if (!res.ok || !body.code || onScreen.current !== from) return;
+      const body = (await res.json()) as { code?: string; busy?: boolean; ticket?: string };
+      if (!res.ok || onScreen.current !== from) return;
+      // Servers busy: the seat is already handed back, so wait in Default's line (your wait still counts).
+      if (body.busy && body.ticket) {
+        forgetSeat(from.code);
+        setCurrentMatch(null);
+        from.dispose();
+        setMatch(null);
+        void playNow(from.settings.raid ? "raid" : "crowd", "default", false, body.ticket);
+        history.replaceState(null, "", `/${location.search}`);
+        return;
+      }
+      if (!body.code) return;
       forgetSeat(from.code);
       joinLobby(body.code, { queue: from.settings.raid ? "raid" : "crowd" });
     } catch {
@@ -576,6 +621,13 @@ export function App() {
           if (inviteCode) history.replaceState(null, "", "/");
         }}
       />
+    );
+  }
+  if (!match && inLine) {
+    return (
+      <FrontFrame wide>
+        <QueueLine raid={inLine.mode === "raid"} waitSeconds={inLine.waitSeconds} onCancel={leaveLine} />
+      </FrontFrame>
     );
   }
   if (!match) {
