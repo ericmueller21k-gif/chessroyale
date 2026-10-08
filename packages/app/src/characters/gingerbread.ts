@@ -442,11 +442,11 @@ const f = (ms: number, p: GingerPose, extra: Partial<Frame> = {}): Frame => ({ m
 /** A four-point frost sparkle: a white core and ice-blue rays. */
 const sparkle = (x: number, y: number, big = false): Speck[] => [
   [x, y, "F"],
-  [x - 1, y, "f"],
-  [x + 1, y, "f"],
-  [x, y - 1, "f"],
-  [x, y + 1, "f"],
-  ...(big ? ([[x - 2, y, "i"], [x + 2, y, "i"], [x, y - 2, "i"], [x, y + 2, "i"]] as Speck[]) : []),
+  [x - 1, y, "I"],
+  [x + 1, y, "I"],
+  [x, y - 1, "I"],
+  [x, y + 1, "I"],
+  ...(big ? ([[x - 2, y, "f"], [x + 2, y, "f"], [x, y - 2, "f"], [x, y + 2, "f"]] as Speck[]) : []),
 ];
 /** Icing spots on him where a frost glint can catch (head trim, belt, cuffs), in frame pixels at rest. */
 const GLINTS: readonly Pt[] = [[OX + 23, OY + 6], [OX + 33, OY + 7], [OX + 25, OY + 36], [OX + 34, OY + 36], [OX + 20, OY + 50], [OX + 38, OY + 50]];
@@ -457,7 +457,7 @@ const swirl = (turn: number, r: number, n = 10, cy = 28): Speck[] =>
     const a = (i / n + turn) * Math.PI * 2;
     const x = Math.round(OX + 28 + Math.cos(a) * r * 1.25);
     const y = Math.round(OY + cy + Math.sin(a) * r * 0.75);
-    return i % 3 === 0 ? sparkle(x, y) : [[x, y, i % 2 ? "F" : "W"]];
+    return i % 3 === 0 ? sparkle(x, y) : [[x, y, "F"], [x + 1, y + 1, i % 2 ? "I" : "J"]];
   }).flat();
 
 /** Snow falling, seeded by frame. */
@@ -465,8 +465,8 @@ const snow = (i: number, n = 14): Speck[] =>
   Array.from({ length: n }, (_, k): Speck => {
     const x = (k * 41 + 7 + Math.round(Math.sin(i * 0.7 + k) * 2)) % 80;
     const y = ((k * 29 + i * 4) % 84) + 2;
-    return [x + 2, y, k % 3 ? "F" : "W"];
-  });
+    return [x + 2, y, k % 3 ? "F" : "I"];
+  }).flatMap((sp, k): Speck[] => (k % 3 ? [sp, [sp[0] + 1, sp[1] + 1, "I"]] : [sp]));
 
 /** A burst of frost round a point (the cane's tip on the ground, a slam). */
 const frostBurst = ([x, y]: Pt, r: number): Speck[] =>
@@ -474,7 +474,7 @@ const frostBurst = ([x, y]: Pt, r: number): Speck[] =>
     const a = (i / 8) * Math.PI * 2;
     const px = Math.round(x + Math.cos(a) * r * 1.4);
     const py = Math.min(y + 1, Math.round(y + Math.sin(a) * r * 0.6) - 1);
-    return i % 2 ? [[px, py, "f"]] : sparkle(px, py);
+    return i % 2 ? [[px, py, "I"]] : sparkle(px, py);
   }).flat();
 
 /** Crumbs knocked off his head, flying out and falling (`t` frames after the hit). */
@@ -544,10 +544,10 @@ const smug: Anim = {
 const drips = (i: number): Speck[] => {
   const t = i % 4;
   return [
-    [OX + 19 - t, OY + 9 + t * 2, "w"],
-    [OX + 19 - t, OY + 10 + t * 2, "W"],
-    [OX + 39 + t, OY + 8 + t * 2, "w"],
-    [OX + 39 + t, OY + 9 + t * 2, "W"],
+    [OX + 19 - t, OY + 9 + t * 2, "W"],
+    [OX + 19 - t, OY + 10 + t * 2, "I"],
+    [OX + 39 + t, OY + 8 + t * 2, "W"],
+    [OX + 39 + t, OY + 9 + t * 2, "I"],
   ];
 };
 /** Rattled: worried brows, wide eyes, his icing sweating, shaking where he stands. */
@@ -697,7 +697,7 @@ const gather = (n: number): Speck[] => {
   return Array.from({ length: 6 }, (_, i): Speck => {
     const a = (i / 6) * Math.PI * 2 + n;
     const r = 9 - n * 2.5;
-    return [Math.round(hx + Math.cos(a) * r), Math.round(hy + Math.sin(a) * r), i % 2 ? "F" : "f"];
+    return [Math.round(hx + Math.cos(a) * r), Math.round(hy + Math.sin(a) * r), i % 2 ? "F" : "I"];
   });
 };
 const freezeCast: Anim = {
@@ -710,7 +710,7 @@ const freezeCast: Anim = {
     f(80, CAST, { cue: "freeze", pal: { ...GLOW_PULSE, ...ICY_EYES }, specks: sparkle(castTip[0] + 2, castTip[1], true), shake: [-1, 0] }),
     f(70, CAST, { pal: { ...GLOW_PULSE, ...ICY_EYES }, specks: bolt(castTip[0] + 12, castTip[1], 1) }),
     f(70, { ...CAST, dx: -1 }, { pal: GLOW_PULSE, specks: bolt(castTip[0] + 18, castTip[1], 3) }),
-    f(90, { ...CAST, dx: -1, mood: "laugh" }, { pal: GLOW_HALF, specks: [[castTip[0] + 12, castTip[1] - 1, "f"], [castTip[0] + 16, castTip[1] + 1, "i"]] }),
+    f(90, { ...CAST, dx: -1, mood: "laugh" }, { pal: GLOW_HALF, specks: [[castTip[0] + 12, castTip[1] - 1, "I"], [castTip[0] + 16, castTip[1] + 1, "J"]] }),
     f(140, { ...CAST, glow: false, mood: "laugh", crouch: 1 }),
     f(140, { crouch: 1, cane: "lift", mood: "smug" }),
     f(160, { mood: "smug" }),

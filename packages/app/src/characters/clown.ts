@@ -569,7 +569,7 @@ const entrance: Anim = {
 /** His pose with a pie held up at (x, y) (his drawing space). */
 const withPie = (ms: number, p: ClownPose, x: number, y: number, extra: Partial<Frame> = {}): Frame => ({ ms, layers: [...pose(p), at("pie", x, y)], ...extra });
 /** Speed lines where the pie flew off. */
-const whoosh: Speck[] = [0, 2, 4].flatMap((dy) => [0, 1, 2, 3].map((i): Speck => [OX + 46 + i + dy, OY + 16 + dy, i < 2 ? "W" : "w"]));
+const whoosh: Speck[] = [0, 2, 4].flatMap((dy) => [0, 1, 2, 3].map((i): Speck => [OX + 46 + i + dy, OY + 16 + dy, i < 2 ? "X" : "W"]));
 
 /**
  * His passive power, the pie: he pulls a pie up behind his head, winds up and throws it (the frame with the "throw"
