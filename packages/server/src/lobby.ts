@@ -1926,8 +1926,19 @@ export class LobbyCore {
       const [, side, , , , full] = b.fenBefore.split(" ");
       const ply = (Math.max(1, Number(full) || 1) - 1) * 2 + (side === "b" ? 1 : 0);
       const crowd = picked.filter((p) => !p.usedPowerUp);
+      const tally = new Map<string, number>();
+      for (const o of crowd) tally.set(o.move!, (tally.get(o.move!) ?? 0) + 1);
       for (const p of picked) {
         const others = crowd.filter((o) => o.playerId !== p.playerId);
+        // What the others picked, the most picked few (the crowd's rate for any move, read later).
+        const mine = crowd.includes(p) ? p.move! : null;
+        const picks = Object.fromEntries(
+          [...tally.entries()]
+            .map(([m, n]) => [m, n - (m === mine ? 1 : 0)] as const)
+            .filter(([, n]) => n > 0)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6),
+        );
         const pick = round.picks[p.playerId];
         const move: FairMove = {
           ply,
@@ -1940,9 +1951,11 @@ export class LobbyCore {
           gap: b.scored.length > 1 ? Math.round(b.scored[1]!.loss * 100) / 100 : null,
           crowd: others.length,
           crowdFound: others.filter((o) => o.loss! <= sig.foundLoss).length,
+          picks,
           thinkMs: pick?.thinkMs ?? 0,
           away: pick?.away ?? 0,
           legal,
+          top: b.scored.slice(0, FAIRPLAY.deep.candidates).map((x) => x.move),
           ...(p.usedPowerUp ? { powerUp: true } : {}),
           ...(last && best.move.slice(2, 4) === last.slice(2, 4) ? { recapture: true } : {}),
         };

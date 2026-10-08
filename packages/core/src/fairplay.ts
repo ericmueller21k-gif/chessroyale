@@ -9,7 +9,8 @@
  * For each human pick the lobby records a FairMove. A match's moves become a FairSummary (matchSignals): which
  * positions count, the strength they show (an engine rating over counted moves), how often they found moves the crowd
  * missed (measured against the other people picking in the same position), timing and look-aways, and points for each.
- * A player's recent summaries give their level (playerLevel): none, watch, review or ban.
+ * A player's recent summaries give their level (playerLevel): none, watch, review or ban. A flagged player's counted
+ * moves are searched again later on the engine server (the deep re-check); a ban needs that confirmation.
  */
 import { FAIRPLAY } from "./settings.ts";
 import { lossForRating, ratingForLoss } from "./rating.ts";
@@ -33,6 +34,11 @@ export interface FairMove {
   /** Other people picking in this position (not practising, no power-up), and how many of them found the best. */
   crowd: number;
   crowdFound: number;
+  /**
+   * What those others picked (UCI move → how many; the most picked few), so the crowd's rate for any move can be read
+   * later: the deep re-check's best, say.
+   */
+  picks?: Record<string, number>;
   /** Thinking time (ms). */
   thinkMs: number;
   /** Look-aways during the move's clock, before the pick: the page hidden or the window unfocused (the app's count). */
@@ -43,6 +49,13 @@ export interface FairMove {
   recapture?: boolean;
   /** Legal moves in the position. */
   legal: number;
+  /** The judges' best moves, best first (up to FAIRPLAY.deep.candidates): what a deep re-check searches. */
+  top?: string[];
+  /**
+   * The deep re-check (on the engine server, afterwards): its best of the candidates, where the pick ranked among them
+   * (1 = its best), what the pick gave away by its numbers, and its top 3.
+   */
+  deep?: { best: string; rank: number; loss: number; top?: string[] };
 }
 
 export type SkipReason = "book" | "forced" | "only" | "recapture" | "decided" | "powerUp";
@@ -99,6 +112,55 @@ export function honestFindChance(crowd: number, found: number, rating: number, s
   return sigmoid(logit(c) + (s.hardSlope * (rating - s.crowdRating)) / 400);
 }
 
+/**
+ * An honest player's chance of picking the best move: from the crowd's rate for that move (c: how many of the others
+ * picked it, smoothed) and the player's strength R, logit(p) = (g0 + g1 Δ) logit(c) + d0 + d1 Δ with Δ = (R − 1500) /
+ * 400 (a stronger player leans less on what the crowd sees), never below a floor, logit = f0 + f1 Δ (the model is
+ * [g0, g1, d0, d1, f0, f1]). Without a crowd: logit(p) = a + b Δ. All fitted on the simulation's honest players
+ * (reports/fairplay.md), one set for the judges' best and one for the deep re-check's.
+ */
+export function honestChance(crowd: number, found: number, rating: number, model: readonly number[], solo: readonly number[], s: Pick<Signals, "minCrowd"> = FAIRPLAY.signals): number {
+  const d = (rating - 1500) / 400;
+  if (crowd < s.minCrowd) return sigmoid(solo[0]! + solo[1]! * d);
+  const c = (found + 0.5) / (crowd + 1);
+  const p = sigmoid((model[0]! + model[1]! * d) * logit(c) + model[2]! + model[3]! * d);
+  // A floor: even where almost nobody in the crowd found it, a strong player sometimes does (logit = f0 + f1 Δ).
+  return model.length >= 6 ? Math.max(p, sigmoid(model[4]! + model[5]! * d)) : p;
+}
+
+/**
+ * One counted pick's evidence: the log-likelihood that an engine user made it rather than an honest player of strength
+ * `rating`.
+ *   - Checked by the deep re-check: was the pick its best, one of its next two, or neither? An honest player's chances
+ *     come from the crowd in that position (how many of them picked its best, its top 3: honestChance), an engine
+ *     user's are cheatDeep (its own engine can differ from ours, so its pick is sometimes our second or third).
+ *   - Not checked: was the pick within foundLoss of the judges' best? An engine user does that at least cheatFind of
+ *     the time.
+ * A best move the crowd missed is strong evidence; a pick outside the engine's top 3 counts strongly the other way.
+ */
+export function moveEvidence(m: FairMove, rating: number, s: Signals = FAIRPLAY.signals): { outcome: number; honest: number[]; evidence: number } {
+  const clampP = (p: number) => Math.min(0.98, Math.max(0.02, p));
+  if (m.deep) {
+    const top = m.deep.top ?? [m.deep.best];
+    const outcome = m.deep.rank === 1 ? 0 : m.deep.rank <= 3 ? 1 : 2;
+    // (Older records without the crowd's picks: its count for the judges' best stands in for that move.)
+    const count = (x: string) => (m.picks ? (m.picks[x] ?? 0) : x === m.best ? m.crowdFound : 0);
+    const share = (moves: readonly string[]) => Math.min(m.crowd, moves.reduce((t, x) => t + count(x), 0));
+    const p1 = clampP(honestChance(m.crowd, share(top.slice(0, 1)), rating, s.findDeep, s.soloDeep, s));
+    const p3 = Math.max(p1 + 0.02, clampP(honestChance(m.crowd, share(top.slice(0, 3)), rating, s.findDeep3, s.soloDeep3, s)));
+    const honest = [p1, p3 - p1, Math.max(0.01, 1 - p3)];
+    // An engine user finds our best at least as often as an honest player would; its other chances keep their shape.
+    const q0 = Math.max(s.cheatDeep[0], p1);
+    const rest = s.cheatDeep[1] + s.cheatDeep[2];
+    const cheat = [q0, (s.cheatDeep[1] * (1 - q0)) / rest, (s.cheatDeep[2] * (1 - q0)) / rest];
+    return { outcome, honest, evidence: Math.log(cheat[outcome]! / honest[outcome]!) };
+  }
+  const event = m.loss <= s.foundLoss;
+  const honest = clampP(honestChance(m.crowd, m.crowdFound, rating, s.findJudge, s.soloFound, s));
+  const q = Math.max(honest, s.cheatFind);
+  return { outcome: event ? 0 : 1, honest: [honest, 1 - honest], evidence: event ? Math.log(q / honest) : Math.log((1 - q) / (1 - honest)) };
+}
+
 /** Spearman rank correlation (average ranks for ties); null with fewer than 3 pairs or no spread. */
 export function spearman(xs: readonly number[], ys: readonly number[]): number | null {
   if (xs.length < 3) return null;
@@ -144,17 +206,25 @@ export interface FairSummary {
   hard: number;
   hardFinds: number;
   hardStreak: number;
-  /** Evidence (log-likelihood) that they find moves the crowd misses like an engine user rather than an honest player. */
-  hardEvidence: number;
+  /**
+   * Evidence (a log-likelihood, over counted moves) that the picks are an engine user's rather than an honest player's
+   * of their own strength (moveEvidence): positive points to an engine.
+   */
+  evidence: number;
   /** Hard finds made in under fastHardMs, and how think time followed difficulty (null without enough moves). */
   fastHard: number;
   timeCorr: number | null;
   /** Counted moves with a look-away during the clock, and how many of those found the best. */
   awayMoves: number;
   awayFound: number;
+  /** The deep re-check: counted moves checked, how many picks were its best (a "deep match"), in its top 3, its average loss. */
+  deepChecked: number;
+  deepMatch: number;
+  deepTop3: number;
+  deepLoss: number | null;
   /** The suspicion score and its parts. */
   score: number;
-  parts: { perf: number; jump: number; hard: number; streak: number; time: number; away: number };
+  parts: { perf: number; jump: number; evidence: number; streak: number; time: number; away: number };
 }
 
 /**
@@ -175,7 +245,7 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
   let hardFinds = 0;
   let hardRun = 0;
   let hardStreak = 0;
-  let hardEvidence = 0;
+  let evidence = 0;
   let fastHard = 0;
   let awayMoves = 0;
   let awayFound = 0;
@@ -191,15 +261,11 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
       awayMoves++;
       if (f) awayFound++;
     }
+    evidence += moveEvidence(m, strength, s).evidence;
     const rate = crowdRate(m, s);
     if (rate === null) continue;
     times.push(m.thinkMs);
     difficulty.push(1 - rate);
-    // Evidence: a find where an honest player of this strength usually misses (p) points to an engine user, who finds
-    // it at least cheatFind of the time (q); a miss points the other way.
-    const p = honestFindChance(m.crowd, m.crowdFound, strength, s);
-    const q = Math.max(p, s.cheatFind);
-    hardEvidence += f ? Math.log(q / p) : Math.log((1 - q) / (1 - p));
     if (rate < s.hardShare) {
       hard++;
       if (f) {
@@ -211,16 +277,20 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
     }
   }
   const timeCorr = times.length >= s.minTimed ? spearman(times, difficulty) : null;
+  const checked = counted.filter((m) => m.deep);
+  const deepMatch = checked.filter((m) => m.deep!.rank === 1).length;
+  const deepTop3 = checked.filter((m) => m.deep!.rank <= 3).length;
+  const deepLoss = checked.length ? checked.reduce((a, m) => a + m.deep!.loss, 0) / checked.length : null;
   const enough = counted.length >= sc.minCounted;
   const parts = {
     perf: enough && perf !== null ? clamp((perf - sc.perfFrom) / sc.perfPer, 0, sc.perfMax) : 0,
     jump: enough && perf !== null && ref !== null && perf - ref >= sc.jumpFrom ? clamp(1 + (perf - ref - sc.jumpFrom) / sc.jumpPer, 0, sc.jumpMax) : 0,
-    hard: clamp(hardEvidence * sc.hardPer, 0, sc.hardMax),
+    evidence: clamp(evidence * sc.evidencePer, 0, sc.evidenceMax),
     streak: topStreak >= sc.streakFrom ? clamp((topStreak - sc.streakFrom + 1) * sc.streakPer, 0, sc.streakMax) : 0,
     time: clamp(Math.max(0, fastHard - 1) * sc.fastPer, 0, sc.fastMax) + (timeCorr !== null && timeCorr < s.flatCorr ? sc.flat : 0),
     away: awayMoves >= sc.awayMoves && awayFound / awayMoves >= sc.awayRate && awayFound / awayMoves - (found - awayFound) / Math.max(1, counted.length - awayMoves) >= sc.awayLift ? sc.away : 0,
   };
-  const score = round2(parts.perf + parts.jump + parts.hard + parts.streak + parts.time + parts.away);
+  const score = round2(parts.perf + parts.jump + parts.evidence + parts.streak + parts.time + parts.away);
   return {
     moves: moves.length,
     counted: counted.length,
@@ -231,11 +301,15 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
     hard,
     hardFinds,
     hardStreak,
-    hardEvidence: round2(hardEvidence),
+    evidence: round2(evidence),
     fastHard,
     timeCorr: timeCorr === null ? null : round2(timeCorr),
     awayMoves,
     awayFound,
+    deepChecked: checked.length,
+    deepMatch,
+    deepTop3,
+    deepLoss: deepLoss === null ? null : round2(deepLoss),
     score,
     parts: Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, round2(v)])) as FairSummary["parts"],
   };
@@ -259,16 +333,15 @@ export interface LevelVerdict {
   reasons: string[];
 }
 
+/** What playerLevel reads from each match (older summaries without the deep fields count as unchecked). */
+export type LevelInput = Pick<FairSummary, "score" | "perf" | "counted"> & Partial<Pick<FairSummary, "deepChecked" | "deepMatch" | "evidence">> & { at: number };
+
 /**
  * A player's level from their recent match summaries (any order; only `at` within the window counts, at most
- * windowMatches of the newest). Ban needs overwhelming evidence: super-GM strength over two matches with a high score,
- * or one match past every bar.
+ * windowMatches of the newest). Ban needs overwhelming evidence confirmed by the deep re-check: super-GM strength
+ * and engine-like moves over two matches with high scores, or one match past every bar.
  */
-export function playerLevel(
-  matches: readonly (Pick<FairSummary, "score" | "perf" | "counted"> & { at: number })[],
-  now: number,
-  lv: Levels = FAIRPLAY.levels,
-): LevelVerdict {
+export function playerLevel(matches: readonly LevelInput[], now: number, lv: Levels = FAIRPLAY.levels): LevelVerdict {
   const recent = matches
     .filter((m) => m.at > now - lv.windowDays * 86_400_000)
     .sort((a, b) => b.at - a.at)
@@ -276,11 +349,24 @@ export function playerLevel(
   const scores = recent.map((m) => m.score).sort((a, b) => b - a);
   const top1 = scores[0] ?? 0;
   const top2 = top1 + (scores[1] ?? 0);
-  const strong = recent.filter((m) => (m.perf ?? 0) >= lv.banPerf && m.counted >= lv.banCounted && m.score >= lv.banScore);
-  const one = recent.find((m) => (m.perf ?? 0) >= lv.banOnePerf && m.counted >= lv.banOneCounted && m.score >= lv.banOneScore);
-  if (strong.length >= lv.banMatches)
-    return { level: "ban", reasons: [`${strong.length} matches at strength ${strong.map((m) => m.perf).join(", ")} with scores ${strong.map((m) => m.score).join(", ")}`] };
-  if (one) return { level: "ban", reasons: [`one match at strength ${one.perf} on ${one.counted} counted moves, score ${one.score}`] };
+  // The ban: from deep-checked matches only.
+  const checked = recent.filter((m) => (m.deepChecked ?? 0) > 0);
+  const sum = (f: (m: LevelInput) => number, ms = checked) => ms.reduce((t, m) => t + f(m), 0);
+  const evidence = sum((m) => m.evidence ?? 0);
+  const deepChecked = sum((m) => m.deepChecked ?? 0);
+  const deepShare = deepChecked ? sum((m) => m.deepMatch ?? 0) / deepChecked : 0;
+  const bestPerf = Math.max(0, ...checked.map((m) => m.perf ?? 0));
+  const r1 = (x: number) => Math.round(x * 10) / 10;
+  if (checked.length >= lv.banMatches && evidence >= lv.banEvidence && deepChecked >= lv.banDeepChecked && deepShare >= lv.banDeep && bestPerf >= lv.banPerf) {
+    return {
+      level: "ban",
+      reasons: [`${checked.length} deep-checked matches: evidence ${r1(evidence)}, ${Math.round(deepShare * 100)}% of ${deepChecked} moves the engine's best, best strength ${bestPerf}`],
+    };
+  }
+  const one = checked.find(
+    (m) => (m.evidence ?? 0) >= lv.banOneEvidence && (m.deepChecked ?? 0) >= lv.banOneDeepChecked && (m.deepMatch ?? 0) / m.deepChecked! >= lv.banOneDeep && (m.perf ?? 0) >= lv.banOnePerf,
+  );
+  if (one) return { level: "ban", reasons: [`one match: evidence ${r1(one.evidence ?? 0)}, ${one.deepMatch}/${one.deepChecked} moves the engine's best, strength ${one.perf}`] };
   if (top1 >= lv.reviewOne) return { level: "review", reasons: [`a match scored ${top1}`] };
   if (top2 >= lv.reviewTwo) return { level: "review", reasons: [`two matches scored ${scores[0]} and ${scores[1]}`] };
   if (top1 >= lv.watch) return { level: "watch", reasons: [`a match scored ${top1}`] };

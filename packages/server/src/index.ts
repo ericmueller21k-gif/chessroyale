@@ -4,11 +4,12 @@ import type { Matchmaker } from "./matchmaker.ts";
 import type { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
-import { d1Sql, lobbyResult, type User } from "./accounts.ts";
+import { d1Sql, ensureSchema, lobbyResult, type User } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, type AdminEnv } from "./admin.ts";
+import { containerSearch, deepCheckRun } from "./fairplay-deep.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";
@@ -65,6 +66,24 @@ export default {
     out.headers.append("server-timing", `app;dur=${ms}`);
     return out;
   },
+
+  /**
+   * The Worker's schedule (wrangler.jsonc, every 15 minutes): fair play's deep re-check of flagged players' moves on
+   * the engine server (cases in review at once, the rest off-peak; fairplay-deep.ts).
+   */
+  async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
+    if (!rawEnv.DB) return;
+    const env = await withSecrets(rawEnv);
+    const search = containerSearch(env);
+    if (!search) return;
+    const sql = d1Sql(rawEnv.DB);
+    ctx.waitUntil(
+      ensureSchema(sql, rawEnv.DB)
+        .then(() => deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) }))
+        .then((r) => r.searches && console.log(`fair play deep re-check: ${r.searches} searches, ${r.matches} matches done`))
+        .catch((e: unknown) => console.log(`fair play deep re-check: ${String(e)}`)),
+    );
+  },
 } satisfies ExportedHandler<Env>;
 
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
@@ -72,7 +91,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // (The sign-in secrets may live in the Secrets Store: read them as strings.)
     const env = await withSecrets(rawEnv);
     // Fair play's review page and the automated reviewer's API (admins and the reviewer's token only).
-    const review = await handleAdmin(request, env, caseMailer(env), waitUntil);
+    const review = await handleAdmin(request, env, caseMailer(env), waitUntil, containerSearch(env));
     if (review) return review;
     // Accounts: /api/me, /api/results, /api/auth/*
     const account = await handleAccountApi(request, env, fetch, waitUntil);

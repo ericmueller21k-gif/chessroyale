@@ -73,4 +73,9 @@ export const FAIRPLAY_SCHEMA = [
     reply TEXT
   )`,
   `CREATE INDEX IF NOT EXISTS fairplay_appeals_status ON fairplay_appeals (status, at)`,
+  // The deep re-check's daily budget (fairplay-deep.ts): searches made each day.
+  `CREATE TABLE IF NOT EXISTS fairplay_budget (
+    day TEXT PRIMARY KEY,
+    searches INTEGER NOT NULL
+  )`,
 ];

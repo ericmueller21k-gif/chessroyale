@@ -163,6 +163,8 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "held", type: "INTEGER" },
   // A report made during a match: that match's lobby code (one report per reporter, player and match).
   { table: "reports", column: "match", type: "TEXT" },
+  // Fair play's deep re-check: 1 once a match's counted moves have all been searched again (fairplay-deep.ts).
+  { table: "fairplay_matches", column: "deep_done", type: "INTEGER" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
 ];

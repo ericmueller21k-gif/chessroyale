@@ -16,7 +16,7 @@
  * FAIRPLAY.evidenceDaysUnflagged days, so a report made after a match still finds its games; for FAIRPLAY.evidenceDays
  * when the player was flagged or reported, and never deleted while their case is open (see purgeEvidence).
  */
-import { FAIRPLAY, matchSignals, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelVerdict } from "@chessroyale/core";
+import { FAIRPLAY, matchSignals, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelInput, type LevelVerdict } from "@chessroyale/core";
 import { getUser, refreshRating, sha256, type Sql, type User } from "./accounts.ts";
 
 /** A case's status; "closed": a watch with nothing new for FAIRPLAY.evidenceDays (not a decision on the merits). */
@@ -362,20 +362,14 @@ export async function recordFairPlay(
   mail?: CaseMailer,
 ): Promise<FairRecord> {
   const lv = FAIRPLAY.levels;
-  const history = await sql.all<{ perf: number | null; score: number; counted: number; played_at: number }>(
-    "SELECT perf, score, counted, played_at FROM fairplay_matches WHERE user_id = ? ORDER BY played_at DESC, id DESC LIMIT 20",
+  const history = await sql.all<HistoryRow>(
+    "SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ORDER BY played_at DESC, id DESC LIMIT 20",
     userId,
   );
   const rating = (await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId))?.rating ?? null;
   const summary = matchSignals(match.moves, referenceStrength(history.slice(0, 10).map((h) => h.perf), rating));
-  // Matches from before a decision on the case (a clearing, say) were weighed then.
   const c = await caseOf(sql, userId);
-  const since = c?.decided_at ?? 0;
-  const verdict = playerLevel(
-    [...history.filter((h) => h.played_at > since).map((h) => ({ score: h.score, perf: h.perf, counted: h.counted, at: h.played_at })), { ...summary, at: now }],
-    now,
-    lv,
-  );
+  const verdict = playerLevel([...levelInputs(history, c), { ...summary, at: now }], now, lv);
   const flagged = summary.score >= lv.watch || verdict.level !== "none" || (!!c && OPEN.includes(c.status));
   await sql.run(
     `INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary, moves, keep_until)
@@ -395,6 +389,44 @@ export async function recordFairPlay(
   const acted = await actOn(sql, userId, verdict, now, mail);
   await purgeEvidence(sql, now);
   return { summary, verdict, acted };
+}
+
+interface HistoryRow {
+  id: number;
+  perf: number | null;
+  score: number;
+  counted: number;
+  played_at: number;
+  summary: string;
+}
+
+/** A player's stored matches as playerLevel reads them. Matches from before a decision on the case (a clearing, say) were weighed then. */
+function levelInputs(history: readonly HistoryRow[], c: Case | null): LevelInput[] {
+  const since = c?.decided_at ?? 0;
+  return history
+    .filter((h) => h.played_at > since)
+    .map((h) => {
+      let deep: Partial<FairSummary> = {};
+      try {
+        deep = JSON.parse(h.summary) as Partial<FairSummary>;
+      } catch {
+        // An unreadable summary: unchecked.
+      }
+      return { score: h.score, perf: h.perf, counted: h.counted, deepChecked: deep.deepChecked ?? 0, deepMatch: deep.deepMatch ?? 0, evidence: deep.evidence ?? 0, at: h.played_at };
+    });
+}
+
+/**
+ * A player's level again after their stored matches changed (the deep re-check added to one), and what detection
+ * does about it. The deep re-check's entry point (fairplay-deep.ts).
+ */
+export async function relevel(sql: Sql, userId: string, now: number, mail?: CaseMailer): Promise<{ verdict: LevelVerdict; acted: FairLevel }> {
+  const history = await sql.all<HistoryRow>(
+    "SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ORDER BY played_at DESC, id DESC LIMIT 20",
+    userId,
+  );
+  const verdict = playerLevel(levelInputs(history, await caseOf(sql, userId)), now, FAIRPLAY.levels);
+  return { verdict, acted: await actOn(sql, userId, verdict, now, mail) };
 }
 
 /**

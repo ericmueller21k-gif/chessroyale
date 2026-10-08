@@ -120,37 +120,6 @@ describe("appeals", () => {
   });
 });
 
-describe("detection that bans (enforcement: ban)", () => {
-  it("bans on overwhelming evidence and emails the player", async () => {
-    const { sql } = memoryDb();
-    await ensureSchema(sql);
-    const p = await player(sql, "Cheat");
-    const { sent, mail } = mailbox();
-    const saved = FAIRPLAY.enforcement;
-    (FAIRPLAY as { enforcement: string }).enforcement = "ban";
-    try {
-      const L = FAIRPLAY.levels;
-      // Two matches past the bars (forced through the summary: strength and score are what the rule reads).
-      await sql.run(
-        "INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary) VALUES (?, 'AAAAA', 'crowd', ?, ?, ?, ?, 'review', '{}')",
-        p.id,
-        50 * DAY,
-        L.banCounted,
-        L.banPerf,
-        L.banScore,
-      );
-      const r = await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: picks(24) }, 50 * DAY + 3_600_000, mail);
-      if (r.summary.perf! >= L.banPerf && r.summary.score >= L.banScore && r.summary.counted >= L.banCounted) {
-        expect(r.acted).toBe("ban");
-        expect((await caseOf(sql, p.id))?.status).toBe("banned");
-        expect(sent.map((s) => s.kind)).toEqual(["banned"]);
-      } else expect(r.acted).not.toBe("ban");
-    } finally {
-      (FAIRPLAY as { enforcement: string }).enforcement = saved;
-    }
-  });
-});
-
 describe("emails", () => {
   it("say what happened and how to appeal, from fairplay@ the sign-in emails' domain; nothing without a key or an address", async () => {
     expect(fairplayFrom({ EMAIL_FROM: "HunChess <login@hunchess.com>" })).toBe("HunChess <fairplay@hunchess.com>");
