@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { bossInfo } from "@chessroyale/core";
+import { bossThreat } from "@chessroyale/core";
 import { account } from "../account.ts";
 import { useLive, type PlayingNow } from "../live.ts";
 import { AccountBar, DressedPawn, GearIcon, LiveLine, Logo, ThemeButton, myHat } from "./FrontDoor.tsx";
@@ -87,7 +87,8 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
 
 /** A running match on the list: its mode (and boss), players left, and how long it's been going. */
 function matchLine(m: PlayingNow, now: number): { title: string; sub: string } {
-  const title = m.mode === "boss" ? `Boss raid${m.bossElo ? ` · ${bossInfo(m.bossElo).name}` : ""}` : m.mode === "crowd" ? "Crowd · 50 v 50" : "Classic";
+  // (A raid's boss is random now: its strength's skulls, not a name.)
+  const title = m.mode === "boss" ? `Boss raid${m.bossElo ? ` · ${"💀".repeat(bossThreat(m.bossElo))}` : ""}` : m.mode === "crowd" ? "Crowd · 50 v 50" : "Classic";
   const left = m.alive !== null && m.total !== null ? `${m.alive} of ${m.total} left` : "starting";
   const min = m.startedAt ? Math.max(0, Math.round((now - m.startedAt) / 60_000)) : null;
   return { title, sub: [left, min === null ? null : min < 1 ? "just started" : `${min} min in`].filter(Boolean).join(" · ") };
@@ -109,7 +110,7 @@ export function RightPanel({ onProfile }: { onProfile: () => void }) {
           return (
             <div key={`${m.startedAt}-${i}`} class="fd-playing">
               <span class={`fd-playing-mode ${m.mode}`} aria-hidden="true">
-                {m.mode === "boss" ? (m.bossElo ? bossInfo(m.bossElo).icon : "👑") : "♟"}
+                {m.mode === "boss" ? "👑" : "♟"}
               </span>
               <span class="fd-item-text">
                 <strong>{l.title}</strong>

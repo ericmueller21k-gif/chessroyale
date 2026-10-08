@@ -2925,7 +2925,7 @@ end to end: sprite, portrait, animations, sounds, lines, and where he stands.
   onto the board.
 - **More bosses drawn from Eric's references:** a farmer with a string trimmer, and a gingerbread man with a candy cane.
 
-## Boss powers and the boss raid rework (design, Oct 8, 2026; not built yet)
+## Boss powers and the boss raid rework (design, Oct 8, 2026; the template, Freeze and Boingo built: see below)
 
 Eric's design, with the director's review folded in and Eric's answers to its questions. Names are placeholders for
 the kind of boss. Nothing here is built yet; when it is, each part gets its own section.
@@ -3011,6 +3011,105 @@ engine choosing a move, and online sync).
 
 **Later ideas:** boss drops (a themed crate item for beating a boss: a clown nose, a zombie hand); bosses jumping to the
 centre of the board to cast; the farmer and the gingerbread man as bosses.
+
+### Built: the boss template, Freeze and Boingo (Oct 8, 2026)
+
+Built by the `god-king` delegate, which now owns boss powers and boss selection. Playable now: **the gingerbread man
+(Freeze)** and **Boingo the Clown (pie and funhouse)**, the only bosses in every boss mode.
+
+**The template** (`packages/core/src/boss.ts`, `BOSS_ROSTER`): each boss has an id, name, icon, strength offset, a
+passive and an ultimate (power ids), and its character kit (the app's `BOSS_KITS` key, for art, moments, lines and
+sounds). Each power's rules live in `packages/chess/src/boss-powers.ts`: the moves allowed this turn (`crowdAllowed`,
+`bossAllowed`), what happens as a turn begins (`prepareTurn`), what each player sees (`NetBoss.powers`: ice, pie,
+flip, rage, the turn's events), whether a turn counts for fair play (`powerTurn`), and the funhouse (the only unscored
+turn).
+- **Playable = a complete character and powers** (`isPlayable`, `playableBosses`, `chooseBoss`): one rule for the raid,
+  the Crowd's boss final and solo's menu. A boss's `kit` is set in the roster once its character is complete; an app
+  test checks every playable boss's kit has every moment, its powers' moments, lines and a portrait.
+- **Strength:** the lobby's (a raid: a step above the group's average; the Crowd final: the crowd's weighted rating)
+  plus the boss's offset. Both offsets are −100 for now. The skulls follow the strength.
+- **Which boss:** random each match (one draw from the match's seed, which also seeds its powers), never the one to
+  avoid when there's another: solo, the last boss this device met (`boss-history.ts`); online, the one most of the
+  lobby met last (each app sends its last boss when it joins; a strict plurality, else none is avoided). A raid's
+  creator can still pick one (`?boss=<id>`); a test link's `?boss=<tier>` fixes the strength.
+- **Solo's boss menu:** "Random boss" (a different one from last time), then each playable boss with its portrait,
+  skulls, powers in a few words and its strength against yours. The ten-tier list is gone: the strength always
+  matches you now (Eric's design: the lobby's strength, a random boss).
+- **Records:** each result stores the boss (`results.boss_id`) with its outcome (`team_won`), solo and online, raid and
+  Crowd final, for self-balancing later. The nudge itself isn't built: it needs real games first, then a small daily
+  job (each boss's win rate → its offset).
+
+**The power system** (the ground rules, as built)
+- **The server decides** every power as each crowd turn begins (after the boss's move, or as the battle starts), from
+  the battle's seed and the position (`prepareTurn`, once per turn: the Last Stand's re-pick doesn't re-roll). Solo
+  runs the same code. The state travels in the shared match state (`BossState.powers`, `NetBoss.powers`): no new
+  messages, only optional fields (`allowed` on jobs and boss requests, `funhouse` on a boss request, `lastBoss` on
+  hello).
+- **Never zero moves, never breaks check:** the allowed moves are always legal moves; a restriction that would leave
+  none lifts for the turn (in check, that's whenever the only escapes are restricted). The king is never frozen.
+  The boss is limited too, by the pie only.
+- **The judge uses the allowed moves:** the best move is the best of the allowed ones (filtered from the top-8 search;
+  if none of the top moves is allowed, one search over every allowed move, Stockfish's `searchmoves`); bots pick from
+  them; a pick of a disallowed move is refused (the screens don't offer it, the server and solo reject it). The same
+  code runs on judges, the host and solo, so honest devices still agree exactly.
+- **Fair play:** a turn a power touches (a frozen piece, a pie, the blizzard, a flipped board) is scored, but never
+  counted as a signal (`FairMove.power`, skip reason `bossPower`). The funhouse turn isn't scored at all, and the
+  boss's strike doesn't count it.
+- **Rage and the ultimate:** the rage meter (in the boss bar, beside the skulls) fills as the boss loses its own
+  material, full at 9 (a queen's worth; `BOSS_POWERS.rageFull`). Full as a turn begins: the warning ("RAGE!", the meter
+  pulsing) that turn; the ultimate the next. Once a match; the meter is gone after. A boss that never loses material
+  never uses it.
+- **Moments:** as the turn passes to the crowd, after the boss's move shows, each power that came with it plays in
+  turn, in the God King's banner style (the boss's portrait on the left, the moment in the middle, the God King on
+  the right). The crowd's clock starts after them, solo and online (`POWER_FX`, `powerMomentMs` in `boss-timing.ts`):
+  a freeze 2.3 s, a pie 2.3 s, the warning 1.7 s, the blizzard 3.6 s, the funhouse 5.2 s.
+
+**The gingerbread man (Freeze)**
+- **Passive:** from the crowd's 2nd turn, every 5-7 turns, one crowd piece (never the king) is iced for 2 turns: a
+  pick from the three that matter most (pieces before pawns, by value and mobility), never one without a move or whose
+  freeze leaves no other legal move. Its moves aren't allowed; it still defends and gives check. The moment: "FREEZE!"
+  ("Your knight is frozen"), then a cold burst and the ice forming on it.
+- **Ultimate, the blizzard:** "BLIZZARD!", then a wall of cloud and snow sweeps the board left to right and every crowd
+  piece ices over as it passes, except the queen (no queen, or she can't move: the king; neither: no ice that turn).
+  One turn. Then the God King says one of his blizzard lines ("Looks like our queen withstood the storm!", and three
+  more; for the king, two). The passive waits a turn on the ultimate's turn.
+
+**Boingo the Clown**
+- **Passive, the pie:** from the crowd's 2nd turn, a pie on one empty square near the centre (c3 to f6) for 3 crowd
+  turns and the boss's replies in between, then 2 clear turns, again and again. Nobody may move onto it. The moment:
+  "PIE!", then the pie flies in from his side and splats on the square.
+- **Ultimate, the funhouse:** as the turn passes to the crowd, he pogos onto the middle of the board, "FUNHOUSE!", the
+  board spins a half turn, he says a line ("Let me get that for you!", three more, or his kit's own) and plays the
+  crowd's move: 10-25 points worse than the best (about 1 to 2.5 pawns from an even position, `funhouseLoss`), never
+  past 1.6 in log-odds, never a move whose line allows a forced mate or leaves the queen to be taken (a queen trade is
+  fine). It reuses the boss's slip code (the engine's top moves, then a head-to-head check with the best) and is
+  played online by the host's engine, as the boss's own moves are. Not scored. Then the boss replies, and the crowd's
+  next 2 turns show the board flipped (the crowd seen from the boss's side).
+
+**Calls I made (Eric may want to change)**
+- The pie's square is chosen without the engine: the empty central square the fewest moves of either side can reach
+  right now (usually none), so blocking it costs nobody a move this turn. The design said the engine checks the eval;
+  the server can't run one, and this keeps the server deciding.
+- Rage counts the boss's own material lost, never coming back down (a trade fills it too).
+- The freeze can ice the queen (she's often the piece that matters most); never the king.
+- The board "flip" is a half-turn spin in the board's plane (pieces upside down for 0.7 s), then the board is drawn
+  from the other side: a 3D card flip made the board measure its squares wrongly mid-turn.
+- After his Last Stand the God King is silent, except for the blizzard's line (it names the one piece that can move).
+- Strength offsets are both −100; self-balancing will move them.
+- Boingo leaves his spot by the board (hidden) while he pogos on it.
+
+**Checking it**
+- `npm run frames:powers -- <dir> [gingerbread|clown|both] [phone|desktop|both] [light|dark]` plays a solo raid with
+  real taps and saves every painted frame of each moment, stills and a GIF.
+- Test switch: `?power=blizzard` or `?power=funhouse` (with `?boss=gingerbread` or `?boss=clown`) warns as the second
+  turn begins and unleashes the ultimate on the third; the passive comes on the second turn anyway. Online too, on a
+  raid's link.
+- Tests: `packages/chess/test/boss-powers.test.ts` (no zero-move states, check, the pie and freeze never block the only
+  escape, the blizzard's fallbacks, deterministic choices, judging with allowed moves, the funhouse's move),
+  `packages/core/test/boss.test.ts` (the playable rule, avoiding repeats), `packages/app/test/boss-kits.test.ts`
+  (playable bosses have complete kits), `packages/server/test/boss-powers-lobby.test.ts` (online: everyone sees the
+  same powers, picks and jobs follow the allowed moves, the funhouse from the host, avoiding the lobby's last boss),
+  `e2e/boss-powers.spec.ts` (a Freeze match and a Boingo match on phone and desktop, the funhouse online).
 
 ## The God King, redrawn as pixel art (Oct 8, 2026)
 

@@ -512,9 +512,19 @@ export class MatchRunner {
     this.top.prefetch(this.opts.engines, [...this.groups.keys()].map((id) => this.boards.get(id)!.fen));
   }
 
-  /** The engine's top moves in a position (shared with scoring, so a prefetched search is reused). */
-  topMovesFor(fen: string): Promise<MoveScore[]> {
-    return this.top.get(this.opts.engines[0]!, fen);
+  /**
+   * The engine's top moves in a position (shared with scoring, so a prefetched search is reused). Boss battle, the
+   * crowd's turn: only the moves allowed this turn (a power's limits; the Last Stand's barred move), as the judge
+   * sees them, so a power-up's hints and the eval bar follow the crowd's rules too.
+   */
+  async topMovesFor(fen: string): Promise<MoveScore[]> {
+    const engine = this.opts.engines[0]!;
+    const all = await this.top.get(engine, fen);
+    const id = this.state.boards[0];
+    const allowed = this.state.boss && id !== undefined && this.boards.get(id)?.fen === fen ? (this.crowdAllowed(id) ?? undefined) : undefined;
+    if (!allowed) return all;
+    const top = judgeCandidates({ allowed }, all, (await allowedSearch(engine, { fen, allowed }, all)) ?? []);
+    return top.length ? top : all;
   }
 
   boardOf(playerId: string): BoardState | null {

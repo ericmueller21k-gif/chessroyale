@@ -224,8 +224,13 @@ export class NetMatch implements GameView {
     this.send({ t: "powerUp", key: this.key });
     this.hint = [];
     this.emit();
+    // (A boss power limits the moves: the hints are the best of the allowed ones.)
+    const allowed = this.boss?.powers?.allowed ?? undefined;
     void this.engines()
-      .then((engines) => this.top.get(engines[0]!, fen))
+      .then(async (engines) => {
+        const all = await this.top.get(engines[0]!, fen);
+        return allowed ? judgeCandidates({ allowed }, all, (await allowedSearch(engines[0]!, { fen, allowed }, all)) ?? []) : all;
+      })
       .then((top) => {
         if (this.phase.kind === "play" && this.phase.board.fen === fen) {
           this.hint = hintsFrom(fen, top);

@@ -11,7 +11,7 @@ test("Boingo the Clown: a raid boss as a character, kitty-corner from the God Ki
   const phone = info.project.name === "phone";
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
-  await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Boingo the Clown, 1600/ }).click();
+  await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Boingo the Clown/ }).click();
 
   // His entrance, with his portrait on the card instead of an emoji.
   await expect(page.locator(".boss-intro .boss-portrait")).toBeVisible({ timeout: 30_000 });
