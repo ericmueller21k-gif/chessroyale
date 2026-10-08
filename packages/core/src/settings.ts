@@ -674,12 +674,16 @@ export const CAPACITY = {
     /** A lobby tells the live hub about a change at most this often (and at least once a minute while it runs). */
     lobbyReportMs: 2_000,
   },
-  /** Requests per window, counted per Worker instance (a runaway client or script, not a person playing). */
+  /**
+   * Requests per window, counted per Worker instance (a runaway client or script, not a person playing). Sized by the
+   * app's own worst burst, measured: a phone reloading a match screen 20 times in a minute (e2e/panel.spec.ts) made
+   * over 300 requests, and a 300 limit broke its chat panel.
+   */
   rateLimits: {
     /** Generous: a school or a mobile network puts many players behind one address. */
-    perIp: { limit: 3_000, windowMs: 60_000 },
-    /** The home screen asks every 5 s (12 a minute); everything else is far rarer. */
-    perUser: { limit: 300, windowMs: 60_000 },
+    perIp: { limit: 10_000, windowMs: 60_000 },
+    /** Four times that reload burst; a script hammering in a loop makes hundreds a second. */
+    perUser: { limit: 1_200, windowMs: 60_000 },
     /** PLAY and new lobbies (a player in line asks every 3 s). */
     play: { limit: 40, windowMs: 60_000 },
   },

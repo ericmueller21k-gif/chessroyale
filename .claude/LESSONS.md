@@ -267,3 +267,22 @@ read the scoreboard's name column (103 px at 360 px) and measured every name in 
   drawn after it.
 - Check text that must fit by measuring it in the real font and box, with some room for other fonts (an iPhone's runs
   wider than headless Chrome's), not by counting characters.
+
+## A rate limit sized by the wrong number (Oct 8, 2026)
+
+**Seen** (by the capacity work, before it shipped): `e2e/panel.spec.ts` failed on the phone, twice, and passed on
+main: after about 15 reloads of a match screen, the chat panel under the board was too short.
+
+**The cause:** the new per-account rate limit was 300 requests a minute, sized by the home screen's polling (12 a
+minute). But a reload of a match screen makes a burst of calls (account, live line, lobby, socket, shop and more),
+and the test reloads about 20 times a minute: over 300. Past the limit some of those calls got a 429, and the screen
+drew with what it had.
+
+**How it was found:** the failure came late in the test (tap 14, tap 18), after many reloads; the same test passed on
+main; with the limit raised it passed.
+
+**The rule:**
+- Size a limit by the app's own worst burst, measured (reloads, reconnects, the app coming back from the background),
+  not by its steady rate. Then leave a few times that as margin, and add a test that the burst stays under it.
+- When a test passes on main and fails on a branch late in its run, look for something that accumulates: a counter,
+  a limit, a cache.
