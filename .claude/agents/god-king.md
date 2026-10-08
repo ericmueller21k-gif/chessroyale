@@ -20,13 +20,15 @@ any section marked "to build" as your brief.
 | His powers' rules, charges, timing | `packages/chess/src/runner.ts` (boss battle), `packages/core/src/settings.ts` (`king*` keys), `packages/chess/src/boss-timing.ts` |
 | Online: the server's side and the messages | `packages/server/src/lobby.ts`, `packages/chess/src/protocol.ts`, `packages/app/src/net.ts` |
 | Solo | `packages/app/src/solo.ts`, `packages/app/src/game.ts` |
-| His sprite and on-board animations | `packages/app/src/components/GodKing.tsx`, `styles.css` (his sections) |
-| Banners | `packages/app/src/components/FightBanner.tsx`, portrait `packages/app/scripts/god-king-portrait.py` → `public/` |
+| His pixel art: parts, poses, animations, white and black looks, portraits (pure) | `packages/app/src/characters/god-king.ts` (the boss characters' format: `sprite.ts`, `paint.ts`) |
+| Where he's drawn and his on-board animations | `packages/app/src/components/GodKing.tsx` (`GodKingSprite`, `KingSummon`, `GodKingPortrait`), `LastStand.tsx`, `styles.css` (his sections) |
+| Banners | `packages/app/src/components/FightBanner.tsx`, his cut-ins in `GodKing.tsx` and `LastStand.tsx` |
 | The dock and his command menu | `packages/app/src/components/BossDock.tsx` |
 | His lines | `packages/app/src/godKing.ts` |
 | Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0 only, credited in `CREDITS.md`), `src/sound.ts` |
 | Boss screens | `packages/app/src/screens/Boss.tsx`, the boss parts of `Crowd.tsx` and `Play.tsx` |
-| Tests | `packages/chess/test/crowd.test.ts`, `packages/server/test/lobby.test.ts`, `packages/app/test/god-king.test.ts`, `e2e/formats.spec.ts` |
+| Previews | `npm run frames:god-king -- <dir> [w\|b] [phone\|desktop\|both] [summon\|laststand\|all] [light\|dark]` (in the game), `npm run preview:characters -- <dir> only=god-king` (GIFs), `node scripts/preview-god-king.mjs out.png banner=1` (sheet) |
+| Tests | `packages/chess/test/crowd.test.ts`, `packages/server/test/lobby.test.ts`, `packages/app/test/god-king.test.ts`, `packages/app/test/god-king-sprite.test.ts`, `e2e/formats.spec.ts` |
 
 Not yours:
 - the boss's chess strength and how moves are judged (the `engine` delegate)
@@ -40,7 +42,7 @@ If you need one of those changed, say what and why, and stop.
 - **He's secondary to the chess.** Big moments are rare and short. No instruction text on screen. He speaks about 5–10
   times a game.
 - **Everything he shows comes in white and black versions:** the sprite, the portrait, any new art. It's a recolour of
-  the armour only; gold, eyes, cape and effects stay the same. Use the crowd's colour.
+  the armour only (his `black` look); gold, eyes, cape and effects stay the same. Use the crowd's colour.
 - **Style.** SNES/Fire Emblem/Final Fantasy: pixel portraits with crisp scaling, slanted cut-in bands, retro SFX, and a
   Press Start 2P speech bubble. Drama is welcome; gore isn't. Cracks, sparks and a few stylised red drops are the limit.
 - **The clock stands still** while he acts on the board, for everyone, solo and online (see how `kingStrikeMs` moves

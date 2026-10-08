@@ -1,6 +1,8 @@
 // Boss characters' preview: for each character, an animated GIF per animation and a showreel (4x), a frame sheet
 // (PNG, every frame with its time and cue), and one comparison PNG of them all at phone size on the game's ground.
 //   npm run preview:characters -- [outDir] [ref=reference.png] [scale=4]
+// A character with recolours (`looks`, such as the God King's black armour) is drawn once per look too, its files
+// named <id>-<look>-*.
 // `ref` puts a reference picture first in the comparison (its white or transparent background is keyed out).
 // No dependencies: PNG and GIF are written (and the reference read) here, with node:zlib.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -286,9 +288,12 @@ function lzw(minSize: number, input: Uint8Array): Uint8Array {
 }
 
 // ---- Output
-const frameImg = (ch: Character, f: Frame) => renderFrame(ch, f, { bg: GROUND });
+let look: string | undefined;
+const frameImg = (ch: Character, f: Frame) => renderFrame(ch, f, { bg: GROUND, look });
+const looksOf = (ch: Character) => [undefined, ...Object.keys(ch.looks ?? {})];
 
-for (const ch of ALL) {
+for (const ch of ALL) for (look of looksOf(ch)) {
+  const id = look ? `${ch.id}-${look}` : ch.id;
   // A GIF per animation, and a showreel: idle twice, each other animation once with idle between.
   const reel: { img: Img; ms: number }[] = [];
   const idle = ch.anims.idle!.frames;
@@ -299,13 +304,13 @@ for (const ch of ALL) {
     const one: { img: Img; ms: number }[] = [];
     push(anim.frames, one);
     if (anim.loop) push(anim.frames, one);
-    writeGif(join(outDir, `${ch.id}-${name}.gif`), one);
+    writeGif(join(outDir, `${id}-${name}.gif`), one);
     if (name !== "idle") {
       push(anim.frames, reel);
       push(idle, reel);
     }
   }
-  writeGif(join(outDir, `${ch.id}.gif`), reel);
+  writeGif(join(outDir, `${id}.gif`), reel);
 
   // Frame sheet: each animation's frames in rows of up to 12, with their number, time and cue.
   const anims = Object.entries(ch.anims);
@@ -315,7 +320,7 @@ for (const ch of ALL) {
   const cellW = ch.w * SCALE + 8;
   const cellH = ch.h * SCALE + 30;
   const sheet = blank(cols * cellW + 8, 30 + anims.reduce((s, [, a]) => s + 14 + rowsOf(a.frames.length) * cellH, 0));
-  text(sheet, `${ch.name}  ${ch.w}x${ch.h} px  shown at ${SCALE}x`, 8, 8, GOLD);
+  text(sheet, `${ch.name}${look ? ` (${look})` : ""}  ${ch.w}x${ch.h} px  shown at ${SCALE}x`, 8, 8, GOLD);
   let y0 = 30;
   for (const [name, anim] of anims) {
     text(sheet, `${name}${anim.loop ? " loop" : ""}`, 8, y0, INK);
@@ -328,8 +333,8 @@ for (const ch of ALL) {
     });
     y0 += 14 + rowsOf(anim.frames.length) * cellH;
   }
-  writePng(join(outDir, `${ch.id}-sheet.png`), sheet);
-  console.log(`${ch.id}: ${Object.entries(ch.anims).map(([n, a]) => `${n} ${a.frames.length}f`).join(", ")}`);
+  writePng(join(outDir, `${id}-sheet.png`), sheet);
+  console.log(`${id}: ${Object.entries(ch.anims).map(([n, a]) => `${n} ${a.frames.length}f`).join(", ")}`);
 }
 
 // Comparison at phone size: the reference (if given), then each character's first idle frame, about 128 px tall,
@@ -342,10 +347,11 @@ if (refPath) {
   const target = Math.max(...ALL.map((c) => spriteHeight(c))) * PHONE;
   tiles.push({ img: resample(ref, target / ref.h), label: "reference" });
 }
-for (const ch of ALL) {
-  const img = scaleUp(renderFrame(ch, ch.anims.idle!.frames[0]!), PHONE);
-  tiles.push({ img: crop(img), label: ch.name.replace(/^The /, "") });
-}
+for (const ch of ALL)
+  for (const lk of looksOf(ch)) {
+    const img = scaleUp(renderFrame(ch, ch.anims.idle!.frames[0]!, { look: lk }), PHONE);
+    tiles.push({ img: crop(img), label: ch.name.replace(/^The /, "") + (lk ? ` ${lk}` : "") });
+  }
 const pad = 24;
 const H = Math.max(...tiles.map((t) => t.img.h));
 const tileW = (t: { img: Img; label: string }) => Math.max(t.img.w, t.label.length * 8);

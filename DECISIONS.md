@@ -3011,3 +3011,70 @@ engine choosing a move, and online sync).
 
 **Later ideas:** boss drops (a themed crate item for beating a boss: a clown nose, a zombie hand); bosses jumping to the
 centre of the board to cast; the farmer and the gingerbread man as bosses.
+
+## The God King, redrawn as pixel art (Oct 8, 2026)
+
+Eric's reference: a holy knight in white plate with gold trim, a winged crown-helmet with glowing gold eyes, a flaming
+golden sword, a blue tabard with gold crosses and a long torn white-and-gold cape. The director asked for a full
+overhaul in the boss characters' format, so the crowd's champion looks as grand as the bosses.
+
+- **The sprite** (`packages/app/src/characters/god-king.ts`, listed with the bosses so their tests and preview cover
+  him): his drawing space is one board square, 60 x 60 px with his feet at the bottom centre, in a 108 x 104 frame
+  that leaves room for his wings, raised sword and cape. It's made of parts: a helm with a T-visor and glowing eyes, a
+  five-spiked crown, gold helmet wings, spiked pauldrons with a gold cross, a breastplate with a gold sun-cross and blue
+  banners, faulds, the tabard, legs with gold knee cops, sabatons, the cape, and white back wings (folded, half open
+  or spread).
+  - The sword arm is drawn from its pose's shoulder, elbow and fist. The sword (a gold hilt and a blade of fire) hangs
+    off the fist in the pose's direction, so a swing is a list of poses. The flame flickers in three shapes, flares
+    when he raises it, and burns down to embers when he falls.
+  - Parts that move: the sword arm, the flame, the cape and tabard (ripples), the back wings, the helmet wings (a
+    flap), and the eyes (glowing, blazing, dim, dark).
+- **Both sides:** a `black` look swaps the four armour colours for dark steel, a step lighter than black so he reads
+  on the dark ground. Gold, eyes, cape, cloth, wings and flame stay the same (his standing rule, so the cape stays
+  white on Black). A unit test checks that no other pixel changes.
+- **Renderer additions** (backwards-compatible; the clown and his tests are unchanged): `lieDown` turns a whole frame
+  a quarter (a fallen figure), each part with its own outline; `partSize`; and the preview draws every look too
+  (`<id>-<look>-*` files, a comparison tile each).
+- **His animations, and where each plays:**
+  - **The dock:** `idle`, by the clock: he breathes, the cape ripples, the flame flickers and sheds embers, the
+    helmet wings lift, the eyes glint. The ready, dimmed and spent looks are as before. His Last Stand leap is `leap`
+    (a crouch, then up with the sword raised) under the same CSS rise and fade. Fallen, he's `fallen`: on his side,
+    cracked, eyes dark, his crown rolled off, the sword down to embers.
+  - **Summoned** (`KingSummon`): he lands out of the beam with wings spread (`appear`, at 1,300 ms), raises the
+    flaming sword with wings spread and eyes blazing (`raise`, at 1,550 ms as before), and holds it through the cut-in.
+    Then either he points it and his bolt leaves its tip (`point`; its bolt frame lands exactly on the bolt), or he
+    cuts once for each slash (`slash`; its cut frame lands exactly on each slash), with a bolt from the raised blade
+    before each cut. `summonMoment` picks the animation and is unit tested.
+  - **The Last Stand:** one animation built from `LAST_STAND`, so it can't drift from the effects and sounds:
+    - the dive (sword down, wings up) and the crash (low, sword planted);
+    - guard over the square (sword across him, wings spread) through the banner and the slide back;
+    - the 25 blows, each a 50 ms red-white flash and a one-pixel jolt, with cracks at the three `crackAt`;
+    - the stagger, the collapse to one knee, then lying as he fades, the same picture as his fallen figure in the
+      dock.
+
+    It replaces the CSS hurt filter, the jolt and the stagger and collapse rotations.
+  - **The results:** fallen; or, if the crowd won, `rise` (from the ground to one knee, up, the sword raised), then
+    the raised loop.
+  - **The shop's King effect preview:** sword raised.
+- **Portraits from his kit** (replacing the Python-made PNGs, removed with their script): a 50 x 37 crop of a portrait
+  pose (sword raised, eyes blazing, wings spread) for his cut-in and the QUEEN SLAIN! face; battle-worn (cracks, eyes
+  dim, embers, three small red drops) for the Last Stand banner.
+- **Sizes:**
+  - On the board, his drawing space is the square, as before.
+  - In the dock on a phone, a 50 px box, the old figure's height.
+  - In the dock on a computer, twice his size (120 px), like the boss across the board; the dock has room there, and
+    the status box keeps its height.
+  - On the results, the epilogue is 184 px tall when he rises (was 156), so his raised sword clears his words.
+- **Timing:** no moment's timing, sound or line changed. His sounds stay on their timers; the frames' cues are for
+  the tests and the preview, not sounds.
+- **Calls I made:**
+  - While he acts on the board (his raise and the cut-in, about 2 s, never at rest), his spread wings and raised sword
+    reach a few pixels into the next squares. I kept that for the grandeur. He never takes a tap.
+  - On the board he bobs but no longer rocks: rotating pixel art blurs it.
+  - His bolt starts at his sword's tip instead of just above his square.
+- **Checking it:**
+  - `npm run frames:god-king -- <dir> [w|b] [phone|desktop|both] [summon|laststand|all] [light|dark]` plays a solo
+    raid: the dock, a strike, a played move and a Last Stand, with frames and stills.
+  - `npm run preview:characters -- <dir> only=god-king` writes GIFs and sheets for both looks.
+  - `node scripts/preview-god-king.mjs out.png banner=1` writes the sheet with his banners.
+  - Test switches: `?laststand=1` and `?side=b`.

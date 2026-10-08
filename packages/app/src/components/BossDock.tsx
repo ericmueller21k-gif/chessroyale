@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import type { GameView, StrikeState } from "../game.ts";
 import { kingLine, kingSay, setKingFallen, type KingCue } from "../godKing.ts";
 import { play } from "../sound.ts";
@@ -162,6 +162,8 @@ function GodKingUnit({
 }) {
   const now = useFrameNow();
   const line = kingLine(now);
+  // His leap (his Last Stand) plays from when it starts.
+  const leapAt = useMemo(() => (leaping ? Date.now() : 0), [leaping]);
   if (fallen) {
     // After his Last Stand: his fallen figure, on his side, cracked and greyed. No menu, no crowns; the charges he
     // had left are your power-ups, in a ⚡ button above him (the whole column is the button).
@@ -196,7 +198,7 @@ function GodKingUnit({
     <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${leaping ? " leaping" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}`}>
       {menu ?? (line && !away && !leaping && <SpeechBubble key={line.at} text={line.text} at={line.at} until={line.until} now={now} />)}
       <button type="button" class="gk-unit-btn" disabled={!ready} onClick={onTap} aria-label={ready ? "God King: tap to summon him" : "God King"}>
-        <GodKingSprite side={side} class={leaping ? "leap" : "idle"} />
+        <GodKingSprite side={side} anim={leaping ? "leap" : "idle"} since={leapAt} class={leaping ? "leap" : "idle"} />
       </button>
       <span class="gk-unit-charges" aria-label={`${charges} charges left`}>
         {charges > 0 ? "👑".repeat(charges) : "—"}

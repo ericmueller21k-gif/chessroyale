@@ -1,5 +1,7 @@
 import type { ComponentChildren } from "preact";
-import { useEffect } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { GOD_KING, GOD_KING_BOX, GOD_KING_PORTRAIT, KING_TIP, kingFrameAt, summonMoment, type GodKingAnim } from "../characters/god-king.ts";
+import { renderFrame, type Frame } from "../characters/sprite.ts";
 import { useFrameNow } from "./Countdown.tsx";
 import { pieceAt } from "@chessroyale/chess";
 import { play, type SoundName } from "../sound.ts";
@@ -12,127 +14,68 @@ export function kingEffectStyle(): Record<string, string> {
   return { "--ks-bolt": look.bolt!, "--ks-glow": look.glow!, "--ks-beam": look.beam! };
 }
 
-/** His colours: armour in the crowd's colour, outlined like the board's pieces; gold for the crown and hilt. */
-function kingColours(side: "w" | "b") {
-  return { fill: side === "w" ? "#f7f7f5" : "#1d1d1f", line: side === "w" ? "#1d1d1f" : "#f7f7f5", gold: "#f2c14e" };
+/** Each frame of his drawn once per look (white or black armour). */
+const images = { w: new WeakMap<Frame, ImageData>(), b: new WeakMap<Frame, ImageData>() };
+function frameImage(side: "w" | "b", frame: Frame): ImageData {
+  let img = images[side].get(frame);
+  if (!img) {
+    const r = renderFrame(GOD_KING, frame, { look: side === "b" ? "black" : undefined });
+    img = new ImageData(new Uint8ClampedArray(r.data), r.w, r.h);
+    images[side].set(frame, img);
+  }
+  return img;
 }
 
-/** His body: the three-tier base, the armour and the visored helm (in a 100 × 150 box, standing). */
-function KingBody({ fill, line }: { fill: string; line: string }) {
-  return (
-    <g class="gk-body" stroke={line} stroke-width="3" stroke-linejoin="round">
-      {/* Base: three tiers, like every piece on the board. */}
-      <rect x="14" y="132" width="72" height="12" rx="3" fill={fill} />
-      <path d="M22 132 Q22 122 30 119 L70 119 Q78 122 78 132 Z" fill={fill} />
-      <rect x="24" y="111" width="52" height="8" rx="3" fill={fill} />
-      {/* Armour: shoulders, chest and the skirt down to the base. */}
-      <path d="M18 66 Q20 52 36 50 L64 50 Q80 52 82 66 L84 84 L74 86 L72 111 L28 111 L26 86 L16 84 Z" fill={fill} />
-      <path d="M36 52 L50 66 L64 52" fill="none" />
-      <path d="M28 86 L72 86" fill="none" />
-      {/* Helmet with a visor. */}
-      <path d="M34 26 Q50 20 66 26 L65 46 Q50 56 35 46 Z" fill={fill} />
-      <path d="M38 32 L62 32" fill="none" />
-      <g stroke={line} stroke-width="2.5">
-        <line x1="42" y1="35" x2="42" y2="43" />
-        <line x1="46" y1="35" x2="46" y2="45" />
-        <line x1="54" y1="35" x2="54" y2="45" />
-        <line x1="58" y1="35" x2="58" y2="43" />
-      </g>
-    </g>
-  );
-}
-
-/** His crown and its cross. */
-function KingCrown({ line, gold }: { line: string; gold: string }) {
-  return (
-    <g class="gk-crown" fill={gold} stroke={line} stroke-width="2" stroke-linejoin="round">
-      <path d="M32 24 L30 8 L40 15 L45 5 L50 13 L55 5 L60 15 L70 8 L68 24 Q50 19 32 24 Z" />
-      <path d="M48 0 h4 v3 h3 v4 h-3 v4 h-4 v-4 h-3 v-4 h3 Z" />
-    </g>
-  );
-}
-
-/** His sword, point down in front of him, his fist on the grip (`fist`: with his hand on it). */
-function KingSword({ fill, line, gold, fist = true, raised = false }: { fill: string; line: string; gold: string; fist?: boolean; raised?: boolean }) {
-  return (
-    <g class={`gk-sword${raised ? " raised" : ""}`} stroke={line} stroke-width="2" stroke-linejoin="round">
-      <path d="M47.5 92 L52.5 92 L52.5 126 L50 131 L47.5 126 Z" fill="#dfe6ee" />
-      <rect x="36" y="88" width="28" height="5" rx="2.5" fill={gold} />
-      <rect x="47" y="70" width="6" height="18" rx="2" fill={gold} />
-      <circle cx="50" cy="67" r="5" fill={gold} />
-      {fist && <rect x="42" y="74" width="16" height="10" rx="4" fill={fill} stroke={line} />}
-    </g>
-  );
-}
+/** Placing his frame: his drawing space (one board square) fills the box's height, his feet at its bottom centre. */
+const BOX_STYLE = {
+  "--gk-w": GOD_KING.w,
+  "--gk-h": GOD_KING.h,
+  "--gk-ox": GOD_KING_BOX.x,
+  "--gk-oy": GOD_KING_BOX.y,
+  "--gk-s": GOD_KING_BOX.size,
+} as Record<string, number>;
 
 /**
- * Cracks in his armour (his Last Stand), worse at each level 1 to 3: a split across the helm, then the chest
- * and a shoulder, then the skirt and the base. Each is a dark jagged line with a bright chipped edge beside it.
+ * The God King: a holy knight in white plate (dark steel for Black) with gold trim, a winged crown-helmet, a flaming
+ * gold sword, a blue tabard and a torn white cape, drawn as pixel art from parts (characters/god-king.ts). `anim`
+ * plays once from `since` (then `then` loops) or, for a loop, runs by the clock. The box sized by CSS is his
+ * drawing space, one board square; his wings, sword and cape reach outside it without ever taking a tap.
  */
-const CRACKS: string[][] = [
-  ["M57 25 L54 31 L58 36 L55 42", "M38 28 L42 33 L39 38"],
-  ["M64 54 L58 61 L62 67 L56 74 L59 80", "M22 62 L28 67 L25 73", "M45 56 L49 60"],
-  ["M34 88 L39 95 L35 101 L40 108", "M66 90 L61 97 L65 104", "M30 121 L36 126 L33 131", "M70 134 L64 139"],
-];
-function KingCracks({ level, line }: { level: number; line: string }) {
-  if (level <= 0) return null;
-  const paths = CRACKS.slice(0, level).flat();
+export function GodKingSprite({ side, anim = "idle", since = 0, then, class: cls = "" }: { side: "w" | "b"; anim?: GodKingAnim; since?: number; then?: GodKingAnim; class?: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const cv = useRef<HTMLCanvasElement>(null);
+  // Drawn before the paint (no empty first frame), then whenever the picture changes.
+  useLayoutEffect(() => {
+    const g = cv.current?.getContext("2d");
+    if (!g) return;
+    let raf = 0;
+    let last = "";
+    const draw = () => {
+      const s = kingFrameAt(anim, Date.now(), since, then);
+      const id = `${s.anim}:${s.frame}`;
+      if (id !== last) {
+        last = id;
+        g.putImageData(frameImage(side, GOD_KING.anims[s.anim]!.frames[s.frame]!), 0, 0);
+        box.current?.setAttribute("data-anim", s.anim);
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, [side, anim, since, then]);
   return (
-    <g class="gk-cracks" fill="none" stroke-linejoin="round" stroke-linecap="round">
-      {paths.map((d) => (
-        <g key={d}>
-          <path d={d} stroke="#fff6d8" stroke-width="2" transform="translate(1.6 0.6)" opacity="0.85" />
-          <path d={d} stroke={line} stroke-width="2.6" />
-        </g>
-      ))}
-    </g>
+    <span ref={box} class={`god-king ${cls}`} data-anim={anim} style={BOX_STYLE} aria-hidden="true">
+      <canvas ref={cv} class="gk-canvas" width={GOD_KING.w} height={GOD_KING.h} />
+    </span>
   );
 }
 
 /**
- * The God King: a chess piece of our own, drawn in parts so he can move. A
- * crowned, visored knight-king on a three-tier chess base, a sword held point
- * down in front of him. Drawn in the crowd's colour, outlined like the board's
- * pieces, with gold for the crown and the hilt. `cracks` (1 to 3): his armour
- * cracking under the blows of his Last Stand.
- */
-export function GodKingSprite({ side, raised = false, cracks = 0, class: cls = "" }: { side: "w" | "b"; raised?: boolean; cracks?: number; class?: string }) {
-  const { fill, line, gold } = kingColours(side);
-  return (
-    <svg class={`god-king ${cls}`} viewBox="0 0 100 150" aria-hidden="true">
-      <KingBody fill={fill} line={line} />
-      <KingCracks level={cracks} line={line} />
-      <KingCrown line={line} gold={gold} />
-      <KingSword fill={fill} line={line} gold={gold} raised={raised} />
-    </svg>
-  );
-}
-
-/**
- * The God King fallen (after his Last Stand): toppled on his side like a beaten
- * chess piece, his armour cracked, his crown knocked off beside his head and his
- * sword on the ground. Greyed in the dock for the rest of the battle.
+ * The God King fallen (after his Last Stand): on his side, his armour cracked, his eyes dark, his crown rolled off
+ * and his sword's flame down to embers. Greyed in the dock for the rest of the battle.
  */
 export function GodKingFallen({ side, class: cls = "" }: { side: "w" | "b"; class?: string }) {
-  const { fill, line, gold } = kingColours(side);
-  return (
-    <svg class={`god-king fallen ${cls}`} viewBox="0 0 160 100" aria-hidden="true">
-      <ellipse class="gk-fallen-shadow" cx="86" cy="94" rx="72" ry="5" />
-      {/* His crown, knocked off, on the ground by his head. */}
-      <g transform="translate(-8 76) rotate(-24 50 12) scale(0.6)">
-        <KingCrown line={line} gold={gold} />
-      </g>
-      {/* Lying on his side: the standing figure turned a quarter, head to the left, base to the right. */}
-      <g transform="translate(12 98) rotate(-90)">
-        <KingBody fill={fill} line={line} />
-        <KingCracks level={3} line={line} />
-      </g>
-      {/* His sword, dropped on the ground in front of him. */}
-      <g transform="translate(-4 124) rotate(-90) scale(0.7)">
-        <KingSword fill={fill} line={line} gold={gold} fist={false} />
-      </g>
-    </svg>
-  );
+  return <GodKingSprite side={side} anim="fallen" class={`fallen ${cls}`} />;
 }
 
 /** Centre of a square on the board in a 0-800 coordinate space, from the given side. */
@@ -190,13 +133,14 @@ const EDGE = Array.from({ length: 12 }, (_, i) => {
 
 /**
  * Summoning the God King on your king's square. A dozen thin bolts converge on
- * the square, a beam of light, a flash, and the God King stands there in your
- * king's place (the real king is hidden while he's on the board). He raises his
- * sword, then either a thin bolt strikes the piece he moves ("move", which then
- * plays at `moveAt`), or he slashes the boss's king three times ("strike", each
- * with its own sound and a yellow "−N" adding up to `hp`). At `exitAt` holy
- * light takes him away on whatever square he's on, and the plain king drops
- * back there. All times are Date.now() values.
+ * the square, a beam of light, a flash, and the God King lands there in your
+ * king's place, wings spread (the real king is hidden while he's on the board).
+ * He raises his flaming sword, then either points it and a thin bolt leaves its
+ * tip for the piece he moves ("move", which then plays at `moveAt`), or he cuts
+ * once for each of three slashes on the boss's king, a bolt from his raised
+ * blade before each ("strike", each with its own sound and a yellow "−N" adding
+ * up to `hp`). At `exitAt` holy light takes him away on whatever square he's
+ * on, and the plain king drops back there. All times are Date.now() values.
  */
 export function KingSummon({
   side,
@@ -237,7 +181,12 @@ export function KingSummon({
   const k0 = squareXY(kingBefore, orientation);
   const tg = target ? squareXY(target, orientation) : null;
   const present = t >= 1300 && out < 700;
-  const raised = t >= 1550;
+  // His own moves on the board: appear, raise the sword, then point it for his bolt or cut once per slash.
+  const moment = summonMoment({ appearAt: 1300, raiseAt: KING_CUT_AT, boltAt: mode === "move" && target ? BOLT_AT : undefined, slashAt: mode === "strike" && target ? SLASH_AT : undefined }, t);
+  // His bolts leave from his sword's tip: pointed for the move, held up for the strike.
+  const tip = (at: readonly [number, number]) => ({ x: k0.x - 50 + at[0] * 100, y: k0.y - 50 + at[1] * 100 });
+  const boltFrom = tip(KING_TIP.point);
+  const strikeFrom = tip(KING_TIP.raised);
   const strike = mode === "strike";
   const hits = slashes(hp ?? 10);
   // His sounds, in time with the animation.
@@ -287,7 +236,7 @@ export function KingSummon({
         {t >= 900 && t < 1300 && <rect x={k0.x - 26} y={0} width={52} height={k0.y + 40} fill="url(#ks-beam)" style={{ opacity: Math.min(1, (t - 900) / 150) * (t > 1200 ? (1300 - t) / 100 : 1) }} />}
         {t >= 1200 && t < 1550 && <circle cx={k0.x} cy={k0.y} r={70 + (t - 1200) / 4} fill="url(#ks-glow)" style={{ opacity: 1 - (t - 1200) / 350 }} />}
         {/* His bolt to the piece he moves. */}
-        {!strike && tg && t >= BOLT_AT && t < BOLT_AT + 300 && <path class="ks-bolt strike" d={boltPath(k0.x, k0.y - 30, tg.x, tg.y, 13)} style={{ opacity: t < BOLT_AT + 150 ? 1 : (BOLT_AT + 300 - t) / 150 }} />}
+        {!strike && tg && t >= BOLT_AT && t < BOLT_AT + 300 && <path class="ks-bolt strike" d={boltPath(boltFrom.x, boltFrom.y, tg.x, tg.y, 13)} style={{ opacity: t < BOLT_AT + 150 ? 1 : (BOLT_AT + 300 - t) / 150 }} />}
         {!strike && tg && t >= BOLT_AT + 50 && t < BOLT_AT + 450 && <circle class="ks-hit" cx={tg.x} cy={tg.y} r={20 + (t - BOLT_AT - 50) / 8} style={{ opacity: 1 - (t - BOLT_AT - 50) / 400 }} />}
         {/* The strike: three quick slashes on the boss's king, each a flash of his bolt and a cut across the square. */}
         {strike &&
@@ -310,7 +259,7 @@ export function KingSummon({
             const fade = age < 160 ? 1 : Math.max(0, 1 - (age - 160) / 220);
             return (
               <g key={i}>
-                {age < 120 && <path class="ks-bolt strike" d={boltPath(k0.x, k0.y - 30, tg.x, tg.y, 21 + i)} style={{ opacity: age < 0 ? 0.6 : 1 - age / 120 }} />}
+                {age < 120 && <path class="ks-bolt strike" d={boltPath(strikeFrom.x, strikeFrom.y, tg.x, tg.y, 21 + i)} style={{ opacity: age < 0 ? 0.6 : 1 - age / 120 }} />}
                 <line class="ks-slash" x1={x1} y1={y1} x2={x2} y2={y2} style={{ opacity: fade }} />
                 {age >= 0 && <circle class="ks-hit" cx={tg.x} cy={tg.y} r={18 + age / 7} style={{ opacity: Math.max(0, 1 - age / 380) }} />}
               </g>
@@ -321,10 +270,10 @@ export function KingSummon({
       </svg>
       {present && (
         <div
-          class={`ks-god${raised ? " raised" : ""}${out >= 0 ? " leaving" : ""}`}
+          class={`ks-god${out >= 0 ? " leaving" : ""}`}
           style={{ left: pct(k.x - 50), top: pct(k.y - 50), opacity: out >= 0 ? Math.max(0, 1 - out / 400) : Math.min(1, (t - 1300) / 150) }}
         >
-          <GodKingSprite side={side} raised={raised} />
+          <GodKingSprite side={side} anim={moment.anim} since={startAt + moment.at} then={moment.then} />
         </div>
       )}
       {out >= 350 && out < 900 && (
@@ -347,15 +296,18 @@ export function KingSummon({
 }
 
 /**
- * The God King's pixel portrait for his cut-in: a holy armoured king with a
- * spiked gold crown, burning gold eyes in his visor, gold-trimmed pauldrons and
- * the king's cross on his chest. A 64 × 60 pixel image (generated by
- * scripts/god-king-portrait.py), scaled up with crisp pixels; his armour in
- * the crowd's colour (the same picture recoloured for Black).
+ * The God King's portrait for his banners, from his drawing: crown and helm, eyes blazing, wings spread and the
+ * flaming sword raised beside him; `hurt`, battle-worn for his Last Stand (cracked, eyes dimmed, the flame low).
+ * Scaled up with crisp pixels; his armour in the crowd's colour.
  */
 export function GodKingPortrait({ side, hurt = false }: { side: "w" | "b"; hurt?: boolean }) {
-  const name = hurt ? "god-king-portrait-hurt" : "god-king-portrait";
-  return <img class="gk-portrait" src={`/sprites/${name}-${side}.png`} alt="" width={64} height={60} draggable={false} />;
+  const cv = useRef<HTMLCanvasElement>(null);
+  const p = GOD_KING_PORTRAIT;
+  useLayoutEffect(() => {
+    const frame = GOD_KING.anims[hurt ? "portraitHurt" : "portrait"]!.frames[0]!;
+    cv.current?.getContext("2d")?.putImageData(frameImage(side, frame), -p.x, -p.y, p.x, p.y, p.w, p.h);
+  }, [side, hurt]);
+  return <canvas ref={cv} class="gk-portrait" width={p.w} height={p.h} aria-hidden="true" />;
 }
 
 const PIECE_NAMES = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" } as const;

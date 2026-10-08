@@ -71,7 +71,7 @@ export function KingEffectPreview({ look, side = "w" }: { look: Record<string, s
         <path class="ks-bolt" d="M14 4 L26 30 L18 34 L32 62 L24 64 L38 92" />
         <path class="ks-bolt" d="M86 6 L74 28 L82 32 L70 58 L78 60 L64 90" />
       </svg>
-      <GodKingSprite side={side} raised class="kep-king" />
+      <GodKingSprite side={side} anim="raised" class="kep-king" />
     </span>
   );
 }

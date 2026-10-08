@@ -225,3 +225,39 @@ export function renderFrame(ch: Character, frame: Frame, opts: { bg?: string; lo
   );
   return { w: ch.w, h: ch.h, data };
 }
+
+/** A part's size in pixels as a layer draws it (after its own quarter turns, before any ripple or outline). */
+export function partSize(part: Part, rot = 0): [number, number] {
+  const w = Math.max(0, ...part.grid.map((r) => r.length));
+  const h = part.grid.length;
+  return rot % 2 ? [h, w] : [w, h];
+}
+
+/**
+ * The same picture lying on its side (a fallen figure): every layer and speck turned a quarter about the pixel
+ * corner (cx, cy), the head to the left (counter-clockwise) or to the right. Each part turns with its own quarter
+ * turns, so its outline stays right. Ripples are dropped (cloth lies still).
+ */
+export function lieDown(
+  parts: Readonly<Record<string, Part>>,
+  frame: { layers: readonly Layer[]; specks?: readonly Speck[] },
+  cx: number,
+  cy: number,
+  head: "left" | "right" = "left",
+): { layers: Layer[]; specks: Speck[] } {
+  const layers = frame.layers.map((l): Layer => {
+    const part = parts[l.part];
+    if (!part) throw new Error(`no part "${l.part}"`);
+    const [w, h] = partSize(part, l.rot ?? 0);
+    const left = head === "left";
+    return {
+      part: l.part,
+      flipX: l.flipX,
+      x: left ? cx + l.y - cy : cx + cy - l.y - h,
+      y: left ? cy + cx - l.x - w : cy + l.x - cx,
+      rot: (((l.rot ?? 0) + (left ? 3 : 1)) % 4) as 0 | 1 | 2 | 3,
+    };
+  });
+  const specks = (frame.specks ?? []).map(([x, y, k]): Speck => (head === "left" ? [cx + y - cy, cy + cx - x - 1, k] : [cx + cy - y - 1, cy + x - cx, k]));
+  return { layers, specks };
+}
