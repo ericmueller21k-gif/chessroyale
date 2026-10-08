@@ -17,7 +17,7 @@ Eric's first look".
 | What | Where |
 | --- | --- |
 | Signals, the suspicion score and levels (pure, tested) | `packages/core/src/fairplay.ts`; every threshold in `FAIRPLAY` in `settings.ts` |
-| Recording each human pick's signals during a match | `packages/server/src/lobby.ts` (only the recording: `fairNote`, the `fair` record) |
+| Recording each human pick's signals during a match | `packages/server/src/lobby.ts` (only the recording: `noteFair`, the `fair` record) |
 | Reports, flags, bans, appeals, device markers, `eligibleForRanked` | `packages/server/src/fairplay.ts` (D1 tables in `fairplay-schema.ts`), emails in `fairplay-mail.ts` |
 | The deep re-check on the engine server (scheduled, its own budget and instance) | `packages/server/src/fairplay-deep.ts`, `fairplay-engine.ts`; the cron in `wrangler.jsonc`, `scheduled()` in `index.ts` |
 | Enforcing bans (PLAY, lobbies, the lobby's hello) | small checks in `index.ts`, `lobby-do.ts` |

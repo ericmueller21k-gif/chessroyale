@@ -53,8 +53,8 @@ interface QueueRow {
 }
 
 /**
- * One scheduled run: matches waiting for the deep re-check (a flagged match, or any match of a player with an open
- * case), cases in review first and the rest only off-peak (`all` ignores the hours: an admin asking). Each counted
+ * One scheduled run: matches waiting for the deep re-check (queueDeep: every match still kept of a player with a
+ * flagged match or an open case), cases in review first and the rest only off-peak (`all` ignores the hours: an admin asking). Each counted
  * move is searched once; a match is done when all of them are (or can't be). The player's level is worked out again
  * afterwards, which is where a ban can come from. Returns how many searches it made.
  */
@@ -64,11 +64,8 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
   const quiet = opts.all || offPeak(now);
   const rows = await sql.all<QueueRow & { status: string | null }>(
     `SELECT m.id, m.user_id, m.played_at, m.moves, c.status FROM fairplay_matches m LEFT JOIN fairplay_cases c ON c.user_id = m.user_id
-     WHERE m.moves IS NOT NULL AND (m.deep_done IS NULL OR m.deep_done = 0)
-       AND (m.score >= ? OR m.level != 'none' OR c.status IN ('watch', 'review'))
-       ${opts.userId ? "AND m.user_id = ?" : ""}
+     WHERE m.deep_queued = 1 ${opts.userId ? "AND m.user_id = ?" : ""}
      ORDER BY CASE c.status WHEN 'review' THEN 0 WHEN 'watch' THEN 1 ELSE 2 END, m.played_at DESC LIMIT 50`,
-    dp.queueScore,
     ...(opts.userId ? [opts.userId] : []),
   );
   let searches = 0;
@@ -81,7 +78,7 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
     try {
       moves = JSON.parse(row.moves) as FairMove[];
     } catch {
-      await sql.run("UPDATE fairplay_matches SET deep_done = 1 WHERE id = ?", row.id);
+      await sql.run("UPDATE fairplay_matches SET deep_done = 1, deep_queued = 0 WHERE id = ?", row.id);
       continue;
     }
     let complete = true;
@@ -126,12 +123,13 @@ async function saveDeep(sql: Sql, row: QueueRow, moves: FairMove[], complete: bo
   const rating = (await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", row.user_id))?.rating ?? null;
   const summary = matchSignals(moves, referenceStrength(before.map((b) => b.perf), rating));
   await sql.run(
-    "UPDATE fairplay_matches SET moves = ?, summary = ?, score = ?, perf = ?, deep_done = ? WHERE id = ?",
+    "UPDATE fairplay_matches SET moves = ?, summary = ?, score = ?, perf = ?, deep_done = ?, deep_queued = ? WHERE id = ?",
     JSON.stringify(moves),
     JSON.stringify(summary),
     summary.score,
     summary.perf,
     complete ? 1 : 0,
+    complete ? 0 : 1,
     row.id,
   );
 }

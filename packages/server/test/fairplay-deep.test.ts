@@ -133,6 +133,22 @@ describe("the deep re-check", () => {
     expect((await deepCheckRun(sql, search, QUIET + 2 * 86_400_000, { perRun: 100 })).searches).toBe(0);
   });
 
+  it("queues a player's every kept match once one is flagged (an earlier, honest-looking match can clear them)", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const p = await player(sql, "Pat");
+    const quiet = engineMatch(12).map((m, i) => ({ ...m, move: i % 2 ? "a1b1" : "a1a2", loss: i % 2 ? 9 : 0, crowdFound: 30 }));
+    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: quiet }, QUIET - 2 * HOUR);
+    const queued = () => sql.all<{ lobby: string; deep_queued: number | null }>("SELECT lobby, deep_queued FROM fairplay_matches ORDER BY id");
+    expect((await queued()).map((r) => r.deep_queued ?? 0)).toEqual([0]);
+    await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: engineMatch(12) }, QUIET - HOUR);
+    expect((await queued()).map((r) => r.deep_queued)).toEqual([1, 1]);
+    const { calls, search } = fakeSearch();
+    await deepCheckRun(sql, search, QUIET, { perRun: 100 });
+    expect(calls).toHaveLength(24);
+    expect((await queued()).map((r) => r.deep_queued)).toEqual([0, 0]);
+  });
+
   it("a server that doesn't answer leaves the match for a later run", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);

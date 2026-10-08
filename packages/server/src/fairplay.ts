@@ -86,13 +86,14 @@ export async function setCase(sql: Sql, userId: string, status: CaseStatus, by: 
     );
   }
   await logCase(sql, userId, status, by, reason, now);
-  // Flagged or reported: their recent matches' evidence is kept the full time.
+  // Flagged or reported: their recent matches' evidence is kept the full time, and waits for the deep re-check.
   if (status === "watch" || status === "review" || status === "banned") {
     await sql.run(
       "UPDATE fairplay_matches SET keep_until = MAX(COALESCE(keep_until, 0), ?) WHERE user_id = ? AND moves IS NOT NULL",
       now + FAIRPLAY.evidenceDays * DAY,
       userId,
     );
+    await queueDeep(sql, userId);
   }
   const held = (s: CaseStatus | undefined) => s === "review" || s === "banned";
   if (held(status) && !held(before?.status)) {
@@ -386,9 +387,16 @@ export async function recordFairPlay(
     JSON.stringify(match.moves),
     now + (flagged ? FAIRPLAY.evidenceDays : FAIRPLAY.evidenceDaysUnflagged) * DAY,
   );
+  // The deep re-check: a flagged match queues every match of theirs still kept (earlier ones can clear them).
+  if (summary.score >= FAIRPLAY.deep.queueScore || verdict.level !== "none") await queueDeep(sql, userId);
   const acted = await actOn(sql, userId, verdict, now, mail);
   await purgeEvidence(sql, now);
   return { summary, verdict, acted };
+}
+
+/** Queues every match of a player's still kept and not yet deep-checked for the deep re-check (fairplay-deep.ts). */
+export async function queueDeep(sql: Sql, userId: string): Promise<void> {
+  await sql.run("UPDATE fairplay_matches SET deep_queued = 1 WHERE user_id = ? AND moves IS NOT NULL AND (deep_done IS NULL OR deep_done = 0)", userId);
 }
 
 interface HistoryRow {
@@ -466,7 +474,7 @@ export async function purgeEvidence(sql: Sql, now: number, force = false): Promi
   for (const { user_id } of stale) await setCase(sql, user_id, "closed", "auto", `nothing new in ${FAIRPLAY.evidenceDays} days`, now);
   // (Open: watch or review, or a ban with an appeal still waiting.)
   await sql.run(
-    `UPDATE fairplay_matches SET moves = NULL, keep_until = NULL
+    `UPDATE fairplay_matches SET moves = NULL, keep_until = NULL, deep_queued = 0
      WHERE keep_until < ? AND user_id NOT IN (SELECT user_id FROM fairplay_cases WHERE status IN ('watch', 'review'))
        AND user_id NOT IN (SELECT user_id FROM fairplay_appeals WHERE status = 'open')`,
     now,

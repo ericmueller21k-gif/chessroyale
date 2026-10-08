@@ -163,12 +163,18 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "held", type: "INTEGER" },
   // A report made during a match: that match's lobby code (one report per reporter, player and match).
   { table: "reports", column: "match", type: "TEXT" },
-  // Fair play's deep re-check: 1 once a match's counted moves have all been searched again (fairplay-deep.ts).
+  // Fair play's deep re-check (fairplay-deep.ts): 1 while a match waits for it, and 1 once its counted moves have all
+  // been searched again.
+  { table: "fairplay_matches", column: "deep_queued", type: "INTEGER" },
   { table: "fairplay_matches", column: "deep_done", type: "INTEGER" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
 ];
-const AFTER_COLUMNS = [`CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`];
+const AFTER_COLUMNS = [
+  `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
+  // (The deep re-check's queue: only the matches waiting, so the scheduled run never scans the whole table.)
+  `CREATE INDEX IF NOT EXISTS fairplay_matches_deep ON fairplay_matches (deep_queued) WHERE deep_queued = 1`,
+];
 
 /**
  * The latest rating among a user's results that count for ranking (ranked, or from before the rule, and not held by a
