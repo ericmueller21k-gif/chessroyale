@@ -114,9 +114,15 @@ test("home → queue → match, then tap a name for that player's profile (phone
   await phone.getByRole("dialog", { name: "Leaderboard" }).getByRole("button", { name: "Desky's profile" }).click();
   await expect(phone.locator(".fd-overlay").getByRole("heading", { name: "Desky" })).toBeVisible();
   await expect(phone.locator(".fd-overlay")).toContainText("Online now");
+  // Report them: a reason, then the thanks. The report is about this match: a second one in it isn't counted again.
   await phone.locator(".fd-overlay").getByRole("button", { name: "Report" }).click();
-  await phone.getByRole("button", { name: "Name", exact: true }).click();
-  await expect(phone.getByText("Thanks. We'll take a look.")).toBeVisible();
+  for (const reason of ["Cheating", "Offensive name or icon", "Something else"]) await expect(phone.getByRole("button", { name: reason, exact: true })).toBeVisible();
+  await phone.getByRole("button", { name: "Cheating", exact: true }).click();
+  await expect(phone.getByText("Thanks, we'll look into it.")).toBeVisible();
+  await phone.getByRole("dialog", { name: "Report Desky" }).getByRole("button", { name: "Close" }).click();
+  await phone.locator(".fd-overlay").getByRole("button", { name: "Report" }).click();
+  await phone.getByRole("button", { name: "Something else", exact: true }).click();
+  await expect(phone.getByText("You've already reported this player in this match.")).toBeVisible();
 });
 
 test("in a match: a bot's name opens a bot's card, yours opens your profile", async ({ page }) => {

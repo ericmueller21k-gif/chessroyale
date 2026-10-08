@@ -1,3 +1,4 @@
+import { LookAways } from "./lookaway.ts";
 import { DEFAULT_SETTINGS, JUDGES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
@@ -163,6 +164,8 @@ export class NetMatch implements GameView {
   private listeners = new Set<() => void>();
   private offset = 0;
   private key: string | null = null;
+  /** Fair play: look-aways during each move's clock, sent with the pick. */
+  private lookAways = new LookAways();
   private myPick: string | null = null;
   private currentBoard: NetBoard | null = null;
   private standingsList: NetStanding[] = [];
@@ -398,6 +401,7 @@ export class NetMatch implements GameView {
         }
         if (m.board) {
           this.prefetch([m.board.fen]);
+          this.lookAways.start();
           this.currentBoard = m.board;
           const startsAt = this.local(m.startsAt ?? m.now);
           this.playStartedAt = startsAt;
@@ -719,7 +723,8 @@ export class NetMatch implements GameView {
     if (Date.now() < this.phase.startsAt - 300) return; // Before the clock starts.
     if (this.phase.strike?.until && Date.now() < this.phase.strike.until) return; // While the King strikes.
     this.myPick = move;
-    this.send({ t: "pick", key: this.key, move });
+    const away = this.lookAways.stop();
+    this.send({ t: "pick", key: this.key, move, ...(away ? { away } : {}) });
     if (this.myId) this.progress.mark(this.myId);
     this.setPhase({ kind: "scoring", board: this.phase.board, move, strike: this.phase.strike });
   }

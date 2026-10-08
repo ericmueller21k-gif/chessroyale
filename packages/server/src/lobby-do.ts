@@ -10,6 +10,7 @@ import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
 import { CAPACITY, DEFAULT_SETTINGS } from "@chessroyale/core";
+import { eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -43,6 +44,11 @@ export class Lobby extends DurableObject<Env> {
   private reportQueued = false;
   /** Many judges: deep searches the lobby asked of the engine server, sent once the lobby is stored. */
   private serverQueue: ServerScoreRequest[] = [];
+  /**
+   * Fair play: the record's `fair` (each person's picks with their signals) as last stored, by its count. Stored under
+   * its own key "fair" and only when a round added to it, so a pick or a chat line never rewrites it.
+   */
+  private fairStored = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -54,6 +60,11 @@ export class Lobby extends DurableObject<Env> {
       if (this.record && last && !Object.keys(this.record.last ?? {}).length) {
         this.record.last = last;
         this.lastStored = new Map(Object.entries(last));
+      }
+      const fair = await ctx.storage.get<LobbyRecord["fair"]>("fair");
+      if (this.record && fair) {
+        this.record.fair = fair;
+        this.fairStored = this.record.fairV ?? 0;
       }
     });
   }
@@ -117,7 +128,15 @@ export class Lobby extends DurableObject<Env> {
     const mode = this.mode();
     for (const r of core.humanResults()) {
       const userId = rec.accounts?.[r.playerId];
-      if (userId) await recordResult(sql, userId, { ...r, mode, online: true, lobby: rec.code }, Date.now()).catch(() => undefined);
+      if (!userId) continue;
+      // Fair play: the match's signals and the player's level first (it may put them in review)…
+      const moves = core.fairMoves(r.playerId);
+      if (moves.length) {
+        await recordFairPlay(sql, userId, { lobby: rec.code, mode, moves }, Date.now()).catch((e: unknown) => console.log(`fair play for ${rec.code}: ${String(e)}`));
+      }
+      // …then a player in review (or banned) has their results held off ranking until they're cleared.
+      const held = !(await eligibleForRanked(sql, userId).catch(() => true));
+      await recordResult(sql, userId, { ...r, mode, online: true, lobby: rec.code, held }, Date.now()).catch(() => undefined);
     }
   }
 
@@ -154,13 +173,22 @@ export class Lobby extends DurableObject<Env> {
     await this.persist(core);
   }
 
-  /** Stores the record: everything but `last` under "lobby", and `last` under "last" when any of it changed. */
+  /**
+   * Stores the record: everything but `last` and `fair` under "lobby", `last` under "last" when any of it changed,
+   * and `fair` under "fair" when a round added to it.
+   */
   private async store(rec: LobbyRecord) {
-    const { last, ...rest } = rec;
+    const { last, fair, ...rest } = rec;
     const entries = Object.entries(last ?? {});
     const changed = entries.length !== this.lastStored.size || entries.some(([id, msg]) => this.lastStored.get(id) !== msg);
-    await this.ctx.storage.put(changed ? { lobby: { ...rest, last: {} }, last: last ?? {} } : { lobby: { ...rest, last: {} } });
+    const fairChanged = (rec.fairV ?? 0) !== this.fairStored;
+    await this.ctx.storage.put({
+      lobby: { ...rest, last: {} },
+      ...(changed ? { last: last ?? {} } : {}),
+      ...(fairChanged ? { fair: fair ?? {} } : {}),
+    });
     if (changed) this.lastStored = new Map(entries);
+    if (fairChanged) this.fairStored = rec.fairV ?? 0;
     countCall(changed ? "lobby.persistWithLast" : "lobby.persist");
   }
 
@@ -205,6 +233,7 @@ export class Lobby extends DurableObject<Env> {
       this.record = null;
       this.icons.clear();
       this.lastStored.clear();
+      this.fairStored = 0;
       this.reservations = [];
       this.reported = null;
       await this.ctx.storage.deleteAlarm();
@@ -279,6 +308,7 @@ export class Lobby extends DurableObject<Env> {
     if (this.record && !(await this.closeIfDue())) return false;
     this.record = newLobbyRecord(code, Date.now(), overrides);
     this.lastStored.clear();
+    this.fairStored = 0;
     this.reservations = [];
     if (keepMs) this.record.keepMs = keepMs;
     const core = this.core(code);

@@ -959,6 +959,11 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
   - **Ski Goggles moved to Paragon (Eric, Oct 6),** next to the Santa hat: 9% each. The Novice present now holds three items, 13.3% each.
   - **Opening:** the strip spins to a present; the present shakes and bursts ("Common present", in its colour, 1.1 s); then the reveal. Fischer Random is unchanged (banner, a 4.8 s second spin among its items). The strip still shows Fischer Random three times as often as it lands, to tease.
   - **No second spin for presents (Eric, Oct 7):** at first a present holding several items had a second, shorter spin among them, and a one-item present (the Uncommon antlers) went straight to the reveal. Eric liked the straight-to-reveal one ("quicker, and it looks nicer"), so every present does that now; only Fischer Random spins again.
+- **The locker: stacks, hold to delete, and the free items (Eric, Oct 8):**
+  - **Stacks.** Copies of the same item in the same colour (both colours, for the present and the goggles) show as one tile with "×3" in the top right. The purest copy is the one shown, and the one you wear when you tap the stack. Stacks sort like single items did (rarest, rarest colour, purest).
+  - **Hold to delete** (about half a second; right-click on a computer), then a confirmation: "It's gone for good." A single item: Delete or Cancel. A stack: delete the extras and keep the best, delete all, or Cancel. If the copy you wore goes, the one you keep goes on. Moving your finger (a scroll) cancels the hold, and the phone's own long-press menu is off on items. The server deletes only your own items (`POST /api/locker/delete`) and takes them off first.
+  - **One place to wear things (Eric).** Pawn hats and God King effects were bought *and* equipped in the Shop tab, so a hat you owned wasn't in your locker and stayed on when you took a crate hat off. Now the shop sells them (as before; free while testing) and says "In your Locker ›" once you have one; the locker lists what you got under "From the shop" (with a God King filter), next to the crate items, and that's where you wear or take off everything. The Shop tab keeps all three categories (God King effects, pawn hats, chat packs); "No hat" isn't for sale (you take a hat off in the locker). Shop items can't be deleted for now (no refunds yet).
+  - **One head.** A pawn hat and a crate head item used to be worn at once, the shop hat showing whenever the crate one came off. Now wearing either takes off the other (on the server, both ways), and taking one off leaves the head bare. A God King effect is always on (tapping another switches it). Someone already wearing both from before sees the pawn hat as "Worn" in the locker once the crate hat comes off, and can take it off there.
   - **The crate page** lists the presents with their odds (and how many items each holds), then every item with its own chance.
   - Server rolls: the tier, then an item evenly from that tier's present (`presentItems`). Nothing stored changes.
 - **Tier names: Common to Mythic (Eric, Oct 6):** "I kind of just want to revert to a common, uncommon, rare, etc.
@@ -2426,6 +2431,77 @@ container (4 cores) can drive about 5,000-6,000 simulated players; 10,000 needs 
 ≈ $0.0015 a match (a lobby awake ~15 minutes at 128 MB), so 100 matches at once around the clock ≈ $400 a month;
 Worker requests ≈ $20 a day at that polling; D1 well inside the plan. Real traffic peaks a few hours a day, so a
 fraction of that. Set the billing alerts in DEPLOY.md first.
+
+## Fair play (Oct 8, 2026)
+
+Eric: catch players copying an engine (a second screen or phone running Stockfish) with a high success rate, aggressive
+rather than lenient; anyone at super-GM strength for a game or two, or a run of superhuman moves after the opening,
+should be banned; and a report system. Built by the `fairplay` delegate (`.claude/agents/fairplay.md`), in steps.
+
+**Reports** (step 1)
+- **Where:** Report on anyone's profile, which also opens from any name tapped in a match (the profile over the game).
+  Reasons: Cheating, Offensive name or icon, Something else (`FAIRPLAY.reports.reasons`). Then "Thanks, we'll look
+  into it."
+- **One per reporter, player and match:** a report made in a match carries its lobby code. A second one in the same
+  match says "You've already reported this player in this match" and isn't stored. From a profile outside a match,
+  one per player a day. 20 a day per reporter (`perDay`).
+- **Reports never ban anyone.** Every report opens a *watch* case (the player's matches are kept as evidence, once
+  signals are recorded: step 2). Cheating reports from 3 different signed-in accounts within 7 days put the player in
+  **review** (Eric, Oct 8); 2 for a new account (fewer than 10 online matches). My calls:
+  - Only "Cheating" counts towards a review: review holds a player's results, which is a fair-play measure. Name and
+    other reports put the player on watch, in the queue for a person.
+  - Guests' reports are stored and read, but don't count towards a review (anyone can make guest accounts; online
+    players are signed in anyway).
+  - After a decision on a case (a clearing, say), only reports made since count again.
+- **Review holds results off ranking** until cleared: entering review marks the player's online results from the last
+  7 days `held` (`results.held`, `FAIRPLAY.holdBackDays`), and results recorded while in review are held too. Held
+  results don't move the rating, its chart or "Top N%" (and later leaderboards and ranked); their stats still count, so
+  a profile shows nothing about a case. Clearing counts them again.
+- **`eligibleForRanked(sql, userId)`** (`packages/server/src/fairplay.ts`): false while a player is in review or
+  banned. The hook for the `ranked` delegate.
+- **Cases** (`fairplay_cases`): one per player, status watch, review, banned or cleared, with a log of every change, who
+  made it (detection, reports, an admin, the automated reviewer) and why (`fairplay_log`).
+
+**Signals and the suspicion score** (step 2, shipped in watch-only mode)
+- **Recorded on the server from the match's own judged numbers** (`LobbyCore.noteFair`, after each round's scores go
+  in: the judges' agreed numbers, the engine server's verdict, or the host's), never numbers a browser makes up. For
+  each person's pick (`FairMove`, `core/fairplay.ts`):
+  - the loss, and the judged best move;
+  - the **crowd-found rate**: how many of the other people picking in that position found the best move (within 1
+    point). Bots, practice players (unlimited hints) and anyone who used a power-up don't count in anyone's crowd. My
+    call: bots never stand in for humans here. They pick from the engine's own scores, so a move that's hard for people
+    (a quiet move, a sacrifice) is no harder for them; with fewer than 8 other people the rate is left out;
+  - position complexity (moves within 2 points of the best) and the gap to the second-best move;
+  - think time (the server's own clock);
+  - whether the position counts: not the opening (the first 12 plies from the starting position), not a forced move,
+    not an only move or recapture that most of the crowd found (one the crowd missed does count), not a position
+    already won or lost (best move's expected score past 0.9 either way), never a pick made with a power-up;
+  - from the app, the one device signal: how many times the page was hidden or lost focus during the move's clock
+    before the pick (`lookaway.ts`, sent with the pick; episodes, so a blur plus a hide is one).
+- **Compact:** the Durable Object keeps the picks under their own storage key, written once per round (not on every
+  pick or chat line). At the end, each signed-in player gets one row in D1 (`fairplay_matches`): the match's summary
+  and score, and the picks as evidence.
+- **Evidence kept** (Eric, Oct 8): every match's picks for 3 days, so a report made after a match still finds its
+  games; 30 days when the player was flagged or reported; never deleted while their case is open (watch or review).
+  A watch with nothing new for 30 days closes, and its evidence then goes. The summary rows stay as the player's
+  history. The privacy page says so in plain words.
+- **The match's signals** (`matchSignals`), over counted moves:
+  - **strength:** an engine rating over counted moves (the same curve as the "Elo" column), with a small pull towards
+    1500 so a handful of lucky moves isn't super-GM strength; and a **jump** far above the player's own history (the
+    median of their last matches, 3 or more) or rating;
+  - **hard finds:** finding the best move where few of the crowd did, measured as evidence (a log-likelihood) against
+    an honest player of the player's own strength (the higher of their history and this match, capped at 2500): a
+    find where such a player usually misses points to an engine, a miss points the other way. Also counted plainly:
+    hard positions (under 10% of the crowd found the best move), hard finds and the longest run of them;
+  - **timing:** hard finds made in under 5 s, and think time that doesn't follow difficulty (rank correlation);
+  - **look-aways:** points only when moves with a look-away found the best far more often than the rest. Never enough
+    for a ban alone.
+- **Levels** (`playerLevel`, over the last 30 days, at most 10 matches): watch, review (one high match, or two adding
+  up), ban (only overwhelming evidence: two matches at super-GM strength on enough counted moves with high scores, or
+  one match past every bar). Every number is in `FAIRPLAY` (settings.ts).
+- **Watch only for now** (`FAIRPLAY.enforcement: "watch"`): detection records each match and its level, opens a watch
+  case, and logs what the level would have done; it reviews and bans nobody until the simulation's numbers are in
+  (below). Reports and admins act regardless.
 
 ## Deep checks on players' computers (Oct 8, 2026; built, ships off)
 

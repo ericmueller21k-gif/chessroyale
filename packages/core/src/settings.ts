@@ -796,3 +796,124 @@ export const CAPACITY = {
     play: { limit: 40, windowMs: 60_000 },
   },
 } as const;
+
+/**
+ * Fair play (the `fairplay` delegate): reports, cases and what each level does. See DECISIONS.md, "Fair play".
+ *   - watch: recorded only (the player's moves are kept as evidence);
+ *   - review: a person (or the automated reviewer) looks; meanwhile their results are held off ranking (the rating,
+ *     its chart, "Top N%", later leaderboards and ranked) until cleared;
+ *   - banned: no online play (solo stays open), with an appeal.
+ */
+export const FAIRPLAY = {
+  /**
+   * What detection may do on its own: "watch" records levels but acts on none of them (until the simulation's numbers
+   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports, admins and the
+   * automated reviewer act whatever this says.
+   */
+  enforcement: "watch" as "watch" | "review" | "ban",
+  reports: {
+    /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts towards an automatic review. */
+    reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
+    /** Reports one account can make a day (one per player per match; outside a match one per player a day). */
+    perDay: 20,
+    /** Cheating reports from this many different signed-in accounts within `reviewDays` put a player in review. */
+    reviewReporters: 3,
+    reviewDays: 7,
+    /** A new account (fewer than `newAccountMatches` online matches) goes to review with this many instead. */
+    newAccountMatches: 10,
+    newAccountReporters: 2,
+  },
+  /** Evidence (each judged move of a match): kept this many days when the player was flagged or reported, otherwise this few. */
+  evidenceDays: 30,
+  evidenceDaysUnflagged: 3,
+  /** Entering review holds the player's online results from this many days back (the matches that put them there). */
+  holdBackDays: 7,
+  /**
+   * Signals (core/fairplay.ts): which positions count, and what each signal measures. Starting values; the
+   * simulation (reports/fairplay.md) tunes them.
+   */
+  signals: {
+    /** The opening: plies from the starting position that never count (6 moves each). */
+    bookPlies: 12,
+    /** A pick within this many points of the best found it. */
+    foundLoss: 1,
+    /** Position complexity: moves within this many points of the best (of those the judges scored). */
+    nearPoints: 2,
+    /** An only move: every other scored move loses at least this many points. */
+    onlyGap: 20,
+    /** Only moves and recaptures are skipped when at least this share of the crowd found them, or there's no crowd. */
+    obviousShare: 0.5,
+    /** Already won or lost: the best move's expected score is below this or above 1 minus it. */
+    decided: 0.1,
+    /** The crowd-found rate needs at least this many other people picking (not practising, no power-up). */
+    minCrowd: 8,
+    /** A hard position: fewer than this share of the crowd found the best move. */
+    hardShare: 0.1,
+    /** Match strength: the engine rating over counted moves, starting as if this many 1500-level moves came first. */
+    perfPriorMoves: 4,
+    /** How much better than the crowd a player of a given strength finds moves: log-odds per 400 rating points. */
+    hardSlope: 0.3,
+    /** The crowd's typical strength (the hard-find model's reference). */
+    crowdRating: 1500,
+    /**
+     * Hard finds are measured against an honest player of the player's own strength (the higher of their history and
+     * this match), but never stronger than this: past it, finding what the crowd misses is itself the evidence.
+     */
+    strengthCap: 2500,
+    /** Hard finds: evidence that a player finds moves like an engine user, who finds a move the crowd misses this often. */
+    cheatFind: 0.5,
+    /** Timing: a hard find this fast is suspicious; timing needs this many counted moves with a crowd. */
+    fastHardMs: 5_000,
+    minTimed: 8,
+    /** Timing: think time this little correlated with difficulty (Spearman) is "the same whatever the difficulty". */
+    flatCorr: 0.1,
+  },
+  /** The suspicion score: points per signal (each capped), from one match's signals. */
+  score: {
+    /** Match strength: points per `perfPer` rating above `perfFrom`, once `minCounted` moves count. */
+    minCounted: 8,
+    perfFrom: 2400,
+    perfPer: 100,
+    perfMax: 10,
+    /** A jump: this far above the player's own history (3+ matches) or rating. */
+    jumpFrom: 500,
+    jumpPer: 200,
+    jumpMax: 3,
+    /** Hard finds: points per unit of evidence (log-likelihood, see FAIRPLAY.signals.cheatFind). */
+    hardPer: 0.8,
+    hardMax: 8,
+    /** A run of found moves (counted ones) this long or longer. */
+    streakFrom: 10,
+    streakPer: 0.5,
+    streakMax: 2,
+    /** Timing: per fast hard find (beyond the first), and flat timing. */
+    fastPer: 0.5,
+    fastMax: 2,
+    flat: 1,
+    /** Look-aways: moves with a look-away, found at least this often and this much more than the rest. */
+    awayMoves: 3,
+    awayRate: 0.8,
+    awayLift: 0.3,
+    away: 2,
+  },
+  /** Levels from the last matches' scores (newest first, within `windowDays`, at most `windowMatches`). */
+  levels: {
+    windowDays: 30,
+    windowMatches: 10,
+    watch: 3,
+    /** Review: one match this high, or the best two adding up to this. */
+    reviewOne: 7,
+    reviewTwo: 10,
+    /**
+     * Auto-ban (overwhelming evidence only): `banMatches` matches in the window each at match strength `banPerf` or
+     * more on `banCounted` counted moves, with a score of `banScore` or more; or one match past all the `banOne*` bars.
+     */
+    banMatches: 2,
+    banPerf: 2900,
+    banCounted: 10,
+    banScore: 12,
+    banOnePerf: 3200,
+    banOneCounted: 14,
+    banOneScore: 20,
+  },
+} as const;
