@@ -2503,3 +2503,66 @@ should be banned; and a report system. Built by the `fairplay` delegate (`.claud
 - **Watch only for now** (`FAIRPLAY.enforcement: "watch"`): detection records each match and its level, opens a watch
   case, and logs what the level would have done; it reviews and bans nobody until the simulation's numbers are in
   (below). Reports and admins act regardless.
+
+## Deep checks on players' computers (Oct 8, 2026; built, ships off)
+
+Eric's idea, via the director: have two fast computers re-check the close calls before a cut instead of the engine
+server, so the server is only used when a lobby has no capable devices or the devices disagree. Then Eric set the rule
+for all engine work: fair scoring, correct results and smooth play first; players' devices wherever they can do the
+job; our servers when truly needed, never skimping. Numbers: `reports/deep-timing.md`, `reports/deep-accuracy.md`,
+`reports/deep-checks.md`.
+
+**Built** (`JUDGES.deepOnDevices`, with tests and an e2e check):
+- A capable device is a computer (never a phone: a 2M-node search every round drains a battery) whose speed check
+  says it can do at least 1M nodes in 3 s (about 390k nodes/s). With two capable devices connected, a board's two
+  judges are drawn from them, and the job asks them to re-check the close calls too, at the depth the slower one fits
+  in 3 s (what the server takes today), at most the server's 2M.
+- The device sends its quick answer first, as before, then its re-check (`judgedDeep`), so the quick numbers never
+  wait for it. Both re-checks exactly alike: used. They differ (a strike for the one further from the server's), or
+  don't come within 3.5 s: the engine server re-checks, as today.
+- Measured in Chrome on this machine (`deep-timing.ts`): the app's engine runs about 490k nodes/s, so 2M nodes take
+  4.1 s and 1.2M fit the window. The speed check (150k nodes) reads the same speed, so it predicts the re-check's time.
+
+**Why it ships off.** The browsers' engine is the lite network; the server runs the full one. On the 267 close calls
+of the judge-accuracy positions (`deep-accuracy.ts`), re-checked as the game does at 2M nodes:
+
+| Re-check | Off the referee by 10+ points | Top-quarter players cut unfairly | Top-half players cut unfairly |
+|---|---:|---:|---:|
+| Engine server (full network) | 26 of 267 | 0.37% | 2.09% |
+| Two computers (lite network) | 43 of 267 | 0.63% | 3.52% |
+
+About 1.7 times as many unfair cuts. By Eric's rule, close calls stay with the server. The full network on computers
+would match it, but in Chrome it runs at 260k nodes/s here (8 s for 2M nodes: too slow for a round), and its 99 MB
+file is over Cloudflare's 25 MiB limit for a static file. Turn the switch on only with a device engine measured as
+good as the server's (`deep-accuracy.ts`, then `judge-cuts.ts`).
+
+**What it would save** (`many-judges.ts`, JUDGE_OUT=deep-checks; 6-person Crowd matches, 2 each):
+
+| Capable devices in the lobby | Engine-server calls per match, as shipped | With the switch on |
+|---|---:|---:|
+| 0 | 15.5 | 15.5 |
+| 1 | 15.5 | 15.5 |
+| 2 | 15.5 | 0 |
+| 5 | 15.5 | 0 |
+
+(With the switch on and two computers, a round's wait for close calls fell from about 3.3 s to 2.2 s at the 95th
+percentile.) A lobby has fewer than two computers 15% of the time at 10 people and 1% at 20, assuming 30% of players
+on computers (with 20%: 38% and 7%); a ranked match (30+ people) almost never.
+
+**Shipped (they cost nothing in fairness or time):**
+- **Knocked-out players keep judging** while their page is open (watching, the cut screen, results), invisibly. It was
+  already so in the lobby (judges are any connected device); now tested, and covered by the harness.
+- **Disputes, never slower:** when two judges disagree, a third device (a capable one if the job carries a re-check)
+  and the engine server are asked at the same moment; whichever settles it first stands: two of three devices exactly
+  alike (the honest number, which is what agreement would have given), or the server's verdict. The server is still
+  asked every time (disputes only come from cheaters, about 2 per cheater per match), because a third device can
+  be slow, and a round must never wait longer than it does for the server. A late answer that disagrees is settled
+  for blame by a third device alone when there is one (no server call).
+- **Live players judge their own boards** (they always did: a job names nobody, and an exact match with an independent
+  device catches a lie). The harness covers a lobby down to two people, both judging, and the endgame below.
+
+**A match's endgame** (20 people, 6 on computers; a share of the knocked-out close the tab): the server is called
+about 22 times a match as shipped, worst case 22 ($0.0022 at $0.0001 a search), almost all during the cut stages
+with 8+ people connected (0.22 calls a round). In the last 10 rounds (the final, with 1–14 people connected,
+depending on how many left) there were no calls at all: a final turn has one pick, rarely a close call, and no cut line.
+With 90% leaving, one person was left connected at the end, and the host path scored it as before.

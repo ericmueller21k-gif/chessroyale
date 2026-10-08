@@ -29,6 +29,8 @@ import {
   type LobbyCloseReason,
   applyRecheck,
   blameJudge,
+  deepTargets,
+  quickPart,
   boardsAgree,
   distanceFrom,
   judgedBoard,
@@ -82,7 +84,7 @@ export interface ServerScoreRequest {
 const SERVER_WAIT_MS = 14_000;
 /** With no engine server, how long a dispute waits for a third device's second opinion. */
 const REFEREE_WAIT_MS = 5_000;
-const waitFor = (kind: "verdict" | "recheck" | "referee") => (kind === "referee" ? REFEREE_WAIT_MS : SERVER_WAIT_MS);
+const waitFor = (kind: "verdict" | "recheck" | "referee", referee = REFEREE_WAIT_MS) => (kind === "referee" ? referee : SERVER_WAIT_MS);
 
 /** Quick chat's state in a lobby. */
 interface ChatRecord {
@@ -662,6 +664,8 @@ export class LobbyCore {
         return this.speed(playerId, msg.nps);
       case "judged":
         return this.judged(playerId, msg.key, msg.id, msg.report);
+      case "judgedDeep":
+        return this.judgedDeep(playerId, msg.key, msg.id, msg.deep);
       case "hello":
         return;
     }
@@ -1345,6 +1349,9 @@ export class LobbyCore {
   // second opinion says which, exactly; without one, distance from the verdict does). Two strikes: no more jobs this
   // match. One judge late or gone: the other's answer, and now and then a spot check on the server afterwards.
   // With fewer than two devices that can judge, the host scores as before. See DECISIONS.md, "Many judges".
+  // Deep checks: with two capable devices (computers fast enough) judging a board, they also re-check its close
+  // calls, and the server is asked only when they disagree or are late (DECISIONS.md, "Deep checks on players'
+  // computers"). A knocked-out player's device judges as long as its page is open.
 
   private get jcfg(): JudgeConfig {
     return this.io.judges ?? JUDGES;
@@ -1377,6 +1384,36 @@ export class LobbyCore {
   private judging(): boolean {
     const cfg = this.jcfg;
     return cfg.on && cfg.perJob >= 2 && this.judgeDevices().length >= 2;
+  }
+
+  /** A device that can re-check close calls itself: a computer fast enough to do deepMinNodes in the deep window. */
+  private capable(id: string): boolean {
+    const cfg = this.jcfg;
+    const d = this.r.judges?.devices[id];
+    return this.human(id)?.device === "computer" && !!d && (d.nps * cfg.deepHeadroom * cfg.deepWindowMs) / 1000 >= cfg.deepMinNodes;
+  }
+
+  /** Deep checks on devices this round: two capable devices can judge. */
+  private deepMode(): boolean {
+    return this.jcfg.deepOnDevices && this.judgeDevices().filter((d) => this.capable(d.id)).length >= 2;
+  }
+
+  /** The devices a round's judges are drawn from: the capable ones in deep mode, else all that can judge. */
+  private judgePool(): { id: string; nps: number }[] {
+    const all = this.judgeDevices();
+    return this.deepMode() ? all.filter((d) => this.capable(d.id)) : all;
+  }
+
+  /**
+   * The re-check's node count for a job its two capable judges share: what the slower does in the deep window (with
+   * headroom, shared by its jobs this round), at most the server's (shared by the round's boards, as the server's).
+   */
+  private deepNodesFor(judges: readonly string[], boards: number, load: number): number {
+    const cfg = this.jcfg;
+    const nps = Math.min(...judges.map((j) => this.r.judges?.devices[j]?.nps ?? 0));
+    const cap = Math.max(400_000, cfg.deepNodes / Math.max(1, boards));
+    const fit = (cfg.deepHeadroom * cfg.deepWindowMs * nps) / 1000 / Math.max(1, load);
+    return Math.max(100_000, Math.floor(Math.min(cap, fit) / 100_000) * 100_000);
   }
 
   /** A device's speed check (nodes per second). */
@@ -1421,7 +1458,7 @@ export class LobbyCore {
   private planJudges(key: string, plan: boolean) {
     const runner = this.runner!;
     const cfg = this.jcfg;
-    const devices = this.judgeDevices();
+    const devices = this.judgePool();
     const boards = [...runner.groups.entries()].map(([boardId, ids]) => ({ boardId, cost: ids.length }));
     const byBoard = assignJudges(() => this.jrng(), boards, devices, Math.min(cfg.perJob, devices.length), cfg);
     this.jr.plan = { key, byBoard: Object.fromEntries([...byBoard].map(([b, j]) => [String(b), j])) };
@@ -1450,7 +1487,7 @@ export class LobbyCore {
     const round = this.r.round!;
     const cfg = this.jcfg;
     const now = this.io.now();
-    const devices = this.judgeDevices();
+    const devices = this.judgePool();
     const perJob = Math.min(cfg.perJob, devices.length);
     const planned = this.r.judges?.plan?.key === round.key ? this.r.judges.plan.byBoard : {};
     const load = new Map<string, number>();
@@ -1467,17 +1504,27 @@ export class LobbyCore {
         seed: seedFor(round.key, sj.boardId),
         rules: this.judgeRules(),
         ...(sj.barred ? { barred: sj.barred } : {}),
-        // No engine server: the devices re-check close calls themselves (and are checked on it).
-        ...(this.serverOn ? {} : { recheck: { recheckLoss: this.settings.recheckLoss, recheckMax: this.settings.recheckMax, recheckNodes: this.settings.recheckNodes, recheckCutLoss: this.settings.recheckCutLoss, recheckCutMax: this.settings.recheckCutMax } }),
         ...(sj.priority ? { priority: sj.priority } : {}),
       };
-      // (A group of bots affects nobody real: never re-checked.)
-      if (!job.picks.length) delete job.recheck;
       const judges = (planned[String(sj.boardId)] ?? []).filter((id) => devices.some((d) => d.id === id)).slice(0, perJob);
       if (judges.length < perJob) judges.push(...drawJudges(() => this.jrng(), devices, perJob - judges.length, cfg, load, new Set(judges)));
       for (const j of judges) load.set(j, (load.get(j) ?? 0) + 1);
       tasks[job.id] = { boardId: sj.boardId, job, botIds: sj.bots.map((b) => b.id), judges, tried: [...judges], want: perJob, sentAt: now, sent: {}, reports: {}, boards: {} };
       this.jr.stats.jobs++;
+    }
+    // The re-check of close calls (where a person picked: a group of bots affects nobody real). Two capable judges:
+    // they do it, at the depth both fit in the deep window. No engine server: the judges do it as before.
+    const boards = Object.keys(tasks).length;
+    for (const t of Object.values(tasks)) {
+      if (!t.job.picks.length) continue;
+      const deep = cfg.deepOnDevices && t.judges.length >= 2 && t.judges.every((j) => this.capable(j));
+      if (!deep && this.serverOn) continue;
+      const nodes = deep ? this.deepNodesFor(t.judges, boards, Math.max(...t.judges.map((j) => load.get(j) ?? 1))) : this.settings.recheckNodes;
+      t.job.recheck = { recheckLoss: this.settings.recheckLoss, recheckMax: this.settings.recheckMax, recheckNodes: nodes, recheckCutLoss: this.settings.recheckCutLoss, recheckCutMax: this.settings.recheckCutMax };
+      if (deep) {
+        t.deep = true;
+        this.jr.stats.deepJobs++;
+      }
     }
     this.jr.tasks = tasks;
     const byJudge = new Map<string, JudgeJob[]>();
@@ -1522,7 +1569,10 @@ export class LobbyCore {
 
   /** Gives a job to one more device, if there's one not yet tried. */
   private replaceJudge(t: JudgeTask): boolean {
-    const [next] = drawJudges(() => this.jrng(), this.judgeDevices(), 1, this.jcfg, new Map(), new Set(t.tried));
+    // (A job with a deep re-check goes to another capable device, if there is one.)
+    const capable = t.deep ? this.judgeDevices().filter((d) => this.capable(d.id)) : [];
+    const pool = capable.some((d) => !t.tried.includes(d.id)) ? capable : this.judgeDevices();
+    const [next] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried));
     if (!next) return false;
     t.judges.push(next);
     t.tried.push(next);
@@ -1553,10 +1603,13 @@ export class LobbyCore {
     if (late?.pending.includes(playerId)) return this.lateAnswer(playerId, id, report);
     const t = this.r.judges?.tasks?.[id];
     if (this.r.phase !== "scoring" || this.r.round?.key !== key || !t || t.done || t.server || !t.judges.includes(playerId) || playerId in t.reports) return;
-    t.reports[playerId] = report;
+    // (The quick part; an app from before deep checks sends its re-check in the same report.)
+    const { deep, ...quick } = (report ?? {}) as JudgeReport;
+    t.reports[playerId] = quick as JudgeReport;
+    if (Array.isArray(deep) && t.job.recheck) (t.deepReports ??= {})[playerId] = deep;
     const d = this.jr.devices[playerId];
     if (d) d.answered++;
-    const board = judgedBoard(t.job, report);
+    const board = judgedBoard(quickPart(t.job), quick as JudgeReport);
     t.boards[playerId] = board;
     if (!board) {
       // An answer that doesn't hold together is wrong whatever the position: a strike, and it's as if unanswered.
@@ -1627,9 +1680,21 @@ export class LobbyCore {
     return { bestMove: moves[0]!, bestExpected: 0.5, expectedAfter: Object.fromEntries(moves.map((m) => [m, 0.5])), botPicks, botPowerUps: [], replies: {}, mates: {}, rechecked: [] };
   }
 
-  /** A job's numbers are settled: with the engine server up, its close calls go to the server first. */
+  /**
+   * A job's quick numbers are settled; then its close calls: re-checked by the devices that agreed (deep checks, or no
+   * engine server), else by the engine server.
+   */
   private accept(t: JudgeTask, board: JudgedBoard, how: JudgeHow) {
     t.waitUntil = undefined;
+    const recheck = t.job.recheck;
+    if (recheck && t.job.picks.length && (how === "agreed" || how === "majority" || (how === "single" && !this.serverOn))) {
+      const flagged = recheckTargets(board, [...t.job.picks, ...board.botPicks], recheck, t.job.priority ?? []);
+      t.done = { board, how };
+      if (!flagged.length) return;
+      const from = how === "agreed" ? [...t.judges] : how === "majority" ? [...(t.majorityPair ?? [])] : [t.judges[0]!];
+      t.awaitDeep = { from, until: this.io.now() + this.jcfg.deepWaitMs };
+      return this.tryDeep(t);
+    }
     if (this.serverOn && t.job.picks.length) {
       const sj = this.r.scoreRequest?.jobs.find((j) => j.boardId === t.boardId);
       const flagged = recheckTargets(board, [...t.job.picks, ...board.botPicks], this.settings, sj?.priority ?? []);
@@ -1644,33 +1709,106 @@ export class LobbyCore {
     t.done = { board, how };
   }
 
+  /** A device's re-check of a job's close calls (deep checks). */
+  private judgedDeep(playerId: string, key: string, id: string, deep: MoveScore[]) {
+    if (typeof id !== "string" || !Array.isArray(deep) || deep.length > 256) return;
+    const t = this.r.judges?.tasks?.[id.replace(/~ref$/, "")];
+    if (this.r.phase !== "scoring" || this.r.round?.key !== key || !t?.job.recheck) return;
+    if (!t.judges.includes(playerId) && t.refereeBy !== playerId) return;
+    if (t.deepReports?.[playerId]) return;
+    (t.deepReports ??= {})[playerId] = deep;
+    this.tryDeep(t);
+    this.afterJudging();
+  }
+
+  /** The re-checks are in from the devices that agreed: identical, used; else the engine server re-checks. */
+  private tryDeep(t: JudgeTask) {
+    const w = t.awaitDeep;
+    if (!w || !t.done || !w.from.every((j) => t.deepReports?.[j] && t.reports[j])) return;
+    const boards = w.from.map((j) => judgedBoard(t.job, { ...t.reports[j]!, deep: t.deepReports![j]! }));
+    w.from.forEach((j, i) => {
+      if (boards[i]) return;
+      this.jr.stats.invalid++;
+      this.strike(j, `re-check for ${t.job.id} doesn't hold together`);
+    });
+    if (w.from.length === 1) {
+      // (No engine server, one judge: its re-check stands, as a device's always did without the server.)
+      t.awaitDeep = undefined;
+      if (boards[0]) t.done = { ...t.done, board: boards[0] };
+      return;
+    }
+    if (boards.every((b) => b) && boardsAgree(boards[0]!, boards[1]!, this.jcfg.tolerance).agree) {
+      this.jr.stats.deepAgreed++;
+      t.awaitDeep = undefined;
+      t.done = { ...t.done, board: boards[0]! };
+      return;
+    }
+    this.jr.stats.deepDisagreed++;
+    console.log(`judges' re-checks disagree: ${this.r.code} job ${t.job.id} (${w.from.join(" v ")})`);
+    t.deepBoards = Object.fromEntries(w.from.map((j, i) => [j, boards[i] ?? null]));
+    this.deepFallback(t, "the devices' re-checks disagree");
+  }
+
+  /** Deep checks that disagreed or came too late: the engine server re-checks (else the quick numbers stand). */
+  private deepFallback(t: JudgeTask, why: string) {
+    const w = t.awaitDeep;
+    t.awaitDeep = undefined;
+    if (!t.done) return;
+    const board = t.done.board;
+    if (this.serverOn) {
+      const flagged = recheckTargets(board, [...t.job.picks, ...board.botPicks], this.settings, t.job.priority ?? []);
+      if (!flagged.length) return;
+      console.log(`judges: ${why} on ${t.job.id} in ${this.r.code}; the engine server re-checks`);
+      t.server = { kind: "recheck", id: `recheck:${t.job.id}`, at: this.io.now() };
+      this.jr.stats.serverRecheck++;
+      this.askServer(t.server.id, t.job.fen, [board.bestMove, ...flagged]);
+      return;
+    }
+    // No engine server: late, a re-check that did come from a device without a strike stands; disagreeing, or
+    // nothing came, the quick numbers.
+    const ok = t.deepBoards ? undefined : (w?.from ?? []).find((j) => t.deepReports?.[j] && !(this.jr.devices[j]?.strikes ?? 0));
+    const full = ok ? judgedBoard(t.job, { ...t.reports[ok]!, deep: t.deepReports![ok]! }) : null;
+    if (full) t.done = { ...t.done, board: full };
+    console.log(`judges: ${why} on ${t.job.id} in ${this.r.code}, and no engine server: ${full ? `${ok}'s re-check` : "the quick numbers"} stand`);
+  }
+
   private askServer(id: string, fen: string, moves: string[]) {
     this.io.serverScore!({ id, fen, moves, boards: Object.keys(this.r.judges?.tasks ?? {}).length || 1 });
   }
 
-  /** Two judges disagree: the engine server decides, and a third device's second opinion says who was off. */
+  /**
+   * Two judges disagree. A third device that can do the job (a capable one when the job carries a deep re-check) gets
+   * it, and the engine server is asked for its verdict at the same moment: whichever settles it first stands (two of
+   * three devices exactly alike, or the server's verdict), so a dispute is never slower than the server alone. With no
+   * engine server, the third device settles it (or the more trusted judge, if it can't).
+   */
   private dispute(t: JudgeTask, a: string, b: string) {
     t.judges = [a, b];
     t.waitUntil = undefined;
-    const [ref] = drawJudges(() => this.jrng(), this.judgeDevices(), 1, this.jcfg, new Map(), new Set(t.tried));
+    const pool = t.deep ? this.judgeDevices().filter((d) => this.capable(d.id)) : this.judgeDevices();
+    const [ref] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried));
     if (ref) {
       t.refereed = true;
+      t.refereeBy = ref;
+      t.tried.push(ref);
       const id = `${t.job.id}~ref`;
       (this.jr.referees ??= {})[id] = { job: { ...t.job, id }, by: ref, boards: { [a]: t.boards[a]!, [b]: t.boards[b]! }, at: this.io.now() };
       this.io.send(ref, { t: "judge", key: this.r.round?.key ?? "", jobs: [{ ...t.job, id }] });
     }
-    if (this.serverOn) {
-      t.server = { kind: "verdict", id: `verdict:${t.job.id}`, at: this.io.now() };
-      this.jr.stats.serverVerdict++;
-      this.askServer(t.server.id, t.job.fen, verdictMoves(t.job, [t.reports[a]!, t.reports[b]!], [t.boards[a]!, t.boards[b]!]));
-      return;
-    }
-    // No engine server: the third device's second opinion settles it (two of three), if it comes in time.
+    if (this.serverOn) return this.askVerdict(t);
     if (ref) {
       t.server = { kind: "referee", id: `${t.job.id}~ref`, at: this.io.now() };
       return;
     }
     this.fallback(t, "no engine server, and no third device");
+  }
+
+  /** The engine server's verdict on a dispute: it scores every move either judge scored. */
+  private askVerdict(t: JudgeTask) {
+    const [a, b] = t.judges as [string, string];
+    t.server = { kind: "verdict", id: `verdict:${t.job.id}`, at: this.io.now() };
+    this.jr.stats.serverVerdict++;
+    this.askServer(t.server.id, t.job.fen, verdictMoves(t.job, [t.reports[a]!, t.reports[b]!], [t.boards[a]!, t.boards[b]!]));
   }
 
   /** A dispute with no verdict: the judge with fewer strikes stands (then the faster device), as the host's did. */
@@ -1735,6 +1873,14 @@ export class LobbyCore {
         const flagged = recheckTargets(b, [...t.job.picks, ...b.botPicks], this.settings, sj?.priority ?? []);
         const checked = applyRecheck(b, flagged, moves);
         t.done = { ...t.done, board: { ...b, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, rechecked: checked.rechecked } };
+        // Two devices' re-checks disagreed: the one further from the server's (by blameMargin) is struck.
+        if (t.deepBoards) {
+          const ids = Object.keys(t.deepBoards).filter((j) => t.deepBoards![j]);
+          if (ids.length === 2) {
+            const { blamed, distances } = blameJudge(t.done.board, ids.map((j) => t.deepBoards![j]!), this.jcfg.blameMargin, this.jcfg.soloBlame);
+            for (const i of blamed) this.strike(ids[i]!, `re-check on ${t.job.id} ${distances[i]!.toFixed(1)} points off the engine server's`);
+          }
+        }
       } else if (!moves) console.log(`judges: engine server didn't answer a re-check in ${this.r.code}; the judges' numbers stand`);
       return this.afterJudging();
     }
@@ -1770,7 +1916,7 @@ export class LobbyCore {
     const late = this.r.judges!.late![id]!;
     late.pending = late.pending.filter((j) => j !== playerId);
     if (!late.pending.length) delete this.r.judges!.late![id];
-    const mine = judgedBoard(late.job, report);
+    const mine = judgedBoard(quickPart(late.job), report);
     if (!mine) {
       this.jr.stats.invalid++;
       return this.strike(playerId, `late report for ${id} doesn't hold together`);
@@ -1784,7 +1930,8 @@ export class LobbyCore {
       (this.jr.referees ??= {})[rid] = { job: { ...late.job, id: rid }, by: ref, boards: { [late.judge]: late.board, [playerId]: mine }, at: this.io.now() };
       this.io.send(ref, { t: "judge", key: this.r.round?.key ?? "", jobs: [{ ...late.job, id: rid }] });
     }
-    if (this.serverOn) {
+    // (A third device's exact second opinion settles the blame; the engine server only when there's none.)
+    if (this.serverOn && !ref) {
       const sid = `late:${id}`;
       (this.jr.spots ??= {})[sid] = { job: late.job, boards: { [late.judge]: late.board, [playerId]: mine }, ...(ref ? { refereed: true } : {}) };
       this.jr.stats.serverSpot++;
@@ -1797,20 +1944,26 @@ export class LobbyCore {
     const ref = this.r.judges!.referees![id]!;
     if (ref.by !== playerId) return;
     delete this.r.judges!.referees![id];
-    const mine = judgedBoard(ref.job, report);
+    const mine = judgedBoard(quickPart(ref.job), report);
     if (!mine) {
       this.jr.stats.invalid++;
       return this.strike(playerId, `second opinion on ${id} doesn't hold together`);
     }
     const matches = Object.entries(ref.boards).filter(([, b]) => b && boardsAgree(mine, b, this.jcfg.tolerance).agree).map(([j]) => j);
     this.jr.stats.refereed++;
-    // A dispute waiting on this (no engine server): two of three decide the scores.
-    const t = Object.values(this.r.judges?.tasks ?? {}).find((x) => x.server?.kind === "referee" && x.server.id === id);
-    if (t && this.r.phase === "scoring") {
+    // A dispute waiting on this: two of three decide the scores (and the re-check goes to those two).
+    const t = Object.values(this.r.judges?.tasks ?? {}).find((x) => (x.server?.kind === "referee" && x.server.id === id) || (x.server?.kind === "verdict" && `${x.job.id}~ref` === id));
+    if (t && this.r.phase === "scoring" && (matches.length === 1 || t.server?.kind === "referee")) {
+      // (Settled two of three before the server's verdict came: its answer, when it comes, is ignored.)
       t.server = undefined;
       if (matches.length === 1) {
         this.jr.stats.majority++;
-        t.done = { board: ref.boards[matches[0]!]!, how: "majority" };
+        const { deep, ...quick } = report;
+        t.reports[playerId] = quick as JudgeReport;
+        if (Array.isArray(deep) && t.job.recheck) (t.deepReports ??= {})[playerId] = deep;
+        t.judges = [matches[0]!];
+        t.majorityPair = [matches[0]!, playerId];
+        this.accept(t, ref.boards[matches[0]!]!, "majority");
       } else this.fallback(t, "the second opinion matched neither judge");
       this.afterJudging();
     }
@@ -1824,9 +1977,14 @@ export class LobbyCore {
     if (this.r.phase !== "scoring" || !tasks) return;
     const now = this.io.now();
     for (const t of Object.values(tasks)) {
-      if (t.server && now >= t.server.at + waitFor(t.server.kind)) {
+      if (t.server && now >= t.server.at + waitFor(t.server.kind, this.jcfg.refereeWaitMs)) {
         if (t.server.kind === "referee") this.fallback(t, "no second opinion in time");
         else this.serverScored(t.server.id, null);
+        continue;
+      }
+      if (t.awaitDeep && now >= t.awaitDeep.until) {
+        this.jr.stats.deepLate++;
+        this.deepFallback(t, `re-checks late (${t.awaitDeep.from.filter((j) => !t.deepReports?.[j]).join(", ")})`);
         continue;
       }
       if (t.done || t.server) continue;
@@ -1844,7 +2002,8 @@ export class LobbyCore {
   private armJudgeTimer() {
     const times: number[] = [];
     for (const t of Object.values(this.r.judges?.tasks ?? {})) {
-      if (t.server) times.push(t.server.at + waitFor(t.server.kind));
+      if (t.server) times.push(t.server.at + waitFor(t.server.kind, this.jcfg.refereeWaitMs));
+      if (t.awaitDeep) times.push(t.awaitDeep.until);
       if (t.done || t.server) continue;
       if (t.waitUntil !== undefined) times.push(t.waitUntil);
       for (const j of t.judges) if (!(j in t.reports)) times.push((t.sent[j] ?? t.sentAt) + SCORE_TIMEOUT_MS);
@@ -1856,7 +2015,7 @@ export class LobbyCore {
   private afterJudging() {
     const tasks = this.r.judges?.tasks;
     if (this.r.phase !== "scoring" || !tasks) return;
-    if (!Object.values(tasks).every((t) => t.done && !t.server)) return this.armJudgeTimer();
+    if (!Object.values(tasks).every((t) => t.done && !t.server && !t.awaitDeep)) return this.armJudgeTimer();
     const round = this.r.round!;
     const boards: BoardScore[] = Object.values(tasks).map((t) => {
       const b = t.done!.board;

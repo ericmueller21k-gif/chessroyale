@@ -20,8 +20,10 @@ import {
   repliesFrom,
   bossMoveFrom,
   judgeBotPicks,
-  runJudgeJob,
+  runQuickJob,
+  deepCheck,
   type JudgeJob,
+  type JudgeReport,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
@@ -590,23 +592,38 @@ export class NetMatch implements GameView {
     }
   }
 
-  /** Many judges: score the lobby's jobs (each board's position and picks, no names) and send each answer back. */
+  /**
+   * Many judges: score the lobby's jobs (each board's position and picks, no names) and send each answer back. The
+   * quick part of every job first; then any job's re-check of its close calls (deep checks: this computer is one of
+   * two re-checking them), sent on its own. A knocked-out player's page judges too, as long as it's open.
+   */
   private async judge(key: string, jobs: JudgeJob[]) {
     const engines = await this.engines().catch(() => [] as UciEngine[]);
-    let next = 0;
-    await Promise.all(
-      engines.map(async (engine) => {
-        while (next < jobs.length) {
-          const job = jobs[next++]!;
-          try {
-            // The top moves were searched while players thought (the prefetch), so usually only the picks are left.
-            const report = await runJudgeJob(engine, job, this.top.get(engine, job.fen));
-            this.send({ t: "judged", key, id: job.id, report });
-          } catch {
-            // No answer: the lobby gives the job to someone else.
+    const quick = new Map<string, JudgeReport>();
+    const each = async (list: JudgeJob[], work: (engine: UciEngine, job: JudgeJob) => Promise<void>) => {
+      let next = 0;
+      await Promise.all(
+        engines.map(async (engine) => {
+          while (next < list.length) {
+            const job = list[next++]!;
+            // (No answer: the lobby gives the job to someone else, or has the engine server do it.)
+            await work(engine, job).catch(() => undefined);
           }
-        }
-      }),
+        }),
+      );
+    };
+    await each(jobs, async (engine, job) => {
+      // The top moves were searched while players thought (the prefetch), so usually only the picks are left.
+      const report = await runQuickJob(engine, job, this.top.get(engine, job.fen));
+      quick.set(job.id, report);
+      this.send({ t: "judged", key, id: job.id, report });
+    });
+    await each(
+      jobs.filter((j) => j.recheck && quick.has(j.id)),
+      async (engine, job) => {
+        const deep = await deepCheck(engine, job, quick.get(job.id)!);
+        if (deep) this.send({ t: "judgedDeep", key, id: job.id, deep });
+      },
     );
   }
 
