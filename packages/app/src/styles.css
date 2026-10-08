@@ -9779,3 +9779,329 @@ img.qicon {
   left: calc(100% + 8px);
   top: 0;
 }
+
+/* ---------------- Boss powers (BossPowers.tsx) ---------------- */
+
+/* The board layer: ice over frozen pieces, the pie on its square. Over the pieces, never taking a tap. */
+.power-board {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.pw-ice,
+.pw-pie,
+.pw-frost,
+.pw-splat {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+}
+.pw-ice-art,
+.pw-pie-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.pw-ice-art {
+  filter: drop-shadow(0 0 0.6cqw rgba(186, 230, 253, 0.8));
+}
+.pw-ice.fresh {
+  animation: pw-ice-form 450ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes pw-ice-form {
+  from {
+    opacity: 0;
+    scale: 0.4;
+    filter: brightness(2.2);
+  }
+}
+.pw-pie-art {
+  scale: 0.86;
+  filter: drop-shadow(0.3cqw 0.4cqw 0 rgba(0, 0, 0, 0.35));
+}
+.pw-pie.fresh {
+  animation: pw-pie-land 450ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes pw-pie-land {
+  from {
+    scale: 1.6 0.5;
+  }
+}
+/* A freeze: a cold burst on the square as the ice forms. */
+.pw-frost {
+  z-index: 3;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 18%, rgba(186, 230, 253, 0.85) 30%, rgba(125, 211, 252, 0) 68%);
+  animation: pw-frost 1050ms ease-out both;
+}
+@keyframes pw-frost {
+  0% {
+    opacity: 0;
+    scale: 0.3;
+  }
+  25% {
+    opacity: 1;
+    scale: 1.7;
+  }
+  100% {
+    opacity: 0;
+    scale: 2.2;
+  }
+}
+/* The pie's flight from the boss's side, and its splat. */
+.pw-pie-fly {
+  position: absolute;
+  z-index: 8;
+  width: 10%;
+  height: 10%;
+  /* (Its flight: 550 ms.) */
+  border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(circle at 50% 35%, #e11d48 0 10%, #fff8e7 11% 48%, #c2853a 50% 70%, transparent 71%);
+  animation: pw-pie-fly 550ms cubic-bezier(0.3, 0, 0.6, 1) both;
+}
+@keyframes pw-pie-fly {
+  0% {
+    rotate: -30deg;
+    scale: 0.8;
+  }
+  50% {
+    scale: 1.6;
+  }
+  100% {
+    left: calc(var(--fx) - 5%);
+    top: calc(var(--fy) - 5%);
+    rotate: 280deg;
+    scale: 1;
+  }
+}
+.pw-splat {
+  z-index: 3;
+  background:
+    radial-gradient(circle at 20% 30%, #fff8e7 0 9%, transparent 10%),
+    radial-gradient(circle at 80% 25%, #fff8e7 0 8%, transparent 9%),
+    radial-gradient(circle at 75% 80%, #fff8e7 0 10%, transparent 11%),
+    radial-gradient(circle at 18% 78%, #fff8e7 0 7%, transparent 8%),
+    radial-gradient(circle, rgba(255, 248, 231, 0.9) 0 30%, transparent 55%);
+  animation: pw-splat 550ms ease-out both;
+}
+@keyframes pw-splat {
+  from {
+    scale: 0.4;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    scale: 2;
+    opacity: 0;
+  }
+}
+/* The blizzard's sweep: a wall of cloud and snow across the board, left to right (clipped to the board). */
+.pw-clip {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  pointer-events: none;
+}
+.pw-sweep {
+  position: absolute;
+  z-index: 8;
+  top: -4%;
+  bottom: -4%;
+  left: -70%;
+  width: 70%;
+  background:
+    radial-gradient(circle at 20% 15%, #fff 0 1.4%, transparent 1.6%) 0 0 / 18% 14%,
+    radial-gradient(circle at 70% 60%, #fff 0 1.1%, transparent 1.3%) 0 0 / 14% 11%,
+    linear-gradient(90deg, rgba(240, 249, 255, 0), rgba(240, 249, 255, 0.92) 35%, rgba(224, 242, 254, 0.95) 60%, rgba(186, 230, 253, 0));
+  filter: blur(0.3cqw);
+  animation: pw-sweep 1500ms linear both;
+}
+@keyframes pw-sweep {
+  to {
+    left: 100%;
+    background-position: 30% 60%, -20% 80%, 0 0;
+  }
+}
+/* The boss casting, small, by the board's top-left corner (its side). */
+.pm-caster {
+  position: absolute;
+  z-index: 8;
+  left: -2%;
+  top: -14%;
+  width: 26%;
+  pointer-events: none;
+}
+.kit-anim {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+/* Boingo's funhouse: he pogos onto the board from his side, bounces in the middle, and pogos off. */
+.pm-pogo {
+  position: absolute;
+  z-index: 8;
+  left: 31%;
+  top: 22%;
+  width: 38%;
+  pointer-events: none;
+  filter: drop-shadow(0 1.2cqw 0 rgba(0, 0, 0, 0.35));
+}
+.pm-pogo.in {
+  animation: pw-pogo-in 700ms cubic-bezier(0.3, 0, 0.4, 1) both;
+}
+.pm-pogo.bounce {
+  animation: pw-pogo-bounce 520ms ease-in-out infinite alternate;
+}
+.pm-pogo.out {
+  animation: pw-pogo-out 800ms cubic-bezier(0.5, 0, 0.8, 0.4) both;
+}
+@keyframes pw-pogo-in {
+  0% {
+    translate: -90% -110%;
+    scale: 0.6;
+  }
+  55% {
+    translate: -30% -60%;
+  }
+  100% {
+    translate: 0 0;
+    scale: 1;
+  }
+}
+@keyframes pw-pogo-bounce {
+  to {
+    translate: 0 -9%;
+  }
+}
+@keyframes pw-pogo-out {
+  45% {
+    translate: 30% -40%;
+  }
+  100% {
+    translate: 110% -130%;
+    scale: 0.6;
+    opacity: 0;
+  }
+}
+/* His line, in his pixel text box above the board's middle. */
+.pm-line {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 6%;
+  translate: -50% 0;
+  max-width: 86%;
+  padding: 1.6cqw 2.4cqw;
+  border: 0.6cqw solid #0b0b1a;
+  border-radius: 1cqw;
+  background: #fff8e7;
+  color: #1b0d22;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 3cqw;
+  line-height: 1.5;
+  text-align: center;
+  box-shadow: 0.6cqw 0.6cqw 0 rgba(11, 11, 26, 0.6);
+  pointer-events: none;
+}
+/* The board flips: a half turn in its own plane (the pieces upside down for a moment), then the board is drawn from
+   the other side, untransformed (chessground measures its squares then). */
+.pw-flipping .board-wrap {
+  animation: pw-spin 700ms cubic-bezier(0.55, 0, 0.35, 1) both;
+}
+@keyframes pw-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(45deg) scale(0.7);
+  }
+  75% {
+    transform: rotate(135deg) scale(0.7);
+  }
+  100% {
+    transform: rotate(180deg) scale(1);
+  }
+}
+/* Boingo leaves his place by the board to pogo onto it for his funhouse. */
+.screen:has(.pm-pogo) .boss-char {
+  visibility: hidden;
+}
+/* The power's banner: the God King's cut-in, the boss on the left, him on the right; its colours by the power. */
+.pc-boss .boss-portrait {
+  display: block;
+  width: 82%;
+  margin: 0 auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0.5cqw 0.5cqw 0 rgba(0, 0, 0, 0.55));
+}
+.pc-king .gk-portrait {
+  width: 118%;
+}
+.fight-banner.power-cut .fb-band {
+  background: linear-gradient(90deg, #12040a, #6b1023 22%, #3b0b2e 50%, #6b1023 78%, #12040a);
+  border-color: #fca5a5;
+  box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(248, 113, 113, 0.45), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.fight-banner.power-cut.cold .fb-band {
+  background: linear-gradient(90deg, #04121c, #0c4a6e 22%, #1e3a5f 50%, #0c4a6e 78%, #04121c);
+  border-color: #bae6fd;
+  box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(125, 211, 252, 0.55), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.fight-banner.power-cut.fun .fb-band {
+  background: repeating-linear-gradient(115deg, #7e1d5c 0 6cqw, #5b21b6 6cqw 12cqw);
+  border-color: #fde68a;
+}
+.fight-banner.power-cut .kc-label {
+  color: #fecaca;
+}
+.fight-banner.power-cut.cold .kc-label {
+  color: #bae6fd;
+}
+.fight-banner.power-cut .kc-text {
+  font-size: 10cqw;
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    0 0 24px rgba(252, 165, 165, 0.9);
+}
+.fight-banner.power-cut.cold .kc-text {
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    0 0 24px rgba(186, 230, 253, 0.95);
+}
+.fight-banner.power-cut .fb-sub {
+  font-size: 3.4cqw;
+}
+/* The rage meter in the boss bar: fills as the boss loses material; flashes for the warning. */
+.rage-meter {
+  display: inline-block;
+  position: relative;
+  width: 44px;
+  height: 6px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.rage-meter i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  transition: width 600ms ease-out;
+}
+.rage-meter.warned,
+.rage-meter.now {
+  border-color: #fecaca;
+  animation: rage-pulse 600ms ease-in-out infinite alternate;
+}
+@keyframes rage-pulse {
+  to {
+    box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.85);
+  }
+}

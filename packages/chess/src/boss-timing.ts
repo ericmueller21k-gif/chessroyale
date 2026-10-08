@@ -33,7 +33,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * banner, the sweep across the board and the God King's line; the funhouse: the clown pogos onto the board, it flips,
  * he speaks and plays the crowd's move (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { freeze: 1800, pie: 1700, warn: 1700, blizzard: 3600, funhouse: 5200 } as const;
+export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200 } as const;
 
 /** How long a turn's power moments take, one after another. */
 export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX }[] | null | undefined): number {

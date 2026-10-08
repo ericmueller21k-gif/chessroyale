@@ -31,7 +31,10 @@ export type KingCue =
   | "spent"
   | "lastStand"
   | "lastWords"
-  | "rise";
+  | "rise"
+  | "blizzard"
+  | "blizzardKing"
+  | "funhouse";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
   intro: ["My blade is yours. Tap me when it counts.", "A boss? I've toppled taller towers.", "Steel's ready. Say the word.", "I'll be watching. Call me if it gets ugly."],
@@ -56,6 +59,15 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   lastStand: ["Fall back! This blow is mine.", "Not while I stand!", "Retreat — I'll hold the line!", "Go! I'll take it from here."],
   lastWords: ["Finish… it… for me."],
   rise: ["A god does not stay down."],
+  // A boss's powers: after the blizzard (the queen alone is free; with no queen to move, the king), after the funhouse.
+  blizzard: [
+    "Looks like our queen withstood the storm!",
+    "Frozen solid, all but our queen. She's ready.",
+    "Ice everywhere, yet the queen still stands!",
+    "That storm couldn't touch our queen.",
+  ],
+  blizzardKing: ["Frozen solid! Only our king can move.", "The storm spared the king alone. Steady, Majesty."],
+  funhouse: ["Upside down? Shake it off!", "That clown played our move! We'll fix it.", "Hold on, the board's spinning. Eyes up!"],
 };
 
 /**
@@ -84,6 +96,9 @@ const CUE_RULES: Record<KingCue, { chance: number; urgent?: boolean; paced?: boo
   lastStand: { chance: 1, urgent: true },
   lastWords: { chance: 1, urgent: true },
   rise: { chance: 1, urgent: true },
+  blizzard: { chance: 1, urgent: true },
+  blizzardKing: { chance: 1, urgent: true },
+  funhouse: { chance: 1, urgent: true },
 };
 
 /** How long a line stays up, and the least time between two lines that aren't urgent. */
@@ -124,7 +139,8 @@ const spoken = new Set<string>();
  * say otherwise). `key` names the moment, so a screen drawn twice speaks once.
  */
 export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => number = Math.random): string | null {
-  if (fallen && cue !== "lastWords" && cue !== "rise") return null;
+  // (The blizzard's word still comes from where he lies: it names the one piece the storm left free.)
+  if (fallen && cue !== "lastWords" && cue !== "rise" && cue !== "blizzard" && cue !== "blizzardKing") return null;
   if (spoken.has(key)) return null;
   spoken.add(key);
   if (spoken.size > 300) spoken.clear();
