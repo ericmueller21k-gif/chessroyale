@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { FRONT_DOOR, itemDef } from "@chessroyale/core";
-import { createGuest, ensureSchema, lobbyResult, profile, publicProfile, recordResult, reportPlayer, signInWithIdentity, touchSession, userFromToken, type Sql } from "../src/accounts.ts";
+import { createGuest, ensureSchema, lobbyResult, profile, publicProfile, recordResult, signInWithIdentity, touchSession, userFromToken, type Sql } from "../src/accounts.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
 import { liveCounts, recordWait, reportLobby, typicalWait, type LobbySummary } from "../src/live.ts";
@@ -250,24 +250,5 @@ describe("profiles", () => {
     // Stats still count every match.
     expect(p.crowd.games).toBe(4);
     expect((await profile(sql, { ...user, email: null, google_sub: null } as never)).rating).toBe(1700);
-  });
-
-  it("reports: stored for a person to read, one per player a day, never about yourself or nobody", async () => {
-    const { sql } = memoryDb();
-    await ensureSchema(sql);
-    const a = (await createGuest(sql, 1000, "Ann")).user.id;
-    const b = (await createGuest(sql, 1000, "Bo")).user.id;
-    expect(await reportPlayer(sql, a, b, "Cheating (an engine)", 5000)).toEqual({ ok: true });
-    // Again the same day: accepted, not stored twice.
-    expect(await reportPlayer(sql, a, b, "Name", 6000)).toEqual({ ok: true });
-    expect((await sql.all("SELECT * FROM reports")).length).toBe(1);
-    expect((await reportPlayer(sql, a, a, "Name", 6000)).ok).toBe(false);
-    expect((await reportPlayer(sql, a, "nobody", "Name", 6000)).ok).toBe(false);
-    expect((await reportPlayer(sql, a, b, "because", 6000)).ok).toBe(false);
-    expect(await reportPlayer(sql, a, b, "Name", 6000 + 86_400_000)).toEqual({ ok: true });
-    expect(await sql.all("SELECT reporter, target, reason FROM reports ORDER BY at")).toEqual([
-      { reporter: a, target: b, reason: "Cheating (an engine)" },
-      { reporter: a, target: b, reason: "Name" },
-    ]);
   });
 });

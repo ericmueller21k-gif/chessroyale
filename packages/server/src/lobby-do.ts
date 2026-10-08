@@ -10,6 +10,7 @@ import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
 import { CAPACITY, DEFAULT_SETTINGS } from "@chessroyale/core";
+import { eligibleForRanked } from "./fairplay.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -117,7 +118,10 @@ export class Lobby extends DurableObject<Env> {
     const mode = this.mode();
     for (const r of core.humanResults()) {
       const userId = rec.accounts?.[r.playerId];
-      if (userId) await recordResult(sql, userId, { ...r, mode, online: true, lobby: rec.code }, Date.now()).catch(() => undefined);
+      if (!userId) continue;
+      // Fair play: a player in review (or banned) has their results held off ranking until they're cleared.
+      const held = !(await eligibleForRanked(sql, userId).catch(() => true));
+      await recordResult(sql, userId, { ...r, mode, online: true, lobby: rec.code, held }, Date.now()).catch(() => undefined);
     }
   }
 

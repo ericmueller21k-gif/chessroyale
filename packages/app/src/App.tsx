@@ -693,7 +693,7 @@ export function App() {
   const overlay = profileOpen && (
     <div class="fd-overlay">
       <FrontFrame>
-        <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+        <PlayerProfileScreen target={profileOpen} onBack={closeProfile} match={match instanceof NetMatch ? match.code : undefined} />
       </FrontFrame>
     </div>
   );
