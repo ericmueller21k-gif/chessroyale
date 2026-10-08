@@ -22,6 +22,24 @@ The account is on **Workers Paid** ($5/month), which Containers need. `wrangler.
 - **Locally:** `npx wrangler dev` builds and runs the container with Docker; `--enable-containers=false --var ENGINE_OFF:1` runs without it (the e2e suite does, to test the device fallback).
 - **Budget alert:** Billing → Add Budget Alert in the Cloudflare dashboard (suggested: $20/month).
 
+## Fair play: the review page and the reviewer's key
+
+Two settings, both added by Eric in the Cloudflare dashboard. **Neither is ever pasted in a chat or put in the
+repository.**
+
+1. **Who may open the review page** (`https://hunchess.com/admin/fairplay`): open **Workers & Pages → chessroyale →
+   Settings → Variables and Secrets → Add**. Name: `ADMIN_EMAILS`. Value: the email you sign in to HunChess with
+   (several, separated by commas, if others should review too). Type: Secret (or Text). Save and deploy. Then sign in
+   to HunChess with that email and open the page; everyone else gets "Not found".
+2. **The automated reviewer's key** (only when the scheduled reviewer is set up): the same screen, name
+   `FAIRPLAY_REVIEW_TOKEN`, type **Secret**, value at least 16 random characters (for example the output of
+   `openssl rand -hex 24`). Give the same value to the reviewer's scheduled task in its own secret settings, not in a
+   message. `docs/fairplay-reviewer.md` describes what it can do.
+
+Either can instead live in the account's Secrets Store (like the sign-in secrets): the Worker reads both forms. If you
+use the Store, add the binding in the dashboard after creating the secret (a binding in `wrangler.jsonc` to a secret
+that doesn't exist yet fails the deploy).
+
 ## Load testing (staging only, never production)
 
 Simulated players (`scripts/load/`) speak the app's real protocol: a guest account, the home screen's live line, PLAY,

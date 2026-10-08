@@ -50,13 +50,19 @@ export type WaitUntil = (p: Promise<unknown>) => void;
 export const presenceTouch = (env: AccountEnv, waitUntil?: WaitUntil) =>
   env.LIVE && waitUntil ? (userId: string) => markSeen(env as Required<Pick<AccountEnv, "LIVE">>, userId, Date.now(), waitUntil) : undefined;
 
-const SECRET_KEYS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY", "EMAIL_FROM"] as const;
+/**
+ * Values that may be a plain Worker variable or secret, or a binding to the account's Secrets Store: the sign-in
+ * secrets, and fair play's admin emails and reviewer token (admin.ts).
+ */
+const SECRET_KEYS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY", "EMAIL_FROM", "ADMIN_EMAILS", "FAIRPLAY_REVIEW_TOKEN"] as const;
 let secretCache: { at: number; values: Partial<Record<(typeof SECRET_KEYS)[number], string>> } | null = null;
+/** Forgets the cached secrets (tests that change them). */
+export const forgetSecrets = () => void (secretCache = null);
 
 /**
- * The sign-in secrets as plain strings. Each can be a Worker secret (already a
- * string) or a binding to the account's Secrets Store (read with `.get()`;
- * see wrangler.jsonc). Store reads are cached for 5 minutes per instance.
+ * The secrets (SECRET_KEYS) as plain strings. Each can be a Worker variable or secret (already a string) or a binding
+ * to the account's Secrets Store (read with `.get()`; see wrangler.jsonc). Store reads are cached for 5 minutes per
+ * instance.
  */
 export async function withSecrets<E extends object>(env: E): Promise<E & AccountEnv> {
   const now = Date.now();

@@ -16,24 +16,30 @@ import { SESSION_COOKIE, readCookie, type AccountEnv } from "./api.ts";
 import { caseOf, decide, decideAppeal, purgeEvidence, type Appeal, type Case, type CaseMailer } from "./fairplay.ts";
 
 export interface AdminEnv extends AccountEnv {
-  /** Admins' sign-in emails, comma-separated (a Worker variable or secret). */
+  /**
+   * Admins' sign-in emails, comma-separated: a Worker variable or secret, or a Secrets Store binding (withSecrets in
+   * api.ts reads it as a string first).
+   */
   ADMIN_EMAILS?: string;
-  /** The automated reviewer's bearer token (a Worker secret). */
+  /** The automated reviewer's bearer token: a Worker secret or a Secrets Store binding, like ADMIN_EMAILS. */
   FAIRPLAY_REVIEW_TOKEN?: string;
 }
+
+/** A setting as a string (anything else, such as a Secrets Store binding nobody read, counts as unset). */
+const text = (v: unknown) => (typeof v === "string" ? v : "");
 
 const DAY = 86_400_000;
 
 /** Whether a signed-in account is an admin (its email is in ADMIN_EMAILS). */
 export function isAdmin(env: AdminEnv, user: Pick<User, "email"> | null): boolean {
   if (!user?.email) return false;
-  const list = (env.ADMIN_EMAILS ?? "").split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const list = text(env.ADMIN_EMAILS).split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
   return list.includes(user.email.toLowerCase());
 }
 
 /** Constant-time comparison of the reviewer's token. */
 function tokenOk(env: AdminEnv, request: Request): boolean {
-  const want = env.FAIRPLAY_REVIEW_TOKEN ?? "";
+  const want = text(env.FAIRPLAY_REVIEW_TOKEN);
   const got = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (want.length < 16 || got.length !== want.length) return false;
   let diff = 0;
