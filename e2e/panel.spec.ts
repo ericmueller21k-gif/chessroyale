@@ -41,6 +41,9 @@ function look(p: Page) {
 
 /** Never an empty box: open shows rows or chat; folded is a small header bar; and it fits the screen. */
 async function expectShowing(p: Page, want: { layout: "split" | "board" | "chat"; open: boolean }, step: string) {
+  // Measured while a move is being chosen: a reveal adds its tally row above the panel (about 90 px on a phone), so
+  // a check that happened to land in one read the chat as too short (the test's steps don't wait for the round).
+  await expect.poll(() => phase(p), { message: `${step}: a move being chosen`, timeout: 60_000 }).toMatch(/^(play|watching)$/);
   await expect
     .poll(async () => {
       const v = await look(p);

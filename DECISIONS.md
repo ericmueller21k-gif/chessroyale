@@ -2283,9 +2283,10 @@ never catches us out. Reports in `reports/load/`; how to run them, staging and m
    writes about 80 KB instead of about 150 KB.
 6. **Rate limits** (`limits.ts`, `CAPACITY.rateLimits`): per address 10,000 a minute (a school or a mobile network
    shares one address), per account 1,200 a minute, PLAY and new lobbies 40 a minute per account (in line asks 20
-   times). The per-account limit was first 300 (the home screen asks 12 times a minute), and the e2e suite caught it:
-   a phone reloading a match screen 20 times in a minute (`e2e/panel.spec.ts`) made over 300 requests, and the 429s
-   left its chat panel short. 1,200 is four times that burst; a script in a loop makes hundreds a second. Past one: 429 "Too many requests. Wait a few seconds and try again."
+   times). The per-account limit was first 300 (the home screen asks 12 times a minute); it's 1,200 so a burst of
+   reloads and reconnects (a match screen makes several calls each time it opens) never gets near it, while a script
+   in a loop, making hundreds a second, still does. (A flaky panel test was first blamed on the 300; it wasn't the
+   cause: see LESSONS, "One lucky pass taken for a cause". The higher limit stays on its own merits.) Past one: 429 "Too many requests. Wait a few seconds and try again."
    with `Retry-After`. Counted in each Worker instance's memory, so they stop runaway clients and scripts, not a
    determined attacker (that's Cloudflare's WAF rate-limiting rules, Eric's call if ever needed). `LOAD_TEST=1`
    (staging only) lifts the per-address one, since every simulated player comes from one machine.

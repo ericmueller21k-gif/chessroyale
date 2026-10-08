@@ -268,21 +268,29 @@ read the scoreboard's name column (103 px at 360 px) and measured every name in 
 - Check text that must fit by measuring it in the real font and box, with some room for other fonts (an iPhone's runs
   wider than headless Chrome's), not by counting characters.
 
-## A rate limit sized by the wrong number (Oct 8, 2026)
+## One lucky pass taken for a cause (Oct 8, 2026)
 
-**Seen** (by the capacity work, before it shipped): `e2e/panel.spec.ts` failed on the phone, twice, and passed on
-main: after about 15 reloads of a match screen, the chat panel under the board was too short.
+**Seen** (by the capacity work, before it shipped): `e2e/panel.spec.ts` failed on the phone three times out of four
+on the capacity branch and passed on main: after about 15 reloads of a match screen, the chat panel under the board
+read too short (16-24 px, the test wants more than 30).
 
-**The cause:** the new per-account rate limit was 300 requests a minute, sized by the home screen's polling (12 a
-minute). But a reload of a match screen makes a burst of calls (account, live line, lobby, socket, shop and more),
-and the test reloads about 20 times a minute: over 300. Past the limit some of those calls got a 429, and the screen
-drew with what it had.
+**The wrong turn:** the branch had just added a per-account rate limit (300 a minute), the failure came late in the
+test, after many reloads, and with the limit raised the test passed once. That looked like proof, and the limit
+went up. The next run failed again with the higher limit.
 
-**How it was found:** the failure came late in the test (tap 14, tap 18), after many reloads; the same test passed on
-main; with the limit raised it passed.
+**The cause:** the test's steps don't wait for the round. Its reload step accepts the reveal and scoring phases, and
+in a reveal the move tallies sit above the panel (about 90 px on a phone), so the chat feed shrinks. Whether a check
+lands in a reveal depends on where the first round's deadline falls during the walk: luck. Main came close too
+(scoring at tap 15, a smaller row, so it passed).
+
+**How it was found:** a copy of the test logged, at every step on both branches, the phase, the seconds left in the
+round, and the top and height of the board, the panel and the chat's parts. The panel moved down 93 px exactly when
+the phase was the reveal.
+
+**The fix:** the panel test measures only while a move is being chosen (play or watching), waiting for it.
 
 **The rule:**
-- Size a limit by the app's own worst burst, measured (reloads, reconnects, the app coming back from the background),
-  not by its steady rate. Then leave a few times that as margin, and add a test that the burst stays under it.
-- When a test passes on main and fails on a branch late in its run, look for something that accumulates: a counter,
-  a limit, a cache.
+- One passing run doesn't confirm a cause. Before changing anything for a suspected cause, log what the test sees at
+  each step on both branches (the phase, times, boxes) and find the step where they differ.
+- A test that measures a layout waits for the phase it means to measure; a phase change in the middle is a different
+  screen.

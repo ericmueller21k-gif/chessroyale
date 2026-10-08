@@ -183,7 +183,7 @@ describe("rate limits", () => {
       if (s % 5 === 0) expect(rateLimited({ ip: "1.1.1.1", session: "tok-a", play: false }, t)).toBeNull();
       if (s % 3 === 0) expect(rateLimited({ ip: "1.1.1.1", session: "tok-a", play: true }, t)).toBeNull();
     }
-    // A phone reloading a match screen 20 times in a minute, about 15 requests each (e2e/panel.spec.ts made over 300).
+    // A phone reloading a match screen 20 times in a minute, about 15 requests each.
     for (let i = 0; i < 20 * 15; i++) expect(rateLimited({ ip: "4.4.4.4", session: "tok-c", play: false }, t + i * 200)).toBeNull();
     // A script hammering from one account.
     let limited = 0;
