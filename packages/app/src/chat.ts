@@ -1,5 +1,7 @@
 import {
   QUICK_CHAT,
+  botChatLines,
+  canSay,
   canSayToAll,
   chatCheck,
   chatPicksOf,
@@ -142,10 +144,10 @@ export class MatchChat {
     return Math.max(chatReadyAt(this.sent), this.blockedUntil);
   }
 
-  /** Whether this line's button works right now (owned, the switch allows it, within the limits). */
+  /** Whether this line's button works right now (chat open, owned, the switch allows it, within the limits). */
   canSay(id: string, now = Date.now()): boolean {
     const say = chatSay(id);
-    if (!say || !this.packs.includes(say.pack) || chatOff()) return false;
+    if (!this.enabled || !say || !this.packs.includes(say.pack) || chatOff()) return false;
     if (this.to === "all" && this.host.teams() && !canSayToAll(id)) return false;
     return now >= this.blockedUntil && chatCheck(this.sent, id, now).ok;
   }
@@ -246,7 +248,7 @@ export class MatchChat {
    */
   floats(now = Date.now()): Map<string, ChatFloat> {
     const out = new Map<string, ChatFloat>();
-    if (chatOff()) return out;
+    if (chatOff() || !this.enabled) return out;
     for (const l of this.lines(now)) {
       const say = chatSay(l.say);
       if (say?.kind === "emoji" && now - l.at < QUICK_CHAT.emojiFloatMs)
@@ -259,6 +261,13 @@ export class MatchChat {
     for (const t of this.timers) clearTimeout(t);
     this.timers.clear();
     this.offPrefs?.();
+  }
+
+  /** Chat is over here (Solo's queue, as its match begins: solo matches have no chat). */
+  close() {
+    this.enabled = false;
+    this.dispose();
+    this.host.emit();
   }
 
   // ---------------- Inside ----------------
@@ -306,13 +315,17 @@ export class MatchChat {
     this.timers.add(t);
   }
 
-  private mutedKey() {
-    return `brc.chatMuted.${this.host.code()}`;
+  /** Where this match's mutes are kept (none for a chat without a lobby code: Solo's queue). */
+  private mutedKey(): string | null {
+    const code = this.host.code();
+    return code ? `brc.chatMuted.${code}` : null;
   }
 
   private loadMuted(): string[] {
+    const key = this.mutedKey();
+    if (!key) return [];
     try {
-      const v = JSON.parse(localStorage.getItem(this.mutedKey()) ?? "[]");
+      const v = JSON.parse(localStorage.getItem(key) ?? "[]");
       return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
     } catch {
       return [];
@@ -320,11 +333,81 @@ export class MatchChat {
   }
 
   private saveMuted() {
+    const key = this.mutedKey();
+    if (!key) return;
     try {
-      if (this.muted.size) localStorage.setItem(this.mutedKey(), JSON.stringify([...this.muted]));
-      else localStorage.removeItem(this.mutedKey());
+      if (this.muted.size) localStorage.setItem(key, JSON.stringify([...this.muted]));
+      else localStorage.removeItem(key);
     } catch {
       // Not important: the mute lasts until a reload.
     }
+  }
+}
+
+/**
+ * Solo's lobby chat: the queue screen while your bots take their seats. There's no server, so this stands in for
+ * one, with the same checks (a known line you own, the limits; mute and chat off are the device's own, as online)
+ * and a hello or two from the bots as they sit down. Solo matches themselves have no chat, so it closes as the match
+ * begins.
+ */
+export class SoloLobbyChat {
+  readonly chat: MatchChat;
+  private n = 0;
+  private sent: ChatSent = noChatSent();
+  /** When the bots' lines are said (the per-minute cap). */
+  private botTimes: number[] = [];
+
+  constructor(
+    private readonly me: string,
+    emit: () => void,
+    /** The shop items your account owns (your chat packs), and the lines and emoji you picked. */
+    private readonly owned: () => readonly string[] | undefined,
+    picks: () => StoredChatPicks | null | undefined,
+  ) {
+    this.chat = new MatchChat({
+      // (No lobby code: a mute here lasts as long as the queue.)
+      code: () => "",
+      me: () => me,
+      send: (m) => this.receive(m),
+      emit,
+      local: (t) => t,
+      teams: () => false,
+      picks,
+    });
+  }
+
+  /** The queue screen is up: chat opens. */
+  open() {
+    this.chat.onLog([], ownedChatPacks(this.owned()));
+  }
+
+  /** The bots that have sat down so far: one or two may say hello (botChatLines' "lobby" moment). */
+  botsArrived(bots: readonly string[], rng: () => number = Math.random) {
+    if (!this.chat.enabled) return;
+    const now = Date.now();
+    for (const l of botChatLines(rng, { kind: "lobby" }, bots, this.botTimes, now)) {
+      const at = now + l.delayMs;
+      this.botTimes.push(at);
+      this.chat.onLine({ n: ++this.n, from: l.from, say: l.say, to: "all", team: null, at, lobby: true });
+    }
+  }
+
+  close() {
+    this.chat.close();
+  }
+
+  /** What the panel sends: a line, checked as the server would (its choices, mute and chat off, stay here). */
+  private receive(m: ClientMessage) {
+    if (m.t !== "chat" || !this.chat.enabled) return;
+    const now = Date.now();
+    const say = String(m.say);
+    if (chatOff()) return this.chat.onRefused(say, "off", now);
+    const line = chatSay(say);
+    if (!line) return this.chat.onRefused(say, "unknown", now);
+    if (!canSay(line.id, this.owned())) return this.chat.onRefused(say, "locked", now);
+    const check = chatCheck(this.sent, line.id, now);
+    if (!check.ok) return this.chat.onRefused(say, check.limit, check.retryAt);
+    this.sent = chatSent(this.sent, line.id, now);
+    this.chat.onLine({ n: ++this.n, from: this.me, say: line.id, to: "all", team: null, at: now, lobby: true });
   }
 }

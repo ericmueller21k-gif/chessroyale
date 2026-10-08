@@ -8,6 +8,8 @@ import { RoundProgress } from "./progress.ts";
 import { warmEngineServer, withServerRecheck } from "./engine.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { crowdMoveCues, kingSay } from "./godKing.ts";
+import { SoloLobbyChat } from "./chat.ts";
+import { account } from "./account.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -39,6 +41,16 @@ export class SoloMatch implements GameView {
   readonly looks = new Map<string, ItemLook>();
   readonly fillAt: number | null = null;
   filledAt: number | null = null;
+  /** Quick chat in the queue (Crowd and raids) while your bots sit down; it closes as the match begins. */
+  private lobbyChat = new SoloLobbyChat(
+    HUMAN,
+    () => this.emit(),
+    () => account().profile?.shop?.owned,
+    () => account().profile?.shop?.chat,
+  );
+  get chat() {
+    return this.lobbyChat.chat;
+  }
   runner!: MatchRunner;
   moves: MoveRecord[] = [];
   scoringMs: number[] = [];
@@ -181,6 +193,7 @@ export class SoloMatch implements GameView {
     if (this.timer) clearTimeout(this.timer);
     this.progress.reset();
     this.listeners.clear();
+    this.lobbyChat.close();
   }
 
   get you(): PlayerState {
@@ -203,8 +216,11 @@ export class SoloMatch implements GameView {
     const me: LobbyPlayer = { id: HUMAN, name: this.playerName, isBot: false, connected: true };
     this.auto = true;
     this.players = [me];
+    // Lobby chat (Crowd and raids, as online; Classic has none): your lines, and a hello or two from the bots.
+    if (this.settings.mode === "crowd") this.lobbyChat.open();
     this.set({ kind: "lobby" });
     const t0 = Date.now();
+    let greeted = false;
     const tick = () => {
       // Easing in and out: a few, a rush, the last few.
       const t = Math.min(1, (Date.now() - t0) / fillMs);
@@ -213,11 +229,18 @@ export class SoloMatch implements GameView {
         this.players = [me, ...bots.slice(0, n)];
         this.emit();
       }
+      // Halfway in, those already seated say hello (so their lines land while the queue is still up).
+      if (!greeted && n >= bots.length / 2 && n > 0) {
+        greeted = true;
+        this.lobbyChat.botsArrived(bots.slice(0, n).map((b) => b.id));
+      }
       if (n < bots.length) return void (this.timer = setTimeout(tick, 40));
       this.filledAt = Date.now();
       this.emit();
       this.timer = setTimeout(() => {
         this.auto = false;
+        // (Solo matches have no chat.)
+        this.lobbyChat.close();
         this.begin();
       }, holdMs);
     };

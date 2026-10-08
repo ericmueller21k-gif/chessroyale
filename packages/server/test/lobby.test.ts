@@ -691,9 +691,7 @@ describe("lobby: quick chat", () => {
     for (let seed = 7; ; seed++) {
       const L = setup({ ...modeSettings("crowd"), augments: false, boardIntroSeconds: 0 }, icons, seed);
       for (const n of ["Ann", "Bo", "Cy"]) L.core.connect(undefined, n, "computer");
-      // Before the match: chat is closed (the queue comes later).
-      L.core.message("p1", { t: "chat", say: "good-luck" });
-      expect(L.last("p1", "chatNo")).toMatchObject({ reason: "closed" });
+      // (Chat before the match, in the lobby: "lobby: quick chat before the match", below.)
       L.core.message("p1", { t: "start" });
       L.advance(DEFAULT_SETTINGS.openingShowSeconds * 1000);
       const team = (id: string) => L.last(id, "round")!.standings.find((s) => s.id === id)!.team!;

@@ -91,7 +91,10 @@ interface ChatRecord {
   /** Lines said so far (the last QUICK_CHAT.logSize, both teams), to send a player who (re)joins. */
   n: number;
   lines: NetChatLine[];
-  /** What each person has sent lately (the limits). */
+  /**
+   * What each person has sent lately (the limits): by account, so leaving the queue and taking a new seat in it
+   * doesn't start them afresh (by seat without one).
+   */
   sent: Record<string, ChatSent>;
   /** The shop items each person's account owns (their chat packs), read when they join. */
   owned: Record<string, string[]>;
@@ -223,9 +226,12 @@ export interface LobbyRecord {
   feats?: Record<string, { brilliant: number; best: { san: string; score: number } | null }>;
   /** When the match began (after any pre-start show). */
   startedAt?: number;
-  /** Quick chat (Crowd matches and boss raids, once the match has begun). */
+  /** Quick chat (Crowd matches and boss raids, from the lobby before the match: the queue, a private lobby). */
   chat?: ChatRecord;
-  /** The last time a person did anything here (joined, left, connected, dropped, sent anything): when it closes. */
+  /**
+   * The last time a person did anything here (joined, left, connected, dropped, sent anything but quick chat): when it
+   * closes.
+   */
   activeAt?: number;
   /** When the match ended (its results came up). */
   endedAt?: number;
@@ -589,6 +595,7 @@ export class LobbyCore {
     this.r.activeAt = this.io.now();
     this.r.humans = this.r.humans.filter((h) => h.id !== playerId);
     delete this.r.last[playerId];
+    this.chatGone(playerId);
     if (this.r.accounts?.[playerId]) {
       const { [playerId]: _gone, ...rest } = this.r.accounts;
       this.r.accounts = rest;
@@ -610,7 +617,8 @@ export class LobbyCore {
   // ---------------- Messages ----------------
 
   message(playerId: string, msg: ClientMessage) {
-    if (this.human(playerId)) this.r.activeAt = this.io.now();
+    // (Quick chat isn't activity: chatting never keeps a lobby nobody starts open. See lobbyClosing.)
+    if (this.human(playerId) && msg.t !== "chat" && msg.t !== "chatPrefs") this.r.activeAt = this.io.now();
     switch (msg.t) {
       case "start":
         return this.start(playerId);
@@ -710,6 +718,8 @@ export class LobbyCore {
       this.r.auto.waiters = waiting.length;
       this.r.auto.waitMs = waiting.length ? waiting.reduce((a, h) => a + (now - h.joinedAt!), 0) / waiting.length : 0;
       this.broadcast(this.lobbyMessage(), false);
+      // The bots just sat down: one or two say hello in the lobby chat (within the full grid's moment).
+      if (bots.length) this.botChat({ kind: "lobby" });
       this.setTimer("autoGo", now + FRONT_DOOR.fillShowMs);
       return;
     }
@@ -724,8 +734,9 @@ export class LobbyCore {
     this.r.phase = voting ? "vote" : "opening";
     this.r.startedAt = now;
     this.broadcast(this.lobbyMessage(), false);
-    // Quick chat opens with the match (and a bot or two wishes everyone luck).
-    for (const h of this.r.humans) this.sendChatLog(h.id);
+    // Quick chat carries on from the lobby into the match, now with teams (and a bot or two wishes everyone luck).
+    // (Icons already sent in the lobby aren't sent again.)
+    for (const h of this.r.humans) this.sendChatLog(h.id, false);
     this.botChat({ kind: "start" });
     if (voting) return this.startVote(0);
     // Boss raid: straight to the boss's intro, which replays the opening from the starting position itself.
@@ -2232,9 +2243,37 @@ export class LobbyCore {
     return (this.r.chat ??= { n: 0, lines: [], sent: {}, owned: {}, iconTo: {}, off: {}, muted: {}, bots: [] });
   }
 
-  /** Chat is on in Crowd matches (50 v 50, everyone moves) and boss raids, once the match has begun (not in the queue, not Classic). */
+  /**
+   * Chat is on in Crowd matches (50 v 50, everyone moves) and boss raids, from the lobby before the match (the queue,
+   * a private lobby) to the results. Not in Classic.
+   */
   chatOpen(): boolean {
-    return this.settings.mode === "crowd" && this.r.phase !== "lobby";
+    return this.settings.mode === "crowd";
+  }
+
+  /**
+   * Before the match (the queue, a private lobby, the full grid's moment before the votes): there are no teams yet,
+   * so there's one channel, everyone in the lobby. Every line you own may go to it (there's no other team to keep a
+   * plan from), and its lines stay in the match's feed, marked as the lobby's.
+   */
+  private chatInLobby(): boolean {
+    return this.r.phase === "lobby";
+  }
+
+  /** Whose limits a line counts against: the account's (a new seat in the same lobby doesn't reset them), else the seat's. */
+  private chatKey(id: string): string {
+    const uid = this.r.accounts?.[id];
+    return uid ? `u:${uid}` : id;
+  }
+
+  /** Someone left the lobby before the match: their chat choices go (their lines stay with those who saw them). */
+  private chatGone(id: string) {
+    const c = this.r.chat;
+    if (!c) return;
+    delete c.owned[id];
+    delete c.iconTo[id];
+    delete c.off[id];
+    delete c.muted[id];
   }
 
   /** A player's side in a 50 v 50 (null when there are no teams). */
@@ -2272,12 +2311,18 @@ export class LobbyCore {
     this.chat.owned[playerId] = owned.filter((x) => typeof x === "string").slice(0, 200);
   }
 
-  /** The recent lines this player can see, and their packs (chat has opened, or they're back). */
-  private sendChatLog(id: string) {
+  /**
+   * The recent lines this player can see, and their packs (they joined, they're back, or the match began). Only lines
+   * from people still here: someone who left the queue took their seat and their name with them, so a newcomer
+   * never sees a line from nobody. `fresh`: the device has nothing yet (it joined or reconnected), so every sender's
+   * icon goes again.
+   */
+  private sendChatLog(id: string, fresh = true) {
     if (!this.chatOpen() || !this.human(id)) return;
     const c = this.chat;
-    c.iconTo[id] = [];
-    const lines = c.lines.filter((l) => this.chatHears(id, l)).slice(-QUICK_CHAT.feedSize);
+    if (fresh) c.iconTo[id] = [];
+    const here = new Set([...this.r.humans.map((h) => h.id), ...this.r.bots.map((b) => b.id)]);
+    const lines = c.lines.filter((l) => here.has(l.from) && this.chatHears(id, l)).slice(-QUICK_CHAT.feedSize);
     this.io.send(id, { t: "chatLog", lines: lines.map((l) => this.withIcon(id, l)), packs: ownedChatPacks(c.owned[id]) });
   }
 
@@ -2294,7 +2339,8 @@ export class LobbyCore {
   /**
    * A person says a line. Only known lines they own, Hello and Sporting lines and emoji alone to everyone, within the
    * limits (one every 3 s, 5 in 30 s, no repeats): anything else is dropped and the sender told why. (Which of their
-   * lines show as buttons is their profile's picks: the app's business. Any line they own may go.)
+   * lines show as buttons is their profile's picks: the app's business. Any line they own may go.) In the lobby
+   * before the match, every line goes to everyone there (no teams yet), with the same checks.
    */
   private chatSay(playerId: string, say: unknown, to: unknown) {
     const now = this.io.now();
@@ -2305,13 +2351,21 @@ export class LobbyCore {
     const line = chatSay(say);
     if (!line) return refuse("unknown");
     if (!canSay(line.id, c.owned[playerId])) return refuse("locked");
-    const toAll = to === "all";
+    const lobby = this.chatInLobby();
+    const toAll = !lobby && to === "all";
     if (toAll && !canSayToAll(line.id)) return refuse("team");
-    const sent = c.sent[playerId] ?? noChatSent();
+    const key = this.chatKey(playerId);
+    const sent = c.sent[key] ?? noChatSent();
     const check = chatCheck(sent, line.id, now);
     if (!check.ok) return refuse(check.limit, check.retryAt);
-    c.sent[playerId] = chatSent(sent, line.id, now);
-    this.chatPost({ from: playerId, say: line.id, to: toAll ? "all" : "team", team: this.chatTeam(playerId), at: now });
+    c.sent[key] = chatSent(sent, line.id, now);
+    this.chatPost(this.chatLine(playerId, line.id, toAll ? "all" : "team", now));
+  }
+
+  /** A line to post: in the lobby, to everyone there; in the match, to the sender's team (or everyone). */
+  private chatLine(from: string, say: string, to: "team" | "all", at: number): Omit<NetChatLine, "n"> {
+    if (this.chatInLobby()) return { from, say, to: "all", team: null, at, lobby: true };
+    return { from, say, to, team: this.chatTeam(from), at };
   }
 
   /** This device's chat choices: chat off, and who it muted for the match (their lines aren't sent to it). */
@@ -2342,7 +2396,7 @@ export class LobbyCore {
     for (const l of lines) {
       const at = now + l.delayMs;
       c.bots = [...c.bots.filter((t) => t > now - 120_000), at];
-      this.chatPost({ from: l.from, say: l.say, to: l.to, team: this.chatTeam(l.from), at });
+      this.chatPost(this.chatLine(l.from, l.say, l.to, at));
     }
   }
 }

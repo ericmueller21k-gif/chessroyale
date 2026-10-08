@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { QUICK_CHAT, defaultChatPicks, type StoredChatPicks } from "@chessroyale/core";
+import { QUICK_CHAT, defaultChatPicks, mulberry32, type StoredChatPicks } from "@chessroyale/core";
 import type { ClientMessage, NetChatLine } from "@chessroyale/chess";
-import { MatchChat } from "../src/chat.ts";
+import { MatchChat, SoloLobbyChat } from "../src/chat.ts";
+import { play } from "../src/sound.ts";
+
+// (The chat's tick: counted, not played.)
+vi.mock("../src/sound.ts", () => ({ play: vi.fn() }));
 
 /** A chat whose match is "p1" on a team, with the server's clock equal to ours. */
 function setup(teams = true, picks: StoredChatPicks | null = null) {
@@ -154,5 +158,121 @@ describe("quick chat in the app", () => {
     expect(chat.picked().lines.map((s) => s.text)).toEqual(["Rematch?", "For the crown!", "Push the pawns!"]);
     // A line that isn't picked can still be said (picks are which buttons show; the server checks ownership).
     expect(chat.canSay("gg")).toBe(true);
+  });
+});
+
+describe("lobby chat in the app (before the match)", () => {
+  /** A device's storage (chat off, mutes). */
+  const storage = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, String(v)), removeItem: (k: string) => void m.delete(k), keys: () => [...m.keys()] };
+  };
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    vi.mocked(play).mockClear();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("the buttons wait while the queue connects (the panel shows at once, so nothing jumps), then work", () => {
+    const { chat, sent } = setup(false);
+    expect(chat.enabled).toBe(false);
+    expect(chat.canSay("hi-all")).toBe(false);
+    chat.say("hi-all");
+    expect(sent).toEqual([]);
+    chat.onLog([], ["basics", "emoji-basics"]);
+    expect(chat.canSay("hi-all")).toBe(true);
+  });
+
+  it("the lobby's lines from others don't tick (they go to everyone there); a team line in the match does", () => {
+    const { chat, line } = setup(false);
+    chat.onLog([], ["basics", "emoji-basics"]);
+    chat.onLine(line(1, "p2", "hi-all", { to: "all", team: null, lobby: true }));
+    expect(play).not.toHaveBeenCalled();
+    expect(chat.lines().map((l) => [l.say, l.lobby])).toEqual([["hi-all", true]]);
+    chat.onLine(line(2, "p2", "push-pawns"));
+    expect(play).toHaveBeenCalledWith("chat");
+  });
+
+  /** Solo's queue: its own stand-in for the server. */
+  function solo(owned: string[] = []) {
+    let emits = 0;
+    const s = new SoloLobbyChat("you", () => emits++, () => owned, () => null);
+    s.open();
+    return { s, chat: s.chat, emits: () => emits };
+  }
+
+  it("Solo: your line shows at once as a lobby line, with the same limits and ownership as online", () => {
+    const { s, chat } = solo();
+    expect(chat.enabled).toBe(true);
+    expect(chat.hasTeams()).toBe(false);
+    chat.say("good-luck");
+    expect(chat.lines()).toEqual([expect.objectContaining({ from: "you", say: "good-luck", to: "all", team: null, lobby: true })]);
+    // The buttons grey out as online; and the stand-in refuses what a server would (it's sent past the buttons here).
+    expect(chat.canSay("wow")).toBe(false);
+    const send = (say: unknown) => (s as unknown as { receive(m: ClientMessage): void })["receive"]({ t: "chat", say } as ClientMessage);
+    send("wow");
+    expect(chat.lines()).toHaveLength(1);
+    vi.advanceTimersByTime(QUICK_CHAT.minGapMs);
+    send("free text!");
+    send("gk-crown");
+    send("good-luck");
+    expect(chat.lines()).toHaveLength(1);
+    send("e-fire");
+    expect(chat.lines().map((l) => l.say)).toEqual(["good-luck", "e-fire"]);
+    // Owning the pack: its lines go.
+    const owner = solo(["chat-godking"]);
+    owner.chat.say("gk-crown");
+    expect(owner.chat.lines().map((l) => l.say)).toEqual(["gk-crown"]);
+  });
+
+  it("Solo: one or two of the seated bots say hello a moment later, then chat closes as the match begins", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const { s, chat } = solo();
+      const bots = ["b1", "b2", "b3", "b4"];
+      s.botsArrived(bots, mulberry32(seed));
+      expect(chat.lines()).toEqual([]);
+      vi.advanceTimersByTime(QUICK_CHAT.botLobbyDelayMs[1] + QUICK_CHAT.botLobbyGapMs * QUICK_CHAT.botLobbyMax);
+      const said = chat.lines();
+      expect(said.length).toBeGreaterThanOrEqual(1);
+      expect(said.length).toBeLessThanOrEqual(QUICK_CHAT.botLobbyMax);
+      for (const l of said) expect(l).toMatchObject({ to: "all", team: null, lobby: true });
+      for (const l of said) expect(bots).toContain(l.from);
+      // A second batch of arrivals is kept within the per-minute cap.
+      s.botsArrived(bots, mulberry32(seed + 100));
+      s.botsArrived(bots, mulberry32(seed + 200));
+      vi.advanceTimersByTime(5_000);
+      expect(chat.lines().length).toBeLessThanOrEqual(QUICK_CHAT.botMaxPerMinute);
+      // The match begins: no more chat (solo matches have none); a line still on its way never shows.
+      s.botsArrived(["b9"], mulberry32(seed));
+      s.close();
+      vi.advanceTimersByTime(5_000);
+      expect(chat.enabled).toBe(false);
+      expect(chat.canSay("hi-all")).toBe(false);
+      expect(chat.lines().some((l) => l.from === "b9")).toBe(false);
+      expect(chat.floats().size).toBe(0);
+    }
+  });
+
+  it("Solo: mute and chat off are this device's, as online; a mute isn't kept after the queue", () => {
+    const store = storage();
+    vi.stubGlobal("localStorage", store);
+    const { s, chat } = solo();
+    s.botsArrived(["b1"], mulberry32(3));
+    vi.advanceTimersByTime(3_000);
+    expect(chat.lines().map((l) => l.from)).toEqual(["b1"]);
+    chat.mute("b1", true);
+    expect(chat.lines()).toEqual([]);
+    expect(store.keys().some((k) => k.startsWith("brc.chatMuted"))).toBe(false);
+    chat.setOff(true);
+    expect(chat.canSay("hi-all")).toBe(false);
+    (s as unknown as { receive(m: ClientMessage): void })["receive"]({ t: "chat", say: "hi-all" });
+    expect(chat.lines().filter((l) => l.from === "you")).toEqual([]);
+    chat.setOff(false);
+    chat.say("hi-all");
+    expect(chat.lines().map((l) => l.from)).toEqual(["you"]);
   });
 });

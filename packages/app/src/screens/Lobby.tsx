@@ -1,6 +1,7 @@
 import type { NetMatch } from "../net.ts";
 import { QueueScreen } from "./Queue.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
+import { LobbyChat } from "../components/LobbyChat.tsx";
 
 export function LobbyScreen({ match, onLeave, onLetBotsFill }: { match: NetMatch; onLeave: () => void; onLetBotsFill?: () => void }) {
   // Matchmade (PLAY): the queue, not a lobby.
@@ -36,6 +37,10 @@ export function LobbyScreen({ match, onLeave, onLetBotsFill }: { match: NetMatch
           </li>
         ))}
       </ul>
+      {/* Quick chat while you wait for the host (Crowd and raids). */}
+      <div class="lobby-chat-box">
+        <LobbyChat match={match} />
+      </div>
       {match.isHost ? (
         <>
           <button type="button" class="btn btn-primary btn-wide" onClick={() => match.startMatch()}>

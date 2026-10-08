@@ -56,9 +56,14 @@ describe("lobby: closing (LOBBY_LIFE)", () => {
     // Even with someone sitting in it: a lobby that never starts closes once nothing has happened for an hour.
     expect(lobbyClosing(L.core.record, true)).toEqual({ at: made + 90 * MIN, reason: "idle" });
     L.advance(20 * MIN);
+    L.core.message("p1", { t: "speed", nps: 500_000 });
+    expect(lobbyClosing(L.core.record, true)!.at).toBe(made + 110 * MIN);
+    // Except quick chat (the lobby's chat before the match): chatting never keeps a lobby open.
+    L.advance(10 * MIN);
+    L.core.message("p1", { t: "chat", say: "hi-all" });
     L.core.message("p1", { t: "chatPrefs", off: false });
     expect(lobbyClosing(L.core.record, true)!.at).toBe(made + 110 * MIN);
-    L.advance(20 * MIN);
+    L.advance(10 * MIN);
     L.core.disconnect("p1");
     expect(lobbyClosing(L.core.record, false)!.at).toBe(made + 130 * MIN);
     // Once it starts it's a match in progress: not while anyone's connected.
