@@ -22,10 +22,13 @@ on Eric's account.
    vote (Eric has an idea to come back to), more boss personalities, an "engine helper" the crowd recruits in the boss
    battle (an assist, not a player that wins it for you: e.g. it can be called on once or twice for a hint), and playtesting the team-final cut pace and boss
    strength with real players (see reports/boss-calibration.md).
-6. **Fair play.** Accounts are the first wall. Next: flag players whose engine-match rate (how often their pick is
-   Stockfish's top move) and speed are out of line with their rating, for review; ban by account; block disposable email
-   domains; Cloudflare Turnstile (free) on email sign-in against scripted sign-ups. (A Report button is on every profile since Oct 6; reports land in D1 for a person to read.) Crowd needs this
-   most: one cheater can't steer the board, but can top the leaderboard.
+6. **Fair play.** Built (Oct 8, the `fairplay` delegate; DECISIONS.md, "Fair play"): reports (per match, three
+   different players' cheating reports in a week put someone in review), signals from each match's judged picks
+   measured against the crowd in the same position, a deep re-check of flagged players' moves on the engine server,
+   reviews (results held) and automatic bans only on overwhelming evidence (the false-ban rate measured in
+   `reports/fairplay.md`), appeals for a person, ban emails, the review page (`/admin/fairplay`) and an API for an
+   automated reviewer (`docs/fairplay-reviewer.md`). Next: refit the evidence model from real cleared players; block
+   disposable email domains and add Cloudflare Turnstile (free) on email sign-in against scripted sign-ups.
 7. **Coins, icons and emotes.** Coins for doing well (placement, surviving cuts, a good move streak, daily first match),
    spent on cosmetic things only: profile icons, emotes to send during a match, board and piece themes, name colours.
    Nothing that changes play: no power-ups, no hints, no extra time. Earned only, not bought, unless Eric decides
