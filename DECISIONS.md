@@ -2389,6 +2389,10 @@ never catches us out. Reports in `reports/load/`; how to run them, staging and m
 | D1 statements per new Worker instance | ~35 | 1 |
 | Pick round trip p50 / p90 (1,000) | 83 / 2,166 ms | 47 / 628 ms |
 
+**In production** (Server-Timing, the Worker's own time per request, sampled before and after the deploy on Oct 8):
+`/api/live` 886-1,464 ms → 79-279 ms; `/api/profile/…` 805-1,061 ms → 34-106 ms. Most of it is the schema check: at
+today's traffic requests keep landing on fresh Worker instances, and each ran ~35 D1 statements first.
+
 **Where it breaks next** (from the numbers above and Cloudflare's published limits; staging will confirm)
 - **The live hub and each matchmaker are single objects.** At 10,000 players the hub gets roughly 200-400 calls a
   second (instances' batches, lobby reports, arrivals, the live line); a Durable Object manages about 1,000 simple
