@@ -91,19 +91,45 @@ function outsideTop(top: readonly MoveScore[], moves: readonly string[]): string
 
 /** What a device does with a job. `top`: the top-moves search if it already ran (prefetched while players thought). */
 export async function runJudgeJob(engine: EngineLike, job: JudgeJob, top?: Promise<MoveScore[]> | MoveScore[]): Promise<JudgeReport> {
+  const report = await runQuickJob(engine, job, top);
+  const deep = await deepCheck(engine, job, report);
+  return deep ? { ...report, deep } : report;
+}
+
+/** The job's quick part: the top moves and the search over picks outside them (no re-check). */
+export async function runQuickJob(engine: EngineLike, job: JudgeJob, top?: Promise<MoveScore[]> | MoveScore[]): Promise<JudgeReport> {
   const all = await (top ?? engine.topMoves(job.fen, job.rules.botCandidateMoves));
   const bots = judgeBotPicks(job, all);
   const missing = outsideTop(all, [...job.picks, ...bots.picks]);
   const extra = missing.length ? await engine.scoreMoves(job.fen, missing) : [];
-  const report: JudgeReport = { top: all, extra };
-  if (job.recheck && engine.scoreMovesAt) {
-    const base = baseBoard(job, report, bots);
-    if (base) {
-      const flagged = recheckTargets(base, [...job.picks, ...bots.picks], job.recheck, job.priority);
-      if (flagged.length) report.deep = await engine.scoreMovesAt(job.fen, [base.bestMove, ...flagged], job.recheck.recheckNodes);
-    }
-  }
-  return report;
+  return { top: all, extra };
+}
+
+/** The moves the job's re-check searches, from its quick report (none: no re-check, or no close calls). */
+export function deepTargets(job: JudgeJob, report: JudgeReport): { best: string; flagged: string[] } | null {
+  if (!job.recheck || !Array.isArray(report?.top) || !report.top.length) return null;
+  const bots = judgeBotPicks(job, report.top);
+  const base = baseBoard(job, report, bots);
+  if (!base) return null;
+  const flagged = recheckTargets(base, [...job.picks, ...bots.picks], job.recheck, job.priority);
+  return flagged.length ? { best: base.bestMove, flagged } : null;
+}
+
+/**
+ * The job's deep part: the re-check of its close calls (one search restricted to them and the best move, at the
+ * job's node count), or null when there's nothing to re-check. A device sends it after the quick part.
+ */
+export async function deepCheck(engine: EngineLike, job: JudgeJob, report: JudgeReport): Promise<MoveScore[] | null> {
+  const t = deepTargets(job, report);
+  if (!t || !engine.scoreMovesAt) return null;
+  return engine.scoreMovesAt(job.fen, [t.best, ...t.flagged], job.recheck!.recheckNodes);
+}
+
+/** The job without its re-check (how the lobby reads a quick report on its own). */
+export function quickPart(job: JudgeJob): JudgeJob {
+  if (!job.recheck) return job;
+  const { recheck: _r, ...rest } = job;
+  return rest;
 }
 
 const okScore = (m: MoveScore | undefined, legal: ReadonlySet<string>) =>

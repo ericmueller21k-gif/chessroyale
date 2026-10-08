@@ -2,6 +2,7 @@ import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
 import type { LastStandRound } from "./runner.ts";
 import type { JudgeJob, JudgeReport, JudgeRules } from "./judge.ts";
+import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
  * lobby), sent as JSON over a WebSocket. Times are server milliseconds; each
@@ -274,7 +275,9 @@ export type ClientMessage =
   /** Many judges: this device's engine speed (nodes per second), from its speed check on joining. */
   | { t: "speed"; nps: number }
   /** Many judges: this device's answer to one scoring job. */
-  | { t: "judged"; key: string; id: string; report: JudgeReport };
+  | { t: "judged"; key: string; id: string; report: JudgeReport }
+  /** Many judges, deep checks: this device's re-check of the job's close calls (sent after its "judged"). */
+  | { t: "judgedDeep"; key: string; id: string; deep: MoveScore[] };
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
