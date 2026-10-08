@@ -145,6 +145,26 @@ export interface ItemInstance {
   seed: number;
 }
 
+/**
+ * The locker's stacks: copies of the same item in the same colour (both colours, for two-colour items) shown as one,
+ * the purest on top (Eric, Oct 8). `items` are purest first, so `items[0]` is the top.
+ */
+export interface ItemStack {
+  key: string;
+  items: ItemInstance[];
+}
+export const stackKey = (it: Pick<ItemInstance, "def" | "color" | "color2">) => `${it.def}|${it.color}|${it.color2 ?? ""}`;
+export function stackItems(items: readonly ItemInstance[]): ItemStack[] {
+  const stacks = new Map<string, ItemInstance[]>();
+  for (const it of items) {
+    const key = stackKey(it);
+    const list = stacks.get(key);
+    if (list) list.push(it);
+    else stacks.set(key, [it]);
+  }
+  return [...stacks].map(([key, list]) => ({ key, items: list.sort((a, b) => a.blemish - b.blemish) }));
+}
+
 /** Purity as shown: 100% minus the blemish, to one decimal place. */
 export const purity = (blemish: number) => Math.round((100 - blemish) * 10) / 10;
 

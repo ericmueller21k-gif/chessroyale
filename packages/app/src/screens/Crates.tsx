@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   CRATES,
@@ -5,6 +6,7 @@ import {
   FISCHER,
   ITEM_COLORS,
   PURITY_BANDS,
+  SHOP_ITEMS,
   SLOT_NAMES,
   TIERS,
   crateDef,
@@ -17,16 +19,20 @@ import {
   itemDef,
   purity,
   rollBlemish,
+  stackItems,
   tierInfo,
+  wornFromLocker,
   type CrateDef,
   type CrateRoll,
   type ItemInstance,
   type ItemSlot,
+  type ItemStack,
   type PresentTier,
 } from "@chessroyale/core";
-import { account, equipLockerItem, openCrate } from "../account.ts";
+import { deleteLockerItems, equipLockerItem, equipShopItem, openCrate } from "../account.ts";
 import { Avatar, CrateArt, FischerArt, ItemArt, KeyArt, PresentArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
+import { HattedPawn, KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play, unlockAudio } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 
@@ -425,16 +431,37 @@ function Reveal({ item, onAgain, onClose }: { item: ItemInstance; onAgain: () =>
 
 // ---------------- Locker ----------------
 
-/** What you own, rarest first; tap to wear it (tap again to take it off). Your avatar shows the result. */
-export function LockerPanel() {
+type LockerTab = ItemSlot | "all" | "king";
+const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "king"];
+const tabName = (t: LockerTab) => (t === "all" ? "All" : t === "king" ? "God King" : SLOT_NAMES[t]);
+
+/**
+ * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same colour
+ * stacked (×3, the purest on top: that's the one you wear). Then what you got in the shop: pawn hats and God King
+ * effects. Tap to wear (tap again to take off); hold a crate item (or right-click it) to delete it. One head: a
+ * pawn hat and a crate head item take each other off. Your avatar shows the result.
+ */
+export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const { profile } = useAccount();
-  const [slot, setSlot] = useState<ItemSlot | "all">("all");
+  const [tab, setTab] = useState<LockerTab>("all");
+  const [deleting, setDeleting] = useState<ItemStack | null>(null);
   const locker = profile?.locker;
-  const hat = equippedLook(account().profile?.shop, "hat").hat ?? "none";
+  const shop = profile?.shop;
+  const hat = equippedLook(shop, "hat").hat ?? "none";
   if (!locker) return <p class="muted">Your locker needs your account.</p>;
-  const items = locker.items
-    .filter((i) => slot === "all" || itemDef(i.def)?.slot === slot)
-    .sort((a, b) => tierIndex(b.def) - tierIndex(a.def) || colorIndex(b.color) - colorIndex(a.color) || a.blemish - b.blemish);
+  const top = (s: ItemStack) => s.items[0]!;
+  const stacks = stackItems(locker.items)
+    .filter((s) => tab === "all" || itemDef(top(s).def)?.slot === tab)
+    .sort((a, b) => tierIndex(top(b).def) - tierIndex(top(a).def) || colorIndex(top(b).color) - colorIndex(top(a).color) || top(a).blemish - top(b).blemish);
+  // What you got in the shop: pawn hats ("No hat" is just taking one off) and God King effects.
+  const fromShop = SHOP_ITEMS.filter((i) => wornFromLocker(i) && i.look.hat !== "none" && shop?.owned.includes(i.id)).filter(
+    (i) => tab === "all" || (tab === "head" && i.slot === "hat") || (tab === "king" && i.slot === "king"),
+  );
+  const shopTab = tab === "all" || tab === "head" || tab === "king";
+  const wornIn = (s: ItemStack) => {
+    const slot = itemDef(top(s).def)!.slot;
+    return s.items.some((i) => i.id === locker.equipped[slot]);
+  };
   return (
     <div class="locker">
       <div class="ff-window locker-preview">
@@ -445,39 +472,198 @@ export function LockerPanel() {
           <Avatar look={locker.look} side="b" hat={hat} />
         </span>
       </div>
-      <div class="shop-tabs" role="tablist">
-        {(["all", "head", "face", "skin", "weapon"] as const).map((s) => (
-          <button type="button" role="tab" key={s} aria-selected={slot === s} class={slot === s ? "on" : ""} onClick={() => setSlot(s)}>
-            {s === "all" ? "All" : SLOT_NAMES[s]}
+      <div class="shop-tabs locker-tabs" role="tablist">
+        {LOCKER_TABS.map((t) => (
+          <button type="button" role="tab" key={t} aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => setTab(t)}>
+            {tabName(t)}
           </button>
         ))}
       </div>
-      {!items.length && <p class="muted">Nothing here yet. Open a crate!</p>}
-      <div class="locker-grid">
-        {items.map((it) => {
-          const d = itemDef(it.def)!;
-          const worn = locker.equipped[d.slot] === it.id;
-          return (
-            <button
-              type="button"
-              key={it.id}
-              class={`locker-item${worn ? " worn" : ""}${isShiny(it.blemish) ? " shiny" : ""}`}
-              style={{ "--tier": tierInfo(d.tier).color }}
-              onClick={() => {
-                play("menuSelect");
-                void equipLockerItem(d.slot, worn ? null : it.id);
-              }}
-            >
-              <ItemArt def={it.def} finish={it} />
-              <strong>{d.name}</strong>
-              <span class="small">{colorName(it)}</span>
-              <span class="small muted">
-                {purity(it.blemish).toFixed(1)}%{isShiny(it.blemish) ? " ✨" : ""}
-              </span>
-              {worn && <span class="locker-worn">Worn</span>}
+      {tab !== "king" && !stacks.length && <p class="muted">No crate items here yet. Open a crate!</p>}
+      {stacks.length > 0 && (
+        <div class="locker-grid">
+          {stacks.map((s) => {
+            const it = top(s);
+            const d = itemDef(it.def)!;
+            const worn = wornIn(s);
+            return (
+              <HoldButton
+                key={s.key}
+                class={`locker-item${worn ? " worn" : ""}${isShiny(it.blemish) ? " shiny" : ""}`}
+                style={{ "--tier": tierInfo(d.tier).color }}
+                label={`${d.name}, ${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. Hold to delete.`}
+                onTap={() => {
+                  play("menuSelect");
+                  void equipLockerItem(d.slot, worn ? null : it.id);
+                }}
+                onHold={() => {
+                  play("menuOpen");
+                  setDeleting(s);
+                }}
+              >
+                <ItemArt def={it.def} finish={it} />
+                <strong>{d.name}</strong>
+                <span class="small">{colorName(it)}</span>
+                <span class="small muted">
+                  {purity(it.blemish).toFixed(1)}%{isShiny(it.blemish) ? " ✨" : ""}
+                </span>
+                {worn && <span class="locker-worn">Worn</span>}
+                {s.items.length > 1 && <span class="locker-count">×{s.items.length}</span>}
+              </HoldButton>
+            );
+          })}
+        </div>
+      )}
+      {shopTab && shop && (
+        <>
+          <h3 class="ff-title locker-subhead">From the shop</h3>
+          <div class="locker-grid">
+            {fromShop.map((item) => {
+              const worn = shop.equipped[item.slot as "hat" | "king"] === item.id;
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  class={`locker-item default${worn ? " worn" : ""}`}
+                  onClick={() => {
+                    play("menuSelect");
+                    // A pawn hat comes off again; a God King effect stays on until you pick another (he always has one).
+                    if (item.slot === "hat") void equipShopItem(worn ? "hat-none" : item.id);
+                    else if (!worn) void equipShopItem(item.id);
+                  }}
+                >
+                  <span class="locker-default-art">{item.slot === "king" ? <KingEffectPreview look={item.look} /> : <HattedPawn hat={item.look.hat!} />}</span>
+                  <strong>{item.name}</strong>
+                  <span class="small muted">{item.slot === "king" ? "God King effect" : "Pawn hat"}</span>
+                  {worn && <span class="locker-worn">{item.slot === "king" ? "On" : "Worn"}</span>}
+                </button>
+              );
+            })}
+          </div>
+          {onShop && (
+            <p class="muted small">
+              More pawn hats and God King effects in the{" "}
+              <button type="button" class="link-button" onClick={onShop}>
+                Shop ›
+              </button>
+            </p>
+          )}
+        </>
+      )}
+      {deleting && <DeleteDialog stack={deleting} wornId={locker.equipped[itemDef(top(deleting).def)!.slot]} onClose={() => setDeleting(null)} />}
+    </div>
+  );
+}
+
+/**
+ * A button you can tap, or hold (about half a second; or right-click) for something else. Moving the finger (a
+ * scroll) cancels the hold, and a hold doesn't also count as a tap.
+ */
+function HoldButton({
+  onTap,
+  onHold,
+  label,
+  children,
+  ...rest
+}: { onTap: () => void; onHold: () => void; label: string; children: ComponentChildren; class: string; style: Record<string, string> }) {
+  const timer = useRef(0);
+  const held = useRef(false);
+  const from = useRef<{ x: number; y: number } | null>(null);
+  const cancel = () => {
+    window.clearTimeout(timer.current);
+    timer.current = 0;
+  };
+  const hold = () => {
+    cancel();
+    held.current = true;
+    navigator.vibrate?.(15);
+    onHold();
+  };
+  return (
+    <button
+      type="button"
+      {...rest}
+      aria-label={label}
+      onPointerDown={(e) => {
+        held.current = false;
+        from.current = { x: e.clientX, y: e.clientY };
+        cancel();
+        timer.current = window.setTimeout(hold, 550);
+      }}
+      onPointerMove={(e) => {
+        if (from.current && Math.hypot(e.clientX - from.current.x, e.clientY - from.current.y) > 10) cancel();
+      }}
+      onPointerUp={cancel}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (!held.current) hold();
+      }}
+      onClick={() => {
+        if (held.current) held.current = false;
+        else onTap();
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Deleting a crate item for good, after a confirmation. A stack offers to delete the extras (keeping the purest) or
+ * all of them. If the one you wear goes, the one you keep goes on instead.
+ */
+function DeleteDialog({ stack, wornId, onClose }: { stack: ItemStack; wornId: string | undefined; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const top = stack.items[0]!;
+  const d = itemDef(top.def)!;
+  const n = stack.items.length;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+  const go = async (ids: string[], keep?: ItemInstance) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteLockerItems(ids);
+      if (keep && wornId && ids.includes(wornId)) await equipLockerItem(d.slot, keep.id);
+      play("menuClose");
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't delete it.");
+      setBusy(false);
+    }
+  };
+  return (
+    <div class="locker-dialog-back" onClick={onClose}>
+      <div class="ff-window locker-dialog" role="dialog" aria-modal="true" aria-labelledby="locker-dialog-title" style={{ "--tier": tierInfo(d.tier).color }} onClick={(e) => e.stopPropagation()}>
+        <span class="locker-dialog-art">
+          <ItemArt def={top.def} finish={top} />
+        </span>
+        <strong id="locker-dialog-title">
+          Delete {d.name}
+          {n > 1 ? ` ×${n}` : ""}?
+        </strong>
+        <span class="small">{n > 1 ? `${colorName(top)} · the best is ${purity(top.blemish).toFixed(1)}%` : finishLine(top)}</span>
+        <p class="small">It's gone for good. This can't be undone.</p>
+        {error && <p class="shop-error">{error}</p>}
+        <div class="locker-dialog-actions">
+          {n > 1 && (
+            <button type="button" class="ff-button small" disabled={busy} onClick={() => void go(stack.items.slice(1).map((i) => i.id), top)}>
+              ▶ Delete {n - 1 === 1 ? "the extra one" : `the ${n - 1} extras`}, keep the best
             </button>
-          );
-        })}
+          )}
+          <button type="button" class="ff-button small danger" disabled={busy} onClick={() => void go(stack.items.map((i) => i.id))}>
+            ▶ {n > 1 ? `Delete all ${n}` : "Delete"}
+          </button>
+          <button type="button" class="ff-button small" disabled={busy} autoFocus onClick={onClose}>
+            ▶ Cancel
+          </button>
+        </div>
       </div>
     </div>
   );

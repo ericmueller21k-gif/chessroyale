@@ -25,6 +25,9 @@ Not yours:
 
 ## Rules
 
+- **Computing priorities** (CLAUDE.md, Eric): never compromise the game; use players' devices wherever they can do
+  the job; use our servers only when truly needed, and then without skimping.
+
 - **Money is Eric's.** Never raise instance counts, caps or plans, or add a paid service, without asking him with a
   monthly estimate. Recommend billing alerts.
 - **Never load-test production.** Use a staging copy (its own Worker, Durable Objects and D1) and tear it down after.
