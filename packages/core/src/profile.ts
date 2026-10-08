@@ -43,8 +43,10 @@ export interface MatchFeats {
   survived: boolean | null;
   /** A boss battle: the God King made his Last Stand. */
   lastStand: boolean | null;
-  /** A boss raid: the boss's strength (one of BOSS_TIERS). */
+  /** A boss raid: the boss's strength (one of BOSS_TIERS: its tier, before the boss's own offset). */
   bossElo: number | null;
+  /** A boss battle (raid or Crowd final): which boss (a BOSS_ROSTER id), for its win rate (self-balancing, later). */
+  bossId?: string | null;
 }
 
 /**
@@ -71,7 +73,8 @@ export function matchFeats(p: Pick<PlayerState, "id" | "outInStage">, stages: nu
     strikesSurvived,
     survived: reachedBoss && boss!.result ? !boss!.kills.some((k) => k.id === p.id) : null,
     lastStand: reachedBoss ? !!boss!.lastStand : null,
-    bossElo: raid && boss ? boss.elo : null,
+    bossElo: raid && boss ? (boss.tier ?? boss.elo) : null,
+    ...(boss?.id ? { bossId: boss.id } : {}),
   };
 }
 

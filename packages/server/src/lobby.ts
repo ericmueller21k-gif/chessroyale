@@ -1,12 +1,13 @@
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LOBBY_LIFE, MATCHMAKING, isRankedMatch, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LOBBY_LIFE, MATCHMAKING, isRankedMatch, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
   bossIntroTimeline,
   bossShowMs,
   bossThinkMs,
+  powerMomentMs,
   LAST_STAND_MS,
   lastMoveTookQueen,
   legalMoves,
@@ -116,6 +117,8 @@ interface Human {
   practice?: boolean;
   /** The rating on their profile (for a boss raid's strength). */
   rating?: number | null;
+  /** The boss they met last (a BOSS_ROSTER id): the next raid avoids the one most of the lobby met. */
+  lastBoss?: string | null;
   /** The crate items they wear. */
   look?: ItemLook;
   /** When they took their seat (the queue's wait). */
@@ -174,8 +177,10 @@ export interface LobbyRecord {
   /** Per-lobby settings: the mode and its options, opening length, plus playtest overrides (rounds, clock, pace, draw rule). */
   overrides?: Partial<Settings> & {
     drawRuleByStage?: DrawRule[];
-    /** Boss raid: the creator picked this boss (its strength), so it isn't matched to the group. */
-    bossPicked?: number;
+    /** Boss raid: the creator picked this boss (a BOSS_ROSTER id), else a random one. */
+    bossPicked?: string;
+    /** Boss raid: a fixed strength (a test link's ?boss=<tier>), so it isn't matched to the group. */
+    bossFixed?: number;
   };
   /** Signed-in players' account ids (by player id), so results go on their profiles. */
   accounts?: Record<string, string>;
@@ -199,7 +204,8 @@ export interface LobbyRecord {
   /** Boss battle: the boss move the host owes the server. */
   bossKey?: string;
   bossStumble?: boolean;
-  bossKind?: "elo" | "stumble" | "stagger";
+  /** "funhouse": the host plays the crowd's move for Boingo (his ultimate). */
+  bossKind?: "elo" | "stumble" | "stagger" | "funhouse";
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
   bossMinAt?: number;
@@ -510,6 +516,7 @@ export class LobbyCore {
     rating: number | null = null,
     look: unknown = undefined,
     userId?: string,
+    lastBoss: string | null = null,
   ) {
     this.r.activeAt = this.io.now();
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
@@ -519,6 +526,7 @@ export class LobbyCore {
       existing.connected = true;
       delete existing.goneAt;
       if (look !== undefined) existing.look = cleanLook(look);
+      if (bossDef(lastBoss)) existing.lastBoss = lastBoss;
       if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [existing.id]: userId };
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
@@ -552,6 +560,7 @@ export class LobbyCore {
       rating: typeof rating === "number" && Number.isFinite(rating) ? Math.max(400, Math.min(3400, rating)) : null,
       look: cleanLook(look),
       joinedAt: this.io.now(),
+      ...(bossDef(lastBoss) ? { lastBoss } : {}),
     });
     if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [id]: userId };
     if (!this.r.hostId) this.r.hostId = id;
@@ -693,11 +702,17 @@ export class LobbyCore {
    */
   private startMatch() {
     if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return;
-    if (this.settings.raid && !this.r.overrides?.bossPicked) {
-      // Boss raid: no bots; the boss is the one the creator picked, else the weakest that's stronger than the group's average rating.
+    if (this.settings.raid && !this.r.overrides?.bossFixed) {
+      // Boss raid: no bots; the boss plays a step above the group's average rating (the weakest tier stronger than it),
+      // plus its own offset (the runner adds that once it knows which boss it is).
       const patch = { bossFixedElo: raidBossElo(this.r.humans.map((h) => h.rating ?? null)) };
       this.r.overrides = { ...(this.r.overrides ?? {}), ...patch } as LobbyRecord["overrides"];
       this.settings = { ...this.settings, ...patch };
+    }
+    if (!this.settings.bossId) {
+      // Which boss (a raid, or a Crowd match that ends in one): random, but not the one most of the lobby met last.
+      const avoid = this.lobbyLastBoss();
+      if (avoid) this.settings = { ...this.settings, bossAvoid: avoid };
     }
     // Bots fill the empty seats, except with Bots off, and in a private raid (people only, as before). A matchmade
     // raid's bots join the crowd.
@@ -724,6 +739,14 @@ export class LobbyCore {
       return;
     }
     this.begin();
+  }
+
+  /** The boss most of the lobby met last (more than any other; ties: none), so a random boss avoids it. */
+  private lobbyLastBoss(): string | null {
+    const count = new Map<string, number>();
+    for (const h of this.r.humans) if (h.lastBoss) count.set(h.lastBoss, (count.get(h.lastBoss) ?? 0) + 1);
+    const ranked = [...count.entries()].sort((a, b) => b[1] - a[1]);
+    return ranked.length && (ranked.length === 1 || ranked[0]![1] > ranked[1]![1]) ? ranked[0]![0] : null;
   }
 
   /** The match begins: the pre-game votes, the boss's intro (a raid) or the opening. */
@@ -895,6 +918,9 @@ export class LobbyCore {
   private sendBossRequest(host: string) {
     const runner = this.runner!;
     const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+    const funhouse = this.r.bossKind === "funhouse";
+    // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for them.
+    const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
@@ -902,11 +928,36 @@ export class LobbyCore {
       elo: runner.boss!.elo,
       nodes: this.settings.bossNodes,
       ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : {}),
+      ...(funhouse ? { funhouse: true } : {}),
+      ...(allowed ? { allowed } : {}),
     });
+  }
+
+  /**
+   * Boingo's funhouse: as the turn passes to the crowd, the boss plays its move for it. The host's engine picks a
+   * weak but recoverable move (as it plays the boss's), everyone sees the funhouse, and then the boss replies.
+   */
+  private requestFunhouse() {
+    this.r.phase = "boss";
+    this.r.bossKey = `f-${++this.r.counter}`;
+    this.r.bossKind = "funhouse";
+    this.r.bossMinAt = undefined;
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
   private playBoss(move: string) {
     this.r.bossKey = undefined;
+    if (this.r.bossKind === "funhouse") {
+      // The crowd's move, played by the boss: unscored; the funhouse plays out, then the boss replies.
+      this.r.bossKind = undefined;
+      this.runner!.applyFunhouse(move);
+      const until = this.io.now() + powerMomentMs([{ kind: "funhouse" }]);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     // Too soon (your queen banner is still up): hold the move until then.
     if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
       this.r.bossPending = move;
@@ -914,7 +965,10 @@ export class LobbyCore {
     }
     this.r.bossPending = undefined;
     this.runner!.applyBossMove(move);
-    const until = this.io.now() + bossShowMs(this.runner!.bossView()?.lastMove);
+    // As the turn passes to the crowd, any power that comes with it (a freeze, a pie, the warning, the blizzard)
+    // plays out before the crowd's clock starts.
+    const view = this.runner!.bossView();
+    const until = this.io.now() + bossShowMs(view?.lastMove) + powerMomentMs(view?.powers?.events);
     this.broadcast(this.bossMessage(until));
     this.setTimer("nextRound", until);
   }
@@ -928,9 +982,10 @@ export class LobbyCore {
       this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
       return;
     }
-    // Nobody can run the engine: the boss plays a random legal move so the match can go on.
+    // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in its funhouse, the
+    // crowd's: a random allowed one too).
     const runner = this.runner!;
-    const legal = legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
+    const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
 
@@ -958,6 +1013,7 @@ export class LobbyCore {
         return this.finishMatch();
       }
       if (runner.bossToMove()) return this.requestBoss();
+      if (runner.funhouseDue()) return this.requestFunhouse();
     }
     if (this.r.augmentVotes) {
       // Crowd augments: the cut's vote sets the move clock from now on.
@@ -1019,7 +1075,13 @@ export class LobbyCore {
       const barred = runner.boss?.barred;
       const plan =
         crowd && !final
-          ? { key, fen: fens[0]!, bots: ids.filter((id) => skills.has(id)).map((id) => ({ id, skill: skills.get(id)!, powerUps: runner.player(id).powerUps })), ...(barred ? { barred } : {}) }
+          ? {
+              key,
+              fen: fens[0]!,
+              bots: ids.filter((id) => skills.has(id)).map((id) => ({ id, skill: skills.get(id)!, powerUps: runner.player(id).powerUps })),
+              ...(barred ? { barred } : {}),
+              ...(runner.boss && runner.crowdAllowed() ? { allowed: runner.crowdAllowed()! } : {}),
+            }
           : undefined;
       this.send(this.r.hostId, { t: "prefetch", fens, ...(plan ? { plan } : {}) }, false);
     }
@@ -1107,8 +1169,9 @@ export class LobbyCore {
     if (now < round.startedAt - 500) return; // Before the clock starts.
     const board = this.runner?.boardOf(playerId);
     if (!board || !legalMoves(board.fen).includes(move)) return;
-    // The re-pick after the God King's Last Stand: the move he took back can't be picked.
-    if (move === this.runner?.boss?.barred) return;
+    // Boss battle: only a move allowed this turn (a power's limits; the move the God King took back can't be picked).
+    const allowed = this.runner?.boss ? this.runner.crowdAllowed() : null;
+    if (allowed && !allowed.includes(move)) return;
     round.picks[playerId] = {
       move,
       thinkMs: Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline)),
@@ -1164,6 +1227,7 @@ export class LobbyCore {
         .map((id) => ({ id, skill: skills.get(id)!, powerUps: this.runner!.player(id).powerUps })),
       ...(this.r.round!.botPlan ? { botPlan: this.r.round!.botPlan.picks, botPlanPowerUps: this.r.round!.botPlan.powerUps } : {}),
       ...(this.runner!.boss?.barred ? { barred: this.runner!.boss.barred } : {}),
+      ...(this.runner!.boss && this.runner!.crowdAllowed(boardId) ? { allowed: this.runner!.crowdAllowed(boardId)! } : {}),
     }));
     // Close calls that can decide the cut are re-checked first.
     const bubble = this.cutPriority();
@@ -1224,8 +1288,8 @@ export class LobbyCore {
       const s = byBoard.get(job.boardId);
       const ids = runner.groups.get(job.boardId)!;
       const picks: Record<string, string | null> = { ...job.humanPicks };
-      // (The re-pick after the God King's Last Stand: no bot takes the move he took back.)
-      const legal = legalMoves(job.fen).filter((m) => m !== job.barred);
+      // (Boss battle: no bot plays a move that isn't allowed, nor the move the God King took back.)
+      const legal = job.allowed ?? legalMoves(job.fen).filter((m) => m !== job.barred);
       for (const b of job.bots) {
         const m = s?.botPicks[b.id];
         picks[b.id] = m && legal.includes(m) ? m : legal[0]!;
@@ -1484,6 +1548,7 @@ export class LobbyCore {
           fen: runner.boards.get(firstBoard)!.fen,
           bots: firstIds.filter((id) => skills.has(id)).map((id) => ({ id, skill: skills.get(id)!, powerUps: runner.player(id).powerUps })),
           ...(barred ? { barred } : {}),
+          ...(runner.boss && runner.crowdAllowed(firstBoard) ? { allowed: runner.crowdAllowed(firstBoard)! } : {}),
           seed: seedFor(key, firstBoard),
           rules: this.judgeRules(),
         }
@@ -1515,6 +1580,7 @@ export class LobbyCore {
         seed: seedFor(round.key, sj.boardId),
         rules: this.judgeRules(),
         ...(sj.barred ? { barred: sj.barred } : {}),
+        ...(sj.allowed ? { allowed: sj.allowed } : {}),
         ...(sj.priority ? { priority: sj.priority } : {}),
       };
       const judges = (planned[String(sj.boardId)] ?? []).filter((id) => devices.some((d) => d.id === id)).slice(0, perJob);
@@ -1685,7 +1751,7 @@ export class LobbyCore {
 
   /** Every pick scored the same (nobody could score the job), the bots picking at random. */
   private equalBoard(t: JudgeTask): JudgedBoard {
-    const legal = legalMoves(t.job.fen).filter((m) => m !== t.job.barred);
+    const legal = t.job.allowed ?? legalMoves(t.job.fen).filter((m) => m !== t.job.barred);
     const botPicks = t.job.bots.map(() => legal[Math.floor(this.rng() * legal.length)]!);
     const moves = [...t.job.picks, ...botPicks, legal[0]!];
     return { bestMove: moves[0]!, bestExpected: 0.5, expectedAfter: Object.fromEntries(moves.map((m) => [m, 0.5])), botPicks, botPowerUps: [], replies: {}, mates: {}, rechecked: [] };
@@ -2127,6 +2193,7 @@ export class LobbyCore {
           legal,
           top: b.scored.slice(0, FAIRPLAY.deep.candidates).map((x) => x.move),
           ...(p.usedPowerUp ? { powerUp: true } : {}),
+          ...(b.power ? { power: true } : {}),
           ...(last && best.move.slice(2, 4) === last.slice(2, 4) ? { recapture: true } : {}),
         };
         ((this.r.fair ??= {})[p.playerId] ??= []).push(move);

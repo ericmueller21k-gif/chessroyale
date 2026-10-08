@@ -217,6 +217,7 @@ export interface PublicProfile {
     survived: boolean | null;
     bestMove: string | null;
     bossElo: number | null;
+    bossId?: string | null;
     playedAt: number;
     /** It counted for ranking (false: under 30% real players, solo or practice; null: from before the rule). */
     ranked?: boolean | null;

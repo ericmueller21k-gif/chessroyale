@@ -110,7 +110,8 @@ export function choosePie(fen: string, seed: number, turn: number): string | nul
 /**
  * As a crowd turn begins (after the boss's move, or as the battle starts): the rage meter, the ultimate's warning
  * and the ultimate, and the passive. `fen` is the position with the crowd to move. Once per turn: calling it again
- * for the same turn (the re-pick after the God King's Last Stand) changes nothing. `test`: a power forced at once.
+ * for the same turn (the re-pick after the God King's Last Stand) changes nothing. `test`: an ultimate (the test switch)
+ * warned as the second turn begins and unleashed on the third (the passive comes on the second turn anyway).
  */
 export function prepareTurn(boss: BossState, fen: string, test = ""): BossState {
   const powers = bossPowers(boss);
@@ -134,7 +135,8 @@ export function prepareTurn(boss: BossState, fen: string, test = ""): BossState 
   let ultNow = false;
   if (next.ultAt === undefined) {
     if (next.warnAt === undefined) {
-      if (lost >= s.rageFull || test === ult) {
+      // (The test switch: warned as the second turn begins, after the boss's first move, as in play.)
+      if (lost >= s.rageFull || (test === ult && turn >= 2)) {
         next.warnAt = turn;
         events.push({ kind: "warn", turn });
       }
@@ -148,7 +150,7 @@ export function prepareTurn(boss: BossState, fen: string, test = ""): BossState 
   // The passive (not on the ultimate's turn: it waits a turn).
   const passive = powers.passive;
   if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
-  else if (turn >= next.nextPassive || (test === passive && turn === 1)) {
+  else if (turn >= next.nextPassive) {
     if (passive === "freeze") {
       const pick = chooseFreeze(fen, crowd, p.seed, turn, next.pie?.square);
       if (pick) {

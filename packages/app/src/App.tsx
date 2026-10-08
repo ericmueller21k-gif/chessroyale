@@ -1,7 +1,8 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
 import { type MatchmakingType, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
-import { bossInUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
+import { bossInUrl, bossTierFromUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
+import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
@@ -58,7 +59,13 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     // The mode's own rules and pace first, then pace and playtest overrides on top (only the ones that are set).
     // The boss raid: its own settings, and (solo) a boss a step above your rating.
     ...(raid
-      ? { ...RAID_SETTINGS, bossFixedElo: (matchBoss && !bossInUrl() ? 0 : chosenBoss()) || raidBossElo([account().profile?.rating ?? null]) }
+      ? {
+          ...RAID_SETTINGS,
+          // A step above your rating (a test link's ?boss=<tier> fixes it), plus the boss's own offset.
+          bossFixedElo: bossTierFromUrl() || raidBossElo([account().profile?.rating ?? null]),
+          // Boss alone: the boss picked from the menu ("" random); a Solo raid's is random. Random avoids your last.
+          bossId: matchBoss && !bossInUrl() ? "" : chosenBoss(),
+        }
       : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { crowdTeams: mode.crowdTeams, augments: mode.augments })),
     ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
     ...definedOnly({
@@ -73,6 +80,10 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     }),
     ...forced,
     ...speed,
+    // Any boss battle: not the boss you met last (when it's random); ?power= brings a boss power at once (tests).
+    bossAvoid: lastBoss() ?? "",
+    ...(["freeze", "blizzard", "pie", "funhouse"].includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
+    ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
   };
 }
 
@@ -383,7 +394,8 @@ export function App() {
       params.set("mode", mode.mode);
       if (mode.mode === "raid") {
         // (The server sets up the raid: the boss picked, else one a step above the group.)
-        if (chosenBoss()) params.set("boss", String(chosenBoss()));
+        if (chosenBoss()) params.set("boss", chosenBoss());
+        else if (bossTierFromUrl()) params.set("boss", String(bossTierFromUrl()));
       } else if (mode.mode === "crowd") {
         params.set("turns", mode.crowdTeams ? "teams" : "all");
         params.set("augments", mode.augments ? "1" : "0");

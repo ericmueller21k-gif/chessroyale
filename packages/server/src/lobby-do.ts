@@ -416,7 +416,7 @@ export class Lobby extends DurableObject<Env> {
         return;
       }
       const before = this.record.humans.length;
-      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null, msg.look, attached?.userId);
+      const result = core.connect(msg.token, msg.name, msg.device, !!msg.practice, msg.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null);
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {

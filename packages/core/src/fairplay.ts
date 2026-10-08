@@ -45,6 +45,8 @@ export interface FairMove {
   away: number;
   /** Used a power-up (saw the engine's top moves): never counted. */
   powerUp?: boolean;
+  /** A boss power touched the turn (a frozen piece, a pie, the blizzard, a flipped board): never counted. */
+  power?: boolean;
   /** The best move takes on the square the last move landed on (a recapture, or taking a piece that just moved). */
   recapture?: boolean;
   /** Legal moves in the position. */
@@ -58,7 +60,7 @@ export interface FairMove {
   deep?: { best: string; rank: number; loss: number; top?: string[] };
 }
 
-export type SkipReason = "book" | "forced" | "only" | "recapture" | "decided" | "powerUp";
+export type SkipReason = "book" | "forced" | "only" | "recapture" | "decided" | "powerUp" | "bossPower";
 
 /** A settings group with its numbers widened (FAIRPLAY is `as const`), so tests and the simulation can try others. */
 type Widen<T> = { [K in keyof T]: T[K] extends number ? number : T[K] };
@@ -83,6 +85,7 @@ export const foundBest = (m: Pick<FairMove, "loss">, s: Pick<Signals, "foundLoss
  */
 export function skipReason(m: FairMove, s: Signals = FAIRPLAY.signals): SkipReason | null {
   if (m.powerUp) return "powerUp";
+  if (m.power) return "bossPower";
   if (m.ply < s.bookPlies) return "book";
   if (m.legal <= 1) return "forced";
   if (m.bestExp >= 1 - s.decided || m.bestExp <= s.decided) return "decided";

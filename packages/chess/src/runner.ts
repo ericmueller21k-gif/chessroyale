@@ -344,6 +344,7 @@ export class MatchRunner {
       boss: {
         id: def.id,
         powers: initPowers(seed, board.fen, crowdSide),
+        tier: this.settings.bossFixedElo || raidBossElo([]),
         elo: bossStrength(this.settings.bossFixedElo || raidBossElo([]), def),
         crowdSide,
         startPly: board.history.length,
@@ -1084,7 +1085,8 @@ export class MatchRunner {
     // Which boss: a random playable one (as in a raid), at the crowd's strength plus its own offset.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid);
-    const elo = bossStrength(bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings), def);
+    const tier = bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
+    const elo = bossStrength(tier, def);
     this.bossLast = null;
     this.state = {
       ...this.state,
@@ -1095,6 +1097,7 @@ export class MatchRunner {
       boss: {
         id: def.id,
         powers: initPowers(seed, this.boards.get(id)!.fen, "w"),
+        tier,
         elo,
         crowdSide: "w",
         startPly,

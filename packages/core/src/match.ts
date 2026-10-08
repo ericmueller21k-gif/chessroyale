@@ -141,6 +141,8 @@ export interface BossState {
   barred?: string;
   /** Which boss this is (a BOSS_ROSTER id), and its powers as they stand. */
   id?: string;
+  /** The strength it was set at before its own offset (a raid's tier): what a profile's "bosses beaten" counts. */
+  tier?: number;
   powers?: BossPowerState;
 }
 

@@ -234,12 +234,13 @@ describe("boss powers: as each turn begins", () => {
     expect(rageOf(b)).toBeNull();
   });
 
-  it("the test switch brings a power at once: a passive on turn 1, an ultimate warned on turn 1 and unleashed on turn 2", () => {
-    expect(prepareTurn(battle("gingerbread", RUY_FEN), RUY_FEN, "freeze").powers!.frozen).toBeTruthy();
-    expect(prepareTurn(battle("clown", RUY_FEN), RUY_FEN, "pie").powers!.pie).toBeTruthy();
+  it("the test switch brings an ultimate early: warned as turn 2 begins (after the boss's first move), unleashed on turn 3", () => {
     let b = prepareTurn(battle("clown", RUY_FEN), RUY_FEN, "funhouse");
-    expect(b.powers!.warnAt).toBe(1);
+    expect(b.powers!.warnAt).toBeUndefined();
     b = prepareTurn({ ...b, crowdMoves: 1 }, RUY_FEN, "funhouse");
+    expect(b.powers!.warnAt).toBe(2);
+    expect(b.powers!.pie).toBeTruthy(); // the passive's first turn too
+    b = prepareTurn({ ...b, crowdMoves: 2 }, RUY_FEN, "funhouse");
     expect(funhouseDue(b)).toBe(true);
   });
 });
@@ -290,12 +291,15 @@ describe("the judge plays by the same rules", () => {
   });
 
   it("the runner (solo, and the host) scores a blizzard turn by the queen's moves only", async () => {
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "gingerbread", bossPowerTest: "blizzard" } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "gingerbread", bossPowerTest: "blizzard", lastStandLoss: 999, lastStandLossFloor: 999 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
     expect(runner.boss!.id).toBe("gingerbread");
-    runner.deal();
-    await runner.score(new Map([["h0", { move: "d2d3", thinkMs: 1000 }]]));
-    await runner.playBoss();
+    for (let i = 0; i < 2; i++) {
+      runner.deal();
+      const fen0 = runner.boards.get(0)!.fen;
+      await runner.score(new Map([["h0", { move: (runner.crowdAllowed() ?? legalMoves(fen0))[0]!, thinkMs: 1000 }]]));
+      await runner.playBoss();
+    }
     expect(blizzardNow(runner.boss)).toBe(true);
     const fen = runner.boards.get(0)!.fen;
     const allowed = runner.crowdAllowed()!;
@@ -363,12 +367,15 @@ describe("Boingo's powers", () => {
   });
 
   it("a funhouse match: warned, the boss plays the crowd's move (unscored), then the board shows flipped for 2 turns", async () => {
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "clown", bossPowerTest: "funhouse" } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "clown", bossPowerTest: "funhouse", lastStandLoss: 999, lastStandLossFloor: 999 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
     expect(runner.boss!.id).toBe("clown");
-    expect(runner.bossView()!.powers!.warned).toBe(true);
     runner.deal();
     await runner.score(new Map([["h0", { move: "d2d3", thinkMs: 1000 }]]));
+    await runner.playBoss();
+    expect(runner.bossView()!.powers!.warned).toBe(true);
+    runner.deal();
+    await runner.score(new Map([["h0", { move: legalMoves(runner.boards.get(0)!.fen).find((m) => runner.crowdAllowed()?.includes(m) ?? true)!, thinkMs: 1000 }]]));
     expect(runner.funhouseDue()).toBe(false); // the boss moves first
     await runner.playBoss();
     expect(runner.funhouseDue()).toBe(true);

@@ -1,4 +1,5 @@
 import { LookAways } from "./lookaway.ts";
+import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { DEFAULT_SETTINGS, JUDGES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
@@ -20,6 +21,9 @@ import {
   recheckCloseCalls,
   repliesFrom,
   bossMoveFrom,
+  funhouseMoveFrom,
+  allowedSearch,
+  judgeCandidates,
   judgeBotPicks,
   runQuickJob,
   deepCheck,
@@ -299,7 +303,7 @@ export class NetMatch implements GameView {
         // No storage: join as a new player.
       }
       const device = matchMedia("(pointer: coarse)").matches ? "phone" : "computer";
-      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, rating: account().profile?.rating ?? null, look: account().profile?.locker?.look ?? {} });
+      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, rating: account().profile?.rating ?? null, look: account().profile?.locker?.look ?? {}, lastBoss: lastBoss() });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as ServerMessage);
     ws.onclose = () => {
@@ -505,7 +509,7 @@ export class NetMatch implements GameView {
         this.currentBoard = m.boss.board;
         return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro });
       case "bossRequest":
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo");
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse);
       case "chat":
         return this.chat.onLine(m.line);
       case "chatLog":
@@ -574,10 +578,14 @@ export class NetMatch implements GameView {
   // ---------------- Host work ----------------
 
   /** Boss battle, host only: play the boss's move with this device's engine at the boss's strength. */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger") {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger", allowed: string[] | null = null, funhouse = false) {
     try {
       const [engine] = await this.engines();
-      const move = await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings));
+      // Boingo's funhouse: the crowd's move, played for it (a weak but recoverable one); else the boss's own (a pie
+      // stops it too).
+      const move = funhouse
+        ? await funhouseMoveFrom(engine!, fen, allowed)
+        : await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed);
       this.send({ t: "bossMove", key, move });
     } catch {
       // No engine here: the server asks someone else, or plays a random move.
@@ -643,16 +651,21 @@ export class NetMatch implements GameView {
         // Many judges: the bots pick from the lobby's seed, exactly as the scoring job will (it checks this plan).
         const top = await this.top.get(engines[0]!, plan.fen);
         const bots = plan.bots.map((b) => ({ skill: b.skill, powerUps: b.powerUps ?? 0 }));
-        const chosen = judgeBotPicks({ fen: plan.fen, bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}) } as JudgeJob, top);
+        const job = { fen: plan.fen, picks: [], bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}) } as unknown as JudgeJob;
+        // (A boss power left none of the top moves open: the bots pick from a search over the allowed ones, as the job will.)
+        const open = await allowedSearch(engines[0]!, job, top);
+        const chosen = judgeBotPicks(job, top, open ?? []);
         const picks = Object.fromEntries(plan.bots.map((b, i) => [b.id, chosen.picks[i]!]));
         if (this.key === plan.key) this.send({ t: "botPlan", key: plan.key, picks, powerUps: chosen.powerUps.map((i) => plan.bots[i]!.id) });
         return;
       }
-      // (The re-pick after the God King's Last Stand: the move he took back is off the table.)
-      const top = (await this.top.get(engines[0]!, plan.fen)).filter((mv) => mv.move !== plan.barred);
-      const best = top[0]!.expected;
+      // (Boss battle: only the moves allowed this turn; the move the God King took back is off the table.)
+      const all = await this.top.get(engines[0]!, plan.fen);
+      const limits = { ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}) };
+      const top = judgeCandidates(limits, all, (await allowedSearch(engines[0]!, { ...limits, fen: plan.fen }, all)) ?? []);
+      const best = top[0]?.expected ?? 0.5;
       const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
-      const legal = legalMoves(plan.fen).filter((mv) => mv !== plan.barred);
+      const legal = plan.allowed ?? legalMoves(plan.fen).filter((mv) => mv !== plan.barred);
       const picks: Record<string, string> = {};
       const powerUps: string[] = [];
       for (const b of plan.bots) {
@@ -676,12 +689,16 @@ export class NetMatch implements GameView {
         while (next < jobs.length) {
           const i = next++;
           const job = jobs[i]!;
-          // The re-pick after the God King's Last Stand: the move he took back is no option (nor the best).
+          // Boss battle: the judge plays by the crowd's rules: only the moves allowed this turn (a power's limits; the
+          // move the God King took back), so the best is the best of those (one search over them if the top has none).
           const all = await this.top.get(engine, job.fen);
-          const top = job.barred && all.some((mv) => mv.move !== job.barred) ? all.filter((mv) => mv.move !== job.barred) : all;
+          const limits = { ...(job.barred ? { barred: job.barred } : {}), ...(job.allowed ? { allowed: job.allowed } : {}) };
+          const humanMoves = Object.values(job.humanPicks).filter((mv): mv is string => !!mv);
+          const open = (await allowedSearch(engine, { ...limits, fen: job.fen, picks: humanMoves }, all)) ?? [];
+          const top = judgeCandidates(limits, all, open);
           const best = top[0]!.expected;
           const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
-          const legal = legalMoves(job.fen).filter((mv) => mv !== job.barred);
+          const legal = job.allowed ?? legalMoves(job.fen).filter((mv) => mv !== job.barred);
           const botPicks: Record<string, string> = {};
           const botThinkMs: Record<string, number> = {};
           const botPowerUps: string[] = [];
@@ -700,10 +717,11 @@ export class NetMatch implements GameView {
             botThinkMs[b.id] = thinkMs(Math.random, this.settings);
           }
           const expectedAfter: Record<string, number> = Object.fromEntries(top.map((mv) => [mv.move, mv.expected]));
+          for (const mv of open) expectedAfter[mv.move] = mv.expected;
           const missing = [...Object.values(job.humanPicks), ...Object.values(botPicks)].filter(
             (mv): mv is string => !!mv && expectedAfter[mv] === undefined,
           );
-          const extra = missing.length ? await engine.scoreMoves(job.fen, missing) : [];
+          const extra = [...open, ...(missing.length ? await engine.scoreMoves(job.fen, missing) : [])];
           for (const s of extra) expectedAfter[s.move] = s.expected;
           // Each move's best reply and mate score from the same searches (what a blunder loses, for the Last Stand).
           const { replies, mates } = repliesFrom([top, extra]);
@@ -727,7 +745,8 @@ export class NetMatch implements GameView {
 
   submit(move: string | null) {
     if (this.phase.kind !== "play" || !this.key || !move) return;
-    if (move === this.boss?.barred) return; // The move the God King took back.
+    // Boss battle: only a move allowed this turn (a power's limits; the move the God King took back).
+    if (move === this.boss?.barred || (this.boss?.powers?.allowed && !this.boss.powers.allowed.includes(move))) return;
     if (Date.now() < this.phase.startsAt - 300) return; // Before the clock starts.
     if (this.phase.strike?.until && Date.now() < this.phase.strike.until) return; // While the King strikes.
     this.myPick = move;
