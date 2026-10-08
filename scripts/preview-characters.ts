@@ -4,11 +4,14 @@
 // A character with recolours (`looks`, such as the God King's black armour) is drawn once per look too, its files
 // named <id>-<look>-*.
 // `ref` puts a reference picture first in the comparison (its white or transparent background is keyed out).
+// The bosses' power effects (characters/effects.ts) are drawn too, over the game's board (a white pawn under the
+// ice, so you can see it through), as fx-<id>-<anim>.gif and fx-<id>-sheet.png.
 // No dependencies: PNG and GIF are written (and the reference read) here, with node:zlib.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
 import { CHARACTERS } from "../packages/app/src/characters/index.ts";
+import { EFFECT_SPRITES } from "../packages/app/src/characters/effects.ts";
 import { renderFrame, type Character, type Frame } from "../packages/app/src/characters/sprite.ts";
 
 const args = process.argv.slice(2);
@@ -337,6 +340,70 @@ for (const ch of ALL) for (look of looksOf(ch)) {
   console.log(`${id}: ${Object.entries(ch.anims).map(([n, a]) => `${n} ${a.frames.length}f`).join(", ")}`);
 }
 
+// ---- The power effects, over the board (chessground's brown squares), at the same scale.
+const LIGHT = "#f0d9b5";
+const DARK = "#b58863";
+/** The board under an effect: one light square (a white pawn on it under the ice), or the whole board. */
+function boardUnder(ch: Character): Img {
+  if (ch.w === ch.h && ch.w > 64) {
+    const img = blank(ch.w, ch.h, LIGHT);
+    const cell = ch.w / 8;
+    for (let y = 0; y < ch.h; y++) for (let x = 0; x < ch.w; x++) if ((Math.floor(x / cell) + Math.floor(y / cell)) % 2) img.data.set([...hex(DARK), 255], (y * ch.w + x) * 4);
+    return img;
+  }
+  const img = blank(ch.w, ch.h, LIGHT);
+  if (ch.id === "ice-overlay") {
+    // A white pawn: head, body, base; black outline.
+    const c = ch.w / 2;
+    const inPawn = (x: number, y: number) => (x - c) ** 2 + (y - 10) ** 2 <= 16 || (y >= 13 && y <= 23 && Math.abs(x - c) <= 2.5 + (y - 13) * 0.45) || (y >= 23 && y <= 26 && Math.abs(x - c) <= 9);
+    for (let y = 0; y < ch.h; y++)
+      for (let x = 0; x < ch.w; x++) {
+        const px = x + 0.5;
+        const py = y + 0.5;
+        const edge = !inPawn(px - 1, py) || !inPawn(px + 1, py) || !inPawn(px, py - 1) || !inPawn(px, py + 1);
+        if (inPawn(px, py)) img.data.set(edge ? [0, 0, 0, 255] : [255, 255, 255, 255], (y * ch.w + x) * 4);
+      }
+  }
+  return img;
+}
+const fxFrame = (ch: Character, f: Frame): Img => {
+  const out = boardUnder(ch);
+  blit(out, renderFrame(ch, f), 0, 0);
+  return out;
+};
+const FX = Object.values(EFFECT_SPRITES).filter((c) => !only || only.includes(c.id) || only.includes("fx"));
+for (const ch of FX) {
+  for (const [name, anim] of Object.entries(ch.anims)) {
+    const one: { img: Img; ms: number }[] = [];
+    for (let rep = 0; rep < (anim.loop ? 2 : 1); rep++) anim.frames.forEach((f) => one.push({ img: scaleUp(fxFrame(ch, f), SCALE), ms: f.ms }));
+    // A short pause on the board after a one-shot, so the GIF's loop shows where it ends.
+    if (!anim.loop) one.push({ img: scaleUp(boardUnder(ch), SCALE), ms: 400 });
+    writeGif(join(outDir, `fx-${ch.id}-${name}.gif`), one);
+  }
+  const anims = Object.entries(ch.anims);
+  const s = ch.w > 64 ? 2 : SCALE;
+  const PER_ROW = ch.w > 64 ? 5 : 10;
+  const cellW = ch.w * s + 8;
+  const cellH = ch.h * s + 30;
+  const rowsOf = (n: number) => Math.ceil(n / PER_ROW);
+  const cols = Math.min(PER_ROW, Math.max(...anims.map(([, a]) => a.frames.length)));
+  const sheet = blank(cols * cellW + 8, 30 + anims.reduce((t, [, a]) => t + 14 + rowsOf(a.frames.length) * cellH, 0));
+  text(sheet, `${ch.name}  ${ch.w}x${ch.h} px  shown at ${s}x`, 8, 8, GOLD);
+  let y0 = 30;
+  for (const [name, anim] of anims) {
+    text(sheet, `${name}${anim.loop ? " loop" : ""}`, 8, y0, INK);
+    anim.frames.forEach((f, c) => {
+      const x = 8 + (c % PER_ROW) * cellW;
+      const y = y0 + 13 + Math.floor(c / PER_ROW) * cellH;
+      blit(sheet, scaleUp(fxFrame(ch, f), s), x, y);
+      text(sheet, `${c + 1} ${f.ms}ms${f.cue ? ` ${f.cue}` : ""}`, x, y + 3 + ch.h * s, f.cue ? GOLD : INK);
+    });
+    y0 += 14 + rowsOf(anim.frames.length) * cellH;
+  }
+  writePng(join(outDir, `fx-${ch.id}-sheet.png`), sheet);
+  console.log(`fx ${ch.id}: ${anims.map(([n, a]) => `${n} ${a.frames.length}f ${a.frames.reduce((t, f) => t + f.ms, 0)}ms`).join(", ")}`);
+}
+
 // Comparison at phone size: the reference (if given), then each character's first idle frame, about 128 px tall,
 // on the game's ground. Sprites at 2x (their size in CSS pixels on a phone); the reference is resampled to match.
 const PHONE = 2;
@@ -353,7 +420,7 @@ for (const ch of ALL)
     tiles.push({ img: crop(img), label: ch.name.replace(/^The /, "") + (lk ? ` ${lk}` : "") });
   }
 const pad = 24;
-const H = Math.max(...tiles.map((t) => t.img.h));
+const H = Math.max(1, ...tiles.map((t) => t.img.h));
 const tileW = (t: { img: Img; label: string }) => Math.max(t.img.w, t.label.length * 8);
 const cmp = blank(tiles.reduce((s, t) => s + tileW(t) + pad, pad), H + pad * 2 + 16);
 let cx = pad;

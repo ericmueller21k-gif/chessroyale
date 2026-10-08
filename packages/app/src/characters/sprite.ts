@@ -72,7 +72,7 @@ export interface Character {
   h: number;
   /** Where the character stands (the ground between its feet), in frame pixels: for placing it on screen. */
   foot: readonly [number, number];
-  /** Palette: key -> #rrggbb. `k` is the outline colour and must be present. */
+  /** Palette: key -> #rrggbb (or #rrggbbaa, see-through). `k` is the outline colour and must be present. */
   palette: Readonly<Record<string, string>>;
   /** A faint 1-pixel backlight around the whole silhouette, so a dark boss still reads on the dark ground. */
   halo?: string;
@@ -195,9 +195,11 @@ export function frameKeys(ch: Character, frame: Frame): Cells {
   return out;
 }
 
-function hex(c: string): [number, number, number] {
-  const n = parseInt(c.replace("#", ""), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+/** `#rrggbb`, or `#rrggbbaa` for a see-through colour (ice over a piece, a cloud): [r, g, b, a]. */
+function hex(c: string): [number, number, number, number] {
+  const s = c.replace("#", "");
+  const n = parseInt(s.slice(0, 6), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255, s.length === 8 ? parseInt(s.slice(6), 16) : 255];
 }
 
 /**
@@ -215,12 +217,14 @@ export function renderFrame(ch: Character, frame: Frame, opts: { bg?: string; lo
       const i = (y * ch.w + x) * 4;
       const colour = k ? pal[k] : undefined;
       if (k && !colour) throw new Error(`${ch.id}: no colour for "${k}"`);
-      const rgb = colour ? hex(colour) : bg;
+      const c = colour ? hex(colour) : null;
+      const rgb = c && bg && c[3] < 255 ? ([0, 1, 2].map((j) => Math.round(c[j]! * (c[3] / 255) + bg[j]! * (1 - c[3] / 255))) as number[]) : (c ?? bg);
       if (!rgb) return;
-      data[i] = rgb[0];
-      data[i + 1] = rgb[1];
-      data[i + 2] = rgb[2];
-      data[i + 3] = 255;
+      data[i] = rgb[0]!;
+      data[i + 1] = rgb[1]!;
+      data[i + 2] = rgb[2]!;
+      // A see-through colour keeps its alpha, unless it was laid over `bg`.
+      data[i + 3] = c && !bg ? c[3] : 255;
     }),
   );
   return { w: ch.w, h: ch.h, data };

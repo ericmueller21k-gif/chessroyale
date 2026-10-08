@@ -6,8 +6,27 @@
  */
 import { fenAfter, inCheck } from "@chessroyale/chess";
 
-/** The moments a boss reacts to. */
-export type Beat = "entrance" | "idle" | "thinking" | "move" | "capture" | "hurt" | "check" | "smug" | "rattled" | "defeat" | "victory" | "strike";
+/**
+ * The moments a boss reacts to. The last three are its powers (see power-art.ts): `power` its passive firing (a pie
+ * thrown, a piece frozen), `ultimateWarn` the one-turn warning, `ultimate` the ultimate itself. `bossBeat` doesn't
+ * produce those: the power rules say when they happen; a kit names their animations and lines.
+ */
+export type Beat =
+  | "entrance"
+  | "idle"
+  | "thinking"
+  | "move"
+  | "capture"
+  | "hurt"
+  | "check"
+  | "smug"
+  | "rattled"
+  | "defeat"
+  | "victory"
+  | "strike"
+  | "power"
+  | "ultimateWarn"
+  | "ultimate";
 /** The loops it rests in between moments. */
 export type Loop = "idle" | "thinking" | "smug" | "rattled" | "defeat" | "victory";
 
