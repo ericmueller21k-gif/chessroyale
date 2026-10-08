@@ -1,4 +1,5 @@
 import { LookAways } from "./lookaway.ts";
+import { showBanNotice } from "./components/FairPlay.tsx";
 import { DEFAULT_SETTINGS, JUDGES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
@@ -361,6 +362,8 @@ export class NetMatch implements GameView {
       case "error":
         // (The match is over: results gone, or a seat from an older lobby that had this code.)
         if (m.ended) return this.goneNow("ended");
+        // Banned for fair play: the ban notice, with its appeal.
+        if (m.banned) showBanNotice();
         this.error = m.message;
         this.closed = true;
         return this.emit();

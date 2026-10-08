@@ -444,7 +444,7 @@ export function PlayerProfileScreen({
           {seenLine(p)} · joined {joined}
         </div>
         <div class="fd-pills">
-          <RankPill tier={p.tier} rating={p.rating} />
+          {p.banned ? <span class="fd-pill fp-banned">Banned</span> : <RankPill tier={p.tier} rating={p.rating} />}
           {p.topPercent !== null && <span class="fd-pill">Top {p.topPercent}%</span>}
         </div>
         {own && (

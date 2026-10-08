@@ -4,8 +4,11 @@ import type { Matchmaker } from "./matchmaker.ts";
 import type { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
-import { d1Sql, lobbyResult } from "./accounts.ts";
-import { SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
+import { d1Sql, lobbyResult, type User } from "./accounts.ts";
+import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
+import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
+import { caseMailer } from "./fairplay-mail.ts";
+import { handleAdmin, type AdminEnv } from "./admin.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";
@@ -16,7 +19,7 @@ export { Matchmaker } from "./matchmaker.ts";
 export { EngineServer } from "./engine.ts";
 export { LiveHub } from "./live-hub.ts";
 
-export interface Env extends AccountEnv, EngineEnv {
+export interface Env extends AccountEnv, EngineEnv, AdminEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   LIVE?: DurableObjectNamespace<LiveHub>;
@@ -35,7 +38,9 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
 export default {
   async fetch(request: Request, rawEnv: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    if (!url.pathname.startsWith("/api/")) return rawEnv.ASSETS.fetch(request);
+    // (The fair-play review page is the Worker's own; everything else outside /api is the app.)
+    const admin = url.pathname === "/admin/fairplay" || url.pathname.startsWith("/admin/fairplay/");
+    if (!url.pathname.startsWith("/api/") && !admin) return rawEnv.ASSETS.fetch(request);
     // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
     if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
       return json(opsStats(url.searchParams.get("reset") === "1"));
@@ -65,7 +70,10 @@ export default {
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
   {
     // (The sign-in secrets may live in the Secrets Store: read them as strings.)
-    const env = url.pathname.startsWith("/api/") ? await withSecrets(rawEnv) : rawEnv;
+    const env = await withSecrets(rawEnv);
+    // Fair play's review page and the automated reviewer's API (admins and the reviewer's token only).
+    const review = await handleAdmin(request, env, caseMailer(env), waitUntil);
+    if (review) return review;
     // Accounts: /api/me, /api/results, /api/auth/*
     const account = await handleAccountApi(request, env, fetch, waitUntil);
     if (account) return account;
@@ -90,7 +98,8 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // &from=CODE with { seat }: Bots off → Default, keeping your wait: you leave that lobby and bots fill a minute after
     // you first joined it at the latest. 409 if that lobby has started meanwhile (stay in it).
     if (url.pathname === "/api/play" && request.method === "POST") {
-      if (env.DB && signInRequired(env) && !isSignedIn(await accountOf(request, env, waitUntil))) return json({ message: SIGN_IN_TO_PLAY }, 401);
+      const refused = await mayPlay(request, env, waitUntil);
+      if (refused) return refused;
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
       const raid = url.searchParams.get("mode") === "raid";
       const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
@@ -119,7 +128,8 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     }
     // POST /api/lobby → { code }
     if (url.pathname === "/api/lobby" && request.method === "POST") {
-      if (env.DB && signInRequired(env) && !isSignedIn(await accountOf(request, env, waitUntil))) return json({ message: SIGN_IN_TO_PLAY }, 401);
+      const refused = await mayPlay(request, env, waitUntil);
+      if (refused) return refused;
       // Playtest overrides, e.g. POST /api/lobby?rounds=2&clock=15
       const n = (k: string) => (url.searchParams.has(k) ? Math.max(1, Math.min(600, Number(url.searchParams.get(k)) || 0)) : undefined);
       const draw = url.searchParams.get("draw") as DrawRule | null;
@@ -184,4 +194,16 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     }
     return json({ message: "Not found" }, 404);
   }
+}
+
+/**
+ * Whether this request may start online play (PLAY, a new lobby): signed in where sign-in is set up (401 otherwise),
+ * and not banned for fair play (403, with `banned` so the app shows the ban notice and its appeal). Null: go ahead.
+ */
+async function mayPlay(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | null> {
+  if (!env.DB) return null;
+  const me: User | null = await accountOf(request, env, waitUntil);
+  if (signInRequired(env) && !isSignedIn(me)) return json({ message: SIGN_IN_TO_PLAY }, 401);
+  const ban = await banCheck(d1Sql(env.DB), me, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }));
+  return ban.banned ? json({ message: BANNED_MESSAGE, banned: true }, 403) : null;
 }

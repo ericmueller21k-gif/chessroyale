@@ -22,13 +22,18 @@ export function LegalScreen({ page, onBack }: { page: "privacy" | "terms"; onBac
               fair-play score) stays with your results.
             </li>
             <li>Reports you make about other players, reports about you, and any fair-play decision about your account and why.</li>
+            <li>
+              A second cookie with a random number for your device, for fair play only: if an account is banned, a new account playing from
+              the same device is looked at by a person. It isn't used for anything else, and clearing your cookies removes it.
+            </li>
+            <li>If your account is banned: an appeal you send, and our reply. We email you about a ban, or when a review clears you.</li>
           </ul>
           <h2>What we don't do</h2>
           <p>No ads, no ad tracking, no selling or sharing your information. Your email is only for signing in.</p>
           <h2>Who handles it</h2>
           <p>
-            The game runs on Cloudflare, which stores the data. Google handles "Continue with Google". Resend sends sign-in codes by
-            email. Each only gets what it needs to do that job.
+            The game runs on Cloudflare, which stores the data. Google handles "Continue with Google". Resend sends sign-in codes and
+            fair-play notices by email. Each only gets what it needs to do that job.
           </p>
           <h2>Your choices</h2>
           <p>

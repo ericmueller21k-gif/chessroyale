@@ -201,6 +201,8 @@ export interface PublicProfile {
   rating: number | null;
   tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   topPercent: number | null;
+  /** Banned for fair play (the profile says so; nothing else about fair play is shown). */
+  banned?: boolean;
   crowd: { games: number; wins: number; avgPlace: number | null; best: number | null; cutsSurvivedPct: number | null; brilliant: number | null };
   boss: { raids: number; bossesBeaten: number; strikesSurvived: number | null; lastStands: number | null; survivedPct: number | null; brilliant: number | null };
   ratingHistory: number[];
@@ -229,6 +231,15 @@ export async function reportPlayer(target: string, reason: string, match?: strin
   const r = await api<{ message?: string }>("/api/report", { method: "POST", body: JSON.stringify({ target, reason, ...(match ? { match } : {}) }) });
   return r.message ?? "Thanks, we'll look into it.";
 }
+
+/** Your fair-play standing: banned or not, and your latest appeal (the ban notice). */
+export interface FairStatus {
+  banned: boolean;
+  appeal: { status: "open" | "upheld" | "overturned"; at: number; reply: string | null } | null;
+}
+export const fairStatus = () => api<FairStatus>("/api/fairplay/status");
+/** A banned account's appeal, for a person to read. */
+export const sendAppeal = (text: string) => api<FairStatus>("/api/appeal", { method: "POST", body: JSON.stringify({ text }) });
 
 export async function fetchProfile(id: string): Promise<PublicProfile> {
   return api<PublicProfile>(`/api/profile/${encodeURIComponent(id)}`);

@@ -8,7 +8,7 @@ export default defineConfig({
   webServer: {
     // The real Worker and Durable Objects, run locally by wrangler, serving the built app.
     // (Without the engine server container, so the phones' own re-checks are what's tested; see DEPLOY.md.)
-    command: "npm run build && npx wrangler dev --port 8788 --enable-containers=false --var MATCH_FILL_SECONDS:8 --var ENGINE_OFF:1",
+    command: "npm run build && npx wrangler dev --port 8788 --enable-containers=false --var MATCH_FILL_SECONDS:8 --var ENGINE_OFF:1 --var FAIRPLAY_REVIEW_TOKEN:e2e-review-token-0123456789",
     url: "http://localhost:8788",
     reuseExistingServer: true,
     timeout: 120_000,
