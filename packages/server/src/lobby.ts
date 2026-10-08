@@ -1,4 +1,5 @@
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
+import { FAIRPLAY, type FairMove } from "@chessroyale/core";
 import { DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LOBBY_LIFE, MATCHMAKING, isRankedMatch, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
@@ -146,7 +147,8 @@ export interface LobbyRecord {
     deadline: number;
     deadlines: Record<string, number>;
     startedAt: number;
-    picks: Record<string, { move: string; thinkMs: number }>;
+    /** `away`: look-aways during the clock before the pick, as the app counted them (fair play's one device signal). */
+    picks: Record<string, { move: string; thinkMs: number; away?: number }>;
     powerUps: Record<string, true>;
     /** Boss battle: players who called the King this move, and who called for his strike. */
     kingCalls?: Record<string, true>;
@@ -231,6 +233,12 @@ export interface LobbyRecord {
   freed?: string[];
   /** Many judges (see judges.ts and DECISIONS.md): each device's speed and strikes, the scoring in progress, counts. */
   judges?: JudgesRecord;
+  /**
+   * Fair play: each person's picks with what the judged numbers say about them (core/fairplay.ts), by player id, and
+   * a count that goes up with each round's additions (the Durable Object stores them apart, only when it changes).
+   */
+  fair?: Record<string, FairMove[]>;
+  fairV?: number;
 }
 
 export interface JudgesRecord {
@@ -605,7 +613,7 @@ export class LobbyCore {
       case "start":
         return this.start(playerId);
       case "pick":
-        return this.pick(playerId, msg.key, msg.move);
+        return this.pick(playerId, msg.key, msg.move, msg.away);
       case "powerUp":
         return this.powerUp(playerId, msg.key);
       case "scores":
@@ -1075,7 +1083,7 @@ export class LobbyCore {
     return Math.max(0, upTo - round.startedAt - frozen);
   }
 
-  private pick(playerId: string, key: string, move: string) {
+  private pick(playerId: string, key: string, move: string, away?: unknown) {
     const round = this.r.round;
     if (this.r.phase !== "play" || !round || round.key !== key || round.picks[playerId] || this.called(playerId)) return;
     const now = this.io.now();
@@ -1086,7 +1094,11 @@ export class LobbyCore {
     if (!board || !legalMoves(board.fen).includes(move)) return;
     // The re-pick after the God King's Last Stand: the move he took back can't be picked.
     if (move === this.runner?.boss?.barred) return;
-    round.picks[playerId] = { move, thinkMs: Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline)) };
+    round.picks[playerId] = {
+      move,
+      thinkMs: Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline)),
+      ...(typeof away === "number" && away > 0 ? { away: Math.min(50, Math.round(away)) } : {}),
+    };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     this.sendTally();
     if (this.roundHumans().every((h) => round.picks[h.id] || this.called(h.id))) this.lock();
@@ -1191,6 +1203,8 @@ export class LobbyCore {
     const round = this.r.round!;
     runner.kingCallers = new Set(Object.keys(round.kingCalls ?? {}));
     const byBoard = new Map(boards.map((b) => [b.boardId, b]));
+    // (Fair play: the move before each position, for recaptures; the boards move on in finishRound.)
+    const lastMoves = new Map(this.r.scoreRequest!.jobs.map((j) => [j.boardId, runner.boards.get(j.boardId)?.lastMove ?? null]));
     const results = this.r.scoreRequest!.jobs.map((job) => {
       const s = byBoard.get(job.boardId);
       const ids = runner.groups.get(job.boardId)!;
@@ -1216,6 +1230,7 @@ export class LobbyCore {
     for (const h of this.roundHumans()) think[h.id] ??= this.thinkTime(round, round.deadlines?.[h.id] ?? round.deadline);
     const report = runner.finishRound(results, think, new Set(Object.keys(round.powerUps ?? {})));
     this.noteFeats(report);
+    this.noteFair(report, lastMoves);
     this.r.scoreRequest = null;
     if (runner.final) {
       // The final: everyone sees the move just played and its loss, then the next turn.
@@ -1887,6 +1902,60 @@ export class LobbyCore {
         if (!f.best || score >= f.best.score) f.best = { san: toSan(b.fenBefore, p.move), score };
       }
     }
+  }
+
+  /**
+   * Fair play: each person's pick this round, with what the round's judged numbers say about it (core/fairplay.ts):
+   * its loss, the share of the other people in that position who found the best move, how many moves were close to
+   * the best, think time, look-aways. Practice players (unlimited hints) aren't recorded, and neither they nor anyone
+   * who used a power-up counts in anyone's crowd.
+   */
+  private noteFair(report: RoundReport, lastMoves: Map<number, string | null>) {
+    const round = this.r.round;
+    if (!round) return;
+    const people = new Set(this.r.humans.filter((h) => !h.practice).map((h) => h.id));
+    const sig = FAIRPLAY.signals;
+    let added = false;
+    for (const b of report.boards) {
+      const picked = b.result.players.filter((p) => people.has(p.playerId) && p.move && p.loss !== null);
+      if (!picked.length || !b.scored.length) continue;
+      const best = b.scored[0]!;
+      const near = b.scored.filter((x) => x.loss <= sig.nearPoints).length;
+      const last = lastMoves.get(b.boardId) ?? null;
+      const legal = legalMoves(b.fenBefore).length;
+      const [, side, , , , full] = b.fenBefore.split(" ");
+      const ply = (Math.max(1, Number(full) || 1) - 1) * 2 + (side === "b" ? 1 : 0);
+      const crowd = picked.filter((p) => !p.usedPowerUp);
+      for (const p of picked) {
+        const others = crowd.filter((o) => o.playerId !== p.playerId);
+        const pick = round.picks[p.playerId];
+        const move: FairMove = {
+          ply,
+          fen: b.fenBefore,
+          move: p.move!,
+          best: best.move,
+          loss: Math.round(p.loss! * 100) / 100,
+          bestExp: Math.round(best.expected * 1000) / 1000,
+          near,
+          gap: b.scored.length > 1 ? Math.round(b.scored[1]!.loss * 100) / 100 : null,
+          crowd: others.length,
+          crowdFound: others.filter((o) => o.loss! <= sig.foundLoss).length,
+          thinkMs: pick?.thinkMs ?? 0,
+          away: pick?.away ?? 0,
+          legal,
+          ...(p.usedPowerUp ? { powerUp: true } : {}),
+          ...(last && best.move.slice(2, 4) === last.slice(2, 4) ? { recapture: true } : {}),
+        };
+        ((this.r.fair ??= {})[p.playerId] ??= []).push(move);
+        added = true;
+      }
+    }
+    if (added) this.r.fairV = (this.r.fairV ?? 0) + 1;
+  }
+
+  /** Fair play: a person's recorded picks this match (for their fair-play summary once it's over). */
+  fairMoves(playerId: string): FairMove[] {
+    return this.r.fair?.[playerId] ?? [];
   }
 
   /** Each human's result once the match is over (for their profiles). */

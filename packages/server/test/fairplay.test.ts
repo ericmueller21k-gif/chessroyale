@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { FAIRPLAY } from "@chessroyale/core";
+import { FAIRPLAY, type FairMove } from "@chessroyale/core";
 import { createGuest, ensureSchema, publicProfile, recordResult, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
-import { caseOf, eligibleForRanked, reportPlayer, setCase } from "../src/fairplay.ts";
+import { caseOf, eligibleForRanked, purgeEvidence, recordFairPlay, reportPlayer, setCase } from "../src/fairplay.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { memoryDb } from "./memory-db.ts";
 
@@ -168,3 +168,97 @@ async function fetch1(env: { DB: D1Database }, method: string, path: string, bod
   const req = new Request(`https://hunchess.test${path}`, { method, headers: { ...(cookie ? { cookie } : {}), "content-type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
   return (await handleAccountApi(req, env))!;
 }
+
+/** A match's picks: `n` counted middlegame moves, every fourth one hard (2 of 40 found it); `engine` finds them all. */
+function picks(n: number, engine: boolean): FairMove[] {
+  return Array.from({ length: n }, (_, i) => {
+    const hard = i % 4 === 0;
+    const loss = engine ? 0 : hard ? 15 : i % 3 === 0 ? 10 : 2;
+    return { ply: 14 + 2 * i, fen: `fen ${i}`, move: engine ? "e2e4" : "d2d4", best: "e2e4", loss, bestExp: 0.55, near: 2, gap: 3, crowd: 40, crowdFound: hard ? 2 : 24, thinkMs: engine ? 3500 : hard ? 15_000 : 6000, away: 0, legal: 30 };
+  });
+}
+
+describe("fair-play records", () => {
+  it("stores each match's signals as history, with the picks as evidence: 3 days, or 30 when flagged", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const honest = await player(sql, "Honest");
+    const cheat = await player(sql, "Cheat");
+    const t = 50 * DAY;
+    const h = await recordFairPlay(sql, honest.id, { lobby: "AAAAA", mode: "crowd", moves: picks(20, false) }, t);
+    expect(h.verdict.level).toBe("none");
+    const c = await recordFairPlay(sql, cheat.id, { lobby: "AAAAA", mode: "crowd", moves: picks(20, true) }, t);
+    expect(c.summary.perf!).toBeGreaterThan(3000);
+    expect(["review", "ban"]).toContain(c.verdict.level);
+    const rows = await sql.all<{ user_id: string; counted: number; perf: number; level: string; moves: string; keep_until: number; summary: string }>(
+      "SELECT user_id, counted, perf, level, moves, keep_until, summary FROM fairplay_matches ORDER BY id",
+    );
+    expect(rows.map((r) => [r.user_id, r.counted, r.level])).toEqual([
+      [honest.id, 20, "none"],
+      [cheat.id, 20, c.verdict.level],
+    ]);
+    expect(JSON.parse(rows[0]!.moves)).toHaveLength(20);
+    expect(JSON.parse(rows[1]!.summary).perf).toBe(c.summary.perf);
+    expect(rows[0]!.keep_until).toBe(t + FAIRPLAY.evidenceDaysUnflagged * DAY);
+    expect(rows[1]!.keep_until).toBe(t + FAIRPLAY.evidenceDays * DAY);
+  });
+
+  it("watch only (the setting at launch): a review or ban level opens a watch case and says what it would have done", async () => {
+    expect(FAIRPLAY.enforcement).toBe("watch");
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const cheat = await player(sql, "Cheat");
+    const t = 50 * DAY;
+    const r1 = await recordFairPlay(sql, cheat.id, { lobby: "AAAAA", mode: "crowd", moves: picks(20, true) }, t);
+    const r2 = await recordFairPlay(sql, cheat.id, { lobby: "BBBBB", mode: "crowd", moves: picks(20, true) }, t + 3_600_000);
+    expect(r2.verdict.level).toBe("ban");
+    expect([r1.acted, r2.acted]).toEqual(["watch", "watch"]);
+    expect((await caseOf(sql, cheat.id))?.status).toBe("watch");
+    expect(await eligibleForRanked(sql, cheat.id)).toBe(true);
+    const log = await sql.all<{ action: string; by: string; reason: string }>("SELECT action, by, reason FROM fairplay_log WHERE user_id = ? ORDER BY id", cheat.id);
+    expect(log.map((l) => `${l.action}/${l.by}`)).toEqual(["watch/detection", "note/detection"]);
+    expect(log[1]!.reason).toMatch(/^level ban, not acted on \(watch only\)/);
+  });
+
+  it("a report after a match keeps that match's evidence the full 30 days; old evidence goes unless the case is open", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const a = await player(sql, "Ann");
+    const b = await player(sql, "Bo");
+    const c = await player(sql, "Cy");
+    const t = 50 * DAY;
+    await recordFairPlay(sql, b.id, { lobby: "AAAAA", mode: "crowd", moves: picks(12, false) }, t);
+    await recordFairPlay(sql, c.id, { lobby: "AAAAA", mode: "crowd", moves: picks(12, false) }, t);
+    // Ann reports Bo the next day: Bo's match is kept 30 days from now.
+    await reportPlayer(sql, a, b.id, "Cheating", "AAAAA", t + DAY);
+    const keep = async (id: string) => (await sql.first<{ keep_until: number | null; moves: string | null }>("SELECT keep_until, moves FROM fairplay_matches WHERE user_id = ?", id))!;
+    expect((await keep(b.id)).keep_until).toBe(t + DAY + FAIRPLAY.evidenceDays * DAY);
+    // Four days on: Cy's (unflagged) evidence is gone, the summary stays; Bo's case is open, so his stays.
+    await purgeEvidence(sql, t + 4 * DAY, true);
+    expect(await keep(c.id)).toEqual({ keep_until: null, moves: null });
+    expect((await keep(b.id)).moves).not.toBeNull();
+    expect((await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM fairplay_matches"))!.n).toBe(2);
+    // Bo's watch sees nothing new for 30 days: it closes, and then his evidence goes too.
+    await purgeEvidence(sql, t + DAY + (FAIRPLAY.evidenceDays + 1) * DAY, true);
+    expect((await caseOf(sql, b.id))?.status).toBe("closed");
+    expect((await keep(b.id)).moves).toBeNull();
+  });
+
+  it("a case in review keeps its evidence past 30 days; after a clearing, older matches don't count again", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const p = await player(sql, "Pat");
+    const t = 50 * DAY;
+    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: picks(20, true) }, t);
+    await setCase(sql, p.id, "review", "admin:eric", "looking", t + 1000);
+    await purgeEvidence(sql, t + 40 * DAY, true);
+    expect((await sql.first<{ moves: string | null }>("SELECT moves FROM fairplay_matches WHERE user_id = ?", p.id))!.moves).not.toBeNull();
+    // Another flagged match, then a clearing two days later: a quiet match after it doesn't bring the old one back.
+    const u = t + 50 * DAY;
+    expect((await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: picks(20, true) }, u)).verdict.level).not.toBe("none");
+    await setCase(sql, p.id, "cleared", "admin:eric", "a strong honest player", u + 2 * DAY);
+    const next = await recordFairPlay(sql, p.id, { lobby: "CCCCC", mode: "crowd", moves: picks(20, false) }, u + 3 * DAY);
+    expect(next.verdict.level).toBe("none");
+    expect((await caseOf(sql, p.id))?.status).toBe("cleared");
+  });
+});

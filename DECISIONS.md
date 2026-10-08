@@ -2461,3 +2461,44 @@ should be banned; and a report system. Built by the `fairplay` delegate (`.claud
   banned. The hook for the `ranked` delegate.
 - **Cases** (`fairplay_cases`): one per player, status watch, review, banned or cleared, with a log of every change, who
   made it (detection, reports, an admin, the automated reviewer) and why (`fairplay_log`).
+
+**Signals and the suspicion score** (step 2, shipped in watch-only mode)
+- **Recorded on the server from the match's own judged numbers** (`LobbyCore.noteFair`, after each round's scores go
+  in: the judges' agreed numbers, the engine server's verdict, or the host's), never numbers a browser makes up. For
+  each person's pick (`FairMove`, `core/fairplay.ts`):
+  - the loss, and the judged best move;
+  - the **crowd-found rate**: how many of the other people picking in that position found the best move (within 1
+    point). Bots, practice players (unlimited hints) and anyone who used a power-up don't count in anyone's crowd. My
+    call: bots never stand in for humans here. They pick from the engine's own scores, so a move that's hard for people
+    (a quiet move, a sacrifice) is no harder for them; with fewer than 8 other people the rate is left out;
+  - position complexity (moves within 2 points of the best) and the gap to the second-best move;
+  - think time (the server's own clock);
+  - whether the position counts: not the opening (the first 12 plies from the starting position), not a forced move,
+    not an only move or recapture that most of the crowd found (one the crowd missed does count), not a position
+    already won or lost (best move's expected score past 0.9 either way), never a pick made with a power-up;
+  - from the app, the one device signal: how many times the page was hidden or lost focus during the move's clock
+    before the pick (`lookaway.ts`, sent with the pick; episodes, so a blur plus a hide is one).
+- **Compact:** the Durable Object keeps the picks under their own storage key, written once per round (not on every
+  pick or chat line). At the end, each signed-in player gets one row in D1 (`fairplay_matches`): the match's summary
+  and score, and the picks as evidence.
+- **Evidence kept** (Eric, Oct 8): every match's picks for 3 days, so a report made after a match still finds its
+  games; 30 days when the player was flagged or reported; never deleted while their case is open (watch or review).
+  A watch with nothing new for 30 days closes, and its evidence then goes. The summary rows stay as the player's
+  history. The privacy page says so in plain words.
+- **The match's signals** (`matchSignals`), over counted moves:
+  - **strength:** an engine rating over counted moves (the same curve as the "Elo" column), with a small pull towards
+    1500 so a handful of lucky moves isn't super-GM strength; and a **jump** far above the player's own history (the
+    median of their last matches, 3 or more) or rating;
+  - **hard finds:** finding the best move where few of the crowd did, measured as evidence (a log-likelihood) against
+    an honest player of the player's own strength (the higher of their history and this match, capped at 2500): a
+    find where such a player usually misses points to an engine, a miss points the other way. Also counted plainly:
+    hard positions (under 10% of the crowd found the best move), hard finds and the longest run of them;
+  - **timing:** hard finds made in under 5 s, and think time that doesn't follow difficulty (rank correlation);
+  - **look-aways:** points only when moves with a look-away found the best far more often than the rest. Never enough
+    for a ban alone.
+- **Levels** (`playerLevel`, over the last 30 days, at most 10 matches): watch, review (one high match, or two adding
+  up), ban (only overwhelming evidence: two matches at super-GM strength on enough counted moves with high scores, or
+  one match past every bar). Every number is in `FAIRPLAY` (settings.ts).
+- **Watch only for now** (`FAIRPLAY.enforcement: "watch"`): detection records each match and its level, opens a watch
+  case, and logs what the level would have done; it reviews and bans nobody until the simulation's numbers are in
+  (below). Reports and admins act regardless.
