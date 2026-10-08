@@ -2197,3 +2197,86 @@ ranking can't change" (since replaced: see Ranking below). The `hub` delegate's 
 
 **Later:** remembering the choice per account; skill-based queues (the `ranked` delegate's; `matchmaker.ts` keeps
 one queue per mode and type for it to build on).
+
+## Many judges (Oct 8, 2026)
+
+Eric approved: online scores must be trustworthy (a modified browser could fake them, and one host did all the work),
+before ranked opens. Built by the `engine` delegate. Numbers: `reports/judge-determinism.md` and
+`reports/many-judges.md`.
+
+**How it works**
+- **A speed check on joining.** Each app times one 150k-node search (`UciEngine.speed`) and tells the lobby
+  (`speed`). An app that never says (an old tab) is never a judge.
+- **Two judges per board.** As a round starts, the lobby draws each board's two judges at random, weighted by speed
+  cubed (a computer is drawn far more often than a phone), the costliest boards first, a device's weight dropping with
+  each job it already has. The judges search the position while players think (the prefetch, as the host did).
+- **The job names nobody:** the position, the people's picks (sorted, one per picker), the bots' skills and a seed. A
+  judge runs exactly the host's old searches (`runJudgeJob`) and sends back the engines' raw output. The lobby works the
+  board out from it with the same code (`judgedBoard`): the best move, every score, and the bots' picks, drawn from the
+  seed (so two honest devices pick the same bot moves, and a report that doesn't follow from its own numbers is caught
+  on its own: a strike).
+- **The engine is deterministic,** so two honest answers are identical, not just close. Measured on 201 realistic jobs
+  (498 searches, the device's own re-check included): identical on two separate engine processes, on a "used" engine
+  that had just searched elsewhere and played a boss move, and in a Web Worker in Chromium. The build has no
+  relaxed-SIMD instructions, the one WebAssembly feature that may differ between CPUs. So the lobby demands an exact
+  match (`JUDGES.tolerance` 0). Not tested: a real ARM phone; any platform difference would show at once in the logs
+  as honest devices disagreeing.
+- **Agree:** used. **Disagree:** the engine server scores every move either judge scored at its deep node count, and
+  its numbers are used. Blame: a third device gets the same job (a second opinion, which holds nothing up); the judge it
+  doesn't match exactly gets a strike. Without a third device, the judge further from the verdict on the disputed moves
+  is struck if it's further by `JUDGES.blameMargin` (4) points. Two strikes: no more jobs that match (and no more
+  hosting). Every disagreement, strike and fallback is logged.
+- **Never slower.** After the first answer the lobby waits `graceMs` (150 ms) or a quarter of the first's time for the
+  second, then uses the first alone. The late answer is still compared when it comes; a disagreement is then settled
+  for blame (the third device, the server). A device with a strike is never trusted alone. A judge that drops is
+  replaced; a job whose second judge never answers gets a spot check on the server 25% of the time
+  (`spotCheckShare`), blamed only past 50 points (`soloBlame`, above the worst honest difference measured, 47.5:
+  a phone's quick search and the server's deep one can differ that much on a sharp move).
+- **No engine server** (down, out of budget): the judges re-check close calls themselves (checked like the rest), and a
+  dispute waits up to 5 s for the third device: two of three decide. No third device: the judge with fewer strikes,
+  then the faster, stands (as the host's did), and the logs say so.
+- **Close calls get depth, wider.** Picks by players within 25 points of the cut line (each team's line in 50 v 50)
+  are re-checked first, from 1 point of loss (`recheckCutLoss`, `recheckCutMax` 5, `recheckCutPoints`), on top of the
+  usual ones; any tie in which moves to re-check is now broken by the move, so every device and the server choose
+  alike. With judges the re-check goes to the engine server once the judges agree; it applies to the host's path too.
+- **Unchanged:** solo, bot-only rounds, a lobby with one device that can judge (the host scores, as before), boss moves
+  (the host). `JUDGES.on = false` turns it all off. Nothing on screen changed.
+
+**Tested against liars** (`packages/sim/scripts/many-judges.ts`: the real lobby logic, whole Crowd matches, real
+Stockfish, simulated time; cheaters claim 3M nodes/s to be drawn as often as possible; 2 matches per scenario, each
+also played the old way):
+
+| Scenario | Cheater's gain, old way (points) | With judges | Cheater benched at round | Honest devices struck |
+|---|---:|---:|---|---:|
+| Scores its own pick as the best | 364 | 0 | 4, 3 | 0 |
+| Random noise on every score | (noise, not a gain) | 0 | 2, 2 | 0 |
+| Every move as good as the best | 88 | 0 | 2, 2 | 0 |
+| Answers from a 5k-node search | 15 | 0 | 2, 3 | 0 |
+| Inflater, with dropping and slow phones | 364 | 0 | 6, 3 | 0 |
+| Inflater, engine server down | 581 | 0 | 4, 3 | 0 |
+| Only two devices: a fast inflater and an honest phone | 213 | 23 | 10, 11 | 0 |
+
+- Scores matched the honest devices exactly on every job two honest judges settled (none moved, 0.0 points), and the
+  rest used the engine server's verdict or two of three devices. Every cheater was benched in every match; no honest
+  device was ever struck.
+- The one gap: with only two devices, a fast cheater's answer is used alone when its honest partner is a slower phone,
+  until it's caught (its first lie is caught when the phone's answer comes). Seven such jobs in two matches, 23 points
+  in all (the old way: 213).
+- **Timing** (lock to reveal, simulated): with two computers judging, the same as the old way (median 287 ms); with a
+  computer and a phone, 150 ms more (437 ms, the grace); the 95th percentile is the server's re-check either way
+  (about 3.4 s). `graceMs` 0 makes it never slower at all, at the price of relying on the late comparison.
+- **Engine server calls:** about the same as before: 15–20 per Crowd match (mostly close calls before cuts, the
+  widened set included), plus about 2 verdicts per cheater per match and the odd spot check.
+
+**Left, or for the director**
+- *Proposal (a visible change, so not built):* when a late answer shows the one used was a lie, correct that round's
+  scores before the next cut. That would close the two-device gap above.
+- Two cheaters colluding (both drawn for the same job, both lying the same way) would agree and pass; random draws make
+  it rare with many devices, and spot checks don't catch it.
+- Crowd's early bot picks (shown live) still come from one judge; the scoring job checks them (a wrong plan: a strike),
+  but the live tally could have been wrong for that round.
+- A quirk found on the way, left as it is (it would change every score): Stockfish's MultiPV output, cut short by the
+  node budget, sometimes lists one move on two lines with different scores; the later line's score is kept.
+- Server budget: with judges, the cap of 3000 searches a day lasts about 190 Crowd matches a day (16 searches each),
+  then devices' numbers stand. Raising it is Eric's call (cost scales with the cap: about $25 a month per 3000 a day,
+  worst case).

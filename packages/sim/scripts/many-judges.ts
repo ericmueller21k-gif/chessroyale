@@ -454,7 +454,7 @@ function pct(xs: number[], p: number) {
 function summary() {
   const rounds = readFileSync(`${out}rounds.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l) as RoundRow);
   const matches = readFileSync(`${out}matches.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l) as MatchRow);
-  const names = [...new Set(matches.map((m) => m.scenario))];
+  const names = SCENARIOS.map((s) => s.name).filter((n) => matches.some((m) => m.scenario === n));
   const desc: Record<string, string> = {
     honest: "6 honest devices (2 computers, 4 phones)",
     inflate: "1 cheater (a computer) scores its own pick as the best; 5 honest",
@@ -482,18 +482,20 @@ Scenarios: ${names.map((n) => `**${n}**: ${desc[n] ?? n}`).join("; ")}.
   md += `## Do the scores match the truth?
 
 Per job (a round's board). *Honest*: every person's pick scored exactly as honest devices score it. *Server*: the
-engine server's verdict used. *Cheater's*: a job a cheater judged whose numbers were used (alone, or as the fallback
-with no server). *Worst shift*: the most any pick's loss moved from the honest devices' (points), over the matches.
+engine server's verdict used. *Two of three*: no server, a third device settled it. *Host*: one device scored it, the
+old way (always, the old way; with judges, once only one device that can judge is left, e.g. after the other was
+benched). *Cheater's*: a job a cheater judged whose numbers were used (alone, or as the fallback with no server).
+*Worst shift*: the most any pick's loss moved from the honest devices' (points), over the matches.
 
-| Scenario | Way | Jobs | Agreed | Server verdict | Two of three | One judge | Fallback | Honest numbers | Cheater's numbers used | Worst shift |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Scenario | Way | Jobs | Agreed | Server verdict | Two of three | One judge | Fallback | Host | Honest numbers | Cheater's numbers used | Worst shift |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 `;
   for (const n of names)
     for (const mode of ["judges", "host"] as const) {
       const rs = rounds.filter((r) => r.scenario === n && r.mode === mode && r.how);
       const c = (f: (r: RoundRow) => boolean) => rs.filter(f).length;
       const cheaterUsed = c((r) => !!r.cheaterJudged && (r.how === "single" || r.how === "fallback" || r.how === "host") && r.honestTruth === false);
-      md += `| ${n} | ${mode === "judges" ? "judges" : "old (host)"} | ${rs.length} | ${c((r) => r.how === "agreed")} | ${c((r) => r.how === "verdict")} | ${c((r) => r.how === "majority")} | ${c((r) => r.how === "single")} | ${c((r) => r.how === "fallback")} | ${c((r) => !!r.honestTruth)} | ${cheaterUsed} | ${fmt(Math.max(0, ...rs.filter((r) => r.how !== "verdict").map((r) => r.worstShift ?? 0)))} |\n`;
+      md += `| ${n} | ${mode === "judges" ? "judges" : "old (host)"} | ${rs.length} | ${c((r) => r.how === "agreed")} | ${c((r) => r.how === "verdict")} | ${c((r) => r.how === "majority")} | ${c((r) => r.how === "single")} | ${c((r) => r.how === "fallback")} | ${c((r) => r.how === "host")} | ${c((r) => !!r.honestTruth)} | ${cheaterUsed} | ${fmt(Math.max(0, ...rs.filter((r) => r.how !== "verdict").map((r) => r.worstShift ?? 0)))} |\n`;
     }
   md += `
 (A job settled by the server's verdict differs from the honest devices' by the server's deeper view, not by any
