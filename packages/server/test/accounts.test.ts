@@ -99,6 +99,24 @@ describe("accounts", () => {
     expect((await signInWithIdentity(sql, c.user, "email", "e@x.com", {}, 6000)).id).toBe(a.user.id);
   });
 
+  it("a Google account's email is kept however the account was made, and added on the next sign-in if missing", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    // No guest on this device: a new account made by Google keeps the email (normalised).
+    const fresh = await signInWithIdentity(sql, null, "google", "sub-2", { email: "Admin@Example.com", name: "A" }, 1000);
+    expect(fresh.email).toBe("admin@example.com");
+    // An older Google account saved without its email gets it when it signs in again.
+    await sql.run("INSERT INTO users (id, name, google_sub, created_at, last_seen) VALUES ('old', 'Old', 'sub-3', 0, 0)");
+    const g = await createGuest(sql, 2000);
+    const back = await signInWithIdentity(sql, g.user, "google", "sub-3", { email: "old@example.com" }, 3000);
+    expect(back.id).toBe("old");
+    expect(back.email).toBe("old@example.com");
+    // Never one already used by another account, and never an unverified one (the caller passes null).
+    const other = await signInWithIdentity(sql, null, "google", "sub-4", { email: "old@example.com" }, 4000);
+    expect(other.email).toBeNull();
+    expect((await signInWithIdentity(sql, null, "google", "sub-5", { email: null }, 5000)).email).toBeNull();
+  });
+
   it("email codes: one use, expiry, attempts and rate limits", async () => {
     const sql = memorySql();
     await ensureSchema(sql);
