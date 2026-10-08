@@ -14,6 +14,7 @@ import { toSan } from "@chessroyale/chess";
 import { d1Sql, ensureSchema, userFromToken, type Sql, type User } from "./accounts.ts";
 import { SESSION_COOKIE, readCookie, type AccountEnv } from "./api.ts";
 import { caseOf, decide, decideAppeal, purgeEvidence, type Appeal, type Case, type CaseMailer } from "./fairplay.ts";
+import { deepCheckRun, type DeepSearch } from "./fairplay-deep.ts";
 
 export interface AdminEnv extends AccountEnv {
   /**
@@ -133,6 +134,9 @@ export interface EvidenceMove {
   gap: number | null;
   thinkS: number;
   away: number;
+  /** The deep re-check: its best move (SAN) and the pick's rank among the candidates (1: its best), or null. */
+  deepBest: string | null;
+  deepRank: number | null;
 }
 
 function evidenceMove(m: FairMove): EvidenceMove {
@@ -162,6 +166,8 @@ function evidenceMove(m: FairMove): EvidenceMove {
     gap: m.gap,
     thinkS: Math.round(m.thinkMs / 100) / 10,
     away: m.away,
+    deepBest: m.deep ? san(m.deep.best) : null,
+    deepRank: m.deep?.rank ?? null,
   };
 }
 
@@ -239,7 +245,13 @@ const notFound = () => new Response("Not found", { status: 404, headers: { "cont
  * /admin/fairplay (the page) and /api/admin/fairplay/* (the API); null for other paths. `mail`: sends ban and
  * clearing emails (fairplay-mail.ts), when the Worker has a Resend key.
  */
-export async function handleAdmin(request: Request, env: AdminEnv, mail?: CaseMailer, waitUntil?: (p: Promise<unknown>) => void): Promise<Response | null> {
+export async function handleAdmin(
+  request: Request,
+  env: AdminEnv,
+  mail?: CaseMailer,
+  waitUntil?: (p: Promise<unknown>) => void,
+  deepSearch?: DeepSearch | null,
+): Promise<Response | null> {
   const url = new URL(request.url);
   const page = url.pathname === "/admin/fairplay" || url.pathname.startsWith("/admin/fairplay/");
   const api = url.pathname.startsWith("/api/admin/fairplay");
@@ -284,11 +296,21 @@ export async function handleAdmin(request: Request, env: AdminEnv, mail?: CaseMa
     const m = url.pathname.match(/^\/admin\/fairplay\/case\/([A-Za-z0-9_-]{1,64})$/);
     if (!m) return notFound();
     const action = String(form.get("action") ?? "");
-    const r =
-      action === "appeal"
-        ? await decideAppeal(sql, Number(form.get("appeal")), form.get("outcome"), by, form.get("reply"), now, mail)
-        : await decide(sql, m[1]!, action, by, form.get("reason"), now, { notice: form.get("notice"), mail });
-    const note = r.ok ? "Done." : r.message;
+    let note: string;
+    if (action === "deep") {
+      // The deep re-check of this player's matches now, whatever the hour (within the day's budget).
+      if (!deepSearch) note = "The engine server isn't available here.";
+      else {
+        const d = await deepCheckRun(sql, deepSearch, now, { all: true, userId: m[1]!, mail, perRun: 60 });
+        note = `Deep re-check: ${d.searches} searches, ${d.matches} matches done.`;
+      }
+    } else {
+      const r =
+        action === "appeal"
+          ? await decideAppeal(sql, Number(form.get("appeal")), form.get("outcome"), by, form.get("reply"), now, mail)
+          : await decide(sql, m[1]!, action, by, form.get("reason"), now, { notice: form.get("notice"), mail });
+      note = r.ok ? "Done." : r.message;
+    }
     return Response.redirect(`${url.origin}/admin/fairplay/case/${m[1]}?note=${encodeURIComponent(note)}`, 303);
   }
   const cm = url.pathname.match(/^\/admin\/fairplay\/case\/([A-Za-z0-9_-]{1,64})$/);
@@ -372,13 +394,13 @@ function casePage(d: CaseDetail, note: string | null): string {
     : "";
   const match = (m: CaseDetail["matches"][number]) => {
     const s = m.summary;
-    const head = `<b>${esc(m.mode)}</b> ${esc(m.lobby ?? "")} · ${when(m.playedAt)} · strength <b>${m.perf ?? "–"}</b> on ${m.counted} counted moves · score <b>${m.score}</b> (strength ${s.parts.perf}, jump ${s.parts.jump}, hard ${s.parts.hard}, streak ${s.parts.streak}, time ${s.parts.time}, look-aways ${s.parts.away}) · level ${esc(m.level)}
-  <br><span class="muted">avg loss ${s.avgLoss ?? "–"}, found ${s.found}/${s.counted}, run ${s.topStreak}; hard ${s.hardFinds}/${s.hard} (run ${s.hardStreak}, evidence ${s.hardEvidence}); fast hard ${s.fastHard}; time vs difficulty ${s.timeCorr ?? "–"}; look-aways ${s.awayFound}/${s.awayMoves} found</span>`;
+    const head = `<b>${esc(m.mode)}</b> ${esc(m.lobby ?? "")} · ${when(m.playedAt)} · strength <b>${m.perf ?? "–"}</b> on ${m.counted} counted moves · score <b>${m.score}</b> (strength ${s.parts.perf}, jump ${s.parts.jump}, evidence ${s.parts.evidence ?? 0}, streak ${s.parts.streak}, time ${s.parts.time}, look-aways ${s.parts.away}) · level ${esc(m.level)}
+  <br><span class="muted">avg loss ${s.avgLoss ?? "–"}, found ${s.found}/${s.counted}, run ${s.topStreak}; hard ${s.hardFinds}/${s.hard} (run ${s.hardStreak}); evidence ${s.evidence ?? "–"}; deep matches ${s.deepMatch ?? 0}/${s.deepChecked ?? 0}; fast hard ${s.fastHard}; time vs difficulty ${s.timeCorr ?? "–"}; look-aways ${s.awayFound}/${s.awayMoves} found</span>`;
     const rows = m.moves
-      ? `<div class="scroll"><table><tr><th>Move</th><th>Pick</th><th>Best</th><th>Loss</th><th>Crowd found</th><th>Near best</th><th>Think</th><th>Away</th><th>Counts</th></tr>${m.moves
+      ? `<div class="scroll"><table><tr><th>Move</th><th>Pick</th><th>Best</th><th>Loss</th><th>Crowd found</th><th>Near best</th><th>Think</th><th>Away</th><th>Deep</th><th>Counts</th></tr>${m.moves
           .map(
             (x) =>
-              `<tr class="${x.counted ? (x.crowdRate !== null && x.crowdRate < FAIRPLAY.signals.hardShare ? "hard" : "") : "skip"}"><td>${esc(x.moveNo)}</td><td>${esc(x.pick)}</td><td>${esc(x.best)}</td><td>${x.loss}</td><td>${x.crowdRate === null ? `– (${x.crowd})` : `${Math.round(x.crowdRate * 100)}% of ${x.crowd}`}</td><td>${x.near}</td><td>${x.thinkS} s</td><td>${x.away || ""}</td><td>${x.counted ? "yes" : esc(x.skip)}</td></tr>`,
+              `<tr class="${x.counted ? (x.crowdRate !== null && x.crowdRate < FAIRPLAY.signals.hardShare ? "hard" : "") : "skip"}"><td>${esc(x.moveNo)}</td><td>${esc(x.pick)}</td><td>${esc(x.best)}</td><td>${x.loss}</td><td>${x.crowdRate === null ? `– (${x.crowd})` : `${Math.round(x.crowdRate * 100)}% of ${x.crowd}`}</td><td>${x.near}</td><td>${x.thinkS} s</td><td>${x.away || ""}</td><td>${x.deepRank === null ? "" : x.deepRank === 1 ? "= engine" : `#${x.deepRank} (${esc(x.deepBest)})`}</td><td>${x.counted ? "yes" : esc(x.skip)}</td></tr>`,
           )
           .join("")}</table></div>`
       : `<p class="muted">Moves deleted (kept ${FAIRPLAY.evidenceDays} days for flagged or reported players).</p>`;
@@ -390,6 +412,7 @@ ${note ? `<div class="card">${esc(note)}</div>` : ""}
 <div class="card">Status: <b class="${esc(c?.status ?? "")}">${esc(c?.status ?? "no case")}</b> ${c ? `· ${esc(c.reason)} · updated ${when(c.updated_at)}${c.decided_by ? ` · last decided by ${esc(c.decided_by)}` : ""}` : ""}</div>
 ${appealForm}
 <h2>Decide</h2>${decision}
+<form class="row" method="post"><button name="action" value="deep">Check the counted moves with the engine server now</button></form>
 <p class="muted">Hard positions (fewer than ${Math.round(FAIRPLAY.signals.hardShare * 100)}% of the crowd found the best move) are in bold; greyed rows don't count (opening, forced, obvious, decided, power-up).</p>
 ${d.sameDevice.length ? `<h2>Same device</h2><p>${d.sameDevice.map((u) => `<a href="/admin/fairplay/case/${esc(u.id)}">${esc(u.name)}</a> (${esc(u.status ?? "no case")})`).join(", ")}</p>` : ""}
 <h2>Reports (${d.reports.length})</h2>${d.reports.length ? `<div class="card scroll"><table><tr><th>When</th><th>Reason</th><th>Match</th><th>By</th></tr>${d.reports

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   FAIRPLAY,
   crowdRate,
-  honestFindChance,
+  honestChance,
+  moveEvidence,
   matchPerf,
   matchSignals,
   playerLevel,
@@ -26,8 +27,9 @@ describe("which positions count", () => {
     expect(skipReason(mv({ ply: S.bookPlies - 1 }))).toBe("book");
     expect(skipReason(mv({ ply: S.bookPlies }))).toBeNull();
     expect(skipReason(mv({ legal: 1 }))).toBe("forced");
-    expect(skipReason(mv({ bestExp: 0.95 }))).toBe("decided");
-    expect(skipReason(mv({ bestExp: 0.04 }))).toBe("decided");
+    expect(skipReason(mv({ bestExp: 0.98 }))).toBe("decided");
+    expect(skipReason(mv({ bestExp: 0.95 }))).toBeNull();
+    expect(skipReason(mv({ bestExp: 0.02 }))).toBe("decided");
     expect(skipReason(mv({ powerUp: true }))).toBe("powerUp");
   });
 
@@ -56,13 +58,36 @@ describe("signals", () => {
     expect(matchPerf(Array(30).fill(0))!).toBeGreaterThan(ratingForLoss(2));
   });
 
-  it("an honest player finds what the crowd misses more often the stronger they are", () => {
-    const weak = honestFindChance(40, 2, 1500);
-    const strong = honestFindChance(40, 2, 2500);
-    expect(weak).toBeCloseTo(2.5 / 41, 3);
-    expect(strong).toBeGreaterThan(weak * 1.5);
-    expect(honestFindChance(40, 2, 2500, { ...S, hardSlope: 1 })).toBeGreaterThan(strong);
-    expect(honestFindChance(40, 38, 1500)).toBeGreaterThan(0.9);
+  it("an honest player's chance of the best move: from the crowd's rate, more for a stronger player, with a floor", () => {
+    const m = S.findDeep;
+    const weak = honestChance(40, 2, 1500, m, S.soloDeep);
+    const strong = honestChance(40, 2, 2700, m, S.soloDeep);
+    expect(strong).toBeGreaterThan(weak);
+    expect(honestChance(40, 30, 1500, m, S.soloDeep)).toBeGreaterThan(weak);
+    // Nobody in the crowd found it: a strong player still sometimes does (the floor).
+    expect(honestChance(40, 0, 2700, [1, 0, 0, 0, -1.5, 0], S.soloDeep)).toBeCloseTo(1 / (1 + Math.exp(1.5)), 5);
+    // Without a crowd: from strength alone.
+    expect(honestChance(3, 0, 1500, m, [-1, 0.5])).toBeCloseTo(1 / (1 + Math.exp(1)), 5);
+  });
+
+  it("evidence: the best move the crowd missed points to an engine; a pick outside the engine's top 3 points away", () => {
+    const deep = (rank: number) => mv({ crowdFound: 2, picks: { e2e4: 2, d2d4: 20, g1f3: 10 }, deep: { best: "e2e4", rank, loss: rank === 1 ? 0 : 6, top: ["e2e4", "d2d4", "g1f3"] } });
+    const hard = moveEvidence(deep(1), 2000);
+    const second = moveEvidence(deep(2), 2000);
+    const outside = moveEvidence(deep(5), 2000);
+    expect(hard.outcome).toBe(0);
+    expect(hard.evidence).toBeGreaterThan(0.5);
+    expect(second.outcome).toBe(1);
+    expect(outside.outcome).toBe(2);
+    expect(outside.evidence).toBeLessThan(-2);
+    expect(second.evidence).toBeGreaterThan(outside.evidence);
+    // An easy best move (most of the crowd picked it) is barely evidence.
+    const easy = moveEvidence(mv({ crowdFound: 35, picks: { e2e4: 35 }, deep: { best: "e2e4", rank: 1, loss: 0, top: ["e2e4"] } }), 2000);
+    expect(easy.evidence).toBeLessThan(0.3);
+    // Not deep-checked: the judges' best within a point, against cheatFind.
+    const judged = moveEvidence(mv({ loss: 0, crowdFound: 2 }), 2000);
+    expect(judged.evidence).toBeGreaterThan(0.5);
+    expect(moveEvidence(mv({ loss: 9, crowdFound: 30 }), 2000).evidence).toBeLessThan(0);
   });
 
   it("spearman: rank correlation, null without enough or without spread", () => {
@@ -72,7 +97,7 @@ describe("signals", () => {
     expect(spearman([1, 2, 3], [5, 5, 5])).toBeNull();
   });
 
-  it("an engine user: super-GM strength, hard finds, flat fast timing; an honest club player scores nothing", () => {
+  it("an engine user: strength, hard finds, flat fast timing; an honest club player scores nothing", () => {
     // 20 counted moves; every fourth position is hard (2 of 40 found it).
     const positions = Array.from({ length: 20 }, (_, i) => ({ ply: 14 + 2 * i, hard: i % 4 === 0 }));
     const engine = positions.map((p, i) => mv({ ply: p.ply, loss: 0, crowdFound: p.hard ? 2 : 24, thinkMs: 3000 + ((i * 1777) % 1900) }));
@@ -84,8 +109,7 @@ describe("signals", () => {
     expect(e.hardFinds).toBe(5);
     expect(e.hardStreak).toBe(5);
     expect(e.topStreak).toBe(20);
-    // (How much evidence hard finds give depends on the tuned model; with a modest one, five of five is plenty.)
-    expect(matchSignals(engine, null, { ...S, hardSlope: 0.6 }).hardEvidence).toBeGreaterThan(2);
+    expect(e.evidence).toBeGreaterThan(2);
     expect(e.fastHard).toBe(5);
     expect(e.parts.perf).toBe(FAIRPLAY.score.perfMax);
     expect(e.parts.time).toBeGreaterThan(0);
@@ -93,21 +117,20 @@ describe("signals", () => {
     const h = matchSignals(honest, null);
     expect(h.perf!).toBeLessThan(2000);
     expect(h.hardFinds).toBe(0);
-    expect(h.hardEvidence).toBeLessThan(0);
+    expect(h.evidence).toBeLessThan(0);
     expect(h.timeCorr!).toBeGreaterThan(0.5);
     expect(h.score).toBe(0);
   });
 
-  it("a strong player measured against their own strength: hard finds at their level aren't evidence", () => {
-    // 12 hard positions (2 of 40 found the best), 3 found: a little suspicious for a 1500, not for a 2500.
-    const moves = Array.from({ length: 12 }, (_, i) => mv({ ply: 14 + 2 * i, loss: i % 4 === 0 ? 0 : 12, crowdFound: 2 }));
-    const st = { ...S, hardSlope: 0.3, strengthCap: 2500 };
-    const asNew = matchSignals(moves, null, st);
-    const asStrong = matchSignals(moves, 2500, st);
-    expect(asNew.hardFinds).toBe(3);
-    expect(asNew.hardEvidence).toBeGreaterThan(0);
-    expect(asStrong.hardEvidence).toBeLessThan(0);
-    expect(asStrong.parts.hard).toBe(0);
+  it("a strong player measured against their own strength: finds at their level are less evidence", () => {
+    // Six hard finds with a so-so match around them: measured against a new player's strength, and a 2700's.
+    const moves = Array.from({ length: 12 }, (_, i) => mv({ ply: 14 + 2 * i, loss: i % 2 === 0 ? 0 : 12, crowdFound: i % 2 === 0 ? 2 : 30 }));
+    const asNew = matchSignals(moves, null);
+    const asStrong = matchSignals(moves, 2700);
+    expect(asNew.hardFinds).toBe(6);
+    const finds = (ref: number) => moves.filter((x) => x.loss === 0).reduce((t, x) => t + moveEvidence(x, ref).evidence, 0);
+    expect(finds(2700)).toBeLessThan(finds(Math.max(1500, asNew.perf!)));
+    expect(asStrong.evidence).toBeLessThan(asNew.evidence + 3);
   });
 
   it("a jump far above the player's own history adds points", () => {
@@ -131,6 +154,19 @@ describe("signals", () => {
     expect(matchSignals(random, null).parts.away).toBe(0);
   });
 
+  it("the deep re-check: picks matching its best far more often than a strong player's would are evidence", () => {
+    const moves = Array.from({ length: 12 }, (_, i) =>
+      mv({ ply: 14 + 2 * i, loss: 0.5, crowdFound: 12, picks: { e2e4: 12, d2d4: 15 }, deep: { best: "e2e4", rank: i < 11 ? 1 : 2, loss: i < 11 ? 0 : 3, top: ["e2e4", "d2d4", "g1f3"] } }),
+    );
+    const s = matchSignals(moves, null);
+    expect([s.deepChecked, s.deepMatch, s.deepTop3]).toEqual([12, 11, 12]);
+    expect(s.deepLoss).toBe(0.25);
+    expect(s.evidence).toBeGreaterThan(2);
+    // Like a strong player (the engine's best a third of the time, often outside its top 3): evidence the other way.
+    const human = moves.map((x, i) => ({ ...x, deep: { ...x.deep!, rank: i % 3 === 0 ? 1 : 5, loss: i % 3 === 0 ? 0 : 6 } }));
+    expect(matchSignals(human, null).evidence).toBeLessThan(-5);
+  });
+
   it("reference strength: the median of 3+ recent match strengths, else the rating", () => {
     expect(referenceStrength([1800, null, 2000, 1900], 1500)).toBe(1900);
     expect(referenceStrength([1800, 2000], 1500)).toBe(1500);
@@ -144,6 +180,7 @@ describe("levels", () => {
   const now = 100 * day;
   const m = (score: number, perf = 2000, counted = 15, daysAgo = 1) => ({ score, perf, counted, at: now - daysAgo * day });
 
+
   it("watch, then review on one high match or two adding up", () => {
     expect(playerLevel([], now).level).toBe("none");
     expect(playerLevel([m(L.watch - 0.1)], now).level).toBe("none");
@@ -154,14 +191,17 @@ describe("levels", () => {
     expect(playerLevel([m(L.reviewOne, 2000, 15, L.windowDays + 1)], now).level).toBe("none");
   });
 
-  it("bans only on overwhelming evidence: super-GM strength over two matches with high scores, or one match past every bar", () => {
-    const strong = m(L.banScore, L.banPerf, L.banCounted);
+  it("bans only on overwhelming evidence from deep-checked matches: two adding up past the bars, or one past every bar", () => {
+    const strong = { ...m(L.banEvidence, L.banPerf), evidence: L.banEvidence / 2, deepChecked: L.banDeepChecked / 2, deepMatch: Math.ceil((L.banDeep * L.banDeepChecked) / 2) };
     expect(playerLevel([strong], now).level).toBe("review");
-    expect(playerLevel([strong, strong], now).level).toBe("ban");
-    // Not on too few counted moves, too low a strength or too low a score.
-    expect(playerLevel([strong, m(L.banScore, L.banPerf, L.banCounted - 1)], now).level).toBe("review");
-    expect(playerLevel([strong, m(L.banScore, L.banPerf - 1, L.banCounted)], now).level).toBe("review");
-    expect(playerLevel([strong, m(L.banScore - 0.1, L.banPerf, L.banCounted)], now).level).toBe("review");
-    expect(playerLevel([m(L.banOneScore, L.banOnePerf, L.banOneCounted)], now)).toMatchObject({ level: "ban", reasons: [expect.stringMatching(/one match/)] });
+    expect(playerLevel([strong, strong], now)).toMatchObject({ level: "ban", reasons: [expect.stringMatching(/2 deep-checked matches/)] });
+    // Not without the deep re-check, nor short of any bar.
+    expect(playerLevel([strong, { ...strong, deepChecked: 0, deepMatch: 0 }], now).level).not.toBe("ban");
+    expect(playerLevel([strong, { ...strong, evidence: L.banEvidence / 2 - 0.1 }], now).level).not.toBe("ban");
+    expect(playerLevel([strong, { ...strong, deepChecked: L.banDeepChecked / 2 - 1, deepMatch: L.banDeepChecked / 2 - 1 }], now).level).not.toBe("ban");
+    expect(playerLevel([strong, { ...strong, deepMatch: 0 }], now).level).not.toBe("ban");
+    expect(playerLevel([{ ...strong, perf: L.banPerf - 1 }, { ...strong, perf: L.banPerf - 1 }], now).level).not.toBe("ban");
+    const one = { ...m(L.banOneEvidence, L.banOnePerf), evidence: L.banOneEvidence, deepChecked: L.banOneDeepChecked, deepMatch: Math.ceil(L.banOneDeep * L.banOneDeepChecked) };
+    expect(playerLevel([one], now)).toMatchObject({ level: "ban", reasons: [expect.stringMatching(/one match/)] });
   });
 });

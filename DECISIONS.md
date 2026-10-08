@@ -2561,6 +2561,68 @@ should be banned; and a report system. Built by the `fairplay` delegate (`.claud
   (a guest), or no Resend key: nothing is sent.
 - **Every number** is in `FAIRPLAY` (settings.ts).
 
+**The deep re-check, the evidence model and the thresholds** (step 4: simulated, then detection switched on)
+- **Why a deep re-check.** The first simulation runs showed the judges' own numbers can't catch an engine user fast: a
+  Crowd finalist makes only about 10 counted picks a match, and the judges search far less deeply than a cheater's
+  engine app, so even a perfect copier "loses" a point or two a move by our judges' numbers (their match strength came
+  out around 2300-2600 on our scale, not super-GM). What separates them is agreement with a strong engine: an engine
+  user picks a strong engine's best move nearly every time, a 2700 player a third to a half of the time. So a flagged
+  player's counted moves are searched again on the engine server (`fairplay-deep.ts`: native Stockfish 17.1, the full
+  network, 2M nodes, restricted to the judges' top 8 moves and the pick), and **a ban needs that confirmation**.
+  - Eric's computing rule (Oct 8): the server's own record and engine, never a device's say-so; the heavy work runs
+    from the Worker's schedule (every 15 minutes: cases in review at once, the rest off-peak, 03-10 UTC), on its own
+    container instance (`fairplay-1`, so a match's re-checks never wait behind it; inside `max_instances` 2) and its
+    own budget (`FAIRPLAY.deep.dailySearches`, 500 a day: about 25 minutes of one instance, under $0.10).
+  - Queued (an indexed flag): every match still kept of a player with a match scoring 2+, or with an open case. Earlier
+    matches are checked too: an honest-looking one counts in their favour.
+  - The review page has a button to run it on one player at once.
+- **The evidence model** (`moveEvidence`): for each counted pick, the log-likelihood that an engine user made it
+  rather than an honest player of the player's own strength (the higher of their history and this match, capped at
+  2700). The crowd says how hard the move was: an honest player's chance of picking the deep re-check's best (or one
+  of its top 3) comes from how many of the other people in that position picked it, adjusted for strength
+  (`honestChance`, fitted on the simulation's honest players, with a floor: strong players sometimes find what nobody
+  in the crowd did). An engine user picks our best 85% of the time and our top 3 almost always (its engine can differ
+  from ours). So the best move the crowd missed is strong evidence, an easy best move is barely any, and a pick outside
+  the engine's top 3 counts strongly the other way. Before the deep re-check, the judges' best within a point stands in;
+  without a crowd (mostly bots), strength alone sets the honest chance.
+  - The first, simpler model (the crowd's rate shifted by strength) was miscalibrated: strong honest players find
+    crowd-missed moves far more often than it said (a 2700: 20% where it said 6%), which gave honest strong players
+    false evidence. The fitted model's calibration table is in `reports/fairplay.md`.
+- **Changed from step 2 after the simulation:** the opening is the first 8 plies (was 12) and only positions past 97%
+  either way count as decided (was 90%): Crowd games are often lopsided early, and engine-like play there is still
+  evidence. The score's parts are strength (points from 2600), a jump above history, evidence, a run of found moves,
+  timing and look-aways.
+- **The thresholds** (`FAIRPLAY.levels`): watch at a match score of 3; **review** at 8 in one match or 12 over two
+  (results held until a person or the reviewer clears them); **auto-ban** only from deep-checked matches (8+ checked
+  moves each): two or more whose evidence adds up to 9+, with 16+ moves checked, 80%+ of them the engine's best and a
+  best match strength of 2200+; or one match with evidence 11+, 12+ moves checked, 90%+ the engine's best, strength
+  2400+.
+- **What they do** (`reports/fairplay.md`: 10,000 honest players per strength from 1200 to 2700 and 2,500 cheaters
+  per type, 5 Crowd 50 v 50 matches each):
+
+  | | Review within 1 / 2 / 5 matches | Ban within 1 / 2 / 5 matches |
+  | --- | --- | --- |
+  | Full engine user (top move, 3-12 s) | 45% / 73% / 98% | 5% / 47% / 89% |
+  | Engine only in hard positions | 8% / 19% / 53% | 0.1% / 5% / 12% |
+  | Engine when its own move is a mistake | 2% / 6% / 18% | 0% / 0.5% / 1.5% |
+  | Engine's 1st/2nd/3rd choice blended | 2% / 5% / 22% | 0% / 0% / 0.2% |
+  | Engine on 20-40% of moves | under 0.5% / 0.5% / 2.4% | 0 |
+  | Honest players, per 1,000 (within 5) | 0.3 (1500), 2.9 (2000), 7.7 (2400), 26 (2700) | 1 of 90,000 (at 2200) |
+
+  - With few people in the match (no crowd rates): full engine users reviewed 96% and banned 87% within 5 matches;
+    honest strong players 1 ban in 25,000.
+  - A more aggressive bar (evidence 8, 75%) bans 52% / 96% of full engine users within 2 / 5 matches but 3 honest
+    players in 90,000; I chose the stricter one, as Eric asked for a tiny false-ban rate, with Review (results held)
+    as the fast path: 73% of full engine users within 2 matches.
+  - A cheater using the engine on a fifth to two fifths of moves plays like a stronger honest player; no move-by-move
+    statistic tells them apart in a few matches. Reports (three in a week put them in review) and a strength far above
+    their own history are what catch them.
+- **Switched on:** `FAIRPLAY.enforcement: "ban"`. Detection opens reviews and bans on the evidence above, with an
+  email and an appeal. The automated reviewer (`docs/fairplay-reviewer.md`) works the reviews.
+- **What the simulation can't tell:** honest players are Stockfish at lower strength, not people; the cheater's engine
+  agreement (85%) and the timing model are assumptions. So bans need the deep re-check and stay at the strict bar.
+  Refit `honestChance` from real cleared players once there are enough, and re-run the simulation.
+
 ## Deep checks on players' computers (Oct 8, 2026; built, ships off)
 
 Eric's idea, via the director: have two fast computers re-check the close calls before a cut instead of the engine

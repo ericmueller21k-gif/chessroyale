@@ -44,6 +44,8 @@
     { "pattern": "www.hunchess.com", "custom_domain": true }
   ],
   "observability": { "enabled": true },
+  // Fair play's deep re-check of flagged players' moves (packages/server/src/fairplay-deep.ts).
+  "triggers": { "crons": ["*/15 * * * *"] },
   // Keep variables set in the dashboard when a deploy runs (otherwise each deploy would wipe plain-text ones).
   "keep_vars": true,
   "env": {

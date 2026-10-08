@@ -120,37 +120,6 @@ describe("appeals", () => {
   });
 });
 
-describe("detection that bans (enforcement: ban)", () => {
-  it("bans on overwhelming evidence and emails the player", async () => {
-    const { sql } = memoryDb();
-    await ensureSchema(sql);
-    const p = await player(sql, "Cheat");
-    const { sent, mail } = mailbox();
-    const saved = FAIRPLAY.enforcement;
-    (FAIRPLAY as { enforcement: string }).enforcement = "ban";
-    try {
-      const L = FAIRPLAY.levels;
-      // Two matches past the bars (forced through the summary: strength and score are what the rule reads).
-      await sql.run(
-        "INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary) VALUES (?, 'AAAAA', 'crowd', ?, ?, ?, ?, 'review', '{}')",
-        p.id,
-        50 * DAY,
-        L.banCounted,
-        L.banPerf,
-        L.banScore,
-      );
-      const r = await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: picks(24) }, 50 * DAY + 3_600_000, mail);
-      if (r.summary.perf! >= L.banPerf && r.summary.score >= L.banScore && r.summary.counted >= L.banCounted) {
-        expect(r.acted).toBe("ban");
-        expect((await caseOf(sql, p.id))?.status).toBe("banned");
-        expect(sent.map((s) => s.kind)).toEqual(["banned"]);
-      } else expect(r.acted).not.toBe("ban");
-    } finally {
-      (FAIRPLAY as { enforcement: string }).enforcement = saved;
-    }
-  });
-});
-
 describe("emails", () => {
   it("say what happened and how to appeal, from fairplay@ the sign-in emails' domain; nothing without a key or an address", async () => {
     expect(fairplayFrom({ EMAIL_FROM: "HunChess <login@hunchess.com>" })).toBe("HunChess <fairplay@hunchess.com>");
@@ -258,6 +227,29 @@ describe("the review page and the reviewer's API", () => {
     // Names are escaped.
     await w.sql.run("UPDATE users SET name = '<b>x</b>' WHERE id = ?", w.cheat.id);
     expect(await (await w.call(`/admin/fairplay/case/${w.cheat.id}`, { cookie: w.ericCookie }))!.text()).toContain("&lt;b&gt;x&lt;/b&gt;");
+  });
+});
+
+describe("the review page's deep re-check button", () => {
+  it("runs the deep re-check on that player's matches now, whatever the hour", async () => {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql, d1);
+    const eric = await player(sql, "Eric", "eric@example.com");
+    const cheat = await player(sql, "Cheat", "cheat@example.com");
+    await recordFairPlay(sql, cheat.id, { lobby: "AAAAA", mode: "crowd", moves: picks(12) }, Date.now() - 1000);
+    const cookie = `hc_session=${await createSession(sql, eric.id, Date.now())}`;
+    const searched: string[][] = [];
+    const search = async (_fen: string, moves: readonly string[]) => (searched.push([...moves]), moves.map((m) => ({ move: m, expected: m === "a1a2" ? 0.6 : 0.5 })));
+    const res = (await handleAdmin(
+      new Request(`https://hunchess.test/admin/fairplay/case/${cheat.id}`, { method: "POST", body: new URLSearchParams({ action: "deep" }), headers: { cookie, origin: "https://hunchess.test", "content-type": "application/x-www-form-urlencoded" } }),
+      { DB: d1, ADMIN_EMAILS: "eric@example.com" },
+      undefined,
+      undefined,
+      search,
+    ))!;
+    expect(res.status).toBe(303);
+    expect(decodeURIComponent(res.headers.get("location")!)).toContain("Deep re-check: 12 searches, 1 matches done.");
+    expect(searched).toHaveLength(12);
   });
 });
 

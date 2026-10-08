@@ -810,7 +810,7 @@ export const FAIRPLAY = {
    * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports, admins and the
    * automated reviewer act whatever this says.
    */
-  enforcement: "watch" as "watch" | "review" | "ban",
+  enforcement: "ban" as "watch" | "review" | "ban",
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts towards an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
@@ -829,12 +829,30 @@ export const FAIRPLAY = {
   /** Entering review holds the player's online results from this many days back (the matches that put them there). */
   holdBackDays: 7,
   /**
-   * Signals (core/fairplay.ts): which positions count, and what each signal measures. Starting values; the
-   * simulation (reports/fairplay.md) tunes them.
+   * The deep re-check (server/fairplay-deep.ts): a flagged player's counted moves searched again on the engine server
+   * (native Stockfish, the full network), restricted to the judges' top moves and the pick. "Deep match": the pick is
+   * the deep search's best. Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
+   * budget of its own (its own container instance, so matches never wait behind it).
+   */
+  deep: {
+    nodes: 2_000_000,
+    /** Matches queued for it: a match scoring this much, or any match of a player with an open case or a report. */
+    queueScore: 2,
+    /** Searches a day, and per scheduled run. */
+    dailySearches: 500,
+    perRun: 40,
+    /** Off-peak hours (UTC, from-to): watch cases are checked only then; reviews any time. */
+    offPeakUtc: [3, 10] as readonly [number, number],
+    /** The candidate moves searched: the judges' best this many, plus the pick. */
+    candidates: 8,
+  },
+  /**
+   * Signals (core/fairplay.ts): which positions count, and what each signal measures. Tuned by the simulation
+   * (reports/fairplay.md).
    */
   signals: {
-    /** The opening: plies from the starting position that never count (6 moves each). */
-    bookPlies: 12,
+    /** The opening: plies from the starting position that never count (4 moves each). */
+    bookPlies: 8,
     /** A pick within this many points of the best found it. */
     foundLoss: 1,
     /** Position complexity: moves within this many points of the best (of those the judges scored). */
@@ -844,24 +862,39 @@ export const FAIRPLAY = {
     /** Only moves and recaptures are skipped when at least this share of the crowd found them, or there's no crowd. */
     obviousShare: 0.5,
     /** Already won or lost: the best move's expected score is below this or above 1 minus it. */
-    decided: 0.1,
-    /** The crowd-found rate needs at least this many other people picking (not practising, no power-up). */
+    decided: 0.03,
+    /** The crowd's rates need at least this many other people picking (not practising, no power-up). */
     minCrowd: 8,
     /** A hard position: fewer than this share of the crowd found the best move. */
     hardShare: 0.1,
     /** Match strength: the engine rating over counted moves, starting as if this many 1500-level moves came first. */
     perfPriorMoves: 4,
-    /** How much better than the crowd a player of a given strength finds moves: log-odds per 400 rating points. */
-    hardSlope: 0.3,
-    /** The crowd's typical strength (the hard-find model's reference). */
+    /**
+     * The evidence model (core/fairplay.ts, honestChance), fitted on the simulation's honest players: [g0, g1, d0, d1]
+     * with a crowd, [a, b] without, for the judges' best and for the deep re-check's best.
+     */
+    findJudge: [0.88, -0.08, -0.13, 0.22, -3.27, 0.8] as readonly number[],
+    findDeep: [0.8, -0.14, -0.3, 0.06, -4, 0.9] as readonly number[],
+    /** The same for the pick being in the deep re-check's top 3 (from the crowd's share of those three). */
+    findDeep3: [0.86, -0.09, -0.02, 0.3] as readonly number[],
+    soloFound: [-0.53, 0.24] as readonly number[],
+    soloDeep: [-1.17, 0.2] as readonly number[],
+    soloDeep3: [0.29, 0.26] as readonly number[],
+    /** The old shift model's slope (log-odds per 400 rating points), kept for the report's comparison. */
+    hardSlope: 0.24,
     crowdRating: 1500,
     /**
-     * Hard finds are measured against an honest player of the player's own strength (the higher of their history and
-     * this match), but never stronger than this: past it, finding what the crowd misses is itself the evidence.
+     * The honest strength a player's picks are measured against: the higher of their own history and this match, but
+     * never stronger than this (past it, picking like an engine is itself the evidence).
      */
-    strengthCap: 2500,
-    /** Hard finds: evidence that a player finds moves like an engine user, who finds a move the crowd misses this often. */
-    cheatFind: 0.5,
+    strengthCap: 2700,
+    /** An engine user picks the judges' best at least this often, wherever the crowd stands (the evidence's other side). */
+    cheatFind: 0.8,
+    /**
+     * An engine user's picks against the deep re-check: its best this often, one of its next two, neither (its own
+     * engine, depth or version can differ from ours).
+     */
+    cheatDeep: [0.85, 0.13, 0.02] as readonly [number, number, number],
     /** Timing: a hard find this fast is suspicious; timing needs this many counted moves with a crowd. */
     fastHardMs: 5_000,
     minTimed: 8,
@@ -872,16 +905,16 @@ export const FAIRPLAY = {
   score: {
     /** Match strength: points per `perfPer` rating above `perfFrom`, once `minCounted` moves count. */
     minCounted: 8,
-    perfFrom: 2400,
+    perfFrom: 2600,
     perfPer: 100,
-    perfMax: 10,
+    perfMax: 6,
     /** A jump: this far above the player's own history (3+ matches) or rating. */
     jumpFrom: 500,
     jumpPer: 200,
     jumpMax: 3,
-    /** Hard finds: points per unit of evidence (log-likelihood, see FAIRPLAY.signals.cheatFind). */
-    hardPer: 0.8,
-    hardMax: 8,
+    /** Evidence (the log-likelihood that the picks are an engine's rather than an honest player's): points per unit. */
+    evidencePer: 1,
+    evidenceMax: 14,
     /** A run of found moves (counted ones) this long or longer. */
     streakFrom: 10,
     streakPer: 0.5,
@@ -902,18 +935,24 @@ export const FAIRPLAY = {
     windowMatches: 10,
     watch: 3,
     /** Review: one match this high, or the best two adding up to this. */
-    reviewOne: 7,
-    reviewTwo: 10,
+    reviewOne: 8,
+    reviewTwo: 12,
     /**
-     * Auto-ban (overwhelming evidence only): `banMatches` matches in the window each at match strength `banPerf` or
-     * more on `banCounted` counted moves, with a score of `banScore` or more; or one match past all the `banOne*` bars.
+     * Auto-ban: only overwhelming evidence, and only from matches the deep re-check has gone through (`banMatchChecked`
+     * moves or more each). Either at least `banMatches` such matches in the window whose evidence adds up to `banEvidence`, with `banDeepChecked` moves
+     * checked among them, a deep-match share of `banDeep` and a best match strength of `banPerf`; or one match past
+     * every `banOne*` bar.
      */
     banMatches: 2,
-    banPerf: 2900,
-    banCounted: 10,
-    banScore: 12,
-    banOnePerf: 3200,
-    banOneCounted: 14,
-    banOneScore: 20,
+    /** (A match counts towards a ban only with this many of its moves deep-checked.) */
+    banMatchChecked: 8,
+    banEvidence: 9,
+    banDeepChecked: 16,
+    banDeep: 0.8,
+    banPerf: 2200,
+    banOneEvidence: 11,
+    banOneDeepChecked: 12,
+    banOneDeep: 0.9,
+    banOnePerf: 2400,
   },
 } as const;

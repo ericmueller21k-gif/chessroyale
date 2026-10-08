@@ -17,12 +17,13 @@ Eric's first look".
 | What | Where |
 | --- | --- |
 | Signals, the suspicion score and levels (pure, tested) | `packages/core/src/fairplay.ts`; every threshold in `FAIRPLAY` in `settings.ts` |
-| Recording each human pick's signals during a match | `packages/server/src/lobby.ts` (only the recording: `fairNote`, the `fair` record) |
-| Reports, flags, bans, appeals, device markers, `eligibleForRanked` | `packages/server/src/fairplay.ts` (D1 tables, API) |
+| Recording each human pick's signals during a match | `packages/server/src/lobby.ts` (only the recording: `noteFair`, the `fair` record) |
+| Reports, flags, bans, appeals, device markers, `eligibleForRanked` | `packages/server/src/fairplay.ts` (D1 tables in `fairplay-schema.ts`), emails in `fairplay-mail.ts` |
+| The deep re-check on the engine server (scheduled, its own budget and instance) | `packages/server/src/fairplay-deep.ts`, `fairplay-engine.ts`; the cron in `wrangler.jsonc`, `scheduled()` in `index.ts` |
 | Enforcing bans (PLAY, lobbies, the lobby's hello) | small checks in `index.ts`, `lobby-do.ts` |
-| The review page | `packages/server/src/admin.ts` at `/admin/fairplay` (server-rendered, admin emails only) |
+| The review page and the reviewer's API | `packages/server/src/admin.ts` at `/admin/fairplay` and `/api/admin/fairplay/*`; the reviewer's brief `docs/fairplay-reviewer.md` |
 | The report sheet, the ban notice and appeal form, the look-away counter | `packages/app` (the report sheet in `PlayerProfile.tsx`, `components/FairPlay.tsx`, `net.ts`'s pick) |
-| Cheater and honest-player simulations | `packages/sim/scripts/fairplay-*.ts` → `reports/fairplay.md` |
+| Cheater and honest-player simulations | `packages/sim/scripts/fairplay-bank.ts` (the position bank, `packages/sim/data/`), `fairplay-sim.ts` → `reports/fairplay.md` |
 
 Not yours:
 - how moves are scored (`engine`), ratings and ranked (`ranked`: it calls `eligibleForRanked`), profiles and the
@@ -37,6 +38,9 @@ Not yours:
   (`packages/sim/scripts/fairplay-sim.ts`): catch rates per cheater type within 1, 2 and 5 matches, and false flags
   and false bans per 1,000 honest players at every strength, strong honest players included. Tables in
   `reports/fairplay.md`, a summary in DECISIONS. Borderline cases go to Review (a person), not a ban.
+- **A ban needs the deep re-check.** Detection's own bans come only from matches the engine server has searched again;
+  the judges' quick numbers can open a review, never a ban. Refit the evidence model (`honestChance`) from real
+  cleared players once there are enough, and re-run the simulation.
 - **Privacy.** No invasive fingerprinting. Admin emails live in a Worker variable or secret, never in the repo.
 - **Ship per CLAUDE.md:** unit tests for every signal and the score, lobby and API tests, e2e for reporting and a
   banned account.
