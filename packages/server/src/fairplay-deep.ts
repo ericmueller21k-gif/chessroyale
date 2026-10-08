@@ -7,37 +7,14 @@
  * Eric's computing rule: the game first, then players' devices, then our servers where truly needed. Detection uses
  * the server's own record of each match and the server's own engine, never a device's say-so; and this heavy work
  * runs from the Worker's schedule: cases in review at once, the rest off-peak, within its own daily budget, on its own
- * container instance ("fairplay-1"), so a match's re-checks never wait behind it.
+ * container instance ("fairplay-1", fairplay-engine.ts), so a match's re-checks never wait behind it.
  */
-import { getContainer } from "@cloudflare/containers";
 import { FAIRPLAY, matchSignals, referenceStrength, skipReason, type FairMove } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { relevel, type CaseMailer } from "./fairplay.ts";
-import type { EngineEnv } from "./engine.ts";
 
 /** One deep search over some moves: each one's expected score (the mover's), or null when the server can't answer. */
 export type DeepSearch = (fen: string, moves: readonly string[]) => Promise<{ move: string; expected: number }[] | null>;
-
-const TIMEOUT_MS = 20_000;
-
-/** The engine server's own instance for fair play (null without one: local runs, the e2e suite). */
-export function containerSearch(env: EngineEnv): DeepSearch | null {
-  if (!env.ENGINE || env.ENGINE_OFF === "1") return null;
-  return async (fen, moves) => {
-    try {
-      const stub = getContainer(env.ENGINE!, "fairplay-1");
-      const res = await Promise.race([
-        stub.fetch("http://engine/score", { method: "POST", body: JSON.stringify({ fen, moves: [...new Set(moves)], nodes: FAIRPLAY.deep.nodes }) }),
-        new Promise<null>((r) => setTimeout(() => r(null), TIMEOUT_MS)),
-      ]);
-      if (!res || !res.ok) return null;
-      const body = (await res.json()) as { moves?: { move: string; expected: number }[] };
-      return Array.isArray(body.moves) && body.moves.length ? body.moves : null;
-    } catch {
-      return null;
-    }
-  };
-}
 
 /** Takes one search from today's budget; false once it's spent. */
 async function takeBudget(sql: Sql, now: number): Promise<boolean> {

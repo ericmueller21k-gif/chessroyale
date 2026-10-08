@@ -9,7 +9,8 @@ import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccoun
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, type AdminEnv } from "./admin.ts";
-import { containerSearch, deepCheckRun } from "./fairplay-deep.ts";
+import { deepCheckRun } from "./fairplay-deep.ts";
+import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";

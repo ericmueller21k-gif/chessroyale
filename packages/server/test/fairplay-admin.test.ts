@@ -230,6 +230,29 @@ describe("the review page and the reviewer's API", () => {
   });
 });
 
+describe("the review page's deep re-check button", () => {
+  it("runs the deep re-check on that player's matches now, whatever the hour", async () => {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql, d1);
+    const eric = await player(sql, "Eric", "eric@example.com");
+    const cheat = await player(sql, "Cheat", "cheat@example.com");
+    await recordFairPlay(sql, cheat.id, { lobby: "AAAAA", mode: "crowd", moves: picks(12) }, Date.now() - 1000);
+    const cookie = `hc_session=${await createSession(sql, eric.id, Date.now())}`;
+    const searched: string[][] = [];
+    const search = async (_fen: string, moves: readonly string[]) => (searched.push([...moves]), moves.map((m) => ({ move: m, expected: m === "a1a2" ? 0.6 : 0.5 })));
+    const res = (await handleAdmin(
+      new Request(`https://hunchess.test/admin/fairplay/case/${cheat.id}`, { method: "POST", body: new URLSearchParams({ action: "deep" }), headers: { cookie, origin: "https://hunchess.test", "content-type": "application/x-www-form-urlencoded" } }),
+      { DB: d1, ADMIN_EMAILS: "eric@example.com" },
+      undefined,
+      undefined,
+      search,
+    ))!;
+    expect(res.status).toBe(303);
+    expect(decodeURIComponent(res.headers.get("location")!)).toContain("Deep re-check: 12 searches, 1 matches done.");
+    expect(searched).toHaveLength(12);
+  });
+});
+
 describe("the player's side of the API", () => {
   it("/api/me gives the device a marker; a banned account sees its status and appeals", async () => {
     const { sql, d1 } = memoryDb();

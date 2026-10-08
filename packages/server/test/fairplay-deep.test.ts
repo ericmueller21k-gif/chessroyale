@@ -52,8 +52,8 @@ describe("the deep re-check", () => {
       { move: "b", expected: 0.58 },
       { move: "c", expected: 0.5 },
     ];
-    expect(deepResult("a", scores)).toEqual({ best: "a", rank: 1, loss: 0 });
-    expect(deepResult("c", scores)).toEqual({ best: "a", rank: 3, loss: 10 });
+    expect(deepResult("a", scores)).toEqual({ best: "a", rank: 1, loss: 0, top: ["a", "b", "c"] });
+    expect(deepResult("c", scores)).toEqual({ best: "a", rank: 3, loss: 10, top: ["a", "b", "c"] });
     expect(deepResult("z", scores)).toBeNull();
   });
 
