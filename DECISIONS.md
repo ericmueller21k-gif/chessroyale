@@ -2924,3 +2924,90 @@ end to end: sprite, portrait, animations, sounds, lines, and where he stands.
 - **Bosses jumping to the centre of the board to cast something** (an ability's wind-up), the way the God King leaps
   onto the board.
 - **More bosses drawn from Eric's references:** a farmer with a string trimmer, and a gingerbread man with a candy cane.
+
+## Boss powers and the boss raid rework (design, Oct 8, 2026; not built yet)
+
+Eric's design, with the director's review folded in and Eric's answers to its questions. Names are placeholders for
+the kind of boss. Nothing here is built yet; when it is, each part gets its own section.
+
+**The raid itself**
+- **A random boss every match, at the lobby's strength.** The lobby's strength sets how strong the boss plays; which
+  boss you meet is random, drawn from a shuffled deck per player so you meet every boss before any repeats. The threat
+  skulls still show how hard this one is.
+- **Each boss has an opening or passive ability and one ultimate.** A boss with nastier powers plays a little weaker
+  underneath (a per-boss strength offset), so every boss is about equally beatable.
+- **Self-balancing, not simulations** (Eric: don't burn tokens on balance testing): the game records how often the crowd
+  beats each boss and nudges that boss's offset toward a target win rate. Rules get cheap unit tests (no power may leave
+  zero legal moves or an illegal position); balance comes from real games.
+- **Banners:** every boss power uses the God King's banner style: the boss on the left, the moment in the middle, your
+  side's king or the God King on the right.
+- **Ultimates are telegraphed:** a rage meter in the boss bar fills as the boss loses material; when full, a one-turn
+  warning, then the ultimate. Once per match. (A proposal; some ultimates have their own trigger, below.)
+
+**Ground rules for every power**
+1. **The judge plays by the same rules as the crowd.** A power that limits moves tells the judge which moves are
+   allowed, and the best move is chosen from those (Stockfish's `searchmoves`). A moment that can't be judged fairly is
+   not scored (a blind turn, a move the boss plays for you).
+2. **A power never leaves you without a legal move and never breaks check.** If a restriction would leave no legal move,
+   or the only escape from check is a restricted piece, it lifts for that turn. The king is never frozen, burned or
+   removed.
+3. **The server decides every power,** from the match's seed and state, so everyone online sees the same thing and no
+   device can tamper with it.
+4. **Fair play skips power turns:** forced or restricted moves, duels and blind turns don't count as detection signals.
+
+**The bosses**
+- **Fire.** Passive: tiles catch fire under your pieces only (his pieces never burn), with a 3-2-1 countdown; a piece
+  still on the tile at 0 is destroyed. At most 1-2 tiles at a time, never under the king; sliding pieces may pass over.
+  The judge treats a piece about to burn as already gone, so saving it is never scored as a mistake. Ultimate: when the
+  engine finds a forced mate for the crowd in 3-5, the whole board catches fire: find the mate within its length + 2
+  moves or lose (the + 2 is the director's suggestion; Eric's note said + 1).
+- **Sludge.** Opening, both sides: pawns can't make the double step; rooks and bishops move only one square on their
+  first move, then the sludge is gone. (No double steps also means no en passant.) Ultimate, your pieces only: a sludge
+  flood: for 2 turns your rooks, bishops and queen move at most one square.
+- **Zombie.** Passive: 1-2 of his pieces have two lives, shown with a glow; when captured, a piece comes back on its
+  starting square, or the nearest empty one on his back row. Pawns can't stand on the back row, so they come back on
+  their starting rank. A respawn never gives check. Ultimate: the next piece he captures rises on his side; a queen never
+  rises as a queen (a knight or bishop at most).
+- **Reflect.** Opening: he mirrors your move for the first 5 turns, unless it's impossible or would walk into mate in 1
+  or hang his queen. Ultimate: for 5 turns you must move the same type of piece he just moved. He only plays a type you
+  still have and can legally move; it ends early if you have none. If he moves his king you're free that turn, and in
+  check any legal escape is allowed.
+- **Freeze.** Passive: freezes one of your pieces (never the king) for 2 turns; a frozen piece still defends and gives
+  check. Ultimate, the blizzard: a cold sweep of cloud and snow crosses the board, every piece ices over except your
+  queen, and the God King says a line (several variants) like "Looks like our queen withstood the storm!", hinting she's
+  the one to move. One turn, then the ice melts. If you have no queen, or she can't move, your king may move instead.
+- **The Challenger.** Passive, the spotlight: every 2-3 moves he calls out one player by name ("Ana, show me what you've
+  got!", several variants). That player's pick carries extra weight in choosing the crowd's move, enough to tip a close
+  call about a quarter of the time, but never enough to pick a blunder (a pick the judge scores far below the best gets
+  no extra weight). People only, never bots; never the same player twice running. Ultimate, the duel: your last-placed
+  person moves alone for one turn, without power-ups; nobody else is scored that turn; if they run out of time, the God
+  King makes a safe move.
+- **Boingo the Clown.** Passive, the pie: he throws a pie at one empty square, which stays pied for 3 turns (nobody can
+  move a piece onto it), then 2 clear turns, then another pie. The square is near the centre and chosen so it's roughly
+  even for both sides (the engine checks it changes the eval little). Ultimate, the funhouse: as the turn passes to
+  you, he pogos down onto the board, the board flips, he says a line and plays your move for you: a weak but
+  recoverable one (about 1-2.5 pawns worse than the best, never hanging mate or the queen outright). That turn isn't
+  scored. The board stays flipped for your next 2 turns (the director's call). The engine already picks deliberately
+  weaker moves with a bounded loss (the boss's slips) and the God King already plays moves for the crowd; this reuses both.
+- **Darkness.** Opening: fog hides his half of the board for 5 moves, with a counter. No move hints under the fog; an
+  invalid move costs the most points a move can lose; you're still told when you're in check. Ultimate: one blind turn
+  that starts on his move. His move is shown as text in his speech box (blindfold players always hear the move), the
+  board is hidden, power-ups are off, you move by tapping a square then a square, and an invalid move costs the most
+  points; maybe a few seconds' extra time. Line ideas: "I have never needed eyes to see your fear."; "Now we are equals.
+  Sight was only ever the illusion."
+
+**A base boss template** (so a new boss is mostly filling in a form): name and title; art kit (sprite, portrait,
+animations); sounds; lines for every moment (entrance, thinking, his move, capture, hurt, check, smug, rattled, power
+used, ultimate warning, ultimate, defeat, victory), several each, picked the same for everyone online; a strength
+offset; a passive (when it fires and what it does) and an ultimate (its trigger, warning, effect, length and banner);
+and, for each power, the rules it answers: which moves are allowed this turn, what happens after a move, what each
+player can see, and whether the turn is scored and counted for fair play.
+
+**Who builds what:** the characters delegate the art, lines and sounds; the god-king delegate the power rules (it owns
+the boss battle's rules and how the God King's powers meet a boss's, e.g. whether the Last Stand undoes a burn); the
+engine delegate judging with allowed moves and picking the clown's weak move. First to build: the template and power
+system with two powers that prove it: Freeze (move limits and judging) and Boingo's funhouse (banners, warnings, the
+engine choosing a move, and online sync).
+
+**Later ideas:** boss drops (a themed crate item for beating a boss: a clown nose, a zombie hand); bosses jumping to the
+centre of the board to cast; the farmer and the gingerbread man as bosses.
