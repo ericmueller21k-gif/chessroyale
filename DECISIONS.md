@@ -1412,8 +1412,18 @@ scoped to 1024 px and wider.
 - **Phones:** the full-screen queue, unchanged (its screenshots match the old ones pixel for pixel).
 - **How it's built:** App renders home and the queue through one function, so the frame and the home screen stay
   mounted from home to the queue and back (no blink of the menu or panel). The private lobby keeps its own screen.
-- **The lobby's chat:** the left column's slot under your card. The social delegate's lobby chat (built alongside)
-  goes there on a computer; on a phone it sits in the queue screen, where it mounts it.
+- **The lobby's chat** (the social delegate's `LobbyChat`, built alongside): on a computer, under your card in the
+  left column, as tall as the lobby so it ends level with Cancel (below 1280 px, under the lobby, 280 px or more). One
+  chat at a time: App decides by the window (`useMedia`, 1024 px), and the queue screen leaves its own spot empty.
+- **A phone's queue, with the chat, fits a common phone** (390 × 664 and 375 × 667: the count, the grid and Cancel in
+  view without scrolling). Before the chat it already ran 72 px past a 664 px screen, Cancel half off. My calls:
+  - **Your seat is one line** under the grid ("You're in · seat 1"): the card's pawn and its "gold-ringed" line go on
+    a phone (your pawn is the gold-ringed one in the grid). A computer keeps the card.
+  - **The chat goes under Cancel** and fills the rest of the screen: on a tall phone it's all in view; on a 664 px one
+    its header shows at the bottom and the rest is a short scroll. The count, the grid and Cancel come first.
+  - The back arrow still leaves the queue (as Cancel does).
+- **A private lobby on a computer** is a 640 px column in the middle (it took the game screens' 1,100 px), so its
+  chat box and the player list read as one column. Phones unchanged.
 - **Checked:** `e2e/home-layout.spec.ts` (the queue in place at 1024, 1280 and 1440 with the menu, panel and card,
   the lobby between them and Cancel in view, Cancel home, into the match, the menu while you wait, the phone's queue
   full screen, no sideways scroll), and `npm run frames:home` (every frame from PLAY to the vote and from PLAY to

@@ -35,7 +35,8 @@ import { VoteScreen } from "./screens/Vote.tsx";
 import { BossScreen } from "./screens/Boss.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
-import { ChatBubble } from "./components/QuickChat.tsx";
+import { ChatBubble, useMedia } from "./components/QuickChat.tsx";
+import { LobbyChat } from "./components/LobbyChat.tsx";
 
 /**
  * Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). `matchBoss`: a raid's
@@ -237,6 +238,8 @@ export function App() {
     });
   });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
+  /** A computer (the front door's frame): the queue fills in place, with the lobby's chat beside it. */
+  const computer = useMedia("(min-width: 1024px)");
 
   useEffect(() => {
     if (!match) return;
@@ -656,10 +659,13 @@ export function App() {
    * Home, or home in the queue (`queue`: you pressed PLAY). The same frame and screen either way, so on a computer the
    * side menu, the live panel and your pawn stay put while the play column turns into the queue (and back on Cancel).
    */
-  const home = (queue?: ComponentChildren) => (
-    <FrontFrame page={queue ? "queue" : "home"} nav={queue ? queueNav : nav}>
+  const home = (queue?: ComponentChildren, chat?: ComponentChildren, side = computer) => (
+    // (A phone's queue is the whole screen: no hidden menu or panel to draw again with every arrival.)
+    <FrontFrame page={queue ? "queue" : "home"} nav={!queue ? nav : computer ? queueNav : undefined}>
       <HomeScreen
         queue={queue}
+        chat={chat}
+        side={side}
         intent={homeIntent}
         loading={loading}
         error={error}
@@ -723,10 +729,12 @@ export function App() {
   const bubble = <ChatBubble match={match} />;
   // Waiting for the match to fill (PLAY, or Solo's bots taking their seats): the home screen, in the queue.
   if (inQueue(match)) {
+    const q = match as NetMatch | SoloMatch;
     const letBots = match instanceof NetMatch ? () => void letBotsFill() : undefined;
+    // (The lobby's chat: a phone's is in the queue screen, under Cancel; a computer's under your card, beside the lobby.)
     return (
       <>
-        {home(<QueueScreen match={match as NetMatch | SoloMatch} onCancel={leave} onLetBotsFill={letBots} />)}
+        {home(<QueueScreen match={q} onCancel={leave} onLetBotsFill={letBots} chat={!computer} />, computer ? <LobbyChat match={q} /> : undefined, computer)}
         {bubble}
         {overlay}
       </>

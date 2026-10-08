@@ -803,6 +803,13 @@ p {
 
 /* ---- Lobby ---- */
 
+/* A private lobby on a computer: a readable column in the middle (not the game screens' 1,100 px), its chat included. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.lobby {
+    width: min(var(--col), 640px);
+  }
+}
+
 .lobby-actions {
   display: grid;
   gap: 10px;
@@ -7632,6 +7639,39 @@ button.fd-logo {
   font-size: 17px;
   font-weight: 800;
 }
+/*
+ * A phone's queue fits a common phone (390 x 664, 375 x 667) with the count, the grid and Cancel in view: your seat is
+ * one line under the grid (your pawn is the gold-ringed one), and the lobby's chat goes under Cancel, filling the rest
+ * of the screen (on a short phone, a scroll away; its header shows). A computer keeps the card (below).
+ */
+@media (max-width: 1023px) {
+  .fd-queue-panel {
+    flex: none;
+  }
+  .fd-queue-you {
+    justify-content: center;
+    margin: 0;
+    padding: 0 0 2px;
+    background: none;
+  }
+  .fd-queue-you .fd-pawn,
+  .fd-queue-you .fd-you-sub {
+    display: none;
+  }
+  .fd-queue-you .fd-you-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--fd-sub);
+  }
+}
+.fd-queue-chat {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.fd-queue-chat:empty {
+  display: none;
+}
 /* An empty seat's dot stays until its pawn pops in, then fades. */
 .fd-seat.pop::before {
   content: "";
@@ -8324,6 +8364,8 @@ button.fd-seat {
   .fd-root.framed .fd-home.queueing .fd-home-main {
     display: grid;
     grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+    /* (As tall as the lobby, so the chat ends level with Cancel.) */
+    grid-template-rows: auto;
     justify-content: stretch;
     align-items: start;
   }

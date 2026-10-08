@@ -145,7 +145,7 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   }
   // Chat opens in the queue (the lobby's chat, one channel for everyone there; e2e/lobby-chat.spec.ts) and carries on
   // into the match.
-  for (const p of [desk, phone]) await expect(p.locator(".fd-queue .qchat-lobby")).toBeVisible();
+  for (const p of [desk, phone]) await expect(p.locator(".fd-home.queueing .qchat-lobby")).toBeVisible();
   for (const p of [desk, phone]) await expect.poll(() => p.evaluate(() => (window as any).match.chat.enabled), { timeout: 60_000 }).toBe(true);
   // Exactly the lines picked in the profile there too.
   await expect(phone.locator(".qchat-lobby .qrow:not(.emoji) .qchip")).toHaveText(phonePicks);

@@ -377,6 +377,7 @@ function Notice({ notice }: { notice: HomeNotice }) {
 export function HomeScreen({
   queue,
   chat,
+  side = true,
   intent,
   loading,
   error,
@@ -395,6 +396,8 @@ export function HomeScreen({
   queue?: ComponentChildren;
   /** In the queue on a computer: the lobby's chat, under your pawn. */
   chat?: ComponentChildren;
+  /** In the queue: draw the computer's column (your card, the chat) beside it. A phone shows only the queue. */
+  side?: boolean;
   /** The computer's side menu asked for the boss menu or Play with friends. */
   intent?: { kind: "boss" | "friends"; n: number } | null;
   loading: boolean;
@@ -502,10 +505,12 @@ export function HomeScreen({
       <div class="fd-home queueing">
         <div class="fd-home-main">
           {/* (A computer's: your pawn, smaller, and the lobby's chat under it. A phone shows only the queue.) */}
-          <div class="fd-wait-side">
-            {hero}
-            {chat && <div class="fd-wait-chat">{chat}</div>}
-          </div>
+          {side && (
+            <div class="fd-wait-side">
+              {hero}
+              {chat && <div class="fd-wait-chat">{chat}</div>}
+            </div>
+          )}
           {queue}
         </div>
       </div>

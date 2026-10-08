@@ -137,8 +137,14 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
     expect(cancel.height).toBeGreaterThanOrEqual(44);
     // (Cancel is right there: no back arrow in the lobby.)
     await expect(page.getByRole("button", { name: "Leave the queue" })).toBeHidden();
-    // From 1280 px your card shrinks to the top of the left column, the lobby beside it.
+    // From 1280 px your card shrinks to the top of the left column, the lobby's chat under it, the lobby beside them.
     const card = page.locator(".fd-wait-side .fd-hero");
+    const chat = page.locator(".fd-wait-chat .qchat-lobby");
+    await expect(chat).toBeVisible();
+    // (One chat: the queue screen's own spot, a phone's, is empty here.)
+    await expect(page.locator(".qchat-lobby")).toHaveCount(1);
+    const ch = (await chat.boundingBox())!;
+    expect(ch.height).toBeGreaterThanOrEqual(120);
     if (w >= 1280) {
       await expect(card).toBeVisible();
       await expect(card).toContainText("Placed");
@@ -146,9 +152,15 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
       expect(c.x + c.width).toBeLessThanOrEqual(seats.x);
       expect(c.y).toBeLessThan(40);
       expect(c.height).toBeLessThan(140);
-    } else await expect(card).toBeHidden();
-    // (No empty box where the lobby's chat goes.)
-    expect(await page.locator(".fd-wait-chat:empty").count()).toBe(0);
+      // The chat: under your card, in the same column, down to the bottom of the box.
+      expect(ch.y).toBeGreaterThanOrEqual(c.y + c.height);
+      expect(Math.abs(ch.x - c.x)).toBeLessThan(2);
+      expect(ch.y + ch.height).toBeLessThanOrEqual(h);
+    } else {
+      await expect(card).toBeHidden();
+      // (1024-1279: under the lobby.)
+      expect(ch.y).toBeGreaterThanOrEqual(cancel.y + cancel.height);
+    }
     expect(await sideways(page), `queue ${w}`).toBe(0);
 
     await page.getByRole("button", { name: "Cancel" }).click();
@@ -192,9 +204,41 @@ test("computer: in the queue, your profile opens over it; another menu item leav
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 });
 
-test("phone: the queue still takes the whole screen; Cancel is home, with the sun in the top bar", async ({ page }) => {
+test("phone: the queue takes the whole screen; the count, the grid and Cancel are in view on common phones, the chat under them; back and Cancel leave", async ({ page }) => {
   test.skip(desktop(), "the phone's layout");
   await named(page, "Pocket");
+  for (const [w, h] of [
+    [390, 664],
+    [375, 667],
+  ] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto(`/?debug&pool=phonefit-${w}-${run}`);
+    await page.getByRole("button", { name: "PLAY", exact: true }).click();
+    await expect(page.locator(".fd-seats .fd-seat")).toHaveCount(100);
+    const chat = page.locator(".fd-queue .qchat-lobby");
+    await expect(chat).toBeVisible();
+    const inView = async (sel: string) => {
+      const b = (await page.locator(sel).first().boundingBox())!;
+      return b.y >= 0 && b.y + b.height <= h;
+    };
+    for (const sel of [".fd-queue-count", ".fd-seats", ".fd-cancel"]) expect(await inView(sel), `${sel} at ${w} x ${h}`).toBe(true);
+    await expect(page.getByText("You're in · seat 1")).toBeVisible();
+    // The chat: under Cancel, its header on screen, the rest a scroll away at most.
+    const cancel = (await page.locator(".fd-cancel").boundingBox())!;
+    const c = (await chat.boundingBox())!;
+    expect(c.y).toBeGreaterThanOrEqual(cancel.y + cancel.height);
+    expect(c.y + 26).toBeLessThanOrEqual(h);
+    await chat.scrollIntoViewIfNeeded();
+    await expect.poll(() => page.evaluate(() => (window as any).match.chat.enabled)).toBe(true);
+    await chat.locator(".qchip", { hasText: "Good luck!" }).click();
+    await expect(chat.locator(".qline.you", { hasText: "Good luck!" })).toBeVisible();
+    expect(await sideways(page)).toBe(0);
+    // The back arrow leaves the queue too.
+    await page.getByRole("button", { name: "Leave the queue" }).click();
+    await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => (window as any).match?.closed)).toBe(true);
+  }
+  await page.setViewportSize({ width: 390, height: 664 });
   await page.goto(`/?debug&pool=phonequeue-${run}`);
   await expect(page.locator(".fd-top").getByRole("button", { name: "Dark mode" })).toBeVisible();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
