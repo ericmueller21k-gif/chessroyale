@@ -2497,3 +2497,44 @@ should be banned; and a report system. Built by the `fairplay` delegate (`.claud
 - **Watch only for now** (`FAIRPLAY.enforcement: "watch"`): detection records each match and its level, opens a watch
   case, and logs what the level would have done; it reviews and bans nobody until the simulation's numbers are in
   (below). Reports and admins act regardless.
+
+**Bans, appeals, the review page and the reviewer's API** (step 3)
+- **A banned account can't play online:** PLAY, a new lobby and joining one (the lobby's hello) are refused (403 with
+  `banned`), and the app shows a plain notice: "Your account can't play online", why, that solo games against bots
+  are still open, and an appeal form. Solo stays open. A banned player's profile says "Banned" (no rating, rank or
+  Top N%); nothing else about fair play is ever shown on a profile.
+- **Every online result of a banned account is held** and its rating removed (out of ranking, percentiles and later
+  leaderboards). A clearing (an appeal overturned) gives everything back.
+- **Ban evasion, made harder without fingerprinting:**
+  - A ban keeps the account's sign-in identities, hashed: a normalised email (lower case, no "+tag", Gmail without
+    dots) and the Google account. A new account signed in with one of them is banned too ("evasion" in the log).
+  - A coarse device marker: a random id in its own cookie (`hc_device`, 400 days), recorded against the accounts that
+    play online from it. A new account on a device a banned account played from goes to **review**, not a ban
+    (families share devices). Clearing cookies clears it; that's accepted.
+  - Guests can't play online anyway once sign-in is set up.
+- **Appeals stay human** (Eric, Oct 8): one open appeal at a time, up to 2,000 characters, queued at the top of the
+  review page. An admin upholds (the ban stands) or overturns (cleared) it with a reply the player sees in the notice
+  and by email. The automated reviewer can't decide appeals, nor change a banned case (the API answers 409).
+- **The review page** (`/admin/fairplay`, the Worker's own server-rendered page, phone-friendly, light and dark):
+  - only for signed-in accounts whose email is in `ADMIN_EMAILS` (a Worker variable or secret, comma-separated; never
+    in the repo); anyone else gets "Not found";
+  - lists appeals waiting, then cases (review first, then by cheating reports and scores), and recent decisions;
+  - a case shows the player (with their email, for the admin only), the log, reports (who, why, which match), accounts
+    on the same device, and every match: strength, score and its parts, and each judged pick with its loss, the
+    crowd's found rate (hard positions in bold), complexity, think time, look-aways and whether it counted;
+  - Ban, Clear, Watch and Review buttons need a written reason (and take an optional note for the player's email);
+    forms are accepted only from the page itself (the cookie is SameSite=Lax and the origin is checked).
+- **The reviewer's API** (Eric, Oct 8: a Claude-run reviewer, scheduled, works the queue), bearer token
+  `FAIRPLAY_REVIEW_TOKEN` (a Worker secret, at least 16 characters):
+  - `GET /api/admin/fairplay/cases?status=open|review|watch|banned|all`: cases with their evidence summary and the
+    current policy (thresholds);
+  - `GET /api/admin/fairplay/cases/ID`: one case's full games;
+  - `POST /api/admin/fairplay/cases/ID/decision {decision: ban|clear|watch|review, reason, notice?}`.
+  - Every decision is logged with its reason and who made it ("reviewer" or "admin:<email>"). The decision policy it
+    follows is `docs/fairplay-reviewer.md`.
+- **Emails** (Eric, Oct 8): on a ban, a clearing after a review or a ban, and an appeal turned down, the player gets an
+  email at their sign-in address (email or Google), from fairplay@ the sign-in emails' domain, through Resend, the
+  service and key that send sign-in codes (it already sends to any address). It says what happened and how to appeal;
+  never anyone else's name or the evidence. Clearing a watch the player never knew about sends nothing. No address
+  (a guest), or no Resend key: nothing is sent.
+- **Every number** is in `FAIRPLAY` (settings.ts).
