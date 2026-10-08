@@ -6,5 +6,6 @@ playwright-report/
 *.log
 reports/demo/
 items-preview.png
+characters-preview/
 wrangler.staging.jsonc
 packages/sim/data/fairplay-bank/

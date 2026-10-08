@@ -13,6 +13,7 @@
     "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/chess --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/app --noEmit && tsc -p packages/server --noEmit",
     "simulate": "tsx packages/sim/scripts/simulate.ts",
     "preview:items": "node scripts/preview-items.mjs",
+    "preview:characters": "tsx scripts/preview-characters.ts",
     "frames:boss": "node scripts/frames-boss-move.mjs",
     "frames:queue": "node scripts/frames-queue-pop.mjs",
     "frames:flash": "node scripts/frames-flash.mjs",

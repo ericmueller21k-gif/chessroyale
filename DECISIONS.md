@@ -2837,3 +2837,30 @@ about 22 times a match as shipped, worst case 22 ($0.0022 at $0.0001 a search), 
 with 8+ people connected (0.22 calls a round). In the last 10 rounds (the final, with 1–14 people connected,
 depending on how many left) there were no calls at all: a final turn has one pick, rarely a close call, and no cut line.
 With 90% leaving, one person was left connected at the end, and the host path scored it as before.
+
+## Boss characters: style test (Oct 8, 2026)
+
+Phase 1, before building any boss into the game: two bosses drawn as code-defined pixel art, to check the look with
+Eric. Nothing in the game changes yet; the bosses still show as emoji icons.
+
+- **What's drawn:** the Black Knight, after Eric's reference picture (a dark armoured knight, plumed helm, winged
+  spear, ragged cape), and the Pawn Golem (a white stone pawn come to life, gold runes, floating boulder fists). Each
+  has an idle loop (8 frames) and an attack: the knight's spear thrust (wind-up, lunge, a spark at the tip), the
+  golem's two-fisted ground slam (fists over its head, a blur, dust and stone chips). Preview:
+  `npm run preview:characters -- <dir> [ref=picture.png]` writes GIFs at 4x, frame sheets and a phone-size comparison.
+- **Pixel art from parts, not whole frames** (`packages/app/src/characters/`): a palette, small grids of palette keys
+  (typed by hand for hard surfaces, painted with shapes for cloth and stone), and frames that stack the parts at
+  whole-pixel offsets, with quarter turns, mirroring and ripples for cloth. Why: an animation is a list of numbers
+  (a lunge is `dx: -4`), so a boss's whole pack (idle, attack, hurt, death, taunt) costs a pose function, not dozens of
+  redrawn frames; a recolour is a palette swap; and each part has its own outline, so the outlines stay right however
+  the parts move.
+- **Cues live on frames** (`cue: "thrust"`, `"hit"`, `"slam"`, `"impact"`): the sprite component will fire the sound
+  and screen effect when that frame shows, so a sound pack lines up with the picture by construction.
+- **Dark bosses on the dark ground:** the reference is nearly black, which vanishes on `#14161b`. The knight keeps the
+  reference's near-black and warm highlights but a step lighter, and every boss gets a faint 1-pixel halo around its
+  silhouette (not around its ground shadow or effects).
+- **Eyes and runes as reactions:** the knight's eyes light red as he winds up, white-hot at the strike; the golem's runes
+  breathe while idle and flare as it attacks. Palette flashes, so they cost nothing to add to any frame.
+- The golem was picked over the Frost Dragon for the second boss: it's the first boss every new player meets, and a
+  living chess pawn says "HunChess" more than a dragon does; a pale stone boss also shows the range against the
+  knight's black steel.
