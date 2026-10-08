@@ -43,4 +43,34 @@ export const FAIRPLAY_SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS fairplay_matches_user ON fairplay_matches (user_id, played_at)`,
   `CREATE INDEX IF NOT EXISTS fairplay_matches_keep ON fairplay_matches (keep_until)`,
+  // A banned account's sign-in identities (hashed: a normalised email, a Google id), so a new account made with the
+  // same one is banned too.
+  `CREATE TABLE IF NOT EXISTS fairplay_identities (
+    kind TEXT NOT NULL,
+    hash TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (kind, hash)
+  )`,
+  // A coarse device marker (a random id in a cookie, no fingerprinting): which accounts played online from it.
+  `CREATE TABLE IF NOT EXISTS fairplay_devices (
+    device TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    first_seen INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    PRIMARY KEY (device, user_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS fairplay_devices_user ON fairplay_devices (user_id)`,
+  // Appeals against a ban, for a person (never the automated reviewer) to decide.
+  `CREATE TABLE IF NOT EXISTS fairplay_appeals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    status TEXT NOT NULL,
+    decided_at INTEGER,
+    decided_by TEXT,
+    reply TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS fairplay_appeals_status ON fairplay_appeals (status, at)`,
 ];

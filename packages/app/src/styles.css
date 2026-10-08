@@ -9230,3 +9230,22 @@ img.qicon {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* -- Fair play: the ban notice and its appeal, a banned profile's pill -- */
+.fp-appeal {
+  font: inherit;
+  font-size: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--fd-line);
+  background: var(--fd-bg);
+  color: var(--fd-text);
+  resize: vertical;
+}
+.fd-pill.fp-banned {
+  color: #fff;
+  background: #a3332b;
+  border-color: #a3332b;
+}

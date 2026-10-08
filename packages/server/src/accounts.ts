@@ -636,6 +636,8 @@ export interface PublicProfile {
   tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   /** "Top 18%" among rated players (null until enough players have a rating). */
   topPercent: number | null;
+  /** Banned for fair play (the profile says "Banned"; nothing else about a fair-play case is ever shown). */
+  banned: boolean;
   crowd: CrowdStats;
   boss: RaidStats;
   /** The rating after each of the last 30 rated matches, oldest first. */
@@ -736,7 +738,8 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     }
   }
   const raids = rows.filter((r) => r.mode === "boss");
-  const tier = ratingTier(rating);
+  const banned = (await sql.first<{ status: string }>("SELECT status FROM fairplay_cases WHERE user_id = ?", userId))?.status === "banned";
+  const tier = ratingTier(banned ? null : rating);
   return {
     id: u.id,
     name: u.name,
@@ -745,9 +748,10 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     joinedAt: u.created_at,
     lastSeen: u.last_seen,
     online: u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
-    rating,
+    rating: banned ? null : rating,
     tier: tier ? { label: tier.label, level: tier.level, color: tier.color, effect: tier.effect } : null,
-    topPercent: top,
+    topPercent: banned ? null : top,
+    banned,
     crowd: crowdStats(rows.filter((r) => r.mode === "crowd")),
     boss: raidStats(raids),
     ratingHistory: rows

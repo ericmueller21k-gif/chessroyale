@@ -296,8 +296,11 @@ export type ServerMessage = { now: number } & (
       /** Matchmade: the seats were filled then (bots in the empty ones); the match begins a moment later. */
       filledAt?: number;
     }
-  /** Can't join (or play on). `ended`: the match is over (or long gone), so the app goes home with a note. */
-  | { t: "error"; message: string; ended?: true }
+  /**
+   * Can't join (or play on). `ended`: the match is over (or long gone), so the app goes home with a note. `banned`:
+   * the account is banned for fair play (the app shows the ban notice and its appeal).
+   */
+  | { t: "error"; message: string; ended?: true; banned?: true }
   /**
    * The lobby is closing: its results have been up long enough (`ended`), it never started and nothing happened in it
    * for a long time (`idle`), or nobody had been in its match for hours (`abandoned`). The socket closes next, and

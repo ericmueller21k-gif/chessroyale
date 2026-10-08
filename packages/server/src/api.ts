@@ -2,7 +2,7 @@ import { equipLocker, lockerState, openCrate } from "./locker.ts";
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.ts";
-import { REPORT_THANKS, reportPlayer } from "./fairplay.ts";
+import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
 import {
   buyItem,
   cleanEmail,
@@ -75,6 +75,11 @@ export async function withSecrets<E extends object>(env: E): Promise<E & Account
 }
 
 export const SESSION_COOKIE = "hc_session";
+/**
+ * Fair play's coarse device marker: a random id in a cookie (not fingerprinting), recorded against the accounts that
+ * play online from it, so a banned player's new account on the same device goes to review. Clearing cookies clears it.
+ */
+export const DEVICE_COOKIE = "hc_device";
 const STATE_COOKIE = "hc_oauth";
 const NEXT_COOKIE = "hc_next";
 
@@ -122,7 +127,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/report" &&
     !path.startsWith("/api/profile/") &&
     !path.startsWith("/api/shop") &&
-    !path.startsWith("/api/locker")
+    !path.startsWith("/api/locker") &&
+    path !== "/api/fairplay/status" &&
+    path !== "/api/appeal"
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -189,11 +196,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return new Response(JSON.stringify(await profile(sql, user)), { status: 200, headers });
   };
 
-  // GET /api/me: your profile (a guest account is made the first time).
+  // GET /api/me: your profile (a guest account is made the first time). It also gives the device its marker.
   if (path === "/api/me" && request.method === "GET") {
-    if (current) return json(await profile(sql, current));
+    const headers = new Headers({ "content-type": "application/json", "cache-control": "no-store" });
+    if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
+    if (current) return new Response(JSON.stringify(await profile(sql, current)), { headers });
     const g = await createGuest(sql, now, url.searchParams.get("name") ?? "Player");
-    return json(await profile(sql, g.user), 200, { "set-cookie": sessionCookie(g.token) });
+    headers.append("set-cookie", sessionCookie(g.token));
+    return new Response(JSON.stringify(await profile(sql, g.user)), { headers });
   }
   if (!current) return json({ message: "No account on this device yet." }, 401);
 
@@ -239,6 +249,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!r.ok) return json({ message: r.message }, 400);
     const already = typeof b.match === "string" ? "You've already reported this player in this match." : "You've already reported this player today.";
     return json({ ok: true, ...(r.already ? { already: true } : {}), message: r.already ? already : REPORT_THANKS });
+  }
+
+  // GET /api/fairplay/status: banned or not, and your latest appeal (the ban notice). POST /api/appeal {text}.
+  if (path === "/api/fairplay/status" && request.method === "GET") return json(await fairStatus(sql, current.id));
+  if (path === "/api/appeal" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { text?: unknown };
+    const r = await appeal(sql, current.id, b.text, now);
+    return r.ok ? json({ ok: true, ...(await fairStatus(sql, current.id)) }) : json({ message: r.message }, 400);
   }
 
   // POST /api/results: a solo match's result, from the browser.

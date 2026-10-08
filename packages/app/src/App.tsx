@@ -18,6 +18,7 @@ import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
 import { SoundLab } from "./screens/SoundLab.tsx";
 import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
+import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
 import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
@@ -384,7 +385,8 @@ export function App() {
         params.set("augments", mode.augments ? "1" : "0");
       } else params.set("moves", String(chosenOpeningMoves()));
       const res = await fetch(`/api/lobby?${params}`, { method: "POST" });
-      const body = (await res.json()) as { code?: string; message?: string };
+      const body = (await res.json()) as { code?: string; message?: string; banned?: boolean };
+      if (body.banned) return showBanNotice();
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");
       joinLobby(body.code, { mode: mode.mode });
     } catch (e) {
@@ -419,8 +421,13 @@ export function App() {
       if (ticket) q.set("ticket", ticket);
       for (;;) {
         const res = await fetch(`/api/play${q.size ? `?${q}` : ""}`, { method: "POST" });
-        const body = (await res.json()) as { code?: string; message?: string; busy?: boolean; ticket?: string; waitSeconds?: number; retryMs?: number };
+        const body = (await res.json()) as { code?: string; message?: string; busy?: boolean; ticket?: string; waitSeconds?: number; retryMs?: number; banned?: boolean };
         if (run !== lineRun.current) return; // Cancelled while asking.
+        // Banned for fair play: the ban notice, with its appeal (solo stays open).
+        if (body.banned) {
+          setInLine(null);
+          return showBanNotice();
+        }
         if (body.code) {
           setInLine(null);
           joinLobby(body.code, { queue: mode });

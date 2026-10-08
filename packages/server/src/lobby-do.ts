@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, lobbyClosing, newLobbyRecord, type LobbyRecord, type ServerScoreRequest } from "./lobby.ts";
-import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired, withSecrets } from "./api.ts";
+import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
@@ -10,7 +10,8 @@ import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
 import { CAPACITY, DEFAULT_SETTINGS } from "@chessroyale/core";
-import { eligibleForRanked, recordFairPlay } from "./fairplay.ts";
+import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
+import { caseMailer } from "./fairplay-mail.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -126,13 +127,14 @@ export class Lobby extends DurableObject<Env> {
     rec.resultsSaved = true;
     const sql = d1Sql(this.env.DB);
     const mode = this.mode();
+    const mail = caseMailer(await withSecrets(this.env));
     for (const r of core.humanResults()) {
       const userId = rec.accounts?.[r.playerId];
       if (!userId) continue;
       // Fair play: the match's signals and the player's level first (it may put them in review)…
       const moves = core.fairMoves(r.playerId);
       if (moves.length) {
-        await recordFairPlay(sql, userId, { lobby: rec.code, mode, moves }, Date.now()).catch((e: unknown) => console.log(`fair play for ${rec.code}: ${String(e)}`));
+        await recordFairPlay(sql, userId, { lobby: rec.code, mode, moves }, Date.now(), mail).catch((e: unknown) => console.log(`fair play for ${rec.code}: ${String(e)}`));
       }
       // …then a player in review (or banned) has their results held off ranking until they're cleared.
       const held = !(await eligibleForRanked(sql, userId).catch(() => true));
@@ -369,9 +371,15 @@ export class Lobby extends DurableObject<Env> {
     // The player id is attached to the socket after "hello"; the account (from the session cookie) now.
     const account = await accountOf(request, this.env, (p) => this.ctx.waitUntil(p)).catch(() => null);
     this.ctx.acceptWebSocket(server);
-    // Online play needs a signed-in account (once sign-in is set up); a guest is told so on "hello".
+    // Online play needs a signed-in account (once sign-in is set up); a guest is told so on "hello". So is a player
+    // banned for fair play (only someone new to this lobby: a seat already taken stays, the ban counts from the next).
     const guest = !!this.env.DB && signInRequired(await withSecrets(this.env)) && !isSignedIn(account);
-    server.serializeAttachment({ userId: account?.id, guest });
+    const seated = !!account && Object.values(this.record.accounts ?? {}).includes(account.id);
+    const banned =
+      !guest && !seated && !!account && !!this.env.DB
+        ? (await banCheck(d1Sql(this.env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }))).banned
+        : false;
+    server.serializeAttachment({ userId: account?.id, guest, banned });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -383,7 +391,7 @@ export class Lobby extends DurableObject<Env> {
     } catch {
       return;
     }
-    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean } | null;
+    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean } | null;
     // The host's scores: the engine server re-checks the close calls first (before the lobby is touched, so
     // nothing changes under it while it waits), and its numbers are the ones used.
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
@@ -400,6 +408,11 @@ export class Lobby extends DurableObject<Env> {
       if (attached?.guest) {
         ws.send(JSON.stringify({ t: "error", message: SIGN_IN_TO_PLAY, now: Date.now() }));
         ws.close(1008, "Sign in to play online");
+        return;
+      }
+      if (attached?.banned) {
+        ws.send(JSON.stringify({ t: "error", message: BANNED_MESSAGE, banned: true, now: Date.now() }));
+        ws.close(1008, "Banned");
         return;
       }
       const before = this.record.humans.length;
