@@ -913,9 +913,9 @@ export const FAIRPLAY = {
     banMatches: 2,
     /** (A match counts towards a ban only with this many of its moves deep-checked.) */
     banMatchChecked: 8,
-    banEvidence: 8,
+    banEvidence: 9,
     banDeepChecked: 16,
-    banDeep: 0.75,
+    banDeep: 0.8,
     banPerf: 2200,
     banOneEvidence: 11,
     banOneDeepChecked: 12,
