@@ -36,9 +36,9 @@ repository.**
    `openssl rand -hex 24`). Give the same value to the reviewer's scheduled task in its own secret settings, not in a
    message. `docs/fairplay-reviewer.md` describes what it can do.
 
-Either can instead live in the account's Secrets Store (like the sign-in secrets): the Worker reads both forms. If you
-use the Store, add the binding in the dashboard after creating the secret (a binding in `wrangler.jsonc` to a secret
-that doesn't exist yet fails the deploy).
+A Worker Secret stays through every deploy, so this is done once. (The Worker would also read either from the
+account's Secrets Store, like the sign-in secrets, but that needs a binding in `wrangler.jsonc` added only after the
+secret exists, or the deploy fails; the plain Secret above is simpler.)
 
 ## Load testing (staging only, never production)
 
