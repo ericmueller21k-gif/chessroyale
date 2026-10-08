@@ -2273,7 +2273,10 @@ never catches us out. Reports in `reports/load/`; how to run them, staging and m
      statement per 500 accounts. A profile's "online now" asks the hub.
    - Without the binding (unit tests), everything falls back to D1 as before.
 4. **Schema check:** a database already at the current schema answers one read (`meta.schema`, a fingerprint of
-   every schema statement) instead of ~35.
+   every schema statement) instead of ~35. Production showed why it matters (the Server-Timing header from step 1,
+   Oct 8): at today's low traffic requests keep landing on fresh Worker instances, and every route that touches D1
+   took about 1 s (`/api/profile/x` 1,012-1,061 ms, `/api/live` 1,056-1,464 ms) while one without D1 took 0-42 ms
+   (`/api/auth/config`).
 5. **A lobby's stored record:** each person's last message (re-sent on reconnect) is stored under its own key, and
    only when it changes. Measured with V8's serialiser (what Durable Object storage writes), a 100-player record is
    about 150 KB (the 2.4 MB JSON size is misleading: JSON repeats the standings every message shares); a pick now
