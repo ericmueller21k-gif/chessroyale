@@ -349,8 +349,8 @@ export function playerLevel(matches: readonly LevelInput[], now: number, lv: Lev
   const scores = recent.map((m) => m.score).sort((a, b) => b - a);
   const top1 = scores[0] ?? 0;
   const top2 = top1 + (scores[1] ?? 0);
-  // The ban: from deep-checked matches only.
-  const checked = recent.filter((m) => (m.deepChecked ?? 0) > 0);
+  // The ban: from deep-checked matches only, each with enough moves checked to mean something.
+  const checked = recent.filter((m) => (m.deepChecked ?? 0) >= lv.banMatchChecked);
   const sum = (f: (m: LevelInput) => number, ms = checked) => ms.reduce((t, m) => t + f(m), 0);
   const evidence = sum((m) => m.evidence ?? 0);
   const deepChecked = sum((m) => m.deepChecked ?? 0);

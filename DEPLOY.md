@@ -22,6 +22,22 @@ The account is on **Workers Paid** ($5/month), which Containers need. `wrangler.
 - **Locally:** `npx wrangler dev` builds and runs the container with Docker; `--enable-containers=false --var ENGINE_OFF:1` runs without it (the e2e suite does, to test the device fallback).
 - **Budget alert:** Billing → Add Budget Alert in the Cloudflare dashboard (suggested: $20/month).
 
+## Fair play: the review page, the reviewer and the deep re-check
+
+- **Admins** (the review page at `https://hunchess.com/admin/fairplay`): in the Worker's Settings → Variables and
+  Secrets, add `ADMIN_EMAILS` (type Secret or Text) with the sign-in emails allowed, comma-separated, e.g. Eric's. Sign
+  in to HunChess with one of them and open the page. Anyone else gets "Not found".
+- **The automated reviewer's token:** add `FAIRPLAY_REVIEW_TOKEN` as a **Secret** (any random string of 16+
+  characters, e.g. `openssl rand -hex 24`), and give the same string to the reviewer's scheduled task. Never commit it.
+  `docs/fairplay-reviewer.md` is the reviewer's brief.
+- **The deep re-check** runs from the Worker's schedule (`triggers.crons` in wrangler.jsonc, every 15 minutes; deployed
+  with the Worker). It uses the engine server on an instance of its own (`fairplay-1`, inside `max_instances`), within
+  `FAIRPLAY.deep.dailySearches` searches a day (default 500, about 25 minutes of one standard-2 instance: well under
+  $0.10 a day), counted in the D1 table `fairplay_budget`. Without the engine server nothing is re-checked, and nobody
+  is auto-banned (a ban needs the deep re-check).
+- **Emails** about bans and clearings go through Resend with the sign-in key, from `fairplay@` the domain of
+  `EMAIL_FROM` (default hunchess.com). Nothing to set up if sign-in codes already send.
+
 ## Load testing (staging only, never production)
 
 Simulated players (`scripts/load/`) speak the app's real protocol: a guest account, the home screen's live line, PLAY,

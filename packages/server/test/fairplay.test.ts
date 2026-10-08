@@ -203,21 +203,26 @@ describe("fair-play records", () => {
     expect(rows[1]!.keep_until).toBe(t + FAIRPLAY.evidenceDays * DAY);
   });
 
-  it("watch only (the setting at launch): a review or ban level opens a watch case and says what it would have done", async () => {
-    expect(FAIRPLAY.enforcement).toBe("watch");
-    const { sql } = memoryDb();
-    await ensureSchema(sql);
-    const cheat = await player(sql, "Cheat");
-    const t = 50 * DAY;
-    const r1 = await recordFairPlay(sql, cheat.id, { lobby: "AAAAA", mode: "crowd", moves: picks(20, true) }, t);
-    const r2 = await recordFairPlay(sql, cheat.id, { lobby: "BBBBB", mode: "crowd", moves: picks(20, true) }, t + 3_600_000);
-    expect(r2.verdict.level).toBe("review");
-    expect([r1.acted, r2.acted]).toEqual(["watch", "watch"]);
-    expect((await caseOf(sql, cheat.id))?.status).toBe("watch");
-    expect(await eligibleForRanked(sql, cheat.id)).toBe(true);
-    const log = await sql.all<{ action: string; by: string; reason: string }>("SELECT action, by, reason FROM fairplay_log WHERE user_id = ? ORDER BY id", cheat.id);
-    expect(log.map((l) => `${l.action}/${l.by}`)).toEqual(["watch/detection", "note/detection"]);
-    expect(log[1]!.reason).toMatch(/^level review, not acted on \(watch only\)/);
+  it("watch only (the setting before the simulation): a review or ban level opens a watch case and says what it would have done", async () => {
+    const saved = FAIRPLAY.enforcement;
+    (FAIRPLAY as { enforcement: string }).enforcement = "watch";
+    try {
+      const { sql } = memoryDb();
+      await ensureSchema(sql);
+      const cheat = await player(sql, "Cheat");
+      const t = 50 * DAY;
+      const r1 = await recordFairPlay(sql, cheat.id, { lobby: "AAAAA", mode: "crowd", moves: picks(20, true) }, t);
+      const r2 = await recordFairPlay(sql, cheat.id, { lobby: "BBBBB", mode: "crowd", moves: picks(20, true) }, t + 3_600_000);
+      expect(r2.verdict.level).toBe("review");
+      expect([r1.acted, r2.acted]).toEqual(["watch", "watch"]);
+      expect((await caseOf(sql, cheat.id))?.status).toBe("watch");
+      expect(await eligibleForRanked(sql, cheat.id)).toBe(true);
+      const log = await sql.all<{ action: string; by: string; reason: string }>("SELECT action, by, reason FROM fairplay_log WHERE user_id = ? ORDER BY id", cheat.id);
+      expect(log.map((l) => `${l.action}/${l.by}`)).toEqual(["watch/detection", "note/detection"]);
+      expect(log[1]!.reason).toMatch(/^level review, not acted on \(watch only\)/);
+    } finally {
+      (FAIRPLAY as { enforcement: string }).enforcement = saved;
+    }
   });
 
   it("a report after a match keeps that match's evidence the full 30 days; old evidence goes unless the case is open", async () => {

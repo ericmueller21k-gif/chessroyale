@@ -777,7 +777,7 @@ export const FAIRPLAY = {
    * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports, admins and the
    * automated reviewer act whatever this says.
    */
-  enforcement: "watch" as "watch" | "review" | "ban",
+  enforcement: "ban" as "watch" | "review" | "ban",
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts towards an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
@@ -818,8 +818,8 @@ export const FAIRPLAY = {
    * (reports/fairplay.md).
    */
   signals: {
-    /** The opening: plies from the starting position that never count (5 moves each). */
-    bookPlies: 10,
+    /** The opening: plies from the starting position that never count (4 moves each). */
+    bookPlies: 8,
     /** A pick within this many points of the best found it. */
     foundLoss: 1,
     /** Position complexity: moves within this many points of the best (of those the judges scored). */
@@ -872,7 +872,7 @@ export const FAIRPLAY = {
   score: {
     /** Match strength: points per `perfPer` rating above `perfFrom`, once `minCounted` moves count. */
     minCounted: 8,
-    perfFrom: 2400,
+    perfFrom: 2600,
     perfPer: 100,
     perfMax: 6,
     /** A jump: this far above the player's own history (3+ matches) or rating. */
@@ -902,18 +902,20 @@ export const FAIRPLAY = {
     windowMatches: 10,
     watch: 3,
     /** Review: one match this high, or the best two adding up to this. */
-    reviewOne: 7,
-    reviewTwo: 10,
+    reviewOne: 8,
+    reviewTwo: 12,
     /**
-     * Auto-ban: only overwhelming evidence, and only from matches the deep re-check has gone through. Either at least
-     * `banMatches` such matches in the window whose evidence adds up to `banEvidence`, with `banDeepChecked` moves
+     * Auto-ban: only overwhelming evidence, and only from matches the deep re-check has gone through (`banMatchChecked`
+     * moves or more each). Either at least `banMatches` such matches in the window whose evidence adds up to `banEvidence`, with `banDeepChecked` moves
      * checked among them, a deep-match share of `banDeep` and a best match strength of `banPerf`; or one match past
      * every `banOne*` bar.
      */
     banMatches: 2,
-    banEvidence: 8,
+    /** (A match counts towards a ban only with this many of its moves deep-checked.) */
+    banMatchChecked: 8,
+    banEvidence: 9,
     banDeepChecked: 16,
-    banDeep: 0.75,
+    banDeep: 0.8,
     banPerf: 2200,
     banOneEvidence: 11,
     banOneDeepChecked: 12,
