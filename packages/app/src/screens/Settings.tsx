@@ -9,6 +9,7 @@ import { chatBubbles, chatOff, crowdAnimations, crowdTrail, setChatBubbles, setC
 import { isMuted, onMuteChange, setMuted, unlockAudio } from "../sound.ts";
 import { OPENING_KEY, chosenMode, chosenOpeningMoves, saveMode } from "./Home.tsx";
 import { useAccount } from "./Profile.tsx";
+import { setThemePref, useTheme, type ThemePref } from "../theme.ts";
 
 /** A setting you switch on or off: a title, what it does, and the switch. */
 function Toggle({ title, checked, disabled, onChange, children }: { title: string; checked: boolean; disabled?: boolean; onChange: (on: boolean) => void; children?: ComponentChildren }) {
@@ -122,7 +123,26 @@ export function HowToPlay() {
   );
 }
 
-/** Settings: sound, how you play, Crowd's options, how to play, installing, and your sign-in. */
+/** Light or dark: Match device (until someone picks), Light or Dark. The same pick as the sun button. */
+const THEMES: { id: ThemePref; label: string }[] = [
+  { id: "system", label: "Match device" },
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+];
+function ThemeChoice() {
+  const { pref } = useTheme();
+  return (
+    <div class="fd-seg three" role="radiogroup" aria-label="Theme">
+      {THEMES.map((t) => (
+        <button type="button" role="radio" key={t.id} aria-checked={pref === t.id} class={pref === t.id ? "on" : ""} onClick={() => setThemePref(t.id)}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Settings: the theme, sound, how you play, Crowd's options, how to play, installing, and your sign-in. */
 export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onSoundLab?: () => void }) {
   const { config, profile } = useAccount();
   const [, rerender] = useState(0);
@@ -149,6 +169,11 @@ export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onS
         <h1>Settings</h1>
         <span class="fd-head-spacer" />
       </header>
+
+      <section class="fd-section">
+        <h2 class="fd-label">THEME</h2>
+        <ThemeChoice />
+      </section>
 
       <section class="fd-section">
         <h2 class="fd-label">SOUND</h2>

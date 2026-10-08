@@ -9,6 +9,7 @@ import { play } from "../sound.ts";
 import { openProfile } from "../profile-nav.ts";
 import { pawnLook } from "../looks.ts";
 import { LobbyChat } from "../components/LobbyChat.tsx";
+import type { MatchChat } from "../chat.ts";
 
 /**
  * What the queue screen shows: an online queue (NetMatch: Default or Bots off) or Solo filling with its bots
@@ -139,7 +140,18 @@ const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms
  * Default (bots after a minute), Bots off (people only, until it's full; one tap lets bots fill instead) and Solo
  * (your bots pop in at once). It says when a match won't count for ranking.
  */
-export function QueueScreen({ match, onCancel, onLetBotsFill }: { match: QueueView; onCancel: () => void; onLetBotsFill?: () => void }) {
+export function QueueScreen({
+  match,
+  onCancel,
+  onLetBotsFill,
+  chat = true,
+}: {
+  match: QueueView & { readonly chat?: MatchChat };
+  onCancel: () => void;
+  onLetBotsFill?: () => void;
+  /** The lobby's chat here, under Cancel (a phone). A computer shows it beside the lobby instead (HomeScreen's `chat`). */
+  chat?: boolean;
+}) {
   const now = useNow();
   const since = useRef(Date.now());
   const raid = !!match.settings.raid;
@@ -213,7 +225,6 @@ export function QueueScreen({ match, onCancel, onLetBotsFill }: { match: QueueVi
       </div>
       <div class="fd-queue-panel">
         {grid}
-        <LobbyChat match={match} />
         <div class="fd-queue-you">
           <DressedPawn size="card" look={myLook} hat={hat} />
           <div>
@@ -225,6 +236,12 @@ export function QueueScreen({ match, onCancel, onLetBotsFill }: { match: QueueVi
       <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
         Cancel
       </button>
+      {/* (A phone: the lobby's chat under Cancel, so the count, the grid and Cancel are all in view; it fills the rest.) */}
+      {chat && (
+        <div class="fd-queue-chat">
+          <LobbyChat match={match} />
+        </div>
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@
     "frames:vote": "node scripts/frames-vote.mjs",
     "frames:close": "node scripts/frames-lobby-close.mjs",
     "frames:matchmaking": "node scripts/frames-matchmaking.mjs",
+    "frames:home": "node scripts/frames-home-queue.mjs",
     "frames:lobbychat": "node scripts/frames-lobby-chat.mjs"
   },
   "devDependencies": {

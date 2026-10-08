@@ -8,9 +8,11 @@ import { createLobbyFromHome, named, soloFromHome, test } from "./helpers.ts";
  */
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
+/** Where it is on the page (a phone's chat is under Cancel, a scroll away on a short screen: scrolling moves nothing). */
 const box = async (l: Locator) => {
   const b = (await l.boundingBox())!;
-  return { x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.width), height: Math.round(b.height) };
+  const scrollY = await l.page().evaluate(() => window.scrollY);
+  return { x: Math.round(b.x), y: Math.round(b.y + scrollY), width: Math.round(b.width), height: Math.round(b.height) };
 };
 type Box = Awaited<ReturnType<typeof box>>;
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
@@ -36,16 +38,16 @@ test("two players in a Default queue chat before the match starts: each sees the
   await Promise.all([ann, bo].map((p) => p.getByRole("button", { name: "PLAY", exact: true }).click()));
   for (const p of [ann, bo]) {
     await expect(p.locator(".fd-count-n")).toHaveText("2", { timeout: 6_000 });
-    await expect(p.locator(".fd-queue .qchat-lobby")).toBeVisible();
+    await expect(p.locator(".fd-home.queueing .qchat-lobby")).toBeVisible();
     await expect(p.locator(".qchat-lobby .qhead-title")).toHaveText("Lobby");
     await expect.poll(() => p.evaluate(() => (window as any).match.chat.enabled)).toBe(true);
   }
   const before = await queueBoxes(ann);
   // Never over the count, the grid or Cancel.
   for (const k of ["count", "seats", "cancel"] as const) expect(overlaps(before.chat, before[k])).toBe(false);
-  // A phone: under the grid. A computer: in the column beside it (for now; the hub's new layout places it).
+  // A phone: under the grid (and Cancel). A computer: the left column, under your card, beside the lobby.
   if (test.info().project.name === "phone") expect(before.chat.y).toBeGreaterThanOrEqual(before.seats.y + before.seats.height);
-  else expect(before.chat.x).toBeGreaterThanOrEqual(before.seats.x + before.seats.width);
+  else expect(before.chat.x + before.chat.width).toBeLessThanOrEqual(before.seats.x);
   expect(before.chat.height).toBeGreaterThanOrEqual(120);
 
   // Ann says hello; Bo sees it with Ann's name (from the lobby). A plan goes too: there are no teams yet.
@@ -101,7 +103,7 @@ test("Solo's queue: the bots say hello, your line shows, and the match itself ha
   await page.goto("/?debug");
   await soloFromHome(page);
   await expect(page.locator(".fd-seats")).toBeVisible({ timeout: 60_000 });
-  const chat = page.locator(".fd-queue .qchat-lobby");
+  const chat = page.locator(".fd-home.queueing .qchat-lobby");
   await expect(chat).toBeVisible();
   await chat.locator(".qchip", { hasText: "Have fun!" }).click();
   await expect(chat.locator(".qline.you", { hasText: "Have fun!" })).toBeVisible();

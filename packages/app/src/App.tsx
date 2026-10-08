@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
 import { type MatchmakingType, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
@@ -34,7 +35,8 @@ import { VoteScreen } from "./screens/Vote.tsx";
 import { BossScreen } from "./screens/Boss.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
-import { ChatBubble } from "./components/QuickChat.tsx";
+import { ChatBubble, useMedia } from "./components/QuickChat.tsx";
+import { LobbyChat } from "./components/LobbyChat.tsx";
 
 /**
  * Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). `matchBoss`: a raid's
@@ -236,6 +238,8 @@ export function App() {
     });
   });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
+  /** A computer (the front door's frame): the queue fills in place, with the lobby's chat beside it. */
+  const computer = useMedia("(min-width: 1024px)");
 
   useEffect(() => {
     if (!match) return;
@@ -542,6 +546,27 @@ export function App() {
     },
   };
 
+  /**
+   * The side menu while you're in the queue (it stays on a computer): Play is where you are, and your profile opens over
+   * the queue (as a name tapped in it does). Anything else leaves the queue first, as leaving the page does on the
+   * chess sites, then goes there.
+   */
+  const queueNav: FrontNav = {
+    ...nav,
+    home: () => undefined,
+    profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
+    ...Object.fromEntries(
+      (["bossAlone", "friends", "shop", "settings"] as const).map((k) => [
+        k,
+        () => {
+          if (match) leave();
+          else leaveLine();
+          nav[k]();
+        },
+      ]),
+    ),
+  };
+
   if (!match && soundLab) return <SoundLab onBack={() => setSoundLab(false)} />;
   if (!match && legal) {
     return (
@@ -630,17 +655,17 @@ export function App() {
       />
     );
   }
-  if (!match && inLine) {
-    return (
-      <FrontFrame wide>
-        <QueueLine raid={inLine.mode === "raid"} waitSeconds={inLine.waitSeconds} onCancel={leaveLine} />
-      </FrontFrame>
-    );
-  }
-  if (!match) {
-    return (
-      <FrontFrame page="home" nav={nav}>
+  /**
+   * Home, or home in the queue (`queue`: you pressed PLAY). The same frame and screen either way, so on a computer the
+   * side menu, the live panel and your pawn stay put while the play column turns into the queue (and back on Cancel).
+   */
+  const home = (queue?: ComponentChildren, chat?: ComponentChildren, side = computer) => (
+    // (A phone's queue is the whole screen: no hidden menu or panel to draw again with every arrival.)
+    <FrontFrame page={queue ? "queue" : "home"} nav={!queue ? nav : computer ? queueNav : undefined}>
       <HomeScreen
+        queue={queue}
+        chat={chat}
+        side={side}
         intent={homeIntent}
         loading={loading}
         error={error}
@@ -669,9 +694,11 @@ export function App() {
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
         onShop={() => setShowShop("shop")}
       />
-      </FrontFrame>
-    );
-  }
+    </FrontFrame>
+  );
+  // (Always a fragment with the frame first, in the queue or not, so the frame is kept from one to the other.)
+  if (!match && inLine) return <>{home(<QueueLine raid={inLine.mode === "raid"} waitSeconds={inLine.waitSeconds} onCancel={leaveLine} />)}</>;
+  if (!match) return <>{home()}</>;
 
   // Play now: the lobby started a moment before we got in, so get the next one.
   if (match instanceof NetMatch && match.error && /already started|full/.test(match.error) && playNowTries.current > 0 && playNowTries.current < 3 && retriedFor.current !== match) {
@@ -690,12 +717,6 @@ export function App() {
     );
   }
 
-  const screen = renderPhase(match, {
-    leave,
-    // (Solo again as it was: through the queue screen, or Boss alone straight in.)
-    again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0 }) : leave()),
-    letBotsFill: () => void letBotsFill(),
-  });
   // A name tapped during the match: their profile over the game (which goes on underneath).
   const overlay = profileOpen && (
     <div class="fd-overlay">
@@ -704,11 +725,30 @@ export function App() {
       </FrontFrame>
     </div>
   );
+  // Quick chat's bubble: the newest message for a moment while no chat is on screen (it lets every tap through).
+  const bubble = <ChatBubble match={match} />;
+  // Waiting for the match to fill (PLAY, or Solo's bots taking their seats): the home screen, in the queue.
+  if (inQueue(match)) {
+    const q = match as NetMatch | SoloMatch;
+    const letBots = match instanceof NetMatch ? () => void letBotsFill() : undefined;
+    // (The lobby's chat: a phone's is in the queue screen, under Cancel; a computer's under your card, beside the lobby.)
+    return (
+      <>
+        {home(<QueueScreen match={q} onCancel={leave} onLetBotsFill={letBots} chat={!computer} />, computer ? <LobbyChat match={q} /> : undefined, computer)}
+        {bubble}
+        {overlay}
+      </>
+    );
+  }
+
+  const screen = renderPhase(match, {
+    leave,
+    // (Solo again as it was: through the queue screen, or Boss alone straight in.)
+    again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0 }) : leave()),
+  });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages (and the pre-game votes, so the
   // board is in the same place when the game begins).
   const tower = ["vote", "play", "scoring", "reveal", "spectating", "final", "watching", "boss"].includes(match.phase.kind) && match.standings().length > 0;
-  // Quick chat's bubble: the newest message for a moment while no chat is on screen (it lets every tap through).
-  const bubble = <ChatBubble match={match} />;
   if (!tower)
     return (
       <>
@@ -739,45 +779,39 @@ export function App() {
 
 const boardKey = (b: { id: number; generation: number; ply: number }) => `${b.id}:${b.generation}:${b.ply}`;
 
-function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void; letBotsFill: () => void }) {
+/** Going back into a match already being played: the splash until its screen comes (not the queue it started in). */
+const resumingSplash = (match: AnyMatch) =>
+  match instanceof NetMatch && match.resuming && (match.phase.kind === "loading" || (match.phase.kind === "lobby" && match.started));
+
+/**
+ * Waiting for a match to fill: a queue you joined with PLAY (from the tap, while connecting, and in its lobby), or
+ * Solo's bots taking their seats. Private lobbies with a code have their own screen.
+ */
+function inQueue(match: AnyMatch): boolean {
+  if (resumingSplash(match)) return false;
+  const k = match.phase.kind;
+  if (match instanceof SoloMatch) return k === "lobby";
+  return match instanceof NetMatch && match.auto && (k === "loading" || k === "lobby");
+}
+
+function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void }) {
   const p = match.phase;
-  // Going back into a match already being played: the splash until its screen comes (not the queue it started in).
-  if (match instanceof NetMatch && match.resuming && (p.kind === "loading" || (p.kind === "lobby" && match.started)))
+  if (resumingSplash(match))
     return (
       <div class="fd-splash">
         <Logo />
       </div>
     );
+  // (The queue, inQueue above, is the home screen's: see App.)
   switch (p.kind) {
     case "loading":
-      if (match instanceof NetMatch && match.auto)
-        return (
-          <FrontFrame wide>
-            <QueueScreen match={match} onCancel={actions.leave} onLetBotsFill={actions.letBotsFill} />
-          </FrontFrame>
-        );
       return (
         <div class="screen center">
           <p class="muted">Connecting…</p>
         </div>
       );
     case "lobby":
-      // Solo: the queue screen while your bots take their seats.
-      if (match instanceof SoloMatch)
-        return (
-          <FrontFrame wide>
-            <QueueScreen match={match} onCancel={actions.leave} />
-          </FrontFrame>
-        );
-      if (!(match instanceof NetMatch)) return null;
-      // (The queue, drawn exactly as while connecting, so the same screen carries on: your seat never pops twice.)
-      return match.auto ? (
-        <FrontFrame wide>
-          <QueueScreen match={match} onCancel={actions.leave} onLetBotsFill={actions.letBotsFill} />
-        </FrontFrame>
-      ) : (
-        <LobbyScreen match={match} onLeave={actions.leave} />
-      );
+      return match instanceof NetMatch ? <LobbyScreen match={match} onLeave={actions.leave} /> : null;
     case "opening":
       return <OpeningGrid boards={p.boards} title="Today's openings" />;
     case "spectating":

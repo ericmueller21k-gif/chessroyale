@@ -3,6 +3,7 @@ import { equippedLook, itemDef, ratingTier, shopItem, type ItemLook, type ItemSl
 import { Avatar } from "./Items.tsx";
 import { account, type Profile } from "../account.ts";
 import type { LiveCounts } from "../live.ts";
+import { setThemePref, toggledPref, useTheme } from "../theme.ts";
 
 /**
  * The front door's shared pieces (home, queue, profiles, the desktop frame), in the approved look: dark ground,
@@ -26,12 +27,29 @@ export function Logo({ onClick }: { onClick?: () => void }) {
   );
 }
 
-/** Your coin balance, as the server has it (hidden without an account). */
+/** "12k", "1.2M": a big balance, short, for the narrowest phones' top bar. */
+export function shortCoins(n: number): string {
+  if (n < 10_000) return n.toLocaleString("en-US");
+  if (n < 1_000_000) return `${Math.floor(n / 1000)}k`;
+  return `${Math.floor(n / 100_000) / 10}M`;
+}
+
+/**
+ * Your coin balance, as the server has it (hidden without an account): "● 1,250 coins". In a phone's top bar the word
+ * goes when there isn't room for it, and below 360 px a balance of 10,000 or more shows short ("12k"), so the bar
+ * never runs off the screen.
+ */
 export function Coins({ coins }: { coins: number | null }) {
   if (coins === null) return null;
+  const full = coins.toLocaleString("en-US");
+  const short = shortCoins(coins);
   return (
     <div class="fd-coins" aria-label={`${coins} coins`}>
-      <span aria-hidden="true">●</span> {coins.toLocaleString("en-US")} coins
+      <span class="fd-coins-n">
+        <span aria-hidden="true">●</span> <span class={short !== full ? "fd-coins-full" : undefined}>{full}</span>
+        {short !== full && <span class="fd-coins-short">{short}</span>}
+      </span>
+      <span class="fd-coins-word"> coins</span>
     </div>
   );
 }
@@ -74,6 +92,53 @@ export function MyPawnButton({ onClick }: { onClick: () => void }) {
     </button>
   );
 }
+
+/** Your coins and your pawn in its ring (the home's top bar on a phone; the top right of the page on a computer). */
+export function AccountBar({ onProfile }: { onProfile: () => void }) {
+  const p = account().profile;
+  return (
+    <div class="fd-top-right">
+      <Coins coins={p?.shop?.coins ?? null} />
+      <MyPawnButton onClick={onProfile} />
+    </div>
+  );
+}
+
+/**
+ * Light or dark (Eric: "when you click the sun, it switches to a black sun, and then it makes it dark mode"): a bright
+ * sun in light mode, a black one in dark mode. A tap shows the other theme and remembers the pick on this device.
+ */
+export function ThemeButton({ class: cls }: { class?: string }) {
+  const { theme } = useTheme();
+  const dark = theme === "dark";
+  return (
+    <button
+      type="button"
+      class={`fd-theme${dark ? " dark" : ""}${cls ? ` ${cls}` : ""}`}
+      aria-label="Dark mode"
+      aria-pressed={dark}
+      title={dark ? "Dark mode (tap for light)" : "Light mode (tap for dark)"}
+      onClick={() => setThemePref(toggledPref(theme))}
+    >
+      <svg viewBox="0 0 24 24" width="24" height="24" stroke-linecap="round" aria-hidden="true">
+        <circle class="fd-sun-disc" cx="12" cy="12" r="6" stroke-width="1.6" />
+        <path
+          class="fd-sun-rays"
+          stroke-width="2"
+          d="M19.8 12H22M17.52 17.52l1.55 1.55M12 19.8V22M6.48 17.52l-1.55 1.55M4.2 12H2M6.48 6.48 4.93 4.93M12 4.2V2M17.52 6.48l1.55-1.55"
+        />
+      </svg>
+    </button>
+  );
+}
+
+/** Settings: a gear (the side menu, your profile). */
+export const GearIcon = () => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="3.2" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+  </svg>
+);
 
 export function FdButton({
   children,

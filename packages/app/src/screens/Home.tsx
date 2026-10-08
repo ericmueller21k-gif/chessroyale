@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BOSS_TIERS, bossInfo, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
-import { Coins, DressedPawn, FdButton, LiveLine, Logo, MyPawnButton, RankLine, myHat, wearingNames } from "../components/FrontDoor.tsx";
+import type { ComponentChildren } from "preact";
+import { AccountBar, DressedPawn, FdButton, LiveLine, Logo, RankLine, ThemeButton, myHat, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 
 export const OPENING_KEY = "brc.openingMoves";
@@ -365,11 +366,18 @@ function Notice({ notice }: { notice: HomeNotice }) {
 }
 
 /**
- * Home (the approved mockup, docs/mockups/front-door/Main.dc.html): the top bar (logo, coins, your pawn), the live
- * line, your dressed pawn, the mode picker, PLAY and the line under it, and four smaller buttons. A note goes under the
- * live line when a lobby you opened has closed.
+ * Home (the approved mockup, docs/mockups/front-door/Main.dc.html): the top bar (logo, the sun, coins, your pawn), the
+ * live line, your dressed pawn, the mode picker, PLAY and the line under it, and four smaller buttons. A note goes under
+ * the live line when a lobby you opened has closed.
+ *
+ * With `queue` (you pressed PLAY), the home becomes the queue: on a phone the queue screen takes the whole screen, as
+ * before; on a computer it fills in place of the play column, and your pawn shrinks to a card at the top of its column
+ * with the lobby's chat under it (`chat`, when there is one). The frame (side menu, live panel) stays.
  */
 export function HomeScreen({
+  queue,
+  chat,
+  side = true,
   intent,
   loading,
   error,
@@ -384,6 +392,12 @@ export function HomeScreen({
   onShop,
   onSignIn,
 }: {
+  /** In the queue: the queue screen (or the line for a seat), shown in place of the play column. */
+  queue?: ComponentChildren;
+  /** In the queue on a computer: the lobby's chat, under your pawn. */
+  chat?: ComponentChildren;
+  /** In the queue: draw the computer's column (your card, the chat) beside it. A phone shows only the queue. */
+  side?: boolean;
   /** The computer's side menu asked for the boss menu or Play with friends. */
   intent?: { kind: "boss" | "friends"; n: number } | null;
   loading: boolean;
@@ -473,28 +487,48 @@ export function HomeScreen({
   const look = profile?.locker?.look;
   const name = profile?.user.name ?? "Player";
   const wearing = wearingNames(look, profile?.shop);
+  const queueing = queue !== undefined && queue !== null;
+  const hero = (
+    <section class="fd-hero" aria-label="You">
+      <DressedPawn look={look} hat={myHat(profile)} size="hero" shadow />
+      <div class="fd-hero-text">
+        <div class="fd-hero-name">{name}</div>
+        <div class="fd-hero-sub">
+          <RankLine rating={profile?.rating ?? null} />
+          {wearing && ` · ${wearing}`}
+        </div>
+      </div>
+    </section>
+  );
+  if (queueing)
+    return (
+      <div class="fd-home queueing">
+        <div class="fd-home-main">
+          {/* (A computer's: your pawn, smaller, and the lobby's chat under it. A phone shows only the queue.) */}
+          {side && (
+            <div class="fd-wait-side">
+              {hero}
+              {chat && <div class="fd-wait-chat">{chat}</div>}
+            </div>
+          )}
+          {queue}
+        </div>
+      </div>
+    );
   return (
     <div class="fd-home">
+      {/* (A phone's top bar. A computer has the logo and the sun in its side menu, your coins and pawn top right.) */}
       <header class="fd-top">
         <Logo />
-        <div class="fd-top-right">
-          <Coins coins={profile?.shop?.coins ?? null} />
-          <MyPawnButton onClick={onProfile} />
+        <div class="fd-top-end">
+          <ThemeButton />
+          <AccountBar onProfile={onProfile} />
         </div>
       </header>
       <LiveLine live={live} />
       {notice && <Notice notice={notice} />}
       <div class="fd-home-main">
-        <section class="fd-hero" aria-label="You">
-          <DressedPawn look={look} hat={myHat(profile)} size="hero" shadow />
-          <div class="fd-hero-text">
-            <div class="fd-hero-name">{name}</div>
-            <div class="fd-hero-sub">
-              <RankLine rating={profile?.rating ?? null} />
-              {wearing && ` · ${wearing}`}
-            </div>
-          </div>
-        </section>
+        {hero}
         <div class="fd-play-col">
           <div class="fd-modes" role="radiogroup" aria-label="Mode">
             {MODES.map((m) => (

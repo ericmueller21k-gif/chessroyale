@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 import { bossInfo } from "@chessroyale/core";
 import { account } from "../account.ts";
 import { useLive, type PlayingNow } from "../live.ts";
-import { DressedPawn, LiveLine, Logo, myHat } from "./FrontDoor.tsx";
+import { AccountBar, DressedPawn, GearIcon, LiveLine, Logo, ThemeButton, myHat } from "./FrontDoor.tsx";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
@@ -31,7 +31,10 @@ function Item({ label, icon, on, onClick }: { label: string; icon: ComponentChil
   );
 }
 
-/** The computer's left column: the logo, where to go, and settings at the bottom (like the big chess sites). */
+/**
+ * The computer's left column: the logo, where to go, and at the bottom light or dark (the sun) and Settings (like the
+ * big chess sites).
+ */
 export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
   const p = account().profile;
   return (
@@ -75,17 +78,8 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
         <Item label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} hat={myHat(p)} />} />
       </div>
       <div class="fd-menu fd-menu-end">
-        <Item
-          label="Settings"
-          on={page === "settings"}
-          onClick={nav.settings}
-          icon={
-            <Icon>
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
-            </Icon>
-          }
-        />
+        <ThemeButton class="fd-side-theme" />
+        <Item label="Settings" on={page === "settings"} onClick={nav.settings} icon={<GearIcon />} />
       </div>
     </nav>
   );
@@ -99,12 +93,13 @@ function matchLine(m: PlayingNow, now: number): { title: string; sub: string } {
   return { title, sub: [left, min === null ? null : min < 1 ? "just started" : `${min} min in`].filter(Boolean).join(" · ") };
 }
 
-/** The computer's right column: the live line and the matches being played now. */
-export function RightPanel() {
+/** The computer's right column: your coins and pawn at the top right, the live line, and the matches being played now. */
+export function RightPanel({ onProfile }: { onProfile: () => void }) {
   const live = useLive();
   const now = Date.now();
   return (
     <aside class="fd-right" aria-label="Live">
+      <AccountBar onProfile={onProfile} />
       <LiveLine live={live} stacked />
       <section class="fd-section">
         <h2 class="fd-label">PLAYING NOW</h2>
@@ -131,15 +126,15 @@ export function RightPanel() {
 
 /**
  * The front door's frame: the page's background and its centre column. On a computer (1024 px and wider) with `nav`,
- * the side menu on the left and the live panel on the right (not for `wide` pages, like the queue, which take the
- * whole width); on a phone, just the centre.
+ * the side menu on the left and the live panel on the right; on a phone, just the centre. (The queue is a state of
+ * the home screen, in the same frame: see HomeScreen.)
  */
-export function FrontFrame({ children, wide, page, nav }: { children: ComponentChildren; wide?: boolean; page?: FrontPage; nav?: FrontNav }) {
+export function FrontFrame({ children, page, nav }: { children: ComponentChildren; page?: FrontPage; nav?: FrontNav }) {
   return (
-    <div class={`fd-root${wide ? " wide" : ""}${nav ? " framed" : ""}`}>
+    <div class={`fd-root${nav ? " framed" : ""}${page ? ` fd-on-${page}` : ""}`}>
       {nav && <SideMenu page={page} nav={nav} />}
       <main class="fd-center">{children}</main>
-      {nav && !wide && <RightPanel />}
+      {nav && <RightPanel onProfile={nav.profile} />}
     </div>
   );
 }
