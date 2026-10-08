@@ -32,61 +32,13 @@ import {
   type UciTransport,
 } from "@chessroyale/chess";
 import { STOCKFISH_BUILD, STOCKFISH_FULL_BUILD, createNodeEngine } from "@chessroyale/chess/node";
+import { browserEngine } from "../src/browser-engine.ts";
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
-import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const out = root + "reports/judge-determinism/";
 const opts = { nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb };
-
-/** The lite build in a Web Worker in headless Chromium, spoken to from here over UCI (the app's own transport). */
-async function browserEngine(): Promise<{ engine: UciEngine; stop: () => Promise<void> }> {
-  const { chromium } = await import("@playwright/test");
-  const dir = dirname(STOCKFISH_BUILD);
-  const server = createServer((req, res) => {
-    const name = (req.url ?? "/").split("?")[0]!.split("#")[0]!.replace(/^\//, "");
-    if (!name) return res.writeHead(200, { "content-type": "text/html" }).end("<!doctype html><title>engine</title>");
-    try {
-      const body = readFileSync(join(dir, name.replace(/[^\w.-]/g, "")));
-      res.writeHead(200, { "content-type": name.endsWith(".wasm") ? "application/wasm" : "text/javascript" }).end(body);
-    } catch {
-      res.writeHead(404).end();
-    }
-  });
-  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
-  const port = (server.address() as { port: number }).port;
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
-  const listeners: ((line: string) => void)[] = [];
-  await page.exposeFunction("uciLine", (text: string) => {
-    for (const line of text.split("\n")) for (const l of listeners) l(line.trim());
-  });
-  await page.goto(`http://127.0.0.1:${port}/`);
-  // (Runs in the page: typed loosely, as this package has no DOM types.)
-  type Page = { Worker: new (url: string) => { onmessage: (e: { data: unknown }) => void; postMessage(c: string): void }; uciLine(t: string): void; sf: { postMessage(c: string): void } };
-  await page.evaluate(() => {
-    const g = globalThis as unknown as Page;
-    const w = new g.Worker(`/stockfish-19-lite-single.js#${encodeURIComponent("/stockfish-19-lite-single.wasm")}`);
-    w.onmessage = (e) => void (typeof e.data === "string" && g.uciLine(e.data));
-    g.sf = w;
-  });
-  const transport: UciTransport = {
-    send: (c) => void page.evaluate((cmd) => (globalThis as unknown as Page).sf.postMessage(cmd), c),
-    onLine: (l) => listeners.push(l),
-    close: () => undefined,
-  };
-  const engine = new UciEngine(transport, opts);
-  await engine.init();
-  return {
-    engine,
-    stop: async () => {
-      await browser.close();
-      server.close();
-    },
-  };
-}
 
 async function run(count: number, seed: number, withBrowser: boolean, refNodes: number) {
   const rng = mulberry32(seed);
@@ -96,7 +48,7 @@ async function run(count: number, seed: number, withBrowser: boolean, refNodes: 
   const b = await createNodeEngine(opts);
   const c = await createNodeEngine(opts);
   const ref = await createNodeEngine({ nodes: refNodes, hashMb: 64 }, STOCKFISH_FULL_BUILD);
-  const web = withBrowser ? await browserEngine() : null;
+  const web = withBrowser ? await browserEngine(opts) : null;
   mkdirSync(out, { recursive: true });
   const file = `${out}seed${seed}.jsonl`;
   let done = 0;

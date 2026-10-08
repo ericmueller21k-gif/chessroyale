@@ -587,6 +587,13 @@ export interface JudgeConfig {
   speedWeight: number;
   benchNodes: number;
   defaultNps: number;
+  deepOnDevices: boolean;
+  deepNodes: number;
+  deepWindowMs: number;
+  deepHeadroom: number;
+  deepMinNodes: number;
+  deepWaitMs: number;
+  refereeWaitMs: number;
 }
 
 export const JUDGES: JudgeConfig = {
@@ -631,6 +638,32 @@ export const JUDGES: JudgeConfig = {
   benchNodes: 150_000,
   /** A device that hasn't reported its speed yet counts as this fast (nodes/s): a typical phone. */
   defaultNps: 250_000,
+  /**
+   * Deep checks on players' computers (DECISIONS.md, "Deep checks on players' computers"): with two capable devices
+   * judging a board, they re-check its close calls themselves, and the engine server is asked only when they
+   * disagree or are late. OFF: the browsers' engine (the lite network) re-checks less accurately than the engine
+   * server (reports/deep-accuracy.md: unfair cuts of top-quarter players 0.63% against 0.37%), and Eric's rule puts
+   * fair scoring first. On only with an engine on the devices as good as the server's.
+   */
+  deepOnDevices: false,
+  /** The re-check's node count at most: the engine server's (shared by the round's boards, as the server's is). */
+  deepNodes: 2_000_000,
+  /**
+   * The time the re-check may take on a device: what the engine server takes today (2M nodes at about 700k nodes/s),
+   * so no round waits longer. A job's node count is what the slower of its two devices does in this time, with
+   * `deepHeadroom` to spare, capped at deepNodes (reports/deep-timing.md: a speed check's reading is the re-check's speed).
+   */
+  deepWindowMs: 3_000,
+  deepHeadroom: 0.85,
+  /**
+   * A capable device: a computer (never a phone: a 2M-node search every round drains a battery) that can re-check at
+   * least this many nodes in the window (so 1M nodes: about 390k nodes/s on its speed check).
+   */
+  deepMinNodes: 1_000_000,
+  /** After the quick answers settle, how long the lobby waits for both devices' re-checks before asking the server. */
+  deepWaitMs: 3_500,
+  /** A dispute settled two of three: how long it waits for the third device's answer. */
+  refereeWaitMs: 5_000,
 };
 
 /**

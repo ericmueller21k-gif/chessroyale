@@ -2,7 +2,7 @@
  * Many judges, the lobby's side (pure helpers; the flow is in lobby.ts). See DECISIONS.md, "Many judges".
  */
 import type { JudgeConfig } from "@chessroyale/core";
-import type { JudgedBoard, JudgeJob, JudgeReport } from "@chessroyale/chess";
+import type { JudgedBoard, JudgeJob, JudgeReport, MoveScore } from "@chessroyale/chess";
 
 /** What the lobby knows about a device that can judge (by player id). */
 export interface JudgeDevice {
@@ -44,6 +44,17 @@ export interface JudgeTask {
   done?: { board: JudgedBoard; how: JudgeHow };
   /** A dispute that went to a third device too (its second opinion decides the blame, not distance from the verdict). */
   refereed?: boolean;
+  /** Two capable judges re-check the close calls themselves (deep checks on devices). */
+  deep?: boolean;
+  /** The third device asked, and (settled two of three) the two devices that agreed. */
+  refereeBy?: string;
+  majorityPair?: string[];
+  /** Deep checks: each device's re-check of the close calls, as it comes (by player id). */
+  deepReports?: Record<string, MoveScore[]>;
+  /** Waiting for these devices' re-checks until then (the quick numbers are settled). */
+  awaitDeep?: { from: string[]; until: number };
+  /** Two re-checks that disagreed, kept for blame when the engine server's re-check comes. */
+  deepBoards?: Record<string, JudgedBoard | null>;
 }
 
 /** Counts for the logs and the harness (reports/many-judges.md). */
@@ -70,6 +81,11 @@ export interface JudgeStats {
   /** Late second answers (after the job was settled on the first): matching it, or not. */
   lateAgreed: number;
   lateDisagreed: number;
+  /** Deep checks on devices: jobs that carried one, re-checks that agreed, disagreed, or came too late. */
+  deepJobs: number;
+  deepAgreed: number;
+  deepDisagreed: number;
+  deepLate: number;
 }
 
 export const emptyStats = (): JudgeStats => ({
@@ -91,6 +107,10 @@ export const emptyStats = (): JudgeStats => ({
   spotCaught: 0,
   lateAgreed: 0,
   lateDisagreed: 0,
+  deepJobs: 0,
+  deepAgreed: 0,
+  deepDisagreed: 0,
+  deepLate: 0,
 });
 
 /** A device's weight when judges are drawn: faster devices more often, and less once it has jobs this round. */

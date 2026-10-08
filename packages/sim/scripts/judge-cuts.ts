@@ -14,8 +14,24 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const dir = root + "reports/judge-accuracy/";
-type Row = { picks: string[]; lite: Record<string, number>; lite1m: Record<string, number>; full: Record<string, number>; ref: Record<string, number> };
+type Row = {
+  fen: string;
+  picks: string[];
+  lite: Record<string, number>;
+  lite1m: Record<string, number>;
+  full: Record<string, number>;
+  ref: Record<string, number>;
+  /** The re-check as the game runs it (deep-accuracy.ts): the lite build at 2M nodes (a computer), the full network at 2M (the server). */
+  liteDeep?: Record<string, number>;
+  fullDeep?: Record<string, number>;
+};
 const rows: Row[] = readdirSync(dir).filter((f) => f.endsWith(".jsonl")).flatMap((f) => readFileSync(dir + f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)));
+try {
+  const deep = new Map(readFileSync(root + "reports/deep-accuracy.jsonl", "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as Row).map((d) => [d.fen, d]));
+  for (const r of rows) Object.assign(r, { liteDeep: deep.get(r.fen)?.liteDeep, fullDeep: deep.get(r.fen)?.fullDeep });
+} catch {
+  // No deep-accuracy run yet.
+}
 
 const N = 100;
 const FIRST = 10;
@@ -28,6 +44,9 @@ const band = (o: Record<string, number>, b: number) => Object.fromEntries(Object
 /** Picks the judge `k` scores `at`+ are searched again by `by` (a deeper search), and that score is used. */
 const recheck = (r: Row, k: "lite" | "lite1m", at: number, by: "ref" | "lite1m" | "full" = "ref") =>
   Object.fromEntries(r.picks.map((m) => [m, r[k][m]! >= at ? r[by][m]! : r[k][m]!]));
+/** The judge "lite" with its picks losing between `range` points searched again by `by` (where it has a number). */
+const recheckIn = (r: Row, [lo, hi]: [number, number], by: "ref" | "lite1m" | "liteDeep" | "fullDeep") =>
+  Object.fromEntries(r.picks.map((m) => [m, r.lite[m]! >= lo && r.lite[m]! <= hi && r[by]?.[m] !== undefined ? r[by]![m]! : r.lite[m]!]));
 const JUDGES: [string, (r: Row) => Record<string, number>][] = [
   ["Referee (truth)", (r) => r.ref],
   ["Today: lite 250k", (r) => r.lite],
@@ -39,6 +58,12 @@ const JUDGES: [string, (r: Row) => Record<string, number>][] = [
   ["Today + re-check 8+ with lite 1M (phone can do)", (r) => recheck(r, "lite", 8, "lite1m")],
   ["Today + re-check 5+ with lite 1M (phone can do)", (r) => recheck(r, "lite", 5, "lite1m")],
   ["Lite 1M + re-check 8+ with the referee (a server)", (r) => recheck(r, "lite1m", 8, "ref")],
+  // The re-check as it runs online (picks losing 5-60 points): on the engine server (the referee stands in for it),
+  // or on two players' computers (the lite build at 1M+ nodes; see DECISIONS.md, "Deep checks on players' computers").
+  ["Online: re-check 5-60 on the engine server", (r) => recheckIn(r, [5, 60], "ref")],
+  ["Online: re-check 5-60 on computers (lite 1M)", (r) => recheckIn(r, [5, 60], "lite1m")],
+  ["As the game runs it: re-check 5-60, full network 2M (the engine server)", (r) => recheckIn(r, [5, 60], "fullDeep")],
+  ["As the game runs it: re-check 5-60, lite 2M (two computers)", (r) => recheckIn(r, [5, 60], "liteDeep")],
 ];
 
 function match(seed: number) {

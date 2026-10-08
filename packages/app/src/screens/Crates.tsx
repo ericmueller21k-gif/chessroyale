@@ -47,13 +47,45 @@ export const finishLine = (it: { color: string; color2?: string | null; blemish:
 
 // ---------------- Crates ----------------
 
+/**
+ * A crate opened but not seen yet: the server rolled it, but you left during the spin (Eric, Oct 8). Kept on the
+ * device (and in memory, if storage is off) until its reveal shows; coming back to the crates opens straight to it.
+ */
+type Unseen = { crate: string; roll: CrateRoll; item: ItemInstance };
+const UNSEEN_KEY = "hunchess-crate-unseen";
+let unseenHere: Unseen | null = null;
+function setUnseen(u: Unseen | null) {
+  unseenHere = u;
+  try {
+    if (u) localStorage.setItem(UNSEEN_KEY, JSON.stringify(u));
+    else localStorage.removeItem(UNSEEN_KEY);
+  } catch {
+    // No storage (private mode): memory alone keeps it while the app is open.
+  }
+}
+function getUnseen(): Unseen | null {
+  try {
+    const v = localStorage.getItem(UNSEEN_KEY);
+    if (v) return JSON.parse(v) as Unseen;
+  } catch {
+    // Fall back to memory.
+  }
+  return unseenHere;
+}
+
 /** Your crates and keys, and each crate's page: what's inside and the odds, and the button to open one. */
 export function CratesPanel() {
   const { profile } = useAccount();
-  const [open, setOpen] = useState<CrateDef | null>(null);
   const locker = profile?.locker;
+  // A crate you left during its spin opens straight to its reveal (unless that item's gone, e.g. deleted).
+  const [resume] = useState(() => {
+    const u = getUnseen();
+    if (!u || !crateDef(u.crate) || (locker && !locker.items.some((i) => i.id === u.item.id))) return null;
+    return u;
+  });
+  const [open, setOpen] = useState<CrateDef | null>(() => (resume ? crateDef(resume.crate)! : null));
   const count = (n: number | null | undefined) => (n === null || n === undefined ? "∞" : String(n));
-  if (open) return <CratePage crate={open} onBack={() => setOpen(null)} />;
+  if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
   return (
     <div class="crates">
       <div class="crate-stock">
@@ -83,13 +115,14 @@ export function CratesPanel() {
   );
 }
 
-function CratePage({ crate, onBack }: { crate: CrateDef; onBack: () => void }) {
+function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
   const q = new URLSearchParams(location.search);
   const [forceFischer, setForceFischer] = useState(q.get("fischer") === "1");
   const [forceShiny, setForceShiny] = useState(q.get("shiny") === "1");
-  const [opening, setOpening] = useState(false);
+  const [opening, setOpening] = useState(!!resume);
   const items = [...crate.items, ...crate.fischer.map((s) => s.item)];
-  if (opening) return <CrateOpening crate={crate} force={{ fischer: forceFischer, shiny: forceShiny }} onClose={() => setOpening(false)} />;
+  if (opening)
+    return <CrateOpening crate={crate} force={{ fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />;
   return (
     <div class="crate-page">
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
@@ -307,17 +340,37 @@ function Spin({ tiles, land, ms, onDone }: { tiles: Tile[]; land: number; ms: nu
  * Opening a crate: the server rolls, the strip spins to a tier's present, which unwraps straight to the reveal; or
  * to Fischer Random, which gets its banner and a second spin among its items before the reveal.
  */
-function CrateOpening({ crate, force, onClose }: { crate: CrateDef; force: { fischer?: boolean; shiny?: boolean }; onClose: () => void }) {
-  const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(null);
+function CrateOpening({
+  crate,
+  force,
+  resume,
+  onClose,
+}: {
+  crate: CrateDef;
+  force: { fischer?: boolean; shiny?: boolean };
+  /** A crate already opened but not seen (you left during the spin): straight to its reveal. */
+  resume?: Unseen;
+  onClose: () => void;
+}) {
+  const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(resume ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">("spin");
+  const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">(resume ? "reveal" : "spin");
   const [round, setRound] = useState(0);
   useEffect(() => {
+    if (round === 0 && resume) return;
+    let here = true;
     setResult(null);
     setStage("spin");
     openCrate(crate.id, force)
-      .then(setResult)
-      .catch((e) => setError(e instanceof Error ? e.message : "Couldn't open the crate."));
+      .then((r) => {
+        // It's yours now: if you leave before the reveal, it waits for you (the reveal clears it).
+        setUnseen({ crate: crate.id, ...r });
+        if (here) setResult(r);
+      })
+      .catch((e) => here && setError(e instanceof Error ? e.message : "Couldn't open the crate."));
+    return () => {
+      here = false;
+    };
   }, [round]);
   const strips = useMemo(() => {
     if (!result) return null;
@@ -391,6 +444,7 @@ function Reveal({ item, onAgain, onClose }: { item: ItemInstance; onAgain: () =>
   const special = d.tier === "legendary" || d.tier === "mythic";
   const [worn, setWorn] = useState(false);
   useEffect(() => {
+    setUnseen(null);
     play(special || shiny ? "bannerStart" : "select");
   }, []);
   return (

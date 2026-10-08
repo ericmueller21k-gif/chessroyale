@@ -78,6 +78,15 @@ test("many judges: two devices in one online match each check their speed, judge
   // The two answers were identical (the engine is deterministic), so the lobby used them as they were.
   const report = (tap: { sent: any[] }, id: string) => JSON.stringify(tap.sent.find((m) => m.t === "judged" && m.id === id)?.report);
   for (const id of both.slice(0, 3)) expect(report(tapD, id)).toBe(report(tapP, id));
+  // No engine server in the e2e run: the two devices re-checked the close calls themselves, sent after the quick
+  // answer, and their re-checks were identical too.
+  const deep = (tap: { sent: any[] }) => new Map(tap.sent.filter((m) => m.t === "judgedDeep").map((m) => [m.id, JSON.stringify(m.deep)]));
+  const [dD, dP] = [deep(tapD), deep(tapP)];
+  for (const [id, d] of dD) if (dP.has(id)) expect(dP.get(id)).toBe(d);
+  for (const tap of [tapD, tapP]) {
+    const order = tap.sent.filter((m) => m.t === "judged" || m.t === "judgedDeep").map((m) => `${m.t}:${m.id}`);
+    for (const id of dD.keys()) if (order.includes(`judgedDeep:${id}`)) expect(order.indexOf(`judged:${id}`)).toBeLessThan(order.indexOf(`judgedDeep:${id}`));
+  }
   // Nobody was cross-checking anyone afterwards (the judges did that).
   expect(tapP.sent.some((m) => m.t === "crossCheck")).toBe(false);
 });
