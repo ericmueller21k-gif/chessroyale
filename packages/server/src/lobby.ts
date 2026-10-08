@@ -1763,9 +1763,9 @@ export class LobbyCore {
 
   /**
    * Two judges disagree. A third device that can do the job (a capable one when the job carries a deep re-check) gets
-   * it: two of three exactly alike settle the score and the strike. The engine server's verdict instead when a
-   * disputing judge already has a strike (that path exists to catch cheaters), when there's no third device, or when
-   * the third matches neither or doesn't answer in time.
+   * it, and the engine server is asked for its verdict at the same moment: whichever settles it first stands (two of
+   * three devices exactly alike, or the server's verdict), so a dispute is never slower than the server alone. With no
+   * engine server, the third device settles it (or the more trusted judge, if it can't).
    */
   private dispute(t: JudgeTask, a: string, b: string) {
     t.judges = [a, b];
@@ -1780,12 +1780,11 @@ export class LobbyCore {
       (this.jr.referees ??= {})[id] = { job: { ...t.job, id }, by: ref, boards: { [a]: t.boards[a]!, [b]: t.boards[b]! }, at: this.io.now() };
       this.io.send(ref, { t: "judge", key: this.r.round?.key ?? "", jobs: [{ ...t.job, id }] });
     }
-    const struck = (this.jr.devices[a]?.strikes ?? 0) > 0 || (this.jr.devices[b]?.strikes ?? 0) > 0;
-    if (ref && !(struck && this.serverOn)) {
+    if (this.serverOn) return this.askVerdict(t);
+    if (ref) {
       t.server = { kind: "referee", id: `${t.job.id}~ref`, at: this.io.now() };
       return;
     }
-    if (this.serverOn) return this.askVerdict(t);
     this.fallback(t, "no engine server, and no third device");
   }
 
@@ -1938,8 +1937,9 @@ export class LobbyCore {
     const matches = Object.entries(ref.boards).filter(([, b]) => b && boardsAgree(mine, b, this.jcfg.tolerance).agree).map(([j]) => j);
     this.jr.stats.refereed++;
     // A dispute waiting on this: two of three decide the scores (and the re-check goes to those two).
-    const t = Object.values(this.r.judges?.tasks ?? {}).find((x) => x.server?.kind === "referee" && x.server.id === id);
-    if (t && this.r.phase === "scoring") {
+    const t = Object.values(this.r.judges?.tasks ?? {}).find((x) => (x.server?.kind === "referee" && x.server.id === id) || (x.server?.kind === "verdict" && `${x.job.id}~ref` === id));
+    if (t && this.r.phase === "scoring" && (matches.length === 1 || t.server?.kind === "referee")) {
+      // (Settled two of three before the server's verdict came: its answer, when it comes, is ignored.)
       t.server = undefined;
       if (matches.length === 1) {
         this.jr.stats.majority++;
@@ -1949,8 +1949,7 @@ export class LobbyCore {
         t.judges = [matches[0]!];
         t.majorityPair = [matches[0]!, playerId];
         this.accept(t, ref.boards[matches[0]!]!, "majority");
-      } else if (this.serverOn) this.askVerdict(t);
-      else this.fallback(t, "the second opinion matched neither judge");
+      } else this.fallback(t, "the second opinion matched neither judge");
       this.afterJudging();
     }
     if (matches.length !== 1) return void console.log(`judges: second opinion on ${id} in ${this.r.code} matched ${matches.length ? "both" : "neither"}: no blame`);
@@ -1964,11 +1963,8 @@ export class LobbyCore {
     const now = this.io.now();
     for (const t of Object.values(tasks)) {
       if (t.server && now >= t.server.at + waitFor(t.server.kind, this.jcfg.refereeWaitMs)) {
-        if (t.server.kind === "referee") {
-          t.server = undefined;
-          if (this.serverOn) this.askVerdict(t);
-          else this.fallback(t, "no second opinion in time");
-        } else this.serverScored(t.server.id, null);
+        if (t.server.kind === "referee") this.fallback(t, "no second opinion in time");
+        else this.serverScored(t.server.id, null);
         continue;
       }
       if (t.awaitDeep && now >= t.awaitDeep.until) {

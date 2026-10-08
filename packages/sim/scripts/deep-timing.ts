@@ -20,7 +20,7 @@ const root = fileURLToPath(new URL("../../../", import.meta.url));
 const file = root + "reports/deep-timing.jsonl";
 const NODES = [700_000, 1_000_000, 2_000_000];
 
-async function run(count: number, slowdowns: number[]) {
+async function run(count: number, slowdowns: number[], build = "stockfish-19-lite-single") {
   const rng = mulberry32(11);
   const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
   const gen = await createNodeEngine({ nodes: 60_000, hashMb: 16 });
@@ -40,7 +40,7 @@ async function run(count: number, slowdowns: number[]) {
   }
   gen.close();
   for (const slow of slowdowns) {
-    const web = await browserEngine({ nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb }, slow);
+    const web = await browserEngine({ nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb }, slow, build);
     const e = web.engine;
     const speed = await e.speed(JUDGES.benchNodes);
     const speed2 = await e.speed(JUDGES.benchNodes);
@@ -54,7 +54,7 @@ async function run(count: number, slowdowns: number[]) {
         await e.scoreMovesAt(c.fen, c.moves, n);
         deepMs[n] = Math.round(performance.now() - t);
       }
-      const row = { slow, speed, speed2, topMs: Math.round(topMs), deepMs };
+      const row = { build, slow, speed, speed2, topMs: Math.round(topMs), deepMs };
       appendFileSync(file, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }
@@ -63,7 +63,7 @@ async function run(count: number, slowdowns: number[]) {
 }
 
 function summary() {
-  const rows = readFileSync(file, "utf8").trim().split("\n").map((l) => JSON.parse(l) as { slow: number; speed: number; speed2: number; topMs: number; deepMs: Record<string, number> });
+  const rows = readFileSync(file, "utf8").trim().split("\n").map((l) => JSON.parse(l) as { build?: string; slow: number; speed: number; speed2: number; topMs: number; deepMs: Record<string, number> });
   const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
   const max = (xs: number[]) => Math.max(...xs);
   let md = `# Deep re-checks in a browser
@@ -73,15 +73,22 @@ Chromium on this machine (one thread, as the app runs it), timed on ${rows.filte
 search (the best move and four others, restricted to them) at each node count, and the top-8 search the judges run
 (${DEFAULT_SETTINGS.engineNodes.toLocaleString("en")} nodes). CPU slowdown is Chrome's own throttling (devtools' "4x slowdown" is roughly a mid-range phone).
 
-| CPU | Speed check (nodes/s, 1st / 2nd) | Top-8 search | ${NODES.map((n) => `Re-check ${n / 1e6}M (median / max)`).join(" | ")} | Nodes/s at 2M |
-|---|---|---:|${NODES.map(() => "---:").join("|")}|---:|
+| Build | CPU | Speed check (nodes/s, 1st / 2nd) | Top-8 search | ${NODES.map((n) => `Re-check ${n / 1e6}M (median / max)`).join(" | ")} | Nodes/s at 2M |
+|---|---|---|---:|${NODES.map(() => "---:").join("|")}|---:|
 `;
-  for (const slow of [...new Set(rows.map((r) => r.slow))]) {
-    const rs = rows.filter((r) => r.slow === slow);
+  const groups = [...new Set(rows.map((r) => `${r.build ?? "stockfish-19-lite-single"}|${r.slow}`))];
+  for (const g of groups) {
+    const [build, slowText] = g.split("|") as [string, string];
+    const slow = Number(slowText);
+    const rs = rows.filter((r) => (r.build ?? "stockfish-19-lite-single") === build && r.slow === slow);
     const at2m = med(rs.map((r) => r.deepMs[2_000_000]!));
-    md += `| ${slow === 1 ? "this machine" : `${slow}x slower`} | ${rs[0]!.speed.toLocaleString("en")} / ${rs[0]!.speed2.toLocaleString("en")} | ${med(rs.map((r) => r.topMs))} ms | ${NODES.map((n) => `${(med(rs.map((r) => r.deepMs[n]!)) / 1000).toFixed(2)} / ${(max(rs.map((r) => r.deepMs[n]!)) / 1000).toFixed(2)} s`).join(" | ")} | ${Math.round(2_000_000 / (at2m / 1000)).toLocaleString("en")} |\n`;
+    md += `| ${build.includes("lite") ? "lite (the app's)" : "full network (99 MB)"} | ${slow === 1 ? "this machine" : `devtools ${slow}x throttling`} | ${rs[0]!.speed.toLocaleString("en")} / ${rs[0]!.speed2.toLocaleString("en")} | ${med(rs.map((r) => r.topMs))} ms | ${NODES.map((n) => `${(med(rs.map((r) => r.deepMs[n]!)) / 1000).toFixed(2)} / ${(max(rs.map((r) => r.deepMs[n]!)) / 1000).toFixed(2)} s`).join(" | ")} | ${Math.round(2_000_000 / (at2m / 1000)).toLocaleString("en")} |\n`;
   }
   md += `
+Chrome's CPU throttling turns out not to slow a Web Worker (the throttled rows match the others), so a phone's speed
+isn't measured here; phones don't do deep checks anyway. The speed check's reading (150k nodes) matches the re-check's
+own speed, so a device's reported speed predicts how long its re-check takes.
+
 The engine server takes about 3 s for its 2M-node re-check (700k nodes/s on one core), after the judges' answers are
 in; that's the time a round already waits for close calls today. See DECISIONS.md, "Deep checks on players'
 computers", for the node count and speed threshold chosen from these.
@@ -91,6 +98,8 @@ computers", for the node count and speed threshold chosen from these.
 }
 
 const [cmd, ...args] = process.argv.slice(2);
-if (cmd === "run") await run(Number(args[0] ?? 12), args.slice(1).length ? args.slice(1).map(Number) : [1, 4]);
+const full = args.includes("full");
+const nums = args.filter((a) => a !== "full").map(Number);
+if (cmd === "run") await run(nums[0] ?? 12, nums.slice(1).length ? nums.slice(1) : [1, 4], full ? "stockfish-19-single" : "stockfish-19-lite-single");
 else if (cmd === "summary") summary();
 else console.log("usage: deep-timing.ts run [positions] [cpuSlowdown...] | summary");

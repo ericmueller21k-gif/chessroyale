@@ -19,7 +19,10 @@
 import { DEFAULT_SETTINGS, JUDGES, modeSettings, mulberry32, type JudgeConfig, type Settings } from "@chessroyale/core";
 import {
   applyRecheck,
+  deepCheck,
   judgedBoard,
+  quickPart,
+  runQuickJob,
   legalMoves,
   recheckTargets,
   runJudgeJob,
@@ -39,7 +42,9 @@ import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } f
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
-const out = root + "reports/many-judges/";
+/** Where runs go (JUDGE_OUT: another folder under reports/, e.g. deep-checks). */
+const outName = process.env.JUDGE_OUT ?? "many-judges";
+const out = root + `reports/${outName}/`;
 const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
 
 type Kind = "honest" | "slow" | "drop" | "inflate" | "noise" | "rubber" | "lazy";
@@ -48,6 +53,8 @@ interface DeviceSpec {
   kind: Kind;
   /** Real speed (nodes/s in the browser's lite build): a computer about 1.1M, a phone 350k, an old phone 90k. */
   nps: number;
+  /** A computer (not a phone): can do deep checks if fast enough. */
+  computer?: boolean;
 }
 interface Scenario {
   name: string;
@@ -55,9 +62,11 @@ interface Scenario {
   server: boolean;
   /** Judges' settings for this scenario (else JUDGES). */
   judges?: Partial<JudgeConfig>;
+  /** Share of players who close the tab when they're knocked out (the rest keep watching, and judging). */
+  leave?: number;
 }
 
-const pc = (kind: Kind = "honest"): DeviceSpec => ({ kind, nps: 1_100_000 });
+const pc = (kind: Kind = "honest"): DeviceSpec => ({ kind, nps: 1_100_000, computer: true });
 const phone = (kind: Kind = "honest"): DeviceSpec => ({ kind, nps: 350_000 });
 const SCENARIOS: Scenario[] = [
   { name: "honest", devices: [pc(), pc(), phone(), phone(), phone(), phone()], server: true },
@@ -68,17 +77,38 @@ const SCENARIOS: Scenario[] = [
   { name: "flaky", devices: [pc("inflate"), pc(), phone(), phone("drop"), phone("drop"), { kind: "slow", nps: 90_000 }], server: true },
   { name: "pair", devices: [pc("inflate"), phone()], server: true },
   { name: "no-server", devices: [pc("inflate"), pc(), phone(), phone(), phone(), phone()], server: false },
+  // Deep checks on computers (DECISIONS.md, "Deep checks on players' computers"): 0, 1, 2 and 5 capable devices.
+  { name: "cap0", devices: [phone(), phone(), phone(), phone(), phone(), phone()], server: true },
+  { name: "cap1", devices: [pc(), phone(), phone(), phone(), phone(), phone()], server: true },
+  { name: "cap2", devices: [pc(), pc(), phone(), phone(), phone(), phone()], server: true },
+  { name: "cap5", devices: [pc(), pc(), pc(), pc(), pc(), phone()], server: true },
+  // A match's endgame: 20 people (6 on computers), and 30%, 60% or 90% of those knocked out close the tab.
+  ...[0.3, 0.6, 0.9].map((leave) => ({
+    name: `end${Math.round(leave * 100)}`,
+    devices: [...Array.from({ length: 6 }, () => pc()), ...Array.from({ length: 14 }, () => phone())],
+    server: true,
+    leave,
+  })),
 ];
 
 /** The engine server's time for one search (2M nodes at about 700k nodes/s on one core), shared by the round's boards. */
 const SERVER_MS = 3000;
 const LATENCY_MS = 60;
 
+type Mode = "judges" | "deep" | "host";
+
 interface RoundRow {
   scenario: string;
   seed: number;
-  mode: "judges" | "host";
+  mode: Mode;
   round: string;
+  /** The round's number in the match, people still connected (and still in), capable devices connected, and the
+   * engine server's searches since the last round. */
+  n?: number;
+  connected?: number;
+  alive?: number;
+  capable?: number;
+  serverCalls?: number;
   /** Lock to reveal (ms, simulated). */
   scoringMs: number;
   /** How the job was settled, by whom, and whether a cheater was among its judges. */
@@ -98,7 +128,7 @@ interface RoundRow {
 interface MatchRow {
   scenario: string;
   seed: number;
-  mode: "judges" | "host";
+  mode: Mode;
   rounds: number;
   stats: Record<string, number> | null;
   strikes: Record<Kind, number[]>;
@@ -130,6 +160,14 @@ class Honest {
     if (!r) this.reports.set(key, (r = runJudgeJob(this.pool.get(), job, this.top(job.fen))));
     return r;
   }
+  private deeps = new Map<string, Promise<MoveScore[] | null>>();
+  /** A job's re-check from an honest quick report. */
+  deep(job: JudgeJob): Promise<MoveScore[] | null> {
+    const key = JSON.stringify({ ...job, id: "" });
+    let d = this.deeps.get(key);
+    if (!d) this.deeps.set(key, (d = this.report(quickPart(job)).then((r) => deepCheck(this.pool.get(), job, r))));
+    return d;
+  }
 }
 
 /**
@@ -156,7 +194,7 @@ function lie(kind: Kind, job: JudgeJob, r: JudgeReport, ownPick: string | undefi
 }
 
 /** One online Crowd match (50 v 50) with these devices, scored by judges or (mode "host") the old way. */
-async function playMatch(sc: Scenario, seed: number, mode: "judges" | "host", honest: Honest, lazyEngine: UciEngine, server: UciEngine, lazyCheck: UciEngine): Promise<{ rounds: RoundRow[]; match: MatchRow }> {
+async function playMatch(sc: Scenario, seed: number, mode: Mode, honest: Honest, lazyEngine: UciEngine, server: UciEngine, lazyCheck: UciEngine): Promise<{ rounds: RoundRow[]; match: MatchRow }> {
   const rng = mulberry32(seed * 7919);
   let now = 1_000_000;
   const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: true, augments: false }) };
@@ -178,7 +216,7 @@ async function playMatch(sc: Scenario, seed: number, mode: "judges" | "host", ho
     {
       now: () => now,
       send: (id, msg) => at(now + LATENCY_MS, () => onMessage(id, { ...msg, now } as ServerMessage)),
-      judges: { ...JUDGES, on: mode === "judges", ...sc.judges },
+      judges: { ...JUDGES, on: mode !== "host", deepOnDevices: mode === "deep", ...sc.judges },
       judgeRng: mulberry32(seed * 31 + 5),
       serverEngine: sc.server,
       serverScore: (req) => {
@@ -208,6 +246,9 @@ async function playMatch(sc: Scenario, seed: number, mode: "judges" | "host", ho
   const rows: RoundRow[] = [];
   const strikesAt: Record<string, number | null> = Object.fromEntries(ids.map((id) => [id, null]));
   let roundsDone = 0;
+  /** Who's still in (from each round's message), and the server's searches counted so far. */
+  const aliveNow = new Map<string, boolean>();
+  let callsSeen = 0;
   /** The jobs as sent (by job id), and everyone's picks when the round locked. */
   const sentJobs = new Map<string, JudgeJob>();
   let picksAtLock = new Map<string, string>();
@@ -226,6 +267,7 @@ async function playMatch(sc: Scenario, seed: number, mode: "judges" | "host", ho
       case "round": {
         roundKey = m.key;
         picks.delete(id);
+        aliveNow.set(id, m.alive);
         if (!m.board || m.watching || !m.alive) return;
         const fen = m.board.fen;
         const think = 1500 + rng() * Math.max(500, m.deadline - m.startsAt - 3000);
@@ -276,15 +318,24 @@ async function playMatch(sc: Scenario, seed: number, mode: "judges" | "host", ho
           });
           return;
         }
+        // The quick part of every job first (sent as each is done), then any re-checks, as the app does.
         let t = now;
+        const quick: { job: JudgeJob; report: JudgeReport }[] = [];
         for (const job of m.jobs) {
           const ready = prefetched.get(`${id}|${job.fen}`);
-          const nodes = (ready !== undefined ? 0 : DEFAULT_SETTINGS.engineNodes) + DEFAULT_SETTINGS.engineNodes + (job.recheck ? job.recheck.recheckNodes : 0);
-          t = Math.max(t, ready ?? t) + computeMs(id, nodes);
-          const base = kind === "lazy" ? await runJudgeJob(lazyEngine, job) : await honest.report(job);
-          const report = CHEATS.includes(kind) ? await cheat(kind, job, base, picks.get(id), rng, lazyCheck) : base;
+          t = Math.max(t, ready ?? t) + computeMs(id, (ready !== undefined ? 0 : DEFAULT_SETTINGS.engineNodes) + DEFAULT_SETTINGS.engineNodes);
+          const qjob = quickPart(job);
+          const base = kind === "lazy" ? await runQuickJob(lazyEngine, qjob) : await honest.report(qjob);
+          const report = CHEATS.includes(kind) ? await cheat(kind, qjob, base, picks.get(id), rng, lazyCheck) : base;
           if (!job.id.endsWith("~ref") && !sentJobs.has(job.id)) sentJobs.set(job.id, job);
           at(t, () => core.message(id, { t: "judged", key: m.key, id: job.id, report }));
+          quick.push({ job, report });
+        }
+        for (const { job, report } of quick) {
+          if (!job.recheck) continue;
+          t += computeMs(id, job.recheck.recheckNodes);
+          const deep = CHEATS.includes(kind) || kind === "lazy" ? await deepCheck(lazyCheck, job, report) : await honest.deep(job);
+          if (deep) at(t, () => core.message(id, { t: "judgedDeep", key: m.key, id: job.id, deep }));
         }
         return;
       }
@@ -329,6 +380,13 @@ async function playMatch(sc: Scenario, seed: number, mode: "judges" | "host", ho
         });
         return;
       }
+      case "stageBreak":
+        // Knocked out: some close the tab (gone for good); the rest keep watching, and their devices keep judging.
+        if (m.knockedOut.includes(id) && sc.leave && rng() < sc.leave) {
+          connected.delete(id);
+          core.disconnect(id);
+        }
+        return;
       case "results":
         finished = true;
         return;
@@ -358,10 +416,19 @@ async function playMatch(sc: Scenario, seed: number, mode: "judges" | "host", ho
   async function measure(jobs: { id: string; how: string; judges: string[]; board: JudgedBoard }[], scoringMs: number, picksAtLock: Map<string, string>) {
     roundsDone++;
     const key = jobs[0]?.id.split("/")[0] ?? "";
+    const capableNps = (JUDGES.deepMinNodes / (JUDGES.deepHeadroom * JUDGES.deepWindowMs)) * 1000;
+    const per = {
+      n: roundsDone,
+      connected: ids.filter((x) => connected.has(x)).length,
+      alive: ids.filter((x) => connected.has(x) && aliveNow.get(x)).length,
+      capable: ids.filter((x) => connected.has(x) && spec.get(x)!.computer && spec.get(x)!.nps >= capableNps).length,
+      serverCalls: serverCalls - callsSeen,
+    };
+    callsSeen = serverCalls;
     for (const id of ids) if (strikesAt[id] === null && (core.record.judges?.devices[id]?.strikes ?? 0) >= JUDGES.strikes) strikesAt[id] = roundsDone;
     for (const s of jobs) {
       const judgeKinds = s.judges.map((j) => spec.get(j)!.kind);
-      const row: RoundRow = { scenario: sc.name, seed, mode, round: key, scoringMs, how: s.how, judges: judgeKinds, cheaterJudged: judgeKinds.some((k) => CHEATS.includes(k)) };
+      const row: RoundRow = { scenario: sc.name, seed, mode, round: key, scoringMs, ...(s === jobs[0] ? per : {}), how: s.how, judges: judgeKinds, cheaterJudged: judgeKinds.some((k) => CHEATS.includes(k)) };
       const job = sentJobs.get(s.id);
       if (job) {
         const base = judgedBoard(job, await honest.report(job))!;
@@ -389,13 +456,13 @@ async function playMatch(sc: Scenario, seed: number, mode: "judges" | "host", ho
       }
       rows.push(row);
     }
-    if (!jobs.length) rows.push({ scenario: sc.name, seed, mode, round: key, scoringMs });
+    if (!jobs.length) rows.push({ scenario: sc.name, seed, mode, round: key, scoringMs, ...per });
   }
 
   // Everyone joins; devices report their speed (cheaters claim 3M nodes/s to be drawn as often as possible).
   for (const id of ids) {
     connected.add(id);
-    core.connect(undefined, id, spec.get(id)!.nps > 500_000 ? "computer" : "phone");
+    core.connect(undefined, id, spec.get(id)!.computer ? "computer" : "phone");
     const d = spec.get(id)!;
     core.message(id, { t: "speed", nps: CHEATS.includes(d.kind) ? 3_000_000 : d.nps });
   }
@@ -432,7 +499,7 @@ async function run(which: string, seeds: number, first: number) {
   const honest = new Honest(pool);
   for (const sc of SCENARIOS.filter((s) => which === "all" || which.split(",").includes(s.name))) {
     for (let seed = first; seed < first + seeds; seed++) {
-      for (const mode of (process.env.MODES ?? "judges,host").split(",") as ("judges" | "host")[]) {
+      for (const mode of (process.env.MODES ?? "judges,host").split(",") as Mode[]) {
         const t = Date.now();
         const { rounds, match } = await playMatch(sc, seed, mode, honest, lazy, server, pool.engines[0]!);
         appendFileSync(`${out}rounds.jsonl`, rounds.map((r) => JSON.stringify(r)).join("\n") + "\n");
@@ -567,8 +634,96 @@ Lock to reveal (ms, simulated), per round.
   console.log(md);
 }
 
+
+/** reports/deep-checks.md: engine-server calls with and without deep checks on computers, and a match's endgame. */
+function summaryDeep() {
+  const rounds = readFileSync(`${out}rounds.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l) as RoundRow);
+  const matches = readFileSync(`${out}matches.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l) as MatchRow);
+  const fmt = (x: number, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : "–");
+  const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+  const way = (m: Mode) => (m === "deep" ? "deep checks on computers (switch on)" : "shipped: engine server re-checks");
+  const firsts = (sc: string, mode: Mode) => rounds.filter((r) => r.scenario === sc && r.mode === mode && r.n !== undefined);
+  let md = `# Deep checks on players' computers: engine-server calls
+
+\`packages/sim/scripts/many-judges.ts\` (JUDGE_OUT=deep-checks): whole online Crowd matches (50 v 50) through the real
+lobby logic, devices scored by real Stockfish, simulated time; computers 1.1M nodes/s, phones 350k. Each scenario is
+played twice per seed: as shipped (the engine server re-checks close calls) and with \`JUDGES.deepOnDevices\` on
+(two capable computers re-check them). The switch ships off: the browsers' engine re-checks less accurately than the
+server (\`reports/deep-accuracy.md\`), and Eric's rule puts fair scoring first.
+
+## Engine-server calls per match, by capable devices in the lobby
+
+6 people; "capable": a computer fast enough to re-check 1M+ nodes in 3 s.
+
+| Capable devices | Way | Matches | Rounds | Close-call re-checks | Verdicts | Spot checks | All calls / match | Re-checks done on computers | Lock to reveal: median / 95th (ms) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+`;
+  for (const [sc, n] of [["cap0", "0"], ["cap1", "1"], ["cap2", "2"], ["cap5", "5"]] as const)
+    for (const mode of ["judges", "deep"] as Mode[]) {
+      const ms = matches.filter((m) => m.scenario === sc && m.mode === mode);
+      if (!ms.length) continue;
+      const st = (k: string) => avg(ms.map((m) => m.stats?.[k] ?? 0));
+      const times = [...new Map(rounds.filter((r) => r.scenario === sc && r.mode === mode).map((r) => [`${r.seed}|${r.round}`, r.scoringMs])).values()].sort((a, b) => a - b);
+      md += `| ${n} | ${way(mode)} | ${ms.length} | ${fmt(avg(ms.map((m) => m.rounds)), 0)} | ${fmt(st("serverRecheck"))} | ${fmt(st("serverVerdict"))} | ${fmt(st("serverSpot"))} | ${fmt(avg(ms.map((m) => m.serverCalls)))} | ${fmt(st("deepAgreed"))} of ${fmt(st("deepJobs"))} | ${Math.round(times[Math.floor(times.length / 2)] ?? 0)} / ${Math.round(times[Math.floor(times.length * 0.95)] ?? 0)} |\n`;
+    }
+  md += `
+## A match's endgame: people leaving as they're knocked out
+
+20 people (6 on computers, 14 on phones) in a 100-seat Crowd match; a share of those knocked out close the tab, the
+rest keep watching (and their devices keep judging). Cost at about $0.0001 per engine-server search.
+
+| Knocked out who leave | Way | Matches | All calls / match (worst) | Worst-case cost / match | Last 10 rounds: people connected | Last 10 rounds: calls (avg / worst) |
+|---|---|---:|---:|---:|---|---:|
+`;
+  for (const leave of [30, 60, 90])
+    for (const mode of ["judges", "deep"] as Mode[]) {
+      const sc = `end${leave}`;
+      const ms = matches.filter((m) => m.scenario === sc && m.mode === mode);
+      if (!ms.length) continue;
+      const worst = Math.max(...ms.map((m) => m.serverCalls));
+      const lastCalls: number[] = [];
+      const lastPeople: number[] = [];
+      for (const m of ms) {
+        const rs = firsts(sc, mode).filter((r) => r.seed === m.seed).sort((a, b) => a.n! - b.n!).slice(-10);
+        lastCalls.push(rs.reduce((a, r) => a + (r.serverCalls ?? 0), 0));
+        lastPeople.push(...rs.map((r) => r.connected ?? 0));
+      }
+      md += `| ${leave}% | ${way(mode)} | ${ms.length} | ${fmt(avg(ms.map((m) => m.serverCalls)))} (${worst}) | $${(worst * 0.0001).toFixed(4)} | ${Math.min(...lastPeople)}–${Math.max(...lastPeople)} | ${fmt(avg(lastCalls))} / ${Math.max(...lastCalls)} |\n`;
+    }
+  md += `
+### Engine-server calls per round, by people still connected (all endgame matches)
+
+| People connected | Way | Rounds | Calls per round | Rounds with a call |
+|---|---|---:|---:|---:|
+`;
+  const buckets: [string, (n: number) => boolean][] = [["0", (n) => n === 0], ["1", (n) => n === 1], ["2", (n) => n === 2], ["3–7", (n) => n >= 3 && n <= 7], ["8–20", (n) => n >= 8]];
+  for (const [label, f] of buckets)
+    for (const mode of ["judges", "deep"] as Mode[]) {
+      const rs = rounds.filter((r) => r.scenario.startsWith("end") && r.mode === mode && r.n !== undefined && f(r.connected ?? 0));
+      if (!rs.length) continue;
+      md += `| ${label} | ${way(mode)} | ${rs.length} | ${fmt(avg(rs.map((r) => r.serverCalls ?? 0)), 2)} | ${fmt((100 * rs.filter((r) => (r.serverCalls ?? 0) > 0).length) / rs.length, 0)}% |\n`;
+    }
+  md += `
+## How often a lobby has fewer than two capable devices
+
+Assumed: a share of players on computers (all fast enough: this test machine's slow server core already does 490k
+nodes/s in Chrome, above the 390k needed), the rest on phones. Chance a lobby of n people has fewer than two
+computers, (1-q)^n + n·q·(1-q)^(n-1):
+
+| People | 20% on computers | 30% on computers | 50% on computers |
+|---:|---:|---:|---:|
+`;
+  for (const n of [2, 3, 5, 10, 20, 30, 50]) {
+    const p = (q: number) => Math.pow(1 - q, n) + n * q * Math.pow(1 - q, n - 1);
+    md += `| ${n} | ${fmt(100 * p(0.2))}% | ${fmt(100 * p(0.3))}% | ${fmt(100 * p(0.5))}% |\n`;
+  }
+  writeFileSync(root + "reports/deep-checks.md", md);
+  console.log(md);
+}
+
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "run") await run(args[0] ?? "all", Number(args[1] ?? 1), Number(args[2] ?? 1));
 else if (cmd === "summary") summary();
+else if (cmd === "summary-deep") summaryDeep();
 else console.log("usage: many-judges.ts run <scenario|all> <seeds> [firstSeed] | summary");
 void readdirSync;

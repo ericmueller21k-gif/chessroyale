@@ -641,9 +641,11 @@ export const JUDGES: JudgeConfig = {
   /**
    * Deep checks on players' computers (DECISIONS.md, "Deep checks on players' computers"): with two capable devices
    * judging a board, they re-check its close calls themselves, and the engine server is asked only when they
-   * disagree or are late. Off: the engine server re-checks close calls, as before.
+   * disagree or are late. OFF: the browsers' engine (the lite network) re-checks less accurately than the engine
+   * server (reports/deep-accuracy.md: unfair cuts of top-quarter players 0.63% against 0.37%), and Eric's rule puts
+   * fair scoring first. On only with an engine on the devices as good as the server's.
    */
-  deepOnDevices: true,
+  deepOnDevices: false,
   /** The re-check's node count at most: the engine server's (shared by the round's boards, as the server's is). */
   deepNodes: 2_000_000,
   /**

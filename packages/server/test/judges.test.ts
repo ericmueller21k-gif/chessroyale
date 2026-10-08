@@ -172,7 +172,7 @@ describe("many judges: the lobby", () => {
     expect(L.serverAsks).toHaveLength(0);
   });
 
-  it("a cheater on one of two judges never changes the result: two of three decide (the server once it has a strike), and the cheater is struck, then benched", async () => {
+  it("a cheater on one of two judges never changes the result: the server's verdict (or two of three devices, if sooner) decides, and the cheater is struck, then benched", async () => {
     const L = setup({ server: true, settings: { firstStageRounds: 12 } });
     L.begin(3, [1_000_000, 900_000, 800_000]);
     let rounds = 0;
@@ -207,8 +207,7 @@ describe("many judges: the lobby", () => {
     expect(rounds).toBeGreaterThanOrEqual(2);
     expect(L.core.record.judges!.devices.p1!.strikes).toBe(2);
     expect(stats.benched).toBe(1);
-    expect(stats.disagreed).toBe(stats.serverVerdict + stats.majority);
-    expect(stats.majority).toBeGreaterThanOrEqual(1);
+    expect(stats.disagreed).toBe(stats.serverVerdict);
     expect(L.core.record.judges!.devices.p2!.strikes + L.core.record.judges!.devices.p3!.strikes).toBe(0);
   });
 
@@ -389,12 +388,13 @@ describe("many judges: the lobby", () => {
   });
 });
 
-describe("deep checks on players' computers", () => {
+describe("deep checks on players' computers (the switch on)", () => {
+  const on = { deepOnDevices: true };
   /** A deep search that never matches a phone's exactly (as two different devices' re-checks would if one lied). */
   const off = (d: MoveScore[]) => d.map((m, i) => (i === d.length - 1 ? { ...m, expected: Math.max(0, m.expected - 0.2) } : m));
 
   it("two capable computers judge and re-check the close calls themselves: no engine server at all", async () => {
-    const L = setup({ server: true });
+    const L = setup({ server: true, judges: on });
     L.begin(4, [1_000_000, 900_000, 300_000, 300_000], [], [0, 1]);
     L.pickAll(4, { p3: legalMoves(L.last("p3", "round")!.board!.fen)[5]!, p4: legalMoves(L.last("p4", "round")!.board!.fen)[9]! });
     expect([...L.judgesOf()].sort()).toEqual(["p1", "p2"]);
@@ -411,14 +411,14 @@ describe("deep checks on players' computers", () => {
   });
 
   it("the node count follows the slower computer: 500k nodes/s fits 1.2M in the window", () => {
-    const L = setup({ server: true });
+    const L = setup({ server: true, judges: on });
     L.begin(3, [500_000, 2_000_000, 300_000], [], [0, 1]);
     L.pickAll(3);
     expect(L.last("p1", "judge")!.jobs[0]!.recheck?.recheckNodes).toBe(1_200_000);
   });
 
   it("phones never re-check, however fast; with one capable computer the engine server re-checks as before", async () => {
-    const L = setup({ server: true });
+    const L = setup({ server: true, judges: on });
     L.begin(3, [1_000_000, 3_000_000, 3_000_000], [], [0]);
     L.pickAll(3);
     const job = L.last(L.judgesOf()[0]!, "judge")!.jobs[0]!;
@@ -427,7 +427,7 @@ describe("deep checks on players' computers", () => {
   });
 
   it("re-checks that disagree: the engine server re-checks, and the device further from it is struck", async () => {
-    const L = setup({ server: true });
+    const L = setup({ server: true, judges: on });
     L.begin(4, [1_000_000, 1_000_000, 300_000, 300_000], [], [0, 1]);
     // Picks that are close calls, so there's something to re-check.
     const fen = L.last("p1", "round")!.board!.fen;
@@ -444,7 +444,7 @@ describe("deep checks on players' computers", () => {
   });
 
   it("re-checks that don't come in time: the engine server re-checks", async () => {
-    const L = setup({ server: true });
+    const L = setup({ server: true, judges: on });
     L.begin(4, [1_000_000, 1_000_000, 300_000, 300_000], [], [0, 1]);
     const fen = L.last("p1", "round")!.board!.fen;
     const ranked = legalMoves(fen).sort((a, b) => truth(fen, b) - truth(fen, a));
@@ -461,7 +461,7 @@ describe("deep checks on players' computers", () => {
   });
 
   it("a knocked-out player's device keeps judging (and re-checking) while its page is open", async () => {
-    const L = setup({ server: true, settings: { firstStageRounds: 20 } });
+    const L = setup({ server: true, judges: on, settings: { firstStageRounds: 20 } });
     L.begin(3, [1_000_000, 1_000_000, 1_000_000], [], [0, 1, 2]);
     // p3 is out of the match (its page stays open, watching).
     const runner = (L.core as unknown as { runner: { state: { players: { id: string; alive: boolean }[] } } }).runner;
@@ -482,7 +482,7 @@ describe("deep checks on players' computers", () => {
     expect(judged).toBe(true);
   });
 
-  it("a disagreement with three capable devices is settled two of three, score and strike, with no engine server", async () => {
+  it("a disagreement with three capable devices: two of three settle score and strike before the server's verdict comes (asked at once, so never slower)", async () => {
     const L = setup({ server: true });
     L.begin(4, [1_000_000, 1_000_000, 1_000_000, 300_000], [], [0, 1, 2]);
     L.pickAll(4);
@@ -496,7 +496,7 @@ describe("deep checks on players' computers", () => {
     await L.answerSplit(third);
     L.serve();
     expect(L.core.record.phase).toBe("reveal");
-    expect(L.core.record.judges!.stats).toMatchObject({ majority: 1, serverVerdict: 0 });
+    expect(L.core.record.judges!.stats).toMatchObject({ majority: 1, serverVerdict: 1 });
     expect(L.core.record.judges!.devices[liar]!.strikes).toBe(1);
     expect(L.last(third, "reveal")!.expectedAfter[worst]).toBeLessThan(truth(job.fen, worst) + 0.02);
   });

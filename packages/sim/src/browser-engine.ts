@@ -6,7 +6,7 @@ import { UciEngine, type EngineOptions, type UciTransport } from "@chessroyale/c
 import { STOCKFISH_BUILD } from "@chessroyale/chess/node";
 
 /** The lite build in a Web Worker in headless Chromium, spoken to from here over UCI (the app's own transport). */
-export async function browserEngine(opts: EngineOptions, cpuSlowdown = 1): Promise<{ engine: UciEngine; stop: () => Promise<void> }> {
+export async function browserEngine(opts: EngineOptions, cpuSlowdown = 1, build = "stockfish-19-lite-single"): Promise<{ engine: UciEngine; stop: () => Promise<void> }> {
   const { chromium } = await import("@playwright/test");
   const dir = dirname(STOCKFISH_BUILD);
   const server = createServer((req, res) => {
@@ -32,12 +32,12 @@ export async function browserEngine(opts: EngineOptions, cpuSlowdown = 1): Promi
   await page.goto(`http://127.0.0.1:${port}/`);
   // (Runs in the page: typed loosely, as this package has no DOM types.)
   type Page = { Worker: new (url: string) => { onmessage: (e: { data: unknown }) => void; postMessage(c: string): void }; uciLine(t: string): void; sf: { postMessage(c: string): void } };
-  await page.evaluate(() => {
+  await page.evaluate((name) => {
     const g = globalThis as unknown as Page;
-    const w = new g.Worker(`/stockfish-19-lite-single.js#${encodeURIComponent("/stockfish-19-lite-single.wasm")}`);
+    const w = new g.Worker(`/${name}.js#${encodeURIComponent(`/${name}.wasm`)}`);
     w.onmessage = (e) => void (typeof e.data === "string" && g.uciLine(e.data));
     g.sf = w;
-  });
+  }, build);
   const transport: UciTransport = {
     send: (c) => void page.evaluate((cmd) => (globalThis as unknown as Page).sf.postMessage(cmd), c),
     onLine: (l) => listeners.push(l),
