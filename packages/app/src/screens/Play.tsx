@@ -9,7 +9,7 @@ import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
-import { BossSide } from "../components/BossCharacter.tsx";
+import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { useReplay } from "../hooks.ts";
@@ -139,7 +139,7 @@ export function PlayScreen({
       startAt: strike.at,
       moveAt: strike.at,
       exitAt: strike.until! - 900,
-      bossIcon: match.boss?.icon,
+      bossIcon: match.boss ? <BossFace boss={match.boss} /> : undefined,
     };
   }, [strike?.at, board.fen]);
   // What the God King might say about the position: danger first, then how it's going, then small talk.

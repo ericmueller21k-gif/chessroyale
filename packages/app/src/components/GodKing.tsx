@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import { useFrameNow } from "./Countdown.tsx";
 import { pieceAt } from "@chessroyale/chess";
@@ -226,7 +227,7 @@ export function KingSummon({
   /** For the cut-in: the move in SAN and the piece he moves, or the boss's face for a strike. */
   san?: string;
   piece?: "p" | "n" | "b" | "r" | "q" | "k";
-  bossIcon?: string;
+  bossIcon?: ComponentChildren;
 }) {
   const now = useFrameNow();
   const t = now - startAt;
@@ -376,7 +377,7 @@ export function KingCutIn({
   side: "w" | "b";
   san?: string;
   piece?: keyof typeof PIECE_NAMES;
-  bossIcon?: string;
+  bossIcon?: ComponentChildren;
 }) {
   return (
     <div class="fight-banner king-cut" role="alert" aria-label={mode === "move" ? `The God King plays ${san}` : "The God King strikes"}>

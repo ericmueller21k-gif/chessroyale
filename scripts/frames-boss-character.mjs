@@ -22,18 +22,18 @@ const browser = await chromium.launch();
 async function run(name, context) {
   const p = await browser.newPage(context);
   p.on("pageerror", (e) => console.log(name, "pageerror", e.message));
-  p.on("response", (r) => (r.headers()["content-type"] ?? "").includes("html") && !r.url().endsWith("/") && !r.url().includes("?debug") && console.log(name, "html for", r.url()));
   await p.goto(url + "?debug&clock=30&nolanding");
   await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: new RegExp(bossName) }).click();
-  const anim = () => p.evaluate(() => document.querySelector(".boss-char")?.getAttribute("data-anim") ?? "-");
+  // The placement showing (the boss bar on a phone, by the board on a computer).
+  const char = () => p.locator(".boss-char:visible").first();
+  const anim = async () => (await char().count()) ? await char().getAttribute("data-anim") : "-";
   const strip = async (tag, ms) => {
     const t0 = Date.now();
     let i = 0;
     while (Date.now() - t0 < ms) {
-      const el = await p.$(".boss-char");
-      const box = el && (await el.boundingBox());
-      if (box) await p.screenshot({ path: `${outDir}/${name}-${tag}-${String(i).padStart(2, "0")}.png`, clip: { x: Math.max(0, box.x - 40), y: Math.max(0, box.y - 40), width: box.width + 80, height: box.height + 80 } });
+      const box = (await char().count()) ? await char().boundingBox() : null;
+      if (box) await p.screenshot({ path: `${outDir}/${name}-${tag}-${String(i).padStart(2, "0")}.png`, clip: { x: Math.max(0, box.x - 60), y: Math.max(0, box.y - 70), width: box.width + 300, height: box.height + 110 } });
       console.log(`${name} ${tag} +${Date.now() - t0}ms ${await anim()}`);
       i++;
       await p.waitForTimeout(120);

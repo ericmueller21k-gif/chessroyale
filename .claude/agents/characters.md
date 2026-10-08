@@ -20,10 +20,12 @@ Read `CLAUDE.md` first and follow it: the shipping rules, the secrets rules, and
 | The sprite format and renderer (pure: grids, parts, palettes, frames, cues) | `packages/app/src/characters/sprite.ts`, `paint.ts` |
 | Each boss: palette, parts, animations, looks | `packages/app/src/characters/<boss>.ts`, registered in `index.ts` |
 | The preview: GIFs, frame sheets, phone-size comparison | `scripts/preview-characters.ts` (`npm run preview:characters -- <outDir> [ref=picture.png]`) |
-| The boss sprite component and its wiring to game events (to build) | `packages/app/src/components/BossSprite.tsx`, the boss parts of `Boss.tsx`, `Crowd.tsx`, `Play.tsx` |
-| Portraits for boss banners (to build) | drawn from the same parts; written to `packages/app/public/sprites/bosses/` |
-| Sound packs (to build) | `packages/app/public/sounds/bosses/<boss>/` (CC0 only, credited in `CREDITS.md`), cue names in `src/sound.ts` |
-| Tests | `packages/app/test/characters.test.ts`, plus an e2e case once a boss is on screen |
+| Which boss has a character: its animations per moment, sounds, lines, portrait | `packages/app/src/characters/kits.ts` |
+| Moments from the shared match state, and line picking (pure) | `packages/app/src/characters/boss-beats.ts` |
+| The character on screen, its text box, its portrait (`BossFace`) | `packages/app/src/components/BossCharacter.tsx`; placed in the boss bar (`BossBar` in `Boss.tsx`), each boss screen's `.board-row` (`BossSide`), and the results |
+| Sound packs | synthesised in `characters/<boss>-sounds.ts`, or CC0 files in `public/sounds/bosses/<boss>/` credited in a `CREDITS.md`; names in `src/sound.ts` |
+| Frame-by-frame check in the game | `scripts/frames-boss-character.mjs` (`npm run frames:character -- <dir> [boss] [phone|desktop|both]`) |
+| Tests | `packages/app/test/characters.test.ts`, `packages/app/test/boss-character.test.ts`, `e2e/boss-character.spec.ts` |
 
 Not yours:
 - boss rules, tiers, names and strength (`boss.ts`, the `engine` delegate); ask the director to rename a boss
@@ -42,8 +44,14 @@ If you need one of those changed, say what and why, and stop.
   `pose()` per boss and build frames from it, so moving a part is a number, not a redraw.
 - **Recolours are palettes:** a `look` swaps keys for a whole boss (an enraged or frozen variant); a frame's `pal`
   flashes eyes or pulses runes.
-- **Cues are on frames:** `cue: "thrust"`, `"impact"`. The sprite component fires the sound and any screen effect when
-  that frame shows, so sound and picture can't drift apart.
+- **Cues are on frames:** `cue: "boing"`, `"honk"`. The component plays the kit's sound for a cue when that frame
+  shows (once, however many placements or screens), so sound and picture can't drift apart. Never louder than a
+  move sound (a unit test measures them), always through `play()` so the mute switch holds.
+- **Same for everyone online:** what a boss does comes only from the shared match state (`boss-beats.ts`): one-shot
+  animations play once per moment from when the device first saw it, loops run by the clock, lines are picked by a
+  hash of the moment. No new protocol.
+- **Where it stands:** kitty-corner across the board from the God King, never over a piece or a tap
+  (`pointer-events: none`): on a phone at the boss bar's left, on a computer by the board's bottom-left corner.
 - **Style:** HunChess's dark ground and gold `#f2c14e`, bold dark outlines like the God King and the items, light from
   the top left, chunky proportions (a big head reads at phone size). Drama yes, gore no (the same limit as the God King).
 

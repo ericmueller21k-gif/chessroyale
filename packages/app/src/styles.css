@@ -9735,6 +9735,9 @@ img.qicon {
 .fb-face .boss-portrait {
   width: 120%;
 }
+.kc-boss .boss-portrait {
+  width: 14cqw;
+}
 @media (min-width: 900px) and (min-height: 600px) {
   .boss-char.place-bar {
     display: none;
