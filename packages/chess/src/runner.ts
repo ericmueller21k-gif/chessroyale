@@ -753,7 +753,8 @@ export class MatchRunner {
     evaluation: BoardEvaluation,
   ): LastStandRound | undefined {
     const b = this.state.boss;
-    if (!b || b.lastStand || b.barred || legalMoves(fen).length < 2) return undefined;
+    // (Never when only one move was open: his re-pick has to leave the crowd another, a power's limits included.)
+    if (!b || b.lastStand || b.barred || (crowdAllowed(b, fen) ?? legalMoves(fen)).length < 2) return undefined;
     const mine = scored.find((m) => m.move === played);
     const loss = mine?.loss ?? 0;
     const charges = b.kingCharges ?? 0;
