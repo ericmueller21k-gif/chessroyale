@@ -12,6 +12,7 @@ import type { BossView, GameView } from "../game.ts";
 import { seenKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
+import { BossCharacter, BossFace, BossSide, hasCharacter } from "../components/BossCharacter.tsx";
 import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
 
@@ -42,11 +43,15 @@ function OpeningRoulette({ name }: { name: string }) {
 }
 
 /** The boss at a glance: who it is, how scary, when it strikes next. Shown above the board all through the battle. */
-export function BossBar({ boss }: { boss: BossView }) {
+export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
+  // A boss with a character stands at the bar's left on a phone (on a computer, by the board: see BossSide), with
+  // its portrait in the bar instead.
+  const char = !!match && hasCharacter(match);
   return (
-    <div class="boss-bar" role="status">
-      <span class="boss-icon" aria-hidden="true">
-        {boss.icon}
+    <div class={`boss-bar${char ? " has-char" : ""}`} role="status">
+      {char && <BossCharacter match={match!} place="bar" />}
+      <span class={`boss-icon${char ? " boss-icon-face" : ""}`} aria-hidden="true">
+        <BossFace boss={boss} />
       </span>
       <span class="boss-name">
         <strong>{boss.name}</strong>
@@ -140,6 +145,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
           <BossHeading side={boss.crowdSide} note={thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
         </div>
         <div class="board-row">
+          <BossSide match={match} />
           <EvalBar fen={boss.board.fen} orientation={boss.crowdSide} evaluate={(f) => match.evaluate(f)} />
           <Board fen={introFen} orientation={boss.crowdSide === "w" ? "white" : "black"} lastMove={introLast}>
             {!thinking && !victim && !alone && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={boss.crowdSide === "w" ? "white" : "black"} />}
@@ -147,11 +153,11 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
             {slewQueen && (
               <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="bannerStart" />
             )}
-            {tookQueen && <FightBanner tone="boss" face={boss.icon} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} sound="bossRoar" />}
+            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} sound="bossRoar" />}
             {showCard && (
               <div class={`boss-intro${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
                 <span class="boss-intro-icon" aria-hidden="true">
-                  {boss.icon}
+                  <BossFace boss={boss} />
                 </span>
                 <span class="boss-strike-text">A boss appears</span>
                 <strong class="boss-intro-name">{boss.name}</strong>
@@ -224,3 +230,4 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
     </div>
   );
 }
+

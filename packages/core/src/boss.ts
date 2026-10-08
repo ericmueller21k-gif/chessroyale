@@ -73,10 +73,10 @@ export interface BossInfo {
   threat: number;
 }
 
-/** One boss per tier, weakest first (the names are placeholders for now). */
+/** One boss per tier, weakest first (the names are placeholders for now; Boingo the Clown is drawn: app characters/). */
 const BOSSES: { from: number; name: string; icon: string }[] = [
   { from: 0, name: "The Pawn Golem", icon: "🗿" },
-  { from: 1500, name: "The Iron Bishop", icon: "🤖" },
+  { from: 1500, name: "Boingo the Clown", icon: "🤡" },
   { from: 1700, name: "The Bone Archer", icon: "💀" },
   { from: 1900, name: "The Black Knight", icon: "🐴" },
   { from: 2100, name: "The Storm Witch", icon: "🧙" },

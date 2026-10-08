@@ -2864,3 +2864,63 @@ Eric. Nothing in the game changes yet; the bosses still show as emoji icons.
 - The golem was picked over the Frost Dragon for the second boss: it's the first boss every new player meets, and a
   living chess pawn says "HunChess" more than a dragon does; a pale stone boss also shows the range against the
   knight's black steel.
+
+### Boingo the Clown, the first boss built (Oct 8, 2026)
+
+The clown on a pogo stick, from Eric's reference, is the 1500 raid boss (the Iron Bishop's placeholder slot). Built
+end to end: sprite, portrait, animations, sounds, lines, and where he stands.
+
+- **Name:** "Boingo the Clown" (short, says pogo; Eric can rename it in `packages/core/src/boss.ts`). His emoji is 🤡
+  wherever a screen has no room for his drawing (the boss menu, the front menu).
+- **Art:** my redraw (version 1 of the two style versions sent to Eric; the other was Gemini's clown converted 1:1).
+  48 x 60 px from parts. The pogo's top is rigid, its spring slides, the gloves hold the handlebar and the shoes
+  stand on the foot bar, and the body rides on top. He has eight faces (grin, laugh, hurt, smug, rattled, think,
+  honk, out), so a new animation is a list of poses. If Eric picks version 2, only the parts change.
+- **Where he stands:** kitty-corner across the board from the God King, never over a piece or a tap
+  (`pointer-events: none`).
+  - **Phone:** at the left of the boss bar above the board, since the God King is under it on the right.
+  - **Computer:** by the board's bottom-left corner, at twice the size, since the God King is by its top-right.
+  - The other layout's placement is hidden. His portrait takes the emoji's place in the bar, the "QUEEN DOWN!" banner,
+    the entrance card and the God King's cut-in.
+- **What he does, and when:** one moment per state change, all from the match state every player already has, so
+  there are no new messages. The pure logic is in `characters/boss-beats.ts`.
+  - **Entrance:** at the intro, he pops out of a puff of smoke and honks his nose.
+  - **Thinking:** while the boss thinks, a hand on his chin and thought dots. **Hurt** comes first if the crowd's
+    move took one of his pieces: a flash, crossed eyes, his hat knocked off.
+  - **His move:** a hop, pointing. **Capture:** a laugh. **Check:** he honks his nose twice. **A strike:** he laughs.
+  - **The crowd's turn:** his mood. **Smug** 3 or more pawns of material ahead, **rattled** 3 or more behind
+    (sweat, a wobbly mouth), otherwise his idle: always bouncing, with a lower big jump every 6 s or so.
+  - **Defeat:** he's knocked off the pogo and sits dazed. **Victory:** spinning leaps in confetti. Both also play on
+    the results screen.
+- **The mood comes from material, not the eval** (a change from the brief's "from the eval"). Each device works out
+  its own eval, a moment apart and not always the same, but the board is identical everywhere, so material keeps
+  every player's clown in the same mood.
+- **In step online:** a moment's animation plays once from when this device first saw it, so a new screen mid-moment
+  carries on rather than restarting; the loops run by the clock. A moment's key is its kind and the move number.
+- **Lines:** short taunts in his own pixel text box, never instructions.
+  - **Rare:** each kind of moment has a chance of a line (his plain moves 12%, thinking 8%, captures 60%, check 75%,
+    his entrance and the end always).
+  - **The same everywhere:** the line, and whether there is one, comes from a hash of the moment's key, so every
+    player gets the same line at the same time.
+  - **Mood lines** only when the mood changes.
+- **Sounds:** synthesised in code (`characters/clown-sounds.ts`), so there are no files or licences: a pogo boing, a
+  bulb-horn honk, a rubber squeak, a slide whistle up and down, and a kazoo laugh (no voice).
+  - **Quieter than a move:** a unit test measures each one against the move sample's peak and mean level; each sits
+    about 3 dB under it.
+  - **Mute:** they play through `sound.ts`, so the mute switch silences them.
+  - **No repeats:** his plain bounces are silent, and a sound never plays twice for the same frame (both placements,
+    or a new screen).
+- **Checking it:**
+  - `npm run frames:character -- <dir> [boss] [phone|desktop|both]` screenshots a Boss-alone raid on a phone and a
+    computer and saves the frames around him.
+  - `npm run preview:characters` writes every animation as a GIF.
+  - `e2e/boss-character.spec.ts` plays a raid against him on both layouts.
+
+### Ideas for later, not built (Eric, Oct 8, 2026)
+
+- **Real boss abilities, never game-breaking:** freezing most of the team for a turn, or making the crowd move a
+  particular piece, but only when that piece has a move that isn't a blunder. They need the rules, the server and
+  the engine (the director's call, with `engine` and `god-king`).
+- **Bosses jumping to the centre of the board to cast something** (an ability's wind-up), the way the God King leaps
+  onto the board.
+- **More bosses drawn from Eric's references:** a farmer with a string trimmer, and a gingerbread man with a candy cane.

@@ -12,6 +12,7 @@ import { KING_CUT_MS, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.tsx";
 import { LAST_STAND, LAST_STAND_MS } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
+import { BossSide } from "../components/BossCharacter.tsx";
 import { BossHeading } from "./Play.tsx";
 import { crowdAnimations, crowdTrail, onPrefsChange } from "../prefs.ts";
 import { elimination, finalName, myTeam, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
@@ -282,6 +283,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
         </div>
         {/* Same row as the play screen (eval bar + board), so the board never moves or resizes between phases. */}
         <div class="board-row">
+        {match.boss && <BossSide match={match} />}
         <EvalBar
           fen={played && !stand ? applyMove(fen, mine.result.playedMove) : fen}
           orientation={orientation === "white" ? "w" : "b"}

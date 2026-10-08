@@ -8,6 +8,7 @@
  */
 
 import { QUICK_CHAT } from "@chessroyale/core";
+import { clownSound, type ClownSound } from "./characters/clown-sounds.ts";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -104,6 +105,18 @@ function sample(name: keyof typeof SAMPLE_FILES, at: number, level = 1, rate = 1
   src.connect(g).connect(master!);
   src.start(at);
 }
+
+/** Plays synthesised samples (a boss character's sounds, see characters/). */
+function buffer(data: Float32Array, at: number) {
+  const c = ctx!;
+  const buf = c.createBuffer(1, data.length, c.sampleRate);
+  buf.getChannelData(0).set(data);
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  src.connect(master!);
+  src.start(at);
+}
+const clown = (name: ClownSound) => (t: number) => buffer(clownSound(name, ctx!.sampleRate), t);
 
 /** A clean clock tick: a very short burst of noise through a narrow band, like a watch's escapement. */
 function clockTick(at: number, level = 0.5) {
@@ -277,7 +290,14 @@ export type SoundName =
   | "gavel"
   | "pop"
   | "popSoft"
-  | "chat";
+  | "chat"
+  // Boingo the Clown (a raid boss): synthesised, see characters/clown-sounds.ts.
+  | "clownBoing"
+  | "clownHonk"
+  | "clownSqueak"
+  | "clownSlideUp"
+  | "clownSlideDown"
+  | "clownLaugh";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -332,6 +352,12 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
     clockTick(t, 0.5 * QUICK_CHAT.tickLevel);
     tap(t + 0.012, 2600, 0.2 * QUICK_CHAT.tickLevel);
   },
+  clownBoing: clown("boing"),
+  clownHonk: clown("honk"),
+  clownSqueak: clown("squeak"),
+  clownSlideUp: clown("slideUp"),
+  clownSlideDown: clown("slideDown"),
+  clownLaugh: clown("laugh"),
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));
