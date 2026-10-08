@@ -220,30 +220,38 @@ describe("account API", () => {
     expect((await call({}, "/api/me")).res.status).toBe(503);
   });
 
-  it("pawn hats and God King effects: everyone has them all (in the locker), equips one of each, and a guest's choices follow them when they sign in", async () => {
+  it("the shop: starters for everyone, get (free while testing) and equip, and a guest's items follow them when they sign in", async () => {
     const sql = memorySql();
     await ensureSchema(sql);
     const { user: guest } = await createGuest(sql, 1000, "Guest");
-    // Everyone starts with the starters equipped, and has every hat and King effect.
+    // Everyone starts with the starters, equipped.
     let shop = await shopState(sql, guest.id);
     expect(shop.equipped).toEqual({ king: "king-holy", hat: "hat-none" });
-    expect(shop.owned).toEqual(expect.arrayContaining(["king-holy", "hat-none", "hat-crown", "hat-party", "king-storm", "king-void"]));
+    expect(shop.owned).toEqual(expect.arrayContaining(["king-holy", "hat-none"]));
+    expect(shop.owned).not.toContain("hat-party");
     expect(shop.coins).toBe(0);
-    // Nothing to get first; only things that aren't items fail.
+    // You can't equip what you don't own, or anything not in the shop.
+    expect(await equipItem(sql, guest.id, "hat-crown")).toEqual({ ok: false, message: "Get it first." });
     expect((await buyItem(sql, guest.id, "hat-nope", 1100)).ok).toBe(false);
-    expect((await equipItem(sql, guest.id, "hat-nope")).ok).toBe(false);
+    // Get it (free while testing), then equip it (the locker does that, with the crate items).
+    const bought = await buyItem(sql, guest.id, "hat-crown", 1100);
+    expect(bought.ok && bought.shop.owned).toContain("hat-crown");
     const eq = await equipItem(sql, guest.id, "hat-crown");
     expect(eq.ok && eq.shop.equipped.hat).toBe("hat-crown");
+    await buyItem(sql, guest.id, "king-storm", 1200);
     await equipItem(sql, guest.id, "king-storm");
     // The profile carries it, so a match knows your look.
     expect((await profile(sql, guest)).shop.equipped).toEqual({ king: "king-storm", hat: "hat-crown" });
-    // An existing account keeps its own choices.
+    // An existing account keeps its own choices; the guest's items join it.
     const account = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, 1300);
+    await buyItem(sql, account.id, "king-hellfire", 1300);
     await equipItem(sql, account.id, "king-hellfire");
     const merged = await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, 1400);
     expect(merged.id).toBe(account.id);
     shop = await shopState(sql, account.id);
+    expect(shop.owned).toEqual(expect.arrayContaining(["hat-crown", "king-storm", "king-hellfire"]));
     expect(shop.equipped).toEqual({ king: "king-hellfire", hat: "hat-crown" });
+    expect((await shopState(sql, guest.id)).owned).not.toContain("hat-crown");
   });
 
   it("one head: a pawn hat takes off a crate head item, and a crate head item takes off the pawn hat", async () => {
@@ -251,6 +259,7 @@ describe("account API", () => {
     await ensureSchema(sql);
     const { user } = await createGuest(sql, 1000, "Guest");
     await sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES ('beanie-1', ?, 'beanie', 'red', 40, 7, 'winter-1', 900)", user.id);
+    for (const hat of ["hat-party", "hat-wizard", "king-void"]) await buyItem(sql, user.id, hat, 950);
     await equipItem(sql, user.id, "hat-party");
     const on = await equipLocker(sql, user.id, "head", "beanie-1");
     expect(on.ok && on.locker.equipped.head).toBe("beanie-1");

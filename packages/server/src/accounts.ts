@@ -18,7 +18,6 @@ import {
   chatPicksAfterGetting,
   cleanChatPickList,
   equippedLook,
-  isLockerDefault,
   ownedChatPacks,
   ratingTier,
   shopItem,
@@ -780,8 +779,7 @@ export async function reportPlayer(sql: Sql, reporter: string, target: unknown, 
 /** Coins, items owned (starters included) and what's equipped in each slot. */
 export async function shopState(sql: Sql, userId: string): Promise<ShopState> {
   const owned = (await sql.all<{ item_id: string }>("SELECT item_id FROM inventory WHERE user_id = ?", userId)).map((r) => r.item_id).filter((id) => shopItem(id));
-  // Everyone has the starters, and every pawn hat and God King effect (they live in the locker).
-  const starters = SHOP_ITEMS.filter((i) => i.starter || isLockerDefault(i)).map((i) => i.id);
+  const starters = SHOP_ITEMS.filter((i) => i.starter).map((i) => i.id);
   const all = [...new Set([...starters, ...owned])];
   const rows = await sql.all<{ slot: string; item_id: string }>("SELECT slot, item_id FROM equipped WHERE user_id = ?", userId);
   const equipped = Object.fromEntries(SHOP_CATEGORIES.filter((c) => !c.ownOnly).map((c) => [c.slot, starterItem(c.slot).id])) as Record<EquipSlot, string>;

@@ -76,11 +76,11 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
 export const SHOP_FREE = true;
 
 /**
- * Pawn hats and God King effects: everyone has every one, and they live in the locker with the crate items, not in
- * the shop (Eric, Oct 8, 2026). The shop keeps the chat packs.
+ * Pawn hats and God King effects: bought in the shop, worn from the locker, with the crate items (Eric, Oct 8, 2026:
+ * one place to wear things, one head).
  */
 export const LOCKER_SLOTS: readonly EquipSlot[] = ["hat", "king"];
-export const isLockerDefault = (item: ShopItem) => (LOCKER_SLOTS as readonly ShopSlot[]).includes(item.slot);
+export const wornFromLocker = (item: ShopItem) => (LOCKER_SLOTS as readonly ShopSlot[]).includes(item.slot);
 
 export function shopItem(id: string): ShopItem | undefined {
   return SHOP_ITEMS.find((i) => i.id === id);

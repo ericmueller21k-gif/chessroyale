@@ -11,7 +11,6 @@ import {
   TIERS,
   crateDef,
   equippedLook,
-  isLockerDefault,
   isShiny,
   itemChance,
   presentChance,
@@ -22,6 +21,7 @@ import {
   rollBlemish,
   stackItems,
   tierInfo,
+  wornFromLocker,
   type CrateDef,
   type CrateRoll,
   type ItemInstance,
@@ -436,11 +436,12 @@ const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapo
 const tabName = (t: LockerTab) => (t === "all" ? "All" : t === "king" ? "God King" : SLOT_NAMES[t]);
 
 /**
- * What you own. Crate items, rarest first, with copies of an item in the same colour stacked (×3, the purest on top:
- * that's the one you wear). Then the free items everyone has: pawn hats and God King effects. Tap to wear (tap again
- * to take off); hold a crate item (or right-click it) to delete it. Your avatar shows the result.
+ * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same colour
+ * stacked (×3, the purest on top: that's the one you wear). Then what you got in the shop: pawn hats and God King
+ * effects. Tap to wear (tap again to take off); hold a crate item (or right-click it) to delete it. One head: a
+ * pawn hat and a crate head item take each other off. Your avatar shows the result.
  */
-export function LockerPanel() {
+export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const { profile } = useAccount();
   const [tab, setTab] = useState<LockerTab>("all");
   const [deleting, setDeleting] = useState<ItemStack | null>(null);
@@ -452,10 +453,11 @@ export function LockerPanel() {
   const stacks = stackItems(locker.items)
     .filter((s) => tab === "all" || itemDef(top(s).def)?.slot === tab)
     .sort((a, b) => tierIndex(top(b).def) - tierIndex(top(a).def) || colorIndex(top(b).color) - colorIndex(top(a).color) || top(a).blemish - top(b).blemish);
-  // The free items: every pawn hat ("No hat" is just taking one off) and God King effect.
-  const defaults = SHOP_ITEMS.filter((i) => isLockerDefault(i) && i.look.hat !== "none").filter(
+  // What you got in the shop: pawn hats ("No hat" is just taking one off) and God King effects.
+  const fromShop = SHOP_ITEMS.filter((i) => wornFromLocker(i) && i.look.hat !== "none" && shop?.owned.includes(i.id)).filter(
     (i) => tab === "all" || (tab === "head" && i.slot === "hat") || (tab === "king" && i.slot === "king"),
   );
+  const shopTab = tab === "all" || tab === "head" || tab === "king";
   const wornIn = (s: ItemStack) => {
     const slot = itemDef(top(s).def)!.slot;
     return s.items.some((i) => i.id === locker.equipped[slot]);
@@ -512,11 +514,11 @@ export function LockerPanel() {
           })}
         </div>
       )}
-      {defaults.length > 0 && shop && (
+      {shopTab && shop && (
         <>
-          <h3 class="ff-title locker-subhead">Yours from the start</h3>
+          <h3 class="ff-title locker-subhead">From the shop</h3>
           <div class="locker-grid">
-            {defaults.map((item) => {
+            {fromShop.map((item) => {
               const worn = shop.equipped[item.slot as "hat" | "king"] === item.id;
               return (
                 <button
@@ -538,6 +540,14 @@ export function LockerPanel() {
               );
             })}
           </div>
+          {onShop && (
+            <p class="muted small">
+              More pawn hats and God King effects in the{" "}
+              <button type="button" class="link-button" onClick={onShop}>
+                Shop ›
+              </button>
+            </p>
+          )}
         </>
       )}
       {deleting && <DeleteDialog stack={deleting} wornId={locker.equipped[itemDef(top(deleting).def)!.slot]} onClose={() => setDeleting(null)} />}
