@@ -12,6 +12,7 @@ import { DEFAULT_SETTINGS, botChoose, mulberry32 } from "@chessroyale/core";
 import { legalMoves } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { applyRecheck, recheckTargets, repliesFrom, type EngineLike, type RecheckSettings } from "./runner.ts";
+import { allowedSearch, jobAllows, judgeCandidates, judgeTop } from "./boss-powers.ts";
 
 /** The lobby's rules for the bots' picks (so every judge picks for them exactly as the lobby would). */
 export interface JudgeRules {
@@ -32,6 +33,12 @@ export interface JudgeJob {
   rules: JudgeRules;
   /** Boss battle, the re-pick after the God King's Last Stand: the move he took back (no option, not the best). */
   barred?: string;
+  /**
+   * Boss battle, a boss power limits the crowd's moves this turn (a frozen piece, a pie, the blizzard): the moves
+   * allowed. The best move is the best of these, and the bots pick from them; with none of them among the top moves,
+   * the device searches them all (the second search).
+   */
+  allowed?: string[];
   /** No engine server: the device re-checks close calls itself, with these settings, `priority` moves first. */
   recheck?: RecheckSettings;
   priority?: string[];
@@ -60,17 +67,13 @@ export interface JudgedBoard {
   rechecked: string[];
 }
 
-/** The top moves the job may use (never the barred move, unless it's the only one). */
-export function judgeTop(job: Pick<JudgeJob, "barred">, top: readonly MoveScore[]): MoveScore[] {
-  return job.barred && top.some((m) => m.move !== job.barred) ? top.filter((m) => m.move !== job.barred) : [...top];
-}
-
-/** The bots' picks, from the top moves and the job's seed: the same on every device and in the lobby. */
-export function judgeBotPicks(job: JudgeJob, top: readonly MoveScore[]): { picks: string[]; powerUps: number[] } {
-  const t = judgeTop(job, top);
+/** The bots' picks, from the top moves (or the allowed search: see judgeCandidates) and the job's seed: the same on every device and in the lobby. */
+export function judgeBotPicks(job: JudgeJob, top: readonly MoveScore[], extra: readonly MoveScore[] = []): { picks: string[]; powerUps: number[] } {
+  const t = judgeCandidates(job, top, extra);
   const best = t[0]?.expected ?? 0.5;
   const candidates = t.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
-  const legal = legalMoves(job.fen).filter((m) => m !== job.barred);
+  const all = legalMoves(job.fen).filter((m) => jobAllows(job, m));
+  const legal = all.length ? all : legalMoves(job.fen);
   const rng = mulberry32(job.seed);
   const settings = { ...DEFAULT_SETTINGS, ...job.rules };
   const picks: string[] = [];
@@ -99,6 +102,9 @@ export async function runJudgeJob(engine: EngineLike, job: JudgeJob, top?: Promi
 /** The job's quick part: the top moves and the search over picks outside them (no re-check). */
 export async function runQuickJob(engine: EngineLike, job: JudgeJob, top?: Promise<MoveScore[]> | MoveScore[]): Promise<JudgeReport> {
   const all = await (top ?? engine.topMoves(job.fen, job.rules.botCandidateMoves));
+  // A boss power left none of the top moves open: the second search covers every allowed move (and every pick).
+  const open = await allowedSearch(engine, job, all);
+  if (open) return { top: all, extra: open };
   const bots = judgeBotPicks(job, all);
   const missing = outsideTop(all, [...job.picks, ...bots.picks]);
   const extra = missing.length ? await engine.scoreMoves(job.fen, missing) : [];
@@ -107,8 +113,8 @@ export async function runQuickJob(engine: EngineLike, job: JudgeJob, top?: Promi
 
 /** The moves the job's re-check searches, from its quick report (none: no re-check, or no close calls). */
 export function deepTargets(job: JudgeJob, report: JudgeReport): { best: string; flagged: string[] } | null {
-  if (!job.recheck || !Array.isArray(report?.top) || !report.top.length) return null;
-  const bots = judgeBotPicks(job, report.top);
+  if (!job.recheck || !Array.isArray(report?.top) || !report.top.length || !Array.isArray(report.extra)) return null;
+  const bots = judgeBotPicks(job, report.top, report.extra);
   const base = baseBoard(job, report, bots);
   if (!base) return null;
   const flagged = recheckTargets(base, [...job.picks, ...bots.picks], job.recheck, job.priority);
@@ -142,7 +148,8 @@ function baseBoard(job: JudgeJob, report: JudgeReport, bots: { picks: string[]; 
   // (No legal position has more than 218 moves: anything longer is junk, and isn't worth the lobby's time.)
   if (report.top.length > job.rules.botCandidateMoves || report.extra.length > 256 || (Array.isArray(report.deep) && report.deep.length > 256)) return null;
   if (![...report.top, ...report.extra].every((m) => okScore(m, legal))) return null;
-  const top = judgeTop(job, report.top);
+  const top = judgeCandidates(job, report.top, report.extra);
+  if (!top.length) return null;
   const expectedAfter: Record<string, number> = Object.fromEntries(top.map((m) => [m.move, m.expected]));
   for (const m of report.extra) if (expectedAfter[m.move] === undefined) expectedAfter[m.move] = m.expected;
   // Every pick (people's and bots') must be scored.
@@ -158,7 +165,7 @@ function baseBoard(job: JudgeJob, report: JudgeReport, bots: { picks: string[]; 
  */
 export function judgedBoard(job: JudgeJob, report: JudgeReport): JudgedBoard | null {
   if (!report || typeof report !== "object") return null;
-  const bots = Array.isArray(report.top) && report.top.length ? judgeBotPicks(job, report.top) : null;
+  const bots = Array.isArray(report.top) && report.top.length && Array.isArray(report.extra) ? judgeBotPicks(job, report.top, report.extra) : null;
   const base = bots && baseBoard(job, report, bots);
   if (!base) return null;
   if (!job.recheck) return base;
@@ -195,7 +202,8 @@ export function verdictMoves(job: JudgeJob, reports: readonly (JudgeReport | nul
   for (const r of reports) for (const m of [...(Array.isArray(r?.top) ? r!.top : []), ...(Array.isArray(r?.extra) ? r!.extra : [])]) if (m && legal.has(m.move)) moves.add(m.move);
   for (const b of boards) for (const m of [...(b?.botPicks ?? []), ...Object.keys(b?.expectedAfter ?? {})]) moves.add(m);
   if (job.barred && moves.size > 1) moves.delete(job.barred);
-  return [...moves].filter((m) => legal.has(m)).sort();
+  // A boss power: only the moves it allows (the best is the best of those).
+  return [...moves].filter((m) => legal.has(m) && (!job.allowed || jobAllows(job, m))).sort();
 }
 
 /**
@@ -205,7 +213,8 @@ export function verdictMoves(job: JudgeJob, reports: readonly (JudgeReport | nul
  */
 export function verdictBoard(job: JudgeJob, deep: readonly MoveScore[], bots: JudgedBoard): JudgedBoard | null {
   const all = legalMoves(job.fen);
-  const legal = new Set(all.length > 1 ? all.filter((m) => m !== job.barred) : all);
+  const open = all.filter((m) => jobAllows(job, m));
+  const legal = new Set(open.length ? open : all);
   const scored = deep.filter((m) => okScore(m, legal));
   if (!scored.length) return null;
   const expectedAfter: Record<string, number> = Object.fromEntries(scored.map((m) => [m.move, m.expected]));

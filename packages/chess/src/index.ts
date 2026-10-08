@@ -7,3 +7,4 @@ export * from "./protocol.ts";
 export * from "./bots.ts";
 export * from "./boss-timing.ts";
 export * from "./judge.ts";
+export * from "./boss-powers.ts";

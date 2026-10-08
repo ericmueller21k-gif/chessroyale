@@ -73,27 +73,133 @@ export interface BossInfo {
   threat: number;
 }
 
-/** One boss per tier, weakest first (the names are placeholders for now; Boingo the Clown is drawn: app characters/). */
-const BOSSES: { from: number; name: string; icon: string }[] = [
-  { from: 0, name: "The Pawn Golem", icon: "🗿" },
-  { from: 1500, name: "Boingo the Clown", icon: "🤡" },
-  { from: 1700, name: "The Bone Archer", icon: "💀" },
-  { from: 1900, name: "The Black Knight", icon: "🐴" },
-  { from: 2100, name: "The Storm Witch", icon: "🧙" },
-  { from: 2300, name: "The Tower Tyrant", icon: "🏰" },
-  { from: 2500, name: "The Frost Dragon", icon: "🐉" },
-  { from: 2700, name: "The Grandmaster Wraith", icon: "👻" },
-  { from: 2900, name: "The Demon Lord", icon: "😈" },
-  { from: 3100, name: "The Engine Eternal", icon: "👹" },
+/** The boss powers there are: a passive (or opening) and an ultimate per boss. */
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse";
+
+/**
+ * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
+ * a move, what each player sees, whether a turn is scored or counts for fair play) live in the chess package's
+ * boss-powers.ts, by power id; its art, lines and sounds in the app's character kit, by `kit`.
+ */
+export interface BossDef {
+  id: string;
+  name: string;
+  /** Where a screen has no room for its drawing. */
+  icon: string;
+  /** Its character kit (art, moments, lines, sounds: the app's BOSS_KITS key) once complete; null until it's drawn. */
+  kit: string | null;
+  /** Elo on top of the lobby's strength: a boss with nastier powers plays a little weaker underneath. */
+  offset: number;
+  /** Its passive and its ultimate; null until they're built. */
+  powers: { passive: PowerId; ultimate: PowerId } | null;
+}
+
+/**
+ * Every boss, complete or not. Only a playable one (isPlayable: a complete character and powers) is ever chosen,
+ * in every boss mode: the raid, the Crowd's boss final and solo's boss menu. The rest are placeholders waiting for
+ * their art and powers.
+ */
+export const BOSS_ROSTER: readonly BossDef[] = [
+  { id: "gingerbread", name: "The Gingerbread Man", icon: "🍪", kit: "The Gingerbread Man", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
+  { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
+  { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
+  { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
+  { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
+  { id: "witch", name: "The Storm Witch", icon: "🧙", kit: null, offset: 0, powers: null },
+  { id: "tyrant", name: "The Tower Tyrant", icon: "🏰", kit: null, offset: 0, powers: null },
+  { id: "dragon", name: "The Frost Dragon", icon: "🐉", kit: null, offset: 0, powers: null },
+  { id: "wraith", name: "The Grandmaster Wraith", icon: "👻", kit: null, offset: 0, powers: null },
+  { id: "demon", name: "The Demon Lord", icon: "😈", kit: null, offset: 0, powers: null },
+  { id: "eternal", name: "The Engine Eternal", icon: "👹", kit: null, offset: 0, powers: null },
 ];
 
-/** The boss's name, look and threat level for a strength (the Elo itself stays secret). */
-export function bossInfo(elo: number): BossInfo {
+/** The one rule for choosing a boss: it has a complete character and its powers. */
+export const isPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null;
+
+/** The bosses that can be met, in roster order. */
+export function playableBosses(roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] {
+  return roster.filter(isPlayable);
+}
+
+export const bossDef = (id: string | null | undefined): BossDef | null => (id ? (BOSS_ROSTER.find((b) => b.id === id) ?? null) : null);
+
+/**
+ * Which boss a match meets: `wanted` if it's playable, else a random playable one (from `roll`, 0-1), not `avoid`
+ * when there's another to meet (no repeats: solo avoids your last boss, online the one most of the lobby met last).
+ */
+export function chooseBoss(roll: number, wanted?: string | null, avoid?: string | null, roster: readonly BossDef[] = BOSS_ROSTER): BossDef {
+  const pick = roster.find((b) => b.id === wanted);
+  if (isPlayable(pick)) return pick;
+  const all = playableBosses(roster);
+  if (!all.length) throw new Error("No playable boss");
+  const pool = all.length > 1 ? all.filter((b) => b.id !== avoid) : all;
+  return pool[Math.min(pool.length - 1, Math.floor(Math.max(0, roll) * pool.length))]!;
+}
+
+/** The boss's strength: the lobby's (the usual calculation) plus its own offset, within what Stockfish plays. */
+export function bossStrength(base: number, def: Pick<BossDef, "offset"> | null): number {
+  return Math.max(800, Math.min(3190, Math.round(base + (def?.offset ?? 0))));
+}
+
+/** Threat thresholds: two to a skull, 1 to 5 (the old ten tiers' boundaries). */
+const THREAT_FROM = [0, 1500, 1700, 1900, 2100, 2300, 2500, 2700, 2900, 3100];
+
+/** How scary a strength is, 1 to 5 skulls (the Elo itself stays secret). */
+export function bossThreat(elo: number): number {
   let i = 0;
-  while (i + 1 < BOSSES.length && elo >= BOSSES[i + 1]!.from) i++;
-  const b = BOSSES[i]!;
-  // Two bosses to a skull: 1 to 5.
-  return { name: b.name, icon: b.icon, threat: Math.floor(i / 2) + 1 };
+  while (i + 1 < THREAT_FROM.length && elo >= THREAT_FROM[i + 1]!) i++;
+  return Math.floor(i / 2) + 1;
+}
+
+/** A boss's name, look and threat level: `id`'s, at strength `elo`. */
+export function bossInfo(elo: number, id?: string | null): BossInfo {
+  const def = bossDef(id);
+  if (def) return { name: def.name, icon: def.icon, threat: bossThreat(elo) };
+  // (Older records with no boss: the tier's old placeholder.)
+  let i = 0;
+  while (i + 1 < THREAT_FROM.length && elo >= THREAT_FROM[i + 1]!) i++;
+  const b = TIER_NAMES[i]!;
+  return { name: b.name, icon: b.icon, threat: bossThreat(elo) };
+}
+
+/** The ten tiers' old names (a record from before bosses had identities shows these). */
+const TIER_NAMES = ["golem", "clown", "archer", "knight", "witch", "tyrant", "dragon", "wraith", "demon", "eternal"].map((id) => bossDef(id)!);
+
+/**
+ * A boss's powers as they stand in a battle (the rules are in the chess package's boss-powers.ts). Crowd turns are
+ * numbered from 1 (the crowd's first move of the battle): turn = crowdMoves + 1.
+ */
+export interface BossPowerState {
+  /** Every choice a power makes comes from this and the position (the same on the server and in every replay). */
+  seed: number;
+  /** The crowd turn these are set for. */
+  turn: number;
+  /** The rage meter: the boss's material when the battle began, and the most of it it has lost since. */
+  material: number;
+  lost: number;
+  /** The ultimate: warned as this crowd turn began, unleashed at this one. Once per match. */
+  warnAt?: number;
+  ultAt?: number;
+  /** When the passive fires next (a crowd turn). */
+  nextPassive: number;
+  /** Freeze: the iced piece (its square and kind), through this crowd turn. */
+  frozen?: { square: string; piece: string; until: number } | null;
+  /** Pie: the pied square (nobody may move onto it), through this crowd turn. */
+  pie?: { square: string; until: number } | null;
+  /** The funhouse: the move the boss played for the crowd, as which crowd turn. */
+  funhouse?: { turn: number; move: string; san: string } | null;
+  /** After the funhouse, the crowd sees the board flipped through this crowd turn. */
+  flipUntil?: number;
+  /** What happened as this turn began, for the screens' moments (the same for everyone). */
+  events: PowerEvent[];
+}
+
+export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse";
+export interface PowerEvent {
+  kind: PowerEventKind;
+  turn: number;
+  /** The square it hit (a freeze, a pie). */
+  square?: string;
 }
 
 /** The settings behind the God King's Last Stand. */

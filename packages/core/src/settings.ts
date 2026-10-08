@@ -71,6 +71,14 @@ export interface Settings {
   raid: boolean;
   /** Boss raid: the boss's strength, set from the lobby's ratings when it starts (0: from the crowd, as in 50 v 50). */
   bossFixedElo: number;
+  /**
+   * Which boss (a BOSS_ROSTER id): the one picked, if it's playable; "" for a random playable boss, not `bossAvoid`
+   * when there's another (your last boss solo; online, the one most of the lobby met last).
+   */
+  bossId: string;
+  bossAvoid: string;
+  /** Test switch (?power=freeze|blizzard|pie|funhouse): that power comes at once (an ultimate after its warning). */
+  bossPowerTest: string;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
   /** Boss battle: how long the King's strike takes on screen (ms). The move clock stands still meanwhile. */
@@ -270,6 +278,9 @@ export const DEFAULT_SETTINGS: Settings = {
   bossNodes: 250_000,
   raid: false,
   bossFixedElo: 0,
+  bossId: "",
+  bossAvoid: "",
+  bossPowerTest: "",
   kingStrikeLoss: [5, 15],
   kingStrikeMs: 5900,
   kingPowerUpsPerCharge: 10,
@@ -406,6 +417,29 @@ export const RAID_SETTINGS: Partial<Settings> = {
   openingMoves: 5,
   powerUpsAtStart: 0,
 };
+
+/**
+ * Boss powers (boss-powers.ts in the chess package). Turns are the crowd's moves. Every power is decided on the
+ * server from the match's seed and the position, never breaks check and never leaves the crowd without a move.
+ */
+export const BOSS_POWERS = {
+  /** The first passive comes as this crowd turn begins. */
+  firstPassive: 2,
+  /** Freeze: a crowd piece (never the king) is iced for this many crowd turns, every 5 to 7 turns (from its start). */
+  freezeTurns: 2,
+  freezeEvery: [5, 7] as readonly [number, number],
+  /** Pie: a square near the centre is pied for this many crowd turns (nobody may move onto it), then this many clear. */
+  pieTurns: 3,
+  pieGap: 2,
+  /** The rage meter fills as the boss loses this much material (pawn 1, knight and bishop 3, rook 5, queen 9). */
+  rageFull: 9,
+  /** The funhouse: the boss plays the crowd's move, one that gives away this many points against the best (1 to 2.5 pawns). */
+  funhouseLoss: [10, 25] as readonly [number, number],
+  /** ...and never one that gives away more than this in log-odds (a lost cause stays a fight). */
+  funhouseMaxLogit: 1.6,
+  /** After the funhouse the crowd sees the board flipped for this many of its turns. */
+  flipTurns: 2,
+} as const;
 
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
