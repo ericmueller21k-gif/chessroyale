@@ -30,6 +30,12 @@ changes beyond the engine's own messages, write up the proposal and stop; that's
   - Fewer than two devices that can judge (or `JUDGES.on` false): the lobby's **host** scores every round, as before.
     `pickHost` in `packages/server/src/lobby.ts` prefers a connected computer over a phone.
   - The harness: `packages/sim/scripts/many-judges.ts` (cheaters, slow and dropping devices) → `reports/many-judges.md`.
+  - A dispute asks a third device and the engine server at once; two of three devices exactly alike settle it if
+    they're first. Knocked-out players' devices keep judging while their page is open.
+  - **Deep checks on computers** (`JUDGES.deepOnDevices`, built, ships **off**): two capable computers could re-check
+    close calls instead of the server, but the browsers' lite network is less accurate than the server
+    (`reports/deep-accuracy.md`), and Eric's rule is fairness first. Turn it on only with a device engine that matches
+    the server (measure with `deep-accuracy.ts` and `judge-cuts.ts`).
   - Before a cut, **close calls are re-checked deeper**: `recheckCloseCalls()` in `packages/chess/src/runner.ts`
     (settings `recheckLoss`, `recheckMax`, `recheckNodes` 700k). It only runs for groups with a human pick.
   - The re-check goes first to the **engine server**: native Stockfish 17.1 in a Cloudflare Container
