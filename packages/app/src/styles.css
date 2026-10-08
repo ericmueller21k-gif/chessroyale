@@ -17,22 +17,25 @@
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg: #f3f1ec;
-    --surface: #ffffff;
-    --surface-2: #e9e6df;
-    --text: #1d1f24;
-    --muted: #6a6f7a;
-    --line: #d9d5cc;
-    --accent: #c8860d;
-    --accent-text: #ffffff;
-    --good: #198754;
-    --bad: #d63939;
-    --danger: #d63939;
-    --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    color-scheme: light;
-  }
+/*
+ * Light mode. The page always says which theme it shows, <html data-theme="light|dark"> (theme.ts; set before the
+ * first paint by the script in index.html, from this device's pick or else the device's own setting), so light rules
+ * hang off :root[data-theme="light"], never a prefers-color-scheme query (that can't see a pick).
+ */
+:root[data-theme="light"] {
+  --bg: #f3f1ec;
+  --surface: #ffffff;
+  --surface-2: #e9e6df;
+  --text: #1d1f24;
+  --muted: #6a6f7a;
+  --line: #d9d5cc;
+  --accent: #c8860d;
+  --accent-text: #ffffff;
+  --good: #198754;
+  --bad: #d63939;
+  --danger: #d63939;
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  color-scheme: light;
 }
 
 * {
@@ -6564,26 +6567,24 @@ button.history-label {
   --fd-danger-line: #5b2a2a;
   --fd-scrim: rgba(0, 0, 0, 0.55);
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --fd-bg: #f4f2ee;
-    --fd-panel: #ffffff;
-    --fd-panel-2: #ebe8e2;
-    --fd-text: #1d1f24;
-    --fd-sub: #565c67;
-    --fd-muted: #6a707b;
-    --fd-dim: #8f95a0;
-    --fd-off: #3a3f48;
-    --fd-gold-text: #9a6a06;
-    --fd-gold-soft: #fbefcc;
-    --fd-green: #16a34a;
-    --fd-seat: #e4e1da;
-    --fd-line: #dcd8d0;
-    --fd-danger: #b42318;
-    --fd-danger-line: #f1b5ae;
-    --fd-scrim: rgba(20, 22, 27, 0.4);
-    --fd-shadow: 0.16;
-  }
+:root[data-theme="light"] {
+  --fd-bg: #f4f2ee;
+  --fd-panel: #ffffff;
+  --fd-panel-2: #ebe8e2;
+  --fd-text: #1d1f24;
+  --fd-sub: #565c67;
+  --fd-muted: #6a707b;
+  --fd-dim: #8f95a0;
+  --fd-off: #3a3f48;
+  --fd-gold-text: #9a6a06;
+  --fd-gold-soft: #fbefcc;
+  --fd-green: #16a34a;
+  --fd-seat: #e4e1da;
+  --fd-line: #dcd8d0;
+  --fd-danger: #b42318;
+  --fd-danger-line: #f1b5ae;
+  --fd-scrim: rgba(20, 22, 27, 0.4);
+  --fd-shadow: 0.16;
 }
 body:has(.fd-root) {
   background: var(--fd-bg);
@@ -6838,11 +6839,102 @@ button.fd-logo {
   justify-content: space-between;
   gap: 10px;
 }
-.fd-top-right {
+.fd-top-right,
+.fd-top-end {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+.fd-coins-short {
+  display: none;
+}
+/*
+ * A phone's top bar holds the logo, the sun, your coins and your pawn. When they don't all fit, the coins' word goes
+ * first (it wraps onto a second line the pill doesn't show: the gold dot is the coin), on narrow phones the logo steps
+ * down a little, and below 360 px a big balance goes short ("12k"). Measured with six-digit balances from 320 px up.
+ */
+.fd-top .fd-coins {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  min-width: 0;
+  height: 33px;
+  padding-block: 0;
+  line-height: 33px;
+  overflow: hidden;
+}
+.fd-top .fd-coins-word {
+  white-space: pre;
+}
+@media (max-width: 399px) {
+  .fd-top {
+    gap: 8px;
+  }
+  .fd-top .fd-logo {
+    font-size: clamp(20px, 6.1vw, 24px);
+  }
+  .fd-top .fd-top-end,
+  .fd-top .fd-top-right {
+    gap: 8px;
+  }
+  .fd-top .fd-coins {
+    padding-inline: 10px;
+  }
+}
+@media (max-width: 359px) {
+  .fd-top .fd-logo {
+    font-size: clamp(17px, 5.5vw, 20px);
+  }
+  .fd-top .fd-top-end,
+  .fd-top .fd-top-right {
+    gap: 6px;
+  }
+  .fd-top .fd-coins-full {
+    display: none;
+  }
+  .fd-top .fd-coins-short {
+    display: inline;
+  }
+}
+/*
+ * Light or dark (theme.ts): a bright sun in light mode, a black one in dark mode (Eric's "black sun"). 44 px. On a
+ * phone it leads the top bar's right side; on a computer it sits above Settings in the side menu.
+ */
+.fd-theme {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--fd-panel-2);
+  cursor: pointer;
+}
+.fd-theme .fd-sun-disc {
+  fill: var(--fd-gold);
+  stroke: var(--fd-gold-text);
+}
+.fd-theme .fd-sun-rays {
+  fill: none;
+  stroke: var(--fd-gold-text);
+}
+/* (A shade lighter than the panel, so the black sun reads as black.) */
+.fd-theme.dark {
+  background: #2f3442;
+}
+.fd-theme.dark .fd-sun-disc {
+  fill: #000;
+  stroke: var(--fd-gold);
+}
+.fd-theme.dark .fd-sun-rays {
+  stroke: var(--fd-gold);
+}
+.fd-theme:active {
+  transform: scale(0.94);
 }
 .fd-home-main {
   flex: 1 1 auto;
@@ -7266,6 +7358,9 @@ button.fd-logo {
   gap: 2px;
   cursor: pointer;
 }
+.fd-seg.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .fd-seg button span {
   font-size: 11px;
   font-weight: 400;
@@ -7354,6 +7449,14 @@ button.fd-logo {
 /* -- The queue (docs/mockups/front-door/Queue.dc.html) -- */
 .fd-queue {
   gap: 14px;
+}
+/* (The queue is the home screen's state: on a phone it's the whole screen, nothing of home around it.) */
+.fd-home.queueing {
+  padding: 0;
+  gap: 0;
+}
+.fd-wait-side {
+  display: none;
 }
 .fd-queue-mode {
   font-size: 15px !important;
@@ -7529,64 +7632,6 @@ button.fd-logo {
   font-size: 17px;
   font-weight: 800;
 }
-/* The queue on a computer: the grid gets most of the screen (pawns about 60-80 px), the count and Cancel beside it. */
-@media (min-width: 1024px) {
-  .fd-root.wide .fd-center {
-    width: 100%;
-  }
-  .fd-queue {
-    --q-side: 340px;
-    --q-grid: min(calc(100dvh - 150px), calc(100vw - var(--fd-menu, 0px) - var(--q-side) - 72px));
-    display: grid;
-    grid-template-columns: var(--q-grid) minmax(260px, var(--q-side));
-    grid-template-rows: auto auto auto auto auto 1fr;
-    grid-template-areas:
-      "head head"
-      "seats info"
-      "seats bar"
-      "seats you"
-      "seats cancel"
-      "seats .";
-    column-gap: 28px;
-    row-gap: 18px;
-    justify-content: center;
-    align-content: start;
-    padding-top: calc(env(safe-area-inset-top) + 24px);
-  }
-  .fd-queue .fd-page-head {
-    grid-area: head;
-  }
-  .fd-queue .fd-queue-info {
-    grid-area: info;
-    text-align: left;
-    align-self: end;
-  }
-  .fd-queue .fd-queue-count {
-    font-size: 56px;
-  }
-  .fd-queue .fd-bar {
-    grid-area: bar;
-  }
-  .fd-queue .fd-queue-panel {
-    display: contents;
-  }
-  .fd-queue .fd-seats {
-    grid-area: seats;
-    width: var(--q-grid);
-    background: var(--fd-panel);
-    border-radius: 22px;
-    padding: 14px;
-    gap: 4px;
-    align-self: start;
-  }
-  .fd-queue .fd-queue-you {
-    grid-area: you;
-    margin-top: 0;
-  }
-  .fd-queue .fd-cancel {
-    grid-area: cancel;
-  }
-}
 /* An empty seat's dot stays until its pawn pops in, then fades. */
 .fd-seat.pop::before {
   content: "";
@@ -7674,11 +7719,9 @@ button.fd-logo {
   color: var(--fd-tier-ink);
   font-weight: 700;
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) :is(.fd-pill.tier, .fd-rank) {
-    --fd-tier-ink: color-mix(in srgb, var(--tier) 55%, #000);
-    --fd-prism-ink: linear-gradient(100deg, #be123c, #854d0e, #15803d, #0369a1, #6d28d9, #be185d);
-  }
+:root[data-theme="light"] :is(.fd-pill.tier, .fd-rank) {
+  --fd-tier-ink: color-mix(in srgb, var(--tier) 55%, #000);
+  --fd-prism-ink: linear-gradient(100deg, #be123c, #854d0e, #15803d, #0369a1, #6d28d9, #be185d);
 }
 /* The top three ranks. Revered: a gold ring and a sheen. Exalted: a ring and a glow. Transcendent: a rainbow. */
 .fd-pill.rank-gilt {
@@ -7973,12 +8016,10 @@ button.fd-seat {
 @media (min-width: 1024px) {
   .fd-root.framed {
     --fd-menu: 232px;
+    --fd-rail: 280px;
     display: grid;
-    grid-template-columns: var(--fd-menu) minmax(0, 1fr) 320px;
+    grid-template-columns: var(--fd-menu) minmax(0, 1fr) var(--fd-rail);
     align-items: start;
-  }
-  .fd-root.framed.wide {
-    grid-template-columns: var(--fd-menu) minmax(0, 1fr);
   }
   .fd-root.framed .fd-center {
     width: 100%;
@@ -7986,9 +8027,6 @@ button.fd-seat {
     justify-self: center;
     /* Other screens in the frame (the shop) take the centre's width, not the window's. */
     --col: 100%;
-  }
-  .fd-root.framed.wide .fd-center {
-    max-width: none;
   }
   .fd-side {
     position: sticky;
@@ -8064,8 +8102,17 @@ button.fd-seat {
     display: flex;
     flex-direction: column;
     gap: 18px;
-    padding: 30px 22px;
+    padding: 24px 22px 30px;
     border-left: 1px solid var(--fd-line);
+  }
+  /* Your coins and your pawn: the top right of the page (Eric's arrow), level with the side menu's logo. */
+  .fd-right > .fd-top-right {
+    justify-content: flex-end;
+    min-height: 44px;
+  }
+  /* Light or dark: the sun, its own small button just above Settings (its icon in line with the menu's). */
+  .fd-side-theme {
+    margin: 0 0 4px 5px;
   }
   .fd-right .fd-live {
     background: var(--fd-panel);
@@ -8102,40 +8149,161 @@ button.fd-seat {
     background: var(--fd-panel-2);
     font-size: 18px;
   }
-  /* Home: the logo and the live line live in the side columns; your pawn and PLAY side by side. */
-  .fd-root.framed .fd-home .fd-top .fd-logo,
-  .fd-root.framed .fd-home > .fd-live {
-    visibility: hidden;
-  }
-  .fd-root.framed .fd-home > .fd-live {
-    display: none;
-  }
-  .fd-root.framed .fd-home {
-    padding: 28px 32px;
-    min-height: 100dvh;
-    max-width: 600px;
-    margin: 0 auto;
-  }
   /* Pages (profile, settings) and the private lobby: a readable column in the centre. */
   .fd-root.framed .fd-page {
     padding: 28px 32px 40px;
   }
 }
-/* Wide enough for both: your pawn and PLAY side by side. */
-@media (min-width: 1280px) {
-  .fd-root.framed .fd-home {
-    max-width: none;
+@media (min-width: 1440px) {
+  .fd-root.framed {
+    --fd-rail: 320px;
   }
-  .fd-root.framed .fd-home-main {
-    flex-direction: row;
+}
+
+/*
+ * -- The computer's home, and the queue in place of its play column (DECISIONS.md, "A cleaner computer home") --
+ * Your coins and pawn are in the live panel, the logo and the sun in the side menu, so the home's own top bar and live
+ * line are a phone's only. From the top: your pawn's card and the play column, side by side from 1280 px (stacked
+ * below that), one box that fills the window's height (to 720 px). In the queue the play column becomes the lobby
+ * and your card shrinks to the top of its column, with the lobby's chat under it.
+ */
+@media (min-width: 1024px) {
+  .fd-root.framed.fd-on-home .fd-center,
+  .fd-root.framed.fd-on-queue .fd-center {
+    max-width: 1080px;
+  }
+  .fd-root.framed .fd-home {
+    padding: 24px 24px 28px;
+    min-height: 100dvh;
+  }
+  .fd-root.framed .fd-home > .fd-top,
+  .fd-root.framed .fd-home > .fd-live {
+    display: none;
+  }
+  /* (1024-1279: one column, as on a phone, kept to a readable width.) */
+  .fd-root.framed .fd-home:not(.queueing) {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  /* The queue: the lobby, then the chat under it (your pawn is in your seat's card). */
+  .fd-root.framed .fd-home.queueing .fd-home-main {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .fd-root.framed .fd-home.queueing .fd-wait-side {
+    order: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .fd-root.framed .fd-home.queueing .fd-wait-side > .fd-hero {
+    display: none;
+  }
+  .fd-root.framed .fd-home.queueing .fd-wait-side:not(:has(.fd-wait-chat)) {
+    display: none;
+  }
+  /* The lobby: the queue screen's parts in a grid (the seats on the panel; your seat and Cancel side by side). */
+  .fd-root.framed .fd-home .fd-queue {
+    --q-grid: min(100%, calc(100dvh - 330px));
+    min-height: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "head head"
+      "info info"
+      "bar bar"
+      "seats seats"
+      "you cancel";
+    gap: 14px;
+    align-content: start;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-page-head {
+    grid-area: head;
+    min-height: 44px;
+  }
+  /* (Cancel is right there, and the side menu is still yours.) */
+  .fd-root.framed .fd-home .fd-queue .fd-back {
+    display: none;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-queue-mode {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    color: var(--fd-text);
+  }
+  /* (The count with "Unranked" beside it, so the pill arriving with the bots never moves the grid.) */
+  .fd-root.framed .fd-home .fd-queue .fd-queue-info {
+    grid-area: info;
+    text-align: left;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 14px;
     align-items: center;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-queue-info > * {
+    grid-column: 1 / -1;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-queue-info > .fd-queue-count {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-queue-info > .fd-queue-rank {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    margin: 0;
+    text-align: right;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-queue-count {
+    font-size: 44px;
+    line-height: 1.1;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-letbots {
+    max-width: 420px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-bar {
+    grid-area: bar;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-queue-panel {
+    display: contents;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-seats {
+    grid-area: seats;
+    width: var(--q-grid);
+    justify-self: center;
+    background: var(--fd-panel);
+    border-radius: 22px;
+    padding: 14px;
+    gap: 4px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-queue-you {
+    grid-area: you;
+    margin: 0;
+    min-width: 0;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-cancel {
+    grid-area: cancel;
+    align-self: stretch;
+    min-width: 150px;
+    padding: 0 28px;
+  }
+}
+@media (min-width: 1280px) {
+  .fd-root.framed .fd-home-main {
+    flex: none;
+    display: grid;
+    grid-template-columns: minmax(0, 540px) minmax(300px, 320px);
+    grid-template-rows: minmax(min(720px, calc(100dvh - 52px)), auto);
+    justify-content: center;
     gap: 24px;
   }
+  .fd-root.framed .fd-home:not(.queueing) {
+    max-width: none;
+  }
+  /* Your pawn's card fills its column from the top (Eric: it sat low, with a big empty space above it). */
   .fd-root.framed .fd-hero {
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: min(600px, calc(100dvh - 160px));
-    align-self: center;
+    min-height: 0;
   }
   .fd-root.framed .fd-hero .fd-pawn-hero {
     width: 240px;
@@ -8145,20 +8313,75 @@ button.fd-seat {
     font-size: 26px;
   }
   .fd-root.framed .fd-play-col {
-    flex: 0 1 360px;
-    min-width: 290px;
+    min-width: 0;
     justify-content: center;
   }
   .fd-root.framed .fd-play {
     height: 88px;
     font-size: 32px;
   }
+  /* The queue: your card and the chat on the left, the lobby (the green area) on the right. */
+  .fd-root.framed .fd-home.queueing .fd-home-main {
+    display: grid;
+    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+    justify-content: stretch;
+    align-items: start;
+  }
+  .fd-root.framed .fd-home.queueing .fd-wait-side,
+  .fd-root.framed .fd-home.queueing .fd-wait-side:not(:has(.fd-wait-chat)) {
+    order: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+    align-self: stretch;
+  }
+  .fd-root.framed .fd-home.queueing .fd-wait-side > .fd-hero {
+    display: flex;
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 18px;
+  }
+  .fd-root.framed .fd-home.queueing .fd-wait-side .fd-pawn-hero {
+    width: 76px;
+    height: 69px;
+  }
+  .fd-root.framed .fd-home.queueing .fd-wait-side .fd-hero-text {
+    text-align: left;
+    min-width: 0;
+  }
+  .fd-root.framed .fd-home.queueing .fd-wait-side .fd-hero-name {
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
+  .fd-root.framed .fd-home.queueing .fd-wait-side .fd-hero-sub {
+    font-size: 13px;
+  }
+  .fd-root.framed .fd-home .fd-queue {
+    --q-grid: min(100%, calc(100dvh - 320px));
+  }
 }
-@media (min-width: 1400px) {
+@media (min-width: 1440px) {
+  .fd-root.framed .fd-home-main {
+    grid-template-columns: minmax(0, 540px) 360px;
+  }
   .fd-root.framed .fd-hero .fd-pawn-hero {
     width: 290px;
     height: 263px;
   }
+  .fd-root.framed .fd-home.queueing .fd-home-main {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+}
+/* The lobby's chat, under your card (it fills the rest of the column). */
+.fd-wait-chat {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* A profile on a wide computer: two columns (who they are and what they wear; their numbers). */
@@ -8618,16 +8841,10 @@ img.qicon {
 .qbubble .emoji {
   font-size: 16px;
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .qbubble {
-    border-color: transparent;
-    background: rgba(16, 18, 22, 0.93);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  }
-}
 :root[data-theme="light"] .qbubble {
   border-color: transparent;
   background: rgba(16, 18, 22, 0.93);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 @keyframes qbubble {
   0% {
@@ -8785,31 +9002,6 @@ img.qicon {
   flex: none;
   height: 132px;
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .qchat-page {
-    --qc-bg: var(--surface);
-    --qc-head: var(--surface-2);
-    --qc-text: var(--text);
-    --qc-muted: var(--muted);
-    --qc-name: #3b4150;
-    --qc-chip: var(--surface-2);
-    --qc-edge: var(--line);
-    --qc-rule: var(--line);
-  }
-  :root:not([data-theme="dark"]) .qchat-page .qicon {
-    background: var(--surface-2);
-  }
-  :root:not([data-theme="dark"]) .qchat-page .qto button,
-  :root:not([data-theme="dark"]) .qchat-page .qhead-btn {
-    color: var(--muted);
-  }
-  :root:not([data-theme="dark"]) .qchat-page .qto button.on {
-    color: #1a1406;
-  }
-  :root:not([data-theme="dark"]) .qchat-page .qfeed-hint {
-    color: #8a6100;
-  }
-}
 :root[data-theme="light"] .qchat-page {
   --qc-bg: var(--surface);
   --qc-head: var(--surface-2);
@@ -8819,6 +9011,19 @@ img.qicon {
   --qc-chip: var(--surface-2);
   --qc-edge: var(--line);
   --qc-rule: var(--line);
+}
+:root[data-theme="light"] .qchat-page .qicon {
+  background: var(--surface-2);
+}
+:root[data-theme="light"] .qchat-page .qto button,
+:root[data-theme="light"] .qchat-page .qhead-btn {
+  color: var(--muted);
+}
+:root[data-theme="light"] .qchat-page .qto button.on {
+  color: #1a1406;
+}
+:root[data-theme="light"] .qchat-page .qfeed-hint {
+  color: #8a6100;
 }
 
 /* Phones: the space under the board, split between the scoreboard and chat (or one of them full width). */

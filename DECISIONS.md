@@ -1300,7 +1300,8 @@ every number on it comes from the server.
   - **No watch links yet:** nobody outside a match can watch it (only knocked-out players inside it can), so the
     list says watching comes later. A leaderboard can join the panel once ranked exists.
 - **The queue keeps the whole window** (no menu or panel): the grid is the show, and a menu click there would have to
-  mean leaving the queue. Private lobbies and every game screen keep their own layouts.
+  mean leaving the queue. Private lobbies and every game screen keep their own layouts. (Replaced Oct 8: the queue
+  fills in place on the home screen, below.)
 - **Phones** (below 1024 px) never see the menu or the panel: one column, as in the mockups.
 
 ### The rank ladder (Eric, Oct 6, 2026)
@@ -1339,6 +1340,85 @@ every number on it comes from the server.
   the rank's name takes its colour. Every pill reads at 4.5:1 or better in both themes, and a unit test checks it.
 - **Item tiers get their own names** (Common to Mythic, the item-builder's change alongside this one), so a rank never
   reads like an item's rarity.
+
+### Light and dark, a switch (Eric, Oct 8, 2026)
+
+Eric, on his computer: "why the sun next to the settings button? it does nothing … I also don't see a light dark mode
+toggle". The "sun" was Settings' icon; nothing in the app could change the theme (it followed the device only).
+
+- **The sun is the switch** (`ThemeButton`, `theme.ts`): a bright gold sun in light mode, a black sun with a gold rim
+  in dark mode (Eric: "when you click the sun, it switches to a black sun, and then it makes it dark mode"). A tap
+  shows the other theme and remembers it on this device (`brc.theme`). 44 px, `aria-pressed` = dark.
+  - **Computer:** its own small round button in the side menu, just above Settings. Settings now has a real gear (the
+    profile's).
+  - **Phone:** the home's top bar, before your coins and pawn.
+  - **Settings → Theme:** Match device / Light / Dark. Match device is the default until someone picks, and follows
+    the device live (switching the phone to dark at sunset switches the app).
+- **No flash of the wrong theme:** a few lines in `index.html`'s `<head>` set `<html data-theme>` before the first
+  paint, from the pick or the device. `theme.ts` keeps it in step afterwards by the same rules; a unit test runs the
+  inline script against `theme.ts` for every case (picked, not, junk, no storage, no media queries).
+- **One rule for light in the stylesheet:** the page always carries the theme it shows (`data-theme="light|dark"`),
+  so every light rule is `:root[data-theme="light"] …`. The old `@media (prefers-color-scheme: light)` blocks (the
+  base colours, the front door's, the rank pills, quick chat's bubble and page chat) became that. Before, a light pick
+  on a dark device would have missed them; quick chat's page-chat had only half its light rules duplicated.
+- **The phone's top bar, measured:** with the sun it holds the logo, the sun, your coins and your pawn. The bar
+  already ran off a 320 px phone with a 4-digit balance (and a 390 px one with 5 digits once the sun was in). Now:
+  the coins' word goes when it doesn't fit (it wraps onto a line the pill doesn't show; the gold dot is the coin),
+  the logo steps down a little below 400 px, and below 360 px a balance of 10,000 or more shows short ("123k").
+  `e2e/home-layout.spec.ts` checks 320-430 px with 123,456 coins.
+- **Checked:** `e2e/home-layout.spec.ts` (the sun on a computer and a phone, the pick through a reload with every
+  value `data-theme` took logged from the first moment, Settings' three choices, following the device live, every
+  front-door page in a forced theme) and `npm run frames:home` (one jump in brightness per tap; a reload with a pick
+  shows no frame of the other theme, both ways).
+
+### A cleaner computer home, and the queue in place (Eric, Oct 8, 2026)
+
+Eric marked up the computer's home: the pawn card sat low with a big empty space above it (arrow up and left); the
+coins and profile button should go to the top right; and "when you click play, that area [the mode picker, PLAY and
+the buttons] should become the large lobby that starts filling up players, and also there should be a chat while you
+wait … right now the whole screen is the hundred player loading". Phones keep their layout; everything here is
+scoped to 1024 px and wider.
+
+**Home (computer)**
+- **Your coins and pawn: the top right of the page,** at the top of the live panel, level with the side menu's logo.
+  On every page in the computer's frame (home, profile, settings, the shop), as the chess sites do. The home's own top
+  bar (and its live line) are a phone's only now; the logo and the sun live in the side menu.
+- **One box from the top:** your card and the play column start at the top (24 px, level with the logo) and share
+  one box that fills the window's height, up to 720 px. Your card fills its column top to bottom (nothing above it);
+  the play column sits in its middle, level with your pawn. On a tall screen the space is below everything, not
+  above.
+- **Sizes:** the card up to 540 px wide, the play column 320 px (1280-1439) or 360 px (1440+), 24 px apart, centred
+  in a centre of up to 1,080 px (it was 920: a 1,860 px screen had wide empty bands). The live panel is 280 px below
+  1440 px (320 above), so the lobby gets the room. 1024-1279: stacked, as before.
+
+**The queue in place (computer)**
+- **PLAY no longer takes the whole window.** The queue is a state of the home screen (`HomeScreen`'s `queue`): the
+  side menu and the live panel stay, the play column becomes the lobby (the mode, the sound, "N / 100", the line, the
+  bar, the grid, your seat and Cancel, "Switch to Default" for Bots off, and "Unranked …"), and your card shrinks to
+  the top of the left column with the lobby's chat under it. When the match starts it goes to the game as before.
+  Cancel is home again, in place.
+- **Sizes:** the left column 280 px (300 from 1440), the lobby the rest; the grid is as wide as the lobby and never
+  taller than the window allows, so Cancel is always in view: about 40 px pawns at 1280 × 800, 48 at 1440 × 900,
+  about 65 on a 1920 × 1080 screen. (Eric's Oct 6 "60-80 px" was for a queue with the whole window; with the frame
+  and the chat kept, it's smaller on a laptop.) At 1024-1279 the lobby takes the centre, your card is in your seat's
+  card, and the chat goes under the lobby.
+- **"Unranked …" sits beside the count,** so when the bots arrive it doesn't push the grid down mid-show. Your seat
+  and Cancel share a row. No back arrow in the lobby (Cancel is there, and the side menu).
+- **The side menu while you wait:** Play is where you are; your profile opens over the queue (as a pawn tapped in it
+  does); anything else (Boss alone, Play with friends, the shop, Settings) leaves the queue first, then goes there, as
+  leaving the page does on the chess sites. My call: a seat you can't see isn't one you're waiting in.
+- **The live panel keeps its numbers fresh while you wait** (every 5 s, as on home; the full-window queue only said
+  "still here" every 30 s). The server caches the live line for 3 s per Worker, so this costs no more than home.
+- **Phones:** the full-screen queue, unchanged (its screenshots match the old ones pixel for pixel).
+- **How it's built:** App renders home and the queue through one function, so the frame and the home screen stay
+  mounted from home to the queue and back (no blink of the menu or panel). The private lobby keeps its own screen.
+- **The lobby's chat:** the left column's slot under your card. The social delegate's lobby chat (built alongside)
+  goes there on a computer; on a phone it sits in the queue screen, where it mounts it.
+- **Checked:** `e2e/home-layout.spec.ts` (the queue in place at 1024, 1280 and 1440 with the menu, panel and card,
+  the lobby between them and Cancel in view, Cancel home, into the match, the menu while you wait, the phone's queue
+  full screen, no sideways scroll), and `npm run frames:home` (every frame from PLAY to the vote and from PLAY to
+  Cancel, dark and light: the menu and panel never missing, the grid never moving, the count never going down, no
+  blinks).
 
 ## Quick chat in matches (design, Oct 6, 2026; built Oct 7, 2026)
 

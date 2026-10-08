@@ -294,3 +294,20 @@ the phase was the reveal.
   each step on both branches (the phase, times, boxes) and find the step where they differ.
 - A test that measures a layout waits for the phase it means to measure; a phase change in the middle is a different
   screen.
+
+## A top bar that only fit a new player (Oct 8, 2026)
+
+**Seen** (by the light/dark switch, before it shipped): adding the sun to the phone's home top bar, a measurement at
+320-430 px with bigger balances showed the bar already ran off a 320 px phone at 1,250 coins (and off a 390 px one
+at 12,345 once the sun was in). Every test passed: every test account has 0 coins.
+
+**The cause:** the bar's items never shrink, and the coin pill grows with the balance. Tests and screenshots only ever
+saw "0 coins", the narrowest the pill gets.
+
+**How it was found:** a script set the pill to 0, 1,250, 9,999, 12,345, 123,456 and 999,999 coins at 320, 360, 375,
+390 and 430 px and measured each item's box against the bar and the page's `scrollWidth`.
+
+**The rule:**
+- A number on screen that grows (coins, ratings, counts, scores) is tested at its widest realistic value, not the
+  value a fresh test account has. Fake the server's answer in the test (`page.route`) if that's the only way to get it.
+- When something new joins a row of fixed-size items, measure the row at 320 px with that widest content first.
