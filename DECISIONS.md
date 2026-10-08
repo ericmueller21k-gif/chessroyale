@@ -1555,7 +1555,8 @@ The `social` delegate built it as designed. The lines and packs are in `core/cha
   - The bubble shows whenever no chat panel is on screen (scoreboard full, folded, a reveal too short for the
     split's feed, the votes). It sits between the top bar and the board. If there's no room it rides up over the bar,
     never over the board, and it takes no taps.
-- **Classic has no chat** (server and app), and neither does the queue.
+- **Classic has no chat** (server and app), and neither does the queue. (The queue does since Oct 8: "Lobby chat",
+  below.)
 - **Checked frame by frame** with `npm run frames:chat -- <dir> [moves] [dark|light] [split|chat|board]`
   (`scripts/frames-chat-move.mjs`, Worker running). It plays real taps on a phone while another player's lines
   arrive, records every painted frame, the board's box, the bubble's box and each change of the pieces.
@@ -1670,6 +1671,67 @@ tall, empty black box about two thirds of the screen wide, under the header "Whi
     every step the panel shows rows, chat or a small bar, and fits the screen.
   - On the old code it failed at the second tap, Eric's box (652 px tall, no rows).
   - `app/test/under-board.test.ts` covers the view, the migration, and a device without storage.
+
+### Lobby chat: quick chat while the match fills (Eric, Oct 8, 2026)
+
+Eric: "there should be a chat while you wait for players … the chat could be initiated at this point and then you
+could see the lobby chat." The `social` delegate's calls:
+
+- **Where:** the queue (Play now's Default and Bots off, raids), private lobbies, and Solo's queue. Crowd and raids
+  only: Classic still has no chat. Not the "servers are busy" line (no seat yet, so no lobby to talk in).
+- **One channel, "Lobby",** for everyone in the lobby. There are no teams yet, so there's no Team / All switch, and
+  every line you own can go, plans included: there's no other team to keep a plan from. Team / All begins with the
+  match.
+- **The lobby's lines carry on into the match's feed.** Eric's "initiated at this point" reads as one conversation
+  that starts in the queue. They're marked as the lobby's: a small "lobby" tag where tags show (the computer's panel,
+  a phone's full-width chat), and no team chip, since nobody had a team when they said it. Lines already seen in the
+  queue don't count as unread or bubble up. A rejoin mid-match gets them too.
+- **The same rules as in the match:** the presets, your 10 lines and 8 emoji from your profile, mute, chat off, the
+  limits (one every 3 s, 5 in 30 s, no repeats), and the server's checks (known lines you own; names from the lobby,
+  never the message). A mute made in the queue lasts into the match (it's kept with the lobby's code). The limits
+  are kept by account, so Cancel and PLAY again into the same lobby doesn't reset them.
+- **Someone who leaves the queue** takes their seat and their name with them. Their lines stay on the screens that
+  already showed them (the app keeps the names it has seen), and newcomers never get them (the server sends only lines
+  from people still in the lobby).
+- **The bots say hello as they fill the empty seats** (Default, a matchmade raid): one or two of "Hi all!", "Have
+  fun!" and "Let's go!", 0.3-0.9 s after they sit down (the second 0.5 s later), inside the 1.8 s the full grid shows.
+  - Always at least one (`botLobbyChance` 1): the moment is short, and an empty chat looks dead.
+  - They count toward the 3-a-minute cap on bot lines, so with the match's own "Good luck!" it's three at most.
+  - Bots off has no bots, so no hellos. A private lobby's bots arrive with Start, which begins the match at once,
+    so they greet as the match begins, as before.
+- **Solo:** its queue (3.1 s) has the chat too. There's no server, so the app stands in for one with the same checks
+  (`SoloLobbyChat` in `app/chat.ts`). The bots already seated halfway through the fill say hello, so their lines land
+  while the queue is up. Solo matches still have no chat, so it closes as the match begins. A mute there isn't stored.
+- **No sound for lobby lines.** They go to everyone there, like All lines in a match (which don't tick), and the
+  queue already has its pops.
+- **The server** relays chat in the waiting phase, with the same validation. Chat never keeps a lobby open:
+  - chat and chat settings don't count as activity (`activeAt`), so a lobby nobody starts closes an hour after the
+    last join, leave, connection or drop, however much is said. The hub's rule ("sent anything") is now "anything but
+    quick chat";
+  - chat sets no timers, so the fill time, the match's start and the close time are untouched.
+  - Icons already sent in the queue aren't sent again as the match begins.
+- **Where it shows** (`components/LobbyChat.tsx`, self-contained: it takes its size from the box it's put in, with
+  no fixed positioning, so the hub can place it):
+  - Phone: under the grid, inside the queue's panel, above "You're in". At least two whole lines
+    (`QUICK_CHAT.lobbyFeedLines`), more when there's room. Its header says "Lobby · Everyone here · teams come with
+    the match", with ⋯ for chat off and the mutes.
+  - Computer: for now in the right column under Cancel (the queue grid's free cell). The hub's new layout moves it.
+  - Private lobby: a 210 px box under the players.
+  - It follows the page's theme (the queue's own colours).
+  - On an iPhone 13 in Safari (390 × 664), the count, the grid and the whole chat are in view while the queue fills.
+    "You're in" and Cancel are below. The queue already ran 72 px past that screen before the chat (Cancel was half
+    off it); the back arrow also leaves the queue.
+- **Checked:**
+  - Unit tests: `server/test/lobby-chat.test.ts` (the relay, validation, mute and chat off, the limits, bot hellos
+    and their cap, close-out never held up by chat, the carry-over), and the lobby moment in `core/test/chat.test.ts`
+    and `app/test/chat.test.ts`.
+  - e2e: `e2e/lobby-chat.spec.ts` (phone and computer): two players in a Default queue see each other's lines, the
+    bots say hello, and the lines carry into the match; Solo's queue; a private lobby.
+  - Frame by frame: `npm run frames:lobbychat -- <dir> [dark|light]` (Worker running) records every frame on a
+    phone while lines arrive, a real tap on a line and on an emoji, people pop in, then the fill and the bots' hellos.
+    In both themes the chat never covered the count, the grid or Cancel, and nothing moved or resized while lines
+    arrived. The only move was the queue's own "Unranked" line appearing at the fill, which moves everything under it
+    down 28 px.
 
 ## No flash between a match's screens (Oct 6, 2026)
 

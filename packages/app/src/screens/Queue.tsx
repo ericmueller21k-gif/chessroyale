@@ -8,6 +8,7 @@ import { account } from "../account.ts";
 import { play } from "../sound.ts";
 import { openProfile } from "../profile-nav.ts";
 import { pawnLook } from "../looks.ts";
+import { LobbyChat } from "../components/LobbyChat.tsx";
 
 /**
  * What the queue screen shows: an online queue (NetMatch: Default or Bots off) or Solo filling with its bots
@@ -212,6 +213,7 @@ export function QueueScreen({ match, onCancel, onLetBotsFill }: { match: QueueVi
       </div>
       <div class="fd-queue-panel">
         {grid}
+        <LobbyChat match={match} />
         <div class="fd-queue-you">
           <DressedPawn size="card" look={myLook} hat={hat} />
           <div>

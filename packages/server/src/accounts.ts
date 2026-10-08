@@ -389,15 +389,12 @@ export async function signInWithIdentity(
       await sql.run("DELETE FROM sessions WHERE user_id = ?", current.id);
       await sql.run("DELETE FROM users WHERE id = ?", current.id);
     }
+    if (kind === "google" && !owner.email && (await adoptGoogleEmail(sql, owner.id, extra.email))) return (await getUser(sql, owner.id))!;
     return owner;
   }
   if (current && !current[col]) {
     await sql.run(`UPDATE users SET ${col} = ? WHERE id = ?`, value, current.id);
-    // A Google account brings its email too, when no other account uses it.
-    if (kind === "google" && extra.email && !current.email) {
-      const taken = await sql.first("SELECT id FROM users WHERE email = ?", extra.email);
-      if (!taken) await sql.run("UPDATE users SET email = ? WHERE id = ?", extra.email, current.id);
-    }
+    if (kind === "google" && !current.email) await adoptGoogleEmail(sql, current.id, extra.email);
     return (await getUser(sql, current.id))!;
   }
   const id = randomToken(12);
@@ -409,7 +406,19 @@ export async function signInWithIdentity(
     now,
     now,
   );
+  if (kind === "google") await adoptGoogleEmail(sql, id, extra.email);
   return (await getUser(sql, id))!;
+}
+
+/**
+ * A Google account brings its (verified) email to an account that has none, when no other account uses it: on every
+ * Google sign-in, so accounts made before this, or made fresh by Google, get it too (admins and fair play match on it).
+ */
+async function adoptGoogleEmail(sql: Sql, userId: string, email: string | null | undefined): Promise<boolean> {
+  const e = cleanEmail(email);
+  if (!e || (await sql.first("SELECT id FROM users WHERE email = ?", e))) return false;
+  await sql.run("UPDATE users SET email = ? WHERE id = ? AND email IS NULL", e, userId);
+  return true;
 }
 
 // ---------------- Email codes ----------------

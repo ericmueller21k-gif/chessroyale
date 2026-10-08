@@ -227,7 +227,8 @@ export interface NetVote {
  * Quick chat: one line said in the match (a phrase or emoji id from core/chat.ts; never free text). `team` is the
  * sender's team when they said it (null: everyone is one team, as in a raid). `at` (server time) is when to show it
  * (a bot's line comes a moment after what it reacts to). `icon` is the sender's pixel icon, sent with their first
- * line to each player (keep it).
+ * line to each player (keep it). `lobby`: said in the lobby before the match (the queue, a private lobby), where
+ * there are no teams yet: it went to everyone there (`to` "all", `team` null), and stays in the match's feed.
  */
 export interface NetChatLine {
   n: number;
@@ -237,6 +238,7 @@ export interface NetChatLine {
   team: "w" | "b" | null;
   at: number;
   icon?: string;
+  lobby?: true;
 }
 
 /** Why the server dropped a chat line (the app mirrors the limits, so this is rare). */
@@ -428,8 +430,8 @@ export type ServerMessage = { now: number } & (
   /** Quick chat: a line for you (your own included, echoed back). */
   | { t: "chat"; line: NetChatLine }
   /**
-   * Quick chat, on (re)joining a started match: the recent lines you can see, and the chat packs the server knows
-   * you own (the buttons to show).
+   * Quick chat, on joining (or rejoining) a lobby or a match, and as the match begins: the recent lines you can see,
+   * and the chat packs the server knows you own (the buttons to show).
    */
   | { t: "chatLog"; lines: NetChatLine[]; packs: string[] }
   /** Quick chat: your line was dropped; `retryAt` (server time) is when it (or anything, for the gap and burst limits) could go. */

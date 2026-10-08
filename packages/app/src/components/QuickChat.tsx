@@ -32,14 +32,38 @@ export function useMedia(query: string): boolean {
   return on;
 }
 
-/** The chat of a match, if it's on (online Crowd and boss raids, once the match has begun). */
+/** The chat of a match, if it's on (online Crowd and boss raids; from the lobby before the match). */
 export const chatOf = (match: GameView): MatchChat | null => (match.chat?.enabled ? match.chat : null);
 
-/** Who said a line: their name (from the lobby, never from the message), team, account and whether it's a bot. */
-function sender(match: GameView, id: string) {
-  const s = match.standings().find((x) => x.id === id);
-  return { name: match.nameOf(id), you: match.isYou(id), bot: !!s?.isBot, uid: s?.uid, team: s?.team ?? null };
+/**
+ * Who's who in a chat: names (from the lobby or the match, never from a message), which one is you, and each
+ * person's seat (a bot, their account for their profile, their team in a 50 v 50). The match's standings in a match;
+ * the lobby's players in the queue (LobbyChat).
+ */
+export interface ChatPeople {
+  nameOf(id: string): string;
+  isYou(id: string): boolean;
+  who(id: string): { isBot?: boolean; uid?: string; team?: "w" | "b" | null } | undefined;
 }
+
+/** A match's people: its standings. */
+export const matchPeople = (match: GameView): ChatPeople => ({
+  nameOf: (id) => match.nameOf(id),
+  isYou: (id) => match.isYou(id),
+  who: (id) => match.standings().find((x) => x.id === id),
+});
+
+/** Who said a line: their name (from the lobby, never from the message), team, account and whether it's a bot. */
+function sender(people: ChatPeople, id: string) {
+  const s = people.who(id);
+  return { name: people.nameOf(id), you: people.isYou(id), bot: !!s?.isBot, uid: s?.uid, team: s?.team ?? null };
+}
+
+/**
+ * The small tag after a line: "lobby" for one said before the match (once teams exist), "all" for one sent to both
+ * teams. Nothing where everyone hears everything anyway (the lobby itself, a raid).
+ */
+const lineTag = (line: ChatLine, teams: boolean): "lobby" | "all" | null => (!teams ? null : line.lobby ? "lobby" : line.to === "all" ? "all" : null);
 
 const sideName = (t: "w" | "b") => (t === "w" ? "White" : "Black");
 
@@ -49,26 +73,28 @@ function ChatIcon({ chat, id }: { chat: MatchChat; id: string }) {
 }
 
 /** One line in the feed: icon, name (tap for the menu) and what they said. */
-function ChatRow({ match, chat, line, teams, onName, tight }: { match: GameView; chat: MatchChat; line: ChatLine; teams: boolean; onName: (id: string) => void; tight: boolean }) {
+function ChatRow({ people, chat, line, teams, onName, tight }: { people: ChatPeople; chat: MatchChat; line: ChatLine; teams: boolean; onName: (id: string) => void; tight: boolean }) {
   const say = chatSay(line.say);
   if (!say) return null;
-  const who = sender(match, line.from);
+  const who = sender(people, line.from);
   const team = line.team ?? who.team;
+  const tag = lineTag(line, teams);
   return (
-    <div class={`qline${who.you ? " you" : ""}${say.kind === "emoji" ? " emoji" : ""}${line.to === "all" && teams ? " all" : ""}`} data-from={line.from}>
+    <div class={`qline${who.you ? " you" : ""}${say.kind === "emoji" ? " emoji" : ""}${tag ? ` ${tag}` : ""}`} data-from={line.from}>
       <ChatIcon chat={chat} id={line.from} />
       <button type="button" class="qline-name" onClick={() => onName(line.from)} aria-label={`${who.you ? "You" : who.name}: profile or mute`}>
-        {teams && team && line.to === "all" && <span class={`team-chip ${team}`} aria-label={`${sideName(team)} team`} />}
+        {/* (A line said in the lobby had no team yet.) */}
+        {tag === "all" && team && <span class={`team-chip ${team}`} aria-label={`${sideName(team)} team`} />}
         <span class="qline-who">{who.you ? "You" : who.name}</span>
       </button>
       <span class="qline-text">{say.text}</span>
-      {line.to === "all" && teams && !tight && <span class="qline-to">all</span>}
+      {tag && !tight && <span class="qline-to">{tag}</span>}
     </div>
   );
 }
 
 /** The feed, newest at the bottom. In a phone's split it shows the newest few that fit; elsewhere it scrolls. */
-function ChatFeed({ match, chat, scroll, teams, onName, hint }: { match: GameView; chat: MatchChat; scroll: boolean; teams: boolean; onName: (id: string) => void; hint: ComponentChildren }) {
+function ChatFeed({ people, chat, scroll, teams, onName, hint, empty }: { people: ChatPeople; chat: MatchChat; scroll: boolean; teams: boolean; onName: (id: string) => void; hint: ComponentChildren; empty: string }) {
   const lines = chat.lines();
   const muted = chat.mutedIds();
   const box = useRef<HTMLDivElement>(null);
@@ -78,16 +104,16 @@ function ChatFeed({ match, chat, scroll, teams, onName, hint }: { match: GameVie
     const el = box.current;
     if (el && scroll) el.scrollTop = el.scrollHeight;
   }, [newest, scroll, !!hint, muted.length]);
-  const rows = lines.map((l) => <ChatRow key={l.n} match={match} chat={chat} line={l} teams={teams} onName={onName} tight={!scroll} />);
+  const rows = lines.map((l) => <ChatRow key={l.n} people={people} chat={chat} line={l} teams={teams} onName={onName} tight={!scroll} />);
   const notes = [
     lines.length === 0 && (
       <p key="empty" class="qfeed-empty">
-        {teams ? "Tap a line to send it to your team." : "Tap a line to send it."}
+        {empty}
       </p>
     ),
     muted.length > 0 && (
       <p key="muted" class="qfeed-empty">
-        🔇 Muted this match: {muted.map((id) => match.nameOf(id)).join(", ")}
+        🔇 Muted this match: {muted.map((id) => people.nameOf(id)).join(", ")}
       </p>
     ),
     hint && (
@@ -244,15 +270,17 @@ function ToSwitch({ chat }: { chat: MatchChat }) {
   );
 }
 
-export type ChatVariant = "split" | "full" | "side" | "page";
+export type ChatVariant = "split" | "full" | "side" | "page" | "lobby";
 
 /**
  * The chat panel: header (title, Team / All, the split buttons), the feed, and the buttons. `split` is a phone's
  * half of the space under the board; `full` the whole of it; `side` the computer's column beside the board; `page`
- * a section of a page (results, watching after you're out).
+ * a section of a page (results, watching after you're out); `lobby` the queue's chat before the match (LobbyChat:
+ * it takes its size from the box it's placed in).
  */
-export function ChatPanel({ match, chat, variant, head, fold }: { match: GameView; chat: MatchChat; variant: ChatVariant; head?: ComponentChildren; fold?: ComponentChildren }) {
+export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatPeople; chat: MatchChat; variant: ChatVariant; head?: ComponentChildren; fold?: ComponentChildren }) {
   const roomy = useMedia(ROOMY);
+  const lobby = variant === "lobby";
   const [menu, setMenu] = useState<string | null>(null);
   const [options, setOptions] = useState(false);
   const self = useRef({});
@@ -278,7 +306,9 @@ export function ChatPanel({ match, chat, variant, head, fold }: { match: GameVie
       chat.shown(self.current, false);
     };
   }, [chat, chat.off, options]);
-  const layout = variant === "side" || (variant === "page" && roomy) ? "groups" : "rows";
+  const layout = variant === "side" || ((variant === "page" || lobby) && roomy) ? "groups" : "rows";
+  // (A phone's split, and the queue's chat on a phone, show the newest whole lines that fit; the rest scroll.)
+  const scroll = variant !== "split" && !(lobby && !roomy);
   const ready = chat.readyAt();
   const waitS = Math.ceil((ready - now) / 1000);
   const hint =
@@ -287,16 +317,17 @@ export function ChatPanel({ match, chat, variant, head, fold }: { match: GameVie
       : teams && chat.to === "all"
         ? "All: Hello and Sporting lines and emoji go to both teams. Plans and reactions stay in your team."
         : null;
-  const target = menu ? sender(match, menu) : null;
+  const target = menu ? sender(people, menu) : null;
   return (
     <section
       class={`qchat qchat-${variant}${chat.off ? " off" : ""}`}
-      aria-label="Quick chat"
+      aria-label={lobby ? "Lobby chat" : "Quick chat"}
       onClick={(e) => e.stopPropagation()}
     >
       <div class="qhead">
         {/* (A phone's split is narrow: with teams, the Team / All switch takes the title's place.) */}
-        {!(variant === "split" && teams && !chat.off) && <span class="qhead-title">Chat</span>}
+        {!(variant === "split" && teams && !chat.off) && <span class="qhead-title">{lobby ? "Lobby" : "Chat"}</span>}
+        {lobby && !chat.off && <span class="qhead-sub">Everyone here · teams come with the match</span>}
         {teams && !chat.off && <ToSwitch chat={chat} />}
         <span class="qhead-gap" />
         {variant !== "split" && (
@@ -325,12 +356,20 @@ export function ChatPanel({ match, chat, variant, head, fold }: { match: GameVie
         </div>
       ) : options ? (
         <div class="qoptions" ref={feed}>
-          <ChatOptions match={match} chat={chat} bubbles={variant === "split" || variant === "full"} onDone={() => setOptions(false)} />
+          <ChatOptions people={people} chat={chat} bubbles={variant === "split" || variant === "full"} onDone={() => setOptions(false)} />
         </div>
       ) : (
         <>
           <div class="qfeed-wrap" ref={feed}>
-            <ChatFeed match={match} chat={chat} scroll={variant !== "split"} teams={teams} onName={(id) => setMenu(id)} hint={hint} />
+            <ChatFeed
+              people={people}
+              chat={chat}
+              scroll={scroll}
+              teams={teams}
+              onName={(id) => setMenu(id)}
+              hint={hint}
+              empty={lobby ? "Say hello while the seats fill." : teams ? "Tap a line to send it to your team." : "Tap a line to send it."}
+            />
           </div>
           {target && menu ? (
             <div class="qmenu" role="group" aria-label={`${target.you ? "You" : target.name}`}>
@@ -362,7 +401,7 @@ export function ChatPanel({ match, chat, variant, head, fold }: { match: GameVie
               </button>
             </div>
           ) : (
-            <ChatButtons chat={chat} layout={layout} fit={variant === "full" || (variant === "page" && !roomy)} now={now} />
+            <ChatButtons chat={chat} layout={layout} fit={variant === "full" || ((variant === "page" || lobby) && !roomy)} now={now} />
           )}
         </>
       )}
@@ -371,7 +410,7 @@ export function ChatPanel({ match, chat, variant, head, fold }: { match: GameVie
 }
 
 /** Chat's switches: the bubble (phones), chat off, and the players muted this match. */
-function ChatOptions({ match, chat, bubbles, onDone }: { match: GameView; chat: MatchChat; bubbles: boolean; onDone: () => void }) {
+function ChatOptions({ people, chat, bubbles, onDone }: { people: ChatPeople; chat: MatchChat; bubbles: boolean; onDone: () => void }) {
   const [, redraw] = useState(0);
   useEffect(() => onPrefsChange(() => redraw((n) => n + 1)), []);
   const muted = chat.mutedIds();
@@ -390,8 +429,8 @@ function ChatOptions({ match, chat, bubbles, onDone }: { match: GameView; chat: 
       <div class="qopt-muted">
         <span class="muted small">{muted.length ? "Muted this match:" : "Tap a name in the chat to mute that player for this match."}</span>
         {muted.map((id) => (
-          <button key={id} type="button" class="qchip" onClick={() => chat.mute(id, false)} aria-label={`Unmute ${match.nameOf(id)}`}>
-            {match.nameOf(id)} ✕
+          <button key={id} type="button" class="qchip" onClick={() => chat.mute(id, false)} aria-label={`Unmute ${people.nameOf(id)}`}>
+            {people.nameOf(id)} ✕
           </button>
         ))}
       </div>
@@ -420,7 +459,7 @@ export function UnderBoard({ match }: { match: GameView }) {
   if (wide) {
     return (
       <div class="under-board side">
-        <ChatPanel match={match} chat={chat} variant="side" />
+        <ChatPanel people={matchPeople(match)} chat={chat} variant="side" />
       </div>
     );
   }
@@ -459,7 +498,7 @@ export function UnderBoard({ match }: { match: GameView }) {
       )}
       {layout !== "board" && (
         <ChatPanel
-          match={match}
+          people={matchPeople(match)}
           chat={chat}
           variant={layout === "chat" ? "full" : "split"}
           head={<SplitButton full={layout === "chat"} what="Chat" onClick={() => showUnderBoard(layout === "chat" ? "split" : "chat")} />}
@@ -474,7 +513,7 @@ export function UnderBoard({ match }: { match: GameView }) {
 export function ChatSection({ match }: { match: GameView }) {
   const chat = chatOf(match);
   if (!chat) return null;
-  return <ChatPanel match={match} chat={chat} variant="page" />;
+  return <ChatPanel people={matchPeople(match)} chat={chat} variant="page" />;
 }
 
 /**
@@ -505,13 +544,14 @@ export function ChatBubble({ match }: { match: GameView }) {
   if (!chat || !line) return null;
   const say = chatSay(line.say);
   if (!say) return null;
-  const who = sender(match, line.from);
+  const who = sender(matchPeople(match), line.from);
+  const tag = lineTag(line, chat.hasTeams());
   return (
     <div class="qbubble" ref={box} role="status" aria-live="polite" key={line.n}>
       <ChatIcon chat={chat} id={line.from} />
       <strong>{who.name}</strong>
       <span class={say.kind === "emoji" ? "emoji" : ""}>{say.text}</span>
-      {line.to === "all" && chat.hasTeams() && <span class="qline-to">all</span>}
+      {tag && <span class="qline-to">{tag}</span>}
     </div>
   );
 }

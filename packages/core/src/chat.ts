@@ -364,6 +364,8 @@ export function chatSent(sent: ChatSent, say: string, now: number, limits: ChatL
 // ---------------- Bots ----------------
 
 export type BotChatMoment =
+  /** The queue's lobby, before the match: the bots have just taken their seats. */
+  | { kind: "lobby" }
   /** The match begins. */
   | { kind: "start" }
   /** A crowd move just played lost at most QUICK_CHAT.botGreatMoveLoss points; `bots` are the team that picked it. */
@@ -380,9 +382,10 @@ export interface BotLine {
 }
 
 /**
- * Bots chat a little, so a lobby with bots doesn't feel dead: "Good luck!" as the match begins, "Nice move!" after a
- * great crowd move (from a bot on the team that made it), "GG" at the end. `recent` are the times of the lobby's
- * bot lines so far (when each is said); across all bots there are at most QUICK_CHAT.botMaxPerMinute a minute.
+ * Bots chat a little, so a lobby with bots doesn't feel dead: "Hi all!" as they take their seats in the queue,
+ * "Good luck!" as the match begins, "Nice move!" after a great crowd move (from a bot on the team that made it), "GG"
+ * at the end. `recent` are the times of the lobby's bot lines so far (when each is said); across all bots there are
+ * at most QUICK_CHAT.botMaxPerMinute a minute, the queue's hellos included.
  */
 export function botChatLines(
   rng: () => number,
@@ -392,14 +395,31 @@ export function botChatLines(
   now: number,
   q: Pick<
     typeof QUICK_CHAT,
-    "botMaxPerMinute" | "botStartChance" | "botStartMax" | "botGreatMoveChance" | "botGreatMoveLoss" | "botEndChance" | "botEndMax" | "botDelayMs"
+    | "botMaxPerMinute"
+    | "botStartChance"
+    | "botStartMax"
+    | "botGreatMoveChance"
+    | "botGreatMoveLoss"
+    | "botEndChance"
+    | "botEndMax"
+    | "botDelayMs"
+    | "botLobbyChance"
+    | "botLobbyMax"
+    | "botLobbyDelayMs"
+    | "botLobbyGapMs"
   > = QUICK_CHAT,
 ): BotLine[] {
   if (!bots.length) return [];
   const pick = <T>(xs: readonly T[]) => xs[Math.floor(rng() * xs.length) % xs.length]!;
-  const delay = () => Math.round(q.botDelayMs[0] + rng() * (q.botDelayMs[1] - q.botDelayMs[0]));
+  const range = moment.kind === "lobby" ? q.botLobbyDelayMs : q.botDelayMs;
+  const delay = () => Math.round(range[0] + rng() * (range[1] - range[0]));
+  // (The queue's last moment is short: its lines come closer together.)
+  const gap = moment.kind === "lobby" ? q.botLobbyGapMs : 1200;
   let want: { say: readonly string[]; to: ChatTo; count: number };
-  if (moment.kind === "start") {
+  if (moment.kind === "lobby") {
+    if (rng() >= q.botLobbyChance) return [];
+    want = { say: ["hi-all", "hi-all", "have-fun", "lets-go"], to: "all", count: 1 + Math.floor(rng() * q.botLobbyMax) };
+  } else if (moment.kind === "start") {
     if (rng() >= q.botStartChance) return [];
     want = { say: ["good-luck", "have-fun", "hi-all", "good-luck"], to: "all", count: 1 + Math.floor(rng() * q.botStartMax) };
   } else if (moment.kind === "greatMove") {
@@ -413,7 +433,7 @@ export function botChatLines(
   const times = [...recent];
   const used = new Set<string>();
   for (let i = 0; i < want.count; i++) {
-    const delayMs = delay() + i * 1200;
+    const delayMs = delay() + i * gap;
     const at = now + delayMs;
     // At most a few lines a minute across all bots (counting the lines already planned).
     if (times.filter((t) => t > at - 60_000 && t <= at + 60_000).length >= q.botMaxPerMinute) break;

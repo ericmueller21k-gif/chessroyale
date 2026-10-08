@@ -9029,6 +9029,84 @@ img.qicon {
   color: #8a6100;
 }
 
+/*
+ * The lobby's chat before the match (components/LobbyChat.tsx): in the queue under the seats. It takes its size from
+ * the box it's placed in (growing into any room left, and never smaller than its header, a couple of whole lines and
+ * its buttons), with no fixed positioning, and follows the page's theme.
+ */
+.lchat {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.lchat > .qchat-lobby {
+  flex: 1 1 auto;
+}
+.qchat-lobby {
+  --qc-bg: var(--fd-panel-2);
+  --qc-head: var(--fd-panel-2);
+  --qc-text: var(--fd-text);
+  --qc-muted: var(--fd-muted);
+  --qc-name: var(--fd-sub);
+  --qc-chip: var(--fd-panel);
+  --qc-edge: var(--fd-line);
+  --qc-rule: var(--fd-line);
+  border-radius: 16px;
+  font-family: inherit;
+}
+.qchat-lobby .qhead {
+  height: 26px;
+  padding-left: 12px;
+}
+.qchat-lobby .qhead-btn {
+  width: 44px;
+  height: 26px;
+}
+.qchat-lobby .qfeed {
+  padding: 3px 10px;
+}
+.qchat-lobby .qhead-title {
+  flex: none;
+  font-size: 13px;
+}
+.qhead-sub {
+  min-width: 0;
+  margin-left: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--qc-muted);
+  font-size: 11px;
+}
+.qchat-lobby .qhead-btn {
+  color: var(--qc-muted);
+}
+.qchat-lobby .qicon {
+  background: var(--fd-panel);
+}
+.qchat-lobby .qline.you .qline-name {
+  color: var(--fd-gold-text);
+}
+.qchat-lobby .qfeed-hint {
+  color: var(--fd-gold-text);
+}
+/* At least a couple of whole lines (QUICK_CHAT.lobbyFeedLines), more when the box has room. */
+.qchat-lobby .qfeed-wrap {
+  flex: 1 1 0;
+  min-height: calc(var(--lines, 2) * 23px + 5px);
+}
+/* A private lobby (screens/Lobby.tsx): a box of its own under the players. */
+.lobby-chat-box {
+  display: flex;
+  flex-direction: column;
+  height: 210px;
+}
+.lobby-chat-box:empty {
+  display: none;
+}
+
 /* Phones: the space under the board, split between the scoreboard and chat (or one of them full width). */
 @media (max-width: 899px) and (min-height: 520px) {
   .screen.game .under-board {
