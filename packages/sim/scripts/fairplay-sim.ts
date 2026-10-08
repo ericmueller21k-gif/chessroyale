@@ -9,6 +9,11 @@
  * copy the bank's strong engine (the full network at 1M nodes); every pick is scored with the judges' numbers.
  *
  *   npx tsx packages/sim/scripts/fairplay-sim.ts [players=2000] [matches=5]
+ *
+ * Other modes (environment variables): FAIRPLAY_SETS='name:levels.banEvidence=8,signals.strengthCap=2800;…' adds
+ * threshold sets to compare; FAIRPLAY_GRID=1 prints one line per set instead of the report; FAIRPLAY_USE_FITTED=1 uses
+ * the models fitted in this run instead of settings.ts's; FAIRPLAY_DIAG / DIAG2 / DIAG3 / DIAG4 print distributions
+ * and the model's calibration; FAIRPLAY_BANNED=1 lists the honest players a set would ban, match by match.
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
@@ -318,14 +323,22 @@ function evaluate(subjects: Subject[], st: Settings) {
     sub.summaries = [];
     sub.levels = [];
     let best: FairLevel = "none";
+    const checked: boolean[] = [];
     sub.movesByMatch.forEach((raw, m) => {
-      const ref = referenceStrength(sub.summaries.map((s) => s.perf), null);
       const at = (m + 1) * HOUR;
-      let summary = { ...matchSignals(raw, ref, st.signals, st.score), at };
+      const refAt = (i: number) => referenceStrength(sub.summaries.slice(0, i).map((s) => s.perf), null);
+      let summary = { ...matchSignals(raw, refAt(m), st.signals, st.score), at };
       let lv = playerLevel([...sub.summaries, summary], at + 1, st.levels).level;
       // Queued for the deep re-check (a flagged match, or a player already watched), done before their next match.
+      // As on the server, once a player is flagged every earlier match still kept is checked too (it can clear them).
       if (summary.score >= st.queueScore || lv !== "none" || best !== "none") {
-        summary = { ...matchSignals(deepCheck(raw, st), ref, st.signals, st.score), at };
+        summary = { ...matchSignals(deepCheck(raw, st), refAt(m), st.signals, st.score), at };
+        checked[m] = true;
+        for (let i = 0; i < m; i++) {
+          if (checked[i]) continue;
+          sub.summaries[i] = { ...matchSignals(deepCheck(sub.movesByMatch[i]!, st), refAt(i), st.signals, st.score), at: sub.summaries[i]!.at };
+          checked[i] = true;
+        }
         lv = playerLevel([...sub.summaries, summary], at + 1, st.levels).level;
       }
       sub.summaries.push(summary);

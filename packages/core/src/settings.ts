@@ -840,15 +840,15 @@ export const FAIRPLAY = {
      * The evidence model (core/fairplay.ts, honestChance), fitted on the simulation's honest players: [g0, g1, d0, d1]
      * with a crowd, [a, b] without, for the judges' best and for the deep re-check's best.
      */
-    findJudge: [0.83, -0.07, -0.16, 0.25, -3.01, 0.7] as readonly number[],
-    findDeep: [0.85, -0.16, -0.27, 0.06, -4.04, 0.93] as readonly number[],
+    findJudge: [0.88, -0.08, -0.13, 0.22, -3.27, 0.8] as readonly number[],
+    findDeep: [0.8, -0.14, -0.3, 0.06, -4, 0.9] as readonly number[],
     /** The same for the pick being in the deep re-check's top 3 (from the crowd's share of those three). */
-    findDeep3: [0.85, -0.09, -0.05, 0.3] as readonly number[],
-    soloFound: [-0.63, 0.29] as readonly number[],
-    soloDeep: [-1.24, 0.24] as readonly number[],
-    soloDeep3: [0.21, 0.28] as readonly number[],
+    findDeep3: [0.86, -0.09, -0.02, 0.3] as readonly number[],
+    soloFound: [-0.53, 0.24] as readonly number[],
+    soloDeep: [-1.17, 0.2] as readonly number[],
+    soloDeep3: [0.29, 0.26] as readonly number[],
     /** The old shift model's slope (log-odds per 400 rating points), kept for the report's comparison. */
-    hardSlope: 0.3,
+    hardSlope: 0.24,
     crowdRating: 1500,
     /**
      * The honest strength a player's picks are measured against: the higher of their own history and this match, but
@@ -913,9 +913,9 @@ export const FAIRPLAY = {
     banMatches: 2,
     /** (A match counts towards a ban only with this many of its moves deep-checked.) */
     banMatchChecked: 8,
-    banEvidence: 9,
+    banEvidence: 8,
     banDeepChecked: 16,
-    banDeep: 0.8,
+    banDeep: 0.75,
     banPerf: 2200,
     banOneEvidence: 11,
     banOneDeepChecked: 12,
