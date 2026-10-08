@@ -125,7 +125,8 @@ describe("account API", () => {
     const headers = new Headers(init.headers);
     if (init.cookie) headers.set("cookie", init.cookie);
     const res = (await handleAccountApi(new Request(origin + path, { ...init, headers }), env as never, fetcher))!;
-    const set = res.headers.get("set-cookie");
+    // (The session cookie: /api/me also gives a new device its fair-play marker.)
+    const set = res.headers.getSetCookie().find((c) => c.startsWith("hc_session=")) ?? null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body: any = res.status === 302 ? null : await res.json().catch(() => null);
     return { res, cookie: set?.split(";")[0] ?? init.cookie, body };

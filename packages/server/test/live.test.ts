@@ -109,7 +109,7 @@ describe("the live line", () => {
     const { d1, sql } = memoryDb();
     const env = { DB: d1 };
     const me = await handleAccountApi(new Request("https://hunchess.com/api/me"), env as never);
-    const cookie = me!.headers.get("set-cookie")!.split(";")[0]!;
+    const cookie = me!.headers.getSetCookie().find((c) => c.startsWith("hc_session="))!.split(";")[0]!;
     const anon = await handleAccountApi(new Request("https://hunchess.com/api/live"), env as never);
     expect(anon!.status).toBe(200);
     expect(await anon!.json()).toMatchObject({ online: 1, matches: 0, queue: 0, playing: [], waits: { crowd: null, boss: null } });

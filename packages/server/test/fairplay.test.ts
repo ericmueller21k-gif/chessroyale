@@ -155,7 +155,7 @@ describe("POST /api/report", () => {
     await ensureSchema(sql, d1);
     const env = { DB: d1 };
     const me = await fetch1(env, "GET", "/api/me");
-    const cookie = me.headers.get("set-cookie")!.split(";")[0]!;
+    const cookie = me!.headers.getSetCookie().find((c) => c.startsWith("hc_session="))!.split(";")[0]!;
     const target = (await createGuest(sql, 1000, "Bo")).user.id;
     const send = (body: unknown) => fetch1(env, "POST", "/api/report", body, cookie).then(async (r) => ({ status: r.status, body: await r.json() }));
     expect(await send({ target, reason: "Cheating", match: "ABCDE" })).toEqual({ status: 200, body: { ok: true, message: "Thanks, we'll look into it." } });
