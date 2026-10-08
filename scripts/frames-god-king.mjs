@@ -81,6 +81,8 @@ async function run(name, context) {
     await strip(p, `${tag}-idle`, 1200);
     const king = p.getByRole("button", { name: /God King: tap to summon/ });
     await king.click();
+    await p.getByRole("menu", { name: "God King commands" }).waitFor();
+    await p.waitForTimeout(250);
     await p.screenshot({ path: `${outDir}/${tag}-menu.png` });
     await p.getByRole("menuitem", { name: /Strike/ }).click();
     await strip(p, `${tag}-strike`, 6800, [2000, 3300]);
