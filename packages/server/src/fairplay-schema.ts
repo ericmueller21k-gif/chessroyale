@@ -25,4 +25,22 @@ export const FAIRPLAY_SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS fairplay_log_user ON fairplay_log (user_id, at)`,
   `CREATE INDEX IF NOT EXISTS reports_target ON reports (target, at)`,
+  // One row per player per online match: the match's fair-play signals and score (core/fairplay.ts), kept as the
+  // player's history; `moves` (every judged pick, as JSON) is evidence, kept until `keep_until` (see fairplay.ts).
+  `CREATE TABLE IF NOT EXISTS fairplay_matches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    lobby TEXT,
+    mode TEXT NOT NULL,
+    played_at INTEGER NOT NULL,
+    counted INTEGER NOT NULL,
+    perf INTEGER,
+    score REAL NOT NULL,
+    level TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    moves TEXT,
+    keep_until INTEGER
+  )`,
+  `CREATE INDEX IF NOT EXISTS fairplay_matches_user ON fairplay_matches (user_id, played_at)`,
+  `CREATE INDEX IF NOT EXISTS fairplay_matches_keep ON fairplay_matches (keep_until)`,
 ];

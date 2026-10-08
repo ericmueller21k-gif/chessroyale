@@ -245,7 +245,8 @@ export type ClientMessage =
   /** `look`: the crate items you wear (others see them on the cut screen). */
   | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; rating?: number | null; look?: unknown }
   | { t: "start" }
-  | { t: "pick"; key: string; move: string }
+  /** `away`: times the page was hidden or lost focus during this move's clock before the pick (fair play). */
+  | { t: "pick"; key: string; move: string; away?: number }
   | { t: "powerUp"; key: string }
   | { t: "scores"; key: string; boards: BoardScore[] }
   | { t: "crossCheck"; key: string; boardId: number; ok: boolean; detail?: string }
