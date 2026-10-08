@@ -68,6 +68,8 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
   engine costs and their sim reports.
 - `god-king`: the God King and the boss battle's presentation: his powers (rules, server, protocol), sprite,
   portrait, banners, lines, sounds, the boss dock and its animations.
+- `characters`: the raid bosses as characters: each boss's pixel-art sprite, portrait, animation pack and sound
+  pack, the boss sprite component and its wiring to game events. Its preview: `npm run preview:characters -- <dir>`.
 - `hub`: the front door: home, queue, online count, profiles (later leaderboards, ranked, friends), phone and desktop,
   front end and the server pieces behind them.
 - `social`: how players talk to each other: quick chat (preset messages) now; emotes, friends, parties and muting
