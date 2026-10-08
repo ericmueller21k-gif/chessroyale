@@ -685,8 +685,8 @@ export const LOBBY_LIFE = {
 } as const;
 
 /**
- * Quick chat in matches (preset phrases and emoji only; see DECISIONS.md, "Quick chat in matches"). The server
- * enforces the limits; the app mirrors them to grey out its buttons.
+ * Quick chat in matches and in the lobby before them (preset phrases and emoji only; see DECISIONS.md, "Quick chat
+ * in matches" and "Lobby chat"). The server enforces the limits; the app mirrors them to grey out its buttons.
  */
 export const QUICK_CHAT = {
   /** One message every this long… */
@@ -720,6 +720,19 @@ export const QUICK_CHAT = {
   botEndMax: 2,
   /** A bot's line comes this long after the moment (ms, random in the range), like a person typing. */
   botDelayMs: [1_500, 6_000] as readonly [number, number],
+  /**
+   * The queue's lobby chat (before the match): "Hi all!" as the bots take their seats. The odds, how many bots at
+   * most, how long after they sit down (ms, random in the range) and how far apart. Short: the full grid shows only
+   * FRONT_DOOR.fillShowMs (1.8 s) before the votes, and Solo's whole queue is MATCHMAKING.soloFillMs + soloHoldMs
+   * (3.1 s). The same per-minute cap as every bot line (botMaxPerMinute), so the match's own "Good luck!" makes it
+   * three at most.
+   */
+  botLobbyChance: 1 as number,
+  botLobbyMax: 2,
+  botLobbyDelayMs: [300, 900] as readonly [number, number],
+  botLobbyGapMs: 500,
+  /** The queue's lobby chat on a phone: the feed shows at least this many whole lines (more when there's room). */
+  lobbyFeedLines: 2,
   /**
    * The profile's picks (Quick chat and emoji): the lines and emoji a player sees in their games, in their order.
    * At most this many lines, and this many emoji (one row on a phone's full-width chat, no scrolling).

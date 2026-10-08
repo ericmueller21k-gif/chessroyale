@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   CHAT_GROUPS,
   CHAT_PACKS,
+  FRONT_DOOR,
+  MATCHMAKING,
   QUICK_CHAT,
   SHOP_ITEMS,
   botChatLines,
@@ -261,6 +263,50 @@ describe("quick chat: bots", () => {
     expect(said / 300).toBeGreaterThan(QUICK_CHAT.botGreatMoveChance - 0.1);
     expect(said / 300).toBeLessThan(QUICK_CHAT.botGreatMoveChance + 0.1);
     expect(botChatLines(mulberry32(1), { kind: "greatMove", loss: 0 }, [], [], 0)).toEqual([]);
+  });
+
+  it("say hello in the lobby as they take their seats: one or two, to everyone, inside the queue's last moment", () => {
+    const counts = new Map<number, number>();
+    for (let seed = 1; seed <= 300; seed++) {
+      const lines = botChatLines(mulberry32(seed), { kind: "lobby" }, bots, [], 0);
+      counts.set(lines.length, (counts.get(lines.length) ?? 0) + 1);
+      for (const l of lines) {
+        expect(["hi-all", "have-fun", "lets-go"]).toContain(l.say);
+        expect(l.to).toBe("all");
+        expect(bots).toContain(l.from);
+        expect(l.delayMs).toBeGreaterThanOrEqual(QUICK_CHAT.botLobbyDelayMs[0]);
+      }
+      // Two different bots, not saying the same thing.
+      if (lines.length > 1) {
+        expect(lines[0]!.from).not.toBe(lines[1]!.from);
+        expect(lines[0]!.say).not.toBe(lines[1]!.say);
+      }
+      // All said while the full grid shows online (FRONT_DOOR.fillShowMs) and before Solo's queue ends (its hellos
+      // start halfway through the fill: soloFillMs / 2 + the delay, inside soloFillMs + soloHoldMs).
+      const last = Math.max(0, ...lines.map((l) => l.delayMs));
+      expect(last).toBeLessThan(FRONT_DOOR.fillShowMs - 200);
+      expect(MATCHMAKING.soloFillMs / 2 + last).toBeLessThan(MATCHMAKING.soloFillMs + MATCHMAKING.soloHoldMs - 300);
+    }
+    // At least one bot always says hello (botLobbyChance 1), at most botLobbyMax; both counts happen.
+    expect(QUICK_CHAT.botLobbyChance).toBe(1);
+    expect(counts.get(0)).toBeUndefined();
+    expect([...counts.keys()].sort()).toEqual([1, 2]);
+    expect(QUICK_CHAT.botLobbyMax).toBe(2);
+    // No bots, no hellos; and the chance is a setting (0: never).
+    expect(botChatLines(mulberry32(1), { kind: "lobby" }, [], [], 0)).toEqual([]);
+    expect(botChatLines(mulberry32(1), { kind: "lobby" }, bots, [], 0, { ...QUICK_CHAT, botLobbyChance: 0 })).toEqual([]);
+  });
+
+  it("the lobby's hellos count toward the per-minute cap: with them, the match's own 'Good luck!' keeps it to three", () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const rng = mulberry32(seed);
+      const said: number[] = [];
+      for (const l of botChatLines(rng, { kind: "lobby" }, bots, said, 0)) said.push(l.delayMs);
+      // The match begins FRONT_DOOR.fillShowMs later.
+      const now = FRONT_DOOR.fillShowMs;
+      for (const l of botChatLines(rng, { kind: "start" }, bots, said, now)) said.push(now + l.delayMs);
+      expect(said.length).toBeLessThanOrEqual(QUICK_CHAT.botMaxPerMinute);
+    }
   });
 
   it("at most a few lines a minute across all bots", () => {

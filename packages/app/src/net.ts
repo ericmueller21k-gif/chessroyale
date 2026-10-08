@@ -196,8 +196,10 @@ export class NetMatch implements GameView {
     return this.myId !== null && this.myId === this.hostId;
   }
   nameOf(id: string) {
-    return this.players.find((p) => p.id === id)?.name ?? id;
+    return this.players.find((p) => p.id === id)?.name ?? this.names.get(id) ?? id;
   }
+  /** Everyone seen in the lobby, kept after they leave (a line they said in the queue keeps its name). */
+  private readonly names = new Map<string, string>();
   isYou(id: string) {
     return id === this.myId;
   }
@@ -371,7 +373,10 @@ export class NetMatch implements GameView {
         return this.goneNow(m.reason);
       case "lobby":
         this.players = m.players;
-        for (const p of m.players) if (p.look) this.looks.set(p.id, p.look);
+        for (const p of m.players) {
+          if (p.look) this.looks.set(p.id, p.look);
+          this.names.set(p.id, p.name);
+        }
         this.hostId = m.hostId;
         this.started = m.started;
         this.auto = !!m.auto;
