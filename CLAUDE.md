@@ -25,6 +25,14 @@ record it in `DECISIONS.md`.
 - Next phase (accounts, profiles, matchmaking, ranked, coins/icons/emotes): see `ROADMAP.md` for the order and what
   needs Eric.
 - Explain rules and scoring in plain language on screen. Real playtests drive changes, so make tweaks easy.
+- **Computing priorities (Eric, Oct 8), in this order:**
+  1. **Never compromise the game.** Fair scoring, correct results and smooth play come first, whatever it costs.
+  2. **Use players' devices wherever they can do the job.** Judging, deep checks and other engine work go to
+     connected devices first (computers before phones, checked against each other), so we don't spend when we
+     don't need to.
+  3. **Use our servers when they're truly needed:** too few capable devices, devices disagreeing, or a check that
+     must be beyond any player's reach. Never skimp on the server when it's needed; never use it when a device would
+     do.
 - Never merge red: every PR runs the typecheck and unit tests on GitHub (`.github/workflows/check.yml`); wait for it
   to pass, and run the e2e suite (`npm run e2e`) yourself before merging anything that changes gameplay or screens.
 - Classic (8 boards) will be reworked (Eric, Oct 5, 2026): don't invest in it until he decides the new design.
@@ -67,6 +75,8 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
 - `ranked`: hidden skill ratings, ranks and rank points, seasons, ranked queues and skill-based matchmaking,
   leaderboard numbers (the `hub` shows them).
 - `ops`: capacity, load tests, scaling choke points, monitoring, rate limits, graceful overload, running costs.
+- `fairplay`: reports, cheat detection (signals from each match's judged moves, the suspicion score), flags, bans,
+  the review page (`/admin/fairplay`) and appeals, and the cheater simulations that tune them.
 - Lanes keep sessions out of each other's files. Run one delegate per lane at a time. In `DECISIONS.md`, add to your
   own sections rather than rewriting others'.
 
