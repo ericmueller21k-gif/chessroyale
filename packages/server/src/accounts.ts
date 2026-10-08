@@ -30,7 +30,7 @@ import {
   type ShopState,
   type StoredChatPicks,
 } from "@chessroyale/core";
-import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
+import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, takeOffHeadItem, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 
 export interface Sql {
@@ -854,6 +854,8 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown): Prom
   // Chat packs aren't equipped: every one you own is yours to use.
   if (item.slot === "chat") return { ok: true, shop: state };
   await sql.run("INSERT INTO equipped (user_id, slot, item_id) VALUES (?, ?, ?) ON CONFLICT (user_id, slot) DO UPDATE SET item_id = excluded.item_id", userId, item.slot, item.id);
+  // One head: a pawn hat takes off a crate head item (and wearing a crate head item takes off the pawn hat).
+  if (item.slot === "hat" && item.look.hat !== "none") await takeOffHeadItem(sql, userId);
   return { ok: true, shop: await shopState(sql, userId) };
 }
 
