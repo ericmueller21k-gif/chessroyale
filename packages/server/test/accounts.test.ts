@@ -19,7 +19,7 @@ import {
   type Sql,
 } from "../src/accounts.ts";
 import { handleAccountApi, isSignedIn, signInRequired } from "../src/api.ts";
-import { equipLocker, lockerState, openCrate } from "../src/locker.ts";
+import { deleteLockerItems, equipLocker, lockerState, openCrate } from "../src/locker.ts";
 
 // node:sqlite through require (Vite doesn't know it as a built-in yet).
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
@@ -125,7 +125,8 @@ describe("account API", () => {
     const headers = new Headers(init.headers);
     if (init.cookie) headers.set("cookie", init.cookie);
     const res = (await handleAccountApi(new Request(origin + path, { ...init, headers }), env as never, fetcher))!;
-    const set = res.headers.get("set-cookie");
+    // (The session cookie: /api/me also gives a new device its fair-play marker.)
+    const set = res.headers.getSetCookie().find((c) => c.startsWith("hc_session=")) ?? null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body: any = res.status === 302 ? null : await res.json().catch(() => null);
     return { res, cookie: set?.split(";")[0] ?? init.cookie, body };
@@ -228,11 +229,12 @@ describe("account API", () => {
     let shop = await shopState(sql, guest.id);
     expect(shop.equipped).toEqual({ king: "king-holy", hat: "hat-none" });
     expect(shop.owned).toEqual(expect.arrayContaining(["king-holy", "hat-none"]));
+    expect(shop.owned).not.toContain("hat-party");
     expect(shop.coins).toBe(0);
     // You can't equip what you don't own, or anything not in the shop.
     expect(await equipItem(sql, guest.id, "hat-crown")).toEqual({ ok: false, message: "Get it first." });
     expect((await buyItem(sql, guest.id, "hat-nope", 1100)).ok).toBe(false);
-    // Get it (free while testing), then equip it.
+    // Get it (free while testing), then equip it (the locker does that, with the crate items).
     const bought = await buyItem(sql, guest.id, "hat-crown", 1100);
     expect(bought.ok && bought.shop.owned).toContain("hat-crown");
     const eq = await equipItem(sql, guest.id, "hat-crown");
@@ -251,6 +253,45 @@ describe("account API", () => {
     expect(shop.owned).toEqual(expect.arrayContaining(["hat-crown", "king-storm", "king-hellfire"]));
     expect(shop.equipped).toEqual({ king: "king-hellfire", hat: "hat-crown" });
     expect((await shopState(sql, guest.id)).owned).not.toContain("hat-crown");
+  });
+
+  it("one head: a pawn hat takes off a crate head item, and a crate head item takes off the pawn hat", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Guest");
+    await sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES ('beanie-1', ?, 'beanie', 'red', 40, 7, 'winter-1', 900)", user.id);
+    for (const hat of ["hat-party", "hat-wizard", "king-void"]) await buyItem(sql, user.id, hat, 950);
+    await equipItem(sql, user.id, "hat-party");
+    const on = await equipLocker(sql, user.id, "head", "beanie-1");
+    expect(on.ok && on.locker.equipped.head).toBe("beanie-1");
+    expect((await shopState(sql, user.id)).equipped.hat).toBe("hat-none");
+    await equipItem(sql, user.id, "hat-wizard");
+    expect((await lockerState(sql, user.id)).equipped.head).toBeUndefined();
+    // Taking the pawn hat off ("No hat") leaves the head bare, and a God King effect doesn't touch it.
+    await equipLocker(sql, user.id, "head", "beanie-1");
+    await equipItem(sql, user.id, "king-void");
+    expect((await lockerState(sql, user.id)).equipped.head).toBe("beanie-1");
+  });
+
+  it("deleting crate items: your own only, for good, taken off first if worn", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Guest");
+    const { user: other } = await createGuest(sql, 1000, "Other");
+    const add = (id: string, userId: string, blemish: number) =>
+      sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES (?, ?, 'santa-beard', 'red', ?, 7, 'winter-1', 900)", id, userId, blemish);
+    await add("a", user.id, 10);
+    await add("b", user.id, 40);
+    await add("c", user.id, 70);
+    await add("theirs", other.id, 5);
+    await equipLocker(sql, user.id, "face", "b");
+    expect((await deleteLockerItems(sql, user.id, "b")).ok).toBe(false);
+    expect((await deleteLockerItems(sql, user.id, [])).ok).toBe(false);
+    const r = await deleteLockerItems(sql, user.id, ["b", "c", "theirs"]);
+    if (!r.ok) throw new Error(r.message);
+    expect(r.locker.items.map((i) => i.id)).toEqual(["a"]);
+    expect(r.locker.equipped.face).toBeUndefined();
+    expect((await lockerState(sql, other.id)).items.map((i) => i.id)).toEqual(["theirs"]);
   });
 
   it("chat packs: the free ones everyone has; a pack you get is yours to use (nothing to equip) and follows you when you sign in", async () => {

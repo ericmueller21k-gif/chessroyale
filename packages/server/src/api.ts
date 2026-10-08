@@ -1,4 +1,4 @@
-import { equipLocker, lockerState, openCrate } from "./locker.ts";
+import { deleteLockerItems, equipLocker, lockerState, openCrate } from "./locker.ts";
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.ts";
@@ -228,7 +228,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
 
   // The locker. GET /api/locker; POST /api/locker/open {crate, fischer?, shiny?} (the test switches work only while
-  // crates are free); POST /api/locker/equip {slot, item} (item null empties the slot).
+  // crates are free); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
+  // {items} (deletes your crate items for good).
   if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id));
   if (path === "/api/locker/open" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown };
@@ -238,6 +239,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/locker/equip" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { slot?: unknown; item?: unknown };
     const r = await equipLocker(sql, current.id, b.slot, b.item ?? null);
+    return r.ok ? json(r.locker) : json({ message: r.message }, 400);
+  }
+  if (path === "/api/locker/delete" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { items?: unknown };
+    const r = await deleteLockerItems(sql, current.id, b.items);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
 
