@@ -19,9 +19,17 @@ changes beyond the engine's own messages, write up the proposal and stop; that's
   - Every pick is scored by Stockfish as an expected score (win/draw/loss), at `engineNodes` (250k) per position.
   - `packages/chess/src/uci.ts` (`UciEngine`) speaks UCI. The same code runs in Node (simulations, tests: `src/node.ts`)
     and in the browser (a Web Worker pool: `packages/app/src/engine.ts`, Stockfish 19 lite WASM).
-- **Who scores, online (the hybrid):**
-  - The lobby's **host** browser scores every round. `pickHost` in `packages/server/src/lobby.ts` prefers a
-    connected computer over a phone.
+- **Who scores, online (many judges; DECISIONS.md "Many judges"):**
+  - Each board's scoring job (position, picks, bots; no names) goes to **two devices** drawn by the lobby, weighted
+    by the speed each reported on joining (`speed` message). Pure flow in `lobby.ts` (section "Many judges"),
+    helpers in `packages/server/src/judges.ts`, the job itself in `packages/chess/src/judge.ts` (`runJudgeJob`,
+    `judgedBoard`: a device sends the engines' raw output; the lobby works out the board with the same code).
+  - The browser engine is deterministic (`reports/judge-determinism.md`), so two honest answers are identical:
+    exact match required (`JUDGES.tolerance` 0). Disagreement: the engine server's verdict, a third device's second
+    opinion for blame; strikes bench a device. A late judge's answer is compared afterwards. Settings: `JUDGES`.
+  - Fewer than two devices that can judge (or `JUDGES.on` false): the lobby's **host** scores every round, as before.
+    `pickHost` in `packages/server/src/lobby.ts` prefers a connected computer over a phone.
+  - The harness: `packages/sim/scripts/many-judges.ts` (cheaters, slow and dropping devices) → `reports/many-judges.md`.
   - Before a cut, **close calls are re-checked deeper**: `recheckCloseCalls()` in `packages/chess/src/runner.ts`
     (settings `recheckLoss`, `recheckMax`, `recheckNodes` 700k). It only runs for groups with a human pick.
   - The re-check goes first to the **engine server**: native Stockfish 17.1 in a Cloudflare Container

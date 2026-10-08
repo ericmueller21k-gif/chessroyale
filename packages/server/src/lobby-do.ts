@@ -1,14 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
-import { LobbyCore, lobbyClosing, newLobbyRecord, type LobbyRecord } from "./lobby.ts";
+import { LobbyCore, lobbyClosing, newLobbyRecord, type LobbyRecord, type ServerScoreRequest } from "./lobby.ts";
 import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired, withSecrets } from "./api.ts";
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
-import { serverRecheck, warmEngine } from "./engine.ts";
+import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
 import { CAPACITY, DEFAULT_SETTINGS } from "@chessroyale/core";
 
 const library = openings as unknown as Opening[];
@@ -41,6 +41,8 @@ export class Lobby extends DurableObject<Env> {
   private reservations: number[] = [];
   /** A live-line report held back by the 2 s limit is on its way. */
   private reportQueued = false;
+  /** Many judges: deep searches the lobby asked of the engine server, sent once the lobby is stored. */
+  private serverQueue: ServerScoreRequest[] = [];
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -70,6 +72,7 @@ export class Lobby extends DurableObject<Env> {
       now: () => Date.now(),
       serverEngine: this.engineUp,
       icon: (playerId) => this.icons.get(playerId),
+      serverScore: (req) => void this.serverQueue.push(req),
       send: (playerId, msg) => {
         const text = JSON.stringify({ ...msg, now: Date.now() } as ServerMessage);
         for (const ws of this.socketsOf(playerId)) {
@@ -93,7 +96,7 @@ export class Lobby extends DurableObject<Env> {
         if (!job || !Object.values(job.humanPicks).some((m) => !!m)) return b;
         const picks = [...Object.values(job.humanPicks), ...Object.values(b.botPicks ?? {})];
         const t = Date.now();
-        const out = await serverRecheck(this.env, job.fen, { bestMove: b.bestMove, bestExpected: b.bestExpected, expectedAfter: b.expectedAfter }, picks, DEFAULT_SETTINGS, jobs.length);
+        const out = await serverRecheck(this.env, job.fen, { bestMove: b.bestMove, bestExpected: b.bestExpected, expectedAfter: b.expectedAfter }, picks, DEFAULT_SETTINGS, jobs.length, job.priority);
         const changed = Object.keys(out.expectedAfter).filter((m) => out.expectedAfter[m] !== b.expectedAfter[m]);
         if (changed.length) console.log(`engine re-check: ${changed.length} moves in ${Date.now() - t} ms`);
         return { ...b, ...out };
@@ -135,6 +138,20 @@ export class Lobby extends DurableObject<Env> {
     else await this.ctx.storage.deleteAlarm();
     // The live line hears about it in the background (it never holds up the match).
     void this.reportLive(core).catch(() => undefined);
+    // Many judges: the engine server's searches run in the background; each answer is a new event for the lobby.
+    for (const req of this.serverQueue.splice(0)) this.ctx.waitUntil(this.serve(req));
+  }
+
+  /** One deep search for the judges (a verdict, a re-check, a spot check); its answer goes back to the lobby. */
+  private async serve(req: ServerScoreRequest) {
+    const nodes = Math.max(400_000, Math.round(SERVER_RECHECK_NODES / Math.max(1, req.boards)));
+    const t = Date.now();
+    const moves = await serverScoreAt(this.env, req.fen, req.moves, nodes).catch(() => null);
+    console.log(`engine server for judges: ${req.id.split(":")[0]} ${moves ? `${moves.length} moves` : "no answer"} in ${Date.now() - t} ms`);
+    if (!this.record) return;
+    const core = this.core(this.record.code);
+    core.serverScored(req.id, moves);
+    await this.persist(core);
   }
 
   /** Stores the record: everything but `last` under "lobby", and `last` under "last" when any of it changed. */
@@ -339,7 +356,7 @@ export class Lobby extends DurableObject<Env> {
     const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean } | null;
     // The host's scores: the engine server re-checks the close calls first (before the lobby is touched, so
     // nothing changes under it while it waits), and its numbers are the ones used.
-    if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId) {
+    if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
       msg = { ...msg, boards: await this.recheckOnServer(msg.boards) };
     }
     // Quick chat: who's joining (their icon and chat packs), read before the lobby is touched, as above.
