@@ -53,6 +53,9 @@ changes beyond the engine's own messages, write up the proposal and stop; that's
 
 ## Rules
 
+- **Computing priorities** (CLAUDE.md, Eric): never compromise the game; use players' devices wherever they can do
+  the job; use our servers only when truly needed, and then without skimping.
+
 - **Money is Eric's.** Never raise `ENGINE_DAILY_SEARCHES`, the container's instance size or its instance count, or
   add a paid service, without asking him. Give the monthly cost estimate with any proposal. Today it's Workers Paid
   ($5/mo) plus container time; the hybrid costs well under 1¢ per match.
