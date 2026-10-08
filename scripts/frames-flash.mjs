@@ -22,7 +22,7 @@ const modeQuery = mode === "boss" ? "" : mode === "crowd" ? "&mode=crowd&turns=t
 await p.goto(url + `?debug&clock=30&nolanding${modeQuery}${extra ? "&" + extra : ""}`);
 if (mode === "boss") {
   await p.getByRole("button", { name: "Boss alone" }).click();
-  await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Iron Bishop/ }).click();
+  await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /Boingo/ }).click();
 } else {
   // Matchmaking: Solo, then PLAY (the seats fill with bots, then the match).
   await p.getByRole("radio", { name: /^Solo/ }).click();

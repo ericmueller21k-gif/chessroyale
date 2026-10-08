@@ -130,12 +130,12 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   await expect(menu).toBeVisible();
   await expect(menu.locator(".boss-row")).toHaveCount(10);
   await expect(menu.getByRole("button", { name: /Match the group/ })).toHaveCount(0);
-  await menu.getByRole("button", { name: /Iron Bishop, 1600/ }).click();
+  await menu.getByRole("button", { name: /Boingo the Clown, 1600/ }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".opening-roulette.landed")).toBeVisible({ timeout: 5_000 });
   const boss = await page.evaluate(() => (window as any).match.boss);
   expect(boss.raid).toBe(true);
-  expect(boss.name).toBe("The Iron Bishop");
+  expect(boss.name).toBe("Boingo the Clown");
   expect(boss.board.ply).toBe(10);
   // On your first move, strike the boss (alone, you're the whole crowd): its next move is staggered.
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");

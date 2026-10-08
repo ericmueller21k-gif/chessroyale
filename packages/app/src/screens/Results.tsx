@@ -8,6 +8,7 @@ import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection } from "../components/QuickChat.tsx";
 import { rankedMinHumans } from "@chessroyale/core";
+import { BossCharacter, hasCharacter } from "../components/BossCharacter.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
   const played = match.moves.filter((m) => m.move !== null);
@@ -65,9 +66,11 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           )}
         </p>
       )}
+      {/* A boss with a character takes its bow: knocked off its pogo, or bouncing in triumph. */}
+      {bossResult && match.boss && <BossCharacter match={match} place="results" />}
       {bossResult && match.boss && (
         <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
-          {match.boss.icon}{" "}
+          {hasCharacter(match) ? null : <>{match.boss.icon} </>}
           {bossResult === "crowd"
             ? `The crowd beat ${match.boss.name}!${survived ? " A win on your record." : ""}`
             : bossResult === "boss"

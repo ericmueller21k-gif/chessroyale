@@ -9674,3 +9674,131 @@ img.qicon {
   background: #a3332b;
   border-color: #a3332b;
 }
+
+/* ---- Boss characters (BossCharacter.tsx): a raid boss drawn as pixel art, kitty-corner from the God King. ---- */
+.boss-char {
+  --bc-scale: 1;
+  position: relative;
+  flex: none;
+  pointer-events: none;
+}
+/* The frame (with room above for jumps) is placed so the character's feet sit on the box's bottom centre. */
+.boss-char-sprite {
+  position: absolute;
+  left: calc(50% - var(--bc-fx) * var(--bc-scale) * 1px);
+  bottom: calc((var(--bc-fy) - var(--bc-h)) * var(--bc-scale) * 1px);
+  width: calc(var(--bc-w) * var(--bc-scale) * 1px);
+  height: calc(var(--bc-h) * var(--bc-scale) * 1px);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+/* A phone: at the left of the boss bar above the board (the God King is under it, on the right). */
+.boss-bar.has-char {
+  min-height: 56px;
+  padding-left: 4px;
+}
+.boss-char.place-bar {
+  width: 48px;
+  height: 56px;
+  align-self: flex-end;
+  margin: -6px 0 -1px;
+  z-index: 3;
+}
+.boss-bar.has-char .boss-icon-face {
+  display: none;
+}
+/* A computer: by the board's bottom-left corner (the God King is by its top-right). */
+.boss-side {
+  display: none;
+}
+/* The results: his bow. */
+.boss-char.place-results {
+  --bc-scale: 2;
+  width: 96px;
+  height: 124px;
+  margin: 4px auto 0;
+}
+/* Portraits: banners, the entrance card, the bar on a computer. */
+.boss-portrait {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+.boss-icon .boss-portrait {
+  width: 48px;
+  margin: -4px 0 -6px;
+}
+.boss-intro-icon .boss-portrait {
+  width: 144px;
+}
+.fb-face .boss-portrait {
+  width: 120%;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-char.place-bar {
+    display: none;
+  }
+  .boss-bar.has-char {
+    min-height: 44px;
+    padding-left: 10px;
+  }
+  .boss-bar.has-char .boss-icon-face {
+    display: inline;
+  }
+  .boss-side {
+    display: block;
+    position: relative;
+    flex: none;
+    width: 0;
+    align-self: flex-end;
+    margin-right: -6px;
+  }
+  .boss-char.place-side {
+    --bc-scale: 2;
+    position: absolute;
+    right: 14px;
+    bottom: 0;
+    width: 96px;
+    height: 120px;
+  }
+}
+/* His words: a pixel text box beside him (above him by the board), like the God King's. */
+.bc-bubble {
+  position: absolute;
+  z-index: 12;
+  width: max-content;
+  max-width: min(220px, 60vw);
+  padding: 8px 9px 7px;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 9px;
+  line-height: 1.6;
+  color: #2b0d13;
+  background: #fff4f4;
+  border: 3px solid #2b0d13;
+  border-radius: 2px;
+  box-shadow: 4px 4px 0 rgba(43, 13, 19, 0.85);
+  pointer-events: none;
+  transition: opacity 240ms ease-in;
+}
+.bc-bubble.fresh {
+  animation: gk-bubble-in 160ms steps(3, end) both;
+}
+.bc-bubble.leaving {
+  opacity: 0;
+}
+.bc-bubble-rest {
+  visibility: hidden;
+}
+.place-bar .bc-bubble {
+  left: calc(100% + 6px);
+  top: 4px;
+}
+.place-side .bc-bubble {
+  right: 0;
+  bottom: calc(100% + 34px);
+}
+.place-results .bc-bubble {
+  left: calc(100% + 8px);
+  top: 0;
+}

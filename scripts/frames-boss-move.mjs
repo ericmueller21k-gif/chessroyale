@@ -1,5 +1,5 @@
 // Frame-by-frame check of one move in a solo boss raid, the way a player makes it (two taps on the board).
-//   npm run frames:boss -- <out-dir> [boss name, default "Iron Bishop"]
+//   npm run frames:boss -- <out-dir> [boss name, default "Boingo"]
 // Starts the app's dev server, picks a boss, taps a knight or bishop move, then saves a PNG every time the board's
 // pieces or the phase change for 12 s, and prints a timeline (ms, phase, piece count, frame). Read the frames: a piece
 // that jumps back, flickers or moves twice shows up as an extra frame. See .claude/LESSONS.md.
@@ -7,7 +7,7 @@ import { chromium, devices } from "@playwright/test";
 import { createServer } from "vite";
 import { Chess } from "chess.js";
 
-const [out = ".", bossName = "Iron Bishop"] = process.argv.slice(2);
+const [out = ".", bossName = "Boingo"] = process.argv.slice(2);
 const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5197 }, logLevel: "error" });
 await server.listen();
 const url = server.resolvedUrls.local[0];

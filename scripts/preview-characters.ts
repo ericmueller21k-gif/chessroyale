@@ -4,7 +4,7 @@
 // `ref` puts a reference picture first in the comparison (its white or transparent background is keyed out).
 // No dependencies: PNG and GIF are written (and the reference read) here, with node:zlib.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
 import { CHARACTERS } from "../packages/app/src/characters/index.ts";
 import { renderFrame, type Character, type Frame } from "../packages/app/src/characters/sprite.ts";
@@ -17,6 +17,10 @@ const GROUND = "#14161b";
 const INK = "#8b93a7";
 const GOLD = "#f2c14e";
 mkdirSync(outDir, { recursive: true });
+// `extra=<module.ts>` adds the characters a draft module exports; `only=<id,id>` picks which to draw.
+const extra = opt("extra") ? Object.values(await import(resolve(opt("extra")!))).filter((v): v is Character => !!v && typeof v === "object" && "anims" in v) : [];
+const only = opt("only")?.split(",");
+const ALL = [...CHARACTERS, ...extra].filter((c) => !only || only.includes(c.id));
 
 interface Img {
   w: number;
@@ -284,7 +288,7 @@ function lzw(minSize: number, input: Uint8Array): Uint8Array {
 // ---- Output
 const frameImg = (ch: Character, f: Frame) => renderFrame(ch, f, { bg: GROUND });
 
-for (const ch of CHARACTERS) {
+for (const ch of ALL) {
   // A GIF per animation, and a showreel: idle twice, each other animation once with idle between.
   const reel: { img: Img; ms: number }[] = [];
   const idle = ch.anims.idle!.frames;
@@ -303,23 +307,27 @@ for (const ch of CHARACTERS) {
   }
   writeGif(join(outDir, `${ch.id}.gif`), reel);
 
-  // Frame sheet: one row per animation, every frame with its number, time and cue.
+  // Frame sheet: each animation's frames in rows of up to 12, with their number, time and cue.
   const anims = Object.entries(ch.anims);
-  const cols = Math.max(...anims.map(([, a]) => a.frames.length));
+  const PER_ROW = 12;
+  const rowsOf = (n: number) => Math.ceil(n / PER_ROW);
+  const cols = Math.min(PER_ROW, Math.max(...anims.map(([, a]) => a.frames.length)));
   const cellW = ch.w * SCALE + 8;
-  const rowH = ch.h * SCALE + 40;
-  const sheet = blank(cols * cellW + 8, anims.length * rowH + 30);
+  const cellH = ch.h * SCALE + 30;
+  const sheet = blank(cols * cellW + 8, 30 + anims.reduce((s, [, a]) => s + 14 + rowsOf(a.frames.length) * cellH, 0));
   text(sheet, `${ch.name}  ${ch.w}x${ch.h} px  shown at ${SCALE}x`, 8, 8, GOLD);
-  anims.forEach(([name, anim], r) => {
-    const y = 30 + r * rowH;
-    text(sheet, `${name}${anim.loop ? " loop" : ""}`, 8, y, INK);
+  let y0 = 30;
+  for (const [name, anim] of anims) {
+    text(sheet, `${name}${anim.loop ? " loop" : ""}`, 8, y0, INK);
     anim.frames.forEach((f, c) => {
-      const x = 8 + c * cellW;
-      blit(sheet, blank(ch.w * SCALE + 2, ch.h * SCALE + 2, "#22252d"), x - 1, y + 13);
-      blit(sheet, scaleUp(frameImg(ch, f), SCALE), x, y + 14);
-      text(sheet, `${c + 1} ${f.ms}ms${f.cue ? ` ${f.cue}` : ""}`, x, y + 16 + ch.h * SCALE, f.cue ? GOLD : INK);
+      const x = 8 + (c % PER_ROW) * cellW;
+      const y = y0 + 13 + Math.floor(c / PER_ROW) * cellH;
+      blit(sheet, blank(ch.w * SCALE + 2, ch.h * SCALE + 2, "#22252d"), x - 1, y - 1);
+      blit(sheet, scaleUp(frameImg(ch, f), SCALE), x, y);
+      text(sheet, `${c + 1} ${f.ms}ms${f.cue ? ` ${f.cue}` : ""}`, x, y + 3 + ch.h * SCALE, f.cue ? GOLD : INK);
     });
-  });
+    y0 += 14 + rowsOf(anim.frames.length) * cellH;
+  }
   writePng(join(outDir, `${ch.id}-sheet.png`), sheet);
   console.log(`${ch.id}: ${Object.entries(ch.anims).map(([n, a]) => `${n} ${a.frames.length}f`).join(", ")}`);
 }
@@ -331,21 +339,22 @@ const tiles: { img: Img; label: string }[] = [];
 const refPath = opt("ref");
 if (refPath) {
   const ref = keyOut(readPng(refPath));
-  const target = Math.max(...CHARACTERS.map((c) => spriteHeight(c))) * PHONE;
+  const target = Math.max(...ALL.map((c) => spriteHeight(c))) * PHONE;
   tiles.push({ img: resample(ref, target / ref.h), label: "reference" });
 }
-for (const ch of CHARACTERS) {
+for (const ch of ALL) {
   const img = scaleUp(renderFrame(ch, ch.anims.idle!.frames[0]!), PHONE);
   tiles.push({ img: crop(img), label: ch.name.replace(/^The /, "") });
 }
 const pad = 24;
 const H = Math.max(...tiles.map((t) => t.img.h));
-const cmp = blank(tiles.reduce((s, t) => s + t.img.w + pad, pad), H + pad * 2 + 16);
+const tileW = (t: { img: Img; label: string }) => Math.max(t.img.w, t.label.length * 8);
+const cmp = blank(tiles.reduce((s, t) => s + tileW(t) + pad, pad), H + pad * 2 + 16);
 let cx = pad;
 for (const t of tiles) {
-  blit(cmp, t.img, cx, pad + H - t.img.h);
-  text(cmp, t.label, cx, pad + H + 10, t.label === "reference" ? INK : GOLD);
-  cx += t.img.w + pad;
+  blit(cmp, t.img, cx + Math.floor((tileW(t) - t.img.w) / 2), pad + H - t.img.h);
+  text(cmp, t.label, cx + Math.floor((tileW(t) - t.label.length * 8) / 2), pad + H + 10, t.label === "reference" ? INK : GOLD);
+  cx += tileW(t) + pad;
 }
 writePng(join(outDir, "comparison.png"), cmp);
 console.log(`wrote ${outDir}/`);

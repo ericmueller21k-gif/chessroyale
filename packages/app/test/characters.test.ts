@@ -10,10 +10,11 @@ describe("boss characters (code-drawn pixel art)", () => {
           for (const row of part.grid) for (const k of row) if (k !== "." && k !== " ") expect(ch.palette, `${name}: "${k}"`).toHaveProperty(k);
       });
 
-      it("has a looping idle and a one-shot attack that fires cues", () => {
+      it("has a looping idle and one-shot moves that fire cues", () => {
         expect(ch.anims.idle?.loop).toBe(true);
-        expect(ch.anims.attack?.loop).toBe(false);
-        expect(ch.anims.attack!.frames.some((f) => f.cue)).toBe(true);
+        const shots = Object.values(ch.anims).filter((a) => !a.loop);
+        expect(shots.length).toBeGreaterThan(0);
+        for (const a of shots) expect(a.frames.some((f) => f.cue)).toBe(true);
       });
 
       it("renders every frame, in every look, without anything cut off at the frame's edge", () => {

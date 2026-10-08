@@ -126,7 +126,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
         </button>
         <MuteButton />
       </div>
-      {boss ? <BossBar boss={boss} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
+      {boss ? <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
       {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}
     </>
   );

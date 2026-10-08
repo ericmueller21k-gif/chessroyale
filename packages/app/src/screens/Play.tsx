@@ -9,6 +9,7 @@ import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
+import { BossSide } from "../components/BossCharacter.tsx";
 import { KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { useReplay } from "../hooks.ts";
@@ -188,6 +189,7 @@ export function PlayScreen({
           )}
         </div>
         <div class="board-row">
+          {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />
           <Board fen={fen} orientation={side === "w" ? "white" : "black"} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows}>
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
