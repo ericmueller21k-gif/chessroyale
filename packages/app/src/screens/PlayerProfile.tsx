@@ -1,6 +1,6 @@
 import { Fragment } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, shopItem, tierInfo, type ItemLook } from "@chessroyale/core";
+import { BOSS_TIERS, FAIRPLAY, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, shopItem, tierInfo, type ItemLook } from "@chessroyale/core";
 import { BackButton, DressedPawn, FdButton, RankPill, WORN_ORDER, myHat } from "../components/FrontDoor.tsx";
 import { HattedPawn } from "../components/Cosmetics.tsx";
 import { ItemArt } from "../components/Items.tsx";
@@ -298,9 +298,8 @@ function EditSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-const REASONS = ["Cheating (an engine)", "Name", "Something else"] as const;
-
-function ReportSheet({ p, onClose }: { p: PublicProfile; onClose: () => void }) {
+/** The report sheet: a reason, then the server's answer. `match`: the lobby's code when it's opened during a match. */
+function ReportSheet({ p, match, onClose }: { p: PublicProfile; match?: string; onClose: () => void }) {
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -317,14 +316,14 @@ function ReportSheet({ p, onClose }: { p: PublicProfile; onClose: () => void }) 
         ) : (
           <>
             <p class="fd-sub">What's wrong? Reports are read by a person; nobody else sees them.</p>
-            {REASONS.map((r) => (
+            {FAIRPLAY.reports.reasons.map((r) => (
               <FdButton
                 key={r}
                 disabled={busy}
                 onClick={() => {
                   setBusy(true);
-                  void reportPlayer(p.id, r)
-                    .then(() => setSent("Thanks. We'll take a look."))
+                  void reportPlayer(p.id, r, match)
+                    .then((m) => setSent(m))
                     .catch((e: Error) => setSent(e.message))
                     .finally(() => setBusy(false));
                 }}
@@ -350,8 +349,11 @@ export function PlayerProfileScreen({
   onLocker,
   onSettings,
   onShop,
+  match,
 }: {
   target: ProfileTarget;
+  /** Opened during an online match: its lobby's code (a report made here is about this match). */
+  match?: string;
   onBack: () => void;
   onLocker?: () => void;
   onSettings?: () => void;
@@ -493,7 +495,7 @@ export function PlayerProfileScreen({
       )}
       </div>
       {sheet === "edit" && <EditSheet onClose={() => setSheet(null)} />}
-      {sheet === "report" && <ReportSheet p={p} onClose={() => setSheet(null)} />}
+      {sheet === "report" && <ReportSheet p={p} match={match} onClose={() => setSheet(null)} />}
     </div>
   );
 }

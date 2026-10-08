@@ -763,3 +763,36 @@ export const CAPACITY = {
     play: { limit: 40, windowMs: 60_000 },
   },
 } as const;
+
+/**
+ * Fair play (the `fairplay` delegate): reports, cases and what each level does. See DECISIONS.md, "Fair play".
+ *   - watch: recorded only (the player's moves are kept as evidence);
+ *   - review: a person (or the automated reviewer) looks; meanwhile their results are held off ranking (the rating,
+ *     its chart, "Top N%", later leaderboards and ranked) until cleared;
+ *   - banned: no online play (solo stays open), with an appeal.
+ */
+export const FAIRPLAY = {
+  /**
+   * What detection may do on its own: "watch" records levels but acts on none of them (until the simulation's numbers
+   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports, admins and the
+   * automated reviewer act whatever this says.
+   */
+  enforcement: "watch" as "watch" | "review" | "ban",
+  reports: {
+    /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts towards an automatic review. */
+    reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
+    /** Reports one account can make a day (one per player per match; outside a match one per player a day). */
+    perDay: 20,
+    /** Cheating reports from this many different signed-in accounts within `reviewDays` put a player in review. */
+    reviewReporters: 3,
+    reviewDays: 7,
+    /** A new account (fewer than `newAccountMatches` online matches) goes to review with this many instead. */
+    newAccountMatches: 10,
+    newAccountReporters: 2,
+  },
+  /** Evidence (each judged move of a match): kept this many days when the player was flagged or reported, otherwise this few. */
+  evidenceDays: 30,
+  evidenceDaysUnflagged: 3,
+  /** Entering review holds the player's online results from this many days back (the matches that put them there). */
+  holdBackDays: 7,
+} as const;

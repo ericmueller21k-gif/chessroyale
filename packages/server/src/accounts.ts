@@ -32,6 +32,7 @@ import {
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, takeOffHeadItem, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
+import { FAIRPLAY_SCHEMA } from "./fairplay-schema.ts";
 
 export interface Sql {
   run(sql: string, ...params: unknown[]): Promise<void>;
@@ -134,6 +135,8 @@ const SCHEMA = [
     at INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS reports_reporter ON reports (reporter, at)`,
+  // Fair play: cases and their log (fairplay.ts).
+  ...FAIRPLAY_SCHEMA,
 ];
 
 /**
@@ -156,17 +159,29 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // Whether a result counts for ranking (Oct 7, 2026): 1 ranked, 0 not (under 30% real players, solo, practice), NULL from
   // before the rule (counted as before). Ranking is the rating, its chart, "Top N%" and the rank.
   { table: "results", column: "ranked", type: "INTEGER" },
+  // Fair play (Oct 8, 2026): a result held off ranking while its player is in review (1), released when cleared (0 or NULL).
+  { table: "results", column: "held", type: "INTEGER" },
+  // A report made during a match: that match's lobby code (one report per reporter, player and match).
+  { table: "reports", column: "match", type: "TEXT" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
 ];
 const AFTER_COLUMNS = [`CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`];
 
-/** The latest rating among a user's results that count for ranking (ranked, or from before the rule), in SQL. */
+/**
+ * The latest rating among a user's results that count for ranking (ranked, or from before the rule, and not held by a
+ * fair-play review), in SQL.
+ */
 function LATEST_RATING(userId: string) {
-  return `(SELECT r.rating FROM results r WHERE r.user_id = ${userId} AND r.rating IS NOT NULL AND (r.ranked IS NULL OR r.ranked = 1) ORDER BY r.played_at DESC, r.id DESC LIMIT 1)`;
+  return `(SELECT r.rating FROM results r WHERE r.user_id = ${userId} AND r.rating IS NOT NULL AND (r.ranked IS NULL OR r.ranked = 1) AND (r.held IS NULL OR r.held = 0) ORDER BY r.played_at DESC, r.id DESC LIMIT 1)`;
 }
-/** A result row counts for ranking (ranked, or from before the rule). */
-const countsForRanking = (r: { ranked: number | null }) => r.ranked !== 0;
+/** A result row counts for ranking (ranked, or from before the rule; not held by a fair-play review). */
+const countsForRanking = (r: { ranked: number | null; held?: number | null }) => r.ranked !== 0 && !r.held;
+
+/** Sets an account's ranking rating from its results again (after results are held or released by fair play). */
+export async function refreshRating(sql: Sql, userId: string): Promise<void> {
+  await sql.run(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, userId);
+}
 
 const ready = new WeakSet<object>();
 /** Every schema statement, as one fingerprint: a database that has it recorded needs none of them run again. */
@@ -463,6 +478,8 @@ export interface MatchResult {
   lobby?: string | null;
   /** It counts for ranking (the lobby decides: isRankedMatch). Solo results never do. */
   ranked?: boolean | null;
+  /** Held off ranking: its player is in a fair-play review (or banned). Counted again if they're cleared. */
+  held?: boolean;
 }
 
 /** A count from a result (0-500), or null. */
@@ -480,8 +497,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   const ranked = r.online && r.ranked === true;
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -503,9 +520,10 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
     r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null,
     ranked ? 1 : 0,
+    r.held ? 1 : 0,
   );
-  // Only a ranked match moves your ranking.
-  if (rating !== null && ranked) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
+  // Only a ranked match moves your ranking (and not while fair play holds your results).
+  if (rating !== null && ranked && !r.held) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
 }
 
 /** Your result in an online match, by its lobby's code (the latest, if a code was used again): for "See your result". */
@@ -545,8 +563,8 @@ export interface Profile {
 }
 
 export async function profile(sql: Sql, user: User): Promise<Profile> {
-  const rows = await sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null }>(
-    "SELECT mode, online, placement, players, team_won, rating, played_at, ranked FROM results WHERE user_id = ? ORDER BY played_at DESC",
+  const rows = await sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
+    "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
     user.id,
   );
   const stats = (rs: typeof rows): ModeStats => ({
@@ -661,6 +679,7 @@ interface ResultRow {
   last_stand: number | null;
   boss_elo: number | null;
   ranked: number | null;
+  held: number | null;
 }
 
 /** The sum of a column over the rows that have it (null if none do). */
@@ -703,7 +722,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
   if (!u) return null;
   const rows = await sql.all<ResultRow>(
     `SELECT mode, online, placement, players, team, team_won, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes,
-       strikes_survived, survived, last_stand, boss_elo, ranked
+       strikes_survived, survived, last_stand, boss_elo, ranked, held
      FROM results WHERE user_id = ? ORDER BY played_at DESC, id DESC`,
     userId,
   );
@@ -751,27 +770,6 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
       ranked: r.ranked === null ? null : r.ranked === 1,
     })),
   };
-}
-
-// ---------------- Reports ----------------
-
-export const REPORT_REASONS = ["Cheating (an engine)", "Name", "Something else"] as const;
-const REPORTS_PER_DAY = 20;
-
-/**
- * A report about a player, for a person to read (nobody else sees them): who, why, by whom, when. One per player per
- * reporter a day, and 20 a day per reporter. Read them in D1: SELECT * FROM reports ORDER BY at DESC.
- */
-export async function reportPlayer(sql: Sql, reporter: string, target: unknown, reason: unknown, now: number): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (typeof target !== "string" || target === reporter || !(await sql.first("SELECT id FROM users WHERE id = ?", target))) return { ok: false, message: "No such player." };
-  const why = REPORT_REASONS.find((r) => r === reason);
-  if (!why) return { ok: false, message: "Pick a reason." };
-  const day = now - 86_400_000;
-  if (await sql.first("SELECT id FROM reports WHERE reporter = ? AND target = ? AND at > ?", reporter, target, day)) return { ok: true };
-  const n = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM reports WHERE reporter = ? AND at > ?", reporter, day))?.n ?? 0;
-  if (n >= REPORTS_PER_DAY) return { ok: false, message: "That's a lot of reports today. Try again tomorrow." };
-  await sql.run("INSERT INTO reports (reporter, target, reason, at) VALUES (?, ?, ?, ?)", reporter, target, why, now);
-  return { ok: true };
 }
 
 // ---------------- The shop ----------------

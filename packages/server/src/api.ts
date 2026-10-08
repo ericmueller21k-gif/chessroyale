@@ -2,6 +2,7 @@ import { deleteLockerItems, equipLocker, lockerState, openCrate } from "./locker
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.ts";
+import { REPORT_THANKS, reportPlayer } from "./fairplay.ts";
 import {
   buyItem,
   cleanEmail,
@@ -14,7 +15,6 @@ import {
   profile,
   publicProfile,
   randomToken,
-  reportPlayer,
   recordResult,
   setChatPicks,
   shopState,
@@ -237,11 +237,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
 
-  // POST /api/report {target, reason}: a report about a player (the profile's Report button).
+  // POST /api/report {target, reason, match?}: a report about a player (a profile's Report button; `match`: the lobby
+  // code when made during a match). One per player per match (outside a match, one a day); see fairplay.ts.
   if (path === "/api/report" && request.method === "POST") {
-    const b = (await request.json().catch(() => ({}))) as { target?: unknown; reason?: unknown };
-    const r = await reportPlayer(sql, current.id, b.target, b.reason, now);
-    return r.ok ? json({ ok: true }) : json({ message: r.message }, 400);
+    const b = (await request.json().catch(() => ({}))) as { target?: unknown; reason?: unknown; match?: unknown };
+    const r = await reportPlayer(sql, current, b.target, b.reason, b.match, now);
+    if (!r.ok) return json({ message: r.message }, 400);
+    const already = typeof b.match === "string" ? "You've already reported this player in this match." : "You've already reported this player today.";
+    return json({ ok: true, ...(r.already ? { already: true } : {}), message: r.already ? already : REPORT_THANKS });
   }
 
   // POST /api/results: a solo match's result, from the browser.

@@ -2431,3 +2431,33 @@ container (4 cores) can drive about 5,000-6,000 simulated players; 10,000 needs 
 ≈ $0.0015 a match (a lobby awake ~15 minutes at 128 MB), so 100 matches at once around the clock ≈ $400 a month;
 Worker requests ≈ $20 a day at that polling; D1 well inside the plan. Real traffic peaks a few hours a day, so a
 fraction of that. Set the billing alerts in DEPLOY.md first.
+
+## Fair play (Oct 8, 2026)
+
+Eric: catch players copying an engine (a second screen or phone running Stockfish) with a high success rate, aggressive
+rather than lenient; anyone at super-GM strength for a game or two, or a run of superhuman moves after the opening,
+should be banned; and a report system. Built by the `fairplay` delegate (`.claude/agents/fairplay.md`), in steps.
+
+**Reports** (step 1)
+- **Where:** Report on anyone's profile, which also opens from any name tapped in a match (the profile over the game).
+  Reasons: Cheating, Offensive name or icon, Something else (`FAIRPLAY.reports.reasons`). Then "Thanks, we'll look
+  into it."
+- **One per reporter, player and match:** a report made in a match carries its lobby code. A second one in the same
+  match says "You've already reported this player in this match" and isn't stored. From a profile outside a match,
+  one per player a day. 20 a day per reporter (`perDay`).
+- **Reports never ban anyone.** Every report opens a *watch* case (the player's matches are kept as evidence, once
+  signals are recorded: step 2). Cheating reports from 3 different signed-in accounts within 7 days put the player in
+  **review** (Eric, Oct 8); 2 for a new account (fewer than 10 online matches). My calls:
+  - Only "Cheating" counts towards a review: review holds a player's results, which is a fair-play measure. Name and
+    other reports put the player on watch, in the queue for a person.
+  - Guests' reports are stored and read, but don't count towards a review (anyone can make guest accounts; online
+    players are signed in anyway).
+  - After a decision on a case (a clearing, say), only reports made since count again.
+- **Review holds results off ranking** until cleared: entering review marks the player's online results from the last
+  7 days `held` (`results.held`, `FAIRPLAY.holdBackDays`), and results recorded while in review are held too. Held
+  results don't move the rating, its chart or "Top N%" (and later leaderboards and ranked); their stats still count, so
+  a profile shows nothing about a case. Clearing counts them again.
+- **`eligibleForRanked(sql, userId)`** (`packages/server/src/fairplay.ts`): false while a player is in review or
+  banned. The hook for the `ranked` delegate.
+- **Cases** (`fairplay_cases`): one per player, status watch, review, banned or cleared, with a log of every change, who
+  made it (detection, reports, an admin, the automated reviewer) and why (`fairplay_log`).
