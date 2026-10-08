@@ -28,9 +28,11 @@ Two settings, both added by Eric in the Cloudflare dashboard. **Neither is ever 
 repository.**
 
 1. **Who may open the review page** (`https://hunchess.com/admin/fairplay`): open **Workers & Pages → chessroyale →
-   Settings → Variables and Secrets → Add**. Name: `ADMIN_EMAILS`. Value: the email you sign in to HunChess with
-   (several, separated by commas, if others should review too). Type: Secret (or Text). Save and deploy. Then sign in
-   to HunChess with that email and open the page; everyone else gets "Not found".
+   Settings → Variables and Secrets → Add**. Use the **Variables and Secrets** section near the top of Settings, not
+   the "Variables and secrets" box under **Build** further down: build variables only reach the build, never the
+   running site (Oct 8: the page said "Not found" until the setting moved). Name: `ADMIN_EMAILS`. Value: the email you
+   sign in to HunChess with (several, separated by commas, if others should review too). Type: Secret (or Text). Save
+   and deploy. Then sign in to HunChess with that email and open the page; everyone else gets "Not found".
 2. **The automated reviewer's key** (only when the scheduled reviewer is set up): the same screen, name
    `FAIRPLAY_REVIEW_TOKEN`, type **Secret**, value at least 16 random characters (for example the output of
    `openssl rand -hex 24`). Give the same value to the reviewer's scheduled task in its own secret settings, not in a
