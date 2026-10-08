@@ -2916,6 +2916,65 @@ end to end: sprite, portrait, animations, sounds, lines, and where he stands.
   - `npm run preview:characters` writes every animation as a GIF.
   - `e2e/boss-character.spec.ts` plays a raid against him on both layouts.
 
+### Ginger Snap, the Freeze boss, and the power art (Oct 8, 2026)
+
+The gingerbread man from Eric's reference, drawn as the Freeze boss, plus the effect sprites his powers and Boingo's
+need. The art, lines and sounds only: the power rules, the board overlays, the banners and making him playable are
+the power rules' job (he becomes playable once he has powers too). `packages/core/src/boss.ts` is unchanged.
+
+- **Name:** "Ginger Snap" (a gingersnap, and he snaps: cross, and a snap freeze). A placeholder Eric can rename; his
+  kit is keyed by that name in `characters/kits.ts`, so the boss entry must use the same one.
+- **Art** (`characters/gingerbread.ts`): 50 x 58 px from parts, in an 84 x 93 frame. Head (eight faces: angry,
+  laugh, shout, hurt, smug, rattled, think, out; up to two cracks), torso with two gumdrop buttons and an icing belt,
+  a green bow tie, and arms, legs and the cane painted from each pose's points (a shoulder, an elbow, a fist; a hip
+  and a foot; the cane's grip and direction), so a new pose is a few numbers. The cane is in his right hand (our
+  left), as in the reference.
+  - **The frosty edge:** his icing's shadow is a cold blue, a frost glint runs round his icing while he idles, and when
+    he casts his cane glows ice-blue (stripes recoloured, a pale rim round it) and his red eyes go icy.
+  - **The cast points low:** he thrusts the cane forward and down across his legs, to his right, where the board is
+    on both layouts (pointing it across his chest hid it behind his arms).
+  - **Defeat:** cracked, he topples over on his side, the cane on the ground; no crumbling to pieces (drama, no gore).
+- **Moments:** the same eleven as Boingo's (entrance: a whirl of snow, he drops in and slams the cane in a burst of
+  frost; thinking: hand on chin, snowflake thoughts; move: a stamp and a cane jab; capture: a cackle, fist up;
+  hurt: crumbs fly, a crack; check: two frosty cane lunges; smug; rattled: his icing sweats; defeat; victory: cane
+  high, jumping in snow). Two power moments: `freezeCast` (cane raised and charged, then thrust; the bolt leaves at
+  the "freeze" cue) and `blizzard` (cane high, snow whirling faster and wider, bursting at the "blizzard" cue).
+- **Lines:** his own, short and cross (cookie and frost puns), as rare as Boingo's, plus three new moments for every
+  boss: `power` (a piece frozen: "Freeze!", "Chill out!"), `ultimateWarn` ("A storm is brewing…") and `ultimate`
+  ("BLIZZARD!", "Let it snow!"). Boingo got lines for them too (the pie, the funhouse). They're in the `Beat` type
+  now; `bossBeat` doesn't produce them: the power rules say when they happen.
+- **Sounds** (`characters/gingerbread-sounds.ts`, synthesised, no voice): a cookie crunch (hurt, defeat), a
+  sleigh-bell jingle (entrance, his move, capture, victory), an ice crackle (frost slams, the cast, the ice) and the
+  blizzard's wind (with the sweep). Seeded noise, so each is the same every time and testable. Each sits about 3 dB
+  under a move's mean level, the wind about 5 dB (it's long), with a soft ceiling keeping peaks under half a move's.
+  The shared synth helpers moved to `characters/synth.ts`; Boingo's sounds are unchanged.
+- **Boingo's new moments,** added without changing his others: `pieThrow` (a pie up behind his head, wind-up, throw;
+  the pie leaves at the "throw" cue, with a slide whistle) and `funhouse` (played on the board: his shadow grows, he
+  drops in, lands with a boing, springs into a spin — the board flips at the "flip" cue — and lands laughing,
+  pointing). New sounds: a pie splat and the funhouse boing-flip.
+- **Effect sprites** (`characters/effects.ts`), each frame exactly the area it covers, so placing one is sizing its
+  canvas to a square or the board:
+  - `iceOverlay` (a square, 32 px): freeze (frost creeps in, the ice closes and flashes), frozen (loop, a glint now
+    and then), thaw (cracks, chips, melts to a puddle, gone). The ice is see-through, so the piece shows under it.
+  - `blizzardSweep` (the whole board, 24 px a square): a ragged cloud front and driven snow crossing left to right in
+    1.3 s, a haze thinning behind it; the wind starts with it.
+  - `pieSplat` (a square): splat (the pie comes down, SPLAT, cream flies), pied (loop), fade.
+  - `iceBolt` and `pieFly` (a square each, loops): the bolt and the pie in flight, for flying them to the square.
+- **Renderer:** a palette colour may be `#rrggbbaa` (see-through), for the ice and the haze. Old palettes are
+  unaffected.
+- **The contract** (`characters/power-art.ts`, also exported from `characters/index.ts`): `POWER_MOMENTS` (per boss:
+  each power's animation, the cue of its hit, whether it plays on the board, the effects that follow), `EFFECTS`
+  (each effect's sprite, what it covers, its start, loop and end animations, its sounds), `EFFECT_NAMES`,
+  `POWER_ANIMS`, `cueAt` and `animLength`. `components/BossEffect.tsx` plays any of it (`<BossEffect>`, and
+  `<BossMoment>` for a boss's animation away from his spot), with its sounds from the frames' cues, once, through
+  the mute switch, from a shared start time so everyone online sees the same frame.
+- **Checking it:**
+  - `npm run preview:characters -- <dir> only=gingerbread` writes his GIFs; the effects are drawn over the board
+    (a white pawn under the ice) as `fx-<id>-<anim>.gif` (`only=fx` for just those).
+  - `npm run frames:character -- <dir> Boingo both kit="Ginger Snap" fx` plays a raid with his kit in Boingo's place,
+    then plays every effect and power moment over the real board and his spot, with frames every ~70 ms.
+  - `packages/app/test/gingerbread.test.ts`: his kit, lines, cast and sounds; the power moments; the effects.
+
 ### Ideas for later, not built (Eric, Oct 8, 2026)
 
 - **Real boss abilities, never game-breaking:** freezing most of the team for a turn, or making the crowd move a
