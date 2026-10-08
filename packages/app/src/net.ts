@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, JUDGES, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, JUDGES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -111,6 +111,8 @@ export class NetMatch implements GameView {
   goneResult?: LobbyResult | null;
   /** Joined by typing a code (not a link, a reload or PLAY). */
   typed = false;
+  /** Back into a match that's already being played (the app opened from scratch): the splash until it shows. */
+  resuming = false;
   stage = 0;
   roundsPlayed = 0;
   cutoff = 0;
@@ -123,6 +125,22 @@ export class NetMatch implements GameView {
   fillAt: number | null = null;
   /** Matchmade: when the seats were filled (bots in the empty ones; local time), just before the match begins. */
   filledAt: number | null = null;
+  /** Matchmade with Bots off: no bots; it waits until it's full. */
+  botsOff = false;
+  /** It counted for your ranking (from the results; null until then). */
+  ranked: boolean | null = null;
+  /** How you were matched (the queue screen's wording). */
+  get queueType(): MatchmakingType {
+    return this.botsOff ? "botsoff" : "default";
+  }
+  /** This device's seat (for Bots off → Default, which hands it back). */
+  get seat(): string | null {
+    try {
+      return localStorage.getItem(this.tokenKey());
+    } catch {
+      return null;
+    }
+  }
   /** What each person in the lobby wears (sent once each, so kept here). */
   readonly looks = new Map<string, ItemLook>();
   readonly serverPaced = true;
@@ -351,6 +369,7 @@ export class NetMatch implements GameView {
         this.auto = !!m.auto;
         this.fillAt = m.fillAt ? this.local(m.fillAt) : null;
         this.filledAt = m.filledAt ? this.local(m.filledAt) : null;
+        this.botsOff = !!m.botsOff;
         if (!m.started && this.phase.kind !== "lobby") this.phase = { kind: "lobby" };
         return this.emit();
       case "opening":
@@ -485,6 +504,7 @@ export class NetMatch implements GameView {
           this.lossesByStage = m.lossesByStage[this.myId] ?? [];
         }
         if (m.standings) this.standingsList = m.standings;
+        if (m.ranked !== undefined) this.ranked = m.ranked;
         return this.showResults(m);
     }
   }

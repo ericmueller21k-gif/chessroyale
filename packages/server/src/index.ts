@@ -5,10 +5,12 @@ import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
 import { d1Sql, lobbyResult } from "./accounts.ts";
 import { SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, signInRequired, withSecrets, type AccountEnv } from "./api.ts";
+import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 
 export { Lobby } from "./lobby-do.ts";
 export { Matchmaker } from "./matchmaker.ts";
+import { queueName } from "./matchmaker.ts";
 export { EngineServer } from "./engine.ts";
 
 export interface Env extends AccountEnv, EngineEnv {
@@ -17,6 +19,8 @@ export interface Env extends AccountEnv, EngineEnv {
   ASSETS: Fetcher;
   /** Seconds a matchmade lobby waits for players before bots fill it (default 60; shorter for local tests). */
   MATCH_FILL_SECONDS?: string;
+  /** Load-test counters at /api/ops/stats, for requests with this as their x-ops-key (unset in production). */
+  OPS_STATS?: string;
 }
 
 const json = (body: unknown, status = 200) =>
@@ -25,6 +29,25 @@ const json = (body: unknown, status = 200) =>
 export default {
   async fetch(request: Request, rawEnv: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (!url.pathname.startsWith("/api/")) return rawEnv.ASSETS.fetch(request);
+    // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
+    if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
+      return json(opsStats(url.searchParams.get("reset") === "1"));
+    }
+    const t = Date.now();
+    const res = await route(request, rawEnv, url);
+    const ms = Date.now() - t;
+    countRoute(routeOf(request.method, url.pathname), ms);
+    // How long the Worker took (the load test reads it; browsers show it in their network panel).
+    if (res.status === 101 || res.webSocket) return res;
+    const out = new Response(res.body, res);
+    out.headers.append("server-timing", `app;dur=${ms}`);
+    return out;
+  },
+} satisfies ExportedHandler<Env>;
+
+async function route(request: Request, rawEnv: Env, url: URL): Promise<Response> {
+  {
     // (The sign-in secrets may live in the Secrets Store: read them as strings.)
     const env = url.pathname.startsWith("/api/") ? await withSecrets(rawEnv) : rawEnv;
     // Accounts: /api/me, /api/results, /api/auth/*
@@ -45,19 +68,29 @@ export default {
     if (url.pathname === "/api/engine/ping") {
       return json({ ok: await warmEngine(env) });
     }
-    // POST /api/play[?mode=raid] → { code }: "Play now", the queue: the 50 v 50 lobby that's filling up (bots fill
-    // the rest at the fill time), or a boss raid's (no bots; the boss matches the group). Unranked.
+    // POST /api/play?mode=crowd|raid&type=default|botsoff → { code }: PLAY, the queue for a mode and matchmaking type
+    // (one queue each). Default: the lobby that's filling up, bots in the empty seats at the fill time. Bots off: people
+    // only, waiting until it's full (a raid: or a minute with enough people). (Solo is played in the browser.)
+    // &from=CODE with { seat }: Bots off → Default, keeping your wait: you leave that lobby and bots fill a minute after
+    // you first joined it at the latest. 409 if that lobby has started meanwhile (stay in it).
     if (url.pathname === "/api/play" && request.method === "POST") {
       if (env.DB && signInRequired(env) && !isSignedIn(await accountOf(request, env))) return json({ message: SIGN_IN_TO_PLAY }, 401);
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
       const raid = url.searchParams.get("mode") === "raid";
+      const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
       const overrides = raid ? RAID_SETTINGS : modeSettings("crowd", { crowdTeams: true, augments: true });
       // ?pool=NAME: a queue of its own (tests run several queues at once without meeting).
-      const pool = url.searchParams.get("pool");
-      const name = `${raid ? "raid" : "crowd"}-unranked${pool && /^[a-z0-9-]{1,24}$/.test(pool) ? `-${pool}` : ""}`;
-      const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(name));
+      const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queueName(raid ? "raid" : "crowd", type, url.searchParams.get("pool"))));
+      let since: number | undefined;
+      const from = url.searchParams.get("from")?.toUpperCase();
+      if (from && type === "default") {
+        const body = (await request.json().catch(() => null)) as { seat?: unknown } | null;
+        const released = /^[A-Z2-9]{5}$/.test(from) && typeof body?.seat === "string" ? await env.LOBBIES.get(env.LOBBIES.idFromName(from)).release(body.seat) : null;
+        if (!released) return json({ message: "That lobby has started." }, 409);
+        since = released.joinedAt;
+      }
       try {
-        return json(await mm.next(JSON.parse(JSON.stringify(overrides)), fill * 1000));
+        return json(await mm.next(JSON.parse(JSON.stringify(overrides)), fill * 1000, { botsOff: type === "botsoff", crowdWaitsForFull: !raid, since }));
       } catch {
         return json({ message: "Couldn't find a match. Try again." }, 500);
       }
@@ -127,7 +160,6 @@ export default {
       if (!(await stub.exists())) return json({ message: "We couldn't find that lobby." }, 404);
       return stub.fetch(request);
     }
-    if (url.pathname.startsWith("/api/")) return json({ message: "Not found" }, 404);
-    return env.ASSETS.fetch(request);
-  },
-} satisfies ExportedHandler<Env>;
+    return json({ message: "Not found" }, 404);
+  }
+}

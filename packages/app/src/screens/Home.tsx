@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, bossInfo, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, PRIOR_RATING, raidBossElo, type ModeChoiceId } from "@chessroyale/core";
+import { BOSS_TIERS, bossInfo, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { Coins, DressedPawn, FdButton, LiveLine, Logo, MyPawnButton, RankLine, myHat, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
@@ -59,6 +59,24 @@ export function chosenOpeningMoves(): number {
     // No storage.
   }
   return S.openingMoves;
+}
+
+const MATCHMAKING_KEY = "brc.matchmaking";
+/** How you're matched (the home screen's Matchmaking: Default, Bots off or Solo): this device's choice. */
+export function chosenMatchmaking(): MatchmakingType {
+  try {
+    const v = localStorage.getItem(MATCHMAKING_KEY);
+    return MATCHMAKING_TYPES.includes(v as MatchmakingType) ? (v as MatchmakingType) : "default";
+  } catch {
+    return "default";
+  }
+}
+function saveMatchmaking(t: MatchmakingType) {
+  try {
+    localStorage.setItem(MATCHMAKING_KEY, t);
+  } catch {
+    // Not important.
+  }
 }
 
 const BOSS_KEY = "brc.boss";
@@ -221,7 +239,6 @@ function FriendsSheet({
   onlineLocked,
   onCreate,
   onJoin,
-  onSolo,
   onSignIn,
   onClose,
 }: {
@@ -231,7 +248,6 @@ function FriendsSheet({
   onlineLocked?: boolean;
   onCreate: () => void;
   onJoin: (code: string) => void;
-  onSolo: () => void;
   onSignIn: () => void;
   onClose: () => void;
 }) {
@@ -284,17 +300,38 @@ function FriendsSheet({
             </div>
           </>
         )}
-        {mode !== "raid" && (
-          <>
-            <div class="fd-or">
-              <span>or practise alone</span>
-            </div>
-            <FdButton disabled={loading} onClick={onSolo}>
-              {loading ? "Loading the engine…" : `Solo vs ${mode === "classic" ? S.lobbySize - 1 : 99} bots`}
-            </FdButton>
-          </>
-        )}
+        {/* (Practising against bots is Solo now, on the home screen.) */}
       </div>
+    </div>
+  );
+}
+
+/** The Matchmaking choices: a word or two under each (the ⓘ says more). */
+const TYPES: { id: MatchmakingType; label: string; sub: string }[] = [
+  { id: "default", label: "Default", sub: "bots at 60 s" },
+  { id: "botsoff", label: "Bots off", sub: "people only" },
+  { id: "solo", label: "Solo", sub: "you + bots" },
+];
+
+/** What each way of being matched does, for the ⓘ. */
+function TypesInfo({ raid }: { raid: boolean }) {
+  // (The real players a match needs to count: 30 of a 50 v 50's 100, 15 of a raid's 50.)
+  const crowdMin = rankedMinHumans(CROWD_SETTINGS.lobbySize ?? 100);
+  const raidMin = rankedMinHumans(RAID_SETTINGS.lobbySize ?? 50);
+  return (
+    <div class="fd-types-info" id="fd-types-info">
+      <p>
+        <strong>Default</strong> adds bots after 60 seconds to keep the wait short.
+      </p>
+      <p>
+        <strong>Bots off</strong> plays real people only: it waits until the {raid ? `raid has 50 (or ${MATCHMAKING.raidBotsOffMinPlayers} after a minute)` : "lobby is full"}.
+      </p>
+      <p>
+        <strong>Solo</strong> is you and bots, starting at once.
+      </p>
+      <p class="fd-types-rank">
+        Your ranking changes only in a match with at least {crowdMin} real players ({raidMin} in a raid). Solo games never change it.
+      </p>
     </div>
   );
 }
@@ -357,10 +394,10 @@ export function HomeScreen({
   notice?: HomeNotice;
   /** Online play needs signing in, and you're a guest: PLAY plays bots. */
   onlineLocked?: boolean;
-  /** PLAY: the queue for a mode. */
-  onPlay: (mode: "crowd" | "raid") => void;
-  /** Solo against bots, or (raid) a boss on your own once one is picked. */
-  onSolo: (mode: ModeChoiceId) => void;
+  /** PLAY, Default or Bots off: the queue for a mode. */
+  onPlay: (mode: "crowd" | "raid", type: Exclude<MatchmakingType, "solo">) => void;
+  /** PLAY, Solo: you and bots, in your browser (`fill`: the queue screen first). Boss alone: you against a boss you pick. */
+  onSolo: (mode: ModeChoiceId, opts?: { fill?: boolean }) => void;
   onCreateLobby: (mode: ModeChoiceId) => void;
   onJoinLobby: (code: string) => void;
   onProfile: () => void;
@@ -374,6 +411,16 @@ export function HomeScreen({
     setModeState(m);
     saveMode({ ...chosenMode(), mode: m });
   };
+  // How you're matched. Guests (online needs signing in) can only play Solo; Classic online is coming (Solo works).
+  const [picked, setPicked] = useState<MatchmakingType>(chosenMatchmaking);
+  const soloOnly = !!onlineLocked;
+  const type: MatchmakingType = soloOnly ? "solo" : picked;
+  const pickType = (t: MatchmakingType) => {
+    if (soloOnly && t !== "solo") return;
+    setPicked(t);
+    saveMatchmaking(t);
+  };
+  const [info, setInfo] = useState(false);
   const [friends, setFriends] = useState(!!joinCode);
   // Boss raid: pick the boss first, for a raid alone or one you create (skipped with ?boss=N).
   const [bossMenu, setBossMenu] = useState<null | "solo" | "raid">(null);
@@ -394,26 +441,30 @@ export function HomeScreen({
     if (joinCode) setFriends(true);
   }, [joinCode]);
   const play = () => {
-    if (mode === "classic") return;
-    if (!onlineLocked) return onPlay(mode);
-    // Guests play bots: the whole game, offline from the queue.
-    if (mode === "raid") bossAlone();
-    else onSolo("crowd");
+    if (type === "solo") return onSolo(mode, { fill: true });
+    if (mode !== "classic") onPlay(mode, type);
   };
   const fill = live?.fillSeconds ?? 60;
   const wait = mode === "raid" ? live?.waits.boss : live?.waits.crowd;
+  const bots = mode === "raid" ? 49 : mode === "classic" ? S.lobbySize - 1 : 99;
+  // The line under PLAY: what PLAY does, for this mode and way of being matched.
+  const soloLine = mode === "raid" ? `You and ${bots} bots against a boss` : `Solo vs ${bots} bots`;
   const hint =
-    mode === "classic" ? (
+    mode === "classic" && type !== "solo" ? (
       "Classic is being reworked"
     ) : onlineLocked ? (
       <>
-        {mode === "raid" ? "You against a boss" : "Solo vs 99 bots"} ·{" "}
+        {soloLine} ·{" "}
         <button type="button" class="fd-link" onClick={onSignIn}>
           Sign in to play online
         </button>
       </>
+    ) : type === "solo" ? (
+      `${soloLine} · starts at once${mode === "classic" ? " · online Classic is coming" : ""}`
+    ) : type === "botsoff" ? (
+      mode === "raid" ? `People only: starts at 50, or ${MATCHMAKING.raidBotsOffMinPlayers} after a minute` : "People only: starts when 100 have joined"
     ) : mode === "raid" ? (
-      "Join a raid; the boss matches the group"
+      `Join a raid; bots fill the crowd after ${fill} s`
     ) : wait ? (
       `Usually about ${wait} s to find a match`
     ) : (
@@ -454,7 +505,46 @@ export function HomeScreen({
               </button>
             ))}
           </div>
-          <button type="button" class="fd-play" disabled={loading || mode === "classic"} onClick={play}>
+          <div class="fd-types-row">
+            <div class="fd-modes fd-types" role="radiogroup" aria-label="Matchmaking">
+              {TYPES.map((t) => {
+                const off = soloOnly && t.id !== "solo";
+                return (
+                  <button
+                    type="button"
+                    role="radio"
+                    key={t.id}
+                    aria-checked={type === t.id}
+                    aria-disabled={off || undefined}
+                    class={`${type === t.id ? "on" : ""}${off ? " off" : ""}`}
+                    title={off ? "Online: sign in to play" : undefined}
+                    onClick={() => pickType(t.id)}
+                  >
+                    {t.label}
+                    <br />
+                    <span>{t.sub}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              class={`fd-info-btn${info ? " open" : ""}`}
+              aria-label="About matchmaking"
+              aria-expanded={info}
+              aria-controls="fd-types-info"
+              onClick={() => setInfo(!info)}
+            >
+              i
+            </button>
+          </div>
+          {info && <TypesInfo raid={mode === "raid"} />}
+          {type === "botsoff" && (
+            <p class="fd-warn" role="note">
+              <span aria-hidden="true">⚠</span> No bots can mean a much longer wait: the match starts only when {mode === "raid" ? "the raid has enough people" : "100 people have joined"}. You can switch to Default from the queue.
+            </p>
+          )}
+          <button type="button" class="fd-play" disabled={loading || (mode === "classic" && type !== "solo")} onClick={play}>
             PLAY
           </button>
           <div class="fd-hint" aria-live="polite">
@@ -484,7 +574,6 @@ export function HomeScreen({
             } else onCreateLobby(mode);
           }}
           onJoin={onJoinLobby}
-          onSolo={() => onSolo(mode === "raid" ? "crowd" : mode)}
           onSignIn={onSignIn}
           onClose={() => setFriends(false)}
         />

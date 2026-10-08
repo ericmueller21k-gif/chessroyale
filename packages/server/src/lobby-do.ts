@@ -6,6 +6,7 @@ import { SIGN_IN_TO_PLAY, accountOf, isSignedIn, signInRequired, withSecrets } f
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
+import { countCall } from "./ops.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
 import { DEFAULT_SETTINGS } from "@chessroyale/core";
 
@@ -113,6 +114,10 @@ export class Lobby extends DurableObject<Env> {
     this.record = core.save();
     await this.saveResults(core, this.record);
     await this.ctx.storage.put("lobby", this.record);
+    if (this.env.OPS_STATS) {
+      countCall("lobby.persist");
+      countCall("lobby.persistBytes", JSON.stringify(this.record).length);
+    }
     // The alarm: the match's next event, or when the lobby closes, whichever comes first.
     const close = lobbyClosing(this.record, this.connectedNow(closing));
     const times = [core.nextAlarm, close?.at].filter((t): t is number => typeof t === "number");
@@ -194,10 +199,12 @@ export class Lobby extends DurableObject<Env> {
     const kind = rec.auto ? "queue" : "private";
     const key = `${s.phase}:${s.humans}:${s.alive}`;
     const now = Date.now();
-    const waitDue = rec.auto?.filledAt && !rec.auto.waitSaved;
+    // (The typical wait under PLAY is Default's: a Bots off wait would skew it.)
+    const waitDue = rec.auto?.filledAt && !rec.auto.waitSaved && !rec.auto.botsOff;
     if (!waitDue && this.reported?.key === key && (s.phase === "over" || now - this.reported.at < 60_000)) return;
     if (s.phase === "waiting" && kind === "private" && !this.reported) return;
     this.reported = { key, at: now };
+    countCall("live.report");
     const sql = d1Sql(this.env.DB);
     await ensureSchema(sql, this.env.DB);
     await reportLobby(sql, { code: rec.code, mode: this.mode(), kind, ...s }, now);
@@ -224,13 +231,13 @@ export class Lobby extends DurableObject<Env> {
    * A new lobby under this code: false if the code is in use (a lobby that hasn't closed), so the caller tries
    * another. `keepMs`: how long its results stay up (playtests).
    */
-  async create(code: string, overrides?: LobbyRecord["overrides"], auto?: { fillAt: number }, keepMs?: number): Promise<boolean> {
+  async create(code: string, overrides?: LobbyRecord["overrides"], auto?: { fillAt: number | null; botsOff?: boolean }, keepMs?: number): Promise<boolean> {
     if (this.record && !(await this.closeIfDue())) return false;
     this.record = newLobbyRecord(code, Date.now(), overrides);
     if (keepMs) this.record.keepMs = keepMs;
     const core = this.core(code);
-    // Matchmade: it starts by itself at fillAt (or when full).
-    if (auto) core.setAuto(auto.fillAt);
+    // Matchmade: it starts by itself at fillAt with bots (or when full; Bots off: see LobbyCore.setAuto).
+    if (auto) core.setAuto(auto.fillAt, !!auto.botsOff);
     // (Stored with its alarm: the fill time, or when it closes if nobody ever starts it.)
     await this.persist(core);
     return true;
@@ -240,6 +247,23 @@ export class Lobby extends DurableObject<Env> {
   async joinable(): Promise<boolean> {
     if (!this.record || (await this.closeIfDue())) return false;
     return this.core(this.record.code).joinable();
+  }
+
+  /** Bots off → Default: this seat leaves (see LobbyCore.release); when its person first joined, or null. */
+  async release(token: string): Promise<{ joinedAt: number } | null> {
+    if (!this.record || (await this.closeIfDue())) return null;
+    const core = this.core(this.record.code);
+    const out = core.release(token);
+    if (out) await this.persist(core);
+    return out;
+  }
+
+  /** Someone who has already waited joins: bots fill by `at` (see LobbyCore.hurry). */
+  async hurry(at: number): Promise<void> {
+    if (!this.record || (await this.closeIfDue())) return;
+    const core = this.core(this.record.code);
+    core.hurry(at);
+    await this.persist(core);
   }
 
   async fetch(request: Request): Promise<Response> {

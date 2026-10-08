@@ -18,7 +18,8 @@
     "frames:flash": "node scripts/frames-flash.mjs",
     "frames:chat": "node scripts/frames-chat-move.mjs",
     "frames:vote": "node scripts/frames-vote.mjs",
-    "frames:close": "node scripts/frames-lobby-close.mjs"
+    "frames:close": "node scripts/frames-lobby-close.mjs",
+    "frames:matchmaking": "node scripts/frames-matchmaking.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261002.1",
@@ -27,7 +28,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9",
-    "wrangler": "^4.147.0"
+    "wrangler": "^4.147.0",
+    "ws": "^8.21.0"
   },
   "dependencies": {
     "chess.js": "^1.4.0",

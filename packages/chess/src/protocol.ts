@@ -290,6 +290,8 @@ export type ServerMessage = { now: number } & (
       /** Matchmade ("Play now"): no host start; the match starts when full or at `fillAt` (server time), bots filling the rest. */
       auto?: boolean;
       fillAt?: number | null;
+      /** Matchmade, Bots off: no bots; it waits until it's full (a raid: or `fillAt` with enough people). */
+      botsOff?: true;
       /** Matchmade: the seats were filled then (bots in the empty ones); the match begins a moment later. */
       filledAt?: number;
     }
@@ -436,5 +438,7 @@ export type ServerMessage = { now: number } & (
       gameWinner?: "w" | "b" | null;
       /** Boss battle: who won it. */
       bossResult?: "crowd" | "boss" | "draw";
+      /** It counted for ranking (real players filled at least RANKING.rankedMinHumanShare of the seats). Missing: an older server. */
+      ranked?: boolean;
     }
 );
