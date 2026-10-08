@@ -67,6 +67,8 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
 - `ranked`: hidden skill ratings, ranks and rank points, seasons, ranked queues and skill-based matchmaking,
   leaderboard numbers (the `hub` shows them).
 - `ops`: capacity, load tests, scaling choke points, monitoring, rate limits, graceful overload, running costs.
+- `fairplay`: reports, cheat detection (signals from each match's judged moves, the suspicion score), flags, bans,
+  the review page (`/admin/fairplay`) and appeals, and the cheater simulations that tune them.
 - Lanes keep sessions out of each other's files. Run one delegate per lane at a time. In `DECISIONS.md`, add to your
   own sections rather than rewriting others'.
 
