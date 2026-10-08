@@ -117,6 +117,14 @@ export interface Settings {
   recheckLoss: readonly [number, number];
   recheckMax: number;
   recheckNodes: number;
+  /**
+   * Close calls that can decide a cut (online, re-checked on the engine server): picks by players whose stage score
+   * is within recheckCutPoints of the cut line are re-checked first, over this wider range of losses, up to
+   * recheckCutMax moves a board (on top of the usual ones, up to recheckMax in all when there are fewer).
+   */
+  recheckCutLoss: readonly [number, number];
+  recheckCutMax: number;
+  recheckCutPoints: number;
   /** Augments: seconds added or taken per vote, and the clock's limits. */
   clockStepSeconds: number;
   clockRange: readonly [number, number];
@@ -282,6 +290,9 @@ export const DEFAULT_SETTINGS: Settings = {
   recheckLoss: [5, 60],
   recheckMax: 3,
   recheckNodes: 700_000,
+  recheckCutLoss: [1, 60],
+  recheckCutMax: 5,
+  recheckCutPoints: 25,
   clockStepSeconds: 5,
   clockRange: [10, 40],
   lobbySize: 64,
@@ -557,6 +568,70 @@ export const BOT_LOOKS = {
   /** A crate item's purity (%), evenly in this range: clean enough to read on a small pawn, never shiny (90%+). */
   purity: [55, 88],
 } as const;
+
+/**
+ * Many judges (see DECISIONS.md, "Many judges"): online, each board's scoring job goes to two players' devices,
+ * chosen at random by the lobby (faster devices more often), and the lobby compares their answers. Agreement: used.
+ * Disagreement: the engine server's deeper search decides, and a device whose answer was off gets a strike.
+ */
+export interface JudgeConfig {
+  on: boolean;
+  perJob: number;
+  tolerance: number;
+  blameMargin: number;
+  soloBlame: number;
+  strikes: number;
+  spotCheckShare: number;
+  graceMs: number;
+  graceFactor: number;
+  speedWeight: number;
+  benchNodes: number;
+  defaultNps: number;
+}
+
+export const JUDGES: JudgeConfig = {
+  /** The switch: off, the lobby's host scores every round as before (one device, the engine server re-checking close calls). */
+  on: true,
+  /** Devices per job (with fewer devices connected that can judge, as many as there are; one: the host, as before). */
+  perJob: 2,
+  /**
+   * How far two answers may differ (expected score, 0 to 1) and still agree. The browser engine is deterministic
+   * (reports/judge-determinism.md: identical numbers on separate engines, used or fresh), so an exact match.
+   */
+  tolerance: 0,
+  /**
+   * Blame after the engine server's verdict: the judge whose losses are further from the verdict's gets a strike, if
+   * further by at least this many points (one move's worst difference). Below it, it's within the engine-to-engine
+   * noise between a phone's quick search and the server's deep one, and nobody is blamed.
+   */
+  blameMargin: 4,
+  /**
+   * A spot check (one judge's answer, checked on the engine server afterwards) blames it only when some move's loss
+   * is at least this many points off the server's: beyond the worst honest difference measured (see
+   * reports/judge-determinism.md), so only a gross lie is caught this way.
+   */
+  soloBlame: 50,
+  /** Strikes before a device is given no more jobs this match. */
+  strikes: 2,
+  /**
+   * Share of jobs answered by one judge only, the other gone without answering (dropped, timed out), that the engine
+   * server checks afterwards. (A late judge's answer is compared with the one used when it comes, instead.)
+   */
+  spotCheckShare: 0.25,
+  /**
+   * After the first judge answers, how long the lobby waits for the second (ms), at least, or this fraction of the
+   * time the first took, whichever is longer, before using the first answer alone (so a round is never held up by a
+   * slow phone). The late answer is still compared when it comes, for blame (the scores used stand).
+   */
+  graceMs: 150,
+  graceFactor: 0.25,
+  /** Choosing judges: weight = (nodes per second) ^ speedWeight, so a computer judges more often than a phone. */
+  speedWeight: 3,
+  /** A device's speed check on joining: one search of this many nodes, timed. */
+  benchNodes: 150_000,
+  /** A device that hasn't reported its speed yet counts as this fast (nodes/s): a typical phone. */
+  defaultNps: 250_000,
+};
 
 /**
  * How long a lobby lives (see DECISIONS.md, "Closing finished lobbies"). When a lobby closes, its Durable Object

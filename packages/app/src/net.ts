@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, JUDGES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -18,6 +18,9 @@ import {
   recheckCloseCalls,
   repliesFrom,
   bossMoveFrom,
+  judgeBotPicks,
+  runJudgeJob,
+  type JudgeJob,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
@@ -77,6 +80,9 @@ export function forgetSeat(code: string) {
  * the server has no lobby under that code (closed a while ago, or never was).
  */
 export type LobbyGone = LobbyCloseReason | "unknown";
+
+/** This page's engine speed check (nodes per second), run once and reported to every lobby it joins. */
+let speedCheck: Promise<number> | null = null;
 
 /**
  * A multiplayer match: the lobby server runs the clock and the draw; this
@@ -344,6 +350,8 @@ export class NetMatch implements GameView {
         }
         if (this.phase.kind === "loading") this.setPhase({ kind: "lobby" });
         this.chat.onWelcome();
+        // This device's engine speed, so the lobby can share out the judging (once per page; sent again on reconnect).
+        void this.reportSpeed();
         return;
       case "error":
         // (The match is over: results gone, or a seat from an older lobby that had this code.)
@@ -425,6 +433,8 @@ export class NetMatch implements GameView {
         return this.emit();
       case "scoreRequest":
         return void this.hostScore(m.key, m.jobs, !!m.serverRecheck);
+      case "judge":
+        return void this.judge(m.key, m.jobs);
       case "reveal":
         return this.onReveal(m);
       case "stageBreak": {
@@ -529,7 +539,8 @@ export class NetMatch implements GameView {
 
   /** Re-scores this player's group and tells the server if it disagrees with the host. */
   private async crossCheck(m: Extract<ServerMessage, { t: "reveal" }>) {
-    if (this.isHost || !m.fenBefore) return;
+    // (Scored by two judges, checked against each other: nothing to cross-check.)
+    if (this.isHost || !m.fenBefore || m.judged) return;
     try {
       const [engine] = await this.engines();
       const moves = [...new Set(m.picks.flatMap((p) => (p.move ? [p.move] : [])))];
@@ -565,10 +576,49 @@ export class NetMatch implements GameView {
       .catch(() => undefined);
   }
 
+  /** Many judges: this device's speed check, then the lobby is told (nodes per second). */
+  private async reportSpeed() {
+    try {
+      speedCheck ??= this.engines().then(([engine]) => engine!.speed(JUDGES.benchNodes));
+      this.send({ t: "speed", nps: await speedCheck });
+    } catch {
+      // No engine here: this device doesn't judge.
+    }
+  }
+
+  /** Many judges: score the lobby's jobs (each board's position and picks, no names) and send each answer back. */
+  private async judge(key: string, jobs: JudgeJob[]) {
+    const engines = await this.engines().catch(() => [] as UciEngine[]);
+    let next = 0;
+    await Promise.all(
+      engines.map(async (engine) => {
+        while (next < jobs.length) {
+          const job = jobs[next++]!;
+          try {
+            // The top moves were searched while players thought (the prefetch), so usually only the picks are left.
+            const report = await runJudgeJob(engine, job, this.top.get(engine, job.fen));
+            this.send({ t: "judged", key, id: job.id, report });
+          } catch {
+            // No answer: the lobby gives the job to someone else.
+          }
+        }
+      }),
+    );
+  }
+
   /** Crowd, host only: decide the bots' picks now (from the round's search) so everyone can watch them come in. */
   private async planBots(plan: NonNullable<Extract<ServerMessage, { t: "prefetch" }>["plan"]>) {
     try {
       const engines = await this.engines();
+      if (plan.seed !== undefined && plan.rules) {
+        // Many judges: the bots pick from the lobby's seed, exactly as the scoring job will (it checks this plan).
+        const top = await this.top.get(engines[0]!, plan.fen);
+        const bots = plan.bots.map((b) => ({ skill: b.skill, powerUps: b.powerUps ?? 0 }));
+        const chosen = judgeBotPicks({ fen: plan.fen, bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}) } as JudgeJob, top);
+        const picks = Object.fromEntries(plan.bots.map((b, i) => [b.id, chosen.picks[i]!]));
+        if (this.key === plan.key) this.send({ t: "botPlan", key: plan.key, picks, powerUps: chosen.powerUps.map((i) => plan.bots[i]!.id) });
+        return;
+      }
       // (The re-pick after the God King's Last Stand: the move he took back is off the table.)
       const top = (await this.top.get(engines[0]!, plan.fen)).filter((mv) => mv.move !== plan.barred);
       const best = top[0]!.expected;
@@ -631,7 +681,7 @@ export class NetMatch implements GameView {
           const people = Object.values(job.humanPicks).some((m) => !!m);
           const checked = serverRecheck || !people
             ? { bestMove: top[0]!.move, bestExpected: best, expectedAfter }
-            : await recheckCloseCalls(engine, job.fen, { bestMove: top[0]!.move, bestExpected: best, expectedAfter }, [...Object.values(job.humanPicks), ...Object.values(botPicks)], this.settings);
+            : await recheckCloseCalls(engine, job.fen, { bestMove: top[0]!.move, bestExpected: best, expectedAfter }, [...Object.values(job.humanPicks), ...Object.values(botPicks)], this.settings, job.priority);
           out[i] = { boardId: job.boardId, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, botPicks, botThinkMs, botPowerUps, replies, mates };
         }
       }),

@@ -69,6 +69,9 @@ export function parseInfo(line: string): InfoLine | null {
   };
 }
 
+/** The speed check's position: a quiet Italian middlegame. */
+const SPEED_FEN = "r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 4 6";
+
 export class UciEngine {
   private listeners: ((line: string) => void)[] = [];
   private queue: Promise<unknown> = Promise.resolve();
@@ -225,6 +228,24 @@ export class UciEngine {
       const move = lines[lines.length - 1]!.split(/\s+/)[1];
       if (!move || move === "(none)") throw new Error(`No move in ${fen}`);
       return move;
+    });
+  }
+
+  /**
+   * This engine's speed in nodes per second: one fixed-budget search of a middlegame position, timed (a device's
+   * speed check when it joins a lobby, so the lobby gives faster devices more of the judging).
+   */
+  speed(nodes: number): Promise<number> {
+    return this.serial(async () => {
+      this.transport.send("ucinewgame");
+      this.transport.send("setoption name MultiPV value 1");
+      await this.ready();
+      this.transport.send(`position fen ${SPEED_FEN}`);
+      const done = this.until((l) => l.startsWith("bestmove"));
+      const t = performance.now();
+      this.transport.send(`go nodes ${nodes}`);
+      await done;
+      return Math.round(nodes / Math.max(0.001, (performance.now() - t) / 1000));
     });
   }
 
