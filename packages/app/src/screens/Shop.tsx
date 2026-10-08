@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, shopItem, type ShopSlot } from "@chessroyale/core";
+import { LOCKER_SLOTS, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, shopItem, type ShopSlot } from "@chessroyale/core";
 import { account, buyShopItem, equipShopItem } from "../account.ts";
 import { openProfile } from "../profile-nav.ts";
 import { HattedPawn, KingEffectPreview } from "../components/Cosmetics.tsx";
@@ -10,11 +10,13 @@ import { CratesPanel, LockerPanel } from "./Crates.tsx";
 /**
  * The shop: cosmetics by category. Get an item (free while we test), then
  * equip it; one equipped per category. Your choices are saved to your account.
+ * Pawn hats and God King effects aren't sold here: everyone has them, in the locker (Eric, Oct 8, 2026).
  */
+const CATEGORIES = SHOP_CATEGORIES.filter((c) => !(LOCKER_SLOTS as readonly ShopSlot[]).includes(c.slot));
 export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: "shop" | "crates" | "locker" | "chat" }) {
   const { profile, config } = useAccount();
   // (A profile's locked quick chat line opens it on the chat packs.)
-  const [slot, setSlot] = useState<ShopSlot>(initial === "chat" ? "chat" : "king");
+  const [slot, setSlot] = useState<ShopSlot>(initial === "chat" ? "chat" : CATEGORIES[0]!.slot);
   // (A profile's "Open locker" opens it on the locker.)
   const [area, setArea] = useState<"shop" | "crates" | "locker">(() =>
     initial && initial !== "chat" ? initial : new URLSearchParams(location.search).has("crates") ? "crates" : "shop",
@@ -24,7 +26,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const shop = profile?.shop;
-  const category = SHOP_CATEGORIES.find((c) => c.slot === slot)!;
+  const category = CATEGORIES.find((c) => c.slot === slot) ?? CATEGORIES[0]!;
   const act = async (id: string, fn: (id: string) => Promise<void>) => {
     setBusy(id);
     setError(null);
@@ -76,8 +78,14 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
         <p class="muted">The shop needs your account, which isn't available here.</p>
       ) : (
         <>
+          <p class="shop-note">
+            Your pawn hats and God King effects are in your{" "}
+            <button type="button" class="link-button" onClick={() => setArea("locker")}>
+              Locker ›
+            </button>
+          </p>
           <div class="shop-tabs" role="tablist">
-            {SHOP_CATEGORIES.map((c) => (
+            {CATEGORIES.map((c) => (
               <button type="button" role="tab" key={c.slot} aria-selected={c.slot === slot} class={c.slot === slot ? "on" : ""} onClick={() => setSlot(c.slot)}>
                 {c.name}
               </button>
@@ -85,9 +93,9 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           </div>
           <p class="muted small">{category.blurb}</p>
           {error && <p class="shop-error">{error}</p>}
-          {slot === "chat" && gotPack && <GotPackNote got={gotPack} />}
+          {category.slot === "chat" && gotPack && <GotPackNote got={gotPack} />}
           <div class="shop-grid">
-            {SHOP_ITEMS.filter((i) => i.slot === slot).map((item) => {
+            {SHOP_ITEMS.filter((i) => i.slot === category.slot).map((item) => {
               const owned = shop.owned.includes(item.id);
               const equipped = item.slot !== "chat" && shop.equipped[item.slot] === item.id;
               // Chat packs: their lines are the preview, and owning one is all it takes (nothing to equip).
@@ -127,7 +135,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
               );
             })}
           </div>
-          {slot === "chat" ? (
+          {category.slot === "chat" ? (
             <div class="shop-soon shop-chat-foot">
               <p class="muted small">Quick chat is in online 50 v 50 matches and boss raids: preset lines only, no typing.</p>
               <button type="button" class="btn btn-small" onClick={pickInProfile}>

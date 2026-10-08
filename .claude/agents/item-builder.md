@@ -19,7 +19,7 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
 | Drawings, fit on the piece, cards | `packages/app/src/components/Items.tsx` |
 | Crate page, opening strip, reveal, locker UI | `packages/app/src/screens/Crates.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts` |
-| Old coin-shop cosmetics (God King looks, pawn hats) | `packages/core/src/shop.ts`, `packages/app/src/components/Cosmetics.tsx` |
+| Pawn hats and God King looks (free for everyone, shown in the locker) | `packages/core/src/shop.ts`, `packages/app/src/components/Cosmetics.tsx` |
 | Tests | `packages/core/test/crates.test.ts`, `packages/server/test/accounts.test.ts` |
 | The record of every call made | `DECISIONS.md`, section "Crates: Winter Crate · Series 1" |
 

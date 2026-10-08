@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CRATES, FISCHER, ITEM_COLORS, ITEM_DEFS, PURITY_BANDS, TIERS, cleanLook, isShiny, itemChance, itemDef, mulberry32, presentChance, presentItems, purity, rollBlemish, rollCrate } from "../src/index.ts";
+import { CRATES, FISCHER, ITEM_COLORS, ITEM_DEFS, PURITY_BANDS, TIERS, cleanLook, isShiny, itemChance, itemDef, mulberry32, presentChance, presentItems, purity, rollBlemish, rollCrate, stackItems } from "../src/index.ts";
 
 const crate = CRATES[0]!;
 
@@ -154,6 +154,20 @@ describe("crates", () => {
       expect(b).toBeGreaterThanOrEqual(last);
       last = b;
     }
+  });
+
+  it("the locker stacks copies of an item in the same colour (both colours, for two-colour ones), the purest on top", () => {
+    const it = (id: string, def: string, color: string, blemish: number, color2?: string) => ({ id, def, color, blemish, seed: 1, ...(color2 ? { color2 } : {}) });
+    const stacks = stackItems([
+      it("a", "santa-beard", "red", 40),
+      it("b", "santa-beard", "red", 12),
+      it("c", "santa-beard", "cobalt", 5),
+      it("d", "present", "red", 30, "emerald"),
+      it("e", "present", "red", 20, "cobalt"),
+      it("f", "santa-beard", "red", 70),
+      it("g", "present", "red", 50, "emerald"),
+    ]);
+    expect(stacks.map((s) => s.items.map((i) => i.id))).toEqual([["b", "a", "f"], ["c"], ["d", "g"], ["e"]]);
   });
 
   it("a look from elsewhere keeps only valid slots", () => {
