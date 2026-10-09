@@ -4001,13 +4001,10 @@ button.history-label {
 .gk-unit-btn:disabled {
   opacity: 1;
 }
+/* He stays in full colour whether or not he can be summoned, and once his moves are used (Eric, Oct 9): the crowns
+   under him say what's left. */
 .gk-unit:not(.ready) .god-king {
-  filter: saturate(0.6) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
-  opacity: 0.75;
-}
-.gk-unit.spent .god-king {
-  filter: grayscale(1);
-  opacity: 0.5;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
 }
 .gk-unit.away .gk-unit-btn {
   opacity: 0;
