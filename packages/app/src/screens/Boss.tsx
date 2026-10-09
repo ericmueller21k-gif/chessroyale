@@ -16,6 +16,7 @@ import { seenKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossCharacter, BossFace, BossSide, hasCharacter } from "../components/BossCharacter.tsx";
+import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
 
@@ -214,6 +215,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
           <EvalBar fen={fenShown} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
           <Board fen={fenShown} orientation={orientation} lastMove={lastShown}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={fenShown} />}
+            {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
             {!thinking && !victim && !alone && !funhouse && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
             <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
             <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />

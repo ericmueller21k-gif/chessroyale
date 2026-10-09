@@ -11,6 +11,7 @@ import { QUICK_CHAT } from "@chessroyale/core";
 import { clownSound, type ClownSound } from "./characters/clown-sounds.ts";
 import { gingerSound, type GingerSound } from "./characters/gingerbread-sounds.ts";
 import { grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds.ts";
+import { hollowSound, type HollowSound } from "./characters/hollow-sounds.ts";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -131,6 +132,7 @@ function buffer(data: Float32Array, at: number, rate = 1) {
 const clown = (name: ClownSound) => (t: number) => buffer(clownSound(name, ctx!.sampleRate), t);
 const ginger = (name: GingerSound) => (t: number) => buffer(gingerSound(name, ctx!.sampleRate), t);
 const grex = (name: GrexSound) => (t: number) => buffer(grexSound(name, ctx!.sampleRate), t);
+const hollow = (name: HollowSound) => (t: number) => buffer(hollowSound(name, ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
 function grexWhistle(t: number) {
   const w = whistlePick(Math.random(), Math.random(), Math.random());
@@ -342,7 +344,18 @@ export type SoundName =
   | "grexPop"
   | "grexRoar"
   | "grexSmack"
-  | "grexWhistle";
+  | "grexWhistle"
+  // Hollow (a raid boss, the Darkness boss): synthesised, see characters/hollow-sounds.ts.
+  | "hollowHum"
+  | "hollowCast"
+  | "hollowWhisper"
+  | "hollowPop"
+  | "hollowSmash"
+  | "hollowTick"
+  | "hollowFound"
+  | "hollowMiss"
+  | "hollowRelight"
+  | "hollowClink";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -417,11 +430,53 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   grexRoar: grex("roar"),
   grexSmack: grex("smack"),
   grexWhistle,
+  hollowHum: hollow("hum"),
+  hollowCast: hollow("cast"),
+  hollowWhisper: hollow("whisper"),
+  hollowPop: hollow("pop"),
+  hollowSmash: hollow("smash"),
+  hollowTick: hollow("tick"),
+  hollowFound: hollow("found"),
+  hollowMiss: hollow("miss"),
+  hollowRelight: hollow("relight"),
+  hollowClink: hollow("clink"),
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));
   },
 };
+
+/** Synthesised sounds that can be made ahead (warmSounds), by name: Hollow's (his smash took 150 ms to make on a computer). */
+const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
+  hollowHum: (r) => hollowSound("hum", r),
+  hollowCast: (r) => hollowSound("cast", r),
+  hollowWhisper: (r) => hollowSound("whisper", r),
+  hollowPop: (r) => hollowSound("pop", r),
+  hollowSmash: (r) => hollowSound("smash", r),
+  hollowTick: (r) => hollowSound("tick", r),
+  hollowFound: (r) => hollowSound("found", r),
+  hollowMiss: (r) => hollowSound("miss", r),
+  hollowRelight: (r) => hollowSound("relight", r),
+  hollowClink: (r) => hollowSound("clink", r),
+};
+/**
+ * Makes a boss's synthesised sounds ahead of time, one per idle moment, so the first time one plays (a bulb smashed in
+ * the middle of his ultimate) a slow phone doesn't stall making it. Needs the audio context (for its sample rate): a
+ * no-op before the first tap.
+ */
+export function warmSounds(names: readonly SoundName[]): void {
+  if (!ctx) return;
+  const rate = ctx.sampleRate;
+  const todo = [...new Set(names)].filter((n) => MAKE[n]);
+  const idle = (fn: () => void) => (typeof requestIdleCallback === "function" ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 60));
+  const next = () => {
+    const n = todo.shift();
+    if (!n) return;
+    MAKE[n]!(rate);
+    idle(next);
+  };
+  if (todo.length) idle(next);
+}
 
 /** Plays a sound; `voice` previews a roulette voice without choosing it (the sound lab). */
 export function play(name: SoundName, voice?: ReelVoice) {

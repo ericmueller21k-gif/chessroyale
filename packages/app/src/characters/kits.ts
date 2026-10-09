@@ -1,14 +1,17 @@
 /**
  * The raid bosses that have a character: its drawing, which animation plays for each moment, its sounds, its
  * lines and its portrait, keyed by the boss's name in packages/core/src/boss.ts. A boss without one keeps its emoji
- * everywhere. A kit whose name isn't a boss there yet (G-REX) is drawn and ready but never shows: a boss
- * becomes playable once it has both a character and its powers (the power rules add it to boss.ts).
+ * everywhere. A kit whose name isn't a boss there yet (Hollow) is drawn and ready but never shows, except in a test
+ * link (`?wip=1&kit=Hollow`: his kit in every boss's place): a boss becomes playable once it has both a character
+ * and its powers (the power rules add it to boss.ts).
  */
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines } from "./boss-beats.ts";
 import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
+import { HOLLOW, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT, bulbsLook } from "./hollow.ts";
+import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
 
 export interface BossKit extends BeatLines {
@@ -21,6 +24,8 @@ export interface BossKit extends BeatLines {
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
   /** Taller than the boss bar's usual box (G-REX's long neck): on a phone the bar grows to hold him. */
   tall?: boolean;
+  /** A recolour (one of the character's `looks`) from the battle's state: Hollow's bulbs still lit. */
+  lookOf?: (boss: BossView) => string | undefined;
 }
 
 export const BOSS_KITS: Record<string, BossKit> = {
@@ -68,6 +73,48 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { ...GREX_PORTRAIT, anim: "idle", frame: 0 },
     tall: true,
   },
+  "Hollow": {
+    ch: HOLLOW,
+    anims: { strike: "capture", power: "darkCast", darkFirst: "darkCast", ultimateWarn: "check", ultimate: "lightsOut", claim: "claimDark", found: "testFound", missed: "testMiss", lightsBack: "lightsBack" },
+    sounds: {
+      hum: "hollowHum",
+      cast: "hollowCast",
+      pop: "hollowPop",
+      clink: "hollowClink",
+      light: "hollowRelight",
+      land: "hollowWhisper",
+      smash1: "hollowSmash",
+      smash2: "hollowSmash",
+      smash3: "hollowSmash",
+      tick: "hollowTick",
+      relight: "hollowRelight",
+    },
+    lines: HOLLOW_LINES,
+    chance: HOLLOW_CHANCE,
+    portrait: { ...HOLLOW_PORTRAIT, anim: "idle", frame: 0 },
+    // His strand shows the bulbs still lit before his next cover of the dark (the power rules' `bulbs`, 0-3).
+    lookOf: (boss) => {
+      const n = (boss.powers as { bulbs?: number } | undefined)?.bulbs;
+      return n === undefined ? undefined : bulbsLook(n);
+    },
+  },
 };
 
-export const bossKit = (name: string | undefined | null): BossKit | null => (name ? (BOSS_KITS[name] ?? null) : null);
+/** Test links only (?wip=1&kit=<name>): a kit drawn before its boss is playable, shown in every boss's place. */
+const WIP_KIT = (() => {
+  try {
+    const q = new URLSearchParams(globalThis.location?.search ?? "");
+    return q.get("wip") === "1" ? q.get("kit") : null;
+  } catch {
+    return null;
+  }
+})();
+/** The kit a test link shows in every boss's place, if any. */
+export const wipKit = (): BossKit | null => (WIP_KIT ? (BOSS_KITS[WIP_KIT] ?? null) : null);
+/**
+ * For a test link's preview of a moment (components/WipPreview.tsx): a look to show instead of the kit's own (his bulbs
+ * counting down before the power rules exist).
+ */
+export const wipLook: { now: (() => string | undefined) | null } = { now: null };
+
+export const bossKit = (name: string | undefined | null): BossKit | null => (name ? ((WIP_KIT && !name.startsWith("original:") ? wipKit() : null) ?? BOSS_KITS[name] ?? null) : null);

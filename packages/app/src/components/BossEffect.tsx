@@ -61,7 +61,19 @@ export function spriteFrameAt(ch: Character, anim: string, then: string | undefi
 }
 
 const images = new WeakMap<Frame, ImageData>();
-function frameImage(ch: Character, frame: Frame): ImageData {
+/** Frames in a look (Hollow's bulbs out), made once each. */
+const lookImages = new WeakMap<Frame, Map<string, ImageData>>();
+function frameImage(ch: Character, frame: Frame, look?: string): ImageData {
+  if (look) {
+    let byLook = lookImages.get(frame);
+    if (!byLook) lookImages.set(frame, (byLook = new Map()));
+    let li = byLook.get(look);
+    if (!li) {
+      const r = renderFrame(ch, frame, { look });
+      byLook.set(look, (li = new ImageData(new Uint8ClampedArray(r.data), r.w, r.h)));
+    }
+    return li;
+  }
   let img = images.get(frame);
   if (!img) {
     const r = renderFrame(ch, frame);
@@ -83,6 +95,27 @@ function frameCanvas(ch: Character, frame: Frame): HTMLCanvasElement {
   }
   return c;
 }
+/**
+ * Draws an effect's frames ahead of time, a slice each animation frame on the shared loop (about 4 ms of work a frame),
+ * so a big effect's first showing doesn't stall: Hollow's night has 256 tiles, and its last smash would otherwise draw
+ * 32 of them in one frame. `frames` in the order they'll be needed ([animation, frame index]). Returns a cancel.
+ */
+export function prewarm(name: EffectName, frames: readonly (readonly [string, number])[]): () => void {
+  const ch = EFFECTS[name].ch;
+  let i = 0;
+  let stop = () => {};
+  stop = onEachFrame(() => {
+    const t0 = performance.now();
+    do {
+      const f = frames[i] && ch.anims[frames[i]![0]]?.frames[frames[i]![1]];
+      if (f) frameCanvas(ch, f);
+      i++;
+    } while (i < frames.length && performance.now() - t0 < 4);
+    if (i >= frames.length) stop();
+  });
+  return () => stop();
+}
+
 /** Sounds already played (a frame shown twice, or a new screen, never plays one twice). */
 const played = new Set<string>();
 
@@ -97,9 +130,11 @@ export interface SpriteAnimProps {
   id?: string;
   class?: string;
   style?: Record<string, string | number>;
+  /** One of the character's looks (Hollow's bulbs: `bulbs0` to `bulbs3`). */
+  look?: string;
 }
 
-export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style }: SpriteAnimProps) {
+export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look }: SpriteAnimProps) {
   const cv = useRef<HTMLCanvasElement>(null);
   // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
   useLayoutEffect(() => {
@@ -113,7 +148,7 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
         last = key;
         const frame = ch.anims[s.anim]!.frames[s.frame]!;
         g.clearRect(0, 0, ch.w, ch.h);
-        g.putImageData(frameImage(ch, frame), 0, 0);
+        g.putImageData(frameImage(ch, frame, look), 0, 0);
         cv.current?.setAttribute("data-frame", key);
         const sound = frame.cue ? sounds[frame.cue] : undefined;
         const tag = `${ch.id}:${id}:${s.tag}:${s.frame}`;
@@ -125,7 +160,7 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
     };
     draw();
     return onEachFrame(draw);
-  }, [ch, anim, then, since, id]);
+  }, [ch, anim, then, since, id, look]);
   return <canvas ref={cv} class={`fx-sprite ${cls}`} width={ch.w} height={ch.h} aria-hidden="true" style={style} data-fx={ch.id} />;
 }
 
@@ -137,10 +172,10 @@ export function BossEffect({ name, anim, since, then, id, class: cls, style }: {
 }
 
 /** A boss's own animation (a power moment) somewhere other than his usual spot: Boingo's funhouse on the board. */
-export function BossMoment({ boss, anim, since, then, class: cls, style }: { boss: string; anim: string; since: number; then?: string; class?: string; style?: Record<string, string | number> }) {
+export function BossMoment({ boss, anim, since, then, class: cls, style, look }: { boss: string; anim: string; since: number; then?: string; class?: string; style?: Record<string, string | number>; look?: string }) {
   const kit = bossKit(boss);
   if (!kit) return null;
-  return <SpriteAnim ch={kit.ch} anim={anim} since={since} then={then} sounds={kit.sounds} id="moment" class={cls} style={style} />;
+  return <SpriteAnim ch={kit.ch} anim={anim} since={since} then={then} sounds={kit.sounds} id="moment" class={cls} style={style} look={look} />;
 }
 
 /** One effect on a square of the board, for <BoardEffects>. */
