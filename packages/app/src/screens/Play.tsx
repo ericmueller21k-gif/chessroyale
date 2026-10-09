@@ -100,10 +100,12 @@ export function PlayScreen({
 
   const hint = match.hint;
   // Power-ups you hold (one in use this move already counts as spent).
-  const held = match.practice ? Infinity : (match.standings().find((s) => s.isYou)?.powerUps ?? 0);
+  const standings = match.standings();
+  const you = standings.find((s) => s.isYou);
+  const held = match.practice ? Infinity : (you?.powerUps ?? 0);
   const powerUps = hint !== null ? Math.max(0, held - 1) : held;
   // Crowd 50 v 50: only your team is picking this turn.
-  const alive = match.standings().filter((s) => !s.out && (s.team == null || s.team === side));
+  const alive = standings.filter((s) => !s.out && (s.team == null || s.team === side));
   // Once you've moved, your move stays on the board while the others finish.
   // (Crowd keeps the position on screen and shows everyone's picks over it instead, unless you're the whole crowd,
   // as in a solo boss raid: then your pick is the move, so it stays where you put it.)
@@ -207,7 +209,7 @@ export function PlayScreen({
           <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows}>
             {match.boss?.powers && !history.browsing && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
-            {match.settings.mode === "crowd" && !match.boss && deadline > 0 && <BoardClock match={match} turn={{ startsAt, deadline, yours: true, done: waiting }} />}
+            {match.settings.mode === "crowd" && !match.boss && deadline > 0 && <BoardClock match={match} you={you} turn={{ startsAt, deadline, yours: true, done: waiting }} />}
             {intro && (
               <CenterCount
                 label="Round start"

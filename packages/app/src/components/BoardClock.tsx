@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import type { GameView } from "../game.ts";
+import type { GameView, Standing } from "../game.ts";
 import { clockText } from "./RaceTower.tsx";
 
 /** Seconds left on your move at which the small clock turns red. */
@@ -24,7 +24,7 @@ export interface TurnClock {
  * No labels (they didn't fit beside the line above the board): "12s" and "9:50" read apart by their formats, and the
  * bank is the same number as the leaderboard's BANK column. The full words are its title and label.
  */
-export function BoardClock({ match, turn }: { match: GameView; turn: TurnClock | null }) {
+export function BoardClock({ match, you, turn }: { match: GameView; you: Standing | undefined; turn: TurnClock | null }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!turn) return;
@@ -36,7 +36,8 @@ export function BoardClock({ match, turn }: { match: GameView; turn: TurnClock |
   if (turn?.done && doneAt.current === null) doneAt.current = Math.min(now, turn.deadline);
   if (!turn?.done) doneAt.current = null;
 
-  const me = match.standings().find((s) => s.isYou);
+  // (Your row comes from the screen, which reads the standings anyway: this redraws ten times a second.)
+  const me = you;
   const runs = !!turn?.yours && !!me && !me.out;
   const thought = runs ? Math.max(0, (doneAt.current ?? now) - turn!.startsAt) : 0;
   // (Each move adds a few seconds to the bank before its clock starts, as the scoreboard's Bank does.)
