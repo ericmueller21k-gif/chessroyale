@@ -52,7 +52,8 @@ async function play(page: Page, opts: { leave?: boolean; step?: boolean } = {}) 
 
 test("G-REX: his sparkler's tile burns in stages, a piece left on it burns, and the Roman candle's 12 shots fall 1, 2, 3, 4, 2", async ({ page }) => {
   test.setTimeout(8 * 60_000);
-  await page.goto("/?debug&clock=40&bossMoves=12&boss=grex&power=candle");
+  // (?laststand=0: leaving a piece to burn on purpose isn't taken back by the God King.)
+  await page.goto("/?debug&clock=40&bossMoves=12&boss=grex&power=candle&laststand=0");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("G-REX");
@@ -83,7 +84,7 @@ test("G-REX: his sparkler's tile burns in stages, a piece left on it burns, and 
   await expect(page.locator(".power-board .pw-fire.stage-2")).toHaveCount(1);
 
   // Then the barrage: 3 crowd moves after he fired, a wave a turn. Leave one piece on a tile ablaze to watch it burn.
-  const left: number[] = [];
+  const left = new Map<number, number>();
   let burnt = false;
   let leftOne = false;
   for (let turn = 4; turn <= 10; turn++) {
@@ -98,15 +99,16 @@ test("G-REX: his sparkler's tile burns in stages, a piece left on it burns, and 
     await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
     if ((await phase(page)) !== "play") break;
     const p = await powers(page);
-    left.push(p.candle.left);
+    left.set(p.turn, p.candle.left);
     if (p.candle.left > 0) await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", String(p.candle.left));
     // Never on the king's square; never two on one square.
     const squares = p.fire.map((t: { square: string }) => t.square);
     expect(new Set(squares).size).toBe(squares.length);
   }
-  // (After turn 4 the 5th begins: none yet; then 1, 2, 3, 4 and the last 2.)
-  expect(left).toEqual([12, 11, 9, 6, 2, 0, 0].slice(0, left.length));
-  expect(left.length).toBeGreaterThanOrEqual(6);
+  // (Fired on turn 3: none as the 5th begins; then 1, 2, 3, 4 and the last 2, a turn each from the 6th.)
+  const want: Record<number, number> = { 5: 12, 6: 11, 7: 9, 8: 6, 9: 2, 10: 0, 11: 0 };
+  for (const [turn, n] of left) expect(n, `shots up as turn ${turn} begins`).toBe(want[turn]);
+  expect(left.size).toBeGreaterThanOrEqual(6);
   if (leftOne) expect(burnt).toBe(true);
 });
 

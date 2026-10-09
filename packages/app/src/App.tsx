@@ -87,6 +87,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     bossAvoid: lastBoss() ?? "",
     ...(["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle"].includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
+    // Testing: ?laststand=0, the God King never makes his Last Stand (a test that leaves a piece to burn on purpose).
+    ...(q.get("laststand") === "0" ? { lastStandLoss: 999, lastStandLossFloor: 999 } : {}),
     // Testing, solo: ?boss=<id>&wip=1 meets a boss whose powers are built before its art is (placeholders show).
     ...(q.get("wip") === "1" && bossDef(q.get("boss"))?.powers ? { bossId: q.get("boss")!, bossUnfinished: true } : {}),
   };
