@@ -657,7 +657,7 @@ const slash: Anim = {
 /** Lowering his sword after commanding it from his spot, back to how he stands by. */
 const lower: Anim = {
   loop: false,
-  frames: [f(90, { ...RAISED, arm: "mid", flame: "lit", eyes: "glow", flick: 0 }), f(90, { arm: "hold", flick: 1 })],
+  frames: [f(90, { ...RAISED, arm: "mid", flame: "lit", eyes: "glow", flick: 0 }, { cue: "lower" }), f(90, { arm: "hold", flick: 1 })],
 };
 
 /** His leap out of the dock (his Last Stand): a crouch, then up, sword raised. */

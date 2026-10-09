@@ -13,8 +13,8 @@ import { TimerBar } from "./Countdown.tsx";
 
 /**
  * Hollow's Lights out on the board, from the shared state (the server's test and timing, solo's alike): the game paused,
- * nobody's clock running. His banner; he leaves his corner for his spot above the board and smashes his three bulbs,
- * the board dimming a step at each, night at the last. Then each round: he names his pieces ("Find my queen."), a bar
+ * nobody's clock running. His banner; he leaves his corner for his spot above the board and smashes his strand in three
+ * strikes, a section at a time, the board dimming a step at each, night at the last. Then each round: he names his pieces ("Find my queen."), a bar
  * counts its seconds down, and every square takes a tap: a piece found flashes back into view; a wrong square gets his
  * red-violet slash. At the round's end the answers show (gold), the pieces not found cost lightsOutMiss each, and the
  * night closes over them again. Then a fresh strand spills from the void, the light spreads out from him across the

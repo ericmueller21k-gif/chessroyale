@@ -63,8 +63,8 @@ export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; fi
 /**
  * Hollow's Lights out, beat by beat (ms from its start), the same for the server and every screen. Nobody's clock runs.
  *   0          "LIGHTS OUT!" (his banner) and his line, "It's time."
- *   dropAt     he drops onto the board's top edge (his `lightsOut`) and smashes his three bulbs: the board dims a step at
- *              each, night at the last.
+ *   dropAt     he drops onto the board's top edge (his `lightsOut`) and smashes his strand in three strikes: the board
+ *              dims a step at each, night at the last.
  *   rounds     each round: his prompt ("Find my queen."), its seconds to tap (BOSS_POWERS.lightsOutRounds) and the
  *              usual late grace; then the answers show (`answerMs`) and the night closes over them again.
  *   backAt     the lights come back (his `lightsBack`: a fresh strand from the void, the dawn spreading from his spot),

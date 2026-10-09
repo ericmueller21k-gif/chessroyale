@@ -2,22 +2,24 @@
  * Hollow, the Darkness boss: a lanky, shaggy creature of charcoal-black fur, after Eric's reference picture, redrawn
  * as an original. The villagers tore him apart; the darkness brought him back and holds him together through the
  * middle, so where his belly was there is a band of violet-black darkness with a void at its heart, slowly swirling.
- * Torn seams across his shoulder, his cheek and his thigh are bound the same way. He carries a strand of three
- * Christmas lights (red, gold, blue), which count down to his next cover of the dark. Glowing gold eyes, a thin violet
+ * Torn seams across his shoulder, his cheek and his thigh are bound the same way. He carries a long strand of
+ * Christmas lights held in the middle, its two halves hanging with five bulbs each (red, gold, blue in turn; Eric's
+ * reference), which count down to his next cover of the dark. Glowing gold eyes, a thin violet
  * edge glow (his halo) so he never vanishes on the dark ground. Drawn facing front, light from the top left.
  *
  * Rigging: the head (one per face), ruff, hips and the band of darkness are painted once; the void is painted per
  * swirl phase and size; the arms and legs are painted from their pose's points (a shoulder, an elbow, a hand; a hip, a
  * knee, an ankle) as shaggy strokes; the strand is painted from the hand that holds it. So a new pose is a few numbers.
  *
- * The bulbs have palette keys of their own (main, shade, glint, glow), so a look (`bulbs2`, `bulbs1`, `bulbs0`) puts
- * them out without redrawing anything, and their glints are specks in the same keys (an unlit bulb never glints).
+ * The bulbs have palette keys of their own per colour (main, shade, glint, glow), so a look (`bulbs2`, `bulbs1`,
+ * `bulbs0`) puts a colour out (about a third of the strand) without redrawing anything, and their glints are specks in
+ * the same keys (an unlit bulb never glints).
  */
 import type { Beat } from "./boss-beats.ts";
 import { canvas, ellipse, line, poly, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
-/** The bulbs' keys: [main, shade, glint, glow], first bulb (nearest his hand) to last. */
+/** The bulbs' keys by colour: [main, shade, glint, glow]; red, gold, blue (bulb `i` on the strand is colour `i % 3`). */
 export const BULB_KEYS = [
   ["1", "4", "7", "!"],
   ["2", "5", "8", "^"],
@@ -58,10 +60,14 @@ export const HOLLOW_PALETTE: Record<string, string> = {
   ...Object.fromEntries(BULB_KEYS.flatMap((keys, b) => keys.map((k, i) => [k, BULB_LIT[b]![i]!]))),
 };
 
-/** His bulbs put out from the last (`bulbs<n>`: n still lit), and the dark stance's look is a frame palette (DARK). */
+/**
+ * His bulbs put out a colour at a time, from the last (`bulbs<n>`: n colours still lit: blue goes out first, then gold,
+ * then red, about a third of the strand each, as the strip by the board loses a bulb); the dark stance's look is a
+ * frame palette (DARK).
+ */
 const bulbsOff = (from: number): Record<string, string> => Object.fromEntries(BULB_KEYS.slice(from).flatMap((keys) => keys.map((k, i) => [k, BULB_OFF[i]!])));
 export const HOLLOW_LOOKS = { bulbs3: {}, bulbs2: bulbsOff(2), bulbs1: bulbsOff(1), bulbs0: bulbsOff(0) } as const;
-/** The look for `n` lit bulbs (0 to 3). */
+/** The look for `n` lit bulbs on the strip (0 to 3): that many thirds of the strand lit. */
 export const bulbsLook = (n: number) => `bulbs${Math.max(0, Math.min(3, Math.round(n)))}` as keyof typeof HOLLOW_LOOKS;
 
 type Pt = readonly [number, number];
@@ -402,27 +408,44 @@ function foot(dir: 1 | -1): Part {
   return { grid: dir === 1 ? rows : rows.map((r) => [...r].reverse().join("")) };
 }
 
-// ---- The strand of lights: a wire from his hand, three bulbs hanging off it.
+// ---- The strand of lights: a long wire held in the middle, its two halves hanging, five bulbs on each.
 
-/** A bulb, 4 x 5: a socket on top, glass pointing down; its keys are bulb `b`'s. */
-const bulbRows = (b: number): string[] => {
-  const [M, S, G] = BULB_KEYS[b]!;
+/** Bulbs on the strand, numbered along the wire: the inner half from its end up to his hand (0-4), then the outer half
+ * from his hand down to its end (5-9). Bulb `i` is colour `i % 3`. */
+export const BULBS = 10;
+const PER_HALF = BULBS / 2;
+/** Where the bulbs sit along each half, from the hand (0) to the end (1). */
+const ALONG = [0.27, 0.45, 0.63, 0.81, 0.98] as const;
+/** Lights out smashes the strand in three strikes, a section at a time: the inner half's low end, the middle by his
+ * hand, the outer half's low end. */
+export const STRAND_SECTIONS: readonly (readonly number[])[] = [
+  [0, 1, 2],
+  [3, 4, 5, 6],
+  [7, 8, 9],
+];
+const ALL_BULBS: readonly number[] = Array.from({ length: BULBS }, (_, i) => i);
+/** A bulb's colour keys. */
+const keysOf = (i: number) => BULB_KEYS[i % 3]!;
+
+/** A bulb, 4 x 5: a socket on top, glass pointing down; in colour `c`'s keys. */
+const bulbRows = (c: number): string[] => {
+  const [M, S, G] = BULB_KEYS[c]!;
   return [".WW.", ".ww.", `${G}${M}${M}${S}`, `${M}${M}${M}${S}`, `.${M}${S}.`];
 };
 /** A smashed bulb: the socket and a few jagged teeth of glass left. */
-const brokenRows = (b: number): string[] => {
-  const [, S] = BULB_KEYS[b]!;
+const brokenRows = (c: number): string[] => {
+  const [, S] = BULB_KEYS[c]!;
   return [".WW.", ".ww.", `${S}.${S}${S}`, `.${S}..`];
 };
 
 export interface StrandSpec {
-  /** Where the hand holds it (drawing space). */
+  /** Where the hand holds its middle (drawing space). */
   hand: Pt;
-  /** Where the wire's end hangs, from the hand. */
-  reach?: Pt;
-  /** How far the wire sags sideways at its middle. */
-  sag?: number;
-  /** Bulbs smashed (by index). */
+  /** Where each half's end hangs, from the hand: the inner half (nearer him), then the outer. */
+  ends?: readonly [Pt, Pt];
+  /** How far each half bows sideways at its middle. */
+  bows?: readonly [number, number];
+  /** Bulbs smashed (by number). */
   broken?: readonly number[];
   /** Only this much of it is out (0-1): the fresh strand spilling out of the void. */
   out?: number;
@@ -430,45 +453,56 @@ export interface StrandSpec {
 
 /** The strand's wire (with its bulbs on it, one part) and the glow round its lit bulbs (another, behind). */
 function strand(s: StrandSpec): { wire: { name: string; at: Pt }; glow: { name: string; at: Pt }; bulbs: Pt[] } {
-  const reach = s.reach ?? [4, 21];
-  const key = `strand:${s.hand.join(",")}:${reach.join(",")}:${s.sag ?? 3}:${(s.broken ?? []).join("")}:${s.out ?? 1}`;
+  const ends = s.ends ?? [[-2, 23], [11, 20]];
+  const bows = s.bows ?? [-2, 3];
+  const out = s.out ?? 1;
+  const key = `strand:${s.hand.join(",")}:${ends.map((e) => e.join(",")).join(";")}:${bows.join(",")}:${(s.broken ?? []).join(".")}:${out}`;
   const [hx, hy] = s.hand;
-  const ex = hx + reach[0];
-  const ey = hy + reach[1];
-  const sag = s.sag ?? 3;
-  // A quadratic curve bowing out sideways (sag) between the hand and the end.
-  const along = (t: number): Pt => {
-    const mx = (hx + ex) / 2 + sag;
+  // Each half a quadratic curve from the hand to its end, bowing sideways at its middle.
+  const along = (h: 0 | 1, t: number): Pt => {
+    const [ex, ey] = [hx + ends[h][0], hy + ends[h][1]];
+    const mx = (hx + ex) / 2 + bows[h];
     const my = (hy + ey) / 2;
     return [(1 - t) ** 2 * hx + 2 * (1 - t) * t * mx + t * t * ex, (1 - t) ** 2 * hy + 2 * (1 - t) * t * my + t * t * ey];
   };
-  const out = s.out ?? 1;
-  const x0 = Math.floor(Math.min(hx, ex, hx + sag) - 10);
-  const y0 = Math.floor(Math.min(hy, ey) - 4);
-  // Where each bulb hangs (its socket's top-left), in drawing space.
-  const bulbs: Pt[] = [0.28, 0.62, 0.96].flatMap((t): Pt[] => {
-    if (t > out + 0.02) return [];
-    const p = along(t);
-    return [[Math.round(p[0] - x0) - 1 + x0, Math.round(p[1] - y0) + y0]];
-  });
+  const x0 = Math.floor(Math.min(hx, hx + ends[0][0], hx + ends[1][0]) - 8);
+  const y0 = Math.floor(hy - 4);
+  // Where each bulb hangs (its socket's top-left), in drawing space, and the wire point it hangs from: the bulbs
+  // alternate either side of the wire on short stems, as in Eric's reference.
+  const spots: { at: Pt; wire: Pt; i: number }[] = [];
+  for (let i = 0; i < BULBS; i++) {
+    const h = i < PER_HALF ? 0 : 1;
+    const t = ALONG[h === 0 ? PER_HALF - 1 - i : i - PER_HALF]!;
+    if (t > out + 0.02) continue;
+    const w = along(h, t);
+    // (Either side of a steep half, a little either side of a shallow one.)
+    const side = (i % 2 === 0 ? -1 : 1) * (Math.abs(ends[h][0]) < ends[h][1] / 2 ? 2 : 1);
+    spots.push({ i, wire: [Math.round(w[0]), Math.round(w[1])], at: [Math.round(w[0]) - 1 + side, Math.round(w[1]) + 1] });
+  }
+  const bulbs: Pt[] = Array.from({ length: BULBS }, (_, i) => spots.find((sp) => sp.i === i)?.at).filter((b): b is Pt => !!b);
   const paint = () => {
-    const cv = canvas(40, 40);
-    const glow = canvas(40, 40);
-    let prev: Pt | null = null;
-    for (let t = 0; t <= out + 1e-9; t += 0.02) {
-      const p = along(t);
-      const q: Pt = [Math.round(p[0] - x0), Math.round(p[1] - y0)];
-      if (prev) line(cv, prev[0], prev[1], q[0], q[1], "w");
-      prev = q;
+    const cv = canvas(48, 46);
+    const glow = canvas(48, 46);
+    for (const h of [0, 1] as const) {
+      let prev: Pt | null = null;
+      for (let t = 0; t <= out + 1e-9; t += 0.02) {
+        const p = along(h, t);
+        const q: Pt = [Math.round(p[0] - x0), Math.round(p[1] - y0)];
+        if (prev) line(cv, prev[0], prev[1], q[0], q[1], "w");
+        prev = q;
+      }
     }
-    bulbs.forEach(([X, Y], b) => {
+    for (const { at: [X, Y], wire: [wx, wy], i } of spots) {
       const [bx, by] = [X - x0, Y - y0];
-      const lit = !(s.broken ?? []).includes(b);
-      const rows = lit ? bulbRows(b) : brokenRows(b);
+      const c = i % 3;
+      const lit = !(s.broken ?? []).includes(i);
+      // The stem from the wire to the socket.
+      line(cv, wx - x0, wy - y0, bx + (i % 2 === 0 ? 2 : 1), by, "w");
+      const rows = lit ? bulbRows(c) : brokenRows(c);
       // A little light round a lit bulb: its glass's colour, see-through, either side of it.
-      if (lit) for (const [gx, gy] of [[-1, 3], [4, 3], [-1, 4], [4, 4], [1, 6], [2, 6]] as const) glow[by + gy] && (glow[by + gy]![bx + gx] = BULB_KEYS[b]![3]);
+      if (lit) for (const [gx, gy] of [[-1, 3], [4, 3], [-1, 4], [4, 4], [1, 6], [2, 6]] as const) glow[by + gy] && (glow[by + gy]![bx + gx] = BULB_KEYS[c]![3]);
       rows.forEach((row, y) => [...row].forEach((k, x) => k !== "." && cv[by + y] && (cv[by + y]![bx + x] = k)));
-    });
+    }
     return { wire: { grid: toGrid(cv) } as Part, glow: { grid: toGrid(glow), outline: false } as Part };
   };
   let painted: ReturnType<typeof paint> | null = null;
@@ -522,13 +556,16 @@ const FREE: Record<FreeArm, { pts: Pt[]; claws: "open" | "grip" | "point"; front
 
 /** The arm that holds the strand (his left, on our right). */
 export type StrandArm = "hold" | "high" | "swing" | "low" | "up";
-const STRAND_ARM: Record<StrandArm, { pts: Pt[]; reach: Pt; sag: number }> = {
-  hold: { pts: [SHOULDER_R, [50, 32], [52, 40]], reach: [10, 17], sag: -4 },
-  low: { pts: [SHOULDER_R, [49, 34], [50, 43]], reach: [10, 15], sag: -4 },
-  swing: { pts: [SHOULDER_R, [52, 28], [58, 26]], reach: [8, 19], sag: -3 },
-  high: { pts: [SHOULDER_R, [52, 21], [51, 11]], reach: [9, 19], sag: -4 },
+/** The lowest the strand's ends hang (drawing space): its last bulb just above the ground. */
+const STRAND_LOWEST = 62;
+/** Each arm pose, and where the strand's two halves hang from his hand (see StrandSpec). */
+const STRAND_ARM: Record<StrandArm, { pts: Pt[]; ends: [Pt, Pt]; bows: [number, number] }> = {
+  hold: { pts: [SHOULDER_R, [50, 32], [52, 40]], ends: [[-1, 22], [17, 19]], bows: [-3, 6] },
+  low: { pts: [SHOULDER_R, [49, 34], [50, 43]], ends: [[-1, 20], [16, 17]], bows: [-3, 6] },
+  swing: { pts: [SHOULDER_R, [52, 28], [58, 26]], ends: [[-3, 24], [12, 22]], bows: [-3, 5] },
+  high: { pts: [SHOULDER_R, [52, 21], [51, 11]], ends: [[-2, 24], [14, 21]], bows: [-3, 5] },
   /** Held up in front of him, to smash its bulbs. */
-  up: { pts: [SHOULDER_R, [52, 26], [47, 19]], reach: [9, 18], sag: -4 },
+  up: { pts: [SHOULDER_R, [52, 26], [47, 19]], ends: [[-4, 23], [7, 23]], bows: [-3, 4] },
 };
 
 export type Feet = "stand" | "wide" | "step" | "tap" | "crouch";
@@ -558,12 +595,14 @@ export interface HollowPose {
   headDx?: number;
   headDy?: number;
   free?: FreeArm;
+  /** His free claw reaching to this point instead (drawing space): crushing a section of the strand. */
+  reach?: Pt;
   arm?: StrandArm;
   feet?: Feet;
   /** The void's swirl (0-7) and size (0 at rest, 1 flaring, 2 widest). */
   phase?: number;
   size?: 0 | 1 | 2;
-  /** The strand's sway: its end swings by this many pixels. */
+  /** The strand's sway: its ends swing by this many pixels. */
   sway?: number;
   /** Smashed bulbs; or no strand at all (`false`). */
   broken?: readonly number[];
@@ -595,7 +634,7 @@ export function hollowBuild(p: HollowPose): Built {
   const footR: Pt = [feet[1][0], feet[1][1] - air];
   const legL = limb("leg", [hipL, knee(hipL, footL, -1.5 - crouch * 0.6), footL], "none", 2);
   const legR = limb("leg", [hipR, knee(hipR, footR, 1.5 + crouch * 0.6), footR], "none", 3);
-  const fr = FREE[p.free ?? "hang"];
+  const fr = p.reach ? { pts: [SHOULDER_L, [(SHOULDER_L[0] + p.reach[0]) / 2, Math.max(SHOULDER_L[1], p.reach[1]) + 7] as Pt, p.reach], claws: "grip" as const, front: true } : FREE[p.free ?? "hang"];
   const armF = limb("arm", down(fr.pts), fr.claws, 4);
   const sa = STRAND_ARM[p.arm ?? "hold"];
   const armS = limb("arm", down(sa.pts), "grip", 5);
@@ -605,7 +644,22 @@ export function hollowBuild(p: HollowPose): Built {
   const heart: Pt = [OX + VOID[0] + dx, OY + VOID[1] + body];
   const layers: Layer[] = [at("shadow", 14, GROUND - 2)];
   let bulbs: Pt[] = [];
-  const strandSpec: StrandSpec | null = p.strand === false ? null : typeof p.strand === "object" ? p.strand : { hand: [hand[0] + 1, hand[1] + 1], reach: [sa.reach[0] + (p.sway ?? 0), sa.reach[1]], sag: sa.sag + Math.round((p.sway ?? 0) / 2), broken: p.broken };
+  const sway = p.sway ?? 0;
+  const strandSpec: StrandSpec | null =
+    p.strand === false
+      ? null
+      : typeof p.strand === "object"
+        ? p.strand
+        : {
+            hand: [hand[0] + 1, hand[1] + 1],
+            // (Crouching, its ends rest on the ground and slide outward a little.)
+            ends: sa.ends.map(([x, y], h): Pt => {
+              const lift = Math.max(0, hand[1] + 1 + y - STRAND_LOWEST);
+              return [x + sway + (h ? lift : -lift), y - lift];
+            }) as [Pt, Pt],
+            bows: [sa.bows[0] + Math.round(sway / 2), sa.bows[1] + Math.round(sway / 2)],
+            broken: p.broken,
+          };
   let strandLayers: Layer[] = [];
   if (strandSpec) {
     const s = strand(strandSpec);
@@ -633,7 +687,7 @@ const f = (ms: number, p: HollowPose, extra: Partial<Frame> = {}): Frame => ({ m
 const bulbGlint = (p: HollowPose, b: number, big = false): Speck[] => {
   const at = build(p).bulbs[b];
   if (!at) return [];
-  const g = BULB_KEYS[b]![2];
+  const g = keysOf(b)[2];
   const [x, y] = [at[0] + 1, at[1] + 2];
   return [[x, y, g], ...(big ? ([[x - 1, y, g], [x, y - 1, g], [x + 1, y + 1, g]] as Speck[]) : [])];
 };
@@ -678,7 +732,7 @@ const shards = ([x, y]: Pt, t: number, b: number): Speck[] =>
   [[-1.4, -1.2], [1.3, -1.5], [1.8, 0.2], [-1.7, 0.4], [0.3, -2], [-0.6, 1.1]].flatMap(([vx, vy], i): Speck[] => {
     const px = Math.round(x + 1 + vx! * (2 + t * 2.4));
     const py = Math.round(y + 3 + vy! * (2 + t * 2.4) + 0.4 * t * t);
-    return [[px, py, i % 2 ? "g" : BULB_KEYS[b]![0]]];
+    return [[px, py, i % 2 ? "g" : keysOf(b)[0]]];
   });
 /** Tufts of fur knocked off him (`t` frames after a hit). */
 const tufts = (t: number, [x, y]: Pt = [OX + 32, OY + 6]): Speck[] =>
@@ -703,7 +757,7 @@ export const DARK_PAL: Record<string, string> = { d: "#0b0a10", c: "#0f0d16", C:
 const DUSK_PAL: Record<string, string> = { d: "#121118", c: "#1a1822", C: "#24212d", h: "#312d3c", n: "#0c0b10" };
 /** A hit: the fur flashes pale. */
 const FLASH: Record<string, string> = { d: "#5e5868", c: "#8a8494", C: "#b3adbd", h: "#ffffff" };
-/** His bulbs flickering (hurt, a hit): all three dim for a frame. */
+/** His bulbs flickering (hurt, a hit): all of them dim for a frame. */
 const FLICKER: Record<string, string> = Object.fromEntries(BULB_KEYS.flatMap((keys) => keys.map((k, i) => [k, i === 3 ? "#00000000" : BULB_OFF[i]!])));
 /** His bulbs flashing bright (victory). */
 const BULBS_BRIGHT: Record<string, string> = { "7": "#ffffff", "8": "#ffffff", "9": "#ffffff", "!": "#ff4a4a99", "^": "#ffc93a99", "~": "#4ab3ff99" };
@@ -717,27 +771,27 @@ const SWAY = [0, 0, 1, 1, 1, 0, 0, -1, -1, -1, 0, 0, 1, 1, 0, -1] as const;
 
 /**
  * Idle: he breathes, glowering; the void at his heart swirls (a full turn every second); the strand sways a little, and
- * a glint runs down the bulbs, one after another. Silent.
+ * a glint runs along the bulbs, one after another, up one half and down the other. Silent.
  */
 const IDLE_P = (i: number): HollowPose => ({ bob: BREATH[i % 8]!, phase: i, sway: SWAY[i % 16]! });
 const idle: Anim = {
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const p = IDLE_P(i);
-    const glint = i >= 4 && i < 10 ? bulbGlint(p, Math.floor((i - 4) / 2), i % 2 === 0) : [];
+    const glint = i >= 3 && i < 3 + BULBS ? bulbGlint(p, i - 3, i % 2 === 0) : [];
     const spark = i === 13 ? sparkle(...(build(p).heart.map((v, n) => v + (n ? -1 : 6)) as [number, number])) : [];
     return f(125, p, { specks: [...glint, ...spark] });
   }),
 };
 
-/** Entrance: darkness gathers into a whirl, he rises out of it, eyes snapping open; his bulbs light one by one. */
+/** Entrance: darkness gathers into a whirl, he rises out of it, eyes snapping open; his bulbs light a colour at a time. */
 const entrance: Anim = {
   loop: false,
   frames: [
     { ms: 110, layers: [], specks: gather(AT_HEART, 0, 8), cue: "hum" },
     { ms: 110, layers: [], specks: gather(AT_HEART, 0.3, 12) },
     { ms: 110, layers: [], specks: [...gather(AT_HEART, 0.6, 14), ...sparkle(...AT_HEART, true)] },
-    f(110, { crouch: 4, mood: "dark", size: 2, phase: 0, broken: [], free: "out" }, { pal: { ...DARK_PAL, ...FLICKER }, specks: wisps([OX + 32, OY + 50], 0, 6, 14) }),
+    f(110, { crouch: 4, mood: "dark", size: 2, phase: 0, free: "out" }, { pal: { ...DARK_PAL, ...FLICKER }, specks: wisps([OX + 32, OY + 50], 0, 6, 14) }),
     f(110, { crouch: 2, mood: "dark", size: 2, phase: 1, free: "out" }, { pal: { ...DUSK_PAL, ...FLICKER }, specks: wisps([OX + 32, OY + 48], 1, 6, 14) }),
     f(120, { crouch: 1, mood: "roar", size: 1, phase: 2, free: "claw" }, { pal: { ...EYES_HOT, ...FLICKER }, specks: wisps([OX + 32, OY + 46], 2, 4, 14) }),
     f(120, { mood: "roar", size: 1, phase: 3, free: "claw" }, { cue: "light", pal: { ...EYES_HOT, ...bulbsOff(1) } }),
@@ -830,7 +884,7 @@ const check: Anim = {
   ],
 };
 
-/** Defeat: the darkness lets go. The void sputters and shrinks to nothing, his bulbs go out one by one, and he slumps into a heap of fur. */
+/** Defeat: the darkness lets go. The void sputters and shrinks to nothing, his bulbs go out a colour at a time, and he slumps into a heap of fur. */
 function heap(mood: Mood, extra: Speck[] = []): Partial<Frame> & { layers: Layer[] } {
   const standing = build({ mood, free: "out", strand: false }).layers.filter((l) => l.part !== "shadow" && !l.part.startsWith("void:"));
   const lying = lieDown(PARTS, { layers: standing }, 0, 0, "right").layers;
@@ -843,7 +897,7 @@ function heap(mood: Mood, extra: Speck[] = []): Partial<Frame> & { layers: Layer
   const y1 = Math.max(...box.map((b) => b[3]));
   const sx = OX + 30 - Math.round((x0 + x1) / 2);
   const sy = OY + GROUND - 4 - y1;
-  const s = strand({ hand: [54, 50], reach: [8, 12], sag: 1, broken: [] });
+  const s = strand({ hand: [50, 53], ends: [[-12, 8], [14, 7]], bows: [2, -2], broken: [] });
   return {
     layers: [{ part: "shadow", x: OX + 12, y: OY + GROUND - 2 }, ...lying.map((l) => ({ ...l, x: l.x + sx, y: l.y + sy })), { part: s.wire.name, x: OX + s.wire.at[0], y: OY + s.wire.at[1] }],
     specks: extra,
@@ -912,21 +966,27 @@ const claimDark: Anim = {
 
 /**
  * His ultimate, Lights out, played ON THE BOARD (hide him in his usual spot meanwhile): his shadow grows, he drops in
- * from above (he has left his corner), lands, raises the strand in front of him and crushes its bulbs one by one in his
- * claw: "smash1", "smash2", "smash3" (dim the board a step at each). With the last bulb the light goes out of him too:
+ * from above (he has left his corner), lands, raises the strand in front of him and crushes it in his claw a section at
+ * a time (STRAND_SECTIONS): "smash1", "smash2", "smash3" (dim the board a step at each). With the last bulb the light goes out of him too:
  * the last frames are his dark stance (the void the only light), which holds until the test (`lightsTest`) takes over.
  */
 const UP_P: HollowPose = { arm: "up", free: "hang", mood: "grim" };
-const smash = (b: number, phase: number): Frame[] => {
-  const broken = [0, 1, 2].filter((x) => x < b);
-  const p: HollowPose = { ...UP_P, broken, phase, free: "grab", mood: "roar" };
-  const bulb = build({ ...UP_P, broken }).bulbs[b]!;
-  const dim = b === 2 ? DUSK_PAL : {};
+const smash = (k: number, phase: number): Frame[] => {
+  const broken = STRAND_SECTIONS.slice(0, k).flat();
+  const section = STRAND_SECTIONS[k]!;
+  const now = [...broken, ...section];
+  const p: HollowPose = { ...UP_P, broken: now, phase, free: "grab", mood: "roar" };
+  const at = build({ ...UP_P, broken }).bulbs;
+  const dim = k === 2 ? DUSK_PAL : {};
+  // Glass off every bulb in the section; his claw closes on its middle bulb, with a sparkle.
+  const glass = (t: number, n = 6) => section.flatMap((b) => shards(at[b]!, t, b).slice(0, n));
+  const mid = at[section[Math.floor(section.length / 2)]!]!;
+  p.reach = [mid[0] - OX + 2, mid[1] - OY + 2];
   return [
-    f(150, { ...UP_P, broken, phase, mood: "sneer", free: "wind" }, { pal: dim, specks: bulbGlint({ ...UP_P, broken }, b, true) }),
-    f(70, { ...p, broken: [...broken, b] }, { cue: `smash${b + 1}`, shake: [1, 1], pal: { ...dim, ...EYES_HOT }, specks: [...shards(bulb, 0, b), ...sparkle(bulb[0] + 1, bulb[1] + 3, true)] }),
-    f(90, { ...p, broken: [...broken, b], phase: phase + 1 }, { pal: dim, specks: shards(bulb, 1, b) }),
-    f(130, { ...p, broken: [...broken, b], phase: phase + 2, mood: "laugh" }, { pal: dim, specks: shards(bulb, 2, b).slice(0, 3) }),
+    f(150, { ...UP_P, broken, phase, mood: "sneer", free: "wind" }, { pal: dim, specks: section.flatMap((b) => bulbGlint({ ...UP_P, broken }, b, b === section[0])) }),
+    f(70, p, { cue: `smash${k + 1}`, shake: [1, 1], pal: { ...dim, ...EYES_HOT }, specks: [...glass(0), ...sparkle(mid[0] + 1, mid[1] + 3, true)] }),
+    f(90, { ...p, phase: phase + 1 }, { pal: dim, specks: glass(1) }),
+    f(130, { ...p, phase: phase + 2, mood: "laugh" }, { pal: dim, specks: glass(2, 3) }),
   ];
 };
 const lightsOut: Anim = {
@@ -943,15 +1003,15 @@ const lightsOut: Anim = {
     ...smash(1, 6),
     ...smash(2, 1),
     // The light goes out of him too: only the void is left.
-    f(140, { ...UP_P, broken: [0, 1, 2], phase: 4, mood: "dark", free: "hang", size: 1 }, { pal: DUSK_PAL }),
-    f(160, { mood: "dark", broken: [0, 1, 2], arm: "low", phase: 5, size: 2 }, { pal: DARK_PAL }),
-    f(400, { mood: "dark", broken: [0, 1, 2], arm: "low", phase: 6, size: 1 }, { pal: DARK_PAL }),
+    f(140, { ...UP_P, broken: ALL_BULBS, phase: 4, mood: "dark", free: "hang", size: 1 }, { pal: DUSK_PAL }),
+    f(160, { mood: "dark", broken: ALL_BULBS, arm: "low", phase: 5, size: 2 }, { pal: DARK_PAL }),
+    f(400, { mood: "dark", broken: ALL_BULBS, arm: "low", phase: 6, size: 1 }, { pal: DARK_PAL }),
   ],
 };
 
 /** The void's pulse in the dark: brighter and wider on the beat. */
 const PULSE_PAL: Record<string, string> = { ...DARK_PAL, u: "#8657e0", U: "#d3b6ff", V: "#4a2a80", x: "#ffffff" };
-const DARK_P = (phase: number, size: 0 | 1 | 2 = 1): HollowPose => ({ mood: "dark", broken: [0, 1, 2], arm: "low", phase, size });
+const DARK_P = (phase: number, size: 0 | 1 | 2 = 1): HollowPose => ({ mood: "dark", broken: ALL_BULBS, arm: "low", phase, size });
 /** The test stance (a loop): in the dark, only the void, pulsing slowly (once a second). */
 const lightsTest: Anim = {
   loop: true,
@@ -995,18 +1055,20 @@ const testMiss: Anim = {
 };
 
 /**
- * Lights back, after the test: the void flares and a fresh strand spills out of it, its bulbs lighting one by one
+ * Lights back, after the test: the void flares and a fresh strand spills out of it, its bulbs lighting a colour at a time
  * ("relight"), the light comes back into him, he takes the strand in hand and leaps back to his corner (the last
  * frame is empty: he's gone from this spot).
  */
+/** The fresh strand spilling out of the void, both halves hanging from his heart. */
+const SPILL: StrandSpec = { hand: [VOID[0] + 1, VOID[1] + 1], ends: [[-6, 24], [10, 23]], bows: [-3, 4], broken: [] };
 const lightsBack: Anim = {
   loop: false,
   frames: [
     f(140, DARK_P(0, 2), { pal: PULSE_PAL }),
     ...[0.25, 0.5, 0.75, 1].map((out, i) =>
-      f(110, { mood: "dark", strand: { hand: [VOID[0] + 1, VOID[1] + 1], reach: [10, 22], sag: 5, out, broken: [] }, arm: "low", phase: 1 + i, size: 2 }, { cue: i === 0 ? "relight" : undefined, pal: { ...DARK_PAL, ...(i < 3 ? bulbsOff(i) : {}) }, specks: sparkle(OX + VOID[0], OY + VOID[1], i % 2 === 0) }),
+      f(110, { mood: "dark", strand: { ...SPILL, out }, arm: "low", phase: 1 + i, size: 2 }, { cue: i === 0 ? "relight" : undefined, pal: { ...DARK_PAL, ...(i < 3 ? bulbsOff(i) : {}) }, specks: sparkle(OX + VOID[0], OY + VOID[1], i % 2 === 0) }),
     ),
-    f(120, { mood: "roar", strand: { hand: [VOID[0] + 1, VOID[1] + 1], reach: [10, 22], sag: 5, broken: [] }, arm: "low", phase: 5, size: 1 }, { pal: { ...DUSK_PAL, ...EYES_HOT } }),
+    f(120, { mood: "roar", strand: SPILL, arm: "low", phase: 5, size: 1 }, { pal: { ...DUSK_PAL, ...EYES_HOT } }),
     f(120, { mood: "sneer", free: "grab", phase: 6, size: 1 }),
     f(150, { mood: "sneer", phase: 7 }, { specks: bulbGlint({}, 0, true) }),
     f(110, { crouch: 3, feet: "crouch", mood: "grim", phase: 0 }),

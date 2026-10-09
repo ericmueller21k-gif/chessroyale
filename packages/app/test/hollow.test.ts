@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER } from "@chessroyale/core";
 import { pickLine, type Beat } from "../src/characters/boss-beats.ts";
 import { HOLLOW_SOUNDS, hollowSound } from "../src/characters/hollow-sounds.ts";
-import { BULB_KEYS, HOLLOW_CAST_FROM, HOLLOW_HEART, bulbsLook, findLine } from "../src/characters/hollow.ts";
+import { BULBS, BULB_KEYS, HOLLOW_CAST_FROM, HOLLOW_HEART, STRAND_SECTIONS, bulbsLook, findLine, hollowBuild } from "../src/characters/hollow.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import { DAWN_STAGGER, EFFECTS, POWER_MOMENTS, animLength, cueAt, darkItem, lightsOutSmashes, lightsOutSpot, nightItems } from "../src/characters/power-art.ts";
 import { frameKeys, lazyParts, renderFrame, type Anim, type Character } from "../src/characters/sprite.ts";
@@ -56,7 +56,7 @@ describe("Hollow, the Darkness boss", () => {
     expect(new Set(glints.flat()).size).toBe(3);
   });
 
-  it("counts down on his strand: each look puts the bulbs out from the last", () => {
+  it("counts down on his strand: each look puts about a third of the bulbs out, a colour at a time", () => {
     const f = anim("idle").frames[0]!;
     // The pixels in a lit bulb's own colours (main, shade, glint).
     const litColours = new Set(BULB_KEYS.flatMap((b) => b.slice(0, 3).map((k) => ch.palette[k]!.toLowerCase())));
@@ -72,6 +72,18 @@ describe("Hollow, the Darkness boss", () => {
     const counts = [3, 2, 1, 0].map((n) => lit(bulbsLook(n)));
     for (let i = 1; i < 4; i++) expect(counts[i]!, `bulbs${3 - i}`).toBeLessThan(counts[i - 1]!);
     expect(counts[3]).toBe(0);
+    // A long strand held in the middle (Eric's reference): ten bulbs, five down each half from his hand; each look
+    // puts about a third out (bulb i is colour i % 3: blue first, then gold, then red).
+    expect(BULBS).toBe(10);
+    const at = hollowBuild({}).bulbs;
+    expect(at).toHaveLength(10);
+    const hand = Math.min(...at.map(([, y]) => y));
+    for (const half of [at.slice(0, 5), at.slice(5)]) expect(Math.max(...half.map(([, y]) => y)) - hand).toBeGreaterThan(12);
+    const litOf = (n: number) => Array.from({ length: BULBS }, (_, i) => i % 3 < n).filter(Boolean).length;
+    expect([3, 2, 1, 0].map(litOf)).toEqual([10, 7, 4, 0]);
+    // Lights out takes it in three sections, every bulb once.
+    expect(STRAND_SECTIONS).toHaveLength(3);
+    expect(STRAND_SECTIONS.flat().sort((a, b) => a - b)).toEqual(Array.from({ length: BULBS }, (_, i) => i));
     expect(bulbsLook(5)).toBe("bulbs3");
     expect(bulbsLook(-1)).toBe("bulbs0");
   });
@@ -88,14 +100,14 @@ describe("Hollow, the Darkness boss", () => {
     expect(Math.abs(HOLLOW_CAST_FROM[1] - HOLLOW_HEART[1])).toBeLessThanOrEqual(3);
   });
 
-  it("puts the lights out on the board: drops in, smashes the three bulbs one by one, and ends in the dark, the void his only light", () => {
+  it("puts the lights out on the board: drops in, smashes the strand in three strikes, a section at a time, and ends in the dark", () => {
     const lo = anim("lightsOut");
     expect(lo.frames[0]!.layers).toEqual([]);
     const t = lightsOutSmashes(lo);
     expect(t[0]).toBeGreaterThan(cueAt(lo, "land")!);
     expect(t[1]).toBeGreaterThan(t[0]! + 300);
     expect(t[2]).toBeGreaterThan(t[1]! + 300);
-    // Each smash leaves one bulb fewer on the strand (its glass gone, the socket left).
+    // Each smash leaves a section fewer lit on the strand (their glass gone, the sockets left).
     const mains = BULB_KEYS.map((b) => b[0]);
     const at = (ms: number) => {
       let acc = 0;
