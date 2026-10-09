@@ -30,11 +30,12 @@
  *     powerHit     "capture"    His laugh, as a piece burns up (lines: `kit.lines.powerHit`).
  *     ultimateWarn "candleWarn" He pulls out the Roman candle, shows it off and taps it; its fuse fizzes.
  *     ultimate     "romanCandle" Played ON THE BOARD, at its middle (hide him in his usual spot meanwhile): his
- *                               shadow grows, he drops in with a roar, raises the candle and fires twelve shots up,
- *                               one every 140 ms, the first at `launch`, each at a `shot` cue (fly a `candleShot`
- *                               up off the board from the candle's top on each, if you like; it pops at `pop`). The
- *                               last frame holds until you take him off. While the shots are up, show
- *                               `candleShots` by the board: `left<n>` for the n still up (12 to 0).
+ *                               shadow grows, he drops in with a roar, heaves the big candle up and slams it down on
+ *                               the board (`slam`: a wood smack), then fires 24 shots, one every 130 ms, sweeping it
+ *                               left and right: the first at `launch`, each at a `shot` cue. Fly a `candleShot` from
+ *                               the candle's top on each, along its tilt (grex.ts: CANDLE_SWEEP, candleMuzzle), so
+ *                               they fan out. The last frame holds until you take him off. While the shots are up,
+ *                               show `candleShots` by the board's right edge: `left<n>` for the n still up (24 to 0).
  *     ultimateHit  "capture"    His laugh, as fireballs come down (lines: `kit.lines.ultimateHit`): for each, fly
  *                               `fireballFall` fall from above the board onto its square, play its `land` there,
  *                               then the square is a stage-1 `fireTile` (land ends on stage1's first frame), which
@@ -63,8 +64,11 @@
  *   candleShot     square  fly (loop), pop (ends empty). A Roman candle rocket pointing up; move it up.
  *   fireballFall   square  fall (loop), land (ends on fireTile's stage1 look). Move the falling one down onto
  *                          the square, land it there, then carry on with fireTile stage1.
- *   candleShots    strip   left12 ... left0 (loops), 74 x 11: the shots still up (lit rockets, then spent).
- *                          Size its box to keep its shape (any width; height = width x 11 / 74).
+ *   candleShots    strip   left24 ... left0 (loops), 7 x 146: a column of the shots still up (lit rockets from
+ *                          the bottom, then spent). Size its box to keep its shape (width = height x 7 / 146).
+ *   fireShadow     square  grow1, shadow1 (loop), grow2, shadow2 (loop), grow3, shadow3 (loop): the shadow of a
+ *                          fireball coming down on the square, small 3 turns out, bigger, then the biggest (a
+ *                          glow round it) the turn before it lands. See-through; draw it under the pieces.
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
  * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
@@ -118,8 +122,8 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     power: { anim: "ignite", hit: "throw", effects: ["sparkFly", "fireTile"] },
     powerHit: { anim: "capture", effects: ["pieceBurn", "fireTile"] },
     ultimateWarn: { anim: "candleWarn", hit: "fizz" },
-    ultimate: { anim: "romanCandle", hit: "launch", onBoard: true, effects: ["candleShot", "candleShots"] },
-    ultimateHit: { anim: "capture", effects: ["fireballFall", "fireTile"] },
+    ultimate: { anim: "romanCandle", hit: "launch", onBoard: true, effects: ["candleShot", "candleShots", "fireShadow"] },
+    ultimateHit: { anim: "capture", effects: ["fireShadow", "fireballFall", "fireTile"] },
   },
 };
 
@@ -168,7 +172,8 @@ export const EFFECTS: Record<EffectName, Effect> = {
   sparkFly: { ch: EFFECT_SPRITES.sparkFly, covers: "square", loop: "fly", sounds: {} },
   candleShot: { ch: EFFECT_SPRITES.candleShot, covers: "square", loop: "fly", end: "pop", sounds: {} },
   fireballFall: { ch: EFFECT_SPRITES.fireballFall, covers: "square", loop: "fall", end: "land", next: { effect: "fireTile", anim: "stage1" }, sounds: { land: "grexPoof" } },
-  candleShots: { ch: EFFECT_SPRITES.candleShots, covers: "strip", loop: "left12", counter: { prefix: "left", max: 12 }, sounds: {} },
+  candleShots: { ch: EFFECT_SPRITES.candleShots, covers: "strip", loop: "left24", counter: { prefix: "left", max: 24 }, sounds: {} },
+  fireShadow: { ch: EFFECT_SPRITES.fireShadow, covers: "square", start: "grow1", loop: "shadow1", stages: [{ into: "grow1", loop: "shadow1" }, { into: "grow2", loop: "shadow2" }, { into: "grow3", loop: "shadow3" }], sounds: {} },
 };
 
 /** An animation's length in ms. */

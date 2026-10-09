@@ -4073,12 +4073,31 @@ button.history-label {
 .boss-dock-status .bad {
   color: var(--bad);
 }
+/* Computers: the dock (the status line with « », and the God King) stays under the board at every width, as on a
+   phone (Eric, Oct 9: it had been in the column beside the board, at its top). The board leaves room for it (the dock is
+   134 px tall there, the God King at twice his size), and the column beside the board keeps chat (or, from 900 to
+   1099 px, the scoreboard) from the top. */
 @media (min-width: 900px) and (min-height: 600px) {
-  .screen.game .boss-dock {
-    grid-column: 2;
+  .screen.game:has(> .boss-dock) > .board-area {
     grid-row: 3;
+  }
+  .screen.game > .boss-dock {
+    grid-column: 1;
+    grid-row: 4;
     align-self: start;
-    margin-top: 24px;
+    width: 100%;
+    max-width: calc(min(100% - 48px, 100dvh - 310px) + 48px);
+    justify-self: center;
+  }
+  .screen.game:has(> .boss-dock) .board-area .board-wrap {
+    width: min(100%, calc(100dvh - 310px));
+  }
+  .screen.game:has(> .boss-dock) .board-row .eval-bar ~ .board-wrap {
+    width: min(calc(100% - 48px), calc(100dvh - 310px));
+  }
+  .screen.game:has(> .boss-dock) > .under-board,
+  .screen.game:has(> .boss-dock) > .mini-tower {
+    grid-row: 3 / 5;
   }
 }
 
@@ -10252,22 +10271,63 @@ img.qicon {
 /* ---------------- G-REX's fire (BossPowers.tsx, the characters' sprites) ---------------- */
 
 /* The fire tiles (and a piece burning on one, a fireball landing): one canvas over the whole board. */
+/* G-REX's fire on one canvas: exactly chessground's board (eighths of --cg-size), so a tile sits on its square. */
 .pw-fire-board {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: var(--cg-size, 100%);
+  height: var(--cg-size, 100%);
   z-index: 1;
+}
+/* The Roman candle's fireballs' shadows, on a canvas of their own under the pieces (z-index 1, the pieces 2, in the
+   board's stacking context): a piece on the square stands on its shadow. */
+.board-wrap > .pw-shadow-board {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cg-size, 100%);
+  height: var(--cg-size, 100%);
+  z-index: 1;
+  pointer-events: none;
 }
 .pw-burns .pw-fire-board,
 .pm-fireball .pw-fire-board {
   z-index: 4;
 }
-/* (Empty markers on the tiles' squares, for tests: which squares are on fire, at which stage, what burnt.) */
+/* Markers on the tiles' squares (which squares are on fire, at which stage, what burnt; where shadows are), exactly
+   on chessground's squares. A tile's carries its countdown. */
 .pw-fire,
-.pw-burn {
+.pw-burn,
+.pw-shadow {
   position: absolute;
-  width: 12.5%;
-  height: 12.5%;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
+  display: grid;
+  place-items: center;
   pointer-events: none;
+}
+/* The countdown on a burning tile (the crowd moves left before it burns: 3, 2, 1; 0 as it burns): small, a little
+   see-through and outlined, in the middle, so it reads on any tile and the piece under it still shows what it is. */
+.pw-count {
+  font: 800 calc(var(--cg-size, 100%) / 8 * 0.34) / 1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: rgba(255, 248, 230, 0.86);
+  -webkit-text-stroke: max(1.5px, calc(var(--cg-size, 100%) / 8 * 0.05)) rgba(42, 13, 5, 0.82);
+  paint-order: stroke fill;
+  text-shadow: 0 0 3px rgba(42, 13, 5, 0.45);
+  opacity: 0.88;
+  font-variant-numeric: tabular-nums;
+}
+.pw-burn .pw-count {
+  animation: pw-count-out 900ms ease-in 300ms both;
+}
+@keyframes pw-count-out {
+  to {
+    opacity: 0;
+    transform: scale(1.3);
+  }
 }
 .pw-burns {
   z-index: 4;
@@ -10279,16 +10339,16 @@ img.qicon {
 .pm-rex {
   aspect-ratio: 100 / 122;
 }
+/* Each shot leaves the candle's top (its rocket's head, 30% down its box, on the muzzle) along the candle's tilt. */
 .pw-shot {
   position: absolute;
   z-index: 9;
-  left: 44%;
-  top: 30%;
   width: 12.5%;
   height: 12.5%;
+  transform-origin: 50% 30%;
   pointer-events: none;
   animation-name: pw-shot;
-  animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1);
+  animation-timing-function: cubic-bezier(0.15, 0.55, 0.35, 1);
   animation-fill-mode: both;
 }
 @keyframes pw-shot {
@@ -10296,12 +10356,27 @@ img.qicon {
     translate: 0 0;
     opacity: 1;
   }
-  80% {
+  75% {
     opacity: 1;
   }
   to {
-    translate: var(--sx) -300%;
+    translate: var(--sx) var(--sy);
     opacity: 0;
+  }
+}
+/* The candle slammed down: the board jolts. */
+.board-area.pw-slam {
+  animation: pw-slam 280ms ease-out 1;
+}
+@keyframes pw-slam {
+  20% {
+    transform: translateY(5px);
+  }
+  45% {
+    transform: translateY(-3px);
+  }
+  70% {
+    transform: translate(1px, 1px);
   }
 }
 /* A fireball falling onto its square (its landing then plays on the board's canvas). */
@@ -10323,17 +10398,19 @@ img.qicon {
     translate: 0 0;
   }
 }
-/* The candle's shots still up, by the board's top edge (the characters' strip, kept to its shape). */
+/* The candle's shots still up: a column in the gutter beside the board's right edge (the characters' 7 x 146 sprite,
+   kept to its shape, as tall as the board), never over the board, its timer bar or the eval bar (on the left). On a
+   phone the board row keeps 24 px there; on a computer there's room. */
 .pw-pips {
   position: absolute;
   z-index: 9;
-  left: 50%;
-  top: 0;
-  translate: -50% -50%;
-  width: 40%;
-  aspect-ratio: 74 / 11;
+  left: calc(var(--cg-size, 100%) + 5px);
+  top: calc(var(--cg-size, 100%) / 2);
+  translate: 0 -50%;
+  width: min(16px, calc(var(--cg-size, 100%) * 7 / 146));
+  aspect-ratio: 7 / 146;
   pointer-events: none;
-  filter: drop-shadow(0 0.4cqw 0 rgba(0, 0, 0, 0.45));
+  filter: drop-shadow(0.15cqw 0.15cqw 0 rgba(0, 0, 0, 0.4));
 }
 /* The fire's banners: embers and flame. */
 .fight-banner.power-cut.fire .fb-band {

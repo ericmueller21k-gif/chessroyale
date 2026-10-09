@@ -412,14 +412,54 @@ for (const s of [0, 1, 2]) PARTS[`puff:${s}`] = puff(s);
 PARTS["burst:0"] = flameTuft(50, 16, 3, 0, 9);
 PARTS["burst:1"] = flameTuft(46, 9, 5, 0, 8);
 
-/** The Roman candle: a cardboard tube, red and cream stripes, two blue bands, a grey end. Upright. */
-PARTS.candle = (() => {
-  const cv = canvas(6, 20);
-  for (let y = 0; y < 20; y++)
-    for (let x = 0; x < 6; x++)
-      cv[y]![x] = y === 0 ? (x === 0 || x === 5 ? "W" : "w") : y === 4 || y === 5 || y === 13 || y === 14 ? (x < 3 ? "v" : "V") : (x + y) % 4 < 2 ? (x >= 4 ? "m" : "q") : x >= 4 ? "U" : "t";
+/**
+ * The Roman candle, big (Eric, Oct 9: much larger and longer, about his own height to the shoulder): a cardboard tube
+ * with red and cream spiral stripes, two blue bands, a grey cap round its dark muzzle and a grey foot. Drawn once at
+ * each tilt he sweeps it through (degrees, + its top to our right), about the middle of its foot.
+ */
+export const CANDLE_LEN = 48;
+const CANDLE_W = 10;
+/** The tilts it's drawn at (one part each). */
+export const CANDLE_TILTS = [-26, -20, -13, -7, 0, 7, 13, 20, 26] as const;
+/** Where the middle of its foot is in each tilt's part. */
+const TUBE_PIVOT = new Map<number, Pt>();
+function tubePart(deg: number): Part {
+  const a = (deg * Math.PI) / 180;
+  const [ux, uy] = [Math.sin(a), -Math.cos(a)]; // along it, foot to muzzle
+  const [vx, vy] = [Math.cos(a), Math.sin(a)]; // across it, left to right
+  const corners = [
+    [-CANDLE_W / 2, 0],
+    [CANDLE_W / 2, 0],
+    [-CANDLE_W / 2, CANDLE_LEN],
+    [CANDLE_W / 2, CANDLE_LEN],
+  ].map(([v, u]) => [v! * vx + u! * ux, v! * vy + u! * uy] as const);
+  const x0 = Math.floor(Math.min(...corners.map((c) => c[0]))) - 1;
+  const y0 = Math.floor(Math.min(...corners.map((c) => c[1]))) - 1;
+  const x1 = Math.ceil(Math.max(...corners.map((c) => c[0]))) + 1;
+  const y1 = Math.ceil(Math.max(...corners.map((c) => c[1]))) + 1;
+  const cv = canvas(x1 - x0, y1 - y0);
+  const bands = [CANDLE_LEN * 0.2, CANDLE_LEN * 0.68];
+  for (let y = 0; y < y1 - y0; y++)
+    for (let x = 0; x < x1 - x0; x++) {
+      const dx = x + 0.5 + x0;
+      const dy = y + 0.5 + y0;
+      const u = dx * ux + dy * uy;
+      const v = dx * vx + dy * vy;
+      if (u < 0 || u >= CANDLE_LEN || Math.abs(v) >= CANDLE_W / 2) continue;
+      const lit = v < CANDLE_W / 2 - 2.2; // (the right edge in shade)
+      if (u >= CANDLE_LEN - 2.5) cv[y]![x] = Math.abs(v) < 1.7 && u >= CANDLE_LEN - 1.2 ? "B" : lit ? "w" : "W";
+      else if (u < 1.6) cv[y]![x] = "W";
+      else if (bands.some((b) => u >= b && u < b + 2.6)) cv[y]![x] = lit ? "v" : "V";
+      else cv[y]![x] = (((u - v * 0.9) % 7) + 7) % 7 < 3.5 ? (lit ? "q" : "m") : lit ? "t" : "U";
+    }
+  TUBE_PIVOT.set(deg, [-x0, -y0]);
   return { grid: toGrid(cv) };
-})();
+}
+for (const deg of CANDLE_TILTS) PARTS[`tube:${deg}`] = tubePart(deg);
+/** The nearest tilt it's drawn at. */
+const tiltOf = (deg: number) => CANDLE_TILTS.reduce((a, b) => (Math.abs(b - deg) < Math.abs(a - deg) ? b : a));
+/** A point `d` pixels up the candle from the middle of its foot (`base`), tilted `deg`. */
+const alongTube = (base: Pt, deg: number, d: number): Pt => [base[0] + d * Math.sin((deg * Math.PI) / 180), base[1] - d * Math.cos((deg * Math.PI) / 180)];
 
 const LIMBS = new Map<string, Painted>();
 type LimbKind = "arm" | "leg" | "tail";
@@ -491,7 +531,7 @@ const SHOULDER_A: Pt = [26, 28];
 const SHOULDER_B: Pt = [34, 27];
 
 /** The arm on his far side (his right), the sparkler up by his face, as in the reference. */
-export type ArmA = "cross" | "high" | "chin" | "flick" | "pump" | "down" | "candle";
+export type ArmA = "cross" | "high" | "chin" | "flick" | "pump" | "down";
 const ARM_A: Record<ArmA, ArmSpec> = {
   cross: { pts: [[30, 28], [39, 34], [38, 25]], dir: [0.4, -1], len: 11, back: true },
   high: { pts: [[25, 27], [16, 20], [13, 8]], dir: [-0.3, -1], len: 11, back: true },
@@ -499,10 +539,9 @@ const ARM_A: Record<ArmA, ArmSpec> = {
   flick: { pts: [[30, 28], [39, 33], [46, 32]], dir: [1, 0.3], len: 11, back: true },
   pump: { pts: [[25, 27], [16, 26], [13, 16]], dir: [-0.45, -1], len: 11, back: true },
   down: { pts: [[29, 28], [31, 35], [34, 41]], dir: [0.5, 1], len: 7, back: true },
-  candle: { pts: [SHOULDER_A, [35, 30], [42, 17]], dir: [0, -1], len: 0 },
 };
 /** The arm on his near side (his left), held out to the side, the sparkler up and out. */
-export type ArmB = "out" | "high" | "wind" | "flick" | "hip" | "point" | "down" | "show" | "candle";
+export type ArmB = "out" | "high" | "wind" | "flick" | "hip" | "point" | "down" | "show";
 const ARM_B: Record<ArmB, ArmSpec> = {
   out: { pts: [SHOULDER_B, [44, 37], [49, 30]], dir: [0.6, -1], len: 11 },
   high: { pts: [SHOULDER_B, [42, 22], [44, 12]], dir: [0.3, -1], len: 11 },
@@ -512,7 +551,6 @@ const ARM_B: Record<ArmB, ArmSpec> = {
   point: { pts: [SHOULDER_B, [42, 31], [51, 29]], dir: [1, -0.2], len: 11 },
   down: { pts: [SHOULDER_B, [40, 36], [42, 42]], dir: [0.5, 1], len: 7 },
   show: { pts: [SHOULDER_B, [44, 31], [46, 19]], dir: [0, -1], len: 0 },
-  candle: { pts: [SHOULDER_B, [41, 24], [43, 11]], dir: [0, -1], len: 0 },
 };
 
 export type Feet = "stand" | "wide" | "narrow" | "stepR" | "kick";
@@ -524,8 +562,10 @@ const FEET: Record<Feet, [Pt, Pt]> = {
   kick: [[12, 57], [50, 49]],
 };
 
-/** Where the Roman candle stands (its top-left, upright) when he shows it off and when he fires it. */
-const CANDLE: Record<"show" | "aim", Pt> = { show: [44, 6], aim: [41, -3] };
+/** Shown off in his near hoof, the candle's foot is this far below the fist (he holds it low down). */
+const SHOW_GRIP = 9;
+/** In both hooves, he grips it this far up from its foot (near hoof). */
+const TUBE_GRIP = 20;
 
 export interface GrexPose {
   /** Off the ground (a jump), the whole of him. */
@@ -552,8 +592,12 @@ export interface GrexPose {
   lit?: boolean;
   /** A hand with no sparkler (thrown, or not drawn yet). */
   empty?: "b" | "both";
-  /** The Roman candle: shown off in one hand, or held up in both and fired. */
-  candle?: "show" | "aim";
+  /**
+   * The Roman candle: shown off upright in his near hoof (`show`), or held in his near hoof (`base`: the middle of its
+   * foot, in his drawing space, where it stays put as he bobs; `deg`: its tilt, + its top to our right; `grip`: how far
+   * up from the foot he holds it, TUBE_GRIP by default).
+   */
+  candle?: "show" | { base: Pt; deg: number; grip?: number };
   /** A wall of flame round his feet (0 roaring, 1 dying down). */
   burst?: 0 | 1;
 }
@@ -587,9 +631,18 @@ export function grexBuild(p: GrexPose): Built {
   const tail = limb("tail", [[21, 38 + hips], [15, 41 + hips], tailEnd]);
   const hx = NECK_TOP[0] - HEAD_SOCKET[0] + (p.headDx ?? 0);
   const hy = NECK_TOP[1] - HEAD_SOCKET[1] + body + (p.headDy ?? 0);
-  const armA = p.candle === "aim" ? "candle" : (p.a ?? "cross");
-  const armB = p.candle ? (p.candle === "aim" ? "candle" : "show") : (p.b ?? "out");
-  const arms = [ARM_A[armA], ARM_B[armB]].map((spec, i) => {
+  const tube = p.candle && p.candle !== "show" ? { base: p.candle.base, deg: tiltOf(p.candle.deg), grip: p.candle.grip ?? TUBE_GRIP } : null;
+  const armA = p.a ?? (tube ? "pump" : "cross");
+  // (Holding the candle by its middle: his near arm reaches from the shoulder to the grip, which stays on the candle.)
+  const grip = tube ? alongTube(tube.base, tube.deg, tube.grip) : null;
+  const specB: ArmSpec = grip
+    ? (() => {
+        const sh: Pt = [SHOULDER_B[0], SHOULDER_B[1] + body];
+        const elbow: Pt = [(sh[0] + grip[0]) / 2 + 1, (sh[1] + grip[1]) / 2 + 3];
+        return { pts: [sh, elbow, grip].map((q): Pt => [Math.round(q[0]), Math.round(q[1] - body)]) as [Pt, Pt, Pt], dir: [0, -1], len: 0 };
+      })()
+    : ARM_B[p.candle === "show" ? "show" : (p.b ?? "out")];
+  const arms = [ARM_A[armA], specB].map((spec, i) => {
     const pts = down(spec.pts);
     const arm = limb("arm", pts);
     const fist = pts[2]!;
@@ -611,7 +664,11 @@ export function grexBuild(p: GrexPose): Built {
   const tailPart = p.smoking ? `puff:${fl}` : `tail${big}:${fl}`;
   const [tw, th] = partSize(PARTS[tailPart]!);
   const wireL = (a: typeof A) => (a.w ? [L(a.w)] : []);
-  const candle = p.candle ? [at("candle", CANDLE[p.candle][0], CANDLE[p.candle][1] + body)] : [];
+  const candle = tube
+    ? [at(`tube:${tube.deg}`, tube.base[0] - TUBE_PIVOT.get(tube.deg)![0], tube.base[1] - TUBE_PIVOT.get(tube.deg)![1])]
+    : p.candle === "show"
+      ? [at("tube:0", ARM_B.show.pts[2][0] - TUBE_PIVOT.get(0)![0], ARM_B.show.pts[2][1] + SHOW_GRIP + body - TUBE_PIVOT.get(0)![1])]
+      : [];
   return {
     layers: [
       at("shadow", 5, GROUND - 2),
@@ -735,29 +792,6 @@ function wisps([x, y]: Pt, t: number, n = 3): Speck[] {
   }).flat();
 }
 
-/** Rockets from the Roman candle: each a white-hot head and a sparkling trail, `age` frames after it left the muzzle. */
-function rockets(muzzle: Pt, ages: readonly number[]): Speck[] {
-  return ages.flatMap((age, n): Speck[] => {
-    const y = Math.round(muzzle[1] - 4 - age * 13);
-    const x = muzzle[0] + ((n * 5) % 3) - 1;
-    if (y < 3) return [];
-    const rim = (["Y", "f", "y"] as const)[n % 3]!;
-    return [
-      [x, y - 1, rim],
-      [x - 1, y, rim],
-      [x, y, "x"],
-      [x + 1, y, "x"],
-      [x + 2, y, rim],
-      [x, y + 1, "x"],
-      [x + 1, y + 1, "y"],
-      [x + 1, y - 1, rim],
-      ...[2, 3, 4, 5, 6, 7, 8, 9].map((d): Speck => [x + (d % 2), y + d, d < 4 ? "Y" : d < 6 ? "f" : d < 8 ? "F" : "R"]),
-      [x - 1, y + 5, "Y"],
-      [x + 2, y + 7, "f"],
-      [x - 1, y + 9, "F"],
-    ];
-  });
-}
 /** The candle's muzzle flash. */
 const muzzleFlash = ([x, y]: Pt, big: boolean): Speck[] => [
   [x, y, "x"],
@@ -981,11 +1015,15 @@ const ignite: Anim = {
   ],
 };
 
-/** The candle's top in a pose, in frame pixels (where its shots leave). */
+/** The candle's muzzle in a pose, in frame pixels (where its shots leave). */
 const muzzle = (p: GrexPose): Pt => {
   const body = (p.crouch ?? 0) + (p.bob ?? 0) - (p.air ?? 0);
-  const c = CANDLE[p.candle ?? "aim"];
-  return [OX + c[0] + 2 + (p.dx ?? 0), OY + c[1] + body - 2];
+  if (p.candle && p.candle !== "show") {
+    const [x, y] = alongTube(p.candle.base, tiltOf(p.candle.deg), CANDLE_LEN + 1);
+    return [Math.round(OX + x + (p.dx ?? 0)), Math.round(OY + y)];
+  }
+  const [fx, fy] = ARM_B.show.pts[2];
+  return [OX + fx + (p.dx ?? 0), OY + fy + SHOW_GRIP + body - CANDLE_LEN - 1];
 };
 
 /** The ultimate's warning: he pulls out the Roman candle, shows it off, taps it, and its fuse fizzes. */
@@ -1003,14 +1041,55 @@ const candleWarn: Anim = {
   ],
 };
 
+/** Where the candle's foot is slammed down and stays while he fires (his drawing space: on the board, in front of him). */
+const PLANT: Pt = [50, 59];
+/** The candle's 24 shots. */
+export const CANDLE_SHOTS = 24;
+/**
+ * Its tilt for each shot (degrees, + its top to our right): he sweeps it right, back across to the left, and right
+ * again, so the shots fan out every which way.
+ */
+export const CANDLE_SWEEP: readonly number[] = [0, 7, 13, 20, 26, 20, 13, 7, 0, -7, -13, -20, -26, -20, -13, -7, 0, 7, 13, 20, 26, 20, 13, 7];
+/** Where shot `i` leaves the candle, in frame pixels, and the direction it flies (degrees from straight up, + right). */
+export function candleMuzzle(i: number): { at: Pt; deg: number } {
+  const deg = CANDLE_SWEEP[i % CANDLE_SWEEP.length]!;
+  const [x, y] = alongTube(PLANT, deg, CANDLE_LEN + 1);
+  return { at: [OX + x, OY + y], deg };
+}
+
+/** The slam: white impact lines out from the candle's foot, and splinters flying. */
+function impact([x, y]: Pt): Speck[] {
+  const out: Speck[] = [];
+  for (const [dx, dy, n] of [[-1, 0, 7], [1, 0, 7], [-0.8, -0.45, 5], [0.8, -0.45, 5], [-0.5, -0.8, 3], [0.5, -0.8, 3]] as const)
+    for (let d = 4; d < 4 + n; d++) out.push([Math.round(x + dx * d), Math.round(y + dy * d), d < 6 ? "x" : "y"]);
+  for (const [sx, sy] of [[-9, -6], [8, -8], [-13, -3], [12, -4], [-5, -10], [4, -12]] as const) out.push([x + sx, y + sy, "U"], [x + sx + 1, y + sy, "b"]);
+  return out;
+}
+/** Dust puffing out along the board from the candle's foot, `t` frames after the slam. */
+function dust([x, y]: Pt, t: number): Speck[] {
+  const out: Speck[] = [];
+  for (const side of [-1, 1])
+    for (let i = 0; i < 4; i++) {
+      const px = Math.round(x + side * (5 + i * 3 + t * 3));
+      const py = y - (i % 2) - (t > 1 ? 1 : 0);
+      out.push([px, py, t > 1 ? "G" : "g"], [px + side, py - 1, "G"], ...(t < 2 ? ([[px, py - 1, "g"]] as Speck[]) : []));
+    }
+  return out;
+}
+/** A short streak behind a shot as it leaves the muzzle, along the candle's tilt. */
+function streak([x, y]: Pt, deg: number): Speck[] {
+  const a = (deg * Math.PI) / 180;
+  return [1, 2, 3, 4, 5, 6].map((d): Speck => [Math.round(x + Math.sin(a) * (2 + d)), Math.round(y - Math.cos(a) * (2 + d)), d < 2 ? "x" : d < 4 ? "y" : "Y"]);
+}
+
 /**
  * His ultimate, the Roman candle, played ON THE BOARD: his shadow grows, he drops onto the middle of the board in a
- * burst of flame with a roar, holds the candle up in both hooves and fires twelve shots into the sky, one every
- * 140 ms (the first frame of the volley has the "launch" cue, every shot a "shot" cue), then laughs. The last frame
- * holds until he's taken off.
+ * burst of flame with a roar, heaves the big candle up and SLAMS it down on the board in front of him (the "slam" cue: a
+ * wood smack, the picture jolts, splinters and dust), its fuse fizzes, and he fires 24 shots, one every 130 ms,
+ * sweeping it right, left and right again so they fan out (the first frame of the volley has the "launch" cue, every
+ * shot a "shot" cue), his other hoof pumping his sparkler; then laughs. The last frame holds until he's taken off.
  */
-const AIM: GrexPose = { candle: "aim", mood: "grin", big: true, feet: "wide" };
-const SHOTS = 12;
+const AIM = (deg: number): GrexPose => ({ candle: { base: PLANT, deg }, mood: "grin", big: true, feet: "wide" });
 const romanCandle: Anim = {
   loop: false,
   frames: [
@@ -1021,17 +1100,26 @@ const romanCandle: Anim = {
     f(110, { crouch: 4, candle: "show", mood: "roar", feet: "wide", big: true, flick: 2, burst: 0 }, { cue: "roar", shake: [0, 1], specks: flameRing(9, 14), pal: EYES_HOT }, 3),
     f(110, { crouch: 3, candle: "show", mood: "roar", feet: "wide", big: true, flick: 3, burst: 1 }, { specks: embers(OX + 28, OY + 50, 1, 10, 26), pal: EYES_HOT }, 4),
     f(120, { crouch: 2, candle: "show", mood: "roar", feet: "wide", big: true, flick: 4 }, { specks: embers(OX + 28, OY + 46, 2, 10, 26) }, 5),
-    f(120, { ...AIM, crouch: 1, flick: 5 }, { specks: sparkSpray(muzzle({ ...AIM, crouch: 1 }), 6, 0.4) }, 6),
-    ...Array.from({ length: SHOTS * 2 }, (_, i) => {
-      const shot = Math.floor(i / 2);
-      const kick = i % 2 === 0;
-      const p: GrexPose = { ...AIM, crouch: kick ? 1 : 0, flick: 6 + i, mood: shot > 5 ? "laugh" : "grin" };
-      const ages = Array.from({ length: shot + 1 }, (_, n) => (i - n * 2) / 2 + 0.5).filter((a) => a >= 0);
-      return f(70, p, { cue: kick ? (shot === 0 ? "launch" : "shot") : undefined, specks: [...(kick ? muzzleFlash(muzzle(p), shot % 3 === 0) : []), ...rockets(muzzle(p), ages)], pal: kick && shot % 4 === 0 ? EYES_HOT : undefined }, 10 + i);
+    // He heaves it up high...
+    f(120, { candle: { base: [44, 26], deg: -7, grip: 10 }, a: "high", mood: "grin", feet: "wide", big: true, flick: 5, headDy: -1 }, {}, 6),
+    f(170, { bob: -1, candle: { base: [40, 10], deg: -20, grip: 6 }, a: "high", mood: "roar", feet: "wide", big: true, flick: 6, headDy: -1 }, { pal: EYES_HOT }, 7),
+    // ...and slams it down on the board.
+    f(50, { crouch: 2, candle: { base: [45, 46], deg: -3, grip: 16 }, a: "pump", mood: "roar", feet: "wide", big: true, flick: 7 }, { specks: [[OX + 38, OY + 38, "y"], [OX + 38, OY + 32, "y"], [OX + 54, OY + 36, "y"], [OX + 54, OY + 30, "y"], [OX + 39, OY + 26, "y"]] }, 8),
+    f(150, { crouch: 4, ...AIM(0), a: "pump", mood: "roar", flick: 8 }, { cue: "slam", shake: [1, 2], specks: [...impact([OX + PLANT[0], OY + PLANT[1]]), ...dust([OX + PLANT[0], OY + PLANT[1]], 0)], pal: EYES_HOT }, 9),
+    f(110, { crouch: 2, ...AIM(0), flick: 9 }, { shake: [-1, 0], specks: dust([OX + PLANT[0], OY + PLANT[1]], 1) }, 10),
+    f(170, { crouch: 1, ...AIM(0), mood: "smug", flick: 10 }, { cue: "fizz", specks: [...dust([OX + PLANT[0], OY + PLANT[1]], 2), ...sparkSpray(muzzle(AIM(0)), 6, 0.5)] }, 11),
+    // 24 shots, sweeping right, left and right again.
+    ...Array.from({ length: CANDLE_SHOTS * 2 }, (_, k) => {
+      const shot = k >> 1;
+      const kick = k % 2 === 0;
+      const deg = CANDLE_SWEEP[shot]!;
+      const p: GrexPose = { ...AIM(deg), crouch: kick ? 1 : 0, flick: 11 + k, mood: shot > 15 ? "laugh" : shot % 6 === 5 ? "roar" : "grin", bob: kick ? 0 : 1 };
+      const m = muzzle(p);
+      return f(kick ? 70 : 60, p, { cue: kick ? (shot === 0 ? "launch" : "shot") : undefined, specks: kick ? [...streak(m, deg), ...muzzleFlash(m, shot % 3 === 0)] : wisps(m, k, 2), pal: kick && shot % 4 === 0 ? EYES_HOT : undefined }, 20 + k);
     }),
-    f(140, { ...AIM, mood: "laugh", flick: 31 }, { specks: [...rockets(muzzle(AIM), [12.5, 13]), ...wisps(muzzle(AIM), 1)] }, 40),
-    f(140, { ...AIM, mood: "laugh", headDy: -1, flick: 32 }, { specks: wisps(muzzle(AIM), 2) }, 41),
-    f(400, { ...AIM, mood: "grin", flick: 33 }, { specks: wisps(muzzle(AIM), 3, 2) }, 42),
+    f(140, { ...AIM(0), mood: "laugh", flick: 60 }, { specks: wisps(muzzle(AIM(0)), 1) }, 70),
+    f(140, { ...AIM(0), mood: "laugh", headDy: -1, flick: 61 }, { specks: wisps(muzzle(AIM(0)), 2) }, 71),
+    f(400, { ...AIM(0), mood: "grin", flick: 62 }, { specks: wisps(muzzle(AIM(0)), 3, 2) }, 72),
   ],
 };
 
