@@ -86,7 +86,7 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
             </i>
           ))}
           <RageMeter boss={boss} />
-          <BulbStrip boss={boss} />
+          <BulbStrip boss={boss} until={match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0} />
         </span>
       </span>
       <span class="boss-next">
@@ -317,7 +317,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 </>
               ) : moment ? (
                 <>
-                  {boss.icon} <strong>{powerLine(bossKit(boss.name), moment) ?? POWER_DOCK[moment.kind]}</strong>
+                  {/* (Hollow's cover: his words are in his text box over the board; the dock keeps it short.) */}
+                  {boss.icon} <strong>{(moment.kind !== "dark" && powerLine(bossKit(boss.name), moment)) || POWER_DOCK[moment.kind]}</strong>
                 </>
               ) : victim ? (
                 <strong class="bad">

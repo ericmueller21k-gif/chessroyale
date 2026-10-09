@@ -123,7 +123,8 @@ describe("Crowd mode", () => {
   });
 
   it("50 v 50 boss battle: the top 10 play White from an even position of their own game, the boss replies and strikes every 3 moves", async () => {
-    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20 };
+    // (Boingo, the boss this seed met before Hollow joined the draw.)
+    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "clown" };
     const { runner, sizes, plies } = await playKnockouts(settings, 4);
     expect(sizes.at(-1)).toBe(10);
     const boss = runner.boss!;
@@ -178,7 +179,7 @@ describe("Crowd mode", () => {
 
   it("boss battle timing: the intro replays the game, and the boss taking your queen stays up longer for its banner", async () => {
     // A 10-ply opening: the card, ten moves at 240 ms, a beat, then "START!".
-    expect(bossIntroTimeline(10)).toEqual({ step: 240, replayAt: 2600, bannerAt: 5250, total: 6750 });
+    expect(bossIntroTimeline(10)).toEqual({ step: 240, replayAt: 2600, claimAt: 5000, bannerAt: 5250, total: 6750 });
     // A long game replays faster, a short one no slower than the cap.
     expect(bossIntroTimeline(24).step).toBe(110);
     expect(bossIntroTimeline(0).total).toBe(2600 + 250 + 1500);

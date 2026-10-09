@@ -41,7 +41,13 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * he speaks and plays the crowd's move; the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2400 } as const;
+export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2700 } as const;
+
+/** Hollow's first cover of the dark holds longer, for his first-cover line ("Don't forget what's there…"). */
+export const DARK_FIRST_EXTRA_MS = 1300;
+
+/** How long one power's moment holds the screen (ms). */
+export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (e.kind === "dark" && e.first ? DARK_FIRST_EXTRA_MS : 0);
 
 /**
  * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
@@ -50,8 +56,8 @@ export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, f
 export const FIRE_BURN_MS = 1500;
 
 /** How long a turn's power moments take, one after another. */
-export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX }[] | null | undefined): number {
-  return (events ?? []).reduce((t, e) => t + (POWER_FX[e.kind] ?? 0), 0);
+export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; first?: boolean }[] | null | undefined): number {
+  return (events ?? []).reduce((t, e) => t + powerFxMs(e), 0);
 }
 
 /**

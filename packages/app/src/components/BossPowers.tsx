@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
-import { FIRE_BURN_MS, POWER_FX, inCheck, powerMomentMs, pieceAt, sideToMove } from "@chessroyale/chess";
+import { FIRE_BURN_MS, inCheck, powerFxMs, powerMomentMs, pieceAt, sideToMove } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
 import { EFFECTS, animLength, cueAt, darkItem } from "../characters/power-art.ts";
 import { CANDLE_SHOTS, candleMuzzle } from "../characters/grex.ts";
@@ -57,7 +57,7 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   const list = p.events.filter((e) => (e.kind === "funhouse") === funhouse).sort((a, b) => ORDER[a.kind] - ORDER[b.kind]);
   let t = until - powerMomentMs(list);
   return list.map((e) => {
-    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: POWER_FX[e.kind], ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}) };
+    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}) };
     t += m.ms;
     return m;
   });
@@ -161,7 +161,7 @@ export const shadowsAt = () => CANDLE.exitAt;
  * leaving the void in his chest at its `cast` cue), the darkness pouring onto the square (`darkPour`), and the square
  * going dark (`darkSquare` gather, then dark).
  */
-export const DARK = { pourAt: 1500, landAt: 1880 } as const;
+export const DARK = { pourAt: 1300, landAt: 1680 } as const;
 /** Where Hollow casts from in a moment by the board's corner (% of the board): a box his frame's shape. */
 export const HOLLOW_CASTER = { left: -9, top: -27, width: 30 } as const;
 /** The void in his chest as he casts, on the board (%), where the darkness leaves from. */
@@ -473,9 +473,10 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
       const cast = kit?.ch.anims.darkCast;
       const castSince = moment.at + DARK.pourAt - ((cast && cueAt(cast, "cast")) ?? 0);
       const fromPt = hollowCastFrom(kit);
+      const line = powerLine(kit, moment);
       return (
         <div class="power-moment pm-dark">
-          {t < 1400 && banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark")}
+          {t < 1250 && banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark")}
           {cast && now >= castSince && (
             <span class="pm-caster pm-hollow" style={{ aspectRatio: `${kit!.ch.w} / ${kit!.ch.h}` }}>
               {/* (His bulbs out as he casts: the last went out with his move.) */}
@@ -483,6 +484,12 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
             </span>
           )}
           {moment.square && t >= DARK.pourAt && t < DARK.landAt && <Flight name="darkPour" square={moment.square} orientation={orientation} since={moment.at + DARK.pourAt} ms={DARK.landAt - DARK.pourAt} aim from={fromPt} />}
+          {/* His words in his pixel text box as the darkness lands: his first cover's always, a taunt now and then. */}
+          {line && t >= DARK.pourAt && (
+            <div class="pm-line" role="status" aria-label={line}>
+              {line.slice(0, Math.min(line.length, Math.floor((t - DARK.pourAt) / 28) + 1))}
+            </div>
+          )}
         </div>
       );
     }
@@ -692,14 +699,16 @@ export function DarkCost({ square, since, now, orientation }: { square: string; 
 /** The strip relights this long after the last bulb goes out (his move shows, then the cast lands). */
 const BULB_RELIGHT_MS = 1800 + DARK.landAt;
 /** When this device saw Hollow's bulbs change, and from what (so the strip plays a bulb going out, or the relight). */
-const bulbSeen = new Map<string, { n: number; from: number; at: number }>();
+const bulbSeen = new Map<string, { n: number; from: number; at: number; relightAt?: number }>();
 /**
  * Hollow's bulbs by the boss bar: the strip (`bulbStrand`), one lit for each of his moves until he covers another square
  * (the same count as on his strand). A bulb goes out as he moves; at the last he covers a square and they relight.
  */
-export function BulbStrip({ boss }: { boss: BossView }) {
+export function BulbStrip({ boss, until = 0 }: { boss: BossView; until?: number }) {
   const n = boss.powers?.bulbs;
   if (n === undefined || boss.result) return null;
+  // (On the boss screen that brings a cover: the strip relights as the darkness lands.)
+  const cover = momentsOf(boss, until).find((m) => m.kind === "dark");
   const key = `${boss.id}:${boss.startMove}:${boss.board.generation}`;
   const now = Date.now();
   let seen = bulbSeen.get(key);
@@ -707,7 +716,8 @@ export function BulbStrip({ boss }: { boss: BossView }) {
   else if (seen.n !== n) bulbSeen.set(key, (seen = { n, from: seen.n, at: now }));
   // Fewer: the bulb going out. More (he covered a square): the last going out with his move, then the relight as the
   // darkness lands.
-  const relightAt = seen.at + BULB_RELIGHT_MS;
+  if (cover && seen.at && n > seen.from) seen.relightAt = cover.at + DARK.landAt;
+  const relightAt = seen.relightAt ?? seen.at + BULB_RELIGHT_MS;
   const look = !seen.at
     ? { anim: `lit${Math.min(3, n)}`, since: 0 }
     : n < seen.from

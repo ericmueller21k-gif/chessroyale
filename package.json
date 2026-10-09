@@ -20,6 +20,7 @@
     "frames:wip": "node scripts/frames-wip.mjs",
     "frames:god-king": "node scripts/frames-god-king.mjs",
     "frames:powers": "node scripts/frames-boss-powers.mjs",
+    "frames:hollow": "node scripts/frames-hollow.mjs",
     "frames:queue": "node scripts/frames-queue-pop.mjs",
     "frames:flash": "node scripts/frames-flash.mjs",
     "frames:chat": "node scripts/frames-chat-move.mjs",
