@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { pickLine, type Beat } from "../src/characters/boss-beats.ts";
-import { GREX_SOUNDS, grexSound } from "../src/characters/grex-sounds.ts";
+import { CRACKLE_EVERY, GREX_SOUNDS, WHISTLES, WHISTLE_SPREAD, grexSound, whistlePick } from "../src/characters/grex-sounds.ts";
+import { CANDLE_LEN, CANDLE_SHOTS, CANDLE_SWEEP, candleMuzzle } from "../src/characters/grex.ts";
+import { CANDLE, candleShotTimes, fireCountdown, shadowItems, type Moment } from "../src/components/BossPowers.tsx";
+import type { BossView } from "../src/game.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import { EFFECTS, POWER_MOMENTS, animLength, cueAt } from "../src/characters/power-art.ts";
 import { frameKeys, renderFrame, type Anim, type Character } from "../src/characters/sprite.ts";
@@ -75,31 +78,51 @@ describe("G-REX, the Fire boss", () => {
   it("warns of the Roman candle by showing it off, its fuse fizzing", () => {
     const warn = anim("candleWarn");
     expect(warn.loop).toBe(false);
-    expect(warn.frames.filter((f) => f.layers.some((l) => l.part === "candle")).length).toBeGreaterThan(3);
+    expect(warn.frames.filter((f) => f.layers.some((l) => l.part.startsWith("tube:"))).length).toBeGreaterThan(3);
     expect(cueAt(warn, "fizz")).not.toBeNull();
   });
 
-  it("drops onto the board with a roar and fires the Roman candle twelve times, in rapid succession", () => {
+  it("drops onto the board with a roar, slams the big candle down and fires it 24 times, sweeping it left and right", () => {
     const rc = anim("romanCandle");
     expect(rc.loop).toBe(false);
     // He drops in: the first frames are only his growing shadow.
     expect(rc.frames[0]!.layers).toEqual([]);
-    expect(cueAt(rc, "roar")!).toBeLessThan(cueAt(rc, "launch")!);
+    // The roar, then the slam (the picture jolts), then the volley.
+    expect(cueAt(rc, "roar")!).toBeLessThan(cueAt(rc, "slam")!);
+    expect(cueAt(rc, "slam")!).toBeLessThan(cueAt(rc, "launch")!);
+    expect(rc.frames.find((f) => f.cue === "slam")!.shake).toBeTruthy();
+    expect(grex.sounds.slam).toBe("grexSmack");
+    expect(grex.sounds.shot).toBe("grexWhistle");
     const shots: number[] = [];
     let t = 0;
     for (const f of rc.frames) {
       if (f.cue === "launch" || f.cue === "shot") shots.push(t);
       t += f.ms;
     }
-    expect(shots.length).toBe(12);
+    expect(shots.length).toBe(CANDLE_SHOTS);
+    expect(CANDLE_SHOTS).toBe(24);
     expect(shots[0]).toBe(cueAt(rc, "launch"));
-    for (let n = 1; n < shots.length; n++) expect(shots[n]! - shots[n - 1]!).toBeLessThanOrEqual(160);
-    // Each shot's rocket climbs from the candle's top on the frames after it.
-    const i = rc.frames.findIndex((f) => f.cue === "launch");
-    const top = (n: number) => Math.min(...rc.frames[n]!.specks!.filter((s) => s[2] === "x").map((s) => s[1]));
-    expect(top(i + 1)).toBeLessThan(top(i));
+    for (let n = 1; n < shots.length; n++) expect(shots[n]! - shots[n - 1]!).toBeLessThanOrEqual(140);
+    // A satisfying few seconds of shots.
+    expect(shots.at(-1)! - shots[0]!).toBeGreaterThan(2500);
+    expect(candleShotTimes(grex)).toEqual(shots);
+    // It's much bigger than before (6 x 20), and he sweeps it both ways: the shots fan out.
+    expect(CANDLE_LEN).toBeGreaterThanOrEqual(40);
+    expect(Math.min(...CANDLE_SWEEP)).toBeLessThanOrEqual(-20);
+    expect(Math.max(...CANDLE_SWEEP)).toBeGreaterThanOrEqual(20);
+    const tilts = new Set(rc.frames.filter((f) => f.cue === "shot" || f.cue === "launch").map((f) => f.layers.find((l) => l.part.startsWith("tube:"))!.part));
+    expect(tilts.size).toBeGreaterThanOrEqual(7);
+    // Each shot leaves from the candle's top, where it is on that frame (its cap is drawn there).
+    rc.frames.forEach((f, i) => {
+      if (f.cue !== "shot" && f.cue !== "launch") return;
+      const n = shots.indexOf(rc.frames.slice(0, i).reduce((x, g) => x + g.ms, 0));
+      const [mx, my] = candleMuzzle(n).at;
+      const cap = pixels(grex.ch, rc, i, "wWB");
+      expect(cap.some(([x, y]) => Math.abs(x - mx) <= 3 && Math.abs(y - my) <= 3), `shot ${n}`).toBe(true);
+    });
     expect(rc.frames.at(-1)!.ms).toBeGreaterThanOrEqual(300);
-    expect(animLength(rc)).toBeLessThan(4000);
+    // The moment holds him on the board long enough (the shared clock gives it POWER_FX.candle).
+    expect(CANDLE.exitAt + 700).toBeLessThanOrEqual(7100);
   });
 
   it("goes out in smoke when he's beaten: his shades fly off and his flames turn to puffs", () => {
@@ -124,6 +147,75 @@ describe("G-REX, the Fire boss", () => {
       expect(10 * Math.log10(sum / s.length), name).toBeLessThan(MOVE_MEAN_DB - 2);
       expect(s, `${name} is the same every time`).toEqual(grexSound(name, 44100));
     }
+  });
+
+  it("whistles each shot up: three whistles, a little pitch either way, now and then a crackle at the top", () => {
+    const picks = Array.from({ length: 300 }, (_, i) => whistlePick(((i * 0.37) % 1 + 1) % 1, ((i * 0.61) % 1 + 1) % 1, ((i * 0.83) % 1 + 1) % 1));
+    expect(new Set(picks.map((p) => p.name))).toEqual(new Set(WHISTLES));
+    for (const p of picks) expect(Math.abs(p.rate - 1)).toBeLessThanOrEqual(WHISTLE_SPREAD + 1e-9);
+    expect(Math.min(...picks.map((p) => p.rate))).toBeLessThan(0.97);
+    expect(Math.max(...picks.map((p) => p.rate))).toBeGreaterThan(1.03);
+    const crackles = picks.filter((p) => p.crackleAt !== null).length / picks.length;
+    expect(crackles).toBeGreaterThan(1 / CRACKLE_EVERY - 0.1);
+    expect(crackles).toBeLessThan(1 / CRACKLE_EVERY + 0.1);
+    // Each whistle rises: its strongest pitch near the end is well above its start (a small DFT over a window).
+    for (const w of WHISTLES) {
+      const s = grexSound(w, 44100);
+      const pitch = (from: number) => {
+        const N = 1024;
+        let best = 0;
+        let at = 0;
+        for (let k = 8; k < 120; k++) {
+          let re = 0;
+          let im = 0;
+          for (let i = 0; i < N; i++) {
+            const a = (2 * Math.PI * k * i) / N;
+            re += s[from + i]! * Math.cos(a);
+            im -= s[from + i]! * Math.sin(a);
+          }
+          if (re * re + im * im > best) [best, at] = [re * re + im * im, k];
+        }
+        return (at * 44100) / N;
+      };
+      expect(pitch(Math.floor(s.length * 0.7)), w).toBeGreaterThan(pitch(Math.floor(44100 * 0.12)) * 1.4);
+    }
+  });
+
+  it("never sounds louder than a move, even the whole volley of 24 whistles at once (the slowest, every crackle)", () => {
+    const R = 44100;
+    const rc = anim("romanCandle");
+    const at: number[] = [];
+    let t = 0;
+    for (const f of rc.frames) {
+      if (f.cue === "launch" || f.cue === "shot") at.push(t / 1000);
+      t += f.ms;
+    }
+    // The worst case: each whistle as long and slow as it can be, overlapping the most, a crackle on every one.
+    const mix = new Float32Array(Math.ceil(R * (at.at(-1)! + 2)));
+    const add = (s: Float32Array, start: number, rate: number) => {
+      for (let j = 0; j * rate < s.length; j++) {
+        const k = Math.floor(start * R) + j;
+        if (k < mix.length) mix[k]! += s[Math.floor(j * rate)]!;
+      }
+    };
+    at.forEach((start, i) => {
+      const w = whistlePick((i % 3) / 3 + 0.01, 0, 0);
+      add(grexSound(w.name, R), start, w.rate);
+      add(grexSound("sparkle", R), start + w.crackleAt!, w.rate);
+    });
+    const smack = grexSound("smack", R);
+    let peak = 0;
+    let sum = 0;
+    const from = Math.floor(at[0]! * R);
+    const to = Math.floor((at.at(-1)! + 0.9) * R);
+    for (let i = from; i < to; i++) {
+      peak = Math.max(peak, Math.abs(mix[i]!));
+      sum += mix[i]! ** 2;
+    }
+    expect(peak).toBeLessThan(MOVE_PEAK);
+    expect(10 * Math.log10(sum / (to - from))).toBeLessThan(MOVE_MEAN_DB - 1);
+    // The smack is a hard hit, but no louder than a move either.
+    expect(Math.max(...smack.map(Math.abs))).toBeLessThan(MOVE_PEAK / 2);
   });
 
   it("names his power moments in the contract: the throw, the warning, the candle on the board, the payoffs later", () => {
@@ -185,13 +277,37 @@ describe("his fire on the board", () => {
     }
   });
 
-  it("counts the shots still up there: left<n> shows n lit", () => {
+  it("counts the shots still up there in a column: left<n> shows n lit, from the bottom", () => {
     const shots = EFFECTS.candleShots;
-    for (let n = 0; n <= 12; n++) expect(shots.ch.anims[`left${n}`]!.frames[0]!.layers.filter((l) => l.part === "lit").length).toBe(n);
+    expect(shots.counter).toEqual({ prefix: "left", max: 24 });
+    expect(shots.ch.h).toBeGreaterThan(shots.ch.w * 15);
+    for (let n = 0; n <= 24; n++) {
+      const layers = shots.ch.anims[`left${n}`]!.frames[0]!.layers;
+      const lit = layers.filter((l) => l.part === "lit");
+      expect(lit.length).toBe(n);
+      if (n && n < 24) expect(Math.min(...lit.map((l) => l.y))).toBeGreaterThan(Math.max(...layers.filter((l) => l.part === "spent").map((l) => l.y)));
+    }
+  });
+
+  it("shadows a fireball's square, small 3 turns out, bigger, then the biggest with a glow; see-through", () => {
+    const sh = EFFECTS.fireShadow;
+    const area = (a: string) => opaque(sh.ch, a);
+    expect(area("shadow2")).toBeGreaterThan(area("shadow1") * 2);
+    expect(area("shadow3")).toBeGreaterThan(area("shadow2") * 1.6);
+    // Small enough at first to read as far away; never the whole square.
+    expect(area("shadow1")).toBeLessThan(32 * 32 * 0.12);
+    expect(area("shadow3")).toBeLessThan(32 * 32 * 0.7);
+    for (const a of Object.keys(sh.ch.anims))
+      for (const f of sh.ch.anims[a]!.frames) {
+        const img = renderFrame(sh.ch, f);
+        for (let p = 3; p < img.data.length; p += 4) expect(img.data[p]!, a).toBeLessThan(0xa0);
+      }
+    // Each size grows out of the one before.
+    expect(sh.stages!.map((st) => st.into)).toEqual(["grow1", "grow2", "grow3"]);
   });
 
   it("stays cheap however long it burns: small frames, few of them, redrawn at most every 50 ms", () => {
-    for (const name of ["fireTile", "pieceBurn", "sparkFly", "candleShot", "fireballFall", "candleShots"] as const) {
+    for (const name of ["fireTile", "pieceBurn", "sparkFly", "candleShot", "fireballFall", "candleShots", "fireShadow"] as const) {
       const fx = EFFECTS[name];
       expect(fx.ch.w * fx.ch.h, name).toBeLessThanOrEqual(32 * 32);
       for (const [a, an] of Object.entries(fx.ch.anims)) {
@@ -199,5 +315,35 @@ describe("his fire on the board", () => {
         for (const f of an.frames) expect(f.ms, `${name} ${a}`).toBeGreaterThanOrEqual(50);
       }
     }
+  });
+});
+
+describe("the fire on screen", () => {
+  it("counts down on a burning tile: the crowd moves left before it burns, 3, 2, 1 (and 0 as it burns)", () => {
+    expect([1, 2, 3].map((st) => fireCountdown(st))).toEqual([3, 2, 1]);
+    expect(fireCountdown(4)).toBe(0);
+  });
+
+  const view = (shadows: { square: string; lands: number; stage: number }[], turn = 6) => ({ powers: { turn, shadows } }) as unknown as Pick<BossView, "powers">;
+  const moment = (kind: Moment["kind"], at: number, ms: number, squares?: string[]): Moment => ({ kind, key: kind, at, ms, ...(squares ? { squares } : {}) });
+
+  it("shows each shadow at its size; the ones just picked once the moment that picked them is over", () => {
+    const sh = [
+      { square: "c3", lands: 9, stage: 1 },
+      { square: "e2", lands: 8, stage: 2 },
+      { square: "g4", lands: 7, stage: 3 },
+    ];
+    // On your move: all three, each at its size.
+    expect(shadowItems(view(sh), [], 1000).map((i) => `${i.square}:${i.then}`)).toEqual(["c3:shadow1", "e2:shadow2", "g4:shadow3"]);
+    // As the candle goes up, the first wave's shadows wait until he jumps off.
+    const candle = moment("candle", 10_000, 7100);
+    expect(shadowItems(view([sh[0]!], 3), [candle], 10_000 + CANDLE.exitAt - 1)).toEqual([]);
+    expect(shadowItems(view([sh[0]!], 3), [candle], 10_000 + CANDLE.exitAt + 1).map((i) => i.square)).toEqual(["c3"]);
+    // A wave landing: its squares keep their biggest shadow until each fireball lands; the new ones come after the last.
+    const wave = moment("fireball", 20_000, 1700, ["a2", "h3"]);
+    const during = shadowItems(view(sh), [wave], 20_100);
+    expect(during.map((i) => `${i.square}:${i.then}`)).toEqual(["e2:shadow2", "g4:shadow3", "a2:shadow3", "h3:shadow3"]);
+    const after = shadowItems(view(sh), [wave], 21_690);
+    expect(after.map((i) => i.square)).toEqual(["c3", "e2", "g4"]);
   });
 });

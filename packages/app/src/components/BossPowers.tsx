@@ -255,14 +255,14 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
       {/* (One marker a tile: what's on fire, at which stage, and its countdown: the crowd moves left before it burns.) */}
       {fire.map((t) =>
         now >= appearAt(t.square, moments, orientation) ? (
-          <span key={`fire-${t.square}-${t.lit}`} class={`pw-fire stage-${Math.min(3, t.stage)}`} style={onSquare(t.square, orientation)} data-stage={t.stage}>
+          <span key={`fire-${t.square}-${t.lit}`} class={`pw-fire stage-${Math.min(3, t.stage)}`} style={onSquare(t.square, orientation)} data-square={t.square} data-stage={t.stage}>
             <b class="pw-count">{fireCountdown(t.stage)}</b>
           </span>
         ) : null,
       )}
       {/* (Markers for the shadows too: which squares are coming, how big.) */}
       {shadows.map((sh) => (
-        <span key={`shadow-${sh.square}`} class={`pw-shadow size-${sh.anim!.slice(-1)}`} style={onSquare(sh.square, orientation)} data-size={sh.anim!.slice(-1)} />
+        <span key={`shadow-${sh.square}`} class={`pw-shadow size-${sh.anim!.slice(-1)}`} style={onSquare(sh.square, orientation)} data-square={sh.square} data-size={sh.anim!.slice(-1)} />
       ))}
       {pie && now >= appearAt(pie, moments, orientation) && (
         <span key={`pie-${pie}`} class="pw-pie" style={at(pie, orientation)}>
@@ -498,7 +498,7 @@ export function FireBurn({ burnt, since, now, orientation }: { burnt: readonly {
     <div class="power-board pw-burns" aria-hidden="true">
       <BoardEffects items={items} orientation={orientation} class="pw-fire-board" />
       {burnt.map((b) => (
-        <span key={`burn-${b.square}`} class={`pw-burn${b.fizzled ? " fizzled" : b.piece ? "" : " out"}`} style={onSquare(b.square, orientation)}>
+        <span key={`burn-${b.square}`} class={`pw-burn${b.fizzled ? " fizzled" : b.piece ? "" : " out"}`} style={onSquare(b.square, orientation)} data-square={b.square}>
           {/* (The countdown reaches 0 as it burns.) */}
           <b class="pw-count">0</b>
         </span>

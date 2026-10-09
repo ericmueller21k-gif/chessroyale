@@ -50,3 +50,63 @@ export async function joinFromInvite(page: Page) {
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Join lobby" }).click();
 }
+
+/**
+ * The engine's top moves for the position on the board (the runner's, ranked as the judge ranks them), without holding
+ * a page.evaluate open while the engine thinks: the search starts in the page, its answer is kept on `window`, and the
+ * test polls for it. An evaluate that awaited the search could fail now and then with "Execution context was destroyed,
+ * most likely because of a navigation" although nothing navigated (.claude/LESSONS.md: "A navigation that never
+ * happened").
+ */
+export async function engineTop(page: Page, timeout = 60_000): Promise<{ fen: string; top: { move: string }[] }> {
+  const key = await page.evaluate(() => {
+    const w = window as unknown as { match: any; __top?: Record<string, unknown> };
+    const m = w.match;
+    const fen: string = m.phase.board.fen;
+    const k = `${fen}#${Math.random().toString(36).slice(2)}`;
+    const store = (w.__top ??= {});
+    store[k] = null;
+    void m.runner.topMovesFor(fen).then(
+      (top: unknown) => (store[k] = { fen, top }),
+      (e: unknown) => (store[k] = { fen, top: [], error: String(e) }),
+    );
+    return k;
+  });
+  let out: { fen: string; top: { move: string }[] } | null = null;
+  await expect
+    .poll(async () => (out = await page.evaluate((k) => ((window as unknown as { __top?: Record<string, unknown> }).__top?.[k] ?? null) as never, key)), { timeout })
+    .not.toBeNull();
+  await page.evaluate((k) => delete (window as unknown as { __top?: Record<string, unknown> }).__top?.[k], key);
+  return out!;
+}
+
+/**
+ * Starts watching the page for a selector (and, optionally, text in another): `seen()` then says whether each ever
+ * showed, however briefly. For things on screen for a moment (a piece burning for 1.5 s), so a test never misses one
+ * by checking a beat too late.
+ */
+export async function watchFor(page: Page, what: Record<string, { selector: string; text?: RegExp }>) {
+  const tag = Math.random().toString(36).slice(2);
+  await page.evaluate(
+    ({ tag, what }) => {
+      const w = window as unknown as { __seen?: Record<string, Record<string, boolean>> };
+      const seen: Record<string, boolean> = Object.fromEntries(Object.keys(what).map((k) => [k, false]));
+      (w.__seen ??= {})[tag] = seen;
+      const check = () => {
+        for (const [k, { selector, text }] of Object.entries(what as Record<string, { selector: string; text?: { source: string; flags: string } }>)) {
+          if (seen[k]) continue;
+          const els = [...document.querySelectorAll(selector)];
+          seen[k] = els.some((e) => !text || new RegExp(text.source, text.flags).test(e.textContent ?? ""));
+        }
+      };
+      check();
+      const obs = new MutationObserver(check);
+      obs.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
+      setTimeout(() => obs.disconnect(), 120_000);
+    },
+    { tag, what: Object.fromEntries(Object.entries(what).map(([k, v]) => [k, { selector: v.selector, text: v.text ? { source: v.text.source, flags: v.text.flags } : undefined }])) as never },
+  );
+  return {
+    seen: () => page.evaluate((t) => (window as unknown as { __seen: Record<string, Record<string, boolean>> }).__seen[t]!, tag),
+  };
+}

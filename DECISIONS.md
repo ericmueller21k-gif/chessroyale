@@ -3504,6 +3504,80 @@ now** in every boss mode, with his art and powers both in; the random draw is am
   `packages/app/test/fire-replays.test.ts` (replays after a burn), `e2e/grex.spec.ts`
   (G-REX on phone and desktop with the candle; the trigger shown for an admin, hidden otherwise).
 
+### G-REX, second pass (Eric, Oct 9, after playing him on phone and desktop)
+
+Eric's eight changes, built across G-REX's lanes (his art, sounds and power rules) by one helper. This replaces the
+12-shot candle described above; everything else about his fire stands.
+
+- **24 shots** (`BOSS_POWERS.candleShots`), falling from 3 crowd moves after the launch as before, in waves of
+  **1, 2, 3, 4, 4, 4, 3, 2, 1** (`candleWaves`): it ramps up, holds at its height for three turns, and tails off, so
+  the barrage lasts nine turns. At its height twelve tiles burn at once (three waves of four), still under half of the
+  crowd's 32 squares. The old rules hold: never on the crowd king's square, spread out (none next to another tile if it
+  can be helped), the sparkler paused through the barrage (the last wave lands 11 turns after the launch and burns
+  out 2 turns later; after a full turn without fire the next sparkler comes, 15 turns after the launch), and the
+  judge's fire rule unchanged (only a tile ablaze counts).
+- **Targets picked 3 turns ahead, shown as falling shadows** (`candleAhead: 3`, `candleTurn` in `boss-powers.ts`):
+  - Each wave's squares are picked 3 crowd turns before it lands, from the battle's seed, so they're the same on every
+    screen. The first wave's are picked as the candle goes up (it lands 3 turns later, as before). They avoid every
+    square that will be burning or hit before then, and the king's square at the time they're picked.
+  - On screen: a small round shadow on each square (3 turns out), bigger the next turn, bigger again (with a faint
+    glow of the fire above) the turn before it lands; then the fireball drops onto it. The view sends them as
+    `powers.shadows` (square, landing turn, size).
+  - Drawn under the pieces (`fireShadow`, on one shared canvas below the pieces in the board's stacking context), so a
+    piece standing on the square stands on its shadow and stays fully visible.
+  - **My call:** if the crowd's king steps onto a shadowed square, that fireball **fizzles** as it lands (the tile's
+    fizzle, no fire tile): "never on the king's square" holds, and walking the king under a fireball is never punished
+    (he's fireproof anyway). The shot still counts as fallen.
+  - **My call:** a square that has just caught fire can be picked for a wave 3 turns out (its tile will have burnt out
+    by then); only squares that would still be burning as the wave lands are kept clear.
+- **A bigger candle and a slam:** the candle is 10 x 48 pixels (was 6 x 20), about his height to the shoulder. He
+  drops onto the board with the roar as before, heaves the candle up over his head and **slams it down on the board**
+  in front of him (the `slam` cue: a hard wooden smack, his picture jolts, splinters and dust, and the board itself
+  jolts for 280 ms), its fuse fizzes, then he fires the 24 shots one every 130 ms (about 3 s) while **sweeping it
+  right, back across to the left and right again** (tilts of up to 26 degrees, drawn once per tilt), his other hoof
+  pumping his sparkler. Each shot leaves from the candle's top along its tilt (a few degrees either way), so the
+  volley fans out across the board. The moment is 7.1 s (was 5 s), before the crowd's clock starts, as every power's.
+- **Firework whistles** (`grex-sounds.ts`, synthesised): each shot plays a rising whistle, one of three (a quick bright
+  one, a long low one, one with a warble), up to 7% higher or lower, and about one shot in three ends in a crackle
+  high up. Each whistle sits about 10 dB under a move; the whole volley at once (24 overlapping whistles, every one
+  crackling, at the slowest pitch) stays under a move's loudness, and the wood smack under half a move's peak. They
+  all follow mute. **To swap in a recorded whistle later:** put the file in `packages/app/public/sounds/grex/` (credit
+  it in `CREDITS.md`) and set `GREX_WHISTLE_FILE` in `packages/app/src/sound.ts` to its path (e.g.
+  `"/sounds/grex/whistle.mp3"`); every shot then plays it, with the same pitch spread and crackles, at
+  `GREX_WHISTLE_FILE_LEVEL`.
+- **Countdowns on his tiles:** a small number in the middle of every burning tile (the sparkler's and the fireballs'):
+  the crowd moves left before it burns out and destroys what's on it, this one included: **3** as it lands, **2**,
+  **1** while it's ablaze, and **0** as it burns (over the burn). Cream, a little see-through, outlined dark, about a
+  third of a square tall, so the piece under it still shows what it is. **My call:** 3-2-1 then 0 rather than 2-1-0, so
+  the tile never says 0 while there's still a move to save the piece (the design's "3-2-1 countdown; a piece still on
+  the tile at 0 is destroyed").
+- **The shots-left pips:** a column of 24 little rockets in the gutter beside the board's right edge (lit from the
+  bottom; the column empties from the top as they fall), as tall as the board on a phone (the board row keeps 24 px
+  there), at most 16 px wide on a computer. Never over the board, its timer bar or the eval bar (on the left).
+- **The bar under the board on a computer.** The dock (the status line with « » and the God King) had been in the
+  column beside the board, at its top, since the dock was built (Oct 4: the boss dock took the panel's place in the
+  right column on a computer); Eric's screen (about 1590 px) shows it there. Now it's under the board at every width,
+  as on a phone, the board leaving room for it (a computer's board is up to 100dvh - 310 px tall in a boss battle,
+  which at 800 px tall is 490 px; at Eric's 923 px it keeps its full 556 px), and the column beside the board keeps chat
+  (online) or the scoreboard (900-1099 px) from its top. Crowd matches are unchanged (vote results and chat where
+  they were). G-REX standing beside the board, over the scoreboard, is as Eric likes it.
+- **A flaky test fixed at its cause** (`e2e/grex.spec.ts`): two different races in the test, none in the game.
+  - "Execution context was destroyed, most likely because of a navigation": nothing navigated. The test awaited the
+    engine's search inside `page.evaluate`; Playwright reports any protocol failure of such a long-held call that way.
+    A page id set before the match was unchanged after the failure, the engine answered the same search a moment
+    later, and every search the page started had finished. The test now starts the search in the page and polls for
+    its answer (`engineTop` in `e2e/helpers.ts`), never holding an evaluate open while the engine thinks. Details in
+    `.claude/LESSONS.md`.
+  - A piece burning shows for 1.5 s as the boss's turn begins; the test looked for it after its own wait for the turn
+    to change, so under load it sometimes looked too late, and when two tiles burnt at once its locator matched two
+    elements. It now watches for that square's burn from before the move (`watchFor`) and reads what burnt from the
+    shared state.
+- **Checking it:** `packages/chess/test/grex.test.ts` (the schedule, the targets 3 ahead, the shadows' timing, the
+  king's fizzle), `packages/app/test/grex.test.ts` (the slam and the sweep, the whistles and the volley's loudness,
+  the countdown, the shadows on screen, the pip column), `e2e/grex.spec.ts` (shadows and countdowns turn by turn on
+  phone and desktop, the pips' place, the dock under the board at six computer sizes), `e2e/perf.spec.ts` (the
+  launch, and twenty tiles and shadows late in a long game, on a phone slowed 4x).
+
 ## The God King, redrawn as pixel art (Oct 8, 2026)
 
 Eric's reference: a holy knight in white plate with gold trim, a winged crown-helmet with glowing gold eyes, a flaming

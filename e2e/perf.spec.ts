@@ -137,14 +137,25 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
     await page.waitForTimeout(ms);
     return frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
   };
-  // Through the sparkler and the candle.
+  // Through the sparkler and the candle: the launch itself measured (he slams the candle down and fires 24 shots that
+  // fan out, each whistling; the first wave's shadows appear as he jumps off).
+  let launch: { p95: number; slow: number } | null = null;
   for (let i = 0; i < 3; i++) {
     await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
     const { fen, allowed } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }));
     const legal = new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? "")).filter((m) => !allowed || allowed.includes(m));
     await page.evaluate((uci) => (window as any).match.submit(uci), legal[0]!);
     await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+    if (i === 1) {
+      await page.locator(".pm-rex").waitFor({ timeout: 30_000 });
+      await page.evaluate(() => ((window as any).__perf.frames = []));
+      await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
+      launch = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
+    }
   }
+  console.log(`G-REX's Roman candle launch (slowed phone): p95 ${launch!.p95} ms, ${Math.round(launch!.slow * 100)}% dropped`);
+  expect(launch!.p95, "the launch: 95th percentile frame (ms)").toBeLessThan(50);
+  expect(launch!.slow, "the launch: share of dropped frames").toBeLessThan(0.15);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   const early = await page.evaluate(counts);
   // Late, at the barrage's peak: a 120-ply game with nine fire tiles across the crowd's half in all three stages (empty
@@ -157,20 +168,24 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   })();
   const squares = ["a1", "c1", "e2", "g2", "b3", "d3", "f3", "h4", "c4", "e4", "a3"].filter((sq) => sq !== king).slice(0, 9);
   await page.evaluate(
-    ({ history, fen, squares }) => {
+    ({ history, fen, squares, king }) => {
       const m = (window as any).match;
       const r = m.runner;
       const b = r.boards.get(r.state.boards[0]);
       Object.assign(b, { history: [...history], fen, lastMove: history[history.length - 1] });
       const p = r.state.boss.powers;
-      r.state = { ...r.state, boss: { ...r.state.boss, powers: { ...p, fire: squares.map((square: string, i: number) => ({ square, lit: p.turn - (i % 3) })), candle: { at: p.turn - 5, left: 4 } } } };
+      // (And the candle's waves on their way: eleven shadows in three sizes, under the pieces.)
+      const shade = ["b1", "d1", "f1", "h1", "a2", "c2", "g3", "a4", "d4", "f4", "h3"].filter((sq) => !squares.includes(sq) && sq !== king);
+      const waves = [0, 1, 2].map((n) => ({ lands: p.turn + 1 + n, shots: 4, squares: shade.slice(n * 4, n * 4 + 4) }));
+      r.state = { ...r.state, boss: { ...r.state.boss, powers: { ...p, fire: squares.map((square: string, i: number) => ({ square, lit: p.turn - (i % 3) })), candle: { at: p.turn - 5, left: 12, next: 9, waves } } } };
       m.phase = { ...m.phase, board: { ...m.phase.board, fen, lastMove: b.lastMove, history: [...history], ply: history.length } };
       m.emit();
     },
-    { history, fen, squares },
+    { history, fen, squares, king },
   );
   await expect(page.locator(".power-board .pw-fire")).toHaveCount(squares.length);
-  await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "4");
+  await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "12");
+  await expect(page.locator(".power-board .pw-shadow")).not.toHaveCount(0);
   const late = await page.evaluate(counts);
   const idle = await frames(1500);
   // A piece dragged round the board for two seconds (and put back).
@@ -194,7 +209,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
   const turn = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
   const f = (s: { p95: number; slow: number }) => `p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped`;
-  console.log(`G-REX, 9 fire tiles, 120 plies: idle ${f(idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom}, anims ${early.anims} → ${late.anims}`);
+  console.log(`G-REX, 9 fire tiles and shadows, 120 plies: idle ${f(idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom}, anims ${early.anims} → ${late.anims}`);
   // The tiles' own elements and animations only (a few each), nothing per redraw.
   expect(late.dom, "DOM elements").toBeLessThanOrEqual(early.dom + 40 + squares.length * 6);
   for (const [what, s] of [["idle", idle], ["drag", drag], ["boss turn", turn]] as const) {

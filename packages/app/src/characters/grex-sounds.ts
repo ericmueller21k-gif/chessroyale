@@ -123,7 +123,7 @@ const SOUNDS: Record<GrexSound, (rate: number) => Float32Array> = {
 };
 
 /** Trims each to sit a little under a move's loudness (as Ginger's and Boingo's do); a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<GrexSound, number> = { crackle: 0.9, whoosh: 0.27, fizz: 0.18, poof: 0.33, pop: 0.31, roar: 0.15, smack: 0.3, whistle1: 0.02, whistle2: 0.022, whistle3: 0.019, sparkle: 0.26 };
+const LEVEL: Record<GrexSound, number> = { crackle: 0.9, whoosh: 0.27, fizz: 0.18, poof: 0.33, pop: 0.31, roar: 0.15, smack: 0.3, whistle1: 0.018, whistle2: 0.02, whistle3: 0.017, sparkle: 0.2 };
 
 const cache = new Map<string, Float32Array>();
 /** The samples for one of his sounds at a sample rate (made once, then reused). */
