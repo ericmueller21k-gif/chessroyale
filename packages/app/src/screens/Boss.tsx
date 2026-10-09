@@ -194,6 +194,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
   const slewQueen = !intro && !!thinkingNow && !victim && lastMoveTookQueen(history, bases);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
+  // Lights out: what the dock says (a round's prompt may take both its lines).
+  const lightsNow = lights ? lightsStatus(lights, match.settings.lateGraceMs, now) : null;
   // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
   const alone = match.standings().length === 1;
   const youStruck = victim !== null && match.isYou(victim);
@@ -297,10 +299,16 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         side={boss.crowdSide}
         cues={kingCues}
         status={
+          lightsNow?.wrap ? (
+            // (His prompt may take both lines on a phone, the count after it.)
+            <span>
+              {lightsNow.line} <span class="muted">{lightsNow.sub}</span>
+            </span>
+          ) : (
           <>
             <span class="dock-line">
               {lights ? (
-                lightsStatus(lights, match.settings.lateGraceMs, now).line
+                lightsNow!.line
               ) : claimed && t >= tl.claimAt && t < tl.bannerAt ? (
                 <>
                   {boss.icon} <strong>{claimLine(boss)}</strong>
@@ -336,7 +344,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             </span>
             <span class="dock-line muted">
               {lights
-                ? lightsStatus(lights, match.settings.lateGraceMs, now).sub
+                ? lightsNow!.sub
                 : intro
                 ? `Worst mover struck every ${match.settings.bossKillEvery} moves.`
                 : funMove
@@ -354,6 +362,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                         : ""}
             </span>
           </>
+          )
         }
       />
       <UnderBoard match={match} />

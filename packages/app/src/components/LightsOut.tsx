@@ -4,7 +4,7 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import { LIGHTS_OUT, lightsDeadline, lightsOutTimeline } from "@chessroyale/chess";
 import { bossKit } from "../characters/kits.ts";
 import { animLength, cueAt, lightsOutSmashes, lightsOutSpot, nightItems, nightWarmList, type NightState, type SquareItem } from "../characters/power-art.ts";
-import { findLine } from "../characters/hollow.ts";
+import { findLine, findShort } from "../characters/hollow.ts";
 import { pickLine } from "../characters/boss-beats.ts";
 import type { BossView, LightsView } from "../game.ts";
 import { BoardEffects, BossMoment, prewarm } from "./BossEffect.tsx";
@@ -68,8 +68,11 @@ export function lightsMissed(lights: LightsView, upTo = lights.rounds.length): n
   return lights.rounds.slice(0, upTo).reduce((n, r, i) => n + (r.answers ? r.pieces.length - (lights.mine[i]?.found.length ?? 0) : 0), 0);
 }
 
-/** The dock's words through Lights out. */
-export function lightsStatus(lights: LightsView, graceMs: number, now: number): { line: ComponentChildren; sub: string } {
+/**
+ * The dock's words through Lights out. `wrap`: the round's prompt, which may take both of the dock's lines (on a
+ * phone his longer prompts don't fit one: measured at 320-390 px), with the count after it.
+ */
+export function lightsStatus(lights: LightsView, graceMs: number, now: number): { line: ComponentChildren; sub: string; wrap?: boolean } {
   const b = lightsBeat(lights, graceMs, now);
   const cost = BOSS_POWERS.lightsOutMiss;
   if (b.back) {
@@ -79,8 +82,8 @@ export function lightsStatus(lights: LightsView, graceMs: number, now: number): 
   if (b.round < 0) return { line: <strong>Lights out!</strong>, sub: "Clocks stopped." };
   const r = lights.rounds[b.round]!;
   const mine = lights.mine[b.round] ?? { found: [], wrong: [] };
-  if (b.open) return { line: <strong>{findLine(r.targets ?? r.pieces)}</strong>, sub: `${mine.found.length}/${r.pieces.length} found` };
-  if (b.waiting) return { line: <strong>{findLine(r.targets ?? r.pieces)}</strong>, sub: `${mine.found.length}/${r.pieces.length} found · waiting for the others` };
+  if (b.open) return { line: <strong>{findShort(r.targets ?? r.pieces, 40)}</strong>, sub: `${mine.found.length}/${r.pieces.length}`, wrap: true };
+  if (b.waiting) return { line: <strong>{findShort(r.targets ?? r.pieces, 40)}</strong>, sub: `${mine.found.length}/${r.pieces.length} · waiting for the others`, wrap: true };
   const missed = r.pieces.length - mine.found.length;
   return { line: <strong>{missed ? `Missed ${missed}: −${missed * cost}` : r.pieces.length > 1 ? "Found them all!" : "Found it!"}</strong>, sub: `Round ${b.round + 1} of ${lights.rounds.length}` };
 }

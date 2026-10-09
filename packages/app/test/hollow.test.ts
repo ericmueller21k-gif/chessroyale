@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER } from "@chessroyale/core";
 import { pickLine, type Beat } from "../src/characters/boss-beats.ts";
 import { HOLLOW_SOUNDS, hollowSound } from "../src/characters/hollow-sounds.ts";
-import { BULBS, BULB_KEYS, HOLLOW_CAST_FROM, HOLLOW_HEART, STRAND_SECTIONS, bulbsLook, findLine, hollowBuild } from "../src/characters/hollow.ts";
+import { BULBS, BULB_KEYS, HOLLOW_CAST_FROM, HOLLOW_HEART, STRAND_SECTIONS, bulbsLook, findLine, findShort, hollowBuild } from "../src/characters/hollow.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import { DAWN_STAGGER, EFFECTS, POWER_MOMENTS, animLength, cueAt, darkItem, lightsOutSmashes, lightsOutSpot, nightItems } from "../src/characters/power-art.ts";
 import { frameKeys, lazyParts, renderFrame, type Anim, type Character } from "../src/characters/sprite.ts";
@@ -165,6 +165,9 @@ describe("Hollow, the Darkness boss", () => {
     expect(findLine([{ type: "k" }, { type: "b" }, { type: "p", file: "c" }])).toBe("Find my king, my bishop and my pawn on the c-file.");
     expect(findLine([{ type: "p", file: "c", several: true }])).toBe("Find one of my pawns on the c-file.");
     expect(findLine(["q"])).toBe("Find my queen.");
+    // The dock's one line: the same when it fits, a compact list when it doesn't.
+    expect(findShort([{ type: "q" }])).toBe("Find my queen.");
+    expect(findShort([{ type: "r", several: true }, { type: "n", several: true }, { type: "p", file: "e" }])).toBe("Find: a rook, a knight, e-pawn");
   });
 
   it("sounds no louder than a piece's move, and the same every time", () => {

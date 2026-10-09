@@ -172,7 +172,7 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   await expect(page.locator('.lo-marks[data-round="0"][data-open="1"]')).toHaveCount(1, { timeout: 15_000 });
   expect((await banner.seen()).lights).toBe(true);
   for (const s of ["a1", "h8", "e4", "d5"]) expect(await covered(page, s, ".lo-board canvas"), s).toBe(255);
-  await expect(page.locator(".boss-dock")).toContainText(/Find my/);
+  await expect(page.locator(".boss-dock")).toContainText(/Find (my|one of my|:)/);
   const target = his(lights.rounds[0].targets[0])[0]!;
   await tap(page, target);
   await expect(page.locator(`.lo-found[data-square="${target}"][data-round="0"]`)).toHaveCount(1);

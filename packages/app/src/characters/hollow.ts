@@ -1188,3 +1188,19 @@ export function findLine(targets: readonly (string | LightsOutTarget)[]): string
   const list = names.length <= 1 ? (names[0] ?? "my pieces") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
   return `Find ${list}.`;
 }
+
+/**
+ * The prompt for the dock's one line: findLine when it's short enough, else a compact list ("Find: a rook, a knight,
+ * e-pawn"), since his own words show in full in his text box over the board.
+ */
+export function findShort(targets: readonly (string | LightsOutTarget)[], max = 30): string {
+  const full = findLine(targets);
+  if (full.length <= max) return full;
+  const names = targets.map((x) => {
+    const t = typeof x === "string" ? { type: x } : x;
+    const word = PIECE_WORD[t.type.toLowerCase()] ?? "piece";
+    if (t.file) return `${t.several ? "a " : ""}${t.file}-pawn`;
+    return t.several ? `a ${word}` : word;
+  });
+  return `Find: ${names.join(", ")}`;
+}

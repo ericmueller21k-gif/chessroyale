@@ -121,12 +121,14 @@ async function run(name, context) {
   await play(legal);
   const lo = await waitUntil((s) => s.kind === "boss" && !!s.lights);
   const lights = lo.lights;
-  log(`lights out: ${JSON.stringify(lights.rounds.map((r) => r.pieces))}`);
+  log(`lights out: ${JSON.stringify(lights.rounds.map((r) => r.targets ?? r.pieces))}`);
   const lfen = lo.boss.board.fen;
-  const his = (t) => {
+  // The squares answering a target: his pieces of its type (a pawn named by its file: on that file).
+  const his = (x) => {
+    const t = typeof x === "string" ? { type: x } : x;
     const c = new Chess(lfen);
     const out = [];
-    for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) { const pc = c.get(`${f}${r}`); if (pc && pc.color === "b" && pc.type === t) out.push(`${f}${r}`); }
+    for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) { const pc = c.get(`${f}${r}`); if (pc && pc.color === "b" && pc.type === t.type && (!t.file || f === t.file)) out.push(`${f}${r}`); }
     return out;
   };
   const open = (i) => p.evaluate((i) => document.querySelector(`.lo-marks[data-round="${i}"][data-open="1"]`) !== null, i);
@@ -134,9 +136,9 @@ async function run(name, context) {
   for (let i = 0; i < 2; i++) {
     for (let k = 0; k < 400 && !(await open(i)); k++) await p.waitForTimeout(40);
     await p.waitForTimeout(900);
-    const want = lights.rounds[i].pieces;
+    const want = lights.rounds[i].targets ?? lights.rounds[i].pieces;
     await tap(his(want[0])[0]);
-    log(`round ${i + 1}: tapped ${his(want[0])[0]} for ${want[0]}`);
+    log(`round ${i + 1}: tapped ${his(want[0])[0]} for ${JSON.stringify(want[0])}`);
     if (i === 1) {
       await p.waitForTimeout(700);
       const empty = ["e5", "d5", "c6", "f6"].find((sq) => !new Chess(lfen).get(sq));
