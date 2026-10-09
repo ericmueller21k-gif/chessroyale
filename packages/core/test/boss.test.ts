@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER, bossStrength, bossThreat, chooseBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
+import { BOSS_DIFFICULTY, ENGINE_MAX_ELO, BOSS_ROSTER, bossStrength, bossThreat, chooseBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
 
 describe("the boss template: who can be met", () => {
   it("only a boss with a complete character and its powers is playable", () => {
@@ -39,5 +39,17 @@ describe("the boss template: who can be met", () => {
     expect(bossStrength(1600, { offset: -100 })).toBe(1500);
     expect(bossStrength(3190, { offset: 200 })).toBe(3190);
     expect([1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3190].map(bossThreat)).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+  });
+
+  it("solo's difficulty: Easy −300, Normal your strength, Hard +250, Hardest +500, never past the engine's strongest", () => {
+    expect(BOSS_DIFFICULTY.map((d) => [d.id, d.elo])).toEqual([["easy", -300], ["normal", 0], ["hard", 250], ["hardest", 500]]);
+    const at = (base: number, id: string) => bossStrength(base, { offset: -100 }, BOSS_DIFFICULTY.find((d) => d.id === id)!.elo);
+    expect([at(1600, "easy"), at(1600, "normal"), at(1600, "hard"), at(1600, "hardest")]).toEqual([1200, 1500, 1750, 2000]);
+    expect(at(3000, "hardest")).toBe(ENGINE_MAX_ELO);
+    expect(at(1000, "easy")).toBe(800);
+    // A test trigger, solo only: a boss whose powers are built before its art (?wip=1); never otherwise.
+    expect(chooseBoss(0.5, "grex").id).not.toBe("grex");
+    expect(chooseBoss(0.5, "grex", null, undefined, true).id).toBe("grex");
+    expect(chooseBoss(0.5, "golem", null, undefined, true).id).not.toBe("golem");
   });
 });

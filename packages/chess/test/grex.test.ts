@@ -388,3 +388,17 @@ describe("a board whose position changed between moves", () => {
     expect(netBoard(newBoard(0, opening(RUY), RUY.length)).bases).toBeUndefined();
   });
 });
+
+describe("solo's difficulty", () => {
+  it("the boss plays at your strength plus its offset plus the difficulty, capped at the engine's strongest; the boss stays random", () => {
+    const elo = (extra: number, base = 2000) => {
+      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: base, bossDifficulty: extra } as Settings;
+      return new MatchRunner({ settings, rng: mulberry32(4), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] }).boss!;
+    };
+    expect(elo(0).elo).toBe(1900);
+    expect(elo(-300).elo).toBe(1600);
+    expect(elo(250).elo).toBe(2150);
+    expect(elo(500, 3000).elo).toBe(3190);
+    expect(elo(500).id).toBe(elo(-300).id);
+  });
+});

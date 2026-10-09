@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
-import { POWER_FX, bossShowMs, legalMoves, pieceAt, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { FIRE_BURN_MS, POWER_FX, bossShowMs, initPowers, legalMoves, pieceAt, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -194,5 +194,75 @@ describe("boss powers online", () => {
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
     expect([...ids].sort()).toEqual(["clown", "gingerbread"]);
+  });
+
+  it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {
+    const L = raid({ bossId: "gingerbread" });
+    // Not an admin (the Durable Object says so), or sent as a plain message: nothing.
+    expect(L.core.ultimateTrigger("p2", false)).toBe(false);
+    L.core.message("p2", { t: "ultimate" });
+    const runner = () => (L.core as unknown as { runner: MatchRunner }).runner;
+    expect(runner().boss!.powers!.ultNext).toBeUndefined();
+    // Switched off: nothing, even for an admin.
+    const on = BOSS_POWERS.ultimateTestButton;
+    (BOSS_POWERS as { ultimateTestButton: boolean }).ultimateTestButton = false;
+    expect(L.core.ultimateTrigger("p1", true)).toBe(false);
+    (BOSS_POWERS as { ultimateTestButton: boolean }).ultimateTestButton = on;
+    // An admin, in the middle of the crowd's turn: this turn goes on as it was.
+    const r1 = L.last("p1", "round")!;
+    expect(L.core.ultimateTrigger("p1", true)).toBe(true);
+    expect(L.core.record.round!.key).toBe(r1.key);
+    expect(L.core.record.phase).toBe("play");
+    crowdMove(L);
+    // While the boss thinks: again, harmless.
+    expect(L.core.ultimateTrigger("p1", true)).toBe(true);
+    hostBoss(L);
+    const b = L.last("p2", "boss")!;
+    expect(b.boss.powers!.events.map((e) => e.kind)).toContain("blizzard");
+    expect(b.boss.powers!.events.map((e) => e.kind)).not.toContain("warn");
+    expect(L.last("p1", "boss")!.boss.powers).toEqual(b.boss.powers);
+    // Spent: nothing more.
+    expect(L.core.ultimateTrigger("p1", true)).toBe(false);
+    L.advance(b.until - L.now + 10);
+    expect(L.last("p1", "round")!.boss!.powers!.allowed!.length).toBeGreaterThan(0);
+  });
+
+  it("G-REX: everyone sees the same fire; on a tile's last turn the job names it, a piece left there burns, and the boss waits for it", () => {
+    const L = raid({ bossId: "grex", bossUnfinished: true });
+    const runner = (L.core as unknown as { runner: MatchRunner }).runner;
+    expect(runner.boss!.id).toBe("grex");
+    // A tile ablaze this turn under one of the crowd's pieces that has a move but isn't the king.
+    const fen = runner.boards.get(0)!.fen;
+    const legal = legalMoves(fen);
+    const square = legal.map((m) => m.slice(0, 2)).find((sq) => pieceAt(fen, sq)?.type !== "k" && pieceAt(fen, sq)?.type !== "p")!;
+    runner.state = { ...runner.state, boss: { ...runner.boss!, powers: { ...runner.boss!.powers!, turn: 1, nextPassive: 99, fire: [{ square, lit: -1 }] } } };
+    // Both pick a move that leaves it there.
+    const r = L.last("p1", "round")!;
+    const stay = legal.find((m) => !m.startsWith(square))!;
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: stay });
+    const req = L.last("p1", "scoreRequest")!;
+    expect(req.key).toBe(r.key);
+    expect(req.jobs[0]!.burn).toEqual([square]);
+    expect(L.hostScores("p1")).toBe(true);
+    L.advance(30_000);
+    // The piece burnt: the boss's turn shows the board without it, the same for everyone, and its move waits for the fire.
+    const thinking = L.last("p2", "boss")!;
+    expect(thinking.boss.powers!.burnt).toEqual([{ turn: 1, square, piece: pieceAt(fen, square)!.type }]);
+    expect(pieceAt(thinking.boss.board.fen, square)).toBeNull();
+    expect(thinking.boss.board.bases).toEqual([{ ply: thinking.boss.board.ply, fen: thinking.boss.board.fen }]);
+    expect(L.last("p1", "boss")!.boss.powers).toEqual(thinking.boss.powers);
+    expect(L.core.record.bossMinAt).toBe(thinking.now + FIRE_BURN_MS);
+    // A fire turn doesn't count for fair play.
+    expect(L.core.fairMoves("p1").map((m) => !!m.power)).toEqual([true]);
+    // (The host's move, in before the fire has played out, waits for it.)
+    hostBoss(L);
+    expect(L.last("p1", "boss")!.thinking).toBe(true);
+    L.advance(FIRE_BURN_MS + 10);
+    const shown = L.last("p1", "boss")!;
+    expect(shown.thinking).toBeFalsy();
+    L.advance(shown.until - L.now + 10);
+    const next = L.last("p1", "round")!;
+    expect(pieceAt(next.board!.fen, square)).toBeNull();
+    expect(next.board!.fen.split(" ")[0]).toBe(runner.boards.get(0)!.fen.split(" ")[0]);
   });
 });
