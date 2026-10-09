@@ -9689,6 +9689,13 @@ img.qicon {
 .boss-bar.has-char .boss-icon-face {
   display: none;
 }
+/* A tall boss (G-REX's long neck): the bar grows to hold him, so his head never covers the heading above it. */
+.boss-char.place-bar.tall {
+  height: 88px;
+}
+.boss-char.place-results.tall {
+  height: 180px;
+}
 /* A computer: by the board's bottom-left corner (the God King is by its top-right). */
 .boss-side {
   display: none;
