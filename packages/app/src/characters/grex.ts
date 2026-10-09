@@ -422,7 +422,7 @@ PARTS.candle = (() => {
 })();
 
 const LIMBS = new Map<string, Painted>();
-type LimbKind = "arm" | "leg" | "neck" | "tail";
+type LimbKind = "arm" | "leg" | "tail";
 function limb(kind: LimbKind, pts: readonly Pt[]): { name: string; at: Pt } {
   const name = `${kind}:${pts.map((p) => p.join(",")).join(";")}`;
   let l = LIMBS.get(name);
@@ -432,9 +432,7 @@ function limb(kind: LimbKind, pts: readonly Pt[]): { name: string; at: Pt } {
         ? paintLimb(pts, 2.3, { fist: true, endR: 2.9, spotEvery: 5 })
         : kind === "leg"
           ? paintLimb(pts, 2.7, { spotEvery: 5.4 })
-          : kind === "neck"
-            ? paintLimb(pts, 3.7, { spotEvery: 4.2, spotFrom: 1.5 })
-            : paintLimb(pts, 1.1, { spotEvery: 99 });
+          : paintLimb(pts, 1.1, { spotEvery: 99 });
     LIMBS.set(name, l);
     PARTS[name] = l.part;
   }
@@ -789,11 +787,6 @@ const f = (ms: number, p: GrexPose, extra: Partial<Frame> = {}, seed = 0): Frame
   const sparks = b.tips.flatMap((t, i) => sparkSpray(t, seed * 7 + i * 3 + 1, p.big ? 1.4 : 1));
   return { ms, layers: b.layers, ...extra, specks: [...sparks, ...(extra.specks ?? [])] };
 };
-
-/** Sparkler tips in a pose, in frame pixels (the ignite throw leaves from the outer one). */
-export function sparklerTips(p: GrexPose): Pt[] {
-  return grexBuild(p).tips;
-}
 
 // ---- Palette flashes.
 
