@@ -1,10 +1,13 @@
 /**
  * The raid bosses that have a character: its drawing, which animation plays for each moment, its sounds, its
- * lines and its portrait. A boss without one keeps its emoji everywhere.
+ * lines and its portrait, keyed by the boss's name in packages/core/src/boss.ts. A boss without one keeps its emoji
+ * everywhere. A kit whose name isn't a boss there yet (Ginger Snap) is drawn and ready but never shows: a boss
+ * becomes playable once it has both a character and its powers (the power rules add it to boss.ts).
  */
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines } from "./boss-beats.ts";
 import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
+import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import type { Character } from "./sprite.ts";
 
 export interface BossKit extends BeatLines {
@@ -20,11 +23,28 @@ export interface BossKit extends BeatLines {
 export const BOSS_KITS: Record<string, BossKit> = {
   "Boingo the Clown": {
     ch: CLOWN,
-    anims: { strike: "capture" },
-    sounds: { boing: "clownBoing", honk: "clownHonk", squeak: "clownSqueak", slideUp: "clownSlideUp", slideDown: "clownSlideDown", laugh: "clownLaugh" },
+    anims: { strike: "capture", power: "pieThrow", ultimateWarn: "check", ultimate: "funhouse" },
+    sounds: {
+      boing: "clownBoing",
+      honk: "clownHonk",
+      squeak: "clownSqueak",
+      slideUp: "clownSlideUp",
+      slideDown: "clownSlideDown",
+      laugh: "clownLaugh",
+      throw: "clownSlideUp",
+      flip: "clownFlip",
+    },
     lines: CLOWN_LINES,
     chance: CLOWN_CHANCE,
     portrait: { ...CLOWN_PORTRAIT, anim: "idle", frame: 4 },
+  },
+  "Ginger Snap": {
+    ch: GINGERBREAD,
+    anims: { strike: "capture", power: "freezeCast", ultimateWarn: "check", ultimate: "blizzard" },
+    sounds: { jingle: "gingerJingle", crunch: "gingerCrunch", crackle: "gingerCrackle", freeze: "gingerCrackle", blizzard: "gingerCrackle" },
+    lines: GINGER_LINES,
+    chance: GINGER_CHANCE,
+    portrait: { ...GINGER_PORTRAIT, anim: "idle", frame: 0 },
   },
 };
 
