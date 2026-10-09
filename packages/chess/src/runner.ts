@@ -80,7 +80,15 @@ import {
   fireShadows,
   fireStage,
   triggerUltimate,
+  bulbsAt,
+  botLightsMisses,
+  chooseLightsOut,
+  darkAttempt,
+  darkSquares,
+  lightsOutDue,
+  touchesDark,
 } from "./boss-powers.ts";
+import type { LightsOutTest } from "@chessroyale/core";
 
 /**
  * Runs a match round by round: deal, collect picks, score with the engine, draw,
@@ -346,17 +354,25 @@ export class MatchRunner {
     // source, which also seeds its powers.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
-    const crowdSide = sideToMove(board.fen);
+    let crowdSide = sideToMove(board.fen);
+    // Hollow, the dark boss: always Black, from the starting position (no opening moves). If the usual pick made the
+    // crowd Black, he claims the dark side before move 1.
+    const claimed = startsDark(def) && crowdSide === "b";
+    if (startsDark(def)) {
+      this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
+      crowdSide = "w";
+    }
+    const fen = this.boards.get(id)!.fen;
     this.state = {
       ...this.state,
       players: this.state.players.map((p) => ({ ...p, colour: null, powerUps: 0 })),
       boss: {
         id: def.id,
-        powers: initPowers(seed, board.fen, crowdSide),
+        powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}) },
         tier: this.settings.bossFixedElo || raidBossElo([]),
         elo: bossStrength(this.settings.bossFixedElo || raidBossElo([]), def, this.settings.bossDifficulty),
         crowdSide,
-        startPly: board.history.length,
+        startPly: this.boards.get(id)!.history.length,
         crowdMoves: 0,
         sinceKill: 0,
         kills: [],
@@ -373,9 +389,47 @@ export class MatchRunner {
   private preparePowers() {
     const b = this.state.boss;
     if (!b?.powers || this.finalGameOver()) return;
-    const fen = this.boards.get(this.state.boards[0]!)!.fen;
-    if (sideToMove(fen) !== b.crowdSide) return;
-    this.state = { ...this.state, boss: prepareTurn(b, fen, this.settings.bossPowerTest) };
+    const board = this.boards.get(this.state.boards[0]!)!;
+    if (sideToMove(board.fen) !== b.crowdSide) return;
+    // (The boss's move just played: Hollow covers its piece's square after his first.)
+    this.state = { ...this.state, boss: prepareTurn(b, board.fen, this.settings.bossPowerTest, BOSS_POWERS, board.lastMove) };
+  }
+
+  /** Boss battle, Hollow's dark: the squares covered this turn (their pieces hidden; a move touching one goes unchecked). */
+  darkSquares(): string[] {
+    return darkSquares(this.state.boss);
+  }
+
+  /**
+   * Hollow's dark: a move attempt that touches a dark square, sent unchecked. A legal (allowed) move is the player's
+   * pick (`move`: a pawn's move to the last rank without a piece named is a queen's). An illegal one costs darkTryCost
+   * off the turn's score (resolveBoard takes it off), and the player picks again; the darkTries-th wrong one ends their
+   * turn as a missed move (`out`). Anything else (no dark on its way, the move the God King took back): refused, free.
+   * Bots never try: they know the board.
+   */
+  darkTry(playerId: string, move: string): { kind: "move"; move: string } | { kind: "wrong"; tries: number; out: boolean } | { kind: "refused" } {
+    const b = this.state.boss;
+    const p = b?.powers;
+    const board = this.boardOf(playerId);
+    if (!b || !p || !board || typeof move !== "string" || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) return { kind: "refused" };
+    const dark = darkSquares(b);
+    const legal = darkAttempt(board.fen, move);
+    if (legal) {
+      const allowed = this.crowdAllowed(board.id);
+      return allowed && !allowed.includes(legal) ? { kind: "refused" } : { kind: "move", move: legal };
+    }
+    if (!touchesDark(move, dark, board.fen)) return { kind: "refused" };
+    const round = this.state.round;
+    const by = p.tries?.round === round ? { ...p.tries.by } : {};
+    by[playerId] = (by[playerId] ?? 0) + 1;
+    this.state = { ...this.state, boss: { ...b, powers: { ...p, tries: { round, by } } } };
+    return { kind: "wrong", tries: by[playerId]!, out: by[playerId]! >= BOSS_POWERS.darkTries };
+  }
+
+  /** Hollow's dark: each player's wrong attempts into the dark this round. */
+  darkTries(): Record<string, number> {
+    const t = this.state.boss?.powers?.tries;
+    return t && t.round === this.state.round ? t.by : {};
   }
 
   /** Boss battle, G-REX's fire: the tiles ablaze this crowd turn (a crowd piece left on one burns after the move). */
@@ -725,6 +779,12 @@ export class MatchRunner {
       .map(([move, expected]) => ({ move, expected, loss: Math.max(0, (best - expected) * 100) }))
       .sort((a, b) => b.expected - a.expected);
     for (const id of abstained) result.players.push({ playerId: id, move: null, loss: null, roundScore: 0, abstained: true });
+    // Hollow's dark: each wrong attempt into the dark costs darkTryCost; a turn never costs more than missing it.
+    const tries = this.darkTries();
+    for (const pl of result.players) {
+      const n = tries[pl.playerId] ?? 0;
+      if (n > 0) pl.roundScore = Math.max(this.settings.missedMoveScore, pl.roundScore - n * BOSS_POWERS.darkTryCost);
+    }
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
@@ -1059,6 +1119,46 @@ export class MatchRunner {
     return t.ok;
   }
 
+  /** Hollow's Lights out is due: the start of his turn (the crowd has moved), from the full meter or the test trigger. */
+  lightsOutDue(): boolean {
+    return lightsOutDue(this.state.boss) && this.bossToMove();
+  }
+
+  /**
+   * Lights out begins (the clocks stopped: nobody is picking): its rounds, picked from the battle's seed and the
+   * position. Once a match: the ultimate is spent from here.
+   */
+  startLightsOut(): LightsOutTest {
+    const b = this.state.boss!;
+    const { ultNext: _trigger, ...p } = b.powers!;
+    const fen = this.boards.get(this.state.boards[0]!)!.fen;
+    const test: LightsOutTest = { at: b.crowdMoves, rounds: chooseLightsOut(fen, b.crowdSide === "w" ? "b" : "w", p.seed) };
+    this.state = { ...this.state, boss: { ...b, powers: { ...p, ultAt: p.ultAt ?? b.crowdMoves, lightsOut: test } } };
+    return test;
+  }
+
+  /**
+   * Lights out is over: every player still in loses lightsOutMiss for each piece they didn't find (people's from their
+   * taps, `missed`; a person with no entry found nothing; bots' from the seed). It isn't a move: nothing else changes,
+   * and fair play never sees it. Returns what each missed.
+   */
+  finishLightsOut(missed: Readonly<Record<string, number>>): Record<string, number> {
+    const b = this.state.boss!;
+    const p = b.powers!;
+    const test = p.lightsOut;
+    if (!test || test.missed) return test?.missed ?? {};
+    const all = test.rounds.reduce((n, r) => n + r.pieces.length, 0);
+    const out: Record<string, number> = {};
+    for (const pl of this.alive()) out[pl.id] = pl.isBot ? botLightsMisses(p.seed, pl.id, test.rounds) : Math.max(0, Math.min(all, missed[pl.id] ?? all));
+    const cost = BOSS_POWERS.lightsOutMiss;
+    this.state = {
+      ...this.state,
+      players: this.state.players.map((pl) => (out[pl.id] ? { ...pl, stageScore: pl.stageScore - out[pl.id]! * cost } : pl)),
+      boss: { ...b, powers: { ...p, lightsOut: { ...test, missed: out } } },
+    };
+    return out;
+  }
+
   /** The boss's last move, and the piece it took (if any). */
   private bossLast: { move: string; san: string; staggered?: boolean; captured?: string } | null = null;
 
@@ -1123,7 +1223,8 @@ export class MatchRunner {
       kingStrikes: b.kingStrikes ?? [],
       staggerNext: !!b.staggerNext,
       raid: !!this.settings.raid,
-      openingName: this.settings.raid ? netBoard(this.boards.get(this.state.boards[0]!)!).openingName : null,
+      // (Hollow starts from the starting position: no opening to name.)
+      openingName: this.settings.raid && (b.startPly ?? 0) > 0 ? netBoard(this.boards.get(this.state.boards[0]!)!).openingName : null,
       lastMove: this.bossLast,
       justKilled,
       lastStand: b.lastStand ?? null,
@@ -1152,6 +1253,15 @@ export class MatchRunner {
               shadows: fireShadows(p),
               stepped: p.stepped ?? null,
               ultNext: !!p.ultNext,
+              ...(powers.passive === "dark"
+                ? {
+                    dark: (p.dark ?? []).map((d) => ({ square: d.square, at: d.at, until: d.until })),
+                    cleared: p.cleared ?? [],
+                    bulbs: p.bulbs ?? bulbsAt(p.turn || 1),
+                    ...(p.claimed ? { claimed: true } : {}),
+                    lightsAt: p.lightsOut ? p.lightsOut.at : null,
+                  }
+                : {}),
             },
           }
         : {}),
@@ -1163,13 +1273,15 @@ export class MatchRunner {
     const id = this.state.boards[0] ?? 0;
     const old = this.boards.get(id)!;
     // From the game just played: a roughly even position between moves 5 and 12, White (the crowd) to move.
-    const startPly = bossStartPly(old.evals ?? [], old.history.length);
-    const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
-    this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
+    let startPly = bossStartPly(old.evals ?? [], old.history.length);
     const alive = this.alive();
     // Which boss: a random playable one (as in a raid), at the crowd's strength plus its own offset.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
+    // (Hollow, the dark boss, plays from the starting position.)
+    if (startsDark(def)) startPly = 0;
+    const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
+    this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
     const tier = bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
     const elo = bossStrength(tier, def, this.settings.bossDifficulty);
     this.bossLast = null;
@@ -1361,6 +1473,9 @@ export class MatchRunner {
 }
 
 export type BossMoveKind = "elo" | "stumble" | "stagger";
+
+/** Hollow, the dark boss: always Black, from the starting position (his passive is the dark). */
+export const startsDark = (def: { powers: { passive: string } | null } | null | undefined) => def?.powers?.passive === "dark";
 
 /** The limits on a boss's moves (see bossSlipLoss, bossMaxLoss and bossMaxLogitLoss in settings). */
 export interface BossGuard {

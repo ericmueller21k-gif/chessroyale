@@ -1,4 +1,4 @@
-import { BOSS_TIERS, bossDef, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, POWER_IDS, bossDef, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 import type { LiveHub } from "./live-hub.ts";
@@ -171,7 +171,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
           })(),
           ...(() => {
             const p = url.searchParams.get("power");
-            return p && ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle"].includes(p) ? { bossPowerTest: p } : {};
+            return p && (POWER_IDS as readonly string[]).includes(p) ? { bossPowerTest: p } : {};
           })(),
           roundsPerStage: n("rounds"),
           firstStageRounds: n("rounds"),

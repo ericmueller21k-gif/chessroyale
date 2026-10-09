@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, CANDLE, FUNHOUSE, FireBurn, funhouseFlipAt, powerLine, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BulbStrip, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, funhouseFlipAt, powerLine, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
+import { BossMoment } from "../components/BossEffect.tsx";
+import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
 import { kingSay, resetKingSpeech, type KingCue } from "../godKing.ts";
@@ -11,7 +13,8 @@ import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
-import type { BossView, GameView } from "../game.ts";
+import type { BossView, GameView, LightsView } from "../game.ts";
+import { LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
 import { seenKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
@@ -47,7 +50,7 @@ function OpeningRoulette({ name }: { name: string }) {
 }
 
 /** The dock's line for a power's moment. */
-const POWER_DOCK: Record<string, string> = { freeze: "Freeze!", pie: "Pie!", blizzard: "Blizzard!", funhouse: "Funhouse!", warn: "Rage!", spark: "Sparkler!", candle: "Roman candle!", fireball: "Fireballs!" };
+const POWER_DOCK: Record<string, string> = { freeze: "Freeze!", pie: "Pie!", blizzard: "Blizzard!", funhouse: "Funhouse!", warn: "Rage!", spark: "Sparkler!", candle: "Roman candle!", fireball: "Fireballs!", dark: "Darkness!" };
 const PIECE_NAME: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen" };
 
 /** When each burn after a crowd move started on this device (a screen drawn again carries on, it doesn't restart). */
@@ -83,6 +86,7 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
             </i>
           ))}
           <RageMeter boss={boss} />
+          <BulbStrip boss={boss} />
         </span>
       </span>
       <span class="boss-next">
@@ -102,19 +106,52 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
   );
 }
 
+/** Hollow's line as he claims the dark side (the same for everyone). */
+const claimLine = (boss: BossView) => {
+  const kit = bossKit(boss.name);
+  return (kit && pickLine(kit, "claim", `${boss.id}:claim:${boss.startMove}`)) ?? "The dark side is mine.";
+};
+
+/**
+ * Hollow claims the dark side in the intro (the crowd would have been Black): he steps up to the board's corner, points
+ * at himself and the dark rises round him like a cloak (his `claimDark`), with his line.
+ */
+function ClaimDark({ boss, since, now }: { boss: BossView; since: number; now: number }) {
+  const kit = bossKit(boss.name);
+  if (!kit?.ch.anims.claimDark) return null;
+  const line = claimLine(boss);
+  const lineAt = since + 500;
+  return (
+    <div class="power-moment pm-claim">
+      <span class="pm-caster pm-hollow" style={{ aspectRatio: `${kit.ch.w} / ${kit.ch.h}`, left: `${HOLLOW_CASTER.left}%`, top: `${HOLLOW_CASTER.top}%`, width: `${HOLLOW_CASTER.width}%` }}>
+        <BossMoment boss={boss.name} anim="claimDark" since={since} then="idle" />
+      </span>
+      {now >= lineAt && (
+        <div class="pm-line" role="status" aria-label={line}>
+          {line.slice(0, Math.min(line.length, Math.floor((now - lineAt) / 28) + 1))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Boss battle, between the crowd's moves: the boss thinking, then its move; or
  * the boss striking down the crowd's worst recent mover, with a flash and the
  * victim's name crossed out.
  */
-export function BossScreen({ match, boss, until, thinking, intro }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean }) {
+export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, lights }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView }) {
   const now = useFrameNow();
+  // (Hollow's Lights out comes before his move: as far as the rest of the screen goes, he hasn't moved yet.)
+  const thinking = thinkingNow || !!lights;
   const [mountedAt] = useState(Date.now());
   const victim = boss.justKilled ?? null;
   // The intro: the boss's card over the starting position, the game so far replayed quickly from the start,
   // then "START!".
   const history = boss.board.history;
-  const tl = useMemo(() => bossIntroTimeline(history.length), [history.length]);
+  // (Hollow claims the dark side after the card, when the crowd would have been Black.)
+  const claimed = !!intro && !!boss.powers?.claimed;
+  const tl = useMemo(() => bossIntroTimeline(history.length, claimed), [history.length, claimed]);
   const t = now - mountedAt;
   const plies = intro ? Math.max(0, Math.min(history.length, Math.floor((t - tl.replayAt) / Math.max(1, tl.step)))) : history.length;
   const bases = boss.board.bases;
@@ -159,7 +196,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   // The boss takes your queen: its banner, face and roar.
   const tookQueen = !intro && !thinking && !victim && !funhouse && boss.lastMove?.captured === "q";
   // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
-  const slewQueen = !intro && !!thinking && !victim && lastMoveTookQueen(history, bases);
+  const slewQueen = !intro && !!thinkingNow && !victim && lastMoveTookQueen(history, bases);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
   const alone = match.standings().length === 1;
@@ -208,17 +245,19 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
       <Hud match={match} />
       <div class={`board-area${slam ? " pw-slam" : ""}`}>
         <div class="opening-name">
-          <BossHeading side={boss.crowdSide} note={thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
+          <BossHeading side={boss.crowdSide} note={lights ? "lights out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
         </div>
         <div class={`board-row${fun?.flipping ? " pw-flipping" : ""}`}>
           <BossSide match={match} />
           <EvalBar fen={fenShown} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
           <Board fen={fenShown} orientation={orientation} lastMove={lastShown}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={fenShown} />}
+            {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
             {!thinking && !victim && !alone && !funhouse && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
             <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
             <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
+            {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
             {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
             {slewQueen && (
               <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="bannerStart" />
@@ -233,7 +272,9 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
                 <strong class="boss-intro-name">{boss.name}</strong>
                 {boss.raid && boss.openingName && <OpeningRoulette name={boss.openingName} />}
                 <span class="boss-intro-note">
-                  {boss.raid
+                  {boss.raid && !boss.openingName
+                    ? `A fresh game from the starting position. You play ${boss.crowdSide === "w" ? "White" : "Black"}.`
+                    : boss.raid
                     ? `It challenges you from this opening, ${boss.startMove - 1} moves in. You play ${boss.crowdSide === "w" ? "White" : "Black"}.`
                     : boss.startMove > 1
                     ? `It takes over your game from move ${boss.startMove}, where it was roughly even. The crowd plays White.`
@@ -262,7 +303,13 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
         status={
           <>
             <span class="dock-line">
-              {intro ? (
+              {lights ? (
+                lightsStatus(lights, match.settings.lateGraceMs, now).line
+              ) : claimed && t >= tl.claimAt && t < tl.bannerAt ? (
+                <>
+                  {boss.icon} <strong>{claimLine(boss)}</strong>
+                </>
+              ) : intro ? (
                 <strong>{boss.raid ? "All of you vs the boss." : "Ten of you vs the boss."}</strong>
               ) : funMove ? (
                 <>
@@ -291,7 +338,9 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
               ) : null}
             </span>
             <span class="dock-line muted">
-              {intro
+              {lights
+                ? lightsStatus(lights, match.settings.lateGraceMs, now).sub
+                : intro
                 ? `Worst mover struck every ${match.settings.bossKillEvery} moves.`
                 : funMove
                   ? "Not scored."

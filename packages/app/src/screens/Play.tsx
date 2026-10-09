@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
+import { BOSS_POWERS } from "@chessroyale/core";
 import { applyMove, inCheck, legalMoves, queenInDanger, sideToMove, toSan } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
@@ -13,12 +14,14 @@ import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
-import { PowerBoard, crowdOrientation } from "../components/BossPowers.tsx";
+import { DarkCost, PowerBoard, crowdOrientation } from "../components/BossPowers.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 
 const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
+const DARK_COST = BOSS_POWERS.darkTryCost;
+const DARK_TRIES = BOSS_POWERS.darkTries;
 
 /** Re-renders every `ms` and returns the time. */
 function useNow(ms = 200) {
@@ -132,7 +135,10 @@ export function PlayScreen({
   const lastMove = history.browsing ? history.lastMove : (moved?.lastMove ?? shown.lastMove);
   // Boss battle: the God King striking the boss. The clock stands still and nobody moves until he's gone.
   const striking = !!strike?.at && now < strike.until!;
-  const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking;
+  // Hollow's dark: the squares covered (their pieces hidden), and how your last attempt into it went.
+  const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
+  const note = match.darkNote;
+  const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending;
   const godKing = useMemo(() => {
     if (!strike?.at) return null;
     const boss = side === "w" ? "b" : "w";
@@ -207,8 +213,10 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows}>
-            {match.boss?.powers && !history.browsing && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
+          <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)}>
+            {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
+            {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
+            {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} />}
             {match.boss && wipPower() && <WipPreview fen={fen} orientation={orientation} crowd={match.boss.crowdSide} />}
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
             {match.settings.mode === "crowd" && !match.boss && deadline > 0 && <BoardClock match={match} you={you} turn={{ startsAt, deadline, yours: true, done: waiting }} />}
@@ -255,7 +263,7 @@ export function PlayScreen({
               </span>
             ) : waiting ? (
               <span>
-                <Dots /> <strong>{picked ? "Move in." : "Time's up."}</strong>{" "}
+                <Dots /> <strong>{picked ? "Move in." : note?.out ? "Out of tries." : "Time's up."}</strong>{" "}
                 <span class="muted">
                   Waiting · {doneCount}/{alive.length}
                 </span>
@@ -272,7 +280,14 @@ export function PlayScreen({
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}
-                {hint !== null ? (
+                {note && !note.pending ? (
+                  // Your own attempt into the dark wasn't legal: what it cost, and the tries you have left.
+                  <span class="dark-note" role="status">
+                    −{DARK_COST} · {DARK_TRIES - note.tries} {DARK_TRIES - note.tries === 1 ? "try" : "tries"} left
+                  </span>
+                ) : note?.pending ? (
+                  <span class="muted">Into the dark…</span>
+                ) : hint !== null ? (
                   <span class="muted">{hint.length ? "⚡ Top 3" : "⚡ Asking the engine…"}</span>
                 ) : barred ? (
                   <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span>

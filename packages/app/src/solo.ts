@@ -1,8 +1,8 @@
 import { BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
-import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
+import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, judgeTaps, lightsOutTimeline, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
+import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
 import { warmEngineServer, withServerRecheck } from "./engine.ts";
@@ -360,6 +360,96 @@ export class SoloMatch implements GameView {
     this.timer = setTimeout(() => this.submit(null), deadline - at + this.settings.lateGraceMs);
     this.set({ ...phase, deadline, strike: { calls, needed, mine: true, at, until: at + ms } });
   }
+  /** Hollow's dark: how your last attempt into the dark went this turn. */
+  darkNote: DarkNote | null = null;
+  /**
+   * Hollow's dark: a move attempt touching a dark square, judged here as the server would: a legal move is your pick;
+   * an illegal one costs points and you pick again, until your last try ends the turn as a miss.
+   */
+  darkTry(move: string) {
+    if (this.phase.kind !== "play" || !this.runner.boss || Date.now() < this.playStartedAt - 300) return;
+    if (this.frozen && Date.now() < this.frozen.until) return; // While the King strikes.
+    const out = this.runner.darkTry(HUMAN, move);
+    if (out.kind === "move") {
+      this.darkNote = null;
+      return this.submit(out.move);
+    }
+    if (out.kind === "refused") return;
+    this.darkNote = { move, at: Date.now(), tries: out.tries, out: out.out };
+    if (out.out) return void this.score(null);
+    this.emit();
+  }
+
+  // ---------------- Hollow's Lights out ----------------
+
+  /** Lights out in progress: when it began, how many rounds are over, your taps round by round. */
+  private lights: { key: string; at: number; ended: number; taps: string[][] } | null = null;
+
+  /** At the start of his turn (the clocks stopped): the rounds, timed here as the server times them online. */
+  private lightsOutTurn() {
+    const test = this.runner.startLightsOut();
+    const at = Date.now();
+    this.lights = { key: `l-${at}`, at, ended: 0, taps: test.rounds.map(() => []) };
+    const tl = lightsOutTimeline(test.rounds, this.settings.lateGraceMs);
+    const step = () => {
+      const l = this.lights;
+      if (!l) return;
+      if (l.ended < tl.rounds.length) {
+        l.ended++;
+        this.showLights();
+        this.timer = setTimeout(step, l.at + (l.ended < tl.rounds.length ? tl.rounds[l.ended]!.answersAt : tl.total) - Date.now());
+        return;
+      }
+      // The lights are back: each piece you missed costs; then his move.
+      const missed = this.lightsMine().reduce((n, r, i) => n + test.rounds[i]!.pieces.length - r.found.length, 0);
+      this.runner.finishLightsOut(this.you.alive ? { [HUMAN]: missed } : {});
+      this.lights = null;
+      void this.bossTurn();
+    };
+    this.showLights();
+    this.timer = setTimeout(step, at + tl.rounds[0]!.answersAt - Date.now());
+  }
+
+  /** Your taps in Lights out, judged round by round. */
+  private lightsMine(): { found: string[]; wrong: string[] }[] {
+    const test = this.runner.boss?.powers ? this.runner.state.boss?.powers?.lightsOut : null;
+    if (!test || !this.lights) return [];
+    const fen = this.runner.boards.get(this.runner.state.boards[0]!)!.fen;
+    const side = this.runner.state.boss!.crowdSide === "w" ? "b" : "w";
+    return test.rounds.map((r, i) => {
+      const j = judgeTaps(r, fen, side, this.lights!.taps[i] ?? []);
+      return { found: j.found, wrong: j.wrong };
+    });
+  }
+
+  private showLights() {
+    const l = this.lights!;
+    const test = this.runner.state.boss!.powers!.lightsOut!;
+    const lights: LightsView = {
+      key: l.key,
+      at: l.at,
+      rounds: test.rounds.map((r, i) => ({ pieces: r.pieces, ms: r.ms, ...(i < l.ended ? { answers: r.answers } : {}) })),
+      mine: this.lightsMine(),
+    };
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, lights });
+  }
+
+  /** Lights out: a tap, in the round that's on (with the usual late grace). */
+  lightsTap(square: string) {
+    const l = this.lights;
+    const test = this.runner.state.boss?.powers?.lightsOut;
+    if (!l || !test || this.phase.kind !== "boss" || !this.phase.lights || !this.you.alive) return;
+    const now = Date.now();
+    const tl = lightsOutTimeline(test.rounds, this.settings.lateGraceMs);
+    const i = tl.rounds.findIndex((r) => now >= l.at + r.at - 300 && now <= l.at + r.answersAt);
+    const taps = l.taps[i];
+    if (i < l.ended || !taps || taps.includes(square)) return;
+    const mine = this.lightsMine()[i]!;
+    if (mine.found.length + mine.wrong.length >= test.rounds[i]!.pieces.length) return;
+    taps.push(square);
+    this.showLights();
+  }
+
   /** Testing (admins): the boss's ultimate as the next crowd turn begins. */
   triggerUltimate() {
     if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin) return;
@@ -431,7 +521,7 @@ export class SoloMatch implements GameView {
       if (!this.bossIntroDone) {
         // The boss arrives: it takes over from an even position of the game just played.
         this.bossIntroDone = true;
-        const introMs = bossIntroTimeline(this.runner.boards.get(this.runner.state.boards[0]!)!.history.length).total;
+        const introMs = bossIntroTimeline(this.runner.boards.get(this.runner.state.boards[0]!)!.history.length, !!this.runner.state.boss?.powers?.claimed).total;
         this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + introMs, intro: true });
         this.timer = setTimeout(() => this.nextRound(), introMs);
         return;
@@ -440,12 +530,14 @@ export class SoloMatch implements GameView {
         this.runner.finishBossBattle();
         return this.finish();
       }
-      if (this.runner.bossToMove()) return void this.bossTurn();
+      // (Hollow's Lights out comes at the start of his turn, before his move.)
+      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.bossTurn());
       if (this.runner.funhouseDue()) return void this.funhouseTurn();
     } else if (this.runner.isFinal()) return void this.finalTurn();
     this.runner.deal();
     this.kingCalled = false;
     this.frozen = null;
+    this.darkNote = null;
     this.runner.prefetch();
     if (!this.runner.boardOf(HUMAN)) return this.watchTurn();
     // The move clock starts after a short settling-in countdown on the new board (alone, at once: nothing to settle).
@@ -655,6 +747,11 @@ export class SoloMatch implements GameView {
           break;
         }
         if (this.runner.bossToMove()) {
+          // (Lights out with nobody watching: the bots' finds from the seed.)
+          if (this.runner.lightsOutDue()) {
+            this.runner.startLightsOut();
+            this.runner.finishLightsOut({});
+          }
           await this.runner.playBoss(this.engines[0]);
           continue;
         }

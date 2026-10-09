@@ -152,8 +152,10 @@ export function UltimateTest({ match }: { match: GameView }) {
   const key = boss ? `${boss.id}:${boss.startMove}:${boss.board.generation}` : "";
   const [pressed, setPressed] = useState("");
   if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result) return null;
-  const spent = p.ultAt !== null;
-  const coming = !spent && (!!p.ultNext || p.warned || pressed === key);
+  // (Hollow's Lights out: the full meter has it on its way until it has come.)
+  const lights = p.ultimate === "lightsout";
+  const spent = lights ? p.lightsAt != null : p.ultAt !== null;
+  const coming = !spent && (!!p.ultNext || p.warned || (lights && p.ultAt !== null) || pressed === key);
   return (
     <button
       type="button"

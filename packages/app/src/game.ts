@@ -1,4 +1,4 @@
-import { toSan, type BoardRound, type Base, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetStanding, type NetVote } from "@chessroyale/chess";
+import { toSan, type BoardRound, type Base, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetLightsOut, type NetStanding, type NetVote } from "@chessroyale/chess";
 import { brilliance } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 import type { MatchChat } from "./chat.ts";
@@ -97,6 +97,21 @@ export type VoteView = NetVote;
 /** The boss battle as the screens see it. */
 export type BossView = Omit<NetBoss, "board"> & { board: BoardView };
 
+/**
+ * Hollow's dark: your last move attempt into the dark this turn (sent unchecked): `pending` while the server judges it;
+ * else wrong, with your wrong tries so far this turn and whether that was the last (your turn is over, a miss).
+ */
+export interface DarkNote {
+  move: string;
+  at: number;
+  pending?: boolean;
+  tries: number;
+  out: boolean;
+}
+
+/** Hollow's Lights out as the screens see it (`at` in local time; every beat follows from it: lightsOutTimeline). */
+export type LightsView = NetLightsOut;
+
 /** The reveal: your group's picks and scores (same shape the server sends). */
 export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls" | "lastStand"> & {
   result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule">;
@@ -138,8 +153,11 @@ export type Phase =
   | { kind: "final"; final: FinalView }
   /** A pre-game vote (Crowd 50 v 50): push a pawn into a zone. */
   | { kind: "vote"; vote: VoteView }
-  /** Boss battle: the boss thinking, its move, or its strike (`until`: when the next crowd move starts). */
-  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean }
+  /**
+   * Boss battle: the boss thinking, its move, or its strike (`until`: when the next crowd move starts). `lights`:
+   * Hollow's Lights out, at the start of his turn (the clocks stopped), before his move.
+   */
+  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView }
   /** `gameWinner`: Crowd, who won the game on the board (null for a draw). `bossResult`: who won a boss battle. */
   | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw" };
 
@@ -211,6 +229,15 @@ export interface GameView {
   triggerUltimate(): void;
   /** You called the King to play this move. */
   readonly kingCalled: boolean;
+  /**
+   * Hollow's dark: a move attempt that touches a dark square (starts on one, lands on one or passes over one), sent
+   * unchecked: a legal one is your pick; an illegal one costs points and you pick again (see darkNote).
+   */
+  darkTry(move: string): void;
+  /** Hollow's dark: how your last attempt into the dark this turn went (null: none). */
+  readonly darkNote: DarkNote | null;
+  /** Hollow's Lights out: you tap a square (in the round that's on). */
+  lightsTap(square: string): void;
   /** Quick chat (online matches only; see `enabled`). */
   readonly chat?: MatchChat;
   /** It counts for your ranking (at least 30% real players; never solo). Null or missing: not known (yet). */

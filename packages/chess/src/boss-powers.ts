@@ -13,7 +13,21 @@
  *
  * Turns are the crowd's: turn N is the crowd's Nth move of the battle (crowdMoves + 1 while it's being picked).
  */
-import { BOSS_POWERS, bossDef, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type BurnEvent, type CandleWave, type FireTile, type PowerEvent, type PowerId } from "@chessroyale/core";
+import {
+  BOSS_POWERS,
+  bossDef,
+  mulberry32,
+  type BossPowerSettings,
+  type BossPowerState,
+  type BossState,
+  type BurnEvent,
+  type CandleWave,
+  type DarkSquare,
+  type FireTile,
+  type LightsOutRound,
+  type PowerEvent,
+  type PowerId,
+} from "@chessroyale/core";
 import { applyMove, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "./rules.ts";
 import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
@@ -133,9 +147,10 @@ export function ragePoints(p: Pick<BossPowerState, "charge" | "lost">, s: RageRa
  * and the ultimate, and the passive. `fen` is the position with the crowd to move. Once per turn: calling it again
  * for the same turn (the re-pick after the God King's Last Stand) changes nothing. `test`: an ultimate (the test switch)
  * warned as the second turn begins and unleashed on the third (the passive comes on the second turn anyway).
- * The test trigger (an admin's, `ultNext`) brings the ultimate as this turn begins, without the warning.
+ * The test trigger (an admin's, `ultNext`) brings the ultimate as this turn begins, without the warning. `lastMove`: the
+ * boss's move just played (Hollow covers its piece's square after his first).
  */
-export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowerSettings = BOSS_POWERS): BossState {
+export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowerSettings = BOSS_POWERS, lastMove: string | null = null): BossState {
   const powers = bossPowers(boss);
   const p = boss.powers;
   if (!powers || !p) return boss;
@@ -147,8 +162,10 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   // The meter over time: each crowd move since the last turn began, faster while the crowd is ahead on the judged eval.
   const moved = p.turn > 0 ? Math.max(0, turn - p.turn) : 0;
   const charge = (p.charge ?? 0) + moved * rageTick(p.judged, s);
+  const ult = powers.ultimate;
+  // (Lights out comes at the start of his turn, not as the crowd's begins: the trigger waits for it there.)
   const { ultNext, ...rest } = p;
-  const next: BossPowerState = { ...rest, turn, lost, charge, events };
+  const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && ult === "lightsout" ? { ultNext } : {}) };
   // What wore off: the ice after its turns (or once its piece is gone), the pie after its turns.
   if (next.frozen) {
     const piece = pieceAt(fen, next.frozen.square);
@@ -156,9 +173,13 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   }
   if (next.pie && next.pie.until < turn) next.pie = null;
   // The ultimate: the rage meter full, a warning as this turn begins; the next turn, the ultimate. Once a match.
-  const ult = powers.ultimate;
   let ultNow = false;
-  if (next.ultAt === undefined) {
+  if (next.ultAt === undefined && ult === "lightsout") {
+    // Hollow's Lights out: the meter full as this turn begins, it comes at the start of his turn after the crowd's move
+    // (lightsOutDue). The full meter is its only warning (no "RAGE!"). The test switch: the meter fills as the second
+    // turn begins.
+    if (ragePoints(next, s) >= s.rageFull || (test === ult && turn >= 2)) next.ultAt = turn;
+  } else if (next.ultAt === undefined) {
     if (ultNext) {
       // (The test trigger: straight to the ultimate.)
       next.ultAt = turn;
@@ -190,7 +211,22 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   }
   // The passive (not on the ultimate's turn: it waits a turn).
   const passive = powers.passive;
-  if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
+  if (passive === "dark") {
+    // Hollow's dark: the squares whose turns are over clear; after his first move and every darkEvery-th after it, he
+    // covers another. His bulbs count down to it.
+    const old = next.dark ?? [];
+    next.dark = old.filter((d) => d.until >= turn);
+    next.cleared = old.filter((d) => d.until < turn).map((d) => d.square);
+    const n = hisMoves(turn);
+    if (coversAfter(n, s)) {
+      const square = chooseDark(fen, crowd, p.seed, turn, next.dark, n === 1 && lastMove ? to(lastMove) : null);
+      if (square) {
+        next.dark = [...next.dark, { square, at: turn, until: turn + s.darkTurns - 1 }];
+        events.push({ kind: "dark", turn, square, ...(n === 1 ? { first: true as const } : {}) });
+      }
+    }
+    next.bulbs = bulbsAt(turn, s);
+  } else if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
   else if (passive === "sparkler") {
     // A sparkler when no tile is burning, a full turn after the last fire went out; paused through the candle's barrage.
     const barrage = !!next.candle && (next.candle.left > 0 || !!next.fire?.length);
@@ -445,6 +481,176 @@ export function fireEscapes(fen: string, burn: readonly string[]): string[] {
   if (!burn.length) return [];
   const on = new Set(burn);
   return legalMoves(fen).filter((m) => on.has(from(m)));
+}
+
+
+// ---------------- Hollow: the dark ----------------
+
+/** His moves made as a crowd turn begins: the crowd (White, from the starting position) moves first. */
+const hisMoves = (turn: number) => Math.max(0, turn - 1);
+
+/** He covers a square after his `n`th move: his first, then every darkEvery-th (his 4th, 7th, 10th…). */
+export const coversAfter = (n: number, s: Pick<BossPowerSettings, "darkEvery"> = BOSS_POWERS) => n >= 1 && (n - 1) % s.darkEvery === 0;
+
+/**
+ * His bulbs still lit as a crowd turn begins: his moves until he next covers a square (one goes out with each move;
+ * the last as he covers, and they relight). 1 before his first move, then 3, 2, 1, 3, 2, 1…
+ */
+export function bulbsAt(turn: number, s: Pick<BossPowerSettings, "darkEvery"> = BOSS_POWERS): number {
+  const n = hisMoves(turn);
+  const next = n < 1 ? 1 : 1 + Math.ceil(n / s.darkEvery) * s.darkEvery;
+  return next - n;
+}
+
+/** Every piece's square on the board, by side, kings apart. */
+function occupied(fen: string): { w: string[]; b: string[]; kings: string[] } {
+  const out = { w: [] as string[], b: [] as string[], kings: [] as string[] };
+  fen
+    .split(" ")[0]!
+    .split("/")
+    .forEach((row, r) => {
+      let f = 0;
+      for (const c of row) {
+        if (c >= "1" && c <= "8") f += Number(c);
+        else {
+          const sq = `${"abcdefgh"[f]}${8 - r}`;
+          if (c.toLowerCase() === "k") out.kings.push(sq);
+          else out[c === c.toUpperCase() ? "w" : "b"].push(sq);
+          f++;
+        }
+      }
+    });
+  return out;
+}
+
+/**
+ * The square he covers: after his first move, the square of the piece he just moved (`moved`); later, a random
+ * occupied square from the seed, his or the crowd's (a coin flip for whose, so roughly half each), never a king's,
+ * never one already dark. Null when there's none.
+ */
+export function chooseDark(fen: string, crowd: Side, seed: number, turn: number, dark: readonly DarkSquare[] = [], moved?: string | null): string | null {
+  const taken = new Set(dark.map((d) => d.square));
+  const board = occupied(fen);
+  if (moved && !taken.has(moved) && !board.kings.includes(moved) && pieceAt(fen, moved)) return moved;
+  const mine = powerRoll(seed, "dark-side", turn) < 0.5 ? crowd : other(crowd);
+  const pick = (side: Side) => board[side].filter((sq) => !taken.has(sq));
+  const pool = pick(mine).length ? pick(mine) : pick(other(mine));
+  return pool.length ? pool[Math.floor(powerRoll(seed, "dark", turn) * pool.length)]! : null;
+}
+
+/** The dark squares as this crowd turn stands (for the board and the judge of move attempts). */
+export const darkSquares = (boss: Pick<BossState, "powers"> | null | undefined): string[] => (boss?.powers?.dark ?? []).map((d) => d.square);
+
+/**
+ * The squares a move touches: where it starts and lands, every square it passes over on its way (a slide along a
+ * rank, file or diagonal; a pawn's double step), and a castling king's way on to his rook's corner (`fen` says it's a
+ * king). A knight's jump passes over nothing.
+ */
+export function moveSquares(move: string, fen?: string): string[] {
+  const a = from(move);
+  const b = to(move);
+  const out = [a, b];
+  const f0 = a.charCodeAt(0) - 97;
+  const r0 = Number(a[1]) - 1;
+  const df = b.charCodeAt(0) - 97 - f0;
+  const dr = Number(b[1]) - 1 - r0;
+  const sq = (f: number, r: number) => `${"abcdefgh"[f]}${r + 1}`;
+  if (df === 0 || dr === 0 || Math.abs(df) === Math.abs(dr)) {
+    const n = Math.max(Math.abs(df), Math.abs(dr));
+    for (let k = 1; k < n; k++) out.push(sq(f0 + Math.sign(df) * k, r0 + Math.sign(dr) * k));
+  }
+  if (fen && dr === 0 && Math.abs(df) === 2 && pieceAt(fen, a)?.type === "k") {
+    // (Castling: his way past the square he lands on, to the rook's corner.)
+    for (let f = f0 + df + Math.sign(df); f >= 0 && f <= 7; f += Math.sign(df)) out.push(sq(f, r0));
+  }
+  return out;
+}
+
+/** A move attempt touches the dark (starts on a dark square, lands on one or passes over one). */
+export const touchesDark = (move: string, dark: readonly string[], fen?: string): boolean => dark.length > 0 && moveSquares(move, fen).some((sq) => dark.includes(sq));
+
+/**
+ * A move attempt sent unchecked because it touches the dark, as the judge reads it: the legal move it is (a pawn's
+ * move to the last rank without a piece named becomes a queen), or null when it isn't one.
+ */
+export function darkAttempt(fen: string, move: string): string | null {
+  const legal = legalMoves(fen);
+  if (legal.includes(move)) return move;
+  if (move.length === 4 && legal.includes(`${move}q`)) return `${move}q`;
+  return null;
+}
+
+// ---------------- Hollow: Lights out ----------------
+
+/** His Lights out comes now: the start of his turn, from the full meter (or the test trigger), once a match. */
+export const lightsOutDue = (boss: BossState | null | undefined): boolean => {
+  const p = boss?.powers;
+  return !!p && !boss!.result && bossPowers(boss)?.ultimate === "lightsout" && !p.lightsOut && (!!p.ultNext || p.ultAt === boss!.crowdMoves);
+};
+
+/**
+ * Lights out's rounds: the pieces he names in each (BOSS_POWERS.lightsOutRounds: 1, 2, then 3), from the seed. Never a
+ * pawn while he has other pieces; the king can be named; no piece named twice across the rounds while others remain
+ * (then those named before come back, before any pawn). A type may come up twice in a round (both his rooks): then
+ * both squares are needed. Each round's answers are every square holding a type it names.
+ */
+export function chooseLightsOut(fen: string, side: Side, seed: number, s: Pick<BossPowerSettings, "lightsOutRounds"> = BOSS_POWERS): LightsOutRound[] {
+  const mine: { square: string; type: string }[] = [];
+  for (const f of "abcdefgh")
+    for (let r = 1; r <= 8; r++) {
+      const pc = pieceAt(fen, `${f}${r}`);
+      if (pc?.color === side) mine.push({ square: `${f}${r}`, type: pc.type });
+    }
+  const named = new Set<string>();
+  return s.lightsOutRounds.map((round, i) => {
+    const order = (xs: typeof mine) => xs.map((x) => ({ x, k: powerRoll(seed, "lights", i, x.square) })).sort((a, b) => a.k - b.k).map((e) => e.x);
+    const fresh = order(mine.filter((x) => x.type !== "p" && !named.has(x.square)));
+    const again = order(mine.filter((x) => x.type !== "p" && named.has(x.square)));
+    const pawns = order(mine.filter((x) => x.type === "p"));
+    const picked = [...fresh, ...again, ...pawns].slice(0, round.pieces);
+    for (const x of picked) named.add(x.square);
+    // (Named in board order, the bigger pieces first: "Find my queen and my knight.")
+    const RANK = "kqrbnp";
+    const pieces = picked.map((x) => x.type).sort((a, b) => RANK.indexOf(a) - RANK.indexOf(b));
+    const answers = mine.filter((x) => pieces.includes(x.type)).map((x) => x.square).sort();
+    return { pieces, answers, ms: round.ms };
+  });
+}
+
+/**
+ * A round's taps, judged in order: a square holding a type he named that's still to find is found; a square already
+ * found (or holding a type already found as often as it was named) changes nothing; any other is wrong. A player has
+ * as many tries as there are pieces to find: found plus wrong. The pieces not found are missed.
+ */
+export function judgeTaps(round: Pick<LightsOutRound, "pieces">, fen: string, side: Side, taps: readonly string[]): { found: string[]; wrong: string[]; missed: number; done: boolean } {
+  const need = new Map<string, number>();
+  for (const t of round.pieces) need.set(t, (need.get(t) ?? 0) + 1);
+  const found: string[] = [];
+  const wrong: string[] = [];
+  for (const sq of taps) {
+    if (found.length + wrong.length >= round.pieces.length) break;
+    if (found.includes(sq) || wrong.includes(sq)) continue;
+    const pc = pieceAt(fen, sq);
+    const left = pc?.color === side ? (need.get(pc.type) ?? 0) : 0;
+    if (left > 0) {
+      need.set(pc!.type, left - 1);
+      found.push(sq);
+    } else if (pc?.color === side && round.pieces.includes(pc.type)) continue;
+    else wrong.push(sq);
+  }
+  return { found, wrong, missed: round.pieces.length - found.length, done: found.length + wrong.length >= round.pieces.length };
+}
+
+/** A bot's Lights out: how many pieces it misses (each found with its round's lightsOutBotHit chance, from the seed). */
+export function botLightsMisses(seed: number, botId: string, rounds: readonly Pick<LightsOutRound, "pieces">[], s: Pick<BossPowerSettings, "lightsOutBotHit"> = BOSS_POWERS): number {
+  let missed = 0;
+  rounds.forEach((r, i) => {
+    const hit = s.lightsOutBotHit[Math.min(i, s.lightsOutBotHit.length - 1)] ?? 0.5;
+    r.pieces.forEach((_, k) => {
+      if (powerRoll(seed, "lights-bot", botId, i, k) >= hit) missed++;
+    });
+  });
+  return missed;
 }
 
 // ---------------- The test trigger ----------------

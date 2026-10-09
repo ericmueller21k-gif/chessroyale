@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, bossDef, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, POWER_IDS, bossDef, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -85,7 +85,7 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...speed,
     // Any boss battle: not the boss you met last (when it's random); ?power= brings a boss power at once (tests).
     bossAvoid: lastBoss() ?? "",
-    ...(["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle"].includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
+    ...((POWER_IDS as readonly string[]).includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
     // Testing: ?laststand=0, the God King never makes his Last Stand (a test that leaves a piece to burn on purpose).
     ...(q.get("laststand") === "0" ? { lastStandLoss: 999, lastStandLossFloor: 999 } : {}),
@@ -869,7 +869,7 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
     case "vote":
       return <VoteScreen match={match} vote={p.vote} />;
     case "boss":
-      return <BossScreen match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} />;
+      return <BossScreen match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} lights={p.lights} />;
     case "results":
       return (
         <ResultsScreen

@@ -32,8 +32,10 @@ import {
   deepCheck,
   type JudgeJob,
   type JudgeReport,
+  judgeTaps,
+  lightsOutTimeline,
 } from "@chessroyale/chess";
-import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
+import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
 import { RoundProgress } from "./progress.ts";
@@ -402,6 +404,7 @@ export class NetMatch implements GameView {
       case "round":
         this.key = m.key;
         this.kingCalled = false;
+        this.darkNote = null;
         // Boss battle: the battle as it stands (his charges; after his Last Stand, the move he took back).
         if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
         this.tally = null;
@@ -515,7 +518,41 @@ export class NetMatch implements GameView {
         this.boss = { ...m.boss, board: this.toView(m.boss.board) };
         this.standingsList = m.standings;
         this.currentBoard = m.boss.board;
+        this.lights = null;
         return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro });
+      case "darkTry": {
+        if (m.key !== this.key || this.phase.kind !== "play") return;
+        if (m.ok) {
+          // Legal: it's your pick.
+          this.darkNote = null;
+          this.myPick = m.move;
+          const away = this.lookAways.stop();
+          void away;
+          if (this.myId) this.progress.mark(this.myId);
+          return this.setPhase({ kind: "scoring", board: this.phase.board, move: m.move, strike: this.phase.strike });
+        }
+        if (m.refused) {
+          this.darkNote = null;
+          return this.emit();
+        }
+        this.darkNote = { move: m.move, at: Date.now(), tries: m.tries ?? 1, out: !!m.out };
+        if (m.out) {
+          // Out of tries: your turn is over, as a miss.
+          if (this.myId) this.progress.mark(this.myId);
+          return this.setPhase({ kind: "scoring", board: this.phase.board, move: null, strike: this.phase.strike });
+        }
+        return this.emit();
+      }
+      case "lights": {
+        this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+        this.standingsList = m.standings;
+        this.currentBoard = m.boss.board;
+        const local: LightsView = { ...m.lights, at: this.local(m.lights.at) };
+        // (Your taps since, not yet in the server's answer, stay.)
+        const kept = this.lights?.key === local.key ? this.lights.taps : local.rounds.map(() => [] as string[]);
+        this.lights = { key: local.key, view: local, taps: kept.map((t, i) => [...new Set([...(local.mine[i] ? [...local.mine[i]!.found, ...local.mine[i]!.wrong] : []), ...t])]) };
+        return this.showLights();
+      }
       case "bossRequest":
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse);
       case "chat":
@@ -760,6 +797,47 @@ export class NetMatch implements GameView {
   triggerUltimate() {
     if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !this.boss) return;
     this.send({ t: "ultimate" });
+  }
+
+  /** Hollow's dark: how your last attempt into the dark went this turn. */
+  darkNote: DarkNote | null = null;
+  darkTry(move: string) {
+    if (this.phase.kind !== "play" || !this.key || this.darkNote?.pending) return;
+    if (Date.now() < this.phase.startsAt - 300) return; // Before the clock starts.
+    if (this.phase.strike?.until && Date.now() < this.phase.strike.until) return; // While the King strikes.
+    // (Sent unchecked: the server says whether it was legal. Until then the board waits.)
+    this.darkNote = { move, at: Date.now(), pending: true, tries: this.darkNote?.tries ?? 0, out: false };
+    this.send({ t: "darkTry", key: this.key, move });
+    this.emit();
+  }
+
+  /** Hollow's Lights out: the server's test as last heard, and your taps round by round (judged here at once too). */
+  private lights: { key: string; view: LightsView; taps: string[][] } | null = null;
+  private showLights() {
+    const l = this.lights;
+    if (!l || !this.boss) return;
+    // Your taps judged here at once (the server's answer, a moment later, says the same).
+    const fen = this.boss.board.fen;
+    const side = this.boss.crowdSide === "w" ? "b" : "w";
+    const mine = l.view.rounds.map((r, i) => {
+      const j = judgeTaps(r, fen, side, l.taps[i] ?? []);
+      return { found: j.found, wrong: j.wrong };
+    });
+    this.setPhase({ kind: "boss", boss: this.boss, until: 0, lights: { ...l.view, mine } });
+  }
+  lightsTap(square: string) {
+    const l = this.lights;
+    if (!l || this.phase.kind !== "boss" || !this.phase.lights || !this.boss) return;
+    const now = Date.now();
+    const tl = lightsOutTimeline(l.view.rounds, this.settings.lateGraceMs);
+    const i = tl.rounds.findIndex((r) => now >= l.view.at + r.at - 300 && now <= l.view.at + r.answersAt);
+    const taps = l.taps[i];
+    const mine = this.phase.lights.mine[i];
+    if (!taps || !mine || l.view.rounds[i]!.answers || taps.includes(square)) return;
+    if (mine.found.length + mine.wrong.length >= l.view.rounds[i]!.pieces.length) return;
+    taps.push(square);
+    this.send({ t: "lightsTap", key: l.key, round: i, square });
+    this.showLights();
   }
 
   submit(move: string | null) {

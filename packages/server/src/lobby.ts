@@ -5,6 +5,9 @@ import {
   MatchRunner,
   botRoster,
   bossIntroTimeline,
+  judgeTaps,
+  lightsOutTimeline,
+  type NetLightsOut,
   bossShowMs,
   bossThinkMs,
   powerMomentMs,
@@ -140,7 +143,8 @@ type Timer =
   | "bossTimeout"
   | "autoStart"
   | "autoGo"
-  | "judgeTick";
+  | "judgeTick"
+  | "lights";
 
 /**
  * A running match's board, for the home page's live window (Crowd and boss raids; the live hub keeps it): the
@@ -179,6 +183,8 @@ export interface LobbyRecord {
     /** Crowd: the host's (or a judge's) early bot picks, and when each bot finishes (ms after the clock starts). */
     botPlan?: { picks: Record<string, string>; powerUps: string[]; by?: string };
     botsDoneIn?: Record<string, number>;
+    /** Hollow's dark: players whose last wrong attempt into the dark ended their turn (a miss), with their time used. */
+    darkOut?: Record<string, number>;
   };
   timer: null | { at: number; kind: Timer };
   /** Last phase message per human, re-sent on reconnect. */
@@ -223,6 +229,11 @@ export interface LobbyRecord {
   bossPending?: string;
   bossMinAt?: number;
   bossIntroDone?: boolean;
+  /**
+   * Hollow's Lights out in progress (the boss's turn, before his move; the phase stays "boss"): when it began, how many
+   * rounds have ended (their answers shown), and each player's taps, round by round.
+   */
+  lights?: { key: string; at: number; ended: number; taps: Record<string, string[][]> };
   /**
    * Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. `filledAt`: the seats
    * were filled then (bots pop in on the queue screen) and the match begins FRONT_DOOR.fillShowMs later; `waitMs`:
@@ -691,11 +702,11 @@ export class LobbyCore {
         if (this.r.phase !== "play" || round?.key !== msg.key || !this.runner?.boss?.kingCharges || !this.runner.player(playerId)?.alive) return;
         if (msg.strike) return this.callStrike(playerId);
         // Calling the King to play the move is this player's whole turn: no move of their own.
-        if (round.picks[playerId] || this.called(playerId)) return;
+        if (this.doneThisRound(playerId)) return;
         (round.kingCalls ??= {})[playerId] = true;
         for (const h of this.r.humans) this.send(h.id, { t: "moved", key: round.key, playerId }, false);
         this.sendTally();
-        if (this.roundHumans().every((h) => round.picks[h.id] || this.called(h.id))) this.lock();
+        if (this.roundHumans().every((h) => this.doneThisRound(h.id))) this.lock();
         return;
       }
       case "bossMove":
@@ -713,6 +724,10 @@ export class LobbyCore {
         return this.judged(playerId, msg.key, msg.id, msg.report);
       case "judgedDeep":
         return this.judgedDeep(playerId, msg.key, msg.id, msg.deep);
+      case "darkTry":
+        return this.darkTry(playerId, msg.key, msg.move);
+      case "lightsTap":
+        return this.lightsTap(playerId, msg.key, msg.round, msg.square);
       case "hello":
       // (The test trigger goes through ultimateTrigger, from the Durable Object, which knows who's an admin.)
       case "ultimate":
@@ -837,6 +852,8 @@ export class LobbyCore {
         return;
       case "judgeTick":
         return this.judgeTick();
+      case "lights":
+        return this.lightsStep();
     }
   }
 
@@ -1039,7 +1056,7 @@ export class LobbyCore {
         // The boss arrives: it takes over from an even position of the game just played.
         this.r.bossIntroDone = true;
         this.r.phase = "boss";
-        const until = this.io.now() + bossIntroTimeline(runner.boards.get(runner.state.boards[0]!)!.history.length).total;
+        const until = this.io.now() + bossIntroTimeline(runner.boards.get(runner.state.boards[0]!)!.history.length, !!runner.boss.powers?.claimed).total;
         this.broadcast({ ...this.bossMessage(until), intro: true } as Outgoing);
         return this.setTimer("nextRound", until);
       }
@@ -1047,7 +1064,8 @@ export class LobbyCore {
         runner.finishBossBattle();
         return this.finishMatch();
       }
-      if (runner.bossToMove()) return this.requestBoss();
+      // (Hollow's Lights out comes at the start of his turn, before his move.)
+      if (runner.bossToMove()) return runner.lightsOutDue() ? this.startLights() : this.requestBoss();
       if (runner.funhouseDue()) return this.requestFunhouse();
     }
     if (this.r.augmentVotes) {
@@ -1158,6 +1176,12 @@ export class LobbyCore {
     return !!this.r.round?.kingCalls?.[playerId];
   }
 
+  /** This player's turn is over this round: they picked, called the King, or ran out of tries in Hollow's dark. */
+  private doneThisRound(playerId: string): boolean {
+    const round = this.r.round;
+    return !!round && (!!round.picks[playerId] || this.called(playerId) || round.darkOut?.[playerId] !== undefined);
+  }
+
   /**
    * Boss battle: a call for the King's strike. When enough have called he strikes now: everyone sees it, the
    * move clock stands still while he does (every deadline, and every bot still thinking, moves back by that
@@ -1198,7 +1222,7 @@ export class LobbyCore {
 
   private pick(playerId: string, key: string, move: string, away?: unknown) {
     const round = this.r.round;
-    if (this.r.phase !== "play" || !round || round.key !== key || round.picks[playerId] || this.called(playerId)) return;
+    if (this.r.phase !== "play" || !round || round.key !== key || this.doneThisRound(playerId)) return;
     const now = this.io.now();
     const deadline = round.deadlines?.[playerId] ?? round.deadline;
     if (now > deadline + this.settings.lateGraceMs) return; // Late picks count as a miss.
@@ -1215,7 +1239,120 @@ export class LobbyCore {
     };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     this.sendTally();
-    if (this.roundHumans().every((h) => round.picks[h.id] || this.called(h.id))) this.lock();
+    if (this.roundHumans().every((h) => this.doneThisRound(h.id))) this.lock();
+  }
+
+  /**
+   * Hollow's dark: a move attempt that touched a dark square, sent unchecked. The runner judges it: a legal move is the
+   * player's pick; an illegal one costs points and they pick again, and the last of their tries ends their turn as a
+   * missed move. Only the player hears how it went.
+   */
+  private darkTry(playerId: string, key: string, move: unknown) {
+    const round = this.r.round;
+    if (this.r.phase !== "play" || !round || round.key !== key || this.doneThisRound(playerId) || !this.runner?.boss || typeof move !== "string") return;
+    const now = this.io.now();
+    const deadline = round.deadlines?.[playerId] ?? round.deadline;
+    if (now > deadline + this.settings.lateGraceMs || now < round.startedAt - 500) return;
+    const out = this.runner.darkTry(playerId, move);
+    if (out.kind === "move") {
+      this.send(playerId, { t: "darkTry", key, move: out.move, ok: true }, false);
+      return this.pick(playerId, key, out.move);
+    }
+    if (out.kind === "refused") return this.send(playerId, { t: "darkTry", key, move, ok: false, refused: true }, false);
+    this.send(playerId, { t: "darkTry", key, move, ok: false, tries: out.tries, ...(out.out ? { out: true } : {}) }, false);
+    if (!out.out) return;
+    (round.darkOut ??= {})[playerId] = Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline));
+    for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
+    this.sendTally();
+    if (this.roundHumans().every((h) => this.doneThisRound(h.id))) this.lock();
+  }
+
+  // ---------------- Hollow's Lights out ----------------
+
+  /** The test's beats (boss-timing.ts), from its rounds' seconds and the late grace. */
+  private lightsTimeline() {
+    return lightsOutTimeline(this.runner?.boss?.powers?.lightsOut?.rounds ?? [], this.settings.lateGraceMs);
+  }
+
+  /** Lights out begins at the start of his turn: the game paused, nobody's clock running, the server timing each round. */
+  private startLights() {
+    const runner = this.runner!;
+    const test = runner.startLightsOut();
+    this.r.phase = "boss";
+    this.r.lights = { key: `l-${++this.r.counter}`, at: this.io.now(), ended: 0, taps: {} };
+    for (const p of runner.alive()) if (!p.isBot) this.r.lights.taps[p.id] = test.rounds.map(() => []);
+    this.sendLights();
+    this.armLights();
+  }
+
+  private armLights() {
+    const l = this.r.lights!;
+    const tl = this.lightsTimeline();
+    this.setTimer("lights", l.at + (l.ended < tl.rounds.length ? tl.rounds[l.ended]!.answersAt : tl.total));
+  }
+
+  /** A round ends (its answers go out, each player's taps judged), or the lights are back: the misses cost, and he moves. */
+  private lightsStep() {
+    const l = this.r.lights;
+    const runner = this.runner;
+    if (!l || !runner || this.r.phase !== "boss") return;
+    const tl = this.lightsTimeline();
+    if (l.ended < tl.rounds.length) {
+      l.ended++;
+      this.sendLights();
+      return this.armLights();
+    }
+    const missed: Record<string, number> = {};
+    for (const id of Object.keys(l.taps)) missed[id] = this.lightsMine(id).reduce((n, r, i) => n + (runner.boss!.powers!.lightsOut!.rounds[i]!.pieces.length - r.found.length), 0);
+    runner.finishLightsOut(missed);
+    this.r.lights = undefined;
+    this.requestBoss();
+  }
+
+  /** A player's taps in Lights out, judged round by round. */
+  private lightsMine(playerId: string): { found: string[]; wrong: string[] }[] {
+    const runner = this.runner!;
+    const test = runner.boss!.powers!.lightsOut!;
+    const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+    const side = runner.boss!.crowdSide === "w" ? "b" : "w";
+    return test.rounds.map((r, i) => {
+      const j = judgeTaps(r, fen, side, this.r.lights?.taps[playerId]?.[i] ?? []);
+      return { found: j.found, wrong: j.wrong };
+    });
+  }
+
+  /** The test as each player sees it (their own taps judged; a round's answers once it's over). */
+  private sendLights(only?: string) {
+    const l = this.r.lights!;
+    const runner = this.runner!;
+    const test = runner.boss!.powers!.lightsOut!;
+    const boss = runner.bossView()!;
+    const standings = this.standings();
+    for (const h of this.r.humans) {
+      if (only && h.id !== only) continue;
+      const lights: NetLightsOut = {
+        key: l.key,
+        at: l.at,
+        rounds: test.rounds.map((r, i) => ({ pieces: r.pieces, ms: r.ms, ...(i < l.ended ? { answers: r.answers } : {}) })),
+        mine: this.lightsMine(h.id),
+      };
+      this.send(h.id, { t: "lights", lights, boss, standings });
+    }
+  }
+
+  /** A tap in Lights out: judged against the round it's in, while it's open (with the usual late grace). */
+  private lightsTap(playerId: string, key: string, round: unknown, square: unknown) {
+    const l = this.r.lights;
+    if (!l || l.key !== key || this.r.phase !== "boss" || typeof round !== "number" || typeof square !== "string" || !/^[a-h][1-8]$/.test(square)) return;
+    const taps = l.taps[playerId]?.[round];
+    const r = this.lightsTimeline().rounds[round];
+    if (!taps || !r) return;
+    const now = this.io.now();
+    if (now < l.at + r.at - 300 || now > l.at + r.answersAt) return;
+    const before = this.lightsMine(playerId)[round]!;
+    if (before.found.length + before.wrong.length >= this.runner!.boss!.powers!.lightsOut!.rounds[round]!.pieces.length || taps.includes(square)) return;
+    taps.push(square);
+    this.sendLights(playerId);
   }
 
   /**
@@ -1234,7 +1371,7 @@ export class LobbyCore {
     const playing = new Set(this.roundHumans().map((h) => h.id));
     for (const h of this.r.humans) {
       const alive = runner.player(h.id)?.alive;
-      if (!alive || (playing.has(h.id) && !round.picks[h.id] && !this.called(h.id))) continue;
+      if (!alive || (playing.has(h.id) && !this.doneThisRound(h.id))) continue;
       this.send(h.id, { t: "tally", key: round.key, picks }, false);
     }
   }
@@ -1242,7 +1379,7 @@ export class LobbyCore {
   /** A power-up: the player's browser shows the engine's top moves; the server just counts it. */
   private powerUp(playerId: string, key: string) {
     const round = this.r.round;
-    if (this.r.phase !== "play" || !round || round.key !== key || round.picks[playerId] || !this.runner) return;
+    if (this.r.phase !== "play" || !round || round.key !== key || this.doneThisRound(playerId) || !this.runner) return;
     if (this.io.now() < round.startedAt - 500) return;
     const p = this.runner.state.players.find((x) => x.id === playerId);
     if (!p?.alive || !(p.practice || p.powerUps > 0)) return;
@@ -1342,8 +1479,8 @@ export class LobbyCore {
       return runner.resolveBoard(job.boardId, ids, picks, { bestMove, bestExpected, expectedAfter, ...(s?.replies ? { replies: s.replies } : {}), ...(s?.mates ? { mates: s.mates } : {}) });
     });
     const think = Object.fromEntries(Object.entries(round.picks).map(([id, p]) => [id, p.thinkMs]));
-    // A miss uses the whole of the player's time for the move.
-    for (const h of this.roundHumans()) think[h.id] ??= this.thinkTime(round, round.deadlines?.[h.id] ?? round.deadline);
+    // A miss uses the whole of the player's time for the move (out of tries in Hollow's dark: the time until then).
+    for (const h of this.roundHumans()) think[h.id] ??= round.darkOut?.[h.id] ?? this.thinkTime(round, round.deadlines?.[h.id] ?? round.deadline);
     const report = runner.finishRound(results, think, new Set(Object.keys(round.powerUps ?? {})));
     this.noteFeats(report);
     this.noteFair(report, lastMoves);

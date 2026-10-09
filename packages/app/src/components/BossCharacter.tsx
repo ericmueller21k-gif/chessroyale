@@ -68,7 +68,7 @@ const SPEECH_MS = 3400;
 /** Where the battle is, from the screen's phase. */
 export function bossStage(phase: Phase, boss: BossView): Stage {
   if (boss.result || phase.kind === "results") return "over";
-  if (phase.kind === "boss") return phase.intro ? "intro" : boss.justKilled ? "strike" : phase.thinking ? "thinking" : "bossMove";
+  if (phase.kind === "boss") return phase.intro ? "intro" : boss.justKilled ? "strike" : phase.thinking || phase.lights ? "thinking" : "bossMove";
   return "crowd";
 }
 
