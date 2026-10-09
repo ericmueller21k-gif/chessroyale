@@ -906,8 +906,11 @@ export class LobbyCore {
     this.r.bossKey = `b-${++this.r.counter}`;
     this.r.bossKind = this.runner!.bossMoveKind();
     // You just took its queen: the boss's reply waits for your banner (otherwise it shows as soon as it's ready).
-    const history = this.runner!.boards.get(this.runner!.state.boards[0]!)!.history;
-    this.r.bossMinAt = lastMoveTookQueen(history) ? this.io.now() + bossThinkMs(history) : undefined;
+    const board = this.runner!.boards.get(this.runner!.state.boards[0]!)!;
+    // (G-REX's fire has just burnt something: that plays first too.)
+    const b = this.runner!.state.boss;
+    const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves);
+    this.r.bossMinAt = lastMoveTookQueen(board.history, board.bases) || burnt ? this.io.now() + bossThinkMs(board.history, board.bases, burnt) : undefined;
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.hostNow();
     this.r.hostId = host;

@@ -1,4 +1,4 @@
-import { toSan, type BoardRound, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetStanding, type NetVote } from "@chessroyale/chess";
+import { toSan, type BoardRound, type Base, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetStanding, type NetVote } from "@chessroyale/chess";
 import { brilliance } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 import type { MatchChat } from "./chat.ts";
@@ -25,6 +25,8 @@ export interface BoardView {
   recentFrom: string;
   /** Every move from the starting position, to step back through the game. */
   history: string[];
+  /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
+  bases?: Base[];
 }
 
 /** One row of the live leaderboard. */

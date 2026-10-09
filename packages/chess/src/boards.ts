@@ -1,6 +1,6 @@
 import type { BoardStatus } from "@chessroyale/core";
 import type { Opening } from "./openings.ts";
-import { applyMove, fenAfter, gameEnd, START_FEN, type GameEnd } from "./rules.ts";
+import { applyMove, baseAt, fenAfter, gameEndWith, withoutPiece, type Base, type GameEnd } from "./rules.ts";
 
 /** A board is a supply of positions: an opening played out, then one drawn move per round. */
 export interface BoardState {
@@ -18,6 +18,8 @@ export interface BoardState {
   generation: number;
   /** Side to move's expected score after each ply (index = moves played), as searched when the move was played. */
   evals?: number[];
+  /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
+  bases?: Base[];
 }
 
 /** The boss battle's board: a fresh game from the starting position. */
@@ -51,7 +53,14 @@ export function playOnBoard(board: BoardState, move: string, moverExpected: numb
 }
 
 export function boardEnd(board: BoardState): GameEnd {
-  return gameEnd(START_FEN, board.history);
+  return gameEndWith(board.history, board.bases);
+}
+
+/** A piece destroyed between moves (G-REX's fire): the square emptied, and the moves from here on played from it. */
+export function burnOnBoard(board: BoardState, square: string): BoardState {
+  const fen = withoutPiece(board.fen, square);
+  const ply = board.history.length;
+  return { ...board, fen, bases: [...(board.bases ?? []).filter((b) => b.ply !== ply), { ply, fen }] };
 }
 
 export function boardStatus(board: BoardState): BoardStatus {
@@ -61,6 +70,8 @@ export function boardStatus(board: BoardState): BoardStatus {
 
 /** The last `n` moves played on a board and the position before them (for replaying what a player missed). */
 export function recentMoves(board: BoardState, n = 4): { from: string; moves: string[] } {
-  const k = Math.min(n, board.history.length);
-  return { from: fenAfter(board.history.slice(0, board.history.length - k)), moves: board.history.slice(board.history.length - k) };
+  // (Only moves since the last change between moves: a replay from before it would bring a destroyed piece back.)
+  const base = baseAt(board.history.length, board.bases);
+  const k = Math.min(n, board.history.length - base.ply);
+  return { from: fenAfter(board.history.slice(base.ply, board.history.length - k), base.fen), moves: board.history.slice(board.history.length - k) };
 }

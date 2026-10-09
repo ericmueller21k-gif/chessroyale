@@ -1,4 +1,5 @@
-import type { PowerEvent, PowerId } from "@chessroyale/core";
+import type { BurnEvent, PowerEvent, PowerId } from "@chessroyale/core";
+import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
 import type { LastStandRound } from "./runner.ts";
@@ -36,6 +37,8 @@ export interface NetBoard {
   recentFrom: string;
   /** Every move from the starting position, to step back through the game. */
   history: string[];
+  /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
+  bases?: Base[];
 }
 
 /** A board at a glance, for the strip of tiny boards along the top (slots never move; closed ones stay greyed). */
@@ -233,6 +236,16 @@ export interface NetBossPowers {
   events: PowerEvent[];
   /** The crowd's turn: the moves it may play (null: any legal move). */
   allowed: string[] | null;
+  /** G-REX's fire tiles (missing from older servers): each square, the crowd turn it landed, its stage (1-3) now. */
+  fire?: { square: string; lit: number; stage: number }[];
+  /** What the fire did after the crowd's last move: pieces destroyed, tiles that fizzled under the king. */
+  burnt?: BurnEvent[];
+  /** The Roman candle: the crowd turn he fired, and the shots still to fall (the pips by the board). */
+  candle?: { at: number; left: number } | null;
+  /** The first crowd turn a crowd piece stepped onto a burning tile (the God King's warning, once a match). */
+  stepped?: number | null;
+  /** The test trigger: the ultimate is on its way (it comes as the next crowd turn begins). */
+  ultNext?: boolean;
 }
 
 /** A pre-game vote, for every screen: everyone's votes, each visible from `at` (server time). */

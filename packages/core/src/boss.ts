@@ -74,7 +74,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle";
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -102,6 +102,8 @@ export interface BossDef {
 export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "gingerbread", name: "Ginger", icon: "🍪", kit: "Ginger", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
   { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
+  // (His character kit, "G-REX", is the characters delegate's: set here once it's complete.)
+  { id: "grex", name: "G-REX", icon: "🦖", kit: null, offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
@@ -136,9 +138,15 @@ export function chooseBoss(roll: number, wanted?: string | null, avoid?: string 
   return pool[Math.min(pool.length - 1, Math.floor(Math.max(0, roll) * pool.length))]!;
 }
 
-/** The boss's strength: the lobby's (the usual calculation) plus its own offset, within what Stockfish plays. */
-export function bossStrength(base: number, def: Pick<BossDef, "offset"> | null): number {
-  return Math.max(800, Math.min(3190, Math.round(base + (def?.offset ?? 0))));
+/** The strongest the engine plays with its strength limited (Stockfish's UCI_Elo ceiling). */
+export const ENGINE_MAX_ELO = 3190;
+
+/**
+ * The boss's strength: the lobby's (the usual calculation) plus its own offset, plus solo's difficulty (`extra`:
+ * Easy −300 to Hardest +500), within what Stockfish plays.
+ */
+export function bossStrength(base: number, def: Pick<BossDef, "offset"> | null, extra = 0): number {
+  return Math.max(800, Math.min(ENGINE_MAX_ELO, Math.round(base + (def?.offset ?? 0) + extra)));
 }
 
 /** Threat thresholds: two to a skull, 1 to 5 (the old ten tiers' boundaries). */
@@ -190,16 +198,53 @@ export interface BossPowerState {
   funhouse?: { turn: number; move: string; san: string } | null;
   /** After the funhouse, the crowd sees the board flipped through this crowd turn. */
   flipUntil?: number;
+  /**
+   * The meter's charge from time and the judged eval (rage points, never coming down); the boss's material lost adds
+   * to it (BOSS_POWERS.ragePerMaterial a point). `judged`: the crowd's expected score after its last move, as judged.
+   */
+  charge?: number;
+  judged?: number;
+  /** The test trigger (an admin): the ultimate comes as the next crowd turn begins, without the warning. */
+  ultNext?: boolean;
+  /**
+   * G-REX's fire tiles, each with the crowd turn it landed (stage 1 that turn, ablaze fireStages - 1 turns later;
+   * after the crowd's move on that turn, a crowd piece still on it burns, the king never).
+   */
+  fire?: FireTile[];
+  /** The crowd turn whose move the last fire went out after (the next sparkler waits fireGap turns from it). */
+  fireOut?: number;
+  /** What the fire did after the crowd's last move: the pieces it destroyed and the tiles that fizzled (a king on them). */
+  burnt?: BurnEvent[];
+  /** The Roman candle: the crowd turn he fired, and the shots still to fall. */
+  candle?: { at: number; left: number } | null;
+  /** The first crowd turn a crowd piece stepped onto a burning tile (the God King's warning, once a match). */
+  stepped?: number;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
 
-export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse";
+/** A fire tile: its square and the crowd turn it landed on (its stage is the turn now − lit + 1). */
+export interface FireTile {
+  square: string;
+  lit: number;
+}
+
+/** After a crowd move: a piece the fire destroyed (`piece` its kind), or a tile that fizzled under the king. */
+export interface BurnEvent {
+  turn: number;
+  square: string;
+  piece?: string;
+  fizzled?: boolean;
+}
+
+export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
-  /** The square it hit (a freeze, a pie). */
+  /** The square it hit (a freeze, a pie, a sparkler). */
   square?: string;
+  /** The squares a wave of fireballs hit. */
+  squares?: string[];
 }
 
 /** The settings behind the God King's Last Stand. */
