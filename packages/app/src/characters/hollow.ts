@@ -561,10 +561,10 @@ export type StrandArm = "hold" | "high" | "swing" | "low" | "up";
 const STRAND_LOWEST = 62;
 /** Each arm pose, and where the strand's two halves hang from his hand (see StrandSpec). */
 const STRAND_ARM: Record<StrandArm, { pts: Pt[]; ends: [Pt, Pt]; bows: [number, number] }> = {
-  hold: { pts: [SHOULDER_R, [50, 32], [52, 40]], ends: [[-1, 22], [17, 19]], bows: [-3, 6] },
-  low: { pts: [SHOULDER_R, [49, 34], [50, 43]], ends: [[-1, 20], [16, 17]], bows: [-3, 6] },
-  swing: { pts: [SHOULDER_R, [52, 28], [58, 26]], ends: [[-3, 24], [12, 22]], bows: [-3, 5] },
-  high: { pts: [SHOULDER_R, [52, 21], [51, 11]], ends: [[-2, 24], [14, 21]], bows: [-3, 5] },
+  hold: { pts: [SHOULDER_R, [50, 32], [52, 40]], ends: [[-5, 22], [9, 20]], bows: [-2, 4] },
+  low: { pts: [SHOULDER_R, [49, 34], [50, 43]], ends: [[-5, 19], [9, 18]], bows: [-2, 4] },
+  swing: { pts: [SHOULDER_R, [52, 28], [58, 26]], ends: [[-4, 24], [7, 22]], bows: [-2, 4] },
+  high: { pts: [SHOULDER_R, [52, 21], [51, 11]], ends: [[-4, 24], [9, 21]], bows: [-2, 4] },
   /** Held up in front of him, to smash its bulbs. */
   up: { pts: [SHOULDER_R, [52, 26], [47, 19]], ends: [[-4, 23], [7, 23]], bows: [-3, 4] },
 };
