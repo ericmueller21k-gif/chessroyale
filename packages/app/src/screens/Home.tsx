@@ -130,7 +130,7 @@ function versus(elo: number, you: number): { text: string; tone: "easy" | "even"
 }
 
 /** What each boss's powers do, in a few words (the menu's line under its name). */
-const POWER_WORDS: Record<string, string> = { freeze: "freezes a piece", blizzard: "blizzard", pie: "pies a square", funhouse: "funhouse" };
+const POWER_WORDS: Record<string, string> = { freeze: "freezes a piece", blizzard: "blizzard", pie: "pies a square", funhouse: "funhouse", sparkler: "sets squares alight", candle: "Roman candle" };
 
 /**
  * Boss raid: the menu that opens when you start: a random boss (a different one from last time), or one of the
