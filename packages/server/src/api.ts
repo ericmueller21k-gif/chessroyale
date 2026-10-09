@@ -3,6 +3,7 @@ import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.ts";
 import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
+import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import {
   buyItem,
   cleanEmail,
@@ -135,7 +136,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     !path.startsWith("/api/shop") &&
     !path.startsWith("/api/locker") &&
     path !== "/api/fairplay/status" &&
-    path !== "/api/appeal"
+    path !== "/api/appeal" &&
+    path !== "/api/chat" &&
+    !path.startsWith("/api/chat/icon/")
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -170,7 +173,16 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
         liveCache = { at: now, body: await liveCounts(sql, now) };
       }
     }
-    return json({ ...liveCache.body, fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)) });
+    // ?chat=N (the home page's global chat is open): its lines after N ride along (global-chat-api.ts).
+    const chatSince = url.searchParams.get("chat");
+    const chat = chatSince !== null && env.LIVE ? await chatSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(chatSince), now).catch(() => null) : null;
+    return json({ ...liveCache.body, fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)), ...(chat ? { chat } : {}) });
+  }
+
+  // GET /api/chat/icon/KEY: a drawn icon on a line in the global chat (anyone may read the chat).
+  if (path.startsWith("/api/chat/icon/") && request.method === "GET") {
+    if (!env.LIVE) return json({ message: "No such icon." }, 404);
+    return chatIconResponse(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), path.slice("/api/chat/icon/".length));
   }
 
   // GET /api/profile/ID: anyone's public profile (what any player can see; nothing private).
@@ -269,6 +281,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const b = (await request.json().catch(() => ({}))) as { text?: unknown };
     const r = await appeal(sql, current.id, b.text, now);
     return r.ok ? json({ ok: true, ...(await fairStatus(sql, current.id)) }) : json({ message: r.message }, 400);
+  }
+
+  // POST /api/chat {say}: a line in the home page's global chat (signed in where sign-in is set up; guests read).
+  if (path === "/api/chat" && request.method === "POST") {
+    if (!env.LIVE) return json({ message: "The chat isn't set up here." }, 503);
+    return chatPostResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), current, !signInRequired(env) || isSignedIn(current), now);
   }
 
   // POST /api/results: a solo match's result, from the browser.

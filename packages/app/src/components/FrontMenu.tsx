@@ -3,6 +3,7 @@ import { bossThreat } from "@chessroyale/core";
 import { account } from "../account.ts";
 import { useLive, type PlayingNow } from "../live.ts";
 import { AccountBar, DressedPawn, GearIcon, LiveLine, Logo, myHat } from "./FrontDoor.tsx";
+import { GlobalChat } from "./GlobalChat.tsx";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
@@ -12,6 +13,8 @@ export interface FrontNav {
   shop: () => void;
   profile: () => void;
   settings: () => void;
+  /** Sign in (the global chat's guests). */
+  signIn?: () => void;
 }
 
 export type FrontPage = "home" | "queue" | "profile" | "settings" | "shop" | "lobby";
@@ -91,7 +94,7 @@ function matchLine(m: PlayingNow, now: number): { title: string; sub: string } {
 }
 
 /** The computer's right column: your coins and pawn at the top right, the live line, and the matches being played now. */
-export function RightPanel({ onProfile }: { onProfile: () => void }) {
+export function RightPanel({ onProfile, chat, onSignIn }: { onProfile: () => void; chat?: boolean; onSignIn?: () => void }) {
   const live = useLive();
   const now = Date.now();
   return (
@@ -117,6 +120,8 @@ export function RightPanel({ onProfile }: { onProfile: () => void }) {
         })}
         {live && live.playing.length > 0 && <p class="fd-note">Watching a match from outside comes later.</p>}
       </section>
+      {/* The home page's global chat (the social lane's: components/GlobalChat.tsx). */}
+      {chat && <GlobalChat onSignIn={onSignIn} />}
     </aside>
   );
 }
@@ -131,7 +136,7 @@ export function FrontFrame({ children, page, nav }: { children: ComponentChildre
     <div class={`fd-root${nav ? " framed" : ""}${page ? ` fd-on-${page}` : ""}`}>
       {nav && <SideMenu page={page} nav={nav} />}
       <main class="fd-center">{children}</main>
-      {nav && <RightPanel onProfile={nav.profile} />}
+      {nav && <RightPanel onProfile={nav.profile} chat={page === "home"} onSignIn={nav.signIn} />}
     </div>
   );
 }
