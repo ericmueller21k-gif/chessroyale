@@ -115,7 +115,7 @@ async function run(kind, name, context, throttle) {
   await cdp.send("Performance.enable");
   const q =
     kind === "crowd"
-      ? "mode=crowd&rounds=1&clock=60&augments=0&turns=all"
+      ? "mode=crowd&clock=60&augments=0&turns=all"
       : kind === "online"
         ? `mode=raid&boss=gingerbread${power ? `&power=${power}` : ""}&clock=60`
         : `boss=${kind}${power ? `&power=${power}` : ""}&clock=60`;
