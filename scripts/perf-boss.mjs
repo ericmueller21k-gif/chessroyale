@@ -2,7 +2,7 @@
 // and on a phone with its CPU slowed 4x, and records after every move: frame times (idle, while dragging a piece,
 // and through the boss's turn), DOM nodes, running animations, rAF callbacks per frame, pending timers, event
 // listeners, JS heap and audio nodes. Prints a table per run and writes everything to <out>.json.
-//   npm run perf:boss -- [out-dir] [gingerbread|clown|crowd] [phone|desktop|both] [moves=25] [power]
+//   npm run perf:boss -- [out-dir] [gingerbread|clown|crowd|online] [phone|desktop|both] [moves=25] [power]
 // The production build (vite build + preview), like the live site. Nothing here should grow with the match
 // (.claude/LESSONS.md: "Lag that grows with the match").
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -12,9 +12,12 @@ import { resolve, join, dirname } from "node:path";
 import { chromium, devices } from "@playwright/test";
 import { preview } from "vite";
 import { Chess } from "chess.js";
+import { counts, frameStats, instrument } from "../e2e/perf-probe.js";
 
 const [out = "perf-out", mode = "gingerbread", which = "both", movesArg = "25", power = ""] = process.argv.slice(2);
 const MOVES = Number(movesArg) || 25;
+// online: a Ginger raid on a running local server (npx wrangler dev --port 8788 ..., after npm run build).
+const ONLINE = process.env.PERF_URL ?? "http://localhost:8788/";
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
 process.chdir("packages/app");
@@ -26,67 +29,6 @@ if (!process.env.PERF_NO_BUILD) execFileSync("npx", ["vite", "build", "--logLeve
 const server = await preview({ root: ".", configFile: "vite.config.ts", preview: { port: 5199, strictPort: false }, logLevel: "error" });
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();
-
-/** Counters the page keeps from its first script: rAF callbacks, timers, audio nodes and a frame recorder. */
-function instrument() {
-  const P = (window.__perf = { raf: 0, frames: [], tag: "", timeouts: new Set(), intervals: new Set(), tSet: 0, iSet: 0, audio: 0, audioOff: 0, contexts: 0 });
-  const raf = window.requestAnimationFrame.bind(window);
-  window.requestAnimationFrame = (cb) => raf((t) => (P.raf++, cb(t)));
-  const st = window.setTimeout.bind(window);
-  const ct = window.clearTimeout.bind(window);
-  const si = window.setInterval.bind(window);
-  const ci = window.clearInterval.bind(window);
-  window.setTimeout = (fn, ms, ...a) => {
-    P.tSet++;
-    const id = st((...x) => (P.timeouts.delete(id), typeof fn === "function" ? fn(...x) : undefined), ms, ...a);
-    P.timeouts.add(id);
-    return id;
-  };
-  window.setInterval = (fn, ms, ...a) => {
-    P.iSet++;
-    const id = si(fn, ms, ...a);
-    P.intervals.add(id);
-    return id;
-  };
-  window.clearTimeout = window.clearInterval = (id) => {
-    P.timeouts.delete(id);
-    P.intervals.delete(id);
-    ct(id);
-    ci(id);
-  };
-  const Ctx = window.BaseAudioContext ?? window.AudioContext;
-  if (Ctx) {
-    for (const k of Object.getOwnPropertyNames(Ctx.prototype)) {
-      if (!k.startsWith("create") || typeof Ctx.prototype[k] !== "function" || k === "createPeriodicWave" || k === "createBuffer") continue;
-      const f = Ctx.prototype[k];
-      Ctx.prototype[k] = function (...a) {
-        P.audio++;
-        return f.apply(this, a);
-      };
-    }
-    const AC = window.AudioContext;
-    window.AudioContext = function (...a) {
-      P.contexts++;
-      return new AC(...a);
-    };
-    window.AudioContext.prototype = AC.prototype;
-    const dis = AudioNode.prototype.disconnect;
-    AudioNode.prototype.disconnect = function (...a) {
-      P.audioOff++;
-      return dis.apply(this, a);
-    };
-  }
-  // Every frame: when, how long since the last, how many rAF callbacks ran, and what was going on.
-  let last = 0;
-  let lastRaf = 0;
-  const loop = (t) => {
-    if (last && !document.hidden) P.frames.push([t - last, P.raf - lastRaf, P.tag || (window.match?.phase?.kind ?? "")]);
-    last = t;
-    lastRaf = P.raf;
-    raf(loop);
-  };
-  raf(loop);
-}
 
 /**
  * The player: Stockfish (the lite build, in its own process) at about club strength, choosing among the moves the
@@ -162,13 +104,7 @@ function pickMove(fen, options, seen) {
   return best;
 }
 
-const stats = (dts) => {
-  if (!dts.length) return { n: 0, p50: 0, p95: 0, slow: 0, max: 0 };
-  const s = [...dts].sort((a, b) => a - b);
-  const q = (x) => s[Math.min(s.length - 1, Math.floor(x * s.length))];
-  // A frame over 20 ms missed at least one 60 Hz refresh (16.7 ms): a dropped frame.
-  return { n: s.length, p50: +q(0.5).toFixed(1), p95: +q(0.95).toFixed(1), slow: +(s.filter((d) => d > 20).length / s.length).toFixed(3), max: +s[s.length - 1].toFixed(0) };
-};
+const stats = frameStats;
 
 async function run(kind, name, context, throttle) {
   const tag = `${kind}-${name}`;
@@ -177,11 +113,21 @@ async function run(kind, name, context, throttle) {
   await p.addInitScript(instrument);
   const cdp = await p.context().newCDPSession(p);
   await cdp.send("Performance.enable");
-  const q = kind === "crowd" ? "mode=crowd&rounds=1&clock=60&augments=0&turns=all" : `boss=${kind}${power ? `&power=${power}` : ""}&clock=60`;
-  await p.goto(`${url}?debug&nolanding&${q}`);
+  const q =
+    kind === "crowd"
+      ? "mode=crowd&rounds=1&clock=60&augments=0&turns=all"
+      : kind === "online"
+        ? `mode=raid&boss=gingerbread${power ? `&power=${power}` : ""}&clock=60`
+        : `boss=${kind}${power ? `&power=${power}` : ""}&clock=60`;
+  await p.goto(`${kind === "online" ? ONLINE : url}?debug&nolanding&${q}`);
   if (kind === "crowd") {
     await p.getByRole("radio", { name: /^Solo/ }).click();
     await p.getByRole("button", { name: "PLAY", exact: true }).click();
+  } else if (kind === "online") {
+    // A raid lobby on the local server, started alone: the server runs the match, this device the boss's engine.
+    await p.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
+    await p.getByRole("button", { name: /^Create a (lobby|raid)$/ }).click();
+    await p.getByRole("button", { name: /^Start with 1 player$/ }).click();
   } else await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   if (throttle > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: throttle });
   const phase = () => p.evaluate(() => window.match?.phase.kind ?? null);
@@ -195,23 +141,8 @@ async function run(kind, name, context, throttle) {
     return null;
   };
   const sample = async () => {
-    const page = await p.evaluate(() => {
-      const P = window.__perf;
-      const frames = P.frames;
-      P.frames = [];
-      return {
-        frames,
-        dom: document.getElementsByTagName("*").length,
-        anims: document.getAnimations().length,
-        timeouts: P.timeouts.size,
-        intervals: P.intervals.size,
-        tSet: P.tSet,
-        audio: P.audio,
-        audioOff: P.audioOff,
-        contexts: P.contexts,
-        canvases: document.getElementsByTagName("canvas").length,
-      };
-    });
+    const frames = await p.evaluate(() => window.__perf.frames.splice(0));
+    const page = { frames, ...(await p.evaluate(counts)) };
     const m = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((x) => [x.name, x.value]));
     return { ...page, listeners: m.JSEventListeners, nodes: m.Nodes, heapMB: +(m.JSHeapUsedSize / 1048576).toFixed(1), script: m.ScriptDuration, layouts: m.LayoutCount, styles: m.RecalcStyleCount };
   };
@@ -316,7 +247,6 @@ async function run(kind, name, context, throttle) {
       heapMB: s.heapMB,
       audio: s.audio,
       audioOff: s.audioOff,
-      contexts: s.contexts,
       scriptPerMove: +(s.script - prev.script).toFixed(2),
       stylesPerMove: s.styles - prev.styles,
     };
