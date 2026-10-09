@@ -3251,8 +3251,8 @@ move 13-15; the blizzard glitched.
   rebuilt it, replaying the whole game with chess.js. The boss screen replayed it on every frame too. Details, numbers
   and the rule are in `.claude/LESSONS.md`.
 - **The fix:** the view is built once per change; replays (`fenAfter`, `gameEnd`) and position lookups (`pieceAt`) are
-  remembered; sprite frames draw about three times faster, with the same pixels. Nothing a player sees or hears
-  changed, and no timing either.
+  remembered; sprite frames draw about three times faster, with the same pixels; the rating curve is worked out once
+  (Crowd's standings re-sorted it 5,100 times a redraw). Nothing a player sees or hears changed, and no timing either.
 - **Bounded caches:** the last 256 lines and endings, the last 32 positions read. A cached answer is always the one a
   fresh replay gives (the key is the whole line), and an illegal move still throws.
 - **Measured** with `npm run perf:boss` (a whole battle on a computer and on a phone slowed 4x, per move); also run on

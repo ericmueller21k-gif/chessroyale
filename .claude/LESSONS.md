@@ -351,6 +351,9 @@ timers and the heap all stayed flat; only frame times climbed.
 - The blizzard added its own cost: its pixel frames are drawn the first time they show (each part's outline redone
   for every frame, each pixel's colour parsed from text), and the ice over every piece built a chess.js game per
   square on every redraw (`pieceAt`).
+- Checking the other modes found the same kind of cost in Crowd. From move 4 (once ratings show), the standings
+  re-sorted the rating curve 51 times per player, for 100 players, on every redraw: drag p95 went from 17 ms to 150-180
+  ms on the slowed phone.
 - No test saw it: tests play a few moves and check what's on the screen, never how long a frame takes at move 20.
 
 **How it was found:** `npm run perf:boss` (`scripts/perf-boss.mjs`) plays a whole battle with real drags, on a computer
@@ -380,6 +383,7 @@ The boss's turn at move 25 went from every frame dropped (p95 200 ms on the comp
   `pieceAt` reads a position once.
 - Sprite frames work out each part's outline once per way it's drawn and each colour once per frame. Every frame of
   every character and effect is byte for byte the same.
+- The rating curve's sorted points and the prior's loss are worked out once per curve.
 
 **The guard:**
 - `packages/chess/test/long-match.test.ts` plays a 40-plus move battle. Reading the boss view again must do no
@@ -393,4 +397,5 @@ The boss's turn at move 25 went from every frame dropped (p95 200 ms on the comp
   looks like a field gets read dozens of times a frame, so it must never rebuild anything.
 - Never replay a game from move 0 per redraw, per read or per round. Use the board's FEN or the remembered `fenAfter`.
 - Before calling a change to a board, the boss or an animation done, run `npm run perf:boss -- <dir> gingerbread phone
-  25`. Frame times late in the match must match the early ones.
+  25`. Frame times late in the match must match the early ones. The same script runs `clown`, `crowd` and `online` (an
+  online raid on a local server).
