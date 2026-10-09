@@ -111,8 +111,9 @@ export interface LiveCounts {
   queue: number;
   playing: PlayingNow[];
   /**
-   * One running match to watch on the home page (the live hub only): the one with the most people in it, then the
-   * newest, with its board. Null when none is running (the window plays a bot match then).
+   * One running match to watch on the home page (the live hub only): a matchmade one (never a private lobby), the one
+   * with the most people in it, then the newest, with its board. Null when none is running (the window plays a bot
+   * match then).
    */
   featured?: (PlayingNow & { board: LiveMatchBoard }) | null;
   /** The typical wait in the queue (seconds, rounded to 5), by mode; null until there's history. */
@@ -231,7 +232,8 @@ export class LiveBoard {
       .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
     let queue = 0;
     for (const l of this.lobbies.values()) if (l.phase === "waiting" && l.kind === "queue" && l.updatedAt > fresh) queue += l.humans;
-    const watch = playing.filter((l) => l.board).sort((a, b) => b.humans - a.humans || (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
+    // (Matchmade only: a private lobby's game is its friends', not the front page's.)
+    const watch = playing.filter((l) => l.board && l.kind === "queue").sort((a, b) => b.humans - a.humans || (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
     return {
       online,
       matches: playing.length,

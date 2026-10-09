@@ -1476,7 +1476,8 @@ it honestly; no server time for the stand-in; light on the device.
   position, the move just played, the crowd's top three votes on it ([SAN, count]) and the move number. No names, no
   codes. Lobbies already report changes to the hub (at most every 2 s); this adds about one report per move per
   running match, to a Durable Object already in use. The live line (`/api/live`, polled every 5 s by the home and
-  cached 3 s per Worker) carries one **featured** match: the one with the most people in it, then the newest. My
+  cached 3 s per Worker) carries one **featured** match: a matchmade one (never a private lobby: that game is its
+  friends'), the one with the most people in it, then the newest. My
   call: not a WebSocket per watcher. Every home page watching one match's lobby would put load on the match itself,
   and the game comes first; the live line costs nothing extra to read. The window shows it as **Live** (a green dot),
   with "White's crowd: e4 25 · c4 7 · d4 6", and no "Bot match" label. When the match ends or empties, the bot match
@@ -1504,7 +1505,7 @@ it honestly; no server time for the stand-in; light on the device.
   and two viewers agree; positions worked out once; every shipped move legal from its position, the most-voted move
   the one played, votes sorted, players left never rising, the final's players), `packages/server/test/lobby.test.ts`
   (a running Crowd match's board and top votes after each move, no names) and `capacity.test.ts` (the featured match:
-  most people, then newest; none empty or stale; the next when one ends), and `e2e/live-window.spec.ts` (the bot
+  matchmade, most people, then newest; never private, empty or stale; the next when one ends), and `e2e/live-window.spec.ts` (the bot
   match at 1280 x 800, 1440 x 900 and 1280 x 680: the label, a square board in the window, the words fitting, PLAY
   still at the bottom, nothing piling up over two moves; none at 1024 or on a phone, and no fetch there; a real match
   running shows as Live with its votes, then back to a bot match).

@@ -44,13 +44,15 @@ const lobby = (code: string, patch: Partial<LobbySummary> = {}): LobbySummary =>
 });
 
 describe("the live hub's board", () => {
-  it("the home page's live window: the running match with the most people in it, with its board (no names); none without a board", () => {
+  it("the home page's live window: the matchmade match with the most people in it, with its board (no names); none without a board or private", () => {
     const now = 50_000_000;
     const board = new LiveBoard();
     const at = (fen: string, ply: number) => ({ fen, lastMove: "e2e4", votes: [["e4", 31], ["d4", 12]] as [string, number][], ply });
     board.report(lobby("AAAAA", { humans: 2, startedAt: now - 60_000, board: at("a", 10) }), now - 1000);
     board.report(lobby("BBBBB", { humans: 5, startedAt: now - 90_000, board: at("b", 20) }), now - 1000);
     board.report(lobby("CCCCC", { humans: 9, startedAt: now - 30_000 }), now - 1000);
+    // (A private lobby is never shown, however full.)
+    board.report(lobby("PPPPP", { kind: "private", humans: 30, board: at("p", 7) }), now - 1000);
     board.report(lobby("DDDDD", { humans: 0, board: at("d", 3) }), now - 1000);
     board.report(lobby("EEEEE", { humans: 50, board: at("e", 3) }), now - FRONT_DOOR.matchStaleMs - 1);
     const c = board.counts(now, { crowd: null, boss: null });
