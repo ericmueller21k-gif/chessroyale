@@ -7,9 +7,12 @@ import { named, test } from "./helpers.ts";
  */
 const desktop = () => test.info().project.name === "desktop";
 const sideways = (p: Page) => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-/** No real match in the live line (other tests' matches would otherwise be shown): the window plays a bot match. */
+/**
+ * No real match in the live line (other tests' matches would otherwise be shown): the window plays a bot match. (By
+ * path: the live line's request carries the global chat's query.)
+ */
 const noRealMatch = (p: Page) =>
-  p.route("**/api/live", async (route) => {
+  p.route((u) => u.pathname === "/api/live", async (route) => {
     const res = await route.fetch();
     const body = await res.json();
     await route.fulfill({ response: res, json: { ...body, featured: null } });
@@ -104,7 +107,7 @@ test("computer: a real match running shows in the live window as Live (no Bot ma
   await named(page, "Watcher");
   // (The switch back is the window's: a route takes the real match off the live line on cue.)
   let hide = false;
-  await page.route("**/api/live", async (route) => {
+  await page.route((u) => u.pathname === "/api/live", async (route) => {
     const res = await route.fetch();
     const body = await res.json();
     await route.fulfill({ response: res, json: hide ? { ...body, featured: null } : body });
