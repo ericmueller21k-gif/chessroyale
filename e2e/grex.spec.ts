@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { Chess } from "chess.js";
 import { test } from "./helpers.ts";
 
 /**
@@ -6,7 +7,6 @@ import { test } from "./helpers.ts";
  * left on a tile ablaze burning, the God King's warning, and the Roman candle (?power=candle: warned as the second
  * turn begins, fired on the third) with its 12 shots falling 1, 2, 3, 4, then 2. And the admins' test trigger.
  *
- * (Until his art lands, ?wip=1 meets him with placeholders: the rules and the moments are the same.)
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
@@ -19,42 +19,40 @@ const banner = (p: Page, text: string) => p.locator(".fight-banner.power-cut", {
 async function play(page: Page, opts: { leave?: boolean; step?: boolean } = {}) {
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await page.waitForTimeout(300);
-  const out = await page.evaluate(async (o) => {
+  const { fen, fire, allowed, best } = await page.evaluate(async () => {
     const m = (window as any).match;
     const fen: string = m.phase.board.fen;
-    const fire: { square: string; stage: number }[] = m.boss?.powers?.fire ?? [];
     const top: { move: string }[] = await m.runner.topMovesFor(fen);
-    const legal: string[] = m.boss?.powers?.allowed ?? m.runner.crowdAllowed() ?? top.map((t) => t.move);
-    const pieceAt = (sq: string) => {
-      const row = fen.split(" ")[0]!.split("/")[8 - Number(sq[1])]!;
-      let f = 0;
-      for (const c of row) {
-        if (/\d/.test(c)) f += Number(c);
-        else if (f++ === sq.charCodeAt(0) - 97) return c;
-      }
-      return null;
-    };
-    const mine = (sq: string) => {
-      const c = pieceAt(sq);
-      return !!c && c === c.toUpperCase() && c !== "K";
-    };
-    const all: string[] = (await m.runner.opts.engines[0].topMoves(fen, 40)).map((t: { move: string }) => t.move).filter((mv: string) => legal.includes(mv));
-    const ablaze = fire.filter((t) => t.stage >= 3 && mine(t.square)).map((t) => t.square);
-    const burning = fire.filter((t) => t.stage < 3).map((t) => t.square);
-    let move: string | undefined;
-    if (o.leave && ablaze.length) move = all.find((mv) => !ablaze.includes(mv.slice(0, 2)));
-    if (!move && o.step) move = all.find((mv) => burning.includes(mv.slice(2, 4)) && pieceAt(mv.slice(0, 2)) !== "K");
-    move ??= top[0]?.move ?? legal[0];
-    if (m.phase.kind === "play" && move) m.submit(move);
-    return { move, left: !!(o.leave && ablaze.length && move && !ablaze.includes(move.slice(0, 2))) };
-  }, opts);
+    return { fen, fire: (m.boss?.powers?.fire ?? []) as { square: string; stage: number }[], allowed: (m.boss?.powers?.allowed ?? null) as string[] | null, best: top[0]?.move ?? null };
+  });
+  const chess = new Chess(fen);
+  const legal = chess
+    .moves({ verbose: true })
+    .map((mv) => mv.from + mv.to + (mv.promotion ?? ""))
+    .filter((mv) => !allowed || allowed.includes(mv));
+  const mine = (sq: string) => {
+    const pc = chess.get(sq as never);
+    return !!pc && pc.color === chess.turn() && pc.type !== "k";
+  };
+  // (A pawn: leaving a bigger piece to burn is a blunder the God King's Last Stand would take back.)
+  const ablaze = fire.filter((t) => t.stage >= 3 && mine(t.square) && chess.get(t.square as never)?.type === "p").map((t) => t.square);
+  const burning = fire.filter((t) => t.stage < 3).map((t) => t.square);
+  let move: string | undefined;
+  // (Leave the piece: the best move that doesn't take it off, if the engine's is one; else any quiet one.)
+  if (opts.leave && ablaze.length) move = best && !ablaze.includes(best.slice(0, 2)) ? best : legal.find((mv) => !ablaze.includes(mv.slice(0, 2)) && !chess.get(mv.slice(2, 4) as never));
+  if (!move && opts.step) move = legal.find((mv) => burning.includes(mv.slice(2, 4)) && chess.get(mv.slice(0, 2) as never)?.type !== "k");
+  move ??= best ?? legal[0];
+  await page.evaluate((mv) => {
+    const m = (window as any).match;
+    if (m.phase.kind === "play" && mv) m.submit(mv);
+  }, move ?? null);
   await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
-  return out;
+  return { move, left: !!(opts.leave && ablaze.length && move && !ablaze.includes(move.slice(0, 2))) };
 }
 
 test("G-REX: his sparkler's tile burns in stages, a piece left on it burns, and the Roman candle's 12 shots fall 1, 2, 3, 4, 2", async ({ page }) => {
   test.setTimeout(8 * 60_000);
-  await page.goto("/?debug&clock=40&bossMoves=12&boss=grex&wip=1&power=candle");
+  await page.goto("/?debug&clock=40&bossMoves=12&boss=grex&power=candle");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("G-REX");
@@ -81,7 +79,7 @@ test("G-REX: his sparkler's tile burns in stages, a piece left on it burns, and 
   const p3 = await powers(page);
   expect(p3.candle).toEqual({ at: 3, left: 12 });
   expect(p3.fire[0].stage).toBe(2);
-  await expect(page.locator(".pw-pips i.on")).toHaveCount(12);
+  await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "12");
   await expect(page.locator(".power-board .pw-fire.stage-2")).toHaveCount(1);
 
   // Then the barrage: 3 crowd moves after he fired, a wave a turn. Leave one piece on a tile ablaze to watch it burn.
@@ -101,7 +99,7 @@ test("G-REX: his sparkler's tile burns in stages, a piece left on it burns, and 
     if ((await phase(page)) !== "play") break;
     const p = await powers(page);
     left.push(p.candle.left);
-    if (p.candle.left > 0) await expect(page.locator(".pw-pips i.on")).toHaveCount(p.candle.left);
+    if (p.candle.left > 0) await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", String(p.candle.left));
     // Never on the king's square; never two on one square.
     const squares = p.fire.map((t: { square: string }) => t.square);
     expect(new Set(squares).size).toBe(squares.length);

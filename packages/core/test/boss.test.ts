@@ -11,8 +11,9 @@ describe("the boss template: who can be met", () => {
     expect(playableBosses([base, { ...base, id: "y", kit: null }, { ...base, id: "z", powers: null }]).map((b) => b.id)).toEqual(["x"]);
   });
 
-  it("today: the gingerbread man (Freeze) and Boingo the Clown", () => {
-    expect(playableBosses().map((b) => b.id).sort()).toEqual(["clown", "gingerbread"]);
+  it("today: Ginger (Freeze), Boingo the Clown and G-REX (Fire)", () => {
+    expect(playableBosses().map((b) => b.id).sort()).toEqual(["clown", "gingerbread", "grex"]);
+    expect(BOSS_ROSTER.find((b) => b.id === "grex")!.powers).toEqual({ passive: "sparkler", ultimate: "candle" });
     expect(BOSS_ROSTER.find((b) => b.id === "gingerbread")!.powers).toEqual({ passive: "freeze", ultimate: "blizzard" });
     expect(BOSS_ROSTER.find((b) => b.id === "clown")!.powers).toEqual({ passive: "pie", ultimate: "funhouse" });
   });
@@ -23,12 +24,12 @@ describe("the boss template: who can be met", () => {
       const b = chooseBoss(i / 100);
       expect(isPlayable(b)).toBe(true);
       seen.add(b.id);
-      expect(chooseBoss(i / 100, null, "clown").id).toBe("gingerbread");
-      expect(chooseBoss(i / 100, null, "gingerbread").id).toBe("clown");
+      expect(chooseBoss(i / 100, null, "clown").id).not.toBe("clown");
+      expect(chooseBoss(i / 100, null, "gingerbread").id).not.toBe("gingerbread");
       // A picked boss that isn't playable is never met.
       expect(isPlayable(chooseBoss(i / 100, "golem"))).toBe(true);
     }
-    expect(seen).toEqual(new Set(["clown", "gingerbread"]));
+    expect(seen).toEqual(new Set(["clown", "gingerbread", "grex"]));
     expect(chooseBoss(0.99, "clown", "clown").id).toBe("clown");
     // With one playable boss, it's met even if it was the last one.
     const one: BossDef[] = [{ id: "a", name: "A", icon: "a", kit: "A", offset: 0, powers: { passive: "pie", ultimate: "funhouse" } }];
@@ -47,9 +48,10 @@ describe("the boss template: who can be met", () => {
     expect([at(1600, "easy"), at(1600, "normal"), at(1600, "hard"), at(1600, "hardest")]).toEqual([1200, 1500, 1750, 2000]);
     expect(at(3000, "hardest")).toBe(ENGINE_MAX_ELO);
     expect(at(1000, "easy")).toBe(800);
-    // A test trigger, solo only: a boss whose powers are built before its art (?wip=1); never otherwise.
-    expect(chooseBoss(0.5, "grex").id).not.toBe("grex");
-    expect(chooseBoss(0.5, "grex", null, undefined, true).id).toBe("grex");
-    expect(chooseBoss(0.5, "golem", null, undefined, true).id).not.toBe("golem");
+    // Testing, solo only: a boss whose powers are built before its art (?wip=1); never otherwise, never one without powers.
+    const wip: BossDef[] = [{ id: "a", name: "A", icon: "a", kit: "A", offset: 0, powers: { passive: "pie", ultimate: "funhouse" } }, { id: "b", name: "B", icon: "b", kit: null, offset: 0, powers: { passive: "freeze", ultimate: "blizzard" } }, { id: "c", name: "C", icon: "c", kit: null, offset: 0, powers: null }];
+    expect(chooseBoss(0.5, "b", null, wip).id).toBe("a");
+    expect(chooseBoss(0.5, "b", null, wip, true).id).toBe("b");
+    expect(chooseBoss(0.5, "c", null, wip, true).id).toBe("a");
   });
 });

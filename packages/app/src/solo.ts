@@ -363,7 +363,7 @@ export class SoloMatch implements GameView {
   /** Testing (admins): the boss's ultimate as the next crowd turn begins. */
   triggerUltimate() {
     if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin) return;
-    if (this.runner.triggerUltimate()) this.set({ ...this.phase });
+    if (this.runner.triggerUltimate()) this.emit();
   }
   get boss(): BossView | null {
     const v = this.runner?.bossView();

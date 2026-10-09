@@ -22,8 +22,8 @@ await server.listen();
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();
 const ULT = { gingerbread: "blizzard", clown: "funhouse", grex: "candle" };
-// (G-REX before his art lands: ?wip=1 meets him with placeholders.)
-const WIP = { grex: "&wip=1" };
+// (?wip=1 meets a boss whose powers are built before its art is, with placeholders: e.g. WIP = { next: "&wip=1" }.)
+const WIP = {};
 
 async function run(boss, name, context) {
   const tag = `${boss}-${name}`;

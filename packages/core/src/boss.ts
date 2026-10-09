@@ -102,8 +102,7 @@ export interface BossDef {
 export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "gingerbread", name: "Ginger", icon: "🍪", kit: "Ginger", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
   { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
-  // (His character kit, "G-REX", is the characters delegate's: set here once it's complete.)
-  { id: "grex", name: "G-REX", icon: "🦖", kit: null, offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
+  { id: "grex", name: "G-REX", icon: "🦖", kit: "G-REX", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },

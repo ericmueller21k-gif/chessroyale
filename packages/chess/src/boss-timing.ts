@@ -39,7 +39,7 @@ export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, f
  * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
  * boss's turn begins. The boss's move waits for it (at least this long after the crowd's move), solo and online.
  */
-export const FIRE_BURN_MS = 1400;
+export const FIRE_BURN_MS = 1500;
 
 /** How long a turn's power moments take, one after another. */
 export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX }[] | null | undefined): number {

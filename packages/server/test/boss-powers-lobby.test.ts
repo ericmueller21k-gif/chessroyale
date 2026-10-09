@@ -184,16 +184,16 @@ describe("boss powers online", () => {
       const L = setup({ ...RAID_SETTINGS }, {}, seed);
       for (const [i, b] of ["clown", "clown", "gingerbread"].entries()) L.core.connect(undefined, `P${i}`, "computer", false, 1500, undefined, undefined, b);
       L.core.message("p1", { t: "start" });
-      expect(L.core.save().runner!.state.boss!.id).toBe("gingerbread");
+      expect(L.core.save().runner!.state.boss!.id).not.toBe("clown");
     }
     const ids = new Set<string>();
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
       const L = setup({ ...RAID_SETTINGS }, {}, seed);
       L.core.connect(undefined, "A", "computer", false, 1500);
       L.core.message("p1", { t: "start" });
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
-    expect([...ids].sort()).toEqual(["clown", "gingerbread"]);
+    expect([...ids].sort()).toEqual(["clown", "gingerbread", "grex"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {

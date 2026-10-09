@@ -2,10 +2,10 @@ import type { ComponentChildren } from "preact";
 import { BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
 import { FIRE_BURN_MS, POWER_FX, powerMomentMs, pieceAt } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
-import { EFFECTS, animLength, cueAt, type Effect, type EffectName } from "../characters/power-art.ts";
+import { EFFECTS, animLength, cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { BossFace } from "./BossCharacter.tsx";
-import { BossEffect, BossMoment, SpriteAnim } from "./BossEffect.tsx";
+import { BoardEffects, BossEffect, BossMoment, SpriteAnim, type BoardItem } from "./BossEffect.tsx";
 import { GodKingPortrait, squareXY } from "./GodKing.tsx";
 
 /**
@@ -19,8 +19,9 @@ import { GodKingPortrait, squareXY } from "./GodKing.tsx";
  *   the God King on the right), with its board effect. The crowd's clock starts after them.
  * - The rage meter (RageMeter) in the boss bar: it fills over the battle (faster as the boss loses material or the
  *   crowd gets ahead), glows as it nears full, flashes for the one-turn warning, and is gone once the ultimate is spent.
- * - G-REX's fire: the tiles in their stages (PowerBoard), the sparkler, the Roman candle and its fireballs (moments),
- *   a piece burning after the crowd's move (FireBurn), and the candle's 12 pips by the board (CandlePips).
+ * - G-REX's fire (the characters' sprites): the tiles in their stages on one canvas (PowerBoard), the sparkler, the
+ *   Roman candle and its fireballs (moments), a piece burning after the crowd's move (FireBurn), and the strip of the
+ *   candle's shots still up by the board (CandlePips).
  */
 
 /** One power's moment on screen: when it starts (ms, wall clock) and how long it takes. */
@@ -110,21 +111,60 @@ export const FREEZE = { boltAt: 1500, iceAt: 1760 } as const;
 export const PIE = { flyAt: 1450, landAt: 1800 } as const;
 /** The blizzard's beats: the banner, then the storm bursts from his cane and sweeps the board, then the God King's line. */
 export const BLIZZARD = { sweepAt: 1300, sweepMs: animLength(EFFECTS.blizzardSweep.ch.anims.sweep!), lineAt: 2800 } as const;
-/** G-REX's sparkler: the banner, then his throw from the board's corner, the sparkler's flight, the tile catching. */
+/**
+ * G-REX's sparkler: the banner, then his throw from the board's corner (his `ignite`, the sparkler leaving at its
+ * `throw` cue), the sparkler's flight (`sparkFly`), the tile catching (`fireTile` ignite, then its first stage).
+ */
 export const SPARK = { flyAt: 1450, landAt: 1850 } as const;
 /**
- * The Roman candle: the banner, then he jumps onto the middle of the board and fires his 12 shots up, one every
- * `shotEvery` (each a pip by the board), then jumps off.
+ * The Roman candle: the banner, then he drops onto the middle of the board (his `romanCandle`) and fires his 12 shots
+ * up, the first at its `launch` cue and one at each `shot` (each a `candleShot` streaking up off the board, and one
+ * more lit in the shots-up strip by the board), then he jumps off.
  */
-export const CANDLE = { rexAt: 1300, shotsAt: 1950, shotEvery: 190, shotMs: 520, exitAt: 4350 } as const;
-/** A wave of fireballs: each falls from above onto its square (a little after the one before) and lands as a fire tile. */
+export const CANDLE = { rexAt: 1300, shotMs: 520, exitAt: 4550 } as const;
+/** When each of the candle's 12 shots goes up (ms into his romanCandle): its `launch` and `shot` cues. */
+export function candleShotTimes(kit: BossKit | null): number[] {
+  const a = kit?.ch.anims[kit.anims.ultimate ?? ""];
+  const out: number[] = [];
+  let t = 0;
+  for (const f of a?.frames ?? []) {
+    if (f.cue === "launch" || f.cue === "shot") out.push(t);
+    t += f.ms;
+  }
+  return out.length ? out.slice(0, 12) : Array.from({ length: 12 }, (_, i) => 820 + i * 140);
+}
+/** A wave of fireballs: each falls from above onto its square (a little after the one before), lands, and is a fire tile. */
 export const FIREBALL = { fallMs: 620, stagger: 170 } as const;
 export const fireballLandAt = (i: number) => i * FIREBALL.stagger + FIREBALL.fallMs;
-/** A piece burning after the crowd's move: the flare (the piece still showing until `goneAt`), then smoke. */
-export const BURN = { goneAt: 520, ms: FIRE_BURN_MS } as const;
+/** A piece burning after the crowd's move: the real piece comes off at the burn's `poof`. */
+export const BURN = { goneAt: cueAt(EFFECTS.pieceBurn.ch.anims.burn!, "poof") ?? 520, ms: FIRE_BURN_MS } as const;
 
-/** An effect sprite from the characters' art, once they've drawn it (until then the placeholders below show). */
-const fx = (name: string): Effect | undefined => (EFFECTS as Record<string, Effect | undefined>)[name];
+/**
+ * When each fire tile's current stage began on this device (the first time it was seen at it): the step up (spread2,
+ * spread3) plays from then. A screen drawn again carries on; it doesn't start over.
+ */
+const stageSeen = new Map<string, number>();
+function stageSince(key: string, now: number): number {
+  let t = stageSeen.get(key);
+  if (t === undefined) {
+    t = now;
+    stageSeen.set(key, t);
+    if (stageSeen.size > 200) stageSeen.delete(stageSeen.keys().next().value!);
+  }
+  return t;
+}
+
+/** A fire tile's look as the board shows it: its stage's loop, after the step up into it (or its landing). */
+function tileItem(t: { square: string; lit: number; stage: number }, since: number, landed: "spark" | "fireball" | null, now: number): BoardItem {
+  const stage = Math.min(3, Math.max(1, t.stage));
+  if (stage === 1) {
+    // A sparkler's tile catches (ignite); a fireball's landing already ends on the first stage's look.
+    if (landed === "spark") return { square: t.square, name: "fireTile", anim: "ignite", then: "stage1", since };
+    return { square: t.square, name: "fireTile", anim: "stage1", since: since || t.lit };
+  }
+  const began = stageSince(`${t.square}:${t.lit}:${stage}`, now);
+  return { square: t.square, name: "fireTile", anim: `spread${stage}`, then: `stage${stage}`, since: began, quiet: true };
+}
 
 const at = (square: string, orientation: "white" | "black") => {
   const { x, y } = squareXY(square, orientation);
@@ -142,8 +182,14 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
   const iced = p.iced.filter((sq) => pieceAt(board, sq)?.color === boss.crowdSide);
   const pie = p.pie?.square;
   const blizzard = moments.some((m) => m.kind === "blizzard");
-  // G-REX's fire tiles, each in its stage (a singe, more burn, ablaze), drawn as it lands.
+  // G-REX's fire tiles, each in its stage (a singe, more burn, ablaze), drawn as it lands: all on one canvas.
   const fire = p.fire ?? [];
+  const tiles = fire.flatMap((t) => {
+    const since = appearAt(t.square, moments, orientation);
+    if (now < since) return [];
+    const landed = moments.some((m) => m.kind === "spark" && m.square === t.square) ? "spark" : moments.some((m) => m.kind === "fireball" && m.squares?.includes(t.square)) ? "fireball" : null;
+    return [tileItem(t, since, landed, now)];
+  });
   // The candle's pips: shots still to fall (during the candle's own moment, it shows them filling).
   const candleM = moments.find((m) => m.kind === "candle");
   const wave = moments.find((m) => m.kind === "fireball");
@@ -152,15 +198,9 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
   return (
     <div class="power-board" aria-hidden="true">
       {pips !== null && <CandlePips left={pips} />}
-      {fire.map((t) => {
-        const since = appearAt(t.square, moments, orientation);
-        if (now < since) return null;
-        return (
-          <span key={`fire-${t.square}-${t.lit}`} class={`pw-fire stage-${Math.min(3, t.stage)}`} style={at(t.square, orientation)} data-stage={t.stage}>
-            <FireTile stage={Math.min(3, t.stage)} since={since || t.lit} id={t.square} />
-          </span>
-        );
-      })}
+      {fire.length > 0 && <BoardEffects items={tiles} orientation={orientation} class="pw-fire-board" />}
+      {/* (One empty marker a tile, for tests and the screen reader-free count: what's on fire, at which stage.) */}
+      {fire.map((t) => (now >= appearAt(t.square, moments, orientation) ? <span key={`fire-${t.square}-${t.lit}`} class={`pw-fire stage-${Math.min(3, t.stage)}`} style={at(t.square, orientation)} data-stage={t.stage} /> : null))}
       {pie && now >= appearAt(pie, moments, orientation) && (
         <span key={`pie-${pie}`} class="pw-pie" style={at(pie, orientation)}>
           <BossEffect name="pieSplat" since={appearAt(pie, moments, orientation)} id={pie} />
@@ -190,11 +230,11 @@ const ULT_NAME: Record<string, string> = { blizzard: "the Blizzard", funhouse: "
 const hash = (s: string) => [...s].reduce((a, c) => Math.imul(a ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
 /** Which of the kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */
-const KIT_MOMENT: Record<PowerEventKind, "power" | "ultimateWarn" | "ultimate"> = {
+const KIT_MOMENT: Record<PowerEventKind, "power" | "ultimateWarn" | "ultimate" | "ultimateHit"> = {
   freeze: "power",
   pie: "power",
   spark: "power",
-  fireball: "ultimate",
+  fireball: "ultimateHit",
   warn: "ultimateWarn",
   blizzard: "ultimate",
   funhouse: "ultimate",
@@ -230,16 +270,9 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
   const kit = bossKit(boss.name);
   const banner = (text: string, sub?: string, tone = "") => <PowerBanner key={moment.key} boss={boss} side={side} text={text} sub={sub} tone={tone} />;
   /** The boss casting by the board's top-left corner, its animation's `hit` cue landing at `hitAt` (ms into the moment). */
-  const cast = (hit: string, hitAt: number, placeholder = false) => {
+  const cast = (hit: string, hitAt: number) => {
     const anim = kitAnim(kit, moment.kind);
-    if (!anim) {
-      // (No art for this moment yet: the boss's face steps up to the corner, a placeholder.)
-      return placeholder && t >= hitAt - 500 ? (
-        <span class="pm-caster pm-placeholder">
-          <BossFace boss={boss} />
-        </span>
-      ) : null;
-    }
+    if (!anim) return null;
     const a = kit!.ch.anims[anim]!;
     const since = moment.at + hitAt - (cueAt(a, hit) ?? 0);
     if (now < since) return null;
@@ -296,41 +329,44 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
       return (
         <div class="power-moment pm-spark">
           {t < 1500 && banner("SPARKLER!", moment.square ? `Fire on ${moment.square}` : undefined, "fire")}
-          {cast("throw", SPARK.flyAt, true)}
+          {cast("throw", SPARK.flyAt)}
           {moment.square && t >= SPARK.flyAt && t < SPARK.landAt && <Flight name="sparkFly" square={moment.square} orientation={orientation} since={moment.at + SPARK.flyAt} ms={SPARK.landAt - SPARK.flyAt} />}
-          {moment.square && t >= SPARK.landAt - 40 && t < SPARK.landAt + 700 && <span class="pw-flare" style={{ ...at(moment.square, orientation), animationDelay: `${SPARK.landAt - 40 - t}ms` }} />}
         </div>
       );
     case "candle": {
       const anim = kitAnim(kit, "candle");
-      const shots = Math.max(0, Math.min(12, Math.floor((t - CANDLE.shotsAt) / CANDLE.shotEvery) + 1));
+      const times = candleShotTimes(kit).map((x) => moment.at + CANDLE.rexAt + x);
+      const shots = times.filter((x) => now >= x).length;
       return (
         <div class="power-moment pm-candle">
           {t < 1500 && banner("ROMAN CANDLE!", "12 shots up…", "fire long")}
           {t >= CANDLE.rexAt && (
-            <span class={`pm-pogo pm-rex${t >= CANDLE.exitAt ? " out" : ""}${anim ? "" : " pm-placeholder"}`}>
+            <span class={`pm-pogo pm-rex${t >= CANDLE.exitAt ? " out" : ""}`}>
               {anim ? <BossMoment boss={boss.name} anim={anim} since={moment.at + CANDLE.rexAt} then="idle" /> : <BossFace boss={boss} />}
             </span>
           )}
-          {Array.from({ length: shots }, (_, i) => {
-            const since = moment.at + CANDLE.shotsAt + i * CANDLE.shotEvery;
-            return now < since + CANDLE.shotMs ? <CandleShot key={i} i={i} since={since} /> : null;
-          })}
-          {t >= CANDLE.shotsAt && <CandlePips left={shots} lit={shots} />}
+          {times.map((since, i) => (now >= since && now < since + CANDLE.shotMs ? <CandleShot key={i} i={i} since={since} /> : null))}
+          {shots > 0 && <CandlePips left={shots} />}
         </div>
       );
     }
     case "fireball":
       return (
         <div class="power-moment pm-fireball">
-          {(moment.squares ?? []).flatMap((sq, i) => {
+          {cast("", 0)}
+          {(moment.squares ?? []).map((sq, i) => {
             const since = moment.at + i * FIREBALL.stagger;
-            const land = moment.at + fireballLandAt(i);
-            return [
-              now >= since && now < land ? <Fireball key={`fb-${sq}`} square={sq} orientation={orientation} since={since} /> : null,
-              now >= land - 40 && now < land + 650 ? <span key={`fl-${sq}`} class="pw-flare" style={{ ...at(sq, orientation), animationDelay: `${land - 40 - now}ms` }} /> : null,
-            ];
+            return now >= since && now < moment.at + fireballLandAt(i) ? <Fireball key={`fb-${sq}`} square={sq} orientation={orientation} since={since} /> : null;
           })}
+          {/* Each lands on its square (its landing ends on the tile's first stage, which the board layer carries on). */}
+          <BoardEffects
+            items={(moment.squares ?? []).flatMap((sq, i) => {
+              const land = moment.at + fireballLandAt(i);
+              return now >= land && now < land + LAND_MS ? [{ square: sq, name: "fireballFall" as const, anim: "land", since: land }] : [];
+            })}
+            orientation={orientation}
+            class="pw-fire-board"
+          />
         </div>
       );
     case "funhouse": {
@@ -373,7 +409,7 @@ function Flight({ name, square, orientation, since, ms, aim = false }: { name: "
   };
   return (
     <span class={`pw-flight ${name}`} style={style}>
-      {fx(name) ? <BossEffect name={name as EffectName} since={since} /> : <span class={`pw-ph-${name}`} />}
+      <BossEffect name={name} since={since} />
     </span>
   );
 }
@@ -381,74 +417,64 @@ function Flight({ name, square, orientation, since, ms, aim = false }: { name: "
 // ---------------- G-REX's fire ----------------
 
 /**
- * A fire tile in its stage: the characters' `fireTile` once drawn (its stage animations), else a placeholder: a singe,
- * then flames along the square, then the whole square ablaze. See-through: the piece on it shows.
- */
-function FireTile({ stage, since, id }: { stage: number; since: number; id: string }) {
-  const art = fx("fireTile");
-  const anim = `stage${stage}`;
-  if (art?.ch.anims[anim]) return <SpriteAnim ch={art.ch} anim={anim} since={since} sounds={art.sounds} id={id} />;
-  return (
-    <span class={`pw-ph-fire s${stage}`}>
-      <i />
-      <i />
-      <i />
-    </span>
-  );
-}
-
-/**
- * After the crowd's move: a piece left on a tile ablaze burns (a flare, flames, smoke), or the tile fizzles out under
- * the king (a puff of smoke). Over the board, for BURN.ms from `since`.
+ * After the crowd's move: a piece left on a tile ablaze burns up (`pieceBurn`, its kind's charred shape, over the
+ * tile's burnOut), a tile under the king fizzles out (he's fireproof), and an empty one just burns out. One canvas over
+ * the board, for BURN.ms from `since`.
  */
 export function FireBurn({ burnt, since, now, orientation }: { burnt: readonly { square: string; piece?: string; fizzled?: boolean }[]; since: number; now: number; orientation: "white" | "black" }) {
   if (!burnt.length || now < since || now >= since + BURN.ms) return null;
+  const items: BoardItem[] = burnt.flatMap((b): BoardItem[] =>
+    b.fizzled
+      ? [{ square: b.square, name: "fireTile", anim: "fizzle", since }]
+      : [{ square: b.square, name: "fireTile", anim: "burnOut", since, quiet: !!b.piece }, ...(b.piece ? [{ square: b.square, name: "pieceBurn" as const, anim: b.piece, since }] : [])],
+  );
   return (
     <div class="power-board pw-burns" aria-hidden="true">
-      {burnt.map((b) => {
-        const art = fx(b.fizzled ? "fireTile" : "pieceBurn");
-        const anim = b.fizzled ? "fizzle" : "burn";
-        return (
-          <span key={`burn-${b.square}`} class={`pw-burn${b.fizzled ? " fizzled" : ""}`} style={at(b.square, orientation)}>
-            {art?.ch.anims[anim] ? <SpriteAnim ch={art.ch} anim={anim} since={since} sounds={art.sounds} id={b.square} /> : <span class={b.fizzled ? "pw-ph-fizzle" : "pw-ph-burn"} style={{ animationDelay: `${since - now}ms` }} />}
-          </span>
-        );
-      })}
+      <BoardEffects items={items} orientation={orientation} class="pw-fire-board" />
+      {burnt.map((b) => (
+        <span key={`burn-${b.square}`} class={`pw-burn${b.fizzled ? " fizzled" : b.piece ? "" : " out"}`} style={at(b.square, orientation)} />
+      ))}
     </div>
   );
 }
 
-/** One of the Roman candle's shots, streaking up from the middle of the board and off its top. */
+/** One of the Roman candle's shots (`candleShot`), streaking up from the middle of the board and off its top. */
 function CandleShot({ i, since }: { i: number; since: number }) {
-  const art = fx("candleShot");
   const style: Record<string, string> = { "--sx": `${(i % 2 ? 1 : -1) * (4 + ((i * 37) % 22))}%`, animationDuration: `${CANDLE.shotMs}ms`, animationDelay: `${since - Date.now()}ms` };
-  return <span class="pw-shot" style={style}>{art ? <SpriteAnim ch={art.ch} anim={art.loop ?? art.start!} since={since} sounds={art.sounds} id={`shot-${i}`} /> : <span class="pw-ph-shot" />}</span>;
+  return (
+    <span class="pw-shot" style={style}>
+      <BossEffect name="candleShot" since={since} id={`shot-${i}`} />
+    </span>
+  );
 }
 
-/** A fireball falling from above the board onto its square. */
+/** A fireball (`fireballFall`) falling from above the board onto its square, moved with a transform. */
 function Fireball({ square, orientation, since }: { square: string; orientation: "white" | "black"; since: number }) {
-  const art = fx("fireballFall");
   const { x, y } = squareXY(square, orientation);
   const style: Record<string, string> = {
     left: `${(x - 50) / 8}%`,
     top: `${(y - 50) / 8}%`,
-    "--fy": `${-(y + 120) / 8}%`,
+    "--fy": `${-(y + 120)}%`,
     animationDuration: `${FIREBALL.fallMs}ms`,
     animationDelay: `${since - Date.now()}ms`,
   };
-  return <span class="pw-fireball" style={style}>{art ? <SpriteAnim ch={art.ch} anim={art.start ?? art.loop!} since={since} sounds={art.sounds} id={`fb-${square}`} /> : <span class="pw-ph-fireball" />}</span>;
+  return (
+    <span class="pw-fireball" style={style}>
+      <BossEffect name="fireballFall" since={since} id={`fb-${square}`} />
+    </span>
+  );
 }
+const LAND_MS = animLength(EFFECTS.fireballFall.ch.anims.land!);
 
 /**
- * The Roman candle's shots still to fall: 12 pips by the board, one lit for each shot in the air, from the moment he
- * fires until the last fireball lands.
+ * The Roman candle's shots still up: the characters' strip by the board's top edge (`candleShots`, `left<n>`), from
+ * the moment he fires until the last fireball lands.
  */
-export function CandlePips({ left, lit = left }: { left: number; lit?: number }) {
+export function CandlePips({ left }: { left: number }) {
+  const n = Math.max(0, Math.min(12, left));
   return (
-    <div class="pw-pips" role="img" aria-label={`${left} fireballs to fall`}>
-      {Array.from({ length: 12 }, (_, i) => (
-        <i key={i} class={i < lit ? "on" : ""} />
-      ))}
+    <div class="pw-pips" role="img" aria-label={`${n} fireballs to fall`} data-left={n}>
+      <BossEffect name="candleShots" anim={`left${n}`} since={0} id="pips" />
     </div>
   );
 }

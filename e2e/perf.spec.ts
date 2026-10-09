@@ -127,8 +127,8 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
-  // (?wip=1 until his art lands; ?power=candle: the Roman candle on the third turn.)
-  await page.goto("/?debug&nolanding&clock=60&boss=grex&wip=1&power=candle");
+  // (?power=candle: the Roman candle on the third turn.)
+  await page.goto("/?debug&nolanding&clock=60&boss=grex&power=candle");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
@@ -170,7 +170,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
     { history, fen, squares },
   );
   await expect(page.locator(".power-board .pw-fire")).toHaveCount(squares.length);
-  await expect(page.locator(".power-board .pw-pips i.on")).toHaveCount(4);
+  await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "4");
   const late = await page.evaluate(counts);
   const idle = await frames(1500);
   // A piece dragged round the board for two seconds (and put back).
