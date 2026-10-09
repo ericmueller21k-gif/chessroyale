@@ -12,7 +12,8 @@ test("only piece sounds, clock ticks and the reveal reel play, and muting silenc
   // The round opens with the "Round start" 3-2-1 on the board, then the clock bar runs.
   await expect(page.locator(".cc-banner")).toHaveText("Round start");
   await expect(page.locator(".center-count")).toHaveCount(0, { timeout: 10_000 });
-  await expect(page.locator(".timer-bar")).toBeVisible();
+  // (The bar above the board; its mirror under the board is .timer-bar.below.)
+  await expect(page.locator(".timer-bar:not(.below)")).toBeVisible();
   // Five power-up slots, three lit at the start. A grey one just shakes; a lit one uses a power-up.
   await expect(page.locator(".pu-dot")).toHaveCount(5);
   await expect(page.locator(".pu-dot.on")).toHaveCount(3);

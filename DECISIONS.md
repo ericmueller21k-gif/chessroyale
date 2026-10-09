@@ -1430,6 +1430,37 @@ scoped to 1024 px and wider.
   Cancel, dark and light: the menu and panel never missing, the grid never moving, the count never going down, no
   blinks).
 
+### The computer's play column, your icon, no sun (Eric, Oct 9, 2026)
+
+Eric marked up the computer's home: drop the Shop and Profile buttons (the side menu has them), put Play with friends
+and Boss alone above PLAY, PLAY at the bottom; and, in follow-ups, the mode tabs right above PLAY (they set up what
+PLAY does), no sun, your icon by your name, and the crate's Fischer Random banner was cut off.
+
+- **The computer's play column (1024 px and wider), top to bottom:** Play with friends | Boss alone, the mode tabs
+  (Crowd / Boss raid / Classic, then Default / Bots off / Solo and the i), PLAY, and its line. No Shop or Profile
+  buttons. From 1280 px the group sits at the bottom of the column, PLAY's line level with the bottom of your card;
+  the room above is for the live game (next). 1024-1279 is stacked as before, in the new order. The DOM follows the
+  order (Home decides by the window, the same 1024 px as the frame), so Tab goes top to bottom too.
+- **Phones keep their layout:** the tabs, PLAY, then all four buttons (screenshots match the old ones below your card).
+- **No sun.** The light/dark button is gone from the side menu and the phone's top bar; **Settings → Theme** (Match
+  device / Light / Dark) is the one place, as before, and works from any page. (Eric asked for the sun on Oct 8; he
+  took it back on Oct 9.) The phone's top bar has more room for the coins as a result.
+- **Your icon** (your pixel drawing, or the old emoji) sits to the left of your name and rating on your home card,
+  48 px (one screen pixel per icon pixel at 1x, sharp), phone and computer. My call: the queue's small card on a
+  computer doesn't show it (your pawn is your picture there, and the name needs the width).
+- **The Fischer Random banner** (crate opening; item-builder's lane, the director's exception for this fix): it used
+  the board banners' sizes, so on a computer the words were taller than the band and wider than the stage (cut at both
+  ends, top and bottom), and on a phone the face and the "!" were cut. Now one size sets the text, the face and the
+  gaps (6.4% of the stage's width, at most 52 px), so the face and the words take about 84% of the width in the
+  widest font measured; the band grows to fit them, and the stage grows with its width (at least 210 px). The text is
+  19 px on a 320 px phone, 47 px at 1280, 52 px from 1440; the line under it never goes below 11 px. Watched frame
+  by frame at 320-1920 px: in, slam, hold and out, nothing clipped.
+- **Checked:** `e2e/home-layout.spec.ts` (the column's order and PLAY at the bottom at 1024, 1280 and 1440; no Shop or
+  Profile on a computer's home; your drawn icon left of your name at 320-430 and 1024-1440; no sun anywhere on home,
+  and Settings' Theme through reloads with no flash), `e2e/crate-banner.spec.ts` (the banner measured every frame at
+  320, 390, 1024, 1280 and 1920), and `npm run frames:home` (now picks the theme in Settings: one jump in brightness
+  per pick, no blinks).
+
 ## Quick chat in matches (design, Oct 6, 2026; built Oct 7, 2026)
 
 Eric: a chat in 50 v 50, preset messages only (no typing), some unlockable, each with the sender's icon and name.
@@ -3429,3 +3460,41 @@ move 13-15; the blizzard glitched.
 - **Measured** with `npm run perf:boss` (a whole battle on a computer and on a phone slowed 4x, per move); also run on
   Boingo, a Crowd match and an online raid. **Guarded** by `packages/chess/test/long-match.test.ts` and
   `e2e/perf.spec.ts`.
+
+## Match screen: timers, the ring, chat on a computer (Eric, Oct 9, 2026)
+
+From Eric's marked-up screenshot of a Crowd match. My calls:
+
+- **The ring was off its square.** Chessground draws the squares in a box it rounds down to a whole multiple of 8
+  device pixels, up to 8 px smaller than the board's wrap (5-6 CSS px at a 125% display scale, as Eric's). The ring
+  was placed in % of the wrap, so it drifted toward the board's far side, a few pixels at most squares. Now the ring,
+  the bars, the clock and the ghost layers size by chessground's own number (`---cg-width`, which it writes every
+  time it sizes the board), so they can't drift. The ring's corners are square and its glow is inside, so nothing
+  of it reads wider than the square. `e2e/match-screen.spec.ts` checks it within 1 px at two widths on a phone and
+  on a 125% computer, at sizes picked where the rounding gap is widest (the old ring failed there).
+- **The bar** is 6 px (was 3): Eric asked for a few pixels. One setting, `--timer-bar-h` in `styles.css`.
+- **The mirror under the board** shows on phones and computers. It sits in the 8 px gap above the next row, so the
+  board keeps its size. One switch: `TIMER_BAR_BELOW` in `components/Countdown.tsx`. On a computer the gaps above and
+  below the board are 8 px now (were 6), as on a phone, to fit the bars.
+- **The board's clock** sits in the line above the board, level with the board's right edge: this move's seconds
+  ("12s") and your bank ("9:50", the leaderboard's BANK). No labels: they made it too wide for a phone's line, and
+  the formats tell them apart; the full words are its tooltip. The seconds go red under 5 s on your own move; the
+  bank red under a minute. Once you've moved, your bank stops and the seconds go grey. Watching the other team, the
+  seconds are theirs (never red). In the reveal only the bank shows, in the same place.
+  - Beside it, the line's own "⏱ 20 s" shows only when it's lit (the clock went up, "▲"); otherwise it repeated the
+    clock. On a phone the line's text is centred in the room left of the clock; it drops "Your pick for" only while
+    the lit note is in it below 430 px, and "you're on White" below 375 px.
+  - Crowd only (not the boss raid, which has the dock, or Classic, which shows the bank in its top bar).
+- **Chat on a computer** was already in the right column, under the vote results, in online matches (solo has no
+  chat). But the panel above it changed height every phase, so chat jumped down at each reveal and back up at each
+  move. The panel keeps one height now (room for five vote rows, yours and the result line), so chat stays put. From
+  900 to 1099 px it's still beside the scoreboard (no leaderboard down the side there).
+
+## Two tweaks (Eric, Oct 9, 2026)
+
+- **Ginger freezes a little more often:** every 4 to 6 crowd turns instead of 5 to 7 (`BOSS_POWERS.freezeEvery`). The
+  first freeze still comes on the crowd's second turn, and each lasts 2 turns, so a freeze is never on top of another.
+- **The God King keeps his colours in the dock:** his figure used to fade and desaturate when he couldn't be summoned,
+  and go grey and half see-through once his moves were used. Now he stays in full colour; the crowns under him show
+  what's left (a dash once they're spent), as before. His fallen figure after his Last Stand is still greyed: that
+  shows he has fallen, which is different from having used his moves.

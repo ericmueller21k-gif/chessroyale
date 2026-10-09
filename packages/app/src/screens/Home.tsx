@@ -4,9 +4,11 @@ import { useAccount } from "./Profile.tsx";
 import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
 import { BossDifficulty } from "../components/BossDifficulty.tsx";
 import type { ComponentChildren } from "preact";
-import { AccountBar, DressedPawn, FdButton, LiveLine, Logo, RankLine, ThemeButton, myHat, wearingNames } from "../components/FrontDoor.tsx";
+import { AccountBar, DressedPawn, FdButton, LiveLine, Logo, RankLine, myHat, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 import { BossFace } from "../components/BossCharacter.tsx";
+import { UserIcon } from "../components/PixelIcon.tsx";
+import { useMedia } from "../components/QuickChat.tsx";
 
 export const OPENING_KEY = "brc.openingMoves";
 const MODE_KEY = "brc.mode";
@@ -376,9 +378,13 @@ function Notice({ notice }: { notice: HomeNotice }) {
 }
 
 /**
- * Home (the approved mockup, docs/mockups/front-door/Main.dc.html): the top bar (logo, the sun, coins, your pawn), the
- * live line, your dressed pawn, the mode picker, PLAY and the line under it, and four smaller buttons. A note goes under
- * the live line when a lobby you opened has closed.
+ * Home (the approved mockup, docs/mockups/front-door/Main.dc.html): the top bar (logo, coins, your pawn), the live
+ * line, your dressed pawn with your icon, name and rating, the mode picker, PLAY and the line under it, and four smaller
+ * buttons. A note goes under the live line when a lobby you opened has closed. Light or dark is in Settings.
+ *
+ * On a computer (1024 px and wider, the side menu's frame) the play column is Play with friends and Boss alone, then
+ * the mode picker, then PLAY at the bottom (Eric, Oct 9): the shop and your profile are in the side menu, and the room
+ * above is kept for a live game.
  *
  * With `queue` (you pressed PLAY), the home becomes the queue: on a phone the queue screen takes the whole screen, as
  * before; on a computer it fills in place of the play column, and your pawn shrinks to a card at the top of its column
@@ -430,6 +436,8 @@ export function HomeScreen({
 }) {
   const { profile } = useAccount();
   const live = useLive();
+  // (The same line as the stylesheet's frame: from 1024 px the side menu has the shop and your profile.)
+  const computer = useMedia("(min-width: 1024px)");
   const [mode, setModeState] = useState<ModeChoiceId>(() => chosenMode().mode);
   const pickMode = (m: ModeChoiceId) => {
     setModeState(m);
@@ -501,14 +509,47 @@ export function HomeScreen({
   const hero = (
     <section class="fd-hero" aria-label="You">
       <DressedPawn look={look} hat={myHat(profile)} size="hero" shadow />
-      <div class="fd-hero-text">
-        <div class="fd-hero-name">{name}</div>
-        <div class="fd-hero-sub">
-          <RankLine rating={profile?.rating ?? null} />
-          {wearing && ` · ${wearing}`}
+      {/* (Your icon to the left of your name and rating, as beside your name in chat.) */}
+      <div class="fd-hero-id">
+        <span class="fd-hero-icon">
+          <UserIcon icon={profile?.user.icon ?? "♟"} />
+        </span>
+        <div class="fd-hero-text">
+          <div class="fd-hero-name">{name}</div>
+          <div class="fd-hero-sub">
+            <RankLine rating={profile?.rating ?? null} />
+            {wearing && ` · ${wearing}`}
+          </div>
         </div>
       </div>
     </section>
+  );
+  // PLAY and the line under it (and an error, if any).
+  const go = (
+    <div class="fd-go">
+      <button type="button" class="fd-play" disabled={loading || (mode === "classic" && type !== "solo")} onClick={play}>
+        PLAY
+      </button>
+      <div class="fd-hint" aria-live="polite">
+        {loading ? "Loading the engine…" : hint}
+      </div>
+      {error && <p class="fd-error">{error}</p>}
+    </div>
+  );
+  // The smaller buttons. (A computer's side menu has the shop and your profile, so its home doesn't repeat them.)
+  const actions = (
+    <div class="fd-actions">
+      <FdButton onClick={() => setFriends(true)}>Play with friends</FdButton>
+      <FdButton disabled={loading} onClick={bossAlone}>
+        Boss alone
+      </FdButton>
+      {!computer && (
+        <>
+          <FdButton onClick={onShop}>Shop &amp; crates</FdButton>
+          <FdButton onClick={onProfile}>Profile</FdButton>
+        </>
+      )}
+    </div>
   );
   if (queueing)
     return (
@@ -527,11 +568,10 @@ export function HomeScreen({
     );
   return (
     <div class="fd-home">
-      {/* (A phone's top bar. A computer has the logo and the sun in its side menu, your coins and pawn top right.) */}
+      {/* (A phone's top bar. A computer has the logo in its side menu, your coins and pawn top right.) */}
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
-          <ThemeButton />
           <AccountBar onProfile={onProfile} />
         </div>
       </header>
@@ -540,6 +580,11 @@ export function HomeScreen({
       <div class="fd-home-main">
         {hero}
         <div class="fd-play-col">
+          {/*
+           * A computer (Eric, Oct 9): Play with friends and Boss alone, then the mode picker right above PLAY (it sets
+           * up what PLAY does), PLAY at the bottom. A phone: the picker, PLAY, then all four buttons.
+           */}
+          {computer && actions}
           <div class="fd-modes" role="radiogroup" aria-label="Mode">
             {MODES.map((m) => (
               <button type="button" role="radio" key={m.id} aria-checked={mode === m.id} class={mode === m.id ? "on" : ""} onClick={() => pickMode(m.id)}>
@@ -588,21 +633,8 @@ export function HomeScreen({
               <span aria-hidden="true">⚠</span> No bots can mean a much longer wait: the match starts only when {mode === "raid" ? "the raid has enough people" : "100 people have joined"}. You can switch to Default from the queue.
             </p>
           )}
-          <button type="button" class="fd-play" disabled={loading || (mode === "classic" && type !== "solo")} onClick={play}>
-            PLAY
-          </button>
-          <div class="fd-hint" aria-live="polite">
-            {loading ? "Loading the engine…" : hint}
-          </div>
-          {error && <p class="fd-error">{error}</p>}
-          <div class="fd-actions">
-            <FdButton onClick={() => setFriends(true)}>Play with friends</FdButton>
-            <FdButton disabled={loading} onClick={bossAlone}>
-              Boss alone
-            </FdButton>
-            <FdButton onClick={onShop}>Shop &amp; crates</FdButton>
-            <FdButton onClick={onProfile}>Profile</FdButton>
-          </div>
+          {go}
+          {!computer && actions}
         </div>
       </div>
       {friends && (

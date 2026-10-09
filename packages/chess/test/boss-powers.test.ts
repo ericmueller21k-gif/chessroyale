@@ -186,7 +186,7 @@ describe("boss powers: as each turn begins", () => {
     }
   });
 
-  it("freezes every 5-7 turns from turn 2, for 2 turns; the second call for the same turn changes nothing", () => {
+  it("freezes every 4-6 turns from turn 2, for 2 turns; the second call for the same turn changes nothing", () => {
     let b = battle("gingerbread", RUY_FEN);
     const freezes: number[] = [];
     for (let turn = 1; turn <= 30; turn++) {
