@@ -931,7 +931,7 @@ export class MatchRunner {
     if (this.state.boss) {
       const { barred: _done, ...b } = this.state.boss;
       // The God King's Last Stand: the scores stand, but the move is taken back (it isn't a move on the board, so
-      // the move count goes back one; the boss's strike waits for the re-pick). He falls, and leaves his charges to
+      // the move count goes back one, and so does the count to the boss's next strike, which waits for the re-pick). He falls, and leaves his charges to
       // the crowd: every player still in gets lastStandPowerUps power-ups for each (the engine's top 3 moves, as in
       // Crowd). Otherwise a re-pick that's been played clears the bar on the move he took back.
       const r = stand ? results.find((x) => x.lastStand)! : null;
@@ -941,7 +941,7 @@ export class MatchRunner {
         ...this.state,
         ...(stand && gift > 0 ? { players: this.state.players.map((p) => (p.alive ? { ...p, powerUps: p.powerUps + gift } : p)) } : {}),
         boss: stand
-          ? { ...b, crowdMoves: b.crowdMoves - 1, kingCharges: 0, lastStand: { atMove: b.crowdMoves, charges, ...stand, fen: r!.fenBefore, bestMove: r!.bestMove }, barred: stand.move }
+          ? { ...b, crowdMoves: b.crowdMoves - 1, sinceKill: Math.max(0, b.sinceKill - 1), kingCharges: 0, lastStand: { atMove: b.crowdMoves, charges, ...stand, fen: r!.fenBefore, bestMove: r!.bestMove }, barred: stand.move }
           : b,
       };
       if (stand) this.forceLastStand = false;
