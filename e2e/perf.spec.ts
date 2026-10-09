@@ -128,7 +128,8 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
   // (?power=candle: the Roman candle on the third turn.)
-  await page.goto("/?debug&nolanding&clock=60&boss=grex&power=candle");
+  // (?laststand=0: a move the God King would take back would put the candle off a turn.)
+  await page.goto("/?debug&nolanding&clock=60&boss=grex&power=candle&laststand=0");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
