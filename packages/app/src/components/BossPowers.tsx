@@ -98,7 +98,8 @@ function appearAt(square: string, moments: readonly Moment[], orientation: "whit
     if (m.kind === "freeze" && m.square === square) return m.at + FREEZE.iceAt;
     if (m.kind === "pie" && m.square === square) return m.at + PIE.landAt;
     if (m.kind === "spark" && m.square === square) return m.at + SPARK.landAt;
-    if (m.kind === "fireball" && m.squares?.includes(square)) return m.at + fireballLandAt(m.squares.indexOf(square));
+    // (A fireball's landing ends on the tile's first stage: the tile carries on from there.)
+    if (m.kind === "fireball" && m.squares?.includes(square)) return m.at + fireballLandAt(m.squares.indexOf(square)) + LAND_MS;
     // The blizzard's sweep crosses the board left to right; each piece ices over as it passes.
     if (m.kind === "blizzard") return m.at + BLIZZARD.sweepAt + (squareXY(square, orientation).x / 800) * BLIZZARD.sweepMs;
   }
