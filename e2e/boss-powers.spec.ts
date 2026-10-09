@@ -69,6 +69,8 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   // The blizzard: its banner, the sweep across the board, and every crowd piece iced but the queen.
   await expect(banner(page, "BLIZZARD!")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".pw-sweep")).toBeVisible({ timeout: 5_000 });
+  // The God King names the one piece the storm left free.
+  await expect(page.locator(".gk-bubble")).toContainText(/queen|king/i, { timeout: 6_000 });
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   const p3 = await powers(page);
   const fen3: string = await page.evaluate(() => (window as any).match.phase.board.fen);
@@ -90,8 +92,6 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   expect([...movers].every((c) => c === "Q" || c === "K")).toBe(true);
   expect(p3.iced.length).toBeGreaterThan(5);
   await expect(page.locator(".power-board .pw-ice")).toHaveCount(p3.iced.length);
-  // The God King names the one piece the storm left free.
-  await expect(page.locator(".gk-bubble")).toContainText(/queen|king/i, { timeout: 8_000 });
   await playBest(page);
   // The ice melts as the next turn begins.
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
