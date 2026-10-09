@@ -1,4 +1,4 @@
-import { GLOBAL_CHAT, GLOBAL_CHAT_BOTS, canSayHome, homeBotLine } from "@chessroyale/core";
+import { GLOBAL_CHAT, GLOBAL_CHAT_BOTS, canSayHome, chatSay, homeBotLine } from "@chessroyale/core";
 import { BOT_NAMES } from "@chessroyale/chess";
 
 /**
@@ -120,7 +120,9 @@ export class GlobalChat {
    * they own that suits the home page (anything else never reaches anyone) and the gap since their last message.
    */
   post(sender: GlobalSender, say: unknown, now: number): GlobalPost {
-    if (!canSayHome(say, sender.owned)) return { ok: false, reason: "unknown", message: "Only the preset lines can go in the chat." };
+    if (!canSayHome(say, sender.owned)) {
+      return { ok: false, reason: "unknown", message: chatSay(say) ? "That line can't go in the global chat." : "Only the preset lines can go in the chat." };
+    }
     const ready = this.readyAt(sender.id, now);
     if (ready > now) return { ok: false, reason: "rate", message: `One message every ${this.o.gapMs / 1000} s.`, retryMs: ready - now };
     for (const [id, at] of this.lastPost) if (now - at >= this.o.gapMs) this.lastPost.delete(id);

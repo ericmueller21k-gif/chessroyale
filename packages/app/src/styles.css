@@ -10191,7 +10191,7 @@ img.qicon {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  max-height: 142px;
+  max-height: 135px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
