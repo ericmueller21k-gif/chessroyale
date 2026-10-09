@@ -11,6 +11,7 @@
     "dev": "npm run dev -w @chessroyale/app",
     "e2e": "playwright test",
     "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/chess --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/app --noEmit && tsc -p packages/server --noEmit",
+    "replays:bots": "tsx packages/sim/scripts/bot-replays.ts",
     "simulate": "tsx packages/sim/scripts/simulate.ts",
     "preview:items": "node scripts/preview-items.mjs",
     "preview:characters": "tsx scripts/preview-characters.ts",

@@ -115,7 +115,6 @@ export function RightPanel({ onProfile }: { onProfile: () => void }) {
             </div>
           );
         })}
-        {live && live.playing.length > 0 && <p class="fd-note">Watching a match from outside comes later.</p>}
       </section>
     </aside>
   );

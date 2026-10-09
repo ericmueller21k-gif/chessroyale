@@ -8410,6 +8410,101 @@ button.fd-seat {
     grid-template-columns: 300px minmax(0, 1fr);
   }
 }
+/*
+ * The live window (a computer's home from 1280 px; LiveWindow.tsx, DECISIONS.md "The live window"): the top of the
+ * play column, in the room above the buttons. Its board is as big as that room allows (a square in what's left after
+ * its two lines of words); on a window too short for a board worth seeing, only the words show.
+ */
+.fd-livewin {
+  display: none;
+}
+@media (min-width: 1280px) {
+  .fd-root.framed .fd-livewin {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 12px 10px;
+    background: var(--fd-panel);
+    border-radius: 18px;
+  }
+  .fd-root.framed .fd-livewin.empty {
+    background: transparent;
+  }
+  .fd-livewin-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+  .fd-livewin-tag {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--fd-panel-2);
+    color: var(--fd-sub);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .fd-livewin-tag.live {
+    color: var(--fd-text);
+  }
+  .fd-livewin-tag .fd-dot {
+    width: 8px;
+    height: 8px;
+    box-shadow: none;
+  }
+  .fd-livewin-mode {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700;
+  }
+  .fd-livewin-meta {
+    flex: none;
+    margin-left: auto;
+    color: var(--fd-muted);
+    white-space: nowrap;
+  }
+  .fd-livewin-board {
+    flex: 1 1 auto;
+    min-height: 0;
+    container-type: size;
+    display: grid;
+    place-items: center;
+  }
+  .fd-livewin-sq {
+    width: min(100cqw, 100cqh);
+  }
+  @container (max-height: 110px) {
+    .fd-livewin-sq {
+      display: none;
+    }
+  }
+  .fd-livewin-line {
+    margin: 0;
+    min-height: 1.3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.3;
+    color: var(--fd-sub);
+  }
+  .fd-livewin-line strong {
+    color: var(--fd-text);
+  }
+}
 /* The lobby's chat, under your card (it fills the rest of the column; under the lobby below 1280 px). */
 .fd-wait-chat {
   flex: 1 1 auto;

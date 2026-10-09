@@ -1461,6 +1461,54 @@ PLAY does), no sun, your icon by your name, and the crate's Fischer Random banne
   320, 390, 1024, 1280 and 1920), and `npm run frames:home` (now picks the theme in Settings: one jump in brightness
   per pick, no blinks).
 
+### The live window (Eric, Oct 9, 2026)
+
+Eric: a live game at the top of the computer's play column: a real match if one is running, otherwise "a bot game
+here for now, 50v50 bots, that runs for now till we get players". Everyone watching should see the same moment; label
+it honestly; no server time for the stand-in; light on the device.
+
+- **Where:** the top of the play column on a computer from 1280 px, above Play with friends | Boss alone, the mode
+  tabs and PLAY (which stays at the bottom). It takes the room left in the column, its board as big as that room
+  allows (about 300 px at 1280 x 800, 210 px at 1280 x 680, 125 px at 1280 x 600); on a window too short for a
+  board worth seeing, only its two lines show. Not at 1024-1279 (stacked: it would push PLAY below the fold) and not on phones; neither fetches
+  the replays, and the app's offline cache (the service worker) leaves them out, so a phone never downloads them.
+- **A real match first.** Each running Crowd or raid lobby now tells the live hub its board when it changes: the
+  position, the move just played, the crowd's top three votes on it ([SAN, count]) and the move number. No names, no
+  codes. Lobbies already report changes to the hub (at most every 2 s); this adds about one report per move per
+  running match, to a Durable Object already in use. The live line (`/api/live`, polled every 5 s by the home and
+  cached 3 s per Worker) carries one **featured** match: the one with the most people in it, then the newest. My
+  call: not a WebSocket per watcher. Every home page watching one match's lobby would put load on the match itself,
+  and the game comes first; the live line costs nothing extra to read. The window shows it as **Live** (a green dot),
+  with "White's crowd: e4 25 · c4 7 · d4 6", and no "Bot match" label. When the match ends or empties, the bot match
+  comes back.
+- **Otherwise, bot matches played back.** `npm run replays:bots -- [count]` (`packages/sim/scripts/bot-replays.ts`)
+  plays Crowd 50 v 50 matches of 100 bots with the real match runner (average-to-loose bots, a 40k-node engine:
+  15-30 s a match) and saves each as a compact replay: the bots' names, and per move the move played, the crowd's top
+  three votes, a voter's name, how many are left, and the final's player. Ten ship now
+  (`packages/app/public/replays/crowd-bots.json`: 75 KB, about 15 KB as served compressed), 64-195 moves each.
+- **One shared "live" cycle by the clock:** the replays play one after another, each move shown 9 s (6 s for a
+  final's single-player moves), the start 6 s and the result 14 s (`LIVE_WINDOW` in settings.ts). Where you are in
+  the cycle comes from the time, so everyone sees the same replay at the same moment. Ten replays make a cycle of
+  about 2.5 hours. Adding more is the script run again: it appends new matches from new seeds without touching the
+  old ones, and the cycle grows. A day without repeats is about 90 more.
+- **Labelled honestly:** "Bot match" (and "Bot match, a recording" to screen readers), the names are the bots'.
+  **This is a beta stand-in until real players arrive**; once matches run most of the time, the window will mostly
+  show real ones, and the replays can go.
+- **Light on the device:** it plays back moves only, with no engine. Each replay's positions are worked out once when
+  it starts (chess.js, about 100 moves). The window redraws only when the move changes, on one timer set to that
+  moment; nothing runs per frame. The live line's poll was already running. Measured on a computer slowed 4x: the
+  page idle 97% of the time, about 200 ms of script in 30 s, DOM nodes flat (240 to 242 over five moves).
+- **The right panel** loses "Watching a match from outside comes later" (the window does it). The global chat (the
+  social helper's) goes under "Playing now".
+- **Checked:** `packages/app/test/bot-replays.test.ts` (the cycle by the clock: every moment's next change is exact,
+  and two viewers agree; positions worked out once; every shipped move legal from its position, the most-voted move
+  the one played, votes sorted, players left never rising, the final's players), `packages/server/test/lobby.test.ts`
+  (a running Crowd match's board and top votes after each move, no names) and `capacity.test.ts` (the featured match:
+  most people, then newest; none empty or stale; the next when one ends), and `e2e/live-window.spec.ts` (the bot
+  match at 1280 x 800, 1440 x 900 and 1280 x 680: the label, a square board in the window, the words fitting, PLAY
+  still at the bottom, nothing piling up over two moves; none at 1024 or on a phone, and no fetch there; a real match
+  running shows as Live with its votes, then back to a bot match).
+
 ## Quick chat in matches (design, Oct 6, 2026; built Oct 7, 2026)
 
 Eric: a chat in 50 v 50, preset messages only (no typing), some unlockable, each with the sender's icon and name.

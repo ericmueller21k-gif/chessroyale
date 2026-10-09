@@ -44,6 +44,28 @@ const lobby = (code: string, patch: Partial<LobbySummary> = {}): LobbySummary =>
 });
 
 describe("the live hub's board", () => {
+  it("the home page's live window: the running match with the most people in it, with its board (no names); none without a board", () => {
+    const now = 50_000_000;
+    const board = new LiveBoard();
+    const at = (fen: string, ply: number) => ({ fen, lastMove: "e2e4", votes: [["e4", 31], ["d4", 12]] as [string, number][], ply });
+    board.report(lobby("AAAAA", { humans: 2, startedAt: now - 60_000, board: at("a", 10) }), now - 1000);
+    board.report(lobby("BBBBB", { humans: 5, startedAt: now - 90_000, board: at("b", 20) }), now - 1000);
+    board.report(lobby("CCCCC", { humans: 9, startedAt: now - 30_000 }), now - 1000);
+    board.report(lobby("DDDDD", { humans: 0, board: at("d", 3) }), now - 1000);
+    board.report(lobby("EEEEE", { humans: 50, board: at("e", 3) }), now - FRONT_DOOR.matchStaleMs - 1);
+    const c = board.counts(now, { crowd: null, boss: null });
+    expect(c.featured).toEqual({ mode: "crowd", alive: 80, total: 100, bossElo: null, startedAt: now - 90_000, board: at("b", 20) });
+    expect(JSON.stringify(c.featured)).not.toMatch(/AAAAA|BBBBB|code|humans/);
+    // A tie on people: the newest. The match ending: the next one.
+    board.report(lobby("FFFFF", { humans: 5, startedAt: now - 10_000, board: at("f", 2) }), now - 500);
+    expect(board.counts(now, { crowd: null, boss: null }).featured?.board.fen).toBe("f");
+    board.report(lobby("FFFFF", { phase: "over" }), now);
+    board.report(lobby("BBBBB", { phase: "over" }), now);
+    expect(board.counts(now, { crowd: null, boss: null }).featured?.board.fen).toBe("a");
+    board.report(lobby("AAAAA", { phase: "over" }), now);
+    expect(board.counts(now, { crowd: null, boss: null }).featured).toBeNull();
+  });
+
   it("gives the same numbers as the D1 live line for the same reports and visits", async () => {
     const sql = memorySql();
     await ensureSchema(sql);

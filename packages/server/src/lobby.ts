@@ -14,6 +14,7 @@ import {
   netBoard,
   boardSlots,
   toSan,
+  type BoardRound,
   type BoardScore,
   type ClientMessage,
   type NetFinal,
@@ -141,6 +142,18 @@ type Timer =
   | "autoGo"
   | "judgeTick";
 
+/**
+ * A running match's board, for the home page's live window (Crowd and boss raids; the live hub keeps it): the
+ * position, the move just played, the crowd's top votes on it ([SAN, count], most first; a final's one player:
+ * [SAN, 1]; none for a boss's move), and the moves played so far. No names.
+ */
+export interface LiveMatchBoard {
+  fen: string;
+  lastMove: string | null;
+  votes: [string, number][];
+  ply: number;
+}
+
 export interface LobbyRecord {
   code: string;
   createdAt: number;
@@ -241,6 +254,11 @@ export interface LobbyRecord {
   activeAt?: number;
   /** When the match ended (its results came up). */
   endedAt?: number;
+  /**
+   * The home page's live window: the crowd's top votes on the move just played ([SAN, count], most first; a final's
+   * one player: [SAN, 1]), and how many moves the game had after it (so a later position doesn't show old votes).
+   */
+  liveVotes?: { ply: number; votes: [string, number][] };
   /** How long the results stay up, if not LOBBY_LIFE's (playtests: ?keep=SECONDS on a lobby you create). */
   keepMs?: number;
   /** Bots off: the tokens of seats freed while their people were gone (they get a new seat if they come back). */
@@ -1316,6 +1334,7 @@ export class LobbyCore {
       const b = report.boards[0]!;
       const p = b.result.players[0]!;
       const last: NetFinal["last"] = { playerId: p.playerId, move: b.result.playedMove, san: toSan(b.fenBefore, b.result.playedMove), loss: p.loss };
+      this.noteLiveVotes(b);
       // Team final: when a step ends, the weakest on each side go out.
       const out = runner.afterFinalTurn();
       for (const id of out) this.r.placements[id] = runner.player(id).placement!;
@@ -1326,6 +1345,7 @@ export class LobbyCore {
       return;
     }
     this.r.phase = "reveal";
+    if (this.settings.mode === "crowd" && report.boards[0]) this.noteLiveVotes(report.boards[0]);
     // Crowd: a bot on the team that made a great move may say so.
     const crowdBoard = this.settings.mode === "crowd" ? report.boards[0] : undefined;
     const playedLoss = crowdBoard?.result.players.find((p) => p.move === crowdBoard.result.playedMove)?.loss;
@@ -2266,10 +2286,31 @@ export class LobbyCore {
     return isRankedMatch(players.filter((p) => !p.isBot).length, Math.max(this.settings.lobbySize, players.length));
   }
 
-  /** What the live line and the "playing now" list need to know about this lobby. */
-  liveSummary(): { phase: "waiting" | "playing" | "over"; humans: number; alive: number | null; total: number | null; bossElo: number | null; startedAt: number | null } {
+  /** The home page's live window: the crowd's top votes on the move just played (Crowd and boss raids; no names). */
+  private noteLiveVotes(b: BoardRound) {
+    const counts = new Map<string, number>();
+    for (const p of b.result.players) if (p.move) counts.set(p.move, (counts.get(p.move) ?? 0) + 1);
+    const played = b.result.playedMove;
+    const top = [...counts.entries()].sort((x, y) => y[1] - x[1] || (x[0] === played ? -1 : y[0] === played ? 1 : 0)).slice(0, 3);
+    const board = this.runner?.boards.get(b.boardId);
+    this.r.liveVotes = { ply: board?.history.length ?? 0, votes: top.map(([m, n]) => [toSan(b.fenBefore, m), n]) };
+  }
+
+  /** What the live line and the "playing now" list need to know about this lobby (and, for Crowd and raids, its board). */
+  liveSummary(): {
+    phase: "waiting" | "playing" | "over";
+    humans: number;
+    alive: number | null;
+    total: number | null;
+    bossElo: number | null;
+    startedAt: number | null;
+    board: LiveMatchBoard | null;
+  } {
     const runner = this.runner;
     const phase = this.r.phase === "results" ? "over" : this.r.phase === "lobby" && !this.r.auto?.filledAt ? "waiting" : "playing";
+    const id = runner?.state.boards[0];
+    const b = runner && phase === "playing" && this.settings.mode === "crowd" && id !== undefined ? runner.boards.get(id) : undefined;
+    const votes = this.r.liveVotes;
     return {
       phase,
       humans: this.r.humans.filter((h) => h.connected).length,
@@ -2277,6 +2318,7 @@ export class LobbyCore {
       total: runner ? runner.state.players.length : null,
       bossElo: this.settings.raid ? (this.settings.bossFixedElo ?? null) : null,
       startedAt: this.r.startedAt ?? this.r.auto?.filledAt ?? null,
+      board: b ? { fen: b.fen, lastMove: b.lastMove, votes: votes && votes.ply === b.history.length ? votes.votes : [], ply: b.history.length } : null,
     };
   }
 
