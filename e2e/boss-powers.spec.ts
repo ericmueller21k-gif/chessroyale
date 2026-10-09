@@ -38,7 +38,7 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   await page.goto("/?debug&clock=40&bossMoves=5&boss=gingerbread&power=blizzard");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-  expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Ginger Snap");
+  expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Ginger");
   await expect(page.locator(".rage-meter")).toBeVisible();
 
   await playBest(page);
@@ -116,9 +116,9 @@ test("Boingo: a pie nobody can move onto, the warning, then the funhouse plays y
   const scoredBefore: number = await page.evaluate(() => (window as any).match.moves.length);
 
   await playBest(page);
-  // The funhouse: Boingo pogos onto the board, the banner, the board spins, his line, and he plays your move.
-  await expect(page.locator(".pm-pogo")).toBeVisible({ timeout: 30_000 });
-  await expect(banner(page, "FUNHOUSE!")).toBeVisible({ timeout: 5_000 });
+  // The funhouse: the banner, then Boingo drops onto the board, it spins, his line, and he plays your move.
+  await expect(banner(page, "FUNHOUSE!")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".pm-pogo")).toBeVisible({ timeout: 5_000 });
   await expect(page.locator(".pm-line")).toBeVisible({ timeout: 6_000 });
   const fun = await page.evaluate(() => (window as any).match.runner.state.boss.powers.funhouse);
   expect(fun.move).toMatch(/^[a-h][1-8][a-h][1-8]/);
@@ -150,8 +150,8 @@ test("Boingo online: the host plays the crowd's move in his funhouse, and everyo
   await playBest(page);
   await expect(banner(page, "PIE!")).toBeVisible({ timeout: 60_000 });
   await playBest(page);
-  await expect(page.locator(".pm-pogo")).toBeVisible({ timeout: 60_000 });
-  await expect(banner(page, "FUNHOUSE!")).toBeVisible({ timeout: 5_000 });
+  await expect(banner(page, "FUNHOUSE!")).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".pm-pogo")).toBeVisible({ timeout: 5_000 });
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   const p = await powers(page);
   expect(p.funhouse?.move).toBeTruthy();

@@ -110,7 +110,7 @@ describe("boss powers online", () => {
     const L = raid({ bossId: "gingerbread", bossPowerTest: "blizzard" });
     const r1 = L.last("p1", "round")!;
     expect(r1.boss!.id).toBe("gingerbread");
-    expect(r1.boss!.name).toBe("Ginger Snap");
+    expect(r1.boss!.name).toBe("Ginger");
     crowdMove(L);
     hostBoss(L);
     // As the turn passes to the crowd: a freeze and the warning, the same for both, and the boss's move shows longer.

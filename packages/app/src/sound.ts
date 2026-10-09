@@ -302,7 +302,7 @@ export type SoundName =
   | "clownLaugh"
   | "clownSplat"
   | "clownFlip"
-  // Ginger Snap (a raid boss, the Freeze boss): synthesised, see characters/gingerbread-sounds.ts.
+  // Ginger (a raid boss, the Freeze boss): synthesised, see characters/gingerbread-sounds.ts.
   | "gingerCrunch"
   | "gingerJingle"
   | "gingerCrackle"

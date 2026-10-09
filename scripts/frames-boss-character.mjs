@@ -3,7 +3,7 @@
 // frames (every 120 ms) around the character, and prints a timeline of which animation showed.
 //   npm run frames:character -- <out-dir> [boss name, default "Boingo"] [phone|desktop|both] [kit=<name>] [fx]
 // `kit=<name>` plays the named character kit in that boss's place (a kit drawn before its boss is playable, such
-// as kit="Ginger Snap"). `fx` then plays the bosses' power art over the board where it will show (the ice, the
+// as kit="Ginger"). `fx` then plays the bosses' power art over the board where it will show (the ice, the
 // pies, the blizzard, the funhouse, and the power moments in his spot), with frames every ~70 ms.
 // Read the frames before calling an animation done (.claude/LESSONS.md: watch it frame by frame).
 import { mkdirSync } from "node:fs";
@@ -109,7 +109,7 @@ async function powers(p, name, sq, board) {
     ["funhouse", [{ kind: "moment", name: kitName ? "original:Boingo the Clown" : "Boingo the Clown", anim: "funhouse", box: { x: board.x + board.width / 2 - cell * 0.9, y: board.y + board.height / 2 - cell * 2.1, w: cell * 1.8, h: cell * 2.35 } }], 2400],
   ];
   if (spot) {
-    const moments = full === "Ginger Snap" || kitName === "Ginger Snap" ? ["freezeCast", "blizzard", "check"] : ["pieThrow", "check"];
+    const moments = full === "Ginger" || kitName === "Ginger" ? ["freezeCast", "blizzard", "check"] : ["pieThrow", "check"];
     for (const m of moments) sequences.push([`moment-${m}`, [{ kind: "moment", name: kitName ? `original:${kitName}` : full, anim: m, box: spot }], 2600]);
   }
   for (const [tag, items, ms] of sequences) {

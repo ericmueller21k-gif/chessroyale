@@ -200,7 +200,7 @@ const ICE_OVERLAY: Character = {
   },
 };
 
-// ---- The ice bolt in flight (Ginger Snap's freeze), pointing right; turn it towards its target.
+// ---- The ice bolt in flight (Ginger's freeze), pointing right; turn it towards its target.
 
 const BOLT_PALETTE = { k: "#1d4e7a", i: "#d6f6ff", I: "#7fd3ff", J: "#3a8fd8", F: "#ffffff", f: "#a8e8ff", g: "#7fd3ff66" } as const;
 const boltPart: Part = {
@@ -373,7 +373,7 @@ const PIE_FLY: Character = {
   },
 };
 
-// ---- The blizzard (Ginger Snap's ultimate): a bank of cloud and snow sweeping across the whole board.
+// ---- The blizzard (Ginger's ultimate): a bank of cloud and snow sweeping across the whole board.
 
 const SNOW_PALETTE = {
   k: "#41566e", // cloud outline

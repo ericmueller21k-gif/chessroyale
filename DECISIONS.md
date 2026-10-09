@@ -2916,14 +2916,14 @@ end to end: sprite, portrait, animations, sounds, lines, and where he stands.
   - `npm run preview:characters` writes every animation as a GIF.
   - `e2e/boss-character.spec.ts` plays a raid against him on both layouts.
 
-### Ginger Snap, the Freeze boss, and the power art (Oct 8, 2026)
+### Ginger, the Freeze boss, and the power art (Oct 8, 2026)
 
 The gingerbread man from Eric's reference, drawn as the Freeze boss, plus the effect sprites his powers and Boingo's
 need. The art, lines and sounds only: the power rules, the board overlays, the banners and making him playable are
 the power rules' job (he becomes playable once he has powers too). `packages/core/src/boss.ts` is unchanged.
 
-- **Name:** "Ginger Snap" (a gingersnap, and he snaps: cross, and a snap freeze). A placeholder Eric can rename; his
-  kit is keyed by that name in `characters/kits.ts`, so the boss entry must use the same one.
+- **Name:** "Ginger" (Eric, Oct 9; drawn first as "Ginger Snap"). His kit is keyed by that name in
+  `characters/kits.ts`, so the boss entry uses the same one. His "Snap!" lines stay: they're words, not his name.
 - **Art** (`characters/gingerbread.ts`): 50 x 58 px from parts, in an 84 x 93 frame. Head (eight faces: angry,
   laugh, shout, hurt, smug, rattled, think, out; up to two cracks), torso with two gumdrop buttons and an icing belt,
   a green bow tie, and arms, legs and the cane painted from each pose's points (a shoulder, an elbow, a fist; a hip
@@ -2971,7 +2971,7 @@ the power rules' job (he becomes playable once he has powers too). `packages/cor
 - **Checking it:**
   - `npm run preview:characters -- <dir> only=gingerbread` writes his GIFs; the effects are drawn over the board
     (a white pawn under the ice) as `fx-<id>-<anim>.gif` (`only=fx` for just those).
-  - `npm run frames:character -- <dir> Boingo both kit="Ginger Snap" fx` plays a raid with his kit in Boingo's place,
+  - `npm run frames:character -- <dir> Boingo both kit="Ginger" fx` plays a raid with his kit in Boingo's place,
     then plays every effect and power moment over the real board and his spot, with frames every ~70 ms.
   - `packages/app/test/gingerbread.test.ts`: his kit, lines, cast and sounds; the power moments; the effects.
 
@@ -3073,7 +3073,7 @@ centre of the board to cast; the farmer and the gingerbread man as bosses.
 
 ### Built: the boss template, Freeze and Boingo (Oct 8, 2026)
 
-Built by the `god-king` delegate, which now owns boss powers and boss selection. Playable now: **Ginger Snap, the
+Built by the `god-king` delegate, which now owns boss powers and boss selection. Playable now: **Ginger, the
 gingerbread man (Freeze)** and **Boingo the Clown (pie and funhouse)**, the only bosses in every boss mode. Their art,
 moments, lines, sounds and the effect sprites are the `characters` delegate's (`characters/power-art.ts`).
 
@@ -3127,7 +3127,7 @@ turn).
   `ultimate` lines, the same for everyone). The crowd's clock starts after them, solo and online (`POWER_FX`, `powerMomentMs` in `boss-timing.ts`):
   a freeze 2.3 s, a pie 2.3 s, the warning 1.7 s, the blizzard 3.6 s, the funhouse 5.2 s.
 
-**Ginger Snap (Freeze)**
+**Ginger (Freeze)**
 - **Passive:** from the crowd's 2nd turn, every 5-7 turns, one crowd piece (never the king) is iced for 2 turns: a
   pick from the three that matter most (pieces before pawns, by value and mobility), never one without a move or whose
   freeze leaves no other legal move. Its moves aren't allowed; it still defends and gives check. The moment: "FREEZE!"

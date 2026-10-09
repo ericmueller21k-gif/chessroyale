@@ -8,11 +8,11 @@ import { EFFECT_NAMES, EFFECTS, POWER_MOMENTS, animLength, cueAt } from "../src/
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 import { spriteFrameAt } from "../src/components/BossEffect.tsx";
 
-const ginger = bossKit("Ginger Snap")!;
+const ginger = bossKit("Ginger")!;
 const clown = bossKit("Boingo the Clown")!;
 const MOMENTS: Beat[] = ["entrance", "move", "capture", "check", "hurt", "thinking", "smug", "rattled", "defeat", "victory", "strike", "power", "ultimateWarn", "ultimate"];
 
-describe("Ginger Snap, the Freeze boss", () => {
+describe("Ginger, the Freeze boss", () => {
   it("has a kit with an animation for every moment, his powers included, and a sound for every cue", () => {
     expect(ginger).not.toBeNull();
     for (const b of [...MOMENTS, "idle" as Beat]) expect(ginger.ch.anims[ginger.anims[b] ?? b], b).toBeTruthy();

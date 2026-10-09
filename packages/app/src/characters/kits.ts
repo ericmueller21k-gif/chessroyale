@@ -1,7 +1,7 @@
 /**
  * The raid bosses that have a character: its drawing, which animation plays for each moment, its sounds, its
  * lines and its portrait, keyed by the boss's name in packages/core/src/boss.ts. A boss without one keeps its emoji
- * everywhere. A kit whose name isn't a boss there yet (Ginger Snap) is drawn and ready but never shows: a boss
+ * everywhere. A kit whose name isn't a boss there yet (Ginger) is drawn and ready but never shows: a boss
  * becomes playable once it has both a character and its powers (the power rules add it to boss.ts).
  */
 import type { SoundName } from "../sound.ts";
@@ -38,7 +38,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
     chance: CLOWN_CHANCE,
     portrait: { ...CLOWN_PORTRAIT, anim: "idle", frame: 4 },
   },
-  "Ginger Snap": {
+  "Ginger": {
     ch: GINGERBREAD,
     anims: { strike: "capture", power: "freezeCast", ultimateWarn: "check", ultimate: "blizzard" },
     sounds: { jingle: "gingerJingle", crunch: "gingerCrunch", crackle: "gingerCrackle", freeze: "gingerCrackle", blizzard: "gingerCrackle" },

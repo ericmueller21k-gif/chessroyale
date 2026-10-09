@@ -1,5 +1,5 @@
 /**
- * Ginger Snap, the Freeze boss: an angry gingerbread man with white icing trim, a green bow tie, red gumdrop buttons
+ * Ginger, the Freeze boss: an angry gingerbread man with white icing trim, a green bow tie, red gumdrop buttons
  * and a big candy cane he holds like a weapon, after Eric's reference picture, redrawn. He's the Freeze boss, so his
  * icing glints like frost, his eyes go ice-blue and his cane glows when he casts. Drawn facing front, light from the
  * top left.
@@ -742,7 +742,7 @@ const blizzard: Anim = {
 
 export const GINGERBREAD: Character = {
   id: "gingerbread",
-  name: "Ginger Snap",
+  name: "Ginger",
   w: OX + 50 + 20,
   h: OY + GROUND + 5,
   foot: [OX + 29, OY + GROUND],
@@ -760,7 +760,7 @@ export const GINGER_PORTRAIT = { x: OX + 8, y: OY, w: 40, h: 30 } as const;
  * `power` is a piece frozen, `ultimateWarn` the blizzard coming, `ultimate` the blizzard itself.
  */
 export const GINGER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
-  entrance: ["Ginger Snap is here!", "You'll crumble!", "Fresh out of the freezer!"],
+  entrance: ["Ginger is here!", "You'll crumble!", "Fresh out of the freezer!"],
   move: ["Snap!", "Hmph!", "Out of my way!", "Cold move. Colder heart."],
   capture: ["Crumbs to crumbs!", "Into the cookie jar!", "Snapped it up!", "That one's iced!"],
   check: ["Check! Feeling a chill?", "Your king's on thin ice!", "Snap! Check!"],
