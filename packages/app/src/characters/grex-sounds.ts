@@ -1,8 +1,8 @@
 /**
  * G-REX's sounds, synthesised (no files, no licences, no voice): a fire crackle, a whoosh, a sparkler's fizz, the poof
  * of a piece burning up, the pop of a Roman candle shot, a comically big roar (a growl that ends in a squeak), the
- * wood-smack of the candle slammed down on the board, and the candle's shots: a firework's rising whistle in three
- * variants, now and then ending in a crackle high up. Each is a pure function of the sample rate (its noise is seeded),
+ * wood-smack of the candle slammed down on the board, and the candle's shots: a firework's shrill sliding whistle in
+ * three variants, now and then ending in a crackle high up. Each is a pure function of the sample rate (its noise is seeded),
  * so a test can measure it: every one stays quieter than a piece's move sound (peak and loudness), and so does the
  * whole volley of 24 whistles at once (see test/grex.test.ts).
  */
@@ -22,24 +22,39 @@ function grains(times: readonly number[], burst: (age: number, i: number) => num
 }
 
 /**
- * A firework's whistle as it climbs: a soft "thoomp" as it leaves the tube, then a tone rising from `f0` to `f1` Hz over
- * `dur` seconds (`curve` < 1 rises fast then eases), with a breath of noise on the same pitch, a little warble, and
- * (`droop`) a slight sag at the very top. It swells a little as it climbs and fades out high up.
+ * A whistling firework (Eric, Oct 9, 2026: higher and shriller, like the real thing): a soft "thoomp" as it leaves the
+ * tube, then a shrill tone sliding from `f0` to `f1` Hz over `dur` seconds (`curve` shapes the slide; up or down), its
+ * overtones making it screech, a quick wobble (`warble` Hz at `wobble` a second) and a slight unsteady drift, and a
+ * little rasp: the tone roughened by a low buzz of noise (`rasp`), with a hiss on its pitch. It fades out at the end.
  */
-function whistle(rate: number, o: { f0: number; f1: number; dur: number; curve: number; warble: number; droop: number; seed: number }): Float32Array {
+function whistle(rate: number, o: { f0: number; f1: number; dur: number; curve: number; warble: number; wobble: number; rasp: number; seed: number }): Float32Array {
+  const drift = lowpass(rate, 12, noise(o.seed + 2));
+  // Worked out once per sample (the tone and the hiss both follow it; the drift is a stream).
+  let at = -1;
+  let hz = o.f0;
   const pitch = (t: number) => {
-    const x = Math.min(1, t / o.dur);
-    return o.f0 + (o.f1 - o.f0) * x ** o.curve - o.droop * Math.max(0, (x - 0.85) / 0.15) ** 2 + o.warble * Math.sin(2 * Math.PI * 6.5 * t);
+    if (t !== at) {
+      at = t;
+      const x = Math.min(1, t / o.dur);
+      hz = (o.f0 + (o.f1 - o.f0) * x ** o.curve + o.warble * Math.sin(2 * Math.PI * o.wobble * t)) * (1 + 1.2 * drift(t));
+    }
+    return hz;
   };
-  const tone = osc(rate, pitch, sine);
-  const breath = bandpass(rate, pitch, 14, noise(o.seed));
+  // A shrill tone: the pitch with its 2nd and 3rd overtones.
+  const tone = osc(rate, pitch, (p) => Math.sin(2 * Math.PI * p) + 0.38 * Math.sin(4 * Math.PI * p) + 0.16 * Math.sin(6 * Math.PI * p));
+  const buzz = lowpass(rate, 240, noise(o.seed + 1));
+  const hiss = bandpass(rate, pitch, 9, noise(o.seed));
   const thoomp = osc(rate, (t) => 80 + 140 * Math.exp(-t / 0.02), sine);
-  const fadeAt = o.dur * 0.78;
+  const fadeAt = o.dur * 0.75;
   return render(rate, o.dur, (t) => {
-    const env = Math.min(1, t / 0.05) * (t < fadeAt ? 1 : Math.max(0, 1 - (t - fadeAt) / (o.dur - fadeAt))) ** 1.5;
-    return env * (0.55 + 0.45 * (t / o.dur)) * (0.75 * tone(t) + 2.2 * breath(t)) + 1.4 * Math.exp(-t / 0.035) * thoomp(t);
+    const env = Math.min(1, t / 0.03) * (t < fadeAt ? 1 : Math.max(0, 1 - (t - fadeAt) / (o.dur - fadeAt))) ** 1.4;
+    const rough = 1 + o.rasp * Math.max(-1, Math.min(1, 9 * buzz(t)));
+    return env * (0.8 + 0.2 * (t / o.dur)) * (0.62 * tone(t) * rough + 1.5 * hiss(t)) + 1.2 * Math.exp(-t / 0.035) * thoomp(t);
   });
 }
+
+/** How long each of the candle's whistles lasts (s). */
+const WHISTLE_DUR = { whistle1: 0.85, whistle2: 1.05, whistle3: 0.72 } as const;
 
 const SOUNDS: Record<GrexSound, (rate: number) => Float32Array> = {
   // Fire crackling: sharp pops scattered over the soft roar of flames.
@@ -95,10 +110,11 @@ const SOUNDS: Record<GrexSound, (rate: number) => Float32Array> = {
       return 2.4 * Math.exp(-t / 0.0035) * crack(t) + 0.8 * ring + 0.9 * Math.exp(-t / 0.045) * thud(t);
     });
   },
-  // The candle's shots: three whistles (a quick bright one, a long low one, one with a warble), told apart by ear.
-  whistle1: (rate) => whistle(rate, { f0: 950, f1: 3100, dur: 0.85, curve: 0.7, warble: 18, droop: 120, seed: 89 }),
-  whistle2: (rate) => whistle(rate, { f0: 720, f1: 2500, dur: 1.05, curve: 0.6, warble: 10, droop: 260, seed: 97 }),
-  whistle3: (rate) => whistle(rate, { f0: 1150, f1: 3400, dur: 0.72, curve: 0.95, warble: 55, droop: 0, seed: 101 }),
+  // The candle's shots: three shrill whistles, told apart by ear: one shrieking up, one sliding down (a tube burning
+  // empty), one screeching on a fast wobble.
+  whistle1: (rate) => whistle(rate, { f0: 2300, f1: 4600, dur: WHISTLE_DUR.whistle1, curve: 0.6, warble: 45, wobble: 7, rasp: 0.35, seed: 89 }),
+  whistle2: (rate) => whistle(rate, { f0: 4400, f1: 2400, dur: WHISTLE_DUR.whistle2, curve: 0.85, warble: 30, wobble: 5.5, rasp: 0.45, seed: 97 }),
+  whistle3: (rate) => whistle(rate, { f0: 2600, f1: 4300, dur: WHISTLE_DUR.whistle3, curve: 0.5, warble: 170, wobble: 11, rasp: 0.55, seed: 101 }),
   // A shot bursting high up: a soft bang, then a spray of tiny crackles dying away.
   sparkle: (rate) => {
     const r = rng(103);
@@ -153,6 +169,6 @@ export const CRACKLE_EVERY = 3;
 export function whistlePick(a: number, b: number, c: number): { name: (typeof WHISTLES)[number]; rate: number; crackleAt: number | null } {
   const name = WHISTLES[Math.min(WHISTLES.length - 1, Math.floor(a * WHISTLES.length))]!;
   const rate = 1 + (b * 2 - 1) * WHISTLE_SPREAD;
-  const dur = { whistle1: 0.85, whistle2: 1.05, whistle3: 0.72 }[name];
+  const dur = WHISTLE_DUR[name];
   return { name, rate, crackleAt: c < 1 / CRACKLE_EVERY ? (dur * 0.92) / rate : null };
 }
