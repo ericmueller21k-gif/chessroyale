@@ -41,6 +41,38 @@
  *                               then the square is a stage-1 `fireTile` (land ends on stage1's first frame), which
  *                               burns up as the passive's does.
  *
+ *   "Hollow"
+ *     power        "darkCast"   He draws his free arm back as darkness spirals into the void in his chest, then flicks
+ *                               it at the board; at `cast` the darkness pours out of his chest: fly `darkPour` from
+ *                               the void (HOLLOW_CAST_FROM in hollow.ts) to the square, then play `darkSquare` gather,
+ *                               dark (loop) while it lasts, thin (loop) on its last turn, clear when it goes
+ *                               (darkItem()). His first cover's line is `kit.lines.darkFirst`; later ones `power`.
+ *     ultimateWarn "check"      His loom, if a warning is shown at all (per Eric the rage meter is the only warning).
+ *     ultimate     "lightsOut"  Played ON THE BOARD, in his new spot (hide him in his corner meanwhile; see
+ *                               LIGHTS_OUT below): his shadow grows, he drops in, lands, holds the strand up and
+ *                               crushes its bulbs one by one: at `smash1`, `smash2`, `smash3` (lightsOutSmashes())
+ *                               dim the board a step with nightItems() step "dim1", "dim2", then "dim3" (into
+ *                               "night"). His last frames are his dark stance, then hand over to `lightsTest`.
+ *                               As he drops in, prewarm("nightSquare", nightWarmList()) draws the night ahead.
+ *     more:
+ *       claim      "claimDark"  The intro, when the crowd would have been black: he takes the dark side (`cast` is
+ *                               the darkness rising round him). Line: `kit.lines.claim`.
+ *       test       "lightsTest" (loop) His stance in the test: in the dark, only the void, pulsing. For a round's
+ *                               countdown play `test3`, `test4` or `test5` (its seconds: a `tick` each second, twice in
+ *                               the last), then `lightsTest` again. The prompt is findLine(pieces) from hollow.ts.
+ *       found      "testFound"  A piece found: he recoils. On its square, nightItems() `shown` kind "found" (the
+ *                               night bursts open in violet and the piece shows). Lines: `kit.lines.found`.
+ *       missed     "testMiss"   A miss: he cackles. Play `darkMiss` on the tapped square (or on every square still
+ *                               hidden, out of time). Lines: `kit.lines.missed`. At a round's end show the answers
+ *                               with nightItems() `shown` kind "answer" (gold), then `closing`.
+ *       lightsBack "lightsBack" Played ON THE BOARD in his new spot: a fresh strand spills out of the void, its bulbs
+ *                               lighting (`relight`), the light comes back into him and he leaps off (ends empty:
+ *                               show him back in his corner). From `relight`, nightItems() step "dawn" spreads the
+ *                               light from his spot out across the board. Lines: `kit.lines.lightsBack`.
+ *       bulbs      the countdown to his next cover: `bulbStrand` (a strip: `lit3`…`lit0`, `out3`/`out2`/`out1` as a
+ *                               bulb goes out, `relight` after the last), and the same on his own strand: his look
+ *                               `bulbs3`…`bulbs0` (kit.lookOf, from the battle's state).
+ *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
  *   keyed by the moment so every player gets the same line), and its sounds fire from its frames' cues.
@@ -69,6 +101,17 @@
  *   fireShadow     square  grow1, shadow1 (loop), grow2, shadow2 (loop), grow3, shadow3 (loop): the shadow of a
  *                          fireball coming down on the square, small 3 turns out, bigger, then the biggest (a
  *                          glow round it) the turn before it lands. See-through; draw it under the pieces.
+ *   darkSquare     square  gather, dark (loop), thin (loop, its last turn), clear (ends empty). Hollow's dark over a
+ *                          square: cloudy smoke, never a flat box, hiding the piece (its body covers 2 to 29 of the
+ *                          square's 32 px, so the selection's green shows round it). Over the pieces, no taps.
+ *   darkPour       square  fly (loop). The darkness in flight, pointing right: turn it towards its target.
+ *   darkMiss       square  miss (ends empty): a red-violet slash, for a wrong tap or a wrong move into the dark.
+ *   bulbStrand     strip   lit3 … lit0 (loops), out3, out2, out1 (a bulb going out; each ends on the next lit<n>),
+ *                          relight (ends on lit3); 44 x 15. Size its box to keep its shape (height = width x 15 / 44).
+ *   nightSquare    square  Lights out, a tile a square: dim1, dim2 (one-shots that hold), dim3<t>, night<t>
+ *                          (loop), close<t>, dawn<t> (ends empty), found, shown (loop), answer, answered (loop),
+ *                          where <t> is the square's tile (16 by where it is, light or dark). Use nightItems().
+ *   nightLabel     square  a … h, 1 … 8: the night's coordinates, over the tiles (nightItems() places them).
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
  * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
@@ -81,12 +124,30 @@ import { EFFECT_SPRITES } from "./effects.ts";
 import type { Anim, Character } from "./sprite.ts";
 
 /** The power moments' animation names, every boss's. */
-export const POWER_ANIMS = ["pieThrow", "funhouse", "freezeCast", "blizzard", "ignite", "candleWarn", "romanCandle"] as const;
+export const POWER_ANIMS = [
+  "pieThrow",
+  "funhouse",
+  "freezeCast",
+  "blizzard",
+  "ignite",
+  "candleWarn",
+  "romanCandle",
+  "darkCast",
+  "claimDark",
+  "lightsOut",
+  "lightsTest",
+  "test3",
+  "test4",
+  "test5",
+  "testFound",
+  "testMiss",
+  "lightsBack",
+] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
 export interface PowerMoment {
   /** The boss's animation (in its kit's character). */
-  anim: PowerAnim | "check" | "capture";
+  anim: PowerAnim | "check" | "capture" | "idle";
   /** The frame cue that marks the moment's hit (the pie or bolt leaving, the board flipping, the storm bursting). */
   hit?: string;
   /** Played on the board, not in his usual spot. */
@@ -105,6 +166,8 @@ export interface BossPowerMoments {
   ultimateWarn: PowerMoment;
   ultimate: PowerMoment;
   ultimateHit?: PowerMoment;
+  /** A boss's other moments (Hollow's intro, test, found, missed, lights back, bulbs), by name. */
+  more?: Readonly<Record<string, PowerMoment>>;
 }
 
 export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
@@ -124,6 +187,19 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     ultimateWarn: { anim: "candleWarn", hit: "fizz" },
     ultimate: { anim: "romanCandle", hit: "launch", onBoard: true, effects: ["candleShot", "candleShots", "fireShadow"] },
     ultimateHit: { anim: "capture", effects: ["fireShadow", "fireballFall", "fireTile"] },
+  },
+  "Hollow": {
+    power: { anim: "darkCast", hit: "cast", effects: ["darkPour", "darkSquare"] },
+    ultimateWarn: { anim: "check" },
+    ultimate: { anim: "lightsOut", hit: "smash3", onBoard: true, effects: ["nightSquare", "nightLabel"] },
+    more: {
+      claim: { anim: "claimDark", hit: "cast" },
+      test: { anim: "lightsTest", onBoard: true },
+      found: { anim: "testFound", onBoard: true, effects: ["nightSquare"] },
+      missed: { anim: "testMiss", onBoard: true, effects: ["darkMiss"] },
+      lightsBack: { anim: "lightsBack", hit: "relight", onBoard: true, effects: ["nightSquare"] },
+      bulbs: { anim: "idle", effects: ["bulbStrand"] },
+    },
   },
 };
 
@@ -174,6 +250,12 @@ export const EFFECTS: Record<EffectName, Effect> = {
   fireballFall: { ch: EFFECT_SPRITES.fireballFall, covers: "square", loop: "fall", end: "land", next: { effect: "fireTile", anim: "stage1" }, sounds: { land: "grexPoof" } },
   candleShots: { ch: EFFECT_SPRITES.candleShots, covers: "strip", loop: "left24", counter: { prefix: "left", max: 24 }, sounds: {} },
   fireShadow: { ch: EFFECT_SPRITES.fireShadow, covers: "square", start: "grow1", loop: "shadow1", stages: [{ into: "grow1", loop: "shadow1" }, { into: "grow2", loop: "shadow2" }, { into: "grow3", loop: "shadow3" }], sounds: {} },
+  darkSquare: { ch: EFFECT_SPRITES.darkSquare, covers: "square", start: "gather", loop: "dark", end: "clear", stages: [{ loop: "dark" }, { loop: "thin" }], sounds: { gather: "hollowWhisper", clear: "hollowWhisper" } },
+  darkPour: { ch: EFFECT_SPRITES.darkPour, covers: "square", loop: "fly", sounds: {} },
+  darkMiss: { ch: EFFECT_SPRITES.darkMiss, covers: "square", start: "miss", sounds: { miss: "hollowMiss" } },
+  bulbStrand: { ch: EFFECT_SPRITES.bulbStrand, covers: "strip", loop: "lit3", counter: { prefix: "lit", max: 3 }, sounds: { pop: "hollowPop", relight: "hollowRelight" } },
+  nightSquare: { ch: EFFECT_SPRITES.nightSquare, covers: "square", loop: "night0D", end: "dawn0D", sounds: { found: "hollowFound", answer: "hollowWhisper" } },
+  nightLabel: { ch: EFFECT_SPRITES.nightLabel, covers: "square", loop: "a", sounds: {} },
 };
 
 /** An animation's length in ms. */
@@ -187,4 +269,122 @@ export function cueAt(a: Anim, cue: string): number | null {
     t += f.ms;
   }
   return null;
+}
+
+// ---------------- Hollow's dark, for the board ----------------
+
+/** One effect on a square of the board (the shape <BoardEffects> takes). */
+export interface SquareItem {
+  square: string;
+  name: EffectName;
+  anim?: string;
+  then?: string;
+  since: number;
+  quiet?: boolean;
+}
+
+/** A dark square's look: forming (gather, then dark), dark, thinning (its last turn), or clearing (ends empty). */
+export function darkItem(square: string, state: "new" | "dark" | "thin" | "clear", since: number): SquareItem {
+  if (state === "new") return { square, name: "darkSquare", anim: "gather", then: "dark", since };
+  if (state === "clear") return { square, name: "darkSquare", anim: "clear", since };
+  return { square, name: "darkSquare", anim: state, since };
+}
+
+const FILES = "abcdefgh";
+/** A square's column and row on screen (0 at the top left) for a board shown this way up. */
+const onScreen = (square: string, orientation: "white" | "black") => {
+  const f = square.charCodeAt(0) - 97;
+  const r = Number(square[1]) - 1;
+  return { col: orientation === "white" ? f : 7 - f, row: orientation === "white" ? 7 - r : r };
+};
+const squareOn = (col: number, row: number, orientation: "white" | "black") =>
+  orientation === "white" ? `${FILES[col]}${8 - row}` : `${FILES[7 - col]}${row + 1}`;
+/** A square's night tile: one of 16 by where it is on screen (the smoke drifts across them as one), light or dark. */
+const tileOf = (col: number, row: number, square: string) => `${(col % 4) + 4 * (row % 4)}${(square.charCodeAt(0) - 97 + Number(square[1]) - 1) % 2 ? "L" : "D"}`;
+
+export interface NightState {
+  orientation: "white" | "black";
+  /**
+   * Where Lights out is: "dim1", "dim2" (after the first and second smash: darker, the pieces still show), "dim3" (the
+   * last smash: into night), "night" (the test), "dawn" (the lights coming back).
+   */
+  step: "dim1" | "dim2" | "dim3" | "night" | "dawn";
+  /** When the step began (Date.now() time, from the shared state). */
+  since: number;
+  now: number;
+  /** Squares showing their piece in the night: found (a violet flash) or an answer at a round's end (gold). */
+  shown?: readonly { square: string; at: number; kind: "found" | "answer" }[];
+  /** Squares the night closes over again (after showing), from when. */
+  closing?: readonly { square: string; at: number }[];
+  /** At dawn, the light spreads from this square (his spot) out across the board, `dawnStagger` ms a square. */
+  from?: string;
+}
+export const DAWN_STAGGER = 55;
+
+/**
+ * Every square's item for Lights out on the shared board canvas: the dim, the night (each square its tile, so the smoke
+ * drifts across the board as one), the coordinates over it (ranks down the left, files along the bottom), squares
+ * showing their piece, closing again, and the dawn spreading out. Only one item plays a sound at a time.
+ */
+export function nightItems(s: NightState): SquareItem[] {
+  const out: SquareItem[] = [];
+  const shown = new Map((s.shown ?? []).map((x) => [x.square, x]));
+  const closing = new Map((s.closing ?? []).map((x) => [x.square, x]));
+  const from = s.from ? onScreen(s.from, s.orientation) : { col: 3.5, row: 3.5 };
+  let answered = false;
+  for (let row = 0; row < 8; row++)
+    for (let col = 0; col < 8; col++) {
+      const square = squareOn(col, row, s.orientation);
+      const t = tileOf(col, row, square);
+      const dark = s.step === "dim3" || s.step === "night" || s.step === "dawn";
+      const sh = shown.get(square);
+      const cl = closing.get(square);
+      if (s.step === "dim1" || s.step === "dim2") out.push({ square, name: "nightSquare", anim: s.step, since: s.since });
+      else if (s.step === "dawn") {
+        const at = s.since + Math.round(Math.hypot(col - from.col, row - from.row) * DAWN_STAGGER);
+        out.push(s.now < at ? { square, name: "nightSquare", anim: `night${t}`, since: 0 } : { square, name: "nightSquare", anim: `dawn${t}`, since: at });
+        if (s.now >= at + 200) continue;
+      } else {
+        if (cl && s.now >= cl.at) out.push({ square, name: "nightSquare", anim: `close${t}`, then: `night${t}`, since: cl.at });
+        else if (sh && s.now >= sh.at) {
+          const found = sh.kind === "found";
+          out.push({ square, name: "nightSquare", anim: found ? "found" : "answer", then: found ? "shown" : "answered", since: sh.at, quiet: !found && answered });
+          if (!found) answered = true;
+        } else if (s.step === "dim3") out.push({ square, name: "nightSquare", anim: `dim3${t}`, then: `night${t}`, since: s.since });
+        else out.push({ square, name: "nightSquare", anim: `night${t}`, since: 0 });
+      }
+      if (!dark) continue;
+      // The coordinates, over the night: ranks in the left column, files along the bottom row.
+      if (col === 0) out.push({ square, name: "nightLabel", anim: square[1]!, since: 0 });
+      if (row === 7) out.push({ square, name: "nightLabel", anim: square[0]!, since: 0 });
+    }
+  return out;
+}
+
+/**
+ * The night's frames in the order Lights out needs them, for prewarm() (components/BossEffect.tsx) from the moment he
+ * drops in: the dims, every tile's first look (all show at the last smash), then each frame of their loop.
+ */
+export function nightWarmList(): [string, number][] {
+  const anims = Object.keys(EFFECT_SPRITES.nightSquare.anims);
+  const tiles = anims.filter((a) => a.startsWith("night"));
+  const out: [string, number][] = [];
+  for (const a of ["dim1", "dim2"]) EFFECT_SPRITES.nightSquare.anims[a]!.frames.forEach((_, i) => out.push([a, i]));
+  for (const a of anims.filter((x) => x.startsWith("dim3"))) out.push([a, 0]);
+  for (let f = 1; f < 8; f++) for (const a of tiles) out.push([a, f]);
+  return out;
+}
+
+/** When Lights out's three smashes land, in ms from the start of `lightsOut` (dim the board a step at each). */
+export function lightsOutSmashes(a: Anim): number[] {
+  return ["smash1", "smash2", "smash3"].map((c) => cueAt(a, c) ?? 0);
+}
+
+/**
+ * Where he goes for Lights out (his new spot), as a box on the board in % of its size: centred above it, his feet on
+ * its top edge, so he never covers a square during the test. The box keeps his frame's shape (`width` wide).
+ */
+export function lightsOutSpot(ch: Character, width = 30): { left: number; top: number; width: number; height: number } {
+  const height = (width * ch.h) / ch.w;
+  return { left: 50 - (width * ch.foot[0]) / ch.w, top: -(height * ch.foot[1]) / ch.h, width, height };
 }

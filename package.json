@@ -17,6 +17,7 @@
     "preview:characters": "tsx scripts/preview-characters.ts",
     "frames:boss": "node scripts/frames-boss-move.mjs",
     "frames:character": "node scripts/frames-boss-character.mjs",
+    "frames:wip": "node scripts/frames-wip.mjs",
     "frames:god-king": "node scripts/frames-god-king.mjs",
     "frames:powers": "node scripts/frames-boss-powers.mjs",
     "frames:queue": "node scripts/frames-queue-pop.mjs",

@@ -3198,6 +3198,97 @@ rules' job (`god-king`); `packages/core/src/boss.ts` is unchanged, so he never s
   on the fire tile); `npm run frames:character -- <dir> Boingo both kit="G-REX" fx` (in the game, frame by frame);
   add `fxperf` for the storm's numbers on a slowed phone. Tests: `packages/app/test/grex.test.ts`.
 
+### Hollow, the Darkness boss: his art, his dark and Lights out (Oct 9, 2026)
+
+The furry Christmas thief from Eric's reference, gone dark, drawn as the Darkness boss (the design is the last section
+of this file). The art, lines, sounds and a preview only: the rules (the dark squares, the tapping, the penalties, the
+test, making him playable) are the power rules' job (`god-king`). `packages/core/src/boss.ts` is unchanged, so he never
+shows in a battle; his kit is `BOSS_KITS["Hollow"]`.
+
+- **An original creature, not a recoloured Grinch** (director's call, per the design): charcoal-black shaggy fur, a
+  round face with spiky cheek tufts and a wild tuft on top, glowing gold eyes, no green anywhere (a unit test checks
+  every colour), no suit, no hat, never "Grinch" in a line. Torn seams across his cheek, his shoulder and a thigh are
+  bound by violet-black darkness, and where his middle was there's a band of it with a void at its heart: a black core,
+  two violet arms turning round it and a tilted ring. **A violet edge glow** (his halo, `#6a46c4`) keeps him from
+  vanishing on the dark ground, and it reads on the light ground too.
+- **Size:** 64 x 66 px in a 104 x 102 frame (room for his drop and leap), lanky, a big head for a phone: about Ginger's
+  size, a bit taller with his tuft. He fits the boss bar's usual box (his head clears the line above it), so no `tall`.
+- **The strand: three bulbs, red, gold and blue** (no green, so nothing reads Grinch, and nothing looks like the
+  board's green). Each bulb has its own palette keys, so **his looks `bulbs3`…`bulbs0` put them out from the end of the
+  strand** without redrawing anything, glints included. The rules show the countdown by `kit.lookOf` (it reads a
+  `bulbs` field, 0-3, the power rules add to the battle's powers), and there's a strip of its own for the board's edge
+  or the boss bar (`bulbStrand`: `lit3`…`lit0`, `out3`/`out2`/`out1` as a bulb flickers out with a little spark,
+  `relight` after the last), because three bulbs on his strand are only a few pixels on a phone.
+- **Moments:** the usual eleven (idle: breathing, the void turning a full circle a second, the strand swaying and a glint
+  running down the bulbs; entrance: darkness gathers, he rises out of it, his bulbs light; thinking: a claw on his chin,
+  orbs of dark for thoughts; move: a step and a flourish of the strand; capture: a cackle, the void flaring; hurt: a
+  flash, fur flies, his bulbs flicker; check: he looms twice, claws up; smug: a claw on his hip, swinging the strand;
+  rattled: shaking, sweating, darkness leaking; defeat: the void sputters out, the bulbs go out one by one and he slumps
+  into a heap; victory: leaping with the strand held high, the bulbs flashing). His power moments:
+  - `darkCast`: he draws his arm back as darkness spirals into the void, flicks it at the board, and at `cast` the
+    darkness pours from his chest (`darkPour` flies on to the square; `HOLLOW_CAST_FROM` is where it leaves him).
+  - `claimDark`: the intro when the crowd would have been black: he points at himself, then the dark rises round him
+    like a cloak. No board effect: a line ("The dark side is mine.") and the moment.
+  - `lightsOut` (on the board): his shadow grows, he drops in, holds up the strand and crushes its bulbs in his claw one
+    by one (`smash1`, `smash2`, `smash3`: dim the board a step at each), and the light goes out of him too.
+  - `lightsTest` (the stance, a loop) and `test3`/`test4`/`test5` (a round's countdown: the void throbs once a second,
+    wider as time runs out, twice in the last second, a `tick` each). His fur nearly black, his eyes two dim violet
+    slits: the void is the only light. `testFound` (he recoils) and `testMiss` (he cackles in the dark).
+  - `lightsBack` (on the board): a fresh strand spills out of the void and lights bulb by bulb (`relight`), the light
+    comes back into him and he leaps off; the last frame is empty, so the rules show him back in his corner.
+- **His new spot for Lights out (my call):** centred above the board, his feet on its top edge (`lightsOutSpot()`).
+  The design leaves the spot open; anywhere on the board would cover squares the test asks about, and there's no room
+  beside the board on a phone. On a phone he stands over the boss bar (the bar and its heading don't matter while the
+  game is paused).
+- **A dark square (`darkSquare`):** billows of violet-black smoke round a dark middle, lit from the top left, turning
+  slowly, violet glints twinkling: cloudy, never a flat box. Its body always covers the square but its outer 2 of 32
+  pixels (corners rounded), so the piece is hidden on every frame (a test checks it) and the normal green selection
+  shows round it as a glow. Its last turn (`thin`) is paler and greyer, wisps peeling off its top, fewer glints, and
+  still hides the piece (the dark lasts that turn too). `gather` as it forms, `clear` as it goes. `darkMiss` is a
+  red-violet slash, for a wrong tap in the test or a wrong move into the dark.
+- **The night (`nightSquare`, on the one shared board canvas):** a tile a square, so a found piece can show through
+  its own square: 64 tiles plus 16 coordinates, one canvas, one loop, only changed squares redrawn. Deep night, the
+  light squares a touch lighter than the dark ones (so you can still count along a rank), faint violet square edges,
+  the coordinates in a small violet pixel font (ranks down the left, files along the bottom, as the board shows them),
+  and wisps of smoke drifting across the whole board as one field (each square's tile is one of 16 by where it is).
+  `dim1` and `dim2` darken the board with a flicker at each smash (the pieces still show); `dim3` goes to night. A found
+  piece: a violet flash, the smoke blown to the edges, a violet rim while it shows. A round's answers: the smoke parts
+  without the flash, a gold rim. `close` brings the night back over a square; `dawn` lifts it, spreading out from his
+  spot. `nightItems()` in `power-art.ts` gives every square's item for any step, so the rules never deal with tiles.
+- **Lines:** quiet, cold, about memory and the dark ("Don't forget what's there. Forgetting costs." for his first
+  cover, always; "Can you still see it?", "How do you like the dark?" now and then; "It's time."; "Remember that."),
+  everyone the same (by the moment's key). The test's prompt names the pieces: `findLine(["r", "n"])` is "Find my rook
+  and my knight." New moments in `Beat` for him: `darkFirst`, `claim`, `found`, `missed`, `lightsBack`.
+- **Sounds** (`characters/hollow-sounds.ts`, synthesised, no voice): the void's low hum, the dark pouring out, a whisper
+  of smoke settling on (or lifting off) a square, a bulb going out (a glassy tink and a dying fizz), a bulb smashed (a
+  crack, glass tinkling, a thump), the void's pulse in the test (a soft double beat), a piece found (a two-note
+  chime), a miss (a dull buzz), the lights coming back (a shimmer and three rising plinks) and his bulbs clinking. Each
+  is 2.7 to 4.7 dB under a move's mean level, peaks under half a move's (a test measures them).
+- **The contract** (`power-art.ts`): `POWER_MOMENTS["Hollow"]` (power `darkCast`, ultimate `lightsOut`, `ultimateWarn`
+  his check only if a warning is shown at all, since per Eric the rage meter is the only warning) with a new optional
+  `more` for his other moments (claim, test, found, missed, lightsBack, bulbs); the six effects; `darkItem()`,
+  `nightItems()`, `lightsOutSmashes()`, `lightsOutSpot()`. `BossMoment` and `SpriteAnim` take a `look` (his bulbs out
+  as he casts).
+- **Kept cheap** (measured with `npm run frames:wip -- <dir> Hollow lightsout phone 21 perf`, a phone slowed 4x):
+  - All his frames' parts were painted when the app loaded, about 350 ms more on every start on a computer (more on a
+    phone). `lazyParts()` (`sprite.ts`) paints each part the first time a frame that uses it shows; his and his
+    effects' parts use it, the older bosses are unchanged.
+  - The night is 80 small items on the one board canvas, redrawn every 220 ms. Its 256 tiles drawn as they first showed
+    stalled the last smash (32 at once) and its first loop: `prewarm()` (`BossEffect.tsx`) draws them ahead, about 4 ms
+    a frame on the shared loop, from when he drops in (`nightWarmList()`).
+  - The first bulb smashed stalled 480 ms: its sound was being made (150 ms on a computer). The glass sounds are now
+    closed-form (30 ms), and `warmSounds()` (`sound.ts`) makes a boss's synthesised sounds in idle moments once his
+    character shows (Hollow's for now).
+  - Through the whole Lights out preview: p95 16.8 ms, 2% of frames over 20 ms, the worst 50 ms; the plain board
+    beside it p95 16.7 ms, 1%. `npm run perf:boss` (Ginger, phone, 25 moves) stays flat at p95 16.7-16.8 ms.
+- **Previewing it, behind `?wip=1` only** (`components/WipPreview.tsx`): `?wip=1&kit=Hollow` puts his kit in every
+  boss's place, and `&power=` plays a moment over the real board, over and over: `dark` (forming, dark, thinning,
+  clearing, a miss), `cast`, `bulbs` (the countdown on his strand and the strip, the cast, the relight), `lightsout`
+  (the whole ultimate, two rounds of the test with a find, a miss and an answer, the lights back), `test`, `back` and
+  `claim`. `npm run frames:wip -- <dir> Hollow <moment> [phone|desktop|both] [seconds]` records it frame by frame and
+  makes a GIF. Tests: `packages/app/test/hollow.test.ts`, `e2e/hollow.spec.ts` (his dark squares hide the piece and never
+  take a tap; the night covers every square and lifts again).
+
 ### Ideas for later, not built (Eric, Oct 8, 2026)
 
 - **Real boss abilities, never game-breaking:** freezing most of the team for a turn, or making the crowd move a
@@ -3701,3 +3792,79 @@ From Eric's marked-up screenshot of a Crowd match. My calls:
   and go grey and half see-through once his moves were used. Now he stays in full colour; the crowns under him show
   what's left (a dash once they're spent), as before. His fallen figure after his Last Stand is still greyed: that
   shows he has fallen, which is different from having used his moves.
+
+## Hollow, the Darkness boss (design, Eric, Oct 9, 2026; calls marked "director's call")
+
+Eric's reference: a furry Christmas-thief creature, gone dark. Lore: the villagers tore him apart; the darkness brought
+him back and now holds him together through the middle, so there is a void in his chest. He carries a strand of
+Christmas lights. He is "the dark boss": a small change to the chess (a memory test), not a fog of war.
+
+**Name: Hollow** (director's call; Eric didn't pick one, names aren't final). Kept an original creature, not a recoloured
+Grinch, because that character is someone else's trademark: no "Grinch"/"Grimch" in names or lines, no green fur, no
+Santa suit or hat. His own look is charcoal-black fur, torn edges bound by violet-black darkness, the chest void, and the
+lights.
+
+### Setup
+- He always plays the black pieces; the crowd is always white (Eric: "he is always dark"). If the usual side pick would
+  have made the crowd black, the intro shows him claiming the dark side with a line, before move 1. Nothing flips
+  mid-game (director's call: avoids the bugs Eric worried about; Boingo's flip may be reused only as a one-off intro
+  spin if it is a clean fit).
+- Standard starting position: no opening moves, no Fischer random (Eric: "start from the baseboard").
+- All power-ups work as usual; no special cases for conflicts with the dark (Eric).
+
+### Passive: the dark
+- After his first move (black's move 1), before the crowd's turn, he casts the dark on the square of the piece he just
+  moved, with a line like "Don't forget what's there. Forgetting costs."
+- Then every 3rd of his moves (his moves 4, 7, 10, ...) he covers another square. Each dark square lasts 10 turns (a
+  turn = one crowd move plus his reply), so they build up to about 4 at once.
+- Later covers pick a random occupied square (his or the crowd's, roughly half each), never a king, never one already
+  dark; the server picks from the match seed (director's call). His lines taunt now and then ("Can you still see it?",
+  "How do you like the dark?"). Everyone sees the same lines.
+- The dark belongs to the square, not the piece: a piece that moves out shows up again where it lands; a piece that
+  moves in disappears. Captures, checks and mates work as normal; check still shows on the king.
+- Look: a cloudy, smoky darkness filling the square (violet glints, slow swirl), never a flat black box. It thins on its
+  last turn so players know it is about to clear.
+- Telegraph (director's call): his strand of 3 lit bulbs counts down, one going out per move; when the last goes out he
+  covers a square and they relight.
+
+### Tapping the dark, and the penalty
+- Tapping a dark square selects it like any piece: the green outer glow on the square. No move dots for it (they'd give
+  the piece away), and no move dots shown onto or past a dark square.
+- Any move attempt that touches a dark square (starts on one, lands on one, or passes over one) goes to the server
+  unchecked. If it's illegal: -5 points and the player tries again. Up to 5 wrong attempts per turn; the 5th ends the
+  turn as a missed move (5 x -5 = -25, the same as `missedMoveScore`, so no extra cost). Eric's rule; the per-turn
+  reading and the cap are the director's call.
+- A turn never costs more than missing it: the turn's score (move plus penalties) is floored at `missedMoveScore`
+  (director's call).
+- Moves that don't touch a dark square behave as now.
+- What's under the dark still reaches players' phones (the judge work on players' devices needs the real position), so a
+  determined cheater could read it. Eric accepted that: it's a memory test, not a secret. Fair play counts these turns
+  as normal (forgetting makes moves worse, never cheat-like).
+
+### Ultimate: Lights out
+- Fires from the shared rage meter like every boss (the meter is the only warning; no extra telegraph, per Eric).
+- At the start of his turn: the game pauses (clocks stop). Line: "It's time." He leaves his corner for a new spot and
+  smashes the bulbs of his strand one by one; each smash dims the board a step, until the whole board is dark. The dark
+  board must look good (deep night, faint violet square edges and coordinates, drifting smoke), and every square must
+  stay clearly tappable.
+- Then a memory test in 3 rounds. He names pieces of his ("Find my queen."); everyone taps where they are:
+  - round 1: 1 piece, 3 seconds
+  - round 2: 2 pieces, 4 seconds
+  - round 3: 3 pieces, 5 seconds
+- He names a type; any square holding that type of his counts; if he names a type twice in a round, both squares are
+  needed. No pawns while he has other pieces; the king can be named; no piece named twice across the rounds while
+  others remain (director's call).
+- A found piece flashes back into view; a miss (wrong square or out of time) costs -10 points per piece (director's call:
+  a single miss shouldn't cost more than a missed move; the whole test can cost at most -60, so the chess still decides
+  the raid). At the end of each round the answers show briefly.
+- The server picks the pieces (seed), times each round, and judges the taps, with the usual late grace.
+- During the test he stands in his new spot, the chest void the only light, pulsing with the countdown.
+- After round 3 the lights come back, a fresh strand spills out of the void, he returns to his corner and plays his move.
+  Dark squares that were there stay.
+- Screenshots could beat it; Eric accepted that. The test isn't a move, so fair play doesn't see it.
+
+### Who builds what
+1. `characters`: Hollow's sprite, idle (swirling void), moments (casting the dark, the bulb countdown, the taunts, the
+   ultimate's leap and smashes, the test stance), the dark-square and blackout looks, sounds. Behind `?wip=1`.
+2. `god-king` (boss powers): the rules above in core/chess/server, the tapping and penalties, the ultimate test, tests and
+   e2e. Hollow joins the playable roster only when both are done.

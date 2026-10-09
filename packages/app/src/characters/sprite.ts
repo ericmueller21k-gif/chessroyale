@@ -301,3 +301,36 @@ export function lieDown(
   const specks = (frame.specks ?? []).map(([x, y, k]): Speck => (head === "left" ? [cx + y - cy, cy + cx - x - 1, k] : [cx + cy - y - 1, cy + x - cx, k]));
   return { layers, specks };
 }
+
+/**
+ * Parts made the first time they're drawn: a boss's dozens of poses (each limb painted from its points), or a hundred
+ * night tiles, cost nothing when the app loads, only when a frame that uses them first shows. `add` registers a part's
+ * maker by name (and returns the name, for a layer); `parts` reads like any parts record (listing it makes them all).
+ */
+export function lazyParts(): { parts: Record<string, Part>; add: (name: string, make: () => Part) => string } {
+  const makers = new Map<string, () => Part>();
+  const made = new Map<string, Part>();
+  const get = (name: string): Part | undefined => {
+    let p = made.get(name);
+    if (!p) {
+      const make = makers.get(name);
+      if (!make) return undefined;
+      made.set(name, (p = make()));
+    }
+    return p;
+  };
+  const parts = new Proxy({} as Record<string, Part>, {
+    get: (_, k) => (typeof k === "string" ? get(k) : undefined),
+    has: (_, k) => typeof k === "string" && makers.has(k),
+    ownKeys: () => [...makers.keys()],
+    // (An accessor, so listing the parts doesn't make them; reading one does.)
+    getOwnPropertyDescriptor: (_, k) => (typeof k === "string" && makers.has(k) ? { enumerable: true, configurable: true, get: () => get(k) } : undefined),
+  });
+  return {
+    parts,
+    add: (name, make) => {
+      if (!makers.has(name)) makers.set(name, make);
+      return name;
+    },
+  };
+}

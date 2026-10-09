@@ -30,7 +30,14 @@ export type Beat =
   | "powerHit"
   | "ultimateWarn"
   | "ultimate"
-  | "ultimateHit";
+  | "ultimateHit"
+  // Hollow's (the Darkness boss): his first cover of the dark, claiming the dark side, a piece found or missed in his
+  // test, the lights coming back.
+  | "darkFirst"
+  | "claim"
+  | "found"
+  | "missed"
+  | "lightsBack";
 /** The loops it rests in between moments. */
 export type Loop = "idle" | "thinking" | "smug" | "rattled" | "defeat" | "victory";
 

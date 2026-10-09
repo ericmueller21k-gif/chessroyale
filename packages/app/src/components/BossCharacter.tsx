@@ -1,9 +1,10 @@
-import { useLayoutEffect, useMemo, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { bossBeat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
-import { bossKit, type BossKit } from "../characters/kits.ts";
+import { bossKit, wipLook, type BossKit } from "../characters/kits.ts";
 import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
-import { play } from "../sound.ts";
+import { play, warmSounds } from "../sound.ts";
+import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
 import { useFrameNow } from "./Countdown.tsx";
 
 /**
@@ -26,13 +27,16 @@ const startOf = (key: string, now = Date.now()) => {
 /** Sounds already played: the phone and computer placements, or a new screen, never play one twice. */
 const played = new Set<string>();
 
-const images = new WeakMap<Frame, ImageData>();
-function frameImage(ch: Character, frame: Frame): ImageData {
-  let img = images.get(frame);
+/** Each frame's pixels, made once per look ("" its own colours; Hollow's `bulbs2` puts a bulb out). */
+const images = new WeakMap<Frame, Map<string, ImageData>>();
+function frameImage(ch: Character, frame: Frame, look = ""): ImageData {
+  let byLook = images.get(frame);
+  if (!byLook) images.set(frame, (byLook = new Map()));
+  let img = byLook.get(look);
   if (!img) {
-    const r = renderFrame(ch, frame);
+    const r = renderFrame(ch, frame, { look: look || undefined });
     img = new ImageData(new Uint8ClampedArray(r.data), r.w, r.h);
-    images.set(frame, img);
+    byLook.set(look, img);
   }
   return img;
 }
@@ -94,6 +98,16 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     [kit, stage, boss.board.fen, boss.board.history.length, boss.result, boss.justKilled],
   );
   const since = beat ? startOf(beat.key) : 0;
+  // His sounds and his powers' made ahead, in idle moments, so a first play never stalls a slow phone.
+  useEffect(() => {
+    if (!kit) return;
+    const m = POWER_MOMENTS[kit.ch.name];
+    const fx = m ? [m.power, m.ultimate, m.powerHit, m.ultimateHit, ...Object.values(m.more ?? {})].flatMap((x) => x?.effects ?? []) : [];
+    warmSounds([...Object.values(kit.sounds), ...fx.flatMap((e) => Object.values(EFFECTS[e].sounds))]);
+  }, [kit]);
+  // A recolour from the battle's state (Hollow's bulbs still lit), read as it's drawn.
+  const lookRef = useRef<() => string>(() => "");
+  lookRef.current = () => (wipLook.now?.() ?? (kit?.lookOf ? kit.lookOf(boss) : undefined)) ?? "";
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
@@ -105,12 +119,14 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     const draw = () => {
       const now = Date.now();
       const s = showing(kit, beat, now, since);
-      const id = `${s.anim}:${s.frame}`;
+      const look = lookRef.current();
+      const id = `${s.anim}:${s.frame}:${look}`;
       if (id !== last) {
         last = id;
         const frame = kit.ch.anims[s.anim]!.frames[s.frame]!;
-        g?.putImageData(frameImage(kit.ch, frame), 0, 0);
+        g?.putImageData(frameImage(kit.ch, frame, look), 0, 0);
         box.current?.setAttribute("data-anim", s.anim);
+        box.current?.setAttribute("data-look", look);
         const sound = frame.cue ? kit.sounds[frame.cue] : undefined;
         if (sound && !played.has(s.tag)) {
           played.add(s.tag);
