@@ -100,7 +100,7 @@ async function run(boss, name, context) {
       if (s.kind === "boss" && s.thinking && s.burnt.length) {
         const key = `burn:${s.crowdMoves}`;
         if (!marks.some((m) => m.key === key)) {
-          marks.push({ key, from: s.now - 500, to: s.now + 1700, kinds: [s.burnt.some((b) => b.piece) ? "burn" : "fizzle", `t${s.crowdMoves}`] });
+          marks.push({ key, from: s.now - 500, to: s.now + 1700, kinds: [s.burnt.some((b) => b.piece) ? "burn" : s.burnt.some((b) => b.fizzled) ? "fizzle" : "burnout", `t${s.crowdMoves}`] });
           console.log(`${tag} +${s.now - t0}ms ${key}: ${JSON.stringify(s.burnt)}`);
         }
       }
