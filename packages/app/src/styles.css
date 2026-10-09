@@ -10051,6 +10051,14 @@ img.qicon {
 .pw-ph-fire.s3 {
   background: radial-gradient(circle at 50% 85%, rgba(255, 220, 90, 0.5), rgba(230, 60, 0, 0.5) 60%, rgba(120, 10, 0, 0.55));
   box-shadow: inset 0 0 10px 4px rgba(255, 70, 0, 0.95), 0 0 10px 2px rgba(255, 90, 0, 0.6);
+}
+/* (Ablaze, it pulses: an opacity animation, cheap on a phone, not a box-shadow one.) */
+.pw-ph-fire.s3::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 14px 6px rgba(255, 140, 0, 1);
+  opacity: 0;
   animation: pw-ablaze 520ms ease-in-out infinite alternate;
 }
 .pw-ph-fire i {
@@ -10097,7 +10105,7 @@ img.qicon {
 }
 @keyframes pw-ablaze {
   to {
-    box-shadow: inset 0 0 14px 6px rgba(255, 120, 0, 1), 0 0 14px 4px rgba(255, 120, 0, 0.75);
+    opacity: 1;
   }
 }
 /* A sparkler or a fireball landing: a hot flare on the square. */

@@ -2984,7 +2984,7 @@ the power rules' job (he becomes playable once he has powers too). `packages/cor
   onto the board.
 - **More bosses drawn from Eric's references:** a farmer with a string trimmer, and a gingerbread man with a candy cane.
 
-## Boss powers and the boss raid rework (design, Oct 8, 2026; the template, Freeze and Boingo built: see below)
+## Boss powers and the boss raid rework (design, Oct 8, 2026; the template, Freeze, Boingo and G-REX (Fire) built: see below)
 
 Eric's design, with the director's review folded in and Eric's answers to its questions. Names are placeholders for
 the kind of boss. Nothing here is built yet; when it is, each part gets its own section.
@@ -3015,7 +3015,8 @@ the kind of boss. Nothing here is built yet; when it is, each part gets its own 
 4. **Fair play skips power turns:** forced or restricted moves, duels and blind turns don't count as detection signals.
 
 **The bosses**
-- **Fire.** Passive: tiles catch fire under your pieces only (his pieces never burn), with a 3-2-1 countdown; a piece
+- **Fire.** (Built as G-REX to Eric's later design, Oct 9: sparkler tiles anywhere on the crowd's half and the Roman
+  candle. See "Built: the meter over time, ... G-REX" below.) Passive: tiles catch fire under your pieces only (his pieces never burn), with a 3-2-1 countdown; a piece
   still on the tile at 0 is destroyed. At most 1-2 tiles at a time, never under the king; sliding pieces may pass over.
   The judge treats a piece about to burn as already gone, so saving it is never scored as a mistake. Ultimate: when the
   engine finds a forced mate for the crowd in 3-5, the whole board catches fire: find the mate within its length + 2
@@ -3158,7 +3159,8 @@ turn).
 - The freeze can ice the queen (she's often the piece that matters most); never the king.
 - The board "flip" is a half-turn spin in the board's plane (pieces upside down for 0.7 s), then the board is drawn
   from the other side: a 3D card flip made the board measure its squares wrongly mid-turn.
-- After his Last Stand the God King is silent, except for the blizzard's line (it names the one piece that can move).
+- After his Last Stand the God King is silent. (He used to keep the blizzard's line, which names the one piece that can
+  move; Eric, Oct 9: silent means silent.)
 - Strength offsets are both −100; self-balancing will move them.
 - A boss leaves its usual spot (hidden) while it casts at the board's corner or, Boingo, jumps on the board.
 
@@ -3174,6 +3176,101 @@ turn).
   (playable bosses have complete kits), `packages/server/test/boss-powers-lobby.test.ts` (online: everyone sees the
   same powers, picks and jobs follow the allowed moves, the funhouse from the host, avoiding the lobby's last boss),
   `e2e/boss-powers.spec.ts` (a Freeze match and a Boingo match on phone and desktop, the funhouse online).
+
+### Built: the meter over time, solo difficulty, the test trigger, G-REX (Oct 9, 2026)
+
+Eric's second round for the bosses, built by the `god-king` delegate. **Eric keeps the boss's elimination strike**
+(every few moves it strikes down the worst recent mover) alongside the powers: the powers add to the raid, they
+don't replace the strike.
+
+**The ultimate's meter fills over time, for every boss** (`BOSS_POWERS` in `settings.ts`, `rageTick`/`ragePoints` in
+`boss-powers.ts`)
+- In rage points, full at 100: 5 each crowd move, so on its own it's full after 20 crowd moves (the warning as the 21st
+  begins, the ultimate on the 22nd), around the middle of a battle; up to 5 more a move while the crowd is ahead on
+  the judged eval (all of it from 75% expected score: twice as fast when the crowd is well ahead); and the boss's own
+  material lost, 100/9 a point, so a queen's worth still fills it on its own. It never comes down.
+- It glows as it nears full (from 75%), then the one-turn warning ("RAGE!", the meter flashing), then the ultimate,
+  once a match, as before. `rageOverTime: false` turns the time and eval parts off (material only).
+- **Online it's the shared, judged state:** the crowd's expected score after its move is the judge's (the number the
+  lobby's runner scores with), kept in the battle's state, and the meter is worked out as each crowd turn begins on
+  the server; every screen draws the number it's sent.
+
+**Solo difficulty** (`BOSS_DIFFICULTY`, `boss-difficulty.ts`, `components/BossDifficulty.tsx`)
+- Four segments above solo's boss list: Easy (−300), Normal (your strength, as before), Hard (+250), Hardest (+500), on
+  top of the boss's usual strength (a step above your rating, plus the boss's offset), capped at 3190, the engine's
+  strongest with its strength limited. The boss list shows each boss's strength with it. The boss stays random (or
+  the one you pick); only how hard it plays changes. Remembered on the device. Not in the raid menu: online, the
+  lobby's strength stands. A test link's `?boss=<tier>` ignores it.
+
+**The test trigger (testing only)**
+- Admins only, the same check as the fair-play review page (`ADMIN_EMAILS`): `/api/me` says `admin: true`, and the
+  boss dock shows a small dashed "Trigger ultimate (testing)" button under itself in any boss battle, on every boss
+  screen (your move, the reveal, the boss's turn). Online the Durable Object marks admins' sockets from the session
+  cookie and the lobby takes the trigger only from them; anyone else's is ignored.
+- It brings the ultimate **as the next crowd turn begins, without the warning** (the normal path, skipping the meter
+  and the warning). It never touches a turn or a moment in progress: pressed during your turn, your turn goes on as it
+  was and the ultimate comes after the boss's reply; pressed while the boss thinks, it comes as your turn begins. Once
+  pressed it reads "Ultimate next turn (testing)" and is greyed out; spent, "Ultimate used (testing)". Already used,
+  the battle over, pressed twice: nothing. `BOSS_POWERS.ultimateTestButton: false` removes it, server included.
+
+**Fix: the God King stays silent after falling** in his Last Stand, the blizzard's line included.
+
+**G-REX, the Fire boss** (`grex` in the roster; his art, lines and sounds are the `characters` delegate's)
+- **Passive, burning tiles:** with no fire tile on the board, from the crowd's 2nd turn, he throws a sparkler onto a
+  random square on the crowd's half (empty or occupied, never their king's). It burns in three stages, one a crowd
+  turn: a singe, more burn, ablaze. After the crowd's move on the ablaze turn, a crowd piece still on it is destroyed
+  (his own pieces never burn); the king is fireproof (the tile fizzles). Pieces may stand on it at any stage, and one
+  that steps onto it ablaze burns at once. Then a full turn with no fire, then the next throw (a throw every 4 turns).
+- **The God King's warning:** the first time in a match a crowd piece steps onto a burning tile (not yet ablaze), he
+  says one of four lines ("Careful on that tile, don't stand there too long!"). Once a match.
+- **Ultimate, the Roman candle:** "ROMAN CANDLE!", then he jumps onto the middle of the board and fires 12 shots up;
+  12 pips by the board's top edge, one lit for each shot still up. 3 crowd moves later the fireballs fall on the
+  crowd's half, a wave a turn: 1, 2, 3, 4, then the last 2 (exactly the 12), each landing as a stage-1 fire tile with
+  the same rules, never on the king's square or a tile already burning, spread out (none next to another tile if it
+  can be helped). The sparkler waits through the barrage, until its last tile is out and a turn has passed.
+- **Fair judging:** on the turn a tile is ablaze, the judge treats a crowd piece left on it as already gone: each move's
+  expected score less what it leaves to burn (1 log-odds a pawn of value, `firePawnLogit`), and the best move the best
+  of those, so saving the piece is never scored as a mistake. The moves that take a piece off the tile are always
+  scored (judges, the host and solo), and bots and power-up hints rank moves the same way. The engines' numbers stay
+  raw everywhere; the lobby's runner takes the fire off them once, for everyone, so judges still agree exactly. A turn
+  with fire on the board is a power turn for fair play.
+- **The rules engine:** a destroyed piece changes the position between moves, so a board keeps a base where it changed
+  (`BoardState.bases`): replays, the game's end, the recent moves, stepping back through the game and a spectator's
+  replay all play from it. A burn never leaves a king in check: a piece shielding its king, or one whose loss would
+  check the boss, doesn't burn (the tile fizzles). A rook burnt in its corner takes its castling right.
+- **Timing:** the sparkler 2.3 s (banner, his throw from the board's corner, the sparkler's flight, the tile catching),
+  the warning 1.7 s, the candle 5 s, a wave of fireballs 1.7 s; all before the crowd's clock starts, as every power's.
+  A piece burning plays as the boss's turn begins (1.4 s; the boss's move waits for it, solo and online).
+
+**Calls I made (Eric may want to change)**
+- The meter's rates: full after 20 crowd moves on its own, twice as fast with the crowd well ahead.
+- Easy to Hardest only for solo's "Boss alone" (the boss picker), not the solo raid with bots or online.
+- The trigger brings the ultimate at the next turn's start rather than mid-turn: an ultimate mid-turn would change
+  the moves allowed (the blizzard) or take the turn (the funhouse) after people had started picking.
+- "After the turn after stage 3" read as: ablaze as a turn begins, and anything left there burns after that turn's move
+  (the design's 3-2-1-0 countdown).
+- A burn happens straight after the crowd's move (so the boss replies to the position without the piece, as the judge
+  scored it), and the piece burns on screen as the boss's turn begins.
+- A piece shielding its king never burns (its tile fizzles), nor one whose loss would check the boss: a power never
+  breaks check, and a burn never gives one.
+- The warning line counts a step onto a burning tile, not a tile landing under a piece, nor a step onto an ablaze tile
+  (that piece burns at once).
+- The fireballs' squares are random but spread out; they can land on pieces (that's the barrage's threat).
+- G-REX plays 100 under the lobby's strength, as the others do; self-balancing will move it.
+
+**Checking it**
+- `npm run frames:powers -- <dir> grex [phone|desktop|both] [light|dark] [moves]` plays G-REX with the candle brought
+  early, leaving a piece on a tile ablaze and stepping onto a burning one, and saves every frame of each moment and
+  burn (`all` runs every boss).
+- Test switches: `?boss=grex&power=candle` (warned as the 2nd turn begins, the candle on the 3rd; the sparkler on the
+  2nd), `?power=sparkler`; `?wip=1` (solo) meets a boss whose powers are built before its art is, with placeholders.
+- `npm run perf:boss -- <dir> grex phone 25 candle`; `e2e/perf.spec.ts` checks G-REX's tiles at the barrage's peak late
+  in a long game on a slowed phone.
+- Tests: `packages/chess/test/grex.test.ts` (the meter's rates and switch, the trigger's safety, the tiles' stages, the
+  king fireproof, judging, the 12-fireball schedule, the once-a-match warning, bases, difficulty),
+  `packages/server/test/boss-powers-lobby.test.ts` (the trigger online: admins only; G-REX online),
+  `packages/core/test/boss.test.ts` and `packages/app/test/boss-difficulty.test.ts` (difficulty), `e2e/grex.spec.ts`
+  (G-REX on phone and desktop with the candle; the trigger shown for an admin, hidden otherwise).
 
 ## The God King, redrawn as pixel art (Oct 8, 2026)
 

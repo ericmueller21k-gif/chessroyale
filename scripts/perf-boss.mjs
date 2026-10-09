@@ -2,7 +2,8 @@
 // and on a phone with its CPU slowed 4x, and records after every move: frame times (idle, while dragging a piece,
 // and through the boss's turn), DOM nodes, running animations, rAF callbacks per frame, pending timers, event
 // listeners, JS heap and audio nodes. Prints a table per run and writes everything to <out>.json.
-//   npm run perf:boss -- [out-dir] [gingerbread|clown|crowd|online] [phone|desktop|both] [moves=25] [power]
+//   npm run perf:boss -- [out-dir] [gingerbread|clown|grex|crowd|online] [phone|desktop|both] [moves=25] [power]
+// (grex: ?wip=1 until his art lands; try power=candle for his barrage.)
 // The production build (vite build + preview), like the live site. Nothing here should grow with the match
 // (.claude/LESSONS.md: "Lag that grows with the match").
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -118,7 +119,7 @@ async function run(kind, name, context, throttle) {
       ? "mode=crowd&clock=60&augments=0&turns=all"
       : kind === "online"
         ? `mode=raid&boss=gingerbread${power ? `&power=${power}` : ""}&clock=60`
-        : `boss=${kind}${power ? `&power=${power}` : ""}&clock=60`;
+        : `boss=${kind}${kind === "grex" ? "&wip=1" : ""}${power ? `&power=${power}` : ""}&clock=60`;
   await p.goto(`${kind === "online" ? ONLINE : url}?debug&nolanding&${q}`);
   if (kind === "crowd") {
     await p.getByRole("radio", { name: /^Solo/ }).click();
