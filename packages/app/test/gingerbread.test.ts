@@ -99,13 +99,13 @@ describe("the effect sprites", () => {
     for (const [name, part] of Object.entries(ch.parts)) for (const row of part.grid) for (const k of row) if (k !== "." && k !== " ") expect(ch.palette, `${ch.id} ${name}: "${k}"`).toHaveProperty(k);
   };
 
-  it("cover one square, or the whole board, and draw every frame", () => {
+  it("cover one square, or the whole board (or a strip of their own size), and draw every frame", () => {
     for (const name of EFFECT_NAMES) {
       const fx = EFFECTS[name];
       const size = fx.covers === "board" ? 8 * BOARD_CELL : SQUARE;
-      expect([fx.ch.w, fx.ch.h], name).toEqual([size, size]);
+      if (fx.covers !== "strip") expect([fx.ch.w, fx.ch.h], name).toEqual([size, size]);
       keysOk(fx.ch);
-      for (const a of Object.values(fx.ch.anims)) for (const f of a.frames) expect(renderFrame(fx.ch, f).data.length).toBe(size * size * 4);
+      for (const a of Object.values(fx.ch.anims)) for (const f of a.frames) expect(renderFrame(fx.ch, f).data.length).toBe(fx.ch.w * fx.ch.h * 4);
     }
   });
 
@@ -114,11 +114,21 @@ describe("the effect sprites", () => {
       const fx = EFFECTS[name];
       if (fx.start) expect(fx.ch.anims[fx.start]!.loop, `${name} start`).toBe(false);
       if (fx.loop) expect(fx.ch.anims[fx.loop]!.loop, `${name} loop`).toBe(true);
-      const ends = [fx.end, !fx.loop ? fx.start : undefined].filter(Boolean) as string[];
+      // Its ends (and other endings, and each piece's burn) finish on an empty frame, unless another effect carries on
+      // from them: then the last frame is that one's first.
+      const ends = [fx.end, !fx.loop ? fx.start : undefined, ...Object.values(fx.endings ?? {}), ...Object.values(fx.pieces ?? {})].filter(Boolean) as string[];
       for (const e of ends) {
         const last = fx.ch.anims[e]!.frames.at(-1)!;
-        expect(frameKeys(fx.ch, last).flat().filter(Boolean), `${name} ${e} ends empty`).toEqual([]);
+        if (fx.next && e === fx.end) {
+          const next = EFFECTS[fx.next.effect];
+          expect(renderFrame(fx.ch, last).data, `${name} ${e} ends as ${fx.next.effect} ${fx.next.anim} starts`).toEqual(renderFrame(next.ch, next.ch.anims[fx.next.anim]!.frames[0]!).data);
+        } else expect(frameKeys(fx.ch, last).flat().filter(Boolean), `${name} ${e} ends empty`).toEqual([]);
       }
+      for (const st of fx.stages ?? []) {
+        expect(fx.ch.anims[st.loop]!.loop, `${name} ${st.loop}`).toBe(true);
+        if (st.into) expect(fx.ch.anims[st.into]!.loop, `${name} ${st.into}`).toBe(false);
+      }
+      if (fx.counter) for (let n = 0; n <= fx.counter.max; n++) expect(fx.ch.anims[`${fx.counter.prefix}${n}`]?.loop, `${name} ${n}`).toBe(true);
       for (const a of Object.values(fx.ch.anims)) for (const f of a.frames) if (f.cue) expect(fx.sounds[f.cue], `${name} ${f.cue}`).toBeTruthy();
     }
   });

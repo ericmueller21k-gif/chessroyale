@@ -1,13 +1,14 @@
 /**
  * The raid bosses that have a character: its drawing, which animation plays for each moment, its sounds, its
  * lines and its portrait, keyed by the boss's name in packages/core/src/boss.ts. A boss without one keeps its emoji
- * everywhere. A kit whose name isn't a boss there yet (Ginger) is drawn and ready but never shows: a boss
+ * everywhere. A kit whose name isn't a boss there yet (G-REX) is drawn and ready but never shows: a boss
  * becomes playable once it has both a character and its powers (the power rules add it to boss.ts).
  */
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines } from "./boss-beats.ts";
 import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
+import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
 import type { Character } from "./sprite.ts";
 
 export interface BossKit extends BeatLines {
@@ -45,6 +46,23 @@ export const BOSS_KITS: Record<string, BossKit> = {
     lines: GINGER_LINES,
     chance: GINGER_CHANCE,
     portrait: { ...GINGER_PORTRAIT, anim: "idle", frame: 0 },
+  },
+  "G-REX": {
+    ch: GREX,
+    anims: { strike: "capture", power: "ignite", powerHit: "capture", ultimateWarn: "candleWarn", ultimate: "romanCandle", ultimateHit: "capture" },
+    sounds: {
+      fizz: "grexFizz",
+      whoosh: "grexWhoosh",
+      throw: "grexWhoosh",
+      crackle: "grexCrackle",
+      poof: "grexPoof",
+      roar: "grexRoar",
+      launch: "grexPop",
+      shot: "grexPop",
+    },
+    lines: GREX_LINES,
+    chance: GREX_CHANCE,
+    portrait: { ...GREX_PORTRAIT, anim: "idle", frame: 0 },
   },
 };
 
