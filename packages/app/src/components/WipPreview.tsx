@@ -93,7 +93,6 @@ export function WipPreview({ fen, orientation, crowd }: { fen: string; orientati
   if (!start) start = now;
   const him = crowd === "w" ? "b" : "w";
   const t = now - start;
-  const at = (ms: number) => start + ms;
   const caster = { left: "-9%", top: "-27%", width: "30%", aspectRatio: `${kit.ch.w} / ${kit.ch.h}` };
   // The darkness leaves his chest: where that is on the board (his frame in the caster's box).
   const from = { x: -9 + (HOLLOW_CAST_FROM[0] / kit.ch.w) * 30, y: -27 + (HOLLOW_CAST_FROM[1] / kit.ch.h) * 30 * (kit.ch.h / kit.ch.w) };
