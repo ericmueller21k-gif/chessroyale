@@ -454,3 +454,40 @@ after a burn.
 **The rule:** anything that changes the position outside a move must leave a base, and nothing may replay a board's
 history from move 0 directly: use `fenAtPly(history, ply, bases)`. When adding such a power, grep for `fenAfter(` and
 `.history` and check each.
+
+## A navigation that never happened (Oct 9, 2026)
+
+**Seen:** `e2e/grex.spec.ts:53` (G-REX's barrage) failed now and then, on the phone and the computer, and passed on a
+rerun. Most often: "page.evaluate: Execution context was destroyed, most likely because of a navigation", in the
+test's `play()`, in the middle of the barrage. The same message had hit `boss-powers.spec.ts` (Ginger) and
+`crowd.spec.ts` once each. Twice more, the check for a piece burning failed (not found; once, two found).
+
+**The cause:** two races in the test, none in the game.
+- Nothing navigated. Each of those tests awaited the engine's search inside `page.evaluate`
+  (`await m.runner.topMovesFor(fen)`), holding a `Runtime.callFunctionOn` open for seconds while the page was busy.
+  Playwright reports any protocol failure of that call (anything but a JavaScript exception or a closed page) as
+  "Execution context was destroyed, most likely because of a navigation" (`rewriteError` in its
+  `crExecutionContext.js`), and the call can fail that way without a navigation: an evaluate whose awaited promise is
+  dropped and collected gives the very same message (checked with a two-line script).
+- A piece burning shows for 1.5 s as the boss's turn begins. The test looked for it after its own wait for the turn to
+  change (`expect.poll` steps up to a second apart), so under load it could look too late; and when two tiles burnt
+  at once, its locator matched both (Playwright's strict mode).
+
+**How it was found:** a copy of the test that set an id on `window` before the app loaded (`addInitScript`) and, on the
+failure, read it back with the URL, then started the same search again and polled for it; it also logged every engine
+call and every `until` listener with times. On a failure the id and URL were unchanged (no navigation), the fresh
+search answered at once, and every search the page had started had finished (the failure came as the awaited one
+resolved). The burn was caught by running the test six times with four workers (one strict-mode failure).
+
+**The fix:** `engineTop(page)` in `e2e/helpers.ts` starts the search in the page, keeps its answer on `window` and
+polls for it, so no evaluate is held open while the engine thinks. `watchFor(page, …)` puts a MutationObserver in the
+page before the move, so a burn that shows for a moment is never missed, and the test reads what burnt from the shared
+state (`powers.burnt`) before expecting it on screen.
+
+**The rule:**
+- Never await long app work (an engine search, a server round trip) inside `page.evaluate`. Start it in the page, keep
+  the answer on `window`, and poll for it from the test. ("Execution context was destroyed" without a navigation is
+  this.) `boss-powers.spec.ts`, `crowd.spec.ts`, `formats.spec.ts` and `boss-character.spec.ts` still await
+  `topMovesFor` inside an evaluate: move them to `engineTop` when they're next touched.
+- Something on screen for a moment is checked by watching for it from before it can appear, not by looking for it
+  after a wait for something else.

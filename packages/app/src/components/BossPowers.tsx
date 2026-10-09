@@ -406,7 +406,8 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
           {t < 1500 && banner("ROMAN CANDLE!", `${CANDLE_SHOTS} shots up…`, "fire long")}
           {t >= CANDLE.rexAt && (
             <span class={`pm-pogo pm-rex${t >= CANDLE.exitAt ? " out" : ""}`}>
-              {anim ? <BossMoment boss={boss.name} anim={anim} since={moment.at + CANDLE.rexAt} then="idle" /> : <BossFace boss={boss} />}
+              {/* (His last frame, the candle in hand, holds as he jumps off.) */}
+              {anim ? <BossMoment boss={boss.name} anim={anim} since={moment.at + CANDLE.rexAt} /> : <BossFace boss={boss} />}
             </span>
           )}
           {times.map((since, i) => (now >= since && now < since + CANDLE.shotMs ? <CandleShot key={i} i={i} since={since} /> : null))}
@@ -517,15 +518,16 @@ export function candleShotPath(i: number): { left: number; top: number; deg: num
   const left = 29 + (at[0] / 100) * 42;
   const top = 14 + (at[1] / 122) * 42 * (122 / 100);
   const jitter = ((i * 37) % 11) - 5;
-  return { left, top, deg: deg * 1.25 + jitter, reach: 520 + ((i * 53) % 4) * 60 };
+  // (Its reach in its own box's size, two squares: five to seven squares.)
+  return { left, top, deg: deg * 1.25 + jitter, reach: 260 + ((i * 53) % 4) * 30 };
 }
 function CandleShot({ i, since }: { i: number; since: number }) {
   const { left, top, deg, reach } = candleShotPath(i);
   const a = (deg * Math.PI) / 180;
-  // (Its box is a square; its rocket's head is near the top middle.)
+  // (Its box is two squares; its rocket's head is near the top middle, 30% down.)
   const style: Record<string, string> = {
-    left: `${left - 6.25}%`,
-    top: `${top - 3.75}%`,
+    left: `${left - 12.5}%`,
+    top: `${top - 7.5}%`,
     rotate: `${deg}deg`,
     "--sx": `${Math.sin(a) * reach}%`,
     "--sy": `${-Math.cos(a) * reach}%`,

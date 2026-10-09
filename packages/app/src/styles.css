@@ -10339,12 +10339,13 @@ img.qicon {
 .pm-rex {
   aspect-ratio: 100 / 122;
 }
-/* Each shot leaves the candle's top (its rocket's head, 30% down its box, on the muzzle) along the candle's tilt. */
+/* Each shot leaves the candle's top (its rocket's head, 30% down its box, on the muzzle) along the candle's tilt; its
+   box is two squares, so the rocket and its trail read at a phone's size. */
 .pw-shot {
   position: absolute;
   z-index: 9;
-  width: 12.5%;
-  height: 12.5%;
+  width: 25%;
+  height: 25%;
   transform-origin: 50% 30%;
   pointer-events: none;
   animation-name: pw-shot;
