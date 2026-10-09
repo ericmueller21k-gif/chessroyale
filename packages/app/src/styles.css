@@ -1763,7 +1763,8 @@ button.history-label {
 .timer-bar {
   position: absolute;
   left: 0;
-  right: 0;
+  /* (Chessground's board, not the wrap: up to 8 device pixels narrower. See .board-wrap.) */
+  width: var(--cg-size, 100%);
   top: calc(-1 * var(--timer-bar-h));
   height: var(--timer-bar-h);
   border-radius: 2px;
@@ -1779,8 +1780,7 @@ button.history-label {
 }
 /* The mirror under the board (TIMER_BAR_BELOW in components/Countdown.tsx turns it off). */
 .timer-bar.below {
-  top: auto;
-  bottom: calc(-1 * var(--timer-bar-h));
+  top: var(--cg-size, 100%);
 }
 
 /* ---- The small clock at the board's top right: this move's seconds and your bank (components/BoardClock.tsx) ---- */
@@ -1789,7 +1789,8 @@ button.history-label {
    the bar, and out of the layout (absolute), so nothing moves when it comes and goes. */
 .board-clock {
   position: absolute;
-  right: 0;
+  /* (Level with chessground's right edge, a hair inside the wrap's.) */
+  right: calc(100% - var(--cg-size, 100%));
   bottom: calc(100% + 7px);
   height: 17px;
   box-sizing: border-box;
