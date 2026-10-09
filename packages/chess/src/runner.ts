@@ -22,6 +22,7 @@ import {
   stagePlan,
   type GroupEvaluation,
   type GroupResult,
+  type BossState,
   type MatchState,
   type PlayerState,
   type RetireReason,
@@ -1029,10 +1030,24 @@ export class MatchRunner {
     return result;
   }
 
-  /** The boss battle as sent to the screens. */
+  /**
+   * The boss battle as sent to the screens. Built once per change: a solo battle's screens ask for it many times on
+   * every redraw (several a second), and building it (the board's view, the moves the powers allow) on every ask was
+   * the lag that grew with the match (.claude/LESSONS.md: "Lag that grows with the match"). The key is everything the
+   * view is made from, so a cached view is always the one a fresh build would give.
+   */
   bossView(justKilled: string | null = null): NetBoss | null {
     const b = this.state.boss;
     if (!b) return null;
+    const board = this.boards.get(this.state.boards[0]!)!;
+    const s = this.settings;
+    const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid]);
+    if (this.bossViewMemo?.key !== key) this.bossViewMemo = { key, view: this.buildBossView(b, justKilled) };
+    return this.bossViewMemo.view;
+  }
+  private bossViewMemo: { key: string; view: NetBoss } | null = null;
+
+  private buildBossView(b: BossState, justKilled: string | null): NetBoss {
     const def = chooseBoss(0, b.id);
     const info = { name: def.name, icon: def.icon, threat: bossThreat(b.elo) };
     const fen = this.boards.get(this.state.boards[0]!)!.fen;

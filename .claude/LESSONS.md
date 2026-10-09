@@ -330,3 +330,72 @@ swaps once the spin has ended, with nothing transformed.
 
 **The rule:** never change what chessground draws (its orientation, its size) while a transform is on it or an
 ancestor. Animate it, then change it once the transform is gone, and watch the frames after the change too.
+
+## Lag that grows with the match (Oct 9, 2026)
+
+**Eric saw:** in a solo boss battle against Ginger, on his phone and his computer, the game started smooth and got
+steadily worse: dragging a piece dropped frames after about 5 moves, worse at 10, unplayable by move 13-15. Ginger's
+blizzard was glitchy too.
+
+**What grew:** the work done on every redraw, not the page. DOM nodes, running animations, rAF callbacks per frame,
+timers and the heap all stayed flat; only frame times climbed.
+- The screens read the boss battle (`match.boss`) many times per redraw. The play screen redraws five times a second
+  and reads it about 20 times; the top bar, the boss bar, the dock and the boss read it too, and the boss screen
+  redraws every frame.
+- In a solo battle `match.boss` looked like a field but was a getter that rebuilt the whole view on every read
+  (`runner.bossView()`). Each build replayed the whole game with chess.js twice (the board's "last few moves" view
+  worked out the position before them from move 0) and generated the legal moves for the powers. So every redraw cost
+  a little more with each move.
+- The boss's turn had the same thing: the boss screen replayed the whole game on every frame (`lastMoveTookQueen`), and
+  the match flow did it again in `gameEnd` several times a round.
+- The blizzard added its own cost: its pixel frames are drawn the first time they show (each part's outline redone
+  for every frame, each pixel's colour parsed from text), and the ice over every piece built a chess.js game per
+  square on every redraw (`pieceAt`).
+- Checking the other modes found the same kind of cost in Crowd. From move 4 (once ratings show), the standings
+  re-sorted the rating curve 51 times per player, for 100 players, on every redraw: drag p95 went from 17 ms to 150-180
+  ms on the slowed phone.
+- No test saw it: tests play a few moves and check what's on the screen, never how long a frame takes at move 20.
+
+**How it was found:** `npm run perf:boss` (`scripts/perf-boss.mjs`) plays a whole battle with real drags, on a computer
+and on a phone with its CPU slowed 4x (CDP), and after every move records frame times (sitting, dragging, the boss's
+turn) with DOM nodes, animations, rAF callbacks, timers, listeners, heap and audio nodes. Everything was flat except
+frame times, so the cost per frame was growing. A CPU profile at move 8 (`PERF_PROFILE=8`: an unminified build)
+put most of the time in chess.js under `get boss` → `bossView` → `netBoard`. A profile of the boss's turn
+(`PERF_PROFILE_BOSS=1`) found `lastMoveTookQueen` → `fenAfter`, and the blizzard's showed the sprite drawing and
+`pieceAt`.
+
+**The numbers** (frames while dragging a piece, p95 and share dropped; a dropped frame is one over 20 ms):
+
+| Move | Computer, before | Computer, after | Phone (4x slower), before | Phone (4x slower), after |
+| ---: | --- | --- | --- | --- |
+| 5 | 67 ms, 13% | 17 ms, 0% | 367 ms, 70% | 17 ms, 0% |
+| 15 | 150 ms, 24% | 17 ms, 0% | 717 ms, 61% | 17 ms, 1% |
+| 25 | 217 ms, 73% | 17 ms, 0% | 1,100 ms, 67% | 17 ms, 0% |
+
+The boss's turn at move 25 went from every frame dropped (p95 200 ms on the computer, 400-1,100 ms on the phone) to
+17 ms with 0-1% dropped. With the view and replays fixed, Ginger's blizzard on the slowed phone still had p95 50 ms
+(9% dropped); the sprite and `pieceAt` changes brought it to 17 ms (4%).
+
+**The fix:**
+- `bossView` keeps its last view, keyed by everything it is built from, so a kept view is always the one a fresh
+  build would give.
+- `fenAfter` and `gameEnd` remember their answers; a line a move or two on from a known one carries on from it.
+  `pieceAt` reads a position once.
+- Sprite frames work out each part's outline once per way it's drawn and each colour once per frame. Every frame of
+  every character and effect is byte for byte the same.
+- The rating curve's sorted points and the prior's loss are worked out once per curve.
+
+**The guard:**
+- `packages/chess/test/long-match.test.ts` plays a 40-plus move battle. Reading the boss view again must do no
+  chess.js work, and a new move only a handful of steps.
+- `e2e/perf.spec.ts` (phone, CPU slowed 4x) plays four moves, checking that DOM nodes, animations, rAF callbacks and
+  timers don't grow. It then makes the game 120 plies long and checks frames while sitting, dragging and through the
+  boss's turn: p95 under 50 ms and under 15% dropped.
+
+**The rule:**
+- Anything a screen reads while rendering must be cheap and must not depend on how long the match is. A getter that
+  looks like a field gets read dozens of times a frame, so it must never rebuild anything.
+- Never replay a game from move 0 per redraw, per read or per round. Use the board's FEN or the remembered `fenAfter`.
+- Before calling a change to a board, the boss or an animation done, run `npm run perf:boss -- <dir> gingerbread phone
+  25`. Frame times late in the match must match the early ones. The same script runs `clown`, `crowd` and `online` (an
+  online raid on a local server).
