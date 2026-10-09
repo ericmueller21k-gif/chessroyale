@@ -30,6 +30,11 @@ export class LookAways {
     this.away = typeof document !== "undefined" && (document.visibilityState === "hidden" || !document.hasFocus());
   }
 
+  /** How many look-aways so far, counting on (a move attempt into Hollow's dark: it may or may not be the pick). */
+  peek(): number {
+    return this.count;
+  }
+
   /** The pick (or the end of the move): how many look-aways there were, and stop counting. */
   stop(): number {
     this.on = false;

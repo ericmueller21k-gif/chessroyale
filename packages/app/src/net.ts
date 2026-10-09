@@ -526,8 +526,7 @@ export class NetMatch implements GameView {
           // Legal: it's your pick.
           this.darkNote = null;
           this.myPick = m.move;
-          const away = this.lookAways.stop();
-          void away;
+          this.lookAways.stop();
           if (this.myId) this.progress.mark(this.myId);
           return this.setPhase({ kind: "scoring", board: this.phase.board, move: m.move, strike: this.phase.strike });
         }
@@ -807,7 +806,8 @@ export class NetMatch implements GameView {
     if (this.phase.strike?.until && Date.now() < this.phase.strike.until) return; // While the King strikes.
     // (Sent unchecked: the server says whether it was legal. Until then the board waits.)
     this.darkNote = { move, at: Date.now(), pending: true, tries: this.darkNote?.tries ?? 0, out: false };
-    this.send({ t: "darkTry", key: this.key, move });
+    const away = this.lookAways.peek();
+    this.send({ t: "darkTry", key: this.key, move, ...(away ? { away } : {}) });
     this.emit();
   }
 

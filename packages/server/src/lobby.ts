@@ -725,7 +725,7 @@ export class LobbyCore {
       case "judgedDeep":
         return this.judgedDeep(playerId, msg.key, msg.id, msg.deep);
       case "darkTry":
-        return this.darkTry(playerId, msg.key, msg.move);
+        return this.darkTry(playerId, msg.key, msg.move, msg.away);
       case "lightsTap":
         return this.lightsTap(playerId, msg.key, msg.round, msg.square);
       case "hello":
@@ -1247,7 +1247,7 @@ export class LobbyCore {
    * player's pick; an illegal one costs points and they pick again, and the last of their tries ends their turn as a
    * missed move. Only the player hears how it went.
    */
-  private darkTry(playerId: string, key: string, move: unknown) {
+  private darkTry(playerId: string, key: string, move: unknown, away?: unknown) {
     const round = this.r.round;
     if (this.r.phase !== "play" || !round || round.key !== key || this.doneThisRound(playerId) || !this.runner?.boss || typeof move !== "string") return;
     const now = this.io.now();
@@ -1256,7 +1256,7 @@ export class LobbyCore {
     const out = this.runner.darkTry(playerId, move);
     if (out.kind === "move") {
       this.send(playerId, { t: "darkTry", key, move: out.move, ok: true }, false);
-      return this.pick(playerId, key, out.move);
+      return this.pick(playerId, key, out.move, away);
     }
     if (out.kind === "refused") return this.send(playerId, { t: "darkTry", key, move, ok: false, refused: true }, false);
     this.send(playerId, { t: "darkTry", key, move, ok: false, tries: out.tries, ...(out.out ? { out: true } : {}) }, false);

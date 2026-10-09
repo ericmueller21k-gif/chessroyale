@@ -368,7 +368,7 @@ export type ClientMessage =
    * Hollow's dark: a move attempt that touches a dark square, sent unchecked (the app can't show what's there). The
    * server judges it: a legal move is this player's pick; an illegal one costs points and they pick again.
    */
-  | { t: "darkTry"; key: string; move: string }
+  | { t: "darkTry"; key: string; move: string; away?: number }
   /** Hollow's Lights out: this player taps a square in round `round` (0-based). */
   | { t: "lightsTap"; key: string; round: number; square: string };
 
