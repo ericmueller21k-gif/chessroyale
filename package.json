@@ -25,7 +25,8 @@
     "frames:close": "node scripts/frames-lobby-close.mjs",
     "frames:matchmaking": "node scripts/frames-matchmaking.mjs",
     "frames:home": "node scripts/frames-home-queue.mjs",
-    "frames:lobbychat": "node scripts/frames-lobby-chat.mjs"
+    "frames:lobbychat": "node scripts/frames-lobby-chat.mjs",
+    "perf:boss": "node scripts/perf-boss.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261002.1",

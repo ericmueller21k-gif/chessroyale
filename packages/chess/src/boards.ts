@@ -59,8 +59,29 @@ export function boardStatus(board: BoardState): BoardStatus {
 }
 
 
+/**
+ * The position after each line of moves asked for lately. A board's view asks for the position a few moves back
+ * every time it's built, and replaying the whole game for it made each build slower as the game went on
+ * (.claude/LESSONS.md: "Lag that grows with the match"): a line seen before is looked up, and a line a move or two
+ * on from one seen before carries on from there.
+ */
+const positions = new Map<string, string>();
+const POSITIONS_KEPT = 256;
+function positionAfter(moves: readonly string[]): string {
+  const key = moves.join(" ");
+  let fen = positions.get(key);
+  if (fen !== undefined) return fen;
+  let from = moves.length;
+  let base: string | undefined;
+  while (base === undefined && from > 0 && moves.length - from < 8) base = positions.get(moves.slice(0, --from).join(" "));
+  fen = base === undefined ? fenAfter(moves) : fenAfter(moves.slice(from), base);
+  positions.set(key, fen);
+  if (positions.size > POSITIONS_KEPT) positions.delete(positions.keys().next().value!);
+  return fen;
+}
+
 /** The last `n` moves played on a board and the position before them (for replaying what a player missed). */
 export function recentMoves(board: BoardState, n = 4): { from: string; moves: string[] } {
   const k = Math.min(n, board.history.length);
-  return { from: fenAfter(board.history.slice(0, board.history.length - k)), moves: board.history.slice(board.history.length - k) };
+  return { from: positionAfter(board.history.slice(0, board.history.length - k)), moves: board.history.slice(board.history.length - k) };
 }
