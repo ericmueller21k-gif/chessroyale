@@ -788,6 +788,34 @@ export const QUICK_CHAT = {
 } as const;
 
 /**
+ * Bots chat in the home page's global chat, so it isn't empty during the beta (Eric, Oct 9, 2026). Every bot line is
+ * tagged "bot". **Eric wants this off when the game goes live: set it to false.**
+ */
+export const GLOBAL_CHAT_BOTS: boolean = true;
+
+/**
+ * The home page's global chat (a computer's right column, under Playing now): preset lines only, like quick chat.
+ * See DECISIONS.md, "Global chat on the home page".
+ */
+export const GLOBAL_CHAT = {
+  /** One message per account every this long (the server enforces it; the app only mirrors it). */
+  gapMs: 30_000,
+  /** The server keeps this many lines for newcomers, and the panel shows at most this many. */
+  keep: 50,
+  /** Lines older than this aren't shown any more. */
+  maxAgeMs: 24 * 60 * 60_000,
+  /** With GLOBAL_CHAT_BOTS on, a bot says something about this often (ms, random in the range) while someone has it open… */
+  botGapMs: [30_000, 90_000] as readonly [number, number],
+  /** …and the first this soon after someone opens it when nobody had it open. */
+  botFirstMs: [4_000, 15_000] as readonly [number, number],
+  /**
+   * Someone has the chat open while their app has asked for it within this long. It asks with the live line (every
+   * FRONT_DOOR.livePollMs on the home screen), so no new request or socket.
+   */
+  watchMs: 15_000,
+} as const;
+
+/**
  * Capacity (the `ops` delegate): the matchmaker's batches and admission, overload, presence and the live line's
  * write limits, and the API's rate limits. See DECISIONS.md, "Capacity: built".
  */

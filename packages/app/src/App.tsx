@@ -556,6 +556,7 @@ export function App() {
       goHome();
       setShowSettings(true);
     },
+    signIn: () => chooseGuest(false),
   };
 
   /**
