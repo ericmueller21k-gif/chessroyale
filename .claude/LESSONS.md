@@ -311,3 +311,22 @@ saw "0 coins", the narrowest the pill gets.
 - A number on screen that grows (coins, ratings, counts, scores) is tested at its widest realistic value, not the
   value a fresh test account has. Fake the server's answer in the test (`page.route`) if that's the only way to get it.
 - When something new joins a row of fixed-size items, measure the row at 320 px with that widest content first.
+
+## A board that vanished after it flipped (Oct 8, 2026)
+
+**Seen** (by the boss powers, before they shipped): Boingo's funhouse flips the board. Built as a 3D card flip (the
+board turned edge-on, its orientation swapped, then back), every square and piece vanished after the flip and stayed
+gone. Every test passed: the orientation, the fen and the moves were all right.
+
+**The cause:** chessground measures its board (`getBoundingClientRect`) when it redraws, and an orientation change
+redraws it. Edge-on, the board measured nearly 0 px wide, so it drew everything at nearly no size, and nothing
+measured it again (it only does on a resize).
+
+**How it was found:** `npm run frames:powers` saved every painted frame of the moment: the board was fine up to the
+swap and empty from then on.
+
+**The fix:** the board spins a half turn in its own plane (the pieces upside down for a moment), and the orientation
+swaps once the spin has ended, with nothing transformed.
+
+**The rule:** never change what chessground draws (its orientation, its size) while a transform is on it or an
+ancestor. Animate it, then change it once the transform is gone, and watch the frames after the change too.
