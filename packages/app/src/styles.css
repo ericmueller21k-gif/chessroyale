@@ -369,6 +369,9 @@ p {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
+  /* Chessground's board size, which it writes on the wrap (---cg-width) each time it sizes the board: a whole
+     multiple of 8 device pixels, a hair smaller than the wrap. Every overlay on the squares is sized by it. */
+  --cg-size: var(---cg-width, 100%);
 }
 
 /* On a phone, size the main board so the controls below it stay on screen. */
@@ -725,6 +728,8 @@ p {
   .screen.game .board-area {
     grid-column: 1;
     grid-row: 3 / 5;
+    /* (8 px, as on a phone: the move clock's bars sit in the gaps above and below the board.) */
+    gap: 8px;
   }
   .screen.game .board-area .board-wrap {
     width: min(100%, calc(100dvh - 215px));
@@ -749,6 +754,14 @@ p {
   }
   .mini-tower-body {
     height: 300px;
+  }
+  /* Quick chat sits under the panel beside the board (the vote results, the waiting banner, the power-up picks). The
+     panel keeps one height in every phase of a turn (room for five vote rows, yours and the result line), so the
+     chat under it stays put instead of jumping down at each reveal and back up at each move (Eric, Oct 9). */
+  .screen.game:has(> .under-board) > .play-footer,
+  .screen.game:has(> .under-board) > .poll {
+    min-height: 236px;
+    align-content: start;
   }
 }
 
@@ -1540,14 +1553,18 @@ button.history-label {
   opacity: 0.12;
   transition: opacity 0.4s;
 }
+/* Exactly on its square: eighths of chessground's own board (--cg-size), at any size, zoom or display scale. Square
+   corners and the glow inside, so nothing of it reads as wider than the square. */
 .square-ring {
   position: absolute;
-  width: 12.5%;
-  height: 12.5%;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
   box-sizing: border-box;
   border: 4px solid #2fd27a;
-  border-radius: 6px;
-  box-shadow: 0 0 14px rgba(47, 210, 122, 0.7);
+  border-radius: 2px;
+  box-shadow: inset 0 0 10px rgba(47, 210, 122, 0.65);
   pointer-events: none;
   z-index: 3;
   animation: ring 500ms ease-out;
@@ -1733,17 +1750,25 @@ button.history-label {
   }
 }
 
-/* ---- The move clock: a thin bar along the board's top edge ---- */
+/* ---- The move clock: a bar along the board's top edge (and its mirror along the bottom edge) ---- */
 
+/* The bar's thickness (Eric, Oct 9: a few pixels thicker than the old 3 px; set it back to 3px if it's too much).
+   It sits in the 8 px gap between the board and the line above it (or the row below), never over the squares. */
+:root {
+  --timer-bar-h: 6px;
+}
 .board-wrap {
   container-type: inline-size;
 }
 .timer-bar {
   position: absolute;
   left: 0;
-  right: 0;
-  top: -3px;
-  height: 3px;
+  /* (Chessground's board, not the wrap: up to 8 device pixels narrower. See .board-wrap.) */
+  width: var(--cg-size, 100%);
+  top: calc(-1 * var(--timer-bar-h));
+  height: var(--timer-bar-h);
+  border-radius: 2px;
+  overflow: hidden;
   display: flex;
   justify-content: center;
   background: color-mix(in srgb, var(--text) 8%, transparent);
@@ -1752,6 +1777,92 @@ button.history-label {
 }
 .timer-fill {
   height: 100%;
+}
+/* The mirror under the board (TIMER_BAR_BELOW in components/Countdown.tsx turns it off). */
+.timer-bar.below {
+  top: var(--cg-size, 100%);
+}
+
+/* ---- The small clock at the board's top right: this move's seconds and your bank (components/BoardClock.tsx) ---- */
+
+/* In the line above the board, level with its text, right-aligned with the board's edge: never over the squares or
+   the bar, and out of the layout (absolute), so nothing moves when it comes and goes. */
+.board-clock {
+  position: absolute;
+  /* (Level with chessground's right edge, a hair inside the wrap's.) */
+  right: calc(100% - var(--cg-size, 100%));
+  bottom: calc(100% + 7px);
+  height: 17px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+.bc-turn {
+  min-width: 1.9em;
+  text-align: right;
+}
+.bc-turn small {
+  margin-left: 1px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.bc-bank {
+  color: var(--muted);
+}
+.bc-turn + .bc-bank {
+  padding-left: 4px;
+  border-left: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+}
+.bc-bank.low {
+  color: var(--danger);
+}
+/* The other team's clock, or yours once you've moved: just information. */
+.board-clock.theirs .bc-turn,
+.board-clock.done .bc-turn {
+  color: var(--muted);
+}
+/* Your last 5 seconds. */
+.board-clock.urgent {
+  box-shadow: 0 0 0 1.5px var(--danger);
+}
+.board-clock.urgent .bc-turn,
+.board-clock.urgent .bc-turn small {
+  color: var(--danger);
+}
+/* The line above the board beside the clock. The clock counts this move's seconds down from its allowance, so the
+   line's own "⏱ 20 s" shows only when it's lit (the clock went up: "⏱ 15 s ▲"). On a phone the line is barely wider
+   than the board, so its text is centred in the room left of the clock, and gives up words where it must. */
+.board-area:has(.board-clock) .clock-part:not(:has(.clock-note.up)) {
+  display: none;
+}
+@media (max-width: 899px) {
+  .board-area:has(.board-clock) > .opening-name {
+    padding-right: 104px;
+  }
+}
+@media (max-width: 429px) {
+  .board-area:has(.board-clock) > .opening-name:has(.clock-note.up) .pick-for {
+    display: none;
+  }
+}
+@media (max-width: 374px) {
+  .board-area:has(.board-clock) > .opening-name .on-team {
+    display: none;
+  }
 }
 
 /* ---- Round start / Round end: banner and a big 3-2-1 on the board ---- */
@@ -4001,13 +4112,10 @@ button.history-label {
 .gk-unit-btn:disabled {
   opacity: 1;
 }
+/* He stays in full colour whether or not he can be summoned, and once his moves are used (Eric, Oct 9): the crowns
+   under him say what's left. */
 .gk-unit:not(.ready) .god-king {
-  filter: saturate(0.6) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
-  opacity: 0.75;
-}
-.gk-unit.spent .god-king {
-  filter: grayscale(1);
-  opacity: 0.5;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
 }
 .gk-unit.away .gk-unit-btn {
   opacity: 0;
@@ -9802,6 +9910,13 @@ img.qicon {
 .boss-bar.has-char .boss-icon-face {
   display: none;
 }
+/* A tall boss (G-REX's long neck): the bar grows to hold him, so his head never covers the heading above it. */
+.boss-char.place-bar.tall {
+  height: 88px;
+}
+.boss-char.place-results.tall {
+  height: 180px;
+}
 /* A computer: by the board's bottom-left corner (the God King is by its top-right). */
 .boss-side {
   display: none;
@@ -10133,4 +10248,419 @@ img.qicon {
   to {
     box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.85);
   }
+}
+/* ---------------- G-REX's fire (BossPowers.tsx, the characters' sprites) ---------------- */
+
+/* The fire tiles (and a piece burning on one, a fireball landing): one canvas over the whole board. */
+.pw-fire-board {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.pw-burns .pw-fire-board,
+.pm-fireball .pw-fire-board {
+  z-index: 4;
+}
+/* (Empty markers on the tiles' squares, for tests: which squares are on fire, at which stage, what burnt.) */
+.pw-fire,
+.pw-burn {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+}
+.pw-burns {
+  z-index: 4;
+}
+.pw-flight.sparkFly {
+  animation-name: pw-lob;
+}
+/* The Roman candle: he drops onto the middle of the board; each shot streaks up and off the top. */
+.pm-rex {
+  aspect-ratio: 100 / 122;
+}
+.pw-shot {
+  position: absolute;
+  z-index: 9;
+  left: 44%;
+  top: 30%;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  animation-name: pw-shot;
+  animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1);
+  animation-fill-mode: both;
+}
+@keyframes pw-shot {
+  from {
+    translate: 0 0;
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  to {
+    translate: var(--sx) -300%;
+    opacity: 0;
+  }
+}
+/* A fireball falling onto its square (its landing then plays on the board's canvas). */
+.pw-fireball {
+  position: absolute;
+  z-index: 9;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  animation-name: pw-fall;
+  animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.5);
+  animation-fill-mode: both;
+}
+@keyframes pw-fall {
+  from {
+    translate: 0 var(--fy);
+  }
+  to {
+    translate: 0 0;
+  }
+}
+/* The candle's shots still up, by the board's top edge (the characters' strip, kept to its shape). */
+.pw-pips {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  top: 0;
+  translate: -50% -50%;
+  width: 40%;
+  aspect-ratio: 74 / 11;
+  pointer-events: none;
+  filter: drop-shadow(0 0.4cqw 0 rgba(0, 0, 0, 0.45));
+}
+/* The fire's banners: embers and flame. */
+.fight-banner.power-cut.fire .fb-band {
+  background: linear-gradient(90deg, #1a0700, #9a3412 22%, #7c2d12 50%, #9a3412 78%, #1a0700);
+  border-color: #fdba74;
+  box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(251, 146, 60, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.fight-banner.power-cut.long .kc-text {
+  font-size: 7.4cqw;
+}
+.fight-banner.power-cut.fire .kc-label {
+  color: #fed7aa;
+}
+.fight-banner.power-cut.fire .kc-text {
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    0 0 24px rgba(253, 186, 116, 0.95);
+}
+
+/* Nearly full: it glows (then the warning, then the ultimate). */
+.rage-meter.glow:not(.warned):not(.now) {
+  border-color: #fed7aa;
+  animation: rage-glow 1100ms ease-in-out infinite alternate;
+}
+.rage-meter.glow i {
+  background: linear-gradient(90deg, #fbbf24, #f97316 60%, #fde68a);
+}
+@keyframes rage-glow {
+  from {
+    box-shadow: 0 0 2px 0 rgba(251, 191, 36, 0.4);
+  }
+  to {
+    box-shadow: 0 0 7px 2px rgba(251, 146, 60, 0.75);
+  }
+}
+
+/* Solo's difficulty, next to the boss picker (the boss menu). */
+.boss-difficulty {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.bd-opt {
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bd-opt.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.bd-opt.on.easy {
+  color: var(--good);
+}
+.bd-opt.on.hard {
+  color: #f08c3a;
+}
+.bd-opt.on.hardest {
+  color: var(--bad);
+}
+
+/* Testing (admins only): the test trigger, small and plain. */
+.ult-test {
+  display: block;
+  margin: 6px auto 0;
+  padding: 4px 10px;
+  border: 1px dashed rgba(127, 127, 127, 0.6);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ult-test:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/*
+ * -- The home page's global chat (GlobalChat.tsx): a computer's right column, under Playing now. It fills the rest of
+ * the column's height; the feed scrolls inside it and the buttons stay at its foot. --
+ */
+.gchat {
+  flex: 1 0 360px;
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gchat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gchat-unmute {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  color: var(--fd-muted);
+  font: 600 12px Archivo, system-ui, sans-serif;
+  cursor: pointer;
+}
+.gchat-box {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--fd-panel);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.gchat-feed {
+  flex: 1 1 0;
+  min-height: 120px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.gchat-empty {
+  margin: auto 0 0;
+  color: var(--fd-muted);
+  font-size: 13px;
+}
+.gline {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.gline:first-child {
+  margin-top: auto;
+}
+.gicon {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 7px;
+  background: var(--fd-panel-2);
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  line-height: 1;
+  image-rendering: pixelated;
+}
+.gline-body {
+  flex: 1;
+  min-width: 0;
+}
+.gline-head {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+}
+.gline-name {
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--fd-text);
+  font: 700 13px Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.gline-name:hover {
+  text-decoration: underline;
+}
+.gline.you .gline-name {
+  color: var(--fd-gold-text);
+}
+.gline-bot {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--fd-panel-2);
+  color: var(--fd-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.gline-rating {
+  flex: none;
+  color: var(--fd-muted);
+  font-variant-numeric: tabular-nums;
+}
+.gline-time {
+  flex: none;
+  margin-left: auto;
+  color: var(--fd-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.gline-text {
+  color: var(--fd-sub);
+  font-size: 14px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.gline.emoji .gline-text {
+  font-size: 20px;
+  line-height: 1.2;
+}
+.gchat-say,
+.gchat-menu,
+.gchat-guest {
+  border-top: 1px solid var(--fd-line);
+  padding: 8px 10px;
+}
+.gchat-say {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.gchat-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--fd-panel-2);
+}
+.gchat-tabs button {
+  flex: 1;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fd-muted);
+  font: 700 12px Archivo, system-ui, sans-serif;
+  cursor: pointer;
+}
+.gchat-tabs button.on {
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.gchat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 135px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gchip {
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid var(--fd-line);
+  border-radius: 999px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font: 600 12.5px Archivo, system-ui, sans-serif;
+  cursor: pointer;
+}
+.gchip:hover:not(:disabled) {
+  border-color: var(--fd-gold);
+}
+.gchip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.gchip.emoji {
+  width: 38px;
+  padding: 2px 0;
+  font-size: 18px;
+}
+.gchip.quiet {
+  border-color: transparent;
+  color: var(--fd-muted);
+}
+.gchip.gold {
+  border-color: transparent;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-weight: 800;
+}
+.gchat-none {
+  color: var(--fd-muted);
+  font-size: 12px;
+}
+.gchat-status {
+  margin: 0;
+  color: var(--fd-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.gchat-status.error {
+  color: var(--fd-danger);
+}
+.gchat-menu,
+.gchat-guest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--fd-sub);
+  font-size: 13px;
+}
+.gchat-menu strong {
+  flex-basis: 100%;
+  color: var(--fd-text);
+}
+.gchat.off {
+  flex: none;
+  min-height: 0;
+}
+.gchat.off .gchat-guest {
+  border: 0;
+  border-radius: 14px;
+  background: var(--fd-panel);
 }

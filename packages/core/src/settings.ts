@@ -77,8 +77,12 @@ export interface Settings {
    */
   bossId: string;
   bossAvoid: string;
-  /** Test switch (?power=freeze|blizzard|pie|funhouse): that power comes at once (an ultimate after its warning). */
+  /** Test switch (?power=freeze|blizzard|pie|funhouse|sparkler|candle): that power comes at once (an ultimate after its warning). */
   bossPowerTest: string;
+  /** Solo's difficulty (BOSS_DIFFICULTY): Elo on top of the boss's strength, within what the engine plays (0 online). */
+  bossDifficulty: number;
+  /** Testing, solo only (?wip=1): `bossId` may be a boss whose powers are built but whose art isn't yet (placeholders). */
+  bossUnfinished: boolean;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
   /** Boss battle: how long the King's strike takes on screen (ms). The move clock stands still meanwhile. */
@@ -281,6 +285,8 @@ export const DEFAULT_SETTINGS: Settings = {
   bossId: "",
   bossAvoid: "",
   bossPowerTest: "",
+  bossDifficulty: 0,
+  bossUnfinished: false,
   kingStrikeLoss: [5, 15],
   kingStrikeMs: 5900,
   kingPowerUpsPerCharge: 10,
@@ -425,21 +431,66 @@ export const RAID_SETTINGS: Partial<Settings> = {
 export const BOSS_POWERS = {
   /** The first passive comes as this crowd turn begins. */
   firstPassive: 2,
-  /** Freeze: a crowd piece (never the king) is iced for this many crowd turns, every 5 to 7 turns (from its start). */
+  /** Freeze: a crowd piece (never the king) is iced for this many crowd turns, every 4 to 6 turns (from its start). */
   freezeTurns: 2,
-  freezeEvery: [5, 7] as readonly [number, number],
+  freezeEvery: [4, 6] as readonly [number, number],
   /** Pie: a square near the centre is pied for this many crowd turns (nobody may move onto it), then this many clear. */
   pieTurns: 3,
   pieGap: 2,
-  /** The rage meter fills as the boss loses this much material (pawn 1, knight and bishop 3, rook 5, queen 9). */
-  rageFull: 9,
+  /**
+   * The ultimate's meter (the rage meter), in rage points: full at rageFull, then a one-turn warning, then the
+   * ultimate, once per match. It fills over time (ragePerMove each crowd move, so on its own it's full after about
+   * 20 crowd moves, around the middle of a battle), faster while the crowd is ahead on the judged eval (up to
+   * rageAheadMax more a move, all of it from rageAheadFull expected score), and with the boss's own material lost
+   * (ragePerMaterial a point: a queen's worth fills it alone, as before). rageOverTime false: material only.
+   */
+  rageFull: 100,
+  rageOverTime: true,
+  ragePerMove: 5,
+  rageAheadMax: 5,
+  rageAheadFull: 0.75,
+  ragePerMaterial: 100 / 9,
+  /** The meter glows from this full (0-1) as it nears its ultimate. */
+  rageGlowFrom: 0.75,
+  /**
+   * The test trigger: admins (ADMIN_EMAILS) see a small "Trigger ultimate (testing)" button in any boss battle, which
+   * brings the boss's ultimate as the next crowd turn begins (no warning). false removes it everywhere, server too.
+   */
+  ultimateTestButton: true,
   /** The funhouse: the boss plays the crowd's move, one that gives away this many points against the best (1 to 2.5 pawns). */
   funhouseLoss: [10, 25] as readonly [number, number],
   /** ...and never one that gives away more than this in log-odds (a lost cause stays a fight). */
   funhouseMaxLogit: 1.6,
   /** After the funhouse the crowd sees the board flipped for this many of its turns. */
   flipTurns: 2,
+  /**
+   * G-REX's fire tiles: a tile burns in fireStages stages, one a crowd turn (a singe, more burn, ablaze); after the
+   * crowd's move on its last stage, a crowd piece still on it is destroyed (never the king: it fizzles). Then
+   * fireGap turns with no fire before he throws the next sparkler.
+   */
+  fireStages: 3,
+  fireGap: 1,
+  /** The judge counts a piece left to burn as gone: this many log-odds of expected score per pawn of its value. */
+  firePawnLogit: 1,
+  /** The Roman candle: the shots he fires, and the waves they fall in (one a crowd turn), from this many crowd moves on. */
+  candleShots: 12,
+  candleWaves: [1, 2, 3, 4, 2] as readonly number[],
+  candleDelay: 3,
 } as const;
+
+/** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */
+export type BossPowerSettings = {
+  -readonly [K in keyof typeof BOSS_POWERS]: (typeof BOSS_POWERS)[K] extends boolean ? boolean : (typeof BOSS_POWERS)[K] extends number ? number : (typeof BOSS_POWERS)[K];
+};
+
+/** Solo's difficulty: Elo on top of the boss's usual strength (yours), capped at what the engine plays. */
+export const BOSS_DIFFICULTY = [
+  { id: "easy", label: "Easy", elo: -300 },
+  { id: "normal", label: "Normal", elo: 0 },
+  { id: "hard", label: "Hard", elo: 250 },
+  { id: "hardest", label: "Hardest", elo: 500 },
+] as const;
+export type BossDifficultyId = (typeof BOSS_DIFFICULTY)[number]["id"];
 
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
@@ -801,6 +852,34 @@ export const QUICK_CHAT = {
     "emoji-winter": 200,
     "emoji-royal": 300,
   } as Readonly<Record<string, number>>,
+} as const;
+
+/**
+ * Bots chat in the home page's global chat, so it isn't empty during the beta (Eric, Oct 9, 2026). Every bot line is
+ * tagged "bot". **Eric wants this off when the game goes live: set it to false.**
+ */
+export const GLOBAL_CHAT_BOTS: boolean = true;
+
+/**
+ * The home page's global chat (a computer's right column, under Playing now): preset lines only, like quick chat.
+ * See DECISIONS.md, "Global chat on the home page".
+ */
+export const GLOBAL_CHAT = {
+  /** One message per account every this long (the server enforces it; the app only mirrors it). */
+  gapMs: 30_000,
+  /** The server keeps this many lines for newcomers, and the panel shows at most this many. */
+  keep: 50,
+  /** Lines older than this aren't shown any more. */
+  maxAgeMs: 24 * 60 * 60_000,
+  /** With GLOBAL_CHAT_BOTS on, a bot says something about this often (ms, random in the range) while someone has it open… */
+  botGapMs: [30_000, 90_000] as readonly [number, number],
+  /** …and the first this soon after someone opens it when nobody had it open. */
+  botFirstMs: [4_000, 15_000] as readonly [number, number],
+  /**
+   * Someone has the chat open while their app has asked for it within this long. It asks with the live line (every
+   * FRONT_DOOR.livePollMs on the home screen), so no new request or socket.
+   */
+  watchMs: 15_000,
 } as const;
 
 /**

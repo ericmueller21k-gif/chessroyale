@@ -1,4 +1,5 @@
-import type { PowerEvent, PowerId } from "@chessroyale/core";
+import type { BurnEvent, PowerEvent, PowerId } from "@chessroyale/core";
+import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
 import type { LastStandRound } from "./runner.ts";
@@ -36,6 +37,8 @@ export interface NetBoard {
   recentFrom: string;
   /** Every move from the starting position, to step back through the game. */
   history: string[];
+  /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
+  bases?: Base[];
 }
 
 /** A board at a glance, for the strip of tiny boards along the top (slots never move; closed ones stay greyed). */
@@ -116,6 +119,11 @@ export interface ScoreJob {
   barred?: string;
   /** Boss battle, a power limits the crowd's moves: the moves allowed (the best and the bots' picks come from these). */
   allowed?: string[];
+  /**
+   * Boss battle, G-REX's fire: the tiles ablaze this turn. A crowd piece left on one after the move burns: the moves
+   * that save it are scored too, and the bots count a piece left there as gone (the lobby's runner does the scoring).
+   */
+  burn?: string[];
   /** Picks that can decide the cut (players near the cut line): re-checked first (recheckCut* in settings). */
   priority?: string[];
 }
@@ -233,6 +241,16 @@ export interface NetBossPowers {
   events: PowerEvent[];
   /** The crowd's turn: the moves it may play (null: any legal move). */
   allowed: string[] | null;
+  /** G-REX's fire tiles (missing from older servers): each square, the crowd turn it landed, its stage (1-3) now. */
+  fire?: { square: string; lit: number; stage: number }[];
+  /** What the fire did after the crowd's last move: pieces destroyed, tiles that fizzled under the king. */
+  burnt?: BurnEvent[];
+  /** The Roman candle: the crowd turn he fired, and the shots still to fall (the pips by the board). */
+  candle?: { at: number; left: number } | null;
+  /** The first crowd turn a crowd piece stepped onto a burning tile (the God King's warning, once a match). */
+  stepped?: number | null;
+  /** The test trigger: the ultimate is on its way (it comes as the next crowd turn begins). */
+  ultNext?: boolean;
 }
 
 /** A pre-game vote, for every screen: everyone's votes, each visible from `at` (server time). */
@@ -313,7 +331,9 @@ export type ClientMessage =
   /** Many judges: this device's answer to one scoring job. */
   | { t: "judged"; key: string; id: string; report: JudgeReport }
   /** Many judges, deep checks: this device's re-check of the job's close calls (sent after its "judged"). */
-  | { t: "judgedDeep"; key: string; id: string; deep: MoveScore[] };
+  | { t: "judgedDeep"; key: string; id: string; deep: MoveScore[] }
+  /** Boss battle, admins only (testing): bring the boss's ultimate as the next crowd turn begins. */
+  | { t: "ultimate" };
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
@@ -391,6 +411,8 @@ export type ServerMessage = { now: number } & (
         barred?: string;
         /** Boss battle, a power limits the crowd's moves: the bots pick from these. */
         allowed?: string[];
+        /** Boss battle, G-REX's fire: the tiles ablaze (the bots count a piece left there as gone). */
+        burn?: string[];
         /** Many judges: the bots pick from this seed and these rules (judgeBotPicks), so the scoring job agrees. */
         seed?: number;
         rules?: JudgeRules;

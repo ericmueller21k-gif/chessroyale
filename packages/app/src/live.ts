@@ -43,14 +43,39 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let started = false;
 let inFlight = false;
 
+/**
+ * Something that rides on the live line's request: the home page's global chat asks for its new lines this way, so it
+ * adds no request of its own (global-chat.ts). `query` is added to the URL; `take` gets the whole answer.
+ */
+export interface LiveRider {
+  query(): string;
+  take(body: unknown): void;
+}
+let rider: LiveRider | null = null;
+/** A rider joined while a request was out: ask again as soon as it's back. */
+let again = false;
+
+/** Rides on the live line's request until the returned function is called (and asks now). */
+export function rideLive(r: LiveRider): () => void {
+  rider = r;
+  if (inFlight) again = true;
+  else if (started) void poll();
+  return () => {
+    if (rider === r) rider = null;
+  };
+}
+
 async function poll() {
   if (inFlight) return;
   inFlight = true;
   try {
     if (typeof document === "undefined" || document.visibilityState !== "hidden") {
-      const res = await fetch("/api/live", { credentials: "same-origin" });
+      const r = rider;
+      const res = await fetch(`/api/live${r ? `?${r.query()}` : ""}`, { credentials: "same-origin" });
       if (res.ok) {
-        current = (await res.json()) as LiveCounts;
+        const body = (await res.json()) as LiveCounts;
+        current = body;
+        r?.take(body);
         listeners.forEach((l) => l());
       }
     }
@@ -58,7 +83,10 @@ async function poll() {
     // Offline or no server (local dev): try again later.
   } finally {
     inFlight = false;
-    schedule();
+    if (again) {
+      again = false;
+      void poll();
+    } else schedule();
   }
 }
 

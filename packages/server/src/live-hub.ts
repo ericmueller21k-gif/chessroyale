@@ -3,6 +3,7 @@ import { CAPACITY, FRONT_DOOR } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LobbySummary } from "./live.ts";
 import { countCall } from "./ops.ts";
+import { GlobalChat, type GlobalChatSnapshot, type GlobalPost, type GlobalSender } from "./global-chat.ts";
 import type { Env } from "./index.ts";
 
 /** The one live hub (its name). */
@@ -22,11 +23,17 @@ export class LiveHub extends DurableObject<Env> {
   private board = new LiveBoard();
   private waits: { at: number; value: LiveCounts["waits"] } | null = null;
   private prunedAt = 0;
+  /** The home page's global chat (global-chat.ts), kept in this object's storage too ("chat", and its drawn icons). */
+  private chat = new GlobalChat();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
       const now = Date.now();
+      this.chat.restore(await ctx.storage.get<GlobalChatSnapshot>("chat"));
+      for (const [k, icon] of await ctx.storage.list<string>({ prefix: "chat-icon:" })) this.chat.rememberIcon(k.slice("chat-icon:".length), icon);
+      const unused = this.chat.unusedIcons();
+      if (unused.length) await ctx.storage.delete(unused.map((k) => `chat-icon:${k}`));
       for (const [, s] of await ctx.storage.list<LobbySummary & { updatedAt: number }>({ prefix: "lobby:" })) {
         this.board.report(s, s.updatedAt);
       }
@@ -105,6 +112,40 @@ export class LiveHub extends DurableObject<Env> {
   async presence(id: string): Promise<{ online: boolean; lastSeen: number | null }> {
     const now = Date.now();
     return { online: this.board.isOnline(id, now), lastSeen: this.board.lastSeen(id) };
+  }
+
+  /**
+   * The global chat for someone who has it open (each Worker instance asks at most every 3 s while anyone on it does).
+   * With bots on, this is also when a bot may speak: nothing runs while nobody has the chat open.
+   */
+  async chatRead(): Promise<GlobalChatSnapshot> {
+    countCall("hub.chat");
+    const now = Date.now();
+    if (this.chat.watch(now)) await this.saveChat();
+    return this.chat.snapshot(now);
+  }
+
+  /** Someone signed in says a line (the Worker has checked their account); the chat as it is after it. */
+  async chatPost(sender: GlobalSender, say: string): Promise<{ post: GlobalPost; chat: GlobalChatSnapshot }> {
+    countCall("hub.chatPost");
+    const now = Date.now();
+    const post = this.chat.post(sender, say, now);
+    if (post.ok) {
+      if (post.line.iconKey && sender.icon) await this.ctx.storage.put(`chat-icon:${post.line.iconKey}`, sender.icon);
+      await this.saveChat();
+    }
+    return { post, chat: this.chat.snapshot(now) };
+  }
+
+  /** A drawn icon on a line still in the chat (null for any other key). */
+  async chatIcon(key: string): Promise<string | null> {
+    return this.chat.icon(key) ?? null;
+  }
+
+  private async saveChat() {
+    const unused = this.chat.unusedIcons();
+    if (unused.length) await this.ctx.storage.delete(unused.map((k) => `chat-icon:${k}`));
+    await this.ctx.storage.put("chat", this.chat.saved());
   }
 
   /** Once a minute while anyone's around: `last_seen` to D1 in batches, and old entries forgotten. */

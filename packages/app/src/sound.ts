@@ -10,6 +10,7 @@
 import { QUICK_CHAT } from "@chessroyale/core";
 import { clownSound, type ClownSound } from "./characters/clown-sounds.ts";
 import { gingerSound, type GingerSound } from "./characters/gingerbread-sounds.ts";
+import { grexSound, type GrexSound } from "./characters/grex-sounds.ts";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -119,6 +120,7 @@ function buffer(data: Float32Array, at: number) {
 }
 const clown = (name: ClownSound) => (t: number) => buffer(clownSound(name, ctx!.sampleRate), t);
 const ginger = (name: GingerSound) => (t: number) => buffer(gingerSound(name, ctx!.sampleRate), t);
+const grex = (name: GrexSound) => (t: number) => buffer(grexSound(name, ctx!.sampleRate), t);
 
 /** A clean clock tick: a very short burst of noise through a narrow band, like a watch's escapement. */
 function clockTick(at: number, level = 0.5) {
@@ -306,7 +308,14 @@ export type SoundName =
   | "gingerCrunch"
   | "gingerJingle"
   | "gingerCrackle"
-  | "gingerWind";
+  | "gingerWind"
+  // G-REX (a raid boss, the Fire boss): synthesised, see characters/grex-sounds.ts.
+  | "grexCrackle"
+  | "grexWhoosh"
+  | "grexFizz"
+  | "grexPoof"
+  | "grexPop"
+  | "grexRoar";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -373,6 +382,12 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gingerJingle: ginger("jingle"),
   gingerCrackle: ginger("crackle"),
   gingerWind: ginger("wind"),
+  grexCrackle: grex("crackle"),
+  grexWhoosh: grex("whoosh"),
+  grexFizz: grex("fizz"),
+  grexPoof: grex("poof"),
+  grexPop: grex("pop"),
+  grexRoar: grex("roar"),
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));

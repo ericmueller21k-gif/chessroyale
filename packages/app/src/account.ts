@@ -26,6 +26,8 @@ export interface Profile {
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
+  /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger. */
+  admin?: boolean;
 }
 
 export interface AccountState {

@@ -399,3 +399,58 @@ The boss's turn at move 25 went from every frame dropped (p95 200 ms on the comp
 - Before calling a change to a board, the boss or an animation done, run `npm run perf:boss -- <dir> gingerbread phone
   25`. Frame times late in the match must match the early ones. The same script runs `clown`, `crowd` and `online` (an
   online raid on a local server).
+
+## A ring a few pixels off its square (Oct 9, 2026)
+
+**Eric saw:** on his computer, the green ring on the crowd's move sat a little low and to the side of its square.
+
+**The cause:** chessground draws the squares in a box it rounds down to a whole multiple of 8 device pixels, up to
+8 px smaller than the board's wrap. The ring was placed in % of the wrap, so the error grew toward the board's far
+side: 1-4 px on most squares, more at a fractional display scale (Eric's is 125%). At the tests' sizes the gap was
+small or zero, and no test compared an overlay with the square under it.
+
+**How it was found:** a script measured the ring's box against chessground's `square.last-move` box and the wrap
+against `cg-container`, at several widths and display scales (1, 1.1, 1.25, 1.5, 3).
+
+**The rule:**
+- Anything drawn over the squares sizes and places itself in eighths of chessground's board (`--cg-size`, from the
+  `---cg-width` chessground writes on the wrap), never in % of the wrap.
+- Check an overlay against the square it marks, within 1 px, at a size where the rounding gap is widest (wrap width
+  times the display scale just under a multiple of 8), not only at the test phone's size.
+
+## A dozen sprites, a dozen loops (Oct 9, 2026)
+
+**Found before it shipped:** G-REX's fire can put a dozen burning tiles on the board at once, with fireballs and
+rockets on top. Mounted as one `<BossEffect>` each, a storm of 22 sprites on a phone slowed 4x dropped 25-33% of frames,
+against 7-11% on the plain board. Each sprite ran its own animation-frame loop and redrew its own canvas: 30
+callbacks a frame instead of 5.
+
+**The fix:** every effect sprite shares one animation-frame loop (`onEachFrame` in `BossEffect.tsx`), and
+`<BoardEffects>` draws many square effects on one canvas over the board, redrawing only the squares whose frame
+changed. The same storm then measured like the plain board.
+
+**The rule:** an effect that can appear many times at once goes on a shared canvas, not a canvas each; never start a
+loop per sprite. Measure the worst case at once on a slowed phone (`npm run frames:character -- <dir> Boingo phone
+kit="G-REX" fxperf`), not one effect at a time.
+
+## A move only legal after a burn (Oct 9, 2026)
+
+**Seen** (by G-REX's fire, before it shipped): watching a G-REX battle frame by frame, the page threw "Invalid move
+d8d1" on every redraw a few moves after a pawn burnt on d4. Every unit test passed.
+
+**The cause:** the fire destroys a piece between moves, so the board's history is no longer a game you can replay from
+the starting position: the boss's queen went d8-d1 down a file the burnt pawn had blocked. The boss's reactions
+(`boss-beats.ts`) replayed the history from move 0 to find the position a move or two back, and chess.js refused the
+queen's move. The tests replayed short histories that never had a move made possible by a burn.
+
+**How it was found:** `npm run frames:powers -- <dir> grex` logs page errors; the error repeated on every frame from
+the queen's move on.
+
+**The fix:** a board keeps a base where its position changed (`BoardState.bases`), and every replay plays from the
+latest base at or before the ply it wants (`fenAtPly`, `gameEndWith`, `recentMoves`, the history arrows, a newcomer's
+replay, the boss's reactions). `packages/app/test/fire-replays.test.ts` replays a game whose last move is only legal
+after a burn.
+
+**The rule:** anything that changes the position outside a move must leave a base, and nothing may replay a board's
+history from move 0 directly: use `fenAtPly(history, ply, bases)`. When adding such a power, grep for `fenAfter(` and
+`.history` and check each.

@@ -179,8 +179,43 @@ export interface ChatSay extends ChatLineDef {
   kind: "phrase" | "emoji";
 }
 
+/**
+ * The lobby pack: lines for the home page's global chat only (greetings, invites, how the last game went). Everyone
+ * has it. It isn't one of CHAT_PACKS, so it never shows in a match, the shop or the profile's picks, and a match's
+ * server refuses its lines (canSay only knows CHAT_PACKS).
+ */
+export const HOME_CHAT_PACK: ChatPack = {
+  id: "lobby",
+  name: "Lobby",
+  kind: "phrases",
+  free: true,
+  blurb: "Lines for the home page's global chat.",
+  lines: [
+    { id: "l-hey", text: "Hey everyone!", group: "hello" },
+    { id: "l-morning", text: "Morning all!", group: "hello" },
+    { id: "l-evening", text: "Evening all!", group: "hello" },
+    { id: "l-welcome", text: "Welcome!", group: "hello" },
+    { id: "l-back", text: "Hello again!", group: "hello" },
+    { id: "l-raid", text: "Anyone up for a raid?", group: "plans" },
+    { id: "l-crowd", text: "Anyone for 50 v 50?", group: "plans" },
+    { id: "l-queue", text: "Queueing now, join me!", group: "plans" },
+    { id: "l-one-more", text: "One more game?", group: "plans" },
+    { id: "l-won", text: "Just won one!", group: "reactions" },
+    { id: "l-boss", text: "Beat the boss!", group: "reactions" },
+    { id: "l-out", text: "Knocked out early…", group: "reactions" },
+    { id: "l-close", text: "What a nail-biter!", group: "reactions" },
+    { id: "l-wild", text: "The crowd was wild!", group: "reactions" },
+    { id: "l-tough", text: "That boss is tough!", group: "reactions" },
+    { id: "l-gg-all", text: "GG all!", group: "sporting" },
+    { id: "l-thanks", text: "Thanks for the games!", group: "sporting" },
+    { id: "l-brb", text: "BRB", group: "sporting" },
+    { id: "l-bye", text: "Bye for now!", group: "sporting" },
+    { id: "l-see-you", text: "See you on the board!", group: "sporting" },
+  ],
+};
+
 const SAYS = new Map<string, ChatSay>(
-  CHAT_PACKS.flatMap((p) => p.lines.map((l) => [l.id, { ...l, pack: p.id, kind: p.kind === "emoji" ? "emoji" : "phrase" } as ChatSay] as const)),
+  [...CHAT_PACKS, HOME_CHAT_PACK].flatMap((p) => p.lines.map((l) => [l.id, { ...l, pack: p.id, kind: p.kind === "emoji" ? "emoji" : "phrase" } as ChatSay] as const)),
 );
 
 /** A line by its id (undefined for anything not on the list: the server drops it). */
@@ -445,4 +480,54 @@ export function botChatLines(
     times.push(at);
   }
   return out;
+}
+
+// ---------------- The home page's global chat ----------------
+
+/** Match lines that suit the home page's global chat: Hello, Reactions and Sporting. Plans are for a team in a match. */
+export const HOME_GROUPS: readonly ChatGroup[] = ["hello", "reactions", "sporting"];
+
+/**
+ * The global chat's presets-only rule: a line from the list (never free text) that the sender owns and that suits the
+ * home page: the lobby pack, Hello, Reactions and Sporting lines of the packs they own, and the emoji they own.
+ */
+export function canSayHome(id: unknown, owned: readonly string[] | null | undefined): boolean {
+  const say = chatSay(id);
+  if (!say) return false;
+  if (say.pack === HOME_CHAT_PACK.id) return true;
+  if (!ownedChatPacks(owned).includes(say.pack)) return false;
+  return say.kind === "emoji" || (!!say.group && HOME_GROUPS.includes(say.group));
+}
+
+/**
+ * The global chat's buttons: the lobby pack's lines, then the lines picked in your profile that suit the home page
+ * (Hello, Reactions, Sporting), then your picked emoji. Owned packs reach it through the picks, as in matches.
+ */
+export function homeChatButtons(picks: ChatPicks): { lobby: ChatSay[]; lines: ChatSay[]; emoji: ChatSay[] } {
+  return {
+    lobby: chatSays(HOME_CHAT_PACK.lines.map((l) => l.id)),
+    lines: chatSays(picks.lines).filter((s) => s.kind === "phrase" && !!s.group && HOME_GROUPS.includes(s.group)),
+    emoji: chatSays(picks.emoji).filter((s) => s.kind === "emoji"),
+  };
+}
+
+/** What bots say in the global chat (free lines only): hellos, invites, results, good sport, and a few emoji. */
+export const HOME_BOT_LINES: readonly string[] = [
+  "l-hey", "l-morning", "l-evening", "l-welcome", "l-back", "hi-all",
+  "l-raid", "l-raid", "l-crowd", "l-crowd", "l-queue", "l-one-more",
+  "l-won", "l-boss", "l-out", "l-close", "l-wild", "l-tough",
+  "l-gg-all", "gg", "well-played", "l-thanks", "l-brb", "l-bye", "l-see-you", "good-luck",
+  "e-thumbs", "e-laugh", "e-fire", "e-party",
+];
+
+/**
+ * A bot's next line in the global chat: a bot that hasn't spoken in the last few lines, saying something not said in
+ * the last few. `names` are the bots' names (the match bots' list); `recent` the chat's latest lines, oldest first.
+ */
+export function homeBotLine(rng: () => number, names: readonly string[], recent: readonly { name: string; say: string; bot?: boolean }[]): { name: string; say: string } {
+  const pick = <T>(xs: readonly T[]) => xs[Math.floor(rng() * xs.length) % xs.length]!;
+  const last = recent.slice(-6);
+  const nameOptions = names.filter((n) => !last.some((l) => l.bot && l.name === n));
+  const sayOptions = HOME_BOT_LINES.filter((s) => !last.some((l) => l.say === s));
+  return { name: pick(nameOptions.length ? nameOptions : names), say: pick(sayOptions.length ? sayOptions : HOME_BOT_LINES) };
 }

@@ -1,4 +1,4 @@
-import { toSan, type BoardRound, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetStanding, type NetVote } from "@chessroyale/chess";
+import { toSan, type BoardRound, type Base, type BoardSlot, type LivePick, type NetBoss, type NetFinal, type NetStanding, type NetVote } from "@chessroyale/chess";
 import { brilliance } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 import type { MatchChat } from "./chat.ts";
@@ -25,6 +25,8 @@ export interface BoardView {
   recentFrom: string;
   /** Every move from the starting position, to step back through the game. */
   history: string[];
+  /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
+  bases?: Base[];
 }
 
 /** One row of the live leaderboard. */
@@ -202,6 +204,11 @@ export interface GameView {
    * strike the boss now (`strike`): the clock stands still while he does, then everyone picks as usual.
    */
   callKing(strike?: boolean): void;
+  /**
+   * Testing, admins only: bring the boss's ultimate as the next crowd turn begins (no warning). Safe at any moment:
+   * it does nothing when the ultimate is spent or the battle's over (online, the server checks the admin too).
+   */
+  triggerUltimate(): void;
   /** You called the King to play this move. */
   readonly kingCalled: boolean;
   /** Quick chat (online matches only; see `enabled`). */

@@ -80,8 +80,11 @@ export function ShadeMoves({
   );
 }
 
-/** A green ring around a square (where the chosen move landed). */
+/**
+ * A green ring around a square (where the chosen move landed). Placed and sized in eighths of chessground's own board
+ * (--cg-size), not of the wrap, so it sits exactly on the square at any size, zoom or display scale.
+ */
 export function SquareRing({ square, orientation }: { square: string; orientation: "white" | "black" }) {
   const p = at(square, orientation);
-  return <div class="square-ring" style={{ left: `${p.left}%`, top: `${p.top}%` }} aria-hidden="true" />;
+  return <div class="square-ring" style={{ "--sq-x": String(p.left / 12.5), "--sq-y": String(p.top / 12.5) }} aria-hidden="true" />;
 }

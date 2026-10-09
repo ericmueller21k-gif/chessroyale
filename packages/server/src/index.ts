@@ -171,7 +171,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
           })(),
           ...(() => {
             const p = url.searchParams.get("power");
-            return p && ["freeze", "blizzard", "pie", "funhouse"].includes(p) ? { bossPowerTest: p } : {};
+            return p && ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle"].includes(p) ? { bossPowerTest: p } : {};
           })(),
           roundsPerStage: n("rounds"),
           firstStageRounds: n("rounds"),

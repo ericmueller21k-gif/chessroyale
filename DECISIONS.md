@@ -1823,6 +1823,84 @@ could see the lobby chat." The `social` delegate's calls:
     arrived. The only move was the queue's own "Unranked" line appearing at the fill, which moves everything under it
     down 28 px.
 
+### Global chat on the home page (Eric, Oct 9, 2026)
+
+Eric marked a "GLOBAL CHAT" box in the computer's right column, under Playing now: "Simulate slow bot chat for beta,
+timestamp of chat, name, icon, rating if possible, limited to 1 message per 30s". The director's brief: preset lines
+only for now, desktop only, signed-in players post, guests read, bots behind one switch. The `social` delegate's calls:
+
+- **Where:** the computer's home page only (the right column from 1024 px, under Playing now), filling the rest of
+  the column's height: the feed scrolls inside it, the buttons stay at its foot. Not the queue (the lobby has its own
+  chat in the centre), the shop, the profile or Settings, and not on a phone yet. The hub owns the column; the panel
+  is one self-contained component (`components/GlobalChat.tsx`) placed after Playing now.
+- **Preset lines only, as in quick chat.** No text box anywhere, and the server takes only a line's id
+  (`canSayHome`, `core/chat.ts`):
+  - **A new free "Lobby" pack, for the home page only** (20 lines): Hey everyone!, Morning all!, Evening all!,
+    Welcome!, Hello again!, Anyone up for a raid?, Anyone for 50 v 50?, Queueing now, join me!, One more game?, Just
+    won one!, Beat the boss!, Knocked out early…, What a nail-biter!, The crowd was wild!, That boss is tough!, GG
+    all!, Thanks for the games!, BRB, Bye for now!, See you on the board!. It isn't in the shop, the profile's picks
+    or a match (a match's server refuses its lines). No line uses "close" or "back": the home page's other buttons
+    are found by those words (Close, Back), in the app and its tests.
+  - **The general lines:** Hello, Reactions and Sporting lines of every pack you own (the free ones, and God King,
+    Winter and Spicy once got). **Plans** ("Defend the king!") are left out: they're orders to a team, and there's no
+    team on the home page.
+  - **Emoji:** every emoji pack you own.
+  - **The buttons** are three tabs: **Lobby** (the pack), **Yours** (your profile's picked lines that suit the home
+    page) and **Emoji** (your picked emoji). Owned packs reach it through your picks, as in matches; the server checks
+    ownership, not picks, as in matches.
+- **Each line shows** its time ("2:41 PM" today, "Oct 8" before), the icon (a drawing, an older account's emoji, else
+  a pawn), the name, the rating if the player has one, and the line. Your own lines say "You", in gold. Names,
+  ratings and icons come from the account on the server, never from the request. Nothing private goes out: no
+  email or sign-in method. A line does carry the account id, so tapping a name can open the profile (ids are random;
+  a player who posts in a public room can be looked up, like anyone in a shared lobby).
+- **The limit: one message per account every 30 s** (`GLOBAL_CHAT.gapMs`), enforced by the live hub. It's checked
+  against the last line kept too, so a restart doesn't reset it. The app mirrors it: after a line, every button
+  greys out with "Next message in 28 s", also after a reload (your own last line says when). The server's 429
+  carries how long to wait, and the app takes that too.
+- **Who can post:** signed-in players, wherever a way to sign in is set up (production), the same rule as online
+  play. Guests read, with "Sign in to chat. Guests can read." and a Sign in button. Banned players can't post (fair
+  play's ban). Locally, with no sign-in set up, anyone can post, as anyone can play online there (so the e2e can).
+- **The server:** the existing live hub Durable Object (`live-hub.ts`) holds one shared room (`server/global-chat.ts`,
+  pure and tested). It keeps the last 50 lines (`GLOBAL_CHAT.keep`, nothing older than a day) in its storage, so a
+  newcomer sees recent chat and a deploy doesn't wipe it.
+- **No new socket or poll.** There's no presence socket: presence is the live line's poll (`GET /api/live`, every 5 s
+  while a front-door screen is open). The chat rides on it: `?chat=N` asks for the lines after N, and the answer
+  carries only those (usually none). Each Worker instance keeps the room for 3 s, like the live line's numbers. So a
+  line reaches others within about 8 s, which suits a room limited to one line in 30 s. Posting is
+  `POST /api/chat {say}`, whose answer brings the poster's view up to date at once. Requests without `?chat` (matches'
+  heartbeats) are unchanged.
+- **Drawn icons** never go in the lines (up to 16 KB each). A line carries the drawing's key (a hash of it), and the
+  app shows `/api/chat/icon/KEY`, which the browser caches for good (the key changes with the drawing). The hub keeps
+  only the icons of lines it still holds.
+- **Bots chatter for the beta**, behind one switch: **`GLOBAL_CHAT_BOTS` in settings.ts. Eric wants it off when the
+  game goes live** (set it to `false`).
+  - A bot says something about every 30-90 s (`GLOBAL_CHAT.botGapMs`), and the first 4-15 s after someone opens the
+    chat when nobody had it open, so a quiet room comes to life soon.
+  - **Only while someone has it open, with nothing running otherwise.** There's no timer or alarm: a bot's line is
+    made when an app asks for the chat and one is due. With nobody watching for over 15 s, nothing is said, and
+    nothing is made up for the gap when someone comes back.
+  - The names are the match bots' list, with the pawn icon, like the bots in a match's chat. Every bot line has a
+    **"bot" tag** after the name, and no rating. No bot speaks twice in six lines, and no line repeats in six.
+  - Their lines (`HOME_BOT_LINES`): hellos, "Anyone up for a raid?" and "Anyone for 50 v 50?" (most often),
+    results, good sport, and 👍 😂 🔥 🎉.
+- **Light:** at most 50 lines in memory and on screen (on the server and in the app). No per-frame work: the panel
+  redraws when a line arrives, and once a second only while your countdown runs. No new paid service: the live hub,
+  its storage (one small write per line) and the Worker, as before.
+- **Mute and report:**
+  - Tapping a name gives Profile and Mute, in place of the buttons.
+  - Mute hides that player's lines on this device (remembered, up to 200 players). The header shows "🔇 2 muted ·
+    unmute" to bring them all back.
+  - Report is on the profile, as before (fair play's reports).
+  - Quick chat's "Chat off" switch (Settings) turns this chat off too. Nothing is fetched then, and the panel says
+    so, with "Turn chat on".
+- **Tested:** `core/test/global-chat.test.ts` (the presets-only rule, the lobby pack kept out of matches and the
+  shop, the buttons, the bots' lines and turns), `server/test/global-chat.test.ts` (the 30 s limit, through a
+  restart; presets only; the bot tag; bots only while watched, never catching up; the switch off; the live hub's
+  relay, history, restart and icons; the API: guests read but can't post where sign-in is set up, banned players
+  can't post, no email in what goes out), `app/test/global-chat.test.ts` (the 50-line cap, the mirrored limit, mute)
+  and `e2e/global-chat.spec.ts` (computer: post a line, a second player sees it, the buttons rest, the server's 429,
+  free text refused, the wait kept through a reload, an emoji, a bot's tagged line, mute; phone: no panel).
+
 ## No flash between a match's screens (Oct 6, 2026)
 
 Eric: in a solo boss raid on his phone, the screen flashed white between moves.
@@ -3055,6 +3133,71 @@ the power rules' job (he becomes playable once he has powers too). `packages/cor
     then plays every effect and power moment over the real board and his spot, with frames every ~70 ms.
   - `packages/app/test/gingerbread.test.ts`: his kit, lines, cast and sounds; the power moments; the effects.
 
+### G-REX, the Fire boss, and his fire (Oct 9, 2026)
+
+The cocky giraffe from Eric's reference, drawn as the Fire boss, with the effect sprites his powers need. The art,
+lines and sounds only: his powers' rules, placing the effects on the board and making him playable are the power
+rules' job (`god-king`); `packages/core/src/boss.ts` is unchanged, so he never shows yet. His kit is `BOSS_KITS["G-REX"]`.
+
+- **Name:** "G-REX" (Eric's), exactly.
+- **Art** (`characters/grex.ts`): 56 x 88 px from parts, in a 100 x 122 frame (room above for his jump and the
+  rockets). Three-quarters, facing right as in the reference: the flaming mane and tail on our left, the two sparklers
+  on our right, towards the board.
+  - **A giraffe first (Eric, Oct 9):** a long neck, so he stands about as tall as the God King with his wings spread,
+    and a giraffe face: half-lidded cocky eyes with a fiery glint, a cream muzzle, flaming ossicones. The first draft
+    had dark shades and a short neck; Eric asked for the neck and the face instead. The head stays big (32 x 23 px) so
+    the eyes and grin read on a phone.
+  - **His box grows on a phone:** the boss bar's character box is 88 px tall for him (`kit.tall`), so his head never
+    covers the heading above the bar; the bar is about 30 px taller in his battles. By the board on a computer and in
+    the results his frame simply rises higher (results box 180 px).
+  - **Rigging:** head (nine faces: grin, laugh, roar, shout, hurt, smug, rattled, think, out; the eyes are drawn from
+    a lid, a slant and where the pupil looks), torso and neck as one part (no seam), and arms, legs and tail painted
+    from each pose's points; the sparklers hang off the fists. The flames (ossicones, mane, tail tuft) are painted
+    tongues in three flicker shapes and a roaring size; the sparklers' sparks are seeded specks, different every frame.
+  - **Yellow with orange-brown spots,** a dark outline and a dark halo, so he reads on the light and the dark ground.
+- **Moments:** the same eleven as Ginger's. Idle crackles: flames flicker, sparklers spit, a head bob to a beat, and
+  every 6 s a sparkler twirl and a laugh. Entrance: a fireball streaks down and he's crouched in a wall of flame, then
+  the sparklers fizz alight. Thinking: a hoof scratching his neck, little flames for thoughts. Move: a step and a
+  sparkler flourish. Capture: laughing, both sparklers up. Hurt: eyes screwed shut, embers knocked off. Check: two
+  jabs of both sparklers, eyes glowing. Smug: fist on hip. Rattled: wide eyes, sweat. Defeat: his flames go out in
+  puffs of smoke and he keels over. Victory: jumping, sparklers high.
+- **Power moments:** `ignite` (he winds up and throws the outer sparkler at the board; it leaves his hand at the
+  `throw` cue; a fresh one fizzes alight), `candleWarn` (the ultimate's warning: he shows off the Roman candle, its
+  fuse fizzing) and `romanCandle` (his ultimate, on the board: he drops onto its middle with a roar, raises the candle
+  and fires twelve shots up, one every 140 ms, `launch` then `shot` cues). The inferno (the whole board ablaze) was
+  dropped when Eric replaced it with the Roman candle.
+- **Two new moments for every boss** in `boss-beats.ts`: `powerHit` (the passive's payoff landing later: a piece burnt
+  up) and `ultimateHit` (the ultimate's payoff: fireballs coming down). Both play his laugh; the kit has their lines.
+- **Lines:** a cocky show-off, fire puns and the odd dinosaur joke ("Rawr! I mean… hi.", "Tiny arms? Not me!",
+  "Extinct… again…"), as rare as Ginger's, with lines for igniting a tile, a piece burning up, the warning, the launch
+  and the fireballs.
+- **Sounds** (`characters/grex-sounds.ts`, synthesised, no voice): a fire crackle, a whoosh, a sparkler's fizz, the
+  poof of a piece burning up, a Roman candle's pop, and a comically big roar (a growl that ends in a squeak). Each
+  sits about 3 dB under a move's mean level, peaks under half a move's.
+- **Effect sprites** (`characters/effects.ts`, one square each unless said):
+  - `fireTile`: ignite, three stages that read on their own with no number (stage 1 a singe at the borders; stage 2
+    the scorch creeps in, flames up the sides; stage 3 ablaze, flames lower in the middle so a piece shows), spread2
+    and spread3 (the flames leap as it steps up), burnOut, and fizzle (the fireproof king). A piece stays visible at
+    every stage. The countdown is the stages: a number overlay was optional, and none is drawn.
+  - `pieceBurn`: one per kind of piece (p, n, b, r, q; never the king): flames engulf it, `poof` (take the real piece
+    off there), its charred shape crumbles from the top into ash and embers.
+  - `sparkFly` (his sparkler tumbling), `candleShot` (a rocket streaking up, and its pop), `fireballFall` (falling, and
+    its landing, which ends on a stage-1 fire tile), and `candleShots`: a strip of 12 little rockets, lit while they're
+    up and spent once fallen (`left12` to `left0`), to show by the board during the wait.
+- **The contract** (`power-art.ts`): `POWER_MOMENTS["G-REX"]` (with the new optional `powerHit` and `ultimateHit`), the
+  six effects in `EFFECTS`, and new optional fields: `stages` (the fire tile's escalation), `endings` (fizzle),
+  `pieces`, `counter` (the shots left) and `next` (a landing that becomes a fire tile); `covers: "strip"`.
+- **Kept cheap:** a storm of his fire at once (14 burning tiles, a piece burning, four fireballs, two rockets, the
+  sparkler, the shots strip and him on the board) on a phone slowed 4x first dropped 25-33% of frames against 7-11%
+  on the plain board: each of 22 sprites had its own animation-frame loop and canvas. Now every effect sprite shares
+  one loop, and `<BoardEffects>` draws many square effects on one canvas over the board, redrawing only squares whose
+  frame changed. The same storm then measured like the plain board (sitting 13% vs 11% dropped, dragging 7% vs 18%,
+  p95 33 ms both; 6 animation-frame callbacks a frame against 5). Loops are at most 8 frames of 50 ms or more, and
+  every frame is drawn once and kept.
+- **Checking it:** `npm run preview:characters -- <dir> only=grex,fx` (his GIFs and the effects over the board, a pawn
+  on the fire tile); `npm run frames:character -- <dir> Boingo both kit="G-REX" fx` (in the game, frame by frame);
+  add `fxperf` for the storm's numbers on a slowed phone. Tests: `packages/app/test/grex.test.ts`.
+
 ### Ideas for later, not built (Eric, Oct 8, 2026)
 
 - **Real boss abilities, never game-breaking:** freezing most of the team for a turn, or making the crowd move a
@@ -3064,7 +3207,7 @@ the power rules' job (he becomes playable once he has powers too). `packages/cor
   onto the board.
 - **More bosses drawn from Eric's references:** a farmer with a string trimmer, and a gingerbread man with a candy cane.
 
-## Boss powers and the boss raid rework (design, Oct 8, 2026; the template, Freeze and Boingo built: see below)
+## Boss powers and the boss raid rework (design, Oct 8, 2026; the template, Freeze, Boingo and G-REX (Fire) built: see below)
 
 Eric's design, with the director's review folded in and Eric's answers to its questions. Names are placeholders for
 the kind of boss. Nothing here is built yet; when it is, each part gets its own section.
@@ -3095,7 +3238,8 @@ the kind of boss. Nothing here is built yet; when it is, each part gets its own 
 4. **Fair play skips power turns:** forced or restricted moves, duels and blind turns don't count as detection signals.
 
 **The bosses**
-- **Fire.** Passive: tiles catch fire under your pieces only (his pieces never burn), with a 3-2-1 countdown; a piece
+- **Fire.** (Built as G-REX to Eric's later design, Oct 9: sparkler tiles anywhere on the crowd's half and the Roman
+  candle. See "Built: the meter over time, ... G-REX" below.) Passive: tiles catch fire under your pieces only (his pieces never burn), with a 3-2-1 countdown; a piece
   still on the tile at 0 is destroyed. At most 1-2 tiles at a time, never under the king; sliding pieces may pass over.
   The judge treats a piece about to burn as already gone, so saving it is never scored as a mistake. Ultimate: when the
   engine finds a forced mate for the crowd in 3-5, the whole board catches fire: find the mate within its length + 2
@@ -3238,7 +3382,8 @@ turn).
 - The freeze can ice the queen (she's often the piece that matters most); never the king.
 - The board "flip" is a half-turn spin in the board's plane (pieces upside down for 0.7 s), then the board is drawn
   from the other side: a 3D card flip made the board measure its squares wrongly mid-turn.
-- After his Last Stand the God King is silent, except for the blizzard's line (it names the one piece that can move).
+- After his Last Stand the God King is silent. (He used to keep the blizzard's line, which names the one piece that can
+  move; Eric, Oct 9: silent means silent.)
 - Strength offsets are both −100; self-balancing will move them.
 - A boss leaves its usual spot (hidden) while it casts at the board's corner or, Boingo, jumps on the board.
 
@@ -3254,6 +3399,110 @@ turn).
   (playable bosses have complete kits), `packages/server/test/boss-powers-lobby.test.ts` (online: everyone sees the
   same powers, picks and jobs follow the allowed moves, the funhouse from the host, avoiding the lobby's last boss),
   `e2e/boss-powers.spec.ts` (a Freeze match and a Boingo match on phone and desktop, the funhouse online).
+
+### Built: the meter over time, solo difficulty, the test trigger, G-REX (Oct 9, 2026)
+
+Eric's second round for the bosses, built by the `god-king` delegate. **Eric keeps the boss's elimination strike**
+(every few moves it strikes down the worst recent mover) alongside the powers: the powers add to the raid, they
+don't replace the strike.
+
+**The ultimate's meter fills over time, for every boss** (`BOSS_POWERS` in `settings.ts`, `rageTick`/`ragePoints` in
+`boss-powers.ts`)
+- In rage points, full at 100: 5 each crowd move, so on its own it's full after 20 crowd moves (the warning as the 21st
+  begins, the ultimate on the 22nd), around the middle of a battle; up to 5 more a move while the crowd is ahead on
+  the judged eval (all of it from 75% expected score: twice as fast when the crowd is well ahead); and the boss's own
+  material lost, 100/9 a point, so a queen's worth still fills it on its own. It never comes down.
+- It glows as it nears full (from 75%), then the one-turn warning ("RAGE!", the meter flashing), then the ultimate,
+  once a match, as before. `rageOverTime: false` turns the time and eval parts off (material only).
+- **Online it's the shared, judged state:** the crowd's expected score after its move is the judge's (the number the
+  lobby's runner scores with), kept in the battle's state, and the meter is worked out as each crowd turn begins on
+  the server; every screen draws the number it's sent.
+
+**Solo difficulty** (`BOSS_DIFFICULTY`, `boss-difficulty.ts`, `components/BossDifficulty.tsx`)
+- Four segments above solo's boss list: Easy (−300), Normal (your strength, as before), Hard (+250), Hardest (+500), on
+  top of the boss's usual strength (a step above your rating, plus the boss's offset), capped at 3190, the engine's
+  strongest with its strength limited. The boss list shows each boss's strength with it. The boss stays random (or
+  the one you pick); only how hard it plays changes. Remembered on the device. Not in the raid menu: online, the
+  lobby's strength stands. A test link's `?boss=<tier>` ignores it.
+
+**The test trigger (testing only)**
+- Admins only, the same check as the fair-play review page (`ADMIN_EMAILS`): `/api/me` says `admin: true`, and the
+  boss dock shows a small dashed "Trigger ultimate (testing)" button under itself in any boss battle, on every boss
+  screen (your move, the reveal, the boss's turn). Online the Durable Object marks admins' sockets from the session
+  cookie and the lobby takes the trigger only from them; anyone else's is ignored.
+- It brings the ultimate **as the next crowd turn begins, without the warning** (the normal path, skipping the meter
+  and the warning). It never touches a turn or a moment in progress: pressed during your turn, your turn goes on as it
+  was and the ultimate comes after the boss's reply; pressed while the boss thinks, it comes as your turn begins. Once
+  pressed it reads "Ultimate next turn (testing)" and is greyed out; spent, "Ultimate used (testing)". Already used,
+  the battle over, pressed twice: nothing. `BOSS_POWERS.ultimateTestButton: false` removes it, server included.
+
+**Fix: the God King stays silent after falling** in his Last Stand, the blizzard's line included.
+
+**G-REX, the Fire boss** (`grex` in the roster; his art, lines and sounds are the `characters` delegate's). **Playable
+now** in every boss mode, with his art and powers both in; the random draw is among three bosses.
+- **Passive, burning tiles:** with no fire tile on the board, from the crowd's 2nd turn, he throws a sparkler onto a
+  random square on the crowd's half (empty or occupied, never their king's). It burns in three stages, one a crowd
+  turn: a singe, more burn, ablaze. After the crowd's move on the ablaze turn, a crowd piece still on it is destroyed
+  (his own pieces never burn); the king is fireproof (the tile fizzles). Pieces may stand on it at any stage, and one
+  that steps onto it ablaze burns at once. Then a full turn with no fire, then the next throw (a throw every 4 turns).
+- **The God King's warning:** the first time in a match a crowd piece steps onto a burning tile (not yet ablaze), he
+  says one of four lines ("Careful on that tile, don't stand there too long!"). Once a match.
+- **Ultimate, the Roman candle:** "ROMAN CANDLE!", then he jumps onto the middle of the board and fires 12 shots up;
+  12 pips by the board's top edge, one lit for each shot still up. 3 crowd moves later the fireballs fall on the
+  crowd's half, a wave a turn: 1, 2, 3, 4, then the last 2 (exactly the 12), each landing as a stage-1 fire tile with
+  the same rules, never on the king's square or a tile already burning, spread out (none next to another tile if it
+  can be helped). The sparkler waits through the barrage, until its last tile is out and a turn has passed.
+- **Fair judging:** on the turn a tile is ablaze, the judge treats a crowd piece left on it as already gone: each move's
+  expected score less what it leaves to burn (1 log-odds a pawn of value, `firePawnLogit`), and the best move the best
+  of those, so saving the piece is never scored as a mistake. The moves that take a piece off the tile are always
+  scored (judges, the host and solo), and bots and power-up hints rank moves the same way. The engines' numbers stay
+  raw everywhere; the lobby's runner takes the fire off them once, for everyone, so judges still agree exactly. A turn
+  with fire on the board is a power turn for fair play.
+- **The rules engine:** a destroyed piece changes the position between moves, so a board keeps a base where it changed
+  (`BoardState.bases`): replays, the game's end, the recent moves, stepping back through the game and a spectator's
+  replay all play from it. A burn never leaves a king in check: a piece shielding its king, or one whose loss would
+  check the boss, doesn't burn (the tile fizzles). A rook burnt in its corner takes its castling right.
+- **Timing:** the sparkler 2.3 s (banner, his throw from the board's corner, the sparkler's flight, the tile catching),
+  the warning 1.7 s, the candle 5 s, a wave of fireballs 1.7 s; all before the crowd's clock starts, as every power's.
+  A piece burning plays as the boss's turn begins (1.5 s, the characters' `pieceBurn` over the tile's burn-out; the
+  boss's move waits for it, solo and online); a tile under the king fizzles, an empty one burns out.
+- **On screen:** his `ignite` at the board's corner for the sparkler (`sparkFly`, then the tile's `ignite`); every tile
+  on one canvas over the board through its stages (`spread2`, `spread3` as a turn begins); for the candle he drops onto
+  the middle of the board (`romanCandle`), each `launch`/`shot` cue sends a `candleShot` up, and the `candleShots`
+  strip by the board's top edge shows the shots still up until the last fireball lands; fireballs fall (`fireballFall`)
+  a little after one another and land as stage-1 tiles while he laughs at the corner (his `ultimateHit` lines).
+
+**Calls I made (Eric may want to change)**
+- The meter's rates: full after 20 crowd moves on its own, twice as fast with the crowd well ahead.
+- Easy to Hardest only for solo's "Boss alone" (the boss picker), not the solo raid with bots or online.
+- The trigger brings the ultimate at the next turn's start rather than mid-turn: an ultimate mid-turn would change
+  the moves allowed (the blizzard) or take the turn (the funhouse) after people had started picking.
+- "After the turn after stage 3" read as: ablaze as a turn begins, and anything left there burns after that turn's move
+  (the design's 3-2-1-0 countdown).
+- A burn happens straight after the crowd's move (so the boss replies to the position without the piece, as the judge
+  scored it), and the piece burns on screen as the boss's turn begins.
+- A piece shielding its king never burns (its tile fizzles), nor one whose loss would check the boss: a power never
+  breaks check, and a burn never gives one.
+- The warning line counts a step onto a burning tile, not a tile landing under a piece, nor a step onto an ablaze tile
+  (that piece burns at once).
+- The fireballs' squares are random but spread out; they can land on pieces (that's the barrage's threat).
+- G-REX plays 100 under the lobby's strength, as the others do; self-balancing will move it.
+
+**Checking it**
+- `npm run frames:powers -- <dir> grex [phone|desktop|both] [light|dark] [moves]` plays G-REX with the candle brought
+  early, leaving a piece on a tile ablaze and stepping onto a burning one, and saves every frame of each moment and
+  burn (`all` runs every boss).
+- Test switches: `?boss=grex&power=candle` (warned as the 2nd turn begins, the candle on the 3rd; the sparkler on the
+  2nd), `?power=sparkler`; `?boss=<id>&wip=1` (solo only) meets a boss whose powers are built before its art is (its
+  emoji face; that's how G-REX was built before his art landed).
+- `npm run perf:boss -- <dir> grex phone 25 candle`; `e2e/perf.spec.ts` checks G-REX's tiles at the barrage's peak late
+  in a long game on a slowed phone.
+- Tests: `packages/chess/test/grex.test.ts` (the meter's rates and switch, the trigger's safety, the tiles' stages, the
+  king fireproof, judging, the 12-fireball schedule, the once-a-match warning, bases, difficulty),
+  `packages/server/test/boss-powers-lobby.test.ts` (the trigger online: admins only; G-REX online),
+  `packages/core/test/boss.test.ts` and `packages/app/test/boss-difficulty.test.ts` (difficulty),
+  `packages/app/test/fire-replays.test.ts` (replays after a burn), `e2e/grex.spec.ts`
+  (G-REX on phone and desktop with the candle; the trigger shown for an admin, hidden otherwise).
 
 ## The God King, redrawn as pixel art (Oct 8, 2026)
 
@@ -3338,3 +3587,41 @@ move 13-15; the blizzard glitched.
 - **Measured** with `npm run perf:boss` (a whole battle on a computer and on a phone slowed 4x, per move); also run on
   Boingo, a Crowd match and an online raid. **Guarded** by `packages/chess/test/long-match.test.ts` and
   `e2e/perf.spec.ts`.
+
+## Match screen: timers, the ring, chat on a computer (Eric, Oct 9, 2026)
+
+From Eric's marked-up screenshot of a Crowd match. My calls:
+
+- **The ring was off its square.** Chessground draws the squares in a box it rounds down to a whole multiple of 8
+  device pixels, up to 8 px smaller than the board's wrap (5-6 CSS px at a 125% display scale, as Eric's). The ring
+  was placed in % of the wrap, so it drifted toward the board's far side, a few pixels at most squares. Now the ring,
+  the bars, the clock and the ghost layers size by chessground's own number (`---cg-width`, which it writes every
+  time it sizes the board), so they can't drift. The ring's corners are square and its glow is inside, so nothing
+  of it reads wider than the square. `e2e/match-screen.spec.ts` checks it within 1 px at two widths on a phone and
+  on a 125% computer, at sizes picked where the rounding gap is widest (the old ring failed there).
+- **The bar** is 6 px (was 3): Eric asked for a few pixels. One setting, `--timer-bar-h` in `styles.css`.
+- **The mirror under the board** shows on phones and computers. It sits in the 8 px gap above the next row, so the
+  board keeps its size. One switch: `TIMER_BAR_BELOW` in `components/Countdown.tsx`. On a computer the gaps above and
+  below the board are 8 px now (were 6), as on a phone, to fit the bars.
+- **The board's clock** sits in the line above the board, level with the board's right edge: this move's seconds
+  ("12s") and your bank ("9:50", the leaderboard's BANK). No labels: they made it too wide for a phone's line, and
+  the formats tell them apart; the full words are its tooltip. The seconds go red under 5 s on your own move; the
+  bank red under a minute. Once you've moved, your bank stops and the seconds go grey. Watching the other team, the
+  seconds are theirs (never red). In the reveal only the bank shows, in the same place.
+  - Beside it, the line's own "⏱ 20 s" shows only when it's lit (the clock went up, "▲"); otherwise it repeated the
+    clock. On a phone the line's text is centred in the room left of the clock; it drops "Your pick for" only while
+    the lit note is in it below 430 px, and "you're on White" below 375 px.
+  - Crowd only (not the boss raid, which has the dock, or Classic, which shows the bank in its top bar).
+- **Chat on a computer** was already in the right column, under the vote results, in online matches (solo has no
+  chat). But the panel above it changed height every phase, so chat jumped down at each reveal and back up at each
+  move. The panel keeps one height now (room for five vote rows, yours and the result line), so chat stays put. From
+  900 to 1099 px it's still beside the scoreboard (no leaderboard down the side there).
+
+## Two tweaks (Eric, Oct 9, 2026)
+
+- **Ginger freezes a little more often:** every 4 to 6 crowd turns instead of 5 to 7 (`BOSS_POWERS.freezeEvery`). The
+  first freeze still comes on the crowd's second turn, and each lasts 2 turns, so a freeze is never on top of another.
+- **The God King keeps his colours in the dock:** his figure used to fade and desaturate when he couldn't be summoned,
+  and go grey and half see-through once his moves were used. Now he stays in full colour; the crowns under him show
+  what's left (a dash once they're spent), as before. His fallen figure after his Last Stand is still greyed: that
+  shows he has fallen, which is different from having used his moves.
