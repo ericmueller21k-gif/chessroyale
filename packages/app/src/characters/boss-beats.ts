@@ -4,7 +4,7 @@
  * function of that shared state, so online every player sees the same animation and the same line at the same
  * moment, with nothing added to the protocol. Lines are picked by a hash of the moment (its key), not at random.
  */
-import { fenAfter, inCheck } from "@chessroyale/chess";
+import { fenAtPly, inCheck, type Base } from "@chessroyale/chess";
 
 /**
  * The moments a boss reacts to. The last five are its powers (see power-art.ts): `power` its passive firing (a pie
@@ -41,6 +41,8 @@ export interface BeatState {
   stage: Stage;
   fen: string;
   history: readonly string[];
+  /** Where the position changed between moves (a piece G-REX's fire destroyed): replays play from there. */
+  bases?: readonly Base[];
   crowdSide: "w" | "b";
   lastMove: { captured?: string } | null;
   result?: "crowd" | "boss" | "draw" | null;
@@ -104,8 +106,8 @@ export function pickLine(cfg: BeatLines, beat: Beat, key: string): string | null
 }
 
 /** The position before the last move (or null at the start). */
-function before(history: readonly string[], back = 1): string | null {
-  return history.length >= back ? fenAfter(history.slice(0, history.length - back)) : null;
+function before(history: readonly string[], back = 1, bases?: readonly Base[]): string | null {
+  return history.length >= back ? fenAtPly(history, history.length - back, bases) : null;
 }
 
 export function bossBeat(cfg: BeatLines, s: BeatState): BeatResult {
@@ -121,7 +123,7 @@ export function bossBeat(cfg: BeatLines, s: BeatState): BeatResult {
   if (s.stage === "strike") return out("strike", now, `strike:${ply}:${s.victim ?? ""}`);
   if (s.stage === "thinking") {
     // The crowd just moved: did it take one of the boss's pieces?
-    const prev = before(s.history);
+    const prev = before(s.history, 1, s.bases);
     const took = prev !== null && material(s.fen, bossSide) < material(prev, bossSide);
     return took ? out("hurt", "thinking", `hurt:${ply}`) : out("thinking", "thinking", `think:${ply}`);
   }
@@ -130,7 +132,7 @@ export function bossBeat(cfg: BeatLines, s: BeatState): BeatResult {
     return out(anim, now, `${anim}:${ply}`);
   }
   // The crowd's move: the boss's mood. It says something only when the mood has just changed.
-  const prev = before(s.history, 2);
+  const prev = before(s.history, 2, s.bases);
   const changed = now !== "idle" && (prev === null || mood(prev, s.crowdSide) !== now);
   return out(now, now, `mood:${now}:${ply}`, changed);
 }

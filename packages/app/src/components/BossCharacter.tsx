@@ -85,6 +85,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
         stage,
         fen: boss.board.fen,
         history: boss.board.history,
+        bases: boss.board.bases,
         crowdSide: boss.crowdSide,
         lastMove: boss.lastMove,
         result: boss.result,
