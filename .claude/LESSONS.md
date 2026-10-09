@@ -493,3 +493,31 @@ state (`powers.burnt`) before expecting it on screen.
   touched.
 - Something on screen for a moment is checked by watching for it from before it can appear, not by looking for it
   after a wait for something else.
+
+## A stall the first time an effect shows (Oct 9, 2026)
+
+**Seen** (by Hollow's art, before it shipped): his Lights out on a phone slowed 4x froze for 480-530 ms as the first
+bulb smashed, and dropped 7-11% of frames for the next few seconds. Every frame after that was smooth, and every test
+passed: tests and previews see an effect's frames, not the first time they're made.
+
+**The cause:** everything is made the first time it's needed, in the frame that needs it.
+- The smash's synthesised sound took 150 ms to make on a computer (16 little glass bells, each running its oscillators
+  for the whole sound), so about 500 ms on the slowed phone, at the cue.
+- At the last smash the night's 32 tile variants all showed for the first time in one frame, and each new frame of the
+  night's loop made 32 more.
+- Earlier, his art painted every part of every frame when the app loaded: about 350 ms more on every start.
+
+**How it was found:** `npm run frames:wip -- <dir> Hollow lightsout phone 21 perf` measures frames a second at a time
+through the moment (e2e/perf-probe.js); the stall sat in the second the first smash landed. Timing each piece in Node
+(the sound, a frame's first render, the night's tiles) named them.
+
+**The fix:** parts are painted when first shown (`lazyParts`); the night is drawn ahead, a slice a frame (`prewarm`,
+from when he drops in); the glass sounds are closed-form (30 ms) and a boss's sounds are made in idle moments once his
+character shows (`warmSounds`). Lights out then measured like the plain board.
+
+**The rule:**
+- Measure a new effect's first showing on a slowed phone, not only its steady state: a second at a time, from the
+  moment it starts.
+- Anything that shows many new frames at once (a board of tiles) is drawn ahead, a slice a frame. A sound made in code
+  is made before its cue, and costs no more than about 30 ms on a computer.
+- Nothing a boss needs only in its battle is made when the app loads.
