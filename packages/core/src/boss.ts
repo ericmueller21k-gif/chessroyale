@@ -100,7 +100,7 @@ export interface BossDef {
  * their art and powers.
  */
 export const BOSS_ROSTER: readonly BossDef[] = [
-  { id: "gingerbread", name: "The Gingerbread Man", icon: "🍪", kit: "The Gingerbread Man", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
+  { id: "gingerbread", name: "Ginger Snap", icon: "🍪", kit: "Ginger Snap", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
   { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },

@@ -38,7 +38,7 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   await page.goto("/?debug&clock=40&bossMoves=5&boss=gingerbread&power=blizzard");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-  expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("The Gingerbread Man");
+  expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Ginger Snap");
   await expect(page.locator(".rage-meter")).toBeVisible();
 
   await playBest(page);

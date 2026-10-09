@@ -9790,7 +9790,8 @@ img.qicon {
 
 /* ---------------- Boss powers (BossPowers.tsx) ---------------- */
 
-/* The board layer: ice over frozen pieces, the pie on its square. Over the pieces, never taking a tap. */
+/* The board layer: ice over frozen pieces, the pie on its square (the characters' effect sprites). Over the pieces,
+   never taking a tap. */
 .power-board {
   position: absolute;
   inset: 0;
@@ -9799,114 +9800,65 @@ img.qicon {
 }
 .pw-ice,
 .pw-pie,
-.pw-frost,
-.pw-splat {
+.pw-frost {
   position: absolute;
   width: 12.5%;
   height: 12.5%;
   pointer-events: none;
 }
-.pw-ice-art,
-.pw-pie-art {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.pw-ice-art {
-  filter: drop-shadow(0 0 0.6cqw rgba(186, 230, 253, 0.8));
-}
-.pw-ice.fresh {
-  animation: pw-ice-form 450ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
-}
-@keyframes pw-ice-form {
-  from {
-    opacity: 0;
-    scale: 0.4;
-    filter: brightness(2.2);
-  }
-}
-.pw-pie-art {
-  scale: 0.86;
-  filter: drop-shadow(0.3cqw 0.4cqw 0 rgba(0, 0, 0, 0.35));
-}
-.pw-pie.fresh {
-  animation: pw-pie-land 450ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
-}
-@keyframes pw-pie-land {
-  from {
-    scale: 1.6 0.5;
-  }
-}
 /* A freeze: a cold burst on the square as the ice forms. */
 .pw-frost {
   z-index: 3;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 18%, rgba(186, 230, 253, 0.85) 30%, rgba(125, 211, 252, 0) 68%);
-  animation: pw-frost 1050ms ease-out both;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 16%, rgba(186, 230, 253, 0.7) 30%, rgba(125, 211, 252, 0) 66%);
+  animation: pw-frost 900ms ease-out both;
 }
 @keyframes pw-frost {
   0% {
     opacity: 0;
-    scale: 0.3;
+    scale: 0.4;
   }
   25% {
     opacity: 1;
-    scale: 1.7;
-  }
-  100% {
-    opacity: 0;
-    scale: 2.2;
-  }
-}
-/* The pie's flight from the boss's side, and its splat. */
-.pw-pie-fly {
-  position: absolute;
-  z-index: 8;
-  width: 10%;
-  height: 10%;
-  /* (Its flight: 550 ms.) */
-  border-radius: 50% 50% 40% 40%;
-  background: radial-gradient(circle at 50% 35%, #e11d48 0 10%, #fff8e7 11% 48%, #c2853a 50% 70%, transparent 71%);
-  animation: pw-pie-fly 550ms cubic-bezier(0.3, 0, 0.6, 1) both;
-}
-@keyframes pw-pie-fly {
-  0% {
-    rotate: -30deg;
-    scale: 0.8;
-  }
-  50% {
     scale: 1.6;
   }
   100% {
-    left: calc(var(--fx) - 5%);
-    top: calc(var(--fy) - 5%);
-    rotate: 280deg;
+    opacity: 0;
+    scale: 2.1;
+  }
+}
+/* The ice bolt and the pie, flying from the boss's corner of the board to the square. */
+.pw-flight {
+  position: absolute;
+  z-index: 8;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  animation-name: pw-fly;
+  animation-timing-function: cubic-bezier(0.35, 0, 0.65, 1);
+  animation-fill-mode: both;
+}
+.pw-flight.pieFly {
+  animation-name: pw-lob;
+}
+@keyframes pw-fly {
+  to {
+    left: var(--fx);
+    top: var(--fy);
+  }
+}
+/* (The pie is lobbed: bigger at the top of its arc.) */
+@keyframes pw-lob {
+  50% {
+    scale: 1.5;
+  }
+  to {
+    left: var(--fx);
+    top: var(--fy);
     scale: 1;
   }
 }
-.pw-splat {
-  z-index: 3;
-  background:
-    radial-gradient(circle at 20% 30%, #fff8e7 0 9%, transparent 10%),
-    radial-gradient(circle at 80% 25%, #fff8e7 0 8%, transparent 9%),
-    radial-gradient(circle at 75% 80%, #fff8e7 0 10%, transparent 11%),
-    radial-gradient(circle at 18% 78%, #fff8e7 0 7%, transparent 8%),
-    radial-gradient(circle, rgba(255, 248, 231, 0.9) 0 30%, transparent 55%);
-  animation: pw-splat 550ms ease-out both;
-}
-@keyframes pw-splat {
-  from {
-    scale: 0.4;
-  }
-  60% {
-    opacity: 1;
-  }
-  to {
-    scale: 2;
-    opacity: 0;
-  }
-}
-/* The blizzard's sweep: a wall of cloud and snow across the board, left to right (clipped to the board). */
+/* The blizzard's sweep covers the whole board (clipped to it). */
 .pw-clip {
   position: absolute;
   inset: 0;
@@ -9916,82 +9868,41 @@ img.qicon {
 }
 .pw-sweep {
   position: absolute;
-  z-index: 8;
-  top: -4%;
-  bottom: -4%;
-  left: -70%;
-  width: 70%;
-  background:
-    radial-gradient(circle at 20% 15%, #fff 0 1.4%, transparent 1.6%) 0 0 / 18% 14%,
-    radial-gradient(circle at 70% 60%, #fff 0 1.1%, transparent 1.3%) 0 0 / 14% 11%,
-    linear-gradient(90deg, rgba(240, 249, 255, 0), rgba(240, 249, 255, 0.92) 35%, rgba(224, 242, 254, 0.95) 60%, rgba(186, 230, 253, 0));
-  filter: blur(0.3cqw);
-  animation: pw-sweep 1500ms linear both;
+  inset: 0;
 }
-@keyframes pw-sweep {
-  to {
-    left: 100%;
-    background-position: 30% 60%, -20% 80%, 0 0;
-  }
-}
-/* The boss casting, small, by the board's top-left corner (its side). */
+/* The boss steps up to the board's top-left corner (its side) to cast; its usual spot is empty for the moment. */
 .pm-caster {
   position: absolute;
   z-index: 8;
-  left: -2%;
-  top: -14%;
+  left: -3%;
+  top: -16%;
   width: 26%;
+  aspect-ratio: 72 / 94;
   pointer-events: none;
+  filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3));
 }
-.kit-anim {
-  display: block;
-  width: 100%;
-  height: auto;
-  image-rendering: pixelated;
+.screen:has(.power-moment) .boss-char {
+  visibility: hidden;
 }
-/* Boingo's funhouse: he pogos onto the board from his side, bounces in the middle, and pogos off. */
+/* Boingo's funhouse: he drops onto the middle of the board (his animation), and bounces off at the end. */
 .pm-pogo {
   position: absolute;
   z-index: 8;
-  left: 31%;
-  top: 22%;
-  width: 38%;
+  left: 29%;
+  top: 14%;
+  width: 42%;
+  aspect-ratio: 72 / 94;
   pointer-events: none;
-  filter: drop-shadow(0 1.2cqw 0 rgba(0, 0, 0, 0.35));
-}
-.pm-pogo.in {
-  animation: pw-pogo-in 700ms cubic-bezier(0.3, 0, 0.4, 1) both;
-}
-.pm-pogo.bounce {
-  animation: pw-pogo-bounce 520ms ease-in-out infinite alternate;
 }
 .pm-pogo.out {
-  animation: pw-pogo-out 800ms cubic-bezier(0.5, 0, 0.8, 0.4) both;
-}
-@keyframes pw-pogo-in {
-  0% {
-    translate: -90% -110%;
-    scale: 0.6;
-  }
-  55% {
-    translate: -30% -60%;
-  }
-  100% {
-    translate: 0 0;
-    scale: 1;
-  }
-}
-@keyframes pw-pogo-bounce {
-  to {
-    translate: 0 -9%;
-  }
+  animation: pw-pogo-out 700ms cubic-bezier(0.5, 0, 0.8, 0.4) both;
 }
 @keyframes pw-pogo-out {
   45% {
-    translate: 30% -40%;
+    translate: 20% -30%;
   }
   100% {
-    translate: 110% -130%;
+    translate: 90% -120%;
     scale: 0.6;
     opacity: 0;
   }
@@ -10035,10 +9946,7 @@ img.qicon {
     transform: rotate(180deg) scale(1);
   }
 }
-/* Boingo leaves his place by the board to pogo onto it for his funhouse. */
-.screen:has(.pm-pogo) .boss-char {
-  visibility: hidden;
-}
+
 /* The power's banner: the God King's cut-in, the boss on the left, him on the right; its colours by the power. */
 .pc-boss .boss-portrait {
   display: block;

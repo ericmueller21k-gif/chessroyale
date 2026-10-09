@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { bossIntroTimeline, fenAfter, inCheck, lastMoveTookQueen, pieceAt } from "@chessroyale/chess";
-import { BLIZZARD, FUNHOUSE, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
+import { BLIZZARD, FUNHOUSE, funhouseFlipAt, powerLine, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
 import { rememberBoss } from "../boss-history.ts";
+import { bossKit } from "../characters/kits.ts";
 import { kingSay, resetKingSpeech, type KingCue } from "../godKing.ts";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GodKingPortrait } from "../components/GodKing.tsx";
@@ -112,7 +113,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   const moments = useMemo(() => (intro || thinking || victim ? [] : momentsOf(boss, until)), [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim]);
   const moment = momentAt(moments, now);
   const funhouse = moments.find((m) => m.kind === "funhouse") ?? null;
-  const fun = funhouseBeat(funhouse && now >= funhouse.at ? funhouse : null, now);
+  const fun = funhouseBeat(funhouse && now >= funhouse.at ? funhouse : null, now, funhouseFlipAt(bossKit(boss.name)));
   const funMove = funhouse ? boss.powers?.funhouse : null;
   // The God King's word on the boss's move.
   const kingCues = useMemo(() => {
@@ -233,9 +234,9 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
                 <>
                   {boss.icon} {boss.name.replace(/^The /, "")} plays <strong>your</strong> move{fun?.played ? <>: <strong>{funMove.san}</strong></> : "…"}
                 </>
-              ) : moment && moment.kind !== "warn" ? (
+              ) : moment ? (
                 <>
-                  {boss.icon} <strong>{POWER_DOCK[moment.kind]}</strong>
+                  {boss.icon} <strong>{powerLine(bossKit(boss.name), moment) ?? POWER_DOCK[moment.kind]}</strong>
                 </>
               ) : victim ? (
                 <strong class="bad">

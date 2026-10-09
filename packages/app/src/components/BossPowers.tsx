@@ -1,11 +1,11 @@
 import type { ComponentChildren } from "preact";
-import { useLayoutEffect, useRef } from "preact/hooks";
 import { BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
 import { POWER_FX, powerMomentMs, pieceAt } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
-import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
+import { EFFECTS, animLength, cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { BossFace } from "./BossCharacter.tsx";
+import { BossEffect, BossMoment, SpriteAnim } from "./BossEffect.tsx";
 import { GodKingPortrait, squareXY } from "./GodKing.tsx";
 
 /**
@@ -61,19 +61,28 @@ export function crowdOrientation(boss: Pick<BossView, "powers"> | null | undefin
 
 // ---------------- The funhouse's beats (ms into its moment) ----------------
 
-/** Boingo pogos in, the banner, the board flips (its orientation swaps halfway), his line, the move, he pogos off. */
-export const FUNHOUSE = { bannerAt: 250, flipAt: 1900, flipMs: 700, lineAt: 2500, moveAt: 3300, exitAt: 4400 } as const;
+/**
+ * The banner first; then Boingo drops onto the board (his kit's `funhouse`: he lands, springs into a spin, and the
+ * board spins with him at its `flip` cue), his line, the move he plays for the crowd, and he bounces off.
+ */
+export const FUNHOUSE = { clownAt: 1300, flipMs: 700, lineAt: 2700, moveAt: 3500, exitAt: 4500 } as const;
+
+/** When the board starts its spin (ms into the moment): on the funhouse animation's `flip` cue. */
+export function funhouseFlipAt(kit: BossKit | null): number {
+  const a = kit?.ch.anims.funhouse;
+  return FUNHOUSE.clownAt + ((a && cueAt(a, "flip")) ?? 620);
+}
 
 /**
  * In the funhouse's moment: whether the board spins (a half turn in its own plane, pieces upside down for a moment),
  * whether it shows flipped yet (the orientation swaps as the spin ends, with nothing transformed, so the board's
  * squares are measured true), and whether the move has been played.
  */
-export function funhouseBeat(m: Moment | null, now: number): { flipped: boolean; flipping: boolean; played: boolean } | null {
+export function funhouseBeat(m: Moment | null, now: number, flipAt: number = funhouseFlipAt(null)): { flipped: boolean; flipping: boolean; played: boolean } | null {
   if (!m || m.kind !== "funhouse") return null;
   const t = now - m.at;
-  const end = FUNHOUSE.flipAt + FUNHOUSE.flipMs;
-  return { flipped: t >= end, flipping: t >= FUNHOUSE.flipAt && t < end, played: t >= FUNHOUSE.moveAt };
+  const end = flipAt + FUNHOUSE.flipMs;
+  return { flipped: t >= end, flipping: t >= flipAt && t < end, played: t >= FUNHOUSE.moveAt };
 }
 
 // ---------------- The board layer ----------------
@@ -89,76 +98,48 @@ function appearAt(square: string, moments: readonly Moment[], orientation: "whit
   return 0;
 }
 
-/** A freeze's beats: the banner, then (once it has gone, so nothing hides it) a cold burst and the ice forming. */
-export const FREEZE = { frostAt: 1400, iceAt: 1600 } as const;
-/** The pie's beats: the banner, then the pie flies in from the boss's side and splats on its square. */
-export const PIE = { flyAt: 1250, landAt: 1800 } as const;
-/** The blizzard's beats: the banner, then the sweep across the board, then the God King's line. */
-export const BLIZZARD = { sweepAt: 1200, sweepMs: 1500, lineAt: 2800 } as const;
+/** A freeze's beats: the banner, then (once it has gone) his cast, the ice bolt to the piece, the ice forming. */
+export const FREEZE = { boltAt: 1500, iceAt: 1760 } as const;
+/** The pie's beats: the banner, then his throw, the pie's flight from his side, the splat. */
+export const PIE = { flyAt: 1450, landAt: 1800 } as const;
+/** The blizzard's beats: the banner, then the storm bursts from his cane and sweeps the board, then the God King's line. */
+export const BLIZZARD = { sweepAt: 1300, sweepMs: animLength(EFFECTS.blizzardSweep.ch.anims.sweep!), lineAt: 2800 } as const;
 
 const at = (square: string, orientation: "white" | "black") => {
   const { x, y } = squareXY(square, orientation);
   return { left: `${(x - 50) / 8}%`, top: `${(y - 50) / 8}%` };
 };
 
-/** Ice over frozen pieces and the pie on its square (over the board, under any banner; never takes a tap). */
+/**
+ * Ice over frozen pieces (the characters' iceOverlay: it forms, then shimmers while it lasts) and the pie on its square
+ * (pieSplat: the splat, then the pie), over the board, under any banner; never takes a tap.
+ */
 export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), fen }: { boss: BossView; orientation: "white" | "black"; moments?: readonly Moment[]; now?: number; fen?: string }) {
   const p = boss.powers;
   if (!p) return null;
   const board = fen ?? boss.board.fen;
   const iced = p.iced.filter((sq) => pieceAt(board, sq)?.color === boss.crowdSide);
   const pie = p.pie?.square;
-  const show = (sq: string) => {
-    const t = appearAt(sq, moments, orientation);
-    return { on: now >= t, fresh: t > 0 && now - t < 450 };
-  };
+  const blizzard = moments.some((m) => m.kind === "blizzard");
   return (
     <div class="power-board" aria-hidden="true">
-      {pie &&
-        show(pie).on &&
-        (() => {
-          const s = show(pie);
-          return (
-            <span key={`pie-${pie}`} class={`pw-pie${s.fresh ? " fresh" : ""}`} style={at(pie, orientation)}>
-              <PieArt />
-            </span>
-          );
-        })()}
+      {pie && now >= appearAt(pie, moments, orientation) && (
+        <span key={`pie-${pie}`} class="pw-pie" style={at(pie, orientation)}>
+          <BossEffect name="pieSplat" since={appearAt(pie, moments, orientation)} id={pie} />
+        </span>
+      )}
       {iced.map((sq) => {
-        const s = show(sq);
-        return s.on ? (
-          <span key={`ice-${sq}`} class={`pw-ice${s.fresh ? " fresh" : ""}`} style={at(sq, orientation)}>
-            <IceArt />
+        const t = appearAt(sq, moments, orientation);
+        if (now < t) return null;
+        const fx = EFFECTS.iceOverlay;
+        return (
+          <span key={`ice-${sq}`} class="pw-ice" style={at(sq, orientation)}>
+            {/* (In the blizzard a dozen pieces ice over at once: the sweep's wind is their sound, not a dozen crackles.) */}
+            <SpriteAnim ch={fx.ch} anim={fx.start!} then={fx.loop} since={t} sounds={blizzard ? {} : fx.sounds} id={sq} />
           </span>
-        ) : null;
+        );
       })}
     </div>
-  );
-}
-
-/** A block of ice over a piece: pale blue, see-through, with frost on its edges and a glint. */
-function IceArt() {
-  return (
-    <svg class="pw-ice-art" viewBox="0 0 16 16" shape-rendering="crispEdges">
-      <rect x="1" y="1" width="14" height="14" fill="rgba(186, 230, 253, 0.42)" />
-      <path d="M1 1h14v1H1zM1 14h14v1H1zM1 2h1v12H1zM14 2h1v12h-1z" fill="rgba(240, 249, 255, 0.95)" />
-      <path d="M3 3h3v1H3zM3 4h1v2H3zM11 12h2v1h-2zM12 10h1v2h-1zM2 8h1v1H2zM13 5h1v1h-1z" fill="#fff" />
-      <path d="M5 11h1v1H5zM9 3h1v1H9zM7 7h1v1H7z" fill="rgba(125, 211, 252, 0.9)" />
-    </svg>
-  );
-}
-
-/** A cream pie, splatted: crust, cream, a cherry. */
-function PieArt() {
-  return (
-    <svg class="pw-pie-art" viewBox="0 0 16 16" shape-rendering="crispEdges">
-      <path d="M2 9h12v1h1v2h-1v1H2v-1H1v-2h1z" fill="#c2853a" />
-      <path d="M3 10h10v2H3z" fill="#e0a85a" />
-      <path d="M2 7h1V6h2V5h6v1h2v1h1v2H2z" fill="#fff8e7" />
-      <path d="M1 8h1v1H1zM14 8h1v2h-1zM4 4h1v1H4zM12 4h1v1h-1zM0 10h1v1H0zM15 6h1v1h-1z" fill="#fff8e7" />
-      <path d="M7 3h2v2H7z" fill="#e11d48" />
-      <path d="M7 3h1v1H7z" fill="#fb7185" />
-    </svg>
   );
 }
 
@@ -170,31 +151,59 @@ const ULT_NAME: Record<string, string> = { blizzard: "the Blizzard", funhouse: "
 /** A small, stable hash, for picking a line the same everywhere. */
 const hash = (s: string) => [...s].reduce((a, c) => Math.imul(a ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
-/** Boingo's line in his funhouse (his kit's, if it has some; these otherwise), the same on every screen. */
-export const FUNHOUSE_LINES = ["Let me get that for you!", "Welcome to the funhouse!", "Your move? Mine now!", "Honk! I'll drive."];
-export function funhouseLine(kit: BossKit | null, key: string): string {
-  const own = (kit?.lines as Partial<Record<string, readonly string[]>> | undefined)?.funhouse;
-  const lines = own?.length ? own : FUNHOUSE_LINES;
-  return lines[hash(key) % lines.length]!;
+/** Which of the kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */
+const KIT_MOMENT: Record<PowerEventKind, "power" | "ultimateWarn" | "ultimate"> = { freeze: "power", pie: "power", warn: "ultimateWarn", blizzard: "ultimate", funhouse: "ultimate" };
+
+/** The boss's line for a power's moment (its kit's), the same on every screen; null without one. */
+export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key">): string | null {
+  const lines = (kit?.lines as Partial<Record<string, readonly string[]>> | undefined)?.[KIT_MOMENT[m.kind]];
+  return lines?.length ? lines[hash(m.key) % lines.length]! : null;
 }
 
+/** Boingo's line in his funhouse (his kit's, if it has some; these otherwise). */
+export const FUNHOUSE_LINES = ["Let me get that for you!", "Welcome to the funhouse!", "Your move? Mine now!", "Honk! I'll drive."];
+export function funhouseLine(kit: BossKit | null, key: string): string {
+  return powerLine(kit, { kind: "funhouse", key }) ?? FUNHOUSE_LINES[hash(key) % FUNHOUSE_LINES.length]!;
+}
+
+/** The boss's animation for a power's moment, from its kit (e.g. freezeCast, pieThrow, check, blizzard, funhouse). */
+const kitAnim = (kit: BossKit | null, kind: PowerEventKind) => {
+  const name = kit?.anims[KIT_MOMENT[kind]];
+  return name && kit!.ch.anims[name] ? name : null;
+};
+
 /**
- * The moment playing now, over the board: its banner (boss left, moment middle, God King right) and its effect on
- * the board. The ice and the pie themselves are the board layer's (PowerBoard), timed to land with the effect.
+ * The moment playing now, over the board: its banner (boss left, moment middle, God King right), the boss stepping up
+ * to the board's corner to cast (its kit's moment, timed so its hit lands on the effect), and its effect. The ice and
+ * the pie themselves are the board layer's (PowerBoard), timed to land with the effect.
  */
 export function PowerMoment({ boss, moment, now, orientation, side }: { boss: BossView; moment: Moment | null; now: number; orientation: "white" | "black"; side: "w" | "b" }) {
   if (!moment) return null;
   const t = now - moment.at;
   const kit = bossKit(boss.name);
   const banner = (text: string, sub?: string, tone = "") => <PowerBanner key={moment.key} boss={boss} side={side} text={text} sub={sub} tone={tone} />;
+  /** The boss casting by the board's top-left corner, its animation's `hit` cue landing at `hitAt` (ms into the moment). */
+  const cast = (hit: string, hitAt: number) => {
+    const anim = kitAnim(kit, moment.kind);
+    if (!anim) return null;
+    const a = kit!.ch.anims[anim]!;
+    const since = moment.at + hitAt - (cueAt(a, hit) ?? 0);
+    if (now < since) return null;
+    return (
+      <span class="pm-caster">
+        <BossMoment boss={boss.name} anim={anim} since={since} then="idle" />
+      </span>
+    );
+  };
   switch (moment.kind) {
     case "freeze": {
       const piece = moment.square ? pieceAt(boss.board.fen, moment.square) : null;
       return (
         <div class="power-moment pm-freeze">
           {t < 1500 && banner("FREEZE!", piece ? `Your ${PIECE_WORD[piece.type]} is frozen` : undefined, "cold")}
-          {moment.square && t >= FREEZE.frostAt && t < FREEZE.frostAt + 1050 && <span class="pw-frost" style={{ ...at(moment.square, orientation), animationDelay: `${FREEZE.frostAt - t}ms` }} />}
-          <CastSprite kit={kit} anim="freezeCast" since={moment.at} />
+          {cast("freeze", FREEZE.boltAt)}
+          {moment.square && t >= FREEZE.boltAt && t < FREEZE.iceAt && <Flight name="iceBolt" square={moment.square} orientation={orientation} since={moment.at + FREEZE.boltAt} ms={FREEZE.iceAt - FREEZE.boltAt} aim />}
+          {moment.square && t >= FREEZE.iceAt - 60 && t < FREEZE.iceAt + 900 && <span class="pw-frost" style={{ ...at(moment.square, orientation), animationDelay: `${FREEZE.iceAt - 60 - t}ms` }} />}
         </div>
       );
     }
@@ -202,33 +211,43 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
       return (
         <div class="power-moment pm-pie">
           {t < 1500 && banner("PIE!", moment.square ? `Splat on ${moment.square}` : undefined)}
-          {moment.square && t >= PIE.flyAt && t < PIE.landAt && <span class="pw-pie-fly" style={{ ...flyStyle(moment.square, orientation), animationDelay: `${PIE.flyAt - t}ms` }} />}
-          {moment.square && t >= PIE.landAt && t < PIE.landAt + 550 && <span class="pw-splat" style={{ ...at(moment.square, orientation), animationDelay: `${PIE.landAt - t}ms` }} />}
-          <CastSprite kit={kit} anim="pieThrow" since={moment.at} />
+          {cast("throw", PIE.flyAt)}
+          {moment.square && t >= PIE.flyAt && t < PIE.landAt && <Flight name="pieFly" square={moment.square} orientation={orientation} since={moment.at + PIE.flyAt} ms={PIE.landAt - PIE.flyAt} />}
         </div>
       );
     case "warn": {
       const ult = boss.powers?.ultimate ?? "";
-      return <div class="power-moment pm-warn">{t < 1600 && banner("RAGE!", `Next turn: ${ULT_NAME[ult] ?? "its ultimate"}`, "rage")}</div>;
+      return (
+        <div class="power-moment pm-warn">
+          {t < 1600 && banner("RAGE!", `Next turn: ${ULT_NAME[ult] ?? "its ultimate"}`, "rage")}
+          {cast("", 0)}
+        </div>
+      );
     }
     case "blizzard":
       return (
         <div class="power-moment pm-blizzard">
           {t < 1500 && banner("BLIZZARD!", undefined, "cold")}
-          {t >= BLIZZARD.sweepAt - 100 && t < BLIZZARD.sweepAt + BLIZZARD.sweepMs + 400 && (
+          {cast("blizzard", BLIZZARD.sweepAt)}
+          {t >= BLIZZARD.sweepAt && t < BLIZZARD.sweepAt + BLIZZARD.sweepMs && (
             <span class="pw-clip">
-              <span class="pw-sweep" style={{ animationDelay: `${BLIZZARD.sweepAt - 100 - t}ms` }} />
+              <span class="pw-sweep">
+                <BossEffect name="blizzardSweep" since={moment.at + BLIZZARD.sweepAt} />
+              </span>
             </span>
           )}
-          <CastSprite kit={kit} anim="blizzard" since={moment.at} />
         </div>
       );
     case "funhouse": {
       const line = funhouseLine(kit, moment.key);
       return (
         <div class="power-moment pm-funhouse">
-          {kit && <PogoClown kit={kit} t={t} />}
-          {t >= FUNHOUSE.bannerAt && t < FUNHOUSE.bannerAt + 1500 && banner("FUNHOUSE!", undefined, "fun")}
+          {t < 1500 && banner("FUNHOUSE!", undefined, "fun")}
+          {t >= FUNHOUSE.clownAt && (
+            <span class={`pm-pogo${t >= FUNHOUSE.exitAt ? " out" : ""}`}>
+              {kitAnim(kit, "funhouse") ? <BossMoment boss={boss.name} anim={kitAnim(kit, "funhouse")!} since={moment.at + FUNHOUSE.clownAt} then="idle" /> : <BossFace boss={boss} />}
+            </span>
+          )}
           {t >= FUNHOUSE.lineAt && t < FUNHOUSE.exitAt && (
             <div class="pm-line" role="status" aria-label={line}>
               {line.slice(0, Math.min(line.length, Math.floor((t - FUNHOUSE.lineAt) / 28) + 1))}
@@ -240,10 +259,28 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
   }
 }
 
-/** From the boss's side of the board (its top corner) to the square: the pie's flight, as CSS variables. */
-function flyStyle(square: string, orientation: "white" | "black") {
+/**
+ * Something flying from the boss's corner of the board (its top-left) to a square: the ice bolt (pointed at its
+ * target) or the pie (tumbling), over `ms`.
+ */
+function Flight({ name, square, orientation, since, ms, aim = false }: { name: "iceBolt" | "pieFly"; square: string; orientation: "white" | "black"; since: number; ms: number; aim?: boolean }) {
   const { x, y } = squareXY(square, orientation);
-  return { "--fx": `${x / 8}%`, "--fy": `${y / 8}%`, left: "8%", top: "-6%" } as Record<string, string>;
+  const from = { x: 60, y: 30 };
+  const angle = (Math.atan2(y - from.y, x - from.x) * 180) / Math.PI;
+  const style: Record<string, string> = {
+    left: `${(from.x - 50) / 8}%`,
+    top: `${(from.y - 50) / 8}%`,
+    "--fx": `${(x - 50) / 8}%`,
+    "--fy": `${(y - 50) / 8}%`,
+    animationDuration: `${ms}ms`,
+    animationDelay: `${since - Date.now()}ms`,
+    ...(aim ? { rotate: `${angle}deg` } : {}),
+  };
+  return (
+    <span class={`pw-flight ${name}`} style={style}>
+      <BossEffect name={name} since={since} />
+    </span>
+  );
 }
 
 /** The power's banner: the God King's cut-in style, the boss on the left and the God King on the right. */
@@ -266,72 +303,6 @@ export function PowerBanner({ boss, side, text, sub, tone = "" }: { boss: BossVi
         </span>
       </div>
     </div>
-  );
-}
-
-// ---------------- Sprites ----------------
-
-const images = new WeakMap<Frame, ImageData>();
-function frameImage(ch: Character, frame: Frame): ImageData {
-  let img = images.get(frame);
-  if (!img) {
-    const r = renderFrame(ch, frame);
-    img = new ImageData(new Uint8ClampedArray(r.data), r.w, r.h);
-    images.set(frame, img);
-  }
-  return img;
-}
-const lengthOf = (a: Anim) => a.frames.reduce((s, f) => s + f.ms, 0);
-function frameAt(a: Anim, t: number): number {
-  const total = lengthOf(a);
-  const tt = a.loop ? ((t % total) + total) % total : t;
-  let acc = 0;
-  for (let i = 0; i < a.frames.length; i++) if (tt < (acc += a.frames[i]!.ms)) return i;
-  return a.frames.length - 1;
-}
-
-/** One of a kit's animations on a canvas, from `since` (wall clock), drawn before the paint and every frame after. */
-export function KitAnim({ kit, anim, since, class: cls = "" }: { kit: BossKit; anim: string; since: number; class?: string }) {
-  const cv = useRef<HTMLCanvasElement>(null);
-  const a = kit.ch.anims[anim] ?? kit.ch.anims.idle!;
-  useLayoutEffect(() => {
-    const g = cv.current?.getContext("2d");
-    if (!g) return;
-    let raf = 0;
-    let last = -1;
-    const draw = () => {
-      const i = frameAt(a, Date.now() - since);
-      if (i !== last) {
-        last = i;
-        g.putImageData(frameImage(kit.ch, a.frames[i]!), 0, 0);
-      }
-      raf = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(raf);
-  }, [kit, anim, since]);
-  return <canvas ref={cv} class={`kit-anim ${cls}`} width={kit.ch.w} height={kit.ch.h} aria-hidden="true" />;
-}
-
-/** The boss casting, by the board's top-left corner (its side), when its kit has the moment's animation. */
-function CastSprite({ kit, anim, since }: { kit: BossKit | null; anim: string; since: number }) {
-  if (!kit?.ch.anims[anim]) return null;
-  return (
-    <span class="pm-caster">
-      <KitAnim kit={kit} anim={anim} since={since} />
-    </span>
-  );
-}
-
-/** Boingo's funhouse: he pogos onto the board from his side, bounces in the middle while it flips, then pogos off. */
-function PogoClown({ kit, t }: { kit: BossKit; t: number }) {
-  const phase = t < 700 ? "in" : t < FUNHOUSE.exitAt ? "bounce" : "out";
-  const anim = kit.ch.anims.funhouse ? "funhouse" : "idle";
-  const since = useRef(Date.now() - t).current;
-  return (
-    <span class={`pm-pogo ${phase}`}>
-      <KitAnim kit={kit} anim={anim} since={since} />
-    </span>
   );
 }
 

@@ -3073,8 +3073,9 @@ centre of the board to cast; the farmer and the gingerbread man as bosses.
 
 ### Built: the boss template, Freeze and Boingo (Oct 8, 2026)
 
-Built by the `god-king` delegate, which now owns boss powers and boss selection. Playable now: **the gingerbread man
-(Freeze)** and **Boingo the Clown (pie and funhouse)**, the only bosses in every boss mode.
+Built by the `god-king` delegate, which now owns boss powers and boss selection. Playable now: **Ginger Snap, the
+gingerbread man (Freeze)** and **Boingo the Clown (pie and funhouse)**, the only bosses in every boss mode. Their art,
+moments, lines, sounds and the effect sprites are the `characters` delegate's (`characters/power-art.ts`).
 
 **The template** (`packages/core/src/boss.ts`, `BOSS_ROSTER`): each boss has an id, name, icon, strength offset, a
 passive and an ultimate (power ids), and its character kit (the app's `BOSS_KITS` key, for art, moments, lines and
@@ -3120,25 +3121,29 @@ turn).
   never uses it.
 - **Moments:** as the turn passes to the crowd, after the boss's move shows, each power that came with it plays in
   turn, in the God King's banner style (the boss's portrait on the left, the moment in the middle, the God King on
-  the right). The crowd's clock starts after them, solo and online (`POWER_FX`, `powerMomentMs` in `boss-timing.ts`):
+  the right). Then the boss steps up to the board's top-left corner (its side) and plays its kit's moment there
+  (`freezeCast`, `pieThrow`, its warning, `blizzard`), timed so the moment's hit cue lands on the effect; its usual
+  spot is empty meanwhile, and the dock shows its line for the moment (its kit's `power`, `ultimateWarn` or
+  `ultimate` lines, the same for everyone). The crowd's clock starts after them, solo and online (`POWER_FX`, `powerMomentMs` in `boss-timing.ts`):
   a freeze 2.3 s, a pie 2.3 s, the warning 1.7 s, the blizzard 3.6 s, the funhouse 5.2 s.
 
-**The gingerbread man (Freeze)**
+**Ginger Snap (Freeze)**
 - **Passive:** from the crowd's 2nd turn, every 5-7 turns, one crowd piece (never the king) is iced for 2 turns: a
   pick from the three that matter most (pieces before pawns, by value and mobility), never one without a move or whose
   freeze leaves no other legal move. Its moves aren't allowed; it still defends and gives check. The moment: "FREEZE!"
-  ("Your knight is frozen"), then a cold burst and the ice forming on it.
-- **Ultimate, the blizzard:** "BLIZZARD!", then a wall of cloud and snow sweeps the board left to right and every crowd
-  piece ices over as it passes, except the queen (no queen, or she can't move: the king; neither: no ice that turn).
+  ("Your knight is frozen"), then he thrusts his cane, the ice bolt flies to the piece, and the ice (`iceOverlay`)
+  forms on it and shimmers while it lasts.
+- **Ultimate, the blizzard:** "BLIZZARD!", then the storm bursts from his raised cane and sweeps the board left to
+  right (`blizzardSweep`, 1.3 s), and every crowd piece ices over as it passes, except the queen (no queen, or she can't move: the king; neither: no ice that turn).
   One turn. Then the God King says one of his blizzard lines ("Looks like our queen withstood the storm!", and three
   more; for the king, two). The passive waits a turn on the ultimate's turn.
 
 **Boingo the Clown**
 - **Passive, the pie:** from the crowd's 2nd turn, a pie on one empty square near the centre (c3 to f6) for 3 crowd
   turns and the boss's replies in between, then 2 clear turns, again and again. Nobody may move onto it. The moment:
-  "PIE!", then the pie flies in from his side and splats on the square.
-- **Ultimate, the funhouse:** as the turn passes to the crowd, he pogos onto the middle of the board, "FUNHOUSE!", the
-  board spins a half turn, he says a line ("Let me get that for you!", three more, or his kit's own) and plays the
+  "PIE!", then he throws: the pie tumbles in from his side (`pieFly`) and splats on the square (`pieSplat`).
+- **Ultimate, the funhouse:** as the turn passes to the crowd, "FUNHOUSE!", then he drops onto the middle of the board
+  (his kit's `funhouse`), the board spins a half turn on its `flip` cue, he says a line ("Let me get that for you!", three more, or his kit's own) and plays the
   crowd's move: 10-25 points worse than the best (about 1 to 2.5 pawns from an even position, `funhouseLoss`), never
   past 1.6 in log-odds, never a move whose line allows a forced mate or leaves the queen to be taken (a queen trade is
   fine). It reuses the boss's slip code (the engine's top moves, then a head-to-head check with the best) and is
@@ -3155,7 +3160,7 @@ turn).
   from the other side: a 3D card flip made the board measure its squares wrongly mid-turn.
 - After his Last Stand the God King is silent, except for the blizzard's line (it names the one piece that can move).
 - Strength offsets are both −100; self-balancing will move them.
-- Boingo leaves his spot by the board (hidden) while he pogos on it.
+- A boss leaves its usual spot (hidden) while it casts at the board's corner or, Boingo, jumps on the board.
 
 **Checking it**
 - `npm run frames:powers -- <dir> [gingerbread|clown|both] [phone|desktop|both] [light|dark]` plays a solo raid with
