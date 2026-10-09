@@ -31,9 +31,10 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * (ms). The crowd's clock starts after them, solo and online, so a power never costs anyone thinking time. A freeze
  * or a pie: its banner and the board effect; the warning: its banner over the full rage meter; the blizzard: its
  * banner, the sweep across the board and the God King's line; the funhouse: the clown pogos onto the board, it flips,
- * he speaks and plays the crowd's move (see the app's PowerMoment for the beats).
+ * he speaks and plays the crowd's move; the Roman candle: G-REX drops onto the board, slams the candle down and fires
+ * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 5000, fireball: 1700 } as const;
+export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700 } as const;
 
 /**
  * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
