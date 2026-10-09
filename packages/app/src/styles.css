@@ -5728,18 +5728,39 @@ button.history-label {
   background: linear-gradient(180deg, #4a3500, #1f1600);
   border-color: #fde68a;
 }
+/*
+ * Fischer Random's banner, in the crate opening rather than over a board: it fits its words at every width (on a
+ * computer the board banner's sizes cut it off at both ends and top and bottom). One size, --fs, sets the text, the
+ * face and the gaps, so the face and the words take about 80% of the stage's width in the widest font we've measured,
+ * capped on a wide screen. The band grows to fit them, and the stage grows with its width so the slanted band stays
+ * inside it. The line under it never goes below 11 px.
+ */
 .fischer-stage {
+  --fs: min(6.4cqw, 52px);
   position: relative;
-  height: 210px;
+  min-height: 210px;
 }
-.fischer-stage .fb-text {
-  font-size: 7.6cqw;
+/* (Its height: 2/7 of its width, at least 210 px. Padding, not aspect-ratio, which in the grid would set a width.) */
+.fischer-stage::before {
+  content: "";
+  display: block;
+  padding-top: 28.6%;
 }
-.fischer-stage .fb-sub {
-  font-size: 3.4cqw;
+.fischer-stage .fight-banner .fb-band {
+  height: auto;
+  padding: calc(var(--fs) * 0.32) 0 calc(var(--fs) * 0.38);
+  gap: calc(var(--fs) * 0.4);
 }
-.fischer-stage .fb-band {
-  height: 46%;
+.fischer-stage .fight-banner .fb-face {
+  width: calc(var(--fs) * 1.7);
+  height: calc(var(--fs) * 1.7);
+  font-size: var(--fs);
+}
+.fischer-stage .fight-banner .fb-text {
+  font-size: var(--fs);
+}
+.fischer-stage .fight-banner .fb-sub {
+  font-size: max(11px, calc(var(--fs) * 0.42));
 }
 /* The reveal. */
 .reveal-card {
@@ -6879,44 +6900,6 @@ button.fd-logo {
     display: inline;
   }
 }
-/*
- * Light or dark (theme.ts): a bright sun in light mode, a black one in dark mode (Eric's "black sun"). 44 px. On a
- * phone it leads the top bar's right side; on a computer it sits above Settings in the side menu.
- */
-.fd-theme {
-  width: 44px;
-  height: 44px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--fd-panel-2);
-  cursor: pointer;
-}
-.fd-theme .fd-sun-disc {
-  fill: var(--fd-gold);
-  stroke: var(--fd-gold-text);
-}
-.fd-theme .fd-sun-rays {
-  fill: none;
-  stroke: var(--fd-gold-text);
-}
-/* (A shade lighter than the panel, so the black sun reads as black.) */
-.fd-theme.dark {
-  background: #2f3442;
-}
-.fd-theme.dark .fd-sun-disc {
-  fill: #000;
-  stroke: var(--fd-gold);
-}
-.fd-theme.dark .fd-sun-rays {
-  stroke: var(--fd-gold);
-}
-.fd-theme:active {
-  transform: scale(0.94);
-}
 .fd-home-main {
   flex: 1 1 auto;
   display: flex;
@@ -6976,8 +6959,33 @@ button.fd-logo {
   border-radius: 22px;
   padding: 18px;
 }
+/* Your icon to the left of your name and rating: the pair centred under your pawn, the words ranged left. */
+.fd-hero-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  min-width: 0;
+}
+.fd-hero-icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--fd-panel-2);
+  font-size: 30px;
+  line-height: 1;
+}
+.fd-hero-icon .user-icon.pixel {
+  width: 48px;
+  height: 48px;
+}
 .fd-hero-text {
-  text-align: center;
+  min-width: 0;
+  text-align: left;
 }
 .fd-hero-name {
   font-size: 20px;
@@ -7116,6 +7124,12 @@ button.fd-logo {
 .fd-play:disabled {
   opacity: 0.45;
   cursor: default;
+}
+/* PLAY, the line under it and an error: spaced as the play column is. */
+.fd-go {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 .fd-hint {
   text-align: center;
@@ -8124,10 +8138,6 @@ button.fd-seat {
     justify-content: flex-end;
     min-height: 44px;
   }
-  /* Light or dark: the sun, its own small button just above Settings (its icon in line with the menu's). */
-  .fd-side-theme {
-    margin: 0 0 4px 5px;
-  }
   .fd-right .fd-live {
     background: var(--fd-panel);
     border-radius: 14px;
@@ -8326,9 +8336,13 @@ button.fd-seat {
   .fd-root.framed .fd-hero-name {
     font-size: 26px;
   }
+  /*
+   * The play column: Play with friends and Boss alone, the mode picker, PLAY at the bottom, level with the bottom of
+   * your card (Eric, Oct 9). The room above is the live game's.
+   */
   .fd-root.framed .fd-play-col {
     min-width: 0;
-    justify-content: center;
+    justify-content: flex-end;
   }
   .fd-root.framed .fd-play {
     height: 88px;
@@ -8368,6 +8382,10 @@ button.fd-seat {
   .fd-root.framed .fd-home.queueing .fd-wait-side .fd-hero-text {
     text-align: left;
     min-width: 0;
+  }
+  /* (The small card: your pawn is your picture here, and the name needs the room.) */
+  .fd-root.framed .fd-home.queueing .fd-wait-side .fd-hero-icon {
+    display: none;
   }
   .fd-root.framed .fd-home.queueing .fd-wait-side .fd-hero-name {
     font-size: 18px;
