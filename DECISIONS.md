@@ -3536,7 +3536,7 @@ Eric's eight changes, built across G-REX's lanes (his art, sounds and power rule
   jolts for 280 ms), its fuse fizzes, then he fires the 24 shots one every 130 ms (about 3 s) while **sweeping it
   right, back across to the left and right again** (tilts of up to 26 degrees, drawn once per tilt), his other hoof
   pumping his sparkler. Each shot leaves from the candle's top along its tilt (a few degrees either way), so the
-  volley fans out across the board. The moment is 7.1 s (was 5 s), before the crowd's clock starts, as every power's.
+  volley fans out across the board; a shot is two squares tall with its trail, so it reads on a phone. The moment is 7.1 s (was 5 s), before the crowd's clock starts, as every power's.
 - **Firework whistles** (`grex-sounds.ts`, synthesised): each shot plays a rising whistle, one of three (a quick bright
   one, a long low one, one with a warble), up to 7% higher or lower, and about one shot in three ends in a crackle
   high up. Each whistle sits about 10 dB under a move; the whole volley at once (24 overlapping whistles, every one
@@ -3566,7 +3566,8 @@ Eric's eight changes, built across G-REX's lanes (his art, sounds and power rule
     engine's search inside `page.evaluate`; Playwright reports any protocol failure of such a long-held call that way.
     A page id set before the match was unchanged after the failure, the engine answered the same search a moment
     later, and every search the page started had finished. The test now starts the search in the page and polls for
-    its answer (`engineTop` in `e2e/helpers.ts`), never holding an evaluate open while the engine thinks. Details in
+    its answer (`engineTop` in `e2e/helpers.ts`), never holding an evaluate open while the engine thinks. The same
+    failure hit Ginger's power test in the full run, so `boss-powers.spec.ts` polls too. Details in
     `.claude/LESSONS.md`.
   - A piece burning shows for 1.5 s as the boss's turn begins; the test looked for it after its own wait for the turn
     to change, so under load it sometimes looked too late, and when two tiles burnt at once its locator matched two
@@ -3575,8 +3576,9 @@ Eric's eight changes, built across G-REX's lanes (his art, sounds and power rule
 - **Checking it:** `packages/chess/test/grex.test.ts` (the schedule, the targets 3 ahead, the shadows' timing, the
   king's fizzle), `packages/app/test/grex.test.ts` (the slam and the sweep, the whistles and the volley's loudness,
   the countdown, the shadows on screen, the pip column), `e2e/grex.spec.ts` (shadows and countdowns turn by turn on
-  phone and desktop, the pips' place, the dock under the board at six computer sizes), `e2e/perf.spec.ts` (the
-  launch, and twenty tiles and shadows late in a long game, on a phone slowed 4x).
+  phone and desktop, the pips' place, the dock under the board at six computer sizes), `e2e/boss-character.spec.ts`
+  (on a computer the God King is now under the board), `e2e/perf.spec.ts` (the launch, and twenty tiles and shadows
+  late in a long game, on a phone slowed 4x: p95 17 ms, 1-3% of frames dropped, as on the plain board).
 
 ## The God King, redrawn as pixel art (Oct 8, 2026)
 
