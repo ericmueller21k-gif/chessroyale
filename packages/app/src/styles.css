@@ -369,6 +369,9 @@ p {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
+  /* Chessground's board size, which it writes on the wrap (---cg-width) each time it sizes the board: a whole
+     multiple of 8 device pixels, a hair smaller than the wrap. Every overlay on the squares is sized by it. */
+  --cg-size: var(---cg-width, 100%);
 }
 
 /* On a phone, size the main board so the controls below it stay on screen. */
@@ -725,6 +728,8 @@ p {
   .screen.game .board-area {
     grid-column: 1;
     grid-row: 3 / 5;
+    /* (8 px, as on a phone: the move clock's bars sit in the gaps above and below the board.) */
+    gap: 8px;
   }
   .screen.game .board-area .board-wrap {
     width: min(100%, calc(100dvh - 215px));
@@ -749,6 +754,14 @@ p {
   }
   .mini-tower-body {
     height: 300px;
+  }
+  /* Quick chat sits under the panel beside the board (the vote results, the waiting banner, the power-up picks). The
+     panel keeps one height in every phase of a turn (room for five vote rows, yours and the result line), so the
+     chat under it stays put instead of jumping down at each reveal and back up at each move (Eric, Oct 9). */
+  .screen.game:has(> .under-board) > .play-footer,
+  .screen.game:has(> .under-board) > .poll {
+    min-height: 236px;
+    align-content: start;
   }
 }
 
@@ -1540,14 +1553,18 @@ button.history-label {
   opacity: 0.12;
   transition: opacity 0.4s;
 }
+/* Exactly on its square: eighths of chessground's own board (--cg-size), at any size, zoom or display scale. Square
+   corners and the glow inside, so nothing of it reads as wider than the square. */
 .square-ring {
   position: absolute;
-  width: 12.5%;
-  height: 12.5%;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
   box-sizing: border-box;
   border: 4px solid #2fd27a;
-  border-radius: 6px;
-  box-shadow: 0 0 14px rgba(47, 210, 122, 0.7);
+  border-radius: 2px;
+  box-shadow: inset 0 0 10px rgba(47, 210, 122, 0.65);
   pointer-events: none;
   z-index: 3;
   animation: ring 500ms ease-out;
@@ -1733,17 +1750,25 @@ button.history-label {
   }
 }
 
-/* ---- The move clock: a thin bar along the board's top edge ---- */
+/* ---- The move clock: a bar along the board's top edge (and its mirror along the bottom edge) ---- */
 
+/* The bar's thickness (Eric, Oct 9: a few pixels thicker than the old 3 px; set it back to 3px if it's too much).
+   It sits in the 8 px gap between the board and the line above it (or the row below), never over the squares. */
+:root {
+  --timer-bar-h: 6px;
+}
 .board-wrap {
   container-type: inline-size;
 }
 .timer-bar {
   position: absolute;
   left: 0;
-  right: 0;
-  top: -3px;
-  height: 3px;
+  /* (Chessground's board, not the wrap: up to 8 device pixels narrower. See .board-wrap.) */
+  width: var(--cg-size, 100%);
+  top: calc(-1 * var(--timer-bar-h));
+  height: var(--timer-bar-h);
+  border-radius: 2px;
+  overflow: hidden;
   display: flex;
   justify-content: center;
   background: color-mix(in srgb, var(--text) 8%, transparent);
@@ -1752,6 +1777,92 @@ button.history-label {
 }
 .timer-fill {
   height: 100%;
+}
+/* The mirror under the board (TIMER_BAR_BELOW in components/Countdown.tsx turns it off). */
+.timer-bar.below {
+  top: var(--cg-size, 100%);
+}
+
+/* ---- The small clock at the board's top right: this move's seconds and your bank (components/BoardClock.tsx) ---- */
+
+/* In the line above the board, level with its text, right-aligned with the board's edge: never over the squares or
+   the bar, and out of the layout (absolute), so nothing moves when it comes and goes. */
+.board-clock {
+  position: absolute;
+  /* (Level with chessground's right edge, a hair inside the wrap's.) */
+  right: calc(100% - var(--cg-size, 100%));
+  bottom: calc(100% + 7px);
+  height: 17px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+.bc-turn {
+  min-width: 1.9em;
+  text-align: right;
+}
+.bc-turn small {
+  margin-left: 1px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.bc-bank {
+  color: var(--muted);
+}
+.bc-turn + .bc-bank {
+  padding-left: 4px;
+  border-left: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+}
+.bc-bank.low {
+  color: var(--danger);
+}
+/* The other team's clock, or yours once you've moved: just information. */
+.board-clock.theirs .bc-turn,
+.board-clock.done .bc-turn {
+  color: var(--muted);
+}
+/* Your last 5 seconds. */
+.board-clock.urgent {
+  box-shadow: 0 0 0 1.5px var(--danger);
+}
+.board-clock.urgent .bc-turn,
+.board-clock.urgent .bc-turn small {
+  color: var(--danger);
+}
+/* The line above the board beside the clock. The clock counts this move's seconds down from its allowance, so the
+   line's own "⏱ 20 s" shows only when it's lit (the clock went up: "⏱ 15 s ▲"). On a phone the line is barely wider
+   than the board, so its text is centred in the room left of the clock, and gives up words where it must. */
+.board-area:has(.board-clock) .clock-part:not(:has(.clock-note.up)) {
+  display: none;
+}
+@media (max-width: 899px) {
+  .board-area:has(.board-clock) > .opening-name {
+    padding-right: 104px;
+  }
+}
+@media (max-width: 429px) {
+  .board-area:has(.board-clock) > .opening-name:has(.clock-note.up) .pick-for {
+    display: none;
+  }
+}
+@media (max-width: 374px) {
+  .board-area:has(.board-clock) > .opening-name .on-team {
+    display: none;
+  }
 }
 
 /* ---- Round start / Round end: banner and a big 3-2-1 on the board ---- */

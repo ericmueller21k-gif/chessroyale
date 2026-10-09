@@ -400,6 +400,24 @@ The boss's turn at move 25 went from every frame dropped (p95 200 ms on the comp
   25`. Frame times late in the match must match the early ones. The same script runs `clown`, `crowd` and `online` (an
   online raid on a local server).
 
+## A ring a few pixels off its square (Oct 9, 2026)
+
+**Eric saw:** on his computer, the green ring on the crowd's move sat a little low and to the side of its square.
+
+**The cause:** chessground draws the squares in a box it rounds down to a whole multiple of 8 device pixels, up to
+8 px smaller than the board's wrap. The ring was placed in % of the wrap, so the error grew toward the board's far
+side: 1-4 px on most squares, more at a fractional display scale (Eric's is 125%). At the tests' sizes the gap was
+small or zero, and no test compared an overlay with the square under it.
+
+**How it was found:** a script measured the ring's box against chessground's `square.last-move` box and the wrap
+against `cg-container`, at several widths and display scales (1, 1.1, 1.25, 1.5, 3).
+
+**The rule:**
+- Anything drawn over the squares sizes and places itself in eighths of chessground's board (`--cg-size`, from the
+  `---cg-width` chessground writes on the wrap), never in % of the wrap.
+- Check an overlay against the square it marks, within 1 px, at a size where the rounding gap is widest (wrap width
+  times the display scale just under a multiple of 8), not only at the test phone's size.
+
 ## A dozen sprites, a dozen loops (Oct 9, 2026)
 
 **Found before it shipped:** G-REX's fire can put a dozen burning tiles on the board at once, with fireballs and
