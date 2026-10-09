@@ -35,7 +35,13 @@ export function useTicks(secs: number, from = TICK_FROM_SECONDS, active = true) 
 }
 
 /**
- * The move clock as a thin bar snug to the top edge of the board: full when
+ * The same bar mirrored under the board (Eric, Oct 9: "might pull this out later"). Set to false to take it out; the
+ * bar's thickness is --timer-bar-h in styles.css.
+ */
+export const TIMER_BAR_BELOW = true;
+
+/**
+ * The move clock as a bar snug to the top edge of the board (and mirrored along the bottom edge): full when
  * the clock starts, shrinking from both ends towards the middle until it's
  * gone at the deadline, and fading from dark green through yellow to red as time
  * runs out. It ticks every second for the last 10 seconds.
@@ -60,10 +66,19 @@ export function TimerBar({
   useTicks(secs, TICK_FROM_SECONDS, now >= startsAt);
   // Dark green (hue 135) at full time down to red (hue 0) at none.
   const color = `hsl(${Math.round(135 * frac)} 70% ${Math.round(42 - 6 * frac)}%)`;
+  // (A new element for each bar: one element can't be drawn in two places.)
+  const fill = () => <div class="timer-fill" style={{ width: `${frac * 100}%`, background: color }} />;
   return (
-    <div class="timer-bar" role="timer" aria-label={`${secs} seconds left`}>
-      <div class="timer-fill" style={{ width: `${frac * 100}%`, background: color }} />
-    </div>
+    <>
+      <div class="timer-bar" role="timer" aria-label={`${secs} seconds left`}>
+        {fill()}
+      </div>
+      {TIMER_BAR_BELOW && (
+        <div class="timer-bar below" aria-hidden="true">
+          {fill()}
+        </div>
+      )}
+    </>
   );
 }
 

@@ -100,17 +100,13 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
       draggable: { enabled: !small, showGhost: true },
       premovable: { enabled: false },
       drawable: { enabled: false, visible: true },
+      // Chessground draws its squares in a box it shrinks to a whole multiple of 8 device pixels (up to 8 px smaller
+      // than the wrap at a fractional zoom or display scale), and writes that exact size to ---cg-width on the wrap
+      // every time it sizes the board. Overlays size and place themselves by it (--cg-size in styles.css), never by
+      // the wrap: a ring placed in % of the wrap drifted off its square by a few pixels toward the board's far side.
+      addDimensionsCssVarsTo: el.current!.parentElement!,
     });
-    // Chessground sizes its board to whole device pixels (a hair smaller than the wrap): overlays use its exact size.
-    const syncSize = () => {
-      const c = el.current?.querySelector("cg-container");
-      if (c) el.current!.parentElement!.style.setProperty("--cg-size", `${c.getBoundingClientRect().width}px`);
-    };
-    const resize = new ResizeObserver(() => {
-      api.current?.redrawAll();
-      syncSize();
-    });
-    syncSize();
+    const resize = new ResizeObserver(() => api.current?.redrawAll());
     resize.observe(el.current!);
     return () => {
       resize.disconnect();
