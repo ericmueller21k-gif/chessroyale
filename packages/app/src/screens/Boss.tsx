@@ -260,9 +260,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
             {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
             {slewQueen && (
-              <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="bannerStart" />
+              <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="queenGasp" />
             )}
-            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} sound="bossRoar" />}
+            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} sound="queenGasp" />}
             {showCard && (
               <div class={`boss-intro${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
                 <span class="boss-intro-icon" aria-hidden="true">

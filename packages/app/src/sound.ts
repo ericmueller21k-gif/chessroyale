@@ -48,7 +48,7 @@ const SAMPLE_FILES = {
   gkLastGrunt2: "/sounds/god-king/last-grunt2.mp3",
   gkLastGroan: "/sounds/god-king/last-groan.mp3",
   bannerStart: "/sounds/banner/start.mp3",
-  bossRoar: "/sounds/banner/boss-roar.mp3",
+  queenGasp: "/sounds/banner/queen-gasp.mp3",
   menuOpen: "/sounds/menu/open.mp3",
   menuClose: "/sounds/menu/close.mp3",
   menuSelect: "/sounds/menu/select.mp3",
@@ -314,7 +314,7 @@ export type SoundName =
   | "gkLastGrunt2"
   | "gkLastGroan"
   | "bannerStart"
-  | "bossRoar"
+  | "queenGasp"
   | "menuOpen"
   | "menuClose"
   | "menuSelect"
@@ -390,7 +390,8 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gkLastGrunt2: (t) => sample("gkLastGrunt2", t, 0.9),
   gkLastGroan: (t) => sample("gkLastGroan", t, 0.95),
   bannerStart: (t) => sample("bannerStart", t, 0.9),
-  bossRoar: (t) => sample("bossRoar", t, 0.9),
+  // A queen taken, either way (QUEEN SLAIN!, QUEEN DOWN!): her short gasp, quieter than a move.
+  queenGasp: (t) => sample("queenGasp", t, 0.9),
   menuOpen: (t) => sample("menuOpen", t, 0.7),
   menuClose: (t) => sample("menuClose", t, 0.7),
   menuSelect: (t) => sample("menuSelect", t, 0.8),
