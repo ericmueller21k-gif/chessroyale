@@ -5,6 +5,7 @@ import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKi
 import { brilliance, type Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
+import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { ChatSection, UnderBoard } from "../components/QuickChat.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
@@ -101,12 +102,13 @@ export function WatchScreen({
       <Hud match={match} />
       <div class="board-area">
         <div class="opening-name">
-          <strong>{sideName(side)} team</strong> is choosing · you're on <strong>{sideName(team)}</strong>
+          <strong>{sideName(side)} team</strong> is choosing<span class="on-team"> · you're on <strong>{sideName(team)}</strong></span>
         </div>
         <div class="board-row">
           <EvalBar fen={board.fen} orientation={team} evaluate={(f) => match.evaluate(f)} />
           <Board fen={board.fen} orientation={team === "w" ? "white" : "black"} lastMove={board.lastMove}>
             {!counting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={Math.max(1, deadline - startsAt)} />}
+            <BoardClock match={match} turn={!counting && deadline > 0 ? { startsAt, deadline, yours: false } : null} />
             <LiveGhosts match={match} fen={board.fen} orientation={team === "w" ? "white" : "black"} />
           </Board>
         </div>
@@ -306,6 +308,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             />
           )}
           {played && !alone && !stand && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
+          {!match.boss && <BoardClock match={match} turn={null} />}
           {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
           {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} />}
         </Board>

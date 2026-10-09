@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { applyMove, inCheck, legalMoves, queenInDanger, sideToMove, toSan } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
+import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar, knownEval } from "../components/EvalBar.tsx";
 import { kingTurn, type KingCue } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
@@ -182,11 +183,15 @@ export function PlayScreen({
             <BossHeading side={side} note={alone && waiting ? "the boss is thinking" : `${doneCount}/${alive.length} picked`} />
           ) : match.settings.mode === "crowd" ? (
             <>
-              Your pick for <strong>{side === "w" ? "White" : "Black"}</strong> ·{" "}
+              {/* (On a phone, dropped while the lit "▲" note is in the line, to leave room for the clock at the board's
+                  top right.) */}
+              <span class="pick-for">Your pick for </span>
+              <strong>{side === "w" ? "White" : "Black"}</strong> ·{" "}
               {clock !== undefined && !waiting && (
-                <>
+                // (Beside the board's own clock, only the lit "more time now" note shows: see styles.css.)
+                <span class="clock-part">
                   <ClockNote match={match} seconds={clock} /> ·{" "}
-                </>
+                </span>
               )}
               <span class="pick-count">
                 {doneCount}/{alive.length} picked
@@ -202,6 +207,7 @@ export function PlayScreen({
           <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows}>
             {match.boss?.powers && !history.browsing && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
+            {match.settings.mode === "crowd" && !match.boss && deadline > 0 && <BoardClock match={match} turn={{ startsAt, deadline, yours: true, done: waiting }} />}
             {intro && (
               <CenterCount
                 label="Round start"
