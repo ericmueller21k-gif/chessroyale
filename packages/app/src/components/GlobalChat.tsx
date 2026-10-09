@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { GLOBAL_CHAT, chatSay, defaultChatPicks, homeChatButtons, type ChatSay } from "@chessroyale/core";
 import { account, mustSignInToPlayOnline, onAccountChange } from "../account.ts";
 import { globalChat, type GlobalLine } from "../global-chat.ts";
+import { chatOff, onPrefsChange, setChatOff } from "../prefs.ts";
 import { openProfile } from "../profile-nav.ts";
 
 /**
@@ -64,16 +65,18 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
   const [menu, setMenu] = useState<GlobalLine | null>(null);
   const feed = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  // Chat off (Settings, the same switch as quick chat): nothing is fetched or shown.
+  const [off, setOff] = useState(chatOff);
+  useEffect(() => onPrefsChange(() => setOff(chatOff())), []);
   useEffect(() => {
-    const close = globalChat.open();
-    const off = globalChat.on(() => redraw((n) => n + 1));
+    const offStore = globalChat.on(() => redraw((n) => n + 1));
     const offAccount = onAccountChange(() => redraw((n) => n + 1));
     return () => {
-      close();
-      off();
+      offStore();
       offAccount();
     };
   }, []);
+  useEffect(() => (off ? undefined : globalChat.open()), [off]);
   const p = account().profile;
   const you = p?.user.id;
   const lines = globalChat.lines();
@@ -98,6 +101,19 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
   const busy = waitS > 0 || globalChat.sending;
   const muted = globalChat.mutedCount();
   const status = globalChat.error && waitS === 0 ? globalChat.error : waitS > 0 ? `Next message in ${waitS} s` : `One message every ${GLOBAL_CHAT.gapMs / 1000} s`;
+  if (off) {
+    return (
+      <section class="gchat off" aria-label="Global chat">
+        <h2 class="fd-label">GLOBAL CHAT</h2>
+        <div class="gchat-guest">
+          <span>Chat is off on this device.</span>
+          <button type="button" class="gchip" onClick={() => setChatOff(false)}>
+            Turn chat on
+          </button>
+        </div>
+      </section>
+    );
+  }
   return (
     <section class="gchat" aria-label="Global chat">
       <div class="gchat-title">

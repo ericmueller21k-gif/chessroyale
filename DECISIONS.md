@@ -1743,6 +1743,83 @@ could see the lobby chat." The `social` delegate's calls:
     arrived. The only move was the queue's own "Unranked" line appearing at the fill, which moves everything under it
     down 28 px.
 
+### Global chat on the home page (Eric, Oct 9, 2026)
+
+Eric marked a "GLOBAL CHAT" box in the computer's right column, under Playing now: "Simulate slow bot chat for beta,
+timestamp of chat, name, icon, rating if possible, limited to 1 message per 30s". The director's brief: preset lines
+only for now, desktop only, signed-in players post, guests read, bots behind one switch. The `social` delegate's calls:
+
+- **Where:** the computer's home page only (the right column from 1024 px, under Playing now), filling the rest of
+  the column's height: the feed scrolls inside it, the buttons stay at its foot. Not the queue (the lobby has its own
+  chat in the centre), the shop, the profile or Settings, and not on a phone yet. The hub owns the column; the panel
+  is one self-contained component (`components/GlobalChat.tsx`) placed after Playing now.
+- **Preset lines only, as in quick chat.** No text box anywhere, and the server takes only a line's id
+  (`canSayHome`, `core/chat.ts`):
+  - **A new free "Lobby" pack, for the home page only** (20 lines): Hey everyone!, Morning all!, Evening all!,
+    Welcome!, I'm back!, Anyone up for a raid?, Anyone for 50 v 50?, Queueing now, join me!, One more game?, Just won
+    one!, Beat the boss!, Knocked out early…, That was close!, The crowd was wild!, That boss is tough!, GG all!,
+    Thanks for the games!, Be right back, Bye for now!, See you on the board!. It isn't in the shop, the profile's
+    picks or a match (a match's server refuses its lines).
+  - **The general lines:** Hello, Reactions and Sporting lines of every pack you own (the free ones, and God King,
+    Winter and Spicy once got). **Plans** ("Defend the king!") are left out: they're orders to a team, and there's no
+    team on the home page.
+  - **Emoji:** every emoji pack you own.
+  - **The buttons** are three tabs: **Lobby** (the pack), **Yours** (your profile's picked lines that suit the home
+    page) and **Emoji** (your picked emoji). Owned packs reach it through your picks, as in matches; the server checks
+    ownership, not picks, as in matches.
+- **Each line shows** its time ("2:41 PM" today, "Oct 8" before), the icon (a drawing, an older account's emoji, else
+  a pawn), the name, the rating if the player has one, and the line. Your own lines say "You", in gold. Names,
+  ratings and icons come from the account on the server, never from the request. Nothing private goes out: no
+  email or sign-in method. A line does carry the account id, so tapping a name can open the profile (ids are random;
+  a player who posts in a public room can be looked up, like anyone in a shared lobby).
+- **The limit: one message per account every 30 s** (`GLOBAL_CHAT.gapMs`), enforced by the live hub. It's checked
+  against the last line kept too, so a restart doesn't reset it. The app mirrors it: after a line, every button
+  greys out with "Next message in 28 s", also after a reload (your own last line says when). The server's 429
+  carries how long to wait, and the app takes that too.
+- **Who can post:** signed-in players, wherever a way to sign in is set up (production), the same rule as online
+  play. Guests read, with "Sign in to chat. Guests can read." and a Sign in button. Banned players can't post (fair
+  play's ban). Locally, with no sign-in set up, anyone can post, as anyone can play online there (so the e2e can).
+- **The server:** the existing live hub Durable Object (`live-hub.ts`) holds one shared room (`server/global-chat.ts`,
+  pure and tested). It keeps the last 50 lines (`GLOBAL_CHAT.keep`, nothing older than a day) in its storage, so a
+  newcomer sees recent chat and a deploy doesn't wipe it.
+- **No new socket or poll.** There's no presence socket: presence is the live line's poll (`GET /api/live`, every 5 s
+  while a front-door screen is open). The chat rides on it: `?chat=N` asks for the lines after N, and the answer
+  carries only those (usually none). Each Worker instance keeps the room for 3 s, like the live line's numbers. So a
+  line reaches others within about 8 s, which suits a room limited to one line in 30 s. Posting is
+  `POST /api/chat {say}`, whose answer brings the poster's view up to date at once. Requests without `?chat` (matches'
+  heartbeats) are unchanged.
+- **Drawn icons** never go in the lines (up to 16 KB each). A line carries the drawing's key (a hash of it), and the
+  app shows `/api/chat/icon/KEY`, which the browser caches for good (the key changes with the drawing). The hub keeps
+  only the icons of lines it still holds.
+- **Bots chatter for the beta**, behind one switch: **`GLOBAL_CHAT_BOTS` in settings.ts. Eric wants it off when the
+  game goes live** (set it to `false`).
+  - A bot says something about every 30-90 s (`GLOBAL_CHAT.botGapMs`), and the first 4-15 s after someone opens the
+    chat when nobody had it open, so a quiet room comes to life soon.
+  - **Only while someone has it open, with nothing running otherwise.** There's no timer or alarm: a bot's line is
+    made when an app asks for the chat and one is due. With nobody watching for over 15 s, nothing is said, and
+    nothing is made up for the gap when someone comes back.
+  - The names are the match bots' list, with the pawn icon, like the bots in a match's chat. Every bot line has a
+    **"bot" tag** after the name, and no rating. No bot speaks twice in six lines, and no line repeats in six.
+  - Their lines (`HOME_BOT_LINES`): hellos, "Anyone up for a raid?" and "Anyone for 50 v 50?" (most often),
+    results, good sport, and 👍 😂 🔥 🎉.
+- **Light:** at most 50 lines in memory and on screen (on the server and in the app). No per-frame work: the panel
+  redraws when a line arrives, and once a second only while your countdown runs. No new paid service: the live hub,
+  its storage (one small write per line) and the Worker, as before.
+- **Mute and report:**
+  - Tapping a name gives Profile and Mute, in place of the buttons.
+  - Mute hides that player's lines on this device (remembered, up to 200 players). The header shows "🔇 2 muted ·
+    unmute" to bring them all back.
+  - Report is on the profile, as before (fair play's reports).
+  - Quick chat's "Chat off" switch (Settings) turns this chat off too. Nothing is fetched then, and the panel says
+    so, with "Turn chat on".
+- **Tested:** `core/test/global-chat.test.ts` (the presets-only rule, the lobby pack kept out of matches and the
+  shop, the buttons, the bots' lines and turns), `server/test/global-chat.test.ts` (the 30 s limit, through a
+  restart; presets only; the bot tag; bots only while watched, never catching up; the switch off; the live hub's
+  relay, history, restart and icons; the API: guests read but can't post where sign-in is set up, banned players
+  can't post, no email in what goes out), `app/test/global-chat.test.ts` (the 50-line cap, the mirrored limit, mute)
+  and `e2e/global-chat.spec.ts` (computer: post a line, a second player sees it, the buttons rest, the server's 429,
+  free text refused, the wait kept through a reload, an emoji, a bot's tagged line, mute; phone: no panel).
+
 ## No flash between a match's screens (Oct 6, 2026)
 
 Eric: in a solo boss raid on his phone, the screen flashed white between moves.
