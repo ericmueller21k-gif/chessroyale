@@ -487,7 +487,9 @@ state (`powers.burnt`) before expecting it on screen.
 **The rule:**
 - Never await long app work (an engine search, a server round trip) inside `page.evaluate`. Start it in the page, keep
   the answer on `window`, and poll for it from the test. ("Execution context was destroyed" without a navigation is
-  this.) `boss-powers.spec.ts`, `crowd.spec.ts`, `formats.spec.ts` and `boss-character.spec.ts` still await
-  `topMovesFor` inside an evaluate: move them to `engineTop` when they're next touched.
+  this; it hit Ginger's test again in the full run while this was being fixed, so `boss-powers.spec.ts` uses
+  `engineTop` too.) `crowd.spec.ts`, `formats.spec.ts` and `boss-character.spec.ts` still await `topMovesFor` inside
+  an evaluate (two of them inside a 12 s race, which only narrows it): move them to `engineTop` when they're next
+  touched.
 - Something on screen for a moment is checked by watching for it from before it can appear, not by looking for it
   after a wait for something else.

@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { createLobbyFromHome, test } from "./helpers.ts";
+import { createLobbyFromHome, engineTop, test } from "./helpers.ts";
 
 /**
  * Boss powers, played through: the gingerbread man's freeze and blizzard, Boingo's pie and funhouse, alone (solo) on a
@@ -13,20 +13,19 @@ const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers
 async function playBest(page: Page) {
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await page.waitForTimeout(300);
-  await page.evaluate(async () => {
+  // (The engine's answer is polled for, never awaited inside the page: see engineTop.)
+  const { top } = await engineTop(page);
+  const { allowed, solo } = await page.evaluate(() => {
     const m = (window as any).match;
-    const fen = m.phase.board.fen;
-    const allowed: string[] | null = m.boss?.powers?.allowed ?? null;
-    let move: string | null = null;
-    if (m.runner) move = (await m.runner.topMovesFor(fen))[0]?.move ?? null;
-    else {
-      const [engine] = await m.engines();
-      const top = await engine.topMoves(fen, 8);
-      move = (allowed ? top.find((t: { move: string }) => allowed.includes(t.move))?.move : top[0]?.move) ?? allowed?.[0] ?? null;
-    }
-    if (allowed && move && !allowed.includes(move)) throw new Error(`hint ${move} isn't allowed`);
-    if (m.phase.kind === "play" && move) m.submit(move);
+    return { allowed: (m.boss?.powers?.allowed ?? null) as string[] | null, solo: !!m.runner };
   });
+  // (Solo, the runner's are already the allowed moves, as the judge sees them; online, this device's engine's are filtered.)
+  const move = solo ? (top[0]?.move ?? null) : ((allowed ? top.find((t) => allowed.includes(t.move))?.move : top[0]?.move) ?? allowed?.[0] ?? null);
+  if (allowed && move && !allowed.includes(move)) throw new Error(`hint ${move} isn't allowed`);
+  await page.evaluate((mv) => {
+    const m = (window as any).match;
+    if (m.phase.kind === "play" && mv) m.submit(mv);
+  }, move);
   await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
 }
 
@@ -54,14 +53,9 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   await expect(page.locator(".power-board .pw-ice")).toHaveCount(1);
   expect(p2.allowed.some((m: string) => m.startsWith(p2.frozen.square))).toBe(false);
   // (A move of the iced piece from the engine's unfiltered search, if it has one there: refused.)
-  const tried = await page.evaluate(async (sq) => {
-    const m = (window as any).match;
-    const r = m.runner;
-    const all: { move: string }[] = await r.top.get(r.opts.engines[0], m.phase.board.fen);
-    const mv = all.find((x) => x.move.startsWith(sq))?.move ?? null;
-    if (mv) m.submit(mv);
-    return mv;
-  }, p2.frozen.square);
+  const all = (await engineTop(page, "raw")).top;
+  const tried = all.find((x) => x.move.startsWith(p2.frozen.square))?.move ?? null;
+  if (tried) await page.evaluate((mv) => (window as any).match.submit(mv), tried);
   if (tried) await page.waitForTimeout(300);
   expect(await phase(page)).toBe("play");
 

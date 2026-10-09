@@ -52,26 +52,33 @@ export async function joinFromInvite(page: Page) {
 }
 
 /**
- * The engine's top moves for the position on the board (the runner's, ranked as the judge ranks them), without holding
- * a page.evaluate open while the engine thinks: the search starts in the page, its answer is kept on `window`, and the
- * test polls for it. An evaluate that awaited the search could fail now and then with "Execution context was destroyed,
- * most likely because of a navigation" although nothing navigated (.claude/LESSONS.md: "A navigation that never
- * happened").
+ * The engine's top moves for the position on the board, without holding a page.evaluate open while the engine thinks:
+ * the search starts in the page, its answer is kept on `window`, and the test polls for it. An evaluate that awaited
+ * the search could fail now and then with "Execution context was destroyed, most likely because of a navigation"
+ * although nothing navigated (.claude/LESSONS.md: "A navigation that never happened").
+ * - "judged" (default): the runner's, ranked as the judge ranks them (a solo match; online, this device's engine's top 8).
+ * - "raw": the runner's unfiltered search (the moves a power may forbid included).
  */
-export async function engineTop(page: Page, timeout = 60_000): Promise<{ fen: string; top: { move: string }[] }> {
-  const key = await page.evaluate(() => {
+export async function engineTop(page: Page, kind: "judged" | "raw" = "judged", timeout = 60_000): Promise<{ fen: string; top: { move: string }[] }> {
+  const key = await page.evaluate((kind) => {
     const w = window as unknown as { match: any; __top?: Record<string, unknown> };
     const m = w.match;
     const fen: string = m.phase.board.fen;
     const k = `${fen}#${Math.random().toString(36).slice(2)}`;
     const store = (w.__top ??= {});
     store[k] = null;
-    void m.runner.topMovesFor(fen).then(
+    const r = m.runner;
+    const search: Promise<unknown> = !r
+      ? m.engines().then(([e]: { topMoves: (f: string, n: number) => Promise<unknown> }[]) => e!.topMoves(fen, 8))
+      : kind === "raw"
+        ? r.top.get(r.opts.engines[0], fen)
+        : r.topMovesFor(fen);
+    void search.then(
       (top: unknown) => (store[k] = { fen, top }),
       (e: unknown) => (store[k] = { fen, top: [], error: String(e) }),
     );
     return k;
-  });
+  }, kind);
   let out: { fen: string; top: { move: string }[] } | null = null;
   await expect
     .poll(async () => (out = await page.evaluate((k) => ((window as unknown as { __top?: Record<string, unknown> }).__top?.[k] ?? null) as never, key)), { timeout })
