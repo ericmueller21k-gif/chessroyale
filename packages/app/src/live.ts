@@ -15,11 +15,22 @@ export interface PlayingNow {
   startedAt: number | null;
 }
 
+/** A running match's board (Crowd and raids): the position, the move just played, the crowd's top votes on it. */
+export interface LiveMatchBoard {
+  fen: string;
+  lastMove: string | null;
+  /** [SAN, count], most first (a final's one player: [SAN, 1]; none for a boss's move). */
+  votes: [string, number][];
+  ply: number;
+}
+
 export interface LiveCounts {
   online: number;
   matches: number;
   queue: number;
   playing: PlayingNow[];
+  /** One running match for the home page's live window (with the most people in it), or null. */
+  featured?: (PlayingNow & { board: LiveMatchBoard }) | null;
   waits: { crowd: number | null; boss: number | null };
   /** Seconds a matchmade lobby waits before bots fill it. */
   fillSeconds?: number;

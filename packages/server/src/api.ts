@@ -160,12 +160,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       const uid = await cachedUserId(sql, token, now);
       if (uid && firstSighting(uid, now)) {
         // Just arrived: the hub hears at once, and its numbers (which include you) refresh this instance's.
-        const counts = await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now).catch(() => null);
+        // (Typed as sent: RPC's types widen the votes' [SAN, count] pairs to plain arrays.)
+        const counts = (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now).catch(() => null)) as LiveCounts | null;
         if (counts) liveCache = { at: now, body: counts };
       } else if (uid) touch(uid);
     } else await touchSession(sql, token, now);
     if (!liveCache || now - liveCache.at > LIVE_CACHE_MS) {
-      if (env.LIVE) liveCache = { at: now, body: await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).liveCounts() };
+      if (env.LIVE) liveCache = { at: now, body: (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).liveCounts()) as LiveCounts };
       else {
         if (now - prunedAt > 10 * 60_000) {
           prunedAt = now;

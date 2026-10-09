@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, PREGAME_VOTES, RAID_SETTINGS, VARIABLE_CLOCK, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
-import { LAST_STAND_MS, applyMove, bossIntroTimeline, legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { LAST_STAND_MS, applyMove, bossIntroTimeline, legalMoves, sanLineToUci, toSan, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -282,6 +282,39 @@ describe("lobby: Crowd mode", () => {
     L.core.message("p2", { t: "augment", choice: "more" });
     L.advance(10_000);
     expect(L.last("p1", "round")!.moveClock).toBe(25);
+  });
+
+  it("the home page's live window: a running match reports its board and the crowd's top votes on the move just played (no names)", () => {
+    const L = setup({ ...modeSettings("crowd"), augments: false, firstStageRounds: 4, roundsPerStage: 2, boardIntroSeconds: 0 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone");
+    expect(L.core.liveSummary().board).toBeNull();
+    L.core.message("p1", { t: "start" });
+    L.advance(DEFAULT_SETTINGS.openingShowSeconds * 1000);
+    expect(L.core.liveSummary().board).toMatchObject({ ply: 0, lastMove: null, votes: [] });
+    for (let round = 0; round < 3; round++) {
+      for (const id of ["p1", "p2"] as const) {
+        const r = L.last(id, "round")!;
+        if (!r.watching) L.core.message(id, { t: "pick", key: r.key, move: legalMoves(r.board!.fen)[0]! });
+      }
+      if (L.last("p1", "round")!.watching && L.last("p2", "round")!.watching) L.advance(5000);
+      expect(L.hostScores("p1")).toBe(true);
+      const rev = L.last("p1", "reveal")!;
+      const b = L.core.liveSummary().board!;
+      expect(b.fen).toBe(rev.board!.fen);
+      expect(b.lastMove).toBe(rev.playedMove);
+      expect(b.ply).toBe(round + 1);
+      // The top three moves by votes, most first, the played one (the most popular) leading.
+      expect(b.votes.length).toBeGreaterThanOrEqual(1);
+      expect(b.votes.length).toBeLessThanOrEqual(3);
+      expect(b.votes[0]![0]).toBe(toSan(rev.fenBefore!, rev.playedMove!));
+      const tally = new Map<string, number>();
+      for (const p of rev.picks) if (p.move) tally.set(p.move, (tally.get(p.move) ?? 0) + 1);
+      expect(b.votes[0]![1]).toBe(Math.max(...tally.values()));
+      expect(b.votes.map((v) => v[1])).toEqual([...b.votes.map((v) => v[1])].sort((x, y) => y - x));
+      expect(JSON.stringify(b)).not.toMatch(/Ann|Bo|p1|p2|bot/);
+      L.advance(10_000);
+    }
   });
 
   it("live tallies: nobody sees picks before making their own; the watching team sees them; the bot plan is scored", () => {

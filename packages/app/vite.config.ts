@@ -41,7 +41,8 @@ function serviceWorker(): Plugin {
     closeBundle() {
       const files = listFiles(outDir)
         .map((f) => "/" + relative(outDir, f).split("\\").join("/"))
-        .filter((f) => f !== "/sw.js" && !f.endsWith(".webmanifest") && !f.endsWith(".txt"))
+        // (Not the live window's bot replays: only a computer's home fetches them, so phones never download them.)
+        .filter((f) => f !== "/sw.js" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.startsWith("/replays/"))
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
         .sort();

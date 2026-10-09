@@ -118,7 +118,6 @@ export function RightPanel({ onProfile, chat, onSignIn }: { onProfile: () => voi
             </div>
           );
         })}
-        {live && live.playing.length > 0 && <p class="fd-note">Watching a match from outside comes later.</p>}
       </section>
       {/* The home page's global chat (the social lane's: components/GlobalChat.tsx). */}
       {chat && <GlobalChat onSignIn={onSignIn} />}

@@ -9,6 +9,7 @@ import { useLive } from "../live.ts";
 import { BossFace } from "../components/BossCharacter.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
+import { LiveWindow } from "../components/LiveWindow.tsx";
 
 export const OPENING_KEY = "brc.openingMoves";
 const MODE_KEY = "brc.mode";
@@ -383,8 +384,8 @@ function Notice({ notice }: { notice: HomeNotice }) {
  * buttons. A note goes under the live line when a lobby you opened has closed. Light or dark is in Settings.
  *
  * On a computer (1024 px and wider, the side menu's frame) the play column is Play with friends and Boss alone, then
- * the mode picker, then PLAY at the bottom (Eric, Oct 9): the shop and your profile are in the side menu, and the room
- * above is kept for a live game.
+ * the mode picker, then PLAY at the bottom (Eric, Oct 9): the shop and your profile are in the side menu. From 1280 px
+ * the live window fills the room above (LiveWindow: a real match, or a bot match played back).
  *
  * With `queue` (you pressed PLAY), the home becomes the queue: on a phone the queue screen takes the whole screen, as
  * before; on a computer it fills in place of the play column, and your pawn shrinks to a card at the top of its column
@@ -438,6 +439,8 @@ export function HomeScreen({
   const live = useLive();
   // (The same line as the stylesheet's frame: from 1024 px the side menu has the shop and your profile.)
   const computer = useMedia("(min-width: 1024px)");
+  // (From 1280 px the play column sits beside your card, with room at its top for the live window.)
+  const wide = useMedia("(min-width: 1280px)");
   const [mode, setModeState] = useState<ModeChoiceId>(() => chosenMode().mode);
   const pickMode = (m: ModeChoiceId) => {
     setModeState(m);
@@ -581,9 +584,11 @@ export function HomeScreen({
         {hero}
         <div class="fd-play-col">
           {/*
-           * A computer (Eric, Oct 9): Play with friends and Boss alone, then the mode picker right above PLAY (it sets
-           * up what PLAY does), PLAY at the bottom. A phone: the picker, PLAY, then all four buttons.
+           * A computer (Eric, Oct 9): the live window (from 1280 px), Play with friends and Boss alone, then the mode
+           * picker right above PLAY (it sets up what PLAY does), PLAY at the bottom. A phone: the picker, PLAY, then all
+           * four buttons.
            */}
+          {wide && <LiveWindow />}
           {computer && actions}
           <div class="fd-modes" role="radiogroup" aria-label="Mode">
             {MODES.map((m) => (

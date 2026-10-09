@@ -258,7 +258,9 @@ export class Lobby extends DurableObject<Env> {
     if (!rec || !this.env.DB) return;
     const s = core.liveSummary();
     const kind = rec.auto ? "queue" : "private";
-    const key = `${s.phase}:${s.humans}:${s.alive}`;
+    // (With the live hub, a matchmade match's every new position too: the home page's live window can show its board.
+    // At most every 2 s.)
+    const key = `${s.phase}:${s.humans}:${s.alive}${this.env.LIVE && rec.auto && s.board ? `:${s.board.ply}:${s.board.votes.length}` : ""}`;
     const now = Date.now();
     // (The typical wait under PLAY is Default's: a Bots off wait would skew it.)
     const waitDue = rec.auto?.filledAt && !rec.auto.waitSaved && !rec.auto.botsOff;

@@ -588,6 +588,22 @@ export const FRONT_DOOR = {
 } as const;
 
 /**
+ * The home page's live window (a computer's; DECISIONS.md, "The live window"): a real match when one is running, else
+ * bot-match replays (packages/app/public/replays/crowd-bots.json, made by packages/sim/scripts/bot-replays.ts) played
+ * one after another on a cycle set by the clock, so everyone watching sees the same moment. More replays make the
+ * cycle longer (toward a day without repeats).
+ */
+export const LIVE_WINDOW = {
+  /** Seconds each crowd move shows (the vote, then the move): about what a Crowd round with bots takes. */
+  plySeconds: 9,
+  /** A final's moves, one player each: quicker. */
+  finalPlySeconds: 6,
+  /** The starting position before a replay's first move, and its result after its last. */
+  startSeconds: 6,
+  endSeconds: 14,
+} as const;
+
+/**
  * How you're matched (the home screen's "Matchmaking", for every mode; see DECISIONS.md, "Matchmaking types"):
  *   - default: real players; bots fill the empty seats once the queue has waited a minute;
  *   - botsoff: real players only; the lobby waits until it's full (a raid: see raidBotsOff*);

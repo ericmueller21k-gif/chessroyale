@@ -1,5 +1,8 @@
 import { FRONT_DOOR } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
+import type { LiveMatchBoard } from "./lobby.ts";
+
+export type { LiveMatchBoard };
 
 /**
  * The live line ("214 online · 9 matches running · 31 in queue") and the "playing now" list, from D1:
@@ -39,6 +42,7 @@ export const LIVE_SCHEMA = [
 
 export type LiveMode = "crowd" | "boss" | "classic";
 
+
 /** What a lobby says about itself. `over` (results) and a private lobby still waiting are taken off the list. */
 export interface LobbySummary {
   code: string;
@@ -54,6 +58,8 @@ export interface LobbySummary {
   /** A boss raid's boss (its strength). */
   bossElo: number | null;
   startedAt: number | null;
+  /** Crowd and raids, while playing: the board (the live hub keeps it for the home page's live window). */
+  board?: LiveMatchBoard | null;
 }
 
 export async function reportLobby(sql: Sql, s: LobbySummary, now: number): Promise<void> {
@@ -104,6 +110,12 @@ export interface LiveCounts {
   matches: number;
   queue: number;
   playing: PlayingNow[];
+  /**
+   * One running match to watch on the home page (the live hub only): a matchmade one (never a private lobby), the one
+   * with the most people in it, then the newest, with its board. Null when none is running (the window plays a bot
+   * match then).
+   */
+  featured?: (PlayingNow & { board: LiveMatchBoard }) | null;
   /** The typical wait in the queue (seconds, rounded to 5), by mode; null until there's history. */
   waits: { crowd: number | null; boss: number | null };
 }
@@ -141,6 +153,8 @@ export async function liveCounts(sql: Sql, now: number): Promise<LiveCounts> {
     matches: playing.length,
     queue: queue?.n ?? 0,
     playing: playing.slice(0, 8).map((r) => ({ mode: r.mode, alive: r.alive, total: r.total, bossElo: r.boss_elo, startedAt: r.started_at })),
+    // (Boards are the live hub's: D1 isn't written for every move.)
+    featured: null,
     waits: { crowd: await typicalWait(sql, "crowd", now), boss: await typicalWait(sql, "boss", now) },
   };
 }
@@ -218,11 +232,14 @@ export class LiveBoard {
       .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
     let queue = 0;
     for (const l of this.lobbies.values()) if (l.phase === "waiting" && l.kind === "queue" && l.updatedAt > fresh) queue += l.humans;
+    // (Matchmade only: a private lobby's game is its friends', not the front page's.)
+    const watch = playing.filter((l) => l.board && l.kind === "queue").sort((a, b) => b.humans - a.humans || (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
     return {
       online,
       matches: playing.length,
       queue,
       playing: playing.slice(0, 8).map((l) => ({ mode: l.mode, alive: l.alive, total: l.total, bossElo: l.bossElo, startedAt: l.startedAt })),
+      featured: watch ? { mode: watch.mode, alive: watch.alive, total: watch.total, bossElo: watch.bossElo, startedAt: watch.startedAt, board: watch.board! } : null,
       waits,
     };
   }
