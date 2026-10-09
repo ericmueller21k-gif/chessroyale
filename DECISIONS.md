@@ -1756,10 +1756,11 @@ only for now, desktop only, signed-in players post, guests read, bots behind one
 - **Preset lines only, as in quick chat.** No text box anywhere, and the server takes only a line's id
   (`canSayHome`, `core/chat.ts`):
   - **A new free "Lobby" pack, for the home page only** (20 lines): Hey everyone!, Morning all!, Evening all!,
-    Welcome!, I'm back!, Anyone up for a raid?, Anyone for 50 v 50?, Queueing now, join me!, One more game?, Just won
-    one!, Beat the boss!, Knocked out early…, That was close!, The crowd was wild!, That boss is tough!, GG all!,
-    Thanks for the games!, Be right back, Bye for now!, See you on the board!. It isn't in the shop, the profile's
-    picks or a match (a match's server refuses its lines).
+    Welcome!, Hello again!, Anyone up for a raid?, Anyone for 50 v 50?, Queueing now, join me!, One more game?, Just
+    won one!, Beat the boss!, Knocked out early…, What a nail-biter!, The crowd was wild!, That boss is tough!, GG
+    all!, Thanks for the games!, BRB, Bye for now!, See you on the board!. It isn't in the shop, the profile's picks
+    or a match (a match's server refuses its lines). No line uses "close" or "back": the home page's other buttons
+    are found by those words (Close, Back), in the app and its tests.
   - **The general lines:** Hello, Reactions and Sporting lines of every pack you own (the free ones, and God King,
     Winter and Spicy once got). **Plans** ("Defend the king!") are left out: they're orders to a team, and there's no
     team on the home page.
