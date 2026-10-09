@@ -24,8 +24,8 @@ describe("Hollow, the Darkness boss", () => {
     expect(ch.anims[kit.portrait.anim]).toBeTruthy();
   });
 
-  it("isn't playable yet: no boss in the roster uses his kit (the power rules add him)", () => {
-    expect(BOSS_ROSTER.some((b) => b.kit === "Hollow")).toBe(false);
+  it("is playable now: the roster's Hollow uses his kit, with the dark and Lights out", () => {
+    expect(BOSS_ROSTER.find((b) => b.kit === "Hollow")?.powers).toEqual({ passive: "dark", ultimate: "lightsout" });
   });
 
   it("is his own creature: charcoal fur, no green anywhere, a violet edge glow so he reads on the dark ground", () => {

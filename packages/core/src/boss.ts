@@ -74,7 +74,9 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout";
+/** Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual). */
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -103,6 +105,7 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "gingerbread", name: "Ginger", icon: "🍪", kit: "Ginger", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
   { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
   { id: "grex", name: "G-REX", icon: "🦖", kit: "G-REX", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
+  { id: "hollow", name: "Hollow", icon: "🌑", kit: "Hollow", offset: -100, powers: { passive: "dark", ultimate: "lightsout" } },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
@@ -223,8 +226,52 @@ export interface BossPowerState {
   candle?: { at: number; left: number; next?: number; waves?: CandleWave[] } | null;
   /** The first crowd turn a crowd piece stepped onto a burning tile (the God King's warning, once a match). */
   stepped?: number;
+  /**
+   * Hollow's dark: the squares covered (the dark belongs to the square, not the piece), each with the crowd turn it fell
+   * as and the last crowd turn it covers; and the squares whose dark cleared as this turn began.
+   */
+  dark?: DarkSquare[];
+  cleared?: string[];
+  /** Hollow's bulbs still lit as this turn began: his moves until he covers the next square (the last goes out as he does). */
+  bulbs?: number;
+  /** Hollow always plays Black: the usual side pick would have made the crowd Black, so he claimed the dark side before move 1. */
+  claimed?: boolean;
+  /**
+   * Hollow's dark: wrong move attempts into the dark this round (the match's round number), by player. Each costs
+   * darkTryCost off the turn's score; the darkTries-th ends that player's turn as a missed move. Never sent to screens.
+   */
+  tries?: { round: number; by: Record<string, number> };
+  /** Hollow's Lights out (his ultimate, at the start of his turn): the test once it has begun. Never sent to screens. */
+  lightsOut?: LightsOutTest | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
+}
+
+/** One of Hollow's dark squares: the crowd turn it fell as, and the last crowd turn it covers (darkTurns in all). */
+export interface DarkSquare {
+  square: string;
+  at: number;
+  until: number;
+}
+
+/**
+ * A round of Lights out: the pieces he names (piece letters; a type named twice needs both squares), the squares that
+ * answer it (every square holding a named type of his), and the time to find them.
+ */
+export interface LightsOutRound {
+  pieces: string[];
+  answers: string[];
+  ms: number;
+}
+
+/**
+ * Hollow's Lights out: after which crowd move it came (crowdMoves), its rounds, and once over, the pieces each player
+ * missed (people from their taps, bots from the seed).
+ */
+export interface LightsOutTest {
+  at: number;
+  rounds: LightsOutRound[];
+  missed?: Record<string, number>;
 }
 
 /**
@@ -252,7 +299,7 @@ export interface BurnEvent {
   fizzled?: boolean;
 }
 
-export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball";
+export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball" | "dark";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -262,6 +309,8 @@ export interface PowerEvent {
   squares?: string[];
   /** Of those, the ones that fizzled as they landed (the crowd's king stood there): no fire tile. */
   fizzled?: string[];
+  /** Hollow's first cover of the dark (the square of the piece he just moved, with his first-cover line). */
+  first?: true;
 }
 
 /** The settings behind the God King's Last Stand. */

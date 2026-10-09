@@ -10742,3 +10742,134 @@ img.qicon {
   border-radius: 14px;
   background: var(--fd-panel);
 }
+
+/* ---------------- Hollow's dark and Lights out (BossPowers.tsx, LightsOut.tsx; the characters' sprites) ---------------- */
+
+/* The dark over its squares: on one canvas over the pieces (it hides them), never taking a tap. */
+.pw-dark-board {
+  z-index: 3;
+}
+/* Markers on the dark squares (which, and how: forming, dark, thinning on its last turn, clearing). */
+.pw-dark,
+.pw-dark-check,
+.pw-cost {
+  position: absolute;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
+  pointer-events: none;
+}
+/* Check still shows on a king in the dark: the board's red glow, over the dark. */
+.pw-dark-check {
+  z-index: 4;
+  background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.85) 0%, rgba(231, 0, 0, 0.6) 30%, rgba(169, 0, 0, 0) 72%);
+  mix-blend-mode: screen;
+}
+/* Hollow casts from the board's corner: his frame is wider than the others'. */
+.pm-caster.pm-hollow {
+  left: -9%;
+  top: -27%;
+  width: 30%;
+}
+/* Your own wrong attempt into the dark: his slash on the square and a small "−5" rising off it. */
+.pw-dark-cost {
+  z-index: 5;
+}
+.pw-dark-slash {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+}
+.pw-cost {
+  display: grid;
+  place-items: center;
+  z-index: 6;
+  font: 800 calc(var(--cg-size, 100%) / 8 * 0.42) / 1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #fecdd3;
+  -webkit-text-stroke: max(1.5px, calc(var(--cg-size, 100%) / 8 * 0.05)) #4c0519;
+  paint-order: stroke fill;
+  text-shadow: 0 0 6px rgba(190, 18, 60, 0.75);
+  animation: pw-cost-rise 1600ms ease-out both;
+}
+@keyframes pw-cost-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(10%) scale(0.7);
+  }
+  14% {
+    opacity: 1;
+    transform: translateY(-10%) scale(1.15);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-45%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-70%) scale(1);
+  }
+}
+/* The tries left after a wrong attempt, in the dock's status line. */
+.dark-note {
+  color: #fda4af;
+  font-weight: 700;
+}
+/* His bulbs (the strip): one lit for each of his moves until he covers another square. Beside the rage meter. */
+.bulb-strip {
+  display: inline-block;
+  width: 33px;
+  aspect-ratio: 44 / 15;
+  margin-left: 6px;
+  vertical-align: -2px;
+}
+/* The darkness's banner: a violet-black band. */
+.fight-banner.power-cut.dark .fb-band {
+  background: linear-gradient(90deg, #05030b, #2e1065 22%, #1e0b3a 50%, #2e1065 78%, #05030b);
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(139, 92, 246, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.fight-banner.power-cut.dark .kc-label {
+  color: #ddd6fe;
+}
+.fight-banner.power-cut.dark .kc-text {
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    0 0 24px rgba(167, 139, 250, 0.95);
+}
+/* Lights out: the night on one canvas over everything on the board; his spot above the board's top edge; his words
+   above the board's top-left; every square takes a tap while a round is open. */
+.lo-board {
+  z-index: 5;
+}
+.lo-misses {
+  z-index: 6;
+}
+.lo-marks {
+  display: none;
+}
+.pm-hollow-spot {
+  position: absolute;
+  z-index: 8;
+  pointer-events: none;
+}
+.pm-line.lo-line {
+  top: auto;
+  bottom: 101%;
+  left: 2%;
+  translate: 0 0;
+  max-width: 34%;
+  z-index: 11;
+}
+.lo-taps {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cg-size, 100%);
+  height: var(--cg-size, 100%);
+  z-index: 9;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}

@@ -256,6 +256,31 @@ export interface NetBossPowers {
   stepped?: number | null;
   /** The test trigger: the ultimate is on its way (it comes as the next crowd turn begins). */
   ultNext?: boolean;
+  /**
+   * Hollow's dark (missing for other bosses): each dark square, the crowd turn it fell as and its last turn (it thins
+   * then); the squares whose dark cleared as this turn began; his bulbs still lit (his moves to his next cover); whether
+   * he claimed the dark side before move 1; and after which crowd move his Lights out came (null: not yet).
+   */
+  dark?: { square: string; at: number; until: number }[];
+  cleared?: string[];
+  bulbs?: number;
+  claimed?: boolean;
+  lightsAt?: number | null;
+}
+
+/**
+ * Hollow's Lights out, for every screen (each player sees their own taps judged). The clocks are stopped; every beat
+ * follows from `at` (server time) by lightsOutTimeline (boss-timing.ts).
+ */
+export interface NetLightsOut {
+  key: string;
+  at: number;
+  /** Each round: the pieces he names (piece letters), its seconds, and once it's over, the squares that answered it. */
+  rounds: { pieces: string[]; ms: number; answers?: string[] }[];
+  /** This player's taps judged, round by round: the squares found and the wrong ones. */
+  mine: { found: string[]; wrong: string[] }[];
+  /** Once the lights are back: the pieces this player missed in all (each cost lightsOutMiss). */
+  missed?: number;
 }
 
 /** A pre-game vote, for every screen: everyone's votes, each visible from `at` (server time). */
@@ -338,7 +363,14 @@ export type ClientMessage =
   /** Many judges, deep checks: this device's re-check of the job's close calls (sent after its "judged"). */
   | { t: "judgedDeep"; key: string; id: string; deep: MoveScore[] }
   /** Boss battle, admins only (testing): bring the boss's ultimate as the next crowd turn begins. */
-  | { t: "ultimate" };
+  | { t: "ultimate" }
+  /**
+   * Hollow's dark: a move attempt that touches a dark square, sent unchecked (the app can't show what's there). The
+   * server judges it: a legal move is this player's pick; an illegal one costs points and they pick again.
+   */
+  | { t: "darkTry"; key: string; move: string; away?: number }
+  /** Hollow's Lights out: this player taps a square in round `round` (0-based). */
+  | { t: "lightsTap"; key: string; round: number; square: string };
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
@@ -487,6 +519,14 @@ export type ServerMessage = { now: number } & (
   | { t: "voteCast"; key: string; playerId: string; option: number; at: number; side: "w" | "b" }
   /** Boss battle: the boss's move or strike (`until`: when the next crowd move starts). */
   | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean }
+  /**
+   * Hollow's dark, to the player who tried: `ok` the attempt was legal and is their pick (`move`, as played); else it
+   * cost darkTryCost (`tries` wrong so far this turn) and they pick again, or (`out`) their turn is over, as a miss.
+   * `refused`: not judged (it didn't touch the dark), nothing lost.
+   */
+  | { t: "darkTry"; key: string; move: string; ok: boolean; tries?: number; out?: boolean; refused?: boolean }
+  /** Hollow's Lights out: as it begins, at each round's end (the answers) and on each of this player's taps. */
+  | { t: "lights"; lights: NetLightsOut; boss: NetBoss; standings: NetStanding[] }
   /** To the host: play the boss's move. */
   | {
       t: "bossRequest";

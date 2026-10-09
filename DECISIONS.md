@@ -3868,3 +3868,91 @@ lights.
    ultimate's leap and smashes, the test stance), the dark-square and blackout looks, sounds. Behind `?wip=1`.
 2. `god-king` (boss powers): the rules above in core/chess/server, the tapping and penalties, the ultimate test, tests and
    e2e. Hollow joins the playable roster only when both are done.
+
+### Built: Hollow's rules, playable (Oct 9, 2026)
+
+Built by the `god-king` delegate on the characters' art (PR #119). **Hollow is playable now** in every boss mode (the
+raid online, Solo "Boss alone" and the Solo raid, and the Crowd's boss final): the random draw is among four bosses.
+Roster: `hollow`, icon 🌑, offset −100 like the others (self-balancing will move it), passive `dark`, ultimate
+`lightsout`. Every number is in `BOSS_POWERS` (`darkEvery` 3, `darkTurns` 10, `darkTryCost` 5, `darkTries` 5,
+`lightsOutRounds` 1/3 s, 2/4 s, 3/5 s, `lightsOutMiss` 10, `lightsOutBotHit`); the beats both sides time by are in
+`boss-timing.ts` (`LIGHTS_OUT`, `lightsOutTimeline`, `CLAIM_MS`, `POWER_FX.dark`, `DARK_FIRST_EXTRA_MS`).
+
+**Setup.** He's always Black and the crowd White, from the starting position (no opening moves; the raid's card says "A
+fresh game from the starting position"; the Crowd's boss final starts there too for him). When the usual side pick
+would have made the crowd Black (today only the `?side=b` test switch does), the intro plays his `claimDark` at the
+board's corner with his claim line before "START!" (2.4 s more intro).
+
+**The dark** (`boss-powers.ts`: `prepareTurn`, `chooseDark`, `bulbsAt`, `moveSquares`, `touchesDark`, `darkAttempt`)
+- After his 1st move and his 4th, 7th, 10th… (decided as the crowd's turn begins, from the seed): the 1st covers the
+  square of the piece he just moved; the others a random occupied square, never a king's, never one already dark.
+  **My call:** a seeded coin flip picks whose pieces (his or the crowd's), then a square of theirs, so it's roughly half
+  each.
+- A dark square lasts 10 crowd turns counting the one it falls on, thinning on its last (`darkItem` "thin"), clearing
+  as the next begins. It's the square's: a piece moving in is hidden, one moving out shows where it lands.
+- **The bulbs** (`powers.bulbs`, read by his kit's `lookOf`): his moves until his next cover: 1 before his first move,
+  then 3, 2, 1, 3… (one goes out with each move; the last as he covers, and they relight). **My call:** the strip
+  (`bulbStrand`) sits beside the rage meter in the boss bar, since three bulbs on his strand are a few pixels on a
+  phone; it plays the bulb going out with his move and the relight as the darkness lands.
+- **The cover's moment** (2.7 s, before the crowd's clock): "DARKNESS!" (sub "Dark on e5"), he casts from the board's
+  corner, the darkness pours from the void in his chest onto the square and gathers. **My call:** his line types out
+  in his text box over the board (the first cover's "Don't forget what's there. Forgetting costs." always, and that
+  moment holds 1.3 s longer so it can be read; later covers a taunt half the time); the dock just says "Darkness!",
+  because the long line was cut off in the phone's one-line dock.
+- **On the board** (`PowerBoard`): the dark on one canvas over the pieces (opaque over the piece on every frame), never
+  taking a tap. Check still shows on a king in the dark: the red glow is drawn over it. **My call:** stepping back
+  through the game keeps the dark on its squares (it belongs to the square), so the history buttons can't lift it.
+- **Tapping** (`Board.tsx`): a tap on a dark square selects it (chessground's green `selected`, round the cloud's edge),
+  nothing picked up and no dots. The next tap is the attempt from it; your own piece in plain sight picks that one up
+  instead; the same square again lets go. No dots from, onto or past a dark square. **My call:** a piece in the dark
+  can't be dragged (dragging would show it); tap, tap. A piece in plain sight can be dropped anywhere while the board
+  has dark squares; a drop that touches no dark square and isn't legal goes back, free, as before.
+- **What "touches" means** (my call): the start, the landing, every square a slide passes over (ranks, files,
+  diagonals, a pawn's double step), and a castling king's way on to his rook's corner. A knight's jump touches only
+  its two squares. A pawn from the dark reaching the last rank becomes a queen (a picker would say it's a pawn); a
+  visible pawn going into the dark gets the picker.
+- **The penalty** (`runner.darkTry`, the lobby's `darkTry`, solo's `darkTry`): an attempt touching the dark goes to the
+  server unchecked. Legal: it's the pick (the reply says so first). Illegal: −5 and you pick again, with a small
+  "−5" rising off the square and his red-violet slash on it, and "−5 · 4 tries left" in your dock; only you see it.
+  The 5th wrong attempt ends your turn as a missed move ("Out of tries."). The turn's score is the move's less 5 a
+  wrong attempt, never below `missedMoveScore` (−25). **My calls:** tries count per pick round, so the re-pick after
+  the God King's Last Stand starts afresh; an attempt the server finds doesn't touch the dark, or the move he took
+  back, is refused at no cost; bots never try (they know the board). Fair play counts dark turns as normal turns.
+
+**Lights out** (`lightsOutDue`, `chooseLightsOut`, `judgeTaps`, `botLightsMisses`; the lobby's `startLights`/`lightsStep`,
+solo's `lightsOutTurn`; on screen `components/LightsOut.tsx`)
+- **When:** at the start of his turn, after the crowd's move on the turn the shared meter was full as it began.
+  **My call:** no "RAGE!" banner for him: that turn the meter shows full and pulses (its only warning), and Lights out
+  comes before his move. The admins' trigger pressed during the crowd's turn brings it at the start of his turn right
+  after; pressed while he thinks, at his next. `?power=lightsout`: full as the 2nd turn begins, so it comes after the
+  crowd's 2nd move. Once a match; the meter is gone after.
+- **Beats** (about 25 s, nobody's clock running): "LIGHTS OUT!" 1.3 s; he drops onto his spot above the board and
+  smashes the bulbs, the board dimming at each (2.9 s); then each round: his prompt ("Find my queen."), a bar counting
+  its 3/4/5 s down, the late grace (0.3 s), the answers 1.8 s; then the lights come back from his spot (2.3 s) and he
+  plays his move. The server times it all and sends each player the test (their own taps judged); the app judges your
+  taps at once with the same function for instant feedback, and the server's word stands.
+- **Which pieces** (my calls): each round's from his pieces not named yet (never a pawn while he has others), then
+  those named before, then pawns. A type can come up twice in a round (both rooks): both squares are needed. Any square
+  holding a named type answers it, so if he names one rook either counts; at the round's end every such square shows.
+- **Taps** (my calls): as many tries as pieces in the round: a square holding a type still to find is found (it flashes
+  into view); a square already found, or another of a type already found as often as named, changes nothing; anything
+  else is wrong (his slash). Out of tries or out of time, the rest are missed (slashed, then shown in gold). A person
+  who taps nothing (or isn't there) misses every piece.
+- **Cost:** −10 a piece missed, off everyone still in, at the end. It isn't a move: nothing else changes (move counts,
+  time banks, the strikes' losses), and fair play never sees it. **My call:** bots in the crowd find each piece at
+  75%, 60%, 50% (rounds 1, 2, 3), from the seed: more pieces and less time each.
+- **My call:** a found or answered square that's dark stays dark under the night: Lights out never shows what's under
+  the dark. The dark squares there before are still there after.
+
+**Checking it**
+- `npm run frames:hollow -- <dir> [phone|desktop|both] [light|dark]` plays Boss alone against him with real taps
+  (`?side=b&power=lightsout`): the claim, the first cover, a wrong attempt, Lights out with a find, a wrong square and a
+  round run out; every painted frame, stills and GIFs.
+- Test switches: `?boss=hollow` (solo, or a raid link), `&power=lightsout` (or `dark`), `&side=b` (the claim).
+- Tests: `packages/chess/test/hollow.test.ts` (setup, the schedule and bulbs, the cover's squares, expiry, what a move
+  touches, attempts and the cutoff, the score floor, the rounds' pieces, tap judging, bots' rate, the timing, the
+  trigger and the switch, the cost, once only), `packages/server/test/boss-powers-lobby.test.ts` ("Hollow online":
+  attempts judged per player, the cutoff and the floor online; Lights out timed by the server, taps judged per player,
+  misses costing, then his move), `e2e/hollow.spec.ts` (phone and desktop: the cover, selecting a dark square, a wrong
+  attempt and the 5-try cutoff, a legal move out of the dark, a full Lights out from the admins' trigger with a find
+  and a miss).

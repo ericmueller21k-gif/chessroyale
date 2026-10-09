@@ -10,12 +10,19 @@ import { fenAtPly, pieceAt, type Base } from "./rules.ts";
  */
 export const BOSS_INTRO = { cardMs: 2600, replayMs: 2400, minStepMs: 110, maxStepMs: 260, bannerGapMs: 250, bannerMs: 1500 } as const;
 
-/** When each part of the intro happens (ms after it starts), for a game `plies` half-moves in. */
-export function bossIntroTimeline(plies: number) {
+/** Hollow claiming the dark side in the intro (when the crowd would have been Black): his `claimDark` and his line. */
+export const CLAIM_MS = 2400;
+
+/**
+ * When each part of the intro happens (ms after it starts), for a game `plies` half-moves in. `claimed`: Hollow claims
+ * the dark side after the card (`claimAt`), before "START!".
+ */
+export function bossIntroTimeline(plies: number, claimed = false) {
   const step = plies > 0 ? Math.max(BOSS_INTRO.minStepMs, Math.min(BOSS_INTRO.maxStepMs, BOSS_INTRO.replayMs / plies)) : 0;
   const replayAt = BOSS_INTRO.cardMs;
-  const bannerAt = replayAt + plies * step + BOSS_INTRO.bannerGapMs;
-  return { step, replayAt, bannerAt, total: bannerAt + BOSS_INTRO.bannerMs };
+  const claimAt = replayAt + plies * step;
+  const bannerAt = claimAt + (claimed ? CLAIM_MS : 0) + BOSS_INTRO.bannerGapMs;
+  return { step, replayAt, claimAt, bannerAt, total: bannerAt + BOSS_INTRO.bannerMs };
 }
 
 /** How long the boss's move stays on screen: longer when it takes your queen (its banner and roar). */
@@ -34,7 +41,13 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * he speaks and plays the crowd's move; the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700 } as const;
+export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2700 } as const;
+
+/** Hollow's first cover of the dark holds longer, for his first-cover line ("Don't forget what's there…"). */
+export const DARK_FIRST_EXTRA_MS = 1300;
+
+/** How long one power's moment holds the screen (ms). */
+export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (e.kind === "dark" && e.first ? DARK_FIRST_EXTRA_MS : 0);
 
 /**
  * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
@@ -43,8 +56,31 @@ export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, f
 export const FIRE_BURN_MS = 1500;
 
 /** How long a turn's power moments take, one after another. */
-export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX }[] | null | undefined): number {
-  return (events ?? []).reduce((t, e) => t + (POWER_FX[e.kind] ?? 0), 0);
+export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; first?: boolean }[] | null | undefined): number {
+  return (events ?? []).reduce((t, e) => t + powerFxMs(e), 0);
+}
+
+/**
+ * Hollow's Lights out, beat by beat (ms from its start), the same for the server and every screen. Nobody's clock runs.
+ *   0          "LIGHTS OUT!" (his banner) and his line, "It's time."
+ *   dropAt     he drops onto the board's top edge (his `lightsOut`) and smashes his three bulbs: the board dims a step at
+ *              each, night at the last.
+ *   rounds     each round: his prompt ("Find my queen."), its seconds to tap (BOSS_POWERS.lightsOutRounds) and the
+ *              usual late grace; then the answers show (`answerMs`) and the night closes over them again.
+ *   backAt     the lights come back (his `lightsBack`: a fresh strand from the void, the dawn spreading from his spot),
+ *              he returns to his corner (`backMs`), and his turn goes on: he plays his move.
+ */
+export const LIGHTS_OUT = { dropAt: 1300, dropMs: 2900, gapMs: 300, answerMs: 1800, backMs: 2300 } as const;
+
+/** Lights out's beats for its rounds' seconds (`ms` each) and the late grace on each round. */
+export function lightsOutTimeline(rounds: readonly { ms: number }[], graceMs: number) {
+  let t = LIGHTS_OUT.dropAt + LIGHTS_OUT.dropMs + LIGHTS_OUT.gapMs;
+  const out = rounds.map((r) => {
+    const round = { at: t, until: t + r.ms, answersAt: t + r.ms + graceMs };
+    t = round.answersAt + LIGHTS_OUT.answerMs;
+    return round;
+  });
+  return { rounds: out, backAt: t, total: t + LIGHTS_OUT.backMs };
 }
 
 /** Alone: how long the boss's move shows before your turn (the piece's slide, and a beat). */

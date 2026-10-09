@@ -484,6 +484,33 @@ export const BOSS_POWERS = {
    * that grows each turn: small, bigger, bigger again, then the fireball drops onto it.
    */
   candleAhead: 3,
+  /**
+   * Hollow's dark: after his first move he covers the square of the piece he moved, then another on every darkEvery-th
+   * of his moves (his 4th, 7th, 10th…), a random occupied square from the seed (his or the crowd's, never a king's, never
+   * one already dark). Each lasts darkTurns crowd turns: it belongs to the square, not the piece.
+   */
+  darkEvery: 3,
+  darkTurns: 10,
+  /**
+   * A move attempt that touches a dark square (starts on one, lands on one or passes over one) goes to the server
+   * unchecked: an illegal one costs darkTryCost points and the player picks again; the darkTries-th in a turn ends that
+   * player's turn as a missed move. A turn's score, penalties included, never goes below missedMoveScore.
+   */
+  darkTryCost: 5,
+  darkTries: 5,
+  /**
+   * Lights out (Hollow's ultimate, at the start of his turn, the clocks stopped): a memory test in rounds, each naming
+   * this many of his pieces with this long to tap where they are (the usual late grace on top).
+   */
+  lightsOutRounds: [
+    { pieces: 1, ms: 3000 },
+    { pieces: 2, ms: 4000 },
+    { pieces: 3, ms: 5000 },
+  ] as readonly { pieces: number; ms: number }[],
+  /** Each piece not found (a wrong square, or out of time) costs this many points. */
+  lightsOutMiss: 10,
+  /** Bots in the crowd find each piece with this chance, round by round (from the seed): fewer as the rounds get harder. */
+  lightsOutBotHit: [0.75, 0.6, 0.5] as readonly number[],
 } as const;
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */

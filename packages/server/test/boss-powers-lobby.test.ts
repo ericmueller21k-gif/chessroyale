@@ -193,7 +193,7 @@ describe("boss powers online", () => {
       L.core.message("p1", { t: "start" });
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
-    expect([...ids].sort()).toEqual(["clown", "gingerbread", "grex"]);
+    expect([...ids].sort()).toEqual(["clown", "gingerbread", "grex", "hollow"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {
@@ -264,5 +264,116 @@ describe("boss powers online", () => {
     const next = L.last("p1", "round")!;
     expect(pieceAt(next.board!.fen, square)).toBeNull();
     expect(next.board!.fen.split(" ")[0]).toBe(runner.boards.get(0)!.fen.split(" ")[0]);
+  });
+});
+
+describe("Hollow online", () => {
+  /** To the next crowd turn's round message (past the boss's move and his moments). */
+  const toRound = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+    return L.last("p1", "round")!;
+  };
+
+  it("the dark: each attempt into it is judged for its player alone; -5 a wrong one, the 5th ends the turn as a miss; a legal one is the pick", () => {
+    const L = raid({ bossId: "hollow" });
+    const r1 = L.last("p1", "round")!;
+    expect(r1.boss!.id).toBe("hollow");
+    expect(r1.board!.history).toEqual([]);
+    expect(r1.boss!.crowdSide).toBe("w");
+    crowdMove(L);
+    const req = hostBoss(L);
+    // After his first move he covers the square of the piece he moved, the same for everyone.
+    const b1 = L.last("p1", "boss")!;
+    expect(b1.boss.powers!.events).toEqual([{ kind: "dark", turn: 2, square: (req.allowed ?? legalMoves(req.fen))[0]!.slice(2, 4), first: true }]);
+    expect(b1.boss.powers).toEqual(L.last("p2", "boss")!.boss.powers);
+    expect(b1.until - L.now).toBeGreaterThanOrEqual(POWER_FX.dark);
+    const r2 = toRound(L);
+    const sq = r2.boss!.powers!.dark![0]!.square;
+    L.take("p1");
+    L.take("p2");
+    // p1 tries to move his piece from the dark: wrong, -5, only p1 hears it.
+    for (let i = 1; i <= 4; i++) {
+      L.core.message("p1", { t: "darkTry", key: r2.key, move: `${sq}a3` });
+      expect(L.last("p1", "darkTry")).toMatchObject({ ok: false, tries: i });
+      expect(L.last("p1", "darkTry")!.out).toBeUndefined();
+    }
+    expect(L.last("p2", "darkTry")).toBeUndefined();
+    // An attempt that doesn't touch the dark: refused, nothing lost.
+    L.core.message("p2", { t: "darkTry", key: r2.key, move: "a2a5" });
+    expect(L.last("p2", "darkTry")).toMatchObject({ ok: false, refused: true });
+    // p2 gets two wrong, then plays a legal move.
+    L.core.message("p2", { t: "darkTry", key: r2.key, move: `${sq}a3` });
+    L.core.message("p2", { t: "darkTry", key: r2.key, move: `${sq}h3` });
+    expect(L.last("p2", "darkTry")).toMatchObject({ ok: false, tries: 2 });
+    // p1's 5th: out of tries; their turn is over (everyone sees they're done).
+    L.core.message("p1", { t: "darkTry", key: r2.key, move: `${sq}a3` });
+    expect(L.last("p1", "darkTry")).toMatchObject({ ok: false, tries: 5, out: true });
+    expect(L.last("p2", "moved")).toMatchObject({ playerId: "p1" });
+    // (A pick after that is too late.)
+    L.core.message("p1", { t: "pick", key: r2.key, move: "a2a3" });
+    expect(L.core.save().phase).toBe("play");
+    const legal = legalMoves(r2.board!.fen).find((m) => !r2.boss!.powers!.dark!.some((d) => m.includes(d.square)))!;
+    L.core.message("p2", { t: "pick", key: r2.key, move: legal });
+    const score = L.last("p1", "scoreRequest")!;
+    expect(score.jobs[0]!.humanPicks).toEqual({ p1: null, p2: legal });
+    expect(L.hostScores("p1")).toBe(true);
+    const rev = L.last("p2", "reveal")!;
+    const pick = (id: string) => rev.picks.find((p) => p.playerId === id)!;
+    // p1: a missed move (-25), never more; p2: the only pick (0 on its own), less 10 for two wrong attempts.
+    expect(pick("p1")).toMatchObject({ move: null, roundScore: DEFAULT_SETTINGS.missedMoveScore });
+    expect(pick("p2").roundScore).toBeCloseTo(-2 * BOSS_POWERS.darkTryCost, 6);
+  });
+
+  it("Lights out: at the start of his turn, before his move; the server times each round and judges each player's taps; the misses cost; then his move", () => {
+    const L = raid({ bossId: "hollow", bossPowerTest: "lightsout" });
+    crowdMove(L);
+    hostBoss(L);
+    toRound(L);
+    crowdMove(L);
+    // The boss's turn: Lights out first (no request for his move yet), the same test for both.
+    const l1 = L.last("p1", "lights")!;
+    const l2 = L.last("p2", "lights")!;
+    expect(l1).toBeTruthy();
+    expect(L.last("p1", "bossRequest")).toBeUndefined();
+    expect(l1.lights.rounds.map((r) => r.pieces.length)).toEqual([1, 2, 3]);
+    expect(l1.lights.rounds).toEqual(l2.lights.rounds);
+    expect(l1.lights.rounds.every((r) => !r.answers)).toBe(true);
+    const fen = l1.boss.board.fen;
+    const his = (t: string) => ["a", "b", "c", "d", "e", "f", "g", "h"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).filter((s) => pieceAt(fen, s)?.color === "b" && pieceAt(fen, s)!.type === t);
+    const at = l1.lights.at;
+    const tl = { r0: 1300 + 2900 + 300 };
+    // A tap before the round opens: nothing.
+    L.core.message("p1", { t: "lightsTap", key: l1.lights.key, round: 0, square: his(l1.lights.rounds[0]!.pieces[0]!)[0]! });
+    expect(L.last("p1", "lights")!.lights.mine[0]).toEqual({ found: [], wrong: [] });
+    L.advance(at + tl.r0 + 500 - L.now);
+    // p1 finds round 1's piece; p2 taps an empty square.
+    const target = his(l1.lights.rounds[0]!.pieces[0]!)[0]!;
+    L.core.message("p1", { t: "lightsTap", key: l1.lights.key, round: 0, square: target });
+    L.core.message("p2", { t: "lightsTap", key: l1.lights.key, round: 0, square: "e4" });
+    expect(L.last("p1", "lights")!.lights.mine[0]).toEqual({ found: [target], wrong: [] });
+    expect(L.last("p2", "lights")!.lights.mine[0]).toEqual({ found: [], wrong: ["e4"] });
+    // (Out of tries: one piece, one try.)
+    L.core.message("p2", { t: "lightsTap", key: l1.lights.key, round: 0, square: target });
+    expect(L.last("p2", "lights")!.lights.mine[0]).toEqual({ found: [], wrong: ["e4"] });
+    // The round ends (its seconds and the late grace): its answers go out.
+    L.advance(at + tl.r0 + 3000 + DEFAULT_SETTINGS.lateGraceMs + 10 - L.now);
+    expect(L.last("p1", "lights")!.lights.rounds[0]!.answers).toEqual(his(l1.lights.rounds[0]!.pieces[0]!).sort());
+    expect(L.last("p1", "lights")!.lights.rounds[1]!.answers).toBeUndefined();
+    // A late tap for a round that's over: nothing.
+    L.core.message("p2", { t: "lightsTap", key: l1.lights.key, round: 0, square: target });
+    expect(L.last("p2", "lights")!.lights.mine[0]!.found).toEqual([]);
+    const before = Object.fromEntries(L.last("p1", "lights")!.standings.map((s) => [s.id, s.points]));
+    // Through rounds 2 and 3 (nobody taps), then the lights come back and he moves.
+    for (let i = 0; i < 6 && !L.last("p1", "bossRequest"); i++) L.advance(5000);
+    const req = L.last("p1", "bossRequest");
+    expect(req).toBeTruthy();
+    expect(L.now - at).toBeGreaterThanOrEqual(1300 + 2900 + 300 + 3000 + 4000 + 5000 + 3 * (DEFAULT_SETTINGS.lateGraceMs + 1800) + 2300);
+    const after = Object.fromEntries(L.last("p1", "boss")!.standings.map((s) => [s.id, s.points]));
+    // p1 found 1 of 6 pieces, p2 none: -50 and -60.
+    expect(after.p1! - before.p1!).toBe(-5 * BOSS_POWERS.lightsOutMiss);
+    expect(after.p2! - before.p2!).toBe(-6 * BOSS_POWERS.lightsOutMiss);
+    expect(L.last("p1", "boss")!.boss.powers!.lightsAt).toBe(2);
+    hostBoss(L);
+    expect(toRound(L).boss!.powers!.lightsAt).toBe(2);
   });
 });

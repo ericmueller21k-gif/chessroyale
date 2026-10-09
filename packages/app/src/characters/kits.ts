@@ -1,9 +1,9 @@
 /**
  * The raid bosses that have a character: its drawing, which animation plays for each moment, its sounds, its
  * lines and its portrait, keyed by the boss's name in packages/core/src/boss.ts. A boss without one keeps its emoji
- * everywhere. A kit whose name isn't a boss there yet (Hollow) is drawn and ready but never shows, except in a test
- * link (`?wip=1&kit=Hollow`: his kit in every boss's place): a boss becomes playable once it has both a character
- * and its powers (the power rules add it to boss.ts).
+ * everywhere. A kit whose name isn't a boss there yet is drawn and ready but never shows, except in a test link
+ * (`?wip=1&kit=<name>`: its kit in every boss's place): a boss becomes playable once it has both a character and its
+ * powers (the power rules add it to boss.ts).
  */
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines } from "./boss-beats.ts";
