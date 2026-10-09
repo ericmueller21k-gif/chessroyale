@@ -88,6 +88,9 @@ test("G-REX: his sparkler's tile burns in stages, a piece left on it burns, and 
   let burnt = false;
   let leftOne = false;
   for (let turn = 4; turn <= 10; turn++) {
+    // (The match can end early: a mate.)
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
+    if ((await phase(page)) !== "play") break;
     const r = await play(page, { leave: !leftOne });
     if (r.left) {
       leftOne = true;
@@ -105,10 +108,10 @@ test("G-REX: his sparkler's tile burns in stages, a piece left on it burns, and 
     const squares = p.fire.map((t: { square: string }) => t.square);
     expect(new Set(squares).size).toBe(squares.length);
   }
-  // (Fired on turn 3: none as the 5th begins; then 1, 2, 3, 4 and the last 2, a turn each from the 6th.)
-  const want: Record<number, number> = { 5: 12, 6: 11, 7: 9, 8: 6, 9: 2, 10: 0, 11: 0 };
+  // (Fired on turn 3: none as the 4th and 5th begin; then 1, 2, 3, 4 and the last 2, a turn each from the 6th.)
+  const want: Record<number, number> = { 4: 12, 5: 12, 6: 11, 7: 9, 8: 6, 9: 2, 10: 0, 11: 0 };
   for (const [turn, n] of left) expect(n, `shots up as turn ${turn} begins`).toBe(want[turn]);
-  expect(left.size).toBeGreaterThanOrEqual(6);
+  expect(left.size).toBeGreaterThanOrEqual(5);
   if (leftOne) expect(burnt).toBe(true);
 });
 
