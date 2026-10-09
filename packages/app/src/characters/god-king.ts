@@ -654,6 +654,12 @@ const slash: Anim = {
   ],
 };
 
+/** Lowering his sword after commanding it from his spot, back to how he stands by. */
+const lower: Anim = {
+  loop: false,
+  frames: [f(90, { ...RAISED, arm: "mid", flame: "lit", eyes: "glow", flick: 0 }), f(90, { arm: "hold", flick: 1 })],
+};
+
 /** His leap out of the dock (his Last Stand): a crouch, then up, sword raised. */
 const leap: Anim = {
   loop: false,
@@ -765,7 +771,7 @@ const portraitHurt: Anim = {
   ],
 };
 
-const ANIMS = { idle, appear, raise, raised, point, slash, leap, lastStand, fallen, rise, portrait, portraitHurt };
+const ANIMS = { idle, appear, raise, raised, point, slash, lower, leap, lastStand, fallen, rise, portrait, portraitHurt };
 export type GodKingAnim = keyof typeof ANIMS;
 
 export const GOD_KING: Character = {
@@ -841,6 +847,30 @@ export function summonMoment(times: SummonTimes, t: number): { anim: GodKingAnim
   if (t >= times.raiseAt) best = { anim: "raise", at: times.raiseAt, then: "raised" };
   if (times.boltAt !== undefined && t >= times.boltAt - cueLead("point")) best = { anim: "point", at: times.boltAt - cueLead("point"), then: "raised" };
   for (const at of times.slashAt ?? []) if (t >= at - cueLead("slash")) best = { anim: "slash", at: at - cueLead("slash"), then: "raised" };
+  return best;
+}
+
+/** When his commanded moments land (ms after he starts), acting from his spot by the board: see KING_COMMAND. */
+export interface CommandTimes {
+  raiseAt: number;
+  /** His bolt to the piece he moves, or the strike's slashes. */
+  boltAt?: number;
+  slashAt?: readonly number[];
+  /** He lowers his sword, and stands by again. */
+  lowerAt: number;
+}
+
+/**
+ * What he does in his spot at `t` ms into a command: stand by until he raises his sword (and holds it up through the
+ * cut-in), point it as his bolt leaves the tip or cut once for each of the strike's slashes, then lower it and stand
+ * by. The frame with the bolt or the cut (its cue) lands exactly on the effect's time.
+ */
+export function commandMoment(times: CommandTimes, t: number): { anim: GodKingAnim; at: number; then: GodKingAnim } {
+  let best: { anim: GodKingAnim; at: number; then: GodKingAnim } = { anim: "idle", at: 0, then: "idle" };
+  if (t >= times.raiseAt) best = { anim: "raise", at: times.raiseAt, then: "raised" };
+  if (times.boltAt !== undefined && t >= times.boltAt - cueLead("point")) best = { anim: "point", at: times.boltAt - cueLead("point"), then: "raised" };
+  for (const at of times.slashAt ?? []) if (t >= at - cueLead("slash")) best = { anim: "slash", at: at - cueLead("slash"), then: "raised" };
+  if (t >= times.lowerAt) best = { anim: "lower", at: times.lowerAt, then: "idle" };
   return best;
 }
 

@@ -12,7 +12,7 @@ import { UnderBoard } from "../components/QuickChat.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace, BossSide } from "../components/BossCharacter.tsx";
-import { KingSummon, kingSquare } from "../components/GodKing.tsx";
+import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdOrientation } from "../components/BossPowers.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
@@ -139,8 +139,17 @@ export function PlayScreen({
   const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
   const note = match.darkNote;
   const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending;
+  // The God King strikes from his spot (or, the old way behind settings.kingOnBoard, summoned onto your king's square).
+  const onBoardKing = !!match.settings.kingOnBoard;
+  const command = useMemo(() => {
+    if (!strike?.at || onBoardKing) return null;
+    const target = kingSquare(board.fen, side === "w" ? "b" : "w");
+    if (!target) return null;
+    const hp = Math.round((match.settings.kingStrikeLoss[0] + match.settings.kingStrikeLoss[1]) / 2);
+    return { side, orientation, target, mode: "strike" as const, hp, startAt: strike.at, bossIcon: match.boss ? <BossFace boss={match.boss} /> : undefined };
+  }, [strike?.at, board.fen]);
   const godKing = useMemo(() => {
-    if (!strike?.at) return null;
+    if (!strike?.at || !onBoardKing) return null;
     const boss = side === "w" ? "b" : "w";
     const mine = kingSquare(board.fen, side);
     const target = kingSquare(board.fen, boss);
@@ -229,6 +238,7 @@ export function PlayScreen({
             )}
             {ending && !striking && <CenterCount label="Round end" n={secsLeft} />}
             {godKing && <KingSummon {...godKing} />}
+            {command && <KingCommand {...command} />}
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
           </Board>
         </div>
@@ -245,7 +255,8 @@ export function PlayScreen({
           match={match}
           side={side}
           cues={kingCues}
-          away={striking}
+          away={striking && onBoardKing}
+          command={command ? { mode: "strike", startAt: command.startAt } : undefined}
           nav={{ view: history, total: board.history.length }}
           canCall={!waiting && !intro && !shown.replaying && !striking}
           strike={strike}

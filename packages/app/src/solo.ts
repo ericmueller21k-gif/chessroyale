@@ -1,7 +1,7 @@
 import { BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, judgeTaps, lightsOutTimeline, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
+import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, judgeTaps, kingMoveMs, kingStrikeMs, lightsOutTimeline, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
@@ -16,8 +16,6 @@ export const HUMAN = "you";
 const FINAL_SHOW_MS = 3200;
 /** Boss battle: how long the boss's move shows, how long it thinks at least, and how long a strike shows. */
 const BOSS_KILL_MS = 3800;
-/** The God King's summoning, cut-in banner and bolt, added to a reveal where he plays the move. */
-const KING_FX_MS = 5400;
 const library = openingsData as unknown as Opening[];
 
 export function boardView(b: BoardState): BoardView {
@@ -350,7 +348,7 @@ export class SoloMatch implements GameView {
     const { struck, calls } = this.runner.callStrike(HUMAN);
     const needed = Math.floor((this.runner.groups.values().next().value?.length ?? 1) / 2) + 1;
     if (!struck) return this.set({ ...phase, strike: { calls, needed, mine: true } });
-    const ms = this.settings.kingStrikeMs;
+    const ms = kingStrikeMs(this.settings);
     const at = Date.now();
     this.frozen = { at, until: at + ms };
     this.progress.postpone(ms);
@@ -608,7 +606,7 @@ export class SoloMatch implements GameView {
       return;
     }
     // The God King's Last Stand plays out in the reveal; the next move's clock starts after it (nobody loses time).
-    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? KING_FX_MS : 0) + (mine.lastStand ? LAST_STAND_MS : 0);
+    const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? kingMoveMs(this.settings) : 0) + (mine.lastStand ? LAST_STAND_MS : 0);
     this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
   }

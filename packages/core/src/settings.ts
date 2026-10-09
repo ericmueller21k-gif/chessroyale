@@ -85,8 +85,18 @@ export interface Settings {
   bossUnfinished: boolean;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
-  /** Boss battle: how long the King's strike takes on screen (ms). The move clock stands still meanwhile. */
+  /**
+   * Boss battle: how long the King's strike takes on screen (ms), commanding it from his spot (KING_COMMAND in
+   * boss-timing.ts: it must cover his last slash). The move clock stands still meanwhile. Summoned onto the board
+   * (`kingOnBoard`) it takes KING_SUMMON.strikeMs instead.
+   */
   kingStrikeMs: number;
+  /**
+   * Boss battle: the God King's old way of acting, summoned onto your king's square (bolts converging, a beam, he
+   * takes the king's place, walks with a king move, leaves in holy light). Off since Eric's Oct 9 polish: he acts from
+   * his spot by the board. Kept, unused, for later.
+   */
+  kingOnBoard: boolean;
   /** Boss battle, the King (the crowd's champion): charges from the ten's leftover power-ups (one per this many, 1 to kingChargesMax). */
   kingPowerUpsPerCharge: number;
   kingChargesMax: number;
@@ -288,7 +298,8 @@ export const DEFAULT_SETTINGS: Settings = {
   bossDifficulty: 0,
   bossUnfinished: false,
   kingStrikeLoss: [5, 15],
-  kingStrikeMs: 5900,
+  kingStrikeMs: 3700,
+  kingOnBoard: false,
   kingPowerUpsPerCharge: 10,
   kingChargesMax: 3,
   kingBotLoss: 6,

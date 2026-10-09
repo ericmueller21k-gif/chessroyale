@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { LAST_STAND } from "@chessroyale/chess";
-import { GOD_KING, GOD_KING_BLACK, GOD_KING_BOX, KING_TIP, cueLead, kingAnimMs, kingFrameAt, summonMoment } from "../src/characters/god-king.ts";
+import { KING_COMMAND, KING_SUMMON, LAST_STAND, kingMoveMs, kingStrikeMs } from "@chessroyale/chess";
+import { DEFAULT_SETTINGS } from "@chessroyale/core";
+import { GOD_KING, GOD_KING_BLACK, GOD_KING_BOX, KING_TIP, commandMoment, cueLead, kingAnimMs, kingFrameAt, summonMoment } from "../src/characters/god-king.ts";
 import { frameKeys, lieDown, renderFrame, type Character } from "../src/characters/sprite.ts";
 
 const frameOf = (anim: keyof typeof GOD_KING.anims, now: number, since = 0, then?: keyof typeof GOD_KING.anims) => {
@@ -9,7 +10,7 @@ const frameOf = (anim: keyof typeof GOD_KING.anims, now: number, since = 0, then
 };
 
 describe("the God King's pixel sprite", () => {
-  it("recolours only his armour for Black: gold, eyes, cape, cloth, wings and flame stay the same", () => {
+  it("recolours only his armour for Black: gold, eyes, cape, cloth and flame stay the same", () => {
     expect(Object.keys(GOD_KING_BLACK).sort()).toEqual(["a", "b", "c", "d"]);
     const f = GOD_KING.anims.idle!.frames[0]!;
     const keys = frameKeys(GOD_KING, f);
@@ -61,6 +62,47 @@ describe("the God King's pixel sprite", () => {
       // Each cut is over, sword up again, before the next one starts.
       expect(m.at + kingAnimMs("slash")).toBeLessThanOrEqual(at + 450 - cueLead("slash"));
     }
+  });
+
+  it("has no back wings in any pose (Eric, Oct 9): only his helmet's", () => {
+    expect(Object.keys(GOD_KING.parts).filter((k) => /wing/i.test(k))).toEqual(["wingHelm"]);
+    for (const [name, anim] of Object.entries(GOD_KING.anims))
+      for (const f of anim.frames) for (const l of f.layers) expect(l.part === "wingHelm" || !/wing/i.test(l.part), `${name}: ${l.part}`).toBe(true);
+  });
+
+  it("commanded from his spot: raises his sword, his bolt or each cut lands on its effect's frame, then he lowers it", () => {
+    const C = KING_COMMAND;
+    const move = { raiseAt: C.raiseAt, boltAt: C.boltAt, lowerAt: C.lowerAt };
+    expect(commandMoment(move, -1).anim).toBe("idle");
+    expect(commandMoment(move, 100)).toEqual({ anim: "raise", at: 0, then: "raised" });
+    const bolt = commandMoment(move, C.boltAt);
+    expect(frameOf(bolt.anim, C.boltAt, bolt.at, bolt.then).cue).toBe("bolt");
+    expect(commandMoment(move, C.lowerAt)).toEqual({ anim: "lower", at: C.lowerAt, then: "idle" });
+    // The bolt comes after the cut-in, and the piece moves after the bolt.
+    expect(C.boltAt).toBeGreaterThanOrEqual(C.cutAt + C.cutMs);
+    expect(C.moveAt).toBeGreaterThan(C.boltAt);
+    const strike = { raiseAt: C.raiseAt, slashAt: C.slashAt, lowerAt: C.strikeLowerAt };
+    for (const at of C.slashAt) {
+      const m = commandMoment(strike, at);
+      expect(frameOf(m.anim, at, m.at, m.then).cue, `slash at ${at}`).toBe("slash");
+      expect(m.at + kingAnimMs("slash")).toBeLessThanOrEqual(at + 450 - cueLead("slash"));
+    }
+    expect(C.slashAt[0]).toBeGreaterThanOrEqual(C.cutAt + C.cutMs);
+  });
+
+  it("the clock stands still for the whole strike, and the reveal holds his move: quicker from his spot than summoned", () => {
+    const C = KING_COMMAND;
+    const s = DEFAULT_SETTINGS;
+    expect(s.kingOnBoard).toBe(false);
+    // The clock stops until his last slash has landed and he's lowering his sword.
+    expect(kingStrikeMs(s)).toBeGreaterThanOrEqual(C.slashAt.at(-1)! + 400);
+    expect(kingStrikeMs(s)).toBeLessThan(KING_SUMMON.strikeMs);
+    // The reveal is longer by the time the move waits for him (a plain reveal plays it 750 ms in).
+    expect(kingMoveMs(s)).toBeGreaterThanOrEqual(C.moveAt - 750);
+    expect(kingMoveMs(s)).toBeLessThan(KING_SUMMON.moveMs);
+    // The old way, kept behind the setting, keeps its own (longer) times.
+    expect(kingStrikeMs({ ...s, kingOnBoard: true })).toBe(KING_SUMMON.strikeMs);
+    expect(kingMoveMs({ ...s, kingOnBoard: true })).toBe(KING_SUMMON.moveMs);
   });
 
   it("his bolts leave from his sword's tip: above his square when raised, out to his side when pointing", () => {

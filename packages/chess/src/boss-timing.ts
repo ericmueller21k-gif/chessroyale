@@ -83,6 +83,48 @@ export function lightsOutTimeline(rounds: readonly { ms: number }[], graceMs: nu
   return { rounds: out, backAt: t, total: t + LIGHTS_OUT.backMs };
 }
 
+/**
+ * The God King acting from his spot by the board (Eric, Oct 9, 2026), ms after he starts: he raises his sword where he
+ * stands (`raiseAt`), his cut-in banner plays (`cutAt`, for `cutMs`), then his bolt leaves the blade for the piece he
+ * moves (`boltAt`; the move plays at `moveAt`), or a bolt and a slash land on the boss's king three times (`slashAt`).
+ * He lowers his sword at `lowerAt` (a move) or `strikeLowerAt` (a strike). The reveal where he plays the move lasts
+ * `moveMs` longer (solo and online); a strike stops the clock for settings.kingStrikeMs, which covers it.
+ */
+export const KING_COMMAND = {
+  raiseAt: 0,
+  cutAt: 300,
+  cutMs: 1500,
+  boltAt: 2000,
+  moveAt: 2350,
+  lowerAt: 2900,
+  slashAt: [2050, 2500, 2950] as readonly number[],
+  strikeLowerAt: 3400,
+  moveMs: 1700,
+} as const;
+
+/**
+ * The old way, kept for later behind settings.kingOnBoard: summoned onto your king's square. Bolts converge, a beam,
+ * he appears (`appearAt`), raises his sword with his cut-in (`raiseAt`), bolts the piece (`boltAt`; it moves at
+ * `moveAt`, walking with a king move) or slashes the boss's king (`slashAt`), and holy light takes him off at the
+ * end. The reveal lasts `moveMs` longer; a strike stops the clock for `strikeMs`.
+ */
+export const KING_SUMMON = {
+  appearAt: 1300,
+  raiseAt: 1550,
+  cutAt: 1550,
+  cutMs: 1500,
+  boltAt: 3250,
+  moveAt: 3600,
+  slashAt: [3300, 3750, 4200] as readonly number[],
+  strikeMs: 5900,
+  moveMs: 5400,
+} as const;
+
+/** How much longer the reveal lasts when the God King plays the move. */
+export const kingMoveMs = (s: { kingOnBoard?: boolean }): number => (s.kingOnBoard ? KING_SUMMON.moveMs : KING_COMMAND.moveMs);
+/** How long the clock stands still while the God King strikes the boss. */
+export const kingStrikeMs = (s: { kingOnBoard?: boolean; kingStrikeMs: number }): number => (s.kingOnBoard ? KING_SUMMON.strikeMs : s.kingStrikeMs);
+
 /** Alone: how long the boss's move shows before your turn (the piece's slide, and a beat). */
 export const BOSS_MOVE_ALONE_MS = 450;
 

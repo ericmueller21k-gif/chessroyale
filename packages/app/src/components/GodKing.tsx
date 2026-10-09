@@ -1,9 +1,10 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
-import { GOD_KING, GOD_KING_BOX, GOD_KING_PORTRAIT, KING_TIP, kingFrameAt, summonMoment, type GodKingAnim } from "../characters/god-king.ts";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { createPortal } from "preact/compat";
+import { GOD_KING, GOD_KING_BOX, GOD_KING_PORTRAIT, KING_TIP, commandMoment, kingFrameAt, summonMoment, type GodKingAnim } from "../characters/god-king.ts";
 import { renderFrame, type Frame } from "../characters/sprite.ts";
 import { useFrameNow } from "./Countdown.tsx";
-import { pieceAt } from "@chessroyale/chess";
+import { KING_COMMAND, KING_SUMMON, pieceAt } from "@chessroyale/chess";
 import { play, type SoundName } from "../sound.ts";
 import { equippedLook } from "@chessroyale/core";
 import { account } from "../account.ts";
@@ -39,7 +40,7 @@ const BOX_STYLE = {
  * The God King: a holy knight in white plate (dark steel for Black) with gold trim, a winged crown-helmet, a flaming
  * gold sword, a blue tabard and a torn white cape, drawn as pixel art from parts (characters/god-king.ts). `anim`
  * plays once from `since` (then `then` loops) or, for a loop, runs by the clock. The box sized by CSS is his
- * drawing space, one board square; his wings, sword and cape reach outside it without ever taking a tap.
+ * drawing space, one board square; his sword and cape reach outside it without ever taking a tap.
  */
 export function GodKingSprite({ side, anim = "idle", since = 0, then, class: cls = "" }: { side: "w" | "b"; anim?: GodKingAnim; since?: number; then?: GodKingAnim; class?: string }) {
   const box = useRef<HTMLSpanElement>(null);
@@ -87,8 +88,8 @@ export function squareXY(square: string, orientation: "white" | "black") {
   return { x: col * 100 + 50, y: row * 100 + 50 };
 }
 
-/** A thin jagged bolt from (x1, y1) to (x2, y2). */
-function boltPath(x1: number, y1: number, x2: number, y2: number, seed: number) {
+/** A thin jagged bolt from (x1, y1) to (x2, y2); `amp`: how far it zigzags (in the board's 0-800 units by default). */
+function boltPath(x1: number, y1: number, x2: number, y2: number, seed: number, amp = 46) {
   const steps = 6;
   let d = `M${x1} ${y1}`;
   const nx = -(y2 - y1);
@@ -96,7 +97,7 @@ function boltPath(x1: number, y1: number, x2: number, y2: number, seed: number) 
   const len = Math.hypot(nx, ny) || 1;
   for (let i = 1; i < steps; i++) {
     const t = i / steps;
-    const jitter = (((seed * 9301 + i * 49297) % 233280) / 233280 - 0.5) * 46 * (1 - t * 0.6);
+    const jitter = (((seed * 9301 + i * 49297) % 233280) / 233280 - 0.5) * amp * (1 - t * 0.6);
     d += ` L${x1 + (x2 - x1) * t + (nx / len) * jitter} ${y1 + (y2 - y1) * t + (ny / len) * jitter}`;
   }
   return `${d} L${x2} ${y2}`;
@@ -111,13 +112,13 @@ export function kingSquare(fen: string, side: "w" | "b"): string | null {
   return null;
 }
 
-/** His cut-in banner: from when he raises his sword, for this long; his bolt and slashes come after it. */
-export const KING_CUT_AT = 1550;
-export const KING_CUT_MS = 1500;
+/** Summoned onto the board (settings.kingOnBoard): his cut-in banner from when he raises his sword, for this long. */
+const KING_CUT_AT = KING_SUMMON.cutAt;
+const KING_CUT_MS = KING_SUMMON.cutMs;
 /** The strike's three slashes: when each lands (ms after the summon starts). */
-export const SLASH_AT = [1800 + KING_CUT_MS, 2250 + KING_CUT_MS, 2700 + KING_CUT_MS] as const;
+const SLASH_AT = KING_SUMMON.slashAt;
 /** His bolt to the piece he moves (ms after the summon starts). */
-const BOLT_AT = 1750 + KING_CUT_MS;
+const BOLT_AT = KING_SUMMON.boltAt;
 
 /** `hp` in three slashes (10: 3, 3, 4). */
 export function slashes(hp: number): number[] {
@@ -132,9 +133,10 @@ const EDGE = Array.from({ length: 12 }, (_, i) => {
 });
 
 /**
+ * The old way, kept for later behind settings.kingOnBoard (unused since Eric's Oct 9 polish: see KingCommand).
  * Summoning the God King on your king's square. A dozen thin bolts converge on
  * the square, a beam of light, a flash, and the God King lands there in your
- * king's place, wings spread (the real king is hidden while he's on the board).
+ * king's place (the real king is hidden while he's on the board).
  * He raises his flaming sword, then either points it and a thin bolt leaves its
  * tip for the piece he moves ("move", which then plays at `moveAt`), or he cuts
  * once for each of three slashes on the boss's king, a bolt from his raised
@@ -201,7 +203,7 @@ export function KingSummon({
         : tg
           ? ([["gkBolt", startAt + BOLT_AT + 10]] as [SoundName, number][])
           : []),
-      ...(strike ? ([["gkSlash", startAt + SLASH_AT[2] - 40]] as [SoundName, number][]) : []),
+      ...(strike ? ([["gkSlash", startAt + SLASH_AT[2]! - 40]] as [SoundName, number][]) : []),
       ["gkLeave", exitAt],
     ];
     // Cues already past (a screen shown partway through) stay silent.
@@ -296,7 +298,144 @@ export function KingSummon({
 }
 
 /**
- * The God King's portrait for his banners, from his drawing: crown and helm, eyes blazing, wings spread and the
+ * The God King acting from his spot by the board (Eric, Oct 9, 2026; KING_COMMAND): he stays in the dock, raises his
+ * sword there (`kingCommandAct` drives his figure), his cut-in sweeps over the board, then a bolt leaves his blade for
+ * the piece he moves ("move": the screen plays it at KING_COMMAND.moveAt), or three bolts and slashes land on the
+ * boss's king ("strike", each with a yellow "−N" adding up to `hp`). The bolts cross from the dock to the board, so
+ * they're drawn over the whole page (in its coordinates, measured from his figure and the board); the cut-in stays on
+ * the board. `startAt` is a Date.now() value.
+ */
+export function KingCommand({
+  side,
+  orientation,
+  target,
+  mode,
+  hp,
+  startAt,
+  san,
+  piece,
+  bossIcon,
+}: {
+  side: "w" | "b";
+  orientation: "white" | "black";
+  /** The piece he moves (its square), or the boss's king for a strike. */
+  target: string;
+  mode: "move" | "strike";
+  hp?: number;
+  startAt: number;
+  san?: string;
+  piece?: "p" | "n" | "b" | "r" | "q" | "k";
+  bossIcon?: ComponentChildren;
+}) {
+  const now = useFrameNow();
+  const t = now - startAt;
+  const strike = mode === "strike";
+  const C = KING_COMMAND;
+  const endAt = strike ? C.strikeLowerAt + 700 : C.lowerAt + 300;
+  const ref = useRef<HTMLDivElement>(null);
+  // Where his sword's tip is (pointed and raised) and the target square, in the page's pixels. Measured as he starts
+  // and when the page changes size or scrolls (his figure and the board don't move otherwise).
+  const [geo, setGeo] = useState<{ point: Xy; raised: Xy; at: Xy; u: number } | null>(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const board = ref.current?.closest(".board-wrap")?.querySelector("cg-board")?.getBoundingClientRect();
+      const him = document.querySelector(".gk-unit .gk-unit-btn .god-king")?.getBoundingClientRect();
+      if (!board || !him || !board.width) return setGeo(null);
+      const tip = ([x, y]: readonly [number, number]): Xy => ({ x: him.left + x * him.width, y: him.top + y * him.height });
+      const sq = squareXY(target, orientation);
+      setGeo({ point: tip(KING_TIP.point), raised: tip(KING_TIP.raised), at: { x: board.left + (sq.x / 800) * board.width, y: board.top + (sq.y / 800) * board.height }, u: board.width / 800 });
+    };
+    measure();
+    addEventListener("resize", measure);
+    addEventListener("scroll", measure, true);
+    return () => {
+      removeEventListener("resize", measure);
+      removeEventListener("scroll", measure, true);
+    };
+  }, [target, orientation]);
+  const hits = slashes(hp ?? 10);
+  // His sounds, in time with his figure: the sword raised, the cut-in, the bolt or the slashes.
+  useEffect(() => {
+    const cues: [SoundName, number][] = [
+      ["gkHyuah", startAt + C.raiseAt],
+      ["gkCutIn", startAt + C.cutAt + 60],
+      ...(strike
+        ? [...C.slashAt.map((at, i) => [i === 2 ? "gkHit" : "gkSlash", startAt + at - 20] as [SoundName, number]), ["gkSlash", startAt + C.slashAt[2]! - 40] as [SoundName, number]]
+        : ([["gkBolt", startAt + C.boltAt + 10]] as [SoundName, number][])),
+    ];
+    // Cues already past (a screen shown partway through) stay silent.
+    const timers = cues.filter(([, at]) => at > Date.now() - 300).map(([name, at]) => setTimeout(() => play(name), Math.max(0, at - Date.now())));
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  if (t > endAt) return null;
+  const g = geo;
+  const fx = g ? (
+    <div class="king-command-fx" style={kingEffectStyle()} aria-hidden="true">
+      <svg class="kc-fx">
+        {/* His bolt to the piece he moves. */}
+        {!strike && t >= C.boltAt && t < C.boltAt + 300 && (
+          <path class="ks-bolt" d={boltPath(g.point.x, g.point.y, g.at.x, g.at.y, 13, 46 * g.u)} style={{ strokeWidth: Math.max(2, 3.5 * g.u * 1.6), opacity: t < C.boltAt + 150 ? 1 : (C.boltAt + 300 - t) / 150 }} />
+        )}
+        {!strike && t >= C.boltAt + 50 && t < C.boltAt + 450 && (
+          <circle class="ks-hit" cx={g.at.x} cy={g.at.y} r={(20 + (t - C.boltAt - 50) / 8) * g.u} style={{ strokeWidth: 3 * g.u, opacity: 1 - (t - C.boltAt - 50) / 400 }} />
+        )}
+        {/* The strike: three quick slashes on the boss's king, each a bolt from his raised blade and a cut across the square. */}
+        {strike &&
+          C.slashAt.map((at, i) => {
+            const age = t - at;
+            if (age < -60 || age > 380) return null;
+            // Alternate the cut's direction: \, /, then straight across.
+            const dir = [
+              [-1, -1, 1, 1],
+              [1, -1, -1, 1],
+              [-1, 0, 1, 0],
+            ][i]!;
+            const r = 46 * g.u;
+            const sweep = Math.min(1, Math.max(0, (age + 60) / 110));
+            const x1 = g.at.x + dir[0]! * r;
+            const y1 = g.at.y + dir[1]! * r;
+            const x2 = x1 + (g.at.x + dir[2]! * r - x1) * sweep;
+            const y2 = y1 + (g.at.y + dir[3]! * r - y1) * sweep;
+            const fade = age < 160 ? 1 : Math.max(0, 1 - (age - 160) / 220);
+            return (
+              <g key={i}>
+                {age < 120 && <path class="ks-bolt strike" d={boltPath(g.raised.x, g.raised.y, g.at.x, g.at.y, 21 + i, 46 * g.u)} style={{ strokeWidth: Math.max(2, 3 * g.u * 1.6), opacity: age < 0 ? 0.6 : 1 - age / 120 }} />}
+                <line class="ks-slash" x1={x1} y1={y1} x2={x2} y2={y2} style={{ strokeWidth: 7 * g.u, opacity: fade }} />
+                {age >= 0 && <circle class="ks-hit" cx={g.at.x} cy={g.at.y} r={(18 + age / 7) * g.u} style={{ strokeWidth: 3 * g.u, opacity: Math.max(0, 1 - age / 380) }} />}
+              </g>
+            );
+          })}
+      </svg>
+      {strike &&
+        C.slashAt.map((at, i) =>
+          t >= at && t < at + 1000 ? (
+            <span key={i} class="ks-hp" style={{ left: `${g.at.x + (i - 1) * 34 * g.u}px`, top: `${g.at.y + (-10 + i * 6) * g.u}px` }}>
+              −{hits[i]}
+            </span>
+          ) : null,
+        )}
+    </div>
+  ) : null;
+  return (
+    <div ref={ref} class={`king-command ${mode}`} aria-label={mode === "move" ? "The God King plays the move" : "The God King strikes the boss"}>
+      {t >= C.cutAt && t < C.cutAt + C.cutMs && <KingCutIn mode={mode} side={side} san={san} piece={piece} bossIcon={bossIcon} />}
+      {fx && createPortal(fx, document.body)}
+    </div>
+  );
+}
+type Xy = { x: number; y: number };
+
+/** His figure in the dock while he commands from his spot (KingCommand): the animation, from when, and what loops after. */
+export function kingCommandAct(mode: "move" | "strike", startAt: number, now: number): { anim: GodKingAnim; since: number; then: GodKingAnim } | undefined {
+  const C = KING_COMMAND;
+  const t = now - startAt;
+  if (t < 0 || t > (mode === "strike" ? C.strikeLowerAt : C.lowerAt) + 1000) return undefined;
+  const m = commandMoment({ raiseAt: C.raiseAt, lowerAt: mode === "strike" ? C.strikeLowerAt : C.lowerAt, ...(mode === "strike" ? { slashAt: C.slashAt } : { boltAt: C.boltAt }) }, t);
+  return m.anim === "idle" ? undefined : { anim: m.anim, since: startAt + m.at, then: m.then };
+}
+
+/**
+ * The God King's portrait for his banners, from his drawing: crown and helm, eyes blazing and the
  * flaming sword raised beside him; `hurt`, battle-worn for his Last Stand (cracked, eyes dimmed, the flame low).
  * Scaled up with crisp pixels; his armour in the crowd's colour.
  */

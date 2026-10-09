@@ -40,6 +40,8 @@ import {
   distanceFrom,
   judgedBoard,
   recheckTargets,
+  kingMoveMs,
+  kingStrikeMs,
   verdictBoard,
   verdictMoves,
   type JudgedBoard,
@@ -350,8 +352,6 @@ const FINAL_CUT_MS = 1800;
 /** Boss battle: how long the boss's move shows, how long a strike shows, and how long the host has to play the boss. */
 const BOSS_KILL_MS = 3800;
 const BOSS_TIMEOUT_MS = 15_000;
-/** The God King's summoning, cut-in banner and bolt, added to a reveal where he plays the move. */
-const KING_FX_MS = 5400;
 
 export class LobbyCore {
   private runner: MatchRunner | null = null;
@@ -1201,7 +1201,7 @@ export class LobbyCore {
       for (const h of this.roundHumans()) this.send(h.id, { t: "strike", key: round.key, calls, needed }, false);
       return;
     }
-    const ms = this.settings.kingStrikeMs;
+    const ms = kingStrikeMs(this.settings);
     round.strike = { at: now, until: now + ms };
     round.deadline += ms;
     for (const id of Object.keys(round.deadlines)) round.deadlines[id]! += ms;
@@ -1512,7 +1512,7 @@ export class LobbyCore {
     const kingActs = report.boards.some((b) => b.king);
     // The God King's Last Stand plays out in the reveal (the next move's clock starts after it: nobody loses time).
     const stand = report.boards.some((b) => b.lastStand);
-    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? KING_FX_MS : 0) + (stand ? LAST_STAND_MS : 0);
+    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? kingMoveMs(this.settings) : 0) + (stand ? LAST_STAND_MS : 0);
     const bossNow = runner.boss ? runner.bossView()! : undefined;
     const st = this.standings();
     const cutoff = this.cutoff();

@@ -10,9 +10,9 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { ChatSection, UnderBoard } from "../components/QuickChat.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
-import { KING_CUT_MS, KingSummon, kingSquare } from "../components/GodKing.tsx";
+import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.tsx";
-import { LAST_STAND, LAST_STAND_MS } from "@chessroyale/chess";
+import { KING_COMMAND, KING_SUMMON, LAST_STAND, LAST_STAND_MS } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
 import { BossHeading } from "./Play.tsx";
@@ -177,8 +177,10 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   // ghost, no count, no second move of the piece.
   const alone = !mine.king && picks.length === 1 && match.isYou(picks[0]!.playerId) && picks[0]!.move === mine.result.playedMove;
   const landAt = alone ? 0 : countEnd + 250;
-  // The God King playing the move: his summoning, his cut-in banner and his bolt come first, then the piece moves.
-  const playAt = alone ? 0 : landAt + (mine.king ? 2100 + KING_CUT_MS : 750);
+  // The God King playing the move: he raises his sword in his spot, his cut-in banner and his bolt come first, then the
+  // piece moves. (Summoned onto the board, the old way behind settings.kingOnBoard, it takes longer.)
+  const onBoardKing = !!match.settings.kingOnBoard;
+  const playAt = alone ? 0 : landAt + (mine.king ? (onBoardKing ? KING_SUMMON.moveAt : KING_COMMAND.moveAt) : 750);
   const landed = t >= landAt;
   const played = t >= playAt;
   useEffect(() => {
@@ -203,9 +205,25 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     if (at === "back" && !kingMoved) return { fen: clearSquare(fen, to), lastMove: board.lastMove };
     return { fen, lastMove: board.lastMove };
   }, [played, stand && lastStandBoard(ts)]);
-  // The God King: summoned on your king's square, then he plays the move, and leaves as the round ends.
+  // The God King commanding the move from his spot: his bolt hits the piece he moves.
+  const command = useMemo(() => {
+    if (!mine.king || onBoardKing) return null;
+    const crowd = sideToMove(fen);
+    const from = mine.result.playedMove.slice(0, 2);
+    return {
+      side: crowd,
+      orientation: (myTeam(match) ?? crowd) === "w" ? ("white" as const) : ("black" as const),
+      target: from,
+      mode: "move" as const,
+      startAt: start + landAt,
+      san: toSan(fen, mine.result.playedMove),
+      piece: pieceAt(fen, from)?.type,
+    };
+  }, [mine, landAt]);
+  // The old way (settings.kingOnBoard): summoned on your king's square, then he plays the move, and leaves as the
+  // round ends.
   const godKing = useMemo(() => {
-    if (!mine.king) return null;
+    if (!mine.king || !onBoardKing) return null;
     const crowd = sideToMove(fen);
     const after = applyMove(fen, mine.result.playedMove);
     const before = kingSquare(fen, crowd);
@@ -313,6 +331,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           {played && !alone && !stand && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
           {!match.boss && <BoardClock match={match} you={you} turn={null} />}
           {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
+          {command && t >= command.startAt - start && <KingCommand {...command} />}
           {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} />}
         </Board>
         </div>
@@ -323,6 +342,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           side={sideToMove(fen)}
           cues={mine.king ? kingCues : landed ? kingCues : []}
           away={(!!godKing && now >= godKing.startAt && now < godKing.exitAt + 900) || (!!stand && ts >= LAST_STAND.leapAt + 450 && ts < LAST_STAND.fadeAt)}
+          command={command ? { mode: "move", startAt: command.startAt } : undefined}
           leaping={!!stand && ts >= LAST_STAND.leapAt && ts < LAST_STAND.leapAt + 450}
           charges={stand && ts < LAST_STAND.leapAt ? (match.boss?.lastStand?.charges ?? 0) : undefined}
           fallen={stand ? ts >= LAST_STAND.fadeAt : undefined}
