@@ -125,16 +125,16 @@ async function asAdmin(page: Page) {
   });
 }
 
-test("the test trigger: hidden from players; an admin's brings the ultimate next turn, pressed during either side's turn", async ({ page }) => {
-  test.setTimeout(6 * 60_000);
-  // A player: no button.
+test("the test trigger is hidden from players", async ({ page }) => {
   await page.goto("/?debug&clock=40&bossMoves=6&boss=gingerbread");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   await expect(page.locator(".boss-dock")).toBeVisible();
   await expect(page.locator(".ult-test")).toHaveCount(0);
+});
 
-  // An admin, against Ginger: pressed during your turn. Twice is once.
+test("an admin's test trigger against Ginger, pressed during your turn: the blizzard next turn, no warning; twice is once", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
   await asAdmin(page);
   await page.goto("/?debug&clock=40&bossMoves=6&boss=gingerbread");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
@@ -152,8 +152,11 @@ test("the test trigger: hidden from players; an admin's brings the ultimate next
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
   await expect(btn).toHaveText("Ultimate used (testing)");
   expect((await powers(page)).allowed.length).toBeGreaterThan(0);
+});
 
-  // Against Boingo: pressed while the boss is thinking (its screen, its move on the way): the funhouse next.
+test("an admin's test trigger against Boingo, pressed while the boss thinks: the funhouse", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  await asAdmin(page);
   await page.goto("/?debug&clock=40&bossMoves=6&boss=clown");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
