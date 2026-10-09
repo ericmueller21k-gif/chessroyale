@@ -17,11 +17,19 @@ export function toSan(fen: string, uci: string): string {
   return chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }).san;
 }
 
-/** The piece on a square: colour and type (p, n, b, r, q, k), or null. */
+/**
+ * The piece on a square: colour and type (p, n, b, r, q, k), or null. The screens ask about many squares of the same
+ * position, some on every redraw (the ice over every frozen piece in the blizzard), so a position is read once.
+ */
 export function pieceAt(fen: string, square: string): { color: "w" | "b"; type: "p" | "n" | "b" | "r" | "q" | "k" } | null {
-  const p = new Chess(fen).get(square as Square);
+  let board = boards.get(fen);
+  if (!board) board = remember(boards, fen, new Chess(fen).board(), 32);
+  const file = square.charCodeAt(0) - 97;
+  const rank = square.charCodeAt(1) - 48;
+  const p = square.length === 2 && file >= 0 && file < 8 && rank >= 1 && rank <= 8 ? board[8 - rank]![file] : null;
   return p ? { color: p.color, type: p.type } : null;
 }
+const boards = new Map<string, ReturnType<Chess["board"]>>();
 
 export function sideToMove(fen: string): "w" | "b" {
   return fen.split(" ")[1] === "b" ? "b" : "w";
@@ -29,10 +37,42 @@ export function sideToMove(fen: string): "w" | "b" {
 
 export type GameEnd = "checkmate" | "stalemate" | "repetition" | "fifty_moves" | "insufficient_material" | null;
 
+/*
+ * Replaying a whole game with chess.js costs more with every move, and the screens and the match flow ask for
+ * positions and endings of the same game many times (some on every redraw): replaying on every ask was the lag that
+ * grew with the match (.claude/LESSONS.md: "Lag that grows with the match"). So answers are remembered, and a line a
+ * move or two on from one already replayed carries on from it. Same answers, same errors for an illegal move.
+ */
+const KEPT = 256;
+const remember = <T>(cache: Map<string, T>, key: string, value: T, kept = KEPT): T => {
+  cache.set(key, value);
+  if (cache.size > kept) cache.delete(cache.keys().next().value!);
+  return value;
+};
+const play = (chess: Chess, moves: readonly string[]) => {
+  for (const m of moves) chess.move({ from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] });
+};
+/** The last game replayed for gameEnd (its repetition count needs the moves themselves, not only the position). */
+let replayed: { start: string; moves: string[]; chess: Chess } | null = null;
+const endings = new Map<string, GameEnd>();
+
 /** For a board, a game is over by mate, stalemate, or a draw by the rules. History matters for repetition. */
 export function gameEnd(startFen: string, uciHistory: readonly string[]): GameEnd {
-  const chess = new Chess(startFen);
-  for (const m of uciHistory) chess.move({ from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] });
+  const key = `${startFen}|${uciHistory.join(" ")}`;
+  const known = endings.get(key);
+  if (known !== undefined) return known;
+  const r = replayed;
+  const on = !!r && r.start === startFen && r.moves.length <= uciHistory.length && r.moves.every((m, i) => m === uciHistory[i]);
+  const chess = on ? r!.chess : new Chess(startFen);
+  // (Off the shelf while it's moved on: an illegal move throws and leaves nothing half-played behind. A position
+  // asked about on its own, with no moves, doesn't take its place.)
+  if (on) replayed = null;
+  play(chess, uciHistory.slice(on ? r!.moves.length : 0));
+  if (on || uciHistory.length) replayed = { start: startFen, moves: [...uciHistory], chess };
+  return remember(endings, key, endOf(chess));
+}
+
+function endOf(chess: Chess): GameEnd {
   if (chess.isCheckmate()) return "checkmate";
   if (chess.isStalemate()) return "stalemate";
   if (chess.isThreefoldRepetition()) return "repetition";
@@ -57,10 +97,20 @@ export function sanLineToUci(sans: readonly string[]): string[] {
   });
 }
 
+const positions = new Map<string, string>();
+
 export function fenAfter(uciMoves: readonly string[], startFen = START_FEN): string {
-  const chess = new Chess(startFen);
-  for (const m of uciMoves) chess.move({ from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] });
-  return chess.fen();
+  const key = (n: number) => `${startFen}|${uciMoves.slice(0, n).join(" ")}`;
+  const known = positions.get(key(uciMoves.length));
+  if (known !== undefined) return known;
+  // From the position a few moves back, if it's known (a FEN is the whole position: the result is the same).
+  let from = uciMoves.length;
+  let base: string | undefined;
+  while (base === undefined && from > 0 && uciMoves.length - from < 8) base = positions.get(key(--from));
+  if (base === undefined) from = 0;
+  const chess = new Chess(base ?? startFen);
+  play(chess, uciMoves.slice(from));
+  return remember(positions, key(uciMoves.length), chess.fen());
 }
 
 /**

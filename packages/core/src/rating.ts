@@ -17,9 +17,20 @@ const MAX_RATING = 3400;
 /** Moves needed before a rating is shown. */
 export const RATING_MIN_MOVES = 3;
 
+type Curve = typeof RATING_CURVE;
+/*
+ * A curve's points sorted by rating, and the prior's loss, worked out once per curve: standings estimate every
+ * player's rating, the screens ask for standings on every redraw, and a Crowd lobby has 100 players (re-sorting the
+ * curve 51 times per player made a Crowd match drop frames from its fourth move: .claude/LESSONS.md, "Lag that grows
+ * with the match").
+ */
+const sortedCurves = new WeakMap<Curve, { elo: number; y: number }[]>();
+const priors = new WeakMap<Curve, number>();
+
 /** The rating whose expected loss per move is `meanLoss` (interpolated on log loss, extrapolated past the ends). */
 export function ratingForLoss(meanLoss: number, curve = RATING_CURVE): number {
-  const pts = [...curve].sort((a, b) => a.elo - b.elo).map((c) => ({ elo: c.elo, y: Math.log(Math.max(c.meanLoss, 0.05)) }));
+  let pts = sortedCurves.get(curve);
+  if (!pts) sortedCurves.set(curve, (pts = [...curve].sort((a, b) => a.elo - b.elo).map((c) => ({ elo: c.elo, y: Math.log(Math.max(c.meanLoss, 0.05)) }))));
   const y = Math.log(Math.max(meanLoss, 0.05));
   // Loss falls as rating rises; find the segment around y (or the nearest end segment).
   let k = pts.findIndex((p, i) => i > 0 && y >= p.y);
@@ -46,7 +57,8 @@ export function lossForRating(rating: number, curve = RATING_CURVE): number {
 /** Rating estimate from a player's move losses (missed moves aren't included), or null with too few moves. */
 export function estimateRating(losses: readonly number[], curve = RATING_CURVE): number | null {
   if (losses.length < RATING_MIN_MOVES) return null;
-  const prior = lossForRating(PRIOR_RATING, curve);
+  let prior = priors.get(curve);
+  if (prior === undefined) priors.set(curve, (prior = lossForRating(PRIOR_RATING, curve)));
   const mean = (losses.reduce((s, x) => s + x, 0) + PRIOR_MOVES * prior) / (losses.length + PRIOR_MOVES);
   return ratingForLoss(mean, curve);
 }

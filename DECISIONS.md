@@ -3241,3 +3241,20 @@ overhaul in the boss characters' format, so the crowd's champion looks as grand 
   - `npm run preview:characters -- <dir> only=god-king` writes GIFs and sheets for both looks.
   - `node scripts/preview-god-king.mjs out.png banner=1` writes the sheet with his banners.
   - Test switches: `?laststand=1` and `?side=b`.
+
+## Lag that grew with the match (Oct 9, 2026)
+
+Eric: a solo boss battle against Ginger slowed with every move, on his phone and his computer, and was unplayable by
+move 13-15; the blizzard glitched.
+
+- **The cause:** the screens read the boss battle's view dozens of times per redraw, and in a solo battle every read
+  rebuilt it, replaying the whole game with chess.js. The boss screen replayed it on every frame too. Details, numbers
+  and the rule are in `.claude/LESSONS.md`.
+- **The fix:** the view is built once per change; replays (`fenAfter`, `gameEnd`) and position lookups (`pieceAt`) are
+  remembered; sprite frames draw about three times faster, with the same pixels; the rating curve is worked out once
+  (Crowd's standings re-sorted it 5,100 times a redraw). Nothing a player sees or hears changed, and no timing either.
+- **Bounded caches:** the last 256 lines and endings, the last 32 positions read. A cached answer is always the one a
+  fresh replay gives (the key is the whole line), and an illegal move still throws.
+- **Measured** with `npm run perf:boss` (a whole battle on a computer and on a phone slowed 4x, per move); also run on
+  Boingo, a Crowd match and an online raid. **Guarded** by `packages/chess/test/long-match.test.ts` and
+  `e2e/perf.spec.ts`.
