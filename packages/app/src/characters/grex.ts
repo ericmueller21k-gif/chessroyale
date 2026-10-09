@@ -1,12 +1,12 @@
 /**
- * G-REX, the Fire boss: a cocky giraffe in dark shades, fiery eyes glowing through them, flames on his horn tips,
+ * G-REX, the Fire boss: a cocky giraffe with a mischievous look and a fiery glint in his eyes, flames on his horn tips,
  * down his mane and on the end of his tail, a cheeky grin, a sparkler in each hand and a wide fighting stance, after
  * Eric's reference picture, redrawn. Yellow with orange-brown spots, light from the top left.
  *
- * Stylised to read at phone size: the head is big and the neck short and curved (a giraffe's real neck would leave a
- * tiny head on a stick in a 48 x 56 box), so the shades, the grin and the flames carry him. Drawn three-quarters,
- * facing right (our right), as in the reference: the flames (mane, tail) on our left, the sparklers on our right,
- * towards the board.
+ * A giraffe first (Eric, Oct 9): a long neck, so he stands taller than the other bosses (about the God King's height
+ * with his wings spread; his frame grows upward), and a typical giraffe face, no sunglasses. The head stays big for
+ * a phone, so his eyes, grin and flaming ossicones read. Drawn three-quarters, facing right (our right), as in the
+ * reference: the flames (mane, tail) on our left, the sparklers on our right, towards the board.
  *
  * Rigging: the head, torso and hooves are painted once per look; the neck, arms, legs and tail are painted from
  * their pose's points (a shoulder, an elbow, a fist; a hip, a knee, an ankle), and the sparklers from the fist in
@@ -31,10 +31,8 @@ export const GREX_PALETTE = {
   b: "#7a4019", // hooves, hands, horn knobs
   B: "#4a230c",
   N: "#a35d2c",
-  s: "#17121d", // shades: lens, frame shine, glint
-  S: "#4d4860",
-  l: "#a9b0d4",
-  e: "#ff5e14", // fiery eyes behind the shades
+  s: "#17121d", // his pupils, and the fiery glint in them
+  e: "#ff5e14",
   E: "#ffe24a",
   m: "#5e1708", // mouth, teeth, tongue
   t: "#fff8e6",
@@ -89,73 +87,78 @@ function stamp(cv: Canvas, rows: readonly string[], x0: number, y0: number, over
   );
 }
 
-// ---- Head: three-quarters, facing right; the shades and the mouth change per mood.
+// ---- Head: three-quarters, facing right; the eyes and the mouth change per mood.
 
 export type Mood = "grin" | "laugh" | "roar" | "shout" | "hurt" | "smug" | "rattled" | "think" | "out";
 
-/** The shades over the eyes (17 wide), typed: the far lens on the left, the bridge, the near lens. */
-const SHADES: Record<string, readonly string[]> = {
-  // Cocky: fiery eyes slanted down to the bridge.
-  angry: [
-    "kkkkkkkkkkkkkkkkkkkk", //
-    "kSsssssskkkSsssssssk",
-    "kseeessskkksseeeeesk",
-    "ksEEEeeskkksseeEEEsk",
-    ".kssssslk.kssssssslk",
-    "..kkkkkk...kkkkkkkk.",
-  ],
-  // Wide-eyed (rattled, hurt): round glows.
-  wide: [
-    "kkkkkkkkkkkkkkkkkkkk", //
-    "kSsseessskkSssseessk",
-    "ksseEEeskkksseEEEesk",
-    "ksseEEeskkksseEEEesk",
-    ".ksseeslk.kssseeeslk",
-    "..kkkkkk...kkkkkkkk.",
-  ],
-  // Half-closed (smug): a thin glow along the bottom.
-  half: [
-    "kkkkkkkkkkkkkkkkkkkk", //
-    "kSsssssskkkSsssssssk",
-    "ksssssssskkssssssssk",
-    "kseeeeeskkksseeeeesk",
-    ".kssssslk.kssssssslk",
-    "..kkkkkk...kkkkkkkk.",
-  ],
-  // Looking up (thinking).
-  look: [
-    "kkkkkkkkkkkkkkkkkkkk", //
-    "kSssEEeskkkSssssEEek",
-    "kssseeeskkksssssseek",
-    "ksssssssskksssssssk.",
-    ".kssssslk.kssssssslk",
-    "..kkkkkk...kkkkkkkk.",
-  ],
-  // Squeezed shut with glee (laughing, roaring): a bright arc.
-  squint: [
-    "kkkkkkkkkkkkkkkkkkkk", //
-    "kSsssssskkkSsssssssk",
-    "ksseEEeskkksseEEEesk",
-    "kseesseskkkseessseek",
-    ".kssssslk.kssssssslk",
-    "..kkkkkk...kkkkkkkk.",
-  ],
-  // Hit: knocked crooked, the near lens two pixels low.
-  askew: [
-    "kkkkkkkkkk..........", //
-    "kSsssssskkkkkkkkkkkk",
-    "kseEEeeskkkSsssssssk",
-    "kseEEeeskkksseEEEesk",
-    ".kssssslk.kssseEEesk",
-    "..kkkkkk..ksssssssl.",
-    "...........kkkkkkkk.",
-  ],
+/** How an eye looks: open with its lid part-way down (slanted), the pupil looking somewhere; or shut. */
+interface EyeLook {
+  /** How far the lid comes down, 0 (wide open) to 1 (shut). */
+  lid?: number;
+  /** The lid's slant: positive, lower at the inner corner (cross); negative, higher there (worried). */
+  slant?: number;
+  /** Where the pupil looks, -1 to 1 each way. */
+  px?: number;
+  py?: number;
+  /** Shut: a happy arc (laughing), squeezed (hurt), or crossed out. */
+  shut?: "arc" | "pinch" | "x";
+}
+
+/**
+ * A giraffe's eye, `w` x `h`: a white with a dark outline, a big dark pupil with a fiery glint, the lid (his yellow
+ * skin) coming down over it, and two lashes at the outer corner (`outer` -1: the left, 1: the right).
+ */
+function eye(w: number, h: number, look: EyeLook, outer: -1 | 1): readonly string[] {
+  const cv = canvas(w + 2, h + 2);
+  const ox = 1;
+  const oy = 1;
+  const inside = inEllipse(ox + w / 2, oy + h / 2, w / 2, h / 2);
+  if (look.shut) {
+    const mid = oy + Math.floor(h / 2);
+    for (let x = ox; x < ox + w; x++) {
+      const t = (x - ox) / Math.max(1, w - 1);
+      if (look.shut === "arc") cv[mid - Math.round(Math.sin(Math.PI * t) * 1.5)]![x] = "k";
+      else if (look.shut === "pinch") cv[mid + Math.round((t < 0.5 ? t : 1 - t) * 3) - 1]![x] = "k";
+      else {
+        cv[oy + Math.round(t * (h - 1))]![x] = "k";
+        cv[oy + h - 1 - Math.round(t * (h - 1))]![x] = "k";
+      }
+    }
+    return toGrid(cv);
+  }
+  const lidAt = (x: number) => oy + (look.lid ?? 0) * h + (look.slant ?? 0) * ((x - ox) / (w - 1) - 0.5) * -outer;
+  for (let y = 0; y < h + 2; y++)
+    for (let x = 0; x < w + 2; x++) {
+      if (!inside(x, y)) continue;
+      const edge = !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1);
+      const lid = y + 0.5 < lidAt(x);
+      cv[y]![x] = edge ? "k" : lid ? "C" : y + 0.5 < lidAt(x) + 1 ? "k" : "t";
+    }
+  // The pupil: 2 x 2 (3 tall on a big eye), where it looks, only where the white shows.
+  const pxC = Math.round(ox + (w - 2) / 2 + (look.px ?? 0) * ((w - 2) / 2 - 0.5));
+  const pyC = Math.round(oy + (h - 2) / 2 + (look.py ?? 0) * ((h - 2) / 2 - 0.5) + (look.lid ?? 0) * 1.2);
+  for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) if (cv[pyC + dy]?.[pxC + dx] === "t") cv[pyC + dy]![pxC + dx] = dx === 0 && dy === 0 ? "e" : "s";
+  // Lashes at the outer corner, flicking up and out.
+  const lx = outer === -1 ? ox : ox + w - 1;
+  const ly = Math.round(lidAt(lx)) - 1;
+  if (cv[ly]?.[lx + outer] !== undefined) cv[ly]![lx + outer] = "k";
+  if (cv[ly - 1]?.[lx + outer * 1] !== undefined && (look.lid ?? 0) < 0.6) cv[ly - 1]![lx] = "k";
+  return toGrid(cv);
+}
+
+/** Each mood's eyes (the near one, on our left, and the far one by the bridge of his nose), mouth and brow. */
+const FACES: Record<Mood, { eyes: EyeLook; far?: EyeLook; mouth: string; brow?: "up" | "worried" }> = {
+  grin: { eyes: { lid: 0.42, slant: 0.6, px: 0.7, py: 0.2 }, mouth: "grin" },
+  laugh: { eyes: { shut: "arc" }, mouth: "laugh" },
+  roar: { eyes: { lid: 0.3, slant: 2, px: 0.5 }, mouth: "roar" },
+  shout: { eyes: { lid: 0.32, slant: 2, px: 0.8 }, mouth: "shout" },
+  hurt: { eyes: { shut: "pinch" }, mouth: "o" },
+  smug: { eyes: { lid: 0.6, slant: 0, px: 0.8, py: 0.6 }, mouth: "smirk", brow: "up" },
+  rattled: { eyes: { lid: 0, slant: -1, px: -0.2, py: 0 }, mouth: "wavy", brow: "worried" },
+  think: { eyes: { lid: 0.2, px: -0.5, py: -1 }, mouth: "flat" },
+  out: { eyes: { shut: "x" }, mouth: "wavy" },
 };
-/** Bare eyes, when the shades slip down (rattled) or come off (out), on the yellow above or in place of them. */
-const BARE: Record<string, readonly string[]> = {
-  worried: ["...kk...kk...", "..k.......k.."],
-  x: ["k..k.....k..k", ".kk.......kk.", ".kk.......kk.", "k..k.....k..k"],
-};
+
 const MOUTHS: Record<string, readonly string[]> = {
   // A cheeky grin, curling up into his cheek, a row of teeth.
   grin: ["kk..........", ".kk.........", "..kkk.....kk", "..ttkkkkkkk."],
@@ -167,18 +170,9 @@ const MOUTHS: Record<string, readonly string[]> = {
   o: ["..kkk.", ".kmmmk", ".kmqmk", "..kkk."],
   flat: ["kkkkkkk"],
 };
-const FACES: Record<Mood, { shades: string | null; bare?: string; mouth: string; shadesDy?: number; brow?: boolean }> = {
-  grin: { shades: "angry", mouth: "grin" },
-  laugh: { shades: "squint", mouth: "laugh" },
-  roar: { shades: "squint", mouth: "roar" },
-  shout: { shades: "angry", mouth: "shout" },
-  hurt: { shades: "askew", mouth: "o" },
-  smug: { shades: "half", mouth: "smirk", brow: true },
-  rattled: { shades: "wide", bare: "worried", mouth: "wavy", shadesDy: 2 },
-  think: { shades: "look", mouth: "flat" },
-  out: { shades: null, bare: "x", mouth: "wavy" },
-};
 
+/** The top of his long neck, at rest, in his drawing space (the head sits on it). */
+const NECK_TOP: Pt = [20, -2];
 /** The head's grid size, and where on it the neck joins (the head part is placed so this sits on the neck's top). */
 const HEAD_W = 32;
 const HEAD_H = 23;
@@ -205,17 +199,18 @@ function head(mood: Mood): Part {
   const nose = inEllipse(27.5, 14.3, 3.6, 4.4);
   const inside = (x: number, y: number) => skull(x, y) || snout(x, y) || nose(x, y);
   shade(cv, inside, "dcCh", roundLight(16, 11, 12, 9, 0.16));
-  // Spots on his cheek and the back of his head only (the forehead stays clear for the shades).
-  for (const [x, y, w] of [[5, 13, 3], [6, 14, 2], [9, 16, 3], [10, 17, 2], [4, 10, 2], [15, 18, 3], [16, 19, 1]] as const) for (let i = 0; i < w; i++) if ("dcCh".includes(cv[y]![x + i]!)) cv[y]![x + i] = cv[y]![x + i] === "d" ? "O" : "o";
+  // Spots on his cheek, the back of his head and his forehead.
+  for (const [x, y, w] of [[5, 13, 3], [6, 14, 2], [9, 16, 3], [10, 17, 2], [4, 10, 2], [15, 18, 3], [16, 19, 1], [13, 5, 2], [14, 6, 1], [21, 9, 2]] as const) for (let i = 0; i < w; i++) if ("dcCh".includes(cv[y]![x + i]!)) cv[y]![x + i] = cv[y]![x + i] === "d" ? "O" : "o";
   // The muzzle is cream, a nostril near its tip.
   const muzzle = inEllipse(27.2, 14.6, 5.6, 5.4);
   shade(cv, (x, y) => inside(x, y) && muzzle(x, y), "Uuu", (x, y) => 1.05 - 0.07 * (y - 10) - 0.015 * (x - 22));
   for (const [x, y] of [[28, 12], [29, 12], [29, 13]] as const) cv[y]![x] = "B";
   const f = FACES[mood];
-  // A raised brow over the shades (smug).
-  if (f.brow) stamp(cv, ["kkkk"], 19, 6);
-  if (f.bare) stamp(cv, BARE[f.bare]!, 8, f.shades ? 7 : 9);
-  if (f.shades) stamp(cv, SHADES[f.shades]!, 6, 8 + (f.shadesDy ?? 0), true);
+  // The near eye big on the side of his head, the far one smaller by the bridge of his nose.
+  stamp(cv, eye(7, 6, f.eyes, -1), 5, 7, true);
+  stamp(cv, eye(5, 5, f.far ?? f.eyes, 1), 14, 7, true);
+  if (f.brow === "up") stamp(cv, ["..kkk", ".k...", "k...."], 6, 4, true);
+  if (f.brow === "worried") stamp(cv, ["k....", ".kk..", "...kk"], 6, 5, true);
   const mouth = MOUTHS[f.mouth]!;
   const mx = f.mouth === "grin" || f.mouth === "laugh" ? 17 : f.mouth === "smirk" ? 17 : f.mouth === "flat" ? 21 : 20;
   stamp(cv, mouth, mx, f.mouth === "flat" || f.mouth === "wavy" ? 17 : 15, true);
@@ -339,14 +334,14 @@ function flameTuft(w: number, h: number, seed: number, lean: number, tongues: nu
 }
 
 /** Where the mane's grid sits in his drawing space, and its size. */
-const MANE_AT: Pt = [3, -9];
+const MANE_AT: Pt = [1, -26];
 /**
  * The mane: flames licking up and back from behind his neck and head, `seed` its flicker, `big` roaring. Drawn behind
  * him, so only the tongues show, rooted along the back of his neck from the shoulders up behind his ears.
  */
 function mane(seed: number, big = false): Part {
-  const cv = canvas(24, 40);
-  const roots: Pt[] = [[22, 27], [20, 23], [18, 19], [16, 15], [14, 12], [11, 9], [12, 5]];
+  const cv = canvas(26, 58);
+  const roots: Pt[] = [[23, 27], [22, 22], [21, 17], [19, 12], [18, 7], [17, 2], [15, -3], [12, -8], [11, -13]];
   roots.forEach(([rx, ry], n) => {
     const hsh = ((n + 3) * 2654435761 + seed * 977) >>> 0;
     const th = (big ? 11 : 8) + (hsh % 3);
@@ -379,7 +374,7 @@ function bodyPart(nx: number, ny: number): { name: string; at: Pt } {
   const name = `body:${nx},${ny}`;
   let l = BODIES.get(name);
   if (!l) {
-    const neck = paintLimb([[27, 27], [23, 21], [21 + nx, 15 + ny]], 3.7, { spotEvery: 5, spotFrom: 1.5 });
+    const neck = paintLimb([[27, 27], [25, 18], [22, 8], [NECK_TOP[0] + nx, NECK_TOP[1] + ny]], 3.6, { spotEvery: 5, spotFrom: 1.5 });
     const x0 = Math.min(neck.at[0], TORSO_AT[0]);
     const y0 = Math.min(neck.at[1], TORSO_AT[1]);
     const tg = torso.grid;
@@ -399,8 +394,8 @@ for (const m of MOODS) PARTS[`head:${m}`] = head(m);
 for (const s of [0, 1, 2]) {
   PARTS[`mane:${s}`] = mane(s);
   PARTS[`maneBig:${s}`] = mane(s, true);
-  PARTS[`horn:${s}`] = flame(5, 8, s * 1.9 + 0.4, s === 1 ? 1 : -1);
-  PARTS[`hornBig:${s}`] = flame(7, 12, s * 1.9 + 0.4, s === 1 ? 1.5 : -1.5);
+  PARTS[`horn:${s}`] = flame(6, 9, s * 1.9 + 0.4, s === 1 ? 1 : -1);
+  PARTS[`hornBig:${s}`] = flame(8, 13, s * 1.9 + 0.4, s === 1 ? 1.5 : -1.5);
   PARTS[`tail:${s}`] = flameTuft(10, 13, s, -1.5 + s, 3);
   PARTS[`tailBig:${s}`] = flameTuft(12, 17, s, -1.5 + s, 4);
 }
@@ -483,7 +478,7 @@ function wire(from: Pt, to: Pt): { name: string; at: Pt } {
 
 /** Where his own drawing space (56 x 60, the ground at y 60) sits on the frame (with room above for jumps and rockets). */
 const OX = 20;
-const OY = 40;
+const OY = 58;
 const GROUND = 60;
 
 /** An arm: shoulder, elbow, fist, and the sparkler's direction and length from the fist (0: no sparkler shown). */
@@ -502,7 +497,7 @@ export type ArmA = "cross" | "high" | "chin" | "flick" | "pump" | "down" | "cand
 const ARM_A: Record<ArmA, ArmSpec> = {
   cross: { pts: [[30, 28], [39, 34], [38, 25]], dir: [0.4, -1], len: 11, back: true },
   high: { pts: [[25, 27], [16, 20], [13, 8]], dir: [-0.3, -1], len: 11, back: true },
-  chin: { pts: [SHOULDER_A, [33, 33], [34, 22]], dir: [0.9, -1], len: 8 },
+  chin: { pts: [SHOULDER_A, [33, 31], [28, 17]], dir: [0.9, -1], len: 8 },
   flick: { pts: [[30, 28], [39, 33], [46, 32]], dir: [1, 0.3], len: 11, back: true },
   pump: { pts: [[25, 27], [16, 26], [13, 16]], dir: [-0.45, -1], len: 11, back: true },
   down: { pts: [[29, 28], [31, 35], [34, 41]], dir: [0.5, 1], len: 7, back: true },
@@ -592,8 +587,8 @@ export function grexBuild(p: GrexPose): Built {
   const torsoNeck = bodyPart(p.headDx ?? 0, p.headDy ?? 0);
   const tailEnd: Pt = [8, 37 + hips + (fl === 1 ? 1 : 0)];
   const tail = limb("tail", [[21, 38 + hips], [15, 41 + hips], tailEnd]);
-  const hx = 21 - HEAD_SOCKET[0] + (p.headDx ?? 0);
-  const hy = 15 - HEAD_SOCKET[1] + body + (p.headDy ?? 0);
+  const hx = NECK_TOP[0] - HEAD_SOCKET[0] + (p.headDx ?? 0);
+  const hy = NECK_TOP[1] - HEAD_SOCKET[1] + body + (p.headDy ?? 0);
   const armA = p.candle === "aim" ? "candle" : (p.a ?? "cross");
   const armB = p.candle ? (p.candle === "aim" ? "candle" : "show") : (p.b ?? "out");
   const arms = [ARM_A[armA], ARM_B[armB]].map((spec, i) => {
@@ -742,14 +737,6 @@ function wisps([x, y]: Pt, t: number, n = 3): Speck[] {
   }).flat();
 }
 
-/** His shades flying off (defeat), `t` frames after the hit: a little black bar spinning away up and right. */
-function flyingShades(t: number): Speck[] {
-  const x = OX + 30 + t * 4;
-  const y = OY + 4 - t * 4 + t * t;
-  const rows = t % 2 ? ["kkkk", "ksSk", "kssk", "kkkk"] : ["kkkkkkk", "ksskssk", ".kk.kk."];
-  return rows.flatMap((row, r) => [...row].flatMap((k, c): Speck[] => (k === "." ? [] : [[x + c, y + r, k]])));
-}
-
 /** Rockets from the Roman candle: each a white-hot head and a sparkling trail, `age` frames after it left the muzzle. */
 function rockets(muzzle: Pt, ages: readonly number[]): Speck[] {
   return ages.flatMap((age, n): Speck[] => {
@@ -790,10 +777,10 @@ const muzzleFlash = ([x, y]: Pt, big: boolean): Speck[] => [
 const sweat = (i: number): Speck[] => {
   const t = i % 4;
   return [
-    [OX + 9 - t, OY + 2 + t, "j"],
-    [OX + 9 - t, OY + 3 + t, "x"],
-    [OX + 35 + t, OY + 1 + t, "j"],
-    [OX + 35 + t, OY + 2 + t, "x"],
+    [OX + 9 - t, OY - 14 + t, "j"],
+    [OX + 9 - t, OY - 13 + t, "x"],
+    [OX + 33 + t, OY - 16 + t, "j"],
+    [OX + 33 + t, OY - 15 + t, "x"],
   ];
 };
 
@@ -810,8 +797,8 @@ export function sparklerTips(p: GrexPose): Pt[] {
 
 // ---- Palette flashes.
 
-/** His fiery eyes flare white-hot behind the shades. */
-const EYES_HOT = { e: "#ffd23a", E: "#ffffff" };
+/** His eyes flare: the pupils glow fiery orange, the glint white-hot. */
+const EYES_HOT = { s: "#d8400e", e: "#ffffff" };
 /** A white flash for the frame he's hit. */
 const FLASH: Record<string, string> = { d: "#e9a24a", c: "#ffd27a", C: "#fff0b8", h: "#ffffff", o: "#e08a4a", O: "#c06a30" };
 
@@ -854,23 +841,23 @@ const entrance: Anim = {
 
 /** Smoke-ring thoughts: little flames popping up beside his head, one by one. */
 const thoughtFlames = (n: number, i: number): Speck[] =>
-  ([[OX + 41, OY - 2], [OX + 46, OY - 7], [OX + 52, OY - 12]] as const).slice(0, n).flatMap(([x, y], k): Speck[] => {
+  ([[OX + 42, OY - 18], [OX + 47, OY - 23], [OX + 53, OY - 28]] as const).slice(0, n).flatMap(([x, y], k): Speck[] => {
     const big = k === 2;
     return [[x, y, "Y"], [x, y - 1, (i + k) % 2 ? "f" : "y"], ...(big ? ([[x - 1, y, "f"], [x + 1, y, "f"], [x, y + 1, "F"], [x, y - 2, "F"]] as Speck[]) : [[x, y + 1, "F"] as Speck])];
   });
-/** Thinking: a hoof on his chin, eyes rolled up behind the shades, tapping a foot, little flames for thoughts. */
+/** Thinking: a hoof scratching his long neck, eyes rolled up, tapping a foot, little flames for thoughts. */
 const thinking: Anim = {
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) => [0, 1, 2, 3].map((i) => f(130, { mood: "think", a: "chin", b: "down", feet: i % 2 ? "stepR" : "stand", bob: i === 2 ? 1 : 0, flick: n * 4 + i }, { specks: thoughtFlames(n, i) }, n * 4 + i))),
 };
 
-/** Smug: a fist on his hip, a brow up over the shades, a slow nod. */
+/** Smug: a fist on his hip, a brow up, eyes half shut, a slow nod. */
 const smug: Anim = {
   loop: true,
   frames: [0, 1, 2, 3, 4, 5, 6, 7].map((i) => f(150, { mood: "smug", b: "hip", bob: i % 4 === 1 ? 1 : 0, headDx: i < 4 ? 0 : 1, flick: i }, {}, i)),
 };
 
-/** Rattled: his shades slipped down his nose, sweat flying, shaking where he stands, the sparklers sputtering. */
+/** Rattled: wide eyes and worried brows, sweat flying, shaking where he stands, the sparklers sputtering. */
 const rattled: Anim = {
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
@@ -905,11 +892,11 @@ const capture: Anim = {
   ],
 };
 
-/** Hurt: hit, his shades knocked crooked, embers knocked off, a flinch; then he shoves the shades back up and grins. */
+/** Hurt: hit, he screws his eyes shut, embers knocked off, a flinch; then he shakes it off with a fist up and grins. */
 const embersOff = (t: number): Speck[] =>
   [[-1, -1], [1, -1.4], [1.6, -0.6], [-1.7, -0.5], [0.5, -1.8]].flatMap(([vx, vy], i): Speck[] => {
     const x = Math.round(OX + 22 + vx! * t * 2.4);
-    const y = Math.round(OY + 4 + vy! * t * 2.4 + 0.5 * t * t);
+    const y = Math.round(OY - 12 + vy! * t * 2.4 + 0.5 * t * t);
     return [[x, y, i % 2 ? "Y" : "f"], [x + 1, y, "F"]];
   });
 const hurt: Anim = {
@@ -925,7 +912,7 @@ const hurt: Anim = {
   ],
 };
 
-/** Check: two jabs of both sparklers at the board, his flames flaring and his eyes white-hot behind the shades. */
+/** Check: two jabs of both sparklers at the board, his flames flaring and his eyes glowing. */
 const JAB: GrexPose = { crouch: 2, feet: "stepR", a: "flick", b: "flick", mood: "shout", big: true };
 const check: Anim = {
   loop: false,
@@ -941,7 +928,7 @@ const check: Anim = {
   ],
 };
 
-/** Defeat: hit, his shades fly off, his flames go out in puffs of smoke, he totters and keels over (the last frame holds). */
+/** Defeat: hit, his eyes cross, his flames go out in puffs of smoke, he totters and keels over (the last frame holds). */
 function fallen(mood: Mood, t: number): Partial<Frame> & { layers: Layer[] } {
   const standing = grexBuild({ mood, smoking: true, lit: false, a: "down", b: "down", empty: "both", feet: "narrow", flick: t }).layers.filter((l) => l.part !== "shadow");
   // On his side, head to the right, his back on the ground, in the middle of the frame.
@@ -961,9 +948,9 @@ const defeat: Anim = {
   loop: false,
   frames: [
     f(80, { crouch: 3, mood: "hurt", a: "down", b: "down", flick: 0 }, { cue: "poof", pal: FLASH, shake: [1, 0], specks: embersOff(0) }, 1),
-    f(90, { crouch: 2, mood: "out", a: "down", b: "down", dx: -1, smoking: true, lit: false }, { specks: [...flyingShades(1), ...wisps([OX + 30, OY - 4], 1)] }),
-    f(110, { crouch: 1, mood: "out", dx: 1, smoking: true, lit: false, a: "down", b: "down" }, { specks: [...flyingShades(2), ...wisps([OX + 30, OY - 4], 2)] }),
-    f(110, { crouch: 2, mood: "out", dx: 2, smoking: true, lit: false, a: "high", b: "high", empty: "both" }, { specks: [...flyingShades(3), ...wisps([OX + 30, OY - 4], 3)] }),
+    f(90, { crouch: 2, mood: "out", a: "down", b: "down", dx: -1, smoking: true, lit: false }, { specks: [...wisps([OX + 22, OY - 22], 1)] }),
+    f(110, { crouch: 1, mood: "out", dx: 1, smoking: true, lit: false, a: "down", b: "down" }, { specks: [...wisps([OX + 22, OY - 22], 2)] }),
+    f(110, { crouch: 2, mood: "out", dx: 2, smoking: true, lit: false, a: "high", b: "high", empty: "both" }, { specks: [...wisps([OX + 22, OY - 22], 3)] }),
     { ms: 120, cue: "poof", shake: [0, 1], ...fallen("out", 0), specks: wisps([OX + 60, OY + 40], 0, 4) },
     { ms: 160, ...fallen("out", 1), specks: wisps([OX + 60, OY + 40], 1, 4) },
     { ms: 200, ...fallen("out", 2), specks: wisps([OX + 60, OY + 40], 2, 4) },
@@ -1036,7 +1023,7 @@ const romanCandle: Anim = {
   frames: [
     { ms: 100, layers: [], specks: dropShadow(4), cue: "whoosh" },
     { ms: 100, layers: [], specks: dropShadow(9) },
-    f(80, { air: 26, candle: "show", mood: "laugh", feet: "wide", big: true, flick: 0 }, {}, 1),
+    f(80, { air: 22, candle: "show", mood: "laugh", feet: "wide", big: true, flick: 0 }, {}, 1),
     f(80, { air: 12, candle: "show", mood: "laugh", feet: "wide", big: true, flick: 1 }, {}, 2),
     f(110, { crouch: 4, candle: "show", mood: "roar", feet: "wide", big: true, flick: 2, burst: 0 }, { cue: "roar", shake: [0, 1], specks: flameRing(9, 14), pal: EYES_HOT }, 3),
     f(110, { crouch: 3, candle: "show", mood: "roar", feet: "wide", big: true, flick: 3, burst: 1 }, { specks: embers(OX + 28, OY + 50, 1, 10, 26), pal: EYES_HOT }, 4),
@@ -1067,8 +1054,8 @@ export const GREX: Character = {
   anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, ignite, candleWarn, romanCandle },
 };
 
-/** The part of him a portrait shows (his head, shades and horn flames), in frame pixels. */
-export const GREX_PORTRAIT = { x: OX + 5, y: OY - 11, w: 38, h: 32 } as const;
+/** The part of him a portrait shows (his head and flaming ossicones), in frame pixels. */
+export const GREX_PORTRAIT = { x: OX + 5, y: OY - 28, w: 38, h: 32 } as const;
 
 /**
  * His lines: a cocky show-off with fire puns and the odd dinosaur joke (a giraffe named like a T-Rex), short, never
@@ -1081,10 +1068,10 @@ export const GREX_LINES: Partial<Record<Beat, readonly string[]>> = {
   move: ["Sizzlin'!", "Too hot to handle?", "Smokin'!", "Watch and learn."],
   capture: ["Toast!", "Extra crispy!", "Burnt to a crisp!", "Well done. Very well done."],
   check: ["Check! Feeling warm?", "Your king's toast!", "Hot seat, your majesty!", "Check! Getting hot?"],
-  hurt: ["Hey! Not the shades!", "Ow! That's hot!", "You singed me!", "Rude!"],
+  hurt: ["Hey! Not the face!", "Ow! That's hot!", "You singed me!", "Rude!"],
   thinking: ["Let it simmer…", "Slow roast…", "Warming up…"],
-  smug: ["Too hot to handle?", "Tiny arms? Not me!", "Burn, baby, burn!", "Cool shades. Hot moves."],
-  rattled: ["Is it hot in here?", "My shades are fogging!", "Not cool. Not cool!"],
+  smug: ["Too hot to handle?", "Tiny arms? Not me!", "Burn, baby, burn!", "Neck and neck? Nope!"],
+  rattled: ["Is it hot in here?", "My neck's sweating!", "Not cool. Not cool!"],
   defeat: ["Burnt out…", "Extinct… again…", "My flame… fizzled…"],
   victory: ["Too hot for you!", "Rawr! Champion!", "Hottest neck in town!", "Fire it up!"],
   strike: ["Torched!", "Flame on!"],
