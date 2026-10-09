@@ -52,29 +52,6 @@ on Eric's account.
    - Who builds it: the `item-builder` delegate (it owns `Avatar`), briefed screen by screen. The waiting room and
      the podium first.
 
-## Queued next (Oct 9, 2026)
-
-A small polish batch, to start once Hollow's rules are merged: one helper, one PR.
-
-1. **God King's wings off:** remove the small upward wings in every pose, both colours, and the portraits and
-   cut-ins; keep the cape.
-2. **God King no longer takes your king's place:** when he plays a move for you or strikes the boss, he stays where he
-   stands, commands his sword, and the bolt hits the piece or the boss's king. The in-between animation goes, so these
-   moves are quicker; the old code stays behind a setting. His Last Stand still appears on the board.
-3. **Queen-capture sound:** one try at a short, dignified woman's cry or gasp (never anything that could read as
-   sexual); keep it only if it's clearly better.
-4. **G-REX's Roman candle whistles:** higher and shriller, like real whistling fireworks: a sliding, almost screeching
-   whistle with a little rasp.
-5. **Hollow's lights:** a long strand held in the middle, hanging in two loops, about 5 bulbs a side, as in Eric's
-   reference; the countdown and Lights out work on it a section at a time.
-6. **The God King talks less:**
-   - one opening line from a much bigger pool;
-   - "brilliant" and other move remarks only now and then;
-   - critical moments always spoken;
-   - everyday chatter at least halved, by settings. Report lines per match before and after.
-7. **A note for later:** every boss gets random quips and short exchanges with the God King. The design is to be
-   worked out with Eric.
-
 ## Later: Eric's ideas (Oct 9, 2026; not started, not queued)
 
 Eric: "too big a change for now". Recorded so they aren't lost; nothing gets built until he says so.
