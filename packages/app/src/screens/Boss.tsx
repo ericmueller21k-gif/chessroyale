@@ -196,8 +196,10 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   const fenPlain = fun && !fun.played ? fenAtPly(history, history.length - 1, bases) : introFen;
   const fenShown = burning.length && now < burnAt + BURN.goneAt ? burning.reduce((f, b) => withPiece(f, b.square, { color: boss.crowdSide, type: b.piece! }), fenPlain) : fenPlain;
   const lastShown = fun ? (fun.played ? funMove?.move ?? introLast : null) : introLast;
-  const burnNames = burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
-  const burnLine = burnt.length && now < burnAt + BURN.ms ? (burning.length ? `${burnNames.charAt(0).toUpperCase()}${burnNames.slice(1)} burnt!` : "Your king is fireproof.") : null;
+  // (One or two pieces by name; more, how many: the dock's line stays one line.)
+  const burnNames = burning.length > 2 ? `${burning.length} pieces` : burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
+  const fizzled = burnt.some((b) => b.fizzled);
+  const burnLine = burnt.length && now < burnAt + BURN.ms ? (burning.length ? `${burnNames.charAt(0).toUpperCase()}${burnNames.slice(1)} burnt!` : fizzled ? "Your king is fireproof." : null) : null;
   return (
     <div class={`screen game boss-screen${victim ? " striking" : ""}`}>
       <Hud match={match} />

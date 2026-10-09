@@ -241,6 +241,9 @@ describe("G-REX's fire tiles", () => {
     expect(ablaze(b)).toEqual(["f3"]);
     const left = fireAfterMove({ ...b, crowdMoves: 4 }, applyMove(KN_FEN, "f3e5"), "f3e5");
     expect(left.emptied).toEqual([]);
+    // (The tile just burns out.)
+    expect(left.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3" }]);
+    expect(left.boss.powers!.fire).toEqual([]);
     const onto = battle("grex", KN_FEN, { crowdMoves: 3, powers: { ...initPowers(7, KN_FEN, "w"), turn: 4, fire: [{ square: "e5", lit: 2 }] } });
     const burnt = fireAfterMove({ ...onto, crowdMoves: 4 }, applyMove(KN_FEN, "f3e5"), "f3e5");
     expect(burnt.emptied).toEqual(["e5"]);

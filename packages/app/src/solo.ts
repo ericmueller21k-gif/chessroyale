@@ -389,7 +389,7 @@ export class SoloMatch implements GameView {
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     // (Alone, it has been "thinking" since your move went in: scoring your move counts towards it.)
     // (G-REX's fire has just burnt something: it plays out before the boss's move.)
-    const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves);
+    const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
     const minThink = bossThinkMs(snap.board.history, snap.board.bases, burnt) - (this.alone && !burnt ? Date.now() - this.movedAt : 0);
     await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out

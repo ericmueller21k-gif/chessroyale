@@ -322,7 +322,8 @@ export function fireAfterMove(boss: BossState, fen: string, move: string | null,
   const stepped = p.stepped ?? (move && p.fire.some((t) => t.square === to(move) && fireStage(t, turn) < s.fireStages) ? turn : undefined);
   const result = burnOutcome(fen, due.map((t) => t.square), boss.crowdSide);
   const fire = p.fire.filter((t) => !due.includes(t));
-  const burnt: BurnEvent[] = result.burnt.map((b) => ({ turn, ...b }));
+  // (A tile with nothing of the crowd's on it just burns out.)
+  const burnt: BurnEvent[] = due.map((t) => ({ turn, square: t.square, ...result.burnt.find((b) => b.square === t.square) })).sort((a, b) => (a.square < b.square ? -1 : 1));
   const powers: BossPowerState = {
     ...p,
     fire,

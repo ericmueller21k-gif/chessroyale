@@ -923,7 +923,7 @@ export class LobbyCore {
     const board = this.runner!.boards.get(this.runner!.state.boards[0]!)!;
     // (G-REX's fire has just burnt something: that plays first too.)
     const b = this.runner!.state.boss;
-    const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves);
+    const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
     this.r.bossMinAt = lastMoveTookQueen(board.history, board.bases) || burnt ? this.io.now() + bossThinkMs(board.history, board.bases, burnt) : undefined;
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.hostNow();

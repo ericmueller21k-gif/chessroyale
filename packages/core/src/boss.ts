@@ -230,7 +230,7 @@ export interface FireTile {
   lit: number;
 }
 
-/** After a crowd move: a piece the fire destroyed (`piece` its kind), or a tile that fizzled under the king. */
+/** After a crowd move: a piece the fire destroyed (`piece` its kind), a tile that fizzled under the king, or one that just burnt out (neither). */
 export interface BurnEvent {
   turn: number;
   square: string;
