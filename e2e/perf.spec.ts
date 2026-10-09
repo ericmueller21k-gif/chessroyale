@@ -106,6 +106,8 @@ test("a long boss battle on a slow phone: nothing grows, and late frames stay wi
 
   const report = { early, after: samples.map((s) => ({ dom: s.dom, anims: s.anims, raf: s.rafPerFrame, timers: s.timeouts + s.intervals, idle: s.idle })), late, drag, turn };
   await test.info().attach("perf", { body: JSON.stringify(report, null, 1), contentType: "application/json" });
+  const f = (s: { p95: number; slow: number }) => `p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped`;
+  console.log(`late (120 plies): idle ${f(late.idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom}, rAF/frame ${early.rafPerFrame} → ${late.rafPerFrame}`);
   // Nothing grows with the moves (a little slack for a banner or a bubble at the moment of counting).
   for (const s of [...samples, late]) {
     expect(s.dom, "DOM elements").toBeLessThanOrEqual(early.dom + 40);

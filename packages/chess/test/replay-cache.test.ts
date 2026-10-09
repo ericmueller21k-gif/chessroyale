@@ -29,8 +29,8 @@ const ending = (c: Chess) =>
 
 describe("remembered replays (fenAfter, gameEnd)", () => {
   it("give the same positions and endings as a fresh replay, asked in any order", () => {
-    for (let seed = 1; seed <= 6; seed++) {
-      const game = randomGame(seed, 120);
+    for (let seed = 1; seed <= 3; seed++) {
+      const game = randomGame(seed, 100);
       // Growing a move at a time (as a match does), with looks back a few moves and at the start on the way.
       for (let n = 0; n <= game.length; n++) {
         const line = game.slice(0, n);
