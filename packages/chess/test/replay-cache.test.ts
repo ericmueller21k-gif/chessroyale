@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
-import { START_FEN, fenAfter, gameEnd } from "../src/rules.ts";
+import { START_FEN, fenAfter, gameEnd, pieceAt } from "../src/rules.ts";
 
 /** A replay with nothing remembered: the answer the cached ones must match. */
 function fresh(moves: readonly string[], start = START_FEN) {
@@ -72,5 +72,21 @@ describe("remembered replays (fenAfter, gameEnd)", () => {
     const more = randomGame(3, 34);
     expect(gameEnd(START_FEN, more)).toBe(ending(fresh(more)));
     expect(fenAfter(more)).toBe(fresh(more).fen());
+  });
+});
+
+describe("pieceAt (a position read once)", () => {
+  it("matches chess.js on every square of many positions, asked in any order", () => {
+    const game = randomGame(5, 80);
+    const fens = game.map((_, n) => fresh(game.slice(0, n)).fen());
+    for (const fen of [...fens, ...fens.slice().reverse()]) {
+      const c = new Chess(fen);
+      for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) {
+        const p = c.get(`${f}${r}` as never);
+        expect(pieceAt(fen, `${f}${r}`)).toEqual(p ? { color: p.color, type: p.type } : null);
+      }
+    }
+    expect(pieceAt(START_FEN, "z9")).toBeNull();
+    expect(() => pieceAt("not a fen", "e1")).toThrow();
   });
 });

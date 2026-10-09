@@ -17,11 +17,19 @@ export function toSan(fen: string, uci: string): string {
   return chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }).san;
 }
 
-/** The piece on a square: colour and type (p, n, b, r, q, k), or null. */
+/**
+ * The piece on a square: colour and type (p, n, b, r, q, k), or null. The screens ask about many squares of the same
+ * position, some on every redraw (the ice over every frozen piece in the blizzard), so a position is read once.
+ */
 export function pieceAt(fen: string, square: string): { color: "w" | "b"; type: "p" | "n" | "b" | "r" | "q" | "k" } | null {
-  const p = new Chess(fen).get(square as Square);
+  let board = boards.get(fen);
+  if (!board) board = remember(boards, fen, new Chess(fen).board(), 32);
+  const file = square.charCodeAt(0) - 97;
+  const rank = square.charCodeAt(1) - 48;
+  const p = square.length === 2 && file >= 0 && file < 8 && rank >= 1 && rank <= 8 ? board[8 - rank]![file] : null;
   return p ? { color: p.color, type: p.type } : null;
 }
+const boards = new Map<string, ReturnType<Chess["board"]>>();
 
 export function sideToMove(fen: string): "w" | "b" {
   return fen.split(" ")[1] === "b" ? "b" : "w";
@@ -36,9 +44,9 @@ export type GameEnd = "checkmate" | "stalemate" | "repetition" | "fifty_moves" |
  * move or two on from one already replayed carries on from it. Same answers, same errors for an illegal move.
  */
 const KEPT = 256;
-const remember = <T>(cache: Map<string, T>, key: string, value: T): T => {
+const remember = <T>(cache: Map<string, T>, key: string, value: T, kept = KEPT): T => {
   cache.set(key, value);
-  if (cache.size > KEPT) cache.delete(cache.keys().next().value!);
+  if (cache.size > kept) cache.delete(cache.keys().next().value!);
   return value;
 };
 const play = (chess: Chess, moves: readonly string[]) => {
