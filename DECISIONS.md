@@ -3258,3 +3258,32 @@ move 13-15; the blizzard glitched.
 - **Measured** with `npm run perf:boss` (a whole battle on a computer and on a phone slowed 4x, per move); also run on
   Boingo, a Crowd match and an online raid. **Guarded** by `packages/chess/test/long-match.test.ts` and
   `e2e/perf.spec.ts`.
+
+## Match screen: timers, the ring, chat on a computer (Eric, Oct 9, 2026)
+
+From Eric's marked-up screenshot of a Crowd match. My calls:
+
+- **The ring was off its square.** Chessground draws the squares in a box it rounds down to a whole multiple of 8
+  device pixels, up to 8 px smaller than the board's wrap (5-6 CSS px at a 125% display scale, as Eric's). The ring
+  was placed in % of the wrap, so it drifted toward the board's far side, a few pixels at most squares. Now the ring,
+  the bars, the clock and the ghost layers size by chessground's own number (`---cg-width`, which it writes every
+  time it sizes the board), so they can't drift. The ring's corners are square and its glow is inside, so nothing
+  of it reads wider than the square. `e2e/match-screen.spec.ts` checks it within 1 px at two widths on a phone and
+  on a 125% computer, at sizes picked where the rounding gap is widest (the old ring failed there).
+- **The bar** is 6 px (was 3): Eric asked for a few pixels. One setting, `--timer-bar-h` in `styles.css`.
+- **The mirror under the board** shows on phones and computers. It sits in the 8 px gap above the next row, so the
+  board keeps its size. One switch: `TIMER_BAR_BELOW` in `components/Countdown.tsx`. On a computer the gaps above and
+  below the board are 8 px now (were 6), as on a phone, to fit the bars.
+- **The board's clock** sits in the line above the board, level with the board's right edge: this move's seconds
+  ("12s") and your bank ("9:50", the leaderboard's BANK). No labels: they made it too wide for a phone's line, and
+  the formats tell them apart; the full words are its tooltip. The seconds go red under 5 s on your own move; the
+  bank red under a minute. Once you've moved, your bank stops and the seconds go grey. Watching the other team, the
+  seconds are theirs (never red). In the reveal only the bank shows, in the same place.
+  - Beside it, the line's own "⏱ 20 s" shows only when it's lit (the clock went up, "▲"); otherwise it repeated the
+    clock. On a phone the line's text is centred in the room left of the clock; it drops "Your pick for" only while
+    the lit note is in it below 430 px, and "you're on White" below 375 px.
+  - Crowd only (not the boss raid, which has the dock, or Classic, which shows the bank in its top bar).
+- **Chat on a computer** was already in the right column, under the vote results, in online matches (solo has no
+  chat). But the panel above it changed height every phase, so chat jumped down at each reveal and back up at each
+  move. The panel keeps one height now (room for five vote rows, yours and the result line), so chat stays put. From
+  900 to 1099 px it's still beside the scoreboard (no leaderboard down the side there).
