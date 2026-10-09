@@ -1,3 +1,4 @@
+import type { BossPowerState } from "./boss.ts";
 import { randomInt, shuffle, weightedIndex, type Rng } from "./rng.ts";
 import type { GroupResult } from "./scoring.ts";
 import { DEFAULT_SETTINGS, moveClockAt, roundsInStage, type Settings } from "./settings.ts";
@@ -138,6 +139,11 @@ export interface BossState {
   };
   /** The re-pick after his Last Stand: this move (the one he took back) can't be picked. Cleared once it's played. */
   barred?: string;
+  /** Which boss this is (a BOSS_ROSTER id), and its powers as they stand. */
+  id?: string;
+  /** The strength it was set at before its own offset (a raid's tier): what a profile's "bosses beaten" counts. */
+  tier?: number;
+  powers?: BossPowerState;
 }
 
 /** The King's charges: the ten's leftover power-ups, one charge per kingPowerUpsPerCharge (rounded), 1 to kingChargesMax. */

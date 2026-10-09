@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, bossInfo, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
+import { BOSS_TIERS, bossDef, bossStrength, bossThreat, isPlayable, playableBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import type { ComponentChildren } from "preact";
 import { AccountBar, DressedPawn, FdButton, LiveLine, Logo, RankLine, ThemeButton, myHat, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
+import { BossFace } from "../components/BossCharacter.tsx";
 
 export const OPENING_KEY = "brc.openingMoves";
 const MODE_KEY = "brc.mode";
@@ -80,28 +81,28 @@ function saveMatchmaking(t: MatchmakingType) {
   }
 }
 
-const BOSS_KEY = "brc.boss";
-/** The boss just picked from the menu (kept here too, for when there's no storage). */
-let pickedBoss: number | null = null;
-/** Remembers the boss picked from the menu (for this solo raid or lobby, and next time). */
-export function chooseBoss(elo: number) {
-  pickedBoss = elo;
+const BOSS_KEY = "brc.bossId";
+/** The boss just picked from the menu ("" for a random one; kept here too, for when there's no storage). */
+let pickedBoss: string | null = null;
+/** Remembers the boss picked from the menu (for this solo raid or lobby, and next time): an id, or "" for random. */
+export function rememberBossPick(id: string) {
+  pickedBoss = id;
   try {
-    localStorage.setItem(BOSS_KEY, String(elo));
+    localStorage.setItem(BOSS_KEY, id);
   } catch {
     // Not important.
   }
 }
 
-/** ?boss=N picks the boss, so the boss menu is skipped (handy for tests). */
+/** ?boss=<id> or ?boss=<strength> picks the boss, so the boss menu is skipped (handy for tests). */
 export function bossInUrl(): boolean {
   return new URLSearchParams(location.search).has("boss");
 }
 
-/** Boss raid: the boss you picked (its strength), or 0 for one a step above you. ?boss=N, else this device's choice. */
-export function chosenBoss(): number {
+/** Boss raid: the boss you picked (a playable one), or "" for a random one. ?boss=<id>, else this device's choice. */
+export function chosenBoss(): string {
   const q = new URLSearchParams(location.search).get("boss");
-  let v = q ?? (pickedBoss === null ? null : String(pickedBoss));
+  let v = q ?? pickedBoss;
   if (v === null) {
     try {
       v = localStorage.getItem(BOSS_KEY);
@@ -109,14 +110,14 @@ export function chosenBoss(): number {
       v = null;
     }
   }
-  const n = Number(v);
-  return BOSS_TIERS.includes(n) ? n : 0;
+  return v && isPlayable(bossDef(v)) ? v : "";
 }
 
-const LOW = BOSS_TIERS[0]!;
-const HIGH = BOSS_TIERS[BOSS_TIERS.length - 1]!;
-/** Where a strength sits on the menu's bars (the weakest boss still gets a sliver). */
-const barPos = (elo: number) => 6 + (94 * (Math.max(LOW, Math.min(HIGH, elo)) - LOW)) / (HIGH - LOW);
+/** A test link's fixed strength (?boss=1600: one of the tiers), else 0: the boss plays a step above you. */
+export function bossTierFromUrl(): number {
+  const n = Number(new URLSearchParams(location.search).get("boss"));
+  return BOSS_TIERS.includes(n) ? n : 0;
+}
 
 /** A boss's strength against yours, in words and a colour. */
 function versus(elo: number, you: number): { text: string; tone: "easy" | "even" | "hard" | "brutal" } {
@@ -126,9 +127,13 @@ function versus(elo: number, you: number): { text: string; tone: "easy" | "even"
   return { text: `+${d} vs you`, tone: d >= 400 ? "brutal" : "hard" };
 }
 
+/** What each boss's powers do, in a few words (the menu's line under its name). */
+const POWER_WORDS: Record<string, string> = { freeze: "freezes a piece", blizzard: "blizzard", pie: "pies a square", funhouse: "funhouse" };
+
 /**
- * Boss raid: the menu that opens when you start, one row per boss, weakest first, with its strength
- * against yours alongside. A tap picks it and starts. Creating a raid also offers "Match the group".
+ * Boss raid: the menu that opens when you start: a random boss (a different one from last time), or one of the
+ * bosses you can meet (only the complete ones: a character and its powers), each at your strength plus its own
+ * offset, with its threat and its strength against yours. A tap picks it and starts.
  */
 export function BossMenu({
   forRaid,
@@ -138,15 +143,14 @@ export function BossMenu({
   onClose,
 }: {
   forRaid: boolean;
-  value: number;
+  value: string;
   rating: number | null;
-  onPick: (elo: number) => void;
+  onPick: (id: string) => void;
   onClose: () => void;
 }) {
   const you = rating ?? PRIOR_RATING;
-  const match = raidBossElo([rating]);
-  // Solo always fights a named boss: an old "Match me" choice shows as your match.
-  const current = !forRaid && value === 0 ? match : value;
+  const base = raidBossElo([rating]);
+  const bosses = playableBosses();
   const picked = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     picked.current?.scrollIntoView({ block: "nearest" });
@@ -169,43 +173,36 @@ export function BossMenu({
             ✕
           </button>
         </div>
-        <div class="boss-menu-list" style={{ "--you": `${barPos(you)}%` }}>
-          {forRaid && (
-            <button type="button" class={`boss-row match${current === 0 ? " on" : ""}`} ref={current === 0 ? picked : undefined} onClick={() => onPick(0)}>
-              <span class="br-icon" aria-hidden="true">
-                🎯
-              </span>
-              <span class="br-main">
-                <strong>Match the group</strong>
-                <span class="br-sub">the weakest boss stronger than your group's average</span>
-              </span>
-            </button>
-          )}
-          {BOSS_TIERS.map((elo) => {
-            const b = bossInfo(elo);
+        <div class="boss-menu-list">
+          <button type="button" class={`boss-row match${value === "" ? " on" : ""}`} ref={value === "" ? picked : undefined} onClick={() => onPick("")}>
+            <span class="br-icon" aria-hidden="true">
+              🎲
+            </span>
+            <span class="br-main">
+              <strong>Random boss</strong>
+              <span class="br-sub">{forRaid ? "a different one from the one most of you met last" : "a different one from last time"}</span>
+            </span>
+          </button>
+          {bosses.map((b) => {
+            const elo = bossStrength(base, b);
             const vs = versus(elo, you);
             return (
               <button
                 type="button"
-                key={elo}
-                class={`boss-row${current === elo ? " on" : ""}`}
-                ref={current === elo ? picked : undefined}
+                key={b.id}
+                class={`boss-row${value === b.id ? " on" : ""}`}
+                ref={value === b.id ? picked : undefined}
                 aria-label={`${b.name}, ${elo}, ${vs.text}`}
-                onClick={() => onPick(elo)}
+                onClick={() => onPick(b.id)}
               >
                 <span class="br-icon" aria-hidden="true">
-                  {b.icon}
+                  <BossFace boss={b} />
                 </span>
                 <span class="br-main">
-                  <strong>
-                    {b.name.replace(/^The /, "")}
-                    {!forRaid && elo === match && <em class="br-tag">your match</em>}
-                  </strong>
+                  <strong>{b.name.replace(/^The /, "")}</strong>
                   <span class="br-sub">
-                    <span class="br-skulls">{"💀".repeat(b.threat)}</span>
-                    <span class="br-bar" aria-hidden="true">
-                      <i style={{ width: `${100 - barPos(elo)}%` }} />
-                    </span>
+                    <span class="br-skulls">{"💀".repeat(bossThreat(elo))}</span>
+                    <span class="br-powers">{b.powers ? `${POWER_WORDS[b.powers.passive]} · ${POWER_WORDS[b.powers.ultimate]}` : ""}</span>
                   </span>
                 </span>
                 <span class="br-elo">
@@ -220,7 +217,6 @@ export function BossMenu({
     </div>
   );
 }
-
 
 /** The mode picker's three choices, and the line under PLAY for each. */
 const MODES: { id: ModeChoiceId; label: string; sub: string }[] = [
@@ -439,8 +435,8 @@ export function HomeScreen({
   // Boss raid: pick the boss first, for a raid alone or one you create (skipped with ?boss=N).
   const [bossMenu, setBossMenu] = useState<null | "solo" | "raid">(null);
   const bossAlone = () => (bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
-  const pickBoss = (elo: number) => {
-    chooseBoss(elo);
+  const pickBoss = (id: string) => {
+    rememberBossPick(id);
     const forRaid = bossMenu === "raid";
     setBossMenu(null);
     if (forRaid) onCreateLobby("raid");

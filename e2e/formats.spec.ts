@@ -125,12 +125,14 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=6");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
-  // First, the boss menu: all ten bosses, each with its strength against yours. Pick one and it starts.
+  // First, the boss menu: a random boss, then every boss you can meet (a complete character and powers), each at
+  // your strength plus its own offset. Pick one and it starts.
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
-  await expect(menu.locator(".boss-row")).toHaveCount(10);
+  await expect(menu.locator(".boss-row")).toHaveCount(3);
+  await expect(menu.getByRole("button", { name: /Random boss/ })).toBeVisible();
   await expect(menu.getByRole("button", { name: /Match the group/ })).toHaveCount(0);
-  await menu.getByRole("button", { name: /Boingo the Clown, 1600/ }).click();
+  await menu.getByRole("button", { name: /Boingo the Clown/ }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".opening-roulette.landed")).toBeVisible({ timeout: 5_000 });
   const boss = await page.evaluate(() => (window as any).match.boss);

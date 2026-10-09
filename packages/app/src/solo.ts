@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, LAST_STAND_MS } from "@chessroyale/chess";
+import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, FinalView, GameView, Hint, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
@@ -385,9 +385,23 @@ export class SoloMatch implements GameView {
     // (Alone, it has been "thinking" since your move went in: scoring your move counts towards it.)
     const minThink = bossThinkMs(snap.board.history) - (this.alone ? Date.now() - this.movedAt : 0);
     await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
-    const showMs = bossShowMs(this.runner.bossView()?.lastMove, this.alone);
+    // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
+    // before your clock starts.
+    const view = this.runner.bossView();
+    const showMs = bossShowMs(view?.lastMove, this.alone) + powerMomentMs(view?.powers?.events);
     const until = Date.now() + showMs;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until });
+    this.timer = setTimeout(() => this.nextRound(), showMs);
+  }
+
+  /**
+   * Boingo's funhouse: as the turn passes to you, he plays your move for you (a weak but recoverable one, unscored).
+   * It plays out, then the boss replies.
+   */
+  private async funhouseTurn() {
+    await this.runner.playFunhouse(this.engines[0]);
+    const showMs = powerMomentMs([{ kind: "funhouse" }]);
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
     this.timer = setTimeout(() => this.nextRound(), showMs);
   }
 
@@ -420,6 +434,7 @@ export class SoloMatch implements GameView {
         return this.finish();
       }
       if (this.runner.bossToMove()) return void this.bossTurn();
+      if (this.runner.funhouseDue()) return void this.funhouseTurn();
     } else if (this.runner.isFinal()) return void this.finalTurn();
     this.runner.deal();
     this.kingCalled = false;
@@ -448,7 +463,8 @@ export class SoloMatch implements GameView {
     if (this.timer) clearTimeout(this.timer);
     const { board, allowedMs: allowed } = this.phase;
     if (move !== null && Date.now() < this.playStartedAt - 300) return; // Before the clock starts.
-    if (move !== null && move === this.runner.boss?.barred) return; // The move the God King took back.
+    // Boss battle: only a move allowed this turn (a power's limits; the move the God King took back).
+    if (move !== null && this.runner.boss && !(this.runner.crowdAllowed() ?? [move]).includes(move)) return;
     const now = Date.now();
     if (move !== null && this.frozen && now < this.frozen.until) return; // While the King strikes.
     const frozen = this.frozen ? Math.max(0, Math.min(now, this.frozen.until) - this.frozen.at) : 0;
@@ -633,6 +649,10 @@ export class SoloMatch implements GameView {
         }
         if (this.runner.bossToMove()) {
           await this.runner.playBoss(this.engines[0]);
+          continue;
+        }
+        if (this.runner.funhouseDue()) {
+          await this.runner.playFunhouse(this.engines[0]);
           continue;
         }
         this.runner.deal();

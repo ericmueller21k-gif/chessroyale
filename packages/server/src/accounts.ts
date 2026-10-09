@@ -9,6 +9,7 @@
 import { countD1 } from "./ops.ts";
 import {
   BOSS_TIERS,
+  bossDef,
   FRONT_DOOR,
   SHOP_CATEGORIES,
   SHOP_FREE,
@@ -154,6 +155,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "survived", type: "INTEGER" },
   { table: "results", column: "last_stand", type: "INTEGER" },
   { table: "results", column: "boss_elo", type: "INTEGER" },
+  // Which boss a boss battle met (Oct 8, 2026: bosses became identities; BOSS_ROSTER ids), with team_won its outcome:
+  // each boss's win rate, for nudging its strength offset later.
+  { table: "results", column: "boss_id", type: "TEXT" },
   // An online match's lobby code (Oct 7, 2026), so a closed lobby's link can offer "See your result". Never shown on a profile.
   { table: "results", column: "lobby", type: "TEXT" },
   // Whether a result counts for ranking (Oct 7, 2026): 1 ranked, 0 not (under 30% real players, solo, practice), NULL from
@@ -491,6 +495,7 @@ export interface MatchResult {
   survived?: boolean | null;
   lastStand?: boolean | null;
   bossElo?: number | null;
+  bossId?: string | null;
   /** An online match: its lobby's code (the server sets it; a solo result has none). */
   lobby?: string | null;
   /** It counts for ranking (the lobby decides: isRankedMatch). Solo results never do. */
@@ -514,8 +519,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   const ranked = r.online && r.ranked === true;
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -538,6 +543,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null,
     ranked ? 1 : 0,
     r.held ? 1 : 0,
+    typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
   );
   // Only a ranked match moves your ranking (and not while fair play holds your results).
   if (rating !== null && ranked && !r.held) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
@@ -673,6 +679,8 @@ export interface PublicProfile {
     survived: boolean | null;
     bestMove: string | null;
     bossElo: number | null;
+    /** A boss raid: which boss (a BOSS_ROSTER id; null from before bosses had identities). */
+    bossId?: string | null;
     playedAt: number;
     /** It counted for ranking (false: under 30% real players, solo or practice; null: from before the rule). */
     ranked: boolean | null;
@@ -697,6 +705,7 @@ interface ResultRow {
   survived: number | null;
   last_stand: number | null;
   boss_elo: number | null;
+  boss_id?: string | null;
   ranked: number | null;
   held: number | null;
 }
@@ -741,7 +750,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
   if (!u) return null;
   const rows = await sql.all<ResultRow>(
     `SELECT mode, online, placement, players, team, team_won, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes,
-       strikes_survived, survived, last_stand, boss_elo, ranked, held
+       strikes_survived, survived, last_stand, boss_elo, boss_id, ranked, held
      FROM results WHERE user_id = ? ORDER BY played_at DESC, id DESC`,
     userId,
   );
@@ -787,6 +796,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
       survived: r.survived === null ? null : r.survived === 1,
       bestMove: r.best_move,
       bossElo: r.boss_elo,
+      bossId: r.boss_id ?? null,
       playedAt: r.played_at,
       ranked: r.ranked === null ? null : r.ranked === 1,
     })),

@@ -32,7 +32,10 @@ import {
   standingPoints,
   standings,
   bossElo,
-  bossInfo,
+  bossStrength,
+  bossThreat,
+  chooseBoss,
+  BOSS_POWERS,
   bossStumbleChance,
   bossStartPly,
   kingCharges,
@@ -54,6 +57,21 @@ import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves
 import { pickOpenings, type Opening } from "./openings.ts";
 import { applyMove, legalMoves, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
+import {
+  allowedSearch,
+  bossAllowed,
+  boardFlipped,
+  crowdAllowed,
+  funhouseDue,
+  funhousePlayed,
+  icedSquares,
+  initPowers,
+  judgeCandidates,
+  powerTurn,
+  prepareTurn,
+  rageOf,
+  bossPowers,
+} from "./boss-powers.ts";
 
 /**
  * Runs a match round by round: deal, collect picks, score with the engine, draw,
@@ -174,6 +192,8 @@ export interface BoardRound {
    * The round's scores stand.
    */
   lastStand?: LastStandRound;
+  /** Boss battle: a boss power touched this turn (a frozen piece, a pie, the blizzard, a flipped board): no fair-play signal. */
+  power?: boolean;
 }
 
 /**
@@ -313,12 +333,20 @@ export class MatchRunner {
     const board = this.boards.get(id)!;
     const n = this.alive().length;
     this.bossLast = null;
+    // Which boss: the one picked, else a random playable one (not the one to avoid). One draw from the match's random
+    // source, which also seeds its powers.
+    const seed = Math.floor(this.opts.rng() * 2 ** 32);
+    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid);
+    const crowdSide = sideToMove(board.fen);
     this.state = {
       ...this.state,
       players: this.state.players.map((p) => ({ ...p, colour: null, powerUps: 0 })),
       boss: {
-        elo: this.settings.bossFixedElo || raidBossElo([]),
-        crowdSide: sideToMove(board.fen),
+        id: def.id,
+        powers: initPowers(seed, board.fen, crowdSide),
+        tier: this.settings.bossFixedElo || raidBossElo([]),
+        elo: bossStrength(this.settings.bossFixedElo || raidBossElo([]), def),
+        crowdSide,
         startPly: board.history.length,
         crowdMoves: 0,
         sinceKill: 0,
@@ -329,6 +357,23 @@ export class MatchRunner {
         minSurvivors: Math.ceil(n / 2),
       },
     };
+    this.preparePowers();
+  }
+
+  /** Boss battle: the powers for the crowd turn about to begin (once per turn; see prepareTurn). */
+  private preparePowers() {
+    const b = this.state.boss;
+    if (!b?.powers || this.finalGameOver()) return;
+    const fen = this.boards.get(this.state.boards[0]!)!.fen;
+    if (sideToMove(fen) !== b.crowdSide) return;
+    this.state = { ...this.state, boss: prepareTurn(b, fen, this.settings.bossPowerTest) };
+  }
+
+  /** Boss battle: the moves the crowd may play this turn (a power's limits, the Last Stand's barred move); null: any. */
+  crowdAllowed(boardId = this.state.boards[0]!): string[] | null {
+    const b = this.state.boss;
+    if (!b) return null;
+    return crowdAllowed(b, this.boards.get(boardId)!.fen);
   }
 
   /** Side to move on each board in play. */
@@ -467,9 +512,19 @@ export class MatchRunner {
     this.top.prefetch(this.opts.engines, [...this.groups.keys()].map((id) => this.boards.get(id)!.fen));
   }
 
-  /** The engine's top moves in a position (shared with scoring, so a prefetched search is reused). */
-  topMovesFor(fen: string): Promise<MoveScore[]> {
-    return this.top.get(this.opts.engines[0]!, fen);
+  /**
+   * The engine's top moves in a position (shared with scoring, so a prefetched search is reused). Boss battle, the
+   * crowd's turn: only the moves allowed this turn (a power's limits; the Last Stand's barred move), as the judge
+   * sees them, so a power-up's hints and the eval bar follow the crowd's rules too.
+   */
+  async topMovesFor(fen: string): Promise<MoveScore[]> {
+    const engine = this.opts.engines[0]!;
+    const all = await this.top.get(engine, fen);
+    const id = this.state.boards[0];
+    const allowed = this.state.boss && id !== undefined && this.boards.get(id)?.fen === fen ? (this.crowdAllowed(id) ?? undefined) : undefined;
+    if (!allowed) return all;
+    const top = judgeCandidates({ allowed }, all, (await allowedSearch(engine, { fen, allowed }, all)) ?? []);
+    return top.length ? top : all;
   }
 
   boardOf(playerId: string): BoardState | null {
@@ -536,7 +591,12 @@ export class MatchRunner {
     const groups = [...this.groups.entries()];
     const run = (async () => {
       for (const [boardId, ids] of groups) {
-        const top = await this.topMovesFor(this.boards.get(boardId)!.fen);
+        const fen = this.boards.get(boardId)!.fen;
+        const all = await this.topMovesFor(fen);
+        // Boss battle: a power left none of the top moves open: the bots pick from a search over the allowed ones.
+        const allowed = this.crowdAllowed(boardId) ?? undefined;
+        const open = await allowedSearch(this.opts.engines[0]!, { fen, allowed }, all);
+        const top = judgeCandidates({ allowed }, all, open ?? []);
         if (this.groups.get(boardId) !== ids) return this.planned; // a new round has been dealt meanwhile
         for (const [id, move] of Object.entries(this.botPicksFor(boardId, ids, top))) this.planned.set(id, move);
       }
@@ -549,10 +609,10 @@ export class MatchRunner {
   /** Picks for every player on a board: humans as given, bots from the engine's top moves. */
   botPicksFor(boardId: number, playerIds: readonly string[], top: readonly MoveScore[]): Record<string, string> {
     const board = this.boards.get(boardId)!;
-    // The re-pick after the God King's Last Stand: the move he took back is off the table.
-    const barred = this.state.boss?.barred;
-    const legal = legalMoves(board.fen).filter((m) => m !== barred);
-    const open = top.filter((m) => m.move !== barred);
+    // Boss battle: only the moves allowed this turn (a power's limits; the move the God King took back is off the table).
+    const allowed = this.crowdAllowed(boardId);
+    const legal = allowed ?? legalMoves(board.fen);
+    const open = allowed ? judgeCandidates({ allowed }, top) : [...top];
     const best = open[0]?.expected ?? top[0]!.expected;
     const candidates = open.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
     const out: Record<string, string> = {};
@@ -581,16 +641,21 @@ export class MatchRunner {
   ): Promise<BoardRound> {
     void rng;
     const board = this.boards.get(boardId)!;
-    // The re-pick after the God King's Last Stand: the move he took back is no option, so it isn't the best either.
-    const barred = this.state.boss?.barred;
+    // Boss battle: the judge plays by the crowd's rules. Only the moves allowed this turn count (a power's limits; the
+    // move the God King took back), so the best is the best of those; with none of them among the top moves, one
+    // search covers them all.
+    const allowed = this.crowdAllowed(boardId) ?? undefined;
     const all = await this.top.get(engine, board.fen);
-    const top = barred && all.some((m) => m.move !== barred) ? all.filter((m) => m.move !== barred) : all;
+    const humans = playerIds.flatMap((id) => (this.player(id).isBot ? [] : [humanPicks.get(id)?.move ?? null])).filter((m): m is string => !!m && (!allowed || allowed.includes(m)));
+    const open = await allowedSearch(engine, { fen: board.fen, allowed, picks: humans }, all);
+    const top = judgeCandidates({ allowed }, all, open ?? []);
     const botPicks = this.botPicksFor(boardId, playerIds, top);
     const picks: Record<string, string | null> = {};
     for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
     const known = new Map(top.map((m) => [m.move, m.expected]));
+    for (const m of open ?? []) known.set(m.move, m.expected);
     const missing = Object.values(picks).flatMap((m) => (m && !known.has(m) ? [m] : []));
-    const extra = missing.length ? await engine.scoreMoves(board.fen, missing) : [];
+    const extra = [...(open ?? []), ...(missing.length ? await engine.scoreMoves(board.fen, missing) : [])];
     for (const m of extra) known.set(m.move, m.expected);
     // Close calls are re-checked where a person is playing (a group of bots affects nobody real).
     const people = playerIds.some((id) => !this.player(id).isBot && humanPicks.get(id)?.move);
@@ -616,7 +681,7 @@ export class MatchRunner {
     rawEvaluation: BoardEvaluation,
   ): BoardRound {
     const board = this.boards.get(boardId)!;
-    const { picks, evaluation } = this.withoutBarred(rawPicks, rawEvaluation);
+    const { picks, evaluation } = this.withoutBarred(rawPicks, rawEvaluation, boardId);
     // Boss battle: humans who called the King instead of picking abstain: no score, not a miss.
     const abstained = new Set(this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && this.kingCallers.has(id)) : []);
     const result = scoreGroup(
@@ -647,21 +712,22 @@ export class MatchRunner {
       bestMove: evaluation.bestMove,
       ...(this.state.boss ? { king: king.plays, kingCalls: king.calls } : {}),
       ...(lastStand ? { lastStand } : {}),
+      ...(powerTurn(this.state.boss) ? { power: true } : {}),
     };
   }
 
   /**
-   * Boss battle, the re-pick after the God King's Last Stand: a pick of the move he took back (which the screens
-   * and the server don't allow) counts as no move, and the move isn't the best on offer either.
+   * Boss battle: a pick of a move not allowed this turn (a boss power's limits, or the move the God King took back,
+   * which the screens and the server don't allow) counts as no move, and such a move isn't the best on offer either.
    */
-  private withoutBarred(picks: Readonly<Record<string, string | null>>, evaluation: BoardEvaluation) {
-    const barred = this.state.boss?.barred;
-    if (!barred) return { picks, evaluation };
-    const clean = Object.fromEntries(Object.entries(picks).map(([id, m]) => [id, m === barred ? null : m]));
-    const expectedAfter = { ...evaluation.expectedAfter };
-    delete expectedAfter[barred];
+  private withoutBarred(picks: Readonly<Record<string, string | null>>, evaluation: BoardEvaluation, boardId: number) {
+    const allowed = this.crowdAllowed(boardId);
+    if (!allowed) return { picks, evaluation };
+    const ok = new Set(allowed);
+    const clean = Object.fromEntries(Object.entries(picks).map(([id, m]) => [id, m && !ok.has(m) ? null : m]));
+    const expectedAfter = Object.fromEntries(Object.entries(evaluation.expectedAfter).filter(([m]) => ok.has(m)));
     let { bestMove, bestExpected } = evaluation;
-    if (bestMove === barred) {
+    if (!ok.has(bestMove)) {
       const next = Object.entries(expectedAfter).sort((a, b) => b[1] - a[1])[0];
       if (next) [bestMove, bestExpected] = next;
     }
@@ -687,7 +753,8 @@ export class MatchRunner {
     evaluation: BoardEvaluation,
   ): LastStandRound | undefined {
     const b = this.state.boss;
-    if (!b || b.lastStand || b.barred || legalMoves(fen).length < 2) return undefined;
+    // (Never when only one move was open: his re-pick has to leave the crowd another, a power's limits included.)
+    if (!b || b.lastStand || b.barred || (crowdAllowed(b, fen) ?? legalMoves(fen)).length < 2) return undefined;
     const mine = scored.find((m) => m.move === played);
     const loss = mine?.loss ?? 0;
     const charges = b.kingCharges ?? 0;
@@ -882,21 +949,59 @@ export class MatchRunner {
   async playBoss(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const kind = this.bossMoveKind();
-    const move = await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings));
+    const move = await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed());
     this.applyBossMove(move, kind === "stagger");
     return move;
   }
 
-  /** Plays the boss's move (from the host's engine online). An illegal move is replaced by the first legal one. */
+  /** The moves the boss may play now (a pie stops it too), or null: any legal move. */
+  bossAllowed(): string[] | null {
+    return bossAllowed(this.state.boss, this.boards.get(this.state.boards[0]!)!.fen);
+  }
+
+  /**
+   * Plays the boss's move (from the host's engine online). An illegal move (or one onto a pie) is replaced by the
+   * first allowed one. Then the crowd's next turn begins: its powers are set (a freeze, a pie, the ultimate).
+   */
   applyBossMove(move: string, staggered = !!this.state.boss?.staggerNext): string {
     const id = this.state.boards[0]!;
     const board = this.boards.get(id)!;
-    const legal = legalMoves(board.fen);
+    const legal = this.bossAllowed() ?? legalMoves(board.fen);
     const m = legal.includes(move) ? move : legal[0]!;
     this.boards.set(id, playOnBoard(board, m, 1 - board.expected));
     const captured = pieceAt(board.fen, m.slice(2, 4))?.type;
     this.bossLast = { move: m, san: toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
+    this.preparePowers();
+    return m;
+  }
+
+  /** Boss battle: the boss plays the crowd's move this turn (its funhouse), before the crowd picks. */
+  funhouseDue(): boolean {
+    return funhouseDue(this.state.boss) && !this.finalGameOver() && !this.bossToMove();
+  }
+
+  /** The funhouse: the boss picks the crowd's move (a weak but recoverable one) and plays it. */
+  async playFunhouse(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
+    const fen = this.boards.get(this.state.boards[0]!)!.fen;
+    const move = await funhouseMoveFrom(engine, fen, this.crowdAllowed());
+    return this.applyFunhouse(move);
+  }
+
+  /**
+   * Plays the funhouse's move for the crowd (from the host's engine online; an illegal or disallowed one is replaced
+   * by the first allowed move). It's the crowd's move on the board, but nobody picked it: it isn't scored, and the
+   * boss's strike doesn't count it. The board then shows flipped for the crowd's next turns.
+   */
+  applyFunhouse(move: string): string {
+    const b = this.state.boss!;
+    const id = this.state.boards[0]!;
+    const board = this.boards.get(id)!;
+    const legal = this.crowdAllowed(id) ?? legalMoves(board.fen);
+    const m = legal.includes(move) ? move : legal[0]!;
+    const san = toSan(board.fen, m);
+    this.boards.set(id, playOnBoard(board, m, board.expected));
+    this.state = { ...this.state, boss: funhousePlayed(b, m, san) };
     return m;
   }
 
@@ -928,7 +1033,11 @@ export class MatchRunner {
   bossView(justKilled: string | null = null): NetBoss | null {
     const b = this.state.boss;
     if (!b) return null;
-    const info = bossInfo(b.elo);
+    const def = chooseBoss(0, b.id);
+    const info = { name: def.name, icon: def.icon, threat: bossThreat(b.elo) };
+    const fen = this.boards.get(this.state.boards[0]!)!.fen;
+    const powers = bossPowers(b);
+    const p = b.powers;
     const strikes = this.alive().length > (b.minSurvivors ?? this.settings.bossMinSurvivors) && !b.result;
     return {
       board: netBoard(this.boards.get(this.state.boards[0]!)!),
@@ -952,6 +1061,26 @@ export class MatchRunner {
       lastStand: b.lastStand ?? null,
       barred: b.barred ?? null,
       ...(b.result ? { result: b.result } : {}),
+      id: def.id,
+      ...(powers && p
+        ? {
+            powers: {
+              passive: powers.passive,
+              ultimate: powers.ultimate,
+              turn: p.turn,
+              rage: rageOf(b),
+              warned: p.warnAt !== undefined && p.ultAt === undefined,
+              ultAt: p.ultAt ?? null,
+              frozen: p.frozen ? { square: p.frozen.square, until: p.frozen.until } : null,
+              pie: p.pie ? { square: p.pie.square, until: p.pie.until } : null,
+              iced: sideToMove(fen) === b.crowdSide ? icedSquares(b, fen) : p.frozen ? [p.frozen.square] : [],
+              flipped: boardFlipped(b),
+              funhouse: p.funhouse ?? null,
+              events: p.events,
+              allowed: sideToMove(fen) === b.crowdSide ? crowdAllowed(b, fen) : null,
+            },
+          }
+        : {}),
     };
   }
 
@@ -964,7 +1093,11 @@ export class MatchRunner {
     const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
     this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
     const alive = this.alive();
-    const elo = bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
+    // Which boss: a random playable one (as in a raid), at the crowd's strength plus its own offset.
+    const seed = Math.floor(this.opts.rng() * 2 ** 32);
+    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid);
+    const tier = bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
+    const elo = bossStrength(tier, def);
     this.bossLast = null;
     this.state = {
       ...this.state,
@@ -973,6 +1106,9 @@ export class MatchRunner {
       // Their leftover power-ups become the King's charges.
       players: this.state.players.map((p) => (p.alive ? { ...p, colour: null, finalLosses: [], powerUps: 0 } : p)),
       boss: {
+        id: def.id,
+        powers: initPowers(seed, this.boards.get(id)!.fen, "w"),
+        tier,
         elo,
         crowdSide: "w",
         startPly,
@@ -984,6 +1120,7 @@ export class MatchRunner {
         kingMoves: [],
       },
     };
+    this.preparePowers();
   }
 
   // ---------------- Team final ----------------
@@ -1213,10 +1350,15 @@ export async function bossMoveFrom(
   _rng: Rng = Math.random,
   strikeLoss: readonly [number, number] = [5, 15],
   guard: BossGuard = DEFAULT_BOSS_GUARD,
+  allowed: readonly string[] | null = null,
 ): Promise<string> {
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
-  const top = await engine.topMoves(fen, 8);
-  if (!top.length) return legalMoves(fen)[0]!;
+  // A boss power can stop the boss too (nobody moves onto a pie): it plays the best of what's allowed.
+  const all = await engine.topMoves(fen, 8);
+  const ok = allowed ? new Set(allowed) : null;
+  let top = ok ? all.filter((m) => ok.has(m.move)) : all;
+  if (ok && !top.length) top = await engine.scoreMoves(fen, [...ok]);
+  if (!top.length) return allowed?.[0] ?? legalMoves(fen)[0]!;
   const bestMove = top[0]!.move;
   // A move other than the best is checked once more, head to head with the best in one focused search (the
   // eight-line search spreads itself thin and now and then misjudges a move); failing that, the best is played.
@@ -1236,9 +1378,71 @@ export async function bossMoveFrom(
   }
   if (!engine.playAtElo) return bestMove;
   const move = await engine.playAtElo(fen, elo, nodes);
+  if (ok && !ok.has(move)) return confirm(pickByLoss(top, guard.slipLoss, guard), guard);
   const best = top[0]!.expected;
   const got = top.find((m) => m.move === move)?.expected ?? (await engine.scoreMoves(fen, [move]))[0]?.expected ?? 0;
   return confirm(withinGuard(moveLoss(best, got), guard) ? move : pickByLoss(top, guard.slipLoss, guard), guard);
+}
+
+/**
+ * Boingo's funhouse: the move he plays for the crowd. Weak but recoverable: from the allowed moves, one that gives
+ * away about `loss` points against the best (1 to 2.5 pawns from an even position), nearest the middle of that range,
+ * never past `maxLogit` in log-odds, never one whose line allows a forced mate, never one that leaves the queen to be
+ * taken (unless it takes a queen itself: a trade). The engine's top moves first; if none is weak enough, the rest of
+ * the allowed moves are searched too. Like the boss's slips, the pick is checked head to head with the best once.
+ */
+export async function funhouseMoveFrom(
+  engine: EngineLike,
+  fen: string,
+  allowed: readonly string[] | null = null,
+  loss: readonly [number, number] = BOSS_POWERS.funhouseLoss,
+  maxLogit: number = BOSS_POWERS.funhouseMaxLogit,
+): Promise<string> {
+  const legal = allowed ? [...allowed] : legalMoves(fen);
+  if (legal.length <= 1) return legal[0]!;
+  const ok = new Set(legal);
+  const top = (await engine.topMoves(fen, 8)).filter((m) => ok.has(m.move));
+  const seen = new Set(top.map((m) => m.move));
+  const scoredAll = [...top];
+  const [lo, hi] = loss;
+  const safe = (m: MoveScore) => !(m.mate !== undefined && m.mate < 0) && !leavesQueen(fen, m);
+  const options = (list: readonly MoveScore[], best: number) =>
+    list.filter(safe).map((m) => ({ move: m.move, loss: moveLoss(best, m.expected) })).filter((x) => x.loss.logit <= maxLogit || x.loss.points <= 2);
+  let best = top[0]?.expected;
+  let inRange = best === undefined ? [] : options(top, best).filter((x) => x.loss.points >= lo && x.loss.points <= hi);
+  if (!inRange.length) {
+    const rest = legal.filter((m) => !seen.has(m));
+    if (rest.length) scoredAll.push(...(await engine.scoreMoves(fen, rest)));
+    best = Math.max(...scoredAll.map((m) => m.expected));
+    inRange = options(scoredAll, best).filter((x) => x.loss.points >= lo && x.loss.points <= hi);
+  }
+  const bestMove = [...scoredAll].sort((a, b) => b.expected - a.expected)[0]?.move ?? legal[0]!;
+  const all = options(scoredAll, best ?? 0.5).filter((x) => x.move !== bestMove);
+  // Nearest the middle of the range; else the weakest move short of it (still a gift, never a blunder); else the best.
+  const mid = (lo + hi) / 2;
+  const pick =
+    [...inRange].sort((a, b) => Math.abs(a.loss.points - mid) - Math.abs(b.loss.points - mid) || (a.move < b.move ? -1 : 1))[0] ??
+    [...all].filter((x) => x.loss.points < lo).sort((a, b) => b.loss.points - a.loss.points)[0];
+  if (!pick) return bestMove;
+  // Checked once more head to head with the best (the wide search spreads itself thin): too much, and the gentlest
+  // option short of the range is played instead.
+  const check = await engine.scoreMoves(fen, [bestMove, pick.move]);
+  const b = check.find((m) => m.move === bestMove)?.expected;
+  const g = check.find((m) => m.move === pick.move);
+  if (b === undefined || !g) return pick.move;
+  const l = moveLoss(Math.max(b, g.expected), g.expected);
+  if (l.points <= hi + 5 && (l.logit <= maxLogit || l.points <= 2) && safe(g)) return pick.move;
+  const gentler = [...all].filter((x) => x.loss.points < pick.loss.points).sort((a, c) => c.loss.points - a.loss.points)[0];
+  return gentler?.move ?? bestMove;
+}
+
+/** After `m`, the reply takes the mover's queen, and `m` didn't take a queen itself (a trade is fine). */
+function leavesQueen(fen: string, m: MoveScore): boolean {
+  if (!m.reply) return false;
+  const mover = sideToMove(fen);
+  if (pieceAt(fen, m.move.slice(2, 4))?.type === "q") return false;
+  const target = pieceAt(applyMove(fen, m.move), m.reply.slice(2, 4));
+  return target?.type === "q" && target.color === mover;
 }
 
 /** A board as sent to (and shown in) the app. */

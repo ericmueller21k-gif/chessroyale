@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
+import { PowerBoard, crowdOrientation } from "../components/BossPowers.tsx";
 import { applyMove, inCheck, pieceAt, sideToMove, toSan } from "@chessroyale/chess";
 import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKing.ts";
 import { brilliance, type Augment } from "@chessroyale/core";
@@ -233,7 +234,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     return crowdMoveCues(fen, played, picks.find((p) => p.move === played)?.loss ?? null);
   }, [mine]);
   const team = myTeam(match);
-  const orientation = (team ?? sideToMove(fen)) === "w" ? "white" : "black";
+  // (Boss battle: flipped for a while after Boingo's funhouse.)
+  const orientation = match.boss ? crowdOrientation(match.boss, team ?? sideToMove(fen)) : (team ?? sideToMove(fen)) === "w" ? "white" : "black";
   // The Last Stand's warning: the eval bar plunges to the crowd's chances after the blunder (White's side of it),
   // and goes back as the piece slides back. In the dock, what it loses in plain words.
   const crowdSide = sideToMove(fen);
@@ -291,6 +293,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           override={plunge}
         />
         <Board fen={onBoard.fen} orientation={orientation} lastMove={onBoard.lastMove} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined}>
+          {match.boss?.powers && <PowerBoard boss={match.boss} orientation={orientation} fen={onBoard.fen} />}
           {!played && (
             <CrowdGhosts
               fen={fen}

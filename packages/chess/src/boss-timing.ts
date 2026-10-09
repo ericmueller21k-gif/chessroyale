@@ -26,6 +26,20 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
   return 1800 + (lastMove?.captured === "q" ? 1300 : 0);
 }
 
+/**
+ * Boss powers' moments as the turn passes to the crowd, after the boss's move shows: how long each holds the screen
+ * (ms). The crowd's clock starts after them, solo and online, so a power never costs anyone thinking time. A freeze
+ * or a pie: its banner and the board effect; the warning: its banner over the full rage meter; the blizzard: its
+ * banner, the sweep across the board and the God King's line; the funhouse: the clown pogos onto the board, it flips,
+ * he speaks and plays the crowd's move (see the app's PowerMoment for the beats).
+ */
+export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200 } as const;
+
+/** How long a turn's power moments take, one after another. */
+export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX }[] | null | undefined): number {
+  return (events ?? []).reduce((t, e) => t + (POWER_FX[e.kind] ?? 0), 0);
+}
+
 /** Alone: how long the boss's move shows before your turn (the piece's slide, and a beat). */
 export const BOSS_MOVE_ALONE_MS = 450;
 

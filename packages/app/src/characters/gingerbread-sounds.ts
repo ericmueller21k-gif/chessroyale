@@ -1,5 +1,5 @@
 /**
- * Ginger Snap's sounds, synthesised (no files, no licences, no voice): a cookie crunch, a sleigh-bell jingle, an ice
+ * Ginger's sounds, synthesised (no files, no licences, no voice): a cookie crunch, a sleigh-bell jingle, an ice
  * crackle and the blizzard's wind. Each is a pure function of the sample rate (its noise is seeded), so a test can
  * measure it: every one stays quieter than a piece's move sound (peak and loudness; see test/gingerbread.test.ts).
  */

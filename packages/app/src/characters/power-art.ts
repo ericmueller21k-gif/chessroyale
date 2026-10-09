@@ -12,7 +12,7 @@
  *     ultimate     "funhouse"   Played ON THE BOARD (hide him in his usual spot meanwhile): his shadow grows, he
  *                               drops in from above, lands, springs into a spin and lands laughing. At `release`
  *                               (the spin) the board flips. The last frame holds until you take him off.
- *   "Ginger Snap"
+ *   "Ginger"
  *     power        "freezeCast" He raises the cane (it glows ice-blue, his eyes go icy) and thrusts it; at
  *                               `release` the ice bolt leaves its tip: fly `iceBolt` to the square, then play
  *                               `iceOverlay` freeze, frozen (loop) while it lasts, thaw.
@@ -62,7 +62,7 @@ export const POWER_MOMENTS: Record<string, { power: PowerMoment; ultimateWarn: P
     ultimateWarn: { anim: "check" },
     ultimate: { anim: "funhouse", hit: "flip", onBoard: true },
   },
-  "Ginger Snap": {
+  "Ginger": {
     power: { anim: "freezeCast", hit: "freeze", effects: ["iceBolt", "iceOverlay"] },
     ultimateWarn: { anim: "check" },
     ultimate: { anim: "blizzard", hit: "blizzard", effects: ["blizzardSweep", "iceOverlay"] },

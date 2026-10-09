@@ -9787,3 +9787,237 @@ img.qicon {
   left: calc(100% + 8px);
   top: 0;
 }
+
+/* ---------------- Boss powers (BossPowers.tsx) ---------------- */
+
+/* The board layer: ice over frozen pieces, the pie on its square (the characters' effect sprites). Over the pieces,
+   never taking a tap. */
+.power-board {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.pw-ice,
+.pw-pie,
+.pw-frost {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+}
+/* A freeze: a cold burst on the square as the ice forms. */
+.pw-frost {
+  z-index: 3;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 16%, rgba(186, 230, 253, 0.7) 30%, rgba(125, 211, 252, 0) 66%);
+  animation: pw-frost 900ms ease-out both;
+}
+@keyframes pw-frost {
+  0% {
+    opacity: 0;
+    scale: 0.4;
+  }
+  25% {
+    opacity: 1;
+    scale: 1.6;
+  }
+  100% {
+    opacity: 0;
+    scale: 2.1;
+  }
+}
+/* The ice bolt and the pie, flying from the boss's corner of the board to the square. */
+.pw-flight {
+  position: absolute;
+  z-index: 8;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  animation-name: pw-fly;
+  animation-timing-function: cubic-bezier(0.35, 0, 0.65, 1);
+  animation-fill-mode: both;
+}
+.pw-flight.pieFly {
+  animation-name: pw-lob;
+}
+@keyframes pw-fly {
+  to {
+    left: var(--fx);
+    top: var(--fy);
+  }
+}
+/* (The pie is lobbed: bigger at the top of its arc.) */
+@keyframes pw-lob {
+  50% {
+    scale: 1.5;
+  }
+  to {
+    left: var(--fx);
+    top: var(--fy);
+    scale: 1;
+  }
+}
+/* The blizzard's sweep covers the whole board (clipped to it). */
+.pw-clip {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  pointer-events: none;
+}
+.pw-sweep {
+  position: absolute;
+  inset: 0;
+}
+/* The boss steps up to the board's top-left corner (its side) to cast; its usual spot is empty for the moment. */
+.pm-caster {
+  position: absolute;
+  z-index: 8;
+  left: -3%;
+  top: -16%;
+  width: 26%;
+  aspect-ratio: 72 / 94;
+  pointer-events: none;
+  filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3));
+}
+.screen:has(.power-moment) .boss-char {
+  visibility: hidden;
+}
+/* Boingo's funhouse: he drops onto the middle of the board (his animation), and bounces off at the end. */
+.pm-pogo {
+  position: absolute;
+  z-index: 8;
+  left: 29%;
+  top: 14%;
+  width: 42%;
+  aspect-ratio: 72 / 94;
+  pointer-events: none;
+}
+.pm-pogo.out {
+  animation: pw-pogo-out 700ms cubic-bezier(0.5, 0, 0.8, 0.4) both;
+}
+@keyframes pw-pogo-out {
+  45% {
+    translate: 20% -30%;
+  }
+  100% {
+    translate: 90% -120%;
+    scale: 0.6;
+    opacity: 0;
+  }
+}
+/* His line, in his pixel text box above the board's middle. */
+.pm-line {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 6%;
+  translate: -50% 0;
+  max-width: 86%;
+  padding: 1.6cqw 2.4cqw;
+  border: 0.6cqw solid #0b0b1a;
+  border-radius: 1cqw;
+  background: #fff8e7;
+  color: #1b0d22;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 3cqw;
+  line-height: 1.5;
+  text-align: center;
+  box-shadow: 0.6cqw 0.6cqw 0 rgba(11, 11, 26, 0.6);
+  pointer-events: none;
+}
+/* The board flips: a half turn in its own plane (the pieces upside down for a moment), then the board is drawn from
+   the other side, untransformed (chessground measures its squares then). */
+.pw-flipping .board-wrap {
+  animation: pw-spin 700ms cubic-bezier(0.55, 0, 0.35, 1) both;
+}
+@keyframes pw-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(45deg) scale(0.7);
+  }
+  75% {
+    transform: rotate(135deg) scale(0.7);
+  }
+  100% {
+    transform: rotate(180deg) scale(1);
+  }
+}
+
+/* The power's banner: the God King's cut-in, the boss on the left, him on the right; its colours by the power. */
+.pc-boss .boss-portrait {
+  display: block;
+  width: 82%;
+  margin: 0 auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0.5cqw 0.5cqw 0 rgba(0, 0, 0, 0.55));
+}
+.pc-king .gk-portrait {
+  width: 118%;
+}
+.fight-banner.power-cut .fb-band {
+  background: linear-gradient(90deg, #12040a, #6b1023 22%, #3b0b2e 50%, #6b1023 78%, #12040a);
+  border-color: #fca5a5;
+  box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(248, 113, 113, 0.45), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.fight-banner.power-cut.cold .fb-band {
+  background: linear-gradient(90deg, #04121c, #0c4a6e 22%, #1e3a5f 50%, #0c4a6e 78%, #04121c);
+  border-color: #bae6fd;
+  box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(125, 211, 252, 0.55), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.fight-banner.power-cut.fun .fb-band {
+  background: repeating-linear-gradient(115deg, #7e1d5c 0 6cqw, #5b21b6 6cqw 12cqw);
+  border-color: #fde68a;
+}
+.fight-banner.power-cut .kc-label {
+  color: #fecaca;
+}
+.fight-banner.power-cut.cold .kc-label {
+  color: #bae6fd;
+}
+.fight-banner.power-cut .kc-text {
+  font-size: 10cqw;
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    0 0 24px rgba(252, 165, 165, 0.9);
+}
+.fight-banner.power-cut.cold .kc-text {
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    0 0 24px rgba(186, 230, 253, 0.95);
+}
+.fight-banner.power-cut .fb-sub {
+  font-size: 3.4cqw;
+}
+/* The rage meter in the boss bar: fills as the boss loses material; flashes for the warning. */
+.rage-meter {
+  display: inline-block;
+  position: relative;
+  width: 44px;
+  height: 6px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.rage-meter i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  transition: width 600ms ease-out;
+}
+.rage-meter.warned,
+.rage-meter.now {
+  border-color: #fecaca;
+  animation: rage-pulse 600ms ease-in-out infinite alternate;
+}
+@keyframes rage-pulse {
+  to {
+    box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.85);
+  }
+}

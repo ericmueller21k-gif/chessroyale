@@ -1,4 +1,4 @@
-import { BOSS_TIERS, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, bossDef, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 import type { LiveHub } from "./live-hub.ts";
@@ -161,10 +161,17 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
         ...(url.searchParams.get("pace") === "quick" ? (mode === "crowd" ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
         // Playtest overrides and the creator's choices: only the ones that are set.
         ...definedOnly({
-          // Boss raid: the boss the creator picked (one of the tiers), else one a step above the group.
+          // Boss raid: the boss the creator picked (a playable one), else a random one; a test link's tier fixes its
+          // strength (else a step above the group, plus the boss's offset). ?power= brings a power at once (tests).
           ...(() => {
-            const b = Number(url.searchParams.get("boss"));
-            return raid && BOSS_TIERS.includes(b) ? { bossFixedElo: b, bossPicked: b } : {};
+            const q = url.searchParams.get("boss");
+            const b = Number(q);
+            if (raid && BOSS_TIERS.includes(b)) return { bossFixedElo: b, bossFixed: b };
+            return q && isPlayable(bossDef(q)) ? { bossId: q, bossPicked: q } : {};
+          })(),
+          ...(() => {
+            const p = url.searchParams.get("power");
+            return p && ["freeze", "blizzard", "pie", "funhouse"].includes(p) ? { bossPowerTest: p } : {};
           })(),
           roundsPerStage: n("rounds"),
           firstStageRounds: n("rounds"),

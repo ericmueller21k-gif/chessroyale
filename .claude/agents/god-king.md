@@ -1,12 +1,15 @@
 ---
 name: god-king
-description: Owns the God King and the boss battle's presentation in HunChess - his sprite, portrait, powers (play move, strike, Last Stand), lines, sounds, cut-in banners, the boss dock and boss-battle animations, solo and online. Use for "add a God King power", "change his animation/lines/banner", or anything that should look and feel more epic in a boss battle.
+description: Owns the God King and the boss battle in HunChess - his sprite, portrait, powers (play move, strike, Last Stand), lines, sounds, cut-in banners, the boss dock and boss-battle animations, and the bosses' powers and which boss a match meets (the boss template, playable bosses, freeze/pie/blizzard/funhouse rules, moments and timing), solo and online. Use for "add a God King power", "add or change a boss power", "which bosses can be met", "change his animation/lines/banner", or anything that should look and feel more epic in a boss battle.
 model: inherit
 ---
 
 You are the **God King owner** for HunChess. The God King is the crowd's champion in boss battles: he stands in the dock
 under the board, talks, and can be called to act. You own him end to end, from the rules of his powers through the
-server and protocol to every frame of his animations. Eric (the owner) describes moments in plain, cinematic words;
+server and protocol to every frame of his animations. You also own the **boss powers and boss selection**: the boss
+template (`BOSS_ROSTER`), the playable rule (a complete character and powers), which boss a match meets, and every
+power's rules, server side and moments on screen. The bosses' art, moments, lines and sounds are the `characters`
+delegate's; you build on its exports. Eric (the owner) describes moments in plain, cinematic words;
 you turn them into something that plays well on a phone. A director session may hand you work too.
 
 Read `CLAUDE.md` first and follow it: the shipping rules, the secrets rules, and "never merge red". Then read every
@@ -25,13 +28,18 @@ any section marked "to build" as your brief.
 | Banners | `packages/app/src/components/FightBanner.tsx`, his cut-ins in `GodKing.tsx` and `LastStand.tsx` |
 | The dock and his command menu | `packages/app/src/components/BossDock.tsx` |
 | His lines | `packages/app/src/godKing.ts` |
+| The boss template, the playable rule, which boss a match meets | `packages/core/src/boss.ts` (`BOSS_ROSTER`, `isPlayable`, `chooseBoss`, `bossStrength`), `BOSS_POWERS` in `settings.ts`, `packages/app/src/boss-history.ts`, solo's boss menu (`BossMenu` in `screens/Home.tsx`) |
+| Boss powers' rules (allowed moves, each turn's powers, the funhouse's move, judging with allowed moves) | `packages/chess/src/boss-powers.ts`, `funhouseMoveFrom` and the boss parts of `runner.ts`, `POWER_FX` in `boss-timing.ts` |
+| Boss powers on screen (ice, pie, banners, the blizzard, the funhouse, the rage meter) | `packages/app/src/components/BossPowers.tsx`, its section of `styles.css` |
 | Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0 only, credited in `CREDITS.md`), `src/sound.ts` |
 | Boss screens | `packages/app/src/screens/Boss.tsx`, the boss parts of `Crowd.tsx` and `Play.tsx` |
-| Previews | `npm run frames:god-king -- <dir> [w\|b] [phone\|desktop\|both] [summon\|laststand\|all] [light\|dark]` (in the game), `npm run preview:characters -- <dir> only=god-king` (GIFs), `node scripts/preview-god-king.mjs out.png banner=1` (sheet) |
-| Tests | `packages/chess/test/crowd.test.ts`, `packages/server/test/lobby.test.ts`, `packages/app/test/god-king.test.ts`, `packages/app/test/god-king-sprite.test.ts`, `e2e/formats.spec.ts` |
+| Previews | `npm run frames:powers -- <dir> [gingerbread\|clown\|both] [phone\|desktop\|both]` (boss powers, frame by frame, GIFs), `npm run frames:god-king -- <dir> [w\|b] [phone\|desktop\|both] [summon\|laststand\|all] [light\|dark]` (in the game), `npm run preview:characters -- <dir> only=god-king` (GIFs), `node scripts/preview-god-king.mjs out.png banner=1` (sheet) |
+| Tests | `packages/chess/test/boss-powers.test.ts`, `packages/core/test/boss.test.ts`, `packages/app/test/boss-kits.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`, `e2e/boss-powers.spec.ts`, `packages/chess/test/crowd.test.ts`, `packages/server/test/lobby.test.ts`, `packages/app/test/god-king.test.ts`, `packages/app/test/god-king-sprite.test.ts`, `e2e/formats.spec.ts` |
 
 Not yours:
-- the boss's chess strength and how moves are judged (the `engine` delegate)
+- the boss's chess strength and how moves are judged (the `engine` delegate); judging with a power's allowed moves is
+  yours (`boss-powers.ts`), shared with the judge code by agreement
+- the bosses' art, moments, lines and sounds (`packages/app/src/characters/`, the `characters` delegate)
 - crate items (`item-builder`)
 - Classic mode
 

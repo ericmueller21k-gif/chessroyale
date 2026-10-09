@@ -12,6 +12,7 @@ import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
+import { PowerBoard, crowdOrientation } from "../components/BossPowers.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 
@@ -111,7 +112,14 @@ export function PlayScreen({
   const doneCount = alive.filter((s) => match.done.has(s.id)).length;
   // Boss battle, the re-pick after the God King's Last Stand: the move he took back is greyed out and can't be played.
   const barred = match.boss?.barred && legalMoves(board.fen).includes(match.boss.barred) ? match.boss.barred : null;
-  const allowed = useMemo(() => (barred ? legalMoves(board.fen).filter((m) => m !== barred) : undefined), [board.fen, barred]);
+  // A boss power limits the moves this turn (a frozen piece, a pie, the blizzard): only those can be played.
+  const powerAllowed = match.boss?.powers?.allowed ?? null;
+  const allowed = useMemo(
+    () => (powerAllowed ? powerAllowed.filter((m) => m !== barred) : barred ? legalMoves(board.fen).filter((m) => m !== barred) : undefined),
+    [board.fen, barred, powerAllowed?.join()],
+  );
+  // The crowd's view of the board: its own side, or flipped for a while after Boingo's funhouse.
+  const orientation = match.boss ? crowdOrientation(match.boss, side) : side === "w" ? "white" : "black";
   const arrows: Arrow[] = [
     ...(!waiting && hint && !history.browsing ? hint.map((h, i) => ({ move: h.move, brush: HINT_BRUSHES[i]!, label: (h.expected * 100).toFixed(1) })) : []),
     ...(barred && !waiting && !history.browsing ? [{ move: barred, brush: "paleGrey" as const, label: "✕" }] : []),
@@ -130,7 +138,7 @@ export function PlayScreen({
     const hp = Math.round((match.settings.kingStrikeLoss[0] + match.settings.kingStrikeLoss[1]) / 2);
     return {
       side,
-      orientation: side === "w" ? ("white" as const) : ("black" as const),
+      orientation,
       kingBefore: mine,
       kingAfter: mine,
       target,
@@ -190,8 +198,9 @@ export function PlayScreen({
         </div>
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
-          <EvalBar fen={history.fen ?? board.fen} orientation={side} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} orientation={side === "w" ? "white" : "black"} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows}>
+          <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
+          <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows}>
+            {match.boss?.powers && !history.browsing && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
             {intro && (
               <CenterCount
@@ -202,7 +211,7 @@ export function PlayScreen({
             )}
             {ending && !striking && <CenterCount label="Round end" n={secsLeft} />}
             {godKing && <KingSummon {...godKing} />}
-            {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={side === "w" ? "white" : "black"} />}
+            {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
           </Board>
         </div>
         {!match.boss && (

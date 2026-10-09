@@ -1,0 +1,198 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { POWER_FX, bossShowMs, legalMoves, pieceAt, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
+
+const hash = (s: string) => {
+  let h = 2166136261;
+  for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return (h >>> 0) / 4294967296;
+};
+const line = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1", "b5", "Bb3", "d6", "c3", "O-O", "h3", "Nb8", "d4", "Nbd7", "c4"]);
+const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
+  id: `o${i}`,
+  eco: "C95",
+  name: `Opening ${i}`,
+  family: `Family ${i}`,
+  unusual: i >= 25,
+  moves: line,
+  namedPlies: 21,
+  expected: Object.fromEntries(Array.from({ length: 22 }, (_, n) => [n, 0.5])),
+}));
+
+type Msg = ServerMessage;
+
+/** A fake lobby: clock, outboxes per player, and a fake host that scores with a hash "engine". */
+function setup(settings: Partial<Settings> = {}, icons: Record<string, string> = {}, seed = 7) {
+  let now = 1_000_000;
+  const inbox = new Map<string, Msg[]>();
+  const core = new LobbyCore(
+    newLobbyRecord("ABCDE", now),
+    {
+      now: () => now,
+      send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
+      icon: (id) => icons[id],
+    },
+    library,
+    mulberry32(seed),
+    { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...settings },
+  );
+  const take = (id: string) => {
+    const msgs = inbox.get(id) ?? [];
+    inbox.set(id, []);
+    return msgs;
+  };
+  const last = <T extends Msg["t"]>(id: string, t: T) =>
+    [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === t) as Extract<Msg, { t: T }> | undefined;
+  const advance = (ms: number) => {
+    now += ms;
+    if (core.nextAlarm && core.nextAlarm <= now) core.alarm();
+  };
+  /** Answers any score request in the host's inbox. */
+  const hostScores = (hostId: string) => {
+    const req = last(hostId, "scoreRequest");
+    if (!req) return false;
+    const boards: BoardScore[] = req.jobs.map((j) => {
+      const legal = legalMoves(j.fen);
+      const exp = Object.fromEntries(legal.map((m) => [m, 0.3 + 0.4 * hash(j.fen + m)]));
+      const best = legal.reduce((a, b) => (exp[b]! > exp[a]! ? b : a));
+      return {
+        boardId: j.boardId,
+        bestMove: best,
+        bestExpected: exp[best]!,
+        expectedAfter: exp,
+        botPicks: Object.fromEntries(j.bots.map((b, i) => [b.id, legal[i % legal.length]!])),
+        botThinkMs: Object.fromEntries(j.bots.map((b) => [b.id, 4000])),
+      };
+    });
+    core.message(hostId, { t: "scores", key: req.key, boards });
+    inbox.set(hostId, (inbox.get(hostId) ?? []).filter((m) => m.t !== "scoreRequest"));
+    return true;
+  };
+  return { core, take, last, advance, hostScores, inbox, get now() { return now; } };
+}
+
+
+/** A raid of two people against a boss, with a power brought at once (the test switch), the Last Stand off. */
+function raid(patch: Partial<Settings>, lastBoss: (string | null)[] = [null, null]) {
+  const L = setup({ ...RAID_SETTINGS, lastStandLoss: 999, lastStandLossFloor: 999, ...patch });
+  lastBoss.forEach((b, i) => L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500, undefined, undefined, b));
+  L.core.message("p1", { t: "start" });
+  L.advance(1000);
+  L.advance(60_000); // past the intro
+  return L;
+}
+
+/** Everyone picks the first allowed move; the host scores; time passes to the boss's turn. */
+function crowdMove(L: ReturnType<typeof setup>, ids = ["p1", "p2"]) {
+  for (const id of ids) {
+    const r = L.last(id, "round")!;
+    const ok = r.boss?.powers?.allowed ?? legalMoves(r.board!.fen);
+    L.core.message(id, { t: "pick", key: r.key, move: ok[0]! });
+  }
+  const req = L.last("p1", "scoreRequest")!;
+  expect(L.hostScores("p1")).toBe(true);
+  L.advance(30_000);
+  return req;
+}
+
+/** The host answers the boss request (its first allowed move, or the funhouse's). */
+function hostBoss(L: ReturnType<typeof setup>) {
+  const req = L.last("p1", "bossRequest")!;
+  expect(req).toBeTruthy();
+  L.core.message("p1", { t: "bossMove", key: req.key, move: (req.allowed ?? legalMoves(req.fen))[0]! });
+  L.inbox.set("p1", (L.inbox.get("p1") ?? []).filter((m) => m.t !== "bossRequest"));
+  return req;
+}
+
+describe("boss powers online", () => {
+  it("the gingerbread man: everyone sees the same freeze and blizzard, the clock waits for them, picks and jobs follow the allowed moves", () => {
+    const L = raid({ bossId: "gingerbread", bossPowerTest: "blizzard" });
+    const r1 = L.last("p1", "round")!;
+    expect(r1.boss!.id).toBe("gingerbread");
+    expect(r1.boss!.name).toBe("Ginger");
+    crowdMove(L);
+    hostBoss(L);
+    // As the turn passes to the crowd: a freeze and the warning, the same for both, and the boss's move shows longer.
+    const b1 = L.last("p1", "boss")!;
+    const b2 = L.last("p2", "boss")!;
+    expect(b1.boss.powers).toEqual(b2.boss.powers);
+    const kinds = b1.boss.powers!.events.map((e) => e.kind).sort();
+    expect(kinds).toEqual(["freeze", "warn"]);
+    expect(b1.until - b1.now).toBe(bossShowMs(b1.boss.lastMove) + POWER_FX.freeze + POWER_FX.warn);
+    L.advance(b1.until - L.now + 10);
+    const r2 = L.last("p1", "round")!;
+    const frozen = r2.boss!.powers!.frozen!.square;
+    expect(r2.boss!.powers!.iced).toEqual([frozen]);
+    // A move of the frozen piece is refused.
+    const icedMove = legalMoves(r2.board!.fen).find((m) => m.startsWith(frozen))!;
+    L.core.message("p1", { t: "pick", key: r2.key, move: icedMove });
+    expect(L.core.record.round!.picks.p1).toBeUndefined();
+    const job2 = crowdMove(L).jobs[0]!;
+    expect(job2.allowed!.some((m) => m.startsWith(frozen))).toBe(false);
+    hostBoss(L);
+    // The blizzard: only the queen moves this turn; every screen ices the rest.
+    const b3 = L.last("p2", "boss")!;
+    expect(b3.boss.powers!.events.map((e) => e.kind)).toEqual(["blizzard"]);
+    L.advance(b3.until - L.now + 10);
+    const r3 = L.last("p2", "round")!;
+    const fen = r3.board!.fen;
+    const allowed = r3.boss!.powers!.allowed!;
+    expect(allowed.length).toBeGreaterThan(0);
+    for (const m of allowed) expect(pieceAt(fen, m.slice(0, 2))!.type).toBe("q");
+    expect(crowdMove(L).jobs[0]!.allowed).toEqual(allowed);
+    // Power turns (the freeze, the blizzard) don't count for fair play; the first turn, before any power, does.
+    expect(L.core.fairMoves("p1").map((m) => !!m.power)).toEqual([false, true, true]);
+  });
+
+  it("Boingo: the host plays the crowd's move in his funhouse (unscored), everyone sees it, then the board shows flipped", () => {
+    const L = raid({ bossId: "clown", bossPowerTest: "funhouse" });
+    crowdMove(L);
+    hostBoss(L);
+    const warned = L.last("p1", "boss")!;
+    expect(warned.boss.powers!.events.map((e) => e.kind).sort()).toEqual(["pie", "warn"]);
+    const pie = warned.boss.powers!.pie!.square;
+    L.advance(warned.until - L.now + 10);
+    const r2 = L.last("p1", "round")!;
+    expect((r2.boss!.powers!.allowed ?? legalMoves(r2.board!.fen)).some((m) => m.slice(2, 4) === pie)).toBe(false);
+    crowdMove(L);
+    const req = hostBoss(L);
+    // The boss never moves onto the pie either.
+    if (req.allowed) expect(req.allowed.some((m) => m.slice(2, 4) === pie)).toBe(false);
+    L.advance(L.last("p1", "boss")!.until - L.now + 10);
+    // The funhouse: the host is asked for the crowd's move (from the allowed ones), nobody picks.
+    const f = L.last("p1", "bossRequest")!;
+    expect(f.funhouse).toBe(true);
+    expect(L.core.record.phase).toBe("boss");
+    const scoresBefore = L.core.save().runner!.state.players.map((p) => p.finalLosses.length);
+    hostBoss(L);
+    const fun = L.last("p2", "boss")!;
+    expect(fun.boss.powers!.funhouse).toBeTruthy();
+    expect(fun.boss.powers!.events.map((e) => e.kind)).toContain("funhouse");
+    expect(fun.until - fun.now).toBe(POWER_FX.funhouse);
+    expect(L.core.save().runner!.state.players.map((p) => p.finalLosses.length)).toEqual(scoresBefore);
+    // Then the boss replies, and the crowd's next two turns show the board flipped.
+    L.advance(fun.until - L.now + 10);
+    hostBoss(L);
+    L.advance(L.last("p1", "boss")!.until - L.now + 10);
+    expect(L.last("p1", "round")!.boss!.powers!.flipped).toBe(true);
+    expect(L.last("p2", "round")!.boss!.powers!.flipped).toBe(true);
+  });
+
+  it("a random boss avoids the one most of the lobby met last; only playable bosses are met", () => {
+    for (const seed of [1, 2, 3, 4]) {
+      const L = setup({ ...RAID_SETTINGS }, {}, seed);
+      for (const [i, b] of ["clown", "clown", "gingerbread"].entries()) L.core.connect(undefined, `P${i}`, "computer", false, 1500, undefined, undefined, b);
+      L.core.message("p1", { t: "start" });
+      expect(L.core.save().runner!.state.boss!.id).toBe("gingerbread");
+    }
+    const ids = new Set<string>();
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const L = setup({ ...RAID_SETTINGS }, {}, seed);
+      L.core.connect(undefined, "A", "computer", false, 1500);
+      L.core.message("p1", { t: "start" });
+      ids.add(L.core.save().runner!.state.boss!.id!);
+    }
+    expect([...ids].sort()).toEqual(["clown", "gingerbread"]);
+  });
+});

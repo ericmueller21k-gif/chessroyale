@@ -1,3 +1,4 @@
+import type { PowerEvent, PowerId } from "@chessroyale/core";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
 import type { LastStandRound } from "./runner.ts";
@@ -113,6 +114,8 @@ export interface ScoreJob {
   botPlanPowerUps?: string[];
   /** Boss battle, the re-pick after the God King's Last Stand: the move he took back (no bot picks it; it isn't the best). */
   barred?: string;
+  /** Boss battle, a power limits the crowd's moves: the moves allowed (the best and the bots' picks come from these). */
+  allowed?: string[];
   /** Picks that can decide the cut (players near the cut line): re-checked first (recheckCut* in settings). */
   priority?: string[];
 }
@@ -201,6 +204,35 @@ export interface NetBoss {
   barred?: string | null;
   /** Set when the battle is over. */
   result?: "crowd" | "boss" | "draw";
+  /** Which boss (a BOSS_ROSTER id). */
+  id?: string;
+  /** Its powers as they stand (boss-powers.ts): the same on every screen. */
+  powers?: NetBossPowers;
+}
+
+/** A boss's powers, for every screen: what to draw and which moves the crowd may play. */
+export interface NetBossPowers {
+  passive: PowerId;
+  ultimate: PowerId;
+  /** The crowd turn they're set for (crowd moves + 1). */
+  turn: number;
+  /** The rage meter, 0-1 (null once the ultimate is spent); the one-turn warning; the turn the ultimate hit. */
+  rage: number | null;
+  warned: boolean;
+  ultAt: number | null;
+  /** A frozen piece's square, a pied square, through which crowd turn. */
+  frozen: { square: string; until: number } | null;
+  pie: { square: string; until: number } | null;
+  /** Squares that show ice now (the frozen piece; in the blizzard every crowd piece but the one free to move). */
+  iced: string[];
+  /** After the funhouse: the crowd sees the board flipped. */
+  flipped: boolean;
+  /** The move the boss played for the crowd in its funhouse. */
+  funhouse: { turn: number; move: string; san: string } | null;
+  /** What happened as this turn began (a freeze, a pie, the warning, the blizzard, the funhouse): each plays once. */
+  events: PowerEvent[];
+  /** The crowd's turn: the moves it may play (null: any legal move). */
+  allowed: string[] | null;
 }
 
 /** A pre-game vote, for every screen: everyone's votes, each visible from `at` (server time). */
@@ -246,7 +278,8 @@ export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "rep
 
 export type ClientMessage =
   /** `look`: the crate items you wear (others see them on the cut screen). */
-  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; rating?: number | null; look?: unknown }
+  /** `lastBoss`: the boss this player met last (a BOSS_ROSTER id), so a raid can avoid the one most of the lobby met. */
+  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; rating?: number | null; look?: unknown; lastBoss?: string | null }
   | { t: "start" }
   /** `away`: times the page was hidden or lost focus during this move's clock before the pick (fair play). */
   | { t: "pick"; key: string; move: string; away?: number }
@@ -356,6 +389,8 @@ export type ServerMessage = { now: number } & (
         fen: string;
         bots: { id: string; skill: number; powerUps: number }[];
         barred?: string;
+        /** Boss battle, a power limits the crowd's moves: the bots pick from these. */
+        allowed?: string[];
         /** Many judges: the bots pick from this seed and these rules (judgeBotPicks), so the scoring job agrees. */
         seed?: number;
         rules?: JudgeRules;
@@ -426,7 +461,19 @@ export type ServerMessage = { now: number } & (
   /** Boss battle: the boss's move or strike (`until`: when the next crowd move starts). */
   | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean }
   /** To the host: play the boss's move. */
-  | { t: "bossRequest"; key: string; fen: string; elo: number; nodes: number; stumble?: boolean; stagger?: boolean }
+  | {
+      t: "bossRequest";
+      key: string;
+      fen: string;
+      elo: number;
+      nodes: number;
+      stumble?: boolean;
+      stagger?: boolean;
+      /** A boss power limits the boss's moves (a pie): play one of these. */
+      allowed?: string[];
+      /** Boingo's funhouse: play the crowd's move for it, a weak but recoverable one (funhouseMoveFrom) from `allowed`. */
+      funhouse?: boolean;
+    }
   /** Quick chat: a line for you (your own included, echoed back). */
   | { t: "chat"; line: NetChatLine }
   /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_TIERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, VARIABLE_CLOCK, type Settings } from "@chessroyale/core";
+import { BOSS_TIERS, bossDef, isPlayable, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, VARIABLE_CLOCK, type Settings } from "@chessroyale/core";
 import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
@@ -210,7 +210,9 @@ describe("Crowd mode", () => {
       entrants: Array.from({ length: 6 }, (_, i) => ({ id: `h${i}`, name: `H${i}`, isBot: false })),
     });
     const boss = runner.boss!;
-    expect(boss.elo).toBe(2000);
+    // The lobby's strength plus the boss's own offset (a random playable boss).
+    expect(isPlayable(bossDef(boss.id))).toBe(true);
+    expect(boss.elo).toBe(2000 + bossDef(boss.id)!.offset);
     expect(boss.minSurvivors).toBe(3);
     expect(boss.kingCharges).toBe(3);
     expect(runner.boards.get(0)!.history).toHaveLength(10);
