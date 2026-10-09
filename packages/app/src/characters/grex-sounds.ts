@@ -1,12 +1,14 @@
 /**
  * G-REX's sounds, synthesised (no files, no licences, no voice): a fire crackle, a whoosh, a sparkler's fizz, the poof
- * of a piece burning up, the pop of a Roman candle shot, and a comically big roar (a growl that ends in a squeak). Each
- * is a pure function of the sample rate (its noise is seeded), so a test can measure it: every one stays quieter than a
- * piece's move sound (peak and loudness; see test/grex.test.ts).
+ * of a piece burning up, the pop of a Roman candle shot, a comically big roar (a growl that ends in a squeak), the
+ * wood-smack of the candle slammed down on the board, and the candle's shots: a firework's rising whistle in three
+ * variants, now and then ending in a crackle high up. Each is a pure function of the sample rate (its noise is seeded),
+ * so a test can measure it: every one stays quieter than a piece's move sound (peak and loudness), and so does the
+ * whole volley of 24 whistles at once (see test/grex.test.ts).
  */
 import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice } from "./synth.ts";
 
-export type GrexSound = "crackle" | "whoosh" | "fizz" | "poof" | "pop" | "roar";
+export type GrexSound = "crackle" | "whoosh" | "fizz" | "poof" | "pop" | "roar" | "smack" | "whistle1" | "whistle2" | "whistle3" | "sparkle";
 
 /** Short bursts at the given times, each shaped by `burst(age, i)`. */
 function grains(times: readonly number[], burst: (age: number, i: number) => number): Voice {
@@ -17,6 +19,26 @@ function grains(times: readonly number[], burst: (age: number, i: number) => num
     });
     return v;
   };
+}
+
+/**
+ * A firework's whistle as it climbs: a soft "thoomp" as it leaves the tube, then a tone rising from `f0` to `f1` Hz over
+ * `dur` seconds (`curve` < 1 rises fast then eases), with a breath of noise on the same pitch, a little warble, and
+ * (`droop`) a slight sag at the very top. It swells a little as it climbs and fades out high up.
+ */
+function whistle(rate: number, o: { f0: number; f1: number; dur: number; curve: number; warble: number; droop: number; seed: number }): Float32Array {
+  const pitch = (t: number) => {
+    const x = Math.min(1, t / o.dur);
+    return o.f0 + (o.f1 - o.f0) * x ** o.curve - o.droop * Math.max(0, (x - 0.85) / 0.15) ** 2 + o.warble * Math.sin(2 * Math.PI * 6.5 * t);
+  };
+  const tone = osc(rate, pitch, sine);
+  const breath = bandpass(rate, pitch, 14, noise(o.seed));
+  const thoomp = osc(rate, (t) => 80 + 140 * Math.exp(-t / 0.02), sine);
+  const fadeAt = o.dur * 0.78;
+  return render(rate, o.dur, (t) => {
+    const env = Math.min(1, t / 0.05) * (t < fadeAt ? 1 : Math.max(0, 1 - (t - fadeAt) / (o.dur - fadeAt))) ** 1.5;
+    return env * (0.55 + 0.45 * (t / o.dur)) * (0.75 * tone(t) + 2.2 * breath(t)) + 1.4 * Math.exp(-t / 0.035) * thoomp(t);
+  });
 }
 
 const SOUNDS: Record<GrexSound, (rate: number) => Float32Array> = {
@@ -55,6 +77,38 @@ const SOUNDS: Record<GrexSound, (rate: number) => Float32Array> = {
     const hiss = bandpass(rate, () => 3000, 1.2, noise(71));
     return render(rate, 0.24, (t) => Math.exp(-t / 0.04) * (thoomp(t) + 0.5 * hiss(t)) + 0.12 * Math.sin(Math.PI * Math.min(1, t / 0.24)) * whistle(t));
   },
+  // The Roman candle slammed down on the board: a hard wooden smack (the crack of contact, the board's hollow knock
+  // ringing for a moment in a few wooden modes, and a dull thud under it).
+  smack: (rate) => {
+    const crack = bandpass(rate, () => 2800, 0.8, noise(83));
+    const modes = [
+      [182, 0.07, 1],
+      [410, 0.05, 0.75],
+      [745, 0.034, 0.55],
+      [1230, 0.022, 0.4],
+      [2050, 0.013, 0.3],
+    ].map(([f, d, a]) => ({ v: osc(rate, () => f!, sine), d: d!, a: a! }));
+    const thud = osc(rate, (t) => 62 + 70 * Math.exp(-t / 0.015), sine);
+    return render(rate, 0.32, (t) => {
+      let ring = 0;
+      for (const m of modes) ring += m.a * Math.exp(-t / m.d) * m.v(t);
+      return 2.4 * Math.exp(-t / 0.0035) * crack(t) + 0.8 * ring + 0.9 * Math.exp(-t / 0.045) * thud(t);
+    });
+  },
+  // The candle's shots: three whistles (a quick bright one, a long low one, one with a warble), told apart by ear.
+  whistle1: (rate) => whistle(rate, { f0: 950, f1: 3100, dur: 0.85, curve: 0.7, warble: 18, droop: 120, seed: 89 }),
+  whistle2: (rate) => whistle(rate, { f0: 720, f1: 2500, dur: 1.05, curve: 0.6, warble: 10, droop: 260, seed: 97 }),
+  whistle3: (rate) => whistle(rate, { f0: 1150, f1: 3400, dur: 0.72, curve: 0.95, warble: 55, droop: 0, seed: 101 }),
+  // A shot bursting high up: a soft bang, then a spray of tiny crackles dying away.
+  sparkle: (rate) => {
+    const r = rng(103);
+    const cracks = Array.from({ length: 46 }, () => ({ t: 0.03 + r() ** 1.4 * 0.62, a: 0.35 + r() * 0.65 }));
+    const n = noise(107);
+    const pops = grains(cracks.map((c) => c.t), (age, i) => (age < 0.03 ? cracks[i]!.a * Math.exp(-age / 0.0025) : 0));
+    const snap = bandpass(rate, () => 3600, 0.9, (t) => pops(t) * n(t));
+    const bang = lowpass(rate, 700, noise(109));
+    return render(rate, 0.75, (t) => 1.4 * snap(t) * (1 - 0.6 * (t / 0.75)) + 0.9 * Math.exp(-t / 0.03) * bang(t));
+  },
   // The roar: a huge wobbling growl (a buzzy low tone and a rumble), pitch climbing then sagging, that ends in a tiny squeak.
   roar: (rate) => {
     const growl = lowpass(rate, 900, osc(rate, (t) => 85 + 40 * Math.sin(Math.PI * Math.min(1, t / 0.85)) + 6 * Math.sin(2 * Math.PI * 9 * t), saw));
@@ -69,7 +123,7 @@ const SOUNDS: Record<GrexSound, (rate: number) => Float32Array> = {
 };
 
 /** Trims each to sit a little under a move's loudness (as Ginger's and Boingo's do); a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<GrexSound, number> = { crackle: 0.9, whoosh: 0.27, fizz: 0.18, poof: 0.33, pop: 0.31, roar: 0.15 };
+const LEVEL: Record<GrexSound, number> = { crackle: 0.9, whoosh: 0.27, fizz: 0.18, poof: 0.33, pop: 0.31, roar: 0.15, smack: 0.3, whistle1: 0.018, whistle2: 0.02, whistle3: 0.017, sparkle: 0.2 };
 
 const cache = new Map<string, Float32Array>();
 /** The samples for one of his sounds at a sample rate (made once, then reused). */
@@ -84,3 +138,21 @@ export function grexSound(name: GrexSound, rate: number): Float32Array {
 }
 
 export const GREX_SOUNDS = Object.keys(SOUNDS) as GrexSound[];
+
+/** The three whistles a shot can make. */
+export const WHISTLES = ["whistle1", "whistle2", "whistle3"] as const;
+/** How far a shot's pitch may stray, up or down (its whistle played a little faster or slower). */
+export const WHISTLE_SPREAD = 0.07;
+/** About one shot in this many ends in a crackle high up. */
+export const CRACKLE_EVERY = 3;
+
+/**
+ * One shot's sound, from three random numbers in [0, 1): which whistle, a little pitch either way (played at `rate`, so
+ * a higher one is a touch shorter), and now and then a crackle as it bursts, `crackleAt` seconds in (its whistle's end).
+ */
+export function whistlePick(a: number, b: number, c: number): { name: (typeof WHISTLES)[number]; rate: number; crackleAt: number | null } {
+  const name = WHISTLES[Math.min(WHISTLES.length - 1, Math.floor(a * WHISTLES.length))]!;
+  const rate = 1 + (b * 2 - 1) * WHISTLE_SPREAD;
+  const dur = { whistle1: 0.85, whistle2: 1.05, whistle3: 0.72 }[name];
+  return { name, rate, crackleAt: c < 1 / CRACKLE_EVERY ? (dur * 0.92) / rate : null };
+}

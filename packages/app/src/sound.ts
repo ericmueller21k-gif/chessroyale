@@ -10,7 +10,7 @@
 import { QUICK_CHAT } from "@chessroyale/core";
 import { clownSound, type ClownSound } from "./characters/clown-sounds.ts";
 import { gingerSound, type GingerSound } from "./characters/gingerbread-sounds.ts";
-import { grexSound, type GrexSound } from "./characters/grex-sounds.ts";
+import { grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds.ts";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -53,6 +53,15 @@ const SAMPLE_FILES = {
   menuSelect: "/sounds/menu/select.mp3",
 } as const;
 
+/**
+ * G-REX's Roman candle whistle is synthesised (characters/grex-sounds.ts: three variants, a little pitch either way,
+ * now and then a crackle). To use a recorded whistle instead, put the file in public/sounds/grex/ (credit it in
+ * CREDITS.md) and set its path here, e.g. "/sounds/grex/whistle.mp3": every shot then plays it, with the same pitch
+ * spread and crackles, at GREX_WHISTLE_FILE_LEVEL (trim it so the whole volley stays under a move's loudness).
+ */
+const GREX_WHISTLE_FILE: string | null = null;
+const GREX_WHISTLE_FILE_LEVEL = 0.15;
+
 /** Call from a tap so browsers allow sound later. Also loads the recorded samples. */
 export function unlockAudio() {
   try {
@@ -65,7 +74,7 @@ export function unlockAudio() {
       soften.type = "lowpass";
       soften.frequency.value = 6000;
       master.connect(soften).connect(ctx.destination);
-      for (const [name, url] of Object.entries(SAMPLE_FILES)) {
+      for (const [name, url] of Object.entries({ ...SAMPLE_FILES, ...(GREX_WHISTLE_FILE ? { grexWhistleFile: GREX_WHISTLE_FILE } : {}) })) {
         void fetch(url)
           .then((r) => r.arrayBuffer())
           .then((b) => ctx!.decodeAudioData(b))
@@ -108,19 +117,35 @@ function sample(name: keyof typeof SAMPLE_FILES, at: number, level = 1, rate = 1
   src.start(at);
 }
 
-/** Plays synthesised samples (a boss character's sounds, see characters/). */
-function buffer(data: Float32Array, at: number) {
+/** Plays synthesised samples (a boss character's sounds, see characters/), at `rate` (a little higher or lower). */
+function buffer(data: Float32Array, at: number, rate = 1) {
   const c = ctx!;
   const buf = c.createBuffer(1, data.length, c.sampleRate);
   buf.getChannelData(0).set(data);
   const src = c.createBufferSource();
   src.buffer = buf;
+  src.playbackRate.value = rate;
   src.connect(master!);
   src.start(at);
 }
 const clown = (name: ClownSound) => (t: number) => buffer(clownSound(name, ctx!.sampleRate), t);
 const ginger = (name: GingerSound) => (t: number) => buffer(gingerSound(name, ctx!.sampleRate), t);
 const grex = (name: GrexSound) => (t: number) => buffer(grexSound(name, ctx!.sampleRate), t);
+/** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
+function grexWhistle(t: number) {
+  const w = whistlePick(Math.random(), Math.random(), Math.random());
+  const file = samples.get("grexWhistleFile");
+  if (file) {
+    const src = ctx!.createBufferSource();
+    src.buffer = file;
+    src.playbackRate.value = w.rate;
+    const g = ctx!.createGain();
+    g.gain.value = GREX_WHISTLE_FILE_LEVEL;
+    src.connect(g).connect(master!);
+    src.start(t);
+  } else buffer(grexSound(w.name, ctx!.sampleRate), t, w.rate);
+  if (w.crackleAt !== null) buffer(grexSound("sparkle", ctx!.sampleRate), t + (file ? file.duration / w.rate : w.crackleAt), w.rate);
+}
 
 /** A clean clock tick: a very short burst of noise through a narrow band, like a watch's escapement. */
 function clockTick(at: number, level = 0.5) {
@@ -315,7 +340,9 @@ export type SoundName =
   | "grexFizz"
   | "grexPoof"
   | "grexPop"
-  | "grexRoar";
+  | "grexRoar"
+  | "grexSmack"
+  | "grexWhistle";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -388,6 +415,8 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   grexPoof: grex("poof"),
   grexPop: grex("pop"),
   grexRoar: grex("roar"),
+  grexSmack: grex("smack"),
+  grexWhistle,
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));

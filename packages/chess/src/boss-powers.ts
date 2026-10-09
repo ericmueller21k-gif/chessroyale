@@ -13,7 +13,7 @@
  *
  * Turns are the crowd's: turn N is the crowd's Nth move of the battle (crowdMoves + 1 while it's being picked).
  */
-import { BOSS_POWERS, bossDef, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type BurnEvent, type FireTile, type PowerEvent, type PowerId } from "@chessroyale/core";
+import { BOSS_POWERS, bossDef, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type BurnEvent, type CandleWave, type FireTile, type PowerEvent, type PowerId } from "@chessroyale/core";
 import { applyMove, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "./rules.ts";
 import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
@@ -180,16 +180,13 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
       events.push({ kind: "candle", turn });
     }
   }
-  // The Roman candle's fireballs: a wave a crowd turn from candleDelay turns after it fired, each a fresh fire tile.
-  if (next.candle && next.candle.left > 0) {
-    const wave = turn - (next.candle.at + s.candleDelay);
-    if (wave >= 0) {
-      const n = Math.min(next.candle.left, s.candleWaves[wave] ?? next.candle.left);
-      const squares = chooseFireballs(fen, crowd, p.seed, turn, n, next.fire ?? []);
-      next.fire = [...(next.fire ?? []), ...squares.map((square) => ({ square, lit: turn }))];
-      next.candle = { ...next.candle, left: next.candle.left - n };
-      events.push({ kind: "fireball", turn, squares });
-    }
+  // The Roman candle's fireballs: a wave a crowd turn from candleDelay turns after it fired, each landing as a fresh fire
+  // tile; each wave's squares picked candleAhead turns before it lands (their shadows growing meanwhile).
+  if (next.candle) {
+    const barrage = candleTurn(next, fen, crowd, turn, s);
+    next.candle = barrage.candle;
+    if (barrage.fire) next.fire = barrage.fire;
+    if (barrage.event) events.push(barrage.event);
   }
   // The passive (not on the ultimate's turn: it waits a turn).
   const passive = powers.passive;
@@ -267,6 +264,68 @@ export function chooseFireballs(fen: string, crowd: Side, seed: number, turn: nu
     out.push(pool[Math.floor(powerRoll(seed, "fireball", turn, i) * pool.length)]!);
   }
   return out;
+}
+
+/** The crowd turn wave `i` of the Roman candle's schedule lands on (he fired on crowd turn `at`). */
+export const candleLands = (at: number, i: number, s: Pick<BossPowerSettings, "candleDelay"> = BOSS_POWERS) => at + s.candleDelay + i;
+
+/**
+ * The Roman candle's barrage as a crowd turn begins: the waves due land, each fireball a stage-1 fire tile (one on the
+ * crowd king's square fizzles: never on his square), then the waves whose time has come are picked, candleAhead turns
+ * before they land: spread out (chooseFireballs), never on the king's square or one that will be burning or hit before
+ * then. Returns the candle and the fire tiles after it, and the turn's fireball event if a wave landed. Pure: the same
+ * everywhere, from the seed.
+ */
+export function candleTurn(
+  p: Pick<BossPowerState, "candle" | "fire" | "seed">,
+  fen: string,
+  crowd: Side,
+  turn: number,
+  s: Pick<BossPowerSettings, "candleWaves" | "candleDelay" | "candleAhead" | "fireStages"> = BOSS_POWERS,
+): { candle: BossPowerState["candle"]; fire: FireTile[] | undefined; event: PowerEvent | null } {
+  const c = p.candle;
+  if (!c) return { candle: c, fire: p.fire, event: null };
+  let waves: CandleWave[] = c.waves ?? [];
+  let left = c.left;
+  let fire = p.fire;
+  let event: PowerEvent | null = null;
+  // Land what's due.
+  const due = waves.filter((w) => w.lands <= turn);
+  if (due.length) {
+    const king = kingSquare(fen, crowd);
+    const burning = new Set((fire ?? []).map((t) => t.square));
+    const squares = due.flatMap((w) => w.squares);
+    const fizzled = squares.filter((sq) => sq === king || burning.has(sq));
+    fire = [...(fire ?? []), ...squares.filter((sq) => !fizzled.includes(sq)).map((square) => ({ square, lit: turn }))];
+    left = Math.max(0, left - due.reduce((t, w) => t + w.shots, 0));
+    waves = waves.filter((w) => w.lands > turn);
+    event = { kind: "fireball", turn, squares, ...(fizzled.length ? { fizzled } : {}) };
+  }
+  // Pick the waves whose time has come (their shots still unassigned: the schedule's, then the rest in one).
+  let nextWave = c.next ?? 0;
+  const ahead = Math.max(0, Math.min(s.candleAhead, s.candleDelay));
+  let unpicked = left - waves.reduce((t, w) => t + w.shots, 0);
+  while (unpicked > 0 && candleLands(c.at, nextWave, s) - ahead <= turn) {
+    const lands = Math.max(turn + 1, candleLands(c.at, nextWave, s));
+    const shots = Math.min(unpicked, s.candleWaves[nextWave] ?? unpicked);
+    // (What will be burning as it lands: tiles not yet burnt out by then, and the waves landing before it.)
+    const taken: FireTile[] = [
+      ...(fire ?? []).filter((t) => t.lit + s.fireStages - 1 >= lands),
+      ...waves.flatMap((w) => w.squares.map((square) => ({ square, lit: w.lands }))),
+    ];
+    waves = [...waves, { lands, shots, squares: chooseFireballs(fen, crowd, p.seed, lands, shots, taken) }];
+    unpicked -= shots;
+    nextWave++;
+  }
+  return { candle: { ...c, left, next: nextWave, waves }, fire, event };
+}
+
+/** A shadow's size on a crowd turn: 1 (small) when its wave is candleAhead turns out, up to candleAhead (lands next turn). */
+export const shadowStage = (lands: number, turn: number, s: Pick<BossPowerSettings, "candleAhead"> = BOSS_POWERS) => s.candleAhead - (lands - turn) + 1;
+
+/** Where the Roman candle's fireballs are coming down: each square still to be hit, the turn it lands, its shadow's size. */
+export function fireShadows(p: Pick<BossPowerState, "candle" | "turn"> | null | undefined, s: Pick<BossPowerSettings, "candleAhead"> = BOSS_POWERS): { square: string; lands: number; stage: number }[] {
+  return (p?.candle?.waves ?? []).flatMap((w) => w.squares.map((square) => ({ square, lands: w.lands, stage: Math.max(1, shadowStage(w.lands, p!.turn, s)) })));
 }
 
 /** A fire tile's stage on a crowd turn: 1 (a singe) as it lands, up to fireStages (ablaze). */

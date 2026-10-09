@@ -929,18 +929,19 @@ const FIREBALL_FALL: Character = {
   },
 };
 
-// ---- The shots still up there: twelve little rockets in a row, lit while they're up, spent once they've fallen.
+// ---- The shots still up there: a column of 24 little rockets by the board's right edge, lit while they're up, spent
+// once they've fallen (lit from the bottom: the column empties from the top down as they come down).
 
-const SHOTS = 12;
-const PIP_W = 6;
+const SHOTS = 24;
+const PIP_H = 6;
 const pipLit: Part = { grid: [".Y.", "yxy", "qYq", "qvq", "qqq"] };
 const pipSpent: Part = { grid: ["...", ".s.", "sss", "sSs", "sss"], outline: false };
 const CANDLE_SHOTS: Character = {
   id: "candle-shots",
   name: "Shots still up there",
-  w: SHOTS * PIP_W + 2,
-  h: 11,
-  foot: [(SHOTS * PIP_W + 2) / 2, 10],
+  w: 7,
+  h: SHOTS * PIP_H + 2,
+  foot: [3, SHOTS * PIP_H + 1],
   palette: FIRE_PALETTE,
   parts: { lit: pipLit, spent: pipSpent },
   anims: Object.fromEntries(
@@ -950,13 +951,73 @@ const CANDLE_SHOTS: Character = {
         loop: true,
         frames: [0, 1, 2, 3].map((i): Frame => ({
           ms: 140,
-          layers: Array.from({ length: SHOTS }, (_, n): Layer => ({ part: n < left ? "lit" : "spent", x: 2 + n * PIP_W, y: 4 })),
+          // (Pip n from the top; the bottom `left` are lit.)
+          layers: Array.from({ length: SHOTS }, (_, n): Layer => ({ part: n >= SHOTS - left ? "lit" : "spent", x: 2, y: 2 + n * PIP_H })),
           // Each lit one's little flame flickers above it, out of step with its neighbours.
-          specks: Array.from({ length: left }, (_, n): Speck => [3 + n * PIP_W, 2 - ((n + i) % 2), (n + i) % 3 ? "f" : "Y"]),
+          specks: Array.from({ length: left }, (_, j): Speck => {
+            const n = SHOTS - 1 - j;
+            return [3, 1 + n * PIP_H - ((n + i) % 2), (n + i) % 3 ? "f" : "Y"];
+          }),
         })),
       },
     ]),
   ),
+};
+
+// ---- A fireball's shadow on the square it will hit: small three turns out, bigger the next turn, bigger again the turn
+// before it lands. Drawn under the pieces (so a piece on the square stands on it), see-through.
+
+const SHADOW_PALETTE = {
+  k: "#00000000",
+  o: "#140a0640", // the soft rim
+  p: "#140a0666",
+  q: "#140a0690", // the dark core
+  h: "#ff6a1a3a", // the fireball's glow on the ground (the biggest only)
+} as const;
+/** Its radius at each size (1 to 3), in the square's 32 pixels. */
+export const SHADOW_R = [0, 5, 8.5, 12] as const;
+function shadowPart(r: number, glow: boolean): Part {
+  const cv = canvas(SQUARE, SQUARE);
+  if (glow) ellipse(cv, 16, 16, r + 1.6, r + 1.6, "h");
+  ellipse(cv, 16, 16, r, r, "o");
+  ellipse(cv, 16, 16, r * 0.72, r * 0.72, "p");
+  ellipse(cv, 16, 16, r * 0.42, r * 0.42, "q");
+  return { grid: toGrid(cv), outline: false };
+}
+const SHADOW_PARTS: Record<string, Part> = {};
+const shadowFrames = (from: number, to: number, glow: boolean): Frame[] =>
+  [0.34, 0.67, 1].map((t, i): Frame => {
+    const r = Math.round((from + (to - from) * t) * 2) / 2;
+    const name = `r${r}${glow ? "g" : ""}`;
+    SHADOW_PARTS[name] ??= shadowPart(r, glow);
+    return { ms: i === 2 ? 90 : 70, layers: [{ part: name, x: 0, y: 0 }] };
+  });
+/** Its loop at a size: it breathes a little (half a pixel), so it reads as something above, coming. */
+const shadowLoop = (size: 1 | 2 | 3): Anim => ({
+  loop: true,
+  frames: [SHADOW_R[size], SHADOW_R[size] + 0.5].map((r, i): Frame => {
+    const name = `r${r}${size === 3 ? "g" : ""}`;
+    SHADOW_PARTS[name] ??= shadowPart(r, size === 3);
+    return { ms: i ? 260 : 300, layers: [{ part: name, x: 0, y: 0 }] };
+  }),
+});
+const FIRE_SHADOW: Character = {
+  id: "fire-shadow",
+  name: "A fireball's shadow",
+  w: SQUARE,
+  h: SQUARE,
+  foot: [16, 31],
+  palette: SHADOW_PALETTE,
+  parts: SHADOW_PARTS,
+  anims: {
+    /** It appears (small), grows to the middle size, grows to the biggest; each then loops at that size. */
+    grow1: { loop: false, frames: shadowFrames(1, SHADOW_R[1], false) },
+    grow2: { loop: false, frames: shadowFrames(SHADOW_R[1], SHADOW_R[2], false) },
+    grow3: { loop: false, frames: shadowFrames(SHADOW_R[2], SHADOW_R[3], true) },
+    shadow1: shadowLoop(1),
+    shadow2: shadowLoop(2),
+    shadow3: shadowLoop(3),
+  },
 };
 
 /** Every effect sprite, by name. */
@@ -972,4 +1033,5 @@ export const EFFECT_SPRITES = {
   candleShot: CANDLE_SHOT,
   fireballFall: FIREBALL_FALL,
   candleShots: CANDLE_SHOTS,
+  fireShadow: FIRE_SHADOW,
 } as const satisfies Record<string, Character>;

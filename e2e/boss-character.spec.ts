@@ -20,8 +20,9 @@ test("Boingo the Clown: a raid boss as a character, kitty-corner from the God Ki
   await expect(page.locator(phone ? ".boss-char.place-side" : ".boss-char.place-bar")).toBeHidden();
 
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
-  // He never takes a tap and never covers the board: on a phone he's in the boss bar above it (the God King is under
-  // it on the right); on a computer he's by its bottom-left corner (the God King by its top-right).
+  // He never takes a tap and never covers the board: on a phone he's in the boss bar above it; on a computer he's by its
+  // bottom-left corner. The God King is in the dock under it on the right, on both (Eric, Oct 9: the dock under the
+  // board at every width).
   const char = visibleChar(page);
   expect(await char.evaluate((e) => getComputedStyle(e).pointerEvents)).toBe("none");
   expect(await char.locator("canvas").evaluate((e) => getComputedStyle(e).pointerEvents)).toBe("none");
@@ -36,8 +37,8 @@ test("Boingo the Clown: a raid boss as a character, kitty-corner from the God Ki
   } else {
     expect(box.x + box.width).toBeLessThanOrEqual(board.x);
     expect(box.y + box.height).toBeGreaterThan(board.y + board.height / 2);
-    expect(king.x).toBeGreaterThanOrEqual(board.x + board.width);
-    expect(king.y + king.height / 2).toBeLessThan(board.y + board.height / 2);
+    expect(king.y).toBeGreaterThanOrEqual(board.y + board.height - 1);
+    expect(king.x + king.width / 2).toBeGreaterThan(board.x + board.width / 2);
   }
   // Taps on the board's corner by him still reach the board.
   const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest(".boss-char") === null, [board.x + 4, board.y + 4]);

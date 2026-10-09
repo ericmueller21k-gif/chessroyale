@@ -216,12 +216,26 @@ export interface BossPowerState {
   fireOut?: number;
   /** What the fire did after the crowd's last move: the pieces it destroyed and the tiles that fizzled (a king on them). */
   burnt?: BurnEvent[];
-  /** The Roman candle: the crowd turn he fired, and the shots still to fall. */
-  candle?: { at: number; left: number } | null;
+  /**
+   * The Roman candle: the crowd turn he fired, the shots still to fall, the next wave of the schedule to pick
+   * (BOSS_POWERS.candleWaves), and the waves picked and on their way (their squares show a growing shadow).
+   */
+  candle?: { at: number; left: number; next?: number; waves?: CandleWave[] } | null;
   /** The first crowd turn a crowd piece stepped onto a burning tile (the God King's warning, once a match). */
   stepped?: number;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
+}
+
+/**
+ * A wave of the Roman candle's fireballs on its way: the crowd turn it lands (as that turn begins), how many shots it
+ * is, and the squares they'll hit, picked candleAhead turns before (never the crowd king's square then; if he stands
+ * on one as it lands, that fireball fizzles).
+ */
+export interface CandleWave {
+  lands: number;
+  shots: number;
+  squares: string[];
 }
 
 /** A fire tile: its square and the crowd turn it landed on (its stage is the turn now − lit + 1). */
@@ -246,6 +260,8 @@ export interface PowerEvent {
   square?: string;
   /** The squares a wave of fireballs hit. */
   squares?: string[];
+  /** Of those, the ones that fizzled as they landed (the crowd's king stood there): no fire tile. */
+  fizzled?: string[];
 }
 
 /** The settings behind the God King's Last Stand. */

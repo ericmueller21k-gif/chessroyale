@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, FUNHOUSE, FireBurn, funhouseFlipAt, powerLine, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, CANDLE, FUNHOUSE, FireBurn, funhouseFlipAt, powerLine, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
 import { kingSay, resetKingSpeech, type KingCue } from "../godKing.ts";
@@ -200,10 +200,12 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   const burnNames = burning.length > 2 ? `${burning.length} pieces` : burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
   const fizzled = burnt.some((b) => b.fizzled);
   const burnLine = burnt.length && now < burnAt + BURN.ms ? (burning.length ? `${burnNames.charAt(0).toUpperCase()}${burnNames.slice(1)} burnt!` : fizzled ? "Your king is fireproof." : null) : null;
+  // G-REX slams the Roman candle down on the board: it jolts.
+  const slam = moment?.kind === "candle" && now >= moment.at + CANDLE.slamAt && now < moment.at + CANDLE.slamAt + CANDLE.slamMs;
   return (
     <div class={`screen game boss-screen${victim ? " striking" : ""}`}>
       <Hud match={match} />
-      <div class="board-area">
+      <div class={`board-area${slam ? " pw-slam" : ""}`}>
         <div class="opening-name">
           <BossHeading side={boss.crowdSide} note={thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
         </div>

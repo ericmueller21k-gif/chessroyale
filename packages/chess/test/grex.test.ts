@@ -18,6 +18,8 @@ import {
   fireJudged,
   fireLoss,
   fireRanked,
+  fireShadows,
+  shadowStage,
   funhouseDue,
   initPowers,
   legalMoves,
@@ -284,26 +286,50 @@ describe("G-REX's fire tiles", () => {
 });
 
 describe("the Roman candle", () => {
-  it("12 shots; 3 crowd moves later they fall 1, 2, 3, 4, then 2, each a stage-1 fire tile, never on the king, spread out", () => {
-    let b = prepareTurn(battle("grex", RUY_FEN), RUY_FEN);
+  /** He fires as turn 2 begins (the test trigger); then turn after turn, the crowd's moves leaving the position as it is. */
+  function barrage(lastTurn: number, fen = RUY_FEN, seed = 7) {
+    let b = prepareTurn(battle("grex", fen, {}, seed), fen);
     b = triggerUltimate(b).boss!;
-    b = prepareTurn({ ...b, crowdMoves: 1 }, RUY_FEN);
-    expect(kinds(b)).toEqual(["candle"]);
-    expect(b.powers!.candle).toEqual({ at: 2, left: 12 });
-    const waves: number[] = [];
-    const sparks: number[] = [];
-    let fen = RUY_FEN;
-    for (let t = 3; t <= 16; t++) {
+    b = prepareTurn({ ...b, crowdMoves: 1 }, fen);
+    const states = new Map<number, BossState>([[2, b]]);
+    for (let t = 3; t <= lastTurn; t++) {
       // The crowd's move on the turn before: the fire burns out on schedule.
       const after = fireAfterMove({ ...b, crowdMoves: t - 1 }, fen, null);
       fen = after.fen;
       b = prepareTurn({ ...after.boss, crowdMoves: t - 1 }, fen);
+      states.set(t, b);
+    }
+    return states;
+  }
+
+  it("fires 24 shots in a schedule that ramps up then down: 1, 2, 3, 4, 4, 4, 3, 2, 1", () => {
+    expect(BOSS_POWERS.candleShots).toBe(24);
+    const w = BOSS_POWERS.candleWaves;
+    expect(w.reduce((x, y) => x + y, 0)).toBe(24);
+    const peak = w.indexOf(Math.max(...w));
+    for (let i = 1; i < w.length; i++) {
+      if (i <= peak) expect(w[i]!).toBeGreaterThanOrEqual(w[i - 1]!);
+      else expect(w[i]!).toBeLessThanOrEqual(w[i - 1]!);
+    }
+    expect(w[0]).toBe(1);
+    expect(w.at(-1)).toBe(1);
+  });
+
+  it("3 crowd moves after the launch they fall a wave a turn, each a stage-1 fire tile, never on the king, spread out", () => {
+    const states = barrage(18);
+    const b2 = states.get(2)!;
+    expect(kinds(b2)).toEqual(["candle"]);
+    expect(b2.powers!.candle).toMatchObject({ at: 2, left: 24 });
+    const waves: number[] = [];
+    const sparks: number[] = [];
+    for (let t = 3; t <= 18; t++) {
+      const b = states.get(t)!;
       const wave = b.powers!.events.find((e) => e.kind === "fireball");
       waves.push(wave ? wave.squares!.length : 0);
       if (kinds(b).includes("spark")) sparks.push(t);
       for (const sq of wave?.squares ?? []) {
         expect(Number(sq[1])).toBeLessThanOrEqual(4);
-        expect(pieceAt(fen, sq)?.type === "k" && pieceAt(fen, sq)?.color === "w").toBe(false);
+        expect(pieceAt(RUY_FEN, sq)?.type === "k" && pieceAt(RUY_FEN, sq)?.color === "w").toBe(false);
         expect(b.powers!.fire!.find((x) => x.square === sq)!.lit).toBe(t);
       }
       // No two tiles on one square; within a wave, none next to another.
@@ -311,11 +337,74 @@ describe("the Roman candle", () => {
       expect(new Set(squares).size).toBe(squares.length);
       for (const a of wave?.squares ?? []) for (const c of wave!.squares!) if (a !== c) expect(Math.max(Math.abs(a.charCodeAt(0) - c.charCodeAt(0)), Math.abs(Number(a[1]) - Number(c[1])))).toBeGreaterThanOrEqual(2);
     }
-    expect(waves.slice(0, 7)).toEqual([0, 0, 1, 2, 3, 4, 2]);
-    expect(waves.reduce((x, y) => x + y, 0)).toBe(12);
-    expect(b.powers!.candle!.left).toBe(0);
-    // The sparkler waited through the barrage: the last tiles (turn 9) burn out after turn 11, a turn with no fire, then turn 13.
-    expect(sparks[0]).toBe(13);
+    // Fired as turn 2 began: none as the 3rd and 4th begin; then 1, 2, 3, 4, 4, 4, 3, 2, 1 from the 5th.
+    expect(waves.slice(0, 11)).toEqual([0, 0, 1, 2, 3, 4, 4, 4, 3, 2, 1]);
+    expect(waves.reduce((x, y) => x + y, 0)).toBe(24);
+    expect(states.get(13)!.powers!.candle!.left).toBe(0);
+    // The shots still up as each turn begins (the pips): 24 until the first lands, then down to 0.
+    expect([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((t) => states.get(t)!.powers!.candle!.left)).toEqual([24, 24, 24, 23, 21, 18, 14, 10, 6, 3, 1, 0]);
+    // The sparkler waited through the barrage: the last tile (turn 13) burns out after turn 15, a turn with no fire, then turn 17.
+    expect(sparks[0]).toBe(17);
+  });
+
+  it("picks each wave's squares 3 turns before it lands: what falls is exactly what was shadowed", () => {
+    const states = barrage(14);
+    for (let t = 2; t <= 10; t++) {
+      const b = states.get(t)!;
+      // As each turn from the launch begins, a new wave is picked to land 3 turns later.
+      const picked = b.powers!.candle!.waves!.filter((w) => w.lands === t + 3);
+      expect(picked, `turn ${t}`).toHaveLength(1);
+      expect(picked[0]!.shots).toBe(BOSS_POWERS.candleWaves[t - 2]);
+      expect(picked[0]!.squares).toHaveLength(picked[0]!.shots);
+      // ...and 3 turns later exactly those squares are hit.
+      const landed = states.get(t + 3)!.powers!.events.find((e) => e.kind === "fireball")!;
+      expect(landed.squares).toEqual(picked[0]!.squares);
+      // Never on a square that's burning or about to be hit when it lands.
+      const before = states.get(t + 3)!.powers!.fire!.filter((f) => f.lit < t + 3).map((f) => f.square);
+      for (const sq of picked[0]!.squares) expect(before).not.toContain(sq);
+    }
+    // Nothing is picked once all 24 are on their way.
+    expect(states.get(11)!.powers!.candle!.waves!.map((w) => w.lands)).toEqual([12, 13]);
+    expect(states.get(13)!.powers!.candle!.waves).toEqual([]);
+  });
+
+  it("each shadow shows small 3 turns out, bigger the next turn, bigger again the turn after, then the fireball drops", () => {
+    const states = barrage(12);
+    const sq = states.get(2)!.powers!.candle!.waves![0]!.squares[0]!;
+    const stageOn = (t: number) => fireShadows(states.get(t)!.powers).find((x) => x.square === sq && x.lands === 5)?.stage ?? null;
+    expect([2, 3, 4, 5].map(stageOn)).toEqual([1, 2, 3, null]);
+    expect(shadowStage(5, 2)).toBe(1);
+    expect(shadowStage(5, 4)).toBe(3);
+    expect(states.get(5)!.powers!.fire!.find((f) => f.square === sq)!.lit).toBe(5);
+    // At the barrage's height three waves are shadowed at once, in three sizes.
+    const sizes = fireShadows(states.get(7)!.powers).map((x) => x.stage);
+    expect(new Set(sizes)).toEqual(new Set([1, 2, 3]));
+    // (Turn 7: the waves landing on turns 8, 9 and 10, four shots each.)
+    expect(sizes.length).toBe(4 + 4 + 4);
+  });
+
+  it("a fireball whose square the crowd's king has stepped onto fizzles: never a tile under the king", () => {
+    const fen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1";
+    let b = prepareTurn(battle("grex", fen), fen);
+    b = triggerUltimate(b).boss!;
+    b = prepareTurn({ ...b, crowdMoves: 1 }, fen);
+    const target = b.powers!.candle!.waves![0]!.squares[0]!;
+    expect(target).not.toBe("e1");
+    // The king walks onto it by the time it lands.
+    const kingOn = (() => {
+      const rank = Number(target[1]);
+      const file = target.charCodeAt(0) - 97;
+      const rows = Array.from({ length: 8 }, (_, i) => (8 - i === rank ? `${file ? file : ""}K${7 - file ? 7 - file : ""}` : "8"));
+      rows[0] = "4k3";
+      return `${rows.join("/")} w - - 0 1`;
+    })();
+    expect(pieceAt(kingOn, target)?.type).toBe("k");
+    for (let t = 3; t <= 5; t++) b = prepareTurn({ ...fireAfterMove({ ...b, crowdMoves: t - 1 }, t < 5 ? fen : kingOn, null).boss, crowdMoves: t - 1 }, t < 5 ? fen : kingOn);
+    const wave = b.powers!.events.find((e) => e.kind === "fireball")!;
+    expect(wave.squares).toContain(target);
+    expect(wave.fizzled).toEqual([target]);
+    expect((b.powers!.fire ?? []).map((f) => f.square)).not.toContain(target);
+    expect(b.powers!.candle!.left).toBe(23);
   });
 
   it("the fireballs' squares are the same everywhere, and never more than there's room for", () => {
@@ -323,6 +412,8 @@ describe("the Roman candle", () => {
     const all = chooseFireballs(RUY_FEN, "w", 9, 5, 40);
     expect(all.length).toBe(31);
     expect(all).not.toContain("g1");
+    // The whole barrage is the same from the same seed, picked ahead or not.
+    expect(JSON.stringify(barrage(13, RUY_FEN, 3).get(13))).toBe(JSON.stringify(barrage(13, RUY_FEN, 3).get(13)));
   });
 });
 

@@ -247,6 +247,11 @@ export interface NetBossPowers {
   burnt?: BurnEvent[];
   /** The Roman candle: the crowd turn he fired, and the shots still to fall (the pips by the board). */
   candle?: { at: number; left: number } | null;
+  /**
+   * Where the candle's fireballs are coming down (missing from older servers): each square, the crowd turn it's hit,
+   * and its shadow's size (1 small, 3 turns out; 3 the biggest, the turn before it lands).
+   */
+  shadows?: { square: string; lands: number; stage: number }[];
   /** The first crowd turn a crowd piece stepped onto a burning tile (the God King's warning, once a match). */
   stepped?: number | null;
   /** The test trigger: the ultimate is on its way (it comes as the next crowd turn begins). */
