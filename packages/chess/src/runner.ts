@@ -77,6 +77,7 @@ import {
   fireEscapes,
   fireJudged,
   fireRanked,
+  fireShadows,
   fireStage,
   triggerUltimate,
 } from "./boss-powers.ts";
@@ -1147,7 +1148,8 @@ export class MatchRunner {
               allowed: sideToMove(fen) === b.crowdSide ? crowdAllowed(b, fen) : null,
               fire: (p.fire ?? []).map((t) => ({ square: t.square, lit: t.lit, stage: fireStage(t, p.turn) })),
               burnt: p.burnt ?? [],
-              candle: p.candle ?? null,
+              candle: p.candle ? { at: p.candle.at, left: p.candle.left } : null,
+              shadows: fireShadows(p),
               stepped: p.stepped ?? null,
               ultNext: !!p.ultNext,
             },

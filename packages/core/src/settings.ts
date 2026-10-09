@@ -472,10 +472,18 @@ export const BOSS_POWERS = {
   fireGap: 1,
   /** The judge counts a piece left to burn as gone: this many log-odds of expected score per pawn of its value. */
   firePawnLogit: 1,
-  /** The Roman candle: the shots he fires, and the waves they fall in (one a crowd turn), from this many crowd moves on. */
-  candleShots: 12,
-  candleWaves: [1, 2, 3, 4, 2] as readonly number[],
+  /**
+   * The Roman candle: the shots he fires, and the waves they fall in (one a crowd turn, ramping up then down), from
+   * this many crowd moves on. 24 shots (Eric, Oct 9; was 12 in 1, 2, 3, 4, 2).
+   */
+  candleShots: 24,
+  candleWaves: [1, 2, 3, 4, 4, 4, 3, 2, 1] as readonly number[],
   candleDelay: 3,
+  /**
+   * Each wave's squares are picked this many crowd turns before it lands (at most candleDelay), and show a shadow
+   * that grows each turn: small, bigger, bigger again, then the fireball drops onto it.
+   */
+  candleAhead: 3,
 } as const;
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */
