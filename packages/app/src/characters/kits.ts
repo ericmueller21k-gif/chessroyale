@@ -19,6 +19,8 @@ export interface BossKit extends BeatLines {
   sounds: Record<string, SoundName>;
   /** The part of a frame a portrait shows, and from which animation and frame. */
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
+  /** Taller than the boss bar's usual box (G-REX's long neck): on a phone the bar grows to hold him. */
+  tall?: boolean;
 }
 
 export const BOSS_KITS: Record<string, BossKit> = {
@@ -63,6 +65,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
     lines: GREX_LINES,
     chance: GREX_CHANCE,
     portrait: { ...GREX_PORTRAIT, anim: "idle", frame: 0 },
+    tall: true,
   },
 };
 

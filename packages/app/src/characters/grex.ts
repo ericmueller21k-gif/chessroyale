@@ -1055,7 +1055,7 @@ export const GREX: Character = {
 };
 
 /** The part of him a portrait shows (his head and flaming ossicones), in frame pixels. */
-export const GREX_PORTRAIT = { x: OX + 5, y: OY - 28, w: 38, h: 32 } as const;
+export const GREX_PORTRAIT = { x: OX + 4, y: OY - 31, w: 40, h: 36 } as const;
 
 /**
  * His lines: a cocky show-off with fire puns and the odd dinosaur joke (a giraffe named like a T-Rex), short, never

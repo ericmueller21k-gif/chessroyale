@@ -67,7 +67,10 @@
  *                          Size its box to keep its shape (any width; height = width x 11 / 74).
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
- * through the mute switch; or render frames yourself with `renderFrame`.
+ * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
+ * burning tiles, a piece burning on one, fireballs landing), use <BoardEffects>: one canvas over the whole board, one
+ * shared loop, only the squares that changed redrawn, so a dozen fires cost what one does. Move flying ones
+ * (sparkFly, candleShot, fireballFall's fall) with a CSS transform, never by redrawing.
  */
 import type { SoundName } from "../sound.ts";
 import { EFFECT_SPRITES } from "./effects.ts";
