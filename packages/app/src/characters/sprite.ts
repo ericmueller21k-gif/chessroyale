@@ -146,6 +146,38 @@ function ring(cells: Cells, key: string): Cells {
   return out;
 }
 
+/**
+ * A part as a layer draws it: turned, mirrored, rippled and outlined, and how far that moves its top-left. The same
+ * part drawn the same way in many frames is worked out once (frames are drawn as they first show, during play, and
+ * redoing every part's outline for every frame made a big effect like the blizzard stutter on a phone). Read only.
+ */
+const placings = new WeakMap<Part, Map<string, { cells: Cells; dx: number; dy: number }>>();
+function placed(part: Part, layer: Layer): { cells: Cells; dx: number; dy: number } {
+  let byWay = placings.get(part);
+  if (!byWay) placings.set(part, (byWay = new Map()));
+  const way = `${layer.flipX ? 1 : 0}|${layer.rot ?? 0}|${layer.wave ? JSON.stringify(layer.wave) : ""}`;
+  let done = byWay.get(way);
+  if (done) return done;
+  let cells = toCells(part.grid);
+  if (layer.flipX) cells = cells.map((r) => [...r].reverse());
+  if (layer.rot) cells = rotate(cells, layer.rot);
+  let dx = 0;
+  let dy = 0;
+  if (layer.wave) {
+    const r = ripple(cells, layer.wave);
+    cells = r.cells;
+    dx -= r.pad;
+    dy -= r.pad;
+  }
+  if (part.outline !== false) {
+    cells = ring(cells, OUTLINE);
+    dx -= 1;
+    dy -= 1;
+  }
+  byWay.set(way, (done = { cells, dx, dy }));
+  return done;
+}
+
 /** A frame as palette keys (null = transparent), before colours. */
 export function frameKeys(ch: Character, frame: Frame): Cells {
   const canvas: Cells = Array.from({ length: ch.h }, () => Array<string | null>(ch.w).fill(null));
@@ -162,24 +194,17 @@ export function frameKeys(ch: Character, frame: Frame): Cells {
   for (const layer of frame.layers) {
     const part = ch.parts[layer.part];
     if (!part) throw new Error(`${ch.id}: no part "${layer.part}"`);
-    let cells = toCells(part.grid);
-    if (layer.flipX) cells = cells.map((r) => [...r].reverse());
-    if (layer.rot) cells = rotate(cells, layer.rot);
-    let ox = layer.x;
-    let oy = layer.y;
-    if (layer.wave) {
-      const r = ripple(cells, layer.wave);
-      cells = r.cells;
-      ox -= r.pad;
-      oy -= r.pad;
-    }
+    const { cells, dx, dy } = placed(part, layer);
     const outlined = part.outline !== false;
-    if (outlined) {
-      cells = ring(cells, OUTLINE);
-      ox -= 1;
-      oy -= 1;
+    const ox = layer.x + dx;
+    const oy = layer.y + dy;
+    for (let y = 0; y < cells.length; y++) {
+      const row = cells[y]!;
+      for (let x = 0; x < row.length; x++) {
+        const c = row[x];
+        if (c) put(ox + x, oy + y, c, outlined);
+      }
     }
-    cells.forEach((row, y) => row.forEach((c, x) => c && put(ox + x, oy + y, c, outlined)));
   }
   let out = canvas;
   if (ch.halo) {
@@ -212,21 +237,32 @@ export function renderFrame(ch: Character, frame: Frame, opts: { bg?: string; lo
   const keys = frameKeys(ch, frame);
   const data = new Uint8ClampedArray(ch.w * ch.h * 4);
   const bg = opts.bg ? hex(opts.bg) : null;
-  keys.forEach((row, y) =>
-    row.forEach((k, x) => {
+  // Each palette key's pixel, worked out once per frame rather than once per pixel: [r, g, b, a], or null (left empty).
+  const pixels = new Map<string | null, readonly number[] | null>();
+  const pixelOf = (k: string | null): readonly number[] | null => {
+    let px = pixels.get(k);
+    if (px !== undefined) return px;
+    const colour = k ? pal[k] : undefined;
+    if (k && !colour) throw new Error(`${ch.id}: no colour for "${k}"`);
+    const c = colour ? hex(colour) : null;
+    const rgb = c && bg && c[3] < 255 ? ([0, 1, 2].map((j) => Math.round(c[j]! * (c[3] / 255) + bg[j]! * (1 - c[3] / 255))) as number[]) : (c ?? bg);
+    // A see-through colour keeps its alpha, unless it was laid over `bg`.
+    px = rgb ? [rgb[0]!, rgb[1]!, rgb[2]!, c && !bg ? c[3] : 255] : null;
+    pixels.set(k, px);
+    return px;
+  };
+  for (let y = 0; y < keys.length; y++) {
+    const row = keys[y]!;
+    for (let x = 0; x < row.length; x++) {
+      const px = pixelOf(row[x] ?? null);
+      if (!px) continue;
       const i = (y * ch.w + x) * 4;
-      const colour = k ? pal[k] : undefined;
-      if (k && !colour) throw new Error(`${ch.id}: no colour for "${k}"`);
-      const c = colour ? hex(colour) : null;
-      const rgb = c && bg && c[3] < 255 ? ([0, 1, 2].map((j) => Math.round(c[j]! * (c[3] / 255) + bg[j]! * (1 - c[3] / 255))) as number[]) : (c ?? bg);
-      if (!rgb) return;
-      data[i] = rgb[0]!;
-      data[i + 1] = rgb[1]!;
-      data[i + 2] = rgb[2]!;
-      // A see-through colour keeps its alpha, unless it was laid over `bg`.
-      data[i + 3] = c && !bg ? c[3] : 255;
-    }),
-  );
+      data[i] = px[0]!;
+      data[i + 1] = px[1]!;
+      data[i + 2] = px[2]!;
+      data[i + 3] = px[3]!;
+    }
+  }
   return { w: ch.w, h: ch.h, data };
 }
 
