@@ -3258,3 +3258,12 @@ move 13-15; the blizzard glitched.
 - **Measured** with `npm run perf:boss` (a whole battle on a computer and on a phone slowed 4x, per move); also run on
   Boingo, a Crowd match and an online raid. **Guarded** by `packages/chess/test/long-match.test.ts` and
   `e2e/perf.spec.ts`.
+
+## Two tweaks (Eric, Oct 9, 2026)
+
+- **Ginger freezes a little more often:** every 4 to 6 crowd turns instead of 5 to 7 (`BOSS_POWERS.freezeEvery`). The
+  first freeze still comes on the crowd's second turn, and each lasts 2 turns, so a freeze is never on top of another.
+- **The God King keeps his colours in the dock:** his figure used to fade and desaturate when he couldn't be summoned,
+  and go grey and half see-through once his moves were used. Now he stays in full colour; the crowns under him show
+  what's left (a dash once they're spent), as before. His fallen figure after his Last Stand is still greyed: that
+  shows he has fallen, which is different from having used his moves.
