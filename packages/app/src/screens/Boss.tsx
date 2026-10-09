@@ -5,7 +5,7 @@ import { BossMoment } from "../components/BossEffect.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
-import { kingSay, resetKingSpeech, type KingCue } from "../godKing.ts";
+import { bossMoveCues, kingSay, resetKingSpeech } from "../godKing.ts";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GodKingPortrait } from "../components/GodKing.tsx";
 import { Board } from "../components/Board.tsx";
@@ -172,12 +172,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const kingCues = useMemo(() => {
     const m = boss.lastMove;
     if (intro || thinking || victim || !m || funhouse) return [];
-    const key = `boss-${boss.board.fen}`;
-    const out: { cue: KingCue; key: string }[] = [];
-    if (inCheck(boss.board.fen)) out.push({ cue: "inCheck", key });
-    if (m.staggered) out.push({ cue: "staggered", key });
-    if (m.captured && m.captured !== "q") out.push({ cue: "bossCapture", key });
-    return out;
+    // (A check is said as your move begins: turnCues.)
+    return bossMoveCues(boss.board.fen, m);
   }, [boss.board.fen, thinking, intro, victim]);
   // A boss blunder: the engine's numbers before and after its move (the eval bar's, already worked out or cheap).
   useEffect(() => {

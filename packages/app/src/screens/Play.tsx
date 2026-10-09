@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { applyMove, inCheck, legalMoves, queenInDanger, sideToMove, toSan } from "@chessroyale/chess";
+import { applyMove, fenAtPly, legalMoves, sideToMove, toSan } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar, knownEval } from "../components/EvalBar.tsx";
-import { kingTurn, type KingCue } from "../godKing.ts";
+import { kingTurn, turnCues } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { UnderBoard } from "../components/QuickChat.tsx";
@@ -173,21 +173,9 @@ export function PlayScreen({
   const kingCues = useMemo(() => {
     if (!match.boss || waiting) return [];
     kingTurn(board.fen);
-    const out: { cue: KingCue; key: string }[] = [];
-    if (strike?.at) out.push({ cue: "struck", key: `struck-${strike.at}` });
-    if (queenInDanger(board.fen, side)) out.push({ cue: "queenDanger", key: `queen-${board.fen}` });
-    if (inCheck(board.fen)) out.push({ cue: "inCheck", key: `check-${board.fen}` });
-    out.push({ cue: "intro", key: "intro" });
-    if (match.boss.kingCharges <= 0) out.push({ cue: "spent", key: "spent" });
     const w = knownEval(board.fen);
-    if (w !== undefined) {
-      const ours = side === "w" ? w : 1 - w;
-      if (ours >= 0.85) out.push({ cue: "winning", key: `winning-${board.fen}` });
-      else if (ours <= 0.15) out.push({ cue: "losing", key: `losing-${board.fen}` });
-    }
-    if (match.boss.kingCharges > 0 && board.ply >= 6) out.push({ cue: "nudge", key: `nudge-${Math.floor(board.ply / 12)}` });
-    out.push({ cue: "idle", key: `idle-${board.fen}` });
-    return out;
+    const prevFen = board.history.length >= 2 ? fenAtPly(board.history, board.history.length - 2, board.bases) : undefined;
+    return turnCues({ fen: board.fen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen });
   }, [board.fen, strike?.at, waiting]);
 
   return (

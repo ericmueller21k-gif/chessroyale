@@ -529,6 +529,40 @@ export type BossPowerSettings = {
   -readonly [K in keyof typeof BOSS_POWERS]: (typeof BOSS_POWERS)[K] extends boolean ? boolean : (typeof BOSS_POWERS)[K] extends number ? number : (typeof BOSS_POWERS)[K];
 };
 
+/**
+ * The God King's chatter (packages/app/src/godKing.ts). Eric, Oct 9, 2026: he talked too much. Critical moments always
+ * speak (a new danger to your queen or king, a mate threat, a queen taken either way, his own strikes and moves, his
+ * Last Stand, a boss's power); everything else is paced by these numbers.
+ */
+export const KING_SPEECH = {
+  /** How long a line stays up (ms). */
+  speechMs: 3800,
+  /** The least time between two lines that aren't critical (ms). */
+  quietMs: 8000,
+  /** Small talk (idle, the tap-me nudge, winning or losing) rests this many crowd moves after any line… */
+  restMoves: 8,
+  /** …then its chance grows by this much with each quiet move. */
+  perQuietMove: 0.1,
+  /** A remark on a move (a brilliant, good or bad move, a capture, a check given, the boss's slip) waits this many crowd moves after the last remark. */
+  remarkGapMoves: 6,
+  /** How likely each remark and each piece of small talk is to be said, when it may be (critical cues always speak). */
+  chance: {
+    greatMove: 0.3,
+    goodMove: 0.08,
+    badMove: 0.35,
+    crowdCapture: 0.2,
+    crowdCheck: 0.25,
+    bossCapture: 0.2,
+    bossBlunder: 0.5,
+    staggered: 0.5,
+    idle: 0,
+    nudge: 0.1,
+    winning: 0.1,
+    losing: 0.1,
+    spent: 1,
+  } as Record<string, number>,
+} as const;
+
 /** Solo's difficulty: Elo on top of the boss's usual strength (yours), capped at what the engine plays. */
 export const BOSS_DIFFICULTY = [
   { id: "easy", label: "Easy", elo: -300 },

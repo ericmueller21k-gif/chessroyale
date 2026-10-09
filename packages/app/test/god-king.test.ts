@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { KING_LINES, SPEECH_MS, blunderLabel, blunderWords, capitalised, chancesWords, kingLine, kingSay, kingTurn, lastStandLine, replyWords, resetKingSpeech, setKingFallen } from "../src/godKing.ts";
+import { KING_SPEECH } from "@chessroyale/core";
+import { KING_LINES, SPEECH_MS, blunderLabel, blunderWords, bossMoveCues, capitalised, chancesWords, crowdMoveCues, kingLine, kingSay, kingTurn, lastStandLine, mateThreatened, replyWords, resetKingSpeech, setKingFallen, turnCues } from "../src/godKing.ts";
 
 describe("the God King's lines", () => {
   beforeEach(() => resetKingSpeech());
@@ -26,30 +27,48 @@ describe("the God King's lines", () => {
     expect(KING_LINES.queenDanger).toContain(kingSay("queenDanger", "q-1", t + 1500, always));
     // Later, small talk is fine (when the dice allow).
     expect(kingSay("idle", "idle-2", t + 20_000, () => 0.9)).toBeNull();
-    for (const m of [1, 2, 3, 4, 5, 6]) kingTurn(`quiet-${m}`);
+    for (let m = 1; m <= KING_SPEECH.restMoves + 10; m++) kingTurn(`quiet-${m}`);
     expect(KING_LINES.idle).toContain(kingSay("idle", "idle-3", t + 30_000, always));
   });
 
-  it("paces small talk by moves: each quiet move makes him likelier to speak, so he talks every few moves", () => {
-    const roll = () => 0.7;
+  it("paces small talk by moves: he rests for several moves after any line, then each quiet move makes him likelier", () => {
+    const roll = () => 0.45;
     let t = 1_000_000;
-    // Right after a line, or at the start, he rests: a 0.7 roll beats idle's chance for a few moves.
-    for (const m of [1, 2, 3, 4]) {
+    const rest = KING_SPEECH.restMoves;
+    // A 0.45 roll beats idle's chance until it has grown past it: restMoves, then a few more quiet moves.
+    const speaksAt = rest + Math.ceil(0.45 / KING_SPEECH.perQuietMove);
+    for (let m = 1; m < speaksAt; m++) {
       kingTurn(`m${m}`);
       kingTurn(`m${m}`); // the same move drawn twice counts once
-      expect(kingSay("idle", `i${m}`, (t += 60_000), roll)).toBeNull();
+      expect(kingSay("idle", `i${m}`, (t += 60_000), roll), `move ${m}`).toBeNull();
     }
-    // Then it gets likelier each quiet move: by the sixth he speaks.
-    kingTurn("m5");
-    expect(kingSay("idle", "i5", (t += 60_000), roll)).toBeNull();
-    kingTurn("m6");
-    expect(kingSay("idle", "i6", (t += 60_000), roll)).not.toBeNull();
+    kingTurn(`m${speaksAt}`);
+    expect(kingSay("idle", `i${speaksAt}`, (t += 60_000), roll)).not.toBeNull();
     // Speaking resets the count.
-    kingTurn("m7");
-    expect(kingSay("idle", "i7", (t += 60_000), roll)).toBeNull();
+    kingTurn("again");
+    expect(kingSay("idle", "i-again", (t += 60_000), roll)).toBeNull();
   });
 
-  it("speaks 5 to 10 times in a typical 35-move boss battle of small talk alone", () => {
+  it("remarks on a move only now and then: a low chance, and none for several moves after the last", () => {
+    let t = 1_000_000;
+    const always = () => 0;
+    kingTurn("r0");
+    expect(kingSay("greatMove", "g0", t, always)).not.toBeNull();
+    // Even with the dice on his side, no remark until remarkGapMoves have passed.
+    for (let m = 1; m < KING_SPEECH.remarkGapMoves; m++) {
+      kingTurn(`r${m}`);
+      expect(kingSay("greatMove", `g${m}`, (t += 60_000), always), `move ${m}`).toBeNull();
+      expect(kingSay("badMove", `b${m}`, t, always)).toBeNull();
+    }
+    kingTurn("r-last");
+    expect(kingSay("goodMove", "g-last", (t += 60_000), always)).not.toBeNull();
+    // A critical moment speaks at once, whatever was just said.
+    expect(kingSay("queenLost", "ql", t + 100, () => 0.99)).not.toBeNull();
+    // And the dice: a brilliant move is remarked on about a third of the time.
+    expect(KING_SPEECH.chance.greatMove).toBeLessThanOrEqual(0.35);
+  });
+
+  it("speaks 2 to 5 times in a 35-move boss battle of small talk alone (Eric, Oct 9: less)", () => {
     let rng = 7;
     const random = () => ((rng = (rng * 16807) % 2147483647) / 2147483647);
     const counts = [];
@@ -63,8 +82,45 @@ describe("the God King's lines", () => {
       counts.push(n);
     }
     const avg = counts.reduce((a, b) => a + b, 0) / counts.length;
-    expect(avg).toBeGreaterThanOrEqual(5);
-    expect(avg).toBeLessThanOrEqual(10);
+    expect(avg).toBeGreaterThanOrEqual(2);
+    expect(avg).toBeLessThanOrEqual(5);
+  });
+
+  it("opens with one line from a big pool, once a battle", () => {
+    expect(KING_LINES.intro.length).toBeGreaterThanOrEqual(20);
+    const fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+    const cues = turnCues({ fen, side: "b", charges: 3, ply: 1 });
+    expect(cues.map((c) => c.cue)).toContain("intro");
+    expect(kingSay("intro", "intro", 1_000_000, () => 0.99)).not.toBeNull();
+    expect(kingSay("intro", "intro", 1_100_000, () => 0)).toBeNull();
+  });
+
+  it("critical moments: a new danger speaks, the same danger on the next move doesn't; a queen taken either way", () => {
+    // White's queen on d4 attacked by the c5 pawn: a new danger.
+    const before = "rnbqkbnr/pp1ppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2";
+    const now = "rnbqkbnr/pp1ppppp/8/2p5/3Q4/8/PPP1PPPP/RNB1KBNR w KQkq - 0 3";
+    const cues = (fen: string, prevFen?: string) => turnCues({ fen, side: "w", charges: 3, ply: 4, prevFen }).map((c) => c.cue);
+    expect(cues(now, before)).toContain("queenDanger");
+    // Still attacked a move later: no repeat.
+    expect(cues(now, now)).not.toContain("queenDanger");
+    // Check, then check again on the next move: said once.
+    const check = "rnb1kbnr/pppp1ppp/8/4p3/5PPq/8/PPPPP2P/RNBQKBNR w KQkq - 1 3";
+    expect(cues(check, "rnbqkbnr/pppp1ppp/8/4p3/5P2/8/PPPPP1PP/RNBQKBNR w KQkq - 0 2")).toContain("inCheck");
+    expect(cues(check, check)).not.toContain("inCheck");
+    // A queen taken: by the boss (with its banner), or by the crowd.
+    expect(bossMoveCues("x", { captured: "q" })[0]!.cue).toBe("queenLost");
+    expect(bossMoveCues("x", { captured: "n" }).map((c) => c.cue)).toEqual(["bossCapture"]);
+    expect(crowdMoveCues(now, "d4c5", 0)[0]!.cue).toBe("crowdCapture");
+    const takeQueen = "rnb1kbnr/pppp1ppp/8/4p3/7q/5N2/PPPPPPPP/RNBQKB1R w KQkq - 2 3";
+    expect(crowdMoveCues(takeQueen, "f3h4", 0)[0]!.cue).toBe("queenWon");
+  });
+
+  it("warns of a mate threat: the boss would mate at once if the crowd passed", () => {
+    // Scholar's mate set up: Black's queen and bishop aim at f7 (White to move... here Black to move, threatened).
+    expect(mateThreatened("r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3")).toBe(true);
+    expect(mateThreatened("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")).toBe(false);
+    // In check already: that's the check's cue, not this.
+    expect(mateThreatened("rnb1kbnr/pppp1ppp/8/4p3/5PPq/8/PPPPP2P/RNBQKBNR w KQkq - 1 3")).toBe(false);
   });
 
   it("never says the same line twice running for a cue", () => {
