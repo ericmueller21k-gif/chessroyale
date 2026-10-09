@@ -1,8 +1,8 @@
-// Frame-by-frame check of the computer's home and its queue in place, and of the light/dark switch (see
+// Frame-by-frame check of the computer's home and its queue in place, and of light and dark (Settings → Theme; see
 // .claude/LESSONS.md and DECISIONS.md, "A cleaner computer home"), with real clicks and taps:
 //   1. computer: PLAY, the lobby fills in place (two people, then the bots), then the match's first screen;
 //   2. computer: PLAY then Cancel, home again;
-//   3. computer: the sun, light to dark and back;
+//   3. computer: Settings → Theme, light to dark and back;
 //   4. a dark device with Light picked: reloading is light from the first frame (and the other way round);
 //   5. phone: PLAY, the full-screen queue, Cancel.
 //   npm run frames:home -- <out-dir> [base url, default http://localhost:8788]
@@ -10,7 +10,7 @@
 // --var MATCH_FILL_SECONDS:8 --var ENGINE_OFF:1). Saves every painted frame (frames/<step>/f<ms>.jpg), a timeline per
 // step (timeline.txt), and screenshots. Flags: the side menu or the live panel missing on a frame of home or the
 // queue (computer), the seat grid moving or vanishing, the count going down, a frame much brighter or darker than both
-// neighbours (a blink), more than one jump in brightness for one tap of the sun, and a frame of the wrong theme while
+// neighbours (a blink), more than one jump in brightness for one theme pick, and a frame of the wrong theme while
 // a page loads.
 import { chromium, devices } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -71,7 +71,7 @@ const state = (p) =>
  * the queue must keep the side menu and live panel. `expectTheme`: every frame must be of that theme (dark under 90 of
  * 255 average brightness, light over 170).
  */
-async function record(ctx, p, name, run, { framed = false, expectTheme = null, sunTaps = 0 } = {}) {
+async function record(ctx, p, name, run, { framed = false, expectTheme = null, themeTaps = 0 } = {}) {
   const dir = `${out}/frames/${name}`;
   mkdirSync(dir, { recursive: true });
   const frames = [];
@@ -124,11 +124,11 @@ async function record(ctx, p, name, run, { framed = false, expectTheme = null, s
     if (expectTheme === "dark" && r.lum > 90) flagged.push({ ms: r.ms, line: `PROBLEM: a light frame while dark is picked, lum=${r.lum.toFixed(0)} ${r.file}` });
     if (expectTheme === "light" && r.lum < 170) flagged.push({ ms: r.ms, line: `PROBLEM: a dark frame while light is picked, lum=${r.lum.toFixed(0)} ${r.file}` });
   });
-  if (sunTaps) {
-    // Each tap of the sun is one jump between the themes: dark <-> light, never there and back.
+  if (themeTaps) {
+    // Each theme picked is one jump between the themes: dark <-> light, never there and back.
     const jumps = rows.filter((r, i) => i > 0 && Math.abs(r.lum - rows[i - 1].lum) > 60).length;
-    log(`${name}: ${jumps} jump(s) in brightness for ${sunTaps} tap(s)`);
-    if (jumps !== sunTaps) flagged.push({ ms: 0, line: `PROBLEM: ${jumps} jumps for ${sunTaps} taps` });
+    log(`${name}: ${jumps} jump(s) in brightness for ${themeTaps} tap(s)`);
+    if (jumps !== themeTaps) flagged.push({ ms: 0, line: `PROBLEM: ${jumps} jumps for ${themeTaps} taps` });
   }
   problems += flagged.length;
   const timeline = [...events.map((e) => ({ ms: Math.round(e.t - t0), line: e.what })), ...flagged].sort((x, y) => x.ms - y.ms);
@@ -217,35 +217,37 @@ for (const scheme of ["dark", "light"]) {
   await ctx2.close();
 }
 
-// 3. The sun (computer): light to dark and back. 4. Reloading with a pick: that theme from the first frame.
+// 3. Settings → Theme (computer): light to dark and back. 4. Reloading with a pick: that theme from the first frame.
+const themePick = (p, name) => p.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name, exact: true });
 {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: "light" });
   await named(ctx, "Framer");
   const p = await ctx.newPage();
-  await p.goto(`${base}/`);
-  await p.getByRole("button", { name: "PLAY", exact: true }).waitFor();
+  await p.goto(`${base}/settings`);
+  await themePick(p, "Dark").waitFor();
   await p.waitForTimeout(1200);
-  const sun = p.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Dark mode" });
-  await p.screenshot({ path: `${out}/toggle-light.png`, clip: { x: 0, y: 640, width: 232, height: 160 } });
+  await p.screenshot({ path: `${out}/settings-light.png` });
   await record(
     ctx,
     p,
-    "3-sun",
+    "3-theme",
     async (mark) => {
-      mark("click the sun (to dark)");
-      await click(p, sun);
+      mark("click Dark");
+      await click(p, themePick(p, "Dark"));
       await p.waitForTimeout(900);
       await p.mouse.move(640, 400);
-      await p.screenshot({ path: `${out}/toggle-dark.png`, clip: { x: 0, y: 640, width: 232, height: 160 } });
-      mark("click the sun (to light)");
-      await click(p, sun);
+      await p.screenshot({ path: `${out}/settings-dark.png` });
+      mark("click Light");
+      await click(p, themePick(p, "Light"));
       await p.waitForTimeout(900);
     },
-    { framed: true, sunTaps: 2 },
+    { framed: true, themeTaps: 2 },
   );
-  // Dark picked on this light device: reload, dark from the first frame.
-  await click(p, sun);
+  // Dark picked on this light device: home, reload, dark from the first frame.
+  await click(p, themePick(p, "Dark"));
   await p.waitForTimeout(300);
+  await p.goto(`${base}/`);
+  await p.getByRole("button", { name: "PLAY", exact: true }).waitFor();
   await record(
     ctx,
     p,
@@ -268,12 +270,17 @@ for (const scheme of ["dark", "light"]) {
   await p.getByRole("button", { name: "PLAY", exact: true }).waitFor();
   await p.waitForTimeout(800);
   await p.screenshot({ path: `${out}/phone-home-dark.png` });
-  // The phone's sun: to light; then a reload is light from the first frame.
-  await record(ctx, p, "4b-phone-sun", async (mark) => {
-    mark("tap the sun (to light)");
-    await tap(p, p.locator(".fd-top").getByRole("button", { name: "Dark mode" }));
+  // The phone: Settings → Light; then home, and a reload is light from the first frame.
+  await p.goto(`${base}/settings`);
+  await themePick(p, "Light").waitFor();
+  await record(ctx, p, "4b-phone-theme", async (mark) => {
+    mark("tap Light");
+    await tap(p, themePick(p, "Light"));
     await p.waitForTimeout(900);
-  }, { sunTaps: 1 });
+  }, { themeTaps: 1 });
+  await p.goto(`${base}/`);
+  await p.getByRole("button", { name: "PLAY", exact: true }).waitFor();
+  await p.waitForTimeout(800);
   await p.screenshot({ path: `${out}/phone-home-light.png` });
   await record(
     ctx,

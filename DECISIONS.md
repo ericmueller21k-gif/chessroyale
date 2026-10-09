@@ -1430,6 +1430,37 @@ scoped to 1024 px and wider.
   Cancel, dark and light: the menu and panel never missing, the grid never moving, the count never going down, no
   blinks).
 
+### The computer's play column, your icon, no sun (Eric, Oct 9, 2026)
+
+Eric marked up the computer's home: drop the Shop and Profile buttons (the side menu has them), put Play with friends
+and Boss alone above PLAY, PLAY at the bottom; and, in follow-ups, the mode tabs right above PLAY (they set up what
+PLAY does), no sun, your icon by your name, and the crate's Fischer Random banner was cut off.
+
+- **The computer's play column (1024 px and wider), top to bottom:** Play with friends | Boss alone, the mode tabs
+  (Crowd / Boss raid / Classic, then Default / Bots off / Solo and the i), PLAY, and its line. No Shop or Profile
+  buttons. From 1280 px the group sits at the bottom of the column, PLAY's line level with the bottom of your card;
+  the room above is for the live game (next). 1024-1279 is stacked as before, in the new order. The DOM follows the
+  order (Home decides by the window, the same 1024 px as the frame), so Tab goes top to bottom too.
+- **Phones keep their layout:** the tabs, PLAY, then all four buttons (screenshots match the old ones below your card).
+- **No sun.** The light/dark button is gone from the side menu and the phone's top bar; **Settings → Theme** (Match
+  device / Light / Dark) is the one place, as before, and works from any page. (Eric asked for the sun on Oct 8; he
+  took it back on Oct 9.) The phone's top bar has more room for the coins as a result.
+- **Your icon** (your pixel drawing, or the old emoji) sits to the left of your name and rating on your home card,
+  48 px (one screen pixel per icon pixel at 1x, sharp), phone and computer. My call: the queue's small card on a
+  computer doesn't show it (your pawn is your picture there, and the name needs the width).
+- **The Fischer Random banner** (crate opening; item-builder's lane, the director's exception for this fix): it used
+  the board banners' sizes, so on a computer the words were taller than the band and wider than the stage (cut at both
+  ends, top and bottom), and on a phone the face and the "!" were cut. Now one size sets the text, the face and the
+  gaps (6.4% of the stage's width, at most 52 px), so the face and the words take about 84% of the width in the
+  widest font measured; the band grows to fit them, and the stage grows with its width (at least 210 px). The text is
+  19 px on a 320 px phone, 47 px at 1280, 52 px from 1440; the line under it never goes below 11 px. Watched frame
+  by frame at 320-1920 px: in, slam, hold and out, nothing clipped.
+- **Checked:** `e2e/home-layout.spec.ts` (the column's order and PLAY at the bottom at 1024, 1280 and 1440; no Shop or
+  Profile on a computer's home; your drawn icon left of your name at 320-430 and 1024-1440; no sun anywhere on home,
+  and Settings' Theme through reloads with no flash), `e2e/crate-banner.spec.ts` (the banner measured every frame at
+  320, 390, 1024, 1280 and 1920), and `npm run frames:home` (now picks the theme in Settings: one jump in brightness
+  per pick, no blinks).
+
 ## Quick chat in matches (design, Oct 6, 2026; built Oct 7, 2026)
 
 Eric: a chat in 50 v 50, preset messages only (no typing), some unlockable, each with the sender's icon and name.

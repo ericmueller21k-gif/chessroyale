@@ -3,7 +3,6 @@ import { equippedLook, itemDef, ratingTier, shopItem, type ItemLook, type ItemSl
 import { Avatar } from "./Items.tsx";
 import { account, type Profile } from "../account.ts";
 import type { LiveCounts } from "../live.ts";
-import { setThemePref, toggledPref, useTheme } from "../theme.ts";
 
 /**
  * The front door's shared pieces (home, queue, profiles, the desktop frame), in the approved look: dark ground,
@@ -101,34 +100,6 @@ export function AccountBar({ onProfile }: { onProfile: () => void }) {
       <Coins coins={p?.shop?.coins ?? null} />
       <MyPawnButton onClick={onProfile} />
     </div>
-  );
-}
-
-/**
- * Light or dark (Eric: "when you click the sun, it switches to a black sun, and then it makes it dark mode"): a bright
- * sun in light mode, a black one in dark mode. A tap shows the other theme and remembers the pick on this device.
- */
-export function ThemeButton({ class: cls }: { class?: string }) {
-  const { theme } = useTheme();
-  const dark = theme === "dark";
-  return (
-    <button
-      type="button"
-      class={`fd-theme${dark ? " dark" : ""}${cls ? ` ${cls}` : ""}`}
-      aria-label="Dark mode"
-      aria-pressed={dark}
-      title={dark ? "Dark mode (tap for light)" : "Light mode (tap for dark)"}
-      onClick={() => setThemePref(toggledPref(theme))}
-    >
-      <svg viewBox="0 0 24 24" width="24" height="24" stroke-linecap="round" aria-hidden="true">
-        <circle class="fd-sun-disc" cx="12" cy="12" r="6" stroke-width="1.6" />
-        <path
-          class="fd-sun-rays"
-          stroke-width="2"
-          d="M19.8 12H22M17.52 17.52l1.55 1.55M12 19.8V22M6.48 17.52l-1.55 1.55M4.2 12H2M6.48 6.48 4.93 4.93M12 4.2V2M17.52 6.48l1.55-1.55"
-        />
-      </svg>
-    </button>
   );
 }
 

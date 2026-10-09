@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { parseThemePref, resolveTheme, toggledPref, type ThemePref } from "../src/theme.ts";
+import { parseThemePref, resolveTheme, type ThemePref } from "../src/theme.ts";
 
 /** A device: its storage (or none), its own light/dark setting (which can change), and the page's <html>. */
 function device({ stored, light = false, noStorage = false }: { stored?: string | null; light?: boolean; noStorage?: boolean } = {}) {
@@ -56,11 +56,6 @@ describe("light or dark", () => {
     expect(resolveTheme("dark", true)).toBe("dark");
   });
 
-  it("the sun shows the other theme from whatever is showing, as a pick", () => {
-    expect(toggledPref("light")).toBe("dark");
-    expect(toggledPref("dark")).toBe("light");
-  });
-
   it("a new device follows its own setting, live, until someone picks", async () => {
     const d = device({ light: true });
     const t = await theme();
@@ -77,8 +72,8 @@ describe("light or dark", () => {
     const d = device({ light: true });
     const t = await theme();
     t.watchTheme();
-    // The sun, in light mode: dark, remembered.
-    t.setThemePref(toggledPref(t.currentTheme()));
+    // Settings' Dark, in light mode: dark, remembered.
+    t.setThemePref("dark");
     expect(d.shown()).toBe("dark");
     expect(d.storage.get("brc.theme")).toBe("dark");
     expect(t.themePref()).toBe("dark");

@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 
 /**
  * Light or dark (DECISIONS.md, "Light and dark, a switch"). Until someone picks, the app follows the device. A pick
- * (the sun button, or Settings → Theme) is remembered on this device.
+ * (Settings → Theme) is remembered on this device.
  *
  * The page always carries the theme it shows as `<html data-theme="light|dark">`, set before the first paint by the
  * little script in index.html (the same rules as `resolveTheme` below; a unit test checks they agree) and kept in step
@@ -24,11 +24,6 @@ export function parseThemePref(stored: string | null | undefined): ThemePref {
 /** The theme shown: the pick, else the device's. */
 export function resolveTheme(pref: ThemePref, deviceLight: boolean): Theme {
   return pref === "system" ? (deviceLight ? "light" : "dark") : pref;
-}
-
-/** The sun button: whatever is showing, the other one (a pick from then on, even if it matches the device). */
-export function toggledPref(shown: Theme): ThemePref {
-  return shown === "dark" ? "light" : "dark";
 }
 
 /** (Without storage, a pick lasts as long as the page.) */
@@ -57,7 +52,7 @@ export const currentTheme = (): Theme => resolveTheme(themePref(), deviceLight()
 
 const listeners = new Set<() => void>();
 
-/** Puts the theme on the page (`<html data-theme>`), and tells whoever's drawing a theme button. */
+/** Puts the theme on the page (`<html data-theme>`), and tells whoever is showing the pick (Settings). */
 export function applyTheme() {
   const t = currentTheme();
   if (document.documentElement.getAttribute("data-theme") !== t) document.documentElement.setAttribute("data-theme", t);
@@ -89,7 +84,7 @@ export function watchTheme() {
   applyTheme();
 }
 
-/** The theme picked and shown, for a button or the Settings choice; re-renders when either changes. */
+/** The theme picked and shown, for the Settings choice; re-renders when either changes. */
 export function useTheme(): { pref: ThemePref; theme: Theme } {
   const read = () => ({ pref: themePref(), theme: currentTheme() });
   const [state, set] = useState(read);
