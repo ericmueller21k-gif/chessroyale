@@ -3,6 +3,7 @@ import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, markSeen } from "./presence.ts";
 import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
+import { isAdmin, type AdminEnv } from "./admin.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import {
   buyItem,
@@ -218,7 +219,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/me" && request.method === "GET") {
     const headers = new Headers({ "content-type": "application/json", "cache-control": "no-store" });
     if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
-    if (current) return new Response(JSON.stringify(await profile(sql, current)), { headers });
+    // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
+    if (current) return new Response(JSON.stringify({ ...(await profile(sql, current)), ...(isAdmin(env as AdminEnv, current) ? { admin: true } : {}) }), { headers });
     const g = await createGuest(sql, now, url.searchParams.get("name") ?? "Player");
     headers.append("set-cookie", sessionCookie(g.token));
     return new Response(JSON.stringify(await profile(sql, g.user)), { headers });

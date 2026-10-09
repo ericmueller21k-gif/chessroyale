@@ -10154,6 +10154,180 @@ img.qicon {
     box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.85);
   }
 }
+/* ---------------- G-REX's fire (BossPowers.tsx, the characters' sprites) ---------------- */
+
+/* The fire tiles (and a piece burning on one, a fireball landing): one canvas over the whole board. */
+.pw-fire-board {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.pw-burns .pw-fire-board,
+.pm-fireball .pw-fire-board {
+  z-index: 4;
+}
+/* (Empty markers on the tiles' squares, for tests: which squares are on fire, at which stage, what burnt.) */
+.pw-fire,
+.pw-burn {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+}
+.pw-burns {
+  z-index: 4;
+}
+.pw-flight.sparkFly {
+  animation-name: pw-lob;
+}
+/* The Roman candle: he drops onto the middle of the board; each shot streaks up and off the top. */
+.pm-rex {
+  aspect-ratio: 100 / 122;
+}
+.pw-shot {
+  position: absolute;
+  z-index: 9;
+  left: 44%;
+  top: 30%;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  animation-name: pw-shot;
+  animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1);
+  animation-fill-mode: both;
+}
+@keyframes pw-shot {
+  from {
+    translate: 0 0;
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  to {
+    translate: var(--sx) -300%;
+    opacity: 0;
+  }
+}
+/* A fireball falling onto its square (its landing then plays on the board's canvas). */
+.pw-fireball {
+  position: absolute;
+  z-index: 9;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  animation-name: pw-fall;
+  animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.5);
+  animation-fill-mode: both;
+}
+@keyframes pw-fall {
+  from {
+    translate: 0 var(--fy);
+  }
+  to {
+    translate: 0 0;
+  }
+}
+/* The candle's shots still up, by the board's top edge (the characters' strip, kept to its shape). */
+.pw-pips {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  top: 0;
+  translate: -50% -50%;
+  width: 40%;
+  aspect-ratio: 74 / 11;
+  pointer-events: none;
+  filter: drop-shadow(0 0.4cqw 0 rgba(0, 0, 0, 0.45));
+}
+/* The fire's banners: embers and flame. */
+.fight-banner.power-cut.fire .fb-band {
+  background: linear-gradient(90deg, #1a0700, #9a3412 22%, #7c2d12 50%, #9a3412 78%, #1a0700);
+  border-color: #fdba74;
+  box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(251, 146, 60, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.fight-banner.power-cut.long .kc-text {
+  font-size: 7.4cqw;
+}
+.fight-banner.power-cut.fire .kc-label {
+  color: #fed7aa;
+}
+.fight-banner.power-cut.fire .kc-text {
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    0 0 24px rgba(253, 186, 116, 0.95);
+}
+
+/* Nearly full: it glows (then the warning, then the ultimate). */
+.rage-meter.glow:not(.warned):not(.now) {
+  border-color: #fed7aa;
+  animation: rage-glow 1100ms ease-in-out infinite alternate;
+}
+.rage-meter.glow i {
+  background: linear-gradient(90deg, #fbbf24, #f97316 60%, #fde68a);
+}
+@keyframes rage-glow {
+  from {
+    box-shadow: 0 0 2px 0 rgba(251, 191, 36, 0.4);
+  }
+  to {
+    box-shadow: 0 0 7px 2px rgba(251, 146, 60, 0.75);
+  }
+}
+
+/* Solo's difficulty, next to the boss picker (the boss menu). */
+.boss-difficulty {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.bd-opt {
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bd-opt.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.bd-opt.on.easy {
+  color: var(--good);
+}
+.bd-opt.on.hard {
+  color: #f08c3a;
+}
+.bd-opt.on.hardest {
+  color: var(--bad);
+}
+
+/* Testing (admins only): the test trigger, small and plain. */
+.ult-test {
+  display: block;
+  margin: 6px auto 0;
+  padding: 4px 10px;
+  border: 1px dashed rgba(127, 127, 127, 0.6);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ult-test:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 
 /*
  * -- The home page's global chat (GlobalChat.tsx): a computer's right column, under Playing now. It fills the rest of

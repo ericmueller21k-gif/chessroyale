@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, bossDef, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, PACE_SETTINGS, bestMoveOf, definedOnly, matchFeats, modeSettings, speedOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenMode, chosenOpeningMoves } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -24,6 +24,7 @@ import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
 import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
+import { difficultyElo } from "./boss-difficulty.ts";
 import { startLive } from "./live.ts";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
@@ -65,6 +66,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
           bossFixedElo: bossTierFromUrl() || raidBossElo([account().profile?.rating ?? null]),
           // Boss alone: the boss picked from the menu ("" random); a Solo raid's is random. Random avoids your last.
           bossId: matchBoss && !bossInUrl() ? "" : chosenBoss(),
+          // Boss alone: the difficulty chosen next to the boss picker (Easy to Hardest) on top of that strength.
+          bossDifficulty: matchBoss || bossTierFromUrl() ? 0 : difficultyElo(),
         }
       : modeSettings(mode.mode === "classic" ? "classic" : "crowd", { crowdTeams: mode.crowdTeams, augments: mode.augments })),
     ...(quickPace() ? (crowd ? { revealSeconds: 2, drawnMoveSeconds: 1.2, stageBreakSeconds: 4 } : PACE_SETTINGS.quick) : {}),
@@ -82,8 +85,12 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...speed,
     // Any boss battle: not the boss you met last (when it's random); ?power= brings a boss power at once (tests).
     bossAvoid: lastBoss() ?? "",
-    ...(["freeze", "blizzard", "pie", "funhouse"].includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
+    ...(["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle"].includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
+    // Testing: ?laststand=0, the God King never makes his Last Stand (a test that leaves a piece to burn on purpose).
+    ...(q.get("laststand") === "0" ? { lastStandLoss: 999, lastStandLossFloor: 999 } : {}),
+    // Testing, solo: ?boss=<id>&wip=1 meets a boss whose powers are built before its art is (placeholders show).
+    ...(q.get("wip") === "1" && bossDef(q.get("boss"))?.powers ? { bossId: q.get("boss")!, bossUnfinished: true } : {}),
   };
 }
 

@@ -1,4 +1,4 @@
-import { fenAfter, pieceAt } from "./rules.ts";
+import { fenAtPly, pieceAt, type Base } from "./rules.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -33,7 +33,13 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * banner, the sweep across the board and the God King's line; the funhouse: the clown pogos onto the board, it flips,
  * he speaks and plays the crowd's move (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200 } as const;
+export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 5000, fireball: 1700 } as const;
+
+/**
+ * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
+ * boss's turn begins. The boss's move waits for it (at least this long after the crowd's move), solo and online.
+ */
+export const FIRE_BURN_MS = 1500;
 
 /** How long a turn's power moments take, one after another. */
 export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX }[] | null | undefined): number {
@@ -43,16 +49,19 @@ export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX }[]
 /** Alone: how long the boss's move shows before your turn (the piece's slide, and a beat). */
 export const BOSS_MOVE_ALONE_MS = 450;
 
-/** The last move in a game (from the starting position) took a queen. */
-export function lastMoveTookQueen(history: readonly string[]): boolean {
+/** The last move in a game (from the starting position, with its bases: G-REX's fire) took a queen. */
+export function lastMoveTookQueen(history: readonly string[], bases?: readonly Base[] | null): boolean {
   const m = history[history.length - 1];
   if (!m) return false;
-  return pieceAt(fenAfter(history.slice(0, -1)), m.slice(2, 4))?.type === "q";
+  return pieceAt(fenAtPly(history, history.length - 1, bases), m.slice(2, 4))?.type === "q";
 }
 
-/** The boss thinks for at least this long; longer when the crowd has just taken its queen (your banner plays first). */
-export function bossThinkMs(history: readonly string[]): number {
-  return lastMoveTookQueen(history) ? 2000 : 1200;
+/**
+ * The boss thinks for at least this long; longer when the crowd has just taken its queen (your banner plays first),
+ * or when G-REX's fire has just burnt (`burnt`: it plays first).
+ */
+export function bossThinkMs(history: readonly string[], bases?: readonly Base[] | null, burnt = false): number {
+  return Math.max(lastMoveTookQueen(history, bases) ? 2000 : 1200, burnt ? FIRE_BURN_MS : 0);
 }
 
 /**

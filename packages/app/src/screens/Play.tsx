@@ -91,7 +91,7 @@ export function PlayScreen({
   const intro = !waiting && now < startsAt;
   const introLeft = Math.ceil((startsAt - now) / 1000);
   const shown = useReplay(match, board, Math.max(0, startsAt - mountedAt));
-  const history = useHistoryView(board.history);
+  const history = useHistoryView(board.history, board.bases);
   // The same 3-2-1 (with a tick each second) opens the round and closes it.
   useTicks(introLeft, COUNT_FROM_SECONDS, intro);
   const total = allowedMs ?? match.settings.moveClockSeconds * 1000;

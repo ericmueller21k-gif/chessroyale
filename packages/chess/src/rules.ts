@@ -170,3 +170,93 @@ export function blunderCost(fen: string, move: string, reply?: string | null, ma
   if (mateIn && mateIn > 0) return { kind: "mate", in: mateIn };
   return { kind: "chances" };
 }
+
+// ---------------- Positions that change outside the moves (G-REX's fire) ----------------
+
+/**
+ * A board's position can change between moves: a piece the fire destroys. A base is the position after `ply` moves,
+ * with whatever happened then: the moves after it are played from it. A game with no bases is a plain game from the
+ * starting position.
+ */
+export interface Base {
+  ply: number;
+  fen: string;
+}
+
+/** The latest base at or before `ply` (none: the starting position). */
+export function baseAt(ply: number, bases?: readonly Base[] | null): Base {
+  let b: Base = { ply: 0, fen: START_FEN };
+  for (const x of bases ?? []) if (x.ply <= ply && x.ply >= b.ply) b = x;
+  return b;
+}
+
+/** The position after `ply` of a game's moves, with its bases (a destroyed piece stays gone). */
+export function fenAtPly(history: readonly string[], ply: number, bases?: readonly Base[] | null): string {
+  const b = baseAt(ply, bases);
+  return fenAfter(history.slice(b.ply, ply), b.fen);
+}
+
+/** Whether a game is over, with its bases (from the latest one: no position before it can come again). */
+export function gameEndWith(history: readonly string[], bases?: readonly Base[] | null): GameEnd {
+  const b = baseAt(history.length, bases);
+  return gameEnd(b.fen, history.slice(b.ply));
+}
+
+/**
+ * The position with a square emptied (a piece the fire destroyed), still with the same side to move. A rook leaving
+ * its corner takes its castling right with it, a pawn that has just made its double step takes the en passant
+ * square, and the fifty-move count starts again (as after a capture).
+ */
+export function withoutPiece(fen: string, square: string): string {
+  const parts = fen.split(" ");
+  const rows = parts[0]!.split("/").map((r) => r.replace(/\d/g, (n) => ".".repeat(Number(n))).split(""));
+  const file = square.charCodeAt(0) - 97;
+  const rank = Number(square[1]);
+  const row = rows[8 - rank];
+  if (!row || file < 0 || file > 7) return fen;
+  const piece = row[file]!;
+  row[file] = ".";
+  parts[0] = rows.map((r) => r.join("").replace(/\.+/g, (d) => String(d.length))).join("/");
+  const corner: Record<string, string> = { a1: "Q", h1: "K", a8: "q", h8: "k" };
+  if (parts[2] && corner[square] && piece.toLowerCase() === "r") parts[2] = parts[2].replace(corner[square]!, "") || "-";
+  if (parts[3] && parts[3] !== "-") {
+    // (The en passant square sits behind the pawn that just made its double step.)
+    const behind = parts[3][1] === "3" ? `${parts[3][0]}4` : `${parts[3][0]}5`;
+    if (behind === square) parts[3] = "-";
+  }
+  if (parts[4]) parts[4] = "0";
+  return parts.join(" ");
+}
+
+/** The position with a piece put on a square (e.g. to show a destroyed piece one last time). */
+export function withPiece(fen: string, square: string, piece: { color: "w" | "b"; type: string }): string {
+  const parts = fen.split(" ");
+  const rows = parts[0]!.split("/").map((r) => r.replace(/\d/g, (n) => ".".repeat(Number(n))).split(""));
+  const row = rows[8 - Number(square[1])];
+  const file = square.charCodeAt(0) - 97;
+  if (!row || file < 0 || file > 7) return fen;
+  row[file] = piece.color === "w" ? piece.type.toUpperCase() : piece.type.toLowerCase();
+  parts[0] = rows.map((r) => r.join("").replace(/\.+/g, (d) => String(d.length))).join("/");
+  return parts.join(" ");
+}
+
+/** Whether `color`'s king is attacked in this position (whoever is to move). */
+export function kingAttacked(fen: string, color: "w" | "b"): boolean {
+  try {
+    const chess = new Chess(fen, { skipValidation: true });
+    const sq = chess.findPiece({ type: "k", color })[0];
+    return !!sq && chess.isAttacked(sq, color === "w" ? "b" : "w");
+  } catch {
+    return true;
+  }
+}
+
+/** The game is over in this position (mate or stalemate), with nothing else to go on. */
+export function positionOver(fen: string): boolean {
+  try {
+    const chess = new Chess(fen);
+    return chess.isCheckmate() || chess.isStalemate();
+  } catch {
+    return false;
+  }
+}

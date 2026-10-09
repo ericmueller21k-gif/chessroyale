@@ -2,7 +2,8 @@
 // and on a phone with its CPU slowed 4x, and records after every move: frame times (idle, while dragging a piece,
 // and through the boss's turn), DOM nodes, running animations, rAF callbacks per frame, pending timers, event
 // listeners, JS heap and audio nodes. Prints a table per run and writes everything to <out>.json.
-//   npm run perf:boss -- [out-dir] [gingerbread|clown|crowd|online] [phone|desktop|both] [moves=25] [power]
+//   npm run perf:boss -- [out-dir] [gingerbread|clown|grex|crowd|online] [phone|desktop|both] [moves=25] [power]
+// (grex: try power=candle for his barrage.)
 // The production build (vite build + preview), like the live site. Nothing here should grow with the match
 // (.claude/LESSONS.md: "Lag that grows with the match").
 import { mkdirSync, writeFileSync } from "node:fs";

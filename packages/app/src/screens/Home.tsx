@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BOSS_TIERS, bossDef, bossStrength, bossThreat, isPlayable, playableBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
+import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
+import { BossDifficulty } from "../components/BossDifficulty.tsx";
 import type { ComponentChildren } from "preact";
 import { AccountBar, DressedPawn, FdButton, LiveLine, Logo, RankLine, myHat, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
@@ -130,7 +132,7 @@ function versus(elo: number, you: number): { text: string; tone: "easy" | "even"
 }
 
 /** What each boss's powers do, in a few words (the menu's line under its name). */
-const POWER_WORDS: Record<string, string> = { freeze: "freezes a piece", blizzard: "blizzard", pie: "pies a square", funhouse: "funhouse" };
+const POWER_WORDS: Record<string, string> = { freeze: "freezes a piece", blizzard: "blizzard", pie: "pies a square", funhouse: "funhouse", sparkler: "sets squares alight", candle: "Roman candle" };
 
 /**
  * Boss raid: the menu that opens when you start: a random boss (a different one from last time), or one of the
@@ -153,6 +155,9 @@ export function BossMenu({
   const you = rating ?? PRIOR_RATING;
   const base = raidBossElo([rating]);
   const bosses = playableBosses();
+  // Solo: a difficulty on top of the boss's strength (online, the lobby's strength stands).
+  const [difficulty, setDifficulty] = useState(chosenDifficulty);
+  const extra = forRaid ? 0 : difficultyElo(difficulty);
   const picked = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     picked.current?.scrollIntoView({ block: "nearest" });
@@ -175,6 +180,15 @@ export function BossMenu({
             ✕
           </button>
         </div>
+        {!forRaid && (
+          <BossDifficulty
+            value={difficulty}
+            onChange={(d) => {
+              rememberDifficulty(d);
+              setDifficulty(d);
+            }}
+          />
+        )}
         <div class="boss-menu-list">
           <button type="button" class={`boss-row match${value === "" ? " on" : ""}`} ref={value === "" ? picked : undefined} onClick={() => onPick("")}>
             <span class="br-icon" aria-hidden="true">
@@ -186,7 +200,7 @@ export function BossMenu({
             </span>
           </button>
           {bosses.map((b) => {
-            const elo = bossStrength(base, b);
+            const elo = bossStrength(base, b, extra);
             const vs = versus(elo, you);
             return (
               <button

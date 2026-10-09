@@ -432,3 +432,25 @@ changed. The same storm then measured like the plain board.
 **The rule:** an effect that can appear many times at once goes on a shared canvas, not a canvas each; never start a
 loop per sprite. Measure the worst case at once on a slowed phone (`npm run frames:character -- <dir> Boingo phone
 kit="G-REX" fxperf`), not one effect at a time.
+
+## A move only legal after a burn (Oct 9, 2026)
+
+**Seen** (by G-REX's fire, before it shipped): watching a G-REX battle frame by frame, the page threw "Invalid move
+d8d1" on every redraw a few moves after a pawn burnt on d4. Every unit test passed.
+
+**The cause:** the fire destroys a piece between moves, so the board's history is no longer a game you can replay from
+the starting position: the boss's queen went d8-d1 down a file the burnt pawn had blocked. The boss's reactions
+(`boss-beats.ts`) replayed the history from move 0 to find the position a move or two back, and chess.js refused the
+queen's move. The tests replayed short histories that never had a move made possible by a burn.
+
+**How it was found:** `npm run frames:powers -- <dir> grex` logs page errors; the error repeated on every frame from
+the queen's move on.
+
+**The fix:** a board keeps a base where its position changed (`BoardState.bases`), and every replay plays from the
+latest base at or before the ply it wants (`fenAtPly`, `gameEndWith`, `recentMoves`, the history arrows, a newcomer's
+replay, the boss's reactions). `packages/app/test/fire-replays.test.ts` replays a game whose last move is only legal
+after a burn.
+
+**The rule:** anything that changes the position outside a move must leave a base, and nothing may replay a board's
+history from move 0 directly: use `fenAtPly(history, ply, bases)`. When adding such a power, grep for `fenAfter(` and
+`.history` and check each.
