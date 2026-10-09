@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { START_FEN, applyMove } from "@chessroyale/chess";
+import { START_FEN, applyMove, baseAt } from "@chessroyale/chess";
 import type { BoardView, GameView } from "./game.ts";
 
 const MAX_REPLAY = 5;
@@ -26,10 +26,13 @@ export function useReplay(
       // First time on this board: the whole game from the starting position.
       const out = [{ fen: START_FEN, lastMove: null as string | null }];
       let fen = START_FEN;
-      for (const m of board.history) {
+      board.history.forEach((m, i) => {
         fen = applyMove(fen, m);
+        // (A piece G-REX's fire destroyed after this move: gone from here on.)
+        const base = baseAt(i + 1, board.bases);
+        if (base.ply === i + 1) fen = base.fen;
         out.push({ fen, lastMove: m });
-      }
+      });
       return out;
     }
     const missed = last === undefined ? 0 : board.ply - last;

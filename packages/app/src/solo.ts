@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
@@ -359,6 +359,11 @@ export class SoloMatch implements GameView {
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => this.submit(null), deadline - at + this.settings.lateGraceMs);
     this.set({ ...phase, deadline, strike: { calls, needed, mine: true, at, until: at + ms } });
+  }
+  /** Testing (admins): the boss's ultimate as the next crowd turn begins. */
+  triggerUltimate() {
+    if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin) return;
+    if (this.runner.triggerUltimate()) this.set({ ...this.phase });
   }
   get boss(): BossView | null {
     const v = this.runner?.bossView();

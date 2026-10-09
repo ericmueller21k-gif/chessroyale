@@ -1,6 +1,6 @@
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LOBBY_LIFE, MATCHMAKING, isRankedMatch, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LOBBY_LIFE, MATCHMAKING, isRankedMatch, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -623,6 +623,18 @@ export class LobbyCore {
     if (this.r.phase === "boss" && this.r.bossKey) this.sendBossRequest(host);
   }
 
+  /**
+   * The test trigger: an admin (the Durable Object checks ADMIN_EMAILS and passes `admin`) brings the boss's ultimate
+   * as the next crowd turn begins, without the warning. Anyone else, no boss battle, or the trigger switched off
+   * (BOSS_POWERS.ultimateTestButton): nothing. Never touches a turn or a moment in progress (see triggerUltimate).
+   */
+  ultimateTrigger(playerId: string, admin: boolean): boolean {
+    if (!admin || !BOSS_POWERS.ultimateTestButton || !this.human(playerId) || !this.runner?.boss || this.r.phase === "results") return false;
+    const ok = this.runner.triggerUltimate();
+    if (ok) console.log(`test trigger: ${playerId} brings the ultimate in ${this.r.code}`);
+    return ok;
+  }
+
   // ---------------- Messages ----------------
 
   message(playerId: string, msg: ClientMessage) {
@@ -684,6 +696,8 @@ export class LobbyCore {
       case "judgedDeep":
         return this.judgedDeep(playerId, msg.key, msg.id, msg.deep);
       case "hello":
+      // (The test trigger goes through ultimateTrigger, from the Durable Object, which knows who's an admin.)
+      case "ultimate":
         return;
     }
   }
@@ -1084,6 +1098,7 @@ export class LobbyCore {
               bots: ids.filter((id) => skills.has(id)).map((id) => ({ id, skill: skills.get(id)!, powerUps: runner.player(id).powerUps })),
               ...(barred ? { barred } : {}),
               ...(runner.boss && runner.crowdAllowed() ? { allowed: runner.crowdAllowed()! } : {}),
+              ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
             }
           : undefined;
       this.send(this.r.hostId, { t: "prefetch", fens, ...(plan ? { plan } : {}) }, false);
@@ -1231,6 +1246,7 @@ export class LobbyCore {
       ...(this.r.round!.botPlan ? { botPlan: this.r.round!.botPlan.picks, botPlanPowerUps: this.r.round!.botPlan.powerUps } : {}),
       ...(this.runner!.boss?.barred ? { barred: this.runner!.boss.barred } : {}),
       ...(this.runner!.boss && this.runner!.crowdAllowed(boardId) ? { allowed: this.runner!.crowdAllowed(boardId)! } : {}),
+      ...(this.runner!.fireBurn().length ? { burn: this.runner!.fireBurn() } : {}),
     }));
     // Close calls that can decide the cut are re-checked first.
     const bubble = this.cutPriority();
@@ -1552,6 +1568,7 @@ export class LobbyCore {
           bots: firstIds.filter((id) => skills.has(id)).map((id) => ({ id, skill: skills.get(id)!, powerUps: runner.player(id).powerUps })),
           ...(barred ? { barred } : {}),
           ...(runner.boss && runner.crowdAllowed(firstBoard) ? { allowed: runner.crowdAllowed(firstBoard)! } : {}),
+          ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
           seed: seedFor(key, firstBoard),
           rules: this.judgeRules(),
         }
@@ -1584,6 +1601,7 @@ export class LobbyCore {
         rules: this.judgeRules(),
         ...(sj.barred ? { barred: sj.barred } : {}),
         ...(sj.allowed ? { allowed: sj.allowed } : {}),
+        ...(sj.burn ? { burn: sj.burn } : {}),
         ...(sj.priority ? { priority: sj.priority } : {}),
       };
       const judges = (planned[String(sj.boardId)] ?? []).filter((id) => devices.some((d) => d.id === id)).slice(0, perJob);

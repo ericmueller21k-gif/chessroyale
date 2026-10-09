@@ -1,7 +1,7 @@
 import { LookAways } from "./lookaway.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { DEFAULT_SETTINGS, JUDGES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -23,6 +23,9 @@ import {
   bossMoveFrom,
   funhouseMoveFrom,
   allowedSearch,
+  fireRanked,
+  jobEscapes,
+  sideToMove,
   judgeCandidates,
   judgeBotPicks,
   runQuickJob,
@@ -656,7 +659,7 @@ export class NetMatch implements GameView {
         // Many judges: the bots pick from the lobby's seed, exactly as the scoring job will (it checks this plan).
         const top = await this.top.get(engines[0]!, plan.fen);
         const bots = plan.bots.map((b) => ({ skill: b.skill, powerUps: b.powerUps ?? 0 }));
-        const job = { fen: plan.fen, picks: [], bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}) } as unknown as JudgeJob;
+        const job = { fen: plan.fen, picks: [], bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}), ...(plan.burn ? { burn: plan.burn } : {}) } as unknown as JudgeJob;
         // (A boss power left none of the top moves open: the bots pick from a search over the allowed ones, as the job will.)
         const open = await allowedSearch(engines[0]!, job, top);
         const chosen = judgeBotPicks(job, top, open ?? []);
@@ -667,7 +670,8 @@ export class NetMatch implements GameView {
       // (Boss battle: only the moves allowed this turn; the move the God King took back is off the table.)
       const all = await this.top.get(engines[0]!, plan.fen);
       const limits = { ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}) };
-      const top = judgeCandidates(limits, all, (await allowedSearch(engines[0]!, { ...limits, fen: plan.fen }, all)) ?? []);
+      // (G-REX's fire: the bots count a piece left on a tile ablaze as gone.)
+      const top = fireRanked(judgeCandidates(limits, all, (await allowedSearch(engines[0]!, { ...limits, fen: plan.fen }, all)) ?? []), plan.fen, plan.burn ?? [], sideToMove(plan.fen));
       const best = top[0]?.expected ?? 0.5;
       const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
       const legal = plan.allowed ?? legalMoves(plan.fen).filter((mv) => mv !== plan.barred);
@@ -702,7 +706,9 @@ export class NetMatch implements GameView {
           const open = (await allowedSearch(engine, { ...limits, fen: job.fen, picks: humanMoves }, all)) ?? [];
           const top = judgeCandidates(limits, all, open);
           const best = top[0]!.expected;
-          const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
+          // (G-REX's fire: the bots count a piece left on a tile ablaze as gone; the scores stay the engine's.)
+          const ranked = fireRanked(top, job.fen, job.burn ?? [], sideToMove(job.fen));
+          const candidates = ranked.map((mv) => ({ move: mv.move, loss: Math.max(0, (ranked[0]!.expected - mv.expected) * 100) }));
           const legal = job.allowed ?? legalMoves(job.fen).filter((mv) => mv !== job.barred);
           const botPicks: Record<string, string> = {};
           const botThinkMs: Record<string, number> = {};
@@ -723,7 +729,9 @@ export class NetMatch implements GameView {
           }
           const expectedAfter: Record<string, number> = Object.fromEntries(top.map((mv) => [mv.move, mv.expected]));
           for (const mv of open) expectedAfter[mv.move] = mv.expected;
-          const missing = [...Object.values(job.humanPicks), ...Object.values(botPicks)].filter(
+          // (G-REX's fire: every move that saves a piece from a tile ablaze is scored too.)
+          const escapes = jobEscapes({ fen: job.fen, burn: job.burn, allowed: job.allowed, barred: job.barred });
+          const missing = [...new Set([...Object.values(job.humanPicks), ...Object.values(botPicks), ...escapes])].filter(
             (mv): mv is string => !!mv && expectedAfter[mv] === undefined,
           );
           const extra = [...open, ...(missing.length ? await engine.scoreMoves(job.fen, missing) : [])];
@@ -746,6 +754,12 @@ export class NetMatch implements GameView {
 
   startMatch() {
     this.send({ t: "start" });
+  }
+
+  /** Testing (admins: the server checks too): the boss's ultimate as the next crowd turn begins. */
+  triggerUltimate() {
+    if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !this.boss) return;
+    this.send({ t: "ultimate" });
   }
 
   submit(move: string | null) {

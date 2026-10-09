@@ -129,8 +129,10 @@ export const bossDef = (id: string | null | undefined): BossDef | null => (id ? 
  * Which boss a match meets: `wanted` if it's playable, else a random playable one (from `roll`, 0-1), not `avoid`
  * when there's another to meet (no repeats: solo avoids your last boss, online the one most of the lobby met last).
  */
-export function chooseBoss(roll: number, wanted?: string | null, avoid?: string | null, roster: readonly BossDef[] = BOSS_ROSTER): BossDef {
+export function chooseBoss(roll: number, wanted?: string | null, avoid?: string | null, roster: readonly BossDef[] = BOSS_ROSTER, unfinished = false): BossDef {
   const pick = roster.find((b) => b.id === wanted);
+  // (Testing, solo only: a boss whose powers are built but whose art isn't yet, with placeholders.)
+  if (unfinished && pick?.powers) return pick;
   if (isPlayable(pick)) return pick;
   const all = playableBosses(roster);
   if (!all.length) throw new Error("No playable boss");

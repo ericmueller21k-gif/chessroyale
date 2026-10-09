@@ -12,6 +12,7 @@ import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "
 import { CAPACITY, DEFAULT_SETTINGS } from "@chessroyale/core";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
+import { isAdmin } from "./admin.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -379,7 +380,9 @@ export class Lobby extends DurableObject<Env> {
       !guest && !seated && !!account && !!this.env.DB
         ? (await banCheck(d1Sql(this.env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }))).banned
         : false;
-    server.serializeAttachment({ userId: account?.id, guest, banned });
+    // (Admins, ADMIN_EMAILS as for the fair-play review: the boss battle's test trigger.)
+    const admin = !guest && isAdmin(await withSecrets(this.env), account);
+    server.serializeAttachment({ userId: account?.id, guest, banned, ...(admin ? { admin } : {}) });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -391,7 +394,7 @@ export class Lobby extends DurableObject<Env> {
     } catch {
       return;
     }
-    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean } | null;
+    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; admin?: boolean } | null;
     // The host's scores: the engine server re-checks the close calls first (before the lobby is touched, so
     // nothing changes under it while it waits), and its numbers are the ones used.
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
@@ -424,7 +427,7 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, result.message);
         return;
       }
-      ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId });
+      ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}) });
       if (chatProfile) {
         core.chatOwned(result.playerId, chatProfile.owned);
         if (chatProfile.icon && this.icons.get(result.playerId) !== chatProfile.icon) {
@@ -439,7 +442,8 @@ export class Lobby extends DurableObject<Env> {
     }
     const playerId = attached?.playerId;
     if (!playerId) return;
-    core.message(playerId, msg);
+    if (msg.t === "ultimate") core.ultimateTrigger(playerId, !!attached?.admin);
+    else core.message(playerId, msg);
     await this.persist(core);
   }
 

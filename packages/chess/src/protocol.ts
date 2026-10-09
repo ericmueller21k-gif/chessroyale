@@ -119,6 +119,11 @@ export interface ScoreJob {
   barred?: string;
   /** Boss battle, a power limits the crowd's moves: the moves allowed (the best and the bots' picks come from these). */
   allowed?: string[];
+  /**
+   * Boss battle, G-REX's fire: the tiles ablaze this turn. A crowd piece left on one after the move burns: the moves
+   * that save it are scored too, and the bots count a piece left there as gone (the lobby's runner does the scoring).
+   */
+  burn?: string[];
   /** Picks that can decide the cut (players near the cut line): re-checked first (recheckCut* in settings). */
   priority?: string[];
 }
@@ -326,7 +331,9 @@ export type ClientMessage =
   /** Many judges: this device's answer to one scoring job. */
   | { t: "judged"; key: string; id: string; report: JudgeReport }
   /** Many judges, deep checks: this device's re-check of the job's close calls (sent after its "judged"). */
-  | { t: "judgedDeep"; key: string; id: string; deep: MoveScore[] };
+  | { t: "judgedDeep"; key: string; id: string; deep: MoveScore[] }
+  /** Boss battle, admins only (testing): bring the boss's ultimate as the next crowd turn begins. */
+  | { t: "ultimate" };
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
@@ -404,6 +411,8 @@ export type ServerMessage = { now: number } & (
         barred?: string;
         /** Boss battle, a power limits the crowd's moves: the bots pick from these. */
         allowed?: string[];
+        /** Boss battle, G-REX's fire: the tiles ablaze (the bots count a piece left there as gone). */
+        burn?: string[];
         /** Many judges: the bots pick from this seed and these rules (judgeBotPicks), so the scoring job agrees. */
         seed?: number;
         rules?: JudgeRules;

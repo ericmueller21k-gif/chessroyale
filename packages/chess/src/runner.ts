@@ -344,7 +344,7 @@ export class MatchRunner {
     // Which boss: the one picked, else a random playable one (not the one to avoid). One draw from the match's random
     // source, which also seeds its powers.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
-    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid);
+    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
     const crowdSide = sideToMove(board.fen);
     this.state = {
       ...this.state,
@@ -375,6 +375,11 @@ export class MatchRunner {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     if (sideToMove(fen) !== b.crowdSide) return;
     this.state = { ...this.state, boss: prepareTurn(b, fen, this.settings.bossPowerTest) };
+  }
+
+  /** Boss battle, G-REX's fire: the tiles ablaze this crowd turn (a crowd piece left on one burns after the move). */
+  fireBurn(): string[] {
+    return this.state.boss ? ablaze(this.state.boss) : [];
   }
 
   /** Boss battle: the moves the crowd may play this turn (a power's limits, the Last Stand's barred move); null: any. */
@@ -1095,7 +1100,7 @@ export class MatchRunner {
   private bossViewMemo: { key: string; view: NetBoss } | null = null;
 
   private buildBossView(b: BossState, justKilled: string | null): NetBoss {
-    const def = chooseBoss(0, b.id);
+    const def = chooseBoss(0, b.id, null, undefined, true);
     const info = { name: def.name, icon: def.icon, threat: bossThreat(b.elo) };
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const powers = bossPowers(b);
@@ -1162,7 +1167,7 @@ export class MatchRunner {
     const alive = this.alive();
     // Which boss: a random playable one (as in a raid), at the crowd's strength plus its own offset.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
-    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid);
+    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
     const tier = bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
     const elo = bossStrength(tier, def, this.settings.bossDifficulty);
     this.bossLast = null;

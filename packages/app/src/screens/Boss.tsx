@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { bossIntroTimeline, fenAfter, inCheck, lastMoveTookQueen, pieceAt } from "@chessroyale/chess";
-import { BLIZZARD, FUNHOUSE, funhouseFlipAt, powerLine, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
+import { bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
+import { BLIZZARD, BURN, FUNHOUSE, FireBurn, funhouseFlipAt, powerLine, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
 import { kingSay, resetKingSpeech, type KingCue } from "../godKing.ts";
@@ -46,7 +46,21 @@ function OpeningRoulette({ name }: { name: string }) {
 }
 
 /** The dock's line for a power's moment. */
-const POWER_DOCK: Record<string, string> = { freeze: "Freeze!", pie: "Pie!", blizzard: "Blizzard!", funhouse: "Funhouse!", warn: "Rage!" };
+const POWER_DOCK: Record<string, string> = { freeze: "Freeze!", pie: "Pie!", blizzard: "Blizzard!", funhouse: "Funhouse!", warn: "Rage!", spark: "Sparkler!", candle: "Roman candle!", fireball: "Fireballs!" };
+const PIECE_NAME: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen" };
+
+/** When each burn after a crowd move started on this device (a screen drawn again carries on, it doesn't restart). */
+const burnStarts = new Map<string, number>();
+function burnStart(key: string): number {
+  if (!key) return 0;
+  let t = burnStarts.get(key);
+  if (t === undefined) {
+    t = Date.now();
+    burnStarts.set(key, t);
+    if (burnStarts.size > 50) burnStarts.delete(burnStarts.keys().next().value!);
+  }
+  return t;
+}
 
 /** The boss at a glance: who it is, how scary, when it strikes next. Shown above the board all through the battle. */
 export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
@@ -102,7 +116,8 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   const tl = useMemo(() => bossIntroTimeline(history.length), [history.length]);
   const t = now - mountedAt;
   const plies = intro ? Math.max(0, Math.min(history.length, Math.floor((t - tl.replayAt) / Math.max(1, tl.step)))) : history.length;
-  const introFen = useMemo(() => (intro ? fenAfter(history.slice(0, plies)) : boss.board.fen), [intro, plies, boss.board.fen]);
+  const bases = boss.board.bases;
+  const introFen = useMemo(() => (intro ? fenAtPly(history, plies, bases) : boss.board.fen), [intro, plies, boss.board.fen]);
   const introLast = intro ? (plies > 0 ? history[plies - 1]! : null) : boss.board.lastMove;
   const showCard = intro && t < tl.replayAt;
   // A new boss battle: the God King starts afresh (he'll introduce himself on your first move). This device remembers
@@ -130,7 +145,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   useEffect(() => {
     if (intro || thinking || victim || funhouse || !boss.lastMove || history.length !== boss.board.ply) return;
     let live = true;
-    const before = fenAfter(history.slice(0, -1));
+    const before = fenAtPly(history, history.length - 1, bases);
     void Promise.all([match.evaluate(before), match.evaluate(boss.board.fen)]).then(([w0, w1]) => {
       if (!live || w0 === null || w1 === null) return;
       const swing = boss.crowdSide === "w" ? w1 - w0 : w0 - w1;
@@ -143,7 +158,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   // The boss takes your queen: its banner, face and roar.
   const tookQueen = !intro && !thinking && !victim && !funhouse && boss.lastMove?.captured === "q";
   // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
-  const slewQueen = !intro && !!thinking && !victim && lastMoveTookQueen(history);
+  const slewQueen = !intro && !!thinking && !victim && lastMoveTookQueen(history, bases);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
   const alone = match.standings().length === 1;
@@ -169,8 +184,20 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
   const unflipped = boss.crowdSide === "w" ? "white" : "black";
   const flippedView = unflipped === "white" ? "black" : "white";
   const orientation = fun ? (fun.flipped ? flippedView : unflipped) : intro ? unflipped : crowdOrientation(boss, boss.crowdSide);
-  const fenShown = fun && !fun.played ? fenAfter(history.slice(0, -1)) : introFen;
+  // G-REX's fire after the crowd's move (while the boss thinks): a piece left on a tile ablaze burns, shown on the
+  // board until its flare; a tile under the king fizzles. The God King's warning the first time a piece steps onto one.
+  const burnt = thinking && !intro && !victim ? (boss.powers?.burnt ?? []).filter((b) => b.turn === boss.crowdMoves) : [];
+  const burnAt = burnStart(burnt.length ? `${boss.id}:${boss.crowdMoves}:${boss.board.ply}` : "");
+  const burning = burnt.filter((b) => b.piece);
+  const stepped = boss.powers?.stepped ?? null;
+  useEffect(() => {
+    if (thinking && stepped !== null && stepped === boss.crowdMoves) kingSay("fireTile", `fire-tile-${boss.id}-${stepped}`);
+  }, [thinking, stepped]);
+  const fenPlain = fun && !fun.played ? fenAtPly(history, history.length - 1, bases) : introFen;
+  const fenShown = burning.length && now < burnAt + BURN.goneAt ? burning.reduce((f, b) => withPiece(f, b.square, { color: boss.crowdSide, type: b.piece! }), fenPlain) : fenPlain;
   const lastShown = fun ? (fun.played ? funMove?.move ?? introLast : null) : introLast;
+  const burnNames = burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
+  const burnLine = burnt.length && now < burnAt + BURN.ms ? (burning.length ? `${burnNames.charAt(0).toUpperCase()}${burnNames.slice(1)} burnt!` : "Your king is fireproof.") : null;
   return (
     <div class={`screen game boss-screen${victim ? " striking" : ""}`}>
       <Hud match={match} />
@@ -185,6 +212,7 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={fenShown} />}
             {!thinking && !victim && !alone && !funhouse && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
             <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
+            <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
             {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
             {slewQueen && (
               <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="bannerStart" />
@@ -242,6 +270,10 @@ export function BossScreen({ match, boss, until, thinking, intro }: { match: Gam
                 <strong class="bad">
                   💀 Struck down: {name(victim)}
                 </strong>
+              ) : burnLine ? (
+                <>
+                  🔥 <strong>{burnLine}</strong>
+                </>
               ) : thinking ? (
                 <>
                   <Dots /> <strong>The boss</strong> is thinking…

@@ -2,7 +2,9 @@
 // (?power=), played with real taps. Records every frame the browser paints (Chrome's screencast) around each power's
 // moment (the passive and the warning as the second turn begins, the ultimate on the third), saves stills and a GIF of
 // each moment, and prints a timeline of phases and moments.
-//   npm run frames:powers -- <out-dir> [gingerbread|clown|both] [phone|desktop|both] [light|dark]
+//   npm run frames:powers -- <out-dir> [gingerbread|clown|grex|all|both] [phone|desktop|both] [light|dark] [moves]
+// G-REX: his sparkler's tile through its stages, a piece left on it burning, a step onto a tile (the God King's
+// warning), the Roman candle (?power=candle) and its five waves of fireballs (12 crowd moves by default).
 // Read the frames before calling a power done (.claude/LESSONS.md: watch it frame by frame).
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -11,7 +13,7 @@ import { chromium, devices } from "@playwright/test";
 import { createServer } from "vite";
 import { Chess } from "chess.js";
 
-const [out = "power-frames", bossArg = "both", which = "both", scheme = "light"] = process.argv.slice(2);
+const [out = "power-frames", bossArg = "both", which = "both", scheme = "light", movesArg] = process.argv.slice(2);
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
 process.chdir("packages/app");
@@ -19,7 +21,9 @@ const server = await createServer({ root: ".", configFile: "vite.config.ts", ser
 await server.listen();
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();
-const ULT = { gingerbread: "blizzard", clown: "funhouse" };
+const ULT = { gingerbread: "blizzard", clown: "funhouse", grex: "candle" };
+// (G-REX before his art lands: ?wip=1 meets him with placeholders.)
+const WIP = { grex: "&wip=1" };
 
 async function run(boss, name, context) {
   const tag = `${boss}-${name}`;
@@ -31,7 +35,7 @@ async function run(boss, name, context) {
     frames.push({ t: f.metadata.timestamp * 1000, data: f.data });
     await cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => undefined);
   });
-  await p.goto(`${url}?debug&clock=60&nolanding&boss=${boss}&power=${ULT[boss]}`);
+  await p.goto(`${url}?debug&clock=60&nolanding&boss=${boss}&power=${ULT[boss]}${WIP[boss] ?? ""}`);
   await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const t0 = Date.now();
   const phase = () => p.evaluate(() => window.match?.phase.kind ?? null);
@@ -39,7 +43,8 @@ async function run(boss, name, context) {
     p.evaluate(() => {
       const m = window.match;
       const b = m?.boss;
-      return { kind: m?.phase.kind, until: m?.phase.until ?? 0, events: b?.powers?.events ?? [], turn: b?.powers?.turn, now: Date.now(), flipped: !!b?.powers?.flipped };
+      const burnt = (b?.powers?.burnt ?? []).filter((x) => x.turn === b.crowdMoves);
+      return { kind: m?.phase.kind, until: m?.phase.until ?? 0, thinking: !!m?.phase.thinking, events: b?.powers?.events ?? [], burnt, crowdMoves: b?.crowdMoves, turn: b?.powers?.turn, now: Date.now(), flipped: !!b?.powers?.flipped };
     });
   const waitFor = async (want, ms = 90_000) => {
     const t0 = Date.now();
@@ -51,16 +56,23 @@ async function run(boss, name, context) {
   };
   /** One crowd move, played with two taps (an allowed move: pieces first, a capture if there's one). */
   const move = async () => {
-    await waitFor(["play"]);
+    if (!(await waitFor(["play"], 60_000))) return false;
     await p.locator(".cc-banner", { hasText: "Round start" }).waitFor({ state: "detached", timeout: 15000 }).catch(() => undefined);
     await p.waitForTimeout(500);
-    const { allowed, fen, orientation } = await p.evaluate(() => {
+    const { allowed, fen, orientation, fire } = await p.evaluate(() => {
       const m = window.match;
       const fen = m.phase.board.fen;
-      return { allowed: m.boss?.powers?.allowed ?? null, fen, orientation: document.querySelector(".cg-wrap")?.classList.contains("orientation-black") ? "black" : "white" };
+      return { allowed: m.boss?.powers?.allowed ?? null, fen, fire: m.boss?.powers?.fire ?? [], orientation: document.querySelector(".cg-wrap")?.classList.contains("orientation-black") ? "black" : "white" };
     });
-    const options = allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
-    const pick = options[Math.floor(options.length / 3)] ?? options[0];
+    const chess = new Chess(fen);
+    let options = allowed ?? chess.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
+    // G-REX: leave a piece on a tile ablaze (to watch it burn), and step onto a burning tile when one's in reach.
+    const ablaze = fire.filter((t) => t.stage >= 3).map((t) => t.square);
+    const burning = fire.filter((t) => t.stage < 3).map((t) => t.square);
+    const onFire = ablaze.filter((sq) => { const pc = chess.get(sq); return pc && pc.color === chess.turn() && pc.type !== "k"; });
+    if (onFire.length) options = options.filter((m) => !onFire.includes(m.slice(0, 2))).length ? options.filter((m) => !onFire.includes(m.slice(0, 2))) : options;
+    const step = options.filter((m) => burning.includes(m.slice(2, 4)) && chess.get(m.slice(0, 2))?.type !== "k");
+    const pick = step[0] ?? options[Math.floor(options.length / 3)] ?? options[0];
     if (!pick) return;
     const board = await p.locator("cg-board").first().boundingBox();
     const flip = orientation === "black";
@@ -80,10 +92,18 @@ async function run(boss, name, context) {
   await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, everyNthFrame: 1 });
   const marks = [];
   // Three crowd moves (or four, to see the board flipped after the funhouse), watching each boss screen's moments.
-  for (let i = 0; i < 4; i++) {
-    await move();
+  const moves = Number(movesArg) || (boss === "grex" ? 12 : 4);
+  for (let i = 0; i < moves; i++) {
+    if ((await move()) === false) break;
     for (let k = 0; k < 400; k++) {
       const s = await state();
+      if (s.kind === "boss" && s.thinking && s.burnt.length) {
+        const key = `burn:${s.crowdMoves}`;
+        if (!marks.some((m) => m.key === key)) {
+          marks.push({ key, from: s.now - 500, to: s.now + 1700, kinds: [s.burnt.some((b) => b.piece) ? "burn" : "fizzle", `t${s.crowdMoves}`] });
+          console.log(`${tag} +${s.now - t0}ms ${key}: ${JSON.stringify(s.burnt)}`);
+        }
+      }
       if (s.kind === "boss" && s.events.length && s.until > s.now) {
         const key = `${s.turn}:${s.events.map((e) => e.kind).join("+")}`;
         if (!marks.some((m) => m.key === key)) {
@@ -99,7 +119,7 @@ async function run(boss, name, context) {
   await cdp.send("Page.stopScreencast");
   // Each moment: its frames, a few stills and a GIF.
   for (const m of marks) {
-    const name = `${tag}-${m.kinds.join("+")}`;
+    const name = `${tag}-${m.kinds.join("+")}${m.kinds.includes("fireball") ? `-t${m.key.split(":")[0]}` : ""}`;
     const dir = join(outDir, `${name}-frames`);
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
@@ -124,7 +144,7 @@ async function run(boss, name, context) {
   await p.close();
 }
 
-for (const boss of bossArg === "both" ? ["gingerbread", "clown"] : [bossArg]) {
+for (const boss of bossArg === "both" ? ["gingerbread", "clown"] : bossArg === "all" ? ["gingerbread", "clown", "grex"] : [bossArg]) {
   if (which !== "desktop") await run(boss, "phone", { ...devices["iPhone 13"] });
   if (which !== "phone") await run(boss, "desktop", { viewport: { width: 1440, height: 900 } });
 }

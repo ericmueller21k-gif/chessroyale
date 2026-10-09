@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type BossState, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type BossPowerSettings, type BossState, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   ablaze,
@@ -65,7 +65,7 @@ function battle(id: "gingerbread" | "clown" | "grex", fen: string, patch: Partia
   return { id, elo: 1500, crowdSide: "w", crowdMoves: 0, sinceKill: 0, kills: [], powers: initPowers(seed, fen, "w"), ...patch };
 }
 /** Turns 1..n begin, the position unchanged; `judged` after each crowd move. */
-function turns(b: BossState, fen: string, n: number, judged?: number, s = BOSS_POWERS): BossState[] {
+function turns(b: BossState, fen: string, n: number, judged?: number, s: BossPowerSettings = BOSS_POWERS): BossState[] {
   const out: BossState[] = [];
   for (let t = 1; t <= n; t++) {
     b = prepareTurn({ ...b, crowdMoves: t - 1, powers: { ...b.powers!, ...(judged !== undefined ? { judged } : {}) } }, fen, "", s);

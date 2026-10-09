@@ -85,6 +85,10 @@ describe("the God King's lines", () => {
     setKingFallen(true);
     expect(kingSay("queenDanger", "q", t, () => 0)).toBeNull();
     expect(kingSay("idle", "i", t + 20_000, () => 0)).toBeNull();
+    // Not even after a blizzard, nor on a burning tile (Eric, Oct 9).
+    expect(kingSay("blizzard", "b", t + 21_000, () => 0)).toBeNull();
+    expect(kingSay("blizzardKing", "bk", t + 22_000, () => 0)).toBeNull();
+    expect(kingSay("fireTile", "f", t + 23_000, () => 0)).toBeNull();
     expect(kingSay("lastWords", "last", t + 30_000, () => 0)).toBe("Finish… it… for me.");
     expect(kingSay("rise", "rise", t + 31_000, () => 0)).toBe("A god does not stay down.");
     // A new battle: he's back.

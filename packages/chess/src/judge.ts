@@ -9,10 +9,10 @@
  * reports are identical (the browser engine is deterministic: reports/judge-determinism.md).
  */
 import { DEFAULT_SETTINGS, botChoose, mulberry32 } from "@chessroyale/core";
-import { legalMoves } from "./rules.ts";
+import { legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { applyRecheck, recheckTargets, repliesFrom, type EngineLike, type RecheckSettings } from "./runner.ts";
-import { allowedSearch, jobAllows, judgeCandidates, judgeTop } from "./boss-powers.ts";
+import { allowedSearch, fireEscapes, fireRanked, jobAllows, judgeCandidates, judgeTop } from "./boss-powers.ts";
 
 /** The lobby's rules for the bots' picks (so every judge picks for them exactly as the lobby would). */
 export interface JudgeRules {
@@ -39,6 +39,12 @@ export interface JudgeJob {
    * the device searches them all (the second search).
    */
   allowed?: string[];
+  /**
+   * Boss battle, G-REX's fire: the tiles ablaze this turn (a crowd piece left on one burns after the move). The moves
+   * that save it are scored too, and the bots count a piece left there as gone; the scores themselves stay the
+   * engine's (the lobby's runner takes the fire off them, once, for everyone).
+   */
+  burn?: string[];
   /** No engine server: the device re-checks close calls itself, with these settings, `priority` moves first. */
   recheck?: RecheckSettings;
   priority?: string[];
@@ -69,7 +75,7 @@ export interface JudgedBoard {
 
 /** The bots' picks, from the top moves (or the allowed search: see judgeCandidates) and the job's seed: the same on every device and in the lobby. */
 export function judgeBotPicks(job: JudgeJob, top: readonly MoveScore[], extra: readonly MoveScore[] = []): { picks: string[]; powerUps: number[] } {
-  const t = judgeCandidates(job, top, extra);
+  const t = fireRanked(judgeCandidates(job, top, extra), job.fen, job.burn ?? [], sideToMove(job.fen));
   const best = t[0]?.expected ?? 0.5;
   const candidates = t.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
   const all = legalMoves(job.fen).filter((m) => jobAllows(job, m));
@@ -106,9 +112,14 @@ export async function runQuickJob(engine: EngineLike, job: JudgeJob, top?: Promi
   const open = await allowedSearch(engine, job, all);
   if (open) return { top: all, extra: open };
   const bots = judgeBotPicks(job, all);
-  const missing = outsideTop(all, [...job.picks, ...bots.picks]);
+  const missing = outsideTop(all, [...job.picks, ...bots.picks, ...jobEscapes(job)]);
   const extra = missing.length ? await engine.scoreMoves(job.fen, missing) : [];
   return { top: all, extra };
+}
+
+/** G-REX's fire: the moves that take a piece off a tile ablaze (scored too, so saving it is always on the table). */
+export function jobEscapes(job: Pick<JudgeJob, "fen" | "burn" | "allowed" | "barred">): string[] {
+  return job.burn?.length ? fireEscapes(job.fen, job.burn).filter((m) => jobAllows(job, m)) : [];
 }
 
 /** The moves the job's re-check searches, from its quick report (none: no re-check, or no close calls). */
@@ -198,7 +209,7 @@ export function boardsAgree(a: JudgedBoard, b: JudgedBoard, tolerance = 0): { ag
 /** Every move the engine server should score to settle a disagreement: everything either judge scored, and every pick. */
 export function verdictMoves(job: JudgeJob, reports: readonly (JudgeReport | null)[], boards: readonly (JudgedBoard | null)[]): string[] {
   const legal = new Set(legalMoves(job.fen));
-  const moves = new Set<string>(job.picks);
+  const moves = new Set<string>([...job.picks, ...jobEscapes(job)]);
   for (const r of reports) for (const m of [...(Array.isArray(r?.top) ? r!.top : []), ...(Array.isArray(r?.extra) ? r!.extra : [])]) if (m && legal.has(m.move)) moves.add(m.move);
   for (const b of boards) for (const m of [...(b?.botPicks ?? []), ...Object.keys(b?.expectedAfter ?? {})]) moves.add(m);
   if (job.barred && moves.size > 1) moves.delete(job.barred);

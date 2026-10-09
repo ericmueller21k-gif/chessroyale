@@ -1,5 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
+import { BOSS_POWERS } from "@chessroyale/core";
+import { account } from "../account.ts";
 import type { GameView, StrikeState } from "../game.ts";
 import { kingLine, kingSay, setKingFallen, type KingCue } from "../godKing.ts";
 import { play } from "../sound.ts";
@@ -84,6 +86,7 @@ export function BossDock({
     if (!ready) setMenu(false);
   }, [ready]);
   return (
+    <>
     <div class="boss-dock">
       <div class={`history-nav boss-dock-main${view?.browsing ? " browsing" : ""}`}>
         <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
@@ -133,6 +136,36 @@ export function BossDock({
         }}
       />
     </div>
+    <UltimateTest match={match} />
+    </>
+  );
+}
+
+/**
+ * Testing, admins only (ADMIN_EMAILS, as for the fair-play review; online the server checks too): a small plain button
+ * that brings the boss's ultimate as the next crowd turn begins, without the warning. Greyed out once it's on its way
+ * or spent. BOSS_POWERS.ultimateTestButton false removes it.
+ */
+export function UltimateTest({ match }: { match: GameView }) {
+  const boss = match.boss;
+  const p = boss?.powers;
+  const key = boss ? `${boss.id}:${boss.startMove}:${boss.board.generation}` : "";
+  const [pressed, setPressed] = useState("");
+  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result) return null;
+  const spent = p.ultAt !== null;
+  const coming = !spent && (!!p.ultNext || p.warned || pressed === key);
+  return (
+    <button
+      type="button"
+      class="ult-test"
+      disabled={spent || coming}
+      onClick={() => {
+        setPressed(key);
+        match.triggerUltimate();
+      }}
+    >
+      {spent ? "Ultimate used (testing)" : coming ? "Ultimate next turn (testing)" : "Trigger ultimate (testing)"}
+    </button>
   );
 }
 

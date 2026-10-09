@@ -81,6 +81,8 @@ export interface Settings {
   bossPowerTest: string;
   /** Solo's difficulty (BOSS_DIFFICULTY): Elo on top of the boss's strength, within what the engine plays (0 online). */
   bossDifficulty: number;
+  /** Testing, solo only (?wip=1): `bossId` may be a boss whose powers are built but whose art isn't yet (placeholders). */
+  bossUnfinished: boolean;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
   /** Boss battle: how long the King's strike takes on screen (ms). The move clock stands still meanwhile. */
@@ -284,6 +286,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bossAvoid: "",
   bossPowerTest: "",
   bossDifficulty: 0,
+  bossUnfinished: false,
   kingStrikeLoss: [5, 15],
   kingStrikeMs: 5900,
   kingPowerUpsPerCharge: 10,
