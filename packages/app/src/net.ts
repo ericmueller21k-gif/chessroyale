@@ -33,6 +33,7 @@ import {
   type JudgeJob,
   type JudgeReport,
   judgeTaps,
+  lightsDeadline,
   lightsOutTimeline,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
@@ -821,20 +822,22 @@ export class NetMatch implements GameView {
     const side = this.boss.crowdSide === "w" ? "b" : "w";
     const mine = l.view.rounds.map((r, i) => {
       const j = judgeTaps(r, fen, side, l.taps[i] ?? []);
-      return { found: j.found, wrong: j.wrong };
+      return { found: j.found, wrong: j.wrong, used: j.used };
     });
     this.setPhase({ kind: "boss", boss: this.boss, until: 0, lights: { ...l.view, mine } });
   }
   lightsTap(square: string) {
     const l = this.lights;
     if (!l || this.phase.kind !== "boss" || !this.phase.lights || !this.boss) return;
-    const now = Date.now();
+    // The round on (the first not over), while it's open for you: your own deadline (a second more for each tap) and
+    // a try left (one per piece). The server checks the same.
+    const t = Date.now() - l.view.at;
     const tl = lightsOutTimeline(l.view.rounds, this.settings.lateGraceMs);
-    const i = tl.rounds.findIndex((r) => now >= l.view.at + r.at - 300 && now <= l.view.at + r.answersAt);
+    const i = tl.rounds.findIndex((r) => !r.over);
+    const r = tl.rounds[i];
     const taps = l.taps[i];
-    const mine = this.phase.lights.mine[i];
-    if (!taps || !mine || l.view.rounds[i]!.answers || taps.includes(square)) return;
-    if (mine.found.length + mine.wrong.length >= l.view.rounds[i]!.pieces.length) return;
+    if (!r || !taps || taps.includes(square) || taps.length >= l.view.rounds[i]!.pieces.length) return;
+    if (t < r.at - 300 || t > lightsDeadline(r, taps.length) + this.settings.lateGraceMs) return;
     taps.push(square);
     this.send({ t: "lightsTap", key: l.key, round: i, square });
     this.showLights();

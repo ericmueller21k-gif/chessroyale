@@ -159,9 +159,12 @@ describe("Hollow, the Darkness boss", () => {
     for (const m of ["move", "thinking"] as Beat[]) expect(kit.chance[m]!).toBeLessThanOrEqual(0.15);
     expect(pickLine(kit, "darkFirst", "dark:1")).toBe("Don't forget what's there. Forgetting costs.");
     expect(pickLine(kit, "ultimate", "ult:9")).toBe("It's time.");
+    expect(findLine([{ type: "q" }])).toBe("Find my queen.");
+    expect(findLine([{ type: "r", several: true }])).toBe("Find one of my rooks.");
+    expect(findLine([{ type: "q" }, { type: "n", several: true }])).toBe("Find my queen and one of my knights.");
+    expect(findLine([{ type: "k" }, { type: "b" }, { type: "p", file: "c" }])).toBe("Find my king, my bishop and my pawn on the c-file.");
+    expect(findLine([{ type: "p", file: "c", several: true }])).toBe("Find one of my pawns on the c-file.");
     expect(findLine(["q"])).toBe("Find my queen.");
-    expect(findLine(["r", "n"])).toBe("Find my rook and my knight.");
-    expect(findLine(["k", "b", "p"])).toBe("Find my king, my bishop and my pawn.");
   });
 
   it("sounds no louder than a piece's move, and the same every time", () => {

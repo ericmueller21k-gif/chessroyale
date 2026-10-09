@@ -1,3 +1,4 @@
+import { BOSS_POWERS } from "@chessroyale/core";
 import { fenAtPly, pieceAt, type Base } from "./rules.ts";
 
 /**
@@ -72,15 +73,34 @@ export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; fi
  */
 export const LIGHTS_OUT = { dropAt: 1300, dropMs: 2900, gapMs: 300, answerMs: 1800, backMs: 2300 } as const;
 
-/** Lights out's beats for its rounds' seconds (`ms` each) and the late grace on each round. */
-export function lightsOutTimeline(rounds: readonly { ms: number }[], graceMs: number) {
+/**
+ * Lights out's beats for its rounds' seconds (`ms` each) and the late grace on each round. A round is over when every
+ * player is done (lightsRoundEnd: each tap gives its player a second more); once it is, `endedAt` (ms from the test's
+ * start) says when, and the next round follows its answers. Until then its end is the earliest it can be: its seconds
+ * and the grace (`over` false).
+ */
+export function lightsOutTimeline(rounds: readonly { ms: number; endedAt?: number }[], graceMs: number) {
   let t = LIGHTS_OUT.dropAt + LIGHTS_OUT.dropMs + LIGHTS_OUT.gapMs;
   const out = rounds.map((r) => {
-    const round = { at: t, until: t + r.ms, answersAt: t + r.ms + graceMs };
+    const round = { at: t, until: t + r.ms, answersAt: r.endedAt ?? t + r.ms + graceMs, over: r.endedAt !== undefined };
     t = round.answersAt + LIGHTS_OUT.answerMs;
     return round;
   });
   return { rounds: out, backAt: t, total: t + LIGHTS_OUT.backMs };
+}
+
+/** A player's own deadline in a round (ms from the test's start, before the late grace): its seconds, and a second more for each tap they've made. */
+export const lightsDeadline = (round: { until: number }, taps: number, tapMs: number = BOSS_POWERS.lightsOutTapMs): number => round.until + taps * tapMs;
+
+/**
+ * When a Lights out round is over (ms from the test's start): when every player is done, each once they've used all
+ * their tries (`pieces`: at their last one) or their own time is up (lightsDeadline, and the late grace). `taps`: each
+ * player's tap times in the round (ms from the test's start), in order. Nobody tapping: its seconds and the grace.
+ */
+export function lightsRoundEnd(round: { until: number }, pieces: number, taps: readonly (readonly number[])[], graceMs: number, tapMs: number = BOSS_POWERS.lightsOutTapMs): number {
+  const base = round.until + graceMs;
+  if (!taps.length) return base;
+  return Math.max(...taps.map((t) => (t.length >= pieces ? t[pieces - 1]! : base + t.length * tapMs)));
 }
 
 /**

@@ -518,6 +518,11 @@ export const BOSS_POWERS = {
     { pieces: 2, ms: 4000 },
     { pieces: 3, ms: 5000 },
   ] as readonly { pieces: number; ms: number }[],
+  /**
+   * Each tap a player makes in a round, right or wrong, adds this long to their own countdown (Eric, Oct 9). Their
+   * tries stay the number of pieces, so a round gives at most that many seconds more.
+   */
+  lightsOutTapMs: 1000,
   /** Each piece not found (a wrong square, or out of time) costs this many points. */
   lightsOutMiss: 10,
   /** Bots in the crowd find each piece with this chance, round by round (from the seed): fewer as the rounds get harder. */

@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { LIGHTS_OUT, lightsOutTimeline } from "@chessroyale/chess";
+import { LIGHTS_OUT, lightsDeadline, lightsOutTimeline } from "@chessroyale/chess";
 import { bossKit } from "../characters/kits.ts";
 import { animLength, cueAt, lightsOutSmashes, lightsOutSpot, nightItems, nightWarmList, type NightState, type SquareItem } from "../characters/power-art.ts";
 import { findLine } from "../characters/hollow.ts";
@@ -14,9 +14,10 @@ import { TimerBar } from "./Countdown.tsx";
 /**
  * Hollow's Lights out on the board, from the shared state (the server's test and timing, solo's alike): the game paused,
  * nobody's clock running. His banner; he leaves his corner for his spot above the board and smashes his strand in three
- * strikes, a section at a time, the board dimming a step at each, night at the last. Then each round: he names his pieces ("Find my queen."), a bar
- * counts its seconds down, and every square takes a tap: a piece found flashes back into view; a wrong square gets his
- * red-violet slash. At the round's end the answers show (gold), the pieces not found cost lightsOutMiss each, and the
+ * strikes, a section at a time, the board dimming a step at each, night at the last. Then each round: he names his
+ * pieces ("Find my queen."), a bar counts your seconds down (each tap, right or wrong, gives you a second more: the bar
+ * bumps back up with a "+1s"), and every square takes a tap: a piece found flashes back into view; a wrong square gets
+ * his red-violet slash. The round is over once everyone has used their tries or run out of time. At the round's end the answers show (gold), the pieces not found cost lightsOutMiss each, and the
  * night closes over them again. Then a fresh strand spills from the void, the light spreads out from him across the
  * board, and he goes back to his corner to play his move. The dark squares from before are still there.
  */
@@ -45,14 +46,21 @@ function squareAtPoint(el: Element, x: number, y: number, orientation: "white" |
   return orientation === "white" ? `${"abcdefgh"[col]}${8 - row}` : `${"abcdefgh"[7 - col]}${row + 1}`;
 }
 
-/** Where Lights out stands at `now`: the round on (or whose answers show), and what the dock says. */
+/**
+ * Where Lights out stands at `now`: the round on (or whose answers show); whether it's open for you (your own time,
+ * a second more for each tap, and tries left) or you're waiting for the others; your deadline in it; the lights back.
+ */
 export function lightsBeat(lights: LightsView, graceMs: number, now: number) {
   const tl = lightsOutTimeline(lights.rounds, graceMs);
   const t = now - lights.at;
-  const i = tl.rounds.findIndex((r) => t < r.answersAt + LIGHTS_OUT.answerMs);
+  const i = tl.rounds.findIndex((r) => !r.over || t < r.answersAt + LIGHTS_OUT.answerMs);
   const round = i >= 0 && t >= tl.rounds[i]!.at ? i : -1;
-  const open = round >= 0 && t < tl.rounds[round]!.answersAt;
-  return { tl, t, round, open, back: t >= tl.backAt };
+  const tr = round >= 0 ? tl.rounds[round]! : null;
+  const used = round >= 0 ? (lights.mine[round]?.used ?? (lights.mine[round]?.found.length ?? 0) + (lights.mine[round]?.wrong.length ?? 0)) : 0;
+  const deadline = tr ? lightsDeadline(tr, used) : 0;
+  const live = !!tr && !tr.over;
+  const open = live && t < deadline + graceMs && used < lights.rounds[round]!.pieces.length;
+  return { tl, t, round, open, waiting: live && !open, used, deadline, back: t >= tl.backAt };
 }
 
 /** The pieces this player has missed so far (rounds over: not found), each costing lightsOutMiss. */
@@ -71,7 +79,8 @@ export function lightsStatus(lights: LightsView, graceMs: number, now: number): 
   if (b.round < 0) return { line: <strong>Lights out!</strong>, sub: "Clocks stopped." };
   const r = lights.rounds[b.round]!;
   const mine = lights.mine[b.round] ?? { found: [], wrong: [] };
-  if (b.open) return { line: <strong>{findLine(r.pieces)}</strong>, sub: `${mine.found.length}/${r.pieces.length} found` };
+  if (b.open) return { line: <strong>{findLine(r.targets ?? r.pieces)}</strong>, sub: `${mine.found.length}/${r.pieces.length} found` };
+  if (b.waiting) return { line: <strong>{findLine(r.targets ?? r.pieces)}</strong>, sub: `${mine.found.length}/${r.pieces.length} found · waiting for the others` };
   const missed = r.pieces.length - mine.found.length;
   return { line: <strong>{missed ? `Missed ${missed}: −${missed * cost}` : r.pieces.length > 1 ? "Found them all!" : "Found it!"}</strong>, sub: `Round ${b.round + 1} of ${lights.rounds.length}` };
 }
@@ -81,7 +90,7 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
   // The night is drawn ahead, a slice a frame, from when he drops in (its first showing never stalls a phone).
   useEffect(() => prewarm("nightSquare", nightWarmList()), [lights.key]);
   if (!kit?.ch.anims.lightsOut || !kit.ch.anims.lightsBack) return null;
-  const { tl, t, round, open, back } = lightsBeat(lights, graceMs, now);
+  const { tl, t, round, open, used, deadline, back } = lightsBeat(lights, graceMs, now);
   const at = lights.at;
   const out = kit.ch.anims.lightsOut;
   const backAnim = kit.ch.anims.lightsBack;
@@ -105,7 +114,7 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
     const r = lights.rounds[latest]!;
     const tr = tl.rounds[latest]!;
     const mine = lights.mine[latest] ?? { found: [], wrong: [] };
-    const ends = at + tr.answersAt;
+    const ends = tr.over ? at + tr.answersAt : Infinity;
     for (const sq of mine.found) shown.push({ square: sq, at: firstSeen(`${lights.key}:${latest}:found:${sq}`, now), kind: "found" });
     for (const sq of mine.wrong) {
       const since = firstSeen(`${lights.key}:${latest}:wrong:${sq}`, now);
@@ -131,7 +140,7 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
     if (t < tr.at) return;
     const secs = Math.round(lights.rounds[i]!.ms / 1000);
     anim = { name: kit.ch.anims[`test${secs}`] ? `test${secs}` : "lightsTest", since: at + tr.at, then: "lightsTest" };
-    if (t >= tr.answersAt) {
+    if (tr.over && t >= tr.answersAt) {
       const missed = lights.rounds[i]!.pieces.length - (lights.mine[i]?.found.length ?? 0);
       anim = { name: missed ? "testMiss" : "testFound", since: at + tr.answersAt, then: "lightsTest" };
     }
@@ -141,10 +150,12 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
   // His words over the board's top-left, in his pixel text box: "It's time.", each round's prompt, the lights back.
   const line =
     back ? { text: (pickLine(kit, "lightsBack", `${lights.key}:back`) ?? kit.lines.lightsBack?.[0]) || "Remember that.", at: at + tl.backAt + 300 }
-    : round >= 0 ? { text: findLine(lights.rounds[round]!.pieces), at: at + tl.rounds[round]!.at }
+    : round >= 0 ? { text: findLine(lights.rounds[round]!.targets ?? lights.rounds[round]!.pieces), at: at + tl.rounds[round]!.at }
     : t >= LIGHTS_OUT.dropAt ? { text: kit.lines.ultimate?.[0] ?? "It's time.", at: at + LIGHTS_OUT.dropAt + 200 }
     : null;
   const tr = round >= 0 ? tl.rounds[round]! : null;
+  // Each tap gives you a second more: "+1s" flashes by the bar as it bumps back up.
+  const bumpAt = open && used > 0 ? firstSeen(`${lights.key}:${round}:tap:${used}`, now) : 0;
   return (
     <>
       {items.length > 0 && (
@@ -177,7 +188,12 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
           {line.text.slice(0, Math.min(line.text.length, Math.floor((now - line.at) / 28) + 1))}
         </div>
       )}
-      {tr && open && <TimerBar startsAt={at + tr.at} deadline={at + tr.until} total={tr.until - tr.at} />}
+      {tr && open && <TimerBar startsAt={at + tr.at} deadline={at + deadline} total={tr.until - tr.at} />}
+      {bumpAt > 0 && now < bumpAt + 800 && (
+        <span key={`bump-${round}-${used}`} class="lo-plus" aria-hidden="true">
+          +1s
+        </span>
+      )}
       {open && (
         <div
           class="lo-taps"

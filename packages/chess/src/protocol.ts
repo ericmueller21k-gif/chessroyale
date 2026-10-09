@@ -1,4 +1,4 @@
-import type { BurnEvent, PowerEvent, PowerId } from "@chessroyale/core";
+import type { BurnEvent, LightsOutTarget, PowerEvent, PowerId } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
@@ -275,10 +275,13 @@ export interface NetBossPowers {
 export interface NetLightsOut {
   key: string;
   at: number;
-  /** Each round: the pieces he names (piece letters), its seconds, and once it's over, the squares that answered it. */
-  rounds: { pieces: string[]; ms: number; answers?: string[] }[];
-  /** This player's taps judged, round by round: the squares found and the wrong ones. */
-  mine: { found: string[]; wrong: string[] }[];
+  /**
+   * Each round: the pieces he names (piece letters, and what exactly: `targets`), its seconds, and once it's over, when
+   * (`endedAt`, ms from `at`: every player done, see lightsRoundEnd) and the squares that answered it.
+   */
+  rounds: { pieces: string[]; targets?: LightsOutTarget[]; ms: number; answers?: string[]; endedAt?: number }[];
+  /** This player's taps judged, round by round: the squares found and the wrong ones, and how many tries used (each a second more). */
+  mine: { found: string[]; wrong: string[]; used?: number }[];
   /** Once the lights are back: the pieces this player missed in all (each cost lightsOutMiss). */
   missed?: number;
 }

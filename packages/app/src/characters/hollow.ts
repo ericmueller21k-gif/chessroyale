@@ -15,6 +15,7 @@
  * `bulbs0`) puts a colour out (about a third of the strand) without redrawing anything, and their glints are specks in
  * the same keys (an unlit bulb never glints).
  */
+import type { LightsOutTarget } from "@chessroyale/core";
 import type { Beat } from "./boss-beats.ts";
 import { canvas, ellipse, line, poly, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
@@ -1172,11 +1173,18 @@ export const HOLLOW_CHANCE: Partial<Record<Beat, number>> = {
 
 const PIECE_WORD: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 /**
- * The test's prompt, naming the pieces he hides in a round (piece letters, "q", "n"…): "Find my queen.", "Find my rook
- * and my knight.", "Find my king, my bishop and my pawn." A type named twice is said twice ("my knight and my knight").
+ * The test's prompt, naming what he hides in a round (Eric, Oct 9): a type ("my queen"; he has several: "one of my
+ * rooks", any counts), or a pawn by its file ("my pawn on the c-file"; a last resort with several there: "one of my
+ * pawns on the c-file"). "Find my queen.", "Find my queen and one of my rooks.", "Find my knight, my bishop and my pawn
+ * on the c-file." A bare piece letter (an older round) reads as "my <piece>".
  */
-export function findLine(pieces: readonly string[]): string {
-  const names = pieces.map((p) => `my ${PIECE_WORD[p.toLowerCase()] ?? "piece"}`);
+export function findLine(targets: readonly (string | LightsOutTarget)[]): string {
+  const names = targets.map((x) => {
+    const t = typeof x === "string" ? { type: x } : x;
+    const word = PIECE_WORD[t.type.toLowerCase()] ?? "piece";
+    const what = t.several ? `one of my ${word}s` : `my ${word}`;
+    return t.file ? `${what} on the ${t.file}-file` : what;
+  });
   const list = names.length <= 1 ? (names[0] ?? "my pieces") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
   return `Find ${list}.`;
 }

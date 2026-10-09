@@ -10895,6 +10895,32 @@ img.qicon {
   max-width: 34%;
   z-index: 11;
 }
+/* Lights out: each tap gives you a second more; "+1s" pops up by the bar as it bumps back up. */
+.lo-plus {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  z-index: 10;
+  pointer-events: none;
+  font: 700 clamp(13px, 3.6vw, 18px) / 1 "Press Start 2P", ui-monospace, monospace;
+  color: #c9b3ff;
+  text-shadow: 0 2px 0 #160c2a, 0 0 8px rgba(156, 108, 255, 0.8);
+  animation: lo-plus 800ms ease-out both;
+}
+@keyframes lo-plus {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(1);
+  }
+}
 .lo-taps {
   position: absolute;
   top: 0;
