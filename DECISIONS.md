@@ -3280,7 +3280,8 @@ don't replace the strike.
 
 **Fix: the God King stays silent after falling** in his Last Stand, the blizzard's line included.
 
-**G-REX, the Fire boss** (`grex` in the roster; his art, lines and sounds are the `characters` delegate's)
+**G-REX, the Fire boss** (`grex` in the roster; his art, lines and sounds are the `characters` delegate's). **Playable
+now** in every boss mode, with his art and powers both in; the random draw is among three bosses.
 - **Passive, burning tiles:** with no fire tile on the board, from the crowd's 2nd turn, he throws a sparkler onto a
   random square on the crowd's half (empty or occupied, never their king's). It burns in three stages, one a crowd
   turn: a singe, more burn, ablaze. After the crowd's move on the ablaze turn, a crowd piece still on it is destroyed
@@ -3305,7 +3306,13 @@ don't replace the strike.
   check the boss, doesn't burn (the tile fizzles). A rook burnt in its corner takes its castling right.
 - **Timing:** the sparkler 2.3 s (banner, his throw from the board's corner, the sparkler's flight, the tile catching),
   the warning 1.7 s, the candle 5 s, a wave of fireballs 1.7 s; all before the crowd's clock starts, as every power's.
-  A piece burning plays as the boss's turn begins (1.4 s; the boss's move waits for it, solo and online).
+  A piece burning plays as the boss's turn begins (1.5 s, the characters' `pieceBurn` over the tile's burn-out; the
+  boss's move waits for it, solo and online); a tile under the king fizzles, an empty one burns out.
+- **On screen:** his `ignite` at the board's corner for the sparkler (`sparkFly`, then the tile's `ignite`); every tile
+  on one canvas over the board through its stages (`spread2`, `spread3` as a turn begins); for the candle he drops onto
+  the middle of the board (`romanCandle`), each `launch`/`shot` cue sends a `candleShot` up, and the `candleShots`
+  strip by the board's top edge shows the shots still up until the last fireball lands; fireballs fall (`fireballFall`)
+  a little after one another and land as stage-1 tiles while he laughs at the corner (his `ultimateHit` lines).
 
 **Calls I made (Eric may want to change)**
 - The meter's rates: full after 20 crowd moves on its own, twice as fast with the crowd well ahead.
@@ -3328,13 +3335,15 @@ don't replace the strike.
   early, leaving a piece on a tile ablaze and stepping onto a burning one, and saves every frame of each moment and
   burn (`all` runs every boss).
 - Test switches: `?boss=grex&power=candle` (warned as the 2nd turn begins, the candle on the 3rd; the sparkler on the
-  2nd), `?power=sparkler`; `?wip=1` (solo) meets a boss whose powers are built before its art is, with placeholders.
+  2nd), `?power=sparkler`; `?boss=<id>&wip=1` (solo only) meets a boss whose powers are built before its art is (its
+  emoji face; that's how G-REX was built before his art landed).
 - `npm run perf:boss -- <dir> grex phone 25 candle`; `e2e/perf.spec.ts` checks G-REX's tiles at the barrage's peak late
   in a long game on a slowed phone.
 - Tests: `packages/chess/test/grex.test.ts` (the meter's rates and switch, the trigger's safety, the tiles' stages, the
   king fireproof, judging, the 12-fireball schedule, the once-a-match warning, bases, difficulty),
   `packages/server/test/boss-powers-lobby.test.ts` (the trigger online: admins only; G-REX online),
-  `packages/core/test/boss.test.ts` and `packages/app/test/boss-difficulty.test.ts` (difficulty), `e2e/grex.spec.ts`
+  `packages/core/test/boss.test.ts` and `packages/app/test/boss-difficulty.test.ts` (difficulty),
+  `packages/app/test/fire-replays.test.ts` (replays after a burn), `e2e/grex.spec.ts`
   (G-REX on phone and desktop with the candle; the trigger shown for an admin, hidden otherwise).
 
 ## The God King, redrawn as pixel art (Oct 8, 2026)
