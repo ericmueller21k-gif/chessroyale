@@ -4112,13 +4112,10 @@ button.history-label {
 .gk-unit-btn:disabled {
   opacity: 1;
 }
+/* He stays in full colour whether or not he can be summoned, and once his moves are used (Eric, Oct 9): the crowns
+   under him say what's left. */
 .gk-unit:not(.ready) .god-king {
-  filter: saturate(0.6) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
-  opacity: 0.75;
-}
-.gk-unit.spent .god-king {
-  filter: grayscale(1);
-  opacity: 0.5;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
 }
 .gk-unit.away .gk-unit-btn {
   opacity: 0;
@@ -9799,6 +9796,13 @@ img.qicon {
 }
 .boss-bar.has-char .boss-icon-face {
   display: none;
+}
+/* A tall boss (G-REX's long neck): the bar grows to hold him, so his head never covers the heading above it. */
+.boss-char.place-bar.tall {
+  height: 88px;
+}
+.boss-char.place-results.tall {
+  height: 180px;
 }
 /* A computer: by the board's bottom-left corner (the God King is by its top-right). */
 .boss-side {

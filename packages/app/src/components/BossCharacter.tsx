@@ -127,7 +127,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   const { ch } = kit;
   const line = beat.line && now - since < SPEECH_MS ? beat.line : null;
   return (
-    <div ref={box} class={`boss-char place-${place}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1] }}>
+    <div ref={box} class={`boss-char place-${place}${kit.tall ? " tall" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1] }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {line && <CharBubble key={beat.key} text={line} at={since} now={now} />}
     </div>
