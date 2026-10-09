@@ -2,8 +2,9 @@ import { expect, type Page } from "@playwright/test";
 import { named, test } from "./helpers.ts";
 
 /**
- * Light or dark, and the computer's home with its queue in place (DECISIONS.md, "Light and dark, a switch" and "A
- * cleaner computer home"). This device is in dark mode: the app follows it until someone picks.
+ * Light or dark, and the computer's home with its queue in place (DECISIONS.md, "Light and dark, a switch", "A cleaner
+ * computer home" and "The computer's play column, your icon, no sun"). This device is in dark mode: the app follows it
+ * until someone picks.
  */
 test.use({ colorScheme: "dark" });
 
@@ -15,7 +16,7 @@ const bg = (p: Page, sel: string) => p.locator(sel).first().evaluate((el) => get
 const LIGHT_GROUND = "rgb(244, 242, 238)";
 const DARK_GROUND = "rgb(20, 22, 27)";
 
-test("light or dark: the sun switches, the pick survives a reload with no flash, Settings has Match device / Light / Dark", async ({ page }) => {
+test("light or dark lives in Settings (Match device / Light / Dark), not on home; the pick survives a reload with no flash", async ({ page }) => {
   await named(page, "Sunny");
   // Every value <html data-theme> takes, from the very start of each load (before the page's own scripts).
   await page.addInitScript(() => {
@@ -26,40 +27,30 @@ test("light or dark: the sun switches, the pick survives a reload with no flash,
   });
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-  // Nothing picked: the device's dark, and the sun is the black one.
+  // Nothing picked: the device's dark. No sun on home (Eric, Oct 9): not in the side menu, not in the phone's top bar.
   expect(await shown(page)).toBe("dark");
-  const sun = page.getByRole("button", { name: "Dark mode" });
-  await expect(sun).toHaveCount(1);
-  await expect(sun).toHaveAttribute("aria-pressed", "true");
-  const box = (await sun.boundingBox())!;
-  expect(box.width).toBeGreaterThanOrEqual(44);
-  expect(box.height).toBeGreaterThanOrEqual(44);
-  if (desktop()) {
-    // The computer: its own small button in the side menu, just above Settings (now a gear).
-    const menu = page.getByRole("navigation", { name: "Menu" });
-    await expect(menu.getByRole("button", { name: "Dark mode" })).toBeVisible();
-    const settings = (await menu.getByRole("button", { name: "Settings" }).boundingBox())!;
-    expect(box.y + box.height).toBeLessThanOrEqual(settings.y + 1);
-    expect(settings.y - (box.y + box.height)).toBeLessThan(24);
-  } else {
-    // A phone: the home's top bar, by your coins and pawn.
-    await expect(page.locator(".fd-top").getByRole("button", { name: "Dark mode" })).toBeVisible();
-    await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile" })).toBeVisible();
-  }
+  await expect(page.locator(".fd-theme")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Dark mode" })).toHaveCount(0);
   expect(await bg(page, ".fd-root")).toBe(DARK_GROUND);
 
-  // Tap: light, forced on a dark device.
-  await sun.click();
+  // Settings: Theme, Match device checked.
+  await page.goto("/settings");
+  const themeChoice = page.getByRole("radiogroup", { name: "Theme" });
+  await expect(themeChoice.getByRole("radio")).toHaveText(["Match device", "Light", "Dark"]);
+  await expect(themeChoice.getByRole("radio", { name: "Match device" })).toHaveAttribute("aria-checked", "true");
+  for (const r of await themeChoice.getByRole("radio").all()) expect((await r.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // Light, forced on a dark device.
+  await themeChoice.getByRole("radio", { name: "Light" }).click();
   expect(await shown(page)).toBe("light");
-  await expect(sun).toHaveAttribute("aria-pressed", "false");
   expect(await bg(page, ".fd-root")).toBe(LIGHT_GROUND);
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bg").trim())).toBe("#f3f1ec");
 
-  // Reload: light from the first moment (the script in index.html), never dark on the way.
+  // Home, reloaded: light from the first moment (the script in index.html), never dark on the way.
+  await page.goto("/");
   await page.reload();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as any).__themes)).toEqual(["light"]);
-  await expect(page.getByRole("button", { name: "Dark mode" })).toHaveAttribute("aria-pressed", "false");
+  expect(await bg(page, ".fd-root")).toBe(LIGHT_GROUND);
 
   // Every front-door page honours it, and the game's colours too.
   for (const path of ["/settings", "/profile", "/shop"]) {
@@ -68,12 +59,9 @@ test("light or dark: the sun switches, the pick survives a reload with no flash,
     expect(await bg(page, ".fd-root"), path).toBe(LIGHT_GROUND);
   }
 
-  // Settings: Theme, with the pick checked.
-  await page.goto("/settings");
-  const themeChoice = page.getByRole("radiogroup", { name: "Theme" });
-  await expect(themeChoice.getByRole("radio")).toHaveText(["Match device", "Light", "Dark"]);
-  await expect(themeChoice.getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
   // Match device: dark again (the device), and it follows the device live.
+  await page.goto("/settings");
+  await expect(themeChoice.getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
   await themeChoice.getByRole("radio", { name: "Match device" }).click();
   expect(await shown(page)).toBe("dark");
   expect(await bg(page, ".fd-root")).toBe(DARK_GROUND);
@@ -88,10 +76,93 @@ test("light or dark: the sun switches, the pick survives a reload with no flash,
   await expect(page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
   expect(await shown(page)).toBe("dark");
   expect(await page.evaluate(() => (window as any).__themes)).toEqual(["dark"]);
-  // Back home, the sun agrees with Settings.
+  // Back home: dark.
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Dark mode" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  expect(await bg(page, ".fd-root")).toBe(DARK_GROUND);
   expect(await sideways(page)).toBe(0);
+});
+
+test("computer: the play column is Play with friends | Boss alone, the mode picker, then PLAY at the bottom; no Shop or Profile buttons", async ({ page }) => {
+  test.skip(!desktop(), "the computer's layout");
+  await named(page, "Columned");
+  const main = page.getByRole("main");
+  for (const [w, h] of [
+    [1024, 768],
+    [1280, 800],
+    [1440, 900],
+  ] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    const play = main.getByRole("button", { name: "PLAY", exact: true });
+    await expect(play).toBeVisible();
+    // The shop and your profile: the side menu's, not repeated on home.
+    await expect(main.getByRole("button", { name: "Shop & crates" })).toHaveCount(0);
+    await expect(main.getByRole("button", { name: "Profile", exact: true })).toHaveCount(0);
+    const menu = page.getByRole("navigation", { name: "Menu" });
+    await expect(menu.getByRole("button", { name: "Shop & crates" })).toBeVisible();
+    await expect(menu.getByRole("button", { name: "Profile" })).toBeVisible();
+    // Top to bottom: the two ways to play (side by side), the mode picker and matchmaking, PLAY, its line.
+    const box = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
+    const friends = await box(main.getByRole("button", { name: "Play with friends" }));
+    const boss = await box(main.getByRole("button", { name: "Boss alone" }));
+    const modes = await box(main.getByRole("radiogroup", { name: "Mode" }));
+    const types = await box(main.getByRole("radiogroup", { name: "Matchmaking" }));
+    const p = await box(play);
+    const hint = await box(page.locator(".fd-hint"));
+    expect(Math.abs(friends.y - boss.y), `${w}`).toBeLessThan(1);
+    expect(friends.x + friends.width).toBeLessThanOrEqual(boss.x);
+    expect(friends.height).toBeGreaterThanOrEqual(44);
+    expect(friends.y + friends.height, `${w}: the buttons above the modes`).toBeLessThanOrEqual(modes.y);
+    expect(modes.y + modes.height).toBeLessThanOrEqual(types.y);
+    expect(types.y + types.height, `${w}: the modes right above PLAY`).toBeLessThanOrEqual(p.y);
+    expect(p.y - (types.y + types.height)).toBeLessThan(30);
+    expect(hint.y).toBeGreaterThanOrEqual(p.y + p.height);
+    await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Solo vs/);
+    if (w >= 1280) {
+      // Beside your card: PLAY's line ends level with the card's bottom, and the room above is free (for a live game).
+      const card = await box(page.locator(".fd-hero"));
+      expect(Math.abs(hint.y + hint.height - (card.y + card.height)), `${w}: PLAY at the bottom`).toBeLessThan(12);
+      expect(friends.y - card.y, `${w}: room above`).toBeGreaterThan(200);
+      expect(friends.x).toBeGreaterThanOrEqual(card.x + card.width);
+    }
+    expect(await sideways(page), `${w}`).toBe(0);
+  }
+});
+
+test("your icon sits to the left of your name and rating on your home card (a drawn icon, pixel-sharp)", async ({ page }) => {
+  await named(page, "Iconic");
+  // A drawn icon (48 x 48 PNG) in the server's answer: gold with a blue diagonal.
+  const png =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAABlBMVEUeOorywU4ACwF6AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAh0lEQVRIx7XWWw4AEBQD0WP/myZiAUbCf+Nx2w7WGmERFapCVah7qKdS76HeXH0r9XXVeagTVGeuukT1lepE1buq29V8qIlSM6imVs252gxql6jto/aV2nBqJ6otqvau2tRqt6s0UPmhEkdllEo1lYMqOVXWqnRWeX6P26MIRH/9NPz8yGzFBJLdB737VQ42AAAAAElFTkSuQmCC";
+  await page.route("**/api/me*", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    if (body?.user) body.user.icon = png;
+    await route.fulfill({ response: res, json: body });
+  });
+  const widths = desktop() ? [1024, 1280, 1440] : [320, 375, 430];
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: desktop() ? 800 : 740 });
+    await page.goto("/");
+    const hero = page.locator(".fd-hero");
+    await expect(hero.locator(".fd-hero-name")).toHaveText("Iconic");
+    const icon = hero.locator(".fd-hero-icon img.user-icon");
+    await expect(icon).toBeVisible();
+    await expect(icon).toHaveAttribute("src", png);
+    const i = (await icon.boundingBox())!;
+    const name = (await hero.locator(".fd-hero-name").boundingBox())!;
+    const sub = (await hero.locator(".fd-hero-sub").boundingBox())!;
+    // Left of the name and the rating line, level with them, under your pawn.
+    expect(i.x + i.width, `${width}`).toBeLessThanOrEqual(Math.min(name.x, sub.x));
+    expect(i.y).toBeLessThan(sub.y + sub.height);
+    expect(i.y + i.height).toBeGreaterThan(name.y);
+    expect(i.width).toBe(48);
+    const pawn = (await hero.locator(".fd-pawn-hero").boundingBox())!;
+    expect(i.y).toBeGreaterThanOrEqual(pawn.y + pawn.height - 1);
+    await expect(hero.locator(".fd-hero-sub")).toContainText(/No rating yet|·/);
+    expect(await sideways(page), `${width}`).toBe(0);
+  }
 });
 
 test("computer: PLAY fills the queue in place (the menu, the live panel and your card stay); Cancel is home; nothing sideways at 1024, 1280, 1440", async ({ page }) => {
@@ -240,7 +311,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   }
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto(`/?debug&pool=phonequeue-${run}`);
-  await expect(page.locator(".fd-top").getByRole("button", { name: "Dark mode" })).toBeVisible();
+  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile" })).toBeVisible();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-seats .fd-seat")).toHaveCount(100);
   const vw = page.viewportSize()!.width;
@@ -262,11 +333,11 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(await sideways(page)).toBe(0);
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-  await expect(page.locator(".fd-top").getByRole("button", { name: "Dark mode" })).toBeVisible();
+  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile" })).toBeVisible();
   expect(await sideways(page)).toBe(0);
 });
 
-test("phone: the top bar (logo, sun, coins, pawn) fits from 320 px up, even with a six-digit balance", async ({ page }) => {
+test("phone: the top bar (logo, coins, pawn) fits from 320 px up, even with a six-digit balance", async ({ page }) => {
   test.skip(desktop(), "the phone's top bar");
   // A big balance (the server's answer, with more coins in it).
   await page.route("**/api/me*", async (route) => {
@@ -284,17 +355,15 @@ test("phone: the top bar (logo, sun, coins, pawn) fits from 320 px up, even with
     // Nothing runs off the bar or the screen; the number shows whole; every button is a full 44 px.
     const fits = await bar.evaluate((el) => {
       const right = el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight);
-      const kids = [...el.querySelectorAll(".fd-logo, .fd-theme, .fd-coins, .fd-ring")].map((k) => k.getBoundingClientRect());
+      const kids = [...el.querySelectorAll(".fd-logo, .fd-coins, .fd-ring")].map((k) => k.getBoundingClientRect());
       const pill = el.querySelector(".fd-coins")!.getBoundingClientRect();
       const n = el.querySelector(".fd-coins-n")!.getBoundingClientRect();
       const inOrder = kids.every((k, i) => i === 0 || k.left >= kids[i - 1]!.right);
       return { inOrder, inside: kids.every((k) => k.right <= right + 0.5), number: n.left >= pill.left && n.right <= pill.right + 0.5 && n.bottom <= pill.bottom + 0.5 };
     });
     expect(fits, `${width} px`).toEqual({ inOrder: true, inside: true, number: true });
-    for (const name of ["Dark mode", "Your profile"]) {
-      const b = (await bar.getByRole("button", { name }).boundingBox())!;
-      expect(b.width, `${name} at ${width}`).toBeGreaterThanOrEqual(44);
-    }
+    const ring = (await bar.getByRole("button", { name: "Your profile" }).boundingBox())!;
+    expect(ring.width, `Your profile at ${width}`).toBeGreaterThanOrEqual(44);
     expect(await sideways(page), `${width} px`).toBe(0);
   }
 });

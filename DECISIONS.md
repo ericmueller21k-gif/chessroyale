@@ -1430,6 +1430,37 @@ scoped to 1024 px and wider.
   Cancel, dark and light: the menu and panel never missing, the grid never moving, the count never going down, no
   blinks).
 
+### The computer's play column, your icon, no sun (Eric, Oct 9, 2026)
+
+Eric marked up the computer's home: drop the Shop and Profile buttons (the side menu has them), put Play with friends
+and Boss alone above PLAY, PLAY at the bottom; and, in follow-ups, the mode tabs right above PLAY (they set up what
+PLAY does), no sun, your icon by your name, and the crate's Fischer Random banner was cut off.
+
+- **The computer's play column (1024 px and wider), top to bottom:** Play with friends | Boss alone, the mode tabs
+  (Crowd / Boss raid / Classic, then Default / Bots off / Solo and the i), PLAY, and its line. No Shop or Profile
+  buttons. From 1280 px the group sits at the bottom of the column, PLAY's line level with the bottom of your card;
+  the room above is for the live game (next). 1024-1279 is stacked as before, in the new order. The DOM follows the
+  order (Home decides by the window, the same 1024 px as the frame), so Tab goes top to bottom too.
+- **Phones keep their layout:** the tabs, PLAY, then all four buttons (screenshots match the old ones below your card).
+- **No sun.** The light/dark button is gone from the side menu and the phone's top bar; **Settings → Theme** (Match
+  device / Light / Dark) is the one place, as before, and works from any page. (Eric asked for the sun on Oct 8; he
+  took it back on Oct 9.) The phone's top bar has more room for the coins as a result.
+- **Your icon** (your pixel drawing, or the old emoji) sits to the left of your name and rating on your home card,
+  48 px (one screen pixel per icon pixel at 1x, sharp), phone and computer. My call: the queue's small card on a
+  computer doesn't show it (your pawn is your picture there, and the name needs the width).
+- **The Fischer Random banner** (crate opening; item-builder's lane, the director's exception for this fix): it used
+  the board banners' sizes, so on a computer the words were taller than the band and wider than the stage (cut at both
+  ends, top and bottom), and on a phone the face and the "!" were cut. Now one size sets the text, the face and the
+  gaps (6.4% of the stage's width, at most 52 px), so the face and the words take about 84% of the width in the
+  widest font measured; the band grows to fit them, and the stage grows with its width (at least 210 px). The text is
+  19 px on a 320 px phone, 47 px at 1280, 52 px from 1440; the line under it never goes below 11 px. Watched frame
+  by frame at 320-1920 px: in, slam, hold and out, nothing clipped.
+- **Checked:** `e2e/home-layout.spec.ts` (the column's order and PLAY at the bottom at 1024, 1280 and 1440; no Shop or
+  Profile on a computer's home; your drawn icon left of your name at 320-430 and 1024-1440; no sun anywhere on home,
+  and Settings' Theme through reloads with no flash), `e2e/crate-banner.spec.ts` (the banner measured every frame at
+  320, 390, 1024, 1280 and 1920), and `npm run frames:home` (now picks the theme in Settings: one jump in brightness
+  per pick, no blinks).
+
 ## Quick chat in matches (design, Oct 6, 2026; built Oct 7, 2026)
 
 Eric: a chat in 50 v 50, preset messages only (no typing), some unlockable, each with the sender's icon and name.
@@ -3053,6 +3084,71 @@ the power rules' job (he becomes playable once he has powers too). `packages/cor
     then plays every effect and power moment over the real board and his spot, with frames every ~70 ms.
   - `packages/app/test/gingerbread.test.ts`: his kit, lines, cast and sounds; the power moments; the effects.
 
+### G-REX, the Fire boss, and his fire (Oct 9, 2026)
+
+The cocky giraffe from Eric's reference, drawn as the Fire boss, with the effect sprites his powers need. The art,
+lines and sounds only: his powers' rules, placing the effects on the board and making him playable are the power
+rules' job (`god-king`); `packages/core/src/boss.ts` is unchanged, so he never shows yet. His kit is `BOSS_KITS["G-REX"]`.
+
+- **Name:** "G-REX" (Eric's), exactly.
+- **Art** (`characters/grex.ts`): 56 x 88 px from parts, in a 100 x 122 frame (room above for his jump and the
+  rockets). Three-quarters, facing right as in the reference: the flaming mane and tail on our left, the two sparklers
+  on our right, towards the board.
+  - **A giraffe first (Eric, Oct 9):** a long neck, so he stands about as tall as the God King with his wings spread,
+    and a giraffe face: half-lidded cocky eyes with a fiery glint, a cream muzzle, flaming ossicones. The first draft
+    had dark shades and a short neck; Eric asked for the neck and the face instead. The head stays big (32 x 23 px) so
+    the eyes and grin read on a phone.
+  - **His box grows on a phone:** the boss bar's character box is 88 px tall for him (`kit.tall`), so his head never
+    covers the heading above the bar; the bar is about 30 px taller in his battles. By the board on a computer and in
+    the results his frame simply rises higher (results box 180 px).
+  - **Rigging:** head (nine faces: grin, laugh, roar, shout, hurt, smug, rattled, think, out; the eyes are drawn from
+    a lid, a slant and where the pupil looks), torso and neck as one part (no seam), and arms, legs and tail painted
+    from each pose's points; the sparklers hang off the fists. The flames (ossicones, mane, tail tuft) are painted
+    tongues in three flicker shapes and a roaring size; the sparklers' sparks are seeded specks, different every frame.
+  - **Yellow with orange-brown spots,** a dark outline and a dark halo, so he reads on the light and the dark ground.
+- **Moments:** the same eleven as Ginger's. Idle crackles: flames flicker, sparklers spit, a head bob to a beat, and
+  every 6 s a sparkler twirl and a laugh. Entrance: a fireball streaks down and he's crouched in a wall of flame, then
+  the sparklers fizz alight. Thinking: a hoof scratching his neck, little flames for thoughts. Move: a step and a
+  sparkler flourish. Capture: laughing, both sparklers up. Hurt: eyes screwed shut, embers knocked off. Check: two
+  jabs of both sparklers, eyes glowing. Smug: fist on hip. Rattled: wide eyes, sweat. Defeat: his flames go out in
+  puffs of smoke and he keels over. Victory: jumping, sparklers high.
+- **Power moments:** `ignite` (he winds up and throws the outer sparkler at the board; it leaves his hand at the
+  `throw` cue; a fresh one fizzes alight), `candleWarn` (the ultimate's warning: he shows off the Roman candle, its
+  fuse fizzing) and `romanCandle` (his ultimate, on the board: he drops onto its middle with a roar, raises the candle
+  and fires twelve shots up, one every 140 ms, `launch` then `shot` cues). The inferno (the whole board ablaze) was
+  dropped when Eric replaced it with the Roman candle.
+- **Two new moments for every boss** in `boss-beats.ts`: `powerHit` (the passive's payoff landing later: a piece burnt
+  up) and `ultimateHit` (the ultimate's payoff: fireballs coming down). Both play his laugh; the kit has their lines.
+- **Lines:** a cocky show-off, fire puns and the odd dinosaur joke ("Rawr! I mean… hi.", "Tiny arms? Not me!",
+  "Extinct… again…"), as rare as Ginger's, with lines for igniting a tile, a piece burning up, the warning, the launch
+  and the fireballs.
+- **Sounds** (`characters/grex-sounds.ts`, synthesised, no voice): a fire crackle, a whoosh, a sparkler's fizz, the
+  poof of a piece burning up, a Roman candle's pop, and a comically big roar (a growl that ends in a squeak). Each
+  sits about 3 dB under a move's mean level, peaks under half a move's.
+- **Effect sprites** (`characters/effects.ts`, one square each unless said):
+  - `fireTile`: ignite, three stages that read on their own with no number (stage 1 a singe at the borders; stage 2
+    the scorch creeps in, flames up the sides; stage 3 ablaze, flames lower in the middle so a piece shows), spread2
+    and spread3 (the flames leap as it steps up), burnOut, and fizzle (the fireproof king). A piece stays visible at
+    every stage. The countdown is the stages: a number overlay was optional, and none is drawn.
+  - `pieceBurn`: one per kind of piece (p, n, b, r, q; never the king): flames engulf it, `poof` (take the real piece
+    off there), its charred shape crumbles from the top into ash and embers.
+  - `sparkFly` (his sparkler tumbling), `candleShot` (a rocket streaking up, and its pop), `fireballFall` (falling, and
+    its landing, which ends on a stage-1 fire tile), and `candleShots`: a strip of 12 little rockets, lit while they're
+    up and spent once fallen (`left12` to `left0`), to show by the board during the wait.
+- **The contract** (`power-art.ts`): `POWER_MOMENTS["G-REX"]` (with the new optional `powerHit` and `ultimateHit`), the
+  six effects in `EFFECTS`, and new optional fields: `stages` (the fire tile's escalation), `endings` (fizzle),
+  `pieces`, `counter` (the shots left) and `next` (a landing that becomes a fire tile); `covers: "strip"`.
+- **Kept cheap:** a storm of his fire at once (14 burning tiles, a piece burning, four fireballs, two rockets, the
+  sparkler, the shots strip and him on the board) on a phone slowed 4x first dropped 25-33% of frames against 7-11%
+  on the plain board: each of 22 sprites had its own animation-frame loop and canvas. Now every effect sprite shares
+  one loop, and `<BoardEffects>` draws many square effects on one canvas over the board, redrawing only squares whose
+  frame changed. The same storm then measured like the plain board (sitting 13% vs 11% dropped, dragging 7% vs 18%,
+  p95 33 ms both; 6 animation-frame callbacks a frame against 5). Loops are at most 8 frames of 50 ms or more, and
+  every frame is drawn once and kept.
+- **Checking it:** `npm run preview:characters -- <dir> only=grex,fx` (his GIFs and the effects over the board, a pawn
+  on the fire tile); `npm run frames:character -- <dir> Boingo both kit="G-REX" fx` (in the game, frame by frame);
+  add `fxperf` for the storm's numbers on a slowed phone. Tests: `packages/app/test/grex.test.ts`.
+
 ### Ideas for later, not built (Eric, Oct 8, 2026)
 
 - **Real boss abilities, never game-breaking:** freezing most of the team for a turn, or making the crowd move a
@@ -3336,3 +3432,12 @@ move 13-15; the blizzard glitched.
 - **Measured** with `npm run perf:boss` (a whole battle on a computer and on a phone slowed 4x, per move); also run on
   Boingo, a Crowd match and an online raid. **Guarded** by `packages/chess/test/long-match.test.ts` and
   `e2e/perf.spec.ts`.
+
+## Two tweaks (Eric, Oct 9, 2026)
+
+- **Ginger freezes a little more often:** every 4 to 6 crowd turns instead of 5 to 7 (`BOSS_POWERS.freezeEvery`). The
+  first freeze still comes on the crowd's second turn, and each lasts 2 turns, so a freeze is never on top of another.
+- **The God King keeps his colours in the dock:** his figure used to fade and desaturate when he couldn't be summoned,
+  and go grey and half see-through once his moves were used. Now he stays in full colour; the crowns under him show
+  what's left (a dash once they're spent), as before. His fallen figure after his Last Stand is still greyed: that
+  shows he has fallen, which is different from having used his moves.

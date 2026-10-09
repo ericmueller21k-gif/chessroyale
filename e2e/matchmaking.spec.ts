@@ -55,7 +55,11 @@ test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warn
   await expect(page.locator(".fd-seats")).toBeVisible();
   await expect(page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Solo");
   await expect(page.locator(".fd-queue-rank")).toHaveText("Unranked: solo games don't count for ranking");
-  await expect(page.locator(".fd-count-n")).toHaveText("100", { timeout: 6_000 });
+  // Full at 100, and the match starts straight away: under load the last frame can be gone before we look, so a
+  // queue that has already moved on to the vote counts as full too.
+  await expect
+    .poll(async () => (await page.evaluate(() => document.querySelector(".fd-count-n")?.textContent ?? null)) === "100" || (await phase(page)) === "vote", { timeout: 6_000 })
+    .toBe(true);
   const filled = Date.now() - t0;
   expect(filled).toBeLessThan(5_000);
   await expect.poll(() => phase(page), { timeout: 10_000 }).toBe("vote");

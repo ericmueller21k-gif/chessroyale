@@ -34,7 +34,9 @@ test("home: the live line comes from the server, the mode picker changes the lin
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
   // No sideways scrolling, and big tap targets.
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
-  for (const name of ["Play with friends", "Boss alone", "Shop & crates", "Profile"]) {
+  // (A computer's home has two: the shop and your profile are in its side menu.)
+  const buttons = test.info().project.name === "desktop" ? ["Play with friends", "Boss alone"] : ["Play with friends", "Boss alone", "Shop & crates", "Profile"];
+  for (const name of buttons) {
     const box = (await page.getByRole("main").getByRole("button", { name, exact: true }).boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
   }

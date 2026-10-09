@@ -425,9 +425,9 @@ export const RAID_SETTINGS: Partial<Settings> = {
 export const BOSS_POWERS = {
   /** The first passive comes as this crowd turn begins. */
   firstPassive: 2,
-  /** Freeze: a crowd piece (never the king) is iced for this many crowd turns, every 5 to 7 turns (from its start). */
+  /** Freeze: a crowd piece (never the king) is iced for this many crowd turns, every 4 to 6 turns (from its start). */
   freezeTurns: 2,
-  freezeEvery: [5, 7] as readonly [number, number],
+  freezeEvery: [4, 6] as readonly [number, number],
   /** Pie: a square near the centre is pied for this many crowd turns (nobody may move onto it), then this many clear. */
   pieTurns: 3,
   pieGap: 2,

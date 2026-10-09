@@ -5,7 +5,7 @@
 // named <id>-<look>-*.
 // `ref` puts a reference picture first in the comparison (its white or transparent background is keyed out).
 // The bosses' power effects (characters/effects.ts) are drawn too, over the game's board (a white pawn under the
-// ice, so you can see it through), as fx-<id>-<anim>.gif and fx-<id>-sheet.png.
+// ice and on the fire tile, so you can see it through), as fx-<id>-<anim>.gif and fx-<id>-sheet.png.
 // No dependencies: PNG and GIF are written (and the reference read) here, with node:zlib.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -352,7 +352,7 @@ function boardUnder(ch: Character): Img {
     return img;
   }
   const img = blank(ch.w, ch.h, LIGHT);
-  if (ch.id === "ice-overlay") {
+  if (ch.id === "ice-overlay" || ch.id === "fire-tile") {
     // A white pawn: head, body, base; black outline.
     const c = ch.w / 2;
     const inPawn = (x: number, y: number) => (x - c) ** 2 + (y - 10) ** 2 <= 16 || (y >= 13 && y <= 23 && Math.abs(x - c) <= 2.5 + (y - 13) * 0.45) || (y >= 23 && y <= 26 && Math.abs(x - c) <= 9);

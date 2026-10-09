@@ -399,3 +399,18 @@ The boss's turn at move 25 went from every frame dropped (p95 200 ms on the comp
 - Before calling a change to a board, the boss or an animation done, run `npm run perf:boss -- <dir> gingerbread phone
   25`. Frame times late in the match must match the early ones. The same script runs `clown`, `crowd` and `online` (an
   online raid on a local server).
+
+## A dozen sprites, a dozen loops (Oct 9, 2026)
+
+**Found before it shipped:** G-REX's fire can put a dozen burning tiles on the board at once, with fireballs and
+rockets on top. Mounted as one `<BossEffect>` each, a storm of 22 sprites on a phone slowed 4x dropped 25-33% of frames,
+against 7-11% on the plain board. Each sprite ran its own animation-frame loop and redrew its own canvas: 30
+callbacks a frame instead of 5.
+
+**The fix:** every effect sprite shares one animation-frame loop (`onEachFrame` in `BossEffect.tsx`), and
+`<BoardEffects>` draws many square effects on one canvas over the board, redrawing only the squares whose frame
+changed. The same storm then measured like the plain board.
+
+**The rule:** an effect that can appear many times at once goes on a shared canvas, not a canvas each; never start a
+loop per sprite. Measure the worst case at once on a slowed phone (`npm run frames:character -- <dir> Boingo phone
+kit="G-REX" fxperf`), not one effect at a time.
