@@ -125,3 +125,26 @@ export const roundLight = (cx: number, cy: number, rx: number, ry: number, bias 
   const ny = (y + 0.5 - cy) / ry;
   return 0.5 + bias - 0.42 * nx - 0.5 * ny;
 };
+
+/**
+ * A flame tongue `w` x `h` pixels, its base at the bottom: a teardrop that waves (`seed` picks the wave), leaning `lean`
+ * pixels at its tip, in bands from a pale core to a dark red rim, by palette keys `y` (core), `Y`, `f`, `F`, `R` (rim).
+ * A character or effect that uses it has those five keys in its palette.
+ */
+export function flame(w: number, h: number, seed: number, lean = 0): Grid {
+  const cv = canvas(w, h);
+  const cx = (w - 1) / 2;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const v = (y + 0.5) / h; // 0 at the tip, 1 at the base
+      const half = (v < 0.62 ? Math.pow(v / 0.62, 0.85) : Math.sqrt(Math.max(0, 1 - ((v - 0.62) / 0.4) ** 2))) * (w / 2);
+      const wave = Math.sin(seed * 2.1 + v * 7) * (1 - v) * 1.1;
+      const c = cx + lean * (1 - v) * (1 - v) + wave;
+      const d = Math.abs(x - c);
+      if (d > half + 0.05) continue;
+      const depth = half <= 0.5 ? 0 : 1 - d / half;
+      const heat = depth * 0.7 + v * 0.55;
+      cv[y]![x] = heat > 1.02 ? "y" : heat > 0.82 ? "Y" : heat > 0.55 ? "f" : heat > 0.3 ? "F" : "R";
+    }
+  return toGrid(cv);
+}
