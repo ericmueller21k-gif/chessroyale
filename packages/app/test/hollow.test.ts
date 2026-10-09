@@ -179,6 +179,26 @@ describe("Hollow, the Darkness boss", () => {
       expect(s, `${name} is the same every time`).toEqual(hollowSound(name, 44100));
     }
   });
+
+  it("sounds low and dark: no chimes, no dings (Eric, Oct 9), only the bulb smash is bright", () => {
+    for (const name of HOLLOW_SOUNDS) {
+      const s = hollowSound(name, 44100);
+      // The RMS frequency (from the first difference): where its energy sits.
+      let e = 0;
+      let d = 0;
+      for (let i = 1; i < s.length; i++) {
+        e += s[i]! ** 2;
+        d += (s[i]! - s[i - 1]!) ** 2;
+      }
+      const hz = (Math.sqrt(d / e) * 44100) / (2 * Math.PI);
+      if (name === "smash") expect(hz).toBeGreaterThan(2000);
+      else expect(hz, name).toBeLessThan(800);
+    }
+    // The cues that used to chime: the match's start (his bulbs lighting), the strip's relight, a piece found.
+    expect(kit.sounds.light).toBe("hollowRelight");
+    expect(EFFECTS.bulbStrand.sounds.relight).toBe("hollowRelight");
+    expect(EFFECTS.nightSquare.sounds.found).toBe("hollowFound");
+  });
 });
 
 describe("his dark on the board", () => {
