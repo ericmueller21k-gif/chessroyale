@@ -11,7 +11,9 @@ them to game events. Eric (the owner) describes them in plain words or with a re
 may hand you work too.
 
 Read `CLAUDE.md` first and follow it: the shipping rules, the secrets rules, and "never merge red". Read
-`.claude/LESSONS.md`, above all "watch it frame by frame". Then read the "Boss characters" section of `DECISIONS.md`.
+`.claude/LESSONS.md`, above all "watch it frame by frame". Then read your area page, `docs/areas/bosses.md` (how the
+bosses work today, the code map and the "adding a boss" checklist). For the why, the "Boss characters" sections
+(indexed in `DECISIONS.md`, in `docs/history/bosses.md`).
 
 ## Your lane
 
@@ -64,7 +66,8 @@ If you need one of those changed, say what and why, and stop.
 - **Test it.** The character tests check palettes, cues and that nothing is cut off at a frame's edge. Add a unit test
   for each event-to-animation rule, and an e2e case once a boss is on screen. Run `npm test` and `npm run typecheck`;
   run `npm run e2e` before merging anything that changes a screen.
-- **Record it** in `DECISIONS.md` under "Boss characters": what you built and any call you made, with the reason.
+- **Record it** in `DECISIONS.md` (New decisions): what you built and any call you made, with the reason. Keep
+  `docs/areas/bosses.md` true.
 - **Ship it** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit.
 
 ## Reporting back

@@ -12,9 +12,11 @@ power's rules, server side and moments on screen. The bosses' art, moments, line
 delegate's; you build on its exports. Eric (the owner) describes moments in plain, cinematic words;
 you turn them into something that plays well on a phone. A director session may hand you work too.
 
-Read `CLAUDE.md` first and follow it: the shipping rules, the secrets rules, and "never merge red". Then read every
-"God King" and "Boss" section of `DECISIONS.md`: they record what Eric liked, what he pushed back on, and why. Read
-any section marked "to build" as your brief.
+Read `CLAUDE.md` first and follow it: the shipping rules, the secrets rules, and "never merge red". Then read your
+area pages, `docs/areas/god-king.md` and `docs/areas/bosses.md` (how it works today, the code map, the "adding a boss"
+checklist). For the why, the "God King" and "Boss" decisions (indexed in `DECISIONS.md`, in
+`docs/history/god-king.md` and `bosses.md`): they record what Eric liked, what he pushed back on, and why. Read any
+section marked "to build" as your brief.
 
 ## Your lane
 
@@ -68,7 +70,8 @@ If you need one of those changed, say what and why, and stop.
   - A lobby test for the online path.
   - An e2e case that plays through it.
   - Run `npm test`, `npm run typecheck` and `npm run e2e` (about 20 minutes, in the background) before merging.
-- **Record it** in `DECISIONS.md` under your feature's section: what you built, timings, any call you made and why.
+- **Record it** in `DECISIONS.md` (New decisions), a section for your feature: what you built, timings, any call you
+  made and why. Keep `docs/areas/god-king.md` and `bosses.md` true.
 - **Ship it** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit, verify live.
 
 ## Reporting back

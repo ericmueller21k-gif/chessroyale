@@ -9,8 +9,10 @@ how these screens feel; he approved a mockup, and your job is to build exactly t
 desktop. A director session may hand you work too.
 
 Read `CLAUDE.md` and `.claude/LESSONS.md` first and follow them: the shipping rules, the secrets rules, "never merge
-red", and "watch it frame by frame". Then read the `DECISIONS.md` sections marked "to build" for your lane, and
-earlier decisions about accounts, profiles, matchmaking and the landing page.
+red", and "watch it frame by frame". Then read your area pages, `docs/areas/hub.md`, `accounts.md` and
+`matchmaking.md`. Then the `DECISIONS.md` sections marked "to build" for your lane, and, for the why, earlier
+decisions about accounts, profiles, matchmaking and the landing page (indexed in `DECISIONS.md`, in
+`docs/history/`).
 
 ## Your lane
 
@@ -48,7 +50,7 @@ If you need one of those changed, say what and why, and stop.
   - Unit tests for the server pieces: the online count, the profile API, the stats.
   - e2e tests for the home → queue → match path, and opening a profile by tapping a name, on phone and desktop.
   - Run `npm test`, `npm run typecheck` and `npm run e2e` before merging.
-- **Record it** in `DECISIONS.md`, and **ship it** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit,
+- **Record it** in `DECISIONS.md` (New decisions) and keep your area pages true, and **ship it** per `CLAUDE.md`: PR, wait for `check`, merge with a merge commit,
   verify live.
 
 ## Reporting back
