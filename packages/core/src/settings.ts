@@ -108,13 +108,18 @@ export interface Settings {
    * bar (points of expected score against the best move), he takes the blow and the move is undone. The bar starts
    * at lastStandLoss (plus lastStandChargedExtra while he still has charges) and falls linearly with every crowd
    * move to lastStandLossFloor, reached after lastStandDecayMoves crowd moves. Never when the best move was worth
-   * less than lastStandFrom (a position that's already lost isn't saved).
+   * less than lastStandFrom (a position that's already lost isn't saved; set it over 100 to turn him off, in tests).
+   * While the best move is worth less than lastStandShareBelow, the bar is a share of the chances left instead
+   * (lastStandShare of them), when that's lower: a weak position has fewer points to lose (Eric, Oct 10: from 25%
+   * no move can give away 35 points, so the plain bar alone could never call him there).
    */
   lastStandLoss: number;
   lastStandChargedExtra: number;
   lastStandLossFloor: number;
   lastStandDecayMoves: number;
   lastStandFrom: number;
+  lastStandShareBelow: number;
+  lastStandShare: number;
   /**
    * The Last Stand: he falls with his charges unspent, and leaves them to the crowd. Every player still in gets this
    * many power-ups (the engine's top 3 moves, as in Crowd) for each charge he had left.
@@ -308,7 +313,9 @@ export const DEFAULT_SETTINGS: Settings = {
   lastStandChargedExtra: 5,
   lastStandLossFloor: 13,
   lastStandDecayMoves: 22,
-  lastStandFrom: 40,
+  lastStandFrom: 20,
+  lastStandShareBelow: 40,
+  lastStandShare: 0.5,
   lastStandPowerUps: 1,
   bossStumbleBelow: 2100,
   bossStumbleMax: 0.25,
@@ -585,14 +592,16 @@ export type BossPowerSettings = {
  * How long every speech line stays up, and how lines take turns (Eric, Oct 10: Ginger's line came and went at once).
  * The rule for every boss's lines and the God King's, in one place (packages/app/src/speech.tsx): a line types out
  * (`typeMs` a character), then stays fully readable for `readMs` plus `perCharMs` a character, at most `maxReadMs`,
- * then fades (`fadeMs`). Only a critical line cuts in on one still inside that time; any other waits its turn, highest
- * priority first, and is dropped if it can't start within `waitMs` of being said (it would be stale by then).
+ * then fades (`fadeMs`). Eric, later on Oct 10: "a few seconds… two, three, four, not that long": a short line
+ * ("Freeze!") rests about 2.5 s once typed, a long one (50 characters) about 4 s, none over 4.5 s. Only a critical
+ * line cuts in on one still inside that time; any other waits its turn, highest priority first, and is dropped if it
+ * can't start within `waitMs` of being said (it would be stale by then).
  */
 export const SPEECH = {
   typeMs: 28,
-  readMs: 2500,
-  perCharMs: 50,
-  maxReadMs: 7000,
+  readMs: 2200,
+  perCharMs: 35,
+  maxReadMs: 4500,
   fadeMs: 260,
   waitMs: 5000,
 } as const;

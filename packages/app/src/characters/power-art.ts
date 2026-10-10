@@ -20,7 +20,7 @@
  *     ultimate     "blizzard"   Cane raised high, a whirl of snow round him that bursts outwards at `release`:
  *                               play `blizzardSweep` across the board from then, and ice every piece (iceOverlay)
  *                               as the sweep passes; the queen stays clear.
- *   "G-REX"
+ *   "Jefferson"
  *     power        "ignite"     He winds up the outer sparkler and throws it at the board; at `throw` it leaves his
  *                               hand: fly `sparkFly` to the square, then play `fireTile` ignite (it lands as stage
  *                               1), stage1 (loop). Each turn after, step it up: spread2 then stage2 (loop), spread3
@@ -202,7 +202,7 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     ultimateWarn: { anim: "check" },
     ultimate: { anim: "blizzard", hit: "blizzard", effects: ["blizzardSweep", "iceOverlay"] },
   },
-  "G-REX": {
+  "Jefferson": {
     power: { anim: "ignite", hit: "throw", effects: ["sparkFly", "fireTile"] },
     powerHit: { anim: "capture", effects: ["pieceBurn", "fireTile"] },
     ultimateWarn: { anim: "candleWarn", hit: "fizz" },

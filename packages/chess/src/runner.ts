@@ -806,7 +806,8 @@ export class MatchRunner {
   /**
    * Boss battle: whether the God King makes his Last Stand on the crowd's played move. Once per game, whether or
    * not he has charges left: the move gave away at least the bar (lastStandBar: it falls the longer the battle
-   * goes without one), and the crowd wasn't already lost (lastStandFrom). The judge's numbers decide, as given.
+   * goes without one, and in a weak position it's a share of the chances left), and the crowd wasn't already lost
+   * (lastStandFrom). The judge's numbers decide, as given.
    */
   private lastStandFor(
     fen: string,
@@ -821,7 +822,7 @@ export class MatchRunner {
     const mine = scored.find((m) => m.move === played);
     const loss = mine?.loss ?? 0;
     const charges = b.kingCharges ?? 0;
-    const bar = Math.round(lastStandBar(b.crowdMoves, charges, this.settings) * 10) / 10;
+    const bar = Math.round(lastStandBar(best, b.crowdMoves, charges, this.settings) * 10) / 10;
     if (!this.forceLastStand && !lastStandDue(loss, best, b.crowdMoves, charges, this.settings)) return undefined;
     // What it loses: the boss's best reply (only if it's a legal move there) and a mate it allows (the crowd mated).
     const reply = evaluation.replies?.[played];

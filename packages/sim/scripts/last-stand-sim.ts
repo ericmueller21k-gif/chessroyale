@@ -176,13 +176,21 @@ function summary() {
     const [kind, elo] = key.split(" ");
     lines.push(`| ${kind} | ${elo} | ${rs.length} | ${hit.length} (${Math.round((100 * hit.length) / rs.length)}%) | ${hit.sort((a, b) => a - b).join(", ") || "-"} | ${Math.round(rs.reduce((n, r) => n + r.moves.length, 0) / rs.length)} | ${big} |`);
   }
-  // Why the floor and its pace barely matter: while the crowd isn't lost yet, its moves are mostly fine or a
-  // piece-sized disaster; the in-between mistakes (12-30) mostly tip the position under lastStandFrom at once.
-  const live = rows.flatMap((r) => r.moves.filter((m) => !m.king && m.best * 100 >= settings.lastStandFrom));
+  // Why the floor and its pace barely matter: while the crowd is doing fine, its moves are mostly fine or a
+  // piece-sized disaster; the in-between mistakes (12-30) mostly tip the position into the weak band at once.
+  const fine = rows.flatMap((r) => r.moves.filter((m) => !m.king && m.best * 100 >= settings.lastStandShareBelow));
   const bands: [string, (l: number) => boolean][] = [["under 5", (l) => l < 5], ["5-12", (l) => l >= 5 && l < 12], ["12-20", (l) => l >= 12 && l < 20], ["20-30", (l) => l >= 20 && l < 30], ["30 or more", (l) => l >= 30]];
-  lines.push("", "## The crowd's moves while it wasn't lost (best move worth 40+), by points given away", "");
+  const row = (list: MoveRow[], bs: [string, (x: number) => boolean][], of: (m: MoveRow) => number) =>
+    "| " + bs.map(([, f]) => `${list.filter((m) => f(of(m))).length} (${((100 * list.filter((m) => f(of(m))).length) / Math.max(1, list.length)).toFixed(1)}%)`).join(" | ") + " |";
+  lines.push("", `## The crowd's moves while it was doing fine (best move worth ${settings.lastStandShareBelow}+), by points given away`, "");
   lines.push("| " + bands.map(([n]) => n).join(" | ") + " |", "|" + bands.map(() => "---").join("|") + "|");
-  lines.push("| " + bands.map(([, f]) => `${live.filter((m) => f(m.loss)).length} (${((100 * live.filter((m) => f(m.loss)).length) / live.length).toFixed(1)}%)`).join(" | ") + " |");
+  lines.push(row(fine, bands, (m) => m.loss));
+  // The weak band (Eric, Oct 10): the bar there is a share of the chances left (lastStandShare).
+  const weak = rows.flatMap((r) => r.moves.filter((m) => !m.king && m.best * 100 >= settings.lastStandFrom && m.best * 100 < settings.lastStandShareBelow));
+  const shares: [string, (x: number) => boolean][] = [["under 25%", (x) => x < 0.25], ["25-50%", (x) => x >= 0.25 && x < 0.5], ["50-75%", (x) => x >= 0.5 && x < 0.75], ["75% or more", (x) => x >= 0.75]];
+  lines.push("", `## The crowd's moves in a weak position (best move worth ${settings.lastStandFrom}-${settings.lastStandShareBelow}), by the share of its chances given away`, "");
+  lines.push("| " + shares.map(([n]) => n).join(" | ") + " |", "|" + shares.map(() => "---").join("|") + "|");
+  lines.push(row(weak, shares, (m) => m.loss / (m.best * 100)));
   writeFileSync(root + "reports/last-stand.md", lines.join("\n") + "\n");
   console.log(lines.join("\n"));
 }

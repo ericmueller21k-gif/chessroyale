@@ -37,19 +37,21 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 | --- | --- | --- | --- |
 | Ginger (`gingerbread`) | the game so far | **Freeze:** a crowd piece (never the king, one that matters: a pick from the top three) iced for `freezeTurns`, every `freezeEvery` turns from turn 2 | **Blizzard:** for one turn only the queen moves (no queen, or she can't: the king) |
 | Boingo the Clown (`clown`) | the game so far | **Pie:** an empty square near the centre that the fewest moves reach is pied for `pieTurns` (nobody, either side, may move onto it), then `pieGap` clear | **Funhouse:** he plays the crowd's move (weak but recoverable: `funhouseLoss`, never past `funhouseMaxLogit`), unscored; the board shows flipped for `flipTurns` |
-| G-REX (`grex`) | the game so far | **Sparkler:** a tile on the crowd's half catches fire and burns in `fireStages` stages, one a crowd turn; a crowd piece left on it after the crowd's move on the last stage burns (never the king, never one whose loss leaves a king in check: it fizzles) | **Roman candle:** `candleShots` fireballs in waves (`candleWaves`) from `candleDelay` turns later, each wave's squares shown as growing shadows `candleAhead` turns ahead |
+| Jefferson (`grex`; G-REX until Oct 10) | the game so far | **Sparkler:** a tile on the crowd's half catches fire and burns in `fireStages` stages, one a crowd turn; a crowd piece left on it after the crowd's move on the last stage burns (never the king, never one whose loss leaves a king in check: it fizzles) | **Roman candle:** `candleShots` fireballs in waves (`candleWaves`) from `candleDelay` turns later, each wave's squares shown as growing shadows `candleAhead` turns ahead |
 | Hollow (`hollow`) | always Black, from the starting position (he claims the dark side in the intro if the crowd would have been Black) | **The dark:** after his first move he covers the square of the piece he moved, then another every `darkEvery`-th move (a random occupied square, never a king's) for `darkTurns`; pieces there are hidden; a move touching the dark goes unchecked, an illegal one costs `darkTryCost` and the `darkTries`-th ends the turn as a miss | **Lights out:** at the start of his turn, a memory test in rounds (`lightsOutRounds`: find 1, 2, then 3 of his pieces); each piece missed costs `lightsOutMiss`; below `lightsOutHold` found, he plays an extra quiet move (`lightsOutExtraGain`) |
 | Big Boy (`bigboy`) | from the starting position less the crowd's d- or e-pawn, which he eats (his snack) | **Toy blocks:** every `blockEvery` turns from turn 2, a block on an empty square in the crowd's half that a crowd piece could move to, for `blockTurns`; nothing (either side) may move onto it or slide through it; a knight jumps it; it never stops an attack | **Big Bounce:** at the start of his turn (after the warning), `bouncePieces` crowd pieces thrown to empty squares within `bounceReach` (pawns sideways), into a position `bounceLoss` pawns worse for the crowd (nearest `bounceTarget`) |
 
-- **Test switches:** `?boss=<id>` picks the boss; `?power=<id>` brings its ultimate early (warned as turn 2 begins,
-  unleashed on turn 3; its passive as usual); admins see "Trigger ultimate (testing)" in any boss battle
-  (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next crowd turn begins, no warning).
+- **Test switches:** `?boss=<id>` picks the boss (`?boss=jefferson` too: `BOSS_ALIASES`, read by `bossIdFromLink`);
+  `?power=<id>` brings its ultimate early (warned as turn 2 begins, unleashed on turn 3; its passive as usual); admins
+  see "Trigger ultimate (testing)" in any boss battle (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next
+  crowd turn begins, no warning).
 - **What a boss says** (`packages/app/src/speech.tsx`, numbers in `SPEECH`; Eric, Oct 10: Ginger's line came and went
   at once): every line (its powers' moments, its ultimate, its warning, its reactions, Hollow's claim and Lights out
   words, Big Boy's snack) goes into the boss's voice and shows in its text box beside it (in the boss bar on a phone,
   by the board on a computer), on every screen of the battle, also while it stands at the board's corner for a
-  moment. Each line types out, then stays fully readable for 2.5 s plus 50 ms a character (at most 7 s), whatever the
-  screen does next. One line at a time: only a critical line (an ultimate's, Hollow's first cover of the dark, his
+  moment. Each line types out, then stays fully readable for 2.2 s plus 35 ms a character (at most 4.5 s: a short
+  line about 2.5 s, a long one about 4 s; Eric, later on Oct 10: "a few seconds… not that long"), whatever the screen
+  does next. One line at a time: only a critical line (an ultimate's, Hollow's first cover of the dark, his
   claim, the battle's end) cuts in on another; the rest wait their turn, highest first, and lapse after 5 s of waiting.
   A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). The
   dock says the moment's word ("Freeze!"). Lights out's round prompt keeps its own box above the board for the whole
@@ -62,7 +64,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 
 Each boss lives in its own files, one per layer, on a shared base. The shared files only put them together.
 
-| Layer | Shared | Each boss (Ginger, Boingo, G-REX, Hollow, Big Boy) |
+| Layer | Shared | Each boss (Ginger, Boingo, Jefferson, Hollow, Big Boy) |
 | --- | --- | --- |
 | The roster, the playable rule, choosing a boss, strength | `packages/core/src/boss.ts` (`BOSS_ROSTER`; power ids, event kinds and every boss's state fields in `BossPowerState`) | its line in `BOSS_ROSTER` |
 | Rules: each turn's powers, allowed moves, what the judge sees, after-move effects, fair-play turns, its opening, its screen fields | `packages/chess/src/bosses/base.ts` (the base boss, `BossRules`, and shared helpers), `bosses/index.ts` (the registry), `boss-powers.ts` (the dispatcher: `prepareTurn`, `crowdAllowed`, `bossAllowed`, `powerTurn`, `icedSquares`, the judge's hooks) | `packages/chess/src/bosses/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts` |
@@ -87,13 +89,13 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `wearOff(next, t)` | As a crowd turn begins, first: what wore off | Ginger (ice), Boingo (pie), Big Boy (block) |
 | `ultimate(next, t)` | The ultimate's step until it has come: true when it comes now. `warnThenUnleash` is the usual one (warn, then the next turn) | all |
 | `ultimateOnHisTurn` | It comes at the start of the boss's turn instead (the test trigger waits for it) | Hollow, Big Boy |
-| `everyTurn(next, t)` | Every turn after the ultimate's step | G-REX (the barrage) |
+| `everyTurn(next, t)` | Every turn after the ultimate's step | Jefferson (the barrage) |
 | `passive(next, t)` | The passive's step (it waits a turn if the ultimate came now) | all |
 | `crowdFilter`, `bossStops` | Its limits on the crowd's and the boss's moves (the dispatcher lifts them if none are left) | Ginger, Boingo, Big Boy |
 | `powerTurn` | A turn its powers touch doesn't count for fair play | all but Hollow |
 | `iced` | The squares that show ice | Ginger |
-| `judge` | What the judge must score too, how it ranks and reads moves | G-REX (fire) |
-| `afterCrowdMove(b, move)` | After any crowd move, in the match | G-REX (the burn) |
+| `judge` | What the judge must score too, how it ranks and reads moves | Jefferson (fire) |
+| `afterCrowdMove(b, move)` | After any crowd move, in the match | Jefferson (the burn) |
 | `scoreRound(b, players)` | Its own costs on a round's scores | Hollow (dark tries) |
 | `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack) |
 | `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy |
@@ -127,7 +129,8 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,
   `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
 - e2e: `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `boss-character.spec.ts`,
-  `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame),
+  `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
+  gone on time),
   `perf.spec.ts`. Unit: `packages/app/test/speech.test.ts` (the speech rule).
 - Frames: `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both]`, `frames:hollow`,
   `frames:bigboy`, `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`.

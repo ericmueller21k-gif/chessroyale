@@ -104,7 +104,7 @@ export interface BossDef {
 export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "gingerbread", name: "Ginger", icon: "🍪", kit: "Ginger", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
   { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
-  { id: "grex", name: "G-REX", icon: "🦖", kit: "G-REX", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
+  { id: "grex", name: "Jefferson", icon: "🦖", kit: "Jefferson", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
   { id: "hollow", name: "Hollow", icon: "🌑", kit: "Hollow", offset: -100, powers: { passive: "dark", ultimate: "lightsout" } },
   // Big Boy eats one of the crowd's centre pawns before move 1 (his snack), so he plays further under the lobby's
   // strength than the others (DECISIONS.md: "Big Boy, built": the boss sim's numbers).
@@ -129,6 +129,14 @@ export function playableBosses(roster: readonly BossDef[] = BOSS_ROSTER): BossDe
 }
 
 export const bossDef = (id: string | null | undefined): BossDef | null => (id ? (BOSS_ROSTER.find((b) => b.id === id) ?? null) : null);
+
+/**
+ * Other names a test link may use for a boss (?boss=jefferson), each to its roster id. A boss renamed on screen keeps
+ * its id everywhere else (Jefferson, Oct 10: he was G-REX, and his id stays "grex").
+ */
+export const BOSS_ALIASES: Readonly<Record<string, string>> = { jefferson: "grex" };
+/** A test link's ?boss= as a roster id (an alias becomes its boss's id); anything else as it is. */
+export const bossIdFromLink = (q: string | null | undefined): string | null => (q ? (BOSS_ALIASES[q.toLowerCase()] ?? q) : null);
 
 /**
  * Which boss a match meets: `wanted` if it's playable, else a random playable one (from `roll`, 0-1), not `avoid`
@@ -362,25 +370,33 @@ export interface PowerEvent {
 }
 
 /** The settings behind the God King's Last Stand. */
-export type LastStandSettings = Pick<Settings, "lastStandLoss" | "lastStandChargedExtra" | "lastStandLossFloor" | "lastStandDecayMoves" | "lastStandFrom">;
+export type LastStandSettings = Pick<
+  Settings,
+  "lastStandLoss" | "lastStandChargedExtra" | "lastStandLossFloor" | "lastStandDecayMoves" | "lastStandFrom" | "lastStandShareBelow" | "lastStandShare"
+>;
 
 /**
  * The God King's Last Stand: how big a mistake it takes (points of expected score given away against the best
- * move) after `crowdMoves` crowd moves without one. It starts at lastStandLoss, a little higher while he still has
- * charges, and falls in a straight line to lastStandLossFloor over lastStandDecayMoves crowd moves, so a long game
- * without a disaster still sees him step in for a smaller one.
+ * move), with the crowd's best move worth `best` (its expected score, 0-1), after `crowdMoves` crowd moves without
+ * one. The plain bar starts at lastStandLoss, a little higher while he still has charges, and falls in a straight
+ * line to lastStandLossFloor over lastStandDecayMoves crowd moves, so a long game without a disaster still sees him
+ * step in for a smaller one. While the best move is worth under lastStandShareBelow, the bar is a share
+ * (lastStandShare) of the chances left, when that's lower: from 25%, a move that throws away half of them (12.5
+ * points) is a disaster, though no move there can give away the plain bar's 35 (Eric, Oct 10).
  */
-export function lastStandBar(crowdMoves: number, charges: number, s: LastStandSettings): number {
+export function lastStandBar(best: number, crowdMoves: number, charges: number, s: LastStandSettings): number {
   const decay = Math.max(0, 1 - crowdMoves / Math.max(1, s.lastStandDecayMoves));
-  const bar = s.lastStandLossFloor + (s.lastStandLoss - s.lastStandLossFloor) * decay;
-  return bar + (charges > 0 ? s.lastStandChargedExtra : 0);
+  const bar = s.lastStandLossFloor + (s.lastStandLoss - s.lastStandLossFloor) * decay + (charges > 0 ? s.lastStandChargedExtra : 0);
+  const left = best * 100;
+  return left < s.lastStandShareBelow ? Math.min(bar, s.lastStandShare * left) : bar;
 }
 
 /**
- * Whether the crowd's played move calls for the Last Stand: it gave away at least the bar (`loss`, in points),
- * and the position wasn't already lost (the best move was worth at least lastStandFrom, `best` being the mover's
- * expected score after it, 0-1). Once per game: the caller checks he hasn't fallen already.
+ * Whether the crowd's played move calls for the Last Stand: it gave away at least the bar (`loss`, in points; see
+ * lastStandBar), and the position wasn't already lost (the best move was worth at least lastStandFrom, `best`
+ * being the mover's expected score after it, 0-1). The engine's judgement decides, not the material: a sacrifice it
+ * likes gives nothing away. Once per game: the caller checks he hasn't fallen already.
  */
 export function lastStandDue(loss: number, best: number, crowdMoves: number, charges: number, s: LastStandSettings): boolean {
-  return best * 100 >= s.lastStandFrom && loss >= lastStandBar(crowdMoves, charges, s);
+  return best * 100 >= s.lastStandFrom && loss >= lastStandBar(best, crowdMoves, charges, s);
 }
