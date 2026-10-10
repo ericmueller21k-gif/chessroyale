@@ -7,7 +7,7 @@ import { findLine, findShort } from "../characters/hollow.ts";
 import { pickLine } from "../characters/boss-beats.ts";
 import type { BossView, LightsView } from "../game.ts";
 import { BoardEffects, BossMoment, prewarm } from "./BossEffect.tsx";
-import { PowerBanner } from "./BossPowers.tsx";
+import { PowerBanner } from "./PowerParts.tsx";
 import { TimerBar } from "./Countdown.tsx";
 
 /**

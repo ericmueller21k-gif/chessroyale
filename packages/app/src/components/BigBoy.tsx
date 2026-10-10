@@ -1,13 +1,13 @@
-import { BOUNCE, SNACK, pieceAt, withPiece, withoutPiece } from "@chessroyale/chess";
+import { BLOCK, BOUNCE, SNACK, pieceAt, withPiece, withoutPiece } from "@chessroyale/chess";
 import type { BounceResult } from "@chessroyale/core";
 import { bounceShape } from "../characters/bigboy.ts";
 import { bossKit } from "../characters/kits.ts";
 import { pickLine } from "../characters/boss-beats.ts";
-import { animLength, EFFECTS } from "../characters/power-art.ts";
+import { animLength, blockItem, blockLetter, EFFECTS } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { BoardEffects, BossEffect, BossMoment, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
-import type { Moment } from "./BossPowers.tsx";
+import { Flight, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 
 /**
  * Big Boy on the board: his snack before move 1 (he waddles over to one of the crowd's centre pawns, grabs it, eats it)
@@ -331,3 +331,84 @@ export function prewarmBigBoy(name: string, look?: string): void {
   prewarm("bouncePuff", fx("bouncePuff"));
   prewarm("bounceCrash", fx("bounceCrash"));
 }
+
+// ---------------- His powers on screen: the toy block, the Big Bounce's moment ----------------
+
+/** When this device saw a toy block go (it puffs away from then, as the next turn begins). */
+const blockGone = new Map<string, number>();
+/** The last toy block each battle showed (so one that has just gone puffs away). */
+const blockLast = new Map<string, { square: string; until: number }>();
+/**
+ * Big Boy's toy block on the board: landing as his toss arrives (its moment), sitting while it lasts, and puffing away
+ * once it's gone (as the turn after its last begins). One canvas over the board, under any banner, never taking a tap.
+ */
+function blockItems(boss: BossView, now: number, appearAt: (square: string) => number): BoardItem[] {
+  const p = boss.powers;
+  if (!p || p.passive !== "blocks") return [];
+  const key = `${boss.id}:${boss.startMove}:${boss.board.generation}`;
+  const block = p.block ?? null;
+  const out: BoardItem[] = [];
+  if (block) {
+    blockLast.set(key, { square: block.square, until: block.until });
+    const since = appearAt(block.square);
+    if (now >= since) out.push(blockItem(block.square, since ? "land" : "sit", since));
+  } else {
+    const last = blockLast.get(key);
+    if (last && last.until < p.turn) {
+      const tag = `${key}:${last.square}:${last.until}`;
+      let at = blockGone.get(tag);
+      if (at === undefined) blockGone.set(tag, (at = now));
+      if (now < at + POOF_MS) out.push(blockItem(last.square, "poof", at));
+    }
+  }
+  return out;
+}
+const POOF_MS = animLength(EFFECTS.toyBlock.ch.anims.poofA!);
+
+function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
+  const letter = moment.square ? blockLetter(moment.square) : "A";
+  return (
+    <div class="power-moment pm-block">
+      {t < 1500 && banner("TOY BLOCK!", moment.square ? `Blocked: ${moment.square}` : undefined, "toy")}
+      {cast("toss", BLOCK.flyAt)}
+      {moment.square && t >= BLOCK.flyAt && t < BLOCK.landAt && (
+        <Flight name="blockFly" anim={`fly${letter}`} square={moment.square} orientation={orientation} since={moment.at + BLOCK.flyAt} ms={BLOCK.landAt - BLOCK.flyAt} />
+      )}
+    </div>
+  );
+}
+
+function bounceMoment({ boss, moment, now, t, orientation, banner }: MomentProps) {
+  return (
+    <div class="power-moment pm-bounce">
+      {t < 1300 && banner("BIG BOUNCE!", undefined, "toy")}
+      <BigBounce boss={boss} moment={moment} now={now} orientation={orientation} />
+    </div>
+  );
+}
+
+/** Big Boy's powers on screen. His rules: packages/chess/src/bosses/bigboy.ts. */
+export const BIGBOY_UI = {
+  id: "bigboy",
+  // (His Big Bounce comes at the start of his turn, after your move.)
+  ultimate: { name: "the Big Bounce", when: "After your move" },
+  moments: {
+    block: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + BLOCK.landAt : undefined), view: blockMoment },
+    // The Big Bounce, at the start of his turn before his move: its own screen.
+    bounce: { order: 3, kit: "ultimate", own: (boss) => !!boss.powers?.bounce && boss.powers.bounce.at === boss.crowdMoves && boss.powers.events.some((e) => e.kind === "bounce"), view: bounceMoment },
+  },
+  // His toy block: landing as his toss arrives, sitting while it lasts, puffing away as it goes.
+  board: ({ boss, orientation, now, appearAt }) => {
+    const blocks = blockItems(boss, now, appearAt);
+    return {
+      over: (
+        <>
+          {blocks.length > 0 && <BoardEffects items={blocks} orientation={orientation} class="pw-fire-board pw-block-board" />}
+          {blocks.map((b) => (
+            <span key={`block-${b.square}`} class="pw-block" style={onSquare(b.square, orientation)} data-square={b.square} data-state={b.anim!.replace(/[A-Z]$/, "")} />
+          ))}
+        </>
+      ),
+    };
+  },
+} satisfies BossUi;
