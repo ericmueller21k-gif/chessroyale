@@ -551,3 +551,22 @@ screen and the boss bar.
 - Text a player must read to play (a prompt, a target) stays on screen for as long as it applies, in a place that's in
   view on every screen. A speech bubble is extra, never the only copy. Measure it through the whole moment, not in one
   screenshot.
+
+## A paint bucket that ran out of memory (Oct 10, 2026)
+
+**Eric saw** (on his computer): in the profile's icon builder, a few clicks of the fill froze the page, then Chrome's
+"Aw, Snap! Out of Memory".
+
+**The cause:** a colour built with bitwise operators (`0xff << 24 | …`) is a *signed* number; the same value read
+back from a `Uint32Array` is unsigned. So the fill's "already that colour, stop" check never matched, and filling an
+area with the colour it already had (any second click on it) re-queued every pixel forever. Every test passed: the one
+test of the fill clicked once, on a blank canvas.
+
+**How it was found:** `e2e/icon-editor.spec.ts` (50 fills in a row on a computer) hung on the second fill on `main`;
+then two lines of Node showed `new Uint32Array([v])[0] !== v` for an opaque colour.
+
+**The rule:**
+- A pixel or packed value compared with what a typed array holds is made unsigned (`>>> 0`) first.
+- A loop that ends only when a check says "done" (a flood fill, a search) also has a bound it can't pass: a visited
+  set, each item queued once.
+- Test a tool the way it gets used: many times in a row, on its own result, not once on a fresh state.
