@@ -109,7 +109,8 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
   chess-engine code.
 - `packages/chess`: chess rules (chess.js), the Stockfish interface over UCI (`src/uci.ts`; Node transport in
   `src/node.ts`), the opening library (`data/openings.json`, built by `scripts/build-openings.ts`), the match runner
-  (`src/runner.ts`) and the lobby protocol (`src/protocol.ts`).
+  (`src/runner.ts`), the lobby protocol (`src/protocol.ts`) and Squads' rules (`src/squads/`, imported as
+  `@chessroyale/chess/squads`; see `docs/areas/squads.md`).
 - `packages/sim`: bot simulation that writes `reports/playtest.md`; `scripts/calibrate-rating.ts` fits the engine-rating
   curve (`packages/core/src/rating-curve.ts`, report in `reports/rating-calibration.md`) against Stockfish's UCI_Elo.
 - `packages/app`: the web app (Vite + Preact, chessground board, Stockfish in Web Workers). Screens in `src/screens/`;
@@ -126,6 +127,7 @@ npm run dev                                    # app dev server (solo only; no A
 npx wrangler dev                               # app + API + Durable Objects at http://localhost:8787
 npm run e2e                                    # Playwright: solo, multiplayer, install (multiplayer takes ~5 min)
 npm run simulate                               # bot simulation -> reports/playtest.md (about 1–2 hours)
+npm run sim:squads                             # Squads bot simulation -> reports/squads-sim.md (about 30 min)
 npx tsx packages/sim/scripts/calibrate-rating.ts   # refit the engine-rating curve (~20 min)
 npx tsx packages/chess/scripts/build-openings.ts   # rebuild the opening library (~15 min, 4 engines)
 ```
