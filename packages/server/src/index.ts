@@ -245,7 +245,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
  *   POST /api/squads/party → { code }: a new party (the invite link is /squads/party/CODE).
  *   GET /api/squads/party/CODE → { open, members, state } | 404; /api/squads/party/CODE/ws: its WebSocket.
  *   GET /api/squads/lobby/CODE → { open, phase } | 404; /api/squads/lobby/CODE/ws: its WebSocket.
- *   POST /api/squads/lobby?start=relay|pairs|final&clock=B+I/FB+FI&keep=S → { code }: a test lobby (test controls:
+ *   POST /api/squads/lobby?start=relay|pairs|final&clock=BANK,TOPUP,FREE,INC&keep=S → { code }: a test lobby (test controls:
  *     admins, or anyone where SQUADS_TEST is "1"; else 404). It fills with bots SQUADS_LOBBY.testFillSeconds after
  *     it opens, and records and rewards nothing.
  */

@@ -163,7 +163,7 @@ plays, ties). Nothing links to it until phase 3's screens. The calls are in `DEC
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
   e2e, never production), while `SQUADS_LOBBY.testControls` is on: `nextRound` in a lobby (the rules' `endByMaterial` on
   the earliest round's matches, the next round 3 s later; in the votes: they close), and `POST /api/squads/lobby?
-  start=pairs|final&clock=...` for a test lobby that fills 5 s after it opens, skipping the rounds before (squads with
+  start=pairs|final&clock=bank,top-up,free,increment` for a test lobby that fills 5 s after it opens, skipping the rounds before (squads with
   more people go through).
 - **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 1, typed): a lobby socket gets
   `welcome`, `lobby` (seats, squads, bracket, rules), `vote`/`voteCast`, `match` (a match in full, as you may see it),

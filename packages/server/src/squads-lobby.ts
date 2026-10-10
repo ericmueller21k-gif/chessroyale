@@ -37,7 +37,10 @@ import {
   squadsRng,
   squadsVotes,
   startArmageddon,
-  timeLeft,
+  matchClocks,
+  settleTeamClocks,
+  startTeamClocks,
+  teamClocks,
   visibleChoices,
   winnerSquad,
   type Bracket,
@@ -50,6 +53,7 @@ import {
   type NetSquadsLobby,
   type NetSquadsMatch,
   type NetSquadsVote,
+  type NetTeamClock,
   type Party,
   type Side,
   type Squad,
@@ -292,15 +296,15 @@ export function partiesFit(sizes: readonly number[], s: SquadsSettings = SQUADS)
 }
 
 /**
- * A test lobby's clock (?clock=), written as chess players write one: "B+I/FB+FI" in seconds, rounds 1 and 2's bank and
- * increment, then the final's (a "+" may arrive as a space). Null if it isn't one.
+ * A test lobby's team clock (?clock=): "bank,top-up,free,increment" in seconds (each squad's starting bank, its top-up
+ * a round, the free seconds a move, the increment), e.g. "120,30,3,0". Null if it isn't one.
  */
 export function parseTestClock(text: string | null): SquadsClock | null {
-  const m = text?.trim().match(/^(\d{1,4})[+ ](\d{1,3})\/(\d{1,4})[+ ](\d{1,3})$/);
+  const m = text?.trim().match(/^(\d{1,4}),(\d{1,4}),(\d{1,3}),(\d{1,3})$/);
   if (!m) return null;
-  const [bank, inc, finalBank, finalInc] = m.slice(1).map(Number) as [number, number, number, number];
-  if (bank < 1 || finalBank < 1) return null;
-  return { id: "test", label: "Test", bankSeconds: bank, incrementSeconds: inc, finalBankSeconds: finalBank, finalIncrementSeconds: finalInc };
+  const [bank, topUp, delay, inc] = m.slice(1).map(Number) as [number, number, number, number];
+  if (bank < 1 || delay < 1) return null;
+  return { id: "test", label: "Test", bankSeconds: bank, topUpSeconds: topUp, delaySeconds: delay, incrementSeconds: inc };
 }
 
 /** The engine's top moves for positions the devices (or the server) have settled, shared by the lobbies here. */
@@ -739,6 +743,8 @@ export class SquadsCore {
     if (this.r.test?.clock) rules.clock = this.r.test.clock;
     this.r.rules = rules;
     this.r.plan = planLobby(this.r.seed, rules, this.library, this.s);
+    // Every squad's team clock for the whole tournament (the rules' numbers).
+    this.r.squads = startTeamClocks(this.r.squads, rules.clock);
     let bracket = drawBracket(
       this.r.squads.map((sq) => sq.id),
       squadsRng(this.r.seed, "bracket"),
@@ -760,6 +766,7 @@ export class SquadsCore {
     this.placeNew();
     for (const bm of bracket[start]!) this.createMatch(start as SquadsRound, bm.index, now + SQUADS_LOBBY.bracketIntroSeconds * 1000);
     this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
+    this.sendClocks();
   }
 
   private createMatch(round: SquadsRound, index: number, startsAt: number) {
@@ -842,9 +849,9 @@ export class SquadsCore {
     for (const d of duties.duties) {
       for (const p of d.players) {
         if (!this.botPlays(p)) continue;
-        // (Blockers think as if on the picking side's clock, as in the sim; nobody charges them for it.)
-        const bankMs = m.boards[d.board]!.clock[m.half];
-        half.bots[p] = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, deadlineMs: d.deadlineMs }, this.s);
+        // (Blockers think as if on the picking squad's clock, as in the sim; nobody charges them for it.)
+        const bankMs = m.banks[d.role === "block" ? otherSide(d.side) : d.side];
+        half.bots[p] = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: m.delayMs, deadlineMs: d.deadlineMs }, this.s);
         boards.add(d.board);
       }
     }
@@ -852,9 +859,24 @@ export class SquadsCore {
     for (const b of boards) this.requestWork(lm, half, b, jobs);
     for (const [device, list] of jobs) this.send(device, { t: "botWork", jobs: list });
     this.touch(lm);
-    this.sendAll({ t: "turn", key: lm.key, current: this.netHalf(lm)! });
+    this.sendAll({ t: "turn", key: lm.key, current: this.netHalf(lm)!, banks: [m.banks[0], m.banks[1]] });
+    this.sendClocks();
     // (The bracket shows the match as playing from its first half.)
     if (half.seq === 0) this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
+  }
+
+  /** Every squad's team clock, as the rules have it (a squad in a match: that match's bank; else its own). */
+  clocksView(): NetTeamClock[] {
+    if (!this.r.bracket) return [];
+    const live = new Map<number, NetTeamClock>();
+    for (const lm of this.liveMatches()) {
+      matchClocks(lm.m).forEach((c) => live.set(c.squadId, { ...c, key: lm.key, since: lm.state === "half" && lm.half ? lm.half.startedAt : null }));
+    }
+    return teamClocks(this.r.squads).map((c) => live.get(c.squadId) ?? { ...c, key: null, since: null });
+  }
+
+  private sendClocks() {
+    this.sendAll({ t: "clocks", clocks: this.clocksView() });
   }
 
   /** When the half ends: everyone with a duty locked in (now), else the last deadline of anyone still choosing (plus the network's grace). */
@@ -974,7 +996,11 @@ export class SquadsCore {
     const now = this.io.now();
     const out = resolveHalf(lm.m, half.inputs, half.at, this.s);
     const was = new Set(this.r.squads.flatMap((sq) => sq.players.filter((p) => p.replacedByBot).map((p) => p.id)));
-    this.r.squads = noteActions(this.r.squads, out.acted, out.missed, this.s);
+    // A move made, but too late for the team clock (sudden death, or the bank ran out mid-half), is a miss on the
+    // record but not a no-show: the person was there. No move at all is a no-show, as the rules count it.
+    const late = new Set(out.timeouts.filter((id) => half.inputs.choices[id]));
+    this.r.squads = noteActions(this.r.squads, [...out.acted, ...late], out.missed.filter((id) => !late.has(id)), this.s);
+    if (late.size) this.r.squads = this.r.squads.map((sq) => ({ ...sq, players: sq.players.map((p) => (late.has(p.id) ? { ...p, misses: p.misses + 1 } : p)) }));
     const replaced = this.r.squads.flatMap((sq) => sq.players.filter((p) => p.replacedByBot && !was.has(p.id)).map((p) => p.id));
     lm.m = out.match;
     lm.half = null;
@@ -984,6 +1010,7 @@ export class SquadsCore {
     this.sendAll({ t: "half", key: lm.key, seq: half.seq, events: out.events, acted: out.acted, missed: out.missed, replaced, match: this.netMatch(lm, false) });
     if (replaced.length) this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
     if (lm.m.result) this.matchOver(lm);
+    else this.sendClocks();
   }
 
   // ---------------- A match's end ----------------
@@ -991,14 +1018,17 @@ export class SquadsCore {
   private matchOver(lm: LiveMatch) {
     const m = lm.m;
     const now = this.io.now();
+    // What's left of each squad's team bank carries into its next match (Armageddon's own clocks aside).
+    this.r.squads = settleTeamClocks(this.r.squads, m);
     if (m.result!.winner === null) {
-      // A drawn final: Armageddon. The squad with more time left picks its colour (bots take Black).
+      // A drawn final: Armageddon. The squad with more team bank left picks its colour (bots take Black).
       lm.drawn = m;
       lm.state = "armageddon";
       lm.startsAt = null;
       lm.arm = { chooser: armageddonChooser(m), until: now + this.s.armageddonIntroSeconds * 1000, colour: null };
       this.touch(lm);
       this.sendAll((id) => this.matchMessage(lm, id, true));
+      this.sendClocks();
       return;
     }
     lm.state = "over";
@@ -1015,6 +1045,7 @@ export class SquadsCore {
       this.sendAll({ t: "results", placements: { ...this.r.placed } });
     }
     this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
+    this.sendClocks();
   }
 
   private armageddonColour(id: string, key: string, colour: Colour) {
@@ -1362,6 +1393,7 @@ export class SquadsCore {
       squads: this.r.squads.map((sq) => ({ id: sq.id, seats: sq.players.map((p) => p.id), placement: this.r.placed[sq.id] ?? null })),
       bracket: this.netBracket(),
       rules: this.r.rules,
+      clocks: this.clocksView(),
       ...(this.r.test ? { test: { start: this.r.test.start, used: true } } : this.r.testUsed ? { test: { start: 0 as SquadsRound, used: true } } : {}),
     };
   }
@@ -1430,7 +1462,6 @@ export class SquadsCore {
         ply: b.moves.length,
         lastMove: b.moves[b.moves.length - 1] ?? null,
         white: b.white,
-        clock: { w: b.clock.w, b: b.clock.b },
         result: b.result,
       })),
       turn: m.turn,
@@ -1440,7 +1471,9 @@ export class SquadsCore {
       startsAt: lm.startsAt,
       current: lm.state === "half" ? this.netHalf(lm) : null,
       result: m.result,
-      ...(lm.drawn ? { drawnFinal: { points: [lm.drawn.result!.points[0], lm.drawn.result!.points[1]] as [number, number], timeLeft: timeLeft(lm.drawn.boards) } } : {}),
+      banks: [m.banks[0], m.banks[1]],
+      delayMs: m.delayMs,
+      ...(lm.drawn ? { drawnFinal: { points: [lm.drawn.result!.points[0], lm.drawn.result!.points[1]] as [number, number], timeLeft: [lm.drawn.banks[0], lm.drawn.banks[1]] as [number, number] } } : {}),
       ...(lm.arm ? { armageddonChoice: { ...lm.arm } } : {}),
     };
   }

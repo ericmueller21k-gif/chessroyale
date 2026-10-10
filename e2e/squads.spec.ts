@@ -61,7 +61,8 @@ test("a test lobby straight at the final (SQUADS_TEST): its people play; Next ro
   test.setTimeout(180_000);
   const base = baseURL!;
   const cookie = await guestCookie(base);
-  const res = await fetch(`${base}/api/squads/lobby?start=final&keep=30`, { method: "POST", headers: { cookie: cookie ?? "" } });
+  // (A small team clock, so the bots think for seconds, not tens of seconds.)
+  const res = await fetch(`${base}/api/squads/lobby?start=final&clock=60,0,3,0&keep=30`, { method: "POST", headers: { cookie: cookie ?? "" } });
   expect(res.status).toBe(200);
   const { code } = (await res.json()) as { code: string };
   const tess = new SquadsClient({ base, name: "Tess", cookie, play: true, thinkMs: [300, 800] });
@@ -75,6 +76,9 @@ test("a test lobby straight at the final (SQUADS_TEST): its people play; Next ro
   expect(fin.sides.some((s) => s.seats.includes(tess.playerId!))).toBe(true);
   // A few halves played (picks, blocks, the reveal), then the test control.
   await tess.until(() => (tess.matches.get("r2m0")?.boards[0]?.ply ?? 0) >= 4, 120_000, "four moves in the final");
+  // Every squad's team clock reaches everyone; the finalists' are the final's.
+  expect(tess.clocks).toHaveLength(8);
+  expect(tess.clocks.filter((c) => c.key === "r2m0")).toHaveLength(2);
   tess.send({ t: "nextRound" });
   await tess.until(() => tess.lobby?.phase === "results", 15_000, "the results");
   expect(tess.results).not.toBeNull();

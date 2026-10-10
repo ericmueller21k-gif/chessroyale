@@ -8,7 +8,7 @@
  *   --mode queue|party|test   how the people get in: PLAY alone (default), a party, or a test lobby (needs SQUADS_TEST=1)
  *   --people N                people (default 1; a party's size with --mode party, at most 4)
  *   --start relay|pairs|final a test lobby's first round
- *   --clock B+I/FB+FI         a test lobby's clock (seconds)
+ *   --clock B,T,F,I            a test lobby's team clock: bank, top-up, free seconds, increment (seconds)
  *   --play                    the people play their own duties (the engine's best, or a random legal move); else they
  *                             sit idle and a bot takes each seat after its third miss (a full bot lobby)
  *   --device                  each person's client answers bot work with Node's Stockfish, as a phone or computer would

@@ -233,23 +233,48 @@ describe("squads lobby: playing a half", () => {
     expect(L.last(party[0]!, "lobby")!.lobby.players.find((x) => x.id === party[2])).toMatchObject({ left: true, botPlays: true });
   });
 
-  it("a flag falls when a squad's bank runs out (the rules' clock: the deadline is the bank, then the board is lost)", () => {
-    const L = squadsLobby({ test: { start: 0, clock: parseTestClock("3+0/3+0")! }, fillInMs: 5_000 });
+  it("team clocks: a squad's bank drains while its moves are thought about; at zero, sudden death (no flag falls)", () => {
+    // Each squad's bank 4 s, 2 s free a move: two of the party's moves at once empty it 4 s into the half.
+    const L = squadsLobby({ test: { start: 0, clock: parseTestClock("4,0,2,0")! }, fillInMs: 5_000 });
     L.core.reserve([{ size: 4, pass: "four" }], 60_000);
     const party = ["A", "B", "C", "D"].map((n) => L.join(n, { party: "four" }));
-    L.advance(5_000 + VOTES_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000);
+    L.advance(5_000 + VOTES_MS);
+    // Everyone sees every squad's clock as the bracket starts.
+    const start = L.last(party[0]!, "clocks")!.clocks;
+    expect(start).toHaveLength(8);
+    expect(start.every((c) => c.bankMs === 4_000 && !c.suddenDeath)).toBe(true);
+    L.advance(SQUADS_LOBBY.bracketIntroSeconds * 1000);
     const lm = L.core.allMatches().find((m) => mineIn(m, party[0]!))!;
-    const turn = L.last(party[0]!, "turn")!.current;
-    const duty = turn.duties.find((d) => party.includes(d.players[0]!))!;
-    // The deadline is the bank (3 s), not the ceiling.
-    expect(duty.deadline - turn.startedAt).toBe(3_000);
+    const side = lm.m.sides.findIndex((x) => x.seats.includes(party[0]!));
+    const squadId = lm.m.sides[side]!.squadId;
+    const turn = L.last(party[0]!, "turn")!;
+    expect(turn.banks[side]).toBe(4_000);
+    const mine = turn.current.duties.filter((d) => d.side === side);
+    expect(mine).toHaveLength(2);
+    // The ceiling bounds a move while the bank lasts.
+    expect(mine.every((d) => d.deadline - turn.current.startedAt === SQUADS.moveCeilingSeconds * 1000)).toBe(true);
+    // One mover chooses at 5 s, after the bank ran out (at 4 s): too late, a miss, but not a no-show. The other never moves.
+    const [late, absent] = [mine[0]!.players[0]!, mine[1]!.players[0]!];
+    L.advance(5_000);
+    L.core.message(late, { t: "choose", key: lm.key, seq: turn.current.seq, move: squadsLegalMoves(lm.m.boards[mine[0]!.board]!.fen)[0]! });
     L.runUntil(() => L.all(party[0]!, "half").some((h) => h.key === lm.key && h.seq === 0), 60_000, "the first half");
     const half = L.all(party[0]!, "half").find((h) => h.key === lm.key && h.seq === 0)!;
-    expect(half.events).toContainEqual(expect.objectContaining({ kind: "board_end", board: duty.board, result: expect.objectContaining({ reason: "flag" }) }));
+    expect(half.events).toContainEqual(expect.objectContaining({ kind: "sudden_death", side }));
+    expect(half.events.some((e) => e.kind === "board_end" && (e.result.reason as string) === "flag")).toBe(false);
+    expect(half.missed).toEqual(expect.arrayContaining([late, absent]));
+    expect(half.match.banks[side]).toBe(0);
+    const seat = (id: string) => L.core.record.squads.flatMap((sq) => sq.players).find((p) => p.id === id)!;
+    expect(seat(late)).toMatchObject({ misses: 1, missStreak: 0 });
+    expect(seat(absent)).toMatchObject({ misses: 1, missStreak: 1 });
+    // Everyone sees that squad in sudden death; its next moves have only the free seconds.
+    expect(L.last(party[3]!, "clocks")!.clocks.find((c) => c.squadId === squadId)).toMatchObject({ bankMs: 0, suddenDeath: true, key: lm.key });
+    L.runUntil(() => L.all(party[0]!, "turn").some((t) => t.key === lm.key && t.current.seq >= 1 && t.current.duties.some((d) => d.side === side)), 120_000, "its next move");
+    const next = L.all(party[0]!, "turn").find((t) => t.key === lm.key && t.current.seq >= 1 && t.current.duties.some((d) => d.side === side))!;
+    for (const d of next.current.duties.filter((x) => x.side === side)) expect(d.deadline - next.current.startedAt).toBe(2_000);
   });
 
-  it("ties: a level match is decided by clock time left (then a coin); the drawn final goes to Armageddon", () => {
-    // ("Next round" settles the matches level on material: time left decides, as for a tie in rounds 1 and 2.)
+  it("ties: a level match goes to the squad with more team bank left (then a coin); banks carry into the next round, topped up", () => {
+    // ("Next round" settles the matches level on material: the banks decide, as for a tie in rounds 1 and 2.)
     const L = squadsLobby({ test: { start: 0 }, fillInMs: 5_000 });
     const a = L.join("Ann", { test: true });
     L.advance(5_000 + VOTES_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000);
@@ -259,8 +284,17 @@ describe("squads lobby: playing a half", () => {
       const r = lm.m.result!;
       expect(r.how).toBe("admin");
       if (r.points[0] === r.points[1]) {
-        expect(r.timeLeft).toBeDefined();
+        expect(r.timeLeft).toEqual([lm.m.banks[0], lm.m.banks[1]]);
         if (r.timeLeft![0] !== r.timeLeft![1]) expect(r.winner).toBe(r.timeLeft![0] > r.timeLeft![1] ? 0 : 1);
+      }
+    }
+    // Each winner's bank goes into round 2, topped up (the rules' planMatch).
+    const rules = L.core.record.rules!;
+    for (const lm of L.core.allMatches().filter((m) => m.round === 1)) {
+      for (const side of [0, 1] as const) {
+        const feeder = L.core.allMatches().find((m) => m.round === 0 && m.m.sides.some((x) => x.squadId === lm.m.sides[side].squadId))!;
+        const was = feeder.m.banks[feeder.m.sides.findIndex((x) => x.squadId === lm.m.sides[side].squadId)]!;
+        expect(lm.m.banks[side]).toBe(was + rules.clock.topUpSeconds * 1000);
       }
     }
   });
@@ -351,7 +385,8 @@ describe("squads lobby: the final, Armageddon and visibility", () => {
     const a = L.core.match("r2m0")!;
     expect(a.m.armageddon).toBe(true);
     expect(a.m.boards[0]!.white).toBe(chooser);
-    expect(a.m.boards[0]!.clock).toEqual({ w: SQUADS.armageddon.whiteSeconds * 1000, b: SQUADS.armageddon.blackSeconds * 1000 });
+    expect(a.m.banks[chooser]).toBe(SQUADS.armageddon.whiteSeconds * 1000);
+    expect(a.m.banks[chooser === 0 ? 1 : 0]).toBe(SQUADS.armageddon.blackSeconds * 1000);
     L.runUntil(() => L.core.record.phase === "results", 60 * 60_000, "the results");
     expect(Object.values(L.core.record.placed).sort()).toEqual([1, 2, 3, 3, 5, 5, 5, 5]);
     expect(L.last(solo, "results")).toBeDefined();
@@ -432,8 +467,8 @@ describe("squads lobby: rewards", () => {
 
 describe("squads lobby: bots' engine work on players' devices", () => {
   /** A test lobby at round 1 with people whose devices take bot work (`phone`: which of them are phones). */
-  function withDevices(n: number, opts: { server?: boolean; phones?: number[] } = {}) {
-    const L = squadsLobby({ test: { start: 0 }, fillInMs: 5_000, serverEngine: !!opts.server });
+  function withDevices(n: number, opts: { server?: boolean; phones?: number[]; clock?: string } = {}) {
+    const L = squadsLobby({ test: { start: 0, ...(opts.clock ? { clock: parseTestClock(opts.clock)! } : {}) }, fillInMs: 5_000, serverEngine: !!opts.server });
     const ids = Array.from({ length: n }, (_, i) => L.join(`D${i}`, { device: opts.phones?.includes(i) ? "phone" : "computer" }));
     ids.forEach((id, i) => L.core.message(id, { t: "speed", nps: 1_000_000 + i * 1000 }));
     L.advance(5_000 + VOTES_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000);
@@ -523,12 +558,13 @@ describe("squads lobby: bots' engine work on players' devices", () => {
   });
 
   it("a bot waits for its devices' answer, then plays from it at once; with no answer, the quick look by its fallback moment", () => {
-    const { L, ids, jobs } = withDevices(2);
+    // (A small bank, so bots think for a second or two: less than the devices may take to answer.)
+    const { L, ids, jobs } = withDevices(2, { clock: "40,0,2,0" });
     const found = jobs(ids[0]!)
       .map((job) => {
         const lm = L.core.match(job.id.split("/")[0]!)!;
         const board = Number(job.id.split("/")[2]);
-        const bot = Object.keys(lm.half!.bots).find((b) => dutyBoard(lm, b) === board);
+        const bot = Object.keys(lm.half!.bots).find((b) => dutyBoard(lm, b) === board && lm.half!.bots[b]! < SQUADS_LOBBY.botWork.answerMs - 500);
         return bot ? { job, lm, board, bot } : null;
       })
       .filter((x) => !!x);
@@ -543,9 +579,10 @@ describe("squads lobby: bots' engine work on players' devices", () => {
     for (const id of ids) L.core.message(id, { t: "botTop", id: first.job.id, top });
     expect(top.map((m) => m.move)).toContain(first.lm.half!.inputs.choices[first.bot]);
     // The other job is never answered: past the answer time, its bot plays from the server's quick look.
-    L.advanceTo(second.lm.half!.startedAt + SQUADS_LOBBY.botWork.answerMs + 1);
-    expect(second.lm.half!.work[second.board]!.how).toBe("fallback");
-    expect(second.lm.half!.inputs.choices[second.bot]).toBeDefined();
+    const half = second.lm.half!;
+    L.advanceTo(half.startedAt + SQUADS_LOBBY.botWork.answerMs + 1);
+    expect(half.work[second.board]!.how).toBe("fallback");
+    expect(half.inputs.choices[second.bot]).toBeDefined();
   });
 });
 

@@ -15,7 +15,7 @@ import type { SquadsRules, SquadsVoteId } from "./votes.ts";
  * Times are server milliseconds; each server message carries `now` so the app can correct for clock offset. Moves are
  * UCI. `hello` carries the app's protocol version (`v`); a server that doesn't speak it says so ("error").
  *
- * Version 1 (Oct 10, 2026): the first.
+ * Version 1 (Oct 10, 2026): the first (team clocks: one bank per squad for the whole tournament).
  */
 export const SQUADS_PROTOCOL = 1;
 
@@ -89,6 +89,8 @@ export interface NetSquadsLobby {
   bracket: NetBracketMatch[];
   /** The votes' result, once decided. */
   rules: SquadsRules | null;
+  /** Every squad's team clock (empty until the bracket is drawn). */
+  clocks: NetTeamClock[];
   /** A test lobby (the test controls): where it started, and whether a test control has been used (no rewards then). */
   test?: { start: SquadsRound; used: boolean };
 }
@@ -127,8 +129,6 @@ export interface NetSquadsBoard {
   lastMove: string | null;
   /** The side of the match that plays White here. */
   white: Side;
-  /** Each colour's bank (ms) as the current half began (the side to move's runs down from `current.startedAt`). */
-  clock: { w: number; b: number };
   result: BoardResult | null;
 }
 
@@ -170,6 +170,14 @@ export interface NetSquadsMatch {
   boards: NetSquadsBoard[];
   turn: number;
   half: Colour;
+  /**
+   * Each side's team bank (ms) as the current half began (Armageddon: its own fixed clocks). During a half it drains past
+   * `delayMs` (the free seconds a move) once for each of that squad's moves still being thought about (a duty's players
+   * not all locked in; blockers don't drain it). At 0 the squad is in sudden death: each move within `delayMs`.
+   */
+  banks: [number, number];
+  delayMs: number;
+  /** Credited to a squad's bank after each move it made in time. */
   incrementMs: number;
   /**
    * break: about to start (the first half at `startsAt`); half: a half is being played (`current`); show: the half's
@@ -180,10 +188,24 @@ export interface NetSquadsMatch {
   startsAt: number | null;
   current: NetSquadsHalf | null;
   result: MatchResult | null;
-  /** After a drawn final: its points and each side's clock time left (which decided who picks Armageddon's colours). */
+  /** After a drawn final: its points and each side's team bank left (which decided who picks Armageddon's colours). */
   drawnFinal?: { points: [number, number]; timeLeft: [number, number] };
   /** A drawn final: the side that picks Armageddon's colours (its squad's people; bots take Black), until when, and the pick so far. */
   armageddonChoice?: { chooser: Side; until: number; colour: Colour | null };
+}
+
+/**
+ * A squad's team clock, for every player (each squad's clock beside its name and rank): its bank (ms) as of `since`,
+ * and whether it's in sudden death. `key`: the match it's playing now (null between matches), whose current half began
+ * at `since`; during that half the bank drains as `NetSquadsMatch.banks` says (the match's duties and who has locked
+ * in, from "turn" and "choices").
+ */
+export interface NetTeamClock {
+  squadId: number;
+  bankMs: number;
+  suddenDeath: boolean;
+  key: string | null;
+  since: number | null;
 }
 
 // ---------------- Messages: the lobby ----------------
@@ -238,8 +260,10 @@ export type SquadsServerMessage = { now: number } & (
    * the picking squad), `locked` who has locked in.
    */
   | { t: "match"; match: NetSquadsMatch; visible: Record<string, string>; locked: string[] }
-  /** A new half has begun in a match (its duties and deadlines). */
-  | { t: "turn"; key: string; current: NetSquadsHalf }
+  /** A new half has begun in a match (its duties and deadlines, and both squads' banks as it began). */
+  | { t: "turn"; key: string; current: NetSquadsHalf; banks: [number, number] }
+  /** Every squad's team clock: as the bracket starts, and whenever a half begins or ends anywhere or a match ends. */
+  | { t: "clocks"; clocks: NetTeamClock[] }
   /** Choices you may see in the half being played, as they change. */
   | { t: "choices"; key: string; seq: number; visible: Record<string, string>; locked: string[] }
   /**

@@ -1,4 +1,4 @@
-import { SQUADS_PROTOCOL, squadsLegalMoves, type NetSquadsLobby, type NetSquadsMatch, type PartyServerMessage, type SquadsServerMessage } from "@chessroyale/chess/squads";
+import { SQUADS_PROTOCOL, squadsLegalMoves, type NetSquadsLobby, type NetSquadsMatch, type NetTeamClock, type PartyServerMessage, type SquadsServerMessage } from "@chessroyale/chess/squads";
 import type { MoveScore } from "@chessroyale/chess";
 
 /**
@@ -53,6 +53,8 @@ export class SquadsClient {
   matches = new Map<string, NetSquadsMatch>();
   placed: Extract<SquadsServerMessage, { t: "placed" }> | null = null;
   results: Record<number, number> | null = null;
+  /** Every squad's team clock, as last sent. */
+  clocks: NetTeamClock[] = [];
   errors: string[] = [];
   closed = false;
   test = false;
@@ -131,6 +133,10 @@ export class SquadsClient {
     switch (msg.t) {
       case "lobby":
         this.lobby = msg.lobby;
+        if (msg.lobby.clocks.length) this.clocks = msg.lobby.clocks;
+        break;
+      case "clocks":
+        this.clocks = msg.clocks;
         break;
       case "match":
         this.matches.set(msg.match.key, msg.match);
@@ -143,6 +149,7 @@ export class SquadsClient {
         if (m) {
           m.state = "half";
           m.current = msg.current;
+          m.banks = msg.banks;
           this.onTurn(m);
         }
         break;
