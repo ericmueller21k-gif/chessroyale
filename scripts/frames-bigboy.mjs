@@ -144,7 +144,7 @@ async function run(name, context) {
     list.forEach((f, i) => writeFileSync(join(dir, `${String(i).padStart(4, "0")}.jpg`), Buffer.from(f.data, "base64")));
     if (list.length > 2) {
       const dur = (list[list.length - 1].t - list[0].t) / 1000;
-      const fps = Math.max(5, Math.min(30, Math.round(list.length / Math.max(0.1, dur))));
+      const fps = Math.max(5, Math.min(60, Math.round(list.length / Math.max(0.1, dur))));
       try {
         execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", join(dir, "%04d.jpg"), "-vf", `fps=12,scale=${name === "desktop" ? 720 : 390}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse`, join(outDir, `${tag}.gif`)]);
       } catch (e) {

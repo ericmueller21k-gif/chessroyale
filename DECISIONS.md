@@ -4243,7 +4243,9 @@ A chubby baby in a diaper and a "BIG BOY" crop shirt, armed with a swirly rainbo
 Built by one delegate across both lanes (`characters` and `god-king`) on the approved sprite (PR from `claude/bigboy`).
 **Big Boy is playable** in every boss mode (the raid online, Solo "Boss alone" and the Solo raid, the Crowd's boss
 final): the random draw is among five bosses. Roster: `bigboy`, icon 🍭, kit `Big Boy` (the preview's kit `BigBoy`
-renamed to his boss name; `?wip=1&kit=BigBoy` still finds it), offset {{OFFSET}}, passive `blocks`, ultimate `bounce`.
+renamed to his boss name; `?wip=1&kit=BigBoy` still finds it), offset −250, passive `blocks`, ultimate `bounce`. His
+card in the boss menu reads "eats a pawn, toy blocks · big bounce" (**my call**: the snack is the first thing a player
+choosing him should know).
 Every number is in `BOSS_POWERS` (`blockEvery` 4, `blockTurns` 3, `bouncePieces` 2-6, `bounceReach` 2,
 `bounceCandidates` 16, `bounceScreenNodes` 15,000, `bounceConfirm` 3, `bounceNodes` 100,000, `bounceLoss` 0.5-1.5,
 `bounceTarget` 1, `bouncePawnLogit` 0.95); the beats both sides time by are in `boss-timing.ts` (`SNACK`, `BOUNCE`,
@@ -4260,7 +4262,29 @@ Every number is in `BOSS_POWERS` (`blockEvery` 4, `blockTurns` 3, `bouncePieces`
   (it leaves the board at `grabAt`), bites it twice ("nom" at `nomAt` and after), smacks his lips and waddles off; his
   line ("Nom nom.") in his text box and the dock; then "START!". The pawn in his hand is the crowd's colour (his look
   `blackPawn`).
-- **His strength offset: {{OFFSET}}** (others −100). {{SIM}}
+- **His strength offset: −250** (the others −100): 150 more for the pawn. From the boss sim
+  (`packages/sim/scripts/boss-sim.ts`, a new `snack` mode: the crowd's d- or e-pawn gone before move 1; `stumble`, the
+  game's boss; files in `reports/boss-sim/`), crowds of 10 bots:
+
+  | Crowd (rating) | Boss | Games | Crowd wins | Draws | Boss wins | Avg moves |
+  |---|---|---|---|---|---|---|
+  | club (2289) | −100, no snack (the others today) | 8 | 0 | 0 | 8 | 44 |
+  | club (2289) | −100, snack | 8 | 0 | 0 | 8 | 37 |
+  | club (2289) | −250, snack | 8 | 0 | 0 | 8 | 38 |
+  | club (2289) | −450, snack | 8 | 0 | 0 | 8 | 33 |
+  | casual (1527) | −100, no snack | 8 | 0 | 0 | 8 | 34 |
+  | casual (1527) | −100, snack | 8 | 0 | 0 | 8 | 30 |
+  | expert (2848) | −100, no snack | 6 | 0 | 3 | 3 | 53 |
+  | expert (2848) | −250, snack | 6 | 0 | 2 | 4 | 49 |
+
+  - **What it shows:** with today's code the sim's boss beats club and casual crowds every time, with or without the
+    snack, even 350 lower: those runs can't tell offsets apart (the old calibration's 38% crowd wins for the club crowd
+    at −100 no longer holds; the boss's blunder guard has come in since). The games are shorter with the snack (37
+    against 44 moves), so it does make him harder. Only the expert crowd isn't swept: there, −250 with the snack scores
+    about as the others' −100 without (the crowd's score 17% against 25%, within six games' noise).
+  - **So −250:** the engine's own measure of the head start, rounded: the starting position is 0.536 for White and
+    0.31/0.30 without its d- or e-pawn (2,000,000 nodes), about 165 Elo by the expected score's odds; the expert runs
+    agree within their noise. Self-balancing (the recorded results) will move it from real games.
 
 **Toy blocks** (`chooseBlock`, `blockedBy`, `crowdAllowed`, `bossAllowed`, `prepareTurn`)
 - From the crowd's 2nd turn, every 4th (turns 2, 6, 10…), a block on an empty square of the crowd's half that one of
@@ -4301,8 +4325,10 @@ Every number is in `BOSS_POWERS` (`blockEvery` 4, `blockTurns` 3, `bouncePieces`
 - **The engine path the boss uses** (each position's top move, the crowd's value one less his), kept to about one of
   his moves: a glance at all 16 candidates (15,000 nodes), then a proper look (100,000) at the position before and
   the 3 nearest the target, the pick from those; shared over the device's engines. **My call:** two stages rather than
-  6 candidates at full budget: the same cost, a far better hit rate. Measured on 20 positions (library middlegames and
-  games from the snack, Node, 3 engines): {{BAND}}
+  6 candidates at full budget: the same cost, a far better hit rate (6 at 100,000 nodes landed in the band 10 times in
+  20). Measured on 30 positions (library middlegames and engine games from the snack, Node, 3 engines): 19 picks in
+  the band (0.5-1.5 pawns), 10 below it (4 of them games already decided, where the engine's expected score is pinned
+  at 0 or 1 and every loss reads 0), 1 with nothing moving; 3.9 pieces moved on average; 0.6 s for the engine's part.
 - **Online:** the server works out the candidates from the seed (they're the same everywhere) and sends them in the
   boss request; the host scores them and answers with the one picked; anything that isn't a candidate, an answer of
   "", or no host anywhere: the bounces play and nothing moves. The host's word stands, as for his moves.
@@ -4356,4 +4382,9 @@ Every number is in `BOSS_POWERS` (`blockEvery` 4, `blockTurns` 3, `bouncePieces`
   cues, squash and stretch, the pieces in the air and the board under them, the block, the sounds' loudness, their
   own names and no bright ones), `e2e/bigboy.spec.ts` (phone and computer: the snack, your move's knock first, the
   block with no dots onto it and gone after its turns; the bounce from the trigger with pieces in the air, the crash,
-  the jolt, the new position on the board and his sounds through mute), `e2e/perf.spec.ts` ({{PERF}}).
+  the jolt, the new position on the board and his sounds through mute), `e2e/perf.spec.ts` (a phone slowed 4x, the first
+  time each shows: the snack p95 16.8 ms, 2% of frames dropped; the block and the warning p95 16.8 ms, 1%; the whole
+  bounce, its getting ready and his move p95 16.8 ms, 1%). `npm run perf:boss -- <dir> bigboy phone 25 bounce`: flat
+  from move 1 to 25 (p95 16.7-16.8 ms everywhere, the bounce's turn included); Ginger's run unchanged.
+- Tests that met a random boss by a fixed seed (`last-stand.test.ts`, `crowd.test.ts`) now name the boss that seed met
+  before Big Boy joined the draw (G-REX), and solo's difficulty test reads the drawn boss's own offset.
