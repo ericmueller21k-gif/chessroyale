@@ -463,6 +463,13 @@ describe("squads lobby: bots' engine work on players' devices", () => {
     expect(jobOf(L, job.id)).toMatchObject({ how: "agreed", top });
   });
 
+  it("a device holds only so many unanswered jobs (a phone fewer); the rest go to other devices, or none", () => {
+    const { ids, jobs } = withDevices(1, { phones: [0] });
+    expect(jobs(ids[0]!)).toHaveLength(SQUADS_LOBBY.botWork.maxInFlight.phone);
+    const two = withDevices(2);
+    expect(two.jobs(two.ids[0]!)).toHaveLength(SQUADS_LOBBY.botWork.maxInFlight.computer);
+  });
+
   it("one answer alone stands after the grace; none at all: the server's own quick look", () => {
     const { L, ids, jobs } = withDevices(2);
     const [j1, j2] = jobs(ids[0]!);
@@ -494,6 +501,8 @@ describe("squads lobby: bots' engine work on players' devices", () => {
     const { L, ids, jobs } = withDevices(3);
     const job = jobs(ids[0]!).find((j) => jobs(ids[1]!).some((x) => x.id === j.id))!;
     const good = fallbackTop(job.fen, job.n);
+    // (The third device answers what it holds first: a device holds only so many unanswered jobs.)
+    for (const j of jobs(ids[2]!)) L.core.message(ids[2]!, { t: "botTop", id: j.id, top: fallbackTop(j.fen, j.n) });
     L.core.message(ids[0]!, { t: "botTop", id: job.id, top: good });
     L.core.message(ids[1]!, { t: "botTop", id: job.id, top: good.slice().reverse() });
     const ref = L.core.match(job.id.split("/")[0]!)!.half!.work[Number(job.id.split("/")[2])]!.referee!;

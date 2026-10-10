@@ -488,7 +488,8 @@ export class SquadsCore {
     if (opts.userId) this.r.accounts[id] = opts.userId;
     this.resendTo(id);
     this.sendAll((to) => (to === id ? null : { t: "lobby", lobby: this.lobbyView(id) }));
-    if (this.r.humans.length >= this.s.squadCount * this.s.squadSize) this.fill();
+    // Full, or (someone the matchmaker promised a seat, arriving late) the fill time has passed: it fills now.
+    if (this.r.humans.length >= this.s.squadCount * this.s.squadSize || (this.r.fillAt !== null && now >= this.r.fillAt)) this.fill();
     this.pump();
     return { ok: true, playerId: id };
   }
