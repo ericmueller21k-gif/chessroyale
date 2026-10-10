@@ -56,7 +56,7 @@ import {
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
 import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { applyMove, legalMoves, moveNumber, pieceAt, sideToMove, toSan, withoutPiece } from "./rules.ts";
+import { applyMove, legalMoves, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import {
   allowedSearch,
@@ -80,16 +80,7 @@ import {
   triggerUltimate,
   type LightsTally,
   darkSquares,
-  blockSquare,
-  bounceCandidates,
-  bounceDue,
-  bounceResult,
-  pawnsLost,
-  pickBounce,
-  snackSquare,
-  startsWithSnack,
-  type BounceCandidate,
-  type BounceScore,
+  bigboyBattle,
   boingoBattle,
   hollowBattle,
   moveLoss,
@@ -369,17 +360,17 @@ export class MatchRunner {
     // if the usual pick made the crowd Black, he claims the dark side before move 1.
     const opening = bossRules(def)?.opening;
     const claimed = !!opening?.crowdWhite && crowdSide === "b";
-    if (opening?.fromStart && !startsWithSnack(def)) this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
+    if (opening?.fromStart) this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
     if (opening?.crowdWhite) crowdSide = "w";
-    // Big Boy: the starting position too (sides as usual), less the crowd's centre pawn he eats before move 1.
-    const snack = startsWithSnack(def) ? this.snackBoard(id, seed, crowdSide, board.generation) : null;
+    // Anything else the boss does to the board before move 1 (Big Boy eats one of the crowd's centre pawns).
+    const setUp = opening?.setUp?.(this.battle, { boardId: id, seed, crowdSide, generation: board.generation }) ?? null;
     const fen = this.boards.get(id)!.fen;
     this.state = {
       ...this.state,
       players: this.state.players.map((p) => ({ ...p, colour: null, powerUps: 0 })),
       boss: {
         id: def.id,
-        powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(snack ? { snack: { square: snack } } : {}) },
+        powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(setUp ?? {}) },
         tier: this.settings.bossFixedElo || raidBossElo([]),
         elo: bossStrength(this.settings.bossFixedElo || raidBossElo([]), def, this.settings.bossDifficulty),
         crowdSide,
@@ -394,18 +385,6 @@ export class MatchRunner {
       },
     };
     this.preparePowers();
-  }
-
-  /**
-   * Big Boy's snack: the board from the starting position less the crowd's d- or e-pawn (from the seed), a base at
-   * ply 0 (the position changed outside a move: every replay plays from it). Returns the pawn's square.
-   */
-  private snackBoard(id: number, seed: number, crowdSide: Side, generation: number): string {
-    const square = snackSquare(seed, crowdSide);
-    const board = newBoard(id, BOSS_OPENING, 0, generation);
-    const fen = withoutPiece(board.fen, square);
-    this.boards.set(id, { ...board, fen, bases: [{ ply: 0, fen }] });
-    return square;
   }
 
   /** Boss battle: the powers for the crowd turn about to begin (once per turn; see prepareTurn). */
@@ -1135,59 +1114,28 @@ export class MatchRunner {
 
   /** Big Boy's Big Bounce is due: the start of his turn (the crowd has moved), from the warning or the test trigger. */
   bounceDue(): boolean {
-    return bounceDue(this.state.boss) && this.bossToMove() && !this.finalGameOver();
+    return bigboyBattle.bounceDue(this.battle);
   }
 
-  /**
-   * The Big Bounce's candidate positions (him to move), from the seed and the position now: the same list on the
-   * server, the host and in solo (bounceCandidates).
-   */
+  /** The Big Bounce's candidate positions (him to move): the same list on the server, the host and in solo. */
   bounceCandidates(): string[] {
-    return this.bounceList().map((c) => c.fen);
+    return bigboyBattle.bounceCandidates(this.battle);
   }
-  /** (Worked out once per position: the pick is checked against the same list.) */
-  private bounceList(): BounceCandidate[] {
-    const b = this.state.boss!;
-    const fen = this.boards.get(this.state.boards[0]!)!.fen;
-    const key = `${fen}|${b.crowdMoves}|${b.powers!.seed}|${blockSquare(b)}`;
-    if (this.bounceMemo?.key !== key) this.bounceMemo = { key, list: bounceCandidates(fen, b.crowdSide, b.powers!.seed, b.crowdMoves, blockSquare(b)) };
-    return this.bounceMemo.list;
-  }
-  private bounceMemo: { key: string; list: BounceCandidate[] } | null = null;
 
   /** The Big Bounce, from this device's engines (bounceFrom: the candidates scored, the pick within the loss band). */
   async playBounce(engines: readonly EngineLike[] = this.opts.engines): Promise<BounceResult> {
-    const fen = this.boards.get(this.state.boards[0]!)!.fen;
-    const pick = await bounceFrom(engines, fen, this.bounceCandidates());
-    return this.applyBounce(pick?.fen ?? null, pick?.loss ?? null);
+    return bigboyBattle.playBounce(this.battle, engines);
   }
 
-  /**
-   * The Big Bounce lands (from the host's engine online): the crowd's pieces where the picked candidate has them (a base
-   * on the board: the position changes between moves), or, with no pick (none within the cap, no engine anywhere, or
-   * anything that isn't one of the candidates), nothing moves; the bounces play either way. It isn't a move: nothing is
-   * scored, fair play never sees it, and he plays his move after it. Once a match: the meter is spent.
-   */
+  /** The Big Bounce lands (from the host's engine online; see bigboyBattle.applyBounce). */
   applyBounce(pick: string | null, loss: number | null = null): BounceResult {
-    const b = this.state.boss!;
-    const { ultNext: _trigger, ...p } = b.powers!;
-    const id = this.state.boards[0]!;
-    const board = this.boards.get(id)!;
-    const picked = (pick && this.bounceList().find((c) => c.fen === pick)) || null;
-    const result = bounceResult(board.fen, b.crowdSide, p.seed, b.crowdMoves, picked, loss);
-    if (picked) {
-      const ply = board.history.length;
-      // (The side to move's expected score: his, better by the loss (in pawns) when it's known.)
-      const odds = Math.log(Math.min(0.999, Math.max(0.001, board.expected)) / (1 - Math.min(0.999, Math.max(0.001, board.expected))));
-      const expected = loss === null ? board.expected : 1 / (1 + Math.exp(-(odds + loss * BOSS_POWERS.bouncePawnLogit)));
-      this.boards.set(id, { ...board, fen: picked.fen, expected, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: picked.fen }] });
-    }
-    this.state = { ...this.state, boss: { ...b, powers: { ...p, ultAt: b.crowdMoves, bounce: result, events: [...p.events, { kind: "bounce", turn: p.turn }] } } };
-    return result;
+    return bigboyBattle.applyBounce(this.battle, pick, loss);
   }
 
   /** The boss's last move, and the piece it took (if any). */
   private bossLast: BossLastMove | null = null;
+  /** The bosses' battle code's own store (Battle's memo). */
+  private bossMemo = new Map<string, unknown>();
 
   /** What a boss's battle code (bosses/<boss>.ts) may use of this runner. */
   private get battle(): Battle {
@@ -1217,6 +1165,7 @@ export class MatchRunner {
       crowdAllowed: (boardId) => runner.crowdAllowed(boardId),
       boardOf: (playerId) => runner.boardOf(playerId),
       afterCrowdMove: (move) => runner.afterCrowdMove(move),
+      memo: runner.bossMemo,
     };
   }
 
@@ -1311,9 +1260,6 @@ export class MatchRunner {
               shadows: fireShadows(p),
               stepped: p.stepped ?? null,
               ultNext: !!p.ultNext,
-              ...(powers.passive === "blocks"
-                ? { block: p.block ? { square: p.block.square, at: p.block.at, until: p.block.until } : null, snack: p.snack?.square ?? null, bounce: p.bounce ?? null }
-                : {}),
               ...(bossRules(b)?.view?.(p) ?? {}),
             },
           }
@@ -1332,10 +1278,11 @@ export class MatchRunner {
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
     // (A boss who plays from the starting position: Hollow; Big Boy too, less the pawn he eats.)
-    if (bossRules(def)?.opening?.fromStart || startsWithSnack(def)) startPly = 0;
+    const start = bossRules(def)?.opening;
+    if (start?.fromStart) startPly = 0;
     const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
     this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
-    const snack = startsWithSnack(def) ? this.snackBoard(id, seed, "w", old.generation + 1) : null;
+    const setUp = start?.setUp?.(this.battle, { boardId: id, seed, crowdSide: "w", generation: old.generation + 1 }) ?? null;
     const tier = bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
     const elo = bossStrength(tier, def, this.settings.bossDifficulty);
     this.bossLast = null;
@@ -1347,7 +1294,7 @@ export class MatchRunner {
       players: this.state.players.map((p) => (p.alive ? { ...p, colour: null, finalLosses: [], powerUps: 0 } : p)),
       boss: {
         id: def.id,
-        powers: { ...initPowers(seed, this.boards.get(id)!.fen, "w"), ...(snack ? { snack: { square: snack } } : {}) },
+        powers: { ...initPowers(seed, this.boards.get(id)!.fen, "w"), ...(setUp ?? {}) },
         tier,
         elo,
         crowdSide: "w",
@@ -1607,58 +1554,6 @@ export async function bossMoveFrom(
   const best = top[0]!.expected;
   const got = top.find((m) => m.move === move)?.expected ?? (await engine.scoreMoves(fen, [move]))[0]?.expected ?? 0;
   return confirm(withinGuard(moveLoss(best, got), guard) ? move : pickByLoss(top, guard.slipLoss, guard), guard);
-}
-
-/** Each position's top move at `nodes`, shared out over the engines (each takes the next position as it's free). */
-async function topEach(engines: readonly EngineLike[], fens: readonly string[], nodes: number): Promise<(MoveScore | undefined)[]> {
-  const best: (MoveScore | undefined)[] = new Array(fens.length);
-  let next = 0;
-  await Promise.all(
-    engines.map(async (e) => {
-      while (next < fens.length) {
-        const i = next++;
-        best[i] = (await (e.topMovesAt ? e.topMovesAt(fens[i]!, 1, nodes) : e.topMoves(fens[i]!, 1)))[0];
-      }
-    }),
-  );
-  return best;
-}
-
-/**
- * Big Boy's Big Bounce: the candidates (positions with him to move) scored by the engine path his moves use (each
- * position's top move; the crowd's expected score is one less his), shared out over this device's engines. A glance at
- * every candidate (bounceScreenNodes), then a proper look (bounceNodes) at the position before and the bounceConfirm
- * nearest the target; then pickBounce on those: the loss nearest the target in the band, else the nearest below it;
- * null (nothing moves) when none is under the cap, or there's no engine. About one of his moves' worth of searching.
- */
-export async function bounceFrom(
-  engines: readonly EngineLike[],
-  fen: string,
-  candidates: readonly string[],
-  s: Parameters<typeof pickBounce>[2] & Pick<typeof BOSS_POWERS, "bounceNodes" | "bounceScreenNodes" | "bounceConfirm"> = BOSS_POWERS,
-): Promise<{ fen: string; loss: number } | null> {
-  if (!candidates.length || !engines.length) return null;
-  const crowdOf = (m: MoveScore | undefined) => (m ? 1 - m.expected : null);
-  // The glance: which few are worth a proper look (nearest the target, no forced mates).
-  const glance = await topEach(engines, [fen, ...candidates], s.bounceScreenNodes);
-  const b0 = crowdOf(glance[0]);
-  if (b0 === null) return null;
-  const near = candidates
-    .map((c, i) => ({ c, m: glance[i + 1] }))
-    .filter((x) => x.m && x.m.mate === undefined)
-    .map((x) => ({ c: x.c, d: Math.abs(pawnsLost(b0, crowdOf(x.m)!, s) - s.bounceTarget) }))
-    .sort((a, b) => a.d - b.d || (a.c < b.c ? -1 : 1))
-    .slice(0, s.bounceConfirm)
-    .map((x) => x.c);
-  if (!near.length) return null;
-  const look = await topEach(engines, [fen, ...near], s.bounceNodes);
-  const before = crowdOf(look[0]);
-  if (before === null) return null;
-  const scored: BounceScore[] = near.flatMap((c, i) => {
-    const m = look[i + 1];
-    return m ? [{ fen: c, crowd: 1 - m.expected, ...(m.mate !== undefined ? { mate: true } : {}) }] : [];
-  });
-  return pickBounce(before, scored, s);
 }
 
 /** A board as sent to (and shown in) the app. */

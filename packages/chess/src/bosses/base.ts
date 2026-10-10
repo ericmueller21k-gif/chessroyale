@@ -272,4 +272,6 @@ export interface Battle {
   boardOf(playerId: string): BoardState | null;
   /** What happens after any crowd move (G-REX's fire). */
   afterCrowdMove(move: string | null): void;
+  /** A boss's own scratch store, kept for the match (Big Boy's bounce candidates, worked out once per position). */
+  readonly memo: Map<string, unknown>;
 }
