@@ -1,24 +1,21 @@
-import { SQUADS, type PregameVote, type SquadsSettings, type VoteOption } from "@chessroyale/core";
+import { SQUADS, type PregameVote, type SquadsClock, type SquadsSettings, type VoteOption } from "@chessroyale/core";
 
 /**
- * Squads' pre-game votes: Start, Pace and Length. Plain data like Crowd's (`core/votes.ts`), so the same machinery
- * runs them: `castPregameVote`, `botVotes`, `closePregameVote` (a tie is drawn, non-voters join the winner). The
- * whole lobby (all 32) votes once, before round 1.
+ * Squads' pre-game votes: Start and Clock. Plain data like Crowd's (`core/votes.ts`), so the same machinery runs them:
+ * `castPregameVote`, `botVotes`, `closePregameVote` (a tie is drawn, non-voters join the winner). The whole lobby
+ * (all 32) votes once, before round 1.
  */
 
 /** The normal starting position / every board from the same opening / each board its own random opening. */
 export type SquadsStart = "standard" | "same" | "random";
-/** Rounds 1 and 2: play to the end, or a move cap (the final is always to the end). */
-export type SquadsLength = "end" | "cap";
 
 export interface SquadsRules {
   start: SquadsStart;
-  /** About this many seconds a move. */
-  paceSeconds: number;
-  length: SquadsLength;
+  /** Every board's chess clock: each side's bank and increment. */
+  clock: SquadsClock;
 }
 
-export type SquadsVoteId = "start" | "pace" | "length";
+export type SquadsVoteId = "start" | "clock";
 
 export interface SquadsVoteOption extends VoteOption {
   /** What this option sets if it wins (the Crowd `patch` is empty: these aren't Crowd settings). */
@@ -30,7 +27,14 @@ export interface SquadsVote extends PregameVote {
   options: readonly SquadsVoteOption[];
 }
 
-/** The three votes, left to right, with their numbers from settings. */
+/** "4+2": minutes (or m:ss) plus the increment in seconds, as chess players write a clock. */
+export function clockName(c: Pick<SquadsClock, "bankSeconds" | "incrementSeconds">): string {
+  const m = Math.floor(c.bankSeconds / 60);
+  const sec = c.bankSeconds % 60;
+  return `${sec ? `${m}:${String(sec).padStart(2, "0")}` : m}+${c.incrementSeconds}`;
+}
+
+/** The votes, left to right, with their numbers from settings. */
 export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
   return [
     {
@@ -52,42 +56,25 @@ export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
       ],
     },
     {
-      id: "pace",
+      id: "clock",
       title: "How fast?",
-      defaultOption: s.paceDefault,
-      options: s.paceSeconds.map((sec, i) => ({
-        id: `pace-${sec}`,
+      defaultOption: s.clockDefault,
+      options: s.clocks.map((c, i) => ({
+        id: c.id,
         icon: ["⚡", "⏱️", "🧘"][i] ?? "⏱️",
-        label: `${sec} s`,
-        blurb: `About ${sec} seconds a move`,
+        label: `${c.label} ${clockName(c)}`,
+        blurb: `${clockName(c).replace("+", " min + ")} s a move, each side, every board`,
+        detail: "Run out of time and you lose that board (a draw if the other side can't mate). Every game is played to the end.",
         patch: {},
-        rule: { paceSeconds: sec },
+        rule: { clock: c },
       })),
-    },
-    {
-      id: "length",
-      title: "Rounds 1 and 2: how long?",
-      // Nobody votes: the cap, so a lobby of 32 isn't kept waiting on one long game.
-      defaultOption: 1,
-      options: [
-        { id: "end", icon: "🏁", label: "To the end", blurb: "Play every game out", patch: {}, rule: { length: "end" } },
-        {
-          id: "cap",
-          icon: "🧮",
-          label: `${s.moveCap}-move cap`,
-          blurb: `After ${s.moveCap} moves, most material wins`,
-          detail: "Level material is a draw. The final is always played to the end.",
-          patch: {},
-          rule: { length: "cap" },
-        },
-      ],
     },
   ];
 }
 
 /** The rules from each vote's winning option (a vote not held gives its default). */
 export function rulesFromVotes(results: Partial<Record<SquadsVoteId, number>>, s: SquadsSettings = SQUADS): SquadsRules {
-  const rules: SquadsRules = { start: "standard", paceSeconds: s.paceSeconds[s.paceDefault] ?? s.paceSeconds[0]!, length: "cap" };
+  const rules: SquadsRules = { start: "standard", clock: s.clocks[s.clockDefault] ?? s.clocks[0]! };
   for (const vote of squadsVotes(s)) {
     const option = vote.options[results[vote.id] ?? vote.defaultOption] ?? vote.options[vote.defaultOption]!;
     Object.assign(rules, option.rule);

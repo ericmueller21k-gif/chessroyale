@@ -3,12 +3,12 @@ import { SQUADS, mulberry32, type SquadsSettings } from "@chessroyale/core";
 import { START_FEN, legalMoves, type EngineLike } from "../src/index.ts";
 import {
   NO_INPUTS,
+  armageddonChooser,
   botArmageddonColour,
   botFinalBlock,
   botFinalPick,
   botPairPick,
   botRelayMove,
-  botThinkShareMs,
   candidatesFrom,
   choose,
   createSquadsMatch,
@@ -17,7 +17,10 @@ import {
   lockIn,
   resolveHalf,
   squadBotCandidates,
+  squadBotSkill,
+  squadBotThinkMs,
   startArmageddon,
+  timeLeft,
   visibleChoices,
   type HalfInputs,
   type Lineup,
@@ -37,9 +40,11 @@ const THREE_MOVES = "k7/8/8/8/8/8/6p1/K7 w - - 0 1";
 const ONE_MOVE = "k7/8/8/8/8/8/1q6/K7 w - - 0 1";
 const WHITE_STALEMATES = "7k/8/6Q1/8/8/8/8/K7 w - - 0 1";
 
-function final(fen = START_FEN, seed = 1, white: Side = 0, s?: SquadsSettings): SquadsMatch {
+const BANK = 240_000;
+const INC = 2_000;
+function final(fen = START_FEN, seed = 1, white: Side = 0, s?: SquadsSettings, clockMs = { w: BANK, b: BANK }): SquadsMatch {
   return createSquadsMatch(
-    { key: "r2m0", seed, round: 2, format: "final", sides, starts: [{ fen, openingId: null }], whites: [white], capMoves: null, paceSeconds: 15 },
+    { key: "r2m0", seed, round: 2, format: "final", sides, starts: [{ fen, openingId: null }], whites: [white], clockMs, incrementMs: INC },
     s,
   );
 }
@@ -64,16 +69,27 @@ function findSeed(fen: string, moves: Record<string, string>, want: (e: ReturnTy
   throw new Error("No seed gives that outcome");
 }
 
+/** Resolves an Armageddon half over seeds until `want` holds. */
+function findArm(arm: SquadsMatch, moves: Record<string, string>, want: (o: ReturnType<typeof resolveHalf>) => boolean) {
+  for (let seed = 1; seed < 200; seed++) {
+    const m = { ...arm, seed };
+    const out = resolveHalf(m, inputs(m, moves));
+    if (want(out)) return out;
+  }
+  throw new Error("No seed gives that outcome");
+}
+
 describe("Squads final: Pick and Block roles", () => {
   it("on a squad's move two of its players pick and two of the other squad block, from move 1", () => {
     const m = final();
+    const ceiling = SQUADS.moveCeilingSeconds * 1000;
     expect(halfDuties(m).duties).toEqual([
-      { board: 0, side: 0, role: "pick", players: ["a0", "a1"] },
-      { board: 0, side: 1, role: "block", players: ["b2", "b3"] },
+      { board: 0, side: 0, role: "pick", players: ["a0", "a1"], deadlineMs: ceiling },
+      { board: 0, side: 1, role: "block", players: ["b2", "b3"], deadlineMs: ceiling },
     ]);
     expect(halfDuties({ ...m, half: "b" }).duties).toEqual([
-      { board: 0, side: 1, role: "pick", players: ["b0", "b1"] },
-      { board: 0, side: 0, role: "block", players: ["a2", "a3"] },
+      { board: 0, side: 1, role: "pick", players: ["b0", "b1"], deadlineMs: ceiling },
+      { board: 0, side: 0, role: "block", players: ["a2", "a3"], deadlineMs: ceiling },
     ]);
     // The squad given Black by the coin picks on Black's moves.
     expect(halfDuties(final(START_FEN, 1, 1)).duties[0]).toMatchObject({ side: 1, role: "pick" });
@@ -241,18 +257,73 @@ describe("Squads final: resolving a move", () => {
     expect(out.missed).toEqual([]);
   });
 
-  it("the final is played to the end (only the silent safety cap); a drawn final goes to Armageddon in Pick and Block", () => {
+  it("the clock runs while the pickers think (the slower picker), as one side's clock; blockers don't run a clock", () => {
+    const m = final();
+    const out = resolveHalf(m, inputs(m, { a0: "e2e4", a1: "d2d4", b2: "g1f3", b3: "b1c3" }), { a0: 2_000, a1: 6_000, b2: 30_000, b3: 39_000 });
+    expect(out.match.boards[0]!.clock).toEqual({ w: BANK - 6_000 + INC, b: BANK });
+    expect(halfDuties(m).duties.map((d) => d.deadlineMs)).toEqual([SQUADS.moveCeilingSeconds * 1000, SQUADS.moveCeilingSeconds * 1000]);
+  });
+
+  it("a flag in the final ends it; a missed pick near the end of the bank is a flag fall, not a random move", () => {
+    const low = final(START_FEN, 1, 0, undefined, { w: 5_000, b: BANK });
+    expect(halfDuties(low).duties[0]!.deadlineMs).toBe(5_000);
+    expect(halfDuties(low).duties[1]!.deadlineMs).toBe(SQUADS.moveCeilingSeconds * 1000);
+    const out = resolveHalf(low, inputs(low, { a0: "e2e4", b2: "d2d4", b3: "g1f3" }), { a0: 1_000 });
+    expect(out.match.boards[0]!.result).toEqual({ winner: "b", reason: "flag" });
+    expect(out.match.boards[0]!.moves).toEqual([]);
+    expect(out.match.result).toEqual({ winner: 1, points: [0, 1], how: "boards" });
+    expect(out.missed).toEqual(["a1"]);
+  });
+
+  it("the final is played to the end; a drawn final goes to Armageddon in Pick and Block, White with more time", () => {
     const m = final(WHITE_STALEMATES);
-    expect(m.capMoves).toBeNull();
     expect(m.safetyMoves).toBe(SQUADS.safetyCap);
     const { out } = findSeed(WHITE_STALEMATES, { a0: "g6f7", a1: "g6g5", b2: "g6g5", b3: "a1a2" }, (x) => x.move === "g6f7");
     expect(out.match.result).toEqual({ winner: null, points: [0.5, 0.5], how: "boards" });
     const arm = startArmageddon(out.match, 1, { fen: START_FEN, openingId: null });
-    expect(arm).toMatchObject({ format: "final", armageddon: true, paceSeconds: SQUADS.armageddonPaceSeconds, capMoves: null });
+    expect(arm).toMatchObject({ format: "final", armageddon: true, key: "r2m0-armageddon", incrementMs: SQUADS.armageddon.incrementSeconds * 1000 });
+    expect(arm.boards[0]!.clock).toEqual({ w: SQUADS.armageddon.whiteSeconds * 1000, b: SQUADS.armageddon.blackSeconds * 1000 });
+    expect(arm.boards[0]!.white).toBe(1);
     expect(halfDuties(arm).duties.map((d) => [d.side, d.role])).toEqual([
       [1, "pick"],
       [0, "block"],
     ]);
+    // Only a drawn final goes to Armageddon.
+    expect(() => startArmageddon(final(), 0, { fen: START_FEN, openingId: null })).toThrow();
+  });
+
+  it("the squad with more clock time left in the final picks Armageddon's colours (a coin if level)", () => {
+    const drawn = (left: { w: number; b: number }, seed = 1): SquadsMatch => {
+      const m = final(START_FEN, seed, 0);
+      return { ...m, boards: [{ ...m.boards[0]!, clock: left, result: { winner: null, reason: "repetition" } }], result: { winner: null, points: [0.5, 0.5], how: "boards" } };
+    };
+    // Side 0 played White.
+    expect(armageddonChooser(drawn({ w: 50_000, b: 20_000 }))).toBe(0);
+    expect(armageddonChooser(drawn({ w: 10_000, b: 20_000 }))).toBe(1);
+    const seen = new Set<Side>();
+    for (let seed = 1; seed < 30; seed++) seen.add(armageddonChooser(drawn({ w: 5_000, b: 5_000 }, seed)));
+    expect([...seen].sort()).toEqual([0, 1]);
+  });
+
+  it("Armageddon: a draw counts for Black; a flag loses for either side, but White flagging against a bare king is a draw, so Black's", () => {
+    const base = (() => {
+      const m = final();
+      return { ...m, result: { winner: null, points: [0.5, 0.5] as const, how: "boards" as const } };
+    })();
+    const stale = startArmageddon(base, 0, { fen: WHITE_STALEMATES, openingId: null });
+    const drawn = findArm(stale, { a0: "g6f7", a1: "g6g5", b2: "g6g5", b3: "a1a2" }, (o) => o.match.boards[0]!.moves[0] === "g6f7");
+    expect(drawn.match.result).toMatchObject({ winner: 1, how: "armageddon" });
+    // White (side 0) runs out: Black wins. (A short bank, so White's runs out before the per-move ceiling.)
+    const short: SquadsSettings = { ...SQUADS, armageddon: { ...SQUADS.armageddon, whiteSeconds: 5 } };
+    const arm = startArmageddon(base, 0, { fen: START_FEN, openingId: null }, short);
+    const flagged = resolveHalf(arm, NO_INPUTS, {}, short);
+    expect(flagged.match.boards[0]!.result).toEqual({ winner: "b", reason: "flag" });
+    expect(flagged.match.result).toMatchObject({ winner: 1, how: "armageddon" });
+    // White flags with Black down to a bare king: a draw, which is Black's.
+    const bare = startArmageddon(base, 0, { fen: "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1", openingId: null }, short);
+    const out = resolveHalf(bare, NO_INPUTS, {}, short);
+    expect(out.match.boards[0]!.result).toEqual({ winner: null, reason: "flag" });
+    expect(out.match.result).toMatchObject({ winner: 1, how: "armageddon" });
   });
 
   it("a whole final replays exactly from the same seed and choices", () => {
@@ -350,13 +421,38 @@ describe("Squad bots", () => {
     expect(share).toBeLessThan(1 - SQUADS.bots.avoidBlockChance + 0.1);
   });
 
-  it("think within their share of the clock, and take Black in Armageddon", () => {
+  it("think by their clock: the bank over moves to go plus the increment, never past the deadline; and take Black in Armageddon", () => {
     const rng = mulberry32(3);
+    const [lo, hi] = SQUADS.bots.thinkRange;
     for (let i = 0; i < 100; i++) {
-      const ms = botThinkShareMs(rng, 15);
-      expect(ms).toBeGreaterThanOrEqual(SQUADS.bots.thinkShare[0] * 15_000);
-      expect(ms).toBeLessThanOrEqual(SQUADS.bots.thinkShare[1] * 15_000);
+      const ms = squadBotThinkMs(rng, { bankMs: 240_000, incrementMs: 2_000, deadlineMs: 40_000 });
+      const target = 240_000 / SQUADS.bots.movesToGo + SQUADS.bots.incrementShare * 2_000;
+      expect(ms).toBeGreaterThanOrEqual(Math.max(SQUADS.bots.minThinkSeconds * 1000, lo * target) - 1);
+      expect(ms).toBeLessThanOrEqual(hi * target + 1);
+      expect(squadBotThinkMs(rng, { bankMs: 3_000, incrementMs: 0, deadlineMs: 3_000 })).toBeLessThan(3_000);
     }
     expect(botArmageddonColour()).toBe("b");
+  });
+
+  it("winning, a bot plays with purpose: the engine's order breaks ties, a seen mate is played, its temperature drops", () => {
+    const won = [
+      { move: "a1a8", expected: 0.99 },
+      { move: "a1a7", expected: 0.99 },
+      { move: "a1a6", expected: 0.99 },
+    ];
+    expect(candidatesFrom(won).map((c) => c.loss)).toEqual([0, SQUADS.bots.wonRankLoss, 2 * SQUADS.bots.wonRankLoss]);
+    expect(squadBotSkill(won, 16)).toBe(SQUADS.bots.wonSkill);
+    expect(squadBotSkill(top, 16)).toBe(16);
+    const mating = [
+      { move: "d1h5", expected: 1, mate: 3 },
+      { move: "a1a8", expected: 1, mate: 1 },
+      { move: "h2h3", expected: 1 },
+    ];
+    const c = candidatesFrom(mating);
+    expect(c.find((x) => x.move === "a1a8")!.loss).toBe(SQUADS.bots.wonRankLoss);
+    expect(c.find((x) => x.move === "d1h5")!.loss).toBe(2 * SQUADS.bots.mateStepLoss);
+    expect(c.find((x) => x.move === "h2h3")!.loss).toBe(SQUADS.bots.mateMissLoss);
+    // Not winning: plain losses, as for any bot.
+    expect(cands.map((x) => Math.round(x.loss))).toEqual([0, 1, 3, 15]);
   });
 });

@@ -6,13 +6,14 @@ import {
   NO_INPUTS,
   allowsMateInOne,
   allowsMateInOneSlow,
-  squadsLegalMoves,
-  armageddonChooser,
   armageddonStart,
+  canMate,
   choose,
   createSquadsMatch,
   decideByMaterial,
   endByMaterial,
+  flagFall,
+  formSquads,
   halfDuties,
   halfReady,
   lockIn,
@@ -24,13 +25,13 @@ import {
   planMatch,
   playOnBoard,
   resolveHalf,
-  startArmageddon,
-  visibleChoices,
-  winnerSquad,
-  formSquads,
+  squadsLegalMoves,
   squadsRng,
+  timeLeft,
+  winnerSquad,
   type HalfInputs,
   type Lineup,
+  type MatchSetup,
   type Side,
   type SquadsEvent,
   type SquadsMatch,
@@ -41,6 +42,10 @@ const sides: [Lineup, Lineup] = [
   { squadId: 0, seats: ["a0", "a1", "a2", "a3"] },
   { squadId: 1, seats: ["b0", "b1", "b2", "b3"] },
 ];
+const BANK = 240_000;
+const INC = 2_000;
+const CEILING = SQUADS.moveCeilingSeconds * 1000;
+const CLOCK = { w: BANK, b: BANK };
 /** White mates in one: Ra8#. */
 const WHITE_MATES = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
 /** White stalemates in one: Qf7. */
@@ -49,8 +54,11 @@ const WHITE_STALEMATES = "7k/8/6Q1/8/8/8/8/K7 w - - 0 1";
 const MERCY = "4r1k1/1b3ppp/3q4/2b5/8/N7/3n1PPP/6K1 w - - 0 1";
 /** White's only legal move is Kxb2. */
 const ONE_MOVE = "k7/8/8/8/8/8/1q6/K7 w - - 0 1";
+/** White a pawn up; Black has a lone king. */
+const PAWN_UP = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
+const rules = (start: "standard" | "same" | "random") => ({ start, clock: SQUADS.clocks[SQUADS.clockDefault]! });
 
-function match(format: "relay" | "pairs", starts: string[], o: Partial<Parameters<typeof createSquadsMatch>[0]> = {}, s?: SquadsSettings): SquadsMatch {
+function match(format: "relay" | "pairs", starts: string[], o: Partial<MatchSetup> = {}, s?: SquadsSettings): SquadsMatch {
   return createSquadsMatch(
     {
       key: "r0m0",
@@ -60,15 +68,15 @@ function match(format: "relay" | "pairs", starts: string[], o: Partial<Parameter
       sides,
       starts: starts.map((fen) => ({ fen, openingId: null })),
       whites: starts.map((_, k) => (k % 2) as Side),
-      capMoves: null,
-      paceSeconds: 15,
+      clockMs: CLOCK,
+      incrementMs: INC,
       ...o,
     },
     s,
   );
 }
-const relay = (starts = Array(4).fill(START_FEN), o = {}, s?: SquadsSettings) => match("relay", starts, o, s);
-const pairs = (starts = Array(2).fill(START_FEN), o = {}, s?: SquadsSettings) => match("pairs", starts, o, s);
+const relay = (starts = Array(4).fill(START_FEN), o: Partial<MatchSetup> = {}, s?: SquadsSettings) => match("relay", starts, o, s);
+const pairs = (starts = Array(2).fill(START_FEN), o: Partial<MatchSetup> = {}, s?: SquadsSettings) => match("pairs", starts, o, s);
 
 /** Inputs from moves by player id, through the real `choose` (so they're checked as a player's would be). */
 function inputs(m: SquadsMatch, moves: Record<string, string>): HalfInputs {
@@ -81,22 +89,22 @@ function inputs(m: SquadsMatch, moves: Record<string, string>): HalfInputs {
   return inp;
 }
 /** Plays a half with each duty's player choosing the first legal move (or the given move); nobody misses. */
-function playHalf(m: SquadsMatch, moves: Record<string, string> = {}) {
+function playHalf(m: SquadsMatch, moves: Record<string, string> = {}, think: Record<string, number> = {}) {
   const all: Record<string, string> = {};
   for (const d of halfDuties(m).duties) {
-    const fen = m.boards[d.board]!.fen;
-    const legal = legalMoves(fen);
+    const legal = legalMoves(m.boards[d.board]!.fen);
     d.players.forEach((p, i) => (all[p] = moves[p] ?? legal[i]!));
   }
-  return resolveHalf(m, inputs(m, all));
+  return resolveHalf(m, inputs(m, all), think);
 }
 const ofKind = <K extends SquadsEvent["kind"]>(events: SquadsEvent[], kind: K) => events.filter((e): e is Extract<SquadsEvent, { kind: K }> => e.kind === kind);
+const bots32 = () => formSquads([], Array.from({ length: 32 }, (_, i) => ({ id: `bot${i}`, name: `B${i}`, isBot: true, skill: 1 })), squadsRng(5, "seats")).squads;
 
 describe("Squads boards", () => {
   it("ends by the rules of chess the same way gameEnd does, without replaying the game; its fast moves match legalMoves", () => {
     for (let seed = 1; seed <= 12; seed++) {
       const rng = squadsRng(seed, "random-game");
-      let b = newSquadsBoard(0, { fen: START_FEN, openingId: null }, 0);
+      let b = newSquadsBoard(0, { fen: START_FEN, openingId: null }, 0, CLOCK);
       while (!b.result && b.moves.length < 300) {
         const legal = squadsLegalMoves(b.fen);
         // The guard on chess.js's internals: the same moves, in the same order, as the public API.
@@ -113,26 +121,39 @@ describe("Squads boards", () => {
     expect(squadsLegalMoves(MERCY).filter((m) => !allowsMateInOne(MERCY, m))).toEqual(["a3c2"]);
   });
 
-  it("counts material (kings don't count) and decides a capped board by it: a lead wins, level is a draw", () => {
+  it("counts material (kings don't count) for the safety cap and Next round: a lead wins, level is a draw", () => {
     expect(materialCount(START_FEN)).toEqual({ w: 39, b: 39 });
-    const up = newSquadsBoard(0, { fen: "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1", openingId: null }, 1);
-    expect(decideByMaterial(up, "move_cap").result).toEqual({ winner: "w", reason: "move_cap", material: { w: 1, b: 0 } });
-    const level = newSquadsBoard(0, { fen: START_FEN, openingId: null }, 0);
-    expect(decideByMaterial(level, "safety_cap").result?.winner).toBeNull();
-    // A bigger winning margin in settings: one pawn is then a draw.
-    expect(decideByMaterial(up, "move_cap", { ...SQUADS, materialLead: 2 }).result?.winner).toBeNull();
+    const up = newSquadsBoard(0, { fen: PAWN_UP, openingId: null }, 1, CLOCK);
+    expect(decideByMaterial(up, "safety_cap").result).toEqual({ winner: "w", reason: "safety_cap", material: { w: 1, b: 0 } });
+    expect(decideByMaterial(newSquadsBoard(0, { fen: START_FEN, openingId: null }, 0, CLOCK), "admin").result?.winner).toBeNull();
+    expect(decideByMaterial(up, "safety_cap", { ...SQUADS, materialLead: 2 }).result?.winner).toBeNull();
+  });
+
+  it("mating material: a lone king, or a king with one knight or bishop, can't mate", () => {
+    expect(canMate("4k3/8/8/8/8/8/8/4K3 w - - 0 1", "w")).toBe(false);
+    expect(canMate("4k3/8/8/8/8/8/8/3NK3 w - - 0 1", "w")).toBe(false);
+    expect(canMate("4kb2/8/8/8/8/8/8/4K3 w - - 0 1", "b")).toBe(false);
+    expect(canMate(PAWN_UP, "w")).toBe(true);
+    expect(canMate("4k3/8/8/8/8/8/8/2NNK3 w - - 0 1", "w")).toBe(true);
+    expect(canMate("4kr2/8/8/8/8/8/8/4K3 w - - 0 1", "b")).toBe(true);
+  });
+
+  it("a flag fall loses the board, or draws it when the other side can't mate", () => {
+    const b = newSquadsBoard(0, { fen: PAWN_UP, openingId: null }, 0, CLOCK);
+    expect(flagFall(b, "w").result).toEqual({ winner: null, reason: "flag" });
+    expect(flagFall(b, "b").result).toEqual({ winner: "w", reason: "flag" });
+    expect(flagFall(b, "b").clock).toEqual({ w: BANK, b: 0 });
   });
 
   it("refuses an illegal move", () => {
-    const b = newSquadsBoard(0, { fen: START_FEN, openingId: null }, 0);
-    expect(() => playOnBoard(b, "e2e5")).toThrow();
+    expect(() => playOnBoard(newSquadsBoard(0, { fen: START_FEN, openingId: null }, 0, CLOCK), "e2e5")).toThrow();
   });
 });
 
 describe("Squads starts and setup", () => {
-  it("random openings: each opening on two boards of a match, colours swapped", () => {
-    const plan = planLobby(5, { start: "random", paceSeconds: 15, length: "cap" }, library);
-    const squads = formSquads([], Array.from({ length: 32 }, (_, i) => ({ id: `bot${i}`, name: `B${i}`, isBot: true, skill: 1 })), squadsRng(5, "seats")).squads;
+  it("random openings: each opening on two boards of a match, colours swapped; every board on the voted clock", () => {
+    const plan = planLobby(5, rules("random"), library);
+    const squads = bots32();
     const m = planMatch(plan, 0, 0, [squads[0]!, squads[1]!], library);
     const ids = m.boards.map((b) => b.start.openingId);
     expect(ids[0]).toBe(ids[1]);
@@ -140,43 +161,42 @@ describe("Squads starts and setup", () => {
     expect(ids[0]).not.toBe(ids[2]);
     expect(m.boards.map((b) => b.white)).toEqual([0, 1, 0, 1]);
     expect(m.boards.every((b) => b.fen.split(" ")[1] === "w")).toBe(true);
-    expect(m.capMoves).toBe(SQUADS.moveCap);
+    const normal = SQUADS.clocks[SQUADS.clockDefault]!;
+    expect(m.boards.every((b) => b.clock.w === normal.bankSeconds * 1000 && b.clock.b === normal.bankSeconds * 1000)).toBe(true);
+    expect(m.incrementMs).toBe(normal.incrementSeconds * 1000);
     expect(m.safetyMoves).toBe(SQUADS.safetyCap);
-    // Pairs: one opening on both boards, each squad White on one. The final: always to the end.
     const r2 = planMatch(plan, 1, 0, [squads[0]!, squads[1]!], library);
     expect(r2.boards).toHaveLength(2);
     expect(r2.boards[0]!.start).toEqual(r2.boards[1]!.start);
     expect(r2.boards.map((b) => b.white)).toEqual([0, 1]);
     const fin = planMatch(plan, 2, 0, [squads[0]!, squads[1]!], library);
     expect(fin.boards).toHaveLength(1);
-    expect(fin.capMoves).toBeNull();
     expect(fin.format).toBe("final");
   });
 
   it("one opening: every board in every round (and Armageddon) starts from the lobby's opening", () => {
-    const plan = planLobby(8, { start: "same", paceSeconds: 10, length: "end" }, library);
+    const fast = SQUADS.clocks[0]!;
+    const plan = planLobby(8, { start: "same", clock: fast }, library);
     expect(plan.start?.openingId).toBeTruthy();
-    const squads = formSquads([], Array.from({ length: 32 }, (_, i) => ({ id: `bot${i}`, name: `B${i}`, isBot: true, skill: 1 })), squadsRng(8, "seats")).squads;
+    const squads = bots32();
     for (const round of [0, 1, 2] as const) {
       const m = planMatch(plan, round, 0, [squads[0]!, squads[1]!], library);
       expect(m.boards.every((b) => b.start.openingId === plan.start!.openingId)).toBe(true);
-      expect(m.capMoves).toBeNull();
-      expect(m.paceSeconds).toBe(10);
+      expect(m.boards[0]!.clock.w).toBe(fast.bankSeconds * 1000);
     }
-    expect(armageddonStart(plan, { key: "r0m0" }, library)).toEqual(plan.start);
+    expect(armageddonStart(plan, { key: "r2m0" }, library)).toEqual(plan.start);
   });
 
   it("the normal start: the starting position everywhere", () => {
-    const plan = planLobby(3, { start: "standard", paceSeconds: 15, length: "cap" }, library);
+    const plan = planLobby(3, rules("standard"), library);
     expect(plan.start).toBeNull();
-    expect(armageddonStart(plan, { key: "r0m0" }, library).fen).toBe(START_FEN);
+    expect(armageddonStart(plan, { key: "r2m0" }, library).fen).toBe(START_FEN);
   });
 
   it("the same seed plans the same matches", () => {
-    const rules = { start: "random", paceSeconds: 15, length: "cap" } as const;
-    const squads = formSquads([], Array.from({ length: 32 }, (_, i) => ({ id: `bot${i}`, name: `B${i}`, isBot: true, skill: 1 })), squadsRng(1, "seats")).squads;
-    const a = planMatch(planLobby(77, rules, library), 2, 0, [squads[0]!, squads[1]!], library);
-    const b = planMatch(planLobby(77, rules, library), 2, 0, [squads[0]!, squads[1]!], library);
+    const squads = bots32();
+    const a = planMatch(planLobby(77, rules("random"), library), 2, 0, [squads[0]!, squads[1]!], library);
+    const b = planMatch(planLobby(77, rules("random"), library), 2, 0, [squads[0]!, squads[1]!], library);
     expect(a).toEqual(b);
   });
 });
@@ -210,22 +230,60 @@ describe("Squads round 1: Relay", () => {
     expect(path).toEqual([1, 2, 3, 0, 1]);
   });
 
-  it("a missed move becomes a random legal move, logged as a miss, the same for the same seed", () => {
+  it("a squad's four players share their side's clock on each board: each mover's time is charged, plus the increment", () => {
+    const first = playHalf(relay(), {}, { a0: 5_000, b1: 3_000, a2: 1_000, b3: 0 });
+    expect(first.match.boards.map((b) => b.clock.w)).toEqual([BANK - 5_000 + INC, BANK - 3_000 + INC, BANK - 1_000 + INC, BANK + INC]);
+    expect(first.match.boards.every((b) => b.clock.b === BANK)).toBe(true);
+    expect(ofKind(first.events, "clock")[0]).toEqual({ kind: "clock", turn: 0, half: "w", board: 0, side: 0, usedMs: 5_000, leftMs: BANK - 3_000 });
+    // Next turn a different player of squad 0 (a3) is White on board 0, on the same clock.
+    const turn1 = playHalf(first.match).match;
+    expect(halfDuties(turn1).duties[0]!.players).toEqual(["a3"]);
+    const after = playHalf(turn1, {}, { a3: 10_000 }).match;
+    expect(after.boards[0]!.clock.w).toBe(BANK - 5_000 + INC - 10_000 + INC);
+  });
+
+  it("the per-move ceiling: a mover who hasn't moved by then misses (a random move), the bank charged meanwhile, no increment", () => {
     const m = relay();
     const d = halfDuties(m).duties;
+    expect(d.every((x) => x.deadlineMs === CEILING)).toBe(true);
     const moves: Record<string, string> = {};
     for (const x of d) moves[x.players[0]!] = "e2e4";
     delete moves[d[2]!.players[0]!];
     const a = resolveHalf(m, inputs(m, moves));
-    const b = resolveHalf(m, inputs(m, moves));
-    expect(a).toEqual(b);
+    expect(resolveHalf(m, inputs(m, moves))).toEqual(a);
     const missed = ofKind(a.events, "relay").find((e) => e.board === 2)!;
     expect(missed.missed).toBe(true);
     expect(legalMoves(START_FEN)).toContain(missed.move);
     expect(a.missed).toEqual([d[2]!.players[0]]);
     expect(a.acted).toHaveLength(3);
-    // The miss counts the whole clock towards that squad's thinking time.
-    expect(a.match.thinkMs[0]).toBe(15_000);
+    expect(a.match.boards[2]!.clock.w).toBe(BANK - CEILING);
+    // With the increment allowed on a miss.
+    expect(resolveHalf(m, inputs(m, moves), {}, { ...SQUADS, incrementOnMiss: true }).match.boards[2]!.clock.w).toBe(BANK - CEILING + INC);
+    // The ceiling is a setting.
+    expect(halfDuties(m, { ...SQUADS, moveCeilingSeconds: 60 }).duties[0]!.deadlineMs).toBe(60_000);
+  });
+
+  it("a flag fall: running out of time loses the board, with no move played", () => {
+    const low = relay(undefined, { clockMs: { w: 3_000, b: BANK } });
+    const d = halfDuties(low).duties;
+    expect(d[0]!.deadlineMs).toBe(3_000);
+    // a0 moved, but after 4 s: too late. b1 (board 2) never moved, with 3 s on the clock: it ran out too.
+    const out = resolveHalf(low, inputs(low, { a0: "e2e4", a2: "e2e4", b3: "e2e4" }), { a0: 4_000, a2: 1_000, b3: 1_000 });
+    expect(out.match.boards[0]!.result).toEqual({ winner: "b", reason: "flag" });
+    expect(out.match.boards[0]!.moves).toEqual([]);
+    expect(out.match.boards[0]!.clock.w).toBe(0);
+    expect(out.match.boards[1]!.result).toEqual({ winner: "b", reason: "flag" });
+    expect(out.missed).toEqual(["b1"]);
+    expect(out.match.boards[2]!.moves).toEqual(["e2e4"]);
+    expect(ofKind(out.events, "board_end").map((e) => e.board)).toEqual([0, 1]);
+    // One board each so far (side 0 was White on board 1, side 1 on board 2): the match goes on.
+    expect(out.match.result).toBeNull();
+  });
+
+  it("a flag against bare material: a draw when the other side can't mate", () => {
+    const bare = relay([PAWN_UP, START_FEN, START_FEN, START_FEN], { clockMs: { w: 1_000, b: BANK } });
+    const out = resolveHalf(bare, inputs(bare, { a0: "e1d1", b1: "e2e4", a2: "e2e4", b3: "e2e4" }), { a0: 2_000, b1: 500, a2: 500, b3: 500 });
+    expect(out.match.boards[0]!.result).toEqual({ winner: null, reason: "flag" });
   });
 
   it("a move is made once; an illegal move or a player without a duty is refused", () => {
@@ -246,15 +304,12 @@ describe("Squads round 1: Relay", () => {
     let m = relay([WHITE_MATES, START_FEN, START_FEN, START_FEN]);
     const first = playHalf(m, { a0: "a1a8" });
     expect(first.match.boards[0]!.result).toEqual({ winner: "w", reason: "checkmate" });
-    expect(ofKind(first.events, "board_end")).toHaveLength(1);
     expect(first.match.result).toBeNull();
     m = first.match;
-    // Black's half: board 1's Black player (squad 1, seat 0) scouts; the other three boards play.
     const black = playHalf(m);
     expect(ofKind(black.events, "scout")).toEqual([{ kind: "scout", turn: 0, half: "b", board: 0, side: 1, players: ["b0"] }]);
     expect(ofKind(black.events, "relay")).toHaveLength(3);
     m = black.match;
-    // Turn 2: seat 3 of each squad lands on the finished board and sits out; seat 0 moves on to board 2.
     const d = halfDuties(m);
     expect(d.scouts.map((x) => x.players[0])).toEqual(["a3"]);
     expect(d.duties.find((x) => x.board === 1)?.players).toEqual(["b0"]);
@@ -267,84 +322,56 @@ describe("Squads round 1: Relay", () => {
     const out = playHalf(m, { a0: "a1a8", b1: "g6f7", a2: "a1a8" });
     expect(out.match.result).toEqual({ winner: 0, points: [2.5, 0.5], how: "clinch" });
     expect(out.match.boards[3]!.result).toBeNull();
-    expect(ofKind(out.events, "match_end")).toHaveLength(1);
     expect(winnerSquad(out.match)).toBe(0);
     expect(() => resolveHalf(out.match, NO_INPUTS)).toThrow();
     expect(halfDuties(out.match).duties).toEqual([]);
   });
 
-  it("a 2-2 tie goes to Armageddon: the squad with less thinking time picks colours", () => {
+  it("a 2-2 tie goes to the squad with more clock time left across its boards (no Armageddon)", () => {
     const m = relay([WHITE_MATES, WHITE_MATES, WHITE_MATES, WHITE_MATES]);
-    const d = halfDuties(m).duties;
-    const moves = Object.fromEntries(d.map((x) => [x.players[0]!, "a1a8"]));
-    const think = { a0: 9000, a2: 9000, b1: 2000, b3: 2000 };
-    const out = resolveHalf(m, inputs(m, moves), think);
-    expect(out.match.result).toEqual({ winner: null, points: [2, 2], how: "boards" });
-    expect(out.match.thinkMs).toEqual([18_000, 4_000]);
-    expect(armageddonChooser(out.match)).toBe(1);
-    const arm = startArmageddon(out.match, 0, { fen: START_FEN, openingId: null });
-    expect(arm).toMatchObject({ armageddon: true, format: "relay", round: 0, paceSeconds: SQUADS.armageddonPaceSeconds, key: "r0m0-armageddon", turn: 0, half: "w" });
-    expect(arm.boards).toHaveLength(1);
-    expect(arm.boards[0]!.white).toBe(0);
-    // One board in Relay: each squad's seats take turns, one move each.
-    expect(halfDuties(arm).duties).toEqual([{ board: 0, side: 0, role: "move", players: ["a0"] }]);
-    expect(halfDuties({ ...arm, turn: 1, half: "b" }).duties).toEqual([{ board: 0, side: 1, role: "move", players: ["b1"] }]);
-    expect(() => startArmageddon(relay(), 0, { fen: START_FEN, openingId: null })).toThrow();
+    const moves = Object.fromEntries(halfDuties(m).duties.map((x) => [x.players[0]!, "a1a8"]));
+    const out = resolveHalf(m, inputs(m, moves), { a0: 9_000, a2: 9_000, b1: 2_000, b3: 2_000 });
+    const left = [4 * BANK + 2 * INC - 18_000, 4 * BANK + 2 * INC - 4_000];
+    expect(timeLeft(out.match.boards)).toEqual(left);
+    expect(out.match.result).toEqual({ winner: 1, points: [2, 2], how: "time", timeLeft: left });
+    expect(winnerSquad(out.match)).toBe(1);
   });
 
-  it("level thinking time: a seeded coin picks who chooses", () => {
-    const tied = { ...relay(), thinkMs: [5, 5] as const };
+  it("exactly level on points and time: a seeded coin decides (both ways happen)", () => {
     const seen = new Set<Side>();
-    for (let seed = 1; seed < 40; seed++) seen.add(armageddonChooser({ ...tied, seed }));
+    for (let seed = 1; seed < 30; seed++) {
+      const m = { ...relay([WHITE_MATES, WHITE_MATES, WHITE_MATES, WHITE_MATES]), seed };
+      const moves = Object.fromEntries(halfDuties(m).duties.map((x) => [x.players[0]!, "a1a8"]));
+      const think = { a0: 1_000, a2: 1_000, b1: 1_000, b3: 1_000 };
+      const out = resolveHalf(m, inputs(m, moves), think);
+      expect(out.match.result).toMatchObject({ points: [2, 2], how: "coin" });
+      expect(resolveHalf(m, inputs(m, moves), think).match.result).toEqual(out.match.result);
+      seen.add(out.match.result!.winner!);
+    }
     expect([...seen].sort()).toEqual([0, 1]);
-    expect(armageddonChooser({ ...tied, seed: 3 })).toBe(armageddonChooser({ ...tied, seed: 3 }));
   });
 
-  it("Armageddon: White must win; a draw (stalemate, or level material at the cap) counts for Black", () => {
-    const tied = { ...relay(), result: { winner: null, points: [2, 2] as const, how: "boards" as const } };
-    const stale = startArmageddon(tied, 0, { fen: WHITE_STALEMATES, openingId: null });
-    const drawn = playHalf(stale, { a0: "g6f7" }).match;
-    expect(drawn.result).toMatchObject({ winner: 1, how: "armageddon" });
-    const mate = startArmageddon(tied, 1, { fen: WHITE_MATES, openingId: null });
-    expect(playHalf(mate, { b0: "a1a8" }).match.result).toMatchObject({ winner: 1, how: "armageddon" });
-    const capped = startArmageddon({ ...tied, capMoves: 1 }, 0, { fen: START_FEN, openingId: null });
-    const end = playHalf(playHalf(capped).match).match;
-    expect(end.boards[0]!.result).toMatchObject({ winner: null, reason: "move_cap" });
-    expect(end.result).toMatchObject({ winner: 1, how: "armageddon" });
-  });
-
-  it("the move cap: boards still going are decided by material once each side has made the cap's moves", () => {
-    const up = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
-    let m = relay([up, START_FEN, up, START_FEN], { capMoves: 2 });
-    m = playHalf(playHalf(m).match).match;
-    expect(m.boards.every((b) => !b.result)).toBe(true);
-    const out = playHalf(playHalf(m).match);
-    expect(out.match.boards.map((b) => b.result?.reason)).toEqual(["move_cap", "move_cap", "move_cap", "move_cap"]);
-    expect(out.match.boards.map((b) => b.result?.winner)).toEqual(["w", null, "w", null]);
-    // Side 0 is White on boards 1 and 3: 2 + 0.5 + 0.5 = 3.
-    expect(out.match.result).toEqual({ winner: 0, points: [3, 1], how: "boards" });
-  });
-
-  it("the silent safety cap guards a game to the end", () => {
+  it("the silent safety cap: material decides a board still going at move 120 (here 1, from settings)", () => {
     const s = { ...SQUADS, safetyCap: 1 };
-    const m = relay(undefined, { capMoves: null }, s);
+    const m = relay([PAWN_UP, START_FEN, START_FEN, START_FEN], {}, s);
     expect(m.safetyMoves).toBe(1);
-    const once = resolveHalf(m, NO_INPUTS, {}, s);
-    const out = resolveHalf(once.match, NO_INPUTS, {}, s);
-    expect(out.match.boards.every((b) => b.result?.reason === "safety_cap")).toBe(true);
-    expect(out.match.result).toEqual({ winner: null, points: [2, 2], how: "boards" });
+    const once = resolveHalf(m, inputs(m, { a0: "e1d1", b1: "e2e4", a2: "e2e4", b3: "e2e4" }), {}, s);
+    const out = resolveHalf(once.match, inputs(once.match, { b0: "e8d8", a1: "e7e5", b2: "e7e5", a3: "e7e5" }), {}, s);
+    expect(out.match.boards.map((b) => b.result?.reason)).toEqual(["safety_cap", "safety_cap", "safety_cap", "safety_cap"]);
+    expect(out.match.boards[0]!.result?.winner).toBe("w");
+    expect(out.match.result).toMatchObject({ winner: 0, points: [2.5, 1.5], how: "boards" });
   });
 
-  it("the test-only Next round: material decides every live board, a tie by a seeded coin", () => {
-    const m = relay([START_FEN, "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1", START_FEN, START_FEN]);
+  it("the test-only Next round: material decides every live board; level goes to time left, then a coin", () => {
+    const m = relay([START_FEN, PAWN_UP, START_FEN, START_FEN]);
     const { match, events } = endByMaterial(m);
     expect(match.boards.every((b) => b.result?.reason === "admin")).toBe(true);
     // Board 2 (side 1 White) is a pawn up: side 1 wins it, the three level boards are draws.
     expect(match.result).toEqual({ winner: 1, points: [1.5, 2.5], how: "admin" });
     expect(ofKind(events, "board_end")).toHaveLength(4);
-    const tie = endByMaterial(relay());
-    expect(tie.match.result?.how).toBe("admin");
-    expect(tie.match.result?.winner).not.toBeNull();
+    const played = playHalf(relay(), {}, { a0: 9_000 }).match;
+    expect(endByMaterial(played).match.result).toMatchObject({ winner: 1, how: "admin" });
+    expect(endByMaterial(relay()).match.result?.winner).not.toBeNull();
   });
 
   it("missed moves reach the players' records through noteActions", () => {
@@ -355,9 +382,8 @@ describe("Squads round 1: Relay", () => {
     ).squads;
     const out = resolveHalf(relay(), NO_INPUTS);
     const after = noteActions(squads, out.acted, out.missed);
-    const a0 = after.flatMap((s) => s.players).find((p) => p.id === "a0")!;
     expect(out.missed).toContain("a0");
-    expect(a0.misses).toBe(1);
+    expect(after.flatMap((s) => s.players).find((p) => p.id === "a0")!.misses).toBe(1);
   });
 });
 
@@ -405,9 +431,12 @@ describe("Squads round 2: Pairs", () => {
     expect(step("b3", "b1c3")).toBe("ok");
     inp = lockIn(lockIn(inp, "b2"), "b3");
     expect(halfReady(m, inp)).toBe(true);
-    // Each squad sees only its own picks.
-    expect(visibleChoices(m, inp, 0)).toEqual({ a0: "e2e4", a1: "c2c4" });
-    expect(visibleChoices(m, inp, null)).toEqual({});
+  });
+
+  it("the clock runs while the pickers think, as one side's clock: the slower picker's time", () => {
+    const m = pairs();
+    const out = resolveHalf(m, inputs(m, { a0: "e2e4", a1: "d2d4", b2: "g1f3", b3: "b1c3" }), { a0: 3_000, a1: 7_000, b2: 2_000, b3: 1_000 });
+    expect(out.match.boards.map((b) => b.clock.w)).toEqual([BANK - 7_000 + INC, BANK - 2_000 + INC]);
   });
 
   it("a coin picks which of the two plays (both happen, the same for the same seed)", () => {
@@ -417,7 +446,7 @@ describe("Squads round 2: Pairs", () => {
       const out = resolveHalf(m, inputs(m, { a0: "e2e4", a1: "d2d4", b2: "g1f3", b3: "b1c3" }));
       const e = ofKind(out.events, "pair").find((x) => x.board === 0)!;
       expect(e.picks).toEqual(["e2e4", "d2d4"]);
-      expect(e.move).toBe(e.picks![e.coin!]);
+      expect(e.move).toBe(e.picks[e.coin]);
       expect(out.match.boards[0]!.moves).toEqual([e.move]);
       seen.add(e.move);
       expect(resolveHalf(m, inputs(m, { a0: "e2e4", a1: "d2d4", b2: "g1f3", b3: "b1c3" }))).toEqual(out);
@@ -425,20 +454,20 @@ describe("Squads round 2: Pairs", () => {
     expect([...seen].sort()).toEqual(["d2d4", "e2e4"]);
   });
 
-  it("a missed pick becomes a random legal move (never the partner's), so the coin may play junk", () => {
+  it("a missed pick becomes a random legal move (never the partner's), the whole ceiling charged, no increment", () => {
     for (let seed = 1; seed < 30; seed++) {
       const m = { ...pairs(), seed };
-      const out = resolveHalf(m, inputs(m, { a0: "e2e4", b2: "g1f3", b3: "b1c3" }));
+      const out = resolveHalf(m, inputs(m, { a0: "e2e4", b2: "g1f3", b3: "b1c3" }), { a0: 2_000 });
       const e = ofKind(out.events, "pair").find((x) => x.board === 0)!;
       expect(e.missed).toEqual([false, true]);
-      expect(e.picks![0]).toBe("e2e4");
-      expect(e.picks![1]).not.toBe("e2e4");
-      expect(legalMoves(START_FEN)).toContain(e.picks![1]);
+      expect(e.picks[0]).toBe("e2e4");
+      expect(e.picks[1]).not.toBe("e2e4");
+      expect(legalMoves(START_FEN)).toContain(e.picks[1]);
       expect(out.missed).toEqual(["a1"]);
+      expect(out.match.boards[0]!.clock.w).toBe(BANK - CEILING);
     }
-    // Both missed: two different random moves.
     const both = ofKind(resolveHalf(pairs(), NO_INPUTS).events, "pair");
-    for (const e of both) expect(e.picks![0]).not.toBe(e.picks![1]);
+    for (const e of both) expect(e.picks[0]).not.toBe(e.picks[1]);
   });
 
   it("a board's coin doesn't depend on what happened on the other board (each draw has its own stream)", () => {
@@ -449,7 +478,7 @@ describe("Squads round 2: Pairs", () => {
     expect(coin(b)).toBe(coin(a));
   });
 
-  it("only one legal move: it plays itself, with no coin and no misses", () => {
+  it("only one legal move: it plays itself, with no coin, no misses and no time used (the increment still comes)", () => {
     const m = pairs([ONE_MOVE, START_FEN]);
     expect(halfDuties(m).forced).toEqual([0]);
     expect(halfDuties(m).duties.map((d) => d.board)).toEqual([1]);
@@ -457,17 +486,17 @@ describe("Squads round 2: Pairs", () => {
     const out = resolveHalf(m, inputs(m, { b2: "g1f3", b3: "b1c3" }));
     expect(ofKind(out.events, "forced")).toEqual([{ kind: "forced", turn: 0, half: "w", board: 0, side: 0, move: "a1b2" }]);
     expect(out.missed).toEqual([]);
+    expect(out.match.boards[0]!.clock.w).toBe(BANK + INC);
   });
 
-  it("1-1 is a tie (Armageddon); 1.5 of 2 wins", () => {
-    // A coin decides which pick plays: find a seed where both boards' coins play the mate.
-    let found: SquadsMatch | null = null;
-    for (let seed = 1; seed < 60 && !found; seed++) {
+  it("1-1 goes to the squad with more time left; 1.5 of 2 wins outright", () => {
+    let tie: SquadsMatch | null = null;
+    for (let seed = 1; seed < 60 && !tie; seed++) {
       const m = { ...pairs([WHITE_MATES, WHITE_MATES]), seed };
-      const out = resolveHalf(m, inputs(m, { a0: "a1a8", a1: "a1a7", b2: "a1a8", b3: "a1a7" }));
-      if (out.match.boards.every((b) => b.result?.reason === "checkmate")) found = out.match;
+      const out = resolveHalf(m, inputs(m, { a0: "a1a8", a1: "a1a7", b2: "a1a8", b3: "a1a7" }), { a0: 1_000, a1: 1_000, b2: 6_000, b3: 1_000 });
+      if (out.match.boards.every((b) => b.result?.reason === "checkmate")) tie = out.match;
     }
-    expect(found?.result).toEqual({ winner: null, points: [1, 1], how: "boards" });
+    expect(tie?.result).toMatchObject({ winner: 0, points: [1, 1], how: "time" });
     let win: SquadsMatch | null = null;
     for (let seed = 1; seed < 60 && !win; seed++) {
       const m = { ...pairs([WHITE_MATES, WHITE_STALEMATES]), seed };
@@ -486,8 +515,8 @@ describe("Squads round 2: Pairs", () => {
     }
     expect(m).not.toBeNull();
     const d = halfDuties(m!);
-    expect(d.scouts).toEqual([{ board: 0, side: 1, role: "pick", players: ["b0", "b1"] }]);
-    expect(d.duties).toEqual([{ board: 1, side: 0, role: "pick", players: ["a2", "a3"] }]);
-    expect(matchResultOf(m!.boards, false)).toBeNull();
+    expect(d.scouts.map((x) => [x.board, x.side, ...x.players])).toEqual([[0, 1, "b0", "b1"]]);
+    expect(d.duties.map((x) => [x.board, x.side, ...x.players])).toEqual([[1, 0, "a2", "a3"]]);
+    expect(matchResultOf(m!)).toBeNull();
   });
 });
