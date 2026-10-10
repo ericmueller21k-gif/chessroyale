@@ -3,13 +3,13 @@
  * reference picture: a winged crown-helmet with glowing gold eyes, a flaming golden sword, a blue tabard with gold
  * crosses, and a long torn white-and-gold cape. Drawn facing front, light from the top left.
  *
- * He plays either side: the `black` look recolours his armour to dark steel; gold, eyes, cape, cloth, wings and the
- * flame stay the same (Eric's rule: everything he shows comes in both colours, the armour only).
+ * He plays either side: the `black` look recolours his armour to dark steel; gold, eyes, cape, cloth and the flame
+ * stay the same (Eric's rule: everything he shows comes in both colours, the armour only).
  *
  * Rigging: his own drawing space is one board square, 60 x 60, his feet at the bottom centre. The sword arm (his
  * right, on the viewer's left) is drawn from its pose's shoulder, elbow and fist, and the sword (a gold hilt and a
  * blade of fire) hangs off the fist in the pose's direction, so a swing is a list of poses. The cape and tabard
- * ripple; the back wings fold, half open or spread; the helmet's wings flap; his eyes glow, flare or go dark.
+ * ripple; the helmet's wings flap; his eyes glow, flare or go dark. (No back wings: Eric, Oct 9, 2026.)
  */
 import { LAST_STAND } from "@chessroyale/chess";
 import { canvas, edge, ellipse, inEllipse, line, poly, roundLight, shade, tint, toGrid } from "./paint.ts";
@@ -105,56 +105,6 @@ const wingHelm: Part = {
     "....gGh",
   ],
 };
-
-// ---- Back wings: white feathers fanning from the root (bottom right of the left wing; the right wing mirrors it).
-
-function wing(w: number, h: number, bone: readonly Pt[], lens: readonly [number, number], fall: readonly [Pt, Pt], n: number): Part {
-  const cv = canvas(w, h);
-  // A point along the bone, s from 0 (root) to 1 (tip).
-  const segs = bone.slice(1).map((b, i) => {
-    const a = bone[i]!;
-    return { a, b, len: Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) };
-  });
-  const total = segs.reduce((t, sg) => t + sg.len, 0);
-  const along = (s: number): Pt => {
-    let d = s * total;
-    for (const sg of segs) {
-      if (d <= sg.len) return [sg.a[0] + ((sg.b[0] - sg.a[0]) * d) / sg.len, sg.a[1] + ((sg.b[1] - sg.a[1]) * d) / sg.len];
-      d -= sg.len;
-    }
-    return bone[bone.length - 1]!;
-  };
-  // Feathers hang off the bone, longest at the tip; drawn from the tip in, so the inner ones lie over the outer.
-  for (let i = n - 1; i >= 0; i--) {
-    const s = n === 1 ? 1 : i / (n - 1);
-    const [bx, by] = along(0.15 + 0.85 * s);
-    let dx = fall[0][0] + (fall[1][0] - fall[0][0]) * s;
-    let dy = fall[0][1] + (fall[1][1] - fall[0][1]) * s;
-    const dl = Math.sqrt(dx * dx + dy * dy) || 1;
-    dx /= dl;
-    dy /= dl;
-    const L = lens[0] + (lens[1] - lens[0]) * s;
-    const px = -dy * 2.1;
-    const py = dx * 2.1;
-    poly(cv, [[bx + px, by + py], [bx + px + dx * L * 0.8, by + py + dy * L * 0.8], [bx + dx * L, by + dy * L], [bx - px * 0.6 + dx * L * 0.7, by - py * 0.6 + dy * L * 0.7], [bx - px, by - py]], i % 2 ? "M" : "m");
-    line(cv, Math.round(bx + px * 0.8), Math.round(by + py * 0.8), Math.round(bx + px * 0.4 + dx * L * 0.85), Math.round(by + py * 0.4 + dy * L * 0.85), "n");
-  }
-  // The bone and its coverts: a band of small feathers along the top, lit from above.
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      let best = Infinity;
-      for (let k = 0; k <= 40; k++) {
-        const [qx, qy] = along(k / 40);
-        best = Math.min(best, (x + 0.5 - qx) ** 2 + (y + 0.5 - qy) ** 2);
-      }
-      if (best <= 2.6 * 2.6) cv[y]![x] = best <= 1.2 ? "m" : "M";
-    }
-  edge(cv, 0, -1, "M", "m");
-  return { grid: toGrid(cv) };
-}
-const wingFold = wing(11, 12, [[9.5, 10.5], [5, 4.5], [1, 1]], [2, 5], [[0.2, 1], [-0.6, 0.8]], 4);
-const wingHalf = wing(18, 20, [[16.5, 18], [12, 9], [5, 2.5], [1, 2]], [3, 9], [[0, 1], [-0.85, 0.5]], 7);
-const wingSpread = wing(26, 27, [[24.5, 25], [19, 13], [10, 4], [1.5, 1.5]], [4, 13], [[0, 1], [-0.9, 0.35]], 10);
 
 // ---- Body.
 
@@ -462,7 +412,6 @@ export interface KingPose {
   /** The flame's flicker (0 to 2) and how it burns. */
   flick?: number;
   flame?: Flame;
-  wings?: "fold" | "half" | "spread";
   /** The helmet's wings, lifted a pixel. */
   flap?: boolean;
   /** The cape's ripple: travel (radians) and size. */
@@ -498,9 +447,6 @@ const PARTS: Record<string, Part> = {
   helm,
   crown,
   wingHelm,
-  wingFold,
-  wingHalf,
-  wingSpread,
   pauldronL,
   pauldronR,
   torso,
@@ -556,18 +502,11 @@ export function kingLayers(p: KingPose): { layers: Layer[]; specks: Speck[] } {
   const limbL = armPart(`armL:${p.off ?? "hang"}`, SHOULDER_L, off.e, off.f);
   // A sword pointing at the ground stops at the ground, however low he crouches.
   const { hilt, blade, sword } = swordParts(arm.dir, p.flick ?? 0, p.flame ?? "lit", arm.len === undefined ? undefined : arm.len - Math.max(0, up) - (p.flame === "flare" ? 4 : 0));
-  const wings = p.wings ?? "fold";
-  const wingPart = wings === "spread" ? "wingSpread" : wings === "half" ? "wingHalf" : "wingFold";
-  const wingAt: Record<string, [number, number]> = { wingFold: [6, 9], wingHalf: [0, 1], wingSpread: [-7, -6] };
-  const [wx, wy] = wingAt[wingPart]!;
-  const wingW = PARTS[wingPart]!.grid[0]!.length;
   const flap = p.flap ? -1 : 0;
   const amp = p.waveAmp ?? 1.5;
   const layers: Layer[] = [
     A("shadow", 13, SIZE - 2),
     A("cape", 13 + dx, 18 + Math.min(4, up), amp ? { wave: { along: "rows", amp, len: 22, phase: p.wave ?? 0, pin: "top" } } : {}),
-    U(wingPart, wx, wy),
-    U(wingPart, SIZE - wx - wingW, wy, { flipX: true }),
     { part: `armL:${p.off ?? "hang"}`, x: OX + limbL.x + dx, y: OY + limbL.y + up },
     A("legL", 19, 38 + Math.ceil(crouch / 2)),
     A("legR", 32, 38 + Math.ceil(crouch / 2)),
@@ -661,31 +600,31 @@ const wave = (i: number, n = FRAMES) => (i / n) * Math.PI * 2;
 const idle: Anim = {
   loop: true,
   frames: Array.from({ length: FRAMES }, (_, i) =>
-    f(100, { bob: breath(i), flick: i, wave: wave(i), flap: i >= 8 && i < 16, wings: "half", eyes: i === 10 || i === 11 ? "hot" : "glow" }, { specks: embers("hold", i) }),
+    f(100, { bob: breath(i), flick: i, wave: wave(i), flap: i >= 8 && i < 16, eyes: i === 10 || i === 11 ? "hot" : "glow" }, { specks: embers("hold", i) }),
   ),
 };
 
-/** Appearing on the board out of the beam: landed low, wings spread; he rises and folds them. */
+/** Appearing on the board out of the beam: landed low, he rises. */
 const appear: Anim = {
   loop: false,
   frames: [
-    f(80, { crouch: 3, arm: "plant", wings: "spread", eyes: "hot", flick: 0 }, { cue: "appear" }),
-    f(80, { crouch: 1, arm: "hold", wings: "spread", flick: 1 }),
-    f(90, { arm: "hold", wings: "half", flick: 2 }),
+    f(80, { crouch: 3, arm: "plant", eyes: "hot", flick: 0 }, { cue: "appear" }),
+    f(80, { crouch: 1, arm: "hold", flick: 1 }),
+    f(90, { arm: "hold", flick: 2 }),
   ],
 };
 
-const RAISED: KingPose = { arm: "raise", wings: "spread", flame: "flare", eyes: "hot" };
-/** Raising his sword: up over his head, the flame flares, his wings spread, his eyes blaze. */
+const RAISED: KingPose = { arm: "raise", flame: "flare", eyes: "hot" };
+/** Raising his sword: up over his head, the flame flares, his eyes blaze. */
 const raise: Anim = {
   loop: false,
   frames: [
-    f(70, { arm: "mid", wings: "half", eyes: "hot", flick: 0 }),
+    f(70, { arm: "mid", eyes: "hot", flick: 0 }),
     f(70, { ...RAISED, bob: -1, flick: 1 }, { cue: "raise", specks: [...burst("raise", 3), ...eyeFlare(RAISED, true)] }),
     f(110, { ...RAISED, flick: 2 }, { specks: [...burst("raise", 5), ...eyeFlare(RAISED)] }),
   ],
 };
-/** Sword raised: the flame roars, wings spread and beating a little. */
+/** Sword raised: the flame roars, his cape stirs. */
 const raised: Anim = {
   loop: true,
   frames: Array.from({ length: 6 }, (_, i) =>
@@ -715,22 +654,28 @@ const slash: Anim = {
   ],
 };
 
-/** His leap out of the dock (his Last Stand): a crouch, then up, wings spread, sword raised. */
+/** Lowering his sword after commanding it from his spot, back to how he stands by. */
+const lower: Anim = {
+  loop: false,
+  frames: [f(90, { ...RAISED, arm: "mid", flame: "lit", eyes: "glow", flick: 0 }, { cue: "lower" }), f(90, { arm: "hold", flick: 1 })],
+};
+
+/** His leap out of the dock (his Last Stand): a crouch, then up, sword raised. */
 const leap: Anim = {
   loop: false,
   frames: [
-    f(100, { crouch: 4, wings: "half", arm: "hold", eyes: "hot" }, { cue: "leap" }),
-    f(120, { bob: -2, wings: "spread", arm: "raise", flame: "flare", eyes: "hot", flick: 1 }),
-    f(230, { bob: -2, wings: "spread", arm: "raise", flame: "flare", eyes: "hot", flick: 2 }),
+    f(100, { crouch: 4, arm: "hold", eyes: "hot" }, { cue: "leap" }),
+    f(120, { bob: -2, arm: "raise", flame: "flare", eyes: "hot", flick: 1 }),
+    f(230, { bob: -2, arm: "raise", flame: "flare", eyes: "hot", flick: 2 }),
   ],
 };
 
 /** Fallen: on his side, cracked, eyes dark, the flame down to embers, his crown rolled off beside him. */
 function fallenFrame(ms: number, i: number, extra: Partial<Frame> = {}): Frame {
   const standing = kingLayers({ arm: "low", flame: "dim", flick: i, eyes: "out", cracks: 3, waveAmp: 0 });
-  // Lying on his side, head to the left: the body without its cape, wings, sword and crown, turned a quarter, then
+  // Lying on his side, head to the left: the body without its cape, sword and crown, turned a quarter, then
   // set down on the floor line, centred on his foot point.
-  const keep = (l: Layer) => !/^(hilt|blade|crown|shadow|cape|wing(Fold|Half|Spread))/.test(l.part);
+  const keep = (l: Layer) => !/^(hilt|blade|crown|shadow|cape)/.test(l.part);
   const turned = lieDown(PARTS, { layers: standing.layers.filter(keep), specks: standing.specks }, 0, 0);
   let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
   for (const l of turned.layers) {
@@ -762,9 +707,9 @@ const rise: Anim = {
   loop: false,
   frames: [
     fallenFrame(200, 0, { cue: "rise" }),
-    f(160, { crouch: 5, bob: 2, arm: "plant", wings: "half", flame: "dim", eyes: "dim", cracks: 1 }),
-    f(160, { crouch: 3, arm: "plant", wings: "half", flame: "lit", eyes: "glow" }),
-    f(140, { crouch: 1, arm: "mid", wings: "spread", eyes: "hot" }),
+    f(160, { crouch: 5, bob: 2, arm: "plant", flame: "dim", eyes: "dim", cracks: 1 }),
+    f(160, { crouch: 3, arm: "plant", flame: "lit", eyes: "glow" }),
+    f(140, { crouch: 1, arm: "mid", eyes: "hot" }),
     f(200, { ...RAISED, flick: 1 }, { specks: [...burst("raise", 5), ...eyeFlare(RAISED, true)] }),
   ],
 };
@@ -785,32 +730,32 @@ const lastStand: Anim = (() => {
     t += ms;
   };
   const cracksAt = (ms: number) => L.crackAt.filter((c) => ms >= c).length;
-  // The dive: sword point down, wings swept up.
-  push(L.crashAt - t0, { arm: "low", wings: "spread", flame: "flare", eyes: "hot", bob: -2, flick: 1 });
+  // The dive: sword point down.
+  push(L.crashAt - t0, { arm: "low", flame: "flare", eyes: "hot", bob: -2, flick: 1 });
   // The crash: landed low, sword planted.
-  push(130, { crouch: 4, arm: "plant", wings: "spread", flame: "flare", eyes: "hot", flick: 2 }, { cue: "crash", shake: [1, 0] });
-  push(170, { crouch: 2, arm: "plant", wings: "spread", eyes: "hot", flick: 0 }, { shake: [-1, 0] });
-  // Standing guard over the square, sword across him, wings spread as a shield.
+  push(130, { crouch: 4, arm: "plant", flame: "flare", eyes: "hot", flick: 2 }, { cue: "crash", shake: [1, 0] });
+  push(170, { crouch: 2, arm: "plant", eyes: "hot", flick: 0 }, { shake: [-1, 0] });
+  // Standing guard over the square, sword across him.
   let i = 0;
-  while (t + 100 <= L.slashAt) push(100, { arm: "guard", wings: "spread", flick: i, wave: wave(i++), eyes: i % 8 === 0 ? "hot" : "glow" });
-  if (L.slashAt > t) push(L.slashAt - t, { arm: "guard", wings: "spread", flick: i, eyes: "hot" });
+  while (t + 100 <= L.slashAt) push(100, { arm: "guard", flick: i, wave: wave(i++), eyes: i % 8 === 0 ? "hot" : "glow" });
+  if (L.slashAt > t) push(L.slashAt - t, { arm: "guard", flick: i, eyes: "hot" });
   // The blows: each lands with a red-white flash and a jolt.
   for (let b = 0; b < L.slashes; b++) {
     const c = cracksAt(t);
-    const p: KingPose = { arm: "guard", wings: b % 4 < 2 ? "spread" : "half", flick: b, cracks: c, eyes: b % 3 === 0 ? "hot" : "glow", flame: b > 18 ? "dim" : "lit" };
+    const p: KingPose = { arm: "guard", flick: b, cracks: c, eyes: b % 3 === 0 ? "hot" : "glow", flame: b > 18 ? "dim" : "lit" };
     push(50, { ...p, bob: 1 }, { hit: true, shake: [b % 2 ? 1 : -1, 0], ...(b === 0 ? { cue: "blows" } : {}) });
     push(L.slashEveryMs - 50, p);
   }
   // Until the stagger: braced, hurt.
-  if (L.staggerAt > t) push(L.staggerAt - t, { arm: "low", wings: "half", flame: "dim", cracks: 3, eyes: "dim", bob: 1 });
+  if (L.staggerAt > t) push(L.staggerAt - t, { arm: "low", flame: "dim", cracks: 3, eyes: "dim", bob: 1 });
   // The stagger: he reels one way, then the other, sword dropping.
   const stagger = L.collapseAt - L.staggerAt;
-  push(Math.round(stagger / 3), { arm: "low", wings: "half", flame: "dim", cracks: 3, eyes: "dim", dx: -2, bob: 1 }, { cue: "stagger" });
-  push(Math.round(stagger / 3), { arm: "low", wings: "half", flame: "dim", cracks: 3, eyes: "dim", dx: 2, bob: 1 });
-  push(L.collapseAt - t, { arm: "low", wings: "fold", flame: "dim", cracks: 3, eyes: "dim", dx: -1, bob: 2 });
+  push(Math.round(stagger / 3), { arm: "low", flame: "dim", cracks: 3, eyes: "dim", dx: -2, bob: 1 }, { cue: "stagger" });
+  push(Math.round(stagger / 3), { arm: "low", flame: "dim", cracks: 3, eyes: "dim", dx: 2, bob: 1 });
+  push(L.collapseAt - t, { arm: "low", flame: "dim", cracks: 3, eyes: "dim", dx: -1, bob: 2 });
   // The collapse: to one knee, slumping, then down on his side.
-  push(140, { crouch: 5, bob: 2, arm: "plant", wings: "fold", flame: "dim", cracks: 3, eyes: "dim" }, { cue: "collapse" });
-  push(140, { crouch: 6, bob: 4, dx: 1, arm: "plant", wings: "fold", flame: "dim", cracks: 3, eyes: "out" });
+  push(140, { crouch: 5, bob: 2, arm: "plant", flame: "dim", cracks: 3, eyes: "dim" }, { cue: "collapse" });
+  push(140, { crouch: 6, bob: 4, dx: 1, arm: "plant", flame: "dim", cracks: 3, eyes: "out" });
   frames.push(fallenFrame(Math.max(100, L.fadeAt + L.fadeMs - t - 280), 0), fallenFrame(1000, 1));
   return { loop: false, frames };
 })();
@@ -820,13 +765,13 @@ const portrait: Anim = { loop: true, frames: [f(1000, { ...RAISED, flick: 1, wav
 const portraitHurt: Anim = {
   loop: true,
   frames: [
-    f(1000, { arm: "hold", wings: "half", flame: "dim", cracks: 3, eyes: "dim", bob: 1, wave: 0 }, {
+    f(1000, { arm: "hold", flame: "dim", cracks: 3, eyes: "dim", bob: 1, wave: 0 }, {
       specks: [[OX + 34, OY + 12, "r"], [OX + 34, OY + 13, "R"], [OX + 25, OY + 27, "r"], [OX + 26, OY + 28, "R"], [OX + 13, OY + 24, "r"]],
     }),
   ],
 };
 
-const ANIMS = { idle, appear, raise, raised, point, slash, leap, lastStand, fallen, rise, portrait, portraitHurt };
+const ANIMS = { idle, appear, raise, raised, point, slash, lower, leap, lastStand, fallen, rise, portrait, portraitHurt };
 export type GodKingAnim = keyof typeof ANIMS;
 
 export const GOD_KING: Character = {
@@ -845,7 +790,7 @@ export const GOD_KING: Character = {
 /** His drawing space on the frame: one board square (60 x 60), for placing him on the board and in the dock. */
 export const GOD_KING_BOX = { x: OX, y: OY, size: SIZE } as const;
 
-/** The part of him a portrait shows (sword, wings, crown to chest), in frame pixels. */
+/** The part of him a portrait shows (sword, crown to chest), in frame pixels. */
 export const GOD_KING_PORTRAIT = { x: OX + 5, y: OY - 7, w: 50, h: 37 } as const;
 
 
@@ -902,6 +847,30 @@ export function summonMoment(times: SummonTimes, t: number): { anim: GodKingAnim
   if (t >= times.raiseAt) best = { anim: "raise", at: times.raiseAt, then: "raised" };
   if (times.boltAt !== undefined && t >= times.boltAt - cueLead("point")) best = { anim: "point", at: times.boltAt - cueLead("point"), then: "raised" };
   for (const at of times.slashAt ?? []) if (t >= at - cueLead("slash")) best = { anim: "slash", at: at - cueLead("slash"), then: "raised" };
+  return best;
+}
+
+/** When his commanded moments land (ms after he starts), acting from his spot by the board: see KING_COMMAND. */
+export interface CommandTimes {
+  raiseAt: number;
+  /** His bolt to the piece he moves, or the strike's slashes. */
+  boltAt?: number;
+  slashAt?: readonly number[];
+  /** He lowers his sword, and stands by again. */
+  lowerAt: number;
+}
+
+/**
+ * What he does in his spot at `t` ms into a command: stand by until he raises his sword (and holds it up through the
+ * cut-in), point it as his bolt leaves the tip or cut once for each of the strike's slashes, then lower it and stand
+ * by. The frame with the bolt or the cut (its cue) lands exactly on the effect's time.
+ */
+export function commandMoment(times: CommandTimes, t: number): { anim: GodKingAnim; at: number; then: GodKingAnim } {
+  let best: { anim: GodKingAnim; at: number; then: GodKingAnim } = { anim: "idle", at: 0, then: "idle" };
+  if (t >= times.raiseAt) best = { anim: "raise", at: times.raiseAt, then: "raised" };
+  if (times.boltAt !== undefined && t >= times.boltAt - cueLead("point")) best = { anim: "point", at: times.boltAt - cueLead("point"), then: "raised" };
+  for (const at of times.slashAt ?? []) if (t >= at - cueLead("slash")) best = { anim: "slash", at: at - cueLead("slash"), then: "raised" };
+  if (t >= times.lowerAt) best = { anim: "lower", at: times.lowerAt, then: "idle" };
   return best;
 }
 

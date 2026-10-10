@@ -50,7 +50,7 @@
  *     ultimateWarn "check"      His loom, if a warning is shown at all (per Eric the rage meter is the only warning).
  *     ultimate     "lightsOut"  Played ON THE BOARD, in his new spot (hide him in his corner meanwhile; see
  *                               LIGHTS_OUT below): his shadow grows, he drops in, lands, holds the strand up and
- *                               crushes its bulbs one by one: at `smash1`, `smash2`, `smash3` (lightsOutSmashes())
+ *                               crushes it a section at a time: at `smash1`, `smash2`, `smash3` (lightsOutSmashes())
  *                               dim the board a step with nightItems() step "dim1", "dim2", then "dim3" (into
  *                               "night"). His last frames are his dark stance, then hand over to `lightsTest`.
  *                               As he drops in, prewarm("nightSquare", nightWarmList()) draws the night ahead.

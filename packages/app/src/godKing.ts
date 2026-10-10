@@ -1,14 +1,21 @@
 /**
  * What the God King says while he watches the boss battle: a short line now and
  * then in a speech bubble beside him. Each moment of the game is a cue; a cue
- * has a few lines (picked at random, never the same line twice running), a
- * chance of being said at all, and a priority: urgent cues (your queen in
- * danger, your king in check, a boss blunder) always speak. Small talk is paced
- * by moves: every move he stays quiet makes it likelier, so he speaks up about
- * every four or five moves (5 to 10 lines in a typical boss battle).
+ * has a few lines (picked at random, never the same line twice running) and a
+ * kind (Eric, Oct 9, 2026: he talked too much, so only critical moments always
+ * speak; the numbers are KING_SPEECH in settings.ts):
+ * - critical: one opening line, a new danger to your queen or king, a mate
+ *   threat, a queen taken either way, his own strikes and moves, his Last
+ *   Stand, a boss's power. Always said (but a warning that still holds isn't
+ *   repeated on the next move).
+ * - remarks on a move (brilliant, good, bad, captures, a check given, the
+ *   boss's slips): a low chance, and at most one every few moves.
+ * - small talk (idle, the tap-me nudge, winning or losing): rests for several
+ *   moves after any line, then gets a little likelier with each quiet move.
  */
 
-import { applyMove, blunderCost, inCheck, pieceAt, toSan, type BlunderCost } from "@chessroyale/chess";
+import { KING_SPEECH } from "@chessroyale/core";
+import { applyMove, blunderCost, inCheck, legalMoves, pieceAt, queenInDanger, toSan, type BlunderCost } from "@chessroyale/chess";
 
 export type KingCue =
   | "intro"
@@ -35,10 +42,39 @@ export type KingCue =
   | "blizzard"
   | "blizzardKing"
   | "funhouse"
-  | "fireTile";
+  | "fireTile"
+  | "mateThreat"
+  | "queenLost"
+  | "queenWon";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
-  intro: ["My blade is yours. Tap me when it counts.", "A boss? I've toppled taller towers.", "Steel's ready. Say the word.", "I'll be watching. Call me if it gets ugly."],
+  // One of these as the battle begins (Eric, Oct 9: one opening line, from a much bigger pool).
+  intro: [
+    "My blade is yours. Tap me when it counts.",
+    "A boss? I've toppled taller towers.",
+    "Steel's ready. Say the word.",
+    "I'll be watching. Call me if it gets ugly.",
+    "Another tyrant on a borrowed throne. Let's take it back.",
+    "Stand tall. Kings bow to no beast.",
+    "Sixty-four squares, and not one of them is theirs.",
+    "Ready the pawns. Glory starts small.",
+    "Fear is a pinned piece. Don't let it move you.",
+    "Let's give the bards something to sing about.",
+    "Hold the centre, and hold your nerve.",
+    "My sword remembers every boss it has met.",
+    "Courage. I fight beside you.",
+    "Every crowd needs a champion. Today, I'm yours.",
+    "Think twice, move once. I'll guard the rest.",
+    "Light the torches. We march.",
+    "Mind your queen. She's worth more than my crown.",
+    "The board is set. Let the reckoning begin.",
+    "A good opening is half a crown.",
+    "I've waited all day for a worthy fight.",
+    "Show me the king you can be.",
+    "This throne has a squatter. Evict it.",
+    "Patience and steel. That's how bosses fall.",
+    "Raise your banners. This one ends on our terms.",
+  ],
   idle: ["I'm ready when you are.", "My sword grows restless.", "Think like a king.", "Take your time. Not too much.", "I've seen this kind of position before…"],
   nudge: ["Need a hand? Tap me.", "I'm right here if you need me.", "Say the word and I'll strike."],
   queenDanger: ["Your queen is under attack!", "Guard the queen!", "Eyes on your queen. She's in danger!", "They're after your queen. Move her or shield her!"],
@@ -69,6 +105,10 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   ],
   blizzardKing: ["Frozen solid! Only our king can move.", "The storm spared the king alone. Steady, Majesty."],
   funhouse: ["Upside down? Shake it off!", "That clown played our move! We'll fix it.", "Hold on, the board's spinning. Eyes up!"],
+  // A mate threatened against us (as our move begins), and a queen taken, either way.
+  mateThreat: ["Mate is near! Shield the king.", "It threatens mate. Look again!", "Danger at the gate. Guard the king!"],
+  queenLost: ["Our queen has fallen. Fight on!", "The queen! She'll be avenged.", "They took the queen. Hold the line."],
+  queenWon: ["Their queen falls!", "The tyrant's queen is ours!", "Down goes the queen. Press on!"],
   // G-REX: the first time a piece of ours steps onto a burning tile (once a match).
   fireTile: [
     "Careful on that tile, don't stand there too long!",
@@ -78,48 +118,48 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   ],
 };
 
-/**
- * How likely each cue is to be said, whether it cuts in over the pause between
- * lines, and (`paced`) whether its chance grows with every quiet move.
- */
-const CUE_RULES: Record<KingCue, { chance: number; urgent?: boolean; paced?: boolean }> = {
-  intro: { chance: 1, urgent: true },
-  idle: { chance: 0, paced: true },
-  nudge: { chance: 0.1, paced: true },
-  queenDanger: { chance: 1, urgent: true },
-  inCheck: { chance: 1, urgent: true },
-  greatMove: { chance: 0.8 },
-  goodMove: { chance: 0.35 },
-  badMove: { chance: 0.75 },
-  crowdCapture: { chance: 0.5 },
-  crowdCheck: { chance: 0.7 },
-  bossCapture: { chance: 0.5 },
-  bossBlunder: { chance: 1, urgent: true },
-  staggered: { chance: 0.8 },
-  struck: { chance: 1, urgent: true },
-  kingPlays: { chance: 1, urgent: true },
-  winning: { chance: 0.1, paced: true },
-  losing: { chance: 0.1, paced: true },
-  spent: { chance: 1 },
-  lastStand: { chance: 1, urgent: true },
-  lastWords: { chance: 1, urgent: true },
-  rise: { chance: 1, urgent: true },
-  blizzard: { chance: 1, urgent: true },
-  blizzardKing: { chance: 1, urgent: true },
-  funhouse: { chance: 1, urgent: true },
-  fireTile: { chance: 1, urgent: true },
+/** Each cue's kind: critical cues always speak; remarks and small talk (`paced`) roll KING_SPEECH.chance. */
+type Kind = "critical" | "remark" | "paced" | "info";
+const KIND: Record<KingCue, Kind> = {
+  intro: "critical",
+  idle: "paced",
+  nudge: "paced",
+  queenDanger: "critical",
+  inCheck: "critical",
+  mateThreat: "critical",
+  queenLost: "critical",
+  queenWon: "critical",
+  greatMove: "remark",
+  goodMove: "remark",
+  badMove: "remark",
+  crowdCapture: "remark",
+  crowdCheck: "remark",
+  bossCapture: "remark",
+  bossBlunder: "remark",
+  staggered: "remark",
+  struck: "critical",
+  kingPlays: "critical",
+  winning: "paced",
+  losing: "paced",
+  spent: "info",
+  lastStand: "critical",
+  lastWords: "critical",
+  rise: "critical",
+  blizzard: "critical",
+  blizzardKing: "critical",
+  funhouse: "critical",
+  fireTile: "critical",
 };
 
-/** How long a line stays up, and the least time between two lines that aren't urgent. */
-export const SPEECH_MS = 3800;
-const QUIET_MS = 8000;
-/** Paced small talk rests for a few moves after any line, then gets likelier with each quiet move. */
-const REST_MOVES = 3;
-const PER_QUIET_MOVE = 0.3;
+/** How long a line stays up. */
+export const SPEECH_MS = KING_SPEECH.speechMs;
 
 let current: { text: string; at: number; until: number } | null = null;
 let lastAt = 0;
 let quietMoves = 0;
+/** Crowd moves so far, and the move of the last remark. */
+let moveNo = 0;
+let remarkAt = -Infinity;
 /** He has fallen (his Last Stand): silent for the rest of the battle, but for his last words and his return. */
 let fallen = false;
 export function setKingFallen(on: boolean) {
@@ -139,6 +179,7 @@ export function kingTurn(key: string) {
   turns.add(key);
   if (turns.size > 300) turns.clear();
   quietMoves++;
+  moveNo++;
 }
 const lastLine = new Map<KingCue, string>();
 const spoken = new Set<string>();
@@ -153,10 +194,14 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
   if (spoken.has(key)) return null;
   spoken.add(key);
   if (spoken.size > 300) spoken.clear();
-  const rule = CUE_RULES[cue];
-  if (!rule.urgent && now - lastAt < QUIET_MS) return null;
-  const chance = rule.paced ? Math.min(1, rule.chance + PER_QUIET_MOVE * Math.max(0, quietMoves - REST_MOVES)) : rule.chance;
-  if (rng() >= chance) return null;
+  const kind = KIND[cue];
+  if (kind !== "critical") {
+    if (now - lastAt < KING_SPEECH.quietMs) return null;
+    if (kind === "remark" && moveNo - remarkAt < KING_SPEECH.remarkGapMoves) return null;
+    const base = KING_SPEECH.chance[cue] ?? 0;
+    const chance = kind === "paced" ? Math.min(1, base + KING_SPEECH.perQuietMove * Math.max(0, quietMoves - KING_SPEECH.restMoves)) : base;
+    if (rng() >= chance) return null;
+  }
   const lines = KING_LINES[cue];
   const options = lines.length > 1 ? lines.filter((l) => l !== lastLine.get(cue)) : lines;
   const text = options[Math.floor(rng() * options.length)]!;
@@ -164,6 +209,7 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
   current = { text, at: now, until: now + SPEECH_MS };
   lastAt = now;
   quietMoves = 0;
+  if (kind === "remark") remarkAt = moveNo;
   return text;
 }
 
@@ -182,20 +228,76 @@ export function resetKingSpeech() {
   fallen = false;
   lastAt = 0;
   quietMoves = 0;
+  moveNo = 0;
+  remarkAt = -Infinity;
   lastLine.clear();
   spoken.clear();
   turns.clear();
 }
 
-/** The God King's word on the crowd's move once it lands: how good it was (points lost against the best move), a check, a capture. */
+/**
+ * The God King's word on the crowd's move once it lands: the boss's queen taken (always), how good it was (points lost
+ * against the best move), a check, a capture.
+ */
 export function crowdMoveCues(fen: string, played: string, loss: number | null): { cue: KingCue; key: string }[] {
   const key = `crowd-${fen}`;
   const out: { cue: KingCue; key: string }[] = [];
+  const took = pieceAt(fen, played.slice(2, 4));
+  if (took?.type === "q") out.push({ cue: "queenWon", key });
   if (loss !== null && loss >= 12) out.push({ cue: "badMove", key });
   if (inCheck(applyMove(fen, played))) out.push({ cue: "crowdCheck", key });
-  if (pieceAt(fen, played.slice(2, 4))) out.push({ cue: "crowdCapture", key });
+  if (took) out.push({ cue: "crowdCapture", key });
   if (loss !== null && loss <= 1) out.push({ cue: "greatMove", key });
   else if (loss !== null && loss <= 4) out.push({ cue: "goodMove", key });
+  return out;
+}
+
+/** The side to move in `fen` (the crowd, as its move begins) is threatened with mate in one: if it passed, the other side could mate. */
+export function mateThreatened(fen: string): boolean {
+  if (inCheck(fen)) return false;
+  const parts = fen.split(" ");
+  // The same position with the other side to move (no en passant): can it mate at once?
+  const passed = [parts[0], parts[1] === "w" ? "b" : "w", parts[2], "-", "0", parts[5] ?? "1"].join(" ");
+  try {
+    return legalMoves(passed).some((m) => {
+      const after = applyMove(passed, m);
+      return inCheck(after) && legalMoves(after).length === 0;
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What he might say as the crowd's move begins (the play screen), most important first: his strike, a new danger
+ * (your queen attacked, your king in check, a mate threatened: each only when it wasn't so at the crowd's last move,
+ * `prevFen`), his opening line, out of charges, how it's going, the nudge, small talk. `ours`: the crowd's chances.
+ */
+export function turnCues(s: { fen: string; side: "w" | "b"; charges: number; ply: number; ours?: number; struckAt?: number; prevFen?: string }): { cue: KingCue; key: string }[] {
+  const { fen, side, prevFen } = s;
+  const out: { cue: KingCue; key: string }[] = [];
+  if (s.struckAt) out.push({ cue: "struck", key: `struck-${s.struckAt}` });
+  if (queenInDanger(fen, side) && !(prevFen && queenInDanger(prevFen, side))) out.push({ cue: "queenDanger", key: `queen-${fen}` });
+  if (inCheck(fen) && !(prevFen && inCheck(prevFen))) out.push({ cue: "inCheck", key: `check-${fen}` });
+  if (mateThreatened(fen) && !(prevFen && mateThreatened(prevFen))) out.push({ cue: "mateThreat", key: `mate-${fen}` });
+  out.push({ cue: "intro", key: "intro" });
+  if (s.charges <= 0) out.push({ cue: "spent", key: "spent" });
+  if (s.ours !== undefined) {
+    if (s.ours >= 0.85) out.push({ cue: "winning", key: `winning-${fen}` });
+    else if (s.ours <= 0.15) out.push({ cue: "losing", key: `losing-${fen}` });
+  }
+  if (s.charges > 0 && s.ply >= 6) out.push({ cue: "nudge", key: `nudge-${Math.floor(s.ply / 12)}` });
+  out.push({ cue: "idle", key: `idle-${fen}` });
+  return out;
+}
+
+/** His word on the boss's move: your queen taken (always; its banner plays too), then his strike's effect, a capture. */
+export function bossMoveCues(fen: string, move: { captured?: string | null; staggered?: boolean }): { cue: KingCue; key: string }[] {
+  const key = `boss-${fen}`;
+  const out: { cue: KingCue; key: string }[] = [];
+  if (move.captured === "q") out.push({ cue: "queenLost", key });
+  if (move.staggered) out.push({ cue: "staggered", key });
+  if (move.captured && move.captured !== "q") out.push({ cue: "bossCapture", key });
   return out;
 }
 

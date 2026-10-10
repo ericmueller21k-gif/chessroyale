@@ -204,6 +204,38 @@ describe("the God King's Last Stand: the rule", () => {
     expect(runner.bossKillDue()).toBe(true);
   });
 
+  it("the move he took back doesn't bring the boss's strike closer, and the strike still weighs that round's picks", async () => {
+    // Found in a 50 v 50 boss final: a Last Stand on the move after a strike, and the next strike came two crowd
+    // moves later, because the taken-back round counted towards it as a move. Five players: three blunder.
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000 } as Settings;
+    const engine = judge({ bestExpected: 0.55, blunder: "d2d4", blunderExpected: 0.08 });
+    const ids = ["h0", "h1", "h2", "h3", "h4"];
+    const runner = new MatchRunner({ settings, rng: mulberry32(9), engines: [engine], library: [opening(RUY)], entrants: ids.map((id) => ({ id, name: id, isBot: false })) });
+    // The boss has just struck, after crowd move 3.
+    runner.state = { ...runner.state, boss: { ...runner.state.boss!, minSurvivors: 1, crowdMoves: 3, sinceKill: 0 } };
+    runner.deal();
+    const picks = (blunderers: string[], blunder: string, others: string) =>
+      new Map(ids.map((id) => [id, { move: blunderers.includes(id) ? blunder : others, thinkMs: 1000 }]));
+    const r = await runner.score(picks(["h0", "h1", "h2"], "d2d4", (await engine.topMoves(runner.boards.get(0)!.fen, 1))[0]!.move));
+    expect(r.boards[0]!.lastStand?.move).toBe("d2d4");
+    expect(runner.state.boss).toMatchObject({ crowdMoves: 3, sinceKill: 0 });
+    expect(runner.bossView()!.strikeIn).toBe(settings.bossKillEvery);
+    // The re-pick (crowd move 4), then moves 5 and 6: the three play the best, the other two a little worse (2 to 7
+    // points a move). The strike comes after move 6, as it would have without him.
+    const due: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      while (runner.bossToMove()) await runner.playBoss();
+      runner.deal();
+      const top = await engine.topMoves(runner.boards.get(0)!.fen, 2);
+      await runner.score(picks(["h0", "h1", "h2"], top[0]!.move, top[1]!.move));
+      if (runner.bossKillDue()) due.push(runner.state.boss!.crowdMoves);
+    }
+    expect(due).toEqual([6]);
+    // It weighs all four rounds since its last strike, the taken-back one too, so one of the three who blundered there
+    // (47 points) goes, not h3 or h4 (at most 28). Leaving that round out, the three would have lost nothing.
+    expect(["h0", "h1", "h2"]).toContain(runner.bossKill());
+  });
+
   it("what it loses: the boss's best reply from the judge's own search, and a mate it allows, on the record", async () => {
     // The scripted search's line for the blunder: the boss answers h6, and mates in 7.
     const reply = "h7h6";

@@ -1,5 +1,5 @@
-// The God King frame by frame in a solo raid, on a phone and a computer: standing in the dock, summoned to strike
-// the boss and to play a move (his cut-in, his bolt, his slashes, leaving), and his Last Stand (?laststand=1: the
+// The God King frame by frame in a solo raid, on a phone and a computer: standing in the dock, commanding from there
+// to strike the boss and to play a move (his sword raised, his cut-in, his bolt, his slashes), and his Last Stand (?laststand=1: the
 // leap, the crash, the banner, the blows, the fall, lying in the dock). Saves a full screenshot at each stage and a
 // strip of frames (as fast as the browser gives them) over the board and the dock, and prints a timeline of his
 // animations.
@@ -52,7 +52,7 @@ async function strip(p, tag, ms, stills = []) {
     const t = Date.now() - t0;
     if (todo.length && t >= todo[0]) await p.screenshot({ path: `${outDir}/${tag}-still-${todo.shift()}ms.png` });
     await p.screenshot({ path: `${outDir}/${tag}-${String(i++).padStart(3, "0")}-${String(t).padStart(5, "0")}ms.png`, clip, scale: "css" });
-    const anims = await p.evaluate(() => [...document.querySelectorAll(".god-king")].map((e) => `${e.parentElement?.className.split(" ")[0]}:${e.getAttribute("data-anim")}`).join(" "));
+    const anims = await p.evaluate(() => `${window.match?.phase.kind} ` + [...document.querySelectorAll(".god-king")].map((e) => `${e.parentElement?.className.split(" ")[0]}:${e.getAttribute("data-anim")}`).join(" "));
     if (anims !== last) console.log(`${tag} +${t}ms ${anims || "-"}`);
     last = anims;
   }
@@ -86,7 +86,7 @@ async function run(name, context) {
     await p.screenshot({ path: `${outDir}/${tag}-menu.png` });
     await p.getByRole("menuitem", { name: /Strike/ }).click();
     await strip(p, `${tag}-strike`, 6800, [2000, 3300]);
-    for (let i = 0; i < 80 && (await p.locator(".king-summon").count()); i++) await p.waitForTimeout(100);
+    for (let i = 0; i < 80 && (await p.locator(".king-summon, .king-command").count()); i++) await p.waitForTimeout(100);
     await king.click();
     await p.getByRole("menuitem", { name: /Play move/ }).click();
     await strip(p, `${tag}-move`, 7600, [3600]);

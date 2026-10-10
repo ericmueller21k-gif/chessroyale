@@ -5,7 +5,7 @@ import { BossMoment } from "../components/BossEffect.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
-import { kingSay, resetKingSpeech, type KingCue } from "../godKing.ts";
+import { bossMoveCues, kingSay, resetKingSpeech } from "../godKing.ts";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GodKingPortrait } from "../components/GodKing.tsx";
 import { Board } from "../components/Board.tsx";
@@ -172,12 +172,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const kingCues = useMemo(() => {
     const m = boss.lastMove;
     if (intro || thinking || victim || !m || funhouse) return [];
-    const key = `boss-${boss.board.fen}`;
-    const out: { cue: KingCue; key: string }[] = [];
-    if (inCheck(boss.board.fen)) out.push({ cue: "inCheck", key });
-    if (m.staggered) out.push({ cue: "staggered", key });
-    if (m.captured && m.captured !== "q") out.push({ cue: "bossCapture", key });
-    return out;
+    // (A check is said as your move begins: turnCues.)
+    return bossMoveCues(boss.board.fen, m);
   }, [boss.board.fen, thinking, intro, victim]);
   // A boss blunder: the engine's numbers before and after its move (the eval bar's, already worked out or cheap).
   useEffect(() => {
@@ -198,6 +194,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
   const slewQueen = !intro && !!thinkingNow && !victim && lastMoveTookQueen(history, bases);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
+  // Lights out: what the dock says (a round's prompt may take both its lines).
+  const lightsNow = lights ? lightsStatus(lights, match.settings.lateGraceMs, now) : null;
   // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
   const alone = match.standings().length === 1;
   const youStruck = victim !== null && match.isYou(victim);
@@ -260,9 +258,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
             {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
             {slewQueen && (
-              <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="bannerStart" />
+              <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="queenGasp" />
             )}
-            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} sound="bossRoar" />}
+            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} sound="queenGasp" />}
             {showCard && (
               <div class={`boss-intro${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
                 <span class="boss-intro-icon" aria-hidden="true">
@@ -301,10 +299,16 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         side={boss.crowdSide}
         cues={kingCues}
         status={
+          lightsNow?.wrap ? (
+            // (His prompt may take both lines on a phone, the count after it.)
+            <span>
+              {lightsNow.line} <span class="muted">{lightsNow.sub}</span>
+            </span>
+          ) : (
           <>
             <span class="dock-line">
               {lights ? (
-                lightsStatus(lights, match.settings.lateGraceMs, now).line
+                lightsNow!.line
               ) : claimed && t >= tl.claimAt && t < tl.bannerAt ? (
                 <>
                   {boss.icon} <strong>{claimLine(boss)}</strong>
@@ -340,7 +344,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             </span>
             <span class="dock-line muted">
               {lights
-                ? lightsStatus(lights, match.settings.lateGraceMs, now).sub
+                ? lightsNow!.sub
                 : intro
                 ? `Worst mover struck every ${match.settings.bossKillEvery} moves.`
                 : funMove
@@ -358,6 +362,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                         : ""}
             </span>
           </>
+          )
         }
       />
       <UnderBoard match={match} />

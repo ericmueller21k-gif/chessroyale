@@ -166,19 +166,25 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   expect(await page.evaluate(() => (window as any).match.boss.board.history.length)).toBe(1);
   const before = await myPoints(page);
   const c = new Chess(await page.evaluate(() => (window as any).match.boss.board.fen as string));
-  const his = (t: string) => "abcdefgh".split("").flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).filter((s) => c.get(s as never)?.color === "b" && c.get(s as never)?.type === t);
+  // The squares answering a target: his pieces of its type (a pawn: on its file).
+  const his = (t: { type: string; file?: string }) => "abcdefgh".split("").flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).filter((s) => c.get(s as never)?.color === "b" && c.get(s as never)?.type === t.type && (!t.file || s[0] === t.file));
   // Round 1 opens: night over every square (opaque at each middle), his prompt; every square takes a tap.
   await expect(page.locator('.lo-marks[data-round="0"][data-open="1"]')).toHaveCount(1, { timeout: 15_000 });
   expect((await banner.seen()).lights).toBe(true);
   for (const s of ["a1", "h8", "e4", "d5"]) expect(await covered(page, s, ".lo-board canvas"), s).toBe(255);
-  await expect(page.locator(".boss-dock")).toContainText(/Find my/);
-  const target = his(lights.rounds[0].pieces[0])[0]!;
+  await expect(page.locator(".boss-dock")).toContainText(/Find (my|one of my|:)/);
+  const target = his(lights.rounds[0].targets[0])[0]!;
   await tap(page, target);
   await expect(page.locator(`.lo-found[data-square="${target}"][data-round="0"]`)).toHaveCount(1);
-  // Round 2: a wrong square (an empty one), then nothing more.
+  // One piece, one try: the round is over at once, its answers show.
+  await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.rounds[0].answers?.length ?? 0), { timeout: 5000 }).toBeGreaterThan(0);
+  // Round 2: a wrong square (an empty one), then nothing more. The tap gives a second more: the bar bumps, "+1s".
   await expect(page.locator('.lo-marks[data-round="1"][data-open="1"]')).toHaveCount(1, { timeout: 15_000 });
-  await tap(page, "e5");
-  await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.mine[1].wrong), { timeout: 5000 }).toEqual(["e5"]);
+  const bump = await watchFor(page, { plus: { selector: ".lo-plus", text: /\+1s/ } });
+  const empty = empties(await page.evaluate(() => (window as any).match.boss.board.fen as string), ["e5", "e4", "a5", "h5"])[0]!;
+  await tap(page, empty);
+  await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.mine[1].wrong), { timeout: 5000 }).toEqual([empty]);
+  expect((await bump.seen()).plus).toBe(true);
   // Its answers show as it ends; the lights come back, his move follows, and the misses cost 10 each.
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.rounds[1].answers?.length ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
   await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
@@ -218,7 +224,8 @@ test("Hollow online: the server judges an attempt into the dark (-5, only for yo
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.lights), { timeout: 60_000 }).toBe(true);
   const lights = await page.evaluate(() => (window as any).match.phase.lights);
   const c = new Chess(await page.evaluate(() => (window as any).match.boss.board.fen as string));
-  const target = "abcdefgh".split("").flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).find((s) => c.get(s as never)?.color === "b" && c.get(s as never)?.type === lights.rounds[0].pieces[0])!;
+  const t0 = lights.rounds[0].targets[0];
+  const target = "abcdefgh".split("").flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).find((s) => c.get(s as never)?.color === "b" && c.get(s as never)?.type === t0.type && (!t0.file || s[0] === t0.file))!;
   await expect(page.locator('.lo-marks[data-round="0"][data-open="1"]')).toHaveCount(1, { timeout: 15_000 });
   await tap(page, target);
   await expect(page.locator(`.lo-found[data-square="${target}"][data-round="0"]`)).toHaveCount(1);

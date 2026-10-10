@@ -149,7 +149,7 @@ describe("G-REX, the Fire boss", () => {
     }
   });
 
-  it("whistles each shot up: three whistles, a little pitch either way, now and then a crackle at the top", () => {
+  it("whistles each shot: three shrill sliding whistles, a little pitch either way, now and then a crackle at the top", () => {
     const picks = Array.from({ length: 300 }, (_, i) => whistlePick(((i * 0.37) % 1 + 1) % 1, ((i * 0.61) % 1 + 1) % 1, ((i * 0.83) % 1 + 1) % 1));
     expect(new Set(picks.map((p) => p.name))).toEqual(new Set(WHISTLES));
     for (const p of picks) expect(Math.abs(p.rate - 1)).toBeLessThanOrEqual(WHISTLE_SPREAD + 1e-9);
@@ -158,7 +158,9 @@ describe("G-REX, the Fire boss", () => {
     const crackles = picks.filter((p) => p.crackleAt !== null).length / picks.length;
     expect(crackles).toBeGreaterThan(1 / CRACKLE_EVERY - 0.1);
     expect(crackles).toBeLessThan(1 / CRACKLE_EVERY + 0.1);
-    // Each whistle rises: its strongest pitch near the end is well above its start (a small DFT over a window).
+    // Each whistle is shrill and slides (Eric, Oct 9: like real whistling fireworks, about 2 to 5 kHz): its strongest
+    // pitch early and late (a small DFT over a window) are both in that range, well apart, one going down.
+    const slides: number[] = [];
     for (const w of WHISTLES) {
       const s = grexSound(w, 44100);
       const pitch = (from: number) => {
@@ -177,8 +179,17 @@ describe("G-REX, the Fire boss", () => {
         }
         return (at * 44100) / N;
       };
-      expect(pitch(Math.floor(s.length * 0.7)), w).toBeGreaterThan(pitch(Math.floor(44100 * 0.12)) * 1.4);
+      const early = pitch(Math.floor(44100 * 0.06));
+      const late = pitch(Math.floor(s.length * 0.85) - 1024);
+      for (const hz of [early, late]) {
+        expect(hz, w).toBeGreaterThan(2000);
+        expect(hz, w).toBeLessThan(5000);
+      }
+      expect(Math.max(early, late) / Math.min(early, late), w).toBeGreaterThan(1.15);
+      slides.push(Math.sign(late - early));
     }
+    expect(slides).toContain(-1);
+    expect(slides).toContain(1);
   });
 
   it("never sounds louder than a move, even the whole volley of 24 whistles at once (the slowest, every crackle)", () => {

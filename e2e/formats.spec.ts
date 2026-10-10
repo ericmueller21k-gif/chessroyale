@@ -151,16 +151,16 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   await king.click();
   // A strike isn't your turn: the clock stops while he strikes, then you pick.
   await page.getByRole("menuitem", { name: /Strike/ }).click();
-  // Alone you're the whole crowd, so he comes at once, during your move: on your king's square, striking the boss.
+  // Alone you're the whole crowd, so he strikes at once, during your move, from his spot by the board.
   await expect(page.getByLabel("The God King strikes the boss")).toBeVisible({ timeout: 5_000 });
   expect(await phase(page)).toBe("play");
   // One strike a move: Strike is greyed out now.
-  await expect(page.locator(".king-summon")).toHaveCount(0, { timeout: 8_000 });
+  await expect(page.locator(".king-summon, .king-command")).toHaveCount(0, { timeout: 8_000 });
   await king.click();
   await expect(page.getByRole("menuitem", { name: /Strike/ })).toBeDisabled();
   await king.click();
   // Then he's gone and the move goes on: still yours to pick.
-  await expect(page.locator(".king-summon")).toHaveCount(0, { timeout: 8_000 });
+  await expect(page.locator(".king-summon, .king-command")).toHaveCount(0, { timeout: 8_000 });
   expect(await phase(page)).toBe("play");
   const seen = new Set<string>();
   await playToResults(page, seen, 7);

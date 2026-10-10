@@ -40,6 +40,10 @@ import {
   distanceFrom,
   judgedBoard,
   recheckTargets,
+  kingMoveMs,
+  kingStrikeMs,
+  lightsDeadline,
+  lightsRoundEnd,
   verdictBoard,
   verdictMoves,
   type JudgedBoard,
@@ -233,7 +237,11 @@ export interface LobbyRecord {
    * Hollow's Lights out in progress (the boss's turn, before his move; the phase stays "boss"): when it began, how many
    * rounds have ended (their answers shown), and each player's taps, round by round.
    */
-  lights?: { key: string; at: number; ended: number; taps: Record<string, string[][]> };
+  /**
+   * Hollow's Lights out: when it began, how many rounds are over and when each ended (ms from `at`), and each person's
+   * taps round by round, with their times (ms from `at`: each gives its player a second more, lightsDeadline).
+   */
+  lights?: { key: string; at: number; ended: number; endedAt?: number[]; taps: Record<string, string[][]>; tapAt?: Record<string, number[][]> };
   /**
    * Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. `filledAt`: the seats
    * were filled then (bots pop in on the queue screen) and the match begins FRONT_DOOR.fillShowMs later; `waitMs`:
@@ -350,8 +358,6 @@ const FINAL_CUT_MS = 1800;
 /** Boss battle: how long the boss's move shows, how long a strike shows, and how long the host has to play the boss. */
 const BOSS_KILL_MS = 3800;
 const BOSS_TIMEOUT_MS = 15_000;
-/** The God King's summoning, cut-in banner and bolt, added to a reveal where he plays the move. */
-const KING_FX_MS = 5400;
 
 export class LobbyCore {
   private runner: MatchRunner | null = null;
@@ -1201,7 +1207,7 @@ export class LobbyCore {
       for (const h of this.roundHumans()) this.send(h.id, { t: "strike", key: round.key, calls, needed }, false);
       return;
     }
-    const ms = this.settings.kingStrikeMs;
+    const ms = kingStrikeMs(this.settings);
     round.strike = { at: now, until: now + ms };
     round.deadline += ms;
     for (const id of Object.keys(round.deadlines)) round.deadlines[id]! += ms;
@@ -1269,9 +1275,19 @@ export class LobbyCore {
 
   // ---------------- Hollow's Lights out ----------------
 
-  /** The test's beats (boss-timing.ts), from its rounds' seconds and the late grace. */
+  /** The test's beats (boss-timing.ts), from its rounds' seconds, the late grace and when the rounds over ended. */
   private lightsTimeline() {
-    return lightsOutTimeline(this.runner?.boss?.powers?.lightsOut?.rounds ?? [], this.settings.lateGraceMs);
+    const ended = this.r.lights?.endedAt ?? [];
+    return lightsOutTimeline((this.runner?.boss?.powers?.lightsOut?.rounds ?? []).map((r, i) => ({ ms: r.ms, endedAt: ended[i] })), this.settings.lateGraceMs);
+  }
+
+  /** When the round on is over (ms from the test's start): every person done, by their tries or their own time. */
+  private lightsRoundEnd(): number {
+    const l = this.r.lights!;
+    const k = l.ended;
+    const r = this.lightsTimeline().rounds[k]!;
+    const pieces = this.runner!.boss!.powers!.lightsOut!.rounds[k]!.pieces.length;
+    return lightsRoundEnd(r, pieces, Object.values(l.tapAt ?? {}).map((x) => x[k] ?? []), this.settings.lateGraceMs);
   }
 
   /** Lights out begins at the start of his turn: the game paused, nobody's clock running, the server timing each round. */
@@ -1279,8 +1295,12 @@ export class LobbyCore {
     const runner = this.runner!;
     const test = runner.startLightsOut();
     this.r.phase = "boss";
-    this.r.lights = { key: `l-${++this.r.counter}`, at: this.io.now(), ended: 0, taps: {} };
-    for (const p of runner.alive()) if (!p.isBot) this.r.lights.taps[p.id] = test.rounds.map(() => []);
+    this.r.lights = { key: `l-${++this.r.counter}`, at: this.io.now(), ended: 0, endedAt: [], taps: {}, tapAt: {} };
+    for (const p of runner.alive())
+      if (!p.isBot) {
+        this.r.lights.taps[p.id] = test.rounds.map(() => []);
+        this.r.lights.tapAt![p.id] = test.rounds.map(() => []);
+      }
     this.sendLights();
     this.armLights();
   }
@@ -1288,7 +1308,7 @@ export class LobbyCore {
   private armLights() {
     const l = this.r.lights!;
     const tl = this.lightsTimeline();
-    this.setTimer("lights", l.at + (l.ended < tl.rounds.length ? tl.rounds[l.ended]!.answersAt : tl.total));
+    this.setTimer("lights", l.at + (l.ended < tl.rounds.length ? this.lightsRoundEnd() : tl.total));
   }
 
   /** A round ends (its answers go out, each player's taps judged), or the lights are back: the misses cost, and he moves. */
@@ -1298,6 +1318,10 @@ export class LobbyCore {
     if (!l || !runner || this.r.phase !== "boss") return;
     const tl = this.lightsTimeline();
     if (l.ended < tl.rounds.length) {
+      // (A tap since may have given someone more time.)
+      const end = this.lightsRoundEnd();
+      if (this.io.now() < l.at + end) return this.armLights();
+      (l.endedAt ??= []).push(Math.max(end, this.io.now() - l.at));
       l.ended++;
       this.sendLights();
       return this.armLights();
@@ -1310,14 +1334,14 @@ export class LobbyCore {
   }
 
   /** A player's taps in Lights out, judged round by round. */
-  private lightsMine(playerId: string): { found: string[]; wrong: string[] }[] {
+  private lightsMine(playerId: string): { found: string[]; wrong: string[]; used: number }[] {
     const runner = this.runner!;
     const test = runner.boss!.powers!.lightsOut!;
     const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
     const side = runner.boss!.crowdSide === "w" ? "b" : "w";
     return test.rounds.map((r, i) => {
       const j = judgeTaps(r, fen, side, this.r.lights?.taps[playerId]?.[i] ?? []);
-      return { found: j.found, wrong: j.wrong };
+      return { found: j.found, wrong: j.wrong, used: j.used };
     });
   }
 
@@ -1333,26 +1357,34 @@ export class LobbyCore {
       const lights: NetLightsOut = {
         key: l.key,
         at: l.at,
-        rounds: test.rounds.map((r, i) => ({ pieces: r.pieces, ms: r.ms, ...(i < l.ended ? { answers: r.answers } : {}) })),
+        rounds: test.rounds.map((r, i) => ({ pieces: r.pieces, targets: r.targets, ms: r.ms, ...(i < l.ended ? { answers: r.answers, endedAt: l.endedAt?.[i] } : {}) })),
         mine: this.lightsMine(h.id),
       };
       this.send(h.id, { t: "lights", lights, boss, standings });
     }
   }
 
-  /** A tap in Lights out: judged against the round it's in, while it's open (with the usual late grace). */
+  /**
+   * A tap in Lights out: judged against the round on, while it's open for this player (their own deadline: the round's
+   * seconds, a second more for each tap, and the usual late grace) and they have tries left (one per piece). Every
+   * tap gives them a second more; once everyone is done, the round is over.
+   */
   private lightsTap(playerId: string, key: string, round: unknown, square: unknown) {
     const l = this.r.lights;
     if (!l || l.key !== key || this.r.phase !== "boss" || typeof round !== "number" || typeof square !== "string" || !/^[a-h][1-8]$/.test(square)) return;
     const taps = l.taps[playerId]?.[round];
     const r = this.lightsTimeline().rounds[round];
-    if (!taps || !r) return;
-    const now = this.io.now();
-    if (now < l.at + r.at - 300 || now > l.at + r.answersAt) return;
-    const before = this.lightsMine(playerId)[round]!;
-    if (before.found.length + before.wrong.length >= this.runner!.boss!.powers!.lightsOut!.rounds[round]!.pieces.length || taps.includes(square)) return;
+    if (!taps || !r || round !== l.ended) return;
+    const t = this.io.now() - l.at;
+    if (t < r.at - 300 || t > lightsDeadline(r, taps.length) + this.settings.lateGraceMs) return;
+    const pieces = this.runner!.boss!.powers!.lightsOut!.rounds[round]!.pieces.length;
+    if (taps.length >= pieces || taps.includes(square)) return;
     taps.push(square);
+    ((l.tapAt ??= {})[playerId] ??= l.taps[playerId]!.map(() => []))[round]!.push(t);
     this.sendLights(playerId);
+    // Done at once if everyone is; otherwise the round may now end later.
+    if (this.lightsRoundEnd() <= t) return this.lightsStep();
+    this.armLights();
   }
 
   /**
@@ -1512,7 +1544,7 @@ export class LobbyCore {
     const kingActs = report.boards.some((b) => b.king);
     // The God King's Last Stand plays out in the reveal (the next move's clock starts after it: nobody loses time).
     const stand = report.boards.some((b) => b.lastStand);
-    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? KING_FX_MS : 0) + (stand ? LAST_STAND_MS : 0);
+    const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? kingMoveMs(this.settings) : 0) + (stand ? LAST_STAND_MS : 0);
     const bossNow = runner.boss ? runner.bossView()! : undefined;
     const st = this.standings();
     const cutoff = this.cutoff();

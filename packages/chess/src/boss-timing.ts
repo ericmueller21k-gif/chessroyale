@@ -1,3 +1,4 @@
+import { BOSS_POWERS } from "@chessroyale/core";
 import { fenAtPly, pieceAt, type Base } from "./rules.ts";
 
 /**
@@ -63,8 +64,8 @@ export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; fi
 /**
  * Hollow's Lights out, beat by beat (ms from its start), the same for the server and every screen. Nobody's clock runs.
  *   0          "LIGHTS OUT!" (his banner) and his line, "It's time."
- *   dropAt     he drops onto the board's top edge (his `lightsOut`) and smashes his three bulbs: the board dims a step at
- *              each, night at the last.
+ *   dropAt     he drops onto the board's top edge (his `lightsOut`) and smashes his strand in three strikes: the board
+ *              dims a step at each, night at the last.
  *   rounds     each round: his prompt ("Find my queen."), its seconds to tap (BOSS_POWERS.lightsOutRounds) and the
  *              usual late grace; then the answers show (`answerMs`) and the night closes over them again.
  *   backAt     the lights come back (his `lightsBack`: a fresh strand from the void, the dawn spreading from his spot),
@@ -72,16 +73,77 @@ export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; fi
  */
 export const LIGHTS_OUT = { dropAt: 1300, dropMs: 2900, gapMs: 300, answerMs: 1800, backMs: 2300 } as const;
 
-/** Lights out's beats for its rounds' seconds (`ms` each) and the late grace on each round. */
-export function lightsOutTimeline(rounds: readonly { ms: number }[], graceMs: number) {
+/**
+ * Lights out's beats for its rounds' seconds (`ms` each) and the late grace on each round. A round is over when every
+ * player is done (lightsRoundEnd: each tap gives its player a second more); once it is, `endedAt` (ms from the test's
+ * start) says when, and the next round follows its answers. Until then its end is the earliest it can be: its seconds
+ * and the grace (`over` false).
+ */
+export function lightsOutTimeline(rounds: readonly { ms: number; endedAt?: number }[], graceMs: number) {
   let t = LIGHTS_OUT.dropAt + LIGHTS_OUT.dropMs + LIGHTS_OUT.gapMs;
   const out = rounds.map((r) => {
-    const round = { at: t, until: t + r.ms, answersAt: t + r.ms + graceMs };
+    const round = { at: t, until: t + r.ms, answersAt: r.endedAt ?? t + r.ms + graceMs, over: r.endedAt !== undefined };
     t = round.answersAt + LIGHTS_OUT.answerMs;
     return round;
   });
   return { rounds: out, backAt: t, total: t + LIGHTS_OUT.backMs };
 }
+
+/** A player's own deadline in a round (ms from the test's start, before the late grace): its seconds, and a second more for each tap they've made. */
+export const lightsDeadline = (round: { until: number }, taps: number, tapMs: number = BOSS_POWERS.lightsOutTapMs): number => round.until + taps * tapMs;
+
+/**
+ * When a Lights out round is over (ms from the test's start): when every player is done, each once they've used all
+ * their tries (`pieces`: at their last one) or their own time is up (lightsDeadline, and the late grace). `taps`: each
+ * player's tap times in the round (ms from the test's start), in order. Nobody tapping: its seconds and the grace.
+ */
+export function lightsRoundEnd(round: { until: number }, pieces: number, taps: readonly (readonly number[])[], graceMs: number, tapMs: number = BOSS_POWERS.lightsOutTapMs): number {
+  const base = round.until + graceMs;
+  if (!taps.length) return base;
+  return Math.max(...taps.map((t) => (t.length >= pieces ? t[pieces - 1]! : base + t.length * tapMs)));
+}
+
+/**
+ * The God King acting from his spot by the board (Eric, Oct 9, 2026), ms after he starts: he raises his sword where he
+ * stands (`raiseAt`), his cut-in banner plays (`cutAt`, for `cutMs`), then his bolt leaves the blade for the piece he
+ * moves (`boltAt`; the move plays at `moveAt`), or a bolt and a slash land on the boss's king three times (`slashAt`).
+ * He lowers his sword at `lowerAt` (a move) or `strikeLowerAt` (a strike). The reveal where he plays the move lasts
+ * `moveMs` longer (solo and online); a strike stops the clock for settings.kingStrikeMs, which covers it.
+ */
+export const KING_COMMAND = {
+  raiseAt: 0,
+  cutAt: 300,
+  cutMs: 1500,
+  boltAt: 2000,
+  moveAt: 2350,
+  lowerAt: 2900,
+  slashAt: [2050, 2500, 2950] as readonly number[],
+  strikeLowerAt: 3400,
+  moveMs: 1700,
+} as const;
+
+/**
+ * The old way, kept for later behind settings.kingOnBoard: summoned onto your king's square. Bolts converge, a beam,
+ * he appears (`appearAt`), raises his sword with his cut-in (`raiseAt`), bolts the piece (`boltAt`; it moves at
+ * `moveAt`, walking with a king move) or slashes the boss's king (`slashAt`), and holy light takes him off at the
+ * end. The reveal lasts `moveMs` longer; a strike stops the clock for `strikeMs`.
+ */
+export const KING_SUMMON = {
+  appearAt: 1300,
+  raiseAt: 1550,
+  cutAt: 1550,
+  cutMs: 1500,
+  boltAt: 3250,
+  moveAt: 3600,
+  slashAt: [3300, 3750, 4200] as readonly number[],
+  strikeMs: 5900,
+  moveMs: 5400,
+} as const;
+
+/** How much longer the reveal lasts when the God King plays the move. */
+export const kingMoveMs = (s: { kingOnBoard?: boolean }): number => (s.kingOnBoard ? KING_SUMMON.moveMs : KING_COMMAND.moveMs);
+/** How long the clock stands still while the God King strikes the boss. */
+export const kingStrikeMs = (s: { kingOnBoard?: boolean; kingStrikeMs: number }): number => (s.kingOnBoard ? KING_SUMMON.strikeMs : s.kingStrikeMs);
 
 /** Alone: how long the boss's move shows before your turn (the piece's slide, and a beat). */
 export const BOSS_MOVE_ALONE_MS = 450;

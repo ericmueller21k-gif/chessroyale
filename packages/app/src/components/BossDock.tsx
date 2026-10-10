@@ -6,7 +6,7 @@ import type { GameView, StrikeState } from "../game.ts";
 import { kingLine, kingSay, setKingFallen, type KingCue } from "../godKing.ts";
 import { play } from "../sound.ts";
 import { useFrameNow } from "./Countdown.tsx";
-import { GodKingFallen, GodKingSprite } from "./GodKing.tsx";
+import { GodKingFallen, GodKingSprite, kingCommandAct } from "./GodKing.tsx";
 import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
 import { Bolt } from "./PowerUpButton.tsx";
 
@@ -35,6 +35,7 @@ export function BossDock({
   cues = [],
   away = false,
   leaping = false,
+  command,
   fallen: fallenNow,
   charges: chargesShown,
   powerUp,
@@ -53,6 +54,8 @@ export function BossDock({
   away?: boolean;
   /** His Last Stand: he leaps up out of the dock onto the board. */
   leaping?: boolean;
+  /** He's commanding from his spot (KingCommand): what, and when he started (a Date.now() value). */
+  command?: { mode: "move" | "strike"; startAt: number };
   /** He has fallen (after his Last Stand); by default, once it has happened. The reveal where it happens times it. */
   fallen?: boolean;
   /** The crowns to show, if not the battle's (the reveal of his Last Stand shows the ones he had until he leaps). */
@@ -111,6 +114,7 @@ export function BossDock({
         ready={ready}
         away={away}
         leaping={leaping}
+        command={command}
         fallen={fallen}
         power={power}
         onPower={() => {
@@ -178,6 +182,7 @@ function GodKingUnit({
   ready,
   away,
   leaping,
+  command,
   fallen,
   power,
   onPower,
@@ -189,6 +194,7 @@ function GodKingUnit({
   ready: boolean;
   away: boolean;
   leaping: boolean;
+  command?: { mode: "move" | "strike"; startAt: number };
   fallen: boolean;
   power: { left: number; inUse: boolean; enabled: boolean } | null;
   onPower: () => void;
@@ -197,6 +203,8 @@ function GodKingUnit({
 }) {
   const now = useFrameNow();
   const line = kingLine(now);
+  // Commanding from his spot: his sword raised, then his bolt or his slashes (in step with KingCommand on the board).
+  const act = command ? kingCommandAct(command.mode, command.startAt, now) : undefined;
   // His leap (his Last Stand) plays from when it starts.
   const leapAt = useMemo(() => (leaping ? Date.now() : 0), [leaping]);
   if (fallen) {
@@ -230,10 +238,16 @@ function GodKingUnit({
     );
   }
   return (
-    <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${leaping ? " leaping" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}`}>
+    <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${leaping ? " leaping" : ""}${act ? " acting" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}`}>
       {menu ?? (line && !away && !leaping && <SpeechBubble key={line.at} text={line.text} at={line.at} until={line.until} now={now} />)}
       <button type="button" class="gk-unit-btn" disabled={!ready} onClick={onTap} aria-label={ready ? "God King: tap to summon him" : "God King"}>
-        <GodKingSprite side={side} anim={leaping ? "leap" : "idle"} since={leapAt} class={leaping ? "leap" : "idle"} />
+        <GodKingSprite
+          side={side}
+          anim={leaping ? "leap" : (act?.anim ?? "idle")}
+          since={leaping ? leapAt : (act?.since ?? 0)}
+          then={leaping ? undefined : act?.then}
+          class={leaping ? "leap" : act ? "act" : "idle"}
+        />
       </button>
       <span class="gk-unit-charges" aria-label={`${charges} charges left`}>
         {charges > 0 ? "👑".repeat(charges) : "—"}

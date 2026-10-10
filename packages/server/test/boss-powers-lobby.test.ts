@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, POWER_FX, bossShowMs, initPowers, legalMoves, pieceAt, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, POWER_FX, bossShowMs, initPowers, legalMoves, lightsOutTimeline, pieceAt, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -339,35 +339,55 @@ describe("Hollow online", () => {
     expect(l1.lights.rounds).toEqual(l2.lights.rounds);
     expect(l1.lights.rounds.every((r) => !r.answers)).toBe(true);
     const fen = l1.boss.board.fen;
-    const his = (t: string) => ["a", "b", "c", "d", "e", "f", "g", "h"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).filter((s) => pieceAt(fen, s)?.color === "b" && pieceAt(fen, s)!.type === t);
+    // The squares answering a round's first target (his pieces of its type; a pawn on its file).
+    const his = (round: number) => {
+      const t = l1.lights.rounds[round]!.targets![0]!;
+      return ["a", "b", "c", "d", "e", "f", "g", "h"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).filter((s) => pieceAt(fen, s)?.color === "b" && pieceAt(fen, s)!.type === t.type && (!t.file || s[0] === t.file));
+    };
     const at = l1.lights.at;
-    const tl = { r0: 1300 + 2900 + 300 };
+    const tl = lightsOutTimeline(l1.lights.rounds, DEFAULT_SETTINGS.lateGraceMs);
+    const grace = DEFAULT_SETTINGS.lateGraceMs;
+    const none = { found: [], wrong: [], used: 0 };
     // A tap before the round opens: nothing.
-    L.core.message("p1", { t: "lightsTap", key: l1.lights.key, round: 0, square: his(l1.lights.rounds[0]!.pieces[0]!)[0]! });
-    expect(L.last("p1", "lights")!.lights.mine[0]).toEqual({ found: [], wrong: [] });
-    L.advance(at + tl.r0 + 500 - L.now);
+    L.core.message("p1", { t: "lightsTap", key: l1.lights.key, round: 0, square: his(0)[0]! });
+    expect(L.last("p1", "lights")!.lights.mine[0]).toEqual(none);
+    L.advance(at + tl.rounds[0]!.at + 500 - L.now);
     // p1 finds round 1's piece; p2 taps an empty square.
-    const target = his(l1.lights.rounds[0]!.pieces[0]!)[0]!;
+    const target = his(0)[0]!;
     L.core.message("p1", { t: "lightsTap", key: l1.lights.key, round: 0, square: target });
+    expect(L.last("p1", "lights")!.lights.mine[0]).toEqual({ found: [target], wrong: [], used: 1 });
+    expect(L.last("p1", "lights")!.lights.rounds[0]!.answers).toBeUndefined();
     L.core.message("p2", { t: "lightsTap", key: l1.lights.key, round: 0, square: "e4" });
-    expect(L.last("p1", "lights")!.lights.mine[0]).toEqual({ found: [target], wrong: [] });
-    expect(L.last("p2", "lights")!.lights.mine[0]).toEqual({ found: [], wrong: ["e4"] });
-    // (Out of tries: one piece, one try.)
-    L.core.message("p2", { t: "lightsTap", key: l1.lights.key, round: 0, square: target });
-    expect(L.last("p2", "lights")!.lights.mine[0]).toEqual({ found: [], wrong: ["e4"] });
-    // The round ends (its seconds and the late grace): its answers go out.
-    L.advance(at + tl.r0 + 3000 + DEFAULT_SETTINGS.lateGraceMs + 10 - L.now);
-    expect(L.last("p1", "lights")!.lights.rounds[0]!.answers).toEqual(his(l1.lights.rounds[0]!.pieces[0]!).sort());
+    // Everyone has used their tries (one piece, one try): the round is over at once, its answers go out.
+    expect(L.last("p2", "lights")!.lights.mine[0]).toEqual({ found: [], wrong: ["e4"], used: 1 });
+    const over = L.last("p1", "lights")!.lights.rounds[0]!;
+    expect(over.answers).toEqual(his(0).sort());
+    expect(over.endedAt).toBe(L.now - at);
     expect(L.last("p1", "lights")!.lights.rounds[1]!.answers).toBeUndefined();
     // A late tap for a round that's over: nothing.
     L.core.message("p2", { t: "lightsTap", key: l1.lights.key, round: 0, square: target });
     expect(L.last("p2", "lights")!.lights.mine[0]!.found).toEqual([]);
+    // Round 2 follows round 1's answers. p1 taps once (wrong): a second more, for p1. p2 doesn't tap.
+    const r1 = lightsOutTimeline(L.last("p1", "lights")!.lights.rounds, grace).rounds[1]!;
+    L.advance(at + r1.at + 200 - L.now);
+    L.core.message("p1", { t: "lightsTap", key: l1.lights.key, round: 1, square: "e4" });
+    expect(L.last("p1", "lights")!.lights.mine[1]).toMatchObject({ wrong: ["e4"], used: 1 });
+    // p2's own time is up at its seconds (and the grace): a tap after is refused.
+    L.advance(at + r1.until + grace + 200 - L.now);
+    L.core.message("p2", { t: "lightsTap", key: l1.lights.key, round: 1, square: his(1)[0]! });
+    expect(L.last("p2", "lights")!.lights.mine[1]).toEqual(none);
+    // But the round isn't over: p1 still has a try and a second more.
+    expect(L.last("p1", "lights")!.lights.rounds[1]!.answers).toBeUndefined();
+    L.advance(at + r1.until + BOSS_POWERS.lightsOutTapMs + grace + 10 - L.now);
+    expect(L.last("p1", "lights")!.lights.rounds[1]!.answers).toBeTruthy();
+    // (Ended when the server saw it: never before its time, so nobody loses any.)
+    expect(L.last("p1", "lights")!.lights.rounds[1]!.endedAt).toBe(L.now - at);
+    expect(L.now - at).toBeGreaterThanOrEqual(r1.until + BOSS_POWERS.lightsOutTapMs + grace);
     const before = Object.fromEntries(L.last("p1", "lights")!.standings.map((s) => [s.id, s.points]));
-    // Through rounds 2 and 3 (nobody taps), then the lights come back and he moves.
+    // Through round 3 (nobody taps), then the lights come back and he moves.
     for (let i = 0; i < 6 && !L.last("p1", "bossRequest"); i++) L.advance(5000);
     const req = L.last("p1", "bossRequest");
     expect(req).toBeTruthy();
-    expect(L.now - at).toBeGreaterThanOrEqual(1300 + 2900 + 300 + 3000 + 4000 + 5000 + 3 * (DEFAULT_SETTINGS.lateGraceMs + 1800) + 2300);
     const after = Object.fromEntries(L.last("p1", "boss")!.standings.map((s) => [s.id, s.points]));
     // p1 found 1 of 6 pieces, p2 none: -50 and -60.
     expect(after.p1! - before.p1!).toBe(-5 * BOSS_POWERS.lightsOutMiss);

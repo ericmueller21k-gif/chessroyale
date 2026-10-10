@@ -25,6 +25,7 @@ import {
   type DarkSquare,
   type FireTile,
   type LightsOutRound,
+  type LightsOutTarget,
   type PowerEvent,
   type PowerId,
 } from "@chessroyale/core";
@@ -588,11 +589,27 @@ export const lightsOutDue = (boss: BossState | null | undefined): boolean => {
   return !!p && !boss!.result && bossPowers(boss)?.ultimate === "lightsout" && !p.lightsOut && (!!p.ultNext || p.ultAt === boss!.crowdMoves);
 };
 
+/** Where each kind of his pieces starts, by file (the back rank, or the pawns' rank). */
+const HOME_FILES: Record<string, string> = { k: "e", q: "d", r: "ah", b: "cf", n: "bg", p: "abcdefgh" };
+/** A piece of `side` still on a square it starts the game on (it may never have moved: anyone could find it). */
+export const onStartSquare = (type: string, square: string, side: Side): boolean =>
+  (HOME_FILES[type] ?? "").includes(square[0]!) && square[1] === (type === "p" ? (side === "w" ? "2" : "7") : side === "w" ? "1" : "8");
+
+/** The squares that answer a target: every piece of the type (a pawn: those on its file). */
+const answersOf = (t: LightsOutTarget, mine: readonly { square: string; type: string }[]) =>
+  mine.filter((x) => x.type === t.type && (!t.file || x.square[0] === t.file)).map((x) => x.square);
+
 /**
- * Lights out's rounds: the pieces he names in each (BOSS_POWERS.lightsOutRounds: 1, 2, then 3), from the seed. Never a
- * pawn while he has other pieces; the king can be named; no piece named twice across the rounds while others remain
- * (then those named before come back, before any pawn). A type may come up twice in a round (both his rooks): then
- * both squares are needed. Each round's answers are every square holding a type it names.
+ * Lights out's rounds: what he names in each (BOSS_POWERS.lightsOutRounds: 1, 2, then 3 pieces), from the seed, never
+ * anything trivial (Eric, Oct 9): only pieces that have left their starting squares.
+ * - A type is named only if every piece he has of it has moved ("Find my queen."; two or more: "Find one of my
+ *   rooks.", any of them counts), else the one left at home would give it away.
+ * - A pawn is named by its file, and only a moved pawn alone on its file ("Find my pawn on the c-file.").
+ * - Nothing is named twice in the test. Pieces before pawns, each in a random order from the seed.
+ * - Not enough of those (an early or a test game): as a last resort, types with a piece at home, then pawns at home
+ *   alone on their file, then any file of pawns ("one of my pawns on the c-file"). A round with nothing left to name
+ *   is dropped.
+ * Each round's answers are every square that answers one of its targets.
  */
 export function chooseLightsOut(fen: string, side: Side, seed: number, s: Pick<BossPowerSettings, "lightsOutRounds"> = BOSS_POWERS): LightsOutRound[] {
   const mine: { square: string; type: string }[] = [];
@@ -601,44 +618,64 @@ export function chooseLightsOut(fen: string, side: Side, seed: number, s: Pick<B
       const pc = pieceAt(fen, `${f}${r}`);
       if (pc?.color === side) mine.push({ square: `${f}${r}`, type: pc.type });
     }
-  const named = new Set<string>();
-  return s.lightsOutRounds.map((round, i) => {
-    const order = (xs: typeof mine) => xs.map((x) => ({ x, k: powerRoll(seed, "lights", i, x.square) })).sort((a, b) => a.k - b.k).map((e) => e.x);
-    const fresh = order(mine.filter((x) => x.type !== "p" && !named.has(x.square)));
-    const again = order(mine.filter((x) => x.type !== "p" && named.has(x.square)));
-    const pawns = order(mine.filter((x) => x.type === "p"));
-    const picked = [...fresh, ...again, ...pawns].slice(0, round.pieces);
-    for (const x of picked) named.add(x.square);
-    // (Named in board order, the bigger pieces first: "Find my queen and my knight.")
-    const RANK = "kqrbnp";
-    const pieces = picked.map((x) => x.type).sort((a, b) => RANK.indexOf(a) - RANK.indexOf(b));
-    const answers = mine.filter((x) => pieces.includes(x.type)).map((x) => x.square).sort();
-    return { pieces, answers, ms: round.ms };
-  });
+  const order = <T>(xs: T[], key: (x: T) => string) => xs.map((x) => ({ x, k: powerRoll(seed, "lights", key(x)) })).sort((a, b) => a.k - b.k).map((e) => e.x);
+  const types = [..."kqrbn"].filter((t) => mine.some((x) => x.type === t));
+  const moved = (xs: typeof mine) => xs.every((x) => !onStartSquare(x.type, x.square, side));
+  const ofType = (t: string) => mine.filter((x) => x.type === t);
+  const pawnsOn = (f: string) => mine.filter((x) => x.type === "p" && x.square[0] === f);
+  const files = [..."abcdefgh"].filter((f) => pawnsOn(f).length > 0);
+  const typeTarget = (t: string): LightsOutTarget => ({ type: t, ...(ofType(t).length > 1 ? { several: true } : {}) });
+  const pawnTarget = (f: string): LightsOutTarget => ({ type: "p", file: f, ...(pawnsOn(f).length > 1 ? { several: true } : {}) });
+  const lone = files.filter((f) => pawnsOn(f).length === 1);
+  const candidates = [
+    ...order(types.filter((t) => moved(ofType(t))), (t) => t).map(typeTarget),
+    ...order(lone.filter((f) => moved(pawnsOn(f))), (f) => `p${f}`).map(pawnTarget),
+    // The last resort: pieces that haven't moved.
+    ...order(types.filter((t) => !moved(ofType(t))), (t) => t).map(typeTarget),
+    ...order(lone.filter((f) => !moved(pawnsOn(f))), (f) => `p${f}`).map(pawnTarget),
+    ...order(files.filter((f) => pawnsOn(f).length > 1), (f) => `p${f}`).map(pawnTarget),
+  ];
+  let next = 0;
+  const RANK = "kqrbnp";
+  return s.lightsOutRounds
+    .map((round) => {
+      // (Named in board order, the bigger pieces first, pawns by file: "Find my queen and my pawn on the c-file.")
+      const targets = candidates.slice(next, (next += round.pieces)).sort((a, b) => RANK.indexOf(a.type) - RANK.indexOf(b.type) || (a.file ?? "").localeCompare(b.file ?? ""));
+      const answers = [...new Set(targets.flatMap((t) => answersOf(t, mine)))].sort();
+      return { pieces: targets.map((t) => t.type), targets, answers, ms: round.ms };
+    })
+    .filter((r) => r.pieces.length > 0);
 }
 
+/** A round's targets (a round from before they were spelt out: one type target per piece letter). */
+const targetsOf = (round: Pick<LightsOutRound, "pieces" | "targets">): LightsOutTarget[] => round.targets ?? round.pieces.map((type) => ({ type }));
+
 /**
- * A round's taps, judged in order: a square holding a type he named that's still to find is found; a square already
- * found (or holding a type already found as often as it was named) changes nothing; any other is wrong. A player has
- * as many tries as there are pieces to find: found plus wrong. The pieces not found are missed.
+ * A round's taps, judged in order. Every tap is a try, and a player has as many tries as there are pieces to find: a
+ * square answering a target still to find finds it; one answering a target already found changes nothing (but uses
+ * the try); any other is wrong. The pieces not found are missed.
  */
-export function judgeTaps(round: Pick<LightsOutRound, "pieces">, fen: string, side: Side, taps: readonly string[]): { found: string[]; wrong: string[]; missed: number; done: boolean } {
-  const need = new Map<string, number>();
-  for (const t of round.pieces) need.set(t, (need.get(t) ?? 0) + 1);
+export function judgeTaps(round: Pick<LightsOutRound, "pieces" | "targets">, fen: string, side: Side, taps: readonly string[]): { found: string[]; wrong: string[]; used: number; missed: number; done: boolean } {
+  const targets = targetsOf(round);
+  const done = new Set<number>();
   const found: string[] = [];
   const wrong: string[] = [];
+  const seen = new Set<string>();
+  let used = 0;
   for (const sq of taps) {
-    if (found.length + wrong.length >= round.pieces.length) break;
-    if (found.includes(sq) || wrong.includes(sq)) continue;
+    if (used >= targets.length) break;
+    if (seen.has(sq)) continue;
+    seen.add(sq);
+    used++;
     const pc = pieceAt(fen, sq);
-    const left = pc?.color === side ? (need.get(pc.type) ?? 0) : 0;
-    if (left > 0) {
-      need.set(pc!.type, left - 1);
+    const answers = (t: LightsOutTarget) => pc?.color === side && pc.type === t.type && (!t.file || sq[0] === t.file);
+    const i = targets.findIndex((t, k) => !done.has(k) && answers(t));
+    if (i >= 0) {
+      done.add(i);
       found.push(sq);
-    } else if (pc?.color === side && round.pieces.includes(pc.type)) continue;
-    else wrong.push(sq);
+    } else if (!targets.some(answers)) wrong.push(sq);
   }
-  return { found, wrong, missed: round.pieces.length - found.length, done: found.length + wrong.length >= round.pieces.length };
+  return { found, wrong, used, missed: targets.length - found.length, done: used >= targets.length };
 }
 
 /** A bot's Lights out: how many pieces it misses (each found with its round's lightsOutBotHit chance, from the seed). */

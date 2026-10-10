@@ -596,7 +596,8 @@ export function finishFinal(state: MatchState, rng: Rng, winningTeam: 0 | 1 | nu
 
 /**
  * The boss strikes after every bossKillEvery crowd moves, while more than bossMinSurvivors are left. Not between
- * the God King's Last Stand and the re-pick: the strike waits until the re-pick is played (and counts both rounds).
+ * the God King's Last Stand and the re-pick: the move he took back isn't a crowd move (so it doesn't bring the strike
+ * closer), and the strike waits until the re-pick is played (then it weighs both rounds' picks).
  */
 export const bossKillDue = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
   !!state.boss && !state.boss.barred && state.boss.sinceKill >= settings.bossKillEvery && alivePlayers(state).length > (state.boss.minSurvivors ?? settings.bossMinSurvivors);
@@ -610,7 +611,10 @@ export function bossKill(state: MatchState, rng: Rng, settings: Settings = DEFAU
   const boss = state.boss;
   if (!boss) return { state, victim: null };
   const alive = alivePlayers(state);
-  const k = Math.max(1, boss.sinceKill);
+  // The rounds since its last strike: its crowd moves, plus the round of a move the God King took back since then
+  // (that round's picks still count against whoever made them).
+  const stood = !!boss.lastStand && boss.lastStand.atMove > (boss.kills.at(-1)?.atMove ?? 0);
+  const k = Math.max(1, boss.sinceKill) + (stood ? 1 : 0);
   const recent = (p: PlayerState) => p.finalLosses.slice(-k).reduce((s, x) => s + x, 0);
   const coin = new Map(alive.map((p) => [p.id, rng()]));
   const victim = [...alive].sort((a, b) => recent(b) - recent(a) || matchLoss(b, settings) - matchLoss(a, settings) || coin.get(a.id)! - coin.get(b.id)!)[0];

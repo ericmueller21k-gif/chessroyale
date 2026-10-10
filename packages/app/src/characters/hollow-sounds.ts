@@ -1,8 +1,9 @@
 /**
- * Hollow's sounds, synthesised (no files, no licences, no voice): the low hum of the void, the darkness pouring out of
- * it, the whisper of smoke settling on a square (and lifting off it), a bulb going out, a bulb smashed in his claw, the
- * void's pulse in the dark (the test's countdown), a piece found (a bright chime) or missed (a dull buzz), the lights
- * coming back (three warm plinks, rising), and his bulbs clinking. Each is a pure function of the sample rate (its
+ * Hollow's sounds, synthesised (no files, no licences, no voice), all low and dark (Eric, Oct 9, 2026: no chimes, ever;
+ * nothing bright, nothing major-key): the low hum of the void, the darkness pouring out of it, the hush of smoke
+ * settling on a square (and lifting off it), a bulb going out (a dull fizzle), a bulb smashed in his claw (kept: Eric
+ * loves it), the void's pulse in the dark (a low heartbeat, the test's countdown), a piece found (a low swell) or missed
+ * (a dull thud), the lights coming back (a deep rising swell), and his strand knocking. Each is a pure function of the sample rate (its
  * noise is seeded), so a test can measure it: every one stays quieter than a piece's move sound (peak and loudness).
  */
 import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice } from "./synth.ts";
@@ -34,6 +35,9 @@ function glass(f: number, decay: number): (age: number) => number {
   return (age) => (age < 0 || age > life ? 0 : parts.reduce((s, p) => s + p.a * Math.exp(-age / p.d) * Math.sin(p.w * age), 0));
 }
 
+/** Noise with its highs rolled off twice (12 dB an octave above `cut`): a dark rumble or breath, never a hiss. */
+const murk = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, lowpass(rate, cut, noise(seed)));
+
 const SOUNDS: Record<HollowSound, (rate: number) => Float32Array> = {
   // The void: a low hum (two close tones beating slowly, a sub under them) that swells and fades.
   hum: (rate) => {
@@ -43,30 +47,31 @@ const SOUNDS: Record<HollowSound, (rate: number) => Float32Array> = {
     const air = lowpass(rate, 260, noise(131));
     return render(rate, 0.9, (t) => Math.sin(Math.PI * Math.min(1, t / 0.9)) ** 1.4 * (a(t) + b(t) + 0.35 * sub(t) + 0.6 * air(t)));
   },
-  // The dark pouring out: a breathy gush whose band falls away, over a low swell.
+  // The dark pouring out: a low swell, a dark breath whose band sinks as it pours, over a falling sub.
   cast: (rate) => {
-    const gush = bandpass(rate, (t) => 1400 - 1100 * Math.min(1, t / 0.6), 1.8, noise(137));
-    const low = osc(rate, (t) => 90 - 35 * Math.min(1, t / 0.6), sine);
-    return render(rate, 0.65, (t) => {
-      const env = Math.min(1, t / 0.06) * Math.max(0, 1 - t / 0.65) ** 1.3;
-      return env * (1.5 * gush(t) + 0.7 * low(t));
+    const gush = bandpass(rate, (t) => 520 - 360 * Math.min(1, t / 0.7), 1.6, murk(rate, 900, 137));
+    const low = osc(rate, (t) => 72 - 30 * Math.min(1, t / 0.7), sine);
+    return render(rate, 0.75, (t) => {
+      const env = Math.min(1, t / 0.18) ** 1.5 * Math.max(0, 1 - t / 0.75) ** 1.2;
+      return env * (1.6 * gush(t) + 0.9 * low(t));
     });
   },
-  // Smoke settling on a square (or lifting off it): a soft rising and falling hush.
+  // Smoke settling on a square (or lifting off it): a low, soft hush that swells and sinks.
   whisper: (rate) => {
-    const hush = bandpass(rate, (t) => 600 + 900 * Math.sin(Math.PI * Math.min(1, t / 0.45)), 1.4, noise(139));
-    return render(rate, 0.45, (t) => Math.sin(Math.PI * Math.min(1, t / 0.45)) ** 2 * hush(t));
+    const hush = bandpass(rate, (t) => 260 + 300 * Math.sin(Math.PI * Math.min(1, t / 0.5)), 1.3, murk(rate, 800, 139));
+    const breath = murk(rate, 160, 141);
+    return render(rate, 0.5, (t) => Math.sin(Math.PI * Math.min(1, t / 0.5)) ** 2 * (hush(t) + 2.2 * breath(t)));
   },
-  // A bulb going out: a tiny glassy tink, then the fizz of the filament dying.
+  // A bulb going out: a dull fizzle, the filament sputtering low and dying, and a soft thup.
   pop: (rate) => {
-    const tink = glass(2300, 0.05);
-    const fizz = bandpass(rate, () => 5200, 1.5, noise(149));
     const r = rng(151);
-    const spits = Array.from({ length: 10 }, () => 0.03 + r() * 0.16);
-    const spit = grains(spits, (age) => Math.exp(-age / 0.004));
-    return render(rate, 0.26, (t) => 0.8 * tink(t) + fizz(t) * Math.min(1, spit(t)) * Math.max(0, 1 - t / 0.22));
+    const spits = Array.from({ length: 12 }, () => 0.01 + r() ** 1.3 * 0.24);
+    const spit = grains(spits, (age) => Math.exp(-age / 0.006));
+    const fizz = lowpass(rate, 900, lowpass(rate, 1400, noise(149)));
+    const thup = osc(rate, (t) => 50 + 40 * Math.exp(-t / 0.03), sine);
+    return render(rate, 0.3, (t) => 2.6 * fizz(t) * Math.min(1, spit(t)) * Math.max(0, 1 - t / 0.28) + 0.7 * Math.exp(-t / 0.05) * thup(t));
   },
-  // A bulb smashed: a sharp crack, glass tinkling down, a fizz, and a dull thump under it.
+  // A bulb smashed: a sharp crack, glass tinkling down, a fizz, and a dull thump under it. (Eric loves it: kept.)
   smash: (rate) => {
     const crack = bandpass(rate, () => 3600, 0.9, noise(157));
     const r = rng(163);
@@ -79,46 +84,60 @@ const SOUNDS: Record<HollowSound, (rate: number) => Float32Array> = {
       return 2.2 * Math.exp(-t / 0.006) * crack(t) + tk + 0.8 * Math.exp(-t / 0.08) * thump(t);
     });
   },
-  // The void's pulse in the dark (the test's countdown): a soft, low double beat, like a heart.
+  // The void's pulse in the dark (the test's countdown): a low heartbeat, lub-dub, felt more than heard.
   tick: (rate) => {
-    const beat = osc(rate, (t) => 62 + 40 * Math.exp(-(t % 0.16) / 0.03), sine);
-    return render(rate, 0.34, (t) => {
-      const a = Math.exp(-t / 0.06);
-      const b = t > 0.16 ? 0.6 * Math.exp(-(t - 0.16) / 0.06) : 0;
-      return (a + b) * beat(t);
-    });
+    const beat = (at: number, level: number) => {
+      const body = osc(rate, (t) => 44 + 34 * Math.exp(-Math.max(0, t - at) / 0.025), sine);
+      const thud = murk(rate, 220, 171 + at * 100);
+      return (t: number) => (t < at ? (body(t), 0) : level * Math.exp(-(t - at) / 0.07) * (body(t) + 0.8 * thud(t) * Math.exp(-(t - at) / 0.02)));
+    };
+    const lub = beat(0, 1);
+    const dub = beat(0.18, 0.65);
+    return render(rate, 0.42, (t) => Math.min(1, t / 0.008) * (lub(t) + dub(t)));
   },
-  // A piece found: a bright little chime, two notes rising.
+  // A piece found: a low swell giving way, two dark tones a minor third apart, rising a little, and a breath.
   found: (rate) => {
-    const n1 = glass(1320, 0.18);
-    const n2 = glass(1760, 0.22);
-    return render(rate, 0.6, (t) => 0.6 * n1(t) + 0.6 * n2(t - 0.09));
-  },
-  // A miss: a dull, low buzz that sags.
-  miss: (rate) => {
-    const buzz = lowpass(rate, 700, osc(rate, (t) => 110 - 30 * Math.min(1, t / 0.3), (p) => (p < 0.5 ? 1 : -1)));
-    return render(rate, 0.32, (t) => Math.min(1, t / 0.01) * Math.exp(-t / 0.12) * buzz(t));
-  },
-  // The lights coming back: a rising shimmer and three warm plinks, one per bulb.
-  relight: (rate) => {
-    const shimmer = bandpass(rate, (t) => 2000 + 3000 * Math.min(1, t / 0.9), 4, noise(167));
-    const notes = [880, 1108, 1318].map((f, i) => ({ at: 0.12 + i * 0.22, v: glass(f, 0.28) }));
-    return render(rate, 1.1, (t) => {
-      let p = 0;
-      for (const n of notes) p += n.v(t - n.at);
-      return 0.6 * Math.sin(Math.PI * Math.min(1, t / 1.1)) * shimmer(t) + 0.55 * p;
+    const a = osc(rate, (t) => 98 + 6 * Math.min(1, t / 0.4), sine);
+    const b = osc(rate, (t) => 116.5 + 7 * Math.min(1, t / 0.4), sine);
+    const breath = bandpass(rate, (t) => 300 + 200 * Math.min(1, t / 0.4), 1.4, murk(rate, 700, 173));
+    return render(rate, 0.55, (t) => {
+      const env = Math.min(1, t / 0.08) * Math.max(0, 1 - t / 0.55) ** 1.5;
+      return env * (0.8 * a(t) + 0.6 * b(t) + 0.9 * breath(t));
     });
   },
-  // His bulbs clinking on their wire: two glassy tinks.
+  // A miss: a dull, low thud that sinks into a short growl.
+  miss: (rate) => {
+    const body = osc(rate, (t) => 82 - 36 * Math.min(1, t / 0.3), sine);
+    const growl = murk(rate, 240, 177);
+    const rough = lowpass(rate, 30, noise(179));
+    return render(rate, 0.34, (t) => Math.min(1, t / 0.008) * Math.exp(-t / 0.12) * (body(t) * (1 + 3 * rough(t)) + 1.8 * growl(t)));
+  },
+  // The lights coming back: a deep swell rising out of the dark (two low tones a minor third apart, a breath opening
+  // up), no plinks.
+  relight: (rate) => {
+    const a = osc(rate, (t) => 46 + 12 * Math.min(1, t / 0.9), sine);
+    const b = osc(rate, (t) => 54.7 + 14 * Math.min(1, t / 0.9), sine);
+    const breath = bandpass(rate, (t) => 150 + 380 * Math.min(1, t / 0.9), 1.2, murk(rate, 700, 167));
+    return render(rate, 1.1, (t) => {
+      const env = Math.sin(Math.PI * Math.min(1, t / 1.1)) ** 1.2;
+      return env * (0.8 * a(t) + 0.7 * b(t) + 1.1 * breath(t));
+    });
+  },
+  // His strand knocking on its wire: two dull, muffled clacks.
   clink: (rate) => {
-    const a = glass(2900, 0.04);
-    const b = glass(3400, 0.035);
-    return render(rate, 0.22, (t) => a(t) + 0.8 * b(t - 0.07));
+    const knock = (at: number) => {
+      const body = osc(rate, (t) => 170 - 50 * Math.min(1, Math.max(0, t - at) / 0.04), sine);
+      const tap = murk(rate, 600, 181 + at * 1000);
+      return (t: number) => (t < at ? (body(t), tap(t), 0) : Math.exp(-(t - at) / 0.025) * (body(t) + 1.5 * tap(t)));
+    };
+    const a = knock(0);
+    const b = knock(0.08);
+    return render(rate, 0.22, (t) => a(t) + 0.8 * b(t));
   },
 };
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<HollowSound, number> = { hum: 0.095, cast: 0.22, whisper: 0.5, pop: 0.27, smash: 0.26, tick: 0.255, found: 0.21, miss: 0.155, relight: 0.155, clink: 0.21 };
+const LEVEL: Record<HollowSound, number> = { hum: 0.095, cast: 0.22, whisper: 0.75, pop: 0.32, smash: 0.26, tick: 0.255, found: 0.21, miss: 0.185, relight: 0.116, clink: 0.25 };
 
 const cache = new Map<string, Float32Array>();
 /** The samples for one of his sounds at a sample rate (made once, then reused). */

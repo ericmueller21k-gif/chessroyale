@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { applyMove, inCheck, legalMoves, queenInDanger, sideToMove, toSan } from "@chessroyale/chess";
+import { applyMove, fenAtPly, legalMoves, sideToMove, toSan } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar, knownEval } from "../components/EvalBar.tsx";
-import { kingTurn, type KingCue } from "../godKing.ts";
+import { kingTurn, turnCues } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace, BossSide } from "../components/BossCharacter.tsx";
-import { KingSummon, kingSquare } from "../components/GodKing.tsx";
+import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdOrientation } from "../components/BossPowers.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
@@ -139,8 +139,17 @@ export function PlayScreen({
   const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
   const note = match.darkNote;
   const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending;
+  // The God King strikes from his spot (or, the old way behind settings.kingOnBoard, summoned onto your king's square).
+  const onBoardKing = !!match.settings.kingOnBoard;
+  const command = useMemo(() => {
+    if (!strike?.at || onBoardKing) return null;
+    const target = kingSquare(board.fen, side === "w" ? "b" : "w");
+    if (!target) return null;
+    const hp = Math.round((match.settings.kingStrikeLoss[0] + match.settings.kingStrikeLoss[1]) / 2);
+    return { side, orientation, target, mode: "strike" as const, hp, startAt: strike.at, bossIcon: match.boss ? <BossFace boss={match.boss} /> : undefined };
+  }, [strike?.at, board.fen]);
   const godKing = useMemo(() => {
-    if (!strike?.at) return null;
+    if (!strike?.at || !onBoardKing) return null;
     const boss = side === "w" ? "b" : "w";
     const mine = kingSquare(board.fen, side);
     const target = kingSquare(board.fen, boss);
@@ -164,21 +173,9 @@ export function PlayScreen({
   const kingCues = useMemo(() => {
     if (!match.boss || waiting) return [];
     kingTurn(board.fen);
-    const out: { cue: KingCue; key: string }[] = [];
-    if (strike?.at) out.push({ cue: "struck", key: `struck-${strike.at}` });
-    if (queenInDanger(board.fen, side)) out.push({ cue: "queenDanger", key: `queen-${board.fen}` });
-    if (inCheck(board.fen)) out.push({ cue: "inCheck", key: `check-${board.fen}` });
-    out.push({ cue: "intro", key: "intro" });
-    if (match.boss.kingCharges <= 0) out.push({ cue: "spent", key: "spent" });
     const w = knownEval(board.fen);
-    if (w !== undefined) {
-      const ours = side === "w" ? w : 1 - w;
-      if (ours >= 0.85) out.push({ cue: "winning", key: `winning-${board.fen}` });
-      else if (ours <= 0.15) out.push({ cue: "losing", key: `losing-${board.fen}` });
-    }
-    if (match.boss.kingCharges > 0 && board.ply >= 6) out.push({ cue: "nudge", key: `nudge-${Math.floor(board.ply / 12)}` });
-    out.push({ cue: "idle", key: `idle-${board.fen}` });
-    return out;
+    const prevFen = board.history.length >= 2 ? fenAtPly(board.history, board.history.length - 2, board.bases) : undefined;
+    return turnCues({ fen: board.fen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen });
   }, [board.fen, strike?.at, waiting]);
 
   return (
@@ -229,6 +226,7 @@ export function PlayScreen({
             )}
             {ending && !striking && <CenterCount label="Round end" n={secsLeft} />}
             {godKing && <KingSummon {...godKing} />}
+            {command && <KingCommand {...command} />}
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
           </Board>
         </div>
@@ -245,7 +243,8 @@ export function PlayScreen({
           match={match}
           side={side}
           cues={kingCues}
-          away={striking}
+          away={striking && onBoardKing}
+          command={command ? { mode: "strike", startAt: command.startAt } : undefined}
           nav={{ view: history, total: board.history.length }}
           canCall={!waiting && !intro && !shown.replaying && !striking}
           strike={strike}

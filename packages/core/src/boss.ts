@@ -258,8 +258,21 @@ export interface DarkSquare {
  * A round of Lights out: the pieces he names (piece letters; a type named twice needs both squares), the squares that
  * answer it (every square holding a named type of his), and the time to find them.
  */
+/**
+ * One piece he names in Lights out: a type ("Find my queen."; `several`: he has more than one of it, any counts: "Find
+ * one of my rooks."), or a pawn by its file ("Find my pawn on the c-file."; `several`: one of those on it, a last
+ * resort).
+ */
+export interface LightsOutTarget {
+  type: string;
+  file?: string;
+  several?: boolean;
+}
+
+/** A Lights out round: the piece letters he names (one per target), what exactly, the squares that answer, its time. */
 export interface LightsOutRound {
   pieces: string[];
+  targets?: LightsOutTarget[];
   answers: string[];
   ms: number;
 }

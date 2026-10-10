@@ -85,8 +85,18 @@ export interface Settings {
   bossUnfinished: boolean;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
-  /** Boss battle: how long the King's strike takes on screen (ms). The move clock stands still meanwhile. */
+  /**
+   * Boss battle: how long the King's strike takes on screen (ms), commanding it from his spot (KING_COMMAND in
+   * boss-timing.ts: it must cover his last slash). The move clock stands still meanwhile. Summoned onto the board
+   * (`kingOnBoard`) it takes KING_SUMMON.strikeMs instead.
+   */
   kingStrikeMs: number;
+  /**
+   * Boss battle: the God King's old way of acting, summoned onto your king's square (bolts converging, a beam, he
+   * takes the king's place, walks with a king move, leaves in holy light). Off since Eric's Oct 9 polish: he acts from
+   * his spot by the board. Kept, unused, for later.
+   */
+  kingOnBoard: boolean;
   /** Boss battle, the King (the crowd's champion): charges from the ten's leftover power-ups (one per this many, 1 to kingChargesMax). */
   kingPowerUpsPerCharge: number;
   kingChargesMax: number;
@@ -288,7 +298,8 @@ export const DEFAULT_SETTINGS: Settings = {
   bossDifficulty: 0,
   bossUnfinished: false,
   kingStrikeLoss: [5, 15],
-  kingStrikeMs: 5900,
+  kingStrikeMs: 3700,
+  kingOnBoard: false,
   kingPowerUpsPerCharge: 10,
   kingChargesMax: 3,
   kingBotLoss: 6,
@@ -507,6 +518,11 @@ export const BOSS_POWERS = {
     { pieces: 2, ms: 4000 },
     { pieces: 3, ms: 5000 },
   ] as readonly { pieces: number; ms: number }[],
+  /**
+   * Each tap a player makes in a round, right or wrong, adds this long to their own countdown (Eric, Oct 9). Their
+   * tries stay the number of pieces, so a round gives at most that many seconds more.
+   */
+  lightsOutTapMs: 1000,
   /** Each piece not found (a wrong square, or out of time) costs this many points. */
   lightsOutMiss: 10,
   /** Bots in the crowd find each piece with this chance, round by round (from the seed): fewer as the rounds get harder. */
@@ -517,6 +533,40 @@ export const BOSS_POWERS = {
 export type BossPowerSettings = {
   -readonly [K in keyof typeof BOSS_POWERS]: (typeof BOSS_POWERS)[K] extends boolean ? boolean : (typeof BOSS_POWERS)[K] extends number ? number : (typeof BOSS_POWERS)[K];
 };
+
+/**
+ * The God King's chatter (packages/app/src/godKing.ts). Eric, Oct 9, 2026: he talked too much. Critical moments always
+ * speak (a new danger to your queen or king, a mate threat, a queen taken either way, his own strikes and moves, his
+ * Last Stand, a boss's power); everything else is paced by these numbers.
+ */
+export const KING_SPEECH = {
+  /** How long a line stays up (ms). */
+  speechMs: 3800,
+  /** The least time between two lines that aren't critical (ms). */
+  quietMs: 8000,
+  /** Small talk (idle, the tap-me nudge, winning or losing) rests this many crowd moves after any line… */
+  restMoves: 8,
+  /** …then its chance grows by this much with each quiet move. */
+  perQuietMove: 0.1,
+  /** A remark on a move (a brilliant, good or bad move, a capture, a check given, the boss's slip) waits this many crowd moves after the last remark. */
+  remarkGapMoves: 6,
+  /** How likely each remark and each piece of small talk is to be said, when it may be (critical cues always speak). */
+  chance: {
+    greatMove: 0.3,
+    goodMove: 0.08,
+    badMove: 0.35,
+    crowdCapture: 0.2,
+    crowdCheck: 0.25,
+    bossCapture: 0.2,
+    bossBlunder: 0.5,
+    staggered: 0.5,
+    idle: 0,
+    nudge: 0.1,
+    winning: 0.1,
+    losing: 0.1,
+    spent: 1,
+  } as Record<string, number>,
+} as const;
 
 /** Solo's difficulty: Elo on top of the boss's usual strength (yours), capped at what the engine plays. */
 export const BOSS_DIFFICULTY = [

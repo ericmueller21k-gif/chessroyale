@@ -17,6 +17,9 @@ import {
   legalMoves,
   lightsOutDue,
   lightsOutTimeline,
+  lightsDeadline,
+  lightsRoundEnd,
+  onStartSquare,
   moveSquares,
   pieceAt,
   powerTurn,
@@ -243,41 +246,93 @@ describe("Hollow's dark", () => {
 });
 
 describe("Hollow's Lights out", () => {
-  it("names 1, 2, then 3 of his pieces: never a pawn while he has others, none twice while others remain; a type twice needs both squares", () => {
-    for (let seed = 0; seed < 50; seed++) {
-      const rounds = chooseLightsOut(START_FEN, "b", seed);
+  // Black after some play: Kg8 (castled), Qb6, Nc6 and Nf6, Bd6 (the c8 bishop at home), Rf8 (the a8 rook at home),
+  // pawns a7 b7 f7 g7 h7 at home, d5 and e6 moved, alone on their files.
+  const MID = "r1b2rk1/pp3ppp/1qnbpn2/3p4/3P4/2NBPN2/PP3PPP/R1BQ1RK1 w - - 0 10";
+  const key = (t: { type: string; file?: string }) => `${t.type}${t.file ?? ""}`;
+
+  it("names 1, 2, then 3 pieces that have left their starting squares (Eric, Oct 9), none twice, pieces before pawns", () => {
+    const seen = new Set<string>();
+    for (let seed = 0; seed < 40; seed++) {
+      const rounds = chooseLightsOut(MID, "b", seed);
       expect(rounds.map((r) => r.pieces.length)).toEqual([1, 2, 3]);
       expect(rounds.map((r) => r.ms)).toEqual([3000, 4000, 5000]);
-      const all = rounds.flatMap((r) => r.pieces);
-      expect(all).not.toContain("p");
-      // Six pieces named from his eight: by type, never more than he has (2 rooks, 2 knights, 2 bishops, 1 queen, 1 king).
-      const count = (t: string) => all.filter((x) => x === t).length;
-      for (const [t, n] of Object.entries({ r: 2, n: 2, b: 2, q: 1, k: 1 })) expect(count(t)).toBeLessThanOrEqual(n);
-      for (const r of rounds) {
-        expect(r.answers.every((sq) => pieceAt(START_FEN, sq)?.color === "b" && r.pieces.includes(pieceAt(START_FEN, sq)!.type))).toBe(true);
-      }
-      expect(chooseLightsOut(START_FEN, "b", seed)).toEqual(rounds);
+      const all = rounds.flatMap((r) => r.targets!);
+      // Nothing named twice in the test.
+      expect(new Set(all.map(key)).size).toBe(6);
+      // The pieces that have all moved (king, queen, knights) come first, then the moved pawns alone on their files
+      // (d, e); only then, as a last resort, a type with a piece still at home (a rook, or a bishop).
+      expect(new Set([...rounds[0]!.targets!, ...rounds[1]!.targets!].map(key))).toEqual(new Set(["k", "q", "n"]));
+      expect(rounds[2]!.targets!.filter((t) => t.type === "p").map((t) => t.file)).toEqual(["d", "e"]);
+      const last = rounds[2]!.targets!.find((t) => t.type !== "p")!;
+      expect(["r", "b"]).toContain(last.type);
+      // Several of a type: any counts ("one of my knights"), and every one of them answers it.
+      const n = all.find((t) => t.type === "n")!;
+      expect(n.several).toBe(true);
+      const withN = rounds.find((r) => r.targets!.includes(n))!;
+      expect(withN.answers).toEqual(expect.arrayContaining(["c6", "f6"]));
+      seen.add(key(rounds[0]!.targets![0]!));
+      expect(chooseLightsOut(MID, "b", seed)).toEqual(rounds);
     }
-    // Just a king, a rook and pawns: the pieces come back before any pawn.
-    const few = chooseLightsOut("4k2r/pppppppp/8/8/8/8/8/4K3 w - - 0 1", "b", 1);
-    expect(few[0]!.pieces).not.toContain("p");
-    expect([...few[1]!.pieces].sort()).toEqual(["k", "r"]);
-    expect([...few[2]!.pieces].sort()).toEqual(["k", "p", "r"]);
-    // Only pawns left besides his king: pawns, then.
-    const pawns = chooseLightsOut("4k3/pppppppp/8/8/8/8/8/4K3 w - - 0 1", "b", 1);
-    expect(pawns[2]!.pieces).toContain("p");
+    // Variety: the first piece named changes with the seed.
+    expect(seen.size).toBe(3);
   });
 
-  it("judges taps in order: a piece still to find is found; a square already found changes nothing; anything else is wrong; tries = pieces", () => {
-    // Both rooks named: both squares needed.
-    const rooks = { pieces: ["r", "r"] };
-    expect(judgeTaps(rooks, START_FEN, "b", ["a8", "a8", "h8"])).toEqual({ found: ["a8", "h8"], wrong: [], missed: 0, done: true });
-    // One rook named: either counts; the other then changes nothing.
-    expect(judgeTaps({ pieces: ["r"] }, START_FEN, "b", ["h8", "a8"])).toEqual({ found: ["h8"], wrong: [], missed: 0, done: true });
-    expect(judgeTaps({ pieces: ["q", "n"] }, START_FEN, "b", ["e4", "a8", "g8"])).toEqual({ found: [], wrong: ["e4", "a8"], missed: 2, done: true });
-    expect(judgeTaps({ pieces: ["q", "n"] }, START_FEN, "b", ["b8"])).toEqual({ found: ["b8"], wrong: [], missed: 1, done: false });
+  it("never names a type with a piece still at home, nor a pawn on its starting square, while there are others; falls back when it must", () => {
+    // After 1...Nf6 2...e5: one knight moved (the other at home), one pawn moved.
+    const early = "rnbqkb1r/pppp1ppp/5n2/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
+    for (let seed = 0; seed < 20; seed++) {
+      const r = chooseLightsOut(early, "b", seed);
+      // The only fair one first: the e-pawn ("my pawn on the e-file"); the knights aren't (b8 would give them away).
+      expect(r[0]!.targets).toEqual([{ type: "p", file: "e" }]);
+      // Then the last resort: the types (all with a piece at home), then pawns at home, never twice.
+      expect(new Set(r.flatMap((x) => x.targets!).map(key)).size).toBe(6);
+    }
+    // The starting position (a test game): only the last resort, types first.
+    const start = chooseLightsOut(START_FEN, "b", 4);
+    expect(start.flatMap((r) => r.targets!).filter((t) => t.type !== "p")).toHaveLength(5);
+    // A doubled pawn is named by its file as "one of my pawns" (any of them), only when nothing else is left; and a
+    // round with nothing left to name is dropped.
+    const bare = chooseLightsOut("6k1/2p5/2p5/8/8/8/8/4K3 w - - 0 1", "b", 1);
+    expect(bare.map((r) => r.targets)).toEqual([[{ type: "k" }], [{ type: "p", file: "c", several: true }]]);
+    expect(bare[1]!.answers).toEqual(["c6", "c7"]);
+    expect(onStartSquare("n", "g8", "b")).toBe(true);
+    expect(onStartSquare("n", "f6", "b")).toBe(false);
+    expect(onStartSquare("p", "e2", "w")).toBe(true);
+  });
+
+  it("judges taps in order: every tap is a try (one per piece); a target still to find is found, one found again changes nothing, the rest are wrong", () => {
+    // One of his knights: either counts; the other then just uses a try (but there's only the one).
+    expect(judgeTaps({ pieces: ["n"], targets: [{ type: "n", several: true }] }, MID, "b", ["f6", "c6"])).toEqual({ found: ["f6"], wrong: [], used: 1, missed: 0, done: true });
+    // A pawn by its file: another pawn of his is wrong.
+    expect(judgeTaps({ pieces: ["q", "p"], targets: [{ type: "q" }, { type: "p", file: "d" }] }, MID, "b", ["e6", "b6"])).toEqual({ found: ["b6"], wrong: ["e6"], used: 2, missed: 1, done: true });
+    // Two targets of a type (an older round): both squares needed; the same square twice counts once.
+    expect(judgeTaps({ pieces: ["r", "r"] }, START_FEN, "b", ["a8", "a8", "h8"])).toEqual({ found: ["a8", "h8"], wrong: [], used: 2, missed: 0, done: true });
+    // A second square of a type already found uses a try but isn't wrong.
+    expect(judgeTaps({ pieces: ["n", "q"], targets: [{ type: "n", several: true }, { type: "q" }] }, MID, "b", ["c6", "f6"])).toEqual({ found: ["c6"], wrong: [], used: 2, missed: 1, done: true });
     // The crowd's own pieces are never his.
     expect(judgeTaps({ pieces: ["q"] }, START_FEN, "b", ["d1"]).wrong).toEqual(["d1"]);
+  });
+
+  it("each tap gives that player a second more; the round is over when everyone has used their tries or their time", () => {
+    const tl = lightsOutTimeline(BOSS_POWERS.lightsOutRounds, 300);
+    const r = tl.rounds[2]!; // 3 pieces, 5 s
+    expect(BOSS_POWERS.lightsOutTapMs).toBe(1000);
+    expect(lightsDeadline(r, 0)).toBe(r.until);
+    expect(lightsDeadline(r, 2)).toBe(r.until + 2000);
+    // Nobody tapping: its seconds and the grace.
+    expect(lightsRoundEnd(r, 3, [], 300)).toBe(r.until + 300);
+    // One player done by their tries (at their 3rd tap), another with two taps: the second's time, two seconds more.
+    const quick = [r.at + 500, r.at + 900, r.at + 1200];
+    expect(lightsRoundEnd(r, 3, [quick], 300)).toBe(r.at + 1200);
+    expect(lightsRoundEnd(r, 3, [quick, [r.at + 4000, r.at + 5500]], 300)).toBe(r.until + 2000 + 300);
+    // At most a second a piece: tries are the pieces, so taps can't buy more.
+    expect(lightsRoundEnd(r, 3, [[1, 2, 3, 4, 5]], 300)).toBe(3);
+    // Once a round is over (when, from the server), the next follows its answers.
+    const ended = lightsOutTimeline(BOSS_POWERS.lightsOutRounds.map((x, i) => ({ ...x, endedAt: i === 0 ? tl.rounds[0]!.at + 1500 : undefined })), 300);
+    expect(ended.rounds[0]).toMatchObject({ over: true, answersAt: tl.rounds[0]!.at + 1500 });
+    expect(ended.rounds[1]!.at).toBe(tl.rounds[0]!.at + 1500 + LIGHTS_OUT.answerMs);
+    expect(ended.rounds[1]!.over).toBe(false);
   });
 
   it("bots find each piece at their round's rate, from the seed", () => {

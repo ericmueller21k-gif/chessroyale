@@ -3386,6 +3386,11 @@ engine choosing a move, and online sync).
 **Later ideas:** boss drops (a themed crate item for beating a boss: a clown nose, a zombie hand); bosses jumping to the
 centre of the board to cast; the farmer and the gingerbread man as bosses.
 
+**Later (Eric, Oct 9, 2026; not built, design to be worked out with Eric):** every boss gets random quips and short
+exchanges with the God King: they talk to each other and about each other (a boss taunting him, his retort; a line
+about the other after a big moment). How often, which moments, and how it fits his quieter pacing (KING_SPEECH) are
+open.
+
 ### Built: the boss template, Freeze and Boingo (Oct 8, 2026)
 
 Built by the `god-king` delegate, which now owns boss powers and boss selection. Playable now: **Ginger, the
@@ -3636,6 +3641,12 @@ Eric's eight changes, built across G-REX's lanes (his art, sounds and power rule
   it in `CREDITS.md`) and set `GREX_WHISTLE_FILE` in `packages/app/src/sound.ts` to its path (e.g.
   `"/sounds/grex/whistle.mp3"`); every shot then plays it, with the same pitch spread and crackles, at
   `GREX_WHISTLE_FILE_LEVEL`.
+  - **Higher and shriller (Eric, Oct 9, polish batch):** like real whistling fireworks, about 2 to 5 kHz (they were
+    0.7 to 3.4 kHz): a sine with its 2nd and 3rd overtones (a screech), a slight unsteady drift, a quick wobble and a
+    little rasp (the tone roughened by a low buzz of noise, with a hiss on its pitch). The variety stays: one shrieks
+    up (2.3 to 4.6 kHz), one slides down like a tube burning empty (4.4 to 2.4 kHz), one wobbles fast on its way up
+    (2.6 to 4.3 kHz, 170 Hz at 11 a second). **My call:** about 1 dB quieter in RMS than before, since the ear is a
+    little more sensitive up there; the whole volley still measures under a move (`grex.test.ts`), and mute holds.
 - **Countdowns on his tiles:** a small number in the middle of every burning tile (the sparkler's and the fireballs'):
   the crowd moves left before it burns out and destroys what's on it, this one included: **3** as it lands, **2**,
   **1** while it's ablaze, and **0** as it burns (over the burn). Cream, a little see-through, outlined dark, about a
@@ -3737,6 +3748,56 @@ overhaul in the boss characters' format, so the crowd's champion looks as grand 
   - `npm run preview:characters -- <dir> only=god-king` writes GIFs and sheets for both looks.
   - `node scripts/preview-god-king.mjs out.png banner=1` writes the sheet with his banners.
   - Test switches: `?laststand=1` and `?side=b`.
+
+## The God King, polish batch (Eric, Oct 9, 2026)
+
+Eric's notes after playing, built in one batch with Hollow's and G-REX's polish (PR "Polish batch").
+
+- **No wings.** The small white back wings are gone from every pose, both colours, the portraits and cut-ins (the QUEEN
+  SLAIN! face is his portrait). The cape, the helmet's gold wings (part of his crown-helmet) and everything else stay.
+  **My call:** "the small upward-pointing wings on either side of him" read as the back wings (folded or half open in
+  the dock, they point up beside him), since Eric said to keep the cape on his back; the helmet's gold wings stay.
+  A unit test checks no back wing is drawn in any frame.
+- **He acts from his spot.** He no longer takes your king's place on the board when he plays a move or strikes the boss.
+  He stays in the dock (under the board on a phone, by it on a computer), raises his sword there with a golden glow
+  behind him, his cut-in banner sweeps over the board, then his bolt leaves the blade (in the dock) and crosses to the
+  piece he moves, or to the boss's king three times, each with a slash and a yellow "−N" there; then he lowers it.
+  The bolts are drawn over the whole page (measured from his figure and the board), never taking a tap.
+  - **Timing** (`KING_COMMAND` in `boss-timing.ts`, ms after he starts): raise 0, cut-in 300 for 1,500, his bolt 2,000
+    and the move 2,350 (or slashes at 2,050, 2,450, 2,950), lowering at 2,900 (3,400 after a strike).
+  - **Before → after:** his move came 3.6 s after he started and the reveal was 5.4 s longer; now 2.35 s and 1.7 s
+    (`kingMoveMs`). A strike stopped the clock for 5.9 s; now 3.7 s (`kingStrikeMs` in settings). Solo and online
+    share these (the server's and solo's duplicated 5,400 is gone).
+  - **The old summon is kept, unused,** behind `kingOnBoard` (settings, off): converging bolts, the beam, taking the
+    king's place, walking with a king move, holy light, the king dropping back, with its own times (`KING_SUMMON`).
+  - His Last Stand still appears on the board as before.
+- **He talks less** (numbers in `KING_SPEECH`, settings.ts; lines in `godKing.ts`):
+  - **Critical moments always speak:** one opening line (now from a pool of 24), a new danger to your queen, your king
+    in check, a **mate threat** (new: the boss would mate at once if you passed), a **queen taken either way** (new
+    cues, with the QUEEN SLAIN!/DOWN! banners), his strikes and moves, his Last Stand, a boss's power moments (the
+    blizzard, the funhouse, G-REX's fire-tile warning).
+  - **Remarks on a move** (brilliant, good, bad, captures, a check you give, the boss's slips, his strike's after-effect):
+    a low chance (brilliant 30%, good 8%, bad 35%, captures 20%, a boss blunder 50%) and none for 6 crowd moves after
+    the last remark. **Small talk** (idle, the tap-me nudge, winning or losing) rests 8 moves after any line (was 3),
+    then gets 10% likelier per quiet move (was 30%).
+  - **My calls:** a warning that still holds on the next move (in check again, the queen still attacked, the mate still
+    threatened) isn't repeated; a check is said once, as your move begins (it used to be said on the boss's screen and
+    again on yours); the boss's blunder is a remark now (it always spoke before).
+  - **Measured** (`scratchpad` sim over 7 Stockfish-played boss battles, 15 to 33 crowd moves each, the player calling
+    him twice and striking once, the same games and dice before and after, 25 runs): **46.1 → 20.1 lines per 40-move
+    match.** Everyday chatter (remarks and small talk) **23.4 → 6.8** (brilliant alone 15.2 → 2.9); critical lines
+    22.7 → 13.4 (checks were said twice and every move a check held).
+- **The queen-capture sound** (one try, kept): a woman's short gasp for a queen taken either way, on both banners
+  (QUEEN SLAIN! played the START whoosh, QUEEN DOWN! a pitched-down male yell; the yell's file is removed). A CC0
+  voice-acted gasp (wintuh, Freesound 471875, licence checked), trimmed, filtered, a light hall echo, levelled under a
+  move (peak −7.7, mean −22.8 dBFS). **My call:** kept because it's what Eric asked for (a woman's voice, a gasp, nothing
+  sexual: a sharp intake of breath) where the old ones were a man's yell and a generic whoosh; it's one file to swap
+  (`public/sounds/banner/queen-gasp.mp3`) if it doesn't land.
+- **Fixed (a rules bug): the boss's strike after a Last Stand.** In a 50 v 50 final, G-REX struck twice two crowd moves
+  apart. The cause: the move the God King takes back isn't a crowd move (the move count goes back), but its round still
+  counted towards the boss's next strike (`sinceKill`), so a Last Stand right after a strike brought the next one a
+  move early. Now the count goes back with the move; the strike still weighs that round's picks (whoever blundered
+  there can still be struck). `last-stand.test.ts` checks both; the crowd test's old seed now strikes every 3 moves.
 
 ## Lag that grew with the match (Oct 9, 2026)
 
@@ -3956,3 +4017,40 @@ solo's `lightsOutTurn`; on screen `components/LightsOut.tsx`)
   misses costing, then his move), `e2e/hollow.spec.ts` (phone and desktop: the cover, selecting a dark square, a wrong
   attempt and the 5-try cutoff, a legal move out of the dark, a full Lights out from the admins' trigger with a find
   and a miss).
+
+### Hollow, polish batch (Eric, Oct 9, 2026, after playing him)
+
+- **His lights: a long strand held in the middle,** like Eric's reference: ten bulbs (red, gold, blue in turn) down its
+  two halves, five a side, hanging from his hand in two curves, the bulbs either side of the wire on short stems. The
+  countdown puts out a colour at a time (blue, then gold, then red: about a third of the strand per move, 10 → 7 → 4 →
+  0 lit), then they relight; the 3-bulb strip by the board is unchanged and goes out in the same order. Lights out
+  smashes the strand in three strikes, a section at a time (the inner half's low end, the middle by his hand, the
+  outer half's low end), his claw reaching for each. **My calls:** one hand holds it, as in the reference (Eric's
+  words said both hands, but his free hand carries his gestures: the claw, his chin, his hip); the strand's ends rest
+  on the ground when he crouches; its outer half stays clear of the eval bar beside him on a computer.
+- **His sounds: no chimes, ever.** The chime was his own: his bulbs lighting at the match's start, the strip relighting
+  after every cover and the lights coming back all played three warm plinks rising in a major chord. Every sound of his
+  but the bulb smash (kept: Eric loves it) is now low and dark: a dull fizzle for a bulb going out (no glass tink), a
+  low heartbeat (lub-dub, about 45-75 Hz) for the void's pulse, low swells two tones a minor third apart for a piece
+  found and the lights back, a dull thud for a miss, a sinking low breath for the darkness pouring and settling, two
+  muffled knocks for his strand. A unit test checks each sits low (its RMS frequency under 800 Hz, the smash over 2
+  kHz) and quieter than a move. **My call:** the hum (already a low beat) is unchanged; no shared sound was the chime
+  (the boss menu and the START banner play no chime).
+- **Lights out timing:** the rounds stay 3, 4 and 5 s. Every tap a player makes, right or wrong, adds 1 s to their own
+  countdown (`lightsOutTapMs`): the bar bumps back up and "+1s" flashes by it. Tries stay one per piece, so a round
+  gives at most that many seconds more. The server judges each player's deadline (the round's seconds, their taps and
+  the late grace); a round is over when everyone has used their tries or run out of time (`lightsRoundEnd`), and the
+  next follows its answers. **My calls:** every tap is a try, a second square of a piece already found included (it
+  isn't wrong, but it can't buy time); the round's end is when the server saw it, never before, so nobody loses time
+  to a late timer; a player done early sees "waiting for the others" online; the dock's prompt may take both its lines
+  on a phone, as a compact list when long ("Find: a rook, a knight, e-pawn"), since his own words show in full in his
+  text box (measured at 320-390 px: everything fits from 360; at 320 the longest lists are clipped).
+- **Lights out picks: never trivial** (`chooseLightsOut`): only pieces that have left their starting squares. A type is
+  named only if every piece he has of it has moved ("Find my queen."; two or more: "Find one of my rooks.", any counts);
+  a pawn only if it has moved and is his only pawn on its file ("Find my pawn on the c-file."). Nothing is named twice
+  in the test; pieces before pawns, each in a seeded random order. Not enough of those (an early or test game): the
+  last resort is types with a piece still at home, then pawns at home alone on their file, then a file with several
+  ("one of my pawns on the c-file"); a round with nothing left to name is dropped. `findLine` speaks the new prompts.
+  **My call:** "moved" is read from the position (a piece on a square its kind starts on counts as unmoved), which is
+  what makes it findable without memory anyway.
+
