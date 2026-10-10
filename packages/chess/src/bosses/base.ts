@@ -26,6 +26,7 @@ import {
 import type { BoardState } from "../boards.ts";
 import { pieceAt } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
+import type { MoveScore } from "../uci.ts";
 
 export type Side = "w" | "b";
 export const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -184,6 +185,24 @@ export interface BossRules {
   powerTurn?(boss: BossState): boolean;
   /** The squares that show ice (`crowdAllowed`: the dispatcher's). */
   iced?(boss: BossState, fen: string, crowdAllowed: (boss: BossState, fen: string) => string[] | null): string[];
+  /**
+   * The judge's view of a crowd turn under its rules (G-REX's fire): moves it must score too, the top moves as it ranks
+   * them, and a board's evaluation as it sees it. Without it, the engine's numbers stand as they are.
+   */
+  judge?: {
+    mustScore(boss: BossState, fen: string): string[];
+    rank(boss: BossState, top: readonly MoveScore[], fen: string): MoveScore[];
+    evaluation<E extends JudgedEvaluation>(boss: BossState, evaluation: E, fen: string): E;
+  };
+  /** In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). */
+  afterCrowdMove?(b: Battle, move: string | null): void;
+}
+
+/** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */
+export interface JudgedEvaluation {
+  bestMove: string;
+  bestExpected: number;
+  expectedAfter: Record<string, number>;
 }
 
 /** The rage meter is full. */

@@ -2,6 +2,7 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import { fenAtPly, pieceAt, type Base } from "./rules.ts";
 import { GINGER_FX } from "./bosses/ginger.ts";
 import { BOINGO_FX } from "./bosses/boingo.ts";
+import { FIRE_BURN_MS, GREX_FX } from "./bosses/grex.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -80,19 +81,13 @@ export const BOUNCE = {
 export const BLOCK = { flyAt: 1450, landAt: 1850 } as const;
 
 // Hollow's extra move (a failed Lights out): his banner over the board as the move lands, then the crowd's turn.
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, spark: 2300, candle: 7100, fireball: 1700, dark: 2700, extra: 2200, block: 2300, bounce: BOUNCE.total } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, dark: 2700, extra: 2200, block: 2300, bounce: BOUNCE.total } as const;
 
 /** Hollow's first cover of the dark holds longer, for his first-cover line ("Don't forget what's there…"). */
 export const DARK_FIRST_EXTRA_MS = 1300;
 
 /** How long one power's moment holds the screen (ms). */
 export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (e.kind === "dark" && e.first ? DARK_FIRST_EXTRA_MS : 0);
-
-/**
- * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
- * boss's turn begins. The boss's move waits for it (at least this long after the crowd's move), solo and online.
- */
-export const FIRE_BURN_MS = 1500;
 
 /** How long a turn's power moments take, one after another. */
 export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; first?: boolean }[] | null | undefined): number {

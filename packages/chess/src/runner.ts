@@ -54,7 +54,7 @@ import {
   moveClockAt,
 } from "@chessroyale/core";
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
-import { BOSS_OPENING, boardEnd, boardStatus, burnOnBoard, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
+import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
 import { applyMove, legalMoves, moveNumber, pieceAt, sideToMove, toSan, withoutPiece } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
@@ -71,12 +71,12 @@ import {
   rageOf,
   bossPowers,
   ablaze,
-  fireAfterMove,
-  fireEscapes,
-  fireJudged,
-  fireRanked,
+  bossRules,
   fireShadows,
   fireStage,
+  judgeEvaluation,
+  judgeMustScore,
+  judgeRanked,
   triggerUltimate,
   bulbsAt,
   botLightsFound,
@@ -626,13 +626,14 @@ export class MatchRunner {
     const id = this.state.boards[0];
     const crowdTurn = !!this.state.boss && id !== undefined && this.boards.get(id)?.fen === fen;
     const allowed = crowdTurn ? (this.crowdAllowed(id) ?? undefined) : undefined;
-    // (G-REX's fire: a piece left on a tile ablaze counts as gone, and the moves that save it are always looked at.)
-    const burn = crowdTurn ? ablaze(this.state.boss) : [];
-    const escapes = burn.length ? fireEscapes(fen, burn).filter((m) => !all.some((x) => x.move === m) && (!allowed || allowed.includes(m))) : [];
+    // (The boss's rules for the judge, e.g. G-REX's fire: a piece left on a tile ablaze counts as gone, and the moves
+    // that save it are always looked at.)
+    const boss = crowdTurn ? this.state.boss : null;
+    const escapes = judgeMustScore(boss, fen).filter((m) => !all.some((x) => x.move === m) && (!allowed || allowed.includes(m)));
     const withEscapes = escapes.length ? [...all, ...(await engine.scoreMoves(fen, escapes))] : all;
-    if (!allowed) return fireRanked(withEscapes, fen, burn, this.state.boss?.crowdSide ?? "w").slice(0, Math.max(all.length, 1));
+    if (!allowed) return judgeRanked(boss, withEscapes, fen).slice(0, Math.max(all.length, 1));
     const top = judgeCandidates({ allowed }, withEscapes, (await allowedSearch(engine, { fen, allowed }, withEscapes)) ?? []);
-    return fireRanked(top.length ? top : all, fen, burn, this.state.boss?.crowdSide ?? "w");
+    return judgeRanked(boss, top.length ? top : all, fen);
   }
 
   boardOf(playerId: string): BoardState | null {
@@ -720,8 +721,8 @@ export class MatchRunner {
     // Boss battle: only the moves allowed this turn (a power's limits; the move the God King took back is off the table).
     const allowed = this.crowdAllowed(boardId);
     const legal = allowed ?? legalMoves(board.fen);
-    // (G-REX's fire: the bots see a piece left on a tile ablaze as gone, as the judge does.)
-    const open = fireRanked(allowed ? judgeCandidates({ allowed }, top) : [...top], board.fen, this.state.boss ? ablaze(this.state.boss) : [], this.state.boss?.crowdSide ?? "w");
+    // (The boss's rules for the judge, e.g. G-REX's fire: the bots see a piece left on a tile ablaze as gone.)
+    const open = judgeRanked(this.state.boss, allowed ? judgeCandidates({ allowed }, top) : [...top], board.fen);
     const best = open[0]?.expected ?? top[0]!.expected;
     const candidates = open.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
     const out: Record<string, string> = {};
@@ -763,8 +764,8 @@ export class MatchRunner {
     for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
     const known = new Map(top.map((m) => [m.move, m.expected]));
     for (const m of open ?? []) known.set(m.move, m.expected);
-    // (G-REX's fire: every move that takes a piece off a tile ablaze is scored too, so saving it is always on the table.)
-    const escapes = this.state.boss ? fireEscapes(board.fen, ablaze(this.state.boss)).filter((m) => !allowed || allowed.includes(m)) : [];
+    // (The boss's rules for the judge, e.g. G-REX's fire: every move that takes a piece off a tile ablaze is scored too.)
+    const escapes = judgeMustScore(this.state.boss, board.fen).filter((m) => !allowed || allowed.includes(m));
     const missing = [...new Set([...Object.values(picks), ...escapes].flatMap((m) => (m && !known.has(m) ? [m] : [])))];
     const extra = [...(open ?? []), ...(missing.length ? await engine.scoreMoves(board.fen, missing) : [])];
     for (const m of extra) known.set(m.move, m.expected);
@@ -794,8 +795,9 @@ export class MatchRunner {
     const board = this.boards.get(boardId)!;
     const limited = this.withoutBarred(rawPicks, rawEvaluation, boardId);
     const picks = limited.picks;
-    // G-REX's fire: the judge treats a piece left on a tile ablaze as already gone (every path's numbers come in raw).
-    const evaluation = this.state.boss ? fireJudged(limited.evaluation, board.fen, ablaze(this.state.boss), this.state.boss.crowdSide) : limited.evaluation;
+    // The boss's rules for the judge, e.g. G-REX's fire: a piece left on a tile ablaze counts as already gone (every
+    // path's numbers come in raw).
+    const evaluation = judgeEvaluation(this.state.boss, limited.evaluation, board.fen);
     // Boss battle: humans who called the King instead of picking abstain: no score, not a miss.
     const abstained = new Set(this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && this.kingCallers.has(id)) : []);
     const result = scoreGroup(
@@ -986,10 +988,11 @@ export class MatchRunner {
       const board = this.boards.get(r.boardId)!;
       const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
       this.boards.set(r.boardId, playOnBoard(board, r.result.playedMove, moverExpected));
-      // Boss battle: the judged eval feeds the ultimate's meter, and G-REX's fire burns what was left on its tiles.
+      // Boss battle: the judged eval feeds the ultimate's meter, and the boss's own after-move effect (G-REX's fire
+      // burns what was left on its tiles).
       if (this.state.boss?.powers) {
         this.state = { ...this.state, boss: { ...this.state.boss, powers: { ...this.state.boss.powers, judged: moverExpected } } };
-        this.burnAfterCrowdMove(r.result.playedMove);
+        this.afterCrowdMove(r.result.playedMove);
       }
     }
     return { stage: this.state.stage, round: this.state.round - 1, boards: [...results], retired: this.retiredThisRound };
@@ -1116,16 +1119,10 @@ export class MatchRunner {
     return boingoBattle.applyFunhouse(this.battle, move);
   }
 
-  /** G-REX's fire, after the crowd's move: what was left on a tile ablaze burns (the board's position changes). */
-  private burnAfterCrowdMove(move: string | null) {
+  /** After the crowd's move: the boss's own effect, if it has one (G-REX's fire: what was left on a tile ablaze burns). */
+  private afterCrowdMove(move: string | null) {
     const b = this.state.boss;
-    if (!b?.powers?.fire?.length) return;
-    const id = this.state.boards[0]!;
-    let board = this.boards.get(id)!;
-    const out = fireAfterMove(b, board.fen, move);
-    for (const sq of out.emptied) board = burnOnBoard(board, sq);
-    this.boards.set(id, board);
-    this.state = { ...this.state, boss: out.boss };
+    if (b) bossRules(b)?.afterCrowdMove?.(this.battle, move);
   }
 
   /**
@@ -1329,7 +1326,7 @@ export class MatchRunner {
       bossToMove: () => runner.bossToMove(),
       crowdAllowed: (boardId) => runner.crowdAllowed(boardId),
       boardOf: (playerId) => runner.boardOf(playerId),
-      afterCrowdMove: (move) => runner.burnAfterCrowdMove(move),
+      afterCrowdMove: (move) => runner.afterCrowdMove(move),
     };
   }
 
