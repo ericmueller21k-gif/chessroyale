@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, bossDef, bossStrength, bossThreat, isPlayable, playableBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
+import { BOSS_TIERS, bossDef, bossIdFromLink, bossStrength, bossThreat, isPlayable, playableBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -107,7 +107,7 @@ export function bossInUrl(): boolean {
 
 /** Boss raid: the boss you picked (a playable one), or "" for a random one. ?boss=<id>, else this device's choice. */
 export function chosenBoss(): string {
-  const q = new URLSearchParams(location.search).get("boss");
+  const q = bossIdFromLink(new URLSearchParams(location.search).get("boss"));
   let v = q ?? pickedBoss;
   if (v === null) {
     try {

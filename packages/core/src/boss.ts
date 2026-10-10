@@ -104,7 +104,7 @@ export interface BossDef {
 export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "gingerbread", name: "Ginger", icon: "🍪", kit: "Ginger", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
   { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
-  { id: "grex", name: "G-REX", icon: "🦖", kit: "G-REX", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
+  { id: "grex", name: "Jefferson", icon: "🦖", kit: "Jefferson", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
   { id: "hollow", name: "Hollow", icon: "🌑", kit: "Hollow", offset: -100, powers: { passive: "dark", ultimate: "lightsout" } },
   // Big Boy eats one of the crowd's centre pawns before move 1 (his snack), so he plays further under the lobby's
   // strength than the others (DECISIONS.md: "Big Boy, built": the boss sim's numbers).
@@ -129,6 +129,14 @@ export function playableBosses(roster: readonly BossDef[] = BOSS_ROSTER): BossDe
 }
 
 export const bossDef = (id: string | null | undefined): BossDef | null => (id ? (BOSS_ROSTER.find((b) => b.id === id) ?? null) : null);
+
+/**
+ * Other names a test link may use for a boss (?boss=jefferson), each to its roster id. A boss renamed on screen keeps
+ * its id everywhere else (Jefferson, Oct 10: he was G-REX, and his id stays "grex").
+ */
+export const BOSS_ALIASES: Readonly<Record<string, string>> = { jefferson: "grex" };
+/** A test link's ?boss= as a roster id (an alias becomes its boss's id); anything else as it is. */
+export const bossIdFromLink = (q: string | null | undefined): string | null => (q ? (BOSS_ALIASES[q.toLowerCase()] ?? q) : null);
 
 /**
  * Which boss a match meets: `wanted` if it's playable, else a random playable one (from `roll`, 0-1), not `avoid`

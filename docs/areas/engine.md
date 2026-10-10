@@ -29,7 +29,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   slightly (`bossSlipLoss`). The **blunder guard** (`bossMaxLoss`, `bossMaxLogitLoss`) forbids any move that throws
   material: "It's boss mode, not idiot mode." A power can limit the boss's moves too (it plays the best allowed one).
 - **Judging with a power.** When a boss power limits the crowd's moves, the best move is the best of the allowed ones
-  (`judgeTop`, `judgeCandidates`, `allowedSearch` in `boss-powers.ts`); G-REX's fire counts a piece left to burn as
+  (`judgeTop`, `judgeCandidates`, `allowedSearch` in `boss-powers.ts`); Jefferson's fire counts a piece left to burn as
   gone (`fireJudged`). Shared with the `god-king` lane by agreement.
 - **Brilliant moves** never come from a power-up move.
 

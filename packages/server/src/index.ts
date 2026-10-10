@@ -1,4 +1,4 @@
-import { BOSS_TIERS, POWER_IDS, bossDef, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, POWER_IDS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 import type { LiveHub } from "./live-hub.ts";
@@ -164,7 +164,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
           // Boss raid: the boss the creator picked (a playable one), else a random one; a test link's tier fixes its
           // strength (else a step above the group, plus the boss's offset). ?power= brings a power at once (tests).
           ...(() => {
-            const q = url.searchParams.get("boss");
+            const q = bossIdFromLink(url.searchParams.get("boss"));
             const b = Number(q);
             if (raid && BOSS_TIERS.includes(b)) return { bossFixedElo: b, bossFixed: b };
             return q && isPlayable(bossDef(q)) ? { bossId: q, bossPicked: q } : {};

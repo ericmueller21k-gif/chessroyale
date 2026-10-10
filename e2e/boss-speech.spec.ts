@@ -17,7 +17,7 @@ const minOnScreen = (text: string) => text.length * SPEECH.typeMs + Math.min(SPE
 const BOSSES = [
   { id: "gingerbread", name: "Ginger", banner: "FREEZE!" },
   { id: "clown", name: "Boingo", banner: "PIE!" },
-  { id: "grex", name: "G-REX", banner: "SPARKLER!" },
+  { id: "grex", name: "Jefferson", banner: "SPARKLER!" },
   { id: "hollow", name: "Hollow", banner: "DARKNESS!" },
   { id: "bigboy", name: "Big Boy", banner: "TOY BLOCK!" },
 ] as const;
@@ -105,7 +105,7 @@ for (const boss of BOSSES) {
     await page.goto(`/?debug&clock=60&boss=${boss.id}`);
     await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
     await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-    // Best moves until the moment comes (Ginger, Boingo, G-REX and Big Boy as your second turn begins; Hollow after his
+    // Best moves until the moment comes (Ginger, Boingo, Jefferson and Big Boy as your second turn begins; Hollow after his
     // first move).
     for (let i = 0; i < 4 && !(await speech()).banners[boss.banner]; i++) {
       await playBest(page);

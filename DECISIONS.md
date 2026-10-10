@@ -427,3 +427,11 @@ The calls made:
   for him with the bar at 12.5, a 10-point slip there doesn't; nothing under 20%; a sacrifice the engine rates best
   never does, in a healthy position or a weak one, nor a speculative one 6 points worse; and with the real judge,
   Légal's 6.Nxe5!, the queen left to Bxd1, doesn't call for him.
+
+### G-REX renamed Jefferson (Oct 10, 2026)
+
+Eric renamed the fire giraffe: every name a player sees now says Jefferson (the roster's name, so the boss menu,
+banners, intro, results and dock; his kit and character, keyed by that name; his entrance line), while his id stays
+`grex` (code, file names, settings, `?boss=grex`, stored records), `?boss=jefferson` works too (`BOSS_ALIASES`, read
+only from a link so a stored id is always the roster's), code comments keep the old name, and his dinosaur jokes from
+the old name ("Tiny arms? Not me!", "Extinct… again…") stay until Eric says otherwise.
