@@ -5,10 +5,11 @@
  * (below). The rules never ask the engine; the engine also judges which of two picks was better, for this report
  * only.
  *
- * Run: npm run sim:squads -- [lobbies per setting = 8] [nodes = 10000] [clocks, e.g. "2+1,3+2"] (about 15 minutes on
- * 4 cores). Writes reports/squads-sim.md, or the file in SQUADS_SIM_OUT (tuning runs). SQUADS_SIM_MIXES limits the
- * mixes (e.g. "mixed"); SQUADS_SIM_SET overrides settings for a tuning run (JSON merged into SQUADS, e.g.
- * '{"moveCeilingSeconds":20}').
+ * Run: npm run sim:squads -- [lobbies per setting = 12] [nodes = 10000] [clocks, e.g. "1+2/4+5,1:30+2/5+5": rounds 1
+ * and 2, then the final] (about 25 minutes on 4 cores). Writes reports/squads-sim.md, or the file in SQUADS_SIM_OUT
+ * (tuning runs). SQUADS_SIM_MIXES limits the mixes (e.g. "mixed"); SQUADS_SIM_SET overrides settings for a tuning run
+ * (JSON merged into SQUADS, e.g. '{"moveCeilingSeconds":20}'); SQUADS_SIM_FINALS_ONLY=1 plays only finals (between
+ * two random squads), to tune the final's clock on many games quickly.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_SETTINGS, SQUADS, botSkillSpread, shuffle, type Candidate, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
@@ -27,6 +28,7 @@ import {
   choose,
   clockName,
   drawBracket,
+  finalClockName,
   formSquads,
   halfDuties,
   lockIn,
@@ -53,16 +55,23 @@ import {
 } from "@chessroyale/chess/squads";
 import { mean, pct, quantile } from "../src/stats.ts";
 
-const LOBBIES = Number(process.argv[2] ?? 8);
+const LOBBIES = Number(process.argv[2] ?? 12);
+const FINALS_ONLY = process.env.SQUADS_SIM_FINALS_ONLY === "1";
 const NODES = Number(process.argv[3] ?? 10_000);
 const WORKERS = 4;
 const library = JSON.parse(readFileSync(new URL("../../chess/data/openings.json", import.meta.url), "utf8")) as Opening[];
 
-/** "2+1" or "1:30+1" as a clock (tuning runs try clocks that aren't in settings). */
+/** "1+2/4+5" (rounds 1 and 2, then the final) or "2+1" (both), with "1:30" for minutes and seconds: a tuning run's clock. */
 function parseClock(text: string, i: number): SquadsClock {
-  const [bank, inc] = text.split("+");
-  const [m, sec] = bank!.split(":");
-  return { id: `try${i}`, label: text, bankSeconds: Number(m) * 60 + Number(sec ?? 0), incrementSeconds: Number(inc) };
+  const one = (t: string) => {
+    const [bank, inc] = t.split("+");
+    const [m, sec] = bank!.split(":");
+    return [Number(m) * 60 + Number(sec ?? 0), Number(inc)] as const;
+  };
+  const [early, final] = text.split("/");
+  const [b, inc] = one(early!);
+  const [fb, finc] = final ? one(final) : [b, inc];
+  return { id: `try${i}`, label: `#${i + 1}`, bankSeconds: b, incrementSeconds: inc, finalBankSeconds: fb, finalIncrementSeconds: finc };
 }
 const S: SquadsSettings = { ...SQUADS, ...(process.env.SQUADS_SIM_SET ? (JSON.parse(process.env.SQUADS_SIM_SET) as Partial<SquadsSettings>) : {}) };
 const CLOCKS: readonly SquadsClock[] = process.argv[4] ? process.argv[4].split(",").map(parseClock) : S.clocks;
@@ -294,6 +303,13 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
   for (const round of [0, 1, 2] as SquadsRound[]) {
     const stats: MatchStat[] = [];
     ends.push([]);
+    if (FINALS_ONLY && round < 2) {
+      // Tuning the final: no early rounds, the first two squads meet in it straight away.
+      out.rounds.push([]);
+      ends[round] = round === 0 ? [votes, votes, votes, votes] : [votes, votes];
+      if (round === 1) bracket = bracket.map((r, i) => (i === 2 ? [{ ...r[0]!, squads: [0, 1] as const }] : r));
+      continue;
+    }
     for (const bm of bracket[round]!) {
       const pair = [squads[bm.squads[0]!]!, squads[bm.squads[1]!]!] as const;
       const played = await play(planMatch(plan, round, bm.index, pair, library, s));
@@ -349,7 +365,7 @@ engines.forEach((e) => e.close());
 const min = (sec: number) => (sec / 60).toFixed(1);
 const f1 = (x: number) => x.toFixed(1);
 const sel = (p: (r: LobbyStat) => boolean) => results.filter(p);
-const clockLabel = (c: SquadsClock) => `${c.label === clockName(c) ? "" : `${c.label} `}${clockName(c)}`;
+const clockLabel = (c: SquadsClock) => `${c.label} ${clockName(c)}, final ${finalClockName(c)}`;
 const byClock = (c: SquadsClock) => sel((r) => r.cfg.clock === c);
 const roundNames = ["Round 1 (Relay)", "Round 2 (Pairs)", "Final"];
 const matchesIn = (rs: LobbyStat[], r: number) => rs.flatMap((x) => x.rounds[r]!);
@@ -365,8 +381,8 @@ push(
   "`packages/sim/scripts/squads-sim.ts` (`npm run sim:squads`), through the real rules in `packages/chess/src/squads/`.",
   "Each lobby plays the whole bracket: round 1 Relay (4 matches on 4 boards), round 2 Pairs (2 matches on 2 boards),",
   "the final (Pick and Block), and an Armageddon board after a drawn final. Every board has a chess clock and is played",
-  "to the end (the silent safety cap at move 120 aside). Start votes rotate between the normal start, one opening and",
-  "random openings.",
+  "to the end (the silent safety cap at move 120 aside): each Clock option sets a quick clock for rounds 1 and 2 and a",
+  "roomier one for the final. Start votes rotate between the normal start, one opening and random openings.",
   "",
   "**How the seats are played.** Every seat is a person played by a bot: the bot engine (Stockfish 19 lite at",
   `${NODES.toLocaleString("en")} nodes, its top ${SQUADS.bots.candidates} moves) then \`botPick\` at the person's skill, a temperature over each move's loss:`,
@@ -416,6 +432,17 @@ table(
       return [clockLabel(c), roundNames[i]!, ...endKinds.map((k) => pct(ends.filter((e) => e === k).length / Math.max(1, ends.length)))];
     }),
   ),
+);
+
+push("Games decided on time (a flag fall, a win or a draw), by round:", "");
+table(
+  ["Clock", "Round 1 boards", "Round 2 boards", "Finals", "Armageddons"],
+  CLOCKS.map((c) => {
+    const onTime = (ends: string[]) => (ends.length ? pct(ends.filter((e) => e === "flag" || e === "flag_draw").length / ends.length) : "–");
+    const rs = byClock(c);
+    const arms = matchesIn(rs, 2).flatMap((m) => (m.armageddon ? [m.armageddon.reason] : []));
+    return [clockLabel(c), ...[0, 1, 2].map((i) => onTime(matchesIn(rs, i).flatMap((m) => m.boardEnds))), arms.length ? `${onTime(arms)} of ${arms.length}` : "–"];
+  }),
 );
 
 push("## Ties", "", "Rounds 1 and 2: a level match goes to the squad with more clock time left (a coin if exactly level). A drawn final goes to Armageddon.", "");

@@ -11,7 +11,7 @@ export type SquadsStart = "standard" | "same" | "random";
 
 export interface SquadsRules {
   start: SquadsStart;
-  /** Every board's chess clock: each side's bank and increment. */
+  /** Every board's chess clock: each side's bank and increment in rounds 1 and 2, and the final's own. */
   clock: SquadsClock;
 }
 
@@ -33,6 +33,10 @@ export function clockName(c: Pick<SquadsClock, "bankSeconds" | "incrementSeconds
   const sec = c.bankSeconds % 60;
   return `${sec ? `${m}:${String(sec).padStart(2, "0")}` : m}+${c.incrementSeconds}`;
 }
+
+/** An option's final clock, written the same way ("4+5"). */
+export const finalClockName = (c: Pick<SquadsClock, "finalBankSeconds" | "finalIncrementSeconds">) =>
+  clockName({ bankSeconds: c.finalBankSeconds, incrementSeconds: c.finalIncrementSeconds });
 
 /** The votes, left to right, with their numbers from settings. */
 export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
@@ -63,8 +67,8 @@ export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
         id: c.id,
         icon: ["⚡", "⏱️", "🧘"][i] ?? "⏱️",
         label: `${c.label} ${clockName(c)}`,
-        blurb: `${clockName(c).replace("+", " min + ")} s a move, each side, every board`,
-        detail: "Run out of time and you lose that board (a draw if the other side can't mate). Every game is played to the end.",
+        blurb: `Rounds 1 and 2: ${clockName(c)}. The final: ${finalClockName(c)}`,
+        detail: `Minutes each side, plus seconds a move. Run out of time and you lose that board (a draw if the other side can't mate). Every game is played to the end.`,
         patch: {},
         rule: { clock: c },
       })),
