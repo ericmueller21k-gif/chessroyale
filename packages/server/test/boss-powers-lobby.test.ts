@@ -75,7 +75,7 @@ function setup(settings: Partial<Settings> = {}, icons: Record<string, string> =
 
 /** A raid of two people against a boss, with a power brought at once (the test switch), the Last Stand off. */
 function raid(patch: Partial<Settings>, lastBoss: (string | null)[] = [null, null]) {
-  const L = setup({ ...RAID_SETTINGS, lastStandLoss: 999, lastStandLossFloor: 999, ...patch });
+  const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, ...patch });
   lastBoss.forEach((b, i) => L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500, undefined, undefined, b));
   L.core.message("p1", { t: "start" });
   L.advance(1000);

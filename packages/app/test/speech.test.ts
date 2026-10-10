@@ -3,12 +3,16 @@ import { SPEECH } from "@chessroyale/core";
 import { CRITICAL, LOW, NORMAL, Voice, holdMs, readMs, typeMs } from "../src/speech.tsx";
 
 describe("speech: every line's time, and lines taking turns (Eric, Oct 10: Ginger's line came and went at once)", () => {
-  it("types out, then stays readable for 2.5 s plus 50 ms a character, at most 7 s, then fades", () => {
-    expect(SPEECH).toMatchObject({ readMs: 2500, perCharMs: 50, maxReadMs: 7000 });
-    expect(readMs("Freeze!")).toBe(2500 + 7 * 50);
-    expect(readMs("x".repeat(500))).toBe(7000);
+  it("types out, then stays readable for 2.2 s plus 35 ms a character, at most 4.5 s, then fades", () => {
+    expect(SPEECH).toMatchObject({ readMs: 2200, perCharMs: 35, maxReadMs: 4500 });
+    expect(readMs("Freeze!")).toBe(2200 + 7 * 35);
+    expect(readMs("x".repeat(500))).toBe(4500);
     expect(holdMs("Chill out!")).toBe(typeMs("Chill out!") + readMs("Chill out!") + SPEECH.fadeMs);
-    // Ginger's shortest freeze line stays up longer than her whole freeze moment did (2.3 s).
+    // Eric (Oct 10, after the first rule): "a few seconds… two, three, four, not that long". A short line rests
+    // about 2.5 s once typed, a long one (50 characters) about 4 s, and none longer than 4.5 s.
+    expect(Math.abs(readMs("Freeze!") - 2500)).toBeLessThanOrEqual(100);
+    expect(Math.abs(readMs("x".repeat(50)) - 4000)).toBeLessThanOrEqual(100);
+    // Ginger's shortest freeze line still stays up longer than her whole freeze moment did (2.3 s).
     expect(holdMs("Freeze!")).toBeGreaterThan(2300);
   });
 

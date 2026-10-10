@@ -1,24 +1,27 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { BOSS_ROSTER } from "@chessroyale/core";
 import { pickLine, type Beat } from "../src/characters/boss-beats.ts";
 import { CRACKLE_EVERY, GREX_SOUNDS, WHISTLES, WHISTLE_SPREAD, grexSound, whistlePick } from "../src/characters/grex-sounds.ts";
 import { CANDLE_LEN, CANDLE_SHOTS, CANDLE_SWEEP, candleMuzzle } from "../src/characters/grex.ts";
 import { CANDLE, candleShotTimes, fireCountdown, shadowItems, type Moment } from "../src/components/BossPowers.tsx";
 import type { BossView } from "../src/game.ts";
-import { bossKit } from "../src/characters/kits.ts";
+import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { EFFECTS, POWER_MOMENTS, animLength, cueAt } from "../src/characters/power-art.ts";
 import { frameKeys, renderFrame, type Anim, type Character } from "../src/characters/sprite.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 
-const grex = bossKit("G-REX")!;
+const grex = bossKit("Jefferson")!;
 const MOMENTS: Beat[] = ["entrance", "move", "capture", "check", "hurt", "thinking", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit"];
 const anim = (name: string): Anim => grex.ch.anims[name]!;
 /** The pixels of a frame drawn in a palette key. */
 const pixels = (ch: Character, a: Anim, i: number, keys: string) => frameKeys(ch, a.frames[i]!).flatMap((row, y) => row.flatMap((k, x) => (k && keys.includes(k) ? [[x, y] as const] : [])));
 
-describe("G-REX, the Fire boss", () => {
+describe("Jefferson (id grex), the Fire boss", () => {
   it("has a kit with an animation for every moment, his powers' included, and a sound for every cue", () => {
     expect(grex).not.toBeNull();
-    expect(grex.ch.name).toBe("G-REX");
+    expect(grex.ch.name).toBe("Jefferson");
     for (const b of [...MOMENTS, "idle" as Beat]) expect(grex.ch.anims[grex.anims[b] ?? b], b).toBeTruthy();
     for (const a of Object.values(grex.ch.anims)) for (const f of a.frames) if (f.cue) expect(grex.sounds[f.cue], f.cue).toBeTruthy();
     expect(grex.ch.anims[grex.portrait.anim]).toBeTruthy();
@@ -230,7 +233,7 @@ describe("G-REX, the Fire boss", () => {
   });
 
   it("names his power moments in the contract: the throw, the warning, the candle on the board, the payoffs later", () => {
-    const m = POWER_MOMENTS["G-REX"]!;
+    const m = POWER_MOMENTS["Jefferson"]!;
     expect(m.power).toMatchObject({ anim: "ignite", hit: "throw", effects: ["sparkFly", "fireTile"] });
     expect(m.ultimate).toMatchObject({ anim: "romanCandle", hit: "launch", onBoard: true });
     for (const beat of ["powerHit", "ultimateHit"] as const) {
@@ -356,5 +359,43 @@ describe("the fire on screen", () => {
     expect(during.map((i) => `${i.square}:${i.then}`)).toEqual(["e2:shadow2", "g4:shadow3", "a2:shadow3", "h3:shadow3"]);
     const after = shadowItems(view(sh), [wave], 21_690);
     expect(after.map((i) => i.square)).toEqual(["c3", "e2", "g4"]);
+  });
+});
+
+describe("his name is Jefferson (Eric, Oct 10: he was G-REX; his id, files and settings keep grex)", () => {
+  it("the roster, his kit and his character all name him Jefferson", () => {
+    const def = BOSS_ROSTER.find((b) => b.id === "grex")!;
+    expect(def.name).toBe("Jefferson");
+    expect(BOSS_KITS[def.kit!]).toBe(grex);
+    expect(grex.ch.id).toBe("grex");
+  });
+
+  /** Every string, template piece and JSX text in a source file: what can reach a screen (comments and code names left out). */
+  const SHOWN = new Set([ts.SyntaxKind.StringLiteral, ts.SyntaxKind.NoSubstitutionTemplateLiteral, ts.SyntaxKind.TemplateHead, ts.SyntaxKind.TemplateMiddle, ts.SyntaxKind.TemplateTail, ts.SyntaxKind.JsxText]);
+  const stringsIn = (file: string): string[] => {
+    const src = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, false, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const out: string[] = [];
+    const walk = (n: ts.Node): void => {
+      if (SHOWN.has(n.kind)) out.push((n as ts.LiteralLikeNode).text);
+      ts.forEachChild(n, walk);
+    };
+    walk(src);
+    return out;
+  };
+  const sources = (dir: URL): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = new URL(name, dir);
+      if (statSync(path).isDirectory()) return sources(new URL(`${name}/`, dir));
+      return /\.tsx?$/.test(name) ? [path.pathname] : [];
+    });
+
+  it("no string a player can see says G-REX or GREX any more: the app, the rules, the server and the shared core", () => {
+    const old = (s: string) => /G-?REX/.test(s) || /g-rex/i.test(s);
+    const files = ["../src/", "../../core/src/", "../../chess/src/", "../../server/src/"].flatMap((d) => sources(new URL(d, import.meta.url)));
+    expect(files.length).toBeGreaterThan(50);
+    const found = files.flatMap((f) => stringsIn(f).filter(old).map((s) => `${f.replace(/^.*\/packages\//, "")}: ${JSON.stringify(s)}`));
+    expect(found).toEqual([]);
+    const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    expect(old(html)).toBe(false);
   });
 });

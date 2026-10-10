@@ -57,11 +57,14 @@ on Eric's account.
    engine in the game. Round 1 Relay (4 boards, one player a move, rotating), round 2 Pairs (2 boards, two pick and
    a coin chooses), the final Pick and Block (one board, pickers and blockers), Armageddon after a tie.
    - Phase 1, the rules and a bot simulation: **done** (`packages/chess/src/squads/`, `reports/squads-sim.md`).
+     Then chess clocks in place of the pace and the move cap (Eric, Oct 10): **done**. A lobby takes about 24-36
+     minutes (Fast 1+2, Normal 1:45+2, Long 2+3).
    - Phase 2, the server: the squads lobby, parties (invite link or code), matchmaking, bots, the bracket,
      spectating, the test controls ("Next round", start at round 2 or the final), placement rewards.
    - Phase 3, the screens: the menu slot, votes, tiny boards and scouting, the pair and pick-and-block panels, the
      final's staging.
-   - Phase 4: e2e and polish, then playtests with real players (the sim's open questions: time per lobby, the cap).
+   - Phase 4: e2e and polish, then playtests with real players (the sim's open questions: real think times and
+     misses, and how often a final is lost on time).
 
 ## Later: Eric's ideas (Oct 9, 2026; not started, not queued)
 

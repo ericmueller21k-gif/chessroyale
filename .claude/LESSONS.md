@@ -96,7 +96,7 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **A dozen sprites, a dozen loops** (Oct 9, [story](../docs/history/lessons.md#a-dozen-sprites-a-dozen-loops-oct-9-2026)):
   an effect that can appear many times at once goes on a shared canvas, not a canvas each; never start a loop per
   sprite. Measure the worst case at once on a slowed phone
-  (`npm run frames:character -- <dir> Boingo phone kit="G-REX" fxperf`), not one effect at a time.
+  (`npm run frames:character -- <dir> Boingo phone kit="Jefferson" fxperf`), not one effect at a time.
 - **A stall the first time an effect shows** (Oct 9, [story](../docs/history/lessons.md#a-stall-the-first-time-an-effect-shows-oct-9-2026)):
   - Measure a new effect's first showing on a slowed phone, not only its steady state: a second at a time, from the
     moment it starts.

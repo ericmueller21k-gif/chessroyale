@@ -6,6 +6,7 @@ import {
   boardPoints,
   colourToMove,
   decideByMaterial,
+  flagFall,
   isLegal,
   newSquadsBoard,
   otherSide,
@@ -25,14 +26,17 @@ import type { SquadsRules } from "./votes.ts";
 
 /**
  * One Squads match between two squads, in its round's format: Relay (round 1), Pairs (round 2) or Pick and Block
- * (the final), or an Armageddon board when one of those ties. Pure and replayable: every random draw comes from the
+ * (the final), or the Armageddon board after a drawn final. Pure and replayable: every random draw comes from the
  * match's seed and the decision's name (`squadsRng`). No engine anywhere: legal moves and mate in one come from
- * chess.js, and a capped board is decided by material.
+ * chess.js; only the silent safety cap and the test-only "Next round" fall back on material.
  *
- * A match is played in turns of two halves: every board's White move, then every board's Black move (in the final,
- * the White squad's move, then the Black squad's). In each half the server collects choices (`choose`, `lock`) until
- * everyone has locked in or the clock runs out, then `resolveHalf` plays the half: a missed move or pick becomes a
- * random legal move, a missed block is forfeited, and everything is logged as events.
+ * Every board has a chess clock: each side a bank and an increment. A match is played in turns of two halves: every
+ * board's White move, then every board's Black move (in the final, the White squad's move, then the Black squad's).
+ * In each half the server collects choices (`choose`, `lockIn`) until everyone has locked in or each board's deadline
+ * passes (the per-move ceiling, or the side's bank if that's shorter), then `resolveHalf` plays the half with each
+ * player's thinking time: the side to move's clock is charged (in Relay the mover's time; in Pairs and the final the
+ * slower picker's), a missed move or pick becomes a random legal move with the whole deadline charged, a missed block
+ * is forfeited, and a side whose bank runs out loses that board (a draw if the other side can't mate).
  */
 
 /** A squad in a match: its id and its players' ids in seat order. */
@@ -42,18 +46,21 @@ export interface Lineup {
 }
 
 export interface MatchResult {
-  /** The winning side; null for a tie (Armageddon decides). */
+  /** The winning side; null only for a drawn final (Armageddon decides). */
   winner: Side | null;
   points: readonly [number, number];
   /**
-   * clinch: passed half the points with boards still going; boards: every board finished; armageddon: the Armageddon
-   * board; admin: the test-only "Next round".
+   * clinch: passed half the points with boards still going; boards: won on points with every board finished; time:
+   * level on points, more clock time left (rounds 1 and 2); coin: level on points and time; armageddon: the
+   * Armageddon board; admin: the test-only "Next round".
    */
-  how: "clinch" | "boards" | "armageddon" | "admin";
+  how: "clinch" | "boards" | "time" | "coin" | "armageddon" | "admin";
+  /** Each side's clock time left across its boards (ms), when it decided a tie. */
+  timeLeft?: readonly [number, number];
 }
 
 export interface SquadsMatch {
-  /** Names the match for its random draws: "r0m2" (round 1, match 3), "r0m2-armageddon". */
+  /** Names the match for its random draws: "r0m2" (round 1, match 3), "r2m0-armageddon". */
   key: string;
   seed: number;
   round: SquadsRound;
@@ -63,15 +70,12 @@ export interface SquadsMatch {
   /** The turn being played (from 0) and its half: "w" (White moves) or "b". */
   turn: number;
   half: Colour;
-  /** One board where White must win: a draw counts for Black. */
+  /** One board where Black has draw odds and White more time. */
   armageddon: boolean;
-  /** The move cap (moves per side in this match; null: to the end) and the silent safety cap. */
-  capMoves: number | null;
+  /** Added to a side's bank after each of its moves (ms). */
+  incrementMs: number;
+  /** The silent safety cap, in moves per side. */
   safetyMoves: number;
-  /** The clock for each half, about this many seconds. */
-  paceSeconds: number;
-  /** Each side's total thinking time (ms): a missed action counts the whole clock. Picks Armageddon's colours. */
-  thinkMs: readonly [number, number];
   result: MatchResult | null;
 }
 
@@ -126,8 +130,9 @@ export interface MatchSetup {
   sides: readonly [Lineup, Lineup];
   starts: readonly BoardStart[];
   whites: readonly Side[];
-  capMoves: number | null;
-  paceSeconds: number;
+  /** Each colour's starting bank on every board (ms), and the increment (ms). */
+  clockMs: { w: number; b: number };
+  incrementMs: number;
   armageddon?: boolean;
 }
 
@@ -140,14 +145,12 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
     round: o.round,
     format: o.format,
     sides: o.sides,
-    boards: o.starts.map((st, k) => newSquadsBoard(k, st, o.whites[k]!)),
+    boards: o.starts.map((st, k) => newSquadsBoard(k, st, o.whites[k]!, o.clockMs)),
     turn: 0,
     half: "w",
     armageddon: !!o.armageddon,
-    capMoves: o.capMoves,
+    incrementMs: o.incrementMs,
     safetyMoves: s.safetyCap,
-    paceSeconds: o.paceSeconds,
-    thinkMs: [0, 0],
     result: null,
   };
 }
@@ -155,14 +158,12 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
 /** A squad's lineup: its id and players in seat order. */
 export const lineupOf = (sq: Squad): Lineup => ({ squadId: sq.id, seats: sq.players.map((p) => p.id) });
 
-/**
- * A bracket match ready to play: round 1 Relay on 4 boards, round 2 Pairs on 2, the final on 1. The Length vote's
- * cap applies to rounds 1 and 2; the final is always played to the end (the safety cap still guards it).
- */
+/** A bracket match ready to play: round 1 Relay on 4 boards, round 2 Pairs on 2, the final on 1, all on the voted clock. */
 export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, squads: readonly [Squad, Squad], library: readonly Opening[], s: SquadsSettings = SQUADS): SquadsMatch {
   const format = ROUND_FORMAT[round];
   const key = `r${round}m${index}`;
   const { starts, whites } = matchStarts(plan, key, s.boards[format], library, s);
+  const bank = plan.rules.clock.bankSeconds * 1000;
   return createSquadsMatch(
     {
       key,
@@ -172,8 +173,8 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
       sides: [lineupOf(squads[0]), lineupOf(squads[1])],
       starts,
       whites,
-      capMoves: round < 2 && plan.rules.length === "cap" ? s.moveCap : null,
-      paceSeconds: plan.rules.paceSeconds,
+      clockMs: { w: bank, b: bank },
+      incrementMs: plan.rules.clock.incrementSeconds * 1000,
     },
     s,
   );
@@ -189,6 +190,8 @@ export interface Duty {
   role: Role;
   /** One player (a Relay move) or two (a pair's picks, the final's pickers or blockers). */
   players: readonly string[];
+  /** How long they have (ms): the per-move ceiling, or (moves and picks) their side's bank if that's shorter. */
+  deadlineMs: number;
 }
 
 export interface HalfDuties {
@@ -203,21 +206,23 @@ export interface HalfDuties {
 
 const seatsOf = (m: SquadsMatch, side: Side, seats: readonly number[]) => seats.map((i) => m.sides[side].seats[i]!);
 
-/** Who acts in the half being played, board by board. */
+/** Who acts in the half being played, board by board, and their deadlines. */
 export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuties {
   const out: HalfDuties = { duties: [], scouts: [], mercy: null, forced: [] };
   if (m.result) return out;
   const n = m.boards.length;
+  const ceiling = s.moveCeilingSeconds * 1000;
   for (const b of m.boards) {
     const side = sideOf(b, m.half);
+    const deadlineMs = Math.min(ceiling, b.clock[m.half]);
     if (m.format === "relay") {
-      const duty: Duty = { board: b.id, side, role: "move", players: seatsOf(m, side, [relaySeat(n, b.id, m.turn)]) };
+      const duty: Duty = { board: b.id, side, role: "move", players: seatsOf(m, side, [relaySeat(n, b.id, m.turn)]), deadlineMs };
       (b.result ? out.scouts : out.duties).push(duty);
       continue;
     }
     const [slot0, slot1] = pairSchedule(m.turn);
     if (m.format === "pairs") {
-      const duty: Duty = { board: b.id, side, role: "pick", players: seatsOf(m, side, n === 1 ? slot0 : b.id === 0 ? slot0 : slot1) };
+      const duty: Duty = { board: b.id, side, role: "pick", players: seatsOf(m, side, n === 1 ? slot0 : b.id === 0 ? slot0 : slot1), deadlineMs };
       if (b.result) out.scouts.push(duty);
       else if (squadsLegalMoves(b.fen).length === 1) out.forced.push(b.id);
       else out.duties.push(duty);
@@ -230,9 +235,9 @@ export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuti
       out.forced.push(b.id);
       continue;
     }
-    out.duties.push({ board: b.id, side, role: "pick", players: seatsOf(m, side, slot0) });
+    out.duties.push({ board: b.id, side, role: "pick", players: seatsOf(m, side, slot0), deadlineMs });
     if (legal <= s.final.noBlocksAtMoves) out.mercy = "few_moves";
-    else out.duties.push({ board: b.id, side: otherSide(side), role: "block", players: seatsOf(m, otherSide(side), slot1) });
+    else out.duties.push({ board: b.id, side: otherSide(side), role: "block", players: seatsOf(m, otherSide(side), slot1), deadlineMs: ceiling });
   }
   return out;
 }
@@ -281,7 +286,7 @@ export function lockIn(inputs: HalfInputs, playerId: string): HalfInputs {
   return { ...inputs, locked: { ...inputs.locked, [playerId]: true } };
 }
 
-/** Whether the half can be resolved before its clock runs out: everyone with a duty has locked in. */
+/** Whether the half can be resolved before its deadlines: everyone with a duty has locked in. */
 export function halfReady(m: SquadsMatch, inputs: HalfInputs, s: SquadsSettings = SQUADS): boolean {
   return halfDuties(m, s).duties.every((d) => d.players.every((p) => inputs.locked[p]));
 }
@@ -313,11 +318,11 @@ export type SquadsEvent =
       board: number;
       side: Side;
       players: readonly string[];
-      /** The two picks as played (a missed slot holds its random move); null when the move was forced. */
-      picks: readonly [string, string] | null;
+      /** The two picks as played (a missed slot holds its random move). */
+      picks: readonly [string, string];
       missed: readonly [boolean, boolean];
-      /** Which pick the coin played; null when forced. */
-      coin: 0 | 1 | null;
+      /** Which pick the coin played. */
+      coin: 0 | 1;
       move: string;
     }
   | {
@@ -330,7 +335,7 @@ export type SquadsEvent =
       pickers: readonly string[];
       /** Empty when the mercy rule took the blocks away. */
       blockers: readonly string[];
-      picks: readonly [string, string] | null;
+      picks: readonly [string, string];
       pickMissed: readonly [boolean, boolean];
       /** A forfeited block is null. */
       blocks: readonly [string | null, string | null];
@@ -342,12 +347,14 @@ export type SquadsEvent =
       cancelled: boolean;
       /** Which pick the active block hit (the other one played); null if it hit neither. */
       hit: 0 | 1 | null;
-      /** Which pick the coin played, when the block hit neither; null otherwise (or forced). */
+      /** Which pick the coin played, when the block hit neither; null otherwise. */
       coin: 0 | 1 | null;
       move: string;
     }
   | { kind: "forced"; turn: number; half: Colour; board: number; side: Side; move: string }
   | { kind: "scout"; turn: number; half: Colour; board: number; side: Side; players: readonly string[] }
+  /** A side's clock this half: how long it ran, and what's left (after any increment; 0 on a flag fall). */
+  | { kind: "clock"; turn: number; half: Colour; board: number; side: Side; usedMs: number; leftMs: number }
   | { kind: "board_end"; board: number; result: BoardResult }
   | { kind: "match_end"; result: MatchResult };
 
@@ -360,19 +367,19 @@ export interface HalfOutcome {
 }
 
 /**
- * Plays the half being played, from the choices as they stand (the clock ran out, or everyone locked in). `thinkMs`
- * is each player's thinking time (a missed action counts the whole clock).
+ * Plays the half being played, from the choices as they stand (everyone locked in, or the deadlines passed).
+ * `thinkMs` is each player's thinking time up to their last choice; a player without one used the whole deadline.
  */
 export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonly<Record<string, number>> = {}, s: SquadsSettings = SQUADS): HalfOutcome {
   if (m.result) throw new Error(`Match ${m.key} is over`);
-  const ctx: Ctx = { m, s, inputs, thinkMs, boards: [...m.boards], think: [...m.thinkMs], events: [], acted: [], missed: [] };
+  const ctx: Ctx = { m, s, inputs, thinkMs, boards: [...m.boards], events: [], acted: [], missed: [] };
   const duties = halfDuties(m, s);
   for (const d of duties.scouts) ctx.events.push({ kind: "scout", turn: m.turn, half: m.half, board: d.board, side: d.side, players: d.players });
   for (const id of duties.forced) {
     const b = m.boards[id]!;
     const move = squadsLegalMoves(b.fen)[0]!;
     ctx.events.push({ kind: "forced", turn: m.turn, half: m.half, board: id, side: sideOf(b, m.half), move });
-    play(ctx, id, move);
+    play(ctx, id, move, 0, true);
   }
   for (const d of duties.duties) {
     if (d.role === "move") relayMove(ctx, d);
@@ -388,7 +395,6 @@ interface Ctx {
   inputs: HalfInputs;
   thinkMs: Readonly<Record<string, number>>;
   boards: SquadsBoard[];
-  think: [number, number];
   events: SquadsEvent[];
   acted: string[];
   missed: string[];
@@ -396,38 +402,60 @@ interface Ctx {
 
 const rngFor = (c: Ctx, board: number, what: string) => squadsRng(c.m.seed, c.m.key, c.m.turn, c.m.half, board, what);
 
-/** A player's choice if it's legal here, else null (a miss). Counts their thinking time and logs them. */
-function take(c: Ctx, player: string, side: Side, fen: string): string | null {
+/** A player's choice if it's legal here, else null (a miss); logs them as acting or missing. */
+function take(c: Ctx, player: string, fen: string): string | null {
   const move = c.inputs.choices[player];
   const ok = !!move && isLegal(fen, move);
-  c.think[side] += ok ? (c.thinkMs[player] ?? 0) : c.m.paceSeconds * 1000;
   (ok ? c.acted : c.missed).push(player);
   return ok ? move! : null;
 }
 
-function play(c: Ctx, board: number, move: string) {
+/**
+ * How long the side to move's clock ran: its slower mover or picker, if they all chose; the whole deadline if one of
+ * them didn't (the bank keeps running to the ceiling). Null if that empties the bank: a flag fall.
+ */
+function clockUsed(c: Ctx, d: Duty, chosen: readonly (string | null)[]): number | null {
+  const bank = c.boards[d.board]!.clock[c.m.half];
+  const used = chosen.every(Boolean) ? Math.min(d.deadlineMs, Math.max(0, ...d.players.map((p) => c.thinkMs[p] ?? 0))) : d.deadlineMs;
+  return used >= bank ? null : used;
+}
+
+/** The side to move ran out of time: it loses the board, unless the other side can't mate. */
+function flag(c: Ctx, d: Duty) {
+  const before = c.boards[d.board]!;
+  const next = flagFall(before, c.m.half);
+  c.boards[d.board] = next;
+  c.events.push({ kind: "clock", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, usedMs: before.clock[c.m.half], leftMs: 0 });
+  c.events.push({ kind: "board_end", board: d.board, result: next.result! });
+}
+
+/** Plays a move and charges the side to move's clock (plus the increment, unless it was a miss). */
+function play(c: Ctx, board: number, move: string, usedMs: number, earned: boolean) {
   const b = c.boards[board]!;
-  if (colourToMove(b) !== c.m.half) throw new Error(`Board ${board} is out of step with the half`);
-  const next = playOnBoard(b, move);
+  const colour = c.m.half;
+  if (colourToMove(b) !== colour) throw new Error(`Board ${board} is out of step with the half`);
+  const leftMs = b.clock[colour] - usedMs + (earned || c.s.incrementOnMiss ? c.m.incrementMs : 0);
+  const next: SquadsBoard = { ...playOnBoard(b, move), clock: { ...b.clock, [colour]: leftMs } };
   c.boards[board] = next;
+  c.events.push({ kind: "clock", turn: c.m.turn, half: colour, board, side: sideOf(b, colour), usedMs, leftMs });
   if (next.result) c.events.push({ kind: "board_end", board, result: next.result });
 }
 
 function relayMove(c: Ctx, d: Duty) {
   const b = c.boards[d.board]!;
   const player = d.players[0]!;
-  const chosen = take(c, player, d.side, b.fen);
+  const chosen = take(c, player, b.fen);
+  const used = clockUsed(c, d, [chosen]);
+  if (used === null) return flag(c, d);
   const move = chosen ?? randomLegalMove(b.fen, rngFor(c, d.board, "miss"));
   c.events.push({ kind: "relay", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, player, move, missed: !chosen });
-  play(c, d.board, move);
+  play(c, d.board, move, used, !!chosen);
 }
 
 /** Two picks, always different: a missed slot becomes a random legal move other than the partner's. */
-function twoPicks(c: Ctx, d: Duty, fen: string): { picks: [string, string]; missed: [boolean, boolean] } {
-  const p0 = take(c, d.players[0]!, d.side, fen);
-  let p1 = take(c, d.players[1]!, d.side, fen);
+function twoPicks(c: Ctx, d: Duty, fen: string, p0: string | null, p1In: string | null): { picks: [string, string]; missed: [boolean, boolean] } {
   // (The inputs never allow it, but two equal picks can't both stand: the second slot is then a miss.)
-  if (p1 !== null && p1 === p0) p1 = null;
+  const p1 = p1In !== null && p1In === p0 ? null : p1In;
   const m0 = p0 ?? randomLegalMove(fen, rngFor(c, d.board, "miss-0"), p1 ? [p1] : []);
   const m1 = p1 ?? randomLegalMove(fen, rngFor(c, d.board, "miss-1"), [m0]);
   return { picks: [m0, m1], missed: [!p0, !p1] };
@@ -435,30 +463,37 @@ function twoPicks(c: Ctx, d: Duty, fen: string): { picks: [string, string]; miss
 
 function pairMove(c: Ctx, d: Duty) {
   const fen = c.boards[d.board]!.fen;
-  const { picks, missed } = twoPicks(c, d, fen);
+  const chosen = [take(c, d.players[0]!, fen), take(c, d.players[1]!, fen)] as const;
+  const used = clockUsed(c, d, chosen);
+  if (used === null) return flag(c, d);
+  const { picks, missed } = twoPicks(c, d, fen, chosen[0], chosen[1]);
   const flip = coin(rngFor(c, d.board, "coin"));
   const move = picks[flip];
   c.events.push({ kind: "pair", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, players: d.players, picks, missed, coin: flip, move });
-  play(c, d.board, move);
+  play(c, d.board, move, used, !missed.some(Boolean));
 }
 
 /**
  * The final's move: two different picks; two different blocks (or none: the mercy rule); a coin makes one block
  * active (an empty slot blocks nothing); a block is cancelled if every other legal move allows mate in one. If the
- * active block hits a pick the other pick plays, otherwise a coin chooses between the picks.
+ * active block hits a pick the other pick plays, otherwise a coin chooses between the picks. Only the pickers' side
+ * runs its clock; blockers have the per-move ceiling.
  */
 function pickAndBlock(c: Ctx, pick: Duty, block: Duty | null, mercy: "few_moves" | null) {
   const fen = c.boards[pick.board]!.fen;
-  const { picks, missed: pickMissed } = twoPicks(c, pick, fen);
+  const chosen = [take(c, pick.players[0]!, fen), take(c, pick.players[1]!, fen)] as const;
   let blocks: [string | null, string | null] = [null, null];
   let blockMissed: [boolean, boolean] = [false, false];
   if (block) {
-    const b0 = take(c, block.players[0]!, block.side, fen);
-    let b1 = take(c, block.players[1]!, block.side, fen);
+    const b0 = take(c, block.players[0]!, fen);
+    let b1 = take(c, block.players[1]!, fen);
     if (b1 !== null && b1 === b0) b1 = null;
     blocks = [b0, b1];
     blockMissed = [!b0, !b1];
   }
+  const used = clockUsed(c, pick, chosen);
+  if (used === null) return flag(c, pick);
+  const { picks, missed: pickMissed } = twoPicks(c, pick, fen, chosen[0], chosen[1]);
   const blockCoin = coin(rngFor(c, pick.board, "block-coin"));
   const pickCoin = coin(rngFor(c, pick.board, "pick-coin"));
   const active = block ? blockCoin : null;
@@ -486,31 +521,21 @@ function pickAndBlock(c: Ctx, pick: Duty, block: Duty | null, mercy: "few_moves"
     coin: hit === null ? pickCoin : null,
     move,
   });
-  play(c, pick.board, move);
+  play(c, pick.board, move, used, !pickMissed.some(Boolean));
 }
 
-/** After a half: the caps (decided by material), the result (clinch, every board, Armageddon), the next half. */
+/** After a half: the safety cap (decided by material), the result, the next half. */
 function afterHalf(c: Ctx): HalfOutcome {
   const { m, s } = c;
   c.boards = c.boards.map((b) => {
-    if (b.result) return b;
-    const capped =
-      m.capMoves !== null && b.moves.length >= 2 * m.capMoves ? "move_cap" : b.moves.length >= 2 * m.safetyMoves ? "safety_cap" : null;
-    if (!capped) return b;
-    const done = decideByMaterial(b, capped, s);
+    if (b.result || b.moves.length < 2 * m.safetyMoves) return b;
+    const done = decideByMaterial(b, "safety_cap", s);
     c.events.push({ kind: "board_end", board: b.id, result: done.result! });
     return done;
   });
-  const result = matchResultOf(c.boards, m.armageddon, s);
+  const result = matchResultOf({ ...m, boards: c.boards }, s);
   if (result) c.events.push({ kind: "match_end", result });
-  const match: SquadsMatch = {
-    ...m,
-    boards: c.boards,
-    turn: m.half === "b" ? m.turn + 1 : m.turn,
-    half: m.half === "w" ? "b" : "w",
-    thinkMs: c.think,
-    result,
-  };
+  const match: SquadsMatch = { ...m, boards: c.boards, turn: m.half === "b" ? m.turn + 1 : m.turn, half: m.half === "w" ? "b" : "w", result };
   return { match, events: c.events, acted: c.acted, missed: c.missed };
 }
 
@@ -521,14 +546,32 @@ export function matchPoints(boards: readonly SquadsBoard[], s: SquadsSettings = 
   return pts;
 }
 
+/** Each side's clock time left across its boards in the match (ms). */
+export function timeLeft(boards: readonly SquadsBoard[]): [number, number] {
+  const out: [number, number] = [0, 0];
+  for (const b of boards) {
+    out[b.white] += b.clock.w;
+    out[otherSide(b.white)] += b.clock.b;
+  }
+  return out;
+}
+
+/** A level match (rounds 1 and 2): more clock time left wins; exactly level, a seeded coin. */
+function tiebreak(m: Pick<SquadsMatch, "seed" | "key">, boards: readonly SquadsBoard[], points: readonly [number, number], admin: boolean): MatchResult {
+  const left = timeLeft(boards);
+  if (left[0] !== left[1]) return { winner: left[0] > left[1] ? 0 : 1, points, how: admin ? "admin" : "time", timeLeft: left };
+  return { winner: coin(squadsRng(m.seed, m.key, "tiebreak")), points, how: admin ? "admin" : "coin", timeLeft: left };
+}
+
 /**
  * The match's result, if it's decided. A squad with more than half the points has won (clinched, if boards are
- * still going: the match ends at once). Every board finished and level: a tie. Armageddon: White must win; a draw
- * counts for Black.
+ * still going: the match ends at once). Every board finished and level: in rounds 1 and 2, the squad with more clock
+ * time left (a coin if exactly level); a drawn final has no winner yet (Armageddon). Armageddon: a draw is Black's.
  */
-export function matchResultOf(boards: readonly SquadsBoard[], armageddon: boolean, s: SquadsSettings = SQUADS): MatchResult | null {
+export function matchResultOf(m: Pick<SquadsMatch, "seed" | "key" | "format" | "armageddon" | "boards">, s: SquadsSettings = SQUADS): MatchResult | null {
+  const { boards } = m;
   const points = matchPoints(boards, s);
-  if (armageddon) {
+  if (m.armageddon) {
     const b = boards[0]!;
     if (!b.result) return null;
     return { winner: b.result.winner === "w" ? b.white : otherSide(b.white), points, how: "armageddon" };
@@ -537,41 +580,43 @@ export function matchResultOf(boards: readonly SquadsBoard[], armageddon: boolea
   for (const side of [0, 1] as const) {
     if (points[side] > (boards.length * s.winPoints) / 2) return { winner: side, points, how: all ? "boards" : "clinch" };
   }
-  return all ? { winner: null, points, how: "boards" } : null;
+  if (!all) return null;
+  return m.format === "final" ? { winner: null, points, how: "boards" } : tiebreak(m, boards, points, false);
 }
 
-// ---- Ties: Armageddon ----
+// ---- A drawn final: Armageddon ----
 
-/** The side that picks Armageddon's colours: the one with less total thinking time (a coin if it's level). */
-export function armageddonChooser(m: SquadsMatch): Side {
-  if (m.thinkMs[0] !== m.thinkMs[1]) return m.thinkMs[0] < m.thinkMs[1] ? 0 : 1;
-  return coin(squadsRng(m.seed, m.key, "armageddon-chooser"));
+/** The side that picks Armageddon's colours: the one with more clock time left in the final (a coin if level). */
+export function armageddonChooser(final: SquadsMatch): Side {
+  const left = timeLeft(final.boards);
+  if (left[0] !== left[1]) return left[0] > left[1] ? 0 : 1;
+  return coin(squadsRng(final.seed, final.key, "armageddon-chooser"));
 }
 
 /** Armageddon's board starts as the lobby's Start vote says (random openings: a fresh one). */
-export function armageddonStart(plan: SquadsPlan, tied: Pick<SquadsMatch, "key">, library: readonly Opening[], s: SquadsSettings = SQUADS): BoardStart {
+export function armageddonStart(plan: SquadsPlan, final: Pick<SquadsMatch, "key">, library: readonly Opening[], s: SquadsSettings = SQUADS): BoardStart {
   if (plan.rules.start === "standard") return STANDARD_START;
   if (plan.rules.start === "same") return plan.start ?? STANDARD_START;
-  return drawOpenings(library, 1, squadsRng(plan.seed, tied.key, "armageddon-opening"), s)[0]!;
+  return drawOpenings(library, 1, squadsRng(plan.seed, final.key, "armageddon-opening"), s)[0]!;
 }
 
 /**
- * One Armageddon board for a tied match (round 1 at 2-2, round 2 at 1-1, a drawn final): the same squads, in that
- * round's format and length, at the fastest pace. `white` is the side the chooser gave White.
+ * One Armageddon board for a drawn final, in the final's format: Black has draw odds, White more time
+ * (`SQUADS.armageddon`). `white` is the side the chooser gave White.
  */
-export function startArmageddon(tied: SquadsMatch, white: Side, start: BoardStart, s: SquadsSettings = SQUADS): SquadsMatch {
-  if (!tied.result || tied.result.winner !== null) throw new Error(`Match ${tied.key} isn't tied`);
+export function startArmageddon(final: SquadsMatch, white: Side, start: BoardStart, s: SquadsSettings = SQUADS): SquadsMatch {
+  if (final.format !== "final" || final.armageddon || !final.result || final.result.winner !== null) throw new Error(`Match ${final.key} isn't a drawn final`);
   return createSquadsMatch(
     {
-      key: `${tied.key}-armageddon`,
-      seed: tied.seed,
-      round: tied.round,
-      format: tied.format,
-      sides: tied.sides,
+      key: `${final.key}-armageddon`,
+      seed: final.seed,
+      round: final.round,
+      format: "final",
+      sides: final.sides,
       starts: [start],
       whites: [white],
-      capMoves: tied.capMoves,
-      paceSeconds: s.armageddonPaceSeconds,
+      clockMs: { w: s.armageddon.whiteSeconds * 1000, b: s.armageddon.blackSeconds * 1000 },
+      incrementMs: s.armageddon.incrementSeconds * 1000,
       armageddon: true,
     },
     s,
@@ -581,8 +626,8 @@ export function startArmageddon(tied: SquadsMatch, white: Side, start: BoardStar
 // ---- Test-only: "Next round" ----
 
 /**
- * The admin/test "Next round" button: every board still going is decided by material and the match ends. A tie
- * (outside Armageddon) is settled by a coin, so the bracket can move on.
+ * The admin/test "Next round" button: every board still going is decided by material and the match ends. A level
+ * result is settled like a round 1 or 2 tie (more clock time left, then a coin), so the bracket can move on.
  */
 export function endByMaterial(m: SquadsMatch, s: SquadsSettings = SQUADS): { match: SquadsMatch; events: SquadsEvent[] } {
   if (m.result) return { match: m, events: [] };
@@ -593,8 +638,8 @@ export function endByMaterial(m: SquadsMatch, s: SquadsSettings = SQUADS): { mat
     events.push({ kind: "board_end", board: b.id, result: done.result! });
     return done;
   });
-  const decided = matchResultOf(boards, m.armageddon, s)!;
-  const result: MatchResult = { winner: decided.winner ?? coin(squadsRng(m.seed, m.key, "admin")), points: decided.points, how: "admin" };
+  const decided = matchResultOf({ ...m, boards }, s)!;
+  const result: MatchResult = decided.winner !== null ? { ...decided, how: "admin" } : tiebreak(m, boards, decided.points, true);
   events.push({ kind: "match_end", result });
   return { match: { ...m, boards, result }, events };
 }

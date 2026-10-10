@@ -51,7 +51,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("a long boss battle", () => {
   it("reading the boss view again costs no chess.js work, and a new move only a few moves' worth", async () => {
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "gingerbread", lastStandLoss: 999, lastStandLossFloor: 999, bossMaxMoves: 200 } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "gingerbread", lastStandFrom: 999, bossMaxMoves: 200 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
     // The crowd shuffles its own knights too, so the game runs long without ending.
     const crowdMove = (fen: string, allowed: string[]) => allowed.find((m) => new Chess(fen).get(m.slice(0, 2) as never)?.type === "n" && !new Chess(fen).get(m.slice(2, 4) as never)) ?? allowed[0]!;

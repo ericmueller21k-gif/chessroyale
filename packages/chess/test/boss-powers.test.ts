@@ -291,7 +291,7 @@ describe("the judge plays by the same rules", () => {
   });
 
   it("the runner (solo, and the host) scores a blizzard turn by the queen's moves only", async () => {
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "gingerbread", bossPowerTest: "blizzard", lastStandLoss: 999, lastStandLossFloor: 999 } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "gingerbread", bossPowerTest: "blizzard", lastStandFrom: 999 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
     expect(runner.boss!.id).toBe("gingerbread");
     for (let i = 0; i < 2; i++) {
@@ -367,7 +367,7 @@ describe("Boingo's powers", () => {
   });
 
   it("a funhouse match: warned, the boss plays the crowd's move (unscored), then the board shows flipped for 2 turns", async () => {
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "clown", bossPowerTest: "funhouse", lastStandLoss: 999, lastStandLossFloor: 999 } as Settings;
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "clown", bossPowerTest: "funhouse", lastStandFrom: 999 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
     expect(runner.boss!.id).toBe("clown");
     runner.deal();

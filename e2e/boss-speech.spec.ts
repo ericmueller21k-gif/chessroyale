@@ -5,8 +5,9 @@ import { engineTop, test } from "./helpers.ts";
 /**
  * Speech stays up long enough to read (Eric, Oct 10: Ginger froze his queen, and her text box came and went at once).
  * For one power moment of every boss, alone (solo) on a phone and a computer: the boss's line for it shows in its text
- * box beside it as the moment plays, and stays there, whole and in view, for its full time by the shared rule (about
- * 2.5 s plus 50 ms a character once typed: SPEECH in settings.ts), through the end of the boss's turn and into yours.
+ * box beside it as the moment plays, and stays there, whole and in view, for its full time by the shared rule (2.2 s
+ * plus 35 ms a character once typed, at most 4.5 s: SPEECH in settings.ts, read here, so the numbers can change
+ * without this test), through the end of the boss's turn and into yours.
  * The God King's opening line is held to the same rule. Every frame is watched, from before the page loads.
  */
 
@@ -16,7 +17,7 @@ const minOnScreen = (text: string) => text.length * SPEECH.typeMs + Math.min(SPE
 const BOSSES = [
   { id: "gingerbread", name: "Ginger", banner: "FREEZE!" },
   { id: "clown", name: "Boingo", banner: "PIE!" },
-  { id: "grex", name: "G-REX", banner: "SPARKLER!" },
+  { id: "grex", name: "Jefferson", banner: "SPARKLER!" },
   { id: "hollow", name: "Hollow", banner: "DARKNESS!" },
   { id: "bigboy", name: "Big Boy", banner: "TOY BLOCK!" },
   { id: "sawyer", name: "Sawyer", banner: "SPLIT PAWN!" },
@@ -105,8 +106,8 @@ for (const boss of BOSSES) {
     await page.goto(`/?debug&clock=60&boss=${boss.id}`);
     await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
     await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-    // Best moves until the moment comes (Ginger, Boingo, G-REX and Big Boy as your second turn begins, Sawyer's split
-    // too; Hollow after his first move).
+    // Best moves until the moment comes (Ginger, Boingo, Jefferson and Big Boy as your second turn begins, Sawyer's split
+    // once there's room for it; Hollow after his first move).
     for (let i = 0; i < 4 && !(await speech()).banners[boss.banner]; i++) {
       await playBest(page);
       await expect.poll(async () => !!(await speech()).banners[boss.banner] || (await phase(page)) === "play", { timeout: 60_000 }).toBe(true);
@@ -122,11 +123,13 @@ for (const boss of BOSSES) {
     // Its whole time, in view on every frame (nothing replaced or hid it), with your clock running for most of it:
     // the old line was gone with its moment (2.3 s for a freeze), or never left the dock.
     const need = minOnScreen(line);
-    await page.waitForTimeout(Math.max(0, shown.from + need + 400 - Date.now()));
+    await page.waitForTimeout(Math.max(0, shown.from + need + 1200 - Date.now()));
     const end = await speech();
     const after = held(end.boss, line)!;
     expect(after.ms, `"${line}" was up whole and in view for ${after.ms} ms of ${need}, ${after.next} (unpainted: ${gapsIn(end, after.from, after.from + after.ms + 500)})`).toBeGreaterThanOrEqual(need - 120);
     expect(after.ms).toBeGreaterThanOrEqual(2000);
+    // …and not much longer (Eric: "a few seconds… not that long"): it starts to fade, or gives way, on time.
+    expect(after.ms, `"${line}" was still up whole after ${after.ms} ms (its time: ${need}), ${after.next}`).toBeLessThanOrEqual(need + 1000);
     // The God King's opening line (said as your first move began): its full time too, whole and in view.
     const first = (await speech()).king.find((s) => s.ok);
     expect(first, "the God King spoke").toBeTruthy();

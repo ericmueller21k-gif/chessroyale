@@ -1,7 +1,8 @@
 /**
- * G-REX, the Fire boss: a cocky giraffe with a mischievous look and a fiery glint in his eyes, flames on his horn tips,
- * down his mane and on the end of his tail, a cheeky grin, a sparkler in each hand and a wide fighting stance, after
- * Eric's reference picture, redrawn. Yellow with orange-brown spots, light from the top left.
+ * Jefferson (id "grex"; G-REX until Oct 10), the Fire boss: a cocky giraffe with a mischievous look and a fiery glint
+ * in his eyes, flames on his horn tips, down his mane and on the end of his tail, a cheeky grin, a sparkler in each
+ * hand and a wide fighting stance, after Eric's reference picture, redrawn. Yellow with orange-brown spots, light from
+ * the top left.
  *
  * A giraffe first (Eric, Oct 9): a long neck, so he stands taller than the other bosses (about the God King's height
  * with his wings spread; his frame grows upward), and a typical giraffe face, no sunglasses. The head stays big for
@@ -1125,7 +1126,7 @@ const romanCandle: Anim = {
 
 export const GREX: Character = {
   id: "grex",
-  name: "G-REX",
+  name: "Jefferson",
   w: OX + 56 + 24,
   h: OY + GROUND + 4,
   foot: [OX + 28, OY + GROUND],
@@ -1139,13 +1140,13 @@ export const GREX: Character = {
 export const GREX_PORTRAIT = { x: OX + 4, y: OY - 31, w: 40, h: 36 } as const;
 
 /**
- * His lines: a cocky show-off with fire puns and the odd dinosaur joke (a giraffe named like a T-Rex), short, never
- * instructions, rare (each moment's chance of a line is in GREX_CHANCE). `power` is a tile set alight (the sparkler
- * thrown), `powerHit` a piece burnt up, `ultimateWarn` the Roman candle coming, `ultimate` its launch, `ultimateHit`
- * the fireballs coming down.
+ * His lines: a cocky show-off with fire puns and the odd dinosaur joke (from his old name, G-REX, like a T-Rex), short,
+ * never instructions, rare (each moment's chance of a line is in GREX_CHANCE). `power` is a tile set alight (the
+ * sparkler thrown), `powerHit` a piece burnt up, `ultimateWarn` the Roman candle coming, `ultimate` its launch,
+ * `ultimateHit` the fireballs coming down.
  */
 export const GREX_LINES: Partial<Record<Beat, readonly string[]>> = {
-  entrance: ["G-REX in the house!", "Feel the heat!", "Rawr! I mean… hi.", "Hot stuff coming through!"],
+  entrance: ["Jefferson in the house!", "Feel the heat!", "Rawr! I mean… hi.", "Hot stuff coming through!"],
   move: ["Sizzlin'!", "Too hot to handle?", "Smokin'!", "Watch and learn."],
   capture: ["Toast!", "Extra crispy!", "Burnt to a crisp!", "Well done. Very well done."],
   check: ["Check! Feeling warm?", "Your king's toast!", "Hot seat, your majesty!", "Check! Getting hot?"],

@@ -108,13 +108,18 @@ export interface Settings {
    * bar (points of expected score against the best move), he takes the blow and the move is undone. The bar starts
    * at lastStandLoss (plus lastStandChargedExtra while he still has charges) and falls linearly with every crowd
    * move to lastStandLossFloor, reached after lastStandDecayMoves crowd moves. Never when the best move was worth
-   * less than lastStandFrom (a position that's already lost isn't saved).
+   * less than lastStandFrom (a position that's already lost isn't saved; set it over 100 to turn him off, in tests).
+   * While the best move is worth less than lastStandShareBelow, the bar is a share of the chances left instead
+   * (lastStandShare of them), when that's lower: a weak position has fewer points to lose (Eric, Oct 10: from 25%
+   * no move can give away 35 points, so the plain bar alone could never call him there).
    */
   lastStandLoss: number;
   lastStandChargedExtra: number;
   lastStandLossFloor: number;
   lastStandDecayMoves: number;
   lastStandFrom: number;
+  lastStandShareBelow: number;
+  lastStandShare: number;
   /**
    * The Last Stand: he falls with his charges unspent, and leaves them to the crowd. Every player still in gets this
    * many power-ups (the engine's top 3 moves, as in Crowd) for each charge he had left.
@@ -308,7 +313,9 @@ export const DEFAULT_SETTINGS: Settings = {
   lastStandChargedExtra: 5,
   lastStandLossFloor: 13,
   lastStandDecayMoves: 22,
-  lastStandFrom: 40,
+  lastStandFrom: 20,
+  lastStandShareBelow: 40,
+  lastStandShare: 0.5,
   lastStandPowerUps: 1,
   bossStumbleBelow: 2100,
   bossStumbleMax: 0.25,
@@ -603,14 +610,16 @@ export type BossPowerSettings = {
  * How long every speech line stays up, and how lines take turns (Eric, Oct 10: Ginger's line came and went at once).
  * The rule for every boss's lines and the God King's, in one place (packages/app/src/speech.tsx): a line types out
  * (`typeMs` a character), then stays fully readable for `readMs` plus `perCharMs` a character, at most `maxReadMs`,
- * then fades (`fadeMs`). Only a critical line cuts in on one still inside that time; any other waits its turn, highest
- * priority first, and is dropped if it can't start within `waitMs` of being said (it would be stale by then).
+ * then fades (`fadeMs`). Eric, later on Oct 10: "a few seconds… two, three, four, not that long": a short line
+ * ("Freeze!") rests about 2.5 s once typed, a long one (50 characters) about 4 s, none over 4.5 s. Only a critical
+ * line cuts in on one still inside that time; any other waits its turn, highest priority first, and is dropped if it
+ * can't start within `waitMs` of being said (it would be stale by then).
  */
 export const SPEECH = {
   typeMs: 28,
-  readMs: 2500,
-  perCharMs: 50,
-  maxReadMs: 7000,
+  readMs: 2200,
+  perCharMs: 35,
+  maxReadMs: 4500,
   fadeMs: 260,
   waitMs: 5000,
 } as const;
@@ -1266,10 +1275,19 @@ export const FAIRPLAY = {
 /**
  * Squads (docs/areas/squads.md; DECISIONS.md, "Squads"): 8 squads of 4 play team chess in a bracket. Round 1 is
  * Relay (4 boards a match, one player a move, everyone moving one board along each turn), round 2 Pairs (2 boards,
- * two players pick and a coin chooses), the final Pick and Block (one board: two pickers, two blockers). No engine
- * in the rules: legal moves and mate in one come from the chess library, and a capped board is decided by material.
- * The rules are in `packages/chess/src/squads/`; every number for the mode is here.
+ * two players pick and a coin chooses), the final Pick and Block (one board: two pickers, two blockers). Every board
+ * has a chess clock (a bank and an increment for each side) and is played to the end. No engine in the rules: legal
+ * moves and mate in one come from the chess library; only the silent safety cap and the test-only "Next round" fall
+ * back on material. The rules are in `packages/chess/src/squads/`; every number for the mode is here.
  */
+export interface SquadsClock {
+  id: string;
+  label: string;
+  /** Each side's bank on each board, and the increment added after each of its moves. */
+  bankSeconds: number;
+  incrementSeconds: number;
+}
+
 export interface SquadsSettings {
   /** Players in a squad, squads in a lobby (a bracket of three rounds). */
   squadSize: number;
@@ -1278,22 +1296,25 @@ export interface SquadsSettings {
   partyMax: number;
   /** Boards in a match: round 1 (Relay), round 2 (Pairs), the final (Pick and Block). Armageddon is always one. */
   boards: { relay: number; pairs: number; final: number };
-  /** The pre-game votes (Start, Pace, Length): seconds each is open, the result's showing, bots that don't vote. */
+  /** The pre-game votes (Start, Clock): seconds each is open, the result's showing, bots that don't vote. */
   voteSeconds: number;
   voteResultSeconds: number;
   voteBotSkip: number;
-  /** The Pace vote's options, about this many seconds a move, and the one that wins if nobody votes (an index). */
-  paceSeconds: readonly number[];
-  paceDefault: number;
-  /** An Armageddon board is played at this pace (the fastest). */
-  armageddonPaceSeconds: number;
-  /** The Length vote's move cap for rounds 1 and 2, in moves per side played in the match (an opening's don't count). */
-  moveCap: number;
-  /** The silent safety cap on every board, "to the end" and the final included, in moves per side. */
+  /** The Clock vote's options (Eric, Oct 10: Fast, Normal, Long; tuned by the sim), and the one if nobody votes. */
+  clocks: readonly SquadsClock[];
+  clockDefault: number;
+  /**
+   * The per-move ceiling: nobody can hold up a half longer than this. A mover or picker who hasn't chosen by then
+   * misses (a random legal move; a blocker forfeits), and their side's bank keeps running down meanwhile.
+   */
+  moveCeilingSeconds: number;
+  /** A missed move (the ceiling reached) earns no increment. */
+  incrementOnMiss: boolean;
+  /** The silent safety cap on every board, in moves per side: then material decides (as does "Next round"). */
   safetyCap: number;
-  /** Material for deciding a board at a cap (no engine): pawn, knight, bishop, rook, queen. */
+  /** Material for the safety cap and "Next round" (no engine): pawn, knight, bishop, rook, queen. */
   material: { p: number; n: number; b: number; r: number; q: number };
-  /** The smallest material lead that wins a board at a cap; less is a draw. */
+  /** The smallest material lead that wins at the safety cap; less is a draw. */
   materialLead: number;
   /** Points for a board: a win, a draw. A squad with more than half a match's points has clinched it. */
   winPoints: number;
@@ -1310,6 +1331,11 @@ export interface SquadsSettings {
     blocksSeenBy: "everyone" | "own";
     picksSeenBy: "everyone" | "own";
   };
+  /**
+   * A drawn final goes to one Armageddon board in the final's format: Black has draw odds, White more time. The squad
+   * with more clock time left in the final picks its colour.
+   */
+  armageddon: { whiteSeconds: number; blackSeconds: number; incrementSeconds: number };
   /** Missed actions in a row before a player's seat goes to a bot (every miss is logged on their record). */
   noShowsBeforeBot: number;
   /** A bot taking over a no-show's seat plays at this skill (a temperature; see botSkillRange). */
@@ -1319,14 +1345,31 @@ export interface SquadsSettings {
     candidates: number;
     /** A bot picker in the final steers clear of a block it can see with this chance. */
     avoidBlockChance: number;
-    /** The colour a bot squad takes when it picks Armageddon's colours (a draw counts for Black). */
+    /** The colour a bot squad takes when it picks Armageddon's colours. */
     armageddonColour: "w" | "b";
-    /** A bot's thinking time, a share of the move clock (random in the range). */
-    thinkShare: readonly [number, number];
+    /**
+     * Winning, a bot plays with purpose: once the best move's expected score is at least `wonAt`, its temperature is
+     * at most `wonSkill`, and moves the engine ranks lower lose `wonRankLoss` points a place (they all score about 1,
+     * so without this a bot wanders). A mate it sees: a longer one loses `mateStepLoss` a move, none `mateMissLoss`.
+     */
+    wonAt: number;
+    wonSkill: number;
+    wonRankLoss: number;
+    mateStepLoss: number;
+    mateMissLoss: number;
+    /**
+     * A bot's thinking time: its bank over `movesToGo`, plus `incrementShare` of the increment (low on time, it plays
+     * at about the increment), times a random factor in `thinkRange`, at least `minThinkSeconds`, and never past its
+     * deadline.
+     */
+    movesToGo: number;
+    incrementShare: number;
+    thinkRange: readonly [number, number];
+    minThinkSeconds: number;
   };
   /**
    * Showing what happened, in seconds: a half's moves landing (Relay), the pair's reveal and coin (Pairs), the
-   * final's reveal (ghost arrows, the lock slamming down, the coin), the bracket between rounds, Armageddon's intro.
+   * final's reveal (ghost arrows, the lock slamming down, the coin), the bracket between matches, Armageddon's intro.
    */
   moveShowSeconds: number;
   pairRevealSeconds: number;
@@ -1343,10 +1386,16 @@ export const SQUADS: SquadsSettings = {
   voteSeconds: 8,
   voteResultSeconds: 3.2,
   voteBotSkip: 0.1,
-  paceSeconds: [10, 15, 25],
-  paceDefault: 1,
-  armageddonPaceSeconds: 10,
-  moveCap: 40,
+  // Eric's start was 2+1, 4+2, 6+3; tuned by reports/squads-sim.md so a lobby takes 20-40 minutes (Normal about 30).
+  clocks: [
+    { id: "fast", label: "Fast", bankSeconds: 60, incrementSeconds: 2 },
+    { id: "normal", label: "Normal", bankSeconds: 105, incrementSeconds: 2 },
+    { id: "long", label: "Long", bankSeconds: 120, incrementSeconds: 3 },
+  ],
+  clockDefault: 1,
+  // 20 s, not the brief's starting 40: a miss charges the whole ceiling, and at 40 s misses decided most finals on time.
+  moveCeilingSeconds: 20,
+  incrementOnMiss: false,
   safetyCap: 120,
   material: { p: 1, n: 3, b: 3, r: 5, q: 9 },
   materialLead: 1,
@@ -1361,13 +1410,22 @@ export const SQUADS: SquadsSettings = {
     blocksSeenBy: "everyone",
     picksSeenBy: "own",
   },
+  armageddon: { whiteSeconds: 90, blackSeconds: 60, incrementSeconds: 1 },
   noShowsBeforeBot: 3,
   replacementBotSkill: 4,
   bots: {
     candidates: 8,
     avoidBlockChance: 0.5,
     armageddonColour: "b",
-    thinkShare: [0.2, 0.8],
+    wonAt: 0.9,
+    wonSkill: 2,
+    wonRankLoss: 3,
+    mateStepLoss: 5,
+    mateMissLoss: 20,
+    movesToGo: 25,
+    incrementShare: 0.8,
+    thinkRange: [0.5, 1.5],
+    minThinkSeconds: 1.5,
   },
   moveShowSeconds: 1,
   pairRevealSeconds: 3,

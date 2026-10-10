@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_DIFFICULTY, ENGINE_MAX_ELO, BOSS_ROSTER, bossStrength, bossThreat, chooseBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
+import { BOSS_DIFFICULTY, ENGINE_MAX_ELO, BOSS_ROSTER, bossDef, bossIdFromLink, bossStrength, bossThreat, chooseBoss, isPlayable, playableBosses, type BossDef } from "../src/index.ts";
 
 describe("the boss template: who can be met", () => {
   it("only a boss with a complete character and its powers is playable", () => {
@@ -11,14 +11,24 @@ describe("the boss template: who can be met", () => {
     expect(playableBosses([base, { ...base, id: "y", kit: null }, { ...base, id: "z", powers: null }]).map((b) => b.id)).toEqual(["x"]);
   });
 
-  it("today: Ginger (Freeze), Boingo the Clown, G-REX (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce) and Sawyer (saw cuts, the board saw)", () => {
+  it("today: Ginger (Freeze), Boingo the Clown, Jefferson (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce) and Sawyer (saw cuts, the board saw)", () => {
     expect(playableBosses().map((b) => b.id).sort()).toEqual(["bigboy", "clown", "gingerbread", "grex", "hollow", "sawyer"]);
     expect(BOSS_ROSTER.find((b) => b.id === "sawyer")).toMatchObject({ name: "Sawyer", icon: "🪚", kit: "Sawyer", powers: { passive: "cuts", ultimate: "boardsaw" } });
     expect(BOSS_ROSTER.find((b) => b.id === "bigboy")).toMatchObject({ name: "Big Boy", icon: "🍭", kit: "Big Boy", powers: { passive: "blocks", ultimate: "bounce" } });
     expect(BOSS_ROSTER.find((b) => b.id === "hollow")).toMatchObject({ name: "Hollow", kit: "Hollow", offset: -100, powers: { passive: "dark", ultimate: "lightsout" } });
-    expect(BOSS_ROSTER.find((b) => b.id === "grex")!.powers).toEqual({ passive: "sparkler", ultimate: "candle" });
+    expect(BOSS_ROSTER.find((b) => b.id === "grex")).toMatchObject({ name: "Jefferson", kit: "Jefferson", powers: { passive: "sparkler", ultimate: "candle" } });
     expect(BOSS_ROSTER.find((b) => b.id === "gingerbread")!.powers).toEqual({ passive: "freeze", ultimate: "blizzard" });
     expect(BOSS_ROSTER.find((b) => b.id === "clown")!.powers).toEqual({ passive: "pie", ultimate: "funhouse" });
+  });
+
+  it("Jefferson was G-REX (Eric, Oct 10): his id stays grex, and a test link's ?boss=jefferson meets him too", () => {
+    for (const q of ["jefferson", "Jefferson", "grex"]) expect(bossIdFromLink(q)).toBe("grex");
+    expect(bossDef(bossIdFromLink("jefferson"))?.name).toBe("Jefferson");
+    expect(bossIdFromLink("hollow")).toBe("hollow");
+    expect(bossIdFromLink("1600")).toBe("1600");
+    expect(bossIdFromLink(null)).toBeNull();
+    // (Only a link resolves the alias: a stored id stays the roster's own.)
+    expect(bossDef("jefferson")).toBeNull();
   });
 
   it("chooses only playable bosses: a picked one if playable, else at random, never the one to avoid when there's another", () => {

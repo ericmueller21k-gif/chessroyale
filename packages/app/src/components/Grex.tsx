@@ -28,7 +28,7 @@ export const SPARK = { flyAt: 1450, landAt: 1850 } as const;
  * and one at each `shot`, each a `candleShot` streaking off from the candle's top along its tilt, so they fan out, and
  * one more lit in the column of shots up by the board. Then he jumps off, and the first wave's shadows appear.
  */
-const ROMAN = bossKit("G-REX")?.ch.anims.romanCandle ?? null;
+const ROMAN = bossKit("Jefferson")?.ch.anims.romanCandle ?? null;
 export const CANDLE = {
   rexAt: 1300,
   /** A shot's flight off the board. */

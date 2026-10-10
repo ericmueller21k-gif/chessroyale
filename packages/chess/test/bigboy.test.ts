@@ -64,7 +64,7 @@ const LINE = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", 
 const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test", family: "Test", unusual: false, moves, namedPlies: moves.length, expected: { 10: 0.52, 11: 0.48, 12: 0.52 } });
 
 function raid(opts: { side?: "b"; patch?: Partial<Settings>; seed?: number; engine?: EngineLike } = {}) {
-  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "bigboy", lastStandLoss: 999, lastStandLossFloor: 999, ...opts.patch } as Settings;
+  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "bigboy", lastStandFrom: 999, ...opts.patch } as Settings;
   return new MatchRunner({
     settings,
     rng: mulberry32(opts.seed ?? 5),

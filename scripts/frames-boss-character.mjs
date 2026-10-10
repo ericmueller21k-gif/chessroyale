@@ -3,8 +3,8 @@
 // frames (every 120 ms) around the character, and prints a timeline of which animation showed.
 //   npm run frames:character -- <out-dir> [boss name, default "Boingo"] [phone|desktop|both] [kit=<name>] [fx] [fxperf]
 // `kit=<name>` plays the named character kit in that boss's place (a kit drawn before its boss is playable, such
-// as kit="G-REX"). `fx` then plays the bosses' power art over the board where it will show (the ice, the
-// pies, the blizzard, the funhouse, and the power moments in his spot; with kit="G-REX" his fire: the tile's
+// as kit="Jefferson"). `fx` then plays the bosses' power art over the board where it will show (the ice, the
+// pies, the blizzard, the funhouse, and the power moments in his spot; with kit="Jefferson" his fire: the tile's
 // stages, a piece burning, the sparkler, the Roman candle on the board, its rockets, fireballs and shots left),
 // with frames every ~70 ms.
 // `fxperf` (on the phone, its CPU slowed 4x) measures frames while sitting and while dragging a piece, first on the
@@ -118,7 +118,7 @@ async function powers(p, name, sq, board) {
     ["blizzard", [{ kind: "effect", name: "blizzardSweep", box: { x: board.x, y: board.y, w: board.width, h: board.height } }], 1500],
     ["funhouse", [{ kind: "moment", name: kitName ? "original:Boingo the Clown" : "Boingo the Clown", anim: "funhouse", box: { x: board.x + board.width / 2 - cell * 0.9, y: board.y + board.height / 2 - cell * 2.1, w: cell * 1.8, h: cell * 2.35 } }], 2400],
   ];
-  const grex = kitName === "G-REX" || full === "G-REX";
+  const grex = kitName === "Jefferson" || full === "Jefferson";
   if (grex) {
     const tile = pieceSq;
     const strip = { x: board.x, y: board.y - cell * 0.45, w: cell * 3, h: (cell * 3 * 11) / 74 };
@@ -209,7 +209,7 @@ async function perf(p, name, sq, board, fen) {
     { kind: "effect", name: "candleShot", box: at("g7") },
     { kind: "effect", name: "sparkFly", box: at("e5") },
     { kind: "effect", name: "candleShots", anim: "left9", box: { x: board.x, y: board.y - cell * 0.45, w: cell * 3, h: (cell * 3 * 11) / 74 } },
-    { kind: "moment", name: kitName ? `original:${kitName}` : "G-REX", anim: "idle", box: { x: board.x + board.width / 2 - cell * 1.25, y: board.y + board.height / 2 - cell * 2.1, w: cell * 2.5, h: cell * 2.6 } },
+    { kind: "moment", name: kitName ? `original:${kitName}` : "Jefferson", anim: "idle", box: { x: board.x + board.width / 2 - cell * 1.25, y: board.y + board.height / 2 - cell * 2.1, w: cell * 2.5, h: cell * 2.6 } },
   ];
   await p.evaluate(async ({ lab, items }) => (await import(lab)).mount(items), { lab, items });
   await p.screenshot({ path: `${outDir}/${name}-fxperf-storm.png` });

@@ -7,7 +7,7 @@
  *
  *   npx tsx packages/sim/scripts/last-stand-blunders.ts <positions> <seed>
  */
-import { DEFAULT_SETTINGS, lastStandBar, mulberry32 } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, lastStandBar, lastStandDue, mulberry32 } from "@chessroyale/core";
 import { applyMove, legalMoves, pieceAt, recheckCloseCalls, START_FEN, toSan, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { readFileSync } from "node:fs";
@@ -56,8 +56,8 @@ for (let i = 0; i < Number(count ?? 8); i++) {
   const checked = await recheckCloseCalls(engine, fen, { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter: Object.fromEntries(known) }, [pick], s);
   const best = Math.max(checked.bestExpected, checked.expectedAfter[pick]!);
   const loss = (best - checked.expectedAfter[pick]!) * 100;
-  const bar = lastStandBar(n, 3, s);
-  const ok = best * 100 >= s.lastStandFrom && loss >= bar;
+  const bar = lastStandBar(best, n, 3, s);
+  const ok = lastStandDue(loss, best, n, 3, s);
   tried++;
   if (ok) fired++;
   rows.push(`| ${o.name} | ${n + 1} | ${toSan(fen, pick)} (${hangs(fen, pick)}) | ${(best * 100).toFixed(1)} | ${loss.toFixed(1)} | ${bar.toFixed(1)} | ${ok ? "yes" : "NO"} | \`${fen}\` |`);

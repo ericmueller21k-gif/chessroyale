@@ -72,7 +72,7 @@ const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test",
 
 /** A raid against Hollow: you alone (or with bots), from the starting position. */
 function raid(opts: { side?: "b"; bots?: number; patch?: Partial<Settings>; seed?: number } = {}) {
-  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "hollow", lastStandLoss: 999, lastStandLossFloor: 999, ...opts.patch } as Settings;
+  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "hollow", lastStandFrom: 999, ...opts.patch } as Settings;
   const bots = Array.from({ length: opts.bots ?? 0 }, (_, i) => ({ id: `b${i}`, name: `Bot ${i}`, isBot: true, skill: 2 }));
   return new MatchRunner({
     settings,
