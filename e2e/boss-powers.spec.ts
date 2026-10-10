@@ -110,10 +110,11 @@ test("Boingo: a pie nobody can move onto, the warning, then the funhouse plays y
   const scoredBefore: number = await page.evaluate(() => (window as any).match.moves.length);
 
   await playBest(page);
-  // The funhouse: the banner, then Boingo drops onto the board, it spins, his line, and he plays your move.
+  // The funhouse: the banner, then Boingo drops onto the board, it spins, his line (in his text box), and he plays
+  // your move.
   await expect(banner(page, "FUNHOUSE!")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".pm-pogo")).toBeVisible({ timeout: 5_000 });
-  await expect(page.locator(".pm-line")).toBeVisible({ timeout: 6_000 });
+  await expect(page.locator(".bc-bubble:visible")).toContainText(/Welcome to the funhouse!|Topsy-turvy!|Boingo's turn!/, { timeout: 6_000 });
   const fun = await page.evaluate(() => (window as any).match.runner.state.boss.powers.funhouse);
   expect(fun.move).toMatch(/^[a-h][1-8][a-h][1-8]/);
   // Not scored: no move of yours was added for it.

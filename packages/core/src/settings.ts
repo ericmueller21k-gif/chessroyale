@@ -582,13 +582,27 @@ export type BossPowerSettings = {
 };
 
 /**
+ * How long every speech line stays up, and how lines take turns (Eric, Oct 10: Ginger's line came and went at once).
+ * The rule for every boss's lines and the God King's, in one place (packages/app/src/speech.tsx): a line types out
+ * (`typeMs` a character), then stays fully readable for `readMs` plus `perCharMs` a character, at most `maxReadMs`,
+ * then fades (`fadeMs`). Only a critical line cuts in on one still inside that time; any other waits its turn, highest
+ * priority first, and is dropped if it can't start within `waitMs` of being said (it would be stale by then).
+ */
+export const SPEECH = {
+  typeMs: 28,
+  readMs: 2500,
+  perCharMs: 50,
+  maxReadMs: 7000,
+  fadeMs: 260,
+  waitMs: 5000,
+} as const;
+
+/**
  * The God King's chatter (packages/app/src/godKing.ts). Eric, Oct 9, 2026: he talked too much. Critical moments always
  * speak (a new danger to your queen or king, a mate threat, a queen taken either way, his own strikes and moves, his
  * Last Stand, a boss's power); everything else is paced by these numbers.
  */
 export const KING_SPEECH = {
-  /** How long a line stays up (ms). */
-  speechMs: 3800,
   /** The least time between two lines that aren't critical (ms). */
   quietMs: 8000,
   /** Small talk (idle, the tap-me nudge, winning or losing) rests this many crowd moves after any line… */

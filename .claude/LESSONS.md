@@ -35,6 +35,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     in view on every screen. A speech bubble is extra, never the only copy. Measure it through the whole moment, not
     in one screenshot.
 
+- **Lines that went with their screen** (Oct 10, [story](../docs/history/lessons.md#lines-that-went-with-their-screen-oct-10-2026)):
+  - A line a character says goes into that speaker's voice (`packages/app/src/speech.tsx`), never into a box a screen
+    or a moment owns. How long it stays comes from the one rule (its length), not from how long the screen lasts.
+  - Test a line's whole time on screen, every frame, from before it can appear (`e2e/boss-speech.spec.ts`), at the
+    pace the mode really has (Boss alone's 0.45 s boss move is a different path from a raid's).
+  - Nothing hides a text box to make it fit, and hiding a figure mustn't hide the words beside it.
+
 ## Measure what's on screen; don't trust a screenshot
 
 - **Purity that didn't match the item** (Oct 6, [story](../docs/history/lessons.md#purity-that-didnt-match-the-item-oct-6-2026)):

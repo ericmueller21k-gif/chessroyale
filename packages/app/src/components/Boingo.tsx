@@ -55,8 +55,8 @@ function pieMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   );
 }
 
-function funhouseMoment({ boss, moment, t, banner, line: kitsLine, anim: kitAnim }: MomentProps) {
-  const line = kitsLine() ?? FUNHOUSE_LINES[hash(moment.key) % FUNHOUSE_LINES.length]!;
+function funhouseMoment({ boss, moment, t, banner, anim: kitAnim }: MomentProps) {
+  // (His line, as he lands on the board, is in his text box: FUNHOUSE.lineAt, said into his voice.)
   return (
     <div class="power-moment pm-funhouse">
       {t < 1500 && banner("FUNHOUSE!", undefined, "fun")}
@@ -64,11 +64,6 @@ function funhouseMoment({ boss, moment, t, banner, line: kitsLine, anim: kitAnim
         <span class={`pm-pogo${t >= FUNHOUSE.exitAt ? " out" : ""}`}>
           {kitAnim() ? <BossMoment boss={boss.name} anim={kitAnim()!} since={moment.at + FUNHOUSE.clownAt} then="idle" /> : <BossFace boss={boss} />}
         </span>
-      )}
-      {t >= FUNHOUSE.lineAt && t < FUNHOUSE.exitAt && (
-        <div class="pm-line" role="status" aria-label={line}>
-          {line.slice(0, Math.min(line.length, Math.floor((t - FUNHOUSE.lineAt) / 28) + 1))}
-        </div>
       )}
     </div>
   );
@@ -84,6 +79,8 @@ export const BOINGO_UI = {
       order: 3,
       kit: "ultimate",
       dock: "Funhouse!",
+      line: (kit, m) => funhouseLine(kit, m.key),
+      lineAt: FUNHOUSE.lineAt,
       own: (boss) => !!boss.powers?.funhouse && boss.powers.funhouse.turn === boss.crowdMoves && boss.powers.events.some((e) => e.kind === "funhouse"),
       view: funhouseMoment,
     },

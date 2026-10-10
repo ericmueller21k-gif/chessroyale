@@ -254,3 +254,75 @@ design). Phase 1 is pure code: the rules (`packages/chess/src/squads/`), squad b
   - a shorter Armageddon (about 20 moves);
   - for Eric to weigh, after playtests: a lower safety cap or a cap for the final, which is now the longest round,
     and a material tiebreak before Armageddon in round 2.
+
+### Speech that stays up long enough to read (Oct 10, 2026)
+
+Eric, playing Ginger in Boss alone: when she froze his queen, her text box appeared and vanished almost at once. The
+same kind of bug as Hollow's Lights out box (PR #124). A sweep of every boss's lines and the God King's found five
+causes, all fixed by one shared rule (`packages/app/src/speech.tsx`, numbers in `SPEECH` in settings.ts):
+
+- **Her text box was tied to the screen:** a reaction's line (her capture, her check) lived 3.4 s only while the
+  battle stayed at the same beat. Alone, the boss's move shows for 0.45 s, so the line was gone as the crowd's turn
+  began; and a power's moment hid her (`.boss-char`, box and all) while she cast. With a freeze, her line went 0.45 s
+  after it came: what Eric saw.
+- **Power lines lived in the dock for the moment's own length** (a freeze 2.3 s, the warning 1.7 s), mostly under the
+  moment's banner, then the next moment or "Your move." replaced them.
+- **Lines drawn over the board lived as long as their moment** (Boingo's funhouse line 1.8 s; Hollow's cover, claim
+  and Big Boy's snack lines until their moment ended).
+- **The God King's line was a flat 3.8 s** whatever its length (his opening lines take up to 1.5 s just to type), and
+  any critical cue replaced it at once, even another critical one just begun.
+- **Lights out:** "It's time." and the verdict were up 2.8 s at most, the verdict cut to about 2 s when Lights out's
+  screen ended, and the prompt box could still be hidden by its fit check.
+
+**The rule, and my calls:**
+- **The time:** a line types out (28 ms a character, as before), then stays fully readable for 2.5 s plus 50 ms a
+  character, at most 7 s (the brief's numbers), then fades (0.26 s). The fade comes after the readable time.
+- **One voice per speaker,** outliving any screen: the boss's (`bossVoice`) and the God King's. Each says one line at a
+  time; a new screen picks a line up where it was.
+- **A line's time runs from when this device says it** (as a boss's animations run from when it first saw their
+  moment), and a line that waited starts when it can show, not at the exact moment the last one ended: a busy frame
+  (the first e2e runs caught one of 240 ms) never eats into its time.
+- **Priorities:** critical cuts in on anything less; everything else waits its turn, highest first, then in the order
+  said. **A critical line doesn't cut in on another critical one** (it waits for it), so no line is ever cut by an equal.
+  Boss: an ultimate's line, Hollow's first cover (it says how the dark works), his claim, the battle's end are critical;
+  passives, the warning, the snack and Lights out's verdict are normal; reactions are low. God King: his critical cues
+  are critical, remarks normal, small talk low (his pacing by `KING_SPEECH` is unchanged).
+- **A waiting line lapses after 5 s** (`waitMs`): "your king's in check" said behind another line would otherwise come
+  after you've answered it.
+- **Every boss line goes in its text box beside it** (the boss bar on a phone, by the board on a computer), on every
+  screen, also while it stands at the board's corner for a moment (only its figure is hidden then). The dock says the
+  moment's word ("Freeze!"), as it already did for Hollow's dark. The on-board line boxes are gone (they covered the
+  board, so they couldn't stay into the crowd's turn). Lights out keeps its prompt box above the board, for the whole
+  round; his other Lights out words go in his text box.
+- **A move that brings a power's moment says nothing of its own,** so the moment's line comes with the moment instead
+  of waiting behind a reaction.
+- **A power's line is always said** (its kit's line for the moment, picked by the moment's key), as the dock always
+  showed one; reactions keep their kits' chances.
+- **Never hidden by a fit check:** a box that would run off the screen takes a smaller size, then moves back into view.
+- **Not changed:** banners (the powers' cut-ins, the Last Stand's) keep their beats, which the server's timing shares;
+  their words are big and untyped. The God King's bubble still gives way to his command menu while you have it open.
+- **Tests:** `packages/app/test/speech.test.ts`; `e2e/boss-speech.spec.ts` watches every frame of one moment of every
+  boss on a phone and a computer (its line whole and in view for its full time, and the God King's opening line). On
+  `main` it fails: the God King's line was up 3.6 s of the 4.7 s it needs, and Ginger's freeze line never reached her
+  text box.
+
+### The Last Stand: working as designed; three proposals for Eric (Oct 10, 2026)
+
+Eric's two games with Ginger: the save never came while he was losing on purpose (bad moves, then his queen left to be
+taken), then came at once for a bad queen move at the start. Replayed in Solo (`scripts/repro-last-stand.ts`, the
+runner's own numbers): moves that gave away 5, 12 and 20 points took the crowd from 52% to 19%, none reaching the bar
+(33 to 35); from 19%, the hung queen cost 9 points and the crowd was under `lastStandFrom` (40) anyway. A queen hung on
+move 1 cost 72 points against a bar of 35: Last Stand. The rule is as Eric set it (Oct 5): judged on the crowd's move
+as played, in points of chances; once a game; never below 40%; the same solo and online; charges add 5 to the bar; no
+move window but the bar easing over 22 moves; never waiting for the boss's capture. No rule changed.
+
+**Proposals (Eric decides):**
+1. **Judge the piece lost, not only the chances** (my pick). When the boss's best reply wins the queen or a rook
+   outright, or mates, he steps in whatever the chances, while the crowd's best is still worth 10% or more. The judge
+   already works out what a blunder loses (`blunderCost`), at no extra engine time. A queen left for the taking in a
+   game already going badly (Eric's game 1) would be saved.
+2. **Measure in pawns once the position is bad.** Below 40%, call him when one move gives away 5 pawns or more by the
+   engine's eval (a rook, a queen); above 40%, as now.
+3. **Lower the "already lost" line** (`lastStandFrom` 40 → 20) **with a bar that's a share of what's left** below 40%
+   (e.g. the move throws away 60% of the crowd's remaining chances). One number alone isn't enough: from 25% no move
+   can lose 35 points.
