@@ -119,7 +119,7 @@ try {
 }
 const filled = marks["phase filled"] ?? t0;
 const ended = marks["phase results"] ?? Date.now();
-const rewards = await Promise.all(clients.map((c, i) => (cookies[i] ? me(base, cookies[i]!) : null)));
+const rewards = await Promise.all(clients.map((c, i) => (cookies[i] ? me(base, cookies[i]!).catch(() => null) : null)));
 const lines = [
   `# Squads: a lobby through the real server`,
   "",
