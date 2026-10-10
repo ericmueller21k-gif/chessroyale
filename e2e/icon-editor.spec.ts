@@ -48,9 +48,11 @@ test("the icon builder's tools survive being spammed", async ({ page }) => {
   expect(await pixel(page, 47, 0)).toEqual([0x00, 0xa2, 0xe8, 255]);
 
   // The other tools, spammed too: pencil strokes, the eraser, clear, and more undos than there are steps.
-  const box = (await canvas.boundingBox())!;
   for (const tool of ["Pencil", "Eraser"]) {
     await page.getByRole("button", { name: tool, exact: true }).click();
+    // (The sheet scrolls on a phone: measure the canvas where it is now, or a stroke lands on the scrim and closes it.)
+    await canvas.scrollIntoViewIfNeeded();
+    const box = (await canvas.boundingBox())!;
     for (let i = 0; i < 10; i++) {
       await page.mouse.move(box.x + 2, box.y + 2 + i * 4);
       await page.mouse.down();
