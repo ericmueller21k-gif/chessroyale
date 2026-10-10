@@ -24,6 +24,7 @@ import {
   type Settings,
 } from "@chessroyale/core";
 import type { BoardState } from "../boards.ts";
+import type { NetBossPowers } from "../protocol.ts";
 import { pieceAt } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
@@ -196,6 +197,20 @@ export interface BossRules {
   };
   /** In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). */
   afterCrowdMove?(b: Battle, move: string | null): void;
+  /** In the match: its own costs on a round's scores (Hollow's wrong tries into the dark). */
+  scoreRound?(b: Battle, players: { playerId: string; roundScore: number }[]): void;
+  /**
+   * How its battle starts, if not from the game so far: `fromStart`, from the starting position; `crowdWhite`, the crowd
+   * always plays White (in a raid where it would have been Black, he claims the dark side first); `setUp`, anything
+   * else done to the board before move 1, returning what to add to its powers' state (Big Boy eats a pawn).
+   */
+  opening?: {
+    fromStart?: boolean;
+    crowdWhite?: boolean;
+    setUp?(b: Battle, at: { boardId: number; seed: number; crowdSide: Side; generation: number }): Partial<BossPowerState>;
+  };
+  /** What the screens get of its own state, on top of every boss's (protocol.ts, NetBossPowers). */
+  view?(p: BossPowerState): Partial<NetBossPowers>;
 }
 
 /** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */

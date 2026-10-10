@@ -20,12 +20,9 @@ import {
   type BossPowerState,
   type BossState,
   type BounceResult,
-  type DarkSquare,
-  type LightsOutRound,
-  type LightsOutTarget,
   type PowerEvent,
 } from "@chessroyale/core";
-import { applyMove, inCheck, legalMoves, pieceAt } from "./rules.ts";
+import { legalMoves, pieceAt } from "./rules.ts";
 import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
 import {
@@ -34,7 +31,6 @@ import {
   type Battle,
   type BossLastMove,
   crowdHalf,
-  from,
   logit,
   materialOf,
   meterFull,
@@ -56,11 +52,13 @@ import {
 import { GINGER } from "./bosses/ginger.ts";
 import { BOINGO } from "./bosses/boingo.ts";
 import { GREX } from "./bosses/grex.ts";
+import { HOLLOW } from "./bosses/hollow.ts";
 
 export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, ragePoints, rageTick, type Battle, type BossLastMove, type BossRules, type RageRates, type TurnContext };
 export * from "./bosses/ginger.ts";
 export * from "./bosses/boingo.ts";
 export * from "./bosses/grex.ts";
+export * from "./bosses/hollow.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */
 export function initPowers(seed: number, fen: string, crowdSide: Side): BossPowerState {
@@ -102,310 +100,6 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
   else rules.passive(next, t);
   return { ...boss, powers: next };
-}
-
-// ---------------- Hollow: the dark ----------------
-
-/** His moves made as a crowd turn begins: the crowd (White, from the starting position) moves first. */
-const hisMoves = (turn: number) => Math.max(0, turn - 1);
-
-/** He covers a square after his `n`th move: his first, then every darkEvery-th (his 4th, 7th, 10th…). */
-export const coversAfter = (n: number, s: Pick<BossPowerSettings, "darkEvery"> = BOSS_POWERS) => n >= 1 && (n - 1) % s.darkEvery === 0;
-
-/**
- * His bulbs still lit as a crowd turn begins: his moves until he next covers a square (one goes out with each move;
- * the last as he covers, and they relight). 1 before his first move, then 3, 2, 1, 3, 2, 1…
- */
-export function bulbsAt(turn: number, s: Pick<BossPowerSettings, "darkEvery"> = BOSS_POWERS): number {
-  const n = hisMoves(turn);
-  const next = n < 1 ? 1 : 1 + Math.ceil(n / s.darkEvery) * s.darkEvery;
-  return next - n;
-}
-
-/** Every piece's square on the board, by side, kings apart. */
-function occupied(fen: string): { w: string[]; b: string[]; kings: string[] } {
-  const out = { w: [] as string[], b: [] as string[], kings: [] as string[] };
-  fen
-    .split(" ")[0]!
-    .split("/")
-    .forEach((row, r) => {
-      let f = 0;
-      for (const c of row) {
-        if (c >= "1" && c <= "8") f += Number(c);
-        else {
-          const sq = `${"abcdefgh"[f]}${8 - r}`;
-          if (c.toLowerCase() === "k") out.kings.push(sq);
-          else out[c === c.toUpperCase() ? "w" : "b"].push(sq);
-          f++;
-        }
-      }
-    });
-  return out;
-}
-
-/**
- * The square he covers: after his first move, the square of the piece he just moved (`moved`); later, a random
- * occupied square from the seed, his or the crowd's (a coin flip for whose, so roughly half each), never a king's,
- * never one already dark. Null when there's none.
- */
-export function chooseDark(fen: string, crowd: Side, seed: number, turn: number, dark: readonly DarkSquare[] = [], moved?: string | null): string | null {
-  const taken = new Set(dark.map((d) => d.square));
-  const board = occupied(fen);
-  if (moved && !taken.has(moved) && !board.kings.includes(moved) && pieceAt(fen, moved)) return moved;
-  const mine = powerRoll(seed, "dark-side", turn) < 0.5 ? crowd : other(crowd);
-  const pick = (side: Side) => board[side].filter((sq) => !taken.has(sq));
-  const pool = pick(mine).length ? pick(mine) : pick(other(mine));
-  return pool.length ? pool[Math.floor(powerRoll(seed, "dark", turn) * pool.length)]! : null;
-}
-
-/** The dark squares as this crowd turn stands (for the board and the judge of move attempts). */
-export const darkSquares = (boss: Pick<BossState, "powers"> | null | undefined): string[] => (boss?.powers?.dark ?? []).map((d) => d.square);
-
-/** A move attempt touches the dark (starts on a dark square, lands on one or passes over one). */
-export const touchesDark = (move: string, dark: readonly string[], fen?: string): boolean => dark.length > 0 && moveSquares(move, fen).some((sq) => dark.includes(sq));
-
-/**
- * A move attempt sent unchecked because it touches the dark, as the judge reads it: the legal move it is (a pawn's
- * move to the last rank without a piece named becomes a queen), or null when it isn't one.
- */
-export function darkAttempt(fen: string, move: string): string | null {
-  const legal = legalMoves(fen);
-  if (legal.includes(move)) return move;
-  if (move.length === 4 && legal.includes(`${move}q`)) return `${move}q`;
-  return null;
-}
-
-// ---------------- Hollow: Lights out ----------------
-
-/** His Lights out comes now: the start of his turn, from the full meter (or the test trigger), once a match. */
-export const lightsOutDue = (boss: BossState | null | undefined): boolean => {
-  const p = boss?.powers;
-  return !!p && !boss!.result && bossPowers(boss)?.ultimate === "lightsout" && !p.lightsOut && (!!p.ultNext || p.ultAt === boss!.crowdMoves);
-};
-
-/** Where each kind of his pieces starts, by file (the back rank, or the pawns' rank). */
-const HOME_FILES: Record<string, string> = { k: "e", q: "d", r: "ah", b: "cf", n: "bg", p: "abcdefgh" };
-/** A piece of `side` still on a square it starts the game on (it may never have moved: anyone could find it). */
-export const onStartSquare = (type: string, square: string, side: Side): boolean =>
-  (HOME_FILES[type] ?? "").includes(square[0]!) && square[1] === (type === "p" ? (side === "w" ? "2" : "7") : side === "w" ? "1" : "8");
-
-/** The squares that answer a target: every piece of the type (a pawn: those on its file). */
-const answersOf = (t: LightsOutTarget, mine: readonly { square: string; type: string }[]) =>
-  mine.filter((x) => x.type === t.type && (!t.file || x.square[0] === t.file)).map((x) => x.square);
-
-/**
- * Lights out's rounds: what he names in each (BOSS_POWERS.lightsOutRounds: 1, 2, then 3 pieces), from the seed, never
- * anything trivial (Eric, Oct 9): only pieces that have left their starting squares.
- * - A type is named only if every piece he has of it has moved ("Find my queen."; two or more: "Find one of my
- *   rooks.", any of them counts), else the one left at home would give it away.
- * - A pawn is named by its file, and only a moved pawn alone on its file ("Find my pawn on the c-file.").
- * - Nothing is named twice in the test. Pieces before pawns, each in a random order from the seed.
- * - Not enough of those (an early or a test game): as a last resort, types with a piece at home, then pawns at home
- *   alone on their file, then any file of pawns ("one of my pawns on the c-file"). A round with nothing left to name
- *   is dropped.
- * Each round's answers are every square that answers one of its targets.
- */
-export function chooseLightsOut(fen: string, side: Side, seed: number, s: Pick<BossPowerSettings, "lightsOutRounds"> = BOSS_POWERS): LightsOutRound[] {
-  const mine: { square: string; type: string }[] = [];
-  for (const f of "abcdefgh")
-    for (let r = 1; r <= 8; r++) {
-      const pc = pieceAt(fen, `${f}${r}`);
-      if (pc?.color === side) mine.push({ square: `${f}${r}`, type: pc.type });
-    }
-  const order = <T>(xs: T[], key: (x: T) => string) => xs.map((x) => ({ x, k: powerRoll(seed, "lights", key(x)) })).sort((a, b) => a.k - b.k).map((e) => e.x);
-  const types = [..."kqrbn"].filter((t) => mine.some((x) => x.type === t));
-  const moved = (xs: typeof mine) => xs.every((x) => !onStartSquare(x.type, x.square, side));
-  const ofType = (t: string) => mine.filter((x) => x.type === t);
-  const pawnsOn = (f: string) => mine.filter((x) => x.type === "p" && x.square[0] === f);
-  const files = [..."abcdefgh"].filter((f) => pawnsOn(f).length > 0);
-  const typeTarget = (t: string): LightsOutTarget => ({ type: t, ...(ofType(t).length > 1 ? { several: true } : {}) });
-  const pawnTarget = (f: string): LightsOutTarget => ({ type: "p", file: f, ...(pawnsOn(f).length > 1 ? { several: true } : {}) });
-  const lone = files.filter((f) => pawnsOn(f).length === 1);
-  const candidates = [
-    ...order(types.filter((t) => moved(ofType(t))), (t) => t).map(typeTarget),
-    ...order(lone.filter((f) => moved(pawnsOn(f))), (f) => `p${f}`).map(pawnTarget),
-    // The last resort: pieces that haven't moved.
-    ...order(types.filter((t) => !moved(ofType(t))), (t) => t).map(typeTarget),
-    ...order(lone.filter((f) => !moved(pawnsOn(f))), (f) => `p${f}`).map(pawnTarget),
-    ...order(files.filter((f) => pawnsOn(f).length > 1), (f) => `p${f}`).map(pawnTarget),
-  ];
-  let next = 0;
-  const RANK = "kqrbnp";
-  return s.lightsOutRounds
-    .map((round) => {
-      // (Named in board order, the bigger pieces first, pawns by file: "Find my queen and my pawn on the c-file.")
-      const targets = candidates.slice(next, (next += round.pieces)).sort((a, b) => RANK.indexOf(a.type) - RANK.indexOf(b.type) || (a.file ?? "").localeCompare(b.file ?? ""));
-      const answers = [...new Set(targets.flatMap((t) => answersOf(t, mine)))].sort();
-      return { pieces: targets.map((t) => t.type), targets, answers, ms: round.ms };
-    })
-    .filter((r) => r.pieces.length > 0);
-}
-
-/** A round's targets (a round from before they were spelt out: one type target per piece letter). */
-const targetsOf = (round: Pick<LightsOutRound, "pieces" | "targets">): LightsOutTarget[] => round.targets ?? round.pieces.map((type) => ({ type }));
-
-/**
- * A round's taps, judged in order. Every tap is a try, and a player has as many tries as there are pieces to find: a
- * square answering a target still to find finds it; one answering a target already found changes nothing (but uses
- * the try); any other is wrong. The pieces not found are missed.
- */
-export function judgeTaps(round: Pick<LightsOutRound, "pieces" | "targets">, fen: string, side: Side, taps: readonly string[]): { found: string[]; wrong: string[]; used: number; missed: number; done: boolean } {
-  const targets = targetsOf(round);
-  const done = new Set<number>();
-  const found: string[] = [];
-  const wrong: string[] = [];
-  const seen = new Set<string>();
-  let used = 0;
-  for (const sq of taps) {
-    if (used >= targets.length) break;
-    if (seen.has(sq)) continue;
-    seen.add(sq);
-    used++;
-    const pc = pieceAt(fen, sq);
-    const answers = (t: LightsOutTarget) => pc?.color === side && pc.type === t.type && (!t.file || sq[0] === t.file);
-    const i = targets.findIndex((t, k) => !done.has(k) && answers(t));
-    if (i >= 0) {
-      done.add(i);
-      found.push(sq);
-    } else if (!targets.some(answers)) wrong.push(sq);
-  }
-  return { found, wrong, used, missed: targets.length - found.length, done: used >= targets.length };
-}
-
-/** A bot's Lights out, round by round: how many pieces it finds (each with its round's lightsOutBotHit chance, from the seed). */
-export function botLightsFound(seed: number, botId: string, rounds: readonly Pick<LightsOutRound, "pieces">[], s: Pick<BossPowerSettings, "lightsOutBotHit"> = BOSS_POWERS): number[] {
-  return rounds.map((r, i) => {
-    const hit = s.lightsOutBotHit[Math.min(i, s.lightsOutBotHit.length - 1)] ?? 0.5;
-    return r.pieces.filter((_, k) => powerRoll(seed, "lights-bot", botId, i, k) < hit).length;
-  });
-}
-
-/** A bot's Lights out: how many pieces it misses in all (botLightsFound). */
-export function botLightsMisses(seed: number, botId: string, rounds: readonly Pick<LightsOutRound, "pieces">[], s: Pick<BossPowerSettings, "lightsOutBotHit"> = BOSS_POWERS): number {
-  const found = botLightsFound(seed, botId, rounds, s);
-  return rounds.reduce((n, r, i) => n + r.pieces.length - found[i]!, 0);
-}
-
-/**
- * The crowd's count in Lights out (Eric, Oct 10): the pieces found by everyone in the test, the pieces settled so far
- * (found, or missed for good), and the pieces asked of them in all. The find rate is found over asked once it's over;
- * while it runs, found over settled (the screens' meter).
- */
-export interface LightsTally {
-  found: number;
-  settled: number;
-  asked: number;
-}
-
-/**
- * The crowd's count so far, from the server's own judging. `ended`: the rounds over. A person's round (judgeTaps):
- * every try settles a piece (one try a piece: a try that finds nothing means a piece missed), and once the round is
- * over, all of its pieces are. A bot's finds count as each round ends (botLightsFound).
- */
-export function lightsTally(
-  rounds: readonly Pick<LightsOutRound, "pieces">[],
-  ended: number,
-  people: readonly (readonly { found: readonly unknown[]; used?: number }[])[],
-  bots: readonly (readonly number[])[],
-): LightsTally {
-  const all = rounds.reduce((n, r) => n + r.pieces.length, 0);
-  let found = 0;
-  let settled = 0;
-  for (const mine of people)
-    rounds.forEach((r, i) => {
-      if (i > ended) return;
-      const m = mine[i];
-      const f = Math.min(r.pieces.length, m?.found.length ?? 0);
-      found += f;
-      settled += i < ended ? r.pieces.length : Math.min(r.pieces.length, Math.max(f, m?.used ?? f));
-    });
-  for (const bot of bots)
-    rounds.forEach((r, i) => {
-      if (i >= ended) return;
-      found += Math.min(r.pieces.length, bot[i] ?? 0);
-      settled += r.pieces.length;
-    });
-  return { found, settled, asked: all * (people.length + bots.length) };
-}
-
-/** The running find rate (0 to 1): found over settled; null before anything is settled. */
-export const lightsRate = (t: Pick<LightsTally, "found" | "settled">): number | null => (t.settled > 0 ? t.found / t.settled : null);
-
-/** The crowd held the light: its find rate over the whole test at or above lightsOutHold (nothing asked: it held). */
-export const lightsHeld = (t: Pick<LightsTally, "found" | "asked">, s: Pick<BossPowerSettings, "lightsOutHold"> = BOSS_POWERS): boolean =>
-  t.asked <= 0 || t.found >= s.lightsOutHold * t.asked - 1e-9;
-
-/** Hollow: squares covered in the dark (their pieces hidden), and Lights out, a memory test, at the start of his turn. */
-export const HOLLOW: BossRules = {
-  id: "hollow",
-  ultimateOnHisTurn: true,
-  // Lights out: the meter full as this turn begins, it comes at the start of his turn after the crowd's move
-  // (lightsOutDue). The full meter is its only warning (no "RAGE!"). The test switch: the meter fills as the second turn
-  // begins.
-  ultimate(next, t) {
-    if (meterFull(next, t) || testSwitch(t)) next.ultAt = t.turn;
-    return false;
-  },
-  // The dark: the squares whose turns are over clear; after his first move and every darkEvery-th after it, he covers
-  // another. His bulbs count down to it.
-  passive(next, t) {
-    const old = next.dark ?? [];
-    next.dark = old.filter((d) => d.until >= t.turn);
-    next.cleared = old.filter((d) => d.until < t.turn).map((d) => d.square);
-    const n = hisMoves(t.turn);
-    if (coversAfter(n, t.s)) {
-      const square = chooseDark(t.fen, t.crowd, t.seed, t.turn, next.dark, n === 1 && t.lastMove ? to(t.lastMove) : null);
-      if (square) {
-        next.dark = [...next.dark, { square, at: t.turn, until: t.turn + t.s.darkTurns - 1 }];
-        t.events.push({ kind: "dark", turn: t.turn, square, ...(n === 1 ? { first: true as const } : {}) });
-      }
-    }
-    next.bulbs = bulbsAt(t.turn, t.s);
-  },
-};
-
-// ---------------- Hollow: the extra move (a failed Lights out) ----------------
-
-/**
- * The position with him to move again after his own move (the crowd's turn passed: the side to move swapped, no en
- * passant), or null when it can't be: the crowd is in check or has no move (the game is over).
- */
-export function passTurn(fen: string): string | null {
-  try {
-    if (inCheck(fen) || !legalMoves(fen).length) return null;
-    const f = fen.split(" ");
-    f[1] = f[1] === "w" ? "b" : "w";
-    f[3] = "-";
-    const passed = f.join(" ");
-    return legalMoves(passed).length ? passed : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * His extra move's candidates in the passed position: quiet moves only (Eric, Oct 10): no capture (en passant
- * included), no promotion, no check; and never one that leaves the crowd without a move (a stalemate would decide
- * the game). His own king is never left in check (only legal moves).
- */
-export function extraMoveCandidates(passed: string): string[] {
-  return legalMoves(passed).filter((m) => {
-    if (m.length > 4 || pieceAt(passed, to(m))) return false;
-    if (pieceAt(passed, from(m))?.type === "p" && m[0] !== m[2]) return false;
-    const after = applyMove(passed, m);
-    return !inCheck(after) && legalMoves(after).length > 0;
-  });
-}
-
-/**
- * His extra move, from the candidates' scores (his expected score after each, 0 to 1) and `before`, his expected score
- * had he not moved again: the one that gains him most without gaining more than `cap` points (expected x 100), nor
- * losing more than that; never one with a forced mate either way in its line. Null when there's none.
- */
-export function pickExtraMove(scored: readonly MoveScore[], before: number, candidates: readonly string[], cap: number = BOSS_POWERS.lightsOutExtraGain): string | null {
-  const ok = new Set(candidates);
-  const within = scored.filter((m) => ok.has(m.move) && m.mate === undefined && Math.abs(m.expected - before) * 100 <= cap + 1e-9);
-  return [...within].sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1))[0]?.move ?? null;
 }
 
 // ---------------- Big Boy: the snack, toy blocks, the Big Bounce ----------------

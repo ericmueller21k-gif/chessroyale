@@ -78,20 +78,8 @@ import {
   judgeMustScore,
   judgeRanked,
   triggerUltimate,
-  bulbsAt,
-  botLightsFound,
-  botLightsMisses,
-  chooseLightsOut,
-  extraMoveCandidates,
-  lightsHeld,
-  lightsTally,
-  passTurn,
-  pickExtraMove,
   type LightsTally,
-  darkAttempt,
   darkSquares,
-  lightsOutDue,
-  touchesDark,
   blockSquare,
   bounceCandidates,
   bounceDue,
@@ -103,6 +91,7 @@ import {
   type BounceCandidate,
   type BounceScore,
   boingoBattle,
+  hollowBattle,
   moveLoss,
   type Battle,
   type BossLastMove,
@@ -376,13 +365,12 @@ export class MatchRunner {
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
     let crowdSide = sideToMove(board.fen);
-    // Hollow, the dark boss: always Black, from the starting position (no opening moves). If the usual pick made the
-    // crowd Black, he claims the dark side before move 1.
-    const claimed = startsDark(def) && crowdSide === "b";
-    if (startsDark(def)) {
-      this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
-      crowdSide = "w";
-    }
+    // A boss whose battle starts from the starting position (no opening moves), and one who always plays Black (Hollow):
+    // if the usual pick made the crowd Black, he claims the dark side before move 1.
+    const opening = bossRules(def)?.opening;
+    const claimed = !!opening?.crowdWhite && crowdSide === "b";
+    if (opening?.fromStart && !startsWithSnack(def)) this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
+    if (opening?.crowdWhite) crowdSide = "w";
     // Big Boy: the starting position too (sides as usual), less the crowd's centre pawn he eats before move 1.
     const snack = startsWithSnack(def) ? this.snackBoard(id, seed, crowdSide, board.generation) : null;
     const fen = this.boards.get(id)!.fen;
@@ -435,36 +423,14 @@ export class MatchRunner {
     return darkSquares(this.state.boss);
   }
 
-  /**
-   * Hollow's dark: a move attempt that touches a dark square, sent unchecked. A legal (allowed) move is the player's
-   * pick (`move`: a pawn's move to the last rank without a piece named is a queen's). An illegal one costs darkTryCost
-   * off the turn's score (resolveBoard takes it off), and the player picks again; the darkTries-th wrong one ends their
-   * turn as a missed move (`out`). Anything else (no dark on its way, the move the God King took back): refused, free.
-   * Bots never try: they know the board.
-   */
+  /** Hollow's dark: a move attempt that touches a dark square, sent unchecked (see hollowBattle.darkTry). */
   darkTry(playerId: string, move: string): { kind: "move"; move: string } | { kind: "wrong"; tries: number; out: boolean } | { kind: "refused" } {
-    const b = this.state.boss;
-    const p = b?.powers;
-    const board = this.boardOf(playerId);
-    if (!b || !p || !board || typeof move !== "string" || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) return { kind: "refused" };
-    const dark = darkSquares(b);
-    const legal = darkAttempt(board.fen, move);
-    if (legal) {
-      const allowed = this.crowdAllowed(board.id);
-      return allowed && !allowed.includes(legal) ? { kind: "refused" } : { kind: "move", move: legal };
-    }
-    if (!touchesDark(move, dark, board.fen)) return { kind: "refused" };
-    const round = this.state.round;
-    const by = p.tries?.round === round ? { ...p.tries.by } : {};
-    by[playerId] = (by[playerId] ?? 0) + 1;
-    this.state = { ...this.state, boss: { ...b, powers: { ...p, tries: { round, by } } } };
-    return { kind: "wrong", tries: by[playerId]!, out: by[playerId]! >= BOSS_POWERS.darkTries };
+    return hollowBattle.darkTry(this.battle, playerId, move);
   }
 
   /** Hollow's dark: each player's wrong attempts into the dark this round. */
   darkTries(): Record<string, number> {
-    const t = this.state.boss?.powers?.tries;
-    return t && t.round === this.state.round ? t.by : {};
+    return hollowBattle.darkTries(this.battle);
   }
 
   /** Boss battle, G-REX's fire: the tiles ablaze this crowd turn (a crowd piece left on one burns after the move). */
@@ -816,12 +782,8 @@ export class MatchRunner {
       .map(([move, expected]) => ({ move, expected, loss: Math.max(0, (best - expected) * 100) }))
       .sort((a, b) => b.expected - a.expected);
     for (const id of abstained) result.players.push({ playerId: id, move: null, loss: null, roundScore: 0, abstained: true });
-    // Hollow's dark: each wrong attempt into the dark costs darkTryCost; a turn never costs more than missing it.
-    const tries = this.darkTries();
-    for (const pl of result.players) {
-      const n = tries[pl.playerId] ?? 0;
-      if (n > 0) pl.roundScore = Math.max(this.settings.missedMoveScore, pl.roundScore - n * BOSS_POWERS.darkTryCost);
-    }
+    // The boss's own costs on the round (Hollow's wrong attempts into the dark).
+    if (this.state.boss) bossRules(this.state.boss)?.scoreRound?.(this.battle, result.players);
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
@@ -1138,109 +1100,37 @@ export class MatchRunner {
 
   /** Hollow's Lights out is due: the start of his turn (the crowd has moved), from the full meter or the test trigger. */
   lightsOutDue(): boolean {
-    return lightsOutDue(this.state.boss) && this.bossToMove();
+    return hollowBattle.lightsOutDue(this.battle);
   }
 
-  /**
-   * Lights out begins (the clocks stopped: nobody is picking): its rounds, picked from the battle's seed and the
-   * position. Once a match: the ultimate is spent from here.
-   */
+  /** Lights out begins (the clocks stopped): its rounds (see hollowBattle.startLightsOut). */
   startLightsOut(): LightsOutTest {
-    const b = this.state.boss!;
-    const { ultNext: _trigger, ...p } = b.powers!;
-    const fen = this.boards.get(this.state.boards[0]!)!.fen;
-    const test: LightsOutTest = { at: b.crowdMoves, rounds: chooseLightsOut(fen, b.crowdSide === "w" ? "b" : "w", p.seed) };
-    this.state = { ...this.state, boss: { ...b, powers: { ...p, ultAt: p.ultAt ?? b.crowdMoves, lightsOut: test } } };
-    return test;
+    return hollowBattle.startLightsOut(this.battle);
   }
 
-  /**
-   * Lights out is over: every player still in loses lightsOutMiss for each piece they didn't find (people's from their
-   * taps, `missed`; a person with no entry found nothing; bots' from the seed). It isn't a move: nothing else changes,
-   * and fair play never sees it. Returns what each missed.
-   */
+  /** Lights out is over: each player's misses cost them (see hollowBattle.finishLightsOut). Returns what each missed. */
   finishLightsOut(missed: Readonly<Record<string, number>>): Record<string, number> {
-    const b = this.state.boss!;
-    const p = b.powers!;
-    const test = p.lightsOut;
-    if (!test || test.missed) return test?.missed ?? {};
-    const all = test.rounds.reduce((n, r) => n + r.pieces.length, 0);
-    const out: Record<string, number> = {};
-    const alive = this.alive();
-    for (const pl of alive) out[pl.id] = pl.isBot ? botLightsMisses(p.seed, pl.id, test.rounds) : Math.max(0, Math.min(all, missed[pl.id] ?? all));
-    const cost = BOSS_POWERS.lightsOutMiss;
-    // The crowd's find rate over the whole test (Eric, Oct 10): under lightsOutHold, he moves twice before its turn.
-    const asked = all * alive.length;
-    const found = asked - alive.reduce((n, pl) => n + out[pl.id]!, 0);
-    const held = lightsHeld({ found, asked });
-    this.state = {
-      ...this.state,
-      players: this.state.players.map((pl) => (out[pl.id] ? { ...pl, stageScore: pl.stageScore - out[pl.id]! * cost } : pl)),
-      boss: { ...b, powers: { ...p, lightsOut: { ...test, missed: out, found, asked, ...(held ? {} : { extra: "due" as const }) } } },
-    };
-    return out;
+    return hollowBattle.finishLightsOut(this.battle, missed);
   }
 
-  /**
-   * Lights out's crowd count so far (the screens' meter, and the verdict as its last round ends): each person's taps
-   * judged (`people`, by id: judgeTaps round by round; nobody's entry, nothing found), each bot's finds from the seed
-   * as each round ends. `ended`: the rounds over. The same people and bots as finishLightsOut counts.
-   */
+  /** Lights out's crowd count so far (see hollowBattle.lightsTally). */
   lightsTally(people: Readonly<Record<string, readonly { found: readonly unknown[]; used?: number }[]>>, ended: number): LightsTally {
-    const p = this.state.boss!.powers!;
-    const rounds = p.lightsOut?.rounds ?? [];
-    const alive = this.alive();
-    return lightsTally(
-      rounds,
-      ended,
-      alive.filter((pl) => !pl.isBot).map((pl) => people[pl.id] ?? []),
-      alive.filter((pl) => pl.isBot).map((pl) => botLightsFound(p.seed, pl.id, rounds)),
-    );
+    return hollowBattle.lightsTally(this.battle, people, ended);
   }
 
-  /**
-   * Hollow's extra move is due: the crowd failed Lights out (under lightsOutHold), and he has played his own move (the
-   * crowd's turn has begun, not yet dealt). Like the funhouse, it comes before the crowd picks.
-   */
+  /** Hollow's extra move is due: the crowd failed Lights out, and he has played his own move. */
   extraMoveDue(): boolean {
-    const b = this.state.boss;
-    const t = b?.powers?.lightsOut;
-    // (Only before the crowd's next move: once it has moved, a driver that skipped it has let it lapse.)
-    return t?.extra === "due" && t.at === b!.crowdMoves && !b!.result && !this.finalGameOver() && !this.bossToMove();
+    return hollowBattle.extraMoveDue(this.battle);
   }
 
   /** His extra move: a quiet one that gains him only a little (extraMoveFrom), from this device's engine. */
   async playExtraMove(engine: EngineLike = this.opts.engines[0]!): Promise<string | null> {
-    return this.applyExtraMove(await extraMoveFrom(engine, this.boards.get(this.state.boards[0]!)!.fen));
+    return hollowBattle.playExtraMove(this.battle, engine);
   }
 
-  /**
-   * Plays his extra move (from the host's engine online): the crowd's turn passes (a base on the board: the position
-   * changes between moves), then his quiet move. A move that isn't one of the candidates (extraMoveCandidates), or
-   * none, and he skips it. It isn't the crowd's: nothing is scored and fair play never sees it; the crowd's turn (its
-   * powers already set as his own move landed) follows as usual. Returns the move played, or null.
-   */
+  /** Plays his extra move (from the host's engine online; see hollowBattle.applyExtraMove). Returns it, or null. */
   applyExtraMove(move: string | null): string | null {
-    const b = this.state.boss!;
-    const p = b.powers!;
-    const test = p.lightsOut;
-    if (!test || test.extra !== "due" || test.at !== b.crowdMoves) return null;
-    const id = this.state.boards[0]!;
-    const board = this.boards.get(id)!;
-    const passed = passTurn(board.fen);
-    if (!move || !passed || !extraMoveCandidates(passed).includes(move)) {
-      this.state = { ...this.state, boss: { ...b, powers: { ...p, lightsOut: { ...test, extra: "skipped" } } } };
-      return null;
-    }
-    const ply = board.history.length;
-    const base: BoardState = { ...board, fen: passed, expected: 1 - board.expected, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: passed }] };
-    this.boards.set(id, playOnBoard(base, move, base.expected));
-    this.bossLast = { move, san: toSan(passed, move) };
-    this.state = {
-      ...this.state,
-      boss: { ...b, powers: { ...p, lightsOut: { ...test, extra: "played" }, events: [...p.events, { kind: "extra", turn: p.turn, square: move.slice(2, 4) }] } },
-    };
-    return move;
+    return hollowBattle.applyExtraMove(this.battle, move);
   }
 
   /** Big Boy's Big Bounce is due: the start of his turn (the crowd has moved), from the warning or the test trigger. */
@@ -1424,16 +1314,7 @@ export class MatchRunner {
               ...(powers.passive === "blocks"
                 ? { block: p.block ? { square: p.block.square, at: p.block.at, until: p.block.until } : null, snack: p.snack?.square ?? null, bounce: p.bounce ?? null }
                 : {}),
-              ...(powers.passive === "dark"
-                ? {
-                    dark: (p.dark ?? []).map((d) => ({ square: d.square, at: d.at, until: d.until })),
-                    cleared: p.cleared ?? [],
-                    bulbs: p.bulbs ?? bulbsAt(p.turn || 1),
-                    ...(p.claimed ? { claimed: true } : {}),
-                    lightsAt: p.lightsOut ? p.lightsOut.at : null,
-                    ...(p.lightsOut?.extra ? { lightsExtra: p.lightsOut.extra } : {}),
-                  }
-                : {}),
+              ...(bossRules(b)?.view?.(p) ?? {}),
             },
           }
         : {}),
@@ -1450,8 +1331,8 @@ export class MatchRunner {
     // Which boss: a random playable one (as in a raid), at the crowd's strength plus its own offset.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
-    // (Hollow, the dark boss, plays from the starting position; Big Boy too, less the pawn he eats.)
-    if (startsDark(def) || startsWithSnack(def)) startPly = 0;
+    // (A boss who plays from the starting position: Hollow; Big Boy too, less the pawn he eats.)
+    if (bossRules(def)?.opening?.fromStart || startsWithSnack(def)) startPly = 0;
     const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
     this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
     const snack = startsWithSnack(def) ? this.snackBoard(id, seed, "w", old.generation + 1) : null;
@@ -1647,9 +1528,6 @@ export class MatchRunner {
 
 export type BossMoveKind = "elo" | "stumble" | "stagger";
 
-/** Hollow, the dark boss: always Black, from the starting position (his passive is the dark). */
-export const startsDark = (def: { powers: { passive: string } | null } | null | undefined) => def?.powers?.passive === "dark";
-
 /** The limits on a boss's moves (see bossSlipLoss, bossMaxLoss and bossMaxLogitLoss in settings). */
 export interface BossGuard {
   slipLoss: readonly [number, number];
@@ -1729,27 +1607,6 @@ export async function bossMoveFrom(
   const best = top[0]!.expected;
   const got = top.find((m) => m.move === move)?.expected ?? (await engine.scoreMoves(fen, [move]))[0]?.expected ?? 0;
   return confirm(withinGuard(moveLoss(best, got), guard) ? move : pickByLoss(top, guard.slipLoss, guard), guard);
-}
-
-/**
- * Hollow's extra move after a failed Lights out (Eric, Oct 10): with the crowd's turn passed, a quiet move (no capture,
- * check or promotion; extraMoveCandidates) that gains him at most `cap` points over not moving again, nor loses him
- * more (pickExtraMove), by the same engine searches the boss's moves use: his expected score had he not moved again is
- * one less the crowd's best in the position now; the engine's top moves first, then the other candidates. Null (he
- * skips it) when the crowd is in check, or no candidate is within the cap.
- */
-export async function extraMoveFrom(engine: EngineLike, fen: string, cap: number = BOSS_POWERS.lightsOutExtraGain): Promise<string | null> {
-  const passed = passTurn(fen);
-  if (!passed) return null;
-  const candidates = extraMoveCandidates(passed);
-  if (!candidates.length) return null;
-  const crowdBest = (await engine.topMoves(fen, 1))[0];
-  const before = crowdBest ? 1 - crowdBest.expected : 0.5;
-  const top = (await engine.topMoves(passed, 8)).filter((m) => candidates.includes(m.move));
-  const pick = pickExtraMove(top, before, candidates, cap);
-  if (pick) return pick;
-  const rest = candidates.filter((m) => !top.some((t) => t.move === m));
-  return rest.length ? pickExtraMove([...top, ...(await engine.scoreMoves(passed, rest))], before, candidates, cap) : null;
 }
 
 /** Each position's top move at `nodes`, shared out over the engines (each takes the next position as it's free). */
