@@ -1,11 +1,11 @@
 # Squads: bot simulation
 
-72 full lobbies of 32 (8 squads of 4), 8 for every skill mix × Clock option, from
+108 full lobbies of 32 (8 squads of 4), 12 for every skill mix × Clock option, from
 `packages/sim/scripts/squads-sim.ts` (`npm run sim:squads`), through the real rules in `packages/chess/src/squads/`.
 Each lobby plays the whole bracket: round 1 Relay (4 matches on 4 boards), round 2 Pairs (2 matches on 2 boards),
 the final (Pick and Block), and an Armageddon board after a drawn final. Every board has a chess clock and is played
-to the end (the silent safety cap at move 120 aside). Start votes rotate between the normal start, one opening and
-random openings.
+to the end (the silent safety cap at move 120 aside): each Clock option sets a quick clock for rounds 1 and 2 and a
+roomier one for the final. Start votes rotate between the normal start, one opening and random openings.
 
 **How the seats are played.** Every seat is a person played by a bot: the bot engine (Stockfish 19 lite at
 10,000 nodes, its top 8 moves) then `botPick` at the person's skill, a temperature over each move's loss:
@@ -26,25 +26,25 @@ Minutes from the votes to the final's last move (Armageddon included).
 
 | Clock | Median | 90th percentile | Longest | Shortest | Median if rounds ran in lockstep |
 | --- | --- | --- | --- | --- | --- |
-| Fast 1+2 | 24.3 | 27.2 | 27.5 | 19.0 | 24.3 |
-| Normal 1:45+2 | 31.3 | 34.6 | 36.3 | 26.3 | 31.3 |
-| Long 2+3 | 35.5 | 38.2 | 39.8 | 23.2 | 36.8 |
+| Fast 1+2, final 4+3 | 32.6 | 35.3 | 36.9 | 25.6 | 32.8 |
+| Normal 1+2, final 4+4 | 33.8 | 36.8 | 38.7 | 26.4 | 34.0 |
+| Long 1+2, final 4:30+4 | 36.0 | 39.2 | 43.5 | 25.2 | 36.0 |
 
 By skill mix (median minutes):
 
-| Mix | Fast 1+2 | Normal 1:45+2 | Long 2+3 |
+| Mix | Fast 1+2, final 4+3 | Normal 1+2, final 4+4 | Long 1+2, final 4:30+4 |
 | --- | --- | --- | --- |
-| Strong | 23.1 | 33.3 | 35.3 |
-| Mixed | 25.6 | 28.3 | 37.1 |
-| Casual | 24.3 | 30.9 | 35.5 |
+| Strong | 33.2 | 34.4 | 35.4 |
+| Mixed | 32.4 | 33.6 | 36.3 |
+| Casual | 32.5 | 33.6 | 37.9 |
 
 A match's length (mean minutes, Armageddon included) and its moves per side (its longest board):
 
 | Clock | Round 1 (Relay): min | Round 2 (Pairs): min | Final: min | Round 1 (Relay): moves | Round 2 (Pairs): moves | Final: moves |
 | --- | --- | --- | --- | --- | --- | --- |
-| Fast 1+2 | 6.5 | 7.0 | 8.0 | 34.2 | 27.4 | 26.1 |
-| Normal 1:45+2 | 8.1 | 9.1 | 10.3 | 36.3 | 32.0 | 30.3 |
-| Long 2+3 | 9.7 | 10.5 | 12.0 | 35.9 | 31.9 | 31.0 |
+| Fast 1+2, final 4+3 | 6.4 | 6.9 | 16.6 | 33.8 | 27.5 | 35.0 |
+| Normal 1+2, final 4+4 | 6.4 | 6.9 | 17.7 | 33.8 | 27.5 | 35.0 |
+| Long 1+2, final 4:30+4 | 6.4 | 6.9 | 19.5 | 33.8 | 27.5 | 37.5 |
 
 ## How boards end
 
@@ -52,15 +52,23 @@ All mixes. A flag is a win on time; a flag against bare material is a draw.
 
 | Clock | Round | Mate | Draw by the rules | Flag (win) | Flag (draw) | Safety cap | Left unfinished (clinched) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Fast 1+2 | Round 1 (Relay) | 71.4% | 0.0% | 22.7% | 0.0% | 0.0% | 6.0% |
-| Fast 1+2 | Round 2 (Pairs) | 36.5% | 0.0% | 63.5% | 0.0% | 0.0% | 0.0% |
-| Fast 1+2 | Final | 25.0% | 0.0% | 75.0% | 0.0% | 0.0% | 0.0% |
-| Normal 1:45+2 | Round 1 (Relay) | 85.7% | 0.0% | 5.7% | 0.0% | 0.0% | 8.6% |
-| Normal 1:45+2 | Round 2 (Pairs) | 69.8% | 0.0% | 30.2% | 0.0% | 0.0% | 0.0% |
-| Normal 1:45+2 | Final | 62.5% | 0.0% | 37.5% | 0.0% | 0.0% | 0.0% |
-| Long 2+3 | Round 1 (Relay) | 90.1% | 0.0% | 1.0% | 0.0% | 0.0% | 8.9% |
-| Long 2+3 | Round 2 (Pairs) | 77.1% | 0.0% | 21.9% | 1.0% | 0.0% | 0.0% |
-| Long 2+3 | Final | 62.5% | 0.0% | 37.5% | 0.0% | 0.0% | 0.0% |
+| Fast 1+2, final 4+3 | Round 1 (Relay) | 73.6% | 0.0% | 20.1% | 0.0% | 0.0% | 6.3% |
+| Fast 1+2, final 4+3 | Round 2 (Pairs) | 39.6% | 0.0% | 60.4% | 0.0% | 0.0% | 0.0% |
+| Fast 1+2, final 4+3 | Final | 94.4% | 0.0% | 5.6% | 0.0% | 0.0% | 0.0% |
+| Normal 1+2, final 4+4 | Round 1 (Relay) | 73.6% | 0.0% | 20.1% | 0.0% | 0.0% | 6.3% |
+| Normal 1+2, final 4+4 | Round 2 (Pairs) | 39.6% | 0.0% | 60.4% | 0.0% | 0.0% | 0.0% |
+| Normal 1+2, final 4+4 | Final | 97.2% | 0.0% | 2.8% | 0.0% | 0.0% | 0.0% |
+| Long 1+2, final 4:30+4 | Round 1 (Relay) | 73.6% | 0.0% | 20.1% | 0.0% | 0.0% | 6.3% |
+| Long 1+2, final 4:30+4 | Round 2 (Pairs) | 39.6% | 0.0% | 60.4% | 0.0% | 0.0% | 0.0% |
+| Long 1+2, final 4:30+4 | Final | 94.4% | 0.0% | 5.6% | 0.0% | 0.0% | 0.0% |
+
+Games decided on time (a flag fall, a win or a draw), by round:
+
+| Clock | Round 1 boards | Round 2 boards | Finals | Armageddons |
+| --- | --- | --- | --- | --- |
+| Fast 1+2, final 4+3 | 20.1% | 60.4% | 5.6% | – |
+| Normal 1+2, final 4+4 | 20.1% | 60.4% | 2.8% | – |
+| Long 1+2, final 4:30+4 | 20.1% | 60.4% | 5.6% | – |
 
 ## Ties
 
@@ -68,17 +76,17 @@ Rounds 1 and 2: a level match goes to the squad with more clock time left (a coi
 
 | Clock | R1 clinched early | R1 level → time | R2 level → time | Level → coin | Median time gap deciding a tie (s) | Final drawn → Armageddon | Armageddon won by Black | Minutes per Armageddon |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Fast 1+2 | 24.0% | 42.7% | 29.2% | 0 of 55 | 17.6 | 0.0% | – | – |
-| Normal 1:45+2 | 34.4% | 40.6% | 37.5% | 0 of 57 | 15.3 | 0.0% | – | – |
-| Long 2+3 | 35.4% | 29.2% | 37.5% | 0 of 46 | 13.9 | 0.0% | – | – |
+| Fast 1+2, final 4+3 | 25.0% | 41.7% | 36.1% | 0 of 86 | 18.6 | 0.0% | – | – |
+| Normal 1+2, final 4+4 | 25.0% | 41.7% | 36.1% | 0 of 86 | 18.6 | 0.0% | – | – |
+| Long 1+2, final 4:30+4 | 25.0% | 41.7% | 36.1% | 0 of 86 | 18.6 | 0.0% | – | – |
 
 ## Clock pressure and missed actions
 
 | Clock | Actions per lobby | Missed | …the ceiling reached | Flag falls per lobby | Seats handed to a bot, per lobby |
 | --- | --- | --- | --- | --- | --- |
-| Fast 1+2 | 1423.1 | 2.3% | 0.0% | 6.9 | 0.1 |
-| Normal 1:45+2 | 1557.0 | 2.1% | 0.0% | 2.5 | 0.0 |
-| Long 2+3 | 1578.4 | 2.1% | 0.0% | 1.5 | 0.0 |
+| Fast 1+2, final 4+3 | 1478.4 | 2.3% | 0.0% | 5.7 | 0.0 |
+| Normal 1+2, final 4+4 | 1478.5 | 2.3% | 0.0% | 5.7 | 0.0 |
+| Long 1+2, final 4:30+4 | 1498.2 | 2.3% | 0.1% | 5.7 | 0.0 |
 
 ## Round 2: how often the coin plays the weaker pick
 
@@ -86,9 +94,9 @@ Per pair move (forced moves left out). "Weaker" is by the engine's expected scor
 
 | Mix | Pair moves | Picks 1+ point apart | Coin played the weaker pick (1+ point) | …weaker by 5+ points | …weaker by 20+ points | Moves with a missed slot |
 | --- | --- | --- | --- | --- | --- | --- |
-| Strong | 4950 | 32.7% | 16.1% | 7.9% | 3.9% | 3.5% |
-| Mixed | 4986 | 31.3% | 16.0% | 8.9% | 3.7% | 3.5% |
-| Casual | 4964 | 29.1% | 14.3% | 7.9% | 3.6% | 3.4% |
+| Strong | 6579 | 37.4% | 18.3% | 8.7% | 4.2% | 2.9% |
+| Mixed | 6975 | 35.0% | 18.7% | 10.3% | 4.5% | 3.1% |
+| Casual | 6306 | 31.6% | 15.6% | 8.2% | 3.1% | 3.3% |
 
 ## The final: picks, blocks and the mercy rules
 
@@ -96,9 +104,9 @@ Per move of the final (and its Armageddon), forced moves left out.
 
 | Mix | Moves | No blocks (3 or fewer legal moves) | A block hits a pick | Blocks that hit a pick | Active block hits a pick | …the better pick | …the worse pick | …picks level | Block cancelled (mate in one) | Forfeited blocks | The worse pick played (1+ point) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Strong | 1398 | 2.6% | 71.7% | 51.7% | 48.5% | 11.2% | 4.4% | 32.9% | 1 (0.1%) | 1.5% | 17.2% |
-| Mixed | 1311 | 2.7% | 65.1% | 43.6% | 41.3% | 9.8% | 2.4% | 29.2% | 3 (0.2%) | 2.2% | 17.2% |
-| Casual | 1397 | 2.1% | 60.3% | 40.0% | 38.4% | 8.6% | 2.7% | 27.1% | 3 (0.2%) | 1.9% | 18.8% |
+| Strong | 2433 | 3.7% | 69.1% | 50.5% | 48.0% | 9.3% | 3.8% | 35.0% | 14 (0.6%) | 2.5% | 13.0% |
+| Mixed | 2599 | 3.8% | 64.2% | 43.6% | 41.0% | 5.7% | 1.0% | 34.4% | 10 (0.4%) | 1.7% | 10.7% |
+| Casual | 2537 | 3.8% | 60.9% | 40.0% | 38.0% | 7.6% | 1.4% | 29.0% | 15 (0.6%) | 2.2% | 15.7% |
 
 The "what this means for fun" section is written by hand below this line.
 
@@ -111,56 +119,38 @@ runs to the safety cap). The minutes come from a model of how people use a clock
 - bank / 25 + 0.8 × increment a move, never under 2 s;
 - a 2% chance of drifting off and missing an action.
 
-The clock options are tuned to that model, so the first playtests should check it: real think times, real misses.
+The first playtests should check that model: real think times, real misses.
 
-- **The lobby fits.** Medians are 24 (Fast), 31 (Normal) and 36 (Long) minutes, and every 90th percentile is under 40
-  (the longest of 72 lobbies, 39.8). The phase-1 rules took about 98 minutes at their defaults. Each round's match
-  now takes 6-12 minutes, and games run 26-36 moves a side.
-- **To fit, the clocks are short and increment-heavy.** Eric's starting options (2+1, 4+2, 6+3) take about 29, 43 and
-  61 minutes (medians of 12 lobbies each, same model). At 4+2 and 6+3 flags hardly decide anything (2% of Pairs
-  boards, 8% of finals). **So the 20-40 minute target and few flags pull against each other:** thinking time is what
-  makes a lobby long.
-  - In Pairs and the final a side's clock runs until both pickers lock in, so a pair can't move much faster than its
-    slower player. With a small increment its bank drains in any long game.
-  - A missed action costs the whole ceiling.
-  - That's why every option has at least 2 s of increment and the ceiling is 20 s, not 40. At 40 s, misses decided
-    most finals on time in the tuning runs.
-- **Flags decide a real share of games, more in the team rounds:**
-  - Relay: 23% of boards on Fast, 6% on Normal, 1% on Long.
-  - Pairs: 64%, 30% and 23%.
-  - The final: 75%, 37.5% and 37.5%.
+**Eric's option B: quick early rounds, a roomier final.** Each Clock option sets a quick clock for rounds 1 and 2
+and the final's own, longer one.
 
-  Fast is a time scramble by design; on Normal and Long a final is lost on time about one time in three. If
-  playtests find that anti-fun, the levers are, in order:
-  - more increment in Pairs and the final than in Relay (two players must agree);
-  - the blockers' side's clock running once both pickers have locked in (so blockers can't sit on the timer, and the
-    pickers don't pay for waiting);
-  - a shorter ceiling;
-  - longer clocks, accepting a longer lobby.
-- **Ties are common, and time settles them cleanly.** 30-43% of Relay matches and 29-38% of Pairs matches end level on
-  points and go to the squad with more time left. The median gap is 14-18 s, and none of about 160 ties needed the
-  coin. It rewards a squad that plays briskly, which suits a timed mode. Relay still clinches early in 24-35% of
-  matches.
-- **Armageddon is now rare.** No final in 72 lobbies was drawn (they end in mate or on time), so the Armageddon board
-  is a safety net, not a regular feature.
-- **The coin and the blocks.**
-  - Pairs: the coin plays a clearly weaker pick (5+ points) on 8-9% of moves, and a real blunder (20+ points) on
-    about 4%. That's lively but fair.
-  - Blocks land on a pick on 60-72% of the final's moves and the active one on 38-49%. Bots that play with purpose
-    all want the same best move, and blockers aim there. But only 9-11% of moves have the block force a clearly
-    worse pick; most hits land on two picks that were as good as each other.
-  - The mercy rules stay rare: blocks off on 2-3% of moves, a block cancelled before mate on 0.1-0.2%.
-- **Missed actions:** about 2% of actions, and almost no seat goes to a bot.
+- **Every option fits 20-40 minutes:**
+  - Fast (1+2, final 4+3): median 32.6, 90th percentile 35.3.
+  - Normal (1+2, final 4+4): median 33.8, 90th percentile 36.8.
+  - Long (1+2, final 4:30+4): median 36.0, 90th percentile 39.2. One Long lobby of 36 ran 43.5 minutes.
+- **The final is the showdown and rarely ends on time:** 2.8-5.6% of finals (36 each), against 37-75% with one clock
+  for every round. A final takes 17-20 minutes and about 35 moves a side. Earlier tuning runs found the final needs
+  about 4 minutes of bank, so a miss (the whole 20 s ceiling) is absorbed, and at least 3 s of increment (4+2: 17% on
+  time). With 3:30 the share hovered around the
+  15% line (8-22% across runs), and with 3 minutes it was 17-23%. An increment of 3-4 s lets two pickers keep pace, and more didn't clearly help.
+- **The early rounds are a scramble, by design.** On time: 20% of Relay boards and 60% of Pairs boards. Pairs runs
+  on the slower picker's time at 1+2, so most Pairs boards end on a flag. Relay matches take about 6.5 minutes, Pairs
+  about 7.
+- **The options can't spread far.** A 4-minute final costs 17-20 minutes and the early rounds about 16, so every
+  option lands at 32-36 minutes. The options differ in the final's room (4+3, 4+4, 4:30+4), not much in length.
+- **Ties stay clean.** About 40% of Relay matches and a third of Pairs matches end level on points and go to the squad
+  with more time left (a median gap of 19 s); none of 86 needed the coin. No final was drawn, so Armageddon stays a
+  safety net.
+- **The coin, the blocks and the mercy rules** behave as before:
+  - the coin plays a clearly weaker pair pick (5+ points) on 8-10% of moves;
+  - the final's active block forces a clearly worse pick on 6-9%;
+  - blocks are off (few legal moves) on 4% of moves, and cancelled before a mate on 0.5%.
 
 ### Tuning I recommend
-1. **Ship these clocks** (Fast 1+2, Normal 1:45+2, Long 2+3) and the 20 s ceiling for the first playtests, and measure
-   real think times, misses and lobby length. Retune with this script (`npm run sim:squads -- 8 10000 "<clocks>"`)
-   once the model can be fitted to real data.
-2. **For Eric: lobby length or flags.** If finals lost on time feel wrong, there are three ways out:
-   - give Pairs and the final extra increment (about +1 s);
-   - switch the clock to the blockers once both pickers lock in;
-   - accept a longer lobby (4+2 is about 43 minutes, with few flags).
-
-   Each changes what he asked for, so it's his call.
-3. **Phase 2:** start each match as soon as its two feeder matches are done (the sim assumes it). It saves little on
-   average (under a minute), but a squad never waits on a match it doesn't need.
+1. **Ship these clocks** for the first playtests and measure real think times, misses and lobby length. Then retune
+   with `npm run sim:squads -- 12 10000 "<early>/<final>,..."`, or tune finals alone with `SQUADS_SIM_FINALS_ONLY=1`.
+2. **If Pairs feels decided by the clock** (60% of its boards end on time), give the early rounds 3 s of increment
+   (1+3). That's about 2 minutes longer and 53% on time.
+3. **If Fast should feel clearly faster,** something has to give:
+   - a smaller final bank (3:30+3 saves about a minute, but 17-22% of finals end on time); or
+   - shorter reveals in Pairs (3 s now).
