@@ -12,6 +12,7 @@ import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
 import { HOLLOW, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT, bulbsLook } from "./hollow.ts";
+import { SAWYER, SAWYER_PORTRAIT } from "./sawyer.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
 
@@ -25,6 +26,9 @@ export interface BossKit extends BeatLines {
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
   /** Taller than the boss bar's usual box (G-REX's long neck): on a phone the bar grows to hold him. */
   tall?: boolean;
+  /** Wider than the boss bar's usual box (Sawyer's saw and tail): on a phone his box is wider, so neither the screen's
+   * edge nor the boss's name cuts into him. */
+  wide?: boolean;
   /** A recolour (one of the character's `looks`) from the battle's state: Hollow's bulbs still lit. */
   lookOf?: (boss: BossView) => string | undefined;
 }
@@ -136,6 +140,29 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { ...BIGBOY_PORTRAIT, anim: "idle", frame: 0 },
     // His snack is the crowd's pawn: white, or black when the crowd plays Black.
     lookOf: (boss) => (boss.crowdSide === "b" ? "blackPawn" : undefined),
+  },
+  // A sprite preview only (?wip=1&kit=Sawyer): no boss, powers, lines or sounds of his own yet. He has three animations,
+  // so every moment plays one of them, and his cues borrow quiet sounds as placeholders.
+  "Sawyer": {
+    ch: SAWYER,
+    anims: {
+      entrance: "rev",
+      thinking: "idle",
+      move: "rev",
+      capture: "sawDown",
+      hurt: "idle",
+      check: "rev",
+      smug: "idle",
+      rattled: "idle",
+      defeat: "idle",
+      victory: "rev",
+      strike: "sawDown",
+    },
+    sounds: { rev: "grexFizz", swing: "clownSlideDown", cut: "gingerCrunch" },
+    lines: {},
+    chance: {},
+    portrait: { ...SAWYER_PORTRAIT, anim: "idle", frame: 0 },
+    wide: true,
   },
 };
 

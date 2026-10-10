@@ -326,3 +326,55 @@ move window but the bar easing over 22 moves; never waiting for the boss's captu
 3. **Lower the "already lost" line** (`lastStandFrom` 40 → 20) **with a bar that's a share of what's left** below 40%
    (e.g. the move throws away 60% of the crowd's remaining chances). One number alone isn't enough: from 25% no move
    can lose 35 points.
+
+### Sawyer, a sprite preview (Oct 10, 2026)
+
+A raccoon in a hard hat with a reciprocating saw, from Eric's reference, drawn so Eric can see him before deciding
+whether to keep this boss (as with Big Boy's preview). Art only: no powers, rules, lines or sounds of his own, and no
+entry in `packages/core/src/boss.ts`, so he never shows in a battle. His kit is `BOSS_KITS["Sawyer"]`, seen only through
+the test link `?wip=1&kit=Sawyer`.
+
+- **Art** (`characters/sawyer.ts`): about 73 x 69 px (with his halo) in an 83 x 73 frame, three-quarters on and facing
+  our left as in the reference, light from the top left. A wide, low stance; a yellow hard hat with three ridges and a
+  brim lower at the front; a bold black bandit mask across his eyes, a toothy grin rising to his near cheek; a white
+  near-cheek tuft; a cream chest; white gloves; a big ringed tail curling up behind him; the saw held
+  across him at about 14°, blade up to our left, as in the reference. The fur is the reference's warm grey-brown.
+  - **Rigging:** the saw is painted from its angle, where its front grip is and how far the blade has slid out, and the
+    gloves ride on its grips, so every saw pose is three numbers and the hands follow. The legs, arms and tail are
+    painted from their points; every part is painted the first time it shows (`lazyParts`).
+  - **No brand marks:** the saw is plain red and black. Its motor's vents are a grille of three short slits; a first
+    try with three stacked dashes read like a letter, so it was changed.
+  - **No goggles (Eric, Oct 10, after the first preview):** the reference's safety goggles hid the raccoon's mask, so
+    they're gone, lenses and strap, and his face is drawn to read as a raccoon first: a bold black mask band from cheek
+    to cheek with the eyes inside it (white, pupils glaring inward with a glint, the tops cut on a slant), white brow
+    patches above it whose lower edges slant down to his nose (the angry brows), a dark stripe down his forehead,
+    white cheeks and a long pointed white snout with a black nose. The grin and the hat are as before; the saw keeps
+    its length (Eric considered a longer blade and decided against it).
+- **Fitting the phone's boss bar:** he is wider than the other bosses (the saw one way, the tail the other). To keep
+  the blade off the screen's edge and the tail off the boss's name: the stance is a few pixels narrower than the
+  reference's, the tail curls closer in and swishes further behind him than out, and the blade is a pixel shorter. His
+  kit is also `wide`: on a phone his box in the boss bar is 58 px wide instead of 48 (`.boss-char.place-bar.wide`,
+  like G-REX's `tall`). Checked in the game on a phone and a computer (`npm run frames:character -- <dir> Boingo both
+  kit=Sawyer`).
+- **Animations:**
+  - `idle` (loop, about 4.9 s, silent): the blade buzzes in and out the whole time (a pixel or two, every 90 ms), his
+    tail swishes slowly, he dips at the knees now and then, blinks twice, and halfway through smirks for a moment (his
+    near brow up, the grin pulled to one side, teeth on that side).
+  - `rev`: a smirk, then he squeezes the trigger (cue `rev`): the saw shakes in his hands and tips up, the blade
+    strokes fast, sawdust sprays off its teeth, his hat jiggles and he grins wide; then back to the smirk.
+  - `sawDown`: he lifts the saw back, leans in and drives it down (cue `swing`), the blade biting at the ground in front
+    of him (cue `cut`) in a burst of sawdust, buzzing there, then pulls it back up. The blade goes in at about 35° below
+    level, not straight down: the saw is as long as he is tall, so straight down would leave his frame. Where the tip
+    bites is exported as `CUT`, for the powers to aim their cut (a pawn, then the board) later.
+- **Never above his hat:** nothing in any animation rises above his hat at rest (the hat's jiggle goes down over his
+  brow, not up), so on a phone he stays under the heading above the bar (a test checks every frame).
+- **Placeholders for the preview only:** every moment plays one of his three animations (his entrance, move, check and
+  victory the rev; a capture and a strike the saw down; the rest the idle), and his cues borrow quiet existing sounds
+  (G-REX's fizz for the rev, Boingo's slide whistle for the swing, Ginger's crunch for the cut) because every cue must
+  have one. No lines.
+- **Portrait:** his hat, mask and grin.
+- **In the test link** he takes the place of every boss, but a battle is still that boss's: when Boingo's powers fire,
+  the boss bar hides its character for the power's moment (as it always does) and Sawyer has no moment to play there.
+- Tests: `packages/app/test/sawyer.test.ts` (a preview kit with no boss; never above his hat; the idle's buzz, swish,
+  blink and smirk, silent; the rev and saw down's cues and where the cut lands; the portrait), plus the shared
+  character tests.
