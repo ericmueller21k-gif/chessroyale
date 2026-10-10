@@ -435,3 +435,65 @@ banners, intro, results and dock; his kit and character, keyed by that name; his
 `grex` (code, file names, settings, `?boss=grex`, stored records), `?boss=jefferson` works too (`BOSS_ALIASES`, read
 only from a link so a stored id is always the roster's), code comments keep the old name, and his dinosaur jokes from
 the old name ("Tiny arms? Not me!", "Extinct… again…") stay until Eric says otherwise.
+
+### The eval bar's switch (Oct 10, 2026)
+
+Eric suspects the eval bar may hurt the game more than it helps and wants to be able to find out, so it stays on by
+default and players get a switch to turn it off. Calls:
+
+- **Where:** Settings only (Eric, Oct 10: never on a board screen), under Playing, as "Eval bar", in the same switch
+  style as the rest of the page.
+- **Stored on the device** (`prefs.ts`, `brc.evalBar`, every read and write in try/catch): accounts keep no preferences
+  today, and adding a preferences store for one switch isn't worth it yet.
+- **Every mode:** the one `EvalBar` component (play, reveal, vote, final, boss screens) draws nothing when it's off. All
+  the layout rules that narrow the board are written for `.eval-bar ~ .board-wrap`, so the board takes the room back
+  by itself, centred, on a phone and a computer (on an iPhone 13 it grows from 312 to 333 px, where the height becomes
+  the limit; on a 1440 x 900 computer from 552 to 584 px). The vote board and the game board still match.
+- **The value is still worked out when it's off:** the God King's word on how it's going reads it (`knownEval`), and
+  he shouldn't talk differently because the bar is hidden; the cost is what it was with the bar on.
+- **Measuring it (cheap, so done):** each result records whether its player had the bar on (`results.eval_bar`: 1, 0,
+  or NULL from an older app): solo's result post carries it, and online the app says it in its `hello` (the lobby keeps
+  it per player; a hello again on coming back updates it). Later, `eval_bar` against placements and average loss
+  shows who turns it off and how they play.
+
+### A boss's attack on a king: Hollow lashes the God King in his Last Stand, and the crowd's king at his mate (Oct 10, 2026)
+
+Eric's brief: the reverse of the God King's strike on the boss. Hollow first; Eric wants to try it before the others
+get theirs. His correction (Oct 10): the main moment is the God King's Last Stand (Hollow attacks the God King as he
+saves the crowd); doing it again at checkmate was left to us. Calls:
+
+- **Both, with one animation.** The kit gets a `kingAttack` moment (`KingAttackKit`, kits.ts) that both use, on beats
+  every boss's attack shares (`KING_ATTACK`, boss-timing.ts): it drops in beside the king, ten hits 170 ms apart (a
+  gold "−N" off the king each, the God King's strike style), cackles and leaps off: 2.78 s. Shared beats keep the God
+  King's frames, the numbers, the sounds and the server's clock in step, whichever boss attacks.
+- **In the Last Stand it is the blow meant for the piece** (beat 5): instead of the 25 anonymous red slashes, Hollow
+  drops in as the piece slides back and lashes the God King, whose blows (a flash and a jolt each, his armour cracking
+  at the 2nd, 6th and 9th) land on the lashes; Hollow leaps off as he staggers; then the Last Stand carries on as
+  before (the collapse, the fade, the re-pick). It fits between the slide and the stagger, so the Last Stand is no
+  longer and the server needed no change for it. His numbers are the God King's gold strike style, as Eric asked,
+  not the red slash numbers.
+- **At his mate:** cosmetic only. The mating move shows, 0.6 s later Hollow drops in beside the crowd's king and lashes
+  it; the king (a copy, the real one hidden) flashes at each lash, darker each time, topples away from him at the last
+  and fades as his dark gathers on its square; then the result. The result waits for it: the mating move now holds
+  3.9 s (was 1.8 s; 0.45 s in Boss alone) for a boss with an attack, solo and online alike (`bossTurnShowMs`, used by
+  both; `KING_ATTACKERS` lists those bosses for the server, and a unit test keeps it equal to the kits). Other bosses
+  and every other move keep today's timing. No power's moment plays with a mate.
+- **Where he stands:** beside the king on the side towards the board's middle (mirrored when the king is on the left
+  half), a square and a half to two squares off, so the whole strand reads as a whip and its tip lands in the king's
+  square. A side-on lash reads better than one from "in front" on a top-down board, and the king's side always has
+  room. He is about 1.8 squares tall (36 frame pixels a square: at least one screen pixel per art pixel on a phone, so
+  his pixels stay crisp), over the squares beside the king for under 3 s while nobody can move.
+- **His art:** his own parts and palette (`HOLLOW_ATTACK`, a frame 38 px wider so the strand fits; his usual frame
+  stays as it was), four new strand poses (cracked out straight, flicked up, cracked out low, dropped), sparks off the
+  bulbs at its tip, and `lashHit` (the crack of a bulb's colour across the king's square, forehand or backhand) on
+  the shared `BoardEffects` canvas. Drawn ahead as his battle starts: his first drop-in frame took about 80 ms to draw
+  cold on a computer.
+- **His sound:** `hollowLash`, a low whoosh sinking as it swings, a dull snap and the wire's rattle; about 6 dB under
+  a move, centred near 240 Hz, no chimes (the loudness and "low and dark" tests cover it).
+- **His line:** as he lands, into his voice by the speech rule, critical (the battle's end, or the Last Stand's big
+  moment): "Shh. Sleep now, little king.", "Into the dark with you." or "Lights out, little king." His usual reaction
+  line to the mating move (a check line) stays quiet then.
+- **Test switches:** `?boss=hollow&laststand=1` (already there: your first move calls the Last Stand) and
+  `?boss=hollow&mate=1` (new, solo: the battle starts after 1.f3 e5 2.g4 with the boss to move, and it plays a mate in
+  one whenever it has one: the attack and the result within seconds of the intro). Frames:
+  `npm run frames:king-attack` (the page's clock paused and stepped 40 ms a frame).

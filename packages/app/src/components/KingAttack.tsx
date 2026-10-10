@@ -46,8 +46,20 @@ export function prewarmKingAttack(name: string): void {
   prewarm("lashHit", Object.entries(EFFECTS.lashHit.ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
 }
 
-/** The boss's mate brings its attack on the crowd's king: its move mated the crowd and its kit has one. */
-export const mateAttack = (boss: BossView | null | undefined): boolean => !!boss && !!bossKit(boss.name)?.kingAttack && mateAttackDue(boss);
+/**
+ * The boss's mate brings its attack on the crowd's king: its move mated the crowd and its kit has one. (Read on every
+ * frame of the boss's screen: the board's check for mate is worked out once per position.)
+ */
+const mated = { key: "", due: false };
+export function mateAttack(boss: BossView | null | undefined): boolean {
+  if (!boss || !bossKit(boss.name)?.kingAttack) return false;
+  const key = `${boss.id}:${boss.crowdSide}:${boss.board.fen}`;
+  if (mated.key !== key) {
+    mated.key = key;
+    mated.due = mateAttackDue(boss);
+  }
+  return mated.due;
+}
 
 /** Where the attack's "−N" numbers float off the king (squares from its middle): round it, kept on the board. */
 function hpSpot(i: number, col: number, row: number): { x: number; y: number } {
