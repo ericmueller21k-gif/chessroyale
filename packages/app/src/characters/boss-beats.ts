@@ -42,7 +42,9 @@ export type Beat =
   | "lightsHeld"
   | "lightsFailed"
   // Big Boy's snack before move 1 (the crowd's pawn, eaten).
-  | "snack";
+  | "snack"
+  // Sawyer's split pawn after his first move (that pawn sawn in two).
+  | "split";
 /** The loops it rests in between moments. */
 export type Loop = "idle" | "thinking" | "smug" | "rattled" | "defeat" | "victory";
 

@@ -581,6 +581,24 @@ export const BOSS_POWERS = {
    * in a lopsided position).
    */
   bouncePawnLogit: 0.95,
+  /**
+   * Sawyer's saw cuts: from crowd turn sawFirst (his split pawn has turn 2 to itself), every sawEvery crowd turns he
+   * saws one edge between two neighbouring squares in the crowd's half that one of its moves would cross, for sawTurns
+   * crowd turns (and his replies in between; then a turn's gap). Nothing, either side, may move straight across it (a
+   * rook, queen, king or pawn moving through it); diagonal moves and knights pass. It blocks moves, never attacks;
+   * never leaves anyone without a move, never blocks the only way out of check (it lifts for that turn).
+   */
+  sawFirst: 3,
+  sawEvery: 4,
+  sawTurns: 3,
+  /**
+   * The board saw (Sawyer's ultimate): the rage meter full, from crowd turn boardSawFrom, and one half of the board
+   * (files a-d or e-h) more his than the crowd's on material: the warning, then the next turn the board is sawn in two
+   * between the d and e files. For boardSawTurns crowd turns (and his replies) no move may cross between the halves,
+   * knights included; then they rejoin. Same fairness as the cuts.
+   */
+  boardSawFrom: 10,
+  boardSawTurns: 5,
 } as const;
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */

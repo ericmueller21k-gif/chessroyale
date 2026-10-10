@@ -74,9 +74,9 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw";
 /** Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual). */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -109,6 +109,9 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // Big Boy eats one of the crowd's centre pawns before move 1 (his snack), so he plays further under the lobby's
   // strength than the others (DECISIONS.md: "Big Boy, built": the boss sim's numbers).
   { id: "bigboy", name: "Big Boy", icon: "🍭", kit: "Big Boy", offset: -250, powers: { passive: "blocks", ultimate: "bounce" } },
+  // Sawyer saws his first pawn in two after his first move (the split pawn): a pawn's head start, so he plays further
+  // under the lobby's strength too (DECISIONS.md: "Sawyer, built": the boss sim's numbers).
+  { id: "sawyer", name: "Sawyer", icon: "🪚", kit: "Sawyer", offset: -250, powers: { passive: "cuts", ultimate: "boardsaw" } },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
@@ -260,6 +263,12 @@ export interface BossPowerState {
   block?: { square: string; at: number; until: number } | null;
   /** Big Boy's Big Bounce (his ultimate, at the start of his turn, after the crowd's move): what it did, once it has. */
   bounce?: BounceResult | null;
+  /** Sawyer's split pawn, once his first move is played (unset until then: his first move must be a pawn move). */
+  split?: SplitPawn;
+  /** Sawyer's saw cut: the edge between two neighbouring squares nothing may move straight across, its first and last crowd turn. */
+  cut?: SawCut | null;
+  /** Sawyer's board saw (his ultimate): no move may cross between the d and e files from crowd turn `at` through `until`. */
+  boardSaw?: { at: number; until: number } | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -276,6 +285,38 @@ export interface BounceResult {
   moves: { from: string; to: string; piece: string }[];
   spots: string[];
   loss: number | null;
+}
+
+/**
+ * Sawyer's split pawn: after his first move (crowd turn `turn` begins with it), the pawn sawn in two (`pawn`: the one
+ * he moved, or another of his when it had no square to split into; null: his first move wasn't a pawn's), or later
+ * (`waiting`), the new half on `square` beside it (null: no split yet, or none). The
+ * two halves are tracked through the game (`halves`: each one's square now and which side of the cut it was, "a" the
+ * half on the a-file side, "h" the other); a half that's taken or promotes is gone from the list.
+ */
+export interface SplitPawn {
+  turn: number;
+  pawn: string | null;
+  square: string | null;
+  halves: { square: string; side: "a" | "h" }[];
+  /**
+   * His first move was a pawn move but there was no room yet for another pawn of his (he had all 8, or the board 32
+   * pieces: the engine plays only positions with up to 8 pawns a side and 32 pieces), or no pawn of his had a square
+   * to split into: the split comes after his first pawn move once there is (then `turn`, `pawn` and `square` are
+   * that one's).
+   */
+  waiting?: true;
+}
+
+/**
+ * A saw cut on the edge between two orthogonally neighbouring squares (`a` before `b`: the lower file, or the lower rank
+ * on one file), from crowd turn `at` through `until` (sawTurns in all).
+ */
+export interface SawCut {
+  a: string;
+  b: string;
+  at: number;
+  until: number;
 }
 
 /** One of Hollow's dark squares: the crowd turn it fell as, and the last crowd turn it covers (darkTurns in all). */
@@ -353,9 +394,10 @@ export interface BurnEvent {
 
 /**
  * `extra`: Hollow's extra move after a failed Lights out (played after his own, before the crowd's turn). `block`: Big
- * Boy's toy block landing; `bounce`: his Big Bounce (at the start of his turn, after the crowd's move).
+ * Boy's toy block landing; `bounce`: his Big Bounce (at the start of his turn, after the crowd's move). `split`:
+ * Sawyer saws the pawn of his first move in two; `cut`: a saw cut on an edge; `boardsaw`: his board saw.
  */
-export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball" | "dark" | "extra" | "block" | "bounce";
+export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball" | "dark" | "extra" | "block" | "bounce" | "split" | "cut" | "boardsaw";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

@@ -3,6 +3,7 @@ import { SNACK, bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, dockLine, funhouseFlipAt, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackLine, snackPawnShown } from "../components/BigBoy.tsx";
+import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
@@ -243,9 +244,13 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // The Big Bounce: the board before it, less the pieces up in the air, then the new position as they come down; the
   // eval bar keeps the position before it until they've all settled. The board jolts as he lands and at the crash.
   const bounceShown = bounceFen(boss.powers?.bounce, bounce && now >= bounce.at ? bounce : null, now, boss.board.fen);
-  const boardFen = bounceShown ?? fenShown;
+  // Sawyer's split after his first move: the new half isn't on the board until the pawn cracks, and both are in the air
+  // (the moment draws them) until they've landed; the board doesn't animate those changes.
+  const split = moments.find((m) => m.kind === "split") ?? null;
+  const splitShown = bounceShown ? null : splitFen(boss.powers?.split, split, now, fenShown);
+  const boardFen = bounceShown ?? splitShown ?? fenShown;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : fenShown;
-  const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now);
+  const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)
   const burnNames = burning.length > 2 ? `${burning.length} pieces` : burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
   const fizzled = burnt.some((b) => b.fizzled);
@@ -262,7 +267,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun?.flipping ? " pw-flipping" : ""}`}>
           <BossSide match={match} />
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} lastMove={lastShown} animate={!bounceShown}>
+          <Board fen={boardFen} orientation={orientation} lastMove={lastShown} animate={!bounceShown && !splitStill(split, now)}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}

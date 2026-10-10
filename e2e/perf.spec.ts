@@ -258,3 +258,46 @@ test("Big Boy on a slow phone: his snack, his toy block and the whole Big Bounce
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
   }
 });
+
+test("Sawyer on a slow phone: the split, the board saw and his first saw cut stay within budget, the first time they show", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(4 * 60_000);
+  await page.addInitScript(instrument);
+  // (?power=boardsaw: the split and the warning as the 2nd turn begins, the board saw on the 3rd, the first cut the 4th.)
+  await page.goto("/?debug&nolanding&clock=60&boss=sawyer&power=boardsaw&laststand=0");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  const through = async (until: () => Promise<boolean>, ms = 60_000) => {
+    await page.evaluate(() => ((window as any).__perf.frames = []));
+    await expect.poll(until, { timeout: ms }).toBe(true);
+    return frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
+  };
+  const move = async () => {
+    const { fen, allowed } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }));
+    const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion && (!allowed || allowed.includes(m.from + m.to)));
+    await page.evaluate((uci) => (window as any).match.submit(uci), legal[0]!.from + legal[0]!.to);
+    await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+  };
+  await page.locator(".boss-intro").waitFor({ timeout: 30_000 });
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  await move();
+  // His first move, the split and the warning.
+  const split = await through(() => phase(page).then((p) => p === "play"));
+  await move();
+  // The board saw: he leaps on, revs, saws up the middle, the board splits.
+  const saw = await through(() => phase(page).then((p) => p === "play"));
+  await move();
+  // The first saw cut.
+  const cut = await through(() => phase(page).then((p) => p === "play"));
+  const powers = await page.evaluate(() => (window as any).match.boss.powers);
+  expect(powers.split).toBeTruthy();
+  expect(powers.boardSaw).toBeTruthy();
+  expect(powers.cut).toBeTruthy();
+  const f = (s: { p95: number; slow: number }) => `p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped`;
+  console.log(`Sawyer (slowed phone): split ${f(split)}; board saw ${f(saw)}; cut ${f(cut)}`);
+  for (const [what, s] of [["split", split], ["board saw", saw], ["cut", cut]] as const) {
+    expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
+    expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
+  }
+});

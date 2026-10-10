@@ -90,6 +90,22 @@
  *                               at SNACK.grabAt (take it off the board), eats it (`nom`, twice) and waddles off. His look
  *                               `blackPawn` when the crowd plays Black. Lines: `kit.lines.snack`.
  *
+ *   "Sawyer"
+ *     power        "sawDown"    A saw cut: he drives the saw down at the board's corner; at `cut` the groove opens on its
+ *                               edge: play `sawCut` open<S> on each of the edge's two squares (S the edge's side of that
+ *                               square on screen), raw<S> (loop) its first turn, tape1<S>/taped1<S> its second,
+ *                               tape2<S>/taped2<S> its third, heal<S> when it goes (cutItems() in components/Sawyer.tsx).
+ *     ultimateWarn "rev"        He revs the saw, for the warning.
+ *     ultimate     "boardSaw"   Played ON THE BOARD (hide him in his corner meanwhile), from BOARD_SAW (boss-timing.ts):
+ *                               a `leap` onto the board's bottom edge between the d and e files, a `rev`, then he saws
+ *                               his way up the middle (`bigsaw`), `boardGap` run behind him; at the top `part` (the
+ *                               board jolts) and `gap` (loop) while it lasts, `close` as the halves rejoin.
+ *     more:
+ *       split      "sawDown"    Played ON THE BOARD after his first move (SPLIT): a `leap` onto the pawn, the saw driven
+ *                               into it (`cut`), `sawCrack` on its square as it cracks, the two halves coming apart (the
+ *                               board's pieces, clipped to halves), a `leap` back. Lines: `kit.lines.split`.
+ *       leap       "leap"       A hop on or off the board: off the ground at LEAP.upAt, down at LEAP.landAt (`hop`).
+ *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
  *   keyed by the moment so every player gets the same line), and its sounds fire from its frames' cues.
@@ -163,6 +179,10 @@ export const POWER_ANIMS = [
   "toss",
   "bigBounce",
   "wail",
+  "rev",
+  "sawDown",
+  "leap",
+  "boardSaw",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -230,6 +250,15 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
       snack: { anim: "snack", hit: "nom", onBoard: true },
     },
   },
+  "Sawyer": {
+    power: { anim: "sawDown", hit: "cut", effects: ["sawCut"] },
+    ultimateWarn: { anim: "rev" },
+    ultimate: { anim: "boardSaw", hit: "bigsaw", onBoard: true, effects: ["boardGap"] },
+    more: {
+      split: { anim: "sawDown", hit: "cut", onBoard: true, effects: ["sawCrack"] },
+      leap: { anim: "leap", hit: "hop", onBoard: true },
+    },
+  },
 };
 
 export type EffectName = keyof typeof EFFECT_SPRITES;
@@ -289,6 +318,9 @@ export const EFFECTS: Record<EffectName, Effect> = {
   blockFly: { ch: EFFECT_SPRITES.blockFly, covers: "square", loop: "flyA", sounds: {} },
   bouncePuff: { ch: EFFECT_SPRITES.bouncePuff, covers: "square", start: "puff", sounds: {} },
   bounceCrash: { ch: EFFECT_SPRITES.bounceCrash, covers: "board", start: "crash", sounds: {} },
+  sawCut: { ch: EFFECT_SPRITES.sawCut, covers: "square", start: "openN", loop: "rawN", end: "healN", stages: [{ loop: "rawN" }, { into: "tape1N", loop: "taped1N" }, { into: "tape2N", loop: "taped2N" }], sounds: { tape: "sawyerTape" } },
+  sawCrack: { ch: EFFECT_SPRITES.sawCrack, covers: "square", start: "crack", sounds: { crack: "sawyerCrack" } },
+  boardGap: { ch: EFFECT_SPRITES.boardGap, covers: "strip", start: "run", loop: "gap", end: "close", sounds: { split: "sawyerCrack", rejoin: "sawyerRejoin" } },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------

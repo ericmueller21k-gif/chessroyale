@@ -23,6 +23,7 @@
     "frames:powers": "node scripts/frames-boss-powers.mjs",
     "frames:hollow": "node scripts/frames-hollow.mjs",
     "frames:bigboy": "node scripts/frames-bigboy.mjs",
+    "frames:sawyer": "node scripts/frames-sawyer.mjs",
     "frames:queue": "node scripts/frames-queue-pop.mjs",
     "frames:flash": "node scripts/frames-flash.mjs",
     "frames:chat": "node scripts/frames-chat-move.mjs",
