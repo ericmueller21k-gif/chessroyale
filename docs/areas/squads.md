@@ -1,28 +1,38 @@
 # Squads
 
-Lane: the director (a new mode; the match screens are the director's). Status: **phase 1 built** (the rules and a bot
-simulation, pure code). No server, screens or menu slot yet: nothing a player sees has changed.
+Lane: the director (a new mode; the match screens are the director's). Status: **the rules and a bot simulation are
+built** (pure code): phase 1, then chess clocks in place of the pace and the move cap (Eric, Oct 10). No server,
+screens or menu slot yet: nothing a player sees has changed.
 
-## How it works today (phase 1)
+## How it works today
 
 - **Pure rules in `packages/chess/src/squads/`**, imported as `@chessroyale/chess/squads`. They live in the chess
   package because they need chess.js (legal moves, mate in one) and the opening library; `core` stays chess-free.
-  **No engine in the rules**: a capped board is decided by material, and "better pick" exists only in the sim.
+  **No engine in the rules**: every game is played to the end on a chess clock; only the silent safety cap and the
+  test-only "Next round" fall back on material. "Better pick" exists only in the sim.
 - **Lobby** (`lobby.ts`): `formSquads` packs parties (1-4) into 8 squads of 4, largest first, each into the squad with
   the fewest free seats it fits (people end up with people); parties that don't fit wait; bots fill every empty seat;
   seats are shuffled. `drawBracket` (seeded, unranked), `reportWinner`, `placements` (1, 2, 3 = 3rd-4th, 5 = 5th-8th).
   `noteActions` logs every miss; `noShowsBeforeBot` (3) in a row hands the seat to a bot (`replacedByBot`).
 - **Seeded randomness**: `squadsRng(seed, ...names)` gives each decision its own stream (match, turn, half, board,
   what's drawn), so the server can replay any decision from the lobby's seed, and adding a draw never moves others.
-- **Votes** (`votes.ts`): Start, Pace, Length as `PregameVote`s, run by Crowd's machinery (`castPregameVote`,
-  `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: normal start, 15 s, the cap.
+- **Votes** (`votes.ts`): Start and Clock as `PregameVote`s, run by Crowd's machinery (`castPregameVote`,
+  `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: normal start, the Normal clock.
+- **Clocks**: every board gives each side a bank and an increment (the Clock vote's option). In Relay a squad's four
+  players share their side's clock on each board; in Pairs and the final the side's clock runs while its pickers
+  think (the slower picker's time). Blockers aren't on a clock. A side whose bank runs out loses that board, unless
+  the other side can't mate (a lone king, or king and one minor piece: `canMate`), which draws it.
+- **The per-move ceiling** (`moveCeilingSeconds`): nobody can hold a half up longer. A mover or picker who hasn't
+  chosen by then misses (a random legal move), their side's bank charged the whole ceiling and no increment earned;
+  a blocker forfeits. If the bank is shorter than the ceiling, running out of it is a flag fall instead.
 - **A match** (`match.ts`) is played in turns of two halves (White's moves, then Black's). The server's loop:
-  `halfDuties` (who acts: moves, picks, blocks; who scouts; forced moves; the mercy rule), `choose` / `lockIn` /
-  `halfReady` while the clock runs, `visibleChoices` for what each viewer may see, then `resolveHalf` plays the half
-  and returns the events, who acted and who missed. Then caps, the result (clinch, every board, a tie), next half.
+  `halfDuties` (who acts, with each duty's deadline: the ceiling, or the side's bank if shorter; who scouts; forced
+  moves; the mercy rule), `choose` / `lockIn` / `halfReady` while the clocks run, `visibleChoices` for what each viewer
+  may see, then `resolveHalf` with each player's thinking time: it charges the clocks, plays the half (or a flag
+  falls), and returns the events, who acted and who missed. Then the safety cap, the result, the next half.
   - **Relay** (round 1, 4 boards): seat i is on board (i + turn) mod 4 (`relaySeat`). Side 0 is White on boards 1 and
     3, so every player alternates colours turn by turn and each half two of a squad move. A finished board: whoever's
-    turn it would be there scouts. A missed move is a random legal move.
+    turn it would be there scouts.
   - **Pairs** (round 2, 2 boards) and **the final** share `pairSchedule`: partners 1+2, 1+3, 1+4 (and the other two),
     player 1's pair alternating slots. Pairs: slot 0 plays board 1, slot 1 board 2. Final: slot 0 picks on its
     squad's move, slot 1 blocks on the other's. Two picks always differ; a missed pick is a random legal move other
@@ -30,43 +40,52 @@ simulation, pure code). No server, screens or menu slot yet: nothing a player se
   - **Pick and Block**: two different blocks (a missed one is forfeited); a coin makes one active (an empty slot
     blocks nothing); a block is cancelled if every other legal move allows mate in one; the active block hitting a
     pick plays the other pick, otherwise a coin. No blocks at 3 or fewer legal moves. One legal move plays itself.
-  - **Caps**: the Length vote's cap (40 moves per side played in the match) in rounds 1 and 2; the silent safety cap
-    (120) everywhere. A capped board goes to material (`materialLead` 1 wins, less is a draw).
-  - **Clinch**: more than half the points ends the match at once. **Ties**: `armageddonChooser` (less thinking time;
-    a coin if level), `armageddonStart`, `startArmageddon` (one board, same format and length, 10 s; a draw is
-    Black's). `endByMaterial` is the test-only "Next round".
-- **What the sim says** (`reports/squads-sim.md`): a lobby takes about 98 minutes at the defaults; the cap decides
-  most round 1 and 2 boards; half of Pairs matches tie; the final is the longest round. Its recommended tuning (a
-  25-move cap, a shorter Armageddon; the final's length and round 2's ties for Eric) isn't applied yet.
+  - **The safety cap** (120 moves per side) is the only cap: material decides a board still going then.
+  - **Clinch**: more than half the points ends the match at once. **Ties** in rounds 1 and 2: the squad with more
+    clock time left across its boards (`timeLeft`), a seeded coin if exactly level; no Armageddon. **A drawn final**:
+    one Armageddon board in Pick and Block (`armageddonChooser`: the squad with more time left in the final picks its
+    colour; `startArmageddon`: White 1:30, Black 1:00, +1 s, a draw is Black's). `endByMaterial` is the test-only
+    "Next round" (a level result goes to time left, then a coin).
+- **What the sim says** (`reports/squads-sim.md`):
+  - Median lobbies take 24 minutes (Fast 1+2), 31 (Normal 1:45+2) and 36 (Long 2+3); every 90th percentile is under
+    40.
+  - The price of short clocks is flags: they decide 23-64% of Pairs boards and 37-75% of finals (Fast the most).
+    Eric's 4+2 would take about 43 minutes with few flags.
+  - Ties in rounds 1 and 2 (about a third of matches) are settled by time left; Armageddon is rare.
 - **Bots** (`bots.ts`): the existing bot engine (Stockfish's top moves, then `botPick` at a skill) for Relay moves,
   pair picks (never the partner's), final picks (avoiding a visible block with `avoidBlockChance`) and blocks (aimed
-  at the best moves, never the partner's). They take Black when they choose Armageddon's colours.
+  at the best moves, never the partner's). Winning, a bot plays with purpose (`squadBotSkill` caps its temperature;
+  `candidatesFrom` breaks ties by the engine's order and plays a mate it sees). `squadBotThinkMs` paces a bot by its
+  clock. Bots take Black when they choose Armageddon's colours.
 
 ## Where the code is
 
 | What | Where |
 | --- | --- |
-| Boards, end detection, material, mate in one, fast legal moves | `packages/chess/src/squads/board.ts` |
+| Boards and their clocks, end detection, flag falls, mating material, material, mate in one, fast legal moves | `packages/chess/src/squads/board.ts` |
 | Squads, parties, the bracket, records, seeded randomness | `packages/chess/src/squads/lobby.ts` |
 | Who plays where (Relay rotation, the pair schedule) | `packages/chess/src/squads/schedule.ts` |
 | The votes | `packages/chess/src/squads/votes.ts` |
-| Matches: setup, duties, choices, visibility, resolution, caps, clinch, Armageddon | `packages/chess/src/squads/match.ts` |
+| Matches: setup, duties, clocks, choices, visibility, resolution, flags, clinch, ties, Armageddon | `packages/chess/src/squads/match.ts` |
 | Squad bots | `packages/chess/src/squads/bots.ts` |
 | The bot simulation | `packages/sim/scripts/squads-sim.ts` → `reports/squads-sim.md` |
 
 ## Settings
 
-`SQUADS` in `packages/core/src/settings.ts`: sizes and boards, the votes (`paceSeconds`, `paceDefault`, vote timing),
-`moveCap`, `safetyCap`, `material`, `materialLead`, points, openings, `final` (the mercy rules and visibility:
-`blocksSeenBy`, `picksSeenBy`), `noShowsBeforeBot`, `replacementBotSkill`, `bots`, and the show times.
+`SQUADS` in `packages/core/src/settings.ts`: sizes and boards, the votes (`clocks`, `clockDefault`, vote timing),
+`moveCeilingSeconds`, `incrementOnMiss`, `safetyCap`, `material`, `materialLead`, points, openings, `final` (the mercy
+rules and visibility: `blocksSeenBy`, `picksSeenBy`), `armageddon` (the drawn final's clocks), `noShowsBeforeBot`,
+`replacementBotSkill`, `bots` (choosing, winning with purpose, pacing), and the show times.
 
 ## Tests and tools
 
 - Unit: `packages/chess/test/squads-lobby.test.ts` (squads, records, bracket, votes, schedules),
-  `squads-match.test.ts` (boards, starts, Relay, Pairs, caps, clinch, ties, Armageddon), `squads-final.test.ts`
-  (Pick and Block, the mercy rules, visibility, castling and promotion, missed actions, replay, bots).
-- Sim: `npm run sim:squads -- [lobbies] [nodes]` (about 30 minutes at the defaults). Its tables are generated; the
-  notes after the marker in `reports/squads-sim.md` are written by hand and kept across runs.
+  `squads-match.test.ts` (boards, clocks, flags, the ceiling, starts, Relay, Pairs, the safety cap, clinch, the
+  time-left tiebreak), `squads-final.test.ts` (Pick and Block, the final's clock, the mercy rules, visibility,
+  castling and promotion, missed actions, the drawn-final Armageddon, replay, bots).
+- Sim: `npm run sim:squads -- [lobbies] [nodes] [clocks]` (about 10 minutes at the defaults; `SQUADS_SIM_SET`,
+  `SQUADS_SIM_MIXES` and `SQUADS_SIM_OUT` for tuning runs). Its tables are generated; the notes after the marker in
+  `reports/squads-sim.md` are written by hand and kept across runs.
 
 ## Rules for this area
 
@@ -78,6 +97,12 @@ simulation, pure code). No server, screens or menu slot yet: nothing a player se
 ## The design (Eric, Oct 10, 2026)
 
 The brief, as given (calls marked "director's call"). Phase 1's own calls are in `DECISIONS.md`, "Squads".
+
+**Changed since (Eric, Oct 10, after phase 1's sim):** chess clocks replace the per-move pace and the move cap; one
+Clock vote (Fast, Normal, Long) replaces the Pace and Length votes; every game is played to the end; ties in rounds 1
+and 2 go to the squad with more clock time left (no Armageddon); a drawn final goes to Armageddon with White on more
+time. A lobby should take about 20-40 minutes. "How it works today" above is current; the brief below is as first
+given.
 
 
 A new full mode in the Classic slot of the mode menu: Crowd · Squads · Boss raid. Squads of 4 play team chess.

@@ -127,7 +127,7 @@ npm run dev                                    # app dev server (solo only; no A
 npx wrangler dev                               # app + API + Durable Objects at http://localhost:8787
 npm run e2e                                    # Playwright: solo, multiplayer, install (multiplayer takes ~5 min)
 npm run simulate                               # bot simulation -> reports/playtest.md (about 1–2 hours)
-npm run sim:squads                             # Squads bot simulation -> reports/squads-sim.md (about 30 min)
+npm run sim:squads                             # Squads bot simulation -> reports/squads-sim.md (about 15 min)
 npx tsx packages/sim/scripts/calibrate-rating.ts   # refit the engine-rating curve (~20 min)
 npx tsx packages/chess/scripts/build-openings.ts   # rebuild the opening library (~15 min, 4 engines)
 ```

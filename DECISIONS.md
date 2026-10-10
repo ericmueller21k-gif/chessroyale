@@ -202,9 +202,10 @@ design). Phase 1 is pure code: the rules (`packages/chess/src/squads/`), squad b
   end up with people (a solo player joins a party of 3 before an empty squad) and bots fill the rest; parties that
   don't fit wait for the next lobby; seats are shuffled. The bracket is a seeded random draw (unranked). The final's
   White is a coin.
-- **Votes:** the whole lobby votes once, before round 1, on Crowd's machinery (one vote each, bots vote, non-voters
-  join the winner). Nobody voting gives the normal start, 15 s and the move cap (a 32-player lobby shouldn't wait on
-  one endless game by default). Length has two options; the vote board's third zone is for phase 3 to settle.
+- **Votes** (Pace and Length replaced by one Clock vote: see the next section): the whole lobby votes once, before
+  round 1, on Crowd's machinery (one vote each, bots vote, non-voters join the winner). Nobody voting gives the normal
+  start, 15 s and the move cap (a 32-player lobby shouldn't wait on one endless game by default). Length has two
+  options; the vote board's third zone is for phase 3 to settle.
 - **Openings:** 4 moves per side, classic lines inside the balance window Classic uses (0.40-0.60). "One opening" is
   one opening for the whole lobby, final and Armageddon included. "Random openings": Relay draws two (boards 1-2 and
   3-4, colours swapped on each pair), Pairs one (both boards, swapped), the final one, an Armageddon a fresh one.
@@ -216,9 +217,10 @@ design). Phase 1 is pure code: the rules (`packages/chess/src/squads/`), squad b
   players switch and two stay. The schedule (`pairSchedule`) keeps the spirit: player 1's pair alternates every turn,
   and over every six turns each player has each slot (board, or pick/block) three times, never more than three
   turns running, and all six possible pairs play each slot once.
-- **Caps count moves played in the match** (an opening's moves don't), per side: 40 for the Length vote's cap, 120
-  for the safety cap, which guards every board, the final and Armageddon included. Material is pawn 1, knight and
-  bishop 3, rook 5, queen 9; any lead wins (`materialLead` 1).
+- **Caps** (the move cap is gone with the clocks; the safety cap stays) **count moves played in the match** (an
+  opening's moves don't), per side: 40 for the Length vote's cap, 120 for the safety cap, which guards every board,
+  the final and Armageddon included. Material is pawn 1, knight and bishop 3, rook 5, queen 9; any lead wins
+  (`materialLead` 1).
 - **Clinch** is "more than half the points". In Pairs that needs both boards finished, so a squad 1-0 up plays on.
 - **Choices:** a Relay move is final once made. Picks and blocks can change until the half ends; a change unlocks.
   Relay and Pairs choices show live to the player's own squad only; the final follows the visibility setting
@@ -232,25 +234,70 @@ design). Phase 1 is pure code: the rules (`packages/chess/src/squads/`), squad b
   block out live.
 - **Missed actions:** a missed pick and a forfeited block both count towards the no-show streak; 3 in a row hands
   the seat to a bot (at skill 4). A forced move or a block the mercy rule took away isn't a miss.
-- **Armageddon:** the same format and length as the tied round (the final's is to the end), at 10 s. In Relay its one
-  board takes each squad's seats in order; in Pairs the turn's first pair plays. "Total thinking time" is the sum of
-  a squad's action times in the tied match, a miss counting the whole clock; level time goes to a coin. Bots choose
-  Black (draw odds).
-- **The test-only "Next round"** (`endByMaterial`) settles a level match with a coin, so the bracket can move on.
+- **Armageddon** (now only for a drawn final: see the next section)**:** the same format and length as the tied round
+  (the final's is to the end), at 10 s. In Relay its one board takes each squad's seats in order; in Pairs the turn's
+  first pair plays. "Total thinking time" is the sum of a squad's action times in the tied match, a miss counting the
+  whole clock; level time goes to a coin. Bots choose Black (draw odds).
+- **The test-only "Next round"** (`endByMaterial`) settles a level match with a coin (now time left first), so the
+  bracket can move on.
 - **Speed:** chess.js's public move list costs about 2.5 ms a position (it builds SAN and two FENs per move). The
   rules use its internal generator, as chess.js's own Move class does, with the public API as the fallback and a
   unit test holding the two to the same moves in the same order.
-- **The simulation** (`npm run sim:squads`, `reports/squads-sim.md`) ran 120 full lobbies at three skill mixes and
+- **The simulation** (since re-run for the clocks: see the next section) ran 120 full lobbies at three skill mixes and
   every Pace and Length vote, with a model of a person's clock and misses (no real data yet). The bot engine runs at
-  10k nodes: enough for bots that play at a temperature, and 30k would have taken 4-6 hours. Findings:
-  - A lobby takes about 98 minutes at the defaults (15 s, 40-move cap) and about 3 hours "to the end".
-  - Material decides 82-84% of round 1 and 2 boards at the cap, and capped matches never clinch early.
-  - A third of Relay matches and half of Pairs matches tie. Black wins about half of Armageddons.
-  - The coin plays a clearly weaker pick on about 7% of Pairs moves.
-  - A block forces the worse pick on about 1 final move in 16. The mercy rules fire on 5% (no blocks) and 0.5%
-    (cancelled) of moves.
+  10k nodes: enough for bots that play at a temperature, and 30k would have taken 4-6 hours. Findings: - A lobby takes
+  about 98 minutes at the defaults (15 s, 40-move cap) and about 3 hours "to the end". - Material decides 82-84% of
+  round 1 and 2 boards at the cap, and capped matches never clinch early. - A third of Relay matches and half of Pairs
+  matches tie. Black wins about half of Armageddons. - The coin plays a clearly weaker pick on about 7% of Pairs
+  moves. - A block forces the worse pick on about 1 final move in 16. The mercy rules fire on 5% (no blocks) and 0.5%
+  (cancelled) of moves.
 - **Settings stay as the brief set them in this PR.** The report recommends:
   - a 25-move cap (the check: 29 minutes saved at 15 s);
   - a shorter Armageddon (about 20 moves);
   - for Eric to weigh, after playtests: a lower safety cap or a cap for the final, which is now the longest round,
     and a material tiebreak before Armageddon in round 2.
+
+### Squads: chess clocks instead of the pace and the move cap (Oct 10, 2026)
+
+Eric read phase 1's sim (a lobby took about 98 minutes) and asked for a lobby of about 20-40 minutes:
+- chess clocks in place of the per-move pace and the move cap;
+- one Clock vote (Fast, Normal, Long; Normal if nobody votes);
+- every game to the end;
+- ties in rounds 1 and 2 to the squad with more clock time left;
+- Armageddon only for a drawn final, with White on more time.
+
+The calls made:
+
+- **Which clock runs.** Relay: the mover's time, on their side's clock for that board (the squad's four players share
+  it). Pairs and the final: the slower picker's, since the side's clock runs until both have locked in. Blockers
+  aren't on a clock; the per-move ceiling bounds them. If playtests show blockers sitting on the timer, the fix is to
+  run the blocking side's clock once both pickers have locked in.
+- **The per-move ceiling is 20 s, not the brief's starting 40.** A missed action charges the whole ceiling. With two
+  pickers in Pairs and the final, 40 s charges decided most finals on time in the tuning runs. At these clocks nobody's
+  ordinary think reaches 20 s, so the ceiling only ever charges a miss.
+- **Missed actions earn no increment** (`incrementOnMiss`). A move chosen after the bank ran out is a flag fall, not a
+  move. If the bank is shorter than the ceiling, a missed move is a flag fall, not a random move.
+- **Can't mate:** a lone king, or a king with one knight or bishop. A flag against that side is a draw (the usual
+  online rule, without asking whether a mate could be helped along).
+- **Forced moves** (one legal move) take no time and earn the increment.
+- **Time left** for the tiebreak is the sum of a squad's clocks over the match's boards; a board that ended early keeps
+  its clock as it was. Exactly level goes to a seeded coin. "Next round" settles a level result the same way.
+- **The drawn final's Armageddon:** White 1:30, Black 1:00, as the brief says, plus a 1 s increment. Without one, two
+  pickers can't keep up a game's moves on a minute. The chooser is the squad with more time left in the final (a coin
+  if level); bots choose Black.
+- **Bots play with purpose when winning.** Their temperature is capped once the best move scores 0.9 or more, the
+  engine's order breaks ties between moves that all win, and they play a mate they see. With every game played to the
+  end, phase 1's wandering bots would otherwise run most games to the safety cap. Bots pace themselves by their clock
+  (bank / 25 + 0.8 × increment), the same model the sim uses for people.
+- **The clock options, tuned by the sim:** Fast 1+2, Normal 1:45+2, Long 2+3, in place of Eric's starting 2+1, 4+2,
+  6+3.
+  - Medians: 24, 31 and 36 minutes; 90th percentiles 27, 35 and 38; the longest of 72 lobbies, 39.8.
+  - Eric's options take about 29, 43 and 61 minutes.
+  - Increments are at least 2 s because a pair can't decide much faster than about 2-3 s. Below that, a side's bank
+    drains in any long game.
+- **The trade-off for Eric:** short clocks mean flags.
+  - Flags decide 23-64% of Pairs boards and 37-75% of finals (Fast the most); at 4+2 almost none do.
+  - If that feels anti-fun in playtests, the options are more increment for Pairs and the final, the blockers' clock,
+    or a longer lobby. Each is his call.
+- **The sim's lobby times assume a match starts as soon as its two feeder matches are done**, not when the whole
+  round is. It saves under a minute on average, and phase 2 should do it.
