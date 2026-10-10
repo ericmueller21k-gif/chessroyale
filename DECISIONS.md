@@ -520,7 +520,9 @@ decide (duties, deadlines, clocks, what a miss plays, ties). Nothing links to it
 - **Bots' engine work goes to players' devices, checked against each other** (Eric's computing priorities). A job is one
   board's position in one half; two devices each, preferring devices outside that match (nobody's engine picks the moves
   of the bots they play against or beside while anyone else's can), then computers, the least loaded and fastest; a
-  device holds at most 4 unanswered jobs (a phone 2). The browser engine is deterministic, so answers must match
+  device holds at most 4 unanswered jobs (a phone 2), and the rest wait for a device to answer (the soonest-needed
+  first), so a lobby with one phone still gets engine bots, not the quick look. Boards in the same position (every
+  board's start on the first turn) share one job. The browser engine is deterministic, so answers must match
   exactly. Two that disagree: the engine server settles it with one restricted search of their moves (counted in its
   daily budget), or without it a third device referees; the wrong device gets a strike, and two strikes mean no more
   work. One answer stands after 400 ms (like the judges' grace); none after 4 s, or no device at all: the server's own

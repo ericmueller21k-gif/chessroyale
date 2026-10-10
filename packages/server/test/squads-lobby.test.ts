@@ -466,13 +466,22 @@ describe("squads lobby: rewards", () => {
 });
 
 describe("squads lobby: bots' engine work on players' devices", () => {
-  /** A test lobby at round 1 with people whose devices take bot work (`phone`: which of them are phones). */
-  function withDevices(n: number, opts: { server?: boolean; phones?: number[]; clock?: string } = {}) {
+  /**
+   * A test lobby at round 1 with people whose devices take bot work (`phone`: which of them are phones), run past the
+   * first turn (on the first, boards from the same start share one job) to the next half that gives `ids[0]` at least
+   * `want` jobs.
+   */
+  function withDevices(n: number, opts: { server?: boolean; phones?: number[]; clock?: string; want?: number; first?: boolean } = {}) {
     const L = squadsLobby({ test: { start: 0, ...(opts.clock ? { clock: parseTestClock(opts.clock)! } : {}) }, fillInMs: 5_000, serverEngine: !!opts.server });
     const ids = Array.from({ length: n }, (_, i) => L.join(`D${i}`, { device: opts.phones?.includes(i) ? "phone" : "computer" }));
     ids.forEach((id, i) => L.core.message(id, { t: "speed", nps: 1_000_000 + i * 1000 }));
     L.advance(5_000 + VOTES_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000);
     const jobs = (id: string) => L.all(id, "botWork").flatMap((w) => w.jobs);
+    if (!opts.first) {
+      L.runUntil(() => L.core.allMatches().every((m) => m.m.turn >= 1), 30 * 60_000, "the second turn");
+      L.clear();
+      L.runUntil(() => jobs(ids[0]!).length >= (opts.want ?? 2), 30 * 60_000, "jobs for the first device");
+    }
     return { L, ids, jobs };
   }
   const jobOf = (L: ReturnType<typeof squadsLobby>, id: string) => {
@@ -482,15 +491,14 @@ describe("squads lobby: bots' engine work on players' devices", () => {
   };
 
   it("two devices outside the match, computers first, each get a job; answers that agree are used (and remembered)", () => {
-    const { L, ids, jobs } = withDevices(3, { phones: [2] });
+    const { L, ids, jobs } = withDevices(3, { phones: [2], want: 1 });
     // (The three people sit in one squad: in the other matches, their devices are outside the match.)
     const outside = L.core.allMatches().filter((m) => !ids.some((id) => mineIn(m, id)));
-    const outsideJobs = jobs(ids[0]!).filter((j) => outside.some((m) => j.id.startsWith(`${m.key}/`)));
-    expect(outsideJobs.length).toBeGreaterThan(0);
-    for (const j of outsideJobs) expect(jobs(ids[1]!).some((x) => x.id === j.id)).toBe(true);
+    L.runUntil(() => jobs(ids[0]!).some((j) => outside.some((m) => j.id.startsWith(`${m.key}/`))), 10 * 60_000, "a job outside");
+    const job = jobs(ids[0]!).find((j) => outside.some((m) => j.id.startsWith(`${m.key}/`)))!;
+    expect(jobs(ids[1]!).some((x) => x.id === job.id)).toBe(true);
     // The phone isn't asked while two computers can do it.
-    expect(jobs(ids[2]!).filter((x) => outsideJobs.some((j) => j.id === x.id))).toEqual([]);
-    const job = outsideJobs[0]!;
+    expect(jobs(ids[2]!).some((x) => x.id === job.id)).toBe(false);
     const top = fallbackTop(job.fen, job.n);
     L.core.message(ids[0]!, { t: "botTop", id: job.id, top });
     expect(jobOf(L, job.id)!.how).toBeUndefined();
@@ -498,11 +506,35 @@ describe("squads lobby: bots' engine work on players' devices", () => {
     expect(jobOf(L, job.id)).toMatchObject({ how: "agreed", top });
   });
 
-  it("a device holds only so many unanswered jobs (a phone fewer); the rest go to other devices, or none", () => {
-    const { ids, jobs } = withDevices(1, { phones: [0] });
-    expect(jobs(ids[0]!)).toHaveLength(SQUADS_LOBBY.botWork.maxInFlight.phone);
-    const two = withDevices(2);
-    expect(two.jobs(two.ids[0]!)).toHaveLength(SQUADS_LOBBY.botWork.maxInFlight.computer);
+  it("boards in the same position share one job: its answer serves them all", () => {
+    // (On the first turn, boards start alike: the same start, or each opening on two boards.)
+    const { L, ids, jobs } = withDevices(2, { first: true });
+    const followers = L.core.allMatches().flatMap((m) => Object.values(m.half?.work ?? {})).filter((j) => j.follows);
+    expect(followers.length).toBeGreaterThan(0);
+    const lead = followers[0]!.follows!;
+    const job = jobs(ids[0]!).find((j) => j.id === lead)!;
+    const top = fallbackTop(job.fen, job.n);
+    for (const id of ids) L.core.message(id, { t: "botTop", id: job.id, top });
+    for (const f of followers.filter((x) => x.follows === lead)) expect(f).toMatchObject({ how: expect.stringMatching(/agreed|cached/), top });
+  });
+
+  it("a device holds only so many unanswered jobs at once (a phone fewer); the rest wait for it, then go out", () => {
+    const { L, ids } = withDevices(1, { phones: [0], want: 1 });
+    let most = 0;
+    let queued = 0;
+    let sentLater = 0;
+    const seen = new Set<string>();
+    for (let i = 0; i < 400; i++) {
+      const live = L.core.allMatches().flatMap((m) => Object.values(m.half?.work ?? {}));
+      most = Math.max(most, live.filter((j) => !j.how && j.devices.includes(ids[0]!) && !(ids[0]! in j.answers)).length);
+      for (const j of live) if (j.queued) seen.add(j.id);
+      queued = seen.size;
+      L.advance(250);
+    }
+    sentLater = L.all(ids[0]!, "botWork").flatMap((w) => w.jobs).filter((j) => seen.has(j.id)).length;
+    expect(most).toBe(SQUADS_LOBBY.botWork.maxInFlight.phone);
+    expect(queued).toBeGreaterThan(0);
+    expect(sentLater).toBeGreaterThan(0);
   });
 
   it("one answer alone stands after the grace; none at all: the server's own quick look", () => {
@@ -536,8 +568,8 @@ describe("squads lobby: bots' engine work on players' devices", () => {
     const { L, ids, jobs } = withDevices(3);
     const job = jobs(ids[0]!).find((j) => jobs(ids[1]!).some((x) => x.id === j.id))!;
     const good = fallbackTop(job.fen, job.n);
-    // (The third device answers what it holds first: a device holds only so many unanswered jobs.)
-    for (const j of jobs(ids[2]!)) L.core.message(ids[2]!, { t: "botTop", id: j.id, top: fallbackTop(j.fen, j.n) });
+    // (The devices answer everything else they hold first: a device holds only so many unanswered jobs.)
+    answerAllBut(L, ids, job.id);
     L.core.message(ids[0]!, { t: "botTop", id: job.id, top: good });
     L.core.message(ids[1]!, { t: "botTop", id: job.id, top: good.slice().reverse() });
     const ref = L.core.match(job.id.split("/")[0]!)!.half!.work[Number(job.id.split("/")[2])]!.referee!;
@@ -564,7 +596,9 @@ describe("squads lobby: bots' engine work on players' devices", () => {
       .map((job) => {
         const lm = L.core.match(job.id.split("/")[0]!)!;
         const board = Number(job.id.split("/")[2]);
-        const bot = Object.keys(lm.half!.bots).find((b) => dutyBoard(lm, b) === board && lm.half!.bots[b]! < SQUADS_LOBBY.botWork.answerMs - 500);
+        const work = lm.half?.work[board];
+        if (!work || work.id !== job.id || work.how) return null;
+        const bot = Object.keys(lm.half!.bots).find((b) => dutyBoard(lm, b) === board && lm.half!.startedAt + lm.half!.bots[b]! < work.sentAt + SQUADS_LOBBY.botWork.answerMs - 500);
         return bot ? { job, lm, board, bot } : null;
       })
       .filter((x) => !!x);
@@ -580,11 +614,30 @@ describe("squads lobby: bots' engine work on players' devices", () => {
     expect(top.map((m) => m.move)).toContain(first.lm.half!.inputs.choices[first.bot]);
     // The other job is never answered: past the answer time, its bot plays from the server's quick look.
     const half = second.lm.half!;
-    L.advanceTo(half.startedAt + SQUADS_LOBBY.botWork.answerMs + 1);
-    expect(half.work[second.board]!.how).toBe("fallback");
+    const work = half.work[second.board]!;
+    L.advanceTo(Math.max(work.sentAt, half.startedAt) + SQUADS_LOBBY.botWork.answerMs + 1);
+    expect(work.how).toBe("fallback");
     expect(half.inputs.choices[second.bot]).toBeDefined();
   });
 });
+
+/** Every device answers every job it holds (the quick look's moves, so they agree), but `keep`, until none is left. */
+function answerAllBut(L: ReturnType<typeof squadsLobby>, ids: readonly string[], keep: string) {
+  for (let round = 0; round < 100; round++) {
+    let sent = 0;
+    for (const lm of L.core.allMatches()) {
+      for (const j of Object.values(lm.half?.work ?? {})) {
+        if (j.how || j.id === keep) continue;
+        for (const d of [...j.devices, ...(j.referee ? [j.referee] : [])]) {
+          if (!ids.includes(d) || d in j.answers) continue;
+          L.core.message(d, { t: "botTop", id: j.id, top: fallbackTop(j.fen, SQUADS.bots.candidates) });
+          sent++;
+        }
+      }
+    }
+    if (!sent) return;
+  }
+}
 
 /** The board a player acts on in the half being played. */
 function dutyBoard(lm: LiveMatch, id: string): number | null {

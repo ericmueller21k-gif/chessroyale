@@ -150,7 +150,8 @@ plays, ties). Nothing links to it until phase 3's screens. The calls are in `DEC
 - **Bots.** Every seat a bot plays (a bot, or a person's seat taken over) acts through the rules' `bots.ts` over the
   bot engine's top moves. The top moves come from players' devices (`botWork`, one job per board per half): two devices
   each, outside the match first, computers before phones, the least loaded and fastest, none holding more than
-  `maxInFlight` unanswered jobs. Answers are checked (`cleanTop`) and compared exactly (the browser engine is
+  `maxInFlight` unanswered jobs (the rest wait for a device to answer, the soonest-needed first). Boards in the same
+  position (the first turn's starts) share one job. Answers are checked (`cleanTop`) and compared exactly (the browser engine is
   deterministic). Two that disagree go to the engine server (one budgeted restricted search of their moves) or, without
   it, to a third device; the wrong device gets a strike (`strikes`: no more work). One answer stands after `graceMs`;
   none after `answerMs`, or no device at all: the server's own quick look (`fallbackTop`: material two plies deep and

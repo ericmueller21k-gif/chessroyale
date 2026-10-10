@@ -150,6 +150,10 @@ export interface WorkJob {
   refereeAt?: number;
   top?: MoveScore[];
   how?: "agreed" | "one" | "server" | "referee" | "cached" | "fallback";
+  /** Waiting for a device with room (every one holds its most unanswered jobs): given out as one answers. */
+  queued?: true;
+  /** Another job is already working on this position (e.g. every board from the same start): this one takes its answer. */
+  follows?: string;
 }
 
 /** The half being played in a match. */
@@ -587,7 +591,8 @@ export class SquadsCore {
       if (lm.state === "armageddon" && lm.arm) times.push(lm.arm.until);
       if (lm.state === "half" && lm.half) times.push(...this.halfWakes(lm));
     }
-    return times.length ? Math.min(...times) : null;
+    // (Everything due has just been done: a time already past would only wake the object to do nothing, over and over.)
+    return times.length ? Math.max(Math.min(...times), this.io.now() + 20) : null;
   }
 
   // ---------------- The lobby's own timeline ----------------
@@ -603,6 +608,7 @@ export class SquadsCore {
         this.lobbyTimer(t.kind);
         changed = true;
       }
+      if (this.assignQueued()) changed = true;
       for (const lm of this.liveMatches()) if (this.advance(lm, now)) changed = true;
       if (!changed) return;
     }
@@ -893,7 +899,8 @@ export class SquadsCore {
     const out = [this.halfDue(lm)];
     for (const bot of Object.keys(half.bots)) out.push(this.botActAt(lm, bot));
     for (const job of Object.values(half.work)) {
-      if (job.how) continue;
+      // (A queued job waits for a device to answer something; one following a twin, for the twin.)
+      if (job.how || job.queued || job.follows) continue;
       if (job.firstAt !== undefined) out.push(job.firstAt + SQUADS_LOBBY.botWork.graceMs);
       out.push(job.sentAt + SQUADS_LOBBY.botWork.answerMs);
       if (job.refereeAt !== undefined) out.push(job.refereeAt + SQUADS_LOBBY.botWork.answerMs);
@@ -953,7 +960,7 @@ export class SquadsCore {
     const d = dutyOf(lm.m, bot, this.s);
     if (!d) return planned;
     const job = half.work[d.duty.board];
-    if (!job || job.how || !job.devices.length) return planned;
+    if (!job || job.how || (!job.devices.length && !job.queued && !job.follows)) return planned;
     return Math.max(planned, half.startedAt + Math.max(0, d.duty.deadlineMs - SQUADS_LOBBY.botWork.fallbackMarginMs));
   }
 
@@ -1248,12 +1255,56 @@ export class SquadsCore {
       half.work[board] = { id, fen, devices: [], sentAt: now, answers: {}, top: cached, how: "cached" };
       return;
     }
+    const twin = this.liveJobs().find(({ job }) => job.fen === fen && !job.how && !job.follows && job.id !== id);
+    if (twin) {
+      half.work[board] = { id, fen, devices: [], sentAt: now, answers: {}, follows: twin.job.id };
+      return;
+    }
     const devices = this.pickDevices(lm, SQUADS_LOBBY.botWork.perJob);
-    half.work[board] = { id, fen, devices, sentAt: now, answers: {} };
+    const queued = !devices.length && Object.keys(this.r.devices).some((d) => this.deviceUp(d));
+    half.work[board] = { id, fen, devices, sentAt: now, answers: {}, ...(queued ? { queued: true as const } : {}) };
     for (const d of devices) {
       this.r.devices[d]!.jobs++;
       out.set(d, [...(out.get(d) ?? []), { id, fen, n: this.s.bots.candidates }]);
     }
+  }
+
+  /** Every bot-work job of the halves being played. */
+  private liveJobs(): { lm: LiveMatch; job: WorkJob }[] {
+    return this.liveMatches().flatMap((lm) => Object.values(lm.half?.work ?? {}).map((job) => ({ lm, job })));
+  }
+
+  /**
+   * Jobs waiting for a device with room go out as devices free up, the soonest-needed first (a bot that hasn't its
+   * answer by its fallback moment plays from the quick look meanwhile).
+   */
+  private assignQueued(): boolean {
+    const waiting = this.liveJobs().filter(({ job }) => job.queued && !job.how);
+    if (!waiting.length) return false;
+    const need = ({ lm, job }: { lm: LiveMatch; job: WorkJob }) => {
+      const half = lm.half!;
+      const board = Number(job.id.split("/")[2]);
+      const times = Object.entries(half.bots).filter(([b]) => dutyOf(lm.m, b, this.s)?.duty.board === board).map(([, t]) => t);
+      return half.startedAt + (times.length ? Math.min(...times) : 0);
+    };
+    waiting.sort((a, b) => need(a) - need(b));
+    const out = new Map<string, { id: string; fen: string; n: number }[]>();
+    let changed = false;
+    for (const { lm, job } of waiting) {
+      const devices = this.pickDevices(lm, SQUADS_LOBBY.botWork.perJob);
+      if (!devices.length) break;
+      delete job.queued;
+      job.devices = devices;
+      job.sentAt = this.io.now();
+      for (const d of devices) {
+        this.r.devices[d]!.jobs++;
+        out.set(d, [...(out.get(d) ?? []), { id: job.id, fen: job.fen, n: this.s.bots.candidates }]);
+      }
+      this.touch(lm);
+      changed = true;
+    }
+    for (const [device, list] of out) this.send(device, { t: "botWork", jobs: list });
+    return changed;
   }
 
   private jobById(id: string): { lm: LiveMatch; job: WorkJob } | null {
@@ -1288,6 +1339,17 @@ export class SquadsCore {
     if (job.how) return false;
     const now = this.io.now();
     const cfg = SQUADS_LOBBY.botWork;
+    if (job.follows) {
+      // The twin's answer (remembered once settled, so a twin from a half that has ended still counts).
+      const cached = TOP_CACHE.get(job.fen);
+      const twin = this.jobById(job.follows)?.job;
+      if (!cached && twin && !twin.how) return false;
+      job.how = cached ? "cached" : twin?.top ? twin.how! : "fallback";
+      if (cached ?? twin?.top) job.top = cached ?? twin!.top;
+      this.touch(lm);
+      return true;
+    }
+    if (job.queued) return false;
     const valid = job.devices.filter((d) => job.answers[d]).map((d) => ({ d, top: job.answers[d]! }));
     const pending = job.devices.filter((d) => !(d in job.answers) && this.deviceUp(d));
     const done = (top: MoveScore[] | undefined, how: NonNullable<WorkJob["how"]>) => {
