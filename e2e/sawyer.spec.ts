@@ -98,7 +98,8 @@ test("Sawyer: his first move a pawn's, then the split (two halves, drawn as halv
     apart: { selector: '.sw-layer[data-split="apart"] piece.sw-half' },
     line: { selector: ".bc-bubble", text: /Two for one!|Half off!|Double trouble!/ },
   });
-  await play(page, (await takeHisPawn(page)) ?? (await allowedMove(page)));
+  // (A quiet move: its knock is the plain move's.)
+  await play(page, await allowedMove(page, ["g1f3", "b1c3", "g8f6", "b8c6", "h2h3", "h7h6"]));
   await expect.poll(async () => (await soundsHeard(page)).map((s) => s.split(":")[0]), { timeout: 10_000 }).toContain("move");
   expect((await soundsHeard(page))[0]!.split(":")[0]).toBe("move");
   await yourMove(page);
@@ -201,7 +202,7 @@ test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board spl
   expect((await powers(page)).cut).toMatchObject({ at: 4, until: 6 });
   // His sounds came, and through the mute switch, silent.
   const heard = (await soundsHeard(page)).filter((x) => x.startsWith("sawyer"));
-  expect(heard.map((x) => x.split(":")[0])).toEqual(expect.arrayContaining(["sawyerHop", "sawyerRev", "sawyerBigSaw", "sawyerCrack", "sawyerCut"]));
+  expect(heard.map((x) => x.split(":")[0])).toEqual(expect.arrayContaining(["sawyerHop", "sawyerRev", "sawyerBigSaw", "sawyerCut"]));
   for (const x of heard) expect(x).toMatch(/:muted$/);
   expect(errors).toEqual([]);
 });

@@ -266,7 +266,8 @@ export const BOARD_GAP: Character = {
   parts: gapParts,
   anims: {
     run: { loop: false, frames: Array.from({ length: GAP_STEPS + 1 }, (_, k) => cutFrame(`run${k}`, gapRunStep(BOARD_SAW.runMs))) },
-    part: { loop: false, frames: [cutFrame("part7", 90, "split"), cutFrame("part10", 90), cutFrame(`part${GAP_W}`, 100)] },
+    // (The first frame long enough that a busy phone never skips it, and its sound with it.)
+    part: { loop: false, frames: [cutFrame("part7", 160, "split"), cutFrame("part10", 90), cutFrame(`part${GAP_W}`, 100)] },
     gap: { loop: true, frames: [cutFrame(`part${GAP_W}`, 1000)] },
     close: { loop: false, frames: [cutFrame("close10", 110, "rejoin"), cutFrame("close6", 110), cutFrame("close2", 140), cutFrame("empty", 30)] },
   },

@@ -378,3 +378,137 @@ the test link `?wip=1&kit=Sawyer`.
 - Tests: `packages/app/test/sawyer.test.ts` (a preview kit with no boss; never above his hat; the idle's buzz, swish,
   blink and smirk, silent; the rev and saw down's cues and where the cut lands; the portrait), plus the shared
   character tests.
+
+
+### Sawyer, built (Oct 10, 2026)
+
+Sawyer becomes a playable boss (`sawyer`, 🪚): his rules, his moments, his art for them, his sounds and lines, on the
+approved sprite (kept as it was; only added to). Eric's design, word for word (the director's calls marked):
+
+#### Sawyer, the raccoon with a saw (design, Eric, Oct 10, 2026; calls marked "director's call")
+
+A raccoon in a yellow hard hat with a black bandit mask and a red-and-black reciprocating saw. Sprite approved by Eric
+("perfect") on branch `claude/sawyer-art` (goggles removed at his request). Name "Sawyer" for now.
+
+##### Opening: the split pawn
+- His first move is always a pawn move. Then he jumps onto that pawn and saws it in half: a second pawn of his
+  appears on an empty square right beside it, left or right at random (seeded; if only one side is empty, that side;
+  if neither, no split). Both play as normal pawns, drawn as halves (the two pawns are tracked through the game).
+- About a pawn's head start: his strength offset drops to match (set from a quick boss-sim run, as Big Boy's was).
+
+##### Passive: saw cuts
+- Every few turns (director's call: every 4, like Big Boy's blocks) he saws one edge of a square: a wall between two
+  neighbouring squares. Nothing may move straight across that edge (a rook, queen, king or pawn moving through it);
+  diagonal moves pass corners, not edges, so they aren't blocked; knights jump it; a piece can still land on the
+  square from another side.
+- Each cut lasts 3 turns and is visibly repaired over them (tape or stitches closing up); a new cut comes after a
+  1-turn gap.
+- Placed on an edge in the crowd's half that one of the crowd's legal moves would cross, so it matters a little.
+
+##### Ultimate: sawing the board in half
+- Needs the shared rage meter full, and move 10 or later, and one half of the board (files a-d or e-h) favouring
+  him on material. He jumps on, revs, and a saw runs up the middle (between the d and e files) from bottom to top
+  with a sawing sound; the board splits visibly in two.
+- For 5 turns each, no piece may cross between the halves (any move whose path crosses the line, knights included).
+- Afterwards the halves rejoin.
+
+##### Rules for both kinds of cut (Eric approved)
+- Cuts block movement, not attacks: checks still count across them, so nobody is suddenly in check when a cut heals
+  or the halves rejoin.
+- If a side's only legal moves cross a cut, those moves are allowed: a cut can never cause a mate or stalemate on its
+  own. Never block the only way out of check. The judge uses the allowed-move filter, like Freeze and the toy blocks.
+
+##### Character
+- Sounds: the saw's buzz and rev, a sawing rasp, a wood crack for the split, tape/zip for the repair, a big board
+  saw for the ultimate. Quieter than a move, through mute, no chimes.
+- Short lines in his text box: "Measure twice, cut once.", "Two for one!", "Timber!", "This board's getting
+  renovated.", and so on.
+
+**What was built, and the calls made:**
+
+- **Rules** (`packages/chess/src/bosses/sawyer.ts`, on the base boss; numbers `BOSS_POWERS.saw*`, `boardSaw*`):
+  - **The split's ninth-pawn problem (my call, for Eric to confirm).** The engine (Stockfish 19, for his moves, the
+    judge, the eval bar, the hints and the bots, on every device and the engine server) refuses any position with a
+    ninth pawn a side or a 33rd piece ("Unsupported position. BLACK has more than 8 pawns."; "More than 32 pieces"),
+    and a search sent one never answers. In 55% of raid openings (5 moves in) he still has all 8 pawns, so the split as
+    designed would break the battle there. So: **the split needs room** (fewer than 8 of his pawns, fewer than 32 pieces:
+    `splitRoom`). After his first move (always a pawn move, as designed) it comes at once when there's room; otherwise
+    it waits and comes after his first pawn move once one of his pawns has gone (`split.waiting`), the same moment.
+    Nothing else changes. Alternatives Eric may prefer: (a) no split at all without room; (b) the split always comes,
+    and the new half replaces one of his other pawns (always seen, no head start); (c) a different engine build (the
+    engine lane's).
+  - **The split never forks (my call).** The new half never lands where it attacks one of the crowd's pieces (a knight,
+    bishop, rook or queen), gives check, or leaves the crowd without a move: the engine measured splits that forked or
+    won a piece at once at 4 to 7 pawns, far past "a pawn's head start". Attacking a pawn is ordinary chess and allowed.
+    Neither side allowed: no split now (it waits for his next pawn move with room, as above).
+  - **The halves are tracked** (`split.halves`, `trackHalves`) through every move, his and the crowd's: a half that's
+    taken (en passant too) or promotes (a whole piece now) is gone; each keeps its side of the cut (`a`: the one towards
+    the a-file).
+  - **His first move:** only pawn moves (`bossStops`); none: any move (the dispatcher lifts it).
+  - **The split is a base** on the board at its ply (the position changes outside a move): every replay plays from it.
+    A new hook on the base boss, `afterBossMove`, does it (the runner calls it after his move, before the crowd's turn
+    is set up); the halves follow the crowd's moves through `afterCrowdMove`.
+  - **Saw cuts** (`sawFirst` 3, `sawEvery` 4, `sawTurns` 3): turns 3-5, 7-9, 11-13… (my call: from turn 3, not 2, so
+    the split after his first move has turn 2 to itself). The edge (`chooseCut`): one of the crowd's legal moves crosses
+    it straight, both its squares in the crowd's half, a seeded pick. `moveEdges`: a slide along a rank or file, a pawn's
+    push or double step, the king's step; castling counts the king's way on to his rook's corner (the king's path and
+    the rook's, as Big Boy's toy block counts it). Diagonals and knights cross no edge.
+  - **The board saw** (`boardSawFrom` 10, `boardSawTurns` 5): the warning when the meter is full, it's turn 10 or later
+    and one half of the board (files a-d or e-h) is his on material (his pieces there worth more than the crowd's,
+    `favouredHalf`); the saw as the next turn begins (my call: whatever the material by then: the warning promised it).
+    Any move from one half to the other is stopped (`crossesMiddle`), knights and castling long included. The test
+    switch and the admins' trigger skip the conditions (my call: they're for testing).
+  - **Fairness:** both kinds of cut stop moves only: chess.js's rules are untouched, so checks and pins work across them
+    and nobody is in check out of nowhere when one heals. The dispatcher lifts a cut for a side whose every legal move it
+    would stop (so never the only way out of check); the judge, bots and hints use the allowed moves; a cut turn is a
+    power turn for fair play. Both sides are stopped (his own moves too).
+- **Strength offset −250** (as Big Boy's): a quick boss-sim run (a new `split` mode in
+  `packages/sim/scripts/boss-sim.ts`: his first move a pawn's, the split by the game's own rules, so from the starting
+  position it comes once one of his pawns has gone; `reports/boss-sim/expert-7-split.jsonl`), an expert crowd of 10
+  bots (rating 2908) at −250: 3 games, the crowd won 1, drew 1, lost 1 (the splits came at crowd moves 5, 5 and 14).
+  For comparison, the others at −100 without a head start: no wins, 3 draws, 3 losses in 6 (Big Boy's runs), and Big
+  Boy at −250 with his snack: no wins, 2 draws, 4 losses. So −250 doesn't make him harder than the rest. The machine was
+  shared with other runs, so the sample is small (the club and casual crowds lose every game to every boss in this sim,
+  as Big Boy's runs found, so they can't tell offsets apart). The engine's own measure of the split, in 12 raid
+  openings with room (White to move after it), puts it at about 1 to 2.5 pawns, more than Big Boy's snack: the new half
+  arrives with a tempo, and now and then it traps a piece a move later (a bishop on g5 or h4 boxed in by an extra g-pawn).
+  **So −250 for now, as Big Boy's**: the games say it's not too generous, the static measure says he's at least a pawn
+  up; the recorded results (self-balancing) will move it.
+- **On screen** (`components/Sawyer.tsx`, `characters/effects/sawyer.ts`, his art in `characters/sawyer.ts`):
+  - **The split** (`SPLIT`, 3.6 s after his move shows): "SPLIT PAWN!" (hazard stripes), he leaps from his corner onto
+    the pawn (`leap`, new: a crouch, feet tucked in the air, a thump; the board draws his shadow), drives the saw into it
+    (`sawDown`, reused; the pawn is drawn in front of him, shaking as the blade bites), it cracks (`sawCrack`: a wood
+    crack, chips flying) and the two halves come apart, one sliding onto the square beside it; he leaps back. Near the
+    right edge he faces right. The board doesn't show the new half before the crack nor animate the swap.
+  - **Half-pawns:** every board (the boss's turn, your turn, the Crowd's) draws his two split pawns as halves wherever
+    they go: chessground's own piece elements on those squares get a class that clips them to one half (the half away
+    from its partner), a thin column at the cut shaded like fresh-cut wood (the pawn's own drawing, toned: it follows the
+    pawn's outline). A MutationObserver keeps the classes in step with chessground before each paint, across its full
+    redraws too (a first version watched a cg-board that chessground had already replaced).
+  - **A cut** (`SAW_CUT`, 2.3 s): "SAW CUT!", his `sawDown` at the board's corner; as its cut cue lands the groove opens
+    along the edge (`sawCut`, its half on each square, under the pieces), raw its first turn, two strips of duct tape its
+    second (a tape sound), more tape and narrower its third, then the tape fades to a scar and it's gone. (My call: tape,
+    not stitches: it reads at phone size.)
+  - **The board saw** (`BOARD_SAW`, 5.7 s): "BOARD SAW!", he leaps onto the board's bottom edge between d and e, revs
+    (`rev`, reused), saws his way up (`boardSaw`, new: the blade down and biting, stepping, sawdust; the big saw sound)
+    with the groove opening behind him (`boardGap` run), and at the top the board jolts and splits: a gap down the middle
+    (14 of the board's 256 px, under the pieces, a shadow round it) for its 5 turns; then the halves close up and knock
+    back together (`close`, a clunk).
+  - All drawn ahead in slices from when his battle shows (`prewarmSawyer`); the gap and cuts are single canvases.
+- **Sounds** (`characters/sawyer-sounds.ts`, synthesised): the rev, a swing, the cut's rasp, the wood crack, tape, the
+  big board saw, a hop's thump, the halves' clunk. Each 3 to 5 dB under a move's mean, peaks under half a move's, low and
+  soft (no chimes), through the mute switch; the big saw is made ahead (31 ms to make on a computer). His moves still
+  knock as every move does (a test hears the move's knock first).
+- **Lines** (`SAWYER_LINES`): Eric's ("Measure twice, cut once.", "Two for one!", "Timber!", "This board's getting
+  renovated.") and more in that voice; every one under 35 characters, so the speech rule shows each whole for its full
+  time (never at the 7 s cap). The split's line comes from a `split` beat of his own.
+- **Test links:** `?boss=sawyer`, `?boss=sawyer&power=boardsaw` (the warning on turn 2, the saw on turn 3), the admins'
+  "Trigger ultimate (testing)" (the saw as the next turn begins).
+- **Tests:** `packages/chess/test/sawyer.test.ts` (the split, its room and its square; tracking through captures, en
+  passant and promotion; cuts with sliders, pawns, the king, knights and diagonals; checks and pins across a cut; the
+  only-legal-moves and only-way-out-of-check lifts; castling; the schedule; the judge's best move always allowed; the
+  board saw's trigger, length and test switches), `packages/server/test/boss-powers-lobby.test.ts` ("Sawyer online"),
+  `packages/app/test/sawyer.test.ts` (his moments' beats, effects, sounds and lines), `e2e/sawyer.spec.ts` (phone and
+  computer: the split and its halves, the board saw and its gap, a cut taped and healing, the rejoin, his sounds
+  through mute), `e2e/perf.spec.ts` (his moments on a slowed phone), `e2e/boss-speech.spec.ts` (his split's line held
+  whole). Frames: `npm run frames:sawyer`.

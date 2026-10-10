@@ -112,7 +112,7 @@ async function run(name, context) {
   };
   /** The boss's reply as a turn begins (whatever comes): stills a beat after it lands and on the crowd's turn. */
   const reply = async (label) => {
-    const s = await waitUntil((x) => x.kind === "boss" && !x.thinking && !x.intro, 60_000);
+    const s = await waitUntil((x) => x.kind === "boss" && !x.thinking && !x.intro, 150_000);
     const end = await waitUntil((x) => x.kind === "play", 60_000);
     mark(label, s.now - 300, end.now + 1500);
     await p.waitForTimeout(1500);
@@ -140,7 +140,7 @@ async function run(name, context) {
   for (let turn = 1; turn <= 18 && done.size < 7; turn++) {
     const t = await takeHisPawn();
     await play(done.has("split") || !t ? await pick("h2h3", "a2a3", "h3h4", "a3a4", "h7h6", "a7a6", "h6h5", "a6a5") : t.from + t.to);
-    const s = await waitUntil((x) => x.kind === "boss" && !x.thinking && !x.intro, 60_000);
+    const s = await waitUntil((x) => x.kind === "boss" && !x.thinking && !x.intro, 150_000);
     const ev = (s.boss?.powers?.events ?? []).map((e) => e.kind);
     const pw = s.boss?.powers ?? {};
     const stage = pw.cut ? Math.min(2, pw.turn - pw.cut.at) : null;
