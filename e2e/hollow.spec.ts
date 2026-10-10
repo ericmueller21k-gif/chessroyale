@@ -57,6 +57,17 @@ const covered = (page: Page, square: string, canvas: string) =>
 
 const empties = (fen: string, squares: string[]) => squares.filter((s) => !new Chess(fen).get(s as never));
 
+/** The sounds played since the log was started (sound.ts logs every play()), by name. */
+const soundsHeard = (p: Page) => p.evaluate(() => ((window as any).__soundLog ?? []).map((s: string) => s.split(":")[0]) as string[]);
+
+/** An element's box is wholly on screen, and below the boss bar (nothing over it). */
+const onScreen = (p: Page, selector: string) =>
+  p.locator(selector).first().evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const bar = document.querySelector(".boss-bar")?.getBoundingClientRect();
+    return r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth && (!bar || r.top >= bar.bottom);
+  });
+
 test("Hollow's dark: his first cover, a dark square selected, a wrong attempt (-5), a legal move out of the dark, the 5-try cutoff", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
@@ -73,7 +84,16 @@ test("Hollow's dark: his first cover, a dark square selected, a wrong attempt (-
 
   // Move 1; he replies and covers the square of the piece he moved (DARKNESS!), his bulbs relit.
   const seen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /DARKNESS!/ } });
+  // Your move knocks as it lands, before any sound of his (Eric, Oct 10: a new sound instead of the move's). A real
+  // player thinks a while, so the engine's search is done and the move is scored at once: the screen it went in on is
+  // replaced before it paints, which had taken its knock with it.
+  await yourMove(page);
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => ((window as any).__soundLog = []));
   await play(page, "e2e4");
+  await expect.poll(() => soundsHeard(page), { timeout: 10_000 }).toContain("move");
+  const heard = await soundsHeard(page);
+  expect(heard[0], heard.join(", ")).toBe("move");
   await expect.poll(async () => (await seen.seen()).banner, { timeout: 30_000 }).toBe(true);
   await yourMove(page);
   const p2 = await powers(page);
@@ -173,22 +193,48 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   expect((await banner.seen()).lights).toBe(true);
   for (const s of ["a1", "h8", "e4", "d5"]) expect(await covered(page, s, ".lo-board canvas"), s).toBe(255);
   await expect(page.locator(".boss-dock")).toContainText(/Find (my|one of my|:)/);
+  // The round's prompt sits in the dock, whole and in view, below the boss bar; the crowd's meter beside the line
+  // (70%) it must hold, nothing settled yet.
+  await expect(page.locator(".lo-dock .lo-prompt")).toContainText(/Find/);
+  expect(await onScreen(page, ".lo-dock .lo-prompt")).toBe(true);
+  const meter = page.locator(".lo-meter[role=meter]");
+  await expect(meter).toBeVisible();
+  await expect(meter).toHaveAttribute("data-settled", "0");
   const target = his(lights.rounds[0].targets[0])[0]!;
   await tap(page, target);
   await expect(page.locator(`.lo-found[data-square="${target}"][data-round="0"]`)).toHaveCount(1);
+  // The meter moves with it: 1 of 1.
+  await expect(meter).toHaveAttribute("aria-valuenow", "100");
   // One piece, one try: the round is over at once, its answers show.
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.rounds[0].answers?.length ?? 0), { timeout: 5000 }).toBeGreaterThan(0);
   // Round 2: a wrong square (an empty one), then nothing more. The tap gives a second more: the bar bumps, "+1s".
   await expect(page.locator('.lo-marks[data-round="1"][data-open="1"]')).toHaveCount(1, { timeout: 15_000 });
+  // Its prompt is the new round's, and stays whole and in view through the round (not typed out and gone).
+  const prompt2 = await page.locator(".lo-dock .lo-prompt strong").textContent();
+  expect(prompt2).not.toBe(null);
+  const failed = await watchFor(page, { twice: { selector: ".fight-banner.power-cut", text: /TWICE!/ } });
   const bump = await watchFor(page, { plus: { selector: ".lo-plus", text: /\+1s/ } });
   const empty = empties(await page.evaluate(() => (window as any).match.boss.board.fen as string), ["e5", "e4", "a5", "h5"])[0]!;
   await tap(page, empty);
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.mine[1].wrong), { timeout: 5000 }).toEqual([empty]);
   expect((await bump.seen()).plus).toBe(true);
-  // Its answers show as it ends; the lights come back, his move follows, and the misses cost 10 each.
+  let checks = 0;
+  for (let i = 0; i < 4 && (await page.locator('.lo-marks[data-round="1"][data-open="1"]').count()) === 1; i++, checks++) {
+    expect(await page.locator(".lo-dock .lo-prompt strong").textContent()).toBe(prompt2);
+    expect(await onScreen(page, ".lo-dock .lo-prompt")).toBe(true);
+    await page.waitForTimeout(1000);
+  }
+  expect(checks).toBeGreaterThanOrEqual(2);
+  // Its answers show as it ends; the lights come back, his move follows, and the misses cost 10 each. 1 found of 6
+  // is under the line (70%): after his move, he moves again (TWICE!), a quiet move, before your turn.
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.rounds[1].answers?.length ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
-  await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
-  expect(await page.evaluate(() => (window as any).match.boss.board.history.length)).toBe(2);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  expect((await failed.seen()).twice).toBe(true);
+  const end = await page.evaluate(() => (window as any).match.boss);
+  expect(end.board.history.length).toBe(3);
+  expect(end.powers.lightsExtra).toBe("played");
+  expect(end.lastMove.move).toBe(end.board.history[2]);
+  expect(new Chess(end.board.fen).turn()).toBe("w");
   // 1 found of 6: 5 missed.
   expect(await myPoints(page)).toBe(before - 50);
   const p = await powers(page);
@@ -227,8 +273,12 @@ test("Hollow online: the server judges an attempt into the dark (-5, only for yo
   const t0 = lights.rounds[0].targets[0];
   const target = "abcdefgh".split("").flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).find((s) => c.get(s as never)?.color === "b" && c.get(s as never)?.type === t0.type && (!t0.file || s[0] === t0.file))!;
   await expect(page.locator('.lo-marks[data-round="0"][data-open="1"]')).toHaveCount(1, { timeout: 15_000 });
+  // The crowd's count comes from the server: the meter shows it, against the line.
+  expect(lights.crowd).toMatchObject({ found: 0, settled: 0 });
+  await expect(page.locator(".lo-meter[role=meter]")).toBeVisible();
   await tap(page, target);
   await expect(page.locator(`.lo-found[data-square="${target}"][data-round="0"]`)).toHaveCount(1);
+  await expect(page.locator(".lo-meter[role=meter]")).toHaveAttribute("data-found", "1");
   // The round's answers come from the server as it ends; then the lights, his move, your turn.
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.rounds[0].answers?.length ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
   expect(await page.evaluate(() => (window as any).match.phase.lights.mine[0].found)).toEqual([target]);
@@ -236,5 +286,10 @@ test("Hollow online: the server judges an attempt into the dark (-5, only for yo
   // -5 for the wrong attempt, -50 for the five pieces not found.
   expect(await myPoints(page)).toBe(-55);
   expect((await powers(page)).lightsAt).toBe(2);
+  // 1 of 6 is under the line: after his move, the host's engine played his extra one, before your turn.
+  const end = await page.evaluate(() => (window as any).match.boss);
+  expect(end.powers.lightsExtra).toBe("played");
+  expect(end.board.history.length).toBe(5);
+  expect(new Chess(end.board.fen).turn()).toBe("w");
   expect(errors).toEqual([]);
 });

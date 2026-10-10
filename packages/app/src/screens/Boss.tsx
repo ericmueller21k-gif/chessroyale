@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
+import type { PowerEventKind } from "@chessroyale/core";
 import { bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BulbStrip, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, funhouseFlipAt, powerLine, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
@@ -14,7 +15,7 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import type { BossView, GameView, LightsView } from "../game.ts";
-import { LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
+import { LightsDock, LightsOutLayer } from "../components/LightsOut.tsx";
 import { seenKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
@@ -50,7 +51,7 @@ function OpeningRoulette({ name }: { name: string }) {
 }
 
 /** The dock's line for a power's moment. */
-const POWER_DOCK: Record<string, string> = { freeze: "Freeze!", pie: "Pie!", blizzard: "Blizzard!", funhouse: "Funhouse!", warn: "Rage!", spark: "Sparkler!", candle: "Roman candle!", fireball: "Fireballs!", dark: "Darkness!" };
+const POWER_DOCK: Record<PowerEventKind | "warn", string> = { freeze: "Freeze!", pie: "Pie!", blizzard: "Blizzard!", funhouse: "Funhouse!", warn: "Rage!", spark: "Sparkler!", candle: "Roman candle!", fireball: "Fireballs!", dark: "Darkness!", extra: "He moves twice!" };
 const PIECE_NAME: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen" };
 
 /** When each burn after a crowd move started on this device (a screen drawn again carries on, it doesn't restart). */
@@ -194,8 +195,6 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
   const slewQueen = !intro && !!thinkingNow && !victim && lastMoveTookQueen(history, bases);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
-  // Lights out: what the dock says (a round's prompt may take both its lines).
-  const lightsNow = lights ? lightsStatus(lights, match.settings.lateGraceMs, now) : null;
   // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
   const alone = match.standings().length === 1;
   const youStruck = victim !== null && match.isYou(victim);
@@ -298,18 +297,15 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         match={match}
         side={boss.crowdSide}
         cues={kingCues}
+        wide={!!lights}
         status={
-          lightsNow?.wrap ? (
-            // (His prompt may take both lines on a phone, the count after it.)
-            <span>
-              {lightsNow.line} <span class="muted">{lightsNow.sub}</span>
-            </span>
+          lights ? (
+            // (Lights out: the round's prompt, whole, for the whole round, and the crowd's meter.)
+            <LightsDock lights={lights} graceMs={match.settings.lateGraceMs} now={now} />
           ) : (
           <>
             <span class="dock-line">
-              {lights ? (
-                lightsNow!.line
-              ) : claimed && t >= tl.claimAt && t < tl.bannerAt ? (
+              {claimed && t >= tl.claimAt && t < tl.bannerAt ? (
                 <>
                   {boss.icon} <strong>{claimLine(boss)}</strong>
                 </>
@@ -343,9 +339,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               ) : null}
             </span>
             <span class="dock-line muted">
-              {lights
-                ? lightsNow!.sub
-                : intro
+              {intro
                 ? `Worst mover struck every ${match.settings.bossKillEvery} moves.`
                 : funMove
                   ? "Not scored."

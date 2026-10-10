@@ -266,6 +266,11 @@ export interface NetBossPowers {
   bulbs?: number;
   claimed?: boolean;
   lightsAt?: number | null;
+  /**
+   * After a failed Lights out (the crowd's find rate under lightsOutHold): his extra move after his own, before the
+   * crowd's turn: "due", then "played" (the turn's `extra` event), or "skipped" (no quiet move within the cap).
+   */
+  lightsExtra?: "due" | "played" | "skipped";
 }
 
 /**
@@ -284,6 +289,12 @@ export interface NetLightsOut {
   mine: { found: string[]; wrong: string[]; used?: number }[];
   /** Once the lights are back: the pieces this player missed in all (each cost lightsOutMiss). */
   missed?: number;
+  /**
+   * The crowd's count, from the server's own judging, the same for everyone (Eric, Oct 10): pieces found by everyone in
+   * the test, settled so far (found, or missed for good), and asked in all. The meter shows found over settled; once
+   * every round is over, found over asked against lightsOutHold says whether he moves twice.
+   */
+  crowd?: { found: number; settled: number; asked: number };
 }
 
 /** A pre-game vote, for every screen: everyone's votes, each visible from `at` (server time). */
@@ -530,6 +541,8 @@ export type ServerMessage = { now: number } & (
   | { t: "darkTry"; key: string; move: string; ok: boolean; tries?: number; out?: boolean; refused?: boolean }
   /** Hollow's Lights out: as it begins, at each round's end (the answers) and on each of this player's taps. */
   | { t: "lights"; lights: NetLightsOut; boss: NetBoss; standings: NetStanding[] }
+  /** Lights out: the crowd's count, to everyone, as anyone's tap changes it (the round's end sends it in `lights`). */
+  | { t: "lightsCrowd"; key: string; crowd: NonNullable<NetLightsOut["crowd"]> }
   /** To the host: play the boss's move. */
   | {
       t: "bossRequest";
@@ -543,6 +556,8 @@ export type ServerMessage = { now: number } & (
       allowed?: string[];
       /** Boingo's funhouse: play the crowd's move for it, a weak but recoverable one (funhouseMoveFrom) from `allowed`. */
       funhouse?: boolean;
+      /** Hollow's extra move (a failed Lights out): a quiet one within the cap (extraMoveFrom); "" if there's none. */
+      extra?: boolean;
     }
   /** Quick chat: a line for you (your own included, echoed back). */
   | { t: "chat"; line: NetChatLine }

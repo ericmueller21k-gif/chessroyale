@@ -31,6 +31,7 @@ export function BossDock({
   canCall = false,
   strike,
   status,
+  wide = false,
   side = "w",
   cues = [],
   away = false,
@@ -46,6 +47,8 @@ export function BossDock({
   canCall?: boolean;
   strike?: StrikeState;
   status: ComponentChildren;
+  /** The status takes the whole row, no « » (Hollow's Lights out: his prompt and the crowd's meter need the room). */
+  wide?: boolean;
   /** The crowd's colour, for the God King's armour. */
   side?: "w" | "b";
   /** What just happened, most important first: he may say something about the first that speaks. */
@@ -91,10 +94,12 @@ export function BossDock({
   return (
     <>
     <div class="boss-dock">
-      <div class={`history-nav boss-dock-main${view?.browsing ? " browsing" : ""}`}>
-        <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
-          <Chevrons back />
-        </button>
+      <div class={`history-nav boss-dock-main${view?.browsing ? " browsing" : ""}${wide ? " wide" : ""}`}>
+        {!wide && (
+          <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
+            <Chevrons back />
+          </button>
+        )}
         <div class="boss-dock-status" role="status" aria-live="polite">
           {view?.browsing ? (
             <button type="button" class="history-label" onClick={() => view.live()} aria-label="Back to the live position">
@@ -104,9 +109,11 @@ export function BossDock({
             status
           )}
         </div>
-        <button type="button" class="nav-btn" aria-label="Next move" disabled={!view?.browsing} onClick={() => view?.go(view.ply + 1)}>
-          <Chevrons />
-        </button>
+        {!wide && (
+          <button type="button" class="nav-btn" aria-label="Next move" disabled={!view?.browsing} onClick={() => view?.go(view.ply + 1)}>
+            <Chevrons />
+          </button>
+        )}
       </div>
       <GodKingUnit
         side={side}

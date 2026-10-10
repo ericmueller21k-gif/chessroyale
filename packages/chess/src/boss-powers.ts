@@ -29,7 +29,7 @@ import {
   type PowerEvent,
   type PowerId,
 } from "@chessroyale/core";
-import { applyMove, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "./rules.ts";
+import { applyMove, inCheck, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "./rules.ts";
 import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
 
@@ -678,16 +678,111 @@ export function judgeTaps(round: Pick<LightsOutRound, "pieces" | "targets">, fen
   return { found, wrong, used, missed: targets.length - found.length, done: used >= targets.length };
 }
 
-/** A bot's Lights out: how many pieces it misses (each found with its round's lightsOutBotHit chance, from the seed). */
-export function botLightsMisses(seed: number, botId: string, rounds: readonly Pick<LightsOutRound, "pieces">[], s: Pick<BossPowerSettings, "lightsOutBotHit"> = BOSS_POWERS): number {
-  let missed = 0;
-  rounds.forEach((r, i) => {
+/** A bot's Lights out, round by round: how many pieces it finds (each with its round's lightsOutBotHit chance, from the seed). */
+export function botLightsFound(seed: number, botId: string, rounds: readonly Pick<LightsOutRound, "pieces">[], s: Pick<BossPowerSettings, "lightsOutBotHit"> = BOSS_POWERS): number[] {
+  return rounds.map((r, i) => {
     const hit = s.lightsOutBotHit[Math.min(i, s.lightsOutBotHit.length - 1)] ?? 0.5;
-    r.pieces.forEach((_, k) => {
-      if (powerRoll(seed, "lights-bot", botId, i, k) >= hit) missed++;
-    });
+    return r.pieces.filter((_, k) => powerRoll(seed, "lights-bot", botId, i, k) < hit).length;
   });
-  return missed;
+}
+
+/** A bot's Lights out: how many pieces it misses in all (botLightsFound). */
+export function botLightsMisses(seed: number, botId: string, rounds: readonly Pick<LightsOutRound, "pieces">[], s: Pick<BossPowerSettings, "lightsOutBotHit"> = BOSS_POWERS): number {
+  const found = botLightsFound(seed, botId, rounds, s);
+  return rounds.reduce((n, r, i) => n + r.pieces.length - found[i]!, 0);
+}
+
+/**
+ * The crowd's count in Lights out (Eric, Oct 10): the pieces found by everyone in the test, the pieces settled so far
+ * (found, or missed for good), and the pieces asked of them in all. The find rate is found over asked once it's over;
+ * while it runs, found over settled (the screens' meter).
+ */
+export interface LightsTally {
+  found: number;
+  settled: number;
+  asked: number;
+}
+
+/**
+ * The crowd's count so far, from the server's own judging. `ended`: the rounds over. A person's round (judgeTaps):
+ * every try settles a piece (one try a piece: a try that finds nothing means a piece missed), and once the round is
+ * over, all of its pieces are. A bot's finds count as each round ends (botLightsFound).
+ */
+export function lightsTally(
+  rounds: readonly Pick<LightsOutRound, "pieces">[],
+  ended: number,
+  people: readonly (readonly { found: readonly unknown[]; used?: number }[])[],
+  bots: readonly (readonly number[])[],
+): LightsTally {
+  const all = rounds.reduce((n, r) => n + r.pieces.length, 0);
+  let found = 0;
+  let settled = 0;
+  for (const mine of people)
+    rounds.forEach((r, i) => {
+      if (i > ended) return;
+      const m = mine[i];
+      const f = Math.min(r.pieces.length, m?.found.length ?? 0);
+      found += f;
+      settled += i < ended ? r.pieces.length : Math.min(r.pieces.length, Math.max(f, m?.used ?? f));
+    });
+  for (const bot of bots)
+    rounds.forEach((r, i) => {
+      if (i >= ended) return;
+      found += Math.min(r.pieces.length, bot[i] ?? 0);
+      settled += r.pieces.length;
+    });
+  return { found, settled, asked: all * (people.length + bots.length) };
+}
+
+/** The running find rate (0 to 1): found over settled; null before anything is settled. */
+export const lightsRate = (t: Pick<LightsTally, "found" | "settled">): number | null => (t.settled > 0 ? t.found / t.settled : null);
+
+/** The crowd held the light: its find rate over the whole test at or above lightsOutHold (nothing asked: it held). */
+export const lightsHeld = (t: Pick<LightsTally, "found" | "asked">, s: Pick<BossPowerSettings, "lightsOutHold"> = BOSS_POWERS): boolean =>
+  t.asked <= 0 || t.found >= s.lightsOutHold * t.asked - 1e-9;
+
+// ---------------- Hollow: the extra move (a failed Lights out) ----------------
+
+/**
+ * The position with him to move again after his own move (the crowd's turn passed: the side to move swapped, no en
+ * passant), or null when it can't be: the crowd is in check or has no move (the game is over).
+ */
+export function passTurn(fen: string): string | null {
+  try {
+    if (inCheck(fen) || !legalMoves(fen).length) return null;
+    const f = fen.split(" ");
+    f[1] = f[1] === "w" ? "b" : "w";
+    f[3] = "-";
+    const passed = f.join(" ");
+    return legalMoves(passed).length ? passed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * His extra move's candidates in the passed position: quiet moves only (Eric, Oct 10): no capture (en passant
+ * included), no promotion, no check; and never one that leaves the crowd without a move (a stalemate would decide
+ * the game). His own king is never left in check (only legal moves).
+ */
+export function extraMoveCandidates(passed: string): string[] {
+  return legalMoves(passed).filter((m) => {
+    if (m.length > 4 || pieceAt(passed, to(m))) return false;
+    if (pieceAt(passed, from(m))?.type === "p" && m[0] !== m[2]) return false;
+    const after = applyMove(passed, m);
+    return !inCheck(after) && legalMoves(after).length > 0;
+  });
+}
+
+/**
+ * His extra move, from the candidates' scores (his expected score after each, 0 to 1) and `before`, his expected score
+ * had he not moved again: the one that gains him most without gaining more than `cap` points (expected x 100), nor
+ * losing more than that; never one with a forced mate either way in its line. Null when there's none.
+ */
+export function pickExtraMove(scored: readonly MoveScore[], before: number, candidates: readonly string[], cap: number = BOSS_POWERS.lightsOutExtraGain): string | null {
+  const ok = new Set(candidates);
+  const within = scored.filter((m) => ok.has(m.move) && m.mate === undefined && Math.abs(m.expected - before) * 100 <= cap + 1e-9);
+  return [...within].sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1))[0]?.move ?? null;
 }
 
 // ---------------- The test trigger ----------------

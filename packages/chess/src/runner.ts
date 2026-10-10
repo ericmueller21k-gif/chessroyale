@@ -81,8 +81,15 @@ import {
   fireStage,
   triggerUltimate,
   bulbsAt,
+  botLightsFound,
   botLightsMisses,
   chooseLightsOut,
+  extraMoveCandidates,
+  lightsHeld,
+  lightsTally,
+  passTurn,
+  pickExtraMove,
+  type LightsTally,
   darkAttempt,
   darkSquares,
   lightsOutDue,
@@ -1149,14 +1156,81 @@ export class MatchRunner {
     if (!test || test.missed) return test?.missed ?? {};
     const all = test.rounds.reduce((n, r) => n + r.pieces.length, 0);
     const out: Record<string, number> = {};
-    for (const pl of this.alive()) out[pl.id] = pl.isBot ? botLightsMisses(p.seed, pl.id, test.rounds) : Math.max(0, Math.min(all, missed[pl.id] ?? all));
+    const alive = this.alive();
+    for (const pl of alive) out[pl.id] = pl.isBot ? botLightsMisses(p.seed, pl.id, test.rounds) : Math.max(0, Math.min(all, missed[pl.id] ?? all));
     const cost = BOSS_POWERS.lightsOutMiss;
+    // The crowd's find rate over the whole test (Eric, Oct 10): under lightsOutHold, he moves twice before its turn.
+    const asked = all * alive.length;
+    const found = asked - alive.reduce((n, pl) => n + out[pl.id]!, 0);
+    const held = lightsHeld({ found, asked });
     this.state = {
       ...this.state,
       players: this.state.players.map((pl) => (out[pl.id] ? { ...pl, stageScore: pl.stageScore - out[pl.id]! * cost } : pl)),
-      boss: { ...b, powers: { ...p, lightsOut: { ...test, missed: out } } },
+      boss: { ...b, powers: { ...p, lightsOut: { ...test, missed: out, found, asked, ...(held ? {} : { extra: "due" as const }) } } },
     };
     return out;
+  }
+
+  /**
+   * Lights out's crowd count so far (the screens' meter, and the verdict as its last round ends): each person's taps
+   * judged (`people`, by id: judgeTaps round by round; nobody's entry, nothing found), each bot's finds from the seed
+   * as each round ends. `ended`: the rounds over. The same people and bots as finishLightsOut counts.
+   */
+  lightsTally(people: Readonly<Record<string, readonly { found: readonly unknown[]; used?: number }[]>>, ended: number): LightsTally {
+    const p = this.state.boss!.powers!;
+    const rounds = p.lightsOut?.rounds ?? [];
+    const alive = this.alive();
+    return lightsTally(
+      rounds,
+      ended,
+      alive.filter((pl) => !pl.isBot).map((pl) => people[pl.id] ?? []),
+      alive.filter((pl) => pl.isBot).map((pl) => botLightsFound(p.seed, pl.id, rounds)),
+    );
+  }
+
+  /**
+   * Hollow's extra move is due: the crowd failed Lights out (under lightsOutHold), and he has played his own move (the
+   * crowd's turn has begun, not yet dealt). Like the funhouse, it comes before the crowd picks.
+   */
+  extraMoveDue(): boolean {
+    const b = this.state.boss;
+    const t = b?.powers?.lightsOut;
+    // (Only before the crowd's next move: once it has moved, a driver that skipped it has let it lapse.)
+    return t?.extra === "due" && t.at === b!.crowdMoves && !b!.result && !this.finalGameOver() && !this.bossToMove();
+  }
+
+  /** His extra move: a quiet one that gains him only a little (extraMoveFrom), from this device's engine. */
+  async playExtraMove(engine: EngineLike = this.opts.engines[0]!): Promise<string | null> {
+    return this.applyExtraMove(await extraMoveFrom(engine, this.boards.get(this.state.boards[0]!)!.fen));
+  }
+
+  /**
+   * Plays his extra move (from the host's engine online): the crowd's turn passes (a base on the board: the position
+   * changes between moves), then his quiet move. A move that isn't one of the candidates (extraMoveCandidates), or
+   * none, and he skips it. It isn't the crowd's: nothing is scored and fair play never sees it; the crowd's turn (its
+   * powers already set as his own move landed) follows as usual. Returns the move played, or null.
+   */
+  applyExtraMove(move: string | null): string | null {
+    const b = this.state.boss!;
+    const p = b.powers!;
+    const test = p.lightsOut;
+    if (!test || test.extra !== "due" || test.at !== b.crowdMoves) return null;
+    const id = this.state.boards[0]!;
+    const board = this.boards.get(id)!;
+    const passed = passTurn(board.fen);
+    if (!move || !passed || !extraMoveCandidates(passed).includes(move)) {
+      this.state = { ...this.state, boss: { ...b, powers: { ...p, lightsOut: { ...test, extra: "skipped" } } } };
+      return null;
+    }
+    const ply = board.history.length;
+    const base: BoardState = { ...board, fen: passed, expected: 1 - board.expected, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: passed }] };
+    this.boards.set(id, playOnBoard(base, move, base.expected));
+    this.bossLast = { move, san: toSan(passed, move) };
+    this.state = {
+      ...this.state,
+      boss: { ...b, powers: { ...p, lightsOut: { ...test, extra: "played" }, events: [...p.events, { kind: "extra", turn: p.turn, square: move.slice(2, 4) }] } },
+    };
+    return move;
   }
 
   /** The boss's last move, and the piece it took (if any). */
@@ -1260,6 +1334,7 @@ export class MatchRunner {
                     bulbs: p.bulbs ?? bulbsAt(p.turn || 1),
                     ...(p.claimed ? { claimed: true } : {}),
                     lightsAt: p.lightsOut ? p.lightsOut.at : null,
+                    ...(p.lightsOut?.extra ? { lightsExtra: p.lightsOut.extra } : {}),
                   }
                 : {}),
             },
@@ -1623,6 +1698,27 @@ export async function funhouseMoveFrom(
   if (l.points <= hi + 5 && (l.logit <= maxLogit || l.points <= 2) && safe(g)) return pick.move;
   const gentler = [...all].filter((x) => x.loss.points < pick.loss.points).sort((a, c) => c.loss.points - a.loss.points)[0];
   return gentler?.move ?? bestMove;
+}
+
+/**
+ * Hollow's extra move after a failed Lights out (Eric, Oct 10): with the crowd's turn passed, a quiet move (no capture,
+ * check or promotion; extraMoveCandidates) that gains him at most `cap` points over not moving again, nor loses him
+ * more (pickExtraMove), by the same engine searches the boss's moves use: his expected score had he not moved again is
+ * one less the crowd's best in the position now; the engine's top moves first, then the other candidates. Null (he
+ * skips it) when the crowd is in check, or no candidate is within the cap.
+ */
+export async function extraMoveFrom(engine: EngineLike, fen: string, cap: number = BOSS_POWERS.lightsOutExtraGain): Promise<string | null> {
+  const passed = passTurn(fen);
+  if (!passed) return null;
+  const candidates = extraMoveCandidates(passed);
+  if (!candidates.length) return null;
+  const crowdBest = (await engine.topMoves(fen, 1))[0];
+  const before = crowdBest ? 1 - crowdBest.expected : 0.5;
+  const top = (await engine.topMoves(passed, 8)).filter((m) => candidates.includes(m.move));
+  const pick = pickExtraMove(top, before, candidates, cap);
+  if (pick) return pick;
+  const rest = candidates.filter((m) => !top.some((t) => t.move === m));
+  return rest.length ? pickExtraMove([...top, ...(await engine.scoreMoves(passed, rest))], before, candidates, cap) : null;
 }
 
 /** After `m`, the reply takes the mover's queen, and `m` didn't take a queen itself (a trade is fine). */

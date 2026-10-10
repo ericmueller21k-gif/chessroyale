@@ -444,11 +444,14 @@ export class SoloMatch implements GameView {
   private showLights() {
     const l = this.lights!;
     const test = this.runner.state.boss!.powers!.lightsOut!;
+    const mine = this.lightsMine();
     const lights: LightsView = {
       key: l.key,
       at: l.at,
       rounds: test.rounds.map((r, i) => ({ pieces: r.pieces, targets: r.targets, ms: r.ms, ...(i < l.ended ? { answers: r.answers, endedAt: l.endedAt[i] } : {}) })),
-      mine: this.lightsMine(),
+      mine,
+      // The crowd's count (you, and any bots as each round ends), worked out here as the server does online.
+      crowd: this.runner.lightsTally(this.you.alive ? { [HUMAN]: mine } : {}, l.ended),
     };
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, lights });
   }
@@ -524,6 +527,22 @@ export class SoloMatch implements GameView {
     this.timer = setTimeout(() => this.nextRound(), showMs);
   }
 
+  /**
+   * Hollow's extra move (the crowd failed Lights out): after his own move he thinks again, then plays a quiet move that
+   * gains him only a little, with its banner; then your turn. None such: he skips it.
+   */
+  private async extraTurn() {
+    const snap = this.bossSnapshot();
+    this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
+    // (No engine answer: he skips it, as online.)
+    const pick = this.runner.playExtraMove(this.engines[0]).catch(() => this.runner.applyExtraMove(null));
+    const [played] = await Promise.all([pick, new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history, snap.board.bases)))]);
+    if (!played) return this.nextRound();
+    const showMs = powerMomentMs([{ kind: "extra" }]);
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
+    this.timer = setTimeout(() => this.nextRound(), showMs);
+  }
+
   /** After a crowd move in the boss battle: the boss strikes when it's due. */
   private afterBossRound() {
     if (this.runner.bossKillDue()) {
@@ -554,6 +573,8 @@ export class SoloMatch implements GameView {
       }
       // (Hollow's Lights out comes at the start of his turn, before his move.)
       if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.bossTurn());
+      // (A failed Lights out: his extra move, after his own and before your turn.)
+      if (this.runner.extraMoveDue()) return void this.extraTurn();
       if (this.runner.funhouseDue()) return void this.funhouseTurn();
     } else if (this.runner.isFinal()) return void this.finalTurn();
     this.runner.deal();
@@ -775,6 +796,10 @@ export class SoloMatch implements GameView {
             this.runner.finishLightsOut({});
           }
           await this.runner.playBoss(this.engines[0]);
+          continue;
+        }
+        if (this.runner.extraMoveDue()) {
+          await this.runner.playExtraMove(this.engines[0]);
           continue;
         }
         if (this.runner.funhouseDue()) {

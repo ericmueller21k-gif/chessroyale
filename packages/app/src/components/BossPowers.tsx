@@ -43,7 +43,7 @@ export interface Moment {
   first?: true;
 }
 
-const ORDER: Record<PowerEventKind, number> = { freeze: 0, pie: 0, spark: 0, fireball: 0, dark: 0, warn: 1, blizzard: 2, candle: 2, funhouse: 3 };
+const ORDER: Record<PowerEventKind, number> = { freeze: 0, pie: 0, spark: 0, fireball: 0, dark: 0, warn: 1, blizzard: 2, candle: 2, funhouse: 3, extra: 3 };
 
 /**
  * The moments a boss screen plays, ending at `until` (the screen's end: the crowd's clock starts then), one after
@@ -54,7 +54,10 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   const p = boss.powers;
   if (!p || !until || !p.events.length) return [];
   const funhouse = !!p.funhouse && p.funhouse.turn === boss.crowdMoves && p.events.some((e) => e.kind === "funhouse");
-  const list = p.events.filter((e) => (e.kind === "funhouse") === funhouse).sort((a, b) => ORDER[a.kind] - ORDER[b.kind]);
+  // (Hollow's extra move, after a failed Lights out: its own moment, after the turn's others played with his move.)
+  const extra = !funhouse && p.lightsExtra === "played" && p.events.some((e) => e.kind === "extra");
+  const only = funhouse ? "funhouse" : extra ? "extra" : null;
+  const list = p.events.filter((e) => (only ? e.kind === only : e.kind !== "funhouse" && e.kind !== "extra")).sort((a, b) => ORDER[a.kind] - ORDER[b.kind]);
   let t = until - powerMomentMs(list);
   return list.map((e) => {
     const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}) };
@@ -353,6 +356,7 @@ const KIT_MOMENT: Record<PowerEventKind, "power" | "ultimateWarn" | "ultimate" |
   funhouse: "ultimate",
   candle: "ultimate",
   dark: "power",
+  extra: "ultimateHit",
 };
 
 /**
@@ -493,6 +497,9 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
         </div>
       );
     }
+    case "extra":
+      // Hollow moves twice (the crowd's find rate in Lights out was under lightsOutHold): his banner as it lands.
+      return <div class="power-moment pm-extra">{t < 1800 && banner("TWICE!", `${boss.name.replace(/^The /, "")} moves again`, "dark")}</div>;
     case "fireball":
       return (
         <div class="power-moment pm-fireball">

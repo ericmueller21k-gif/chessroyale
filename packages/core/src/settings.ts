@@ -525,8 +525,22 @@ export const BOSS_POWERS = {
   lightsOutTapMs: 1000,
   /** Each piece not found (a wrong square, or out of time) costs this many points. */
   lightsOutMiss: 10,
-  /** Bots in the crowd find each piece with this chance, round by round (from the seed): fewer as the rounds get harder. */
-  lightsOutBotHit: [0.75, 0.6, 0.5] as readonly number[],
+  /**
+   * Bots in the crowd find each piece with this chance, round by round (from the seed): fewer as the rounds get harder.
+   * Eric, Oct 10: high enough that a crowd of bots sits near lightsOutHold (about 72% over the test), not always under it.
+   */
+  lightsOutBotHit: [0.85, 0.75, 0.65] as readonly number[],
+  /**
+   * The crowd's find rate over the whole test (every piece found by everyone still in, over every piece asked of them)
+   * that holds the light (Eric, Oct 10). Below it, he plays an extra move after his own, before the crowd's turn.
+   */
+  lightsOutHold: 0.7,
+  /**
+   * His extra move (a failed Lights out) is a quiet one (no capture, check or promotion) that gains him at most this
+   * many points (expected score x 100) over not moving again, and loses him no more than that either; none such: no
+   * extra move.
+   */
+  lightsOutExtraGain: 3,
 } as const;
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */

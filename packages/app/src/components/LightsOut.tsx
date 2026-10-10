@@ -1,7 +1,6 @@
-import type { ComponentChildren } from "preact";
-import { useEffect } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { LIGHTS_OUT, lightsDeadline, lightsOutTimeline } from "@chessroyale/chess";
+import { LIGHTS_OUT, lightsDeadline, lightsHeld, lightsOutTimeline, lightsRate } from "@chessroyale/chess";
 import { bossKit } from "../characters/kits.ts";
 import { animLength, cueAt, lightsOutSmashes, lightsOutSpot, nightItems, nightWarmList, type NightState, type SquareItem } from "../characters/power-art.ts";
 import { findLine, findShort } from "../characters/hollow.ts";
@@ -69,23 +68,113 @@ export function lightsMissed(lights: LightsView, upTo = lights.rounds.length): n
 }
 
 /**
- * The dock's words through Lights out. `wrap`: the round's prompt, which may take both of the dock's lines (on a
- * phone his longer prompts don't fit one: measured at 320-390 px), with the count after it.
+ * The crowd's verdict, once every round is over (the server's count): it held the light (its find rate at or above
+ * lightsOutHold), or he moves twice. Null while the test runs (or without a count).
  */
-export function lightsStatus(lights: LightsView, graceMs: number, now: number): { line: ComponentChildren; sub: string; wrap?: boolean } {
+export function lightsVerdict(lights: LightsView): "held" | "failed" | null {
+  const c = lights.crowd;
+  if (!c || c.settled < c.asked || !lights.rounds.every((r) => r.answers)) return null;
+  return lightsHeld(c) ? "held" : "failed";
+}
+
+/**
+ * What the dock shows through Lights out (Eric, Oct 10: the round's prompt on screen, whole, for the whole round, in a
+ * place that's always in view): the round's prompt (his words, or the compact list when they don't fit the dock's two
+ * lines), your count, then the round's result; the crowd's meter all along; at the end, the verdict.
+ */
+export function lightsStatus(lights: LightsView, graceMs: number, now: number): { prompt: string; short: string; note: string; meter: boolean; key: string } {
   const b = lightsBeat(lights, graceMs, now);
   const cost = BOSS_POWERS.lightsOutMiss;
   if (b.back) {
     const n = lightsMissed(lights);
-    return { line: <strong>The lights are back.</strong>, sub: n ? `Missed ${n}: −${n * cost}` : "You found every piece." };
+    const v = lightsVerdict(lights);
+    const text = v === "failed" ? "He moves twice!" : v === "held" ? "The light holds." : "The lights are back.";
+    return { prompt: text, short: text, note: n ? `Missed ${n}: −${n * cost}` : "You found every piece.", meter: true, key: "back" };
   }
-  if (b.round < 0) return { line: <strong>Lights out!</strong>, sub: "Clocks stopped." };
+  if (b.round < 0) return { prompt: "Lights out!", short: "Lights out!", note: "Clocks stopped.", meter: false, key: "start" };
   const r = lights.rounds[b.round]!;
   const mine = lights.mine[b.round] ?? { found: [], wrong: [] };
-  if (b.open) return { line: <strong>{findShort(r.targets ?? r.pieces, 40)}</strong>, sub: `${mine.found.length}/${r.pieces.length}`, wrap: true };
-  if (b.waiting) return { line: <strong>{findShort(r.targets ?? r.pieces, 40)}</strong>, sub: `${mine.found.length}/${r.pieces.length} · waiting for the others`, wrap: true };
+  const targets = r.targets ?? r.pieces;
+  const prompt = findLine(targets);
+  const short = findShort(targets, 0);
   const missed = r.pieces.length - mine.found.length;
-  return { line: <strong>{missed ? `Missed ${missed}: −${missed * cost}` : r.pieces.length > 1 ? "Found them all!" : "Found it!"}</strong>, sub: `Round ${b.round + 1} of ${lights.rounds.length}` };
+  const note =
+    b.open ? `${mine.found.length}/${r.pieces.length}`
+    : b.waiting ? `${mine.found.length}/${r.pieces.length} · waiting for the others`
+    : missed ? `Missed ${missed}: −${missed * cost}`
+    : r.pieces.length > 1 ? "Found them all!" : "Found it!";
+  return { prompt, short, note, meter: true, key: `round-${b.round}` };
+}
+
+/**
+ * The dock through Lights out: the round's prompt, whole (his sentence; the compact list if that would take more than
+ * the dock's two lines, measured in its own font and box), your count or the round's result, and the crowd's meter: its
+ * find rate so far against lightsOutHold (the line), from the server's count, moving as anyone taps.
+ */
+export function LightsDock({ lights, graceMs, now }: { lights: LightsView; graceMs: number; now: number }) {
+  const st = lightsStatus(lights, graceMs, now);
+  const box = useRef<HTMLSpanElement>(null);
+  // 0: his sentence; 1: the compact list (it didn't fit); 2: the compact list, a size smaller.
+  const [fit, setFit] = useState({ key: "", level: 0 });
+  const level = fit.key === st.key + st.prompt ? fit.level : 0;
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || level >= 2) return;
+    if (el.scrollHeight > el.clientHeight + 1) setFit({ key: st.key + st.prompt, level: level + 1 });
+  });
+  const hold = BOSS_POWERS.lightsOutHold;
+  const c = lights.crowd;
+  const rate = c ? lightsRate(c) : null;
+  const pct = rate === null ? null : Math.round(rate * 100);
+  return (
+    <div class="lo-dock" data-step={st.key}>
+      <span ref={box} class={`lo-prompt${level === 2 ? " small" : ""}`} data-fit={level}>
+        <strong>{level ? st.short : st.prompt}</strong> <span class="muted">{st.note}</span>
+      </span>
+      {st.meter && c ? (
+        <span
+          class={`lo-meter${rate !== null && rate >= hold ? " ok" : ""}`}
+          role="meter"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct ?? 0}
+          aria-label={`The crowd has found ${pct ?? 0}% of his pieces so far; it needs ${Math.round(hold * 100)}%`}
+          data-found={c.found}
+          data-settled={c.settled}
+          data-asked={c.asked}
+        >
+          <span class="lo-meter-bar" aria-hidden="true">
+            <i style={{ width: `${pct ?? 0}%` }} />
+            <b style={{ left: `${hold * 100}%` }} />
+          </span>
+          <span class="lo-meter-pct">{pct === null ? "—" : `${pct}%`}</span>
+          <span class="lo-meter-of muted">needs {Math.round(hold * 100)}%</span>
+        </span>
+      ) : (
+        <span class="lo-meter" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
+/**
+ * His words in his pixel text box above the board's top-left (each round's prompt, typed). Kept only where it fits:
+ * a box that would run off the screen (a long prompt on a narrow phone grows upward) isn't shown; the dock always has
+ * the prompt (LightsDock).
+ */
+function LightsLine({ text, at, now }: { text: string; at: number; now: number }) {
+  const el = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const e = el.current;
+    if (!e) return;
+    const r = e.getBoundingClientRect();
+    e.style.visibility = r.top < 0 || r.left < 0 || r.right > innerWidth ? "hidden" : "";
+  });
+  return (
+    <div ref={el} class="pm-line lo-line" role="status" aria-label={text}>
+      {text.slice(0, Math.min(text.length, Math.floor((now - at) / 28) + 1))}
+    </div>
+  );
 }
 
 export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap }: { boss: BossView; lights: LightsView; now: number; orientation: "white" | "black"; graceMs: number; onTap: (square: string) => void }) {
@@ -151,8 +240,11 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
   if (back) anim = { name: "lightsBack", since: at + tl.backAt };
   const gone = t >= tl.backAt + animLength(backAnim);
   // His words over the board's top-left, in his pixel text box: "It's time.", each round's prompt, the lights back.
+  // (As the lights come back: the verdict, the crowd held the light or he moves twice; without a count, his usual line.)
+  const verdict = lightsVerdict(lights);
+  const verdictBeat = verdict === "held" ? "lightsHeld" : verdict === "failed" ? "lightsFailed" : "lightsBack";
   const line =
-    back ? { text: (pickLine(kit, "lightsBack", `${lights.key}:back`) ?? kit.lines.lightsBack?.[0]) || "Remember that.", at: at + tl.backAt + 300 }
+    back ? { text: (pickLine(kit, verdictBeat, `${lights.key}:back`) ?? kit.lines[verdictBeat]?.[0] ?? kit.lines.lightsBack?.[0]) || "Remember that.", at: at + tl.backAt + 300 }
     : round >= 0 ? { text: findLine(lights.rounds[round]!.targets ?? lights.rounds[round]!.pieces), at: at + tl.rounds[round]!.at }
     : t >= LIGHTS_OUT.dropAt ? { text: kit.lines.ultimate?.[0] ?? "It's time.", at: at + LIGHTS_OUT.dropAt + 200 }
     : null;
@@ -186,11 +278,7 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
           )}
         </div>
       )}
-      {line && now >= line.at && now < line.at + 2800 && (
-        <div class="pm-line lo-line" role="status" aria-label={line.text}>
-          {line.text.slice(0, Math.min(line.text.length, Math.floor((now - line.at) / 28) + 1))}
-        </div>
-      )}
+      {line && now >= line.at && now < line.at + 2800 && <LightsLine key={line.text} text={line.text} at={line.at} now={now} />}
       {tr && open && <TimerBar startsAt={at + tr.at} deadline={at + deadline} total={tr.until - tr.at} />}
       {bumpAt > 0 && now < bumpAt + 800 && (
         <span key={`bump-${round}-${used}`} class="lo-plus" aria-hidden="true">

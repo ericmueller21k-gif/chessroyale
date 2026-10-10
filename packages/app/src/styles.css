@@ -10932,3 +10932,85 @@ img.qicon {
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
+/* Lights out in the dock (Eric, Oct 10): the round's prompt, whole, for the whole round (his sentence, or the compact
+   list when that would take more than two lines here), your count, and the crowd's meter against the line it must
+   hold. The dock keeps its height (the board never moves); the « » give their room to it meanwhile. */
+.boss-dock-main.wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* (Two lines for the prompt and one for the meter, always: nothing in the dock moves as the rounds change.) */
+.lo-dock {
+  display: grid;
+  grid-template-rows: 34px 14px;
+  gap: 4px;
+  min-width: 0;
+}
+.lo-prompt {
+  display: block;
+  height: 34px;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 17px;
+  overflow-wrap: anywhere;
+}
+.lo-prompt.small {
+  font-size: 12px;
+  line-height: 16px;
+}
+.lo-meter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 14px;
+  font-size: 12px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+.lo-meter-bar {
+  position: relative;
+  flex: 1 1 auto;
+  max-width: 160px;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+}
+.lo-meter-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: #8b5cf6;
+  transition: width 250ms ease-out;
+}
+.lo-meter.ok .lo-meter-bar i {
+  background: var(--good);
+}
+/* The line the crowd must hold (lightsOutHold). */
+.lo-meter-bar b {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+}
+.lo-meter-pct {
+  min-width: 3ch;
+  font-weight: 700;
+}
+/* Computers: the dock is wider and the prompt a size up (still two lines and the meter in its 62 px). */
+@media (min-width: 900px) and (min-height: 600px) {
+  .lo-dock {
+    grid-template-rows: 40px 14px;
+  }
+  .lo-prompt {
+    height: 40px;
+    font-size: 15px;
+    line-height: 20px;
+  }
+  .lo-prompt.small {
+    font-size: 14px;
+    line-height: 20px;
+  }
+}

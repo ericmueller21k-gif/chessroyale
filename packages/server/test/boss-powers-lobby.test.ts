@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, POWER_FX, bossShowMs, initPowers, legalMoves, lightsOutTimeline, pieceAt, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, POWER_FX, bossShowMs, extraMoveCandidates, initPowers, legalMoves, lightsOutTimeline, passTurn, pieceAt, sanLineToUci, sideToMove, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -354,9 +354,14 @@ describe("Hollow online", () => {
     L.advance(at + tl.rounds[0]!.at + 500 - L.now);
     // p1 finds round 1's piece; p2 taps an empty square.
     const target = his(0)[0]!;
+    // (The crowd's count before anyone taps: nothing settled, 6 pieces asked of each of the two.)
+    expect(l1.lights.crowd).toEqual({ found: 0, settled: 0, asked: 12 });
     L.core.message("p1", { t: "lightsTap", key: l1.lights.key, round: 0, square: target });
     expect(L.last("p1", "lights")!.lights.mine[0]).toEqual({ found: [target], wrong: [], used: 1 });
     expect(L.last("p1", "lights")!.lights.rounds[0]!.answers).toBeUndefined();
+    // Everyone's meter moves with the tap: the server's count, the same for both (Eric, Oct 10).
+    expect(L.last("p1", "lights")!.lights.crowd).toEqual({ found: 1, settled: 1, asked: 12 });
+    expect(L.last("p2", "lightsCrowd")).toMatchObject({ key: l1.lights.key, crowd: { found: 1, settled: 1, asked: 12 } });
     L.core.message("p2", { t: "lightsTap", key: l1.lights.key, round: 0, square: "e4" });
     // Everyone has used their tries (one piece, one try): the round is over at once, its answers go out.
     expect(L.last("p2", "lights")!.lights.mine[0]).toEqual({ found: [], wrong: ["e4"], used: 1 });
@@ -393,7 +398,71 @@ describe("Hollow online", () => {
     expect(after.p1! - before.p1!).toBe(-5 * BOSS_POWERS.lightsOutMiss);
     expect(after.p2! - before.p2!).toBe(-6 * BOSS_POWERS.lightsOutMiss);
     expect(L.last("p1", "boss")!.boss.powers!.lightsAt).toBe(2);
+    // 1 of 12 found, under the line: as the last round ended, every screen had the count to say so.
+    expect(L.last("p2", "lights")!.lights.crowd).toEqual({ found: 1, settled: 12, asked: 12 });
+    expect(L.last("p1", "boss")!.boss.powers!.lightsExtra).toBe("due");
     hostBoss(L);
-    expect(toRound(L).boss!.powers!.lightsAt).toBe(2);
+    // After his own move (and its moments), he thinks again: the host is asked for his extra move.
+    for (let i = 0; i < 6 && !L.last("p1", "bossRequest"); i++) L.advance(5000);
+    const extra = L.last("p1", "bossRequest")!;
+    expect(extra).toMatchObject({ extra: true });
+    expect(L.core.save().phase).toBe("boss");
+    expect(L.last("p2", "boss")!.thinking).toBe(true);
+    const quiet = extraMoveCandidates(passTurn(extra.fen)!);
+    L.core.message("p1", { t: "bossMove", key: extra.key, move: quiet[0]! });
+    const shown = L.last("p2", "boss")!;
+    expect(shown.boss.lastMove!.move).toBe(quiet[0]);
+    expect(shown.boss.powers!.lightsExtra).toBe("played");
+    expect(shown.boss.powers!.events.some((e) => e.kind === "extra")).toBe(true);
+    expect(shown.until - L.now).toBe(POWER_FX.extra);
+    const h = shown.boss.board.history;
+    expect(sideToMove(shown.boss.board.fen)).toBe("w");
+    expect(h.length).toBe(5); // e2e4-ish, his reply, the crowd's 2nd, his move, his extra move
+    const round = toRound(L);
+    expect(round.boss!.powers!.lightsAt).toBe(2);
+    expect(round.board!.history.length).toBe(5);
+  });
+
+  it("Lights out held (the crowd's find rate at the line or over): no extra move; and his extra move, asked of a host that can't, is skipped", () => {
+    const L = raid({ bossId: "hollow", bossPowerTest: "lightsout" });
+    crowdMove(L);
+    hostBoss(L);
+    toRound(L);
+    crowdMove(L);
+    const l1 = L.last("p1", "lights")!;
+    const fen = l1.boss.board.fen;
+    const squares = (round: number) =>
+      l1.lights.rounds[round]!.targets!.map((t) => ["a", "b", "c", "d", "e", "f", "g", "h"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).find((s) => pieceAt(fen, s)?.color === "b" && pieceAt(fen, s)!.type === t.type && (!t.file || s[0] === t.file))!);
+    // Both find everything they're asked (a piece named twice in a round needs two squares: the test's own rounds don't).
+    for (let k = 0; k < 3; k++) {
+      const tl = lightsOutTimeline(L.last("p1", "lights")!.lights.rounds, DEFAULT_SETTINGS.lateGraceMs).rounds[k]!;
+      L.advance(Math.max(0, l1.lights.at + tl.at + 100 - L.now));
+      for (const id of ["p1", "p2"]) for (const sq of [...new Set(squares(k))]) L.core.message(id, { t: "lightsTap", key: l1.lights.key, round: k, square: sq });
+    }
+    for (let i = 0; i < 6 && !L.last("p1", "bossRequest"); i++) L.advance(5000);
+    const c = L.last("p1", "lights")!.lights.crowd!;
+    expect(c.settled).toBe(c.asked);
+    expect(c.found / c.asked).toBeGreaterThanOrEqual(BOSS_POWERS.lightsOutHold);
+    expect(L.last("p1", "boss")!.boss.powers!.lightsExtra).toBeUndefined();
+    hostBoss(L);
+    const round = toRound(L);
+    expect(round.board!.history.length).toBe(4);
+
+    // Under the line, and the host finds no quiet move within the cap (it answers ""): he skips it, the crowd's turn goes on.
+    const M = raid({ bossId: "hollow", bossPowerTest: "lightsout" });
+    crowdMove(M);
+    hostBoss(M);
+    toRound(M);
+    crowdMove(M);
+    // (Nobody taps: the rounds run their time out.)
+    for (let i = 0; i < 12 && !M.last("p1", "bossRequest"); i++) M.advance(5000);
+    hostBoss(M);
+    for (let i = 0; i < 12 && !M.last("p1", "bossRequest"); i++) M.advance(5000);
+    const ask = M.last("p1", "bossRequest")!;
+    expect(ask).toMatchObject({ extra: true });
+    M.core.message("p1", { t: "bossMove", key: ask.key, move: "" });
+    const r = toRound(M);
+    expect(r.board!.history.length).toBe(4);
+    expect(r.boss!.powers!.lightsExtra).toBe("skipped");
   });
 });

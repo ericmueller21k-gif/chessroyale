@@ -285,6 +285,14 @@ export interface LightsOutTest {
   at: number;
   rounds: LightsOutRound[];
   missed?: Record<string, number>;
+  /** Once over: the pieces found by everyone still in, and the pieces asked of them (the crowd's find rate). */
+  found?: number;
+  asked?: number;
+  /**
+   * Under lightsOutHold: his extra move after his own, before the crowd's turn ("due"), then "played", or "skipped"
+   * when no quiet move within lightsOutExtraGain was there. At or above it: none.
+   */
+  extra?: "due" | "played" | "skipped";
 }
 
 /**
@@ -312,7 +320,8 @@ export interface BurnEvent {
   fizzled?: boolean;
 }
 
-export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball" | "dark";
+/** `extra`: Hollow's extra move after a failed Lights out (played after his own, before the crowd's turn). */
+export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball" | "dark" | "extra";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

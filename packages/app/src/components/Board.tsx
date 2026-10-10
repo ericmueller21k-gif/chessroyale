@@ -6,6 +6,7 @@ import type { DrawShape } from "chessground/draw";
 import type { Key } from "chessground/types";
 import { legalMoves, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { play } from "../sound.ts";
+import { knockFor } from "../move-sound.ts";
 
 export interface Arrow {
   move: string;
@@ -79,24 +80,23 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
   const darkOn = !!interactive && !!dark?.length && !!onDarkTry;
   const live = useRef({ fen, dark: dark ?? [], darkOn, darkSel, sync: () => {} });
   live.current = { ...live.current, fen, dark: dark ?? [], darkOn, darkSel };
-  const prevFen = useRef(fen);
+  const prevFen = useRef<string | null>(null);
   const lastSound = useRef(0);
 
-  // A move appearing on a big board makes a sound (a capture sounds different).
-  useEffect(() => {
-    const before = prevFen.current;
+  // A move appearing on a big board makes a sound (a capture sounds different). Before the paint (a layout effect),
+  // and a board that takes over from another screen's knocks for the move made there (knockFor): a screen replaced
+  // before it painted never ran its effects, and your own move went silent.
+  useLayoutEffect(() => {
+    const prev = prevFen.current;
     prevFen.current = fen;
-    if (small || before === fen || !lastMove) return;
-    const to = lastMove.slice(2, 4);
-    const mover = pieceAt(before, lastMove.slice(0, 2));
-    if (!mover) return;
-    const captured = !!pieceAt(before, to) || (mover.type === "p" && lastMove[0] !== lastMove[2]);
-    const castled = mover.type === "k" && Math.abs(lastMove.charCodeAt(0) - lastMove.charCodeAt(2)) === 2;
+    if (small) return;
+    const knock = knockFor(prev, fen, lastMove);
+    if (!knock) return;
     // A fast replay (a whole game from move 0) would be a clatter: at most one knock every 180 ms.
     const now = performance.now();
     if (now - lastSound.current < 180) return;
     lastSound.current = now;
-    play(captured ? "capture" : castled ? "castle" : "move");
+    play(knock);
   }, [fen]);
 
   // The board is built, and kept in step, before the browser paints (layout effects): a plain effect runs after the
