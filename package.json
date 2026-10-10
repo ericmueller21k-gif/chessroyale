@@ -22,6 +22,7 @@
     "frames:god-king": "node scripts/frames-god-king.mjs",
     "frames:powers": "node scripts/frames-boss-powers.mjs",
     "frames:hollow": "node scripts/frames-hollow.mjs",
+    "frames:king-attack": "node scripts/frames-king-attack.mjs",
     "frames:bigboy": "node scripts/frames-bigboy.mjs",
     "frames:queue": "node scripts/frames-queue-pop.mjs",
     "frames:flash": "node scripts/frames-flash.mjs",

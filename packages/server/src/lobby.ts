@@ -7,7 +7,7 @@ import {
   MatchRunner,
   botRoster,
   bossIntroTimeline,
-  bossShowMs,
+  bossTurnShowMs,
   bossThinkMs,
   powerMomentMs,
   LAST_STAND_MS,
@@ -128,6 +128,8 @@ export interface Human {
   look?: ItemLook;
   /** When they took their seat (the queue's wait). */
   joinedAt?: number;
+  /** They had the eval bar on (Settings), as their app said on joining: kept with their result. */
+  evalBar?: boolean;
   /** When they dropped (not connected since). */
   goneAt?: number;
 }
@@ -579,6 +581,7 @@ export class LobbyCore {
     look: unknown = undefined,
     userId?: string,
     lastBoss: string | null = null,
+    evalBar: boolean | null = null,
   ) {
     this.r.activeAt = this.io.now();
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
@@ -589,6 +592,7 @@ export class LobbyCore {
       delete existing.goneAt;
       if (look !== undefined) existing.look = cleanLook(look);
       if (bossDef(lastBoss)) existing.lastBoss = lastBoss;
+      if (evalBar !== null) existing.evalBar = evalBar;
       if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [existing.id]: userId };
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
@@ -623,6 +627,7 @@ export class LobbyCore {
       look: cleanLook(look),
       joinedAt: this.io.now(),
       ...(bossDef(lastBoss) ? { lastBoss } : {}),
+      ...(evalBar !== null ? { evalBar } : {}),
     });
     if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [id]: userId };
     if (!this.r.hostId) this.r.hostId = id;
@@ -1108,8 +1113,9 @@ export class LobbyCore {
     this.runner!.applyBossMove(move);
     // As the turn passes to the crowd, any power that comes with it (a freeze, a pie, the warning, the blizzard)
     // plays out before the crowd's clock starts.
+    // (At a mate, the boss's attack on the crowd's king, if it has one: the result waits for it.)
     const view = this.runner!.bossView();
-    const until = this.io.now() + bossShowMs(view?.lastMove) + powerMomentMs(view?.powers?.events);
+    const until = this.io.now() + bossTurnShowMs(view);
     this.broadcast(this.bossMessage(until));
     this.setTimer("nextRound", until);
   }
@@ -2373,6 +2379,8 @@ export class LobbyCore {
     bestMove: string | null;
     /** It counts for their ranking: enough real players (isRankedMatch), and they weren't practising (unlimited hints). */
     ranked: boolean;
+    /** They had the eval bar on, as their app said (null: an app from before the setting). */
+    evalBar: boolean | null;
   } & MatchFeats)[] {
     const runner = this.runner;
     if (!runner || this.r.phase !== "results") return [];
@@ -2403,6 +2411,7 @@ export class LobbyCore {
           brilliant: f?.brilliant ?? 0,
           bestMove: f?.best?.san ?? null,
           ranked: this.ranked() && !h.practice,
+          evalBar: h.evalBar ?? null,
           ...matchFeats(p, stages, boss, !!this.settings.raid),
         },
       ];

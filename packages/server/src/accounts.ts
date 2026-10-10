@@ -165,6 +165,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "ranked", type: "INTEGER" },
   // Fair play (Oct 8, 2026): a result held off ranking while its player is in review (1), released when cleared (0 or NULL).
   { table: "results", column: "held", type: "INTEGER" },
+  // Whether the player had the eval bar on (Oct 10, 2026: Settings can switch it off): 1 on, 0 off, NULL unknown (older
+  // results, older apps). To see later who turns it off and how they do.
+  { table: "results", column: "eval_bar", type: "INTEGER" },
   // A report made during a match: that match's lobby code (one report per reporter, player and match).
   { table: "reports", column: "match", type: "TEXT" },
   // Fair play's deep re-check (fairplay-deep.ts): 1 while a match waits for it, and 1 once its counted moves have all
@@ -502,6 +505,8 @@ export interface MatchResult {
   ranked?: boolean | null;
   /** Held off ranking: its player is in a fair-play review (or banned). Counted again if they're cleared. */
   held?: boolean;
+  /** The player had the eval bar on (Settings), as far as their app said. */
+  evalBar?: boolean | null;
 }
 
 /** A count from a result (0-500), or null. */
@@ -519,8 +524,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   const ranked = r.online && r.ranked === true;
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -544,6 +549,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     ranked ? 1 : 0,
     r.held ? 1 : 0,
     typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
+    flag(r.evalBar),
   );
   // Only a ranked match moves your ranking (and not while fair play holds your results).
   if (rating !== null && ranked && !r.held) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);

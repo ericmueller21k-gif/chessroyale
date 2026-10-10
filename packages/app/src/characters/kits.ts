@@ -11,9 +11,30 @@ import { BIGBOY, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.t
 import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
-import { HOLLOW, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT, bulbsLook } from "./hollow.ts";
+import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT, bulbsLook } from "./hollow.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
+import { lashItem, type SquareItem } from "./power-art.ts";
+
+/**
+ * A boss's attack on a king (Eric, Oct 10: Hollow first): played on the board beside the God King in his Last Stand
+ * (the blow meant for the piece) and beside the crowd's king when the boss mates it, before the result. Its beats are
+ * shared (KING_ATTACK in boss-timing.ts: the drop, the hits, the leap off), so its animation lands each hit on them;
+ * the screen adds a "−N" off the king for each hit and plays `hit` on the king's square. A boss with one is listed in
+ * KING_ATTACKERS (boss-timing.ts) too, so the server waits for it at a mate.
+ */
+export interface KingAttackKit {
+  /** The character it's drawn from (the boss's own parts; its frame may be wider than its usual one). */
+  ch: Character;
+  /** Its animation, the king to our right; mirrored when the king is to its left. */
+  anim: string;
+  /** Its size on the board: frame pixels to a square. */
+  perSquare: number;
+  /** Where its feet go: this many squares to the king's side of the king's square's middle. */
+  stand: number;
+  /** Each hit on the king's square (the shared board canvas): the i-th, coming in from its left or right edge. */
+  hit: (square: string, i: number, from: "L" | "R", since: number) => SquareItem;
+}
 
 export interface BossKit extends BeatLines {
   ch: Character;
@@ -27,6 +48,8 @@ export interface BossKit extends BeatLines {
   tall?: boolean;
   /** A recolour (one of the character's `looks`) from the battle's state: Hollow's bulbs still lit. */
   lookOf?: (boss: BossView) => string | undefined;
+  /** Its attack on a king (the God King's Last Stand, its mate), if it has one: see KingAttackKit. */
+  kingAttack?: KingAttackKit;
 }
 
 export const BOSS_KITS: Record<string, BossKit> = {
@@ -89,6 +112,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
       smash3: "hollowSmash",
       tick: "hollowTick",
       relight: "hollowRelight",
+      lash: "hollowLash",
     },
     lines: HOLLOW_LINES,
     chance: HOLLOW_CHANCE,
@@ -98,6 +122,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
       const n = (boss.powers as { bulbs?: number } | undefined)?.bulbs;
       return n === undefined ? undefined : bulbsLook(n);
     },
+    // He drops in beside the king and whips his strand at it (hollow.ts: kingAttack), a lash of colour on its square each hit.
+    kingAttack: { ch: HOLLOW_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: lashItem },
   },
   "Big Boy": {
     ch: BIGBOY,

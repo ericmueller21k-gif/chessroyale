@@ -56,7 +56,7 @@ import {
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
 import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { applyMove, legalMoves, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
+import { applyMove, gameEnd, legalMoves, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import {
   allowedSearch,
@@ -359,11 +359,17 @@ export class MatchRunner {
     // A boss whose battle starts from the starting position (no opening moves), and one who always plays Black (Hollow):
     // if the usual pick made the crowd Black, he claims the dark side before move 1.
     const opening = bossRules(def)?.opening;
-    const claimed = !!opening?.crowdWhite && crowdSide === "b";
+    const claimed = !!opening?.crowdWhite && crowdSide === "b" && !this.settings.bossMateTest;
     if (opening?.fromStart) this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
     if (opening?.crowdWhite) crowdSide = "w";
     // Anything else the boss does to the board before move 1 (Big Boy eats one of the crowd's centre pawns).
-    const setUp = opening?.setUp?.(this.battle, { boardId: id, seed, crowdSide, generation: board.generation }) ?? null;
+    let setUp = opening?.setUp?.(this.battle, { boardId: id, seed, crowdSide, generation: board.generation }) ?? null;
+    // (Test switch: the crowd White, mated in one, the boss to move. Instead of any other set-up.)
+    if (this.settings.bossMateTest) {
+      this.boards.set(id, newBoard(id, { ...BOSS_OPENING, moves: [...MATE_TEST_MOVES] }, MATE_TEST_MOVES.length, board.generation));
+      crowdSide = "w";
+      setUp = null;
+    }
     const fen = this.boards.get(id)!.fen;
     this.state = {
       ...this.state,
@@ -1019,7 +1025,9 @@ export class MatchRunner {
   async playBoss(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const kind = this.bossMoveKind();
-    const move = await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed());
+    // (Test switch: a mate in one whenever there is one.)
+    const mate = this.settings.bossMateTest ? (this.bossAllowed() ?? legalMoves(fen)).find((m) => gameEnd(applyMove(fen, m), []) === "checkmate") : undefined;
+    const move = mate ?? (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed()));
     this.applyBossMove(move, kind === "stagger");
     return move;
   }
@@ -1482,6 +1490,9 @@ export interface BossGuard {
   maxLoss: number;
   maxLogitLoss: number;
 }
+
+/** The mate test's start (settings.bossMateTest): 1.f3 e5 2.g4, and the boss (Black) mates with Qh4. */
+export const MATE_TEST_MOVES: readonly string[] = ["f2f3", "e7e5", "g2g4"];
 
 export const DEFAULT_BOSS_GUARD: BossGuard = { slipLoss: [2, 7], maxLoss: 10, maxLogitLoss: 1 };
 

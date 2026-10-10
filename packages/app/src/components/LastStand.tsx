@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { LAST_STAND, lastStandHits, pieceAt, toSan, type NetBoss } from "@chessroyale/chess";
+import { LAST_STAND, lastStandAttackHits, lastStandHits, pieceAt, toSan, type NetBoss } from "@chessroyale/chess";
 import { useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingPortrait, GodKingSprite, squareXY } from "./GodKing.tsx";
 import { play, type SoundName } from "../sound.ts";
 import { KING_LINES, blunderLabel, blunderWords, chancesWords, kingSay, lastStandLine, replyWords } from "../godKing.ts";
 import { MiniBoard } from "./MiniBoard.tsx";
+import { KingAttack } from "./KingAttack.tsx";
+import { bossKit } from "../characters/kits.ts";
+import type { BossView } from "../game.ts";
 
 const PIECE_NAMES = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" } as const;
 const pct = (v: number) => `${v / 8}%`;
@@ -62,13 +65,19 @@ export function lastStandBoard(t: number): "after" | "pushed" | "back" | "before
  * instead, 25 rapid slashes with red damage numbers while his armour cracks; he staggers, collapses and fades.
  * Nothing in it flashes white. Timings: LAST_STAND (boss-timing.ts). `fen` is the position before the move. The
  * board itself (what it shows when) follows lastStandBoard.
+ *
+ * Against a boss whose kit has a `kingAttack` (Hollow; Eric, Oct 10), the blow is the boss's: he drops in beside the
+ * God King as the piece slides back and lashes him (KingAttack, from LAST_STAND.attackAt), his blows landing on its
+ * lashes with "−N" hits in the God King's strike style instead of the red slashes; then he staggers and falls as before.
  */
-export function LastStand({ side, orientation, fen, move, startAt }: { side: "w" | "b"; orientation: "white" | "black"; fen: string; move: string; startAt: number }) {
+export function LastStand({ side, orientation, fen, move, startAt, boss }: { side: "w" | "b"; orientation: "white" | "black"; fen: string; move: string; startAt: number; boss?: BossView | null }) {
   const now = useFrameNow();
   const L = LAST_STAND;
   const t = now - startAt;
   const seed = fen + move;
   const hits = useMemo(() => lastStandHits(seed), [seed]);
+  // The boss's attack instead of the anonymous blows (its kit has one).
+  const attack = !!boss && !!bossKit(boss.name)?.kingAttack;
   const line = lastStandLine(seed);
   const to = squareXY(move.slice(2, 4), orientation);
   const from = squareXY(move.slice(0, 2), orientation);
@@ -77,16 +86,27 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
   useEffect(() => {
     const at = (ms: number) => startAt + ms;
     const blowAt = (i: number) => at(L.slashAt + i * L.slashEveryMs);
+    // (Against a boss's attack: its lashes make their own sounds; his grunts land on its hits.)
+    const lashAt = (i: number) => at(lastStandAttackHits()[i]!);
+    const blows: [SoundName, number][] = attack
+      ? [
+          ["gkLastGrunt1", lashAt(1)],
+          ["gkLastGrunt2", lashAt(5)],
+          ["gkLastGrunt1", lashAt(8)],
+        ]
+      : [
+          ["gkLastSlashes", blowAt(0)],
+          ["gkLastGrunt1", blowAt(1)],
+          ["gkLastGrunt2", blowAt(10)],
+          ["gkLastGrunt1", blowAt(19)],
+        ];
     const cues: [SoundName, number][] = [
       ["gkWarn", at(L.badgeAt)],
       ["gkLastLeap", at(L.leapAt)],
       ["gkLastCrash", at(L.crashAt)],
       ["gkCutIn", at(L.bannerAt + 60)],
       ["move", at(L.slideAt)],
-      ["gkLastSlashes", blowAt(0)],
-      ["gkLastGrunt1", blowAt(1)],
-      ["gkLastGrunt2", blowAt(10)],
-      ["gkLastGrunt1", blowAt(19)],
+      ...blows,
       ["gkLastGroan", at(L.collapseAt)],
     ];
     const timers = cues.filter(([, ms]) => ms > Date.now() - 300).map(([name, ms]) => setTimeout(() => play(name), Math.max(0, ms - Date.now())));
@@ -119,7 +139,7 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
   const warnFade = t > L.crashAt ? clamp01(1 - (t - L.crashAt) / 160) : 1;
   const badge = { x: Math.min(782, to.x + 34), y: Math.max(18, to.y - 34) };
   return (
-    <div class="last-stand" role="alert" aria-label={`The God King's Last Stand: ${line}`}>
+    <div class="last-stand" role="alert" aria-label={`The God King's Last Stand: ${line}`} data-start={startAt}>
       {t >= L.badgeAt && t < L.crashAt + 160 && (
         <span class="ls-badge" role="img" aria-label="Blunder" style={{ left: pct(badge.x), top: pct(badge.y), opacity: warnFade }}>
           ??
@@ -142,8 +162,9 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
             const d = 20 + crash / 6;
             return <circle key={i} class="ls-dust" cx={to.x + Math.cos(a) * d * (i % 2 ? 1.3 : 1)} cy={to.y + 38 - Math.sin(a) * d * 0.35} r={10 + crash / 40 + (i % 3) * 3} style={{ opacity: 0.75 * (1 - crash / 800) }} />;
           })}
-        {/* 5. The blow meant for the piece: rapid slashes across him, each a red-white cut and a hit. */}
-        {Array.from({ length: L.slashes }, (_, i) => {
+        {/* 5. The blow meant for the piece: rapid slashes across him, each a red-white cut and a hit (unless the boss
+            attacks him itself: KingAttack, below). */}
+        {!attack && Array.from({ length: L.slashes }, (_, i) => {
           const age = t - (L.slashAt + i * L.slashEveryMs);
           if (age < -30 || age > 240) return null;
           const { angle } = blow(i, to);
@@ -167,10 +188,14 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
       )}
       {present && (
         <div class={`ls-god${falling ? " falling" : ""}`} style={{ left: pct(to.x - 50), top: pct(godY - 50), opacity: fade }}>
-          <GodKingSprite side={side} anim="lastStand" since={startAt + L.fallAt} />
+          <GodKingSprite side={side} anim={attack ? "lastStandAttacked" : "lastStand"} since={startAt + L.fallAt} />
         </div>
       )}
-      {Array.from({ length: L.slashes }, (_, i) => {
+      {/* 5, the boss's way: it drops in beside him and lashes him ("−N" hits off him), then leaps off. */}
+      {attack && boss && (
+        <KingAttack boss={boss} square={move.slice(2, 4)} orientation={orientation} startAt={startAt + L.attackAt} now={now} seed={`laststand:${seed}`} />
+      )}
+      {!attack && Array.from({ length: L.slashes }, (_, i) => {
         const age = t - (L.slashAt + i * L.slashEveryMs);
         if (age < 0 || age > 620) return null;
         const b = blow(i, to);
@@ -180,7 +205,7 @@ export function LastStand({ side, orientation, fen, move, startAt }: { side: "w"
           </span>
         );
       })}
-      {DROPS.map((i) => {
+      {!attack && DROPS.map((i) => {
         const age = t - (L.slashAt + i * L.slashEveryMs);
         if (age < 0 || age > 700) return null;
         const dir = to.x > 560 ? -1 : to.x < 240 ? 1 : i % 2 === 0 ? 1 : -1;
