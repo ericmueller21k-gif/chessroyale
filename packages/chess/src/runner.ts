@@ -63,8 +63,6 @@ import {
   bossAllowed,
   boardFlipped,
   crowdAllowed,
-  funhouseDue,
-  funhousePlayed,
   icedSquares,
   initPowers,
   judgeCandidates,
@@ -104,6 +102,10 @@ import {
   startsWithSnack,
   type BounceCandidate,
   type BounceScore,
+  boingoBattle,
+  moveLoss,
+  type Battle,
+  type BossLastMove,
 } from "./boss-powers.ts";
 import type { BounceResult, LightsOutTest } from "@chessroyale/core";
 
@@ -1101,32 +1103,17 @@ export class MatchRunner {
 
   /** Boss battle: the boss plays the crowd's move this turn (its funhouse), before the crowd picks. */
   funhouseDue(): boolean {
-    return funhouseDue(this.state.boss) && !this.finalGameOver() && !this.bossToMove();
+    return boingoBattle.funhouseDue(this.battle);
   }
 
   /** The funhouse: the boss picks the crowd's move (a weak but recoverable one) and plays it. */
   async playFunhouse(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
-    const fen = this.boards.get(this.state.boards[0]!)!.fen;
-    const move = await funhouseMoveFrom(engine, fen, this.crowdAllowed());
-    return this.applyFunhouse(move);
+    return boingoBattle.playFunhouse(this.battle, engine);
   }
 
-  /**
-   * Plays the funhouse's move for the crowd (from the host's engine online; an illegal or disallowed one is replaced
-   * by the first allowed move). It's the crowd's move on the board, but nobody picked it: it isn't scored, and the
-   * boss's strike doesn't count it. The board then shows flipped for the crowd's next turns.
-   */
+  /** Plays the funhouse's move for the crowd (from the host's engine online; see boingoBattle.applyFunhouse). */
   applyFunhouse(move: string): string {
-    const b = this.state.boss!;
-    const id = this.state.boards[0]!;
-    const board = this.boards.get(id)!;
-    const legal = this.crowdAllowed(id) ?? legalMoves(board.fen);
-    const m = legal.includes(move) ? move : legal[0]!;
-    const san = toSan(board.fen, m);
-    this.boards.set(id, playOnBoard(board, m, board.expected));
-    this.state = { ...this.state, boss: funhousePlayed(b, m, san) };
-    this.burnAfterCrowdMove(m);
-    return m;
+    return boingoBattle.applyFunhouse(this.battle, move);
   }
 
   /** G-REX's fire, after the crowd's move: what was left on a tile ablaze burns (the board's position changes). */
@@ -1313,7 +1300,38 @@ export class MatchRunner {
   }
 
   /** The boss's last move, and the piece it took (if any). */
-  private bossLast: { move: string; san: string; staggered?: boolean; captured?: string } | null = null;
+  private bossLast: BossLastMove | null = null;
+
+  /** What a boss's battle code (bosses/<boss>.ts) may use of this runner. */
+  private get battle(): Battle {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const runner = this;
+    return {
+      get state() {
+        return runner.state;
+      },
+      set state(v) {
+        runner.state = v;
+      },
+      boards: runner.boards,
+      get settings() {
+        return runner.settings;
+      },
+      get bossLast() {
+        return runner.bossLast;
+      },
+      set bossLast(v) {
+        runner.bossLast = v;
+      },
+      engines: runner.opts.engines,
+      alive: () => runner.alive(),
+      finalGameOver: () => runner.finalGameOver(),
+      bossToMove: () => runner.bossToMove(),
+      crowdAllowed: (boardId) => runner.crowdAllowed(boardId),
+      boardOf: (playerId) => runner.boardOf(playerId),
+      afterCrowdMove: (move) => runner.burnAfterCrowdMove(move),
+    };
+  }
 
   /** The boss strikes now (every bossKillEvery crowd moves). */
   bossKillDue(): boolean {
@@ -1650,21 +1668,6 @@ export const bossGuardFrom = (s: { bossSlipLoss: readonly [number, number]; boss
   maxLogitLoss: s.bossMaxLogitLoss,
 });
 
-const logit = (p: number) => {
-  const q = Math.min(0.999, Math.max(0.001, p));
-  return Math.log(q / (1 - q));
-};
-
-/**
- * How much a move gives away against the best: points of expected score (0-100) and log-odds. Log-odds
- * catch a blunder in a position that's already won or lost, where the points shrink (0.05 to 0.01 is 4
- * points but throws the rest away).
- */
-export function moveLoss(best: number, got: number): { points: number; logit: number } {
-  const g = Math.min(best, got);
-  return { points: (best - g) * 100, logit: logit(best) - logit(g) };
-}
-
 /** Within the guard: never more than maxLoss points, nor more than maxLogitLoss log-odds (a couple of points is always fine). */
 export function withinGuard(loss: { points: number; logit: number }, guard: BossGuard): boolean {
   return loss.points <= guard.maxLoss && (loss.logit <= guard.maxLogitLoss || loss.points <= 2);
@@ -1729,58 +1732,6 @@ export async function bossMoveFrom(
   const best = top[0]!.expected;
   const got = top.find((m) => m.move === move)?.expected ?? (await engine.scoreMoves(fen, [move]))[0]?.expected ?? 0;
   return confirm(withinGuard(moveLoss(best, got), guard) ? move : pickByLoss(top, guard.slipLoss, guard), guard);
-}
-
-/**
- * Boingo's funhouse: the move he plays for the crowd. Weak but recoverable: from the allowed moves, one that gives
- * away about `loss` points against the best (1 to 2.5 pawns from an even position), nearest the middle of that range,
- * never past `maxLogit` in log-odds, never one whose line allows a forced mate, never one that leaves the queen to be
- * taken (unless it takes a queen itself: a trade). The engine's top moves first; if none is weak enough, the rest of
- * the allowed moves are searched too. Like the boss's slips, the pick is checked head to head with the best once.
- */
-export async function funhouseMoveFrom(
-  engine: EngineLike,
-  fen: string,
-  allowed: readonly string[] | null = null,
-  loss: readonly [number, number] = BOSS_POWERS.funhouseLoss,
-  maxLogit: number = BOSS_POWERS.funhouseMaxLogit,
-): Promise<string> {
-  const legal = allowed ? [...allowed] : legalMoves(fen);
-  if (legal.length <= 1) return legal[0]!;
-  const ok = new Set(legal);
-  const top = (await engine.topMoves(fen, 8)).filter((m) => ok.has(m.move));
-  const seen = new Set(top.map((m) => m.move));
-  const scoredAll = [...top];
-  const [lo, hi] = loss;
-  const safe = (m: MoveScore) => !(m.mate !== undefined && m.mate < 0) && !leavesQueen(fen, m);
-  const options = (list: readonly MoveScore[], best: number) =>
-    list.filter(safe).map((m) => ({ move: m.move, loss: moveLoss(best, m.expected) })).filter((x) => x.loss.logit <= maxLogit || x.loss.points <= 2);
-  let best = top[0]?.expected;
-  let inRange = best === undefined ? [] : options(top, best).filter((x) => x.loss.points >= lo && x.loss.points <= hi);
-  if (!inRange.length) {
-    const rest = legal.filter((m) => !seen.has(m));
-    if (rest.length) scoredAll.push(...(await engine.scoreMoves(fen, rest)));
-    best = Math.max(...scoredAll.map((m) => m.expected));
-    inRange = options(scoredAll, best).filter((x) => x.loss.points >= lo && x.loss.points <= hi);
-  }
-  const bestMove = [...scoredAll].sort((a, b) => b.expected - a.expected)[0]?.move ?? legal[0]!;
-  const all = options(scoredAll, best ?? 0.5).filter((x) => x.move !== bestMove);
-  // Nearest the middle of the range; else the weakest move short of it (still a gift, never a blunder); else the best.
-  const mid = (lo + hi) / 2;
-  const pick =
-    [...inRange].sort((a, b) => Math.abs(a.loss.points - mid) - Math.abs(b.loss.points - mid) || (a.move < b.move ? -1 : 1))[0] ??
-    [...all].filter((x) => x.loss.points < lo).sort((a, b) => b.loss.points - a.loss.points)[0];
-  if (!pick) return bestMove;
-  // Checked once more head to head with the best (the wide search spreads itself thin): too much, and the gentlest
-  // option short of the range is played instead.
-  const check = await engine.scoreMoves(fen, [bestMove, pick.move]);
-  const b = check.find((m) => m.move === bestMove)?.expected;
-  const g = check.find((m) => m.move === pick.move);
-  if (b === undefined || !g) return pick.move;
-  const l = moveLoss(Math.max(b, g.expected), g.expected);
-  if (l.points <= hi + 5 && (l.logit <= maxLogit || l.points <= 2) && safe(g)) return pick.move;
-  const gentler = [...all].filter((x) => x.loss.points < pick.loss.points).sort((a, c) => c.loss.points - a.loss.points)[0];
-  return gentler?.move ?? bestMove;
 }
 
 /**
@@ -1854,15 +1805,6 @@ export async function bounceFrom(
     return m ? [{ fen: c, crowd: 1 - m.expected, ...(m.mate !== undefined ? { mate: true } : {}) }] : [];
   });
   return pickBounce(before, scored, s);
-}
-
-/** After `m`, the reply takes the mover's queen, and `m` didn't take a queen itself (a trade is fine). */
-function leavesQueen(fen: string, m: MoveScore): boolean {
-  if (!m.reply) return false;
-  const mover = sideToMove(fen);
-  if (pieceAt(fen, m.move.slice(2, 4))?.type === "q") return false;
-  const target = pieceAt(applyMove(fen, m.move), m.reply.slice(2, 4));
-  return target?.type === "q" && target.color === mover;
 }
 
 /** A board as sent to (and shown in) the app. */

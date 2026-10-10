@@ -10,8 +10,22 @@
  * - The judge plays by the same rules (judgeTop, judgeCandidates, allowedSearch).
  * - Turns are the crowd's: turn N is the crowd's Nth move of the battle (crowdMoves + 1 while it's being picked).
  */
-import { BOSS_POWERS, bossDef, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type PowerId } from "@chessroyale/core";
+import {
+  BOSS_POWERS,
+  bossDef,
+  mulberry32,
+  type BossPowerSettings,
+  type BossPowerState,
+  type BossState,
+  type MatchState,
+  type PlayerState,
+  type PowerEvent,
+  type PowerId,
+  type Settings,
+} from "@chessroyale/core";
+import type { BoardState } from "../boards.ts";
 import { pieceAt } from "../rules.ts";
+import type { EngineLike } from "../runner.ts";
 
 export type Side = "w" | "b";
 export const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -83,6 +97,16 @@ export const logit = (x: number) => {
   const q = Math.min(0.999, Math.max(0.001, x));
   return Math.log(q / (1 - q));
 };
+
+/**
+ * How much a move gives away against the best: points of expected score (0-100) and log-odds. Log-odds
+ * catch a blunder in a position that's already won or lost, where the points shrink (0.05 to 0.01 is 4
+ * points but throws the rest away).
+ */
+export function moveLoss(best: number, got: number): { points: number; logit: number } {
+  const g = Math.min(best, got);
+  return { points: (best - g) * 100, logit: logit(best) - logit(g) };
+}
 
 // ---------------- The ultimate's meter ----------------
 
@@ -189,4 +213,29 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
     return true;
   }
   return false;
+}
+
+// ---------------- A boss's part in the match runner ----------------
+
+/** The boss's last move, as the screens show it (and the piece it took, if any). */
+export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string };
+
+/**
+ * What a boss's battle code (its moments in a match: the funhouse, Lights out, the bounce…) may use of the match
+ * runner. The runner's methods for those moments hand it over (MatchRunner's `battle`), so each boss's code lives in its
+ * own file and the runner's methods stay as they were.
+ */
+export interface Battle {
+  state: MatchState;
+  readonly boards: Map<number, BoardState>;
+  readonly settings: Settings;
+  bossLast: BossLastMove | null;
+  readonly engines: readonly EngineLike[];
+  alive(): PlayerState[];
+  finalGameOver(): boolean;
+  bossToMove(): boolean;
+  crowdAllowed(boardId?: number): string[] | null;
+  boardOf(playerId: string): BoardState | null;
+  /** What happens after any crowd move (G-REX's fire). */
+  afterCrowdMove(move: string | null): void;
 }

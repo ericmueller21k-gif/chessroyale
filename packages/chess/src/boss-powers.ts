@@ -34,6 +34,9 @@ import type { MoveScore } from "./uci.ts";
 import {
   VALUE,
   bossPowers,
+  moveLoss,
+  type Battle,
+  type BossLastMove,
   crowdHalf,
   from,
   logit,
@@ -55,43 +58,15 @@ import {
 } from "./bosses/base.ts";
 
 import { GINGER } from "./bosses/ginger.ts";
+import { BOINGO } from "./bosses/boingo.ts";
 
-export { bossPowers, materialOf, moveSquares, powerRoll, ragePoints, rageTick, type BossRules, type RageRates, type TurnContext };
+export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, ragePoints, rageTick, type Battle, type BossLastMove, type BossRules, type RageRates, type TurnContext };
 export * from "./bosses/ginger.ts";
+export * from "./bosses/boingo.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */
 export function initPowers(seed: number, fen: string, crowdSide: Side): BossPowerState {
   return { seed: seed >>> 0, turn: 0, material: materialOf(fen, other(crowdSide)), lost: 0, nextPassive: BOSS_POWERS.firstPassive, events: [] };
-}
-
-/** The legal moves of the side not to move (as if it were its turn): what a square would block for the boss. */
-function movesOfOther(fen: string): string[] {
-  const parts = fen.split(" ");
-  parts[1] = parts[1] === "w" ? "b" : "w";
-  parts[3] = "-";
-  try {
-    return legalMoves(parts.join(" "));
-  } catch {
-    return [];
-  }
-}
-
-const CENTRE = ["d4", "e4", "d5", "e5", "c3", "d3", "e3", "f3", "c4", "f4", "c5", "f5", "c6", "d6", "e6", "f6"];
-const centreDistance = (sq: string) => Math.abs(sq.charCodeAt(0) - 100.5) + Math.abs(Number(sq[1]) - 4.5);
-
-/**
- * Pie: the square to pie, an empty one near the centre chosen so the position barely changes: the fewest moves of
- * either side can land there right now (none, if possible), nearest the middle first, a pick from the best few.
- */
-export function choosePie(fen: string, seed: number, turn: number): string | null {
-  const reach = new Map<string, number>();
-  for (const m of [...legalMoves(fen), ...movesOfOther(fen)]) reach.set(to(m), (reach.get(to(m)) ?? 0) + 1);
-  const empty = CENTRE.filter((sq) => !pieceAt(fen, sq))
-    .map((sq) => ({ sq, reach: reach.get(sq) ?? 0, d: centreDistance(sq) }))
-    .sort((a, b) => a.reach - b.reach || a.d - b.d || (a.sq < b.sq ? -1 : 1));
-  if (!empty.length) return null;
-  const least = empty.filter((e) => e.reach === empty[0]!.reach).slice(0, 4);
-  return least[Math.floor(powerRoll(seed, "pie", turn) * least.length)]!.sq;
 }
 
 /**
@@ -130,38 +105,6 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   else rules.passive(next, t);
   return { ...boss, powers: next };
 }
-
-// ---------------- Boingo: the pie and the funhouse ----------------
-
-/** Boingo: a pie on a square near the centre (nobody moves onto it), and he plays the crowd's move (the funhouse). */
-export const BOINGO: BossRules = {
-  id: "clown",
-  wearOff(next, t) {
-    // The pie after its turns.
-    if (next.pie && next.pie.until < t.turn) next.pie = null;
-  },
-  // (The funhouse's moment is the move it plays: added when it's played.)
-  ultimate: warnThenUnleash,
-  passive(next, t) {
-    if (t.turn < next.nextPassive) return;
-    const square = choosePie(t.fen, t.seed, t.turn);
-    if (square) {
-      next.pie = { square, until: t.turn + t.s.pieTurns - 1 };
-      t.events.push({ kind: "pie", turn: t.turn, square });
-      next.nextPassive = t.turn + t.s.pieTurns + t.s.pieGap;
-    } else next.nextPassive = t.turn + 1;
-  },
-  // Nobody can move onto the pie, the boss included.
-  crowdFilter(allowed, boss) {
-    const pie = boss.powers!.pie;
-    return pie ? allowed.filter((m) => to(m) !== pie.square) : allowed;
-  },
-  bossStops(boss) {
-    const pie = boss.powers?.pie?.square;
-    return pie ? (m) => to(m) === pie : null;
-  },
-  powerTurn: (boss) => !!boss.powers!.pie || boardFlipped(boss),
-};
 
 // ---------------- G-REX: fire ----------------
 
@@ -1082,16 +1025,6 @@ export function triggerUltimate(boss: BossState | null | undefined): { boss: Bos
   return { boss: { ...boss, powers: { ...p, ultNext: true } }, ok: true };
 }
 
-/** The boss plays the crowd's move this turn (the funhouse), and hasn't yet. */
-export const funhouseDue = (boss: BossState | null | undefined): boolean =>
-  !!boss?.powers && !boss.result && bossPowers(boss)?.ultimate === "funhouse" && boss.powers.ultAt === turnOf(boss) && !boss.powers.funhouse;
-
-/** After the funhouse, the crowd sees the board flipped for its next few turns. */
-export const boardFlipped = (boss: BossState | null | undefined): boolean => {
-  const p = boss?.powers;
-  return !!p?.funhouse && p.flipUntil !== undefined && turnOf(boss!) > p.funhouse.turn && turnOf(boss!) <= p.flipUntil;
-};
-
 /**
  * The moves the crowd may play this turn, or null when every legal move is allowed. Frozen pieces can't move and
  * nobody can move onto the pie; in the blizzard only the queen moves (no queen, or she can't: the king). The God
@@ -1157,17 +1090,6 @@ export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_P
   if (!p || !bossPowers(boss)) return null;
   if (p.ultAt !== undefined && turnOf(boss!) > p.ultAt) return null;
   return Math.max(0, Math.min(1, ragePoints(p, s) / s.rageFull));
-}
-
-/** The funhouse played: the crowd's move is on the board (the caller plays it), and the board flips for a while. */
-export function funhousePlayed(boss: BossState, move: string, san: string): BossState {
-  const p = boss.powers!;
-  const turn = turnOf(boss);
-  return {
-    ...boss,
-    crowdMoves: boss.crowdMoves + 1,
-    powers: { ...p, funhouse: { turn, move, san }, flipUntil: turn + BOSS_POWERS.flipTurns, events: [...p.events, { kind: "funhouse", turn }] },
-  };
 }
 
 // ---------------- The judge plays by the same rules ----------------
