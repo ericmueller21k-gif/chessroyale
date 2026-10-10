@@ -5,6 +5,7 @@ import type { BossView } from "../game.ts";
 import { BossFace } from "./BossCharacter.tsx";
 import { BossEffect, type BoardItem } from "./BossEffect.tsx";
 import { GodKingPortrait, squareXY } from "./GodKing.tsx";
+import type { Priority } from "../speech.tsx";
 
 /**
  * The pieces every boss's powers on screen are built from, and the shape each boss's screen file fills in (BossUi):
@@ -43,8 +44,6 @@ export interface MomentProps {
   banner: (text: string, sub?: string, tone?: string) => JSX.Element;
   /** The boss casting by the board's top-left corner, its animation's `hit` cue landing at `hitAt` (ms into the moment). */
   cast: (hit: string, hitAt: number) => JSX.Element | null;
-  /** The boss's line for this moment (its kit's), the same on every screen; null without one. */
-  line: () => string | null;
   /** The boss's animation for this moment, from its kit (e.g. freezeCast, pieThrow, check, blizzard, funhouse); null without one. */
   anim: () => string | null;
 }
@@ -55,16 +54,18 @@ export interface MomentUi {
   order: number;
   /** Which of the kit's moments it is. */
   kit: KitMoment;
-  /** The dock's word for it when the boss has no line for it ("Freeze!"). */
+  /** The dock's word for it ("Freeze!"): the boss's own words are in its text box (speech.tsx). */
   dock: string;
-  /** The dock keeps to its word even when the boss has a line (Hollow's cover: his words are in his text box). */
-  dockWordOnly?: boolean;
   /** When what it puts on a square appears there (ms, wall clock); undefined: it puts nothing on that square. */
   appearAt?: (m: Moment, square: string, orientation: "white" | "black") => number | undefined;
   /** It plays on a screen of its own (the funhouse, his extra move, the Big Bounce) when this says so. */
   own?: (boss: BossView) => boolean;
   /** Its line, when the kit's lines for its moment aren't the whole story (Hollow's first cover of the dark). */
   line?: (kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first">) => string | null;
+  /** When the boss says its line (ms into the moment: as it begins unless given), into its voice (speech.tsx). */
+  lineAt?: number;
+  /** How much its line matters (speech.tsx): an ultimate's cuts in on another line, anything else waits its turn. */
+  priority?: (m: Pick<Moment, "kind" | "first">) => Priority;
   /** What it shows over the board (called as a function by PowerMoment, so the board's elements stay as they were). */
   view: (p: MomentProps) => ComponentChildren;
 }

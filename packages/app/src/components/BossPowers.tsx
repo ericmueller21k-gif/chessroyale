@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { useLayoutEffect } from "preact/hooks";
 import { BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
 import { powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
@@ -11,6 +12,7 @@ import { GINGER_UI } from "./Ginger.tsx";
 import { GREX_UI } from "./Grex.tsx";
 import { HOLLOW_UI } from "./Hollow.tsx";
 import { PowerBanner, kitLine, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 
 /**
  * Boss powers on screen: what every player sees, from the battle's shared state (NetBoss.powers), so online everyone
@@ -135,10 +137,32 @@ export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | 
   return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
 }
 
-/** The dock's line for a power's moment: the boss's line for it, or its word ("Freeze!"). */
-export function dockLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first">): string {
+/** The dock's word for a power's moment ("Freeze!"); the boss's own words are in its text box. */
+export function dockLine(m: Pick<Moment, "kind">): string {
+  return MOMENT_UI[m.kind].dock;
+}
+
+/** When the boss says a moment's line (ms into it). */
+export const momentLineAt = (m: Pick<Moment, "kind">): number => MOMENT_UI[m.kind].lineAt ?? 0;
+
+/** How much a moment's line matters: an ultimate's cuts in on another line; a passive's or the warning's waits its turn. */
+export function momentPriority(m: Pick<Moment, "kind" | "first">): Priority {
   const ui = MOMENT_UI[m.kind];
-  return (!ui.dockWordOnly && powerLine(kit, m)) || ui.dock;
+  return ui.priority?.(m) ?? (ui.kit === "ultimate" ? CRITICAL : NORMAL);
+}
+
+/**
+ * Every power moment's line, said into the boss's voice as the moment reaches it (each kind's `lineAt`): its text box
+ * shows it for its time and in turn (speech.tsx), through the rest of the boss's turn and into the crowd's, on every
+ * screen. The one place a boss's power lines are said, so a new boss's are too.
+ */
+export function useMomentSpeech(boss: BossView, moments: readonly Moment[], now: number) {
+  const due = moments.filter((m) => now >= m.at + momentLineAt(m));
+  const last = due.at(-1)?.key;
+  useLayoutEffect(() => {
+    // (Each moment's line once: the voice ignores a moment said again.)
+    for (const m of due) bossVoice.say(powerLine(bossKit(boss.name), m), `${boss.id}:${boss.startMove}:${m.key}`, momentPriority(m), m.at + momentLineAt(m));
+  }, [last]);
 }
 
 /** The boss's animation for a power's moment, from its kit (e.g. freezeCast, pieThrow, check, blizzard, funhouse). */
@@ -171,7 +195,7 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
       </span>
     );
   };
-  return MOMENT_UI[moment.kind].view({ boss, moment, now, t, orientation, side, kit, banner, cast, line: () => powerLine(kit, moment), anim: () => kitAnim(kit, moment.kind) });
+  return MOMENT_UI[moment.kind].view({ boss, moment, now, t, orientation, side, kit, banner, cast, anim: () => kitAnim(kit, moment.kind) });
 }
 
 // ---------------- The rage meter ----------------

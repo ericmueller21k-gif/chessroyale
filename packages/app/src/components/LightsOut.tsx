@@ -9,6 +9,7 @@ import type { BossView, LightsView } from "../game.ts";
 import { BoardEffects, BossMoment, prewarm } from "./BossEffect.tsx";
 import { PowerBanner } from "./PowerParts.tsx";
 import { TimerBar } from "./Countdown.tsx";
+import { CRITICAL, NORMAL, Say, SpeechBox, bossVoice } from "../speech.tsx";
 
 /**
  * Hollow's Lights out on the board, from the shared state (the server's test and timing, solo's alike): the game paused,
@@ -157,31 +158,8 @@ export function LightsDock({ lights, graceMs, now }: { lights: LightsView; grace
   );
 }
 
-/** His text box's sizes, each a step smaller (`.lo-line.fit1`…); past the last, it isn't shown. */
+/** The prompt box's sizes, each a step smaller (`.lo-line.fit1`…); past the last, it's moved back into view (SpeechBox). */
 const LINE_FITS = 3;
-
-/**
- * His words in his pixel text box above the board's top-left (each round's prompt, typed). The box has its full size
- * from its first frame (the words not typed yet hold their place, unseen), so it never grows as it types. Whether it
- * fits is settled once per line, before it's first painted: a box that would run off the screen takes a smaller size,
- * a step at a time; only one that fits at none (a long prompt on a narrow phone) isn't shown. Nothing checks it again
- * while the line is up. The dock always has the prompt (LightsDock).
- */
-function LightsLine({ text, at, now }: { text: string; at: number; now: number }) {
-  const el = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState(0);
-  useLayoutEffect(() => {
-    const r = el.current?.getBoundingClientRect();
-    if (r && fit <= LINE_FITS && (r.top < 0 || r.left < 0 || r.right > innerWidth)) setFit(fit + 1);
-  }, [fit]);
-  const typed = Math.min(text.length, Math.floor((now - at) / 28) + 1);
-  return (
-    <div ref={el} class={`pm-line lo-line${fit ? ` fit${fit}` : ""}`} style={fit > LINE_FITS ? { visibility: "hidden" } : undefined} role="status" aria-label={text} data-fit={fit}>
-      {text.slice(0, typed)}
-      <span class="lo-line-rest">{text.slice(typed)}</span>
-    </div>
-  );
-}
 
 export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap }: { boss: BossView; lights: LightsView; now: number; orientation: "white" | "black"; graceMs: number; onTap: (square: string) => void }) {
   const kit = bossKit(boss.name);
@@ -245,17 +223,16 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
   });
   if (back) anim = { name: "lightsBack", since: at + tl.backAt };
   const gone = t >= tl.backAt + animLength(backAnim);
-  // His words over the board's top-left, in his pixel text box: "It's time.", each round's prompt, the lights back.
-  // (As the lights come back: the verdict, the crowd held the light or he moves twice; without a count, his usual line.)
-  // A round's prompt stays up for the whole round, through its answers, until the next round's (or the lights back)
-  // replaces it (Eric, Oct 10); his other lines are up for 2.8 s.
+  // Each round's prompt in its box above the board's top-left, typed, for the whole round, through its answers, until
+  // the next round's replaces it (Eric, Oct 10). His other words ("It's time.", and as the lights come back the
+  // verdict: the crowd held the light or he moves twice; without a count, his usual line) go into his voice: his text
+  // box keeps each up for its time (speech.tsx), after this screen has gone.
   const verdict = lightsVerdict(lights);
   const verdictBeat = verdict === "held" ? "lightsHeld" : verdict === "failed" ? "lightsFailed" : "lightsBack";
-  const line =
-    back ? { text: (pickLine(kit, verdictBeat, `${lights.key}:back`) ?? kit.lines[verdictBeat]?.[0] ?? kit.lines.lightsBack?.[0]) || "Remember that.", at: at + tl.backAt + 300, ms: 2800 }
-    : round >= 0 ? { text: findLine(lights.rounds[round]!.targets ?? lights.rounds[round]!.pieces), at: at + tl.rounds[round]!.at, ms: Infinity }
-    : t >= LIGHTS_OUT.dropAt ? { text: kit.lines.ultimate?.[0] ?? "It's time.", at: at + LIGHTS_OUT.dropAt + 200, ms: 2800 }
-    : null;
+  const prompt = round >= 0 ? { text: findLine(lights.rounds[round]!.targets ?? lights.rounds[round]!.pieces), at: at + tl.rounds[round]!.at } : null;
+  const said = `${boss.id}:${boss.startMove}:${lights.key}`;
+  const timeAt = at + LIGHTS_OUT.dropAt + 200;
+  const backAt = at + tl.backAt + 300;
   const tr = round >= 0 ? tl.rounds[round]! : null;
   // Each tap gives you a second more: "+1s" flashes by the bar as it bumps back up.
   const bumpAt = open && used > 0 ? firstSeen(`${lights.key}:${round}:tap:${used}`, now) : 0;
@@ -286,7 +263,11 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
           )}
         </div>
       )}
-      {line && now >= line.at && now < line.at + line.ms && <LightsLine key={line.text} text={line.text} at={line.at} now={now} />}
+      {now >= timeAt && <Say voice={bossVoice} text={kit.lines.ultimate?.[0] ?? "It's time."} sayKey={`${said}:time`} priority={CRITICAL} at={timeAt} />}
+      {back && now >= backAt && (
+        <Say voice={bossVoice} text={(pickLine(kit, verdictBeat, `${lights.key}:back`) ?? kit.lines[verdictBeat]?.[0] ?? kit.lines.lightsBack?.[0]) || "Remember that."} sayKey={`${said}:back`} priority={NORMAL} at={backAt} />
+      )}
+      {prompt && now >= prompt.at && <SpeechBox key={prompt.text} class="pm-line lo-line" text={prompt.text} at={prompt.at} until={Infinity} now={now} fits={LINE_FITS} />}
       {tr && open && <TimerBar startsAt={at + tr.at} deadline={at + deadline} total={tr.until - tr.at} />}
       {bumpAt > 0 && now < bumpAt + 800 && (
         <span key={`bump-${round}-${used}`} class="lo-plus" aria-hidden="true">

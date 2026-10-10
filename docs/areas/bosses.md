@@ -44,6 +44,16 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Test switches:** `?boss=<id>` picks the boss; `?power=<id>` brings its ultimate early (warned as turn 2 begins,
   unleashed on turn 3; its passive as usual); admins see "Trigger ultimate (testing)" in any boss battle
   (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next crowd turn begins, no warning).
+- **What a boss says** (`packages/app/src/speech.tsx`, numbers in `SPEECH`; Eric, Oct 10: Ginger's line came and went
+  at once): every line (its powers' moments, its ultimate, its warning, its reactions, Hollow's claim and Lights out
+  words, Big Boy's snack) goes into the boss's voice and shows in its text box beside it (in the boss bar on a phone,
+  by the board on a computer), on every screen of the battle, also while it stands at the board's corner for a
+  moment. Each line types out, then stays fully readable for 2.5 s plus 50 ms a character (at most 7 s), whatever the
+  screen does next. One line at a time: only a critical line (an ultimate's, Hollow's first cover of the dark, his
+  claim, the battle's end) cuts in on another; the rest wait their turn, highest first, and lapse after 5 s of waiting.
+  A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). The
+  dock says the moment's word ("Freeze!"). Lights out's round prompt keeps its own box above the board for the whole
+  round (and the dock).
 - **Same for everyone online:** what a boss does and says on screen comes only from the shared match state
   (`boss-beats.ts`): one-shot animations play once per moment from when the device first saw it, loops run by the
   clock, lines are picked by a hash of the moment. No new protocol for a boss's looks.
@@ -62,6 +72,7 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | Solo | `packages/app/src/solo.ts` (drives the same runner; its own timing of Lights out) | |
 | Art and sounds | `characters/index.ts` (`CHARACTERS`), `characters/kits.ts` (`BOSS_KITS`: animations per moment, lines, portrait), `characters/power-art.ts` (each power's moments and effects) | `characters/<boss>.ts`, `<boss>-sounds.ts` (`gingerbread`, `clown`, `grex`, `hollow`, `bigboy`) |
 | Board effect sprites | `characters/effects.ts` (`EFFECT_SPRITES`), `characters/effects/common.ts` | `characters/effects/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts` |
+| Speech: every line's time and turn, the text box | `packages/app/src/speech.tsx` (`Voice`, `bossVoice`, `SpeechBox`, `holdMs`); power moments' lines said in `BossPowers.tsx` (`useMomentSpeech`), reactions in `BossCharacter.tsx` | a moment's `line`, `lineAt` and `priority` in its `BossUi` (only when the kit's lines aren't the whole story) |
 | Powers on screen: moments, banners, the board layer, the rage meter | `components/BossPowers.tsx` (`momentsOf`, `PowerMoment`, `PowerBoard`, `BossBarExtra`, `dockLine`, the warning), `components/PowerParts.tsx` (`BossUi`, `Moment`, `Flight`, `PowerBanner`), `components/BossEffect.tsx` | `components/Ginger.tsx`, `Boingo.tsx`, `Grex.tsx`, `Hollow.tsx` (+ `LightsOut.tsx`), `BigBoy.tsx` |
 | The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below) | |
 | The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
@@ -87,7 +98,7 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack) |
 | `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy |
 
-A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` word, `appearAt`, `own` screen, `line`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer.
+A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` word, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself.
 
 ### Adding a boss
 
@@ -96,7 +107,7 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 3. **Numbers** in `BOSS_POWERS` (`packages/core/src/settings.ts`): every tunable stays there.
 4. **Rules**: `packages/chess/src/bosses/<boss>.ts` with its `BossRules` (start from the closest boss's file), its choose functions (seeded with `powerRoll`), its moments' lengths (`<BOSS>_FX`) and any beats the server and screens share. Register it: one line each in `bosses/index.ts`, `boss-powers.ts` (`export *`) and `boss-timing.ts` (`POWER_FX`). Its screen fields go in `NetBossPowers` (`protocol.ts`) and its `view` hook.
 5. **Character and art**: `characters/<boss>.ts` (+ sounds), in `characters/index.ts` and `BOSS_KITS` (`kits.ts`); its effects in `characters/effects/<boss>.ts`, in `effects.ts` and `power-art.ts`'s `EFFECTS`; its moments in `power-art.ts`.
-6. **Screen**: `components/<Boss>.tsx` with its `BossUi`; add it to `BOSS_UI` and `MOMENT_UI` in `BossPowers.tsx` (the compiler names any moment kind without a view). Its power words in `power-words.ts` (the compiler names a missing one).
+6. **Screen**: `components/<Boss>.tsx` with its `BossUi`; add it to `BOSS_UI` and `MOMENT_UI` in `BossPowers.tsx` (the compiler names any moment kind without a view). Its power words in `power-words.ts` (the compiler names a missing one). Its lines need nothing more: its kit's lines for each moment are said into its voice and held by the speech rule (`speech.tsx`); give a moment `lineAt` if the boss speaks partway through it, and say any other line with `bossVoice.say` (or `<Say>`), never in a box of its own.
 7. **Only if it has a moment of its own beyond these** (and these still mean shared edits, because they're protocol):
    - one the host's engine plays (like the funhouse, the extra move, the bounce): a `<boss>Battle` with one-line runner methods, the lobby's request, answer and timeout (`lobby.ts`, `bossKind`), the host's handler (`net.ts`) and solo's (`solo.ts`), and the request's flag in `protocol.ts`;
    - one the server times (like Lights out): `packages/server/src/bosses/<boss>.ts` on `BossLobby`, routed from `lobby.ts`, its messages in `protocol.ts`, and solo's timing in `solo.ts`;
@@ -116,7 +127,8 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,
   `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
 - e2e: `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `boss-character.spec.ts`,
-  `perf.spec.ts`.
+  `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame),
+  `perf.spec.ts`. Unit: `packages/app/test/speech.test.ts` (the speech rule).
 - Frames: `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both]`, `frames:hollow`,
   `frames:bigboy`, `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`.
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect).
@@ -134,3 +146,6 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 - Nothing read while rendering may grow with the match; run `npm run perf:boss` late in the match.
 - Tables keyed by a closed set (powers, events) are typed by it (`Record<PowerId, …>`).
 - Text a player must read to play (Lights out's prompt) stays on screen as long as it applies, outside the speech box.
+- A boss's words go into its voice (`speech.tsx`), never into a box a screen or a moment owns: a line lives as long as
+  the rule says, not as long as the screen that said it. Nothing hides a speech box to make it fit: it shrinks, then
+  moves into view. Test a line's whole time on screen, every frame (`e2e/boss-speech.spec.ts`).

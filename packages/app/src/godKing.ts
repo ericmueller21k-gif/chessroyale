@@ -12,10 +12,14 @@
  *   boss's slips): a low chance, and at most one every few moves.
  * - small talk (idle, the tap-me nudge, winning or losing): rests for several
  *   moves after any line, then gets a little likelier with each quiet move.
+ * Each line then stays up for its time, and takes its turn, by the rule every
+ * speaker shares (speech.tsx): a critical line cuts in on a remark or small
+ * talk; anything else waits for the line before it.
  */
 
 import { KING_SPEECH } from "@chessroyale/core";
 import { applyMove, blunderCost, inCheck, legalMoves, pieceAt, queenInDanger, toSan, type BlunderCost } from "@chessroyale/chess";
+import { CRITICAL, LOW, NORMAL, Voice, type Priority, type Spoken } from "./speech.tsx";
 
 export type KingCue =
   | "intro"
@@ -151,10 +155,11 @@ const KIND: Record<KingCue, Kind> = {
   fireTile: "critical",
 };
 
-/** How long a line stays up. */
-export const SPEECH_MS = KING_SPEECH.speechMs;
+/** How much each kind of line matters to his voice: critical cuts in; a remark waits its turn ahead of small talk. */
+const PRIORITY: Record<Kind, Priority> = { critical: CRITICAL, remark: NORMAL, paced: LOW, info: LOW };
 
-let current: { text: string; at: number; until: number } | null = null;
+/** His voice: one line at a time, each for its time (speech.tsx). */
+const voice = new Voice();
 let lastAt = 0;
 let quietMoves = 0;
 /** Crowd moves so far, and the move of the last remark. */
@@ -206,7 +211,7 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
   const options = lines.length > 1 ? lines.filter((l) => l !== lastLine.get(cue)) : lines;
   const text = options[Math.floor(rng() * options.length)]!;
   lastLine.set(cue, text);
-  current = { text, at: now, until: now + SPEECH_MS };
+  voice.say(text, key, PRIORITY[kind], now);
   lastAt = now;
   quietMoves = 0;
   if (kind === "remark") remarkAt = moveNo;
@@ -218,13 +223,13 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
  * turn draws its own God King; they all show the same line from the same moment,
  * so a screen change carries on where the bubble was instead of starting over.
  */
-export function kingLine(now = Date.now()): { text: string; at: number; until: number } | null {
-  return current && now < current.until ? current : null;
+export function kingLine(now = Date.now()): Spoken | null {
+  return voice.line(now);
 }
 
 /** For tests: forget everything said. */
 export function resetKingSpeech() {
-  current = null;
+  voice.reset();
   fallen = false;
   lastAt = 0;
   quietMoves = 0;

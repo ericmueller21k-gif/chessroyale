@@ -21,7 +21,10 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   position). Charges he falls with go to the crowd as power-ups. The round's scores stand.
 - **Fair.** A power never changes how a player's own pick was judged, and a move he plays never earns brilliant credit.
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
-  power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game).
+  power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). Each
+  line then follows the speech rule every speaker shares (`speech.tsx`, `SPEECH`; Oct 10): it types out and stays
+  readable for 2.5 s plus 50 ms a character (at most 7 s); a critical line cuts in on a remark or small talk, but
+  waits for another critical line to have its time; the others wait their turn and lapse after 5 s.
 - **Looks.** Pixel art in the boss characters' format, in white and black versions (a recolour of the armour only,
   in the crowd's colour). SNES/Fire Emblem style: pixel portraits, slanted cut-in banners, retro sounds, a Press
   Start 2P speech bubble. Drama yes, gore no (cracks, sparks and a few stylised red drops are the limit).
@@ -58,11 +61,14 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - Frames in the game: `npm run frames:god-king -- <dir> [w|b] [phone|desktop|both] [summon|laststand|all] [light|dark]`.
 - Sheets and GIFs: `npm run preview:characters -- <dir> only=god-king`, `node scripts/preview-god-king.mjs out.png banner=1`.
 - Sims: `packages/sim/scripts/last-stand-sim.ts`, `last-stand-blunders.ts` (`reports/last-stand.md`).
+- e2e for his lines' time: `e2e/boss-speech.spec.ts` (his opening line held for its full time). Unit:
+  `packages/app/test/speech.test.ts`.
 
 ## Rules for this area
 
 - Everything he shows comes in white and black versions.
 - Tunables in `settings.ts`; timings the server and the screens must agree on in `boss-timing.ts`.
 - Add a test switch (a `?query` flag) that forces any new moment in solo, so Eric can see it on demand.
+- His words go through his voice (`kingSay`), held by the speech rule; never draw a line in a box a screen owns.
 - Watch every moment frame by frame on a phone (`npm run frames:god-king`), in light and dark mode
   (`.claude/LESSONS.md`).

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { SNACK, bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, dockLine, funhouseFlipAt, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, dockLine, funhouseFlipAt, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackLine, snackPawnShown } from "../components/BigBoy.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
@@ -23,6 +23,7 @@ import { BossCharacter, BossFace, BossSide, hasCharacter } from "../components/B
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
+import { CRITICAL, bossVoice } from "../speech.tsx";
 
 /** For the raid's opening roulette: famous lines flicking past before the real one lands. */
 const ROULETTE = [
@@ -117,19 +118,18 @@ const claimLine = (boss: BossView) => {
  */
 function ClaimDark({ boss, since, now }: { boss: BossView; since: number; now: number }) {
   const kit = bossKit(boss.name);
-  if (!kit?.ch.anims.claimDark) return null;
-  const line = claimLine(boss);
+  // His line, into his voice (his text box, for its time: speech.tsx).
   const lineAt = since + 500;
+  const due = now >= lineAt;
+  useLayoutEffect(() => {
+    if (due) bossVoice.say(claimLine(boss), `${boss.id}:${boss.startMove}:claim`, CRITICAL, lineAt);
+  }, [due]);
+  if (!kit?.ch.anims.claimDark) return null;
   return (
     <div class="power-moment pm-claim">
       <span class="pm-caster pm-hollow" style={{ aspectRatio: `${kit.ch.w} / ${kit.ch.h}`, left: `${HOLLOW_CASTER.left}%`, top: `${HOLLOW_CASTER.top}%`, width: `${HOLLOW_CASTER.width}%` }}>
         <BossMoment boss={boss.name} anim="claimDark" since={since} then="idle" />
       </span>
-      {now >= lineAt && (
-        <div class="pm-line" role="status" aria-label={line}>
-          {line.slice(0, Math.min(line.length, Math.floor((now - lineAt) / 28) + 1))}
-        </div>
-      )}
     </div>
   );
 }
@@ -166,11 +166,13 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const showCard = intro && t < tl.replayAt;
   // A new boss battle: the God King starts afresh (he'll introduce himself on your first move). This device remembers
   // the boss, so the next random one is another.
-  useState(() => intro && resetKingSpeech());
+  useState(() => intro && (resetKingSpeech(), bossVoice.reset()));
   useState(() => intro && rememberBoss(boss.id, `${boss.id}:${history.join("")}`));
   // Boss powers: the moments that come as the turn passes to the crowd (after the boss's move), or the funhouse's own.
   const moments = useMemo(() => (intro || thinking || victim ? [] : momentsOf(boss, until)), [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim]);
   const moment = momentAt(moments, now);
+  // Each moment's line, into the boss's voice: its text box keeps it up for its time, into the crowd's turn.
+  useMomentSpeech(boss, moments, now);
   const funhouse = moments.find((m) => m.kind === "funhouse") ?? null;
   // (Big Boy's Big Bounce, before his move: as far as the rest of the screen goes, his last move isn't news.)
   const bounce = moments.find((m) => m.kind === "bounce") ?? null;
@@ -335,7 +337,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 </>
               ) : moment ? (
                 <>
-                  {boss.icon} <strong>{dockLine(bossKit(boss.name), moment)}</strong>
+                  {boss.icon} <strong>{dockLine(moment)}</strong>
                 </>
               ) : victim ? (
                 <strong class="bad">

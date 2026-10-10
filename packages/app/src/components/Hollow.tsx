@@ -7,6 +7,7 @@ import { pickLine } from "../characters/boss-beats.ts";
 import type { BossView } from "../game.ts";
 import { BoardEffects, BossEffect, BossMoment } from "./BossEffect.tsx";
 import { Flight, at, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { CRITICAL, NORMAL } from "../speech.tsx";
 
 /**
  * Hollow's powers on screen: his cover of the dark (his cast from the board's corner, the darkness pouring onto its
@@ -96,11 +97,10 @@ function bulbStrip({ boss, moments }: { boss: BossView; moments: () => Moment[] 
   );
 }
 
-function darkMoment({ boss, moment, now, t, orientation, kit, banner, line: kitsLine }: MomentProps) {
+function darkMoment({ boss, moment, now, t, orientation, kit, banner }: MomentProps) {
   const cast = kit?.ch.anims.darkCast;
   const castSince = moment.at + DARK.pourAt - ((cast && cueAt(cast, "cast")) ?? 0);
   const fromPt = hollowCastFrom(kit);
-  const line = kitsLine();
   return (
     <div class="power-moment pm-dark">
       {t < 1250 && banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark")}
@@ -111,12 +111,7 @@ function darkMoment({ boss, moment, now, t, orientation, kit, banner, line: kits
         </span>
       )}
       {moment.square && t >= DARK.pourAt && t < DARK.landAt && <Flight name="darkPour" square={moment.square} orientation={orientation} since={moment.at + DARK.pourAt} ms={DARK.landAt - DARK.pourAt} aim from={fromPt} />}
-      {/* His words in his pixel text box as the darkness lands: his first cover's always, a taunt now and then. */}
-      {line && t >= DARK.pourAt && (
-        <div class="pm-line" role="status" aria-label={line}>
-          {line.slice(0, Math.min(line.length, Math.floor((t - DARK.pourAt) / 28) + 1))}
-        </div>
-      )}
+      {/* (His words as the darkness pours, his first cover's always and a taunt now and then, are in his text box.) */}
     </div>
   );
 }
@@ -132,11 +127,12 @@ export const HOLLOW_UI = {
       order: 0,
       kit: "power",
       dock: "Darkness!",
-      // (His words are in his text box over the board; the dock keeps it short.)
-      dockWordOnly: true,
       appearAt: (m, square) => (m.square === square ? m.at + DARK.landAt : undefined),
       // His first cover of the dark always has his first-cover line; later ones a taunt now and then (his kit's chance).
       line: (kit, m) => (m.first ? (kit?.lines.darkFirst?.[0] ?? null) : kit ? pickLine(kit, "power", m.key) : null),
+      // Said as the darkness pours; his first cover's line says how the dark works, so it cuts in on any other.
+      lineAt: DARK.pourAt,
+      priority: (m) => (m.first ? CRITICAL : NORMAL),
       view: darkMoment,
     },
     // His extra move, after a failed Lights out: its own moment, after the turn's others played with his move.

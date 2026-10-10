@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { KING_SPEECH } from "@chessroyale/core";
-import { KING_LINES, SPEECH_MS, blunderLabel, blunderWords, bossMoveCues, capitalised, chancesWords, crowdMoveCues, kingLine, kingSay, kingTurn, lastStandLine, mateThreatened, replyWords, resetKingSpeech, setKingFallen, turnCues } from "../src/godKing.ts";
+import { holdMs } from "../src/speech.tsx";
+import { KING_LINES, blunderLabel, blunderWords, bossMoveCues, capitalised, chancesWords, crowdMoveCues, kingLine, kingSay, kingTurn, lastStandLine, mateThreatened, replyWords, resetKingSpeech, setKingFallen, turnCues } from "../src/godKing.ts";
 
 describe("the God King's lines", () => {
   beforeEach(() => resetKingSpeech());
@@ -12,19 +13,22 @@ describe("the God King's lines", () => {
     for (const lines of Object.values(KING_LINES)) expect(lines.length).toBeGreaterThan(0);
   });
 
-  it("speaks once per moment, shows the line for a while, and lets urgent cues cut in over small talk", () => {
+  it("speaks once per moment, shows the line for its time, and a second critical line waits for the first", () => {
     const always = () => 0;
     const t = 1_000_000;
     const intro = kingSay("intro", "intro", t, always)!;
     expect(KING_LINES.intro).toContain(intro);
-    expect(kingLine(t + 100)).toEqual({ text: intro, at: t, until: t + SPEECH_MS });
-    expect(kingLine(t + SPEECH_MS + 1)).toBeNull();
+    expect(kingLine(t + 100)).toMatchObject({ text: intro, at: t, until: t + holdMs(intro) });
     // The same moment again (a screen drawn twice): silent.
     expect(kingSay("intro", "intro", t + 10, always)).toBeNull();
     // Small talk waits a while after the last line…
     expect(kingSay("idle", "idle-1", t + 1000, always)).toBeNull();
-    // …but danger doesn't.
-    expect(KING_LINES.queenDanger).toContain(kingSay("queenDanger", "q-1", t + 1500, always));
+    // …but danger doesn't: it's said, and (both critical) it waits until his opening line has had its time.
+    const danger = kingSay("queenDanger", "q-1", t + 1500, always)!;
+    expect(KING_LINES.queenDanger).toContain(danger);
+    expect(kingLine(t + holdMs(intro) - 1)?.text).toBe(intro);
+    expect(kingLine(t + holdMs(intro))).toMatchObject({ text: danger, at: t + holdMs(intro) });
+    expect(kingLine(t + holdMs(intro) + holdMs(danger))).toBeNull();
     // Later, small talk is fine (when the dice allow).
     expect(kingSay("idle", "idle-2", t + 20_000, () => 0.9)).toBeNull();
     for (let m = 1; m <= KING_SPEECH.restMoves + 10; m++) kingTurn(`quiet-${m}`);
@@ -62,8 +66,10 @@ describe("the God King's lines", () => {
     }
     kingTurn("r-last");
     expect(kingSay("goodMove", "g-last", (t += 60_000), always)).not.toBeNull();
-    // A critical moment speaks at once, whatever was just said.
-    expect(kingSay("queenLost", "ql", t + 100, () => 0.99)).not.toBeNull();
+    // A critical moment speaks at once, whatever was just said: it cuts in on the remark.
+    const lost = kingSay("queenLost", "ql", t + 100, () => 0.99);
+    expect(lost).not.toBeNull();
+    expect(kingLine(t + 200)?.text).toBe(lost);
     // And the dice: a brilliant move is remarked on about a third of the time.
     expect(KING_SPEECH.chance.greatMove).toBeLessThanOrEqual(0.35);
   });
