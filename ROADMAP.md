@@ -57,8 +57,8 @@ on Eric's account.
    engine in the game. Round 1 Relay (4 boards, one player a move, rotating), round 2 Pairs (2 boards, two pick and
    a coin chooses), the final Pick and Block (one board, pickers and blockers), Armageddon after a tie.
    - Phase 1, the rules and a bot simulation: **done** (`packages/chess/src/squads/`, `reports/squads-sim.md`).
-     Then chess clocks in place of the pace and the move cap (Eric, Oct 10): **done**. A lobby takes about 24-36
-     minutes (Fast 1+2, Normal 1:45+2, Long 2+3).
+     Then chess clocks in place of the pace and the move cap (Eric, Oct 10): **done**. With quick early rounds and a
+     roomier final (option B), a lobby takes about 33-36 minutes (median).
    - Phase 2, the server: the squads lobby, parties (invite link or code), matchmaking, bots, the bracket,
      spectating, the test controls ("Next round", start at round 2 or the final), placement rewards.
    - Phase 3, the screens: the menu slot, votes, tiny boards and scouting, the pair and pick-and-block panels, the

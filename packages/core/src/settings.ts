@@ -1265,9 +1265,12 @@ export const FAIRPLAY = {
 export interface SquadsClock {
   id: string;
   label: string;
-  /** Each side's bank on each board, and the increment added after each of its moves. */
+  /** Rounds 1 and 2: each side's bank on each board, and the increment added after each of its moves. */
   bankSeconds: number;
   incrementSeconds: number;
+  /** The final's own, roomier clock (two pickers must agree, and it's the showdown): rarely decided on time. */
+  finalBankSeconds: number;
+  finalIncrementSeconds: number;
 }
 
 export interface SquadsSettings {
@@ -1282,7 +1285,10 @@ export interface SquadsSettings {
   voteSeconds: number;
   voteResultSeconds: number;
   voteBotSkip: number;
-  /** The Clock vote's options (Eric, Oct 10: Fast, Normal, Long; tuned by the sim), and the one if nobody votes. */
+  /**
+   * The Clock vote's options (Eric, Oct 10: Fast, Normal, Long; tuned by the sim), each setting both the early rounds'
+   * clock and the final's, and the one if nobody votes.
+   */
   clocks: readonly SquadsClock[];
   clockDefault: number;
   /**
@@ -1368,11 +1374,12 @@ export const SQUADS: SquadsSettings = {
   voteSeconds: 8,
   voteResultSeconds: 3.2,
   voteBotSkip: 0.1,
-  // Eric's start was 2+1, 4+2, 6+3; tuned by reports/squads-sim.md so a lobby takes 20-40 minutes (Normal about 30).
+  // Eric, Oct 10 (option B): quick early rounds, a roomier final. Tuned by reports/squads-sim.md: every lobby 20-40
+  // minutes, Normal's median 30-35, under about 15% of finals decided on time.
   clocks: [
-    { id: "fast", label: "Fast", bankSeconds: 60, incrementSeconds: 2 },
-    { id: "normal", label: "Normal", bankSeconds: 105, incrementSeconds: 2 },
-    { id: "long", label: "Long", bankSeconds: 120, incrementSeconds: 3 },
+    { id: "fast", label: "Fast", bankSeconds: 60, incrementSeconds: 2, finalBankSeconds: 240, finalIncrementSeconds: 3 },
+    { id: "normal", label: "Normal", bankSeconds: 60, incrementSeconds: 2, finalBankSeconds: 240, finalIncrementSeconds: 4 },
+    { id: "long", label: "Long", bankSeconds: 60, incrementSeconds: 2, finalBankSeconds: 270, finalIncrementSeconds: 4 },
   ],
   clockDefault: 1,
   // 20 s, not the brief's starting 40: a miss charges the whole ceiling, and at 40 s misses decided most finals on time.

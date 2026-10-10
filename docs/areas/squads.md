@@ -18,7 +18,9 @@ screens or menu slot yet: nothing a player sees has changed.
   what's drawn), so the server can replay any decision from the lobby's seed, and adding a draw never moves others.
 - **Votes** (`votes.ts`): Start and Clock as `PregameVote`s, run by Crowd's machinery (`castPregameVote`,
   `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: normal start, the Normal clock.
-- **Clocks**: every board gives each side a bank and an increment (the Clock vote's option). In Relay a squad's four
+- **Clocks**: every board gives each side a bank and an increment. Each Clock option sets a quick clock for rounds 1
+  and 2 and a roomier one for the final (Eric's option B: the final is the showdown; `finalBankSeconds`,
+  `finalIncrementSeconds`). In Relay a squad's four
   players share their side's clock on each board; in Pairs and the final the side's clock runs while its pickers
   think (the slower picker's time). Blockers aren't on a clock. A side whose bank runs out loses that board, unless
   the other side can't mate (a lone king, or king and one minor piece: `canMate`), which draws it.
@@ -47,11 +49,11 @@ screens or menu slot yet: nothing a player sees has changed.
     colour; `startArmageddon`: White 1:30, Black 1:00, +1 s, a draw is Black's). `endByMaterial` is the test-only
     "Next round" (a level result goes to time left, then a coin).
 - **What the sim says** (`reports/squads-sim.md`):
-  - Median lobbies take 24 minutes (Fast 1+2), 31 (Normal 1:45+2) and 36 (Long 2+3); every 90th percentile is under
-    40.
-  - The price of short clocks is flags: they decide 23-64% of Pairs boards and 37-75% of finals (Fast the most).
-    Eric's 4+2 would take about 43 minutes with few flags.
-  - Ties in rounds 1 and 2 (about a third of matches) are settled by time left; Armageddon is rare.
+  - Median lobbies take 33 minutes (Fast: 1+2, final 4+3), 34 (Normal: 1+2, final 4+4) and 36 (Long: 1+2, final
+    4:30+4); every 90th percentile is under 40.
+  - The final rarely ends on time (3-6%). The quick early rounds do, by design: 20% of Relay boards and 60% of Pairs
+    boards.
+  - Ties in rounds 1 and 2 (about a third to 40% of matches) are settled by time left; Armageddon is rare.
 - **Bots** (`bots.ts`): the existing bot engine (Stockfish's top moves, then `botPick` at a skill) for Relay moves,
   pair picks (never the partner's), final picks (avoiding a visible block with `avoidBlockChance`) and blocks (aimed
   at the best moves, never the partner's). Winning, a bot plays with purpose (`squadBotSkill` caps its temperature;
@@ -101,7 +103,8 @@ The brief, as given (calls marked "director's call"). Phase 1's own calls are in
 **Changed since (Eric, Oct 10, after phase 1's sim):** chess clocks replace the per-move pace and the move cap; one
 Clock vote (Fast, Normal, Long) replaces the Pace and Length votes; every game is played to the end; ties in rounds 1
 and 2 go to the squad with more clock time left (no Armageddon); a drawn final goes to Armageddon with White on more
-time. A lobby should take about 20-40 minutes. "How it works today" above is current; the brief below is as first
+time. A lobby should take about 20-40 minutes. Then option B: quick early rounds and a roomier final, each Clock
+option setting both. "How it works today" above is current; the brief below is as first
 given.
 
 
