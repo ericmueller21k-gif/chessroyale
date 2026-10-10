@@ -117,5 +117,5 @@ test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls
   expect(during.filter((x) => x.on).every((x) => x.corner === "hidden")).toBe(true);
   // Gone before the God King collapses; the Last Stand then ends as it always has.
   expect(s.filter((x) => x.now > standAt + ATTACK_AT + ATTACK_MS + 100).every((x) => !x.on)).toBe(true);
-  await expect(page.locator(".gk-unit .god-king.fallen, .gk-unit .fallen").first()).toBeVisible();
+  await expect(page.getByRole("img", { name: "The God King has fallen" })).toBeVisible();
 });
