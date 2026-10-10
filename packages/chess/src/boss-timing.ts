@@ -42,7 +42,8 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * he speaks and plays the crowd's move; the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2700 } as const;
+// Hollow's extra move (a failed Lights out): his banner over the board as the move lands, then the crowd's turn.
+export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2700, extra: 2200 } as const;
 
 /** Hollow's first cover of the dark holds longer, for his first-cover line ("Don't forget what's there…"). */
 export const DARK_FIRST_EXTRA_MS = 1300;

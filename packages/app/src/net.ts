@@ -22,6 +22,7 @@ import {
   repliesFrom,
   bossMoveFrom,
   funhouseMoveFrom,
+  extraMoveFrom,
   allowedSearch,
   fireRanked,
   jobEscapes,
@@ -553,7 +554,13 @@ export class NetMatch implements GameView {
         this.lights = { key: local.key, view: local, taps: kept.map((t, i) => [...new Set([...(local.mine[i] ? [...local.mine[i]!.found, ...local.mine[i]!.wrong] : []), ...t])]) };
         return this.showLights();
       }
+      case "lightsCrowd":
+        // Lights out: the crowd's count moved (someone else's tap).
+        if (!this.lights || this.lights.key !== m.key) return;
+        this.lights = { ...this.lights, view: { ...this.lights.view, crowd: m.crowd } };
+        return this.showLights();
       case "bossRequest":
+        if (m.extra) return void this.hostExtra(m.key, m.fen);
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse);
       case "chat":
         return this.chat.onLine(m.line);
@@ -634,6 +641,16 @@ export class NetMatch implements GameView {
       this.send({ t: "bossMove", key, move });
     } catch {
       // No engine here: the server asks someone else, or plays a random move.
+    }
+  }
+
+  /** Hollow's extra move (a failed Lights out), host only: a quiet move within the cap, or "" (he skips it). */
+  private async hostExtra(key: string, fen: string) {
+    try {
+      const [engine] = await this.engines();
+      this.send({ t: "bossMove", key, move: (await extraMoveFrom(engine!, fen)) ?? "" });
+    } catch {
+      // No engine here: the server asks someone else, or he skips it.
     }
   }
 

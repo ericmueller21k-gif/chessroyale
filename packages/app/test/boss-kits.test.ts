@@ -27,3 +27,28 @@ describe("the playable rule: a complete character and its powers", () => {
     expect(playableBosses().every((b) => b.powers)).toBe(true);
   });
 });
+
+describe("bosses' sounds play on their own moments, never as your move (Eric, Oct 10: a new sound as he moved a piece against Hollow)", () => {
+  const PIECE_SOUNDS = ["move", "capture", "castle"];
+  it("no boss's cue plays a piece's sound (the board knocks for every move itself)", () => {
+    for (const [name, kit] of Object.entries(BOSS_KITS)) for (const [cue, sound] of Object.entries(kit.sounds)) expect(PIECE_SOUNDS, `${name}: ${cue} → ${sound}`).not.toContain(sound);
+  });
+
+  it("what a boss shows as your plain move lands (him thinking) has no sound in it: only the board's knock is heard", () => {
+    for (const b of playableBosses()) {
+      const kit = BOSS_KITS[b.kit!]!;
+      const anim = kit.ch.anims[kit.anims.thinking ?? "thinking"]!;
+      const cues = anim.frames.map((f) => f.cue).filter((c): c is string => !!c && !!kit.sounds[c]);
+      expect(cues, `${b.name}: thinking`).toEqual([]);
+    }
+  });
+
+  it("every cue in a boss's animations is wired to one of its own sounds (Hollow's to his)", () => {
+    for (const b of playableBosses()) {
+      const kit = BOSS_KITS[b.kit!]!;
+      for (const [anim, a] of Object.entries(kit.ch.anims))
+        for (const f of a.frames) if (f.cue && kit.sounds[f.cue]) expect(PIECE_SOUNDS, `${b.name}: ${anim} ${f.cue}`).not.toContain(kit.sounds[f.cue]);
+    }
+    for (const sound of Object.values(BOSS_KITS.Hollow!.sounds)) expect(sound).toMatch(/^hollow/);
+  });
+});

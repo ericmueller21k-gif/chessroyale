@@ -521,3 +521,33 @@ character shows (`warmSounds`). Lights out then measured like the plain board.
 - Anything that shows many new frames at once (a board of tiles) is drawn ahead, a slice a frame. A sound made in code
   is made before its cue, and costs no more than about 30 ms on a computer.
 - Nothing a boss needs only in its battle is made when the app loads.
+
+## A move that went silent, a card that said "undefined", a prompt gone too soon (Oct 10, 2026)
+
+**Eric saw** (playing Hollow on his phone): "undefined" twice on Hollow's card in the boss menu; a new sound instead of
+the knock when he moved a piece; and Lights out's "Find my …" typed out and gone before he could read it, off the top
+of the screen.
+
+**The cause:**
+- The menu's power words were a plain `Record<string, string>`: a new power without words compiled, and read
+  "undefined". Every other table of power words was typed by the power, and caught it.
+- The board knocked for a move in a plain effect, which runs after the next paint. Alone against a boss, a move the
+  judge scores at once (its search done while you thought) swaps the play screen for the boss screen before that paint:
+  the effect never ran, the new board started after your move, and the first sound was the boss's reply. Every test
+  passed: none listened, and the tests move fast, before the engine's search is done, so their moves took the slow path.
+- The prompt was only in his speech box: 2.8 s, a third of the board wide, growing upward from above the board.
+
+**How it was found:** a script logged every `play()` (`window.__soundLog`) and every phase change, to the millisecond,
+over moves with a 4 s think on a phone slowed 4x: "scoring" lasted 30-50 ms and no knock came. For the prompt, a script
+sampled its box every 100 ms through whole tests at 320-430 px wide (short and tall) and on computers, against the
+screen and the boss bar.
+
+**The rule:**
+- A table keyed by a closed set (powers, events, beats) is typed by that set (`Record<PowerId, …>`), so a new member
+  without an entry doesn't compile.
+- Anything a player hears or sees *as* something changes (a sound, a first frame) goes in a layout effect, and must not
+  depend on a screen surviving to its next paint: screens can be replaced within a frame.
+- Test the realistic pace too: a test that moves at once takes a different path from a player who thinks.
+- Text a player must read to play (a prompt, a target) stays on screen for as long as it applies, in a place that's in
+  view on every screen. A speech bubble is extra, never the only copy. Measure it through the whole moment, not in one
+  screenshot.

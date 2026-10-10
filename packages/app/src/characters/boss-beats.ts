@@ -37,7 +37,10 @@ export type Beat =
   | "claim"
   | "found"
   | "missed"
-  | "lightsBack";
+  | "lightsBack"
+  // Lights out's verdict as the lights come back (Eric, Oct 10): the crowd held the light, or he moves twice.
+  | "lightsHeld"
+  | "lightsFailed";
 /** The loops it rests in between moments. */
 export type Loop = "idle" | "thinking" | "smug" | "rattled" | "defeat" | "victory";
 

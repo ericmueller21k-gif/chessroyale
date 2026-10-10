@@ -1148,6 +1148,9 @@ export const HOLLOW_LINES: Partial<Record<Beat, readonly string[]>> = {
   found: ["Hmph. You remembered.", "Lucky.", "Not bad… for now."],
   missed: ["Forgotten already?", "Forgetting costs.", "Wrong. So wrong."],
   lightsBack: ["Remember that.", "Lights on. For now.", "Keep your eyes open."],
+  // Lights out's verdict (Eric, Oct 10), as the lights come back: the crowd held the light, or he moves twice.
+  lightsHeld: ["The light holds. For now.", "You remembered. This time.", "Hmph. The light holds."],
+  lightsFailed: ["You forgot. The dark moves twice.", "Forgotten. I move twice.", "The dark moves twice."],
 };
 export const HOLLOW_CHANCE: Partial<Record<Beat, number>> = {
   entrance: 1,
@@ -1169,6 +1172,8 @@ export const HOLLOW_CHANCE: Partial<Record<Beat, number>> = {
   found: 0.6,
   missed: 0.6,
   lightsBack: 1,
+  lightsHeld: 1,
+  lightsFailed: 1,
 };
 
 const PIECE_WORD: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };

@@ -5,6 +5,7 @@ import {
   MatchRunner,
   START_FEN,
   applyMove,
+  botLightsFound,
   botLightsMisses,
   bulbsAt,
   bossIntroTimeline,
@@ -12,7 +13,17 @@ import {
   chooseLightsOut,
   coversAfter,
   darkAttempt,
+  extraMoveCandidates,
+  extraMoveFrom,
+  fenAtPly,
+  inCheck,
   initPowers,
+  lightsHeld,
+  lightsRate,
+  lightsTally,
+  passTurn,
+  pickExtraMove,
+  sideToMove,
   judgeTaps,
   legalMoves,
   lightsOutDue,
@@ -446,6 +457,212 @@ describe("Hollow's Lights out", () => {
     await r.playBoss();
     expect(fenOf(r)).not.toBe(fen);
     expect(r.bossView()!.powers!.dark!.map((d) => d.square)).toEqual(expect.arrayContaining(dark.filter((sq) => r.darkSquares().includes(sq))));
+  });
+});
+
+describe("Hollow's Lights out: the crowd's find rate, and his extra move below it (Eric, Oct 10)", () => {
+  it("the find rate: everything found over everything asked, held at 70% or more", () => {
+    expect(BOSS_POWERS.lightsOutHold).toBe(0.7);
+    expect(lightsHeld({ found: 7, asked: 10 })).toBe(true);
+    expect(lightsHeld({ found: 69, asked: 100 })).toBe(false);
+    expect(lightsHeld({ found: 70, asked: 100 })).toBe(true);
+    // Alone, 6 pieces: 5 found holds (83%), 4 doesn't (67%).
+    expect(lightsHeld({ found: 5, asked: 6 })).toBe(true);
+    expect(lightsHeld({ found: 4, asked: 6 })).toBe(false);
+    expect(lightsHeld({ found: 0, asked: 0 })).toBe(true);
+    expect(lightsRate({ found: 0, settled: 0 })).toBeNull();
+    expect(lightsRate({ found: 3, settled: 4 })).toBe(0.75);
+  });
+
+  it("the running count: a person's every try settles a piece (all of a round once it's over); a bot's finds count as each round ends", () => {
+    const rounds = [{ pieces: ["q"] }, { pieces: ["r", "n"] }, { pieces: ["b", "k", "p"] }];
+    const a = [{ found: ["d5"], used: 1 }, { found: ["a5"], used: 1 }];
+    const b = [{ found: [], used: 1 }, { found: [], used: 0 }];
+    const bot = [1, 2, 1];
+    // Round 1 over, round 2 open: a found 2 of 2 settled, b 0 of 1, the bot 1 of 1 (round 2 not yet).
+    expect(lightsTally(rounds, 1, [a, b], [bot])).toEqual({ found: 3, settled: 4, asked: 18 });
+    // Round 2 over: all of it settled for everyone, the bot's two found.
+    expect(lightsTally(rounds, 2, [a, b], [bot])).toEqual({ found: 5, settled: 9, asked: 18 });
+    // All over: settled is asked; found over asked is the rate (6 of 18: under the line).
+    const end = lightsTally(rounds, 3, [a, b], [bot]);
+    expect(end).toEqual({ found: 6, settled: 18, asked: 18 });
+    expect(lightsHeld(end)).toBe(false);
+    // Nothing yet: nothing settled.
+    expect(lightsTally(rounds, 0, [[], []], [bot])).toEqual({ found: 0, settled: 0, asked: 18 });
+  });
+
+  it("bots now find 85%, 75% and 65% by round, so a crowd of bots sits near the line, either side of it", () => {
+    expect(BOSS_POWERS.lightsOutBotHit).toEqual([0.85, 0.75, 0.65]);
+    const rounds = chooseLightsOut(START_FEN, "b", 3);
+    let held = 0;
+    let rate = 0;
+    for (let seed = 0; seed < 300; seed++) {
+      // A crowd of 6 bots, from this battle's seed.
+      const found = Array.from({ length: 6 }, (_, i) => botLightsFound(seed, `bot${i}`, rounds));
+      const t = lightsTally(rounds, 3, [], found);
+      rate += t.found / t.asked;
+      if (lightsHeld(t)) held++;
+    }
+    expect(rate / 300).toBeGreaterThan(0.68);
+    expect(rate / 300).toBeLessThan(0.76);
+    expect(held).toBeGreaterThan(60);
+    expect(held).toBeLessThan(240);
+  });
+
+  it("decides it as the test ends: under the line, his extra move is due; at or over it, none", async () => {
+    const r = raid({ patch: { bossPowerTest: "lightsout" } });
+    await turn(r, "e2e4");
+    r.deal();
+    await r.score(new Map([["h0", { move: "d2d4", thinkMs: 1000 }]]));
+    r.startLightsOut();
+    r.finishLightsOut({ h0: 2 });
+    expect(r.boss!.powers!.lightsOut).toMatchObject({ found: 4, asked: 6, extra: "due" });
+    const q = raid({ patch: { bossPowerTest: "lightsout" } });
+    await turn(q, "e2e4");
+    q.deal();
+    await q.score(new Map([["h0", { move: "d2d4", thinkMs: 1000 }]]));
+    q.startLightsOut();
+    q.finishLightsOut({ h0: 1 });
+    expect(q.boss!.powers!.lightsOut).toMatchObject({ found: 5, asked: 6 });
+    expect(q.boss!.powers!.lightsOut!.extra).toBeUndefined();
+    await q.playBoss();
+    expect(q.extraMoveDue()).toBe(false);
+    // Bots count: everyone still in, people from their taps and bots from the seed (the meter's count, at its end).
+    const w = raid({ bots: 4, patch: { bossPowerTest: "lightsout" } });
+    await turn(w, "e2e4");
+    w.deal();
+    await w.score(new Map([["h0", { move: "d2d4", thinkMs: 1000 }]]));
+    const test = w.startLightsOut();
+    const live = w.lightsTally({ h0: test.rounds.map((x) => ({ found: x.answers.slice(0, x.pieces.length), used: x.pieces.length })) }, test.rounds.length);
+    w.finishLightsOut({ h0: 0 });
+    expect(w.boss!.powers!.lightsOut).toMatchObject({ found: live.found, asked: live.asked });
+    expect(live.settled).toBe(live.asked);
+  });
+
+  it("the extra move's candidates: the crowd's turn passed, quiet moves only (no capture, check or promotion, never a stalemate)", () => {
+    // The crowd in check (or without a move): no pass, no extra move.
+    expect(passTurn("4k3/8/8/8/8/8/5q2/4K3 w - - 0 1")).toBeNull();
+    const fen = "4k3/8/8/6b1/4P3/2n5/1p6/R3K3 w - - 0 1";
+    const passed = passTurn(fen)!;
+    expect(sideToMove(passed)).toBe("b");
+    const c = extraMoveCandidates(passed);
+    expect(c).toEqual(expect.arrayContaining(["c3d5", "e8d7", "g5e3"]));
+    for (const m of ["c3e4", "g5h4", "g5d2", "b2b1q", "b2a1q"]) expect(c, m).not.toContain(m);
+    for (const m of c) {
+      const after = applyMove(passed, m);
+      expect(inCheck(after), m).toBe(false);
+      expect(pieceAt(passed, m.slice(2, 4)), m).toBeNull();
+    }
+    // A move that would leave the crowd no move (a stalemate) is out too.
+    const lone = passTurn("8/8/8/8/8/7q/2k5/K7 w - - 0 1")!;
+    expect(legalMoves(lone)).toContain("h3b3");
+    expect(extraMoveCandidates(lone)).not.toContain("h3b3");
+    expect(extraMoveCandidates(lone)).not.toContain("h3h1");
+    expect(extraMoveCandidates(lone)).toContain("h3h4");
+  });
+
+  it("the extra move gains him at most a couple of points: the best within the cap either way, never a mate line; none, he skips it", () => {
+    expect(BOSS_POWERS.lightsOutExtraGain).toBe(3);
+    const scored = [
+      { move: "a", expected: 0.6 },
+      { move: "b", expected: 0.52 },
+      { move: "c", expected: 0.53 },
+      { move: "d", expected: 0.4 },
+      { move: "e", expected: 0.52, mate: 4 },
+      { move: "f", expected: 0.515 },
+    ];
+    expect(pickExtraMove(scored, 0.5, ["a", "b", "c", "d", "e", "f"])).toBe("c");
+    expect(pickExtraMove(scored, 0.5, ["a", "b", "d", "e", "f"])).toBe("b");
+    // Only candidates count; nothing within the cap: null.
+    expect(pickExtraMove(scored, 0.5, ["a", "d", "e"])).toBeNull();
+    expect(pickExtraMove(scored, 0.5, ["c"], 2)).toBeNull();
+  });
+
+  it("from the engine: a candidate within the cap, by the same searches as his moves", async () => {
+    const fen = applyMove(applyMove(START_FEN, "e2e4"), "e7e5");
+    const e = fakeEngine();
+    const m = await extraMoveFrom(e, fen);
+    const passed = passTurn(fen)!;
+    if (m) {
+      expect(extraMoveCandidates(passed)).toContain(m);
+      const before = 1 - (await e.topMoves(fen, 1))[0]!.expected;
+      const got = (await e.scoreMoves(passed, [m]))[0]!.expected;
+      expect(Math.abs(got - before) * 100).toBeLessThanOrEqual(BOSS_POWERS.lightsOutExtraGain + 1e-9);
+    }
+    // The crowd in check: none.
+    expect(await extraMoveFrom(e, "4k3/8/8/8/8/8/5q2/4K3 w - - 0 1")).toBeNull();
+  });
+
+  it("in a battle: after his own move he plays the extra one before the crowd's turn (a base where the turn passed); unscored, once", async () => {
+    // An engine whose scores are all even: every quiet move is within the cap.
+    const even: EngineLike = { ...fakeEngine(), topMoves: async (f, n) => legalMoves(f).sort().slice(0, n).map((move) => ({ move, expected: 0.5 })), scoreMoves: async (f, ms) => [...ms].map((move) => ({ move, expected: 0.5 })) };
+    const r = raid({ patch: { bossPowerTest: "lightsout" } });
+    await turn(r, "e2e4");
+    r.deal();
+    await r.score(new Map([["h0", { move: "d2d4", thinkMs: 1000 }]]));
+    r.startLightsOut();
+    r.finishLightsOut({});
+    expect(r.extraMoveDue()).toBe(false); // his own move first
+    await r.playBoss();
+    expect(r.extraMoveDue()).toBe(true);
+    const before = r.boards.get(0)!;
+    const crowdMoves = r.boss!.crowdMoves;
+    const scores = r.state.players.map((p) => p.stageScore);
+    const m = await r.playExtraMove(even);
+    expect(m).not.toBeNull();
+    const after = r.boards.get(0)!;
+    expect(after.history).toEqual([...before.history, m]);
+    expect(sideToMove(after.fen)).toBe("w");
+    expect(after.bases?.some((b) => b.ply === before.history.length && sideToMove(b.fen) === "b")).toBe(true);
+    // Every replay plays from the base: the history ends on the board's position.
+    expect(fenAtPly(after.history, after.history.length, after.bases).split(" ")[0]).toBe(after.fen.split(" ")[0]);
+    expect(pieceAt(before.fen, m!.slice(2, 4))).toBeNull();
+    expect(inCheck(after.fen)).toBe(false);
+    const v = r.bossView()!;
+    expect(v.lastMove?.move).toBe(m);
+    expect(v.powers!.lightsExtra).toBe("played");
+    expect(v.powers!.events.some((e) => e.kind === "extra")).toBe(true);
+    // Not the crowd's: nothing scored, its turn count the same; once.
+    expect(r.boss!.crowdMoves).toBe(crowdMoves);
+    expect(r.state.players.map((p) => p.stageScore)).toEqual(scores);
+    expect(r.extraMoveDue()).toBe(false);
+    expect(r.applyExtraMove(legalMoves(after.fen)[0]!)).toBeNull();
+    // The crowd's turn goes on as usual, and the game after it.
+    r.deal();
+    await r.score(new Map([["h0", { move: legalMoves(after.fen).sort()[0]!, thinkMs: 1000 }]]));
+    expect(r.boss!.crowdMoves).toBe(crowdMoves + 1);
+    await r.playBoss();
+    expect(r.boards.get(0)!.history.length).toBe(after.history.length + 2);
+  });
+
+  it("skips it when nothing fits (or for anything but a candidate), and it lapses if the crowd's turn goes ahead", async () => {
+    const setup = async () => {
+      const r = raid({ patch: { bossPowerTest: "lightsout" } });
+      await turn(r, "e2e4");
+      r.deal();
+      await r.score(new Map([["h0", { move: "d2d4", thinkMs: 1000 }]]));
+      r.startLightsOut();
+      r.finishLightsOut({});
+      await r.playBoss();
+      return r;
+    };
+    const a = await setup();
+    const fen = fenOf(a);
+    expect(a.applyExtraMove(null)).toBeNull();
+    expect(a.bossView()!.powers!.lightsExtra).toBe("skipped");
+    expect(fenOf(a)).toBe(fen);
+    expect(a.extraMoveDue()).toBe(false);
+    // A capture isn't a candidate: skipped.
+    const b = await setup();
+    const capture = legalMoves(passTurn(fenOf(b))!).find((m) => pieceAt(fenOf(b), m.slice(2, 4)));
+    expect(b.applyExtraMove(capture ?? "a1a1")).toBeNull();
+    expect(b.bossView()!.powers!.lightsExtra).toBe("skipped");
+    // A driver that deals the crowd's turn instead: once the crowd has moved, it's no longer due.
+    const c = await setup();
+    c.deal();
+    await c.score(new Map([["h0", { move: legalMoves(fenOf(c)).sort()[0]!, thinkMs: 1000 }]]));
+    await c.playBoss();
+    expect(c.extraMoveDue()).toBe(false);
   });
 });
 

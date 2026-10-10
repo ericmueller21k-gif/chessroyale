@@ -4054,3 +4054,99 @@ solo's `lightsOutTurn`; on screen `components/LightsOut.tsx`)
   **My call:** "moved" is read from the position (a piece on a square its kind starts on counts as unmoved), which is
   what makes it findable without memory anyway.
 
+
+### Hollow, fixes after Eric's play, and Lights out's verdict (Eric, Oct 10, 2026)
+
+**The boss menu read "undefined · undefined" on his card.** The card's words for each power (`POWER_WORDS` in
+`Home.tsx`) were a plain string table that never got his two powers. They're now in `power-words.ts`, typed by every
+power there is, so a power without words doesn't compile, and `test/power-words.test.ts` checks every boss's card line.
+His card reads "darkens a square · lights out" (**my call**, in the style of "freezes a piece · blizzard"). Every other
+power-word table (the dock's, the rage banner's, the kits' moments) already covered him; the dock's is now typed the
+same way.
+
+**Your move made a new sound against him.** It wasn't one of his sounds wired to the wrong cue: your move made no
+sound at all, and the first thing you heard was his reply, his bulb going out and his strand's knocks.
+- The board plays a move's knock as its position changes, and it did so in a plain effect, which Preact runs after
+  the next paint.
+- Alone against a boss, your move goes in, the screen shows "scoring", and the boss screen (him thinking) replaces it
+  as soon as your move is scored. A real player thinks for a while, so the engine's search is done and the move is
+  scored at once.
+- When the boss screen came before the paint, the play screen's effect never ran. Its new board started from the
+  position after your move, so it had nothing to knock for.
+- Logged on a phone slowed 4x, thinking 4 s a move: Hollow lost 2 knocks of 4 and Boingo 1 of 4, with "scoring" on
+  screen 30-50 ms. Ginger and G-REX kept theirs, only because their scoring happened to take longer. It hit Hollow most
+  because he plays from the starting position.
+- **The fix** (`move-sound.ts`, `Board.tsx`): the knock plays in a layout effect, and the app remembers the last
+  position any big board showed. A board that takes over from another screen knocks once for the move made there, but
+  only if its position is exactly that move played on the last one shown: never another game's board, never a jump of
+  several moves, never twice.
+- After the fix, the same runs knock on every move, within 15 ms of it, with no double knocks.
+- Tests: `test/move-sound.test.ts`; `test/boss-kits.test.ts`, for all four bosses (no boss cue plays a piece's sound,
+  and nothing a boss shows as your plain move lands has a sound in it); `e2e/hollow.spec.ts` (after a 2.5 s think, your
+  move's knock is the first sound heard).
+- **My call:** his hurt (you take one of his pieces) keeps its sound, his bulb's fizzle, since it's his reaction, like
+  Ginger's crunch, Boingo's squeak and G-REX's poof. Boingo's bounce in his mood loops during your turn is his idle,
+  not a move sound, and is unchanged.
+
+**Lights out's prompt typed out and was gone, and went off the top of a phone.** It was only in his text box: above
+the board's top-left, a third of the board wide, growing upward, up for 2.8 s.
+- **Now the round's prompt is in the dock under the board, for the whole round** (and through its answers, with its
+  result), until the next round's replaces it. The dock is in view on every screen and never under the boss bar.
+- Through Lights out, the dock's « » make room for it. The dock keeps its height, so the board never moves.
+- It's his sentence ("Find my king, one of my rooks and one of my knights."). Where that would take more than the
+  dock's two lines (measured in its own font and box), it shows the compact list ("Find: king, a rook, a knight"), a
+  size smaller if it must.
+- Your count follows it ("0/3"), and the crowd's meter is under it (below).
+- **My call:** his text box stays (his words as each round starts), but only where it fits: a box that would run off
+  the screen isn't shown. The prompt never depends on it.
+- Measured every 100 ms through whole tests at 320, 360, 390 and 430 px wide, each short (568-740 px) and tall
+  (720-932 px), and at 1280×800 and 1920×1080. In all 2,276 samples the round's prompt was on screen, whole, in view
+  and clear of the boss bar, in one fixed box per screen, and it changed with each round. Only at 320 px did the
+  longest prompt take the compact list. Before, it was up for about a third of each round, and grew upward over the
+  boss bar to 100 px tall.
+
+**Lights out: miss too much and he moves twice** (Eric's rule, Oct 10)
+- The −10 a piece missed stays.
+- **The crowd's find rate:** every piece found by everyone still in, over every piece asked of them. At or above
+  `lightsOutHold` (70%) the light holds; under it, he moves twice.
+- **My call:** everyone still in counts, people from their taps and bots from the seed. Alone ("Boss alone") that's
+  just you; in a Solo raid with bots, the bots count, as online. The runner counts it the same way for the meter and
+  the verdict (`lightsTally`, `finishLightsOut`).
+- **The meter** (the dock, the whole test): found over settled so far, against a line at 70%.
+  - A person's every try settles a piece (one try a piece, so a try that finds nothing is a piece missed), and once a
+    round is over all of its pieces are.
+  - Bots' finds count as each round ends.
+  - "—" before anything is settled.
+  - The server counts from its own judging and sends it with each round's end and the tapper's answer, plus a small
+    `lightsCrowd` message to everyone else on each tap (like `moved`); solo counts it the same way.
+- **Bots** now find 85%, 75% and 65% by round (`lightsOutBotHit`): 71.7% over a test on average. A crowd of 6 bots
+  holds about 55% of the time, 20 bots 71%, 49 bots 76% (2,000 seeds each).
+- **The verdict, as the lights come back:** his line, "The light holds. For now." (or another of `lightsHeld`) or "You
+  forgot. The dark moves twice." (`lightsFailed`), and the dock says "The light holds." or "He moves twice!".
+- **His extra move** (`extraMoveFrom` in runner.ts, `passTurn`, `extraMoveCandidates` and `pickExtraMove` in
+  boss-powers.ts). After his own move and its moments, he thinks again (as for a move), then plays it, with his banner
+  "TWICE!" ("Hollow moves again", 2.2 s, `POWER_FX.extra`). Then the crowd's turn and clock.
+  - It's a quiet move: no capture (en passant included), no check, no promotion, and his king never in check.
+  - **My call:** never one that leaves the crowd without a move (a stalemate would decide the game), and never a line
+    with a forced mate either way.
+  - Its gain is at most `lightsOutExtraGain` (3 points, expected score × 100) over not moving again. His expected score
+    had he not moved is one less the crowd's best in the position after his move.
+  - **My call:** it may not lose him more than 3 either, so it never hands the crowd the game. Of the moves within
+    that, he plays the one that gains most.
+  - The engine's top 8 first, then the rest of the quiet moves (as Boingo's funhouse move is picked), by the same
+    engine as his moves: the host's online, this device's in Solo.
+  - He skips it when the crowd is in check after his move, when no quiet move fits, or online when the host answers
+    "" or anything that isn't a candidate. **My call:** with no engine anywhere, he skips it rather than play a random
+    move.
+  - On the board, the crowd's turn passes (a base where the position changes between moves, as G-REX's burns leave),
+    then his move: the history keeps both of his moves, and every replay plays from the base.
+  - It isn't the crowd's turn: nothing is scored, fair play never sees it, and the crowd's turn count (and with it the
+    dark's schedule and his bulbs) is unchanged.
+  - It works online and in Solo, and the admins' trigger still brings Lights out. Once the crowd has moved, it lapses
+    (a driver that skips it, like a simulation, can't give it him a turn late).
+- Tests: `packages/chess/test/hollow.test.ts` (the rate and the line, the running count, the bots' rates, the verdict,
+  the candidates, the cap, the engine pick, the extra move in a battle, skipping it and its lapse),
+  `packages/server/test/boss-powers-lobby.test.ts` (the count to everyone as anyone taps, the verdict, the host asked
+  for the extra move and everyone seeing it, a crowd that holds the line, the host's ""), and `e2e/hollow.spec.ts` (the
+  meter moving, a failed test bringing "TWICE!" and his second move before yours).
+- Test switch, as before: `?boss=hollow&power=lightsout`. Tap nothing and he moves twice.

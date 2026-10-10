@@ -228,7 +228,7 @@ export interface LobbyRecord {
   bossKey?: string;
   bossStumble?: boolean;
   /** "funhouse": the host plays the crowd's move for Boingo (his ultimate). */
-  bossKind?: "elo" | "stumble" | "stagger" | "funhouse";
+  bossKind?: "elo" | "stumble" | "stagger" | "funhouse" | "extra";
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
   bossMinAt?: number;
@@ -987,8 +987,26 @@ export class LobbyCore {
       nodes: this.settings.bossNodes,
       ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : {}),
       ...(funhouse ? { funhouse: true } : {}),
+      ...(this.r.bossKind === "extra" ? { extra: true } : {}),
       ...(allowed ? { allowed } : {}),
     });
+  }
+
+  /**
+   * Hollow's extra move (the crowd failed Lights out): after his own move, he thinks again while the host's engine
+   * picks a quiet move that gains him only a little (extraMoveFrom); everyone sees it land with its banner, then the
+   * crowd's turn. No such move (or no engine anywhere): he skips it.
+   */
+  private requestExtra() {
+    this.r.phase = "boss";
+    this.r.bossKey = `x-${++this.r.counter}`;
+    this.r.bossKind = "extra";
+    this.r.bossMinAt = undefined;
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
   /**
@@ -1008,6 +1026,14 @@ export class LobbyCore {
 
   private playBoss(move: string) {
     this.r.bossKey = undefined;
+    if (this.r.bossKind === "extra") {
+      // His extra move: not the crowd's, so nothing is scored; its banner plays out, then the crowd's turn.
+      this.r.bossKind = undefined;
+      const played = this.runner!.applyExtraMove(move || null);
+      const until = this.io.now() + (played ? powerMomentMs([{ kind: "extra" }]) : 0);
+      if (played) this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "funhouse") {
       // The crowd's move, played by the boss: unscored; the funhouse plays out, then the boss replies.
       this.r.bossKind = undefined;
@@ -1041,8 +1067,9 @@ export class LobbyCore {
       return;
     }
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in its funhouse, the
-    // crowd's: a random allowed one too).
+    // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
+    if (this.r.bossKind === "extra") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -1072,6 +1099,8 @@ export class LobbyCore {
       }
       // (Hollow's Lights out comes at the start of his turn, before his move.)
       if (runner.bossToMove()) return runner.lightsOutDue() ? this.startLights() : this.requestBoss();
+      // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
+      if (runner.extraMoveDue()) return this.requestExtra();
       if (runner.funhouseDue()) return this.requestFunhouse();
     }
     if (this.r.augmentVotes) {
@@ -1345,6 +1374,12 @@ export class LobbyCore {
     });
   }
 
+  /** The crowd's count so far, from the server's judging of everyone's taps (bots' as each round ends). */
+  private lightsCrowd(): NonNullable<NetLightsOut["crowd"]> {
+    const l = this.r.lights!;
+    return this.runner!.lightsTally(Object.fromEntries(Object.keys(l.taps).map((id) => [id, this.lightsMine(id)])), l.ended);
+  }
+
   /** The test as each player sees it (their own taps judged; a round's answers once it's over). */
   private sendLights(only?: string) {
     const l = this.r.lights!;
@@ -1352,6 +1387,7 @@ export class LobbyCore {
     const test = runner.boss!.powers!.lightsOut!;
     const boss = runner.bossView()!;
     const standings = this.standings();
+    const crowd = this.lightsCrowd();
     for (const h of this.r.humans) {
       if (only && h.id !== only) continue;
       const lights: NetLightsOut = {
@@ -1359,6 +1395,7 @@ export class LobbyCore {
         at: l.at,
         rounds: test.rounds.map((r, i) => ({ pieces: r.pieces, targets: r.targets, ms: r.ms, ...(i < l.ended ? { answers: r.answers, endedAt: l.endedAt?.[i] } : {}) })),
         mine: this.lightsMine(h.id),
+        crowd,
       };
       this.send(h.id, { t: "lights", lights, boss, standings });
     }
@@ -1382,6 +1419,9 @@ export class LobbyCore {
     taps.push(square);
     ((l.tapAt ??= {})[playerId] ??= l.taps[playerId]!.map(() => []))[round]!.push(t);
     this.sendLights(playerId);
+    // Everyone's meter moves with it (a small message; the tapper's came with their own taps).
+    const crowd = this.lightsCrowd();
+    for (const h of this.r.humans) if (h.id !== playerId) this.send(h.id, { t: "lightsCrowd", key: l.key, crowd }, false);
     // Done at once if everyone is; otherwise the round may now end later.
     if (this.lightsRoundEnd() <= t) return this.lightsStep();
     this.armLights();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { BOSS_TIERS, bossDef, bossStrength, bossThreat, isPlayable, playableBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, MAX_OPENING_MOVES, PRIOR_RATING, RAID_SETTINGS, raidBossElo, rankedMinHumans, type MatchmakingType, type ModeChoiceId } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-difficulty.ts";
+import { powersLine } from "../power-words.ts";
 import { BossDifficulty } from "../components/BossDifficulty.tsx";
 import type { ComponentChildren } from "preact";
 import { AccountBar, DressedPawn, FdButton, LiveLine, Logo, RankLine, myHat, wearingNames } from "../components/FrontDoor.tsx";
@@ -133,8 +134,6 @@ function versus(elo: number, you: number): { text: string; tone: "easy" | "even"
 }
 
 /** What each boss's powers do, in a few words (the menu's line under its name). */
-const POWER_WORDS: Record<string, string> = { freeze: "freezes a piece", blizzard: "blizzard", pie: "pies a square", funhouse: "funhouse", sparkler: "sets squares alight", candle: "Roman candle" };
-
 /**
  * Boss raid: the menu that opens when you start: a random boss (a different one from last time), or one of the
  * bosses you can meet (only the complete ones: a character and its powers), each at your strength plus its own
@@ -219,7 +218,7 @@ export function BossMenu({
                   <strong>{b.name.replace(/^The /, "")}</strong>
                   <span class="br-sub">
                     <span class="br-skulls">{"💀".repeat(bossThreat(elo))}</span>
-                    <span class="br-powers">{b.powers ? `${POWER_WORDS[b.powers.passive]} · ${POWER_WORDS[b.powers.ultimate]}` : ""}</span>
+                    <span class="br-powers">{powersLine(b)}</span>
                   </span>
                 </span>
                 <span class="br-elo">
