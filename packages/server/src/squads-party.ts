@@ -55,6 +55,9 @@ export function partyClosing(r: PartyRecord, connected: boolean): { at: number; 
   return { at: r.activeAt + SQUADS_LOBBY.partyIdleMinutes * 60_000, reason: "idle" };
 }
 
+/** How long a party's question to the matchmaker may take before it asks again (its answer comes in a few seconds). */
+const PARTY_ASK_MS = 15_000;
+
 const hex = (n: number) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
 
 /** What the matchmaker answers a party (as for PLAY): a lobby, or "busy, you're in line" with the ticket to ask again with. */
@@ -177,10 +180,14 @@ export class PartyCore {
     this.broadcast();
   }
 
-  /** In line and due to ask the matchmaker (now or at its retry time): what to ask for. */
-  wantsQueue(): { ticket: string | null; size: number; pass: string } | null {
+  /**
+   * In line and due to ask the matchmaker (now or at its retry time): what to ask for. Taking it puts the next try a
+   * while off (the answer sets it properly), so a lost answer is asked again, never in a tight loop.
+   */
+  takeQueue(): { ticket: string | null; size: number; pass: string } | null {
     const q = this.r.queue;
     if (this.r.state !== "queueing" || !q || q.retryAt > this.io.now()) return null;
+    q.retryAt = this.io.now() + PARTY_ASK_MS;
     return { ticket: q.ticket, size: q.size, pass: q.pass };
   }
 

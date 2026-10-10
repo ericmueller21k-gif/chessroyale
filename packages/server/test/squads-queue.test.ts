@@ -145,14 +145,14 @@ describe("parties", () => {
     if (!a.ok || !b.ok || !c.ok) throw new Error("join");
     P.core.disconnect(c.memberId);
     P.core.message(a.memberId, { t: "queue" });
-    const want = P.core.wantsQueue()!;
+    const want = P.core.takeQueue()!;
     expect(want).toMatchObject({ ticket: null, size: 2 });
     P.core.answered(want.pass, { busy: true, ticket: "t-123456789", position: 3, waitSeconds: 10, retryMs: 3000, message: "Servers are busy, you're in line: about 10 s" });
     expect(P.view(b.memberId)!.party).toMatchObject({ state: "queueing", busy: { position: 3, waitSeconds: 10 } });
-    expect(P.core.wantsQueue()).toBeNull();
+    expect(P.core.takeQueue()).toBeNull();
     expect(P.core.nextAlarm).toBe(P.now + 3000);
     P.tick(3000);
-    expect(P.core.wantsQueue()).toMatchObject({ ticket: "t-123456789", pass: want.pass });
+    expect(P.core.takeQueue()).toMatchObject({ ticket: "t-123456789", pass: want.pass });
     // An answer for an older pass is ignored.
     P.core.answered("old", { code: "WRONG" });
     P.core.answered(want.pass, { code: "LOBBY", ticket: "t-123456789" });
@@ -161,7 +161,7 @@ describe("parties", () => {
     P.core.message(a.memberId, { t: "cancel" });
     expect(P.core.record.state).toBe("open");
     P.core.message(a.memberId, { t: "queue" });
-    expect(P.core.wantsQueue()!.pass).not.toBe(want.pass);
+    expect(P.core.takeQueue()!.pass).not.toBe(want.pass);
   });
 
   it("a party with nobody in it closes after its idle time; never while someone is connected", () => {
@@ -181,7 +181,7 @@ describe("parties", () => {
     });
     await squadPlay(mm, 1);
     P.core.message(ids[0]!, { t: "queue" });
-    const want = P.core.wantsQueue()!;
+    const want = P.core.takeQueue()!;
     P.core.answered(want.pass, await mm.next({}, 60_000, { squads: true }, want.ticket, { size: want.size, pass: want.pass }));
     const placed = P.core.record.placed!;
     const lobby = L.lobbies.get(placed.lobby)!;

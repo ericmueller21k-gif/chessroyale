@@ -19,6 +19,9 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   instance; later columns by `ALTER TABLE` migrations that tolerate re-runs), so a deploy needs no migration step.
 - **Results.** The server records online matches when a lobby reaches results, for every connected player with an
   account (`results.ranked` says whether it counts for ranking). The browser posts solo matches (`online = 0`).
+- **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward:
+  coins into `wallets.coins`, crates counted in `wallets.crates` (for when crates stop being free), both carried over
+  when a guest signs in (`grantReward`).
 - **Admins** are the emails in `ADMIN_EMAILS` (a Worker variable or secret, never in the repo): the fair-play review
   page and the boss battle's "Trigger ultimate (testing)" button.
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.

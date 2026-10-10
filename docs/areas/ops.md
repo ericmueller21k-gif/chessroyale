@@ -6,7 +6,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 
 - **Hosting:** Cloudflare, on Eric's account (Workers Paid, $5/month, which Containers need): one Worker
   (`chessroyale`) serves the built app and routes `/api/*` and `/admin/fairplay`; Durable Objects for each lobby
-  (`Lobby`), the matchmaker (`Matchmaker`) and the live hub (`LiveHub`); the engine server as a Container
+  (`Lobby`), the matchmaker (`Matchmaker`), the live hub (`LiveHub`), and Squads' lobbies and parties (`SquadsLobby`,
+  `SquadsParty`); the engine server as a Container
   (`EngineServer`, `standard-2`, `max_instances` 2); D1 (`hunchess`) for accounts, results, the locker, fair play and
   budgets. The domain is hunchess.com.
 - **Deploy:** every push to `main` builds (`npm run build`) and deploys (`npx wrangler deploy`) through Workers Builds.
@@ -47,7 +48,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 ## Settings
 
 `CAPACITY` (queue, overload, presence, rate limits), `LOBBY_LIFE` in settings.ts; Worker variables
-`MATCH_FILL_SECONDS`, `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`, `OPS_STATS`, `LOAD_TEST` (staging only).
+`MATCH_FILL_SECONDS`, `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`, `OPS_STATS`, `LOAD_TEST` (staging only), `SQUADS_TEST`
+(local and e2e only: anyone may use Squads' test controls). Squads lobbies aren't on the live line yet, so the
+overload limit doesn't count their players.
 
 ## Tests and tools
 

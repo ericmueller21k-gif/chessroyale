@@ -966,10 +966,13 @@ export const SQUADS_LOBBY = {
    * disagree go to the engine server (a restricted search of their moves, at `serverNodes`) or a third device, and
    * the device that was wrong gets a strike (`strikes` and it gets no more work). A bot whose candidates aren't in
    * `fallbackMarginMs` before its deadline (no devices, none answering) plays from the server's own quick look
-   * (material two moves deep and mate in one: no engine), `fallbackScale` turning its pawns into expected score.
+   * (material two moves deep and mate in one: no engine), `fallbackScale` turning its pawns into expected score. A
+   * device holds at most `maxInFlight` unanswered jobs at once (a phone fewer: its battery), so a slow one is never
+   * buried; with every device busy, a job goes to fewer devices, or none.
    */
   botWork: {
     perJob: 2,
+    maxInFlight: { computer: 4, phone: 2 },
     graceMs: 400,
     answerMs: 4_000,
     serverNodes: 400_000,

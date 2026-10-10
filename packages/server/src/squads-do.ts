@@ -436,10 +436,12 @@ export class SquadsParty extends DurableObject<Env> {
   /** In line: ask the Squads matchmaker for seats for the party (its answer: a lobby, or busy and when to ask again). */
   private async askMatchmaker() {
     if (this.asking || !this.record) return;
-    const want = this.core().wantsQueue();
+    const asking = this.core();
+    const want = asking.takeQueue();
     if (!want) return;
     this.asking = true;
     try {
+      await this.persist(asking);
       const mm = this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(this.record.queueName));
       const answer = await mm.next({}, this.record.fillMs, { squads: true }, want.ticket, { size: want.size, pass: want.pass }).catch(() => null);
       if (!this.record) return;

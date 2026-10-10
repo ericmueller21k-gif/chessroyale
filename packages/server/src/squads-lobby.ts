@@ -779,8 +779,28 @@ export class SquadsCore {
     return this.allMatches().filter((lm) => lm.state !== "over");
   }
 
-  /** One match's due work: begin a half, play bots, settle bot work, resolve the half, start Armageddon. */
+  /**
+   * One match's due work. Should the rules ever throw (a bug), the match is ended by material rather than leaving
+   * the lobby stuck on an alarm that fails forever ("degrade, don't die").
+   */
   private advance(lm: LiveMatch, now: number): boolean {
+    try {
+      return this.advanceMatch(lm, now);
+    } catch (e) {
+      console.log(`squads ${this.r.code}: ${lm.key} failed (${String(e)}): ended by material`);
+      const { match, events } = endByMaterial({ ...lm.m, result: null }, this.s);
+      lm.m = match;
+      lm.half = null;
+      delete lm.arm;
+      this.touch(lm);
+      this.sendAll({ t: "half", key: lm.key, seq: lm.seq, events, acted: [], missed: [], replaced: [], match: this.netMatch(lm, false) });
+      this.matchOver(lm);
+      return true;
+    }
+  }
+
+  /** One match's due work: begin a half, play bots, settle bot work, resolve the half, start Armageddon. */
+  private advanceMatch(lm: LiveMatch, now: number): boolean {
     if ((lm.state === "break" || lm.state === "show") && lm.startsAt !== null && lm.startsAt <= now) {
       this.startHalf(lm);
       return true;
@@ -1152,14 +1172,29 @@ export class SquadsCore {
     return !!d && !!h && h.connected && !h.left && d.strikes < SQUADS_LOBBY.botWork.strikes;
   }
 
+  /** Jobs a device holds unanswered right now (every live match's half). */
+  private inFlight(): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const lm of this.liveMatches()) {
+      for (const job of Object.values(lm.half?.work ?? {})) {
+        if (job.how) continue;
+        for (const d of [...job.devices, ...(job.referee ? [job.referee] : [])]) if (!(d in job.answers)) out.set(d, (out.get(d) ?? 0) + 1);
+      }
+    }
+    return out;
+  }
+
   /**
    * Devices for a job, best first: outside this match before those in it (nobody's engine decides the bots they play
-   * against or beside, while anyone else's can), computers before phones, the least loaded, the fastest.
+   * against or beside, while anyone else's can), computers before phones, the least loaded, the fastest. None holding
+   * its most unanswered jobs already.
    */
   private pickDevices(lm: LiveMatch, n: number, exclude: readonly string[] = []): string[] {
     const inMatch = new Set(lm.m.sides.flatMap((x) => x.seats));
+    const busy = this.inFlight();
+    const cap = SQUADS_LOBBY.botWork.maxInFlight;
     return Object.keys(this.r.devices)
-      .filter((id) => this.deviceUp(id) && !exclude.includes(id))
+      .filter((id) => this.deviceUp(id) && !exclude.includes(id) && (busy.get(id) ?? 0) < cap[this.human(id)!.device])
       .sort((a, b) => {
         const da = this.r.devices[a]!;
         const db = this.r.devices[b]!;
