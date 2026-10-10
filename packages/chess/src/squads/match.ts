@@ -158,12 +158,17 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
 /** A squad's lineup: its id and players in seat order. */
 export const lineupOf = (sq: Squad): Lineup => ({ squadId: sq.id, seats: sq.players.map((p) => p.id) });
 
-/** A bracket match ready to play: round 1 Relay on 4 boards, round 2 Pairs on 2, the final on 1, all on the voted clock. */
+/**
+ * A bracket match ready to play: round 1 Relay on 4 boards, round 2 Pairs on 2, the final on 1. Rounds 1 and 2 use the
+ * voted option's quick clock, the final its own roomier one.
+ */
 export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, squads: readonly [Squad, Squad], library: readonly Opening[], s: SquadsSettings = SQUADS): SquadsMatch {
   const format = ROUND_FORMAT[round];
   const key = `r${round}m${index}`;
   const { starts, whites } = matchStarts(plan, key, s.boards[format], library, s);
-  const bank = plan.rules.clock.bankSeconds * 1000;
+  const c = plan.rules.clock;
+  const final = round === 2;
+  const bank = (final ? c.finalBankSeconds : c.bankSeconds) * 1000;
   return createSquadsMatch(
     {
       key,
@@ -174,7 +179,7 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
       starts,
       whites,
       clockMs: { w: bank, b: bank },
-      incrementMs: plan.rules.clock.incrementSeconds * 1000,
+      incrementMs: (final ? c.finalIncrementSeconds : c.incrementSeconds) * 1000,
     },
     s,
   );

@@ -627,3 +627,33 @@ A raccoon in a yellow hard hat with a black bandit mask and a red-and-black reci
   computer: the split and its halves, the board saw and its gap, a cut taped and healing, the rejoin, his sounds
   through mute), `e2e/perf.spec.ts` (his moments on a slowed phone), `e2e/boss-speech.spec.ts` (his split's line held
   whole). Frames: `npm run frames:sawyer`.
+
+### Squads: quick early rounds, a roomier final (Oct 10, 2026)
+
+Eric picked option B: the final is the showdown, and he likes more games. Each Clock option now sets a quick clock for
+rounds 1 and 2 and the final's own, longer one (`finalBankSeconds`, `finalIncrementSeconds`), aiming at:
+- every option's lobby within 20-40 minutes;
+- Normal's median at 30-35;
+- under about 15% of finals decided on time.
+
+The calls, from the sim's tuning runs (`reports/squads-sim.md`):
+
+- **The final needs about 4 minutes of bank and at least 3 s of increment.** In finals-only runs (60 finals each):
+  - 3+3 to 3+5 ended on time in 17-23% of finals;
+  - 3:30 hovered at the 15% line (8-22% across runs);
+  - 4+3 to 5+5 ended on time in 3-10%: a bank that size absorbs a missed pick's 20 s charge;
+  - 4+2 ended on time in 17%: two pickers need about 3 s a move to keep pace;
+  - 5 s of increment didn't clearly help, and it costs a minute.
+- **The chosen options**, 36 lobbies each:
+
+  | Option | Rounds 1 and 2 | Final | Median | 90th pct | Longest | Finals on time |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Fast | 1+2 | 4+3 | 32.6 | 35.3 | 36.9 | 5.6% |
+  | Normal | 1+2 | 4+4 | 33.8 | 36.8 | 38.7 | 2.8% |
+  | Long | 1+2 | 4:30+4 | 36.0 | 39.2 | 43.5 | 5.6% |
+- **The same early clock (1+2) for every option.** A 4-minute final costs 17-20 minutes and the early rounds about 16,
+  so there's no room for a slower early clock. 1+3 added about 2 minutes, and with it a Long option's 90th percentile
+  went over 40. The options differ in the final's room, not much in length; a clearly faster Fast would need a final
+  closer to the 15% line.
+- **The early rounds are a scramble:** 20% of Relay boards and 60% of Pairs boards end on time. That's option B's "quick
+  early rounds". If Pairs feels decided by the clock in playtests, 1+3 brings it to about 53% for about 2 minutes more.

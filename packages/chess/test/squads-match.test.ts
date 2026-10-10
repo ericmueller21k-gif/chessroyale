@@ -182,9 +182,26 @@ describe("Squads starts and setup", () => {
     for (const round of [0, 1, 2] as const) {
       const m = planMatch(plan, round, 0, [squads[0]!, squads[1]!], library);
       expect(m.boards.every((b) => b.start.openingId === plan.start!.openingId)).toBe(true);
-      expect(m.boards[0]!.clock.w).toBe(fast.bankSeconds * 1000);
+      expect(m.boards[0]!.clock.w).toBe((round === 2 ? fast.finalBankSeconds : fast.bankSeconds) * 1000);
     }
     expect(armageddonStart(plan, { key: "r2m0" }, library)).toEqual(plan.start);
+  });
+
+  it("each Clock option sets a quick clock for rounds 1 and 2 and a roomier one for the final", () => {
+    const squads = bots32();
+    for (const clock of SQUADS.clocks) {
+      expect(clock.finalBankSeconds).toBeGreaterThan(clock.bankSeconds);
+      expect(clock.finalIncrementSeconds).toBeGreaterThanOrEqual(clock.incrementSeconds);
+      const plan = planLobby(4, { start: "standard", clock }, library);
+      for (const round of [0, 1] as const) {
+        const m = planMatch(plan, round, 0, [squads[0]!, squads[1]!], library);
+        expect(m.boards.every((b) => b.clock.w === clock.bankSeconds * 1000 && b.clock.b === clock.bankSeconds * 1000)).toBe(true);
+        expect(m.incrementMs).toBe(clock.incrementSeconds * 1000);
+      }
+      const fin = planMatch(plan, 2, 0, [squads[0]!, squads[1]!], library);
+      expect(fin.boards[0]!.clock).toEqual({ w: clock.finalBankSeconds * 1000, b: clock.finalBankSeconds * 1000 });
+      expect(fin.incrementMs).toBe(clock.finalIncrementSeconds * 1000);
+    }
   });
 
   it("the normal start: the starting position everywhere", () => {
