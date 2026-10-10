@@ -12,8 +12,9 @@ import {
   reportWinner,
   roundDecided,
   clockName,
-  finalClockName,
+  minutesName,
   rulesFromVotes,
+  teamClockLine,
   squadsRng,
   squadsVotes,
   type Party,
@@ -144,8 +145,14 @@ describe("Squads: pre-game votes", () => {
     expect(votes[1]!.options.map((o) => o.rule.clock)).toEqual([...SQUADS.clocks]);
     expect(votes[1]!.options.map((o) => o.id)).toEqual(["fast", "normal", "long"]);
     const c = SQUADS.clocks[1]!;
-    expect(votes[1]!.options[1]!.label).toBe(`Normal ${clockName(c)}`);
-    expect(votes[1]!.options[1]!.blurb).toBe(`Rounds 1 and 2: ${clockName(c)}. The final: ${finalClockName(c)}`);
+    expect(votes[1]!.options[1]!.label).toBe(`Normal ${minutesName(c.bankSeconds)} min`);
+    expect(votes[1]!.options[1]!.blurb).toBe(teamClockLine(c));
+    expect(teamClockLine({ id: "x", label: "X", bankSeconds: 360, topUpSeconds: 60, delaySeconds: 5, incrementSeconds: 0 })).toBe(
+      "Team clock 6 min · +1 min a round · 5 s free a move",
+    );
+    expect(teamClockLine({ id: "x", label: "X", bankSeconds: 90, topUpSeconds: 45, delaySeconds: 3, incrementSeconds: 1 })).toBe(
+      "Team clock 1:30 min · +0:45 min a round · 3 s free a move · +1 s a move",
+    );
   });
 
   it("writes a clock the way chess players do", () => {
