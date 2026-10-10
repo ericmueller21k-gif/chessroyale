@@ -185,7 +185,7 @@ async function watchLine(page: Page) {
           : null;
         if (why && !r.bad) r.bad = `frame ${r.frames}: ${why}`;
         r.text ??= text;
-        r.lastTyped = !!el && el.querySelector(".lo-line-rest")?.textContent === "";
+        r.lastTyped = !!el && el.querySelector(".speech-rest")?.textContent === "";
         r.lastBox = b ? [b.left, b.top, b.width, b.height].map(Math.round) : null;
       }
       requestAnimationFrame(loop);

@@ -62,7 +62,7 @@ test("Big Boy's snack before move 1, your move's knock, and his toy block (no do
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?debug&clock=60&boss=bigboy&laststand=0");
-  const snackSeen = await watchFor(page, { snack: { selector: ".pm-snack .bb-snack" }, nom: { selector: ".pm-snack .pm-line", text: /./ } });
+  const snackSeen = await watchFor(page, { snack: { selector: ".pm-snack .bb-snack" }, nom: { selector: ".bc-bubble", text: /Nom nom\.|Yummy pawn!|Snack time!/ } });
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   const boss = await page.evaluate(() => (window as any).match.boss);

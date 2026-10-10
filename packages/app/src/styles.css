@@ -4230,8 +4230,14 @@ button.history-label {
   border-bottom: 3px solid #1a1406;
   transform: rotate(45deg);
 }
-.gk-bubble-rest {
+/* A speech box at its full size from its first frame: the words not typed yet hold their place, unseen (speech.tsx). */
+.speech-rest {
   visibility: hidden;
+}
+/* A box that would run off the screen takes a smaller size first (SpeechBox), then moves back into view. */
+.gk-bubble.fit1,
+.bc-bubble.fit1 {
+  font-size: 8px;
 }
 @keyframes gk-bubble-in {
   from {
@@ -10052,9 +10058,6 @@ img.qicon {
 .bc-bubble.leaving {
   opacity: 0;
 }
-.bc-bubble-rest {
-  visibility: hidden;
-}
 .place-bar .bc-bubble {
   left: calc(100% + 6px);
   top: 4px;
@@ -10161,7 +10164,7 @@ img.qicon {
   pointer-events: none;
   filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3));
 }
-.screen:has(.power-moment) .boss-char {
+.screen:has(.power-moment) .boss-char-sprite {
   visibility: hidden;
 }
 /* Boingo's funhouse: he drops onto the middle of the board (his animation), and bounces off at the end. */
@@ -10895,12 +10898,9 @@ img.qicon {
   max-width: 34%;
   z-index: 11;
 }
-/* His box at its full size from its first frame: the words not typed yet hold their place, unseen. A box that would run
-   off the screen takes a smaller size, a step at a time, down to 8 px (LightsLine): on a computer the room above the
-   board stays about 140 px while the board, and the box with it, grows. */
-.lo-line-rest {
-  visibility: hidden;
-}
+/* The round's prompt box at its full size from its first frame (SpeechBox). A box that would run off the screen takes
+   a smaller size, a step at a time, down to 8 px, then moves back into view: on a computer the room above the board
+   stays about 140 px while the board, and the box with it, grows. */
 .pm-line.lo-line.fit1 {
   font-size: min(3cqw, max(2.4cqw, 8px));
 }

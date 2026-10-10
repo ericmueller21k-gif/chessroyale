@@ -571,3 +571,28 @@ then two lines of Node showed `new Uint32Array([v])[0] !== v` for an opaque colo
 - A loop that ends only when a check says "done" (a flood fill, a search) also has a bound it can't pass: a visited
   set, each item queued once.
 - Test a tool the way it gets used: many times in a row, on its own result, not once on a fresh state.
+
+## Lines that went with their screen (Oct 10, 2026)
+
+**Eric saw** (Ginger, Boss alone): when she froze his queen, her text box appeared and disappeared almost at once.
+
+**The cause:** every speech box lived inside something shorter-lived than the line. Her text box beside her showed a
+line for 3.4 s only while the battle stayed at the same beat, and alone the boss's move shows for 0.45 s; a power's
+moment also hid her figure, with the box inside it (`visibility: hidden` on `.boss-char`). Her power lines lived in
+the dock for the moment's own length (2.3 s, mostly under its banner); lines drawn over the board lived as long as
+their moment; the God King's line was a flat 3.8 s and any critical cue replaced it at once; Lights out's verdict was
+cut when its screen ended. PR #124 had fixed one of these boxes (Hollow's prompt) on its own. No test looked at how
+long a line stayed up: the tests checked that a box appeared.
+
+**How it was found:** a probe logged every speech box's time on screen, every frame, through a Boss alone game: the
+freeze line 2.3 s in the dock, nothing in her text box, the God King's opening line 3.6 s however long it was. Then
+each box's owner was traced back to the screen or moment that removed it.
+
+**The rule:**
+- A line a character says goes into that speaker's voice (`speech.tsx`), never into a box a screen or a moment owns.
+  How long it stays comes from the one rule (its length), not from how long the screen lasts. A new line waits its
+  turn; only a critical one cuts in.
+- Test a line's whole time on screen, every frame, from before it can appear (`e2e/boss-speech.spec.ts`), at the pace
+  the mode really has (Boss alone's 0.45 s boss move is a different path from a raid's 1.8 s).
+- Nothing hides a text box to make it fit, and hiding a figure mustn't hide the words beside it: check what else sits
+  inside an element you hide.

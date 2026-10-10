@@ -9,6 +9,7 @@ import { useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingSprite, kingCommandAct } from "./GodKing.tsx";
 import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
 import { Bolt } from "./PowerUpButton.tsx";
+import { SpeechBox } from "../speech.tsx";
 
 /**
  * Boss battle: everything below the board, the same on every screen (your move,
@@ -220,7 +221,7 @@ function GodKingUnit({
     const count = power ? (power.left === Infinity ? "∞" : String(power.left)) : "";
     return (
       <div class={`gk-unit fallen${power ? " has-power" : ""}`}>
-        {line && <SpeechBubble key={line.at} text={line.text} at={line.at} until={line.until} now={now} />}
+        {line && <SpeechBox key={line.key} class="gk-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />}
         {power && (
           <button
             type="button"
@@ -246,7 +247,7 @@ function GodKingUnit({
   }
   return (
     <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${leaping ? " leaping" : ""}${act ? " acting" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}`}>
-      {menu ?? (line && !away && !leaping && <SpeechBubble key={line.at} text={line.text} at={line.at} until={line.until} now={now} />)}
+      {menu ?? (line && !away && !leaping && <SpeechBox key={line.key} class="gk-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />)}
       <button type="button" class="gk-unit-btn" disabled={!ready} onClick={onTap} aria-label={ready ? "God King: tap to summon him" : "God King"}>
         <GodKingSprite
           side={side}
@@ -258,25 +259,6 @@ function GodKingUnit({
       </button>
       <span class="gk-unit-charges" aria-label={`${charges} charges left`}>
         {charges > 0 ? "👑".repeat(charges) : "—"}
-      </span>
-    </div>
-  );
-}
-
-/**
- * A pixel speech bubble; the words type themselves out. It runs from the line's
- * own start (`at`), so a new screen mid-line picks up where the last one was:
- * no second pop-in, no retyping. It fades out over its last moments.
- */
-function SpeechBubble({ text, at, until, now }: { text: string; at: number; until: number; now: number }) {
-  const shown = Math.min(text.length, Math.floor((now - at) / 28) + 1);
-  const fresh = now - at < 200;
-  const leaving = until - now < 260;
-  return (
-    <div class={`gk-bubble${fresh ? " fresh" : ""}${leaving ? " leaving" : ""}`} role="status" aria-label={text}>
-      <span aria-hidden="true">{text.slice(0, shown)}</span>
-      <span class="gk-bubble-rest" aria-hidden="true">
-        {text.slice(shown)}
       </span>
     </div>
   );

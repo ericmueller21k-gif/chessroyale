@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
-import { bossBeat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
+import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
 import { bossKit, wipLook, type BossKit } from "../characters/kits.ts";
 import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
-import { useFrameNow } from "./Countdown.tsx";
 import { prewarmBigBoy } from "./BigBoy.tsx";
+import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, useVoice, type Priority } from "../speech.tsx";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing kitty-corner across the board from
@@ -16,6 +16,10 @@ import { prewarmBigBoy } from "./BigBoy.tsx";
  * What it does comes from the shared match state (characters/boss-beats.ts): every player sees the same animation
  * and the same line. An animation plays once per moment, from when this device first saw the moment, so a new
  * screen mid-animation carries on rather than starting again; the loops run by the clock.
+ *
+ * Its text box beside it shows the boss's voice (speech.tsx): its reactions from here, its powers' lines from the boss
+ * screen, each for its time and in turn, on every screen of the battle (and through its powers' moments, while it
+ * stands at the board's corner).
  */
 
 /** When each moment was first seen here. */
@@ -64,7 +68,8 @@ export function showing(kit: BossKit, beat: Pick<BeatResult, "anim" | "loop" | "
   return { anim: kit.ch.anims[beat.loop] ? beat.loop : "idle", frame, tag: `${beat.loop}:${cycle}:${frame}` };
 }
 
-const SPEECH_MS = 3400;
+/** How much a reaction's line matters (speech.tsx): the battle's start and end over the rest, which wait their turn. */
+const BEAT_PRIORITY: Partial<Record<Beat, Priority>> = { entrance: NORMAL, defeat: CRITICAL, victory: CRITICAL };
 
 /** Where the battle is, from the screen's phase. */
 export function bossStage(phase: Phase, boss: BossView): Stage {
@@ -141,28 +146,21 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     draw();
     return () => cancelAnimationFrame(raf);
   }, [kit, beat?.key, beat?.anim, beat?.loop, since]);
-  const speaking = !!beat?.line && Date.now() - since < SPEECH_MS;
-  const now = useFrameNow(speaking);
+  // Its line for this moment goes into its voice: it waits its turn and stays up its time, whatever the screen does
+  // next (the boss's turn ends, a power's moment begins). A move that brings a power's moment says nothing of its
+  // own: the moment's line is what the boss says that turn.
+  const quiet = stage === "bossMove" && !!boss.powers?.events.length;
+  useLayoutEffect(() => {
+    if (beat?.line && !quiet) bossVoice.say(beat.line, `${boss.id}:${boss.startMove}:${beat.key}`, BEAT_PRIORITY[beat.anim] ?? LOW);
+  }, [beat?.key]);
+  const { line, now } = useVoice(bossVoice);
   if (!kit || !beat) return null;
   const { ch } = kit;
-  const line = beat.line && now - since < SPEECH_MS ? beat.line : null;
   return (
     <div ref={box} class={`boss-char place-${place}${kit.tall ? " tall" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1] }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
-      {line && <CharBubble key={beat.key} text={line} at={since} now={now} />}
-    </div>
-  );
-}
-
-/** His words: a pixel text box beside him that types itself out and fades at the end (like the God King's). */
-function CharBubble({ text, at, now }: { text: string; at: number; now: number }) {
-  const shown = Math.min(text.length, Math.floor((now - at) / 28) + 1);
-  return (
-    <div class={`bc-bubble${now - at < 200 ? " fresh" : ""}${SPEECH_MS - (now - at) < 260 ? " leaving" : ""}`} role="status" aria-label={text}>
-      <span aria-hidden="true">{text.slice(0, shown)}</span>
-      <span class="bc-bubble-rest" aria-hidden="true">
-        {text.slice(shown)}
-      </span>
+      {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). */}
+      {line && <SpeechBox key={line.key} class="bc-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />}
     </div>
   );
 }

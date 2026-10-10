@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "preact/hooks";
 import { BLOCK, BOUNCE, SNACK, pieceAt, withPiece, withoutPiece } from "@chessroyale/chess";
 import type { BounceResult } from "@chessroyale/core";
 import { bounceShape } from "../characters/bigboy.ts";
@@ -8,6 +9,7 @@ import type { BossView } from "../game.ts";
 import { BoardEffects, BossEffect, BossMoment, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
 import { Flight, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { NORMAL, bossVoice } from "../speech.tsx";
 
 /**
  * Big Boy on the board: his snack before move 1 (he waddles over to one of the crowd's centre pawns, grabs it, eats it)
@@ -281,6 +283,12 @@ export const snackPawnShown = (since: number, now: number) => now < since + SNAC
 export function SnackTime({ boss, since, now, orientation }: { boss: BossView; since: number; now: number; orientation: Orientation }) {
   const kit = bossKit(boss.name);
   const sq = boss.powers?.snack;
+  // His line, into his voice (his text box, for its time: speech.tsx).
+  const lineAt = since + SNACK.nomAt;
+  const due = now >= lineAt;
+  useLayoutEffect(() => {
+    if (due) bossVoice.say(snackLine(boss), `${boss.id}:${boss.startMove}:snack`, NORMAL);
+  }, [due]);
   if (!kit?.ch.anims.snack || !sq) return null;
   const ch = kit.ch;
   const t = now - since;
@@ -293,19 +301,12 @@ export function SnackTime({ boss, since, now, orientation }: { boss: BossView; s
   const back = SNACK.ms - 650;
   const x = t < SNACK.walkMs ? fromX + (foot.x - fromX) * (t / SNACK.walkMs) : t < back ? foot.x : foot.x + (fromX - foot.x) * clamp01((t - back) / 650);
   const h = (SNACK_W * ch.h) / ch.w;
-  const line = snackLine(boss);
-  const lineAt = since + SNACK.nomAt;
   return (
     <div class="power-moment pm-snack">
       {t < SNACK.ms && (
         <span class="bb-snack" style={{ left: `${x - (SNACK_W * ch.foot[0]) / ch.w}%`, top: `${foot.y - (h * ch.foot[1]) / ch.h}%`, width: `${SNACK_W}%`, aspectRatio: `${ch.w} / ${ch.h}`, opacity: t > SNACK.ms - 200 ? String((SNACK.ms - t) / 200) : "1" }}>
           <BossMoment boss={boss.name} anim="snack" since={since} look={boss.crowdSide === "b" ? "blackPawn" : undefined} />
         </span>
-      )}
-      {now >= lineAt && t < SNACK.ms + 300 && (
-        <div class="pm-line" role="status" aria-label={line}>
-          {line.slice(0, Math.min(line.length, Math.floor((now - lineAt) / 28) + 1))}
-        </div>
       )}
     </div>
   );
