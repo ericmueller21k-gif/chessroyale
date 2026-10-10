@@ -25,6 +25,15 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   line then follows the speech rule every speaker shares (`speech.tsx`, `SPEECH`; Oct 10): it types out and stays
   readable for 2.5 s plus 50 ms a character (at most 7 s); a critical line cuts in on a remark or small talk, but
   waits for another critical line to have its time; the others wait their turn and lapse after 5 s.
+- **Why his Last Stand can seem to come one game and not the next** (Eric, Oct 10; working as designed). He judges
+  the crowd's move as it's played, before the boss replies, by how much it lowers the crowd's chances (the judge's
+  expected score, the eval bar's number), not by pawns. He dives in when one move throws away at least the bar (35
+  points of chances on the first move with charges, easing to 18 by move 22), and only while the crowd's best move
+  still keeps 40% or more; below that the game counts as already lost. A slow slide (several bad moves, each under the
+  bar) takes the chances under 40% without ever calling him, and from there nothing does. And from 19% a hung queen
+  can cost at most 19 points, since chances can't fall below 0. A hung queen from an even position costs 50 to 70
+  points: he saves that. Charges only raise the bar by 5; solo and online are the same; it never waits for the boss to
+  take the piece. `scripts/repro-last-stand.ts` replays both in Solo.
 - **Looks.** Pixel art in the boss characters' format, in white and black versions (a recolour of the armour only,
   in the crowd's colour). SNES/Fire Emblem style: pixel portraits, slanted cut-in banners, retro sounds, a Press
   Start 2P speech bubble. Drama yes, gore no (cracks, sparks and a few stylised red drops are the limit).
@@ -61,6 +70,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - Frames in the game: `npm run frames:god-king -- <dir> [w|b] [phone|desktop|both] [summon|laststand|all] [light|dark]`.
 - Sheets and GIFs: `npm run preview:characters -- <dir> only=god-king`, `node scripts/preview-god-king.mjs out.png banner=1`.
 - Sims: `packages/sim/scripts/last-stand-sim.ts`, `last-stand-blunders.ts` (`reports/last-stand.md`).
+- Replays in the real Solo app, the runner's own numbers logged move by move: `npx tsx scripts/repro-last-stand.ts
+  [phone|desktop] [boss]` (a slow slide then a hung queen: no Last Stand; a queen hung on move 1: Last Stand).
 - e2e for his lines' time: `e2e/boss-speech.spec.ts` (his opening line held for its full time). Unit:
   `packages/app/test/speech.test.ts`.
 
