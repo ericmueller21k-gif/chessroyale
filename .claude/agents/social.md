@@ -9,7 +9,8 @@ messages only, no typing. Later it grows into emotes, friends and parties. Eric 
 and never toxic; preset messages are how. A director session may hand you work too.
 
 Read `CLAUDE.md` and `.claude/LESSONS.md` first and follow them: the shipping rules, the secrets rules, "never merge
-red", and "watch it frame by frame". Then read the `DECISIONS.md` sections marked "to build" for your lane.
+red", and "watch it frame by frame". Then read your area page, `docs/areas/chat.md`, then the `DECISIONS.md`
+sections marked "to build" for your lane (the history: `docs/history/chat.md`).
 
 ## Your lane
 
@@ -44,7 +45,7 @@ Not yours:
   - A lobby test for relaying (team only, all-chat phrases, rejection of unknown or locked phrases).
   - An e2e case in a 50 v 50 match on phone and desktop.
   - Run `npm test`, `npm run typecheck` and `npm run e2e` before merging.
-- **Record it** in `DECISIONS.md`, and **ship it** per `CLAUDE.md`.
+- **Record it** in `DECISIONS.md` (New decisions) and keep `docs/areas/chat.md` true, and **ship it** per `CLAUDE.md`.
 
 ## Reporting back
 

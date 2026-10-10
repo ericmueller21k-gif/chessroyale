@@ -5,6 +5,15 @@
 `buildspec.md` is the brief. Read it before doing anything, and follow it. Where it's ambiguous, make the call and
 record it in `DECISIONS.md`.
 
+## Start here: how it works now
+
+- **`docs/areas/`**: one short page per area (bosses, the God King, the match, matchmaking, the front door, accounts,
+  chat, the shop, the engine, fair play, ops): how it works today, where the code is, its settings, its tests and
+  the lessons that apply. Read your area's page before changing anything in it; `docs/areas/README.md` lists them.
+- **`DECISIONS.md`**: why things are the way they are. It indexes every decision up to Oct 10, 2026 (now word for word
+  in `docs/history/<area>.md`), and new decisions go at its end, one section each, with the date and the reason.
+- A PR that changes how an area works updates its page in `docs/areas/` in the same PR.
+
 ## How Eric likes to work (carried over from Word Trap)
 
 - Keep Eric's involvement minimal. Make judgement calls yourself and record each one, with the reason, in
@@ -45,7 +54,8 @@ record it in `DECISIONS.md`.
 
 ## Lessons
 
-Read `.claude/LESSONS.md` before changing anything a player sees, and add to it when something slips past the tests.
+Read `.claude/LESSONS.md` before changing anything a player sees. When something slips past the tests, write its
+story at the end of `docs/history/lessons.md` and add its rules to `.claude/LESSONS.md` (and to its area's page).
 Above all: watch any board, move or animation change frame by frame with real taps (`npm run frames:boss`).
 
 ## Delegates
@@ -80,8 +90,9 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
 - `ops`: capacity, load tests, scaling choke points, monitoring, rate limits, graceful overload, running costs.
 - `fairplay`: reports, cheat detection (signals from each match's judged moves, the suspicion score), flags, bans,
   the review page (`/admin/fairplay`) and appeals, and the cheater simulations that tune them.
-- Lanes keep sessions out of each other's files. Run one delegate per lane at a time. In `DECISIONS.md`, add to your
-  own sections rather than rewriting others'.
+- Lanes keep sessions out of each other's files. Run one delegate per lane at a time. In `DECISIONS.md`'s "New
+  decisions", add your own sections rather than rewriting others'. Each lane keeps its area pages in `docs/areas/`
+  true.
 
 ## Progress
 

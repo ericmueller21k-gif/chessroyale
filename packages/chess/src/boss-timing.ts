@@ -1,5 +1,9 @@
-import { BOSS_POWERS } from "@chessroyale/core";
 import { fenAtPly, pieceAt, type Base } from "./rules.ts";
+import { GINGER_FX } from "./bosses/ginger.ts";
+import { BOINGO_FX } from "./bosses/boingo.ts";
+import { FIRE_BURN_MS, GREX_FX } from "./bosses/grex.ts";
+import { CLAIM_MS, HOLLOW_FX, HOLLOW_FX_EXTRA } from "./bosses/hollow.ts";
+import { BIGBOY_FX, SNACK_MS } from "./bosses/bigboy.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -10,17 +14,6 @@ import { fenAtPly, pieceAt, type Base } from "./rules.ts";
  * move at a time, then a fighting-game "START!" banner.
  */
 export const BOSS_INTRO = { cardMs: 2600, replayMs: 2400, minStepMs: 110, maxStepMs: 260, bannerGapMs: 250, bannerMs: 1500 } as const;
-
-/** Hollow claiming the dark side in the intro (when the crowd would have been Black): his `claimDark` and his line. */
-export const CLAIM_MS = 2400;
-
-/**
- * Big Boy's snack in the intro (before move 1): he waddles over to the crowd's centre pawn, grabs it and eats it
- * ("Nom nom."), beat by beat in ms from its start (the app's SnackTime): he's at the pawn at `grabAt` (it leaves the
- * board), eats it at `nomAt`, and is back in his corner by the end.
- */
-export const SNACK = { walkMs: 1100, grabAt: 1100, nomAt: 1500, ms: 3000 } as const;
-export const SNACK_MS = SNACK.ms;
 
 /**
  * When each part of the intro happens (ms after it starts), for a game `plies` half-moves in. `claimed`: Hollow claims
@@ -51,92 +44,17 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * he speaks and plays the crowd's move; the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-/**
- * Big Boy's Big Bounce, beat by beat (ms into its moment, at the start of his turn; nobody's clock runs):
- *   0         "BIG BOUNCE!" (his banner).
- *   leapAt    he leaps from his corner; a shadow grows on the first of his three spots (each a 2x2 block of squares).
- *   lands     he lands on each spot in turn, squashing, then stretches up again: the pieces there are knocked up and
- *             tumble in the air.
- *   jumpAt    the last spring, high up and out of sight, his shadow growing over the four centre squares.
- *   crashAt   the giant fall on the centre: a crash, a shockwave across the board, dust, the board jolts (`jolt` ms).
- *   settleAt  every piece comes down into the new position, settled by `settledAt`.
- *   backAt    he bounces back to his corner (gone from the board by `total`); then he plays his move.
- */
-export const BOUNCE = {
-  leapAt: 1300,
-  lands: [1850, 2450, 3050] as readonly number[],
-  jumpAt: 3050,
-  crashAt: 4100,
-  jolt: 320,
-  settleAt: 4500,
-  settledAt: 5200,
-  backAt: 5350,
-  total: 6200,
-} as const;
-
-/** Big Boy's toy block: the banner, then his toss from the board's corner, the block's flight, and it lands. */
-export const BLOCK = { flyAt: 1450, landAt: 1850 } as const;
-
-// Hollow's extra move (a failed Lights out): his banner over the board as the move lands, then the crowd's turn.
-export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2700, extra: 2200, block: 2300, bounce: BOUNCE.total } as const;
-
-/** Hollow's first cover of the dark holds longer, for his first-cover line ("Don't forget what's there…"). */
-export const DARK_FIRST_EXTRA_MS = 1300;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX } as const;
 
 /** How long one power's moment holds the screen (ms). */
-export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (e.kind === "dark" && e.first ? DARK_FIRST_EXTRA_MS : 0);
+export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);
 
-/**
- * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
- * boss's turn begins. The boss's move waits for it (at least this long after the crowd's move), solo and online.
- */
-export const FIRE_BURN_MS = 1500;
+/** A moment that can hold longer (Hollow's first cover of the dark): the extra ms, by its kind. */
+const POWER_FX_EXTRA: Partial<Record<keyof typeof POWER_FX, (e: { first?: boolean }) => number>> = { ...HOLLOW_FX_EXTRA };
 
 /** How long a turn's power moments take, one after another. */
 export function powerMomentMs(events: readonly { kind: keyof typeof POWER_FX; first?: boolean }[] | null | undefined): number {
   return (events ?? []).reduce((t, e) => t + powerFxMs(e), 0);
-}
-
-/**
- * Hollow's Lights out, beat by beat (ms from its start), the same for the server and every screen. Nobody's clock runs.
- *   0          "LIGHTS OUT!" (his banner) and his line, "It's time."
- *   dropAt     he drops onto the board's top edge (his `lightsOut`) and smashes his strand in three strikes: the board
- *              dims a step at each, night at the last.
- *   rounds     each round: his prompt ("Find my queen."), its seconds to tap (BOSS_POWERS.lightsOutRounds) and the
- *              usual late grace; then the answers show (`answerMs`) and the night closes over them again.
- *   backAt     the lights come back (his `lightsBack`: a fresh strand from the void, the dawn spreading from his spot),
- *              he returns to his corner (`backMs`), and his turn goes on: he plays his move.
- */
-export const LIGHTS_OUT = { dropAt: 1300, dropMs: 2900, gapMs: 300, answerMs: 1800, backMs: 2300 } as const;
-
-/**
- * Lights out's beats for its rounds' seconds (`ms` each) and the late grace on each round. A round is over when every
- * player is done (lightsRoundEnd: each tap gives its player a second more); once it is, `endedAt` (ms from the test's
- * start) says when, and the next round follows its answers. Until then its end is the earliest it can be: its seconds
- * and the grace (`over` false).
- */
-export function lightsOutTimeline(rounds: readonly { ms: number; endedAt?: number }[], graceMs: number) {
-  let t = LIGHTS_OUT.dropAt + LIGHTS_OUT.dropMs + LIGHTS_OUT.gapMs;
-  const out = rounds.map((r) => {
-    const round = { at: t, until: t + r.ms, answersAt: r.endedAt ?? t + r.ms + graceMs, over: r.endedAt !== undefined };
-    t = round.answersAt + LIGHTS_OUT.answerMs;
-    return round;
-  });
-  return { rounds: out, backAt: t, total: t + LIGHTS_OUT.backMs };
-}
-
-/** A player's own deadline in a round (ms from the test's start, before the late grace): its seconds, and a second more for each tap they've made. */
-export const lightsDeadline = (round: { until: number }, taps: number, tapMs: number = BOSS_POWERS.lightsOutTapMs): number => round.until + taps * tapMs;
-
-/**
- * When a Lights out round is over (ms from the test's start): when every player is done, each once they've used all
- * their tries (`pieces`: at their last one) or their own time is up (lightsDeadline, and the late grace). `taps`: each
- * player's tap times in the round (ms from the test's start), in order. Nobody tapping: its seconds and the grace.
- */
-export function lightsRoundEnd(round: { until: number }, pieces: number, taps: readonly (readonly number[])[], graceMs: number, tapMs: number = BOSS_POWERS.lightsOutTapMs): number {
-  const base = round.until + graceMs;
-  if (!taps.length) return base;
-  return Math.max(...taps.map((t) => (t.length >= pieces ? t[pieces - 1]! : base + t.length * tapMs)));
 }
 
 /**

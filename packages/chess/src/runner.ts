@@ -54,17 +54,15 @@ import {
   moveClockAt,
 } from "@chessroyale/core";
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
-import { BOSS_OPENING, boardEnd, boardStatus, burnOnBoard, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
+import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { applyMove, legalMoves, moveNumber, pieceAt, sideToMove, toSan, withoutPiece } from "./rules.ts";
+import { applyMove, legalMoves, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import {
   allowedSearch,
   bossAllowed,
   boardFlipped,
   crowdAllowed,
-  funhouseDue,
-  funhousePlayed,
   icedSquares,
   initPowers,
   judgeCandidates,
@@ -73,37 +71,21 @@ import {
   rageOf,
   bossPowers,
   ablaze,
-  fireAfterMove,
-  fireEscapes,
-  fireJudged,
-  fireRanked,
+  bossRules,
   fireShadows,
   fireStage,
+  judgeEvaluation,
+  judgeMustScore,
+  judgeRanked,
   triggerUltimate,
-  bulbsAt,
-  botLightsFound,
-  botLightsMisses,
-  chooseLightsOut,
-  extraMoveCandidates,
-  lightsHeld,
-  lightsTally,
-  passTurn,
-  pickExtraMove,
   type LightsTally,
-  darkAttempt,
   darkSquares,
-  lightsOutDue,
-  touchesDark,
-  blockSquare,
-  bounceCandidates,
-  bounceDue,
-  bounceResult,
-  pawnsLost,
-  pickBounce,
-  snackSquare,
-  startsWithSnack,
-  type BounceCandidate,
-  type BounceScore,
+  bigboyBattle,
+  boingoBattle,
+  hollowBattle,
+  moveLoss,
+  type Battle,
+  type BossLastMove,
 } from "./boss-powers.ts";
 import type { BounceResult, LightsOutTest } from "@chessroyale/core";
 
@@ -374,22 +356,21 @@ export class MatchRunner {
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
     let crowdSide = sideToMove(board.fen);
-    // Hollow, the dark boss: always Black, from the starting position (no opening moves). If the usual pick made the
-    // crowd Black, he claims the dark side before move 1.
-    const claimed = startsDark(def) && crowdSide === "b";
-    if (startsDark(def)) {
-      this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
-      crowdSide = "w";
-    }
-    // Big Boy: the starting position too (sides as usual), less the crowd's centre pawn he eats before move 1.
-    const snack = startsWithSnack(def) ? this.snackBoard(id, seed, crowdSide, board.generation) : null;
+    // A boss whose battle starts from the starting position (no opening moves), and one who always plays Black (Hollow):
+    // if the usual pick made the crowd Black, he claims the dark side before move 1.
+    const opening = bossRules(def)?.opening;
+    const claimed = !!opening?.crowdWhite && crowdSide === "b";
+    if (opening?.fromStart) this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
+    if (opening?.crowdWhite) crowdSide = "w";
+    // Anything else the boss does to the board before move 1 (Big Boy eats one of the crowd's centre pawns).
+    const setUp = opening?.setUp?.(this.battle, { boardId: id, seed, crowdSide, generation: board.generation }) ?? null;
     const fen = this.boards.get(id)!.fen;
     this.state = {
       ...this.state,
       players: this.state.players.map((p) => ({ ...p, colour: null, powerUps: 0 })),
       boss: {
         id: def.id,
-        powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(snack ? { snack: { square: snack } } : {}) },
+        powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(setUp ?? {}) },
         tier: this.settings.bossFixedElo || raidBossElo([]),
         elo: bossStrength(this.settings.bossFixedElo || raidBossElo([]), def, this.settings.bossDifficulty),
         crowdSide,
@@ -404,18 +385,6 @@ export class MatchRunner {
       },
     };
     this.preparePowers();
-  }
-
-  /**
-   * Big Boy's snack: the board from the starting position less the crowd's d- or e-pawn (from the seed), a base at
-   * ply 0 (the position changed outside a move: every replay plays from it). Returns the pawn's square.
-   */
-  private snackBoard(id: number, seed: number, crowdSide: Side, generation: number): string {
-    const square = snackSquare(seed, crowdSide);
-    const board = newBoard(id, BOSS_OPENING, 0, generation);
-    const fen = withoutPiece(board.fen, square);
-    this.boards.set(id, { ...board, fen, bases: [{ ply: 0, fen }] });
-    return square;
   }
 
   /** Boss battle: the powers for the crowd turn about to begin (once per turn; see prepareTurn). */
@@ -433,36 +402,14 @@ export class MatchRunner {
     return darkSquares(this.state.boss);
   }
 
-  /**
-   * Hollow's dark: a move attempt that touches a dark square, sent unchecked. A legal (allowed) move is the player's
-   * pick (`move`: a pawn's move to the last rank without a piece named is a queen's). An illegal one costs darkTryCost
-   * off the turn's score (resolveBoard takes it off), and the player picks again; the darkTries-th wrong one ends their
-   * turn as a missed move (`out`). Anything else (no dark on its way, the move the God King took back): refused, free.
-   * Bots never try: they know the board.
-   */
+  /** Hollow's dark: a move attempt that touches a dark square, sent unchecked (see hollowBattle.darkTry). */
   darkTry(playerId: string, move: string): { kind: "move"; move: string } | { kind: "wrong"; tries: number; out: boolean } | { kind: "refused" } {
-    const b = this.state.boss;
-    const p = b?.powers;
-    const board = this.boardOf(playerId);
-    if (!b || !p || !board || typeof move !== "string" || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) return { kind: "refused" };
-    const dark = darkSquares(b);
-    const legal = darkAttempt(board.fen, move);
-    if (legal) {
-      const allowed = this.crowdAllowed(board.id);
-      return allowed && !allowed.includes(legal) ? { kind: "refused" } : { kind: "move", move: legal };
-    }
-    if (!touchesDark(move, dark, board.fen)) return { kind: "refused" };
-    const round = this.state.round;
-    const by = p.tries?.round === round ? { ...p.tries.by } : {};
-    by[playerId] = (by[playerId] ?? 0) + 1;
-    this.state = { ...this.state, boss: { ...b, powers: { ...p, tries: { round, by } } } };
-    return { kind: "wrong", tries: by[playerId]!, out: by[playerId]! >= BOSS_POWERS.darkTries };
+    return hollowBattle.darkTry(this.battle, playerId, move);
   }
 
   /** Hollow's dark: each player's wrong attempts into the dark this round. */
   darkTries(): Record<string, number> {
-    const t = this.state.boss?.powers?.tries;
-    return t && t.round === this.state.round ? t.by : {};
+    return hollowBattle.darkTries(this.battle);
   }
 
   /** Boss battle, G-REX's fire: the tiles ablaze this crowd turn (a crowd piece left on one burns after the move). */
@@ -624,13 +571,14 @@ export class MatchRunner {
     const id = this.state.boards[0];
     const crowdTurn = !!this.state.boss && id !== undefined && this.boards.get(id)?.fen === fen;
     const allowed = crowdTurn ? (this.crowdAllowed(id) ?? undefined) : undefined;
-    // (G-REX's fire: a piece left on a tile ablaze counts as gone, and the moves that save it are always looked at.)
-    const burn = crowdTurn ? ablaze(this.state.boss) : [];
-    const escapes = burn.length ? fireEscapes(fen, burn).filter((m) => !all.some((x) => x.move === m) && (!allowed || allowed.includes(m))) : [];
+    // (The boss's rules for the judge, e.g. G-REX's fire: a piece left on a tile ablaze counts as gone, and the moves
+    // that save it are always looked at.)
+    const boss = crowdTurn ? this.state.boss : null;
+    const escapes = judgeMustScore(boss, fen).filter((m) => !all.some((x) => x.move === m) && (!allowed || allowed.includes(m)));
     const withEscapes = escapes.length ? [...all, ...(await engine.scoreMoves(fen, escapes))] : all;
-    if (!allowed) return fireRanked(withEscapes, fen, burn, this.state.boss?.crowdSide ?? "w").slice(0, Math.max(all.length, 1));
+    if (!allowed) return judgeRanked(boss, withEscapes, fen).slice(0, Math.max(all.length, 1));
     const top = judgeCandidates({ allowed }, withEscapes, (await allowedSearch(engine, { fen, allowed }, withEscapes)) ?? []);
-    return fireRanked(top.length ? top : all, fen, burn, this.state.boss?.crowdSide ?? "w");
+    return judgeRanked(boss, top.length ? top : all, fen);
   }
 
   boardOf(playerId: string): BoardState | null {
@@ -718,8 +666,8 @@ export class MatchRunner {
     // Boss battle: only the moves allowed this turn (a power's limits; the move the God King took back is off the table).
     const allowed = this.crowdAllowed(boardId);
     const legal = allowed ?? legalMoves(board.fen);
-    // (G-REX's fire: the bots see a piece left on a tile ablaze as gone, as the judge does.)
-    const open = fireRanked(allowed ? judgeCandidates({ allowed }, top) : [...top], board.fen, this.state.boss ? ablaze(this.state.boss) : [], this.state.boss?.crowdSide ?? "w");
+    // (The boss's rules for the judge, e.g. G-REX's fire: the bots see a piece left on a tile ablaze as gone.)
+    const open = judgeRanked(this.state.boss, allowed ? judgeCandidates({ allowed }, top) : [...top], board.fen);
     const best = open[0]?.expected ?? top[0]!.expected;
     const candidates = open.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
     const out: Record<string, string> = {};
@@ -761,8 +709,8 @@ export class MatchRunner {
     for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
     const known = new Map(top.map((m) => [m.move, m.expected]));
     for (const m of open ?? []) known.set(m.move, m.expected);
-    // (G-REX's fire: every move that takes a piece off a tile ablaze is scored too, so saving it is always on the table.)
-    const escapes = this.state.boss ? fireEscapes(board.fen, ablaze(this.state.boss)).filter((m) => !allowed || allowed.includes(m)) : [];
+    // (The boss's rules for the judge, e.g. G-REX's fire: every move that takes a piece off a tile ablaze is scored too.)
+    const escapes = judgeMustScore(this.state.boss, board.fen).filter((m) => !allowed || allowed.includes(m));
     const missing = [...new Set([...Object.values(picks), ...escapes].flatMap((m) => (m && !known.has(m) ? [m] : [])))];
     const extra = [...(open ?? []), ...(missing.length ? await engine.scoreMoves(board.fen, missing) : [])];
     for (const m of extra) known.set(m.move, m.expected);
@@ -792,8 +740,9 @@ export class MatchRunner {
     const board = this.boards.get(boardId)!;
     const limited = this.withoutBarred(rawPicks, rawEvaluation, boardId);
     const picks = limited.picks;
-    // G-REX's fire: the judge treats a piece left on a tile ablaze as already gone (every path's numbers come in raw).
-    const evaluation = this.state.boss ? fireJudged(limited.evaluation, board.fen, ablaze(this.state.boss), this.state.boss.crowdSide) : limited.evaluation;
+    // The boss's rules for the judge, e.g. G-REX's fire: a piece left on a tile ablaze counts as already gone (every
+    // path's numbers come in raw).
+    const evaluation = judgeEvaluation(this.state.boss, limited.evaluation, board.fen);
     // Boss battle: humans who called the King instead of picking abstain: no score, not a miss.
     const abstained = new Set(this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && this.kingCallers.has(id)) : []);
     const result = scoreGroup(
@@ -812,12 +761,8 @@ export class MatchRunner {
       .map(([move, expected]) => ({ move, expected, loss: Math.max(0, (best - expected) * 100) }))
       .sort((a, b) => b.expected - a.expected);
     for (const id of abstained) result.players.push({ playerId: id, move: null, loss: null, roundScore: 0, abstained: true });
-    // Hollow's dark: each wrong attempt into the dark costs darkTryCost; a turn never costs more than missing it.
-    const tries = this.darkTries();
-    for (const pl of result.players) {
-      const n = tries[pl.playerId] ?? 0;
-      if (n > 0) pl.roundScore = Math.max(this.settings.missedMoveScore, pl.roundScore - n * BOSS_POWERS.darkTryCost);
-    }
+    // The boss's own costs on the round (Hollow's wrong attempts into the dark).
+    if (this.state.boss) bossRules(this.state.boss)?.scoreRound?.(this.battle, result.players);
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
@@ -984,10 +929,11 @@ export class MatchRunner {
       const board = this.boards.get(r.boardId)!;
       const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
       this.boards.set(r.boardId, playOnBoard(board, r.result.playedMove, moverExpected));
-      // Boss battle: the judged eval feeds the ultimate's meter, and G-REX's fire burns what was left on its tiles.
+      // Boss battle: the judged eval feeds the ultimate's meter, and the boss's own after-move effect (G-REX's fire
+      // burns what was left on its tiles).
       if (this.state.boss?.powers) {
         this.state = { ...this.state, boss: { ...this.state.boss, powers: { ...this.state.boss.powers, judged: moverExpected } } };
-        this.burnAfterCrowdMove(r.result.playedMove);
+        this.afterCrowdMove(r.result.playedMove);
       }
     }
     return { stage: this.state.stage, round: this.state.round - 1, boards: [...results], retired: this.retiredThisRound };
@@ -1101,44 +1047,23 @@ export class MatchRunner {
 
   /** Boss battle: the boss plays the crowd's move this turn (its funhouse), before the crowd picks. */
   funhouseDue(): boolean {
-    return funhouseDue(this.state.boss) && !this.finalGameOver() && !this.bossToMove();
+    return boingoBattle.funhouseDue(this.battle);
   }
 
   /** The funhouse: the boss picks the crowd's move (a weak but recoverable one) and plays it. */
   async playFunhouse(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
-    const fen = this.boards.get(this.state.boards[0]!)!.fen;
-    const move = await funhouseMoveFrom(engine, fen, this.crowdAllowed());
-    return this.applyFunhouse(move);
+    return boingoBattle.playFunhouse(this.battle, engine);
   }
 
-  /**
-   * Plays the funhouse's move for the crowd (from the host's engine online; an illegal or disallowed one is replaced
-   * by the first allowed move). It's the crowd's move on the board, but nobody picked it: it isn't scored, and the
-   * boss's strike doesn't count it. The board then shows flipped for the crowd's next turns.
-   */
+  /** Plays the funhouse's move for the crowd (from the host's engine online; see boingoBattle.applyFunhouse). */
   applyFunhouse(move: string): string {
-    const b = this.state.boss!;
-    const id = this.state.boards[0]!;
-    const board = this.boards.get(id)!;
-    const legal = this.crowdAllowed(id) ?? legalMoves(board.fen);
-    const m = legal.includes(move) ? move : legal[0]!;
-    const san = toSan(board.fen, m);
-    this.boards.set(id, playOnBoard(board, m, board.expected));
-    this.state = { ...this.state, boss: funhousePlayed(b, m, san) };
-    this.burnAfterCrowdMove(m);
-    return m;
+    return boingoBattle.applyFunhouse(this.battle, move);
   }
 
-  /** G-REX's fire, after the crowd's move: what was left on a tile ablaze burns (the board's position changes). */
-  private burnAfterCrowdMove(move: string | null) {
+  /** After the crowd's move: the boss's own effect, if it has one (G-REX's fire: what was left on a tile ablaze burns). */
+  private afterCrowdMove(move: string | null) {
     const b = this.state.boss;
-    if (!b?.powers?.fire?.length) return;
-    const id = this.state.boards[0]!;
-    let board = this.boards.get(id)!;
-    const out = fireAfterMove(b, board.fen, move);
-    for (const sq of out.emptied) board = burnOnBoard(board, sq);
-    this.boards.set(id, board);
-    this.state = { ...this.state, boss: out.boss };
+    if (b) bossRules(b)?.afterCrowdMove?.(this.battle, move);
   }
 
   /**
@@ -1154,166 +1079,95 @@ export class MatchRunner {
 
   /** Hollow's Lights out is due: the start of his turn (the crowd has moved), from the full meter or the test trigger. */
   lightsOutDue(): boolean {
-    return lightsOutDue(this.state.boss) && this.bossToMove();
+    return hollowBattle.lightsOutDue(this.battle);
   }
 
-  /**
-   * Lights out begins (the clocks stopped: nobody is picking): its rounds, picked from the battle's seed and the
-   * position. Once a match: the ultimate is spent from here.
-   */
+  /** Lights out begins (the clocks stopped): its rounds (see hollowBattle.startLightsOut). */
   startLightsOut(): LightsOutTest {
-    const b = this.state.boss!;
-    const { ultNext: _trigger, ...p } = b.powers!;
-    const fen = this.boards.get(this.state.boards[0]!)!.fen;
-    const test: LightsOutTest = { at: b.crowdMoves, rounds: chooseLightsOut(fen, b.crowdSide === "w" ? "b" : "w", p.seed) };
-    this.state = { ...this.state, boss: { ...b, powers: { ...p, ultAt: p.ultAt ?? b.crowdMoves, lightsOut: test } } };
-    return test;
+    return hollowBattle.startLightsOut(this.battle);
   }
 
-  /**
-   * Lights out is over: every player still in loses lightsOutMiss for each piece they didn't find (people's from their
-   * taps, `missed`; a person with no entry found nothing; bots' from the seed). It isn't a move: nothing else changes,
-   * and fair play never sees it. Returns what each missed.
-   */
+  /** Lights out is over: each player's misses cost them (see hollowBattle.finishLightsOut). Returns what each missed. */
   finishLightsOut(missed: Readonly<Record<string, number>>): Record<string, number> {
-    const b = this.state.boss!;
-    const p = b.powers!;
-    const test = p.lightsOut;
-    if (!test || test.missed) return test?.missed ?? {};
-    const all = test.rounds.reduce((n, r) => n + r.pieces.length, 0);
-    const out: Record<string, number> = {};
-    const alive = this.alive();
-    for (const pl of alive) out[pl.id] = pl.isBot ? botLightsMisses(p.seed, pl.id, test.rounds) : Math.max(0, Math.min(all, missed[pl.id] ?? all));
-    const cost = BOSS_POWERS.lightsOutMiss;
-    // The crowd's find rate over the whole test (Eric, Oct 10): under lightsOutHold, he moves twice before its turn.
-    const asked = all * alive.length;
-    const found = asked - alive.reduce((n, pl) => n + out[pl.id]!, 0);
-    const held = lightsHeld({ found, asked });
-    this.state = {
-      ...this.state,
-      players: this.state.players.map((pl) => (out[pl.id] ? { ...pl, stageScore: pl.stageScore - out[pl.id]! * cost } : pl)),
-      boss: { ...b, powers: { ...p, lightsOut: { ...test, missed: out, found, asked, ...(held ? {} : { extra: "due" as const }) } } },
-    };
-    return out;
+    return hollowBattle.finishLightsOut(this.battle, missed);
   }
 
-  /**
-   * Lights out's crowd count so far (the screens' meter, and the verdict as its last round ends): each person's taps
-   * judged (`people`, by id: judgeTaps round by round; nobody's entry, nothing found), each bot's finds from the seed
-   * as each round ends. `ended`: the rounds over. The same people and bots as finishLightsOut counts.
-   */
+  /** Lights out's crowd count so far (see hollowBattle.lightsTally). */
   lightsTally(people: Readonly<Record<string, readonly { found: readonly unknown[]; used?: number }[]>>, ended: number): LightsTally {
-    const p = this.state.boss!.powers!;
-    const rounds = p.lightsOut?.rounds ?? [];
-    const alive = this.alive();
-    return lightsTally(
-      rounds,
-      ended,
-      alive.filter((pl) => !pl.isBot).map((pl) => people[pl.id] ?? []),
-      alive.filter((pl) => pl.isBot).map((pl) => botLightsFound(p.seed, pl.id, rounds)),
-    );
+    return hollowBattle.lightsTally(this.battle, people, ended);
   }
 
-  /**
-   * Hollow's extra move is due: the crowd failed Lights out (under lightsOutHold), and he has played his own move (the
-   * crowd's turn has begun, not yet dealt). Like the funhouse, it comes before the crowd picks.
-   */
+  /** Hollow's extra move is due: the crowd failed Lights out, and he has played his own move. */
   extraMoveDue(): boolean {
-    const b = this.state.boss;
-    const t = b?.powers?.lightsOut;
-    // (Only before the crowd's next move: once it has moved, a driver that skipped it has let it lapse.)
-    return t?.extra === "due" && t.at === b!.crowdMoves && !b!.result && !this.finalGameOver() && !this.bossToMove();
+    return hollowBattle.extraMoveDue(this.battle);
   }
 
   /** His extra move: a quiet one that gains him only a little (extraMoveFrom), from this device's engine. */
   async playExtraMove(engine: EngineLike = this.opts.engines[0]!): Promise<string | null> {
-    return this.applyExtraMove(await extraMoveFrom(engine, this.boards.get(this.state.boards[0]!)!.fen));
+    return hollowBattle.playExtraMove(this.battle, engine);
   }
 
-  /**
-   * Plays his extra move (from the host's engine online): the crowd's turn passes (a base on the board: the position
-   * changes between moves), then his quiet move. A move that isn't one of the candidates (extraMoveCandidates), or
-   * none, and he skips it. It isn't the crowd's: nothing is scored and fair play never sees it; the crowd's turn (its
-   * powers already set as his own move landed) follows as usual. Returns the move played, or null.
-   */
+  /** Plays his extra move (from the host's engine online; see hollowBattle.applyExtraMove). Returns it, or null. */
   applyExtraMove(move: string | null): string | null {
-    const b = this.state.boss!;
-    const p = b.powers!;
-    const test = p.lightsOut;
-    if (!test || test.extra !== "due" || test.at !== b.crowdMoves) return null;
-    const id = this.state.boards[0]!;
-    const board = this.boards.get(id)!;
-    const passed = passTurn(board.fen);
-    if (!move || !passed || !extraMoveCandidates(passed).includes(move)) {
-      this.state = { ...this.state, boss: { ...b, powers: { ...p, lightsOut: { ...test, extra: "skipped" } } } };
-      return null;
-    }
-    const ply = board.history.length;
-    const base: BoardState = { ...board, fen: passed, expected: 1 - board.expected, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: passed }] };
-    this.boards.set(id, playOnBoard(base, move, base.expected));
-    this.bossLast = { move, san: toSan(passed, move) };
-    this.state = {
-      ...this.state,
-      boss: { ...b, powers: { ...p, lightsOut: { ...test, extra: "played" }, events: [...p.events, { kind: "extra", turn: p.turn, square: move.slice(2, 4) }] } },
-    };
-    return move;
+    return hollowBattle.applyExtraMove(this.battle, move);
   }
 
   /** Big Boy's Big Bounce is due: the start of his turn (the crowd has moved), from the warning or the test trigger. */
   bounceDue(): boolean {
-    return bounceDue(this.state.boss) && this.bossToMove() && !this.finalGameOver();
+    return bigboyBattle.bounceDue(this.battle);
   }
 
-  /**
-   * The Big Bounce's candidate positions (him to move), from the seed and the position now: the same list on the
-   * server, the host and in solo (bounceCandidates).
-   */
+  /** The Big Bounce's candidate positions (him to move): the same list on the server, the host and in solo. */
   bounceCandidates(): string[] {
-    return this.bounceList().map((c) => c.fen);
+    return bigboyBattle.bounceCandidates(this.battle);
   }
-  /** (Worked out once per position: the pick is checked against the same list.) */
-  private bounceList(): BounceCandidate[] {
-    const b = this.state.boss!;
-    const fen = this.boards.get(this.state.boards[0]!)!.fen;
-    const key = `${fen}|${b.crowdMoves}|${b.powers!.seed}|${blockSquare(b)}`;
-    if (this.bounceMemo?.key !== key) this.bounceMemo = { key, list: bounceCandidates(fen, b.crowdSide, b.powers!.seed, b.crowdMoves, blockSquare(b)) };
-    return this.bounceMemo.list;
-  }
-  private bounceMemo: { key: string; list: BounceCandidate[] } | null = null;
 
   /** The Big Bounce, from this device's engines (bounceFrom: the candidates scored, the pick within the loss band). */
   async playBounce(engines: readonly EngineLike[] = this.opts.engines): Promise<BounceResult> {
-    const fen = this.boards.get(this.state.boards[0]!)!.fen;
-    const pick = await bounceFrom(engines, fen, this.bounceCandidates());
-    return this.applyBounce(pick?.fen ?? null, pick?.loss ?? null);
+    return bigboyBattle.playBounce(this.battle, engines);
   }
 
-  /**
-   * The Big Bounce lands (from the host's engine online): the crowd's pieces where the picked candidate has them (a base
-   * on the board: the position changes between moves), or, with no pick (none within the cap, no engine anywhere, or
-   * anything that isn't one of the candidates), nothing moves; the bounces play either way. It isn't a move: nothing is
-   * scored, fair play never sees it, and he plays his move after it. Once a match: the meter is spent.
-   */
+  /** The Big Bounce lands (from the host's engine online; see bigboyBattle.applyBounce). */
   applyBounce(pick: string | null, loss: number | null = null): BounceResult {
-    const b = this.state.boss!;
-    const { ultNext: _trigger, ...p } = b.powers!;
-    const id = this.state.boards[0]!;
-    const board = this.boards.get(id)!;
-    const picked = (pick && this.bounceList().find((c) => c.fen === pick)) || null;
-    const result = bounceResult(board.fen, b.crowdSide, p.seed, b.crowdMoves, picked, loss);
-    if (picked) {
-      const ply = board.history.length;
-      // (The side to move's expected score: his, better by the loss (in pawns) when it's known.)
-      const odds = Math.log(Math.min(0.999, Math.max(0.001, board.expected)) / (1 - Math.min(0.999, Math.max(0.001, board.expected))));
-      const expected = loss === null ? board.expected : 1 / (1 + Math.exp(-(odds + loss * BOSS_POWERS.bouncePawnLogit)));
-      this.boards.set(id, { ...board, fen: picked.fen, expected, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: picked.fen }] });
-    }
-    this.state = { ...this.state, boss: { ...b, powers: { ...p, ultAt: b.crowdMoves, bounce: result, events: [...p.events, { kind: "bounce", turn: p.turn }] } } };
-    return result;
+    return bigboyBattle.applyBounce(this.battle, pick, loss);
   }
 
   /** The boss's last move, and the piece it took (if any). */
-  private bossLast: { move: string; san: string; staggered?: boolean; captured?: string } | null = null;
+  private bossLast: BossLastMove | null = null;
+  /** The bosses' battle code's own store (Battle's memo). */
+  private bossMemo = new Map<string, unknown>();
+
+  /** What a boss's battle code (bosses/<boss>.ts) may use of this runner. */
+  private get battle(): Battle {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const runner = this;
+    return {
+      get state() {
+        return runner.state;
+      },
+      set state(v) {
+        runner.state = v;
+      },
+      boards: runner.boards,
+      get settings() {
+        return runner.settings;
+      },
+      get bossLast() {
+        return runner.bossLast;
+      },
+      set bossLast(v) {
+        runner.bossLast = v;
+      },
+      engines: runner.opts.engines,
+      alive: () => runner.alive(),
+      finalGameOver: () => runner.finalGameOver(),
+      bossToMove: () => runner.bossToMove(),
+      crowdAllowed: (boardId) => runner.crowdAllowed(boardId),
+      boardOf: (playerId) => runner.boardOf(playerId),
+      afterCrowdMove: (move) => runner.afterCrowdMove(move),
+      memo: runner.bossMemo,
+    };
+  }
 
   /** The boss strikes now (every bossKillEvery crowd moves). */
   bossKillDue(): boolean {
@@ -1406,19 +1260,7 @@ export class MatchRunner {
               shadows: fireShadows(p),
               stepped: p.stepped ?? null,
               ultNext: !!p.ultNext,
-              ...(powers.passive === "blocks"
-                ? { block: p.block ? { square: p.block.square, at: p.block.at, until: p.block.until } : null, snack: p.snack?.square ?? null, bounce: p.bounce ?? null }
-                : {}),
-              ...(powers.passive === "dark"
-                ? {
-                    dark: (p.dark ?? []).map((d) => ({ square: d.square, at: d.at, until: d.until })),
-                    cleared: p.cleared ?? [],
-                    bulbs: p.bulbs ?? bulbsAt(p.turn || 1),
-                    ...(p.claimed ? { claimed: true } : {}),
-                    lightsAt: p.lightsOut ? p.lightsOut.at : null,
-                    ...(p.lightsOut?.extra ? { lightsExtra: p.lightsOut.extra } : {}),
-                  }
-                : {}),
+              ...(bossRules(b)?.view?.(p) ?? {}),
             },
           }
         : {}),
@@ -1435,11 +1277,12 @@ export class MatchRunner {
     // Which boss: a random playable one (as in a raid), at the crowd's strength plus its own offset.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
-    // (Hollow, the dark boss, plays from the starting position; Big Boy too, less the pawn he eats.)
-    if (startsDark(def) || startsWithSnack(def)) startPly = 0;
+    // (A boss who plays from the starting position: Hollow; Big Boy too, less the pawn he eats.)
+    const start = bossRules(def)?.opening;
+    if (start?.fromStart) startPly = 0;
     const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
     this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
-    const snack = startsWithSnack(def) ? this.snackBoard(id, seed, "w", old.generation + 1) : null;
+    const setUp = start?.setUp?.(this.battle, { boardId: id, seed, crowdSide: "w", generation: old.generation + 1 }) ?? null;
     const tier = bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
     const elo = bossStrength(tier, def, this.settings.bossDifficulty);
     this.bossLast = null;
@@ -1451,7 +1294,7 @@ export class MatchRunner {
       players: this.state.players.map((p) => (p.alive ? { ...p, colour: null, finalLosses: [], powerUps: 0 } : p)),
       boss: {
         id: def.id,
-        powers: { ...initPowers(seed, this.boards.get(id)!.fen, "w"), ...(snack ? { snack: { square: snack } } : {}) },
+        powers: { ...initPowers(seed, this.boards.get(id)!.fen, "w"), ...(setUp ?? {}) },
         tier,
         elo,
         crowdSide: "w",
@@ -1632,9 +1475,6 @@ export class MatchRunner {
 
 export type BossMoveKind = "elo" | "stumble" | "stagger";
 
-/** Hollow, the dark boss: always Black, from the starting position (his passive is the dark). */
-export const startsDark = (def: { powers: { passive: string } | null } | null | undefined) => def?.powers?.passive === "dark";
-
 /** The limits on a boss's moves (see bossSlipLoss, bossMaxLoss and bossMaxLogitLoss in settings). */
 export interface BossGuard {
   slipLoss: readonly [number, number];
@@ -1649,21 +1489,6 @@ export const bossGuardFrom = (s: { bossSlipLoss: readonly [number, number]; boss
   maxLoss: s.bossMaxLoss,
   maxLogitLoss: s.bossMaxLogitLoss,
 });
-
-const logit = (p: number) => {
-  const q = Math.min(0.999, Math.max(0.001, p));
-  return Math.log(q / (1 - q));
-};
-
-/**
- * How much a move gives away against the best: points of expected score (0-100) and log-odds. Log-odds
- * catch a blunder in a position that's already won or lost, where the points shrink (0.05 to 0.01 is 4
- * points but throws the rest away).
- */
-export function moveLoss(best: number, got: number): { points: number; logit: number } {
-  const g = Math.min(best, got);
-  return { points: (best - g) * 100, logit: logit(best) - logit(g) };
-}
 
 /** Within the guard: never more than maxLoss points, nor more than maxLogitLoss log-odds (a couple of points is always fine). */
 export function withinGuard(loss: { points: number; logit: number }, guard: BossGuard): boolean {
@@ -1729,140 +1554,6 @@ export async function bossMoveFrom(
   const best = top[0]!.expected;
   const got = top.find((m) => m.move === move)?.expected ?? (await engine.scoreMoves(fen, [move]))[0]?.expected ?? 0;
   return confirm(withinGuard(moveLoss(best, got), guard) ? move : pickByLoss(top, guard.slipLoss, guard), guard);
-}
-
-/**
- * Boingo's funhouse: the move he plays for the crowd. Weak but recoverable: from the allowed moves, one that gives
- * away about `loss` points against the best (1 to 2.5 pawns from an even position), nearest the middle of that range,
- * never past `maxLogit` in log-odds, never one whose line allows a forced mate, never one that leaves the queen to be
- * taken (unless it takes a queen itself: a trade). The engine's top moves first; if none is weak enough, the rest of
- * the allowed moves are searched too. Like the boss's slips, the pick is checked head to head with the best once.
- */
-export async function funhouseMoveFrom(
-  engine: EngineLike,
-  fen: string,
-  allowed: readonly string[] | null = null,
-  loss: readonly [number, number] = BOSS_POWERS.funhouseLoss,
-  maxLogit: number = BOSS_POWERS.funhouseMaxLogit,
-): Promise<string> {
-  const legal = allowed ? [...allowed] : legalMoves(fen);
-  if (legal.length <= 1) return legal[0]!;
-  const ok = new Set(legal);
-  const top = (await engine.topMoves(fen, 8)).filter((m) => ok.has(m.move));
-  const seen = new Set(top.map((m) => m.move));
-  const scoredAll = [...top];
-  const [lo, hi] = loss;
-  const safe = (m: MoveScore) => !(m.mate !== undefined && m.mate < 0) && !leavesQueen(fen, m);
-  const options = (list: readonly MoveScore[], best: number) =>
-    list.filter(safe).map((m) => ({ move: m.move, loss: moveLoss(best, m.expected) })).filter((x) => x.loss.logit <= maxLogit || x.loss.points <= 2);
-  let best = top[0]?.expected;
-  let inRange = best === undefined ? [] : options(top, best).filter((x) => x.loss.points >= lo && x.loss.points <= hi);
-  if (!inRange.length) {
-    const rest = legal.filter((m) => !seen.has(m));
-    if (rest.length) scoredAll.push(...(await engine.scoreMoves(fen, rest)));
-    best = Math.max(...scoredAll.map((m) => m.expected));
-    inRange = options(scoredAll, best).filter((x) => x.loss.points >= lo && x.loss.points <= hi);
-  }
-  const bestMove = [...scoredAll].sort((a, b) => b.expected - a.expected)[0]?.move ?? legal[0]!;
-  const all = options(scoredAll, best ?? 0.5).filter((x) => x.move !== bestMove);
-  // Nearest the middle of the range; else the weakest move short of it (still a gift, never a blunder); else the best.
-  const mid = (lo + hi) / 2;
-  const pick =
-    [...inRange].sort((a, b) => Math.abs(a.loss.points - mid) - Math.abs(b.loss.points - mid) || (a.move < b.move ? -1 : 1))[0] ??
-    [...all].filter((x) => x.loss.points < lo).sort((a, b) => b.loss.points - a.loss.points)[0];
-  if (!pick) return bestMove;
-  // Checked once more head to head with the best (the wide search spreads itself thin): too much, and the gentlest
-  // option short of the range is played instead.
-  const check = await engine.scoreMoves(fen, [bestMove, pick.move]);
-  const b = check.find((m) => m.move === bestMove)?.expected;
-  const g = check.find((m) => m.move === pick.move);
-  if (b === undefined || !g) return pick.move;
-  const l = moveLoss(Math.max(b, g.expected), g.expected);
-  if (l.points <= hi + 5 && (l.logit <= maxLogit || l.points <= 2) && safe(g)) return pick.move;
-  const gentler = [...all].filter((x) => x.loss.points < pick.loss.points).sort((a, c) => c.loss.points - a.loss.points)[0];
-  return gentler?.move ?? bestMove;
-}
-
-/**
- * Hollow's extra move after a failed Lights out (Eric, Oct 10): with the crowd's turn passed, a quiet move (no capture,
- * check or promotion; extraMoveCandidates) that gains him at most `cap` points over not moving again, nor loses him
- * more (pickExtraMove), by the same engine searches the boss's moves use: his expected score had he not moved again is
- * one less the crowd's best in the position now; the engine's top moves first, then the other candidates. Null (he
- * skips it) when the crowd is in check, or no candidate is within the cap.
- */
-export async function extraMoveFrom(engine: EngineLike, fen: string, cap: number = BOSS_POWERS.lightsOutExtraGain): Promise<string | null> {
-  const passed = passTurn(fen);
-  if (!passed) return null;
-  const candidates = extraMoveCandidates(passed);
-  if (!candidates.length) return null;
-  const crowdBest = (await engine.topMoves(fen, 1))[0];
-  const before = crowdBest ? 1 - crowdBest.expected : 0.5;
-  const top = (await engine.topMoves(passed, 8)).filter((m) => candidates.includes(m.move));
-  const pick = pickExtraMove(top, before, candidates, cap);
-  if (pick) return pick;
-  const rest = candidates.filter((m) => !top.some((t) => t.move === m));
-  return rest.length ? pickExtraMove([...top, ...(await engine.scoreMoves(passed, rest))], before, candidates, cap) : null;
-}
-
-/** Each position's top move at `nodes`, shared out over the engines (each takes the next position as it's free). */
-async function topEach(engines: readonly EngineLike[], fens: readonly string[], nodes: number): Promise<(MoveScore | undefined)[]> {
-  const best: (MoveScore | undefined)[] = new Array(fens.length);
-  let next = 0;
-  await Promise.all(
-    engines.map(async (e) => {
-      while (next < fens.length) {
-        const i = next++;
-        best[i] = (await (e.topMovesAt ? e.topMovesAt(fens[i]!, 1, nodes) : e.topMoves(fens[i]!, 1)))[0];
-      }
-    }),
-  );
-  return best;
-}
-
-/**
- * Big Boy's Big Bounce: the candidates (positions with him to move) scored by the engine path his moves use (each
- * position's top move; the crowd's expected score is one less his), shared out over this device's engines. A glance at
- * every candidate (bounceScreenNodes), then a proper look (bounceNodes) at the position before and the bounceConfirm
- * nearest the target; then pickBounce on those: the loss nearest the target in the band, else the nearest below it;
- * null (nothing moves) when none is under the cap, or there's no engine. About one of his moves' worth of searching.
- */
-export async function bounceFrom(
-  engines: readonly EngineLike[],
-  fen: string,
-  candidates: readonly string[],
-  s: Parameters<typeof pickBounce>[2] & Pick<typeof BOSS_POWERS, "bounceNodes" | "bounceScreenNodes" | "bounceConfirm"> = BOSS_POWERS,
-): Promise<{ fen: string; loss: number } | null> {
-  if (!candidates.length || !engines.length) return null;
-  const crowdOf = (m: MoveScore | undefined) => (m ? 1 - m.expected : null);
-  // The glance: which few are worth a proper look (nearest the target, no forced mates).
-  const glance = await topEach(engines, [fen, ...candidates], s.bounceScreenNodes);
-  const b0 = crowdOf(glance[0]);
-  if (b0 === null) return null;
-  const near = candidates
-    .map((c, i) => ({ c, m: glance[i + 1] }))
-    .filter((x) => x.m && x.m.mate === undefined)
-    .map((x) => ({ c: x.c, d: Math.abs(pawnsLost(b0, crowdOf(x.m)!, s) - s.bounceTarget) }))
-    .sort((a, b) => a.d - b.d || (a.c < b.c ? -1 : 1))
-    .slice(0, s.bounceConfirm)
-    .map((x) => x.c);
-  if (!near.length) return null;
-  const look = await topEach(engines, [fen, ...near], s.bounceNodes);
-  const before = crowdOf(look[0]);
-  if (before === null) return null;
-  const scored: BounceScore[] = near.flatMap((c, i) => {
-    const m = look[i + 1];
-    return m ? [{ fen: c, crowd: 1 - m.expected, ...(m.mate !== undefined ? { mate: true } : {}) }] : [];
-  });
-  return pickBounce(before, scored, s);
-}
-
-/** After `m`, the reply takes the mover's queen, and `m` didn't take a queen itself (a trade is fine). */
-function leavesQueen(fen: string, m: MoveScore): boolean {
-  if (!m.reply) return false;
-  const mover = sideToMove(fen);
-  if (pieceAt(fen, m.move.slice(2, 4))?.type === "q") return false;
-  const target = pieceAt(applyMove(fen, m.move), m.reply.slice(2, 4));
-  return target?.type === "q" && target.color === mover;
 }
 
 /** A board as sent to (and shown in) the app. */
