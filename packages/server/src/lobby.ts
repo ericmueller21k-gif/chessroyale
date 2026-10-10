@@ -227,8 +227,10 @@ export interface LobbyRecord {
   /** Boss battle: the boss move the host owes the server. */
   bossKey?: string;
   bossStumble?: boolean;
-  /** "funhouse": the host plays the crowd's move for Boingo (his ultimate). */
-  bossKind?: "elo" | "stumble" | "stagger" | "funhouse" | "extra";
+  /** "funhouse": the host plays the crowd's move for Boingo (his ultimate); "bounce": it picks Big Boy's Big Bounce. */
+  bossKind?: "elo" | "stumble" | "stagger" | "funhouse" | "extra" | "bounce";
+  /** Big Boy's Big Bounce: the candidates the host was sent (the answer must be one of them). */
+  bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
   bossMinAt?: number;
@@ -988,8 +990,27 @@ export class LobbyCore {
       ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : {}),
       ...(funhouse ? { funhouse: true } : {}),
       ...(this.r.bossKind === "extra" ? { extra: true } : {}),
-      ...(allowed ? { allowed } : {}),
+      ...(this.r.bossKind === "bounce" ? { bounce: this.r.bounceCandidates ?? [] } : {}),
+      ...(allowed && this.r.bossKind !== "bounce" ? { allowed } : {}),
     });
+  }
+
+  /**
+   * Big Boy's Big Bounce (at the start of his turn, after the crowd's move): everyone sees him get ready (thinking) while
+   * the host's engine scores the candidates (worked out here from the seed) and picks the new position; then the
+   * bounce plays for everyone, and he plays his move. No host engine anywhere: the bounces play and nothing moves.
+   */
+  private requestBounce() {
+    this.r.phase = "boss";
+    this.r.bossKey = `y-${++this.r.counter}`;
+    this.r.bossKind = "bounce";
+    this.r.bossMinAt = undefined;
+    this.r.bounceCandidates = this.runner!.bounceCandidates();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
   /**
@@ -1026,6 +1047,17 @@ export class LobbyCore {
 
   private playBoss(move: string) {
     this.r.bossKey = undefined;
+    if (this.r.bossKind === "bounce") {
+      // The Big Bounce: the position the host picked (one of the candidates, else nothing moves); it plays out, then
+      // his move.
+      this.r.bossKind = undefined;
+      const picked = this.r.bounceCandidates?.includes(move) ? move : null;
+      this.r.bounceCandidates = undefined;
+      this.runner!.applyBounce(picked);
+      const until = this.io.now() + powerMomentMs([{ kind: "bounce" }]);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "extra") {
       // His extra move: not the crowd's, so nothing is scored; its banner plays out, then the crowd's turn.
       this.r.bossKind = undefined;
@@ -1069,7 +1101,7 @@ export class LobbyCore {
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in its funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
-    if (this.r.bossKind === "extra") return this.playBoss("");
+    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -1089,7 +1121,7 @@ export class LobbyCore {
         // The boss arrives: it takes over from an even position of the game just played.
         this.r.bossIntroDone = true;
         this.r.phase = "boss";
-        const until = this.io.now() + bossIntroTimeline(runner.boards.get(runner.state.boards[0]!)!.history.length, !!runner.boss.powers?.claimed).total;
+        const until = this.io.now() + bossIntroTimeline(runner.boards.get(runner.state.boards[0]!)!.history.length, !!runner.boss.powers?.claimed, !!runner.boss.powers?.snack).total;
         this.broadcast({ ...this.bossMessage(until), intro: true } as Outgoing);
         return this.setTimer("nextRound", until);
       }
@@ -1097,8 +1129,8 @@ export class LobbyCore {
         runner.finishBossBattle();
         return this.finishMatch();
       }
-      // (Hollow's Lights out comes at the start of his turn, before his move.)
-      if (runner.bossToMove()) return runner.lightsOutDue() ? this.startLights() : this.requestBoss();
+      // (Hollow's Lights out and Big Boy's Big Bounce come at the start of his turn, before his move.)
+      if (runner.bossToMove()) return runner.lightsOutDue() ? this.startLights() : runner.bounceDue() ? this.requestBounce() : this.requestBoss();
       // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       if (runner.funhouseDue()) return this.requestFunhouse();

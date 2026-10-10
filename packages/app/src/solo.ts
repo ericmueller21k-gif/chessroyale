@@ -543,6 +543,21 @@ export class SoloMatch implements GameView {
     this.timer = setTimeout(() => this.nextRound(), showMs);
   }
 
+  /**
+   * Big Boy's Big Bounce (at the start of his turn, after your move): he gets ready (thinking) while this device's
+   * engines score the candidate positions, then the bounce plays out (nobody's clock runs), then his move. No engine
+   * answer: the bounces play and nothing moves, as online.
+   */
+  private async bounceTurn() {
+    const snap = this.bossSnapshot();
+    this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
+    const bounce = this.runner.playBounce(this.engines).catch(() => this.runner.applyBounce(null));
+    await Promise.all([bounce, new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history, snap.board.bases)))]);
+    const showMs = powerMomentMs([{ kind: "bounce" }]);
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
+    this.timer = setTimeout(() => this.nextRound(), showMs);
+  }
+
   /** After a crowd move in the boss battle: the boss strikes when it's due. */
   private afterBossRound() {
     if (this.runner.bossKillDue()) {
@@ -562,7 +577,8 @@ export class SoloMatch implements GameView {
       if (!this.bossIntroDone) {
         // The boss arrives: it takes over from an even position of the game just played.
         this.bossIntroDone = true;
-        const introMs = bossIntroTimeline(this.runner.boards.get(this.runner.state.boards[0]!)!.history.length, !!this.runner.state.boss?.powers?.claimed).total;
+        const powers = this.runner.state.boss?.powers;
+        const introMs = bossIntroTimeline(this.runner.boards.get(this.runner.state.boards[0]!)!.history.length, !!powers?.claimed, !!powers?.snack).total;
         this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + introMs, intro: true });
         this.timer = setTimeout(() => this.nextRound(), introMs);
         return;
@@ -571,8 +587,8 @@ export class SoloMatch implements GameView {
         this.runner.finishBossBattle();
         return this.finish();
       }
-      // (Hollow's Lights out comes at the start of his turn, before his move.)
-      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.bossTurn());
+      // (Hollow's Lights out and Big Boy's Big Bounce come at the start of his turn, before his move.)
+      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.bossTurn());
       // (A failed Lights out: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       if (this.runner.funhouseDue()) return void this.funhouseTurn();
@@ -795,6 +811,7 @@ export class SoloMatch implements GameView {
             this.runner.startLightsOut();
             this.runner.finishLightsOut({});
           }
+          if (this.runner.bounceDue()) await this.runner.playBounce(this.engines).catch(() => this.runner.applyBounce(null));
           await this.runner.playBoss(this.engines[0]);
           continue;
         }

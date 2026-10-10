@@ -1,14 +1,19 @@
 /**
- * Big Boy (a sprite preview; no powers, rules or sounds of his own yet): a chubby bald baby after Eric's reference
- * picture, redrawn. A few hair tufts on top, big ears, half-lidded eyes and big pink lips; a teal crop shirt reading
+ * Big Boy, the baby boss: a chubby bald baby after Eric's reference picture, redrawn. A few hair tufts on top, big ears, half-lidded eyes and big pink lips; a teal crop shirt reading
  * "BIG BOY", a light blue diaper, bare feet, and a swirly rainbow lollipop (his weapon) in his right hand, on our left.
  * Drawn facing front, light from the top left.
  *
  * Rigging: the head (one per face), the shirt, belly, diaper and feet are painted once; the arms (each with its short
  * sleeve) and legs are painted from their pose's points (a shoulder, an elbow, a hand; a hip and a foot), and the
  * lollipop from where his fist holds it and where the candy is. So a new pose is a few numbers.
+ *
+ * His powers' moments (characters/power-art.ts): `snack` (he waddles over to one of the crowd's centre pawns, grabs it
+ * and eats it: nom, nom), `toss` (a toy block thrown at the board), `bigBounce` (on the board: three bounces with squash
+ * and stretch, a giant fall, dazed, a giggle, and off again; timed to boss-timing's BOUNCE), and his reactions `lick`
+ * (a slurp of the lollipop), `giggle` and `wail` (the tantrum with its wail). Idle, swing and tantrum are as approved.
  */
 import { canvas, ellipse, inEllipse, inPoly, roundLight, shade, toGrid, type Canvas } from "./paint.ts";
+import { BOUNCE, SNACK } from "@chessroyale/chess";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const BIGBOY_PALETTE: Record<string, string> = {
@@ -47,15 +52,27 @@ export const BIGBOY_PALETTE: Record<string, string> = {
   F: "#ffffff",
   j: "#8fd8ff", // tears
   s: "#7d8290", // dust
+  S: "#b9bcc6",
   z: "#0d0e12", // ground shadow
+  x: "#f4f0e6", // his snack: a white pawn (the crowd's black one: his look `blackPawn`)
+  X: "#b8b0a0",
+  o: "#f5c983", // a toy block: wood, top to side; its letter's panel and the letter
+  O: "#d69c52",
+  D: "#9c6a2e",
+  a: "#e2483f",
+  Y: "#fff4d0",
+  y: "#ffd84a", // dazed stars
 };
+
+/** Recolours: the crowd's pawn in his hand is black when the crowd plays Black. */
+const LOOKS: Record<string, Record<string, string>> = { blackPawn: { x: "#55555f", X: "#26262e" } };
 
 type Pt = readonly [number, number];
 const SKIN = "dcCh";
 
 // ---- Head: one face per mood.
 
-export type Mood = "blank" | "blink" | "lick" | "yum" | "fierce" | "grin" | "pout" | "tantrum";
+export type Mood = "blank" | "blink" | "lick" | "yum" | "fierce" | "grin" | "pout" | "tantrum" | "chew" | "nom" | "ooh" | "squish" | "dazed" | "giggle";
 
 /** The head's grid: 35 x 25, its middle column 17. */
 const HEAD_W = 35;
@@ -87,6 +104,10 @@ const EYES: Record<string, readonly string[]> = {
   squeeze: ["kk....", "..kkk.", "kk...."],
   grin: ["......", "kkkkkk", "dwweed"],
   wet: ["kkkkkk", "kwweek", ".jjjj."],
+  /** Round and wide open (in the air). */
+  wide: ["kkkkkk", "kweewk", "kwwwwk"],
+  /** Dazed after the crash: little crosses. */
+  dazed: ["kk..kk", "..kk..", "kk..kk"],
 };
 const MOUTHS: Record<string, { rows: readonly string[]; y: number }> = {
   // Big pink lips, a little open: the reference.
@@ -97,6 +118,12 @@ const MOUTHS: Record<string, { rows: readonly string[]; y: number }> = {
   smile: { y: 16, rows: ["M.........M", "LMMMM.MMMML", "MLNNLLLLLLM", ".MmmmmmmmM.", ".MLLLLLLLM.", "..MLNNLLM..", "...MMMMM..."] },
   wobble: { y: 16, rows: ["...........", "..MMMMMMM..", ".MLNLLLLLM.", "MmmmMMMmmmM", "MLLLLLLLLLM", ".MLNNLLLLM.", "..MMMMMMM.."] },
   wail: { y: 15, rows: ["..MMMMMMM..", ".MLNLLLLLM.", "MLmmmmmmmLM", "MmmmggggmmM", "MLmmggggmLM", ".MLNNLLLLM.", "..MMMMMMM.."] },
+  /** Chewing his snack: lips pressed, puffed out. */
+  chew: { y: 17, rows: ["..MMMMMMM..", ".MLLNNLLLM.", "MLLLLLLLLLM", ".MmmmmmmmM.", "..MLLLLLM..", "...MMMMM..."] },
+  /** The bite: wide open, happy. */
+  nom: { y: 15, rows: ["..MMMMMMM..", ".MLNLLLLLM.", "MLmmmmmmmLM", "MmmmmmmmmmM", "MLmmmmmmmLM", ".MLLNNLLLM.", "..MMMMMMM.."] },
+  /** A small round "oh". */
+  o: { y: 17, rows: ["...MMM...", "..MLNLM..", ".MLmmmLM.", "..MLLLM..", "...MMM..."] },
 };
 const FACES: Record<Mood, { brows: string; eyes: string; mouth: string }> = {
   blank: { brows: "arch", eyes: "blank", mouth: "pucker" },
@@ -107,6 +134,12 @@ const FACES: Record<Mood, { brows: string; eyes: string; mouth: string }> = {
   grin: { brows: "arch", eyes: "grin", mouth: "smile" },
   pout: { brows: "worried", eyes: "wet", mouth: "wobble" },
   tantrum: { brows: "angry", eyes: "squeeze", mouth: "wail" },
+  chew: { brows: "arch", eyes: "happy", mouth: "chew" },
+  nom: { brows: "arch", eyes: "happy", mouth: "nom" },
+  ooh: { brows: "arch", eyes: "wide", mouth: "o" },
+  squish: { brows: "arch", eyes: "squeeze", mouth: "smile" },
+  dazed: { brows: "worried", eyes: "dazed", mouth: "o" },
+  giggle: { brows: "arch", eyes: "happy", mouth: "smile" },
 };
 
 function head(mood: Mood): Part {
@@ -329,9 +362,15 @@ add("diaper", diaper);
 add("shadow", shadow);
 add("footL", () => foot(-1));
 add("footR", () => foot(1));
-const MOODS: readonly Mood[] = ["blank", "blink", "lick", "yum", "fierce", "grin", "pout", "tantrum"];
+const MOODS: readonly Mood[] = ["blank", "blink", "lick", "yum", "fierce", "grin", "pout", "tantrum", "chew", "nom", "ooh", "squish", "dazed", "giggle"];
 for (const m of MOODS) add(`head:${m}`, () => head(m));
 for (let s = 0; s < 12; s++) add(`candy:${s}`, () => candy(s / 2));
+/** His snack: a little pawn of the crowd's (white; his look `blackPawn` makes it the crowd's black), whole, then bitten. */
+add("pawn", () => ({ grid: ["..xx..", ".xxxX.", ".xxxX.", "..xX..", ".xxxX.", "xxxxXX", "XXXXXX"] }));
+add("pawn:bit", () => ({ grid: ["......", "......", ".x.xX.", "..xX..", ".xxxX.", "xxxxXX", "XXXXXX"] }));
+add("pawn:crumb", () => ({ grid: ["xxX.", "xXXX"] }));
+/** A toy block in his hand (the board's own, characters/effects.ts toyBlock, is bigger): wood, a red panel, a letter. */
+add("block", () => ({ grid: [".ooooo..", "ooooooo.", "OOOOOOOD", "OaYYaaOD", "OaYaYaOD", "OaYYaaOD", "OaaaaaOD", "OOOOOOD."] }));
 
 const r1 = (v: number) => Math.round(v * 2) / 2;
 function limb(kind: "arm" | "leg", pts: readonly Pt[]): { name: string; at: Pt } {
@@ -355,7 +394,7 @@ const SHOULDER_L: Pt = [23.5, 30];
 const SHOULDER_R: Pt = [44.5, 30];
 
 /** Where the lollipop arm (his right, on our left) holds it: its elbow and fist, and the candy's middle. */
-export type Lolly = "hold" | "toward" | "lick" | "lickUp" | "up" | "waveL" | "waveR" | "windup" | "swing" | "smash" | "shakeUp" | "shakeDown";
+export type Lolly = "hold" | "toward" | "lick" | "lickUp" | "up" | "waveL" | "waveR" | "windup" | "swing" | "smash" | "shakeUp" | "shakeDown" | "splat";
 const LOLLY: Record<Lolly, { elbow: Pt; fist: Pt; candy: Pt; behind?: boolean }> = {
   hold: { elbow: [17, 37], fist: [11.5, 34.5], candy: [10, 21] },
   toward: { elbow: [16, 39], fist: [15.5, 35], candy: [16.5, 22.5] },
@@ -370,19 +409,41 @@ const LOLLY: Record<Lolly, { elbow: Pt; fist: Pt; candy: Pt; behind?: boolean }>
   smash: { elbow: [18, 41], fist: [16, 46], candy: [9.5, 55.5] },
   shakeUp: { elbow: [16, 31], fist: [11, 26], candy: [9.5, 13] },
   shakeDown: { elbow: [17, 39], fist: [12, 38], candy: [10.5, 25] },
+  /** Flung out low to his side as he crashes down (squashed: kept inside his frame). */
+  splat: { elbow: [16, 37], fist: [11, 41], candy: [5.5, 49.5] },
 };
 
 /** His free arm (his left, on our right). */
-export type Free = "hang" | "out" | "fist" | "pump";
+export type Free = "hang" | "out" | "fist" | "pump" | "up" | "reach" | "mouth" | "hold" | "back" | "throw";
 const FREE: Record<Free, Pt[]> = {
   hang: [SHOULDER_R, [48.5, 37.5], [49.5, 45]],
   out: [SHOULDER_R, [50.5, 33], [55, 30.5]],
   fist: [SHOULDER_R, [50, 30], [51, 22.5]],
   pump: [SHOULDER_R, [49.5, 36.5], [52, 42]],
+  /** Up high (in the air, both arms up). */
+  up: [SHOULDER_R, [50, 24], [51.5, 15.5]],
+  /** Down to his side, reaching for something on the ground (his snack). */
+  reach: [SHOULDER_R, [50.5, 39], [54, 47]],
+  /** His hand at his mouth (eating; giggling behind it). */
+  mouth: [SHOULDER_R, [48.5, 35], [38, 25.5]],
+  /** Up by his ear, holding something (the pawn on its way, a block before the throw). */
+  hold: [SHOULDER_R, [51, 27.5], [51.5, 19.5]],
+  /** Wound back over his shoulder (the throw's wind-up): the arm drawn behind him, what it holds up over his head. */
+  back: [SHOULDER_R, [52.5, 25], [50, 13]],
+  /** Thrown out towards the board (on our right). */
+  throw: [SHOULDER_R, [51.5, 31], [55.5, 33.5]],
 };
+/** What his free hand holds, drawn at it: the pawn (whole or bitten), or a toy block. */
+export type InHand = "pawn" | "pawn:bit" | "block";
 
-export type Feet = "stand" | "rockL" | "rockR" | "liftL" | "liftR";
+export type Feet = "stand" | "rockL" | "rockR" | "liftL" | "liftR" | "wide" | "tuck" | "together";
 const FEET: Record<Feet, [Pt, Pt]> = {
+  /** Planted wide (a landing's squash). */
+  wide: [[23.5, 63], [44.5, 63]],
+  /** Knees pulled up (in the air). */
+  tuck: [[28, 59], [40, 59]],
+  /** Legs straight down, feet together (the stretch). */
+  together: [[29.5, 64], [38.5, 64]],
   stand: [[26.5, 63], [41.5, 63]],
   /** Rocking onto his left foot (on our right) or his right: the other heel up a pixel. */
   rockL: [[26.5, 62], [41.5, 63]],
@@ -410,6 +471,10 @@ export interface BigBoyPose {
   spin?: number;
   free?: Free;
   feet?: Feet;
+  /** Something in his free hand. */
+  holding?: InHand;
+  /** No ground shadow under him (in the air on the board: the board has its own shadow for him). */
+  noShadow?: boolean;
 }
 
 export function bigBoyLayers(p: BigBoyPose): Layer[] {
@@ -425,7 +490,18 @@ export function bigBoyLayers(p: BigBoyPose): Layer[] {
   const fist = up(lo.fist);
   const candyAt = up(lo.candy);
   const arm = limb("arm", [up(SHOULDER_L), up(lo.elbow), fist]);
-  const free = limb("arm", FREE[p.free ?? "hang"].map(up));
+  const freePts = FREE[p.free ?? "hang"].map(up);
+  const free = limb("arm", freePts);
+  const hand = freePts[freePts.length - 1]!;
+  // (The pawn stands on his palm, the block sits in it; at his mouth the pawn is up at his lips.)
+  const held: Layer[] = !p.holding
+    ? []
+    : p.holding === "block"
+      ? [at("block", Math.round(hand[0] - 3), Math.round(hand[1] - 7))]
+      : p.free === "mouth"
+        ? [at(p.holding, Math.round(hand[0] - 5), Math.round(hand[1] - 8))]
+        : [at(p.holding, Math.round(hand[0] - 2), Math.round(hand[1] - 8))];
+  const behindFree = p.free === "back";
   // The stick runs from the candy's middle through his fist and a little past it.
   const vx = fist[0] - candyAt[0];
   const vy = fist[1] - candyAt[1];
@@ -434,9 +510,10 @@ export function bigBoyLayers(p: BigBoyPose): Layer[] {
   const cnd = at(`candy:${((p.spin ?? 0) % 12 + 12) % 12}`, Math.round(candyAt[0] - 9), Math.round(candyAt[1] - 9));
   const lolly = [L(stk), L(arm), cnd];
   return [
-    at("shadow", 17, GROUND - 2),
-    // Wound up behind his head: the lollipop and that arm go behind him.
+    ...(p.noShadow ? [] : [at("shadow", 17, GROUND - 2)]),
+    // Wound up behind his head: the lollipop and that arm go behind him (his free arm too, for a throw's wind-up).
     ...(lo.behind ? [L(stk), cnd, L(arm)] : []),
+    ...(behindFree ? [L(free)] : []),
     L(legL),
     L(legR),
     at("footL", fl[0] - 5, fl[1] - 2),
@@ -446,7 +523,7 @@ export function bigBoyLayers(p: BigBoyPose): Layer[] {
     at("shirt", 20 + sway, 26 + bob),
     at("hair", 29 + sway + (p.headDx ?? 0), -3 + bob + (p.headDy ?? 0)),
     at(`head:${p.mood ?? "blank"}`, 17 + sway + (p.headDx ?? 0), 3 + bob + (p.headDy ?? 0)),
-    L(free),
+    ...(behindFree ? held : [L(free), ...held]),
     ...(lo.behind ? [] : lolly),
   ];
 }
@@ -583,6 +660,150 @@ const tantrum: Anim = {
   ],
 };
 
+// ---- His powers' moments and his reactions (everything above stays as approved).
+
+/** A step of his waddle: weight on one foot, the other lifted, swaying. */
+const WADDLE: readonly BigBoyPose[] = [
+  { feet: "liftL", sway: -1, headDx: -1 },
+  { feet: "stand", bob: 1 },
+  { feet: "liftR", sway: 1, headDx: 1 },
+  { feet: "stand", bob: 1 },
+];
+/** Crumbs off his snack, `t` frames on. */
+const crumbs = (t: number): Speck[] =>
+  [[-1, 0.4], [1, 0.2], [-0.6, 1], [0.8, 1.1]].map(([vx, vy], i): Speck => [Math.round(OX + 38 + vx! * (2 + t * 2)), Math.round(OY + 26 + vy! * (1 + t * 2) + t * t * 0.4), i % 2 ? "x" : "X"]);
+
+/**
+ * His snack, before move 1 (SNACK in boss-timing.ts: the board moves him; this is his part): he waddles over (to
+ * `grabAt`), reaches down and grabs the crowd's pawn, lifts it to his mouth and bites it twice (a `nom` cue at
+ * `nomAt` and one after), smacks his lips and waddles back.
+ */
+const snackFrames = (): Frame[] => {
+  const walk = (n: number, ms: number) => Array.from({ length: n }, (_, i) => f(ms, { ...WADDLE[i % 4]!, mood: "grin" }));
+  const frames: Frame[] = [
+    ...walk(8, SNACK.walkMs / 8),
+    f(150, { free: "reach", bob: 2, mood: "ooh" }),
+    f(150, { free: "hold", holding: "pawn", mood: "grin" }),
+    f(SNACK.nomAt - SNACK.grabAt - 300, { free: "mouth", holding: "pawn", mood: "nom" }),
+    f(200, { free: "mouth", holding: "pawn:bit", mood: "chew", bob: 1 }, { cue: "nom", specks: crumbs(0) }),
+    f(200, { free: "mouth", holding: "pawn:bit", mood: "nom" }, { specks: crumbs(1) }),
+    f(200, { free: "mouth", mood: "chew", bob: 1 }, { cue: "nom", specks: crumbs(0) }),
+    f(150, { free: "pump", mood: "chew" }, { specks: crumbs(2) }),
+    f(200, { free: "pump", mood: "yum", bob: 1 }),
+  ];
+  const used = frames.reduce((t, x) => t + x.ms, 0);
+  const back = Math.max(4, Math.round((SNACK.ms - used) / 150));
+  return [...frames, ...Array.from({ length: back }, (_, i) => f((SNACK.ms - used) / back, { ...WADDLE[i % 4]!, mood: "yum" }))];
+};
+const snack: Anim = { loop: false, frames: snackFrames() };
+
+/** Toy block toss (his passive): he pulls out a block, winds up behind his head and throws it (`toss`: it leaves his hand). */
+const toss: Anim = {
+  loop: false,
+  frames: [
+    f(140, { free: "hold", holding: "block", mood: "grin" }),
+    f(170, { free: "back", holding: "block", mood: "fierce", sway: 1, headDx: 1 }),
+    f(80, { free: "throw", mood: "fierce", sway: -1 }, { cue: "toss" }),
+    f(160, { free: "throw", mood: "grin", sway: -1 }),
+    f(160, { free: "out", mood: "grin" }),
+    f(200, { mood: "grin" }),
+  ],
+};
+
+/** A slurp of his lollipop (his move). */
+const lick: Anim = {
+  loop: false,
+  frames: [
+    f(110, { lolly: "toward" }),
+    f(160, { lolly: "lick", mood: "lick" }, { cue: "slurp" }),
+    f(130, { lolly: "lickUp", mood: "lick", bob: 1 }),
+    f(160, { lolly: "lick", mood: "lick" }),
+    f(180, { lolly: "toward", mood: "yum" }),
+    f(160, { mood: "yum" }),
+  ],
+};
+
+/** A giggle behind his hand, shoulders bobbing. */
+const giggle: Anim = {
+  loop: false,
+  frames: [
+    f(120, { free: "mouth", mood: "giggle" }, { cue: "giggle" }),
+    ...[0, 1, 2, 3, 4].map((i) => f(110, { free: "mouth", mood: "giggle", bob: i % 2, headDy: i % 2 ? 1 : 0, sway: i % 2 ? 1 : 0 })),
+    f(160, { mood: "grin" }),
+    f(160, { mood: "grin", bob: 1 }),
+  ],
+};
+
+/** The tantrum as approved, with its wail as he goes red. */
+const wail: Anim = { loop: false, frames: tantrum.frames.map((fr, i) => (i === 2 ? { ...fr, cue: "wail" } : fr)) };
+
+/** Dazed stars circling his head, `t` steps round. */
+const stars = (t: number, bob: number): Speck[] =>
+  [0, 1, 2].flatMap((k) => {
+    const a = ((t * 50 + k * 120) * Math.PI) / 180;
+    return star(Math.round(OX + 34 + Math.cos(a) * 15), Math.round(OY + 1 + bob + Math.sin(a) * 4), "y");
+  });
+/** The crash's dust round his feet, `t` frames on. */
+const crashDust = (t: number): Speck[] =>
+  Array.from({ length: 12 }, (_, i): Speck[] => {
+    const side = i % 2 ? 1 : -1;
+    const d = (i % 6) * 2 + t * 3;
+    const x = Math.round(OX + 34 + side * (12 + d));
+    // (Inside his frame: the board's own crash throws the dust further.)
+    return x < 1 || x > OX + 60 ? [] : [[x, Math.round(OY + GROUND - 1 - (i % 3) - t), i % 3 ? "s" : "S"]];
+  }).flat();
+
+/** The bounce's poses: a crouch, the stretch up (or down, falling), tucked in the air, the squash as he lands. */
+const CROUCH: BigBoyPose = { bob: 2, feet: "wide", free: "out", mood: "grin", noShadow: true };
+const STRETCH: BigBoyPose = { bob: -3, feet: "together", lolly: "up", free: "up", mood: "ooh", noShadow: true };
+const AIR: BigBoyPose = { bob: -1, feet: "tuck", lolly: "up", free: "up", mood: "grin", noShadow: true };
+const SQUASH: BigBoyPose = { bob: 4, feet: "wide", lolly: "swing", free: "out", mood: "squish", noShadow: true };
+
+/**
+ * The Big Bounce, on the board (from BOUNCE.leapAt to its end; the board moves him from spot to spot): a crouch and a
+ * leap; three landings (each a squash with its `boing`, a stretch up, a tuck through the air, a stretch down to land);
+ * a deep crouch and the big spring up (`whoosh`), falling arms and legs out; the giant crash (`crash`: flat, dust);
+ * dazed, stars round his head; a giggle (`giggle`) as the pieces settle; a crouch and a spring off (`boing`).
+ */
+function bounceFrames(): Frame[] {
+  const L = BOUNCE.leapAt;
+  const lands = BOUNCE.lands.map((x) => x - L);
+  const crash = BOUNCE.crashAt - L;
+  const back = BOUNCE.backAt - L;
+  const end = BOUNCE.total - L;
+  const out: Frame[] = [];
+  let t = 0;
+  const to = (until: number, p: BigBoyPose, extra: Partial<Frame> = {}) => {
+    const ms = Math.round(until - t);
+    if (ms <= 0) return;
+    out.push(f(ms, p, extra));
+    t += ms;
+  };
+  to(90, CROUCH);
+  to(200, STRETCH);
+  for (const [i, land] of lands.entries()) {
+    to(land - 100, AIR);
+    to(land, { ...STRETCH, mood: "grin" });
+    to(land + 100, SQUASH, { cue: "boing", shake: [0, 1] });
+    if (i < lands.length - 1) to(land + 210, STRETCH);
+  }
+  // The big one: a deep crouch, the spring up, up and away, then down, arms and legs out.
+  to(lands[2]! + 230, { ...SQUASH, bob: 5, mood: "fierce", lolly: "hold", free: "pump" });
+  to(lands[2]! + 350, { ...STRETCH, bob: -4, mood: "grin" }, { cue: "whoosh" });
+  to(crash - 300, AIR);
+  to(crash, { ...STRETCH, feet: "wide", mood: "ooh" });
+  to(crash + 100, { ...SQUASH, bob: 5, mood: "tantrum", lolly: "splat" }, { cue: "crash", shake: [0, 2], specks: crashDust(0) });
+  to(crash + 250, { ...SQUASH, bob: 5, mood: "dazed", lolly: "splat" }, { specks: crashDust(1) });
+  for (let k = 0; t < BOUNCE.settleAt - L + 150; k++) to(t + 200, { ...SQUASH, bob: 4, mood: "dazed", lolly: "splat", headDx: k % 2 ? 1 : -1 }, { specks: stars(k, 4) });
+  to(t + 140, { ...SQUASH, bob: 3, mood: "giggle", free: "mouth" }, { cue: "giggle" });
+  for (let k = 0; t < back - 120; k++) to(Math.min(back - 120, t + 120), { ...SQUASH, bob: 3 - (k % 2), mood: "giggle", free: "mouth", headDy: k % 2 });
+  to(back, CROUCH);
+  to(back + 150, STRETCH, { cue: "boing" });
+  to(end, AIR);
+  return out;
+}
+const bigBounce: Anim = { loop: false, frames: bounceFrames() };
+
 export const BIGBOY: Character = {
   id: "bigboy",
   name: "Big Boy",
@@ -591,9 +812,62 @@ export const BIGBOY: Character = {
   foot: [OX + 28, OY + GROUND],
   palette: BIGBOY_PALETTE,
   halo: "#2c2622",
+  looks: LOOKS,
   parts: PARTS,
-  anims: { idle, swing, tantrum },
+  anims: { idle, swing, tantrum, snack, toss, bigBounce, lick, giggle, wail },
 };
+
+/**
+ * The bounce's frames by kind, for the board's squash and stretch (components/BigBoy.tsx scales his box a little on
+ * top of the pose): which of `bigBounce`'s time windows (ms from its start) are a squash and which a stretch.
+ */
+export function bounceShape(t: number): "squash" | "stretch" | "crash" | null {
+  const L = BOUNCE.leapAt;
+  for (const land of BOUNCE.lands) if (t >= land - L && t < land - L + 100) return "squash";
+  for (const land of BOUNCE.lands) if ((t >= land - L - 100 && t < land - L) || (t >= land - L + 100 && t < land - L + 210)) return "stretch";
+  if (t >= BOUNCE.crashAt - L && t < BOUNCE.crashAt - L + 250) return "crash";
+  if (t >= 90 && t < 200) return "stretch";
+  return null;
+}
 
 /** The part of him a portrait shows (his head and the candy beside it), in frame pixels. */
 export const BIGBOY_PORTRAIT = { x: OX, y: OY - 4, w: 54, h: 36 } as const;
+
+/**
+ * His lines: short baby talk in his text box (Eric: "Mine!", "Nom nom.", "Waaaah!", "Big boy BOUNCE!"), never
+ * instructions, rare (each moment's chance of a line is in BIGBOY_CHANCE), the same for everyone (by the moment).
+ */
+export const BIGBOY_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
+  entrance: ["Big boy here!", "Mine! All mine!", "Wanna play?"],
+  snack: ["Nom nom.", "Yummy pawn!", "Snack time!"],
+  move: ["Mine!", "Me go!", "Hee hee!", "Big boy move!"],
+  capture: ["Mine!", "Gimme!", "Nom nom.", "My toy now!"],
+  check: ["Peekaboo!", "Boo!", "Got you!"],
+  hurt: ["Waaaah!", "No fair!", "Owie!", "Mine! Give back!"],
+  thinking: ["Hmmm…", "Goo?", "Uhhh…"],
+  smug: ["Easy peasy!", "Big boy winning!", "Hee hee hee!"],
+  rattled: ["Uh-oh.", "Mama?", "No like this…"],
+  defeat: ["Waaaah!", "Nap time…", "Not fair…"],
+  victory: ["Big boy win!", "Yay! All mine!", "Again! Again!"],
+  strike: ["Bonk!", "Time out!", "Bad! Bonk!"],
+  power: ["Catch!", "Blocky!", "My toy!", "Stack it!"],
+  ultimateWarn: ["Big boy mad!", "Gonna bounce…", "Waaaah!"],
+  ultimate: ["Big boy BOUNCE!", "Boing boing!", "Bouncy bouncy!"],
+};
+export const BIGBOY_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
+  entrance: 1,
+  snack: 1,
+  move: 0.12,
+  capture: 0.6,
+  check: 0.75,
+  hurt: 0.6,
+  thinking: 0.08,
+  smug: 0.8,
+  rattled: 0.8,
+  defeat: 1,
+  victory: 1,
+  strike: 0.8,
+  power: 0.5,
+  ultimateWarn: 1,
+  ultimate: 1,
+};

@@ -73,6 +73,23 @@
  *                               bulb goes out, `relight` after the last), and the same on his own strand: his look
  *                               `bulbs3`…`bulbs0` (kit.lookOf, from the battle's state).
  *
+ *   "Big Boy"
+ *     power        "toss"       He pulls out a toy block, winds up over his shoulder and throws it; at `toss` it leaves
+ *                               his hand: fly `blockFly` (fly<letter>) from him to the square, then play `toyBlock`
+ *                               land<letter>, sit<letter> (loop) while it lasts, poof<letter> when it goes (blockItem()).
+ *     ultimateWarn "wail"       His tantrum (a wail as he goes red), for the one-turn warning.
+ *     ultimate     "bigBounce"  Played ON THE BOARD (hide him in his corner meanwhile), from BOUNCE.leapAt
+ *                               (boss-timing.ts): a leap, then three landings (each a squash with its `boing`) on the
+ *                               2x2 spots, a spring up and away (`whoosh`), the giant fall onto the four middle squares
+ *                               (`crash`: play `bounceCrash` over the board, and jolt it), dazed, a `giggle` as the
+ *                               pieces settle, and a spring off (`boing`). The board moves him (components/BigBoy.tsx);
+ *                               `bouncePuff` on each square of a spot as he lands; bounceShape() says which of his
+ *                               frames to squash or stretch a little more.
+ *     more:
+ *       snack      "snack"      Before move 1 (SNACK in boss-timing.ts): he waddles over to the crowd's pawn, grabs it
+ *                               at SNACK.grabAt (take it off the board), eats it (`nom`, twice) and waddles off. His look
+ *                               `blackPawn` when the crowd plays Black. Lines: `kit.lines.snack`.
+ *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
  *   keyed by the moment so every player gets the same line), and its sounds fire from its frames' cues.
@@ -120,7 +137,7 @@
  * (sparkFly, candleShot, fireballFall's fall) with a CSS transform, never by redrawing.
  */
 import type { SoundName } from "../sound.ts";
-import { EFFECT_SPRITES } from "./effects.ts";
+import { EFFECT_SPRITES, TOY_LETTER_NAMES, type ToyLetter } from "./effects.ts";
 import type { Anim, Character } from "./sprite.ts";
 
 /** The power moments' animation names, every boss's. */
@@ -142,6 +159,10 @@ export const POWER_ANIMS = [
   "testFound",
   "testMiss",
   "lightsBack",
+  "snack",
+  "toss",
+  "bigBounce",
+  "wail",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -201,6 +222,14 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
       bulbs: { anim: "idle", effects: ["bulbStrand"] },
     },
   },
+  "Big Boy": {
+    power: { anim: "toss", hit: "toss", effects: ["blockFly", "toyBlock"] },
+    ultimateWarn: { anim: "wail" },
+    ultimate: { anim: "bigBounce", hit: "crash", onBoard: true, effects: ["bouncePuff", "bounceCrash"] },
+    more: {
+      snack: { anim: "snack", hit: "nom", onBoard: true },
+    },
+  },
 };
 
 export type EffectName = keyof typeof EFFECT_SPRITES;
@@ -256,7 +285,23 @@ export const EFFECTS: Record<EffectName, Effect> = {
   bulbStrand: { ch: EFFECT_SPRITES.bulbStrand, covers: "strip", loop: "lit3", counter: { prefix: "lit", max: 3 }, sounds: { pop: "hollowPop", relight: "hollowRelight" } },
   nightSquare: { ch: EFFECT_SPRITES.nightSquare, covers: "square", loop: "night0D", end: "dawn0D", sounds: { found: "hollowFound", answer: "hollowWhisper" } },
   nightLabel: { ch: EFFECT_SPRITES.nightLabel, covers: "square", loop: "a", sounds: {} },
+  toyBlock: { ch: EFFECT_SPRITES.toyBlock, covers: "square", start: "landA", loop: "sitA", end: "poofA", sounds: { clack: "bigboyClack", poof: "bigboyPoof" } },
+  blockFly: { ch: EFFECT_SPRITES.blockFly, covers: "square", loop: "flyA", sounds: {} },
+  bouncePuff: { ch: EFFECT_SPRITES.bouncePuff, covers: "square", start: "puff", sounds: {} },
+  bounceCrash: { ch: EFFECT_SPRITES.bounceCrash, covers: "board", start: "crash", sounds: {} },
 };
+
+// ---------------- Big Boy's toy block, for the board ----------------
+
+/** A toy block's letter, by its square (A, B or C): the same everywhere, and the next one usually another. */
+export const blockLetter = (square: string): ToyLetter => TOY_LETTER_NAMES[(square.charCodeAt(0) - 97 + Number(square[1])) % 3]!;
+
+/** A toy block's look on its square: landing (then sitting), sitting, or going (ends empty). */
+export function blockItem(square: string, state: "land" | "sit" | "poof", since: number): SquareItem {
+  const l = blockLetter(square);
+  if (state === "land") return { square, name: "toyBlock", anim: `land${l}`, then: `sit${l}`, since };
+  return { square, name: "toyBlock", anim: `${state}${l}`, since };
+}
 
 /** An animation's length in ms. */
 export const animLength = (a: Anim) => a.frames.reduce((s, f) => s + f.ms, 0);

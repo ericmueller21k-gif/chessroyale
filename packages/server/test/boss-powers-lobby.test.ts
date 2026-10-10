@@ -187,13 +187,13 @@ describe("boss powers online", () => {
       expect(L.core.save().runner!.state.boss!.id).not.toBe("clown");
     }
     const ids = new Set<string>();
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
+    for (let seed = 1; seed <= 40 && ids.size < 5; seed++) {
       const L = setup({ ...RAID_SETTINGS }, {}, seed);
       L.core.connect(undefined, "A", "computer", false, 1500);
       L.core.message("p1", { t: "start" });
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
-    expect([...ids].sort()).toEqual(["clown", "gingerbread", "grex", "hollow"]);
+    expect([...ids].sort()).toEqual(["bigboy", "clown", "gingerbread", "grex", "hollow"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {
@@ -464,5 +464,112 @@ describe("Hollow online", () => {
     const r = toRound(M);
     expect(r.board!.history.length).toBe(4);
     expect(r.boss!.powers!.lightsExtra).toBe("skipped");
+  });
+});
+
+describe("Big Boy online", () => {
+  /** To the next crowd turn's round message (past the boss's move and his moments). */
+  const toRound = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+    return L.last("p1", "round")!;
+  };
+  /** Everyone plays an allowed move that keeps the battle going (any of them: the toy block's limits). */
+  const play = (L: ReturnType<typeof setup>) => crowdMove(L);
+
+  it("his snack before move 1 and his toy blocks: the same for everyone, the crowd's moves and the jobs keep off the block", () => {
+    const L = raid({ bossId: "bigboy" });
+    const r1 = L.last("p1", "round")!;
+    expect(r1.boss!.id).toBe("bigboy");
+    expect(r1.board!.history).toEqual([]);
+    const snack = r1.boss!.powers!.snack!;
+    expect(["d2", "e2"]).toContain(snack);
+    expect(pieceAt(r1.board!.fen, snack)).toBeNull();
+    expect(r1.board!.bases).toEqual([{ ply: 0, fen: r1.board!.fen }]);
+    expect(L.last("p2", "round")!.boss!.powers!.snack).toBe(snack);
+    play(L);
+    hostBoss(L);
+    const b = L.last("p1", "boss")!;
+    const block = b.boss.powers!.events.find((e) => e.kind === "block")!;
+    expect(block).toMatchObject({ kind: "block", turn: 2 });
+    expect(b.boss.powers).toEqual(L.last("p2", "boss")!.boss.powers);
+    expect(b.boss.powers!.block).toEqual({ square: block.square, at: 2, until: 2 + BOSS_POWERS.blockTurns - 1 });
+    expect(b.until - L.now).toBeGreaterThanOrEqual(POWER_FX.block);
+    const r2 = toRound(L);
+    const allowed = r2.boss!.powers!.allowed!;
+    expect(allowed.length).toBeGreaterThan(0);
+    expect(allowed.some((m) => m.slice(2, 4) === block.square)).toBe(false);
+    expect(legalMoves(r2.board!.fen).some((m) => m.slice(2, 4) === block.square)).toBe(true);
+    // A pick onto the block is refused; the scoring job carries the allowed moves.
+    L.core.message("p1", { t: "pick", key: r2.key, move: legalMoves(r2.board!.fen).find((m) => m.slice(2, 4) === block.square)! });
+    const req = crowdMove(L);
+    expect(req.jobs[0]!.allowed).toEqual(allowed);
+  });
+
+  it("the Big Bounce: at the start of his turn the host scores the candidates; everyone sees the bounce and the new position; then his move", () => {
+    const L = raid({ bossId: "bigboy", bossPowerTest: "bounce" });
+    play(L);
+    hostBoss(L);
+    const warned = toRound(L);
+    expect(warned.boss!.powers!.warned).toBe(true);
+    play(L);
+    // His turn: the host is asked to pick the bounce, not his move; everyone sees him get ready.
+    const ask = L.last("p1", "bossRequest")!;
+    expect(ask.bounce!.length).toBe(BOSS_POWERS.bounceCandidates);
+    expect(ask.allowed).toBeUndefined();
+    expect(L.last("p2", "boss")!.thinking).toBe(true);
+    const before = ask.fen;
+    const pick = ask.bounce![3]!;
+    L.inbox.set("p1", []);
+    L.core.message("p1", { t: "bossMove", key: ask.key, move: pick });
+    const shown = L.last("p2", "boss")!;
+    expect(shown.boss.board.fen).toBe(pick);
+    expect(shown.boss.powers!.bounce).toMatchObject({ at: 2, before });
+    expect(shown.boss.powers!.bounce!.moves.length).toBeGreaterThanOrEqual(2);
+    expect(shown.boss.powers!.bounce!.spots).toHaveLength(3);
+    expect(shown.boss.powers!.events.at(-1)).toEqual({ kind: "bounce", turn: 2 });
+    expect(shown.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
+    expect(shown.until - L.now).toBe(POWER_FX.bounce);
+    expect(shown.boss.board.bases).toContainEqual({ ply: shown.boss.board.history.length, fen: pick });
+    // Then his own move, from the new position.
+    L.advance(shown.until - L.now + 10);
+    const move = L.last("p1", "bossRequest")!;
+    expect(move.bounce).toBeUndefined();
+    expect(move.fen).toBe(pick);
+    hostBoss(L);
+    const r3 = toRound(L);
+    // (The crowd's two moves and his two: the bounce isn't a move.)
+    expect(r3.board!.history.length).toBe(4);
+    expect(r3.boss!.powers!.rage).toBeNull();
+  });
+
+  it("nothing within the cap (the host answers \"\"), anything that isn't a candidate, or no host at all: the bounces play, nothing moves", () => {
+    for (const answer of ["", "8/8/8/8/8/8/8/K6k b - - 0 1", null]) {
+      const L = raid({ bossId: "bigboy", bossPowerTest: "bounce" });
+      play(L);
+      hostBoss(L);
+      toRound(L);
+      play(L);
+      const ask = L.last("p1", "bossRequest")!;
+      if (answer === null) {
+        // (The host goes quiet: after the timeout another is asked; nobody answers, so nothing moves.)
+        L.core.disconnect("p2");
+        for (let i = 0; i < 6 && !L.last("p1", "boss")?.boss.powers?.bounce; i++) L.advance(15_000);
+      } else L.core.message("p1", { t: "bossMove", key: ask.key, move: answer });
+      const shown = L.last("p1", "boss")!;
+      expect(shown.boss.powers!.bounce!.moves).toEqual([]);
+      expect(shown.boss.board.fen).toBe(ask.fen);
+    }
+  });
+
+  it("the admins' trigger: the bounce at the start of his turn after the crowd's move, without the warning", () => {
+    const L = raid({ bossId: "bigboy" });
+    expect(L.core.ultimateTrigger("p1", true)).toBe(true);
+    play(L);
+    const ask = L.last("p1", "bossRequest")!;
+    expect(ask.bounce).toBeTruthy();
+    L.core.message("p1", { t: "bossMove", key: ask.key, move: ask.bounce![0]! });
+    expect(L.last("p2", "boss")!.boss.powers!.bounce!.at).toBe(1);
+    expect(L.last("p2", "boss")!.boss.powers!.warned).toBe(false);
+    expect(L.core.ultimateTrigger("p1", true)).toBe(false);
   });
 });

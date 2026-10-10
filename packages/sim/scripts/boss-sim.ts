@@ -5,13 +5,15 @@
  * moves (down to 3). Crowds of three strengths (expert, club and casual players,
  * modelled as bots that sometimes play a random move). The goal is a boss that's hard but beatable.
  *
- *   npx tsx packages/sim/scripts/boss-sim.ts run <expert|club|casual|beginner> <offsets,comma> <games> <seed> [stumble]
+ *   npx tsx packages/sim/scripts/boss-sim.ts run <expert|club|casual|beginner> <offsets,comma> <games> <seed> [stumble][,snack]
+ *
+ * `snack`: Big Boy's opening, the crowd's d- or e-pawn eaten before move 1 (a coin flip per game).
  *   npx tsx packages/sim/scripts/boss-sim.ts summary
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { DEFAULT_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng } from "@chessroyale/core";
-import { applyMove, bossMoveFrom, fenAfter, gameEnd, legalMoves, START_FEN, type Opening } from "@chessroyale/chess";
+import { applyMove, bossMoveFrom, fenAfter, gameEnd, legalMoves, START_FEN, withoutPiece, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -31,7 +33,7 @@ const CROWDS: Record<string, { skills: number[]; random: number }> = {
   beginner: { skills: spread(30, 90), random: 0.25 },
 };
 
-async function run(kind: string, offsets: number[], games: number, seed: number, stumble: boolean) {
+async function run(kind: string, offsets: number[], games: number, seed: number, stumble: boolean, snack = false) {
   const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
   const engine = await createNodeEngine({ nodes: CROWD_NODES, hashMb: 16 });
   const boss = await createNodeEngine({ nodes: settings.bossNodes, hashMb: 16 });
@@ -62,9 +64,11 @@ async function run(kind: string, offsets: number[], games: number, seed: number,
       // As the game does: the target strength (down to 800), Stockfish at no less than 1320, stumbling below 1700.
       const elo = stumble ? Math.max(settings.bossEloRange[0], Math.min(3190, rating + offset)) : Math.max(1320, Math.min(3190, rating + offset));
       const chance = stumble ? bossStumbleChance(elo, settings) : 0;
-      const result = await battle(rng, skills, pickSettings, candidates, (fen) => bossMoveFrom(boss, fen, elo, settings.bossNodes, rng() < chance, rng));
-      const row = { kind, rating, offset, elo, stumble, ...result };
-      appendFileSync(root + `reports/boss-sim/${kind}-${seed}.jsonl`, JSON.stringify(row) + "\n");
+      // (Big Boy's snack: the crowd's d- or e-pawn gone before move 1.)
+      const start = snack ? withoutPiece(START_FEN, rng() < 0.5 ? "d2" : "e2") : START_FEN;
+      const result = await battle(rng, skills, pickSettings, candidates, (fen) => bossMoveFrom(boss, fen, elo, settings.bossNodes, rng() < chance, rng), start);
+      const row = { kind, rating, offset, elo, stumble, ...(snack ? { snack } : {}), ...result };
+      appendFileSync(root + `reports/boss-sim/${kind}-${seed}${snack ? "-snack" : ""}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }
   }
@@ -78,13 +82,14 @@ async function battle(
   pickSettings: typeof settings,
   candidates: (fen: string) => Promise<{ top: { move: string; expected: number }[]; list: { move: string; loss: number }[] }>,
   bossMove: (fen: string) => Promise<string>,
+  start: string = START_FEN,
 ) {
   let history: string[] = [];
-  let fen = START_FEN;
+  let fen = start;
   let alive = skills.map((skill, i) => ({ i, skill, recent: [] as number[] }));
   let moves = 0;
   let lastExpected = 0.5;
-  while (moves < MAX_MOVES && !gameEnd(START_FEN, history)) {
+  while (moves < MAX_MOVES && !gameEnd(start, history)) {
     const { top, list } = await candidates(fen);
     lastExpected = top[0]!.expected;
     const legal = legalMoves(fen);
@@ -105,12 +110,12 @@ async function battle(
       const victim = [...alive].sort((a, b) => sum(b) - sum(a))[0]!;
       alive = alive.filter((p) => p !== victim);
     }
-    if (gameEnd(START_FEN, history)) break;
+    if (gameEnd(start, history)) break;
     const reply = await bossMove(fen);
     history = [...history, reply];
     fen = applyMove(fen, reply);
   }
-  const end = gameEnd(START_FEN, history);
+  const end = gameEnd(start, history);
   let result: "crowd" | "boss" | "draw";
   if (end === "checkmate") result = fen.split(" ")[1] === "b" ? "crowd" : "boss";
   else if (end) result = "draw";
@@ -127,11 +132,11 @@ function summary() {
     readFileSync(`${dir}/${f}`, "utf8")
       .split("\n")
       .filter(Boolean)
-      .map((l) => JSON.parse(l) as { kind: string; rating: number; offset: number; elo: number; result: string; moves: number; ended: string; stumble?: boolean }),
+      .map((l) => JSON.parse(l) as { kind: string; rating: number; offset: number; elo: number; result: string; moves: number; ended: string; stumble?: boolean; snack?: boolean }),
   );
   const groups = new Map<string, typeof rows>();
   for (const r of rows) {
-    const key = `${r.kind}|${r.offset}|${r.stumble ? "s" : ""}`;
+    const key = `${r.kind}|${r.offset}|${r.stumble ? "s" : ""}${r.snack ? "+snack" : ""}`;
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   const lines = [
@@ -154,7 +159,7 @@ function summary() {
     const n = rs.length;
     const pct = (k: string) => `${Math.round((100 * rs.filter((r) => r.result === k).length) / n)}%`;
     const avg = Math.round(rs.reduce((s, r) => s + r.moves, 0) / n);
-    lines.push(`| ${kind} | ${rs[0]!.rating} | ${Number(offset) >= 0 ? "+" : ""}${offset} | ${st ? "stumbles" : "plain"} | ${Math.round(rs.reduce((s, r) => s + r.elo, 0) / n)} | ${n} | ${pct("crowd")} | ${pct("draw")} | ${pct("boss")} | ${avg} |`);
+    lines.push(`| ${kind} | ${rs[0]!.rating} | ${Number(offset) >= 0 ? "+" : ""}${offset} | ${st?.startsWith("s") ? "stumbles" : "plain"}${st?.endsWith("+snack") ? ", snack (a centre pawn eaten)" : ""} | ${Math.round(rs.reduce((s, r) => s + r.elo, 0) / n)} | ${n} | ${pct("crowd")} | ${pct("draw")} | ${pct("boss")} | ${avg} |`);
   }
   writeFileSync(root + "reports/boss-calibration.md", lines.join("\n") + "\n");
   console.log(lines.join("\n"));
@@ -162,4 +167,4 @@ function summary() {
 
 const [cmd, kind, offsets, games, seed, mode] = process.argv.slice(2);
 if (cmd === "summary") summary();
-else await run(kind ?? "club", (offsets ?? "0").split(",").map(Number), Number(games ?? 4), Number(seed ?? 1), mode === "stumble");
+else await run(kind ?? "club", (offsets ?? "0").split(",").map(Number), Number(games ?? 4), Number(seed ?? 1), !!mode?.split(",").includes("stumble"), !!mode?.split(",").includes("snack"));

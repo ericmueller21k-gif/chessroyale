@@ -541,6 +541,39 @@ export const BOSS_POWERS = {
    * extra move.
    */
   lightsOutExtraGain: 3,
+  /**
+   * Big Boy's toy blocks: from the crowd's 2nd turn (firstPassive), every blockEvery crowd turns he tosses a toy block
+   * onto an empty square in the crowd's half that one of its pieces could move to. It stays blockTurns crowd turns (and
+   * the boss's replies in between): nothing may move onto it or slide through it, either side. Never leaves anyone
+   * without a move, never blocks the only way out of check (it lifts for that turn).
+   */
+  blockEvery: 4,
+  blockTurns: 3,
+  /**
+   * The Big Bounce (Big Boy's ultimate, at the start of his turn, from the rage meter): the crowd's pieces thrown about.
+   * Each candidate moves bouncePieces of them (never the king, no captures), each to an empty square within bounceReach
+   * (pawns only sideways along their rank). Of bounceCandidates such positions (from the seed), each glanced at by the
+   * engine (bounceScreenNodes), the bounceConfirm nearest the target are looked at properly (bounceNodes, as is the
+   * position before), and of those the one whose value for the crowd is nearest bounceTarget pawns worse inside
+   * bounceLoss (half a pawn to a pawn and a half); none inside: the nearest below it (never one better for the crowd);
+   * none at all: the bounces still play but nothing moves. About one of his moves' worth of searching, shared out over
+   * the engines, so the bounce never stalls a match.
+   */
+  bouncePieces: [2, 6] as readonly [number, number],
+  bounceReach: 2,
+  bounceCandidates: 16,
+  bounceScreenNodes: 15_000,
+  bounceConfirm: 3,
+  bounceNodes: 100_000,
+  bounceLoss: [0.5, 1.5] as readonly [number, number],
+  bounceTarget: 1,
+  /**
+   * A pawn, in log-odds of the engine's expected score: the starting position is 0.536 for White, without its d- or
+   * e-pawn 0.31 or 0.30 (2,000,000 nodes), 0.95 log-odds apart. Losses are measured this way, so a pawn and a half is a
+   * pawn and a half however far ahead or behind the crowd already is (in points of expected score it shrinks to nothing
+   * in a lopsided position).
+   */
+  bouncePawnLogit: 0.95,
 } as const;
 
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */

@@ -23,6 +23,7 @@ import {
   bossMoveFrom,
   funhouseMoveFrom,
   extraMoveFrom,
+  bounceFrom,
   allowedSearch,
   fireRanked,
   jobEscapes,
@@ -561,6 +562,7 @@ export class NetMatch implements GameView {
         return this.showLights();
       case "bossRequest":
         if (m.extra) return void this.hostExtra(m.key, m.fen);
+        if (m.bounce) return void this.hostBounce(m.key, m.fen, m.bounce);
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse);
       case "chat":
         return this.chat.onLine(m.line);
@@ -651,6 +653,19 @@ export class NetMatch implements GameView {
       this.send({ t: "bossMove", key, move: (await extraMoveFrom(engine!, fen)) ?? "" });
     } catch {
       // No engine here: the server asks someone else, or he skips it.
+    }
+  }
+
+  /**
+   * Big Boy's Big Bounce, host only: the candidate positions scored on this device's engines (shared out, so it costs
+   * about one of his moves), the pick within the loss band, or "" (nothing moves).
+   */
+  private async hostBounce(key: string, fen: string, candidates: string[]) {
+    try {
+      const engines = await this.engines();
+      this.send({ t: "bossMove", key, move: (await bounceFrom(engines, fen, candidates))?.fen ?? "" });
+    } catch {
+      // No engine here: the server asks someone else, or nothing moves.
     }
   }
 
