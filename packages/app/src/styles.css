@@ -9966,6 +9966,11 @@ img.qicon {
 .boss-char.place-bar.tall {
   height: 88px;
 }
+/* A wide boss (Sawyer's saw out to one side, his tail to the other): a wider box, so the screen's edge and the boss's
+   name stay clear of him. */
+.boss-char.place-bar.wide {
+  width: 58px;
+}
 .boss-char.place-results.tall {
   height: 180px;
 }
