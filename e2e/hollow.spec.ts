@@ -154,6 +154,47 @@ test("Hollow's dark: his first cover, a dark square selected, a wrong attempt (-
   expect(errors).toEqual([]);
 });
 
+/**
+ * Watches his speech box through Lights out, every frame, round by round (Eric, Oct 10: on a computer it showed for a
+ * moment and was gone). Every frame of a round, from its first to the end of its answers, must show the box on screen
+ * with that round's line (the dock's sentence, when the dock shows it whole), and its last frame the whole line typed.
+ */
+async function watchLine(page: Page) {
+  await page.evaluate(() => {
+    type Seen = { frames: number; bad: string | null; text: string | null; lastTyped: boolean; lastBox: number[] | null };
+    const rounds: Record<number, Seen> = ((window as any).__loLine = {});
+    let began = false;
+    const loop = () => {
+      const marks = document.querySelector(".lo-marks");
+      if (began && !marks) return;
+      began ||= !!marks;
+      const round = Number(marks?.getAttribute("data-round") ?? -1);
+      if (round >= 0) {
+        const r = (rounds[round] ??= { frames: 0, bad: null, text: null, lastTyped: false, lastBox: null });
+        r.frames++;
+        const el = document.querySelector<HTMLElement>(".lo-line");
+        const b = el?.getBoundingClientRect();
+        const text = el?.getAttribute("aria-label") ?? null;
+        const dock = document.querySelector('.lo-dock .lo-prompt[data-fit="0"] strong')?.textContent ?? null;
+        const why =
+          !el || !b ? "no box"
+          : getComputedStyle(el).visibility !== "visible" ? "hidden"
+          : b.height === 0 || b.top < 0 || b.left < 0 || b.right > innerWidth || b.bottom > innerHeight ? `off screen ${[b.left, b.top, b.right, b.bottom].map(Math.round)}`
+          : r.text !== null && text !== r.text ? `"${r.text}" became "${text}"`
+          : dock !== null && dock !== text ? `"${text}", the dock "${dock}"`
+          : null;
+        if (why && !r.bad) r.bad = `frame ${r.frames}: ${why}`;
+        r.text ??= text;
+        r.lastTyped = !!el && el.querySelector(".lo-line-rest")?.textContent === "";
+        r.lastBox = b ? [b.left, b.top, b.width, b.height].map(Math.round) : null;
+      }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  });
+  return () => page.evaluate(() => (window as any).__loLine as Record<number, { frames: number; bad: string | null; text: string | null; lastTyped: boolean; lastBox: number[] | null }>);
+}
+
 /** Your profile says you're an admin (as /api/me does for an email in ADMIN_EMAILS). */
 async function asAdmin(page: Page) {
   await page.route("**/api/me*", async (route) => {
@@ -180,6 +221,7 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   const banner = await watchFor(page, { lights: { selector: ".fight-banner.power-cut", text: /LIGHTS OUT!/ } });
   await play(page, "e2e4");
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.lights), { timeout: 20_000 }).toBe(true);
+  const line = await watchLine(page);
   const lights = await page.evaluate(() => (window as any).match.phase.lights);
   expect(lights.rounds.map((r: { pieces: string[] }) => r.pieces.length)).toEqual([1, 2, 3]);
   // The clocks stopped: he hasn't moved yet.
@@ -230,6 +272,16 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.rounds[1].answers?.length ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   expect((await failed.seen()).twice).toBe(true);
+  // His speech box: up with each round's line, on screen, every frame of the round, and the whole line still there as
+  // the round ends (its answers' last frame); each round's line replaced the one before.
+  const said = await line();
+  for (const i of [0, 1, 2]) {
+    expect(said[i]?.frames ?? 0, `round ${i + 1}: frames watched`).toBeGreaterThan(30);
+    expect(said[i]!.bad, `round ${i + 1}: his box`).toBeNull();
+    expect(said[i]!.text, `round ${i + 1}: his line`).toMatch(/^Find /);
+    expect(said[i]!.lastTyped, `round ${i + 1}: the whole line at its end (box ${said[i]!.lastBox})`).toBe(true);
+  }
+  expect(new Set([0, 1, 2].map((i) => said[i]!.text)).size).toBe(3);
   const end = await page.evaluate(() => (window as any).match.boss);
   expect(end.board.history.length).toBe(3);
   expect(end.powers.lightsExtra).toBe("played");
