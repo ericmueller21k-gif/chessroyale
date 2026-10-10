@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import type { PowerEventKind } from "@chessroyale/core";
 import { SNACK, bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, funhouseFlipAt, powerLine, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, dockLine, funhouseFlipAt, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackLine, snackPawnShown } from "../components/BigBoy.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
@@ -51,8 +50,6 @@ function OpeningRoulette({ name }: { name: string }) {
   return <span class={`opening-roulette${spinning ? " spinning" : " landed"}`}>{spinning ? ROULETTE[i % ROULETTE.length] : name}</span>;
 }
 
-/** The dock's line for a power's moment. */
-const POWER_DOCK: Record<PowerEventKind | "warn", string> = { freeze: "Freeze!", pie: "Pie!", blizzard: "Blizzard!", funhouse: "Funhouse!", warn: "Rage!", spark: "Sparkler!", candle: "Roman candle!", fireball: "Fireballs!", dark: "Darkness!", extra: "He moves twice!", block: "Toy block!", bounce: "Big Bounce!" };
 const PIECE_NAME: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen" };
 
 /** When each burn after a crowd move started on this device (a screen drawn again carries on, it doesn't restart). */
@@ -338,8 +335,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 </>
               ) : moment ? (
                 <>
-                  {/* (Hollow's cover: his words are in his text box over the board; the dock keeps it short.) */}
-                  {boss.icon} <strong>{(moment.kind !== "dark" && powerLine(bossKit(boss.name), moment)) || POWER_DOCK[moment.kind]}</strong>
+                  {boss.icon} <strong>{dockLine(bossKit(boss.name), moment)}</strong>
                 </>
               ) : victim ? (
                 <strong class="bad">

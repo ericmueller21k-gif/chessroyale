@@ -131,13 +131,16 @@ export const HOLLOW_UI = {
     dark: {
       order: 0,
       kit: "power",
+      dock: "Darkness!",
+      // (His words are in his text box over the board; the dock keeps it short.)
+      dockWordOnly: true,
       appearAt: (m, square) => (m.square === square ? m.at + DARK.landAt : undefined),
       // His first cover of the dark always has his first-cover line; later ones a taunt now and then (his kit's chance).
       line: (kit, m) => (m.first ? (kit?.lines.darkFirst?.[0] ?? null) : kit ? pickLine(kit, "power", m.key) : null),
       view: darkMoment,
     },
     // His extra move, after a failed Lights out: its own moment, after the turn's others played with his move.
-    extra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.lightsExtra === "played" && boss.powers.events.some((e) => e.kind === "extra"), view: extraMoment },
+    extra: { order: 3, kit: "ultimateHit", dock: "He moves twice!", own: (boss) => boss.powers?.lightsExtra === "played" && boss.powers.events.some((e) => e.kind === "extra"), view: extraMoment },
   },
   bar: bulbStrip,
   // The dark: each covered square hides its piece (forming as his cast lands, thinning on its last turn), and one that

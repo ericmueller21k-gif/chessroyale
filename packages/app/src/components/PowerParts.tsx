@@ -55,6 +55,10 @@ export interface MomentUi {
   order: number;
   /** Which of the kit's moments it is. */
   kit: KitMoment;
+  /** The dock's word for it when the boss has no line for it ("Freeze!"). */
+  dock: string;
+  /** The dock keeps to its word even when the boss has a line (Hollow's cover: his words are in his text box). */
+  dockWordOnly?: boolean;
   /** When what it puts on a square appears there (ms, wall clock); undefined: it puts nothing on that square. */
   appearAt?: (m: Moment, square: string, orientation: "white" | "black") => number | undefined;
   /** It plays on a screen of its own (the funhouse, his extra move, the Big Bounce) when this says so. */

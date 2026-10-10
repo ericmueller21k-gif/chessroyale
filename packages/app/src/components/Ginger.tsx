@@ -47,9 +47,9 @@ export const GINGER_UI = {
   id: "gingerbread",
   ultimate: { name: "the Blizzard" },
   moments: {
-    freeze: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + FREEZE.iceAt : undefined), view: freezeMoment },
+    freeze: { order: 0, kit: "power", dock: "Freeze!", appearAt: (m, square) => (m.square === square ? m.at + FREEZE.iceAt : undefined), view: freezeMoment },
     // The blizzard's sweep crosses the board left to right; each piece ices over as it passes.
-    blizzard: { order: 2, kit: "ultimate", appearAt: (m, square, orientation) => m.at + BLIZZARD.sweepAt + (squareXY(square, orientation).x / 800) * BLIZZARD.sweepMs, view: blizzardMoment },
+    blizzard: { order: 2, kit: "ultimate", dock: "Blizzard!", appearAt: (m, square, orientation) => m.at + BLIZZARD.sweepAt + (squareXY(square, orientation).x / 800) * BLIZZARD.sweepMs, view: blizzardMoment },
   },
   // Ice over frozen pieces (the characters' iceOverlay: it forms, then shimmers while it lasts).
   board: ({ boss, p, board, orientation, moments, now, appearAt }) => {

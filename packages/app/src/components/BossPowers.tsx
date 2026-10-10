@@ -42,6 +42,7 @@ const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null =>
 const WARN: MomentUi = {
   order: 1,
   kit: "ultimateWarn",
+  dock: "Rage!",
   view: ({ boss, t, banner, cast }: MomentProps) => {
     const ui = bossUi(boss);
     const when = ui?.ultimate.when ?? "Next turn";
@@ -132,6 +133,12 @@ export function BossBarExtra({ boss, until = 0 }: { boss: BossView; until?: numb
 export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first">): string | null {
   const ui = MOMENT_UI[m.kind];
   return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
+}
+
+/** The dock's line for a power's moment: the boss's line for it, or its word ("Freeze!"). */
+export function dockLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first">): string {
+  const ui = MOMENT_UI[m.kind];
+  return (!ui.dockWordOnly && powerLine(kit, m)) || ui.dock;
 }
 
 /** The boss's animation for a power's moment, from its kit (e.g. freezeCast, pieThrow, check, blizzard, funhouse). */
