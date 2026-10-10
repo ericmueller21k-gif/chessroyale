@@ -9,6 +9,8 @@ import type { MoveScore } from "./uci.ts";
  * Messages between the browser and the lobby server (one Durable Object per
  * lobby), sent as JSON over a WebSocket. Times are server milliseconds; each
  * server message carries `now` so clients can correct for clock offset.
+ *
+ * Squads (its lobbies and parties) has its own, versioned messages: `squads/protocol.ts` (`@chessroyale/chess/squads`).
  */
 
 export interface LobbyPlayer {

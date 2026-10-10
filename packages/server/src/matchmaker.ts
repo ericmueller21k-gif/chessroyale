@@ -25,6 +25,11 @@ export interface PlayOptions {
   crowdWaitsForFull?: boolean;
   /** Bots off → Default: waiting since then, so bots fill a minute after that at the latest (never sooner than switchMinWaitMs). */
   since?: number;
+  /**
+   * Squads: this queue's lobbies are Squads lobbies (SquadsLobby objects, 32 seats in squads of 4). Each ticket is a
+   * group, `info` { size, pass }: a party of `size` under its pass (a solo player: size 1, no pass), seated whole.
+   */
+  squads?: boolean;
 }
 
 /**
@@ -47,11 +52,12 @@ export class Matchmaker extends DurableObject<Env> {
   private current = new Map<string, string>();
   private forming: Promise<void> | null = null;
   private again: ReturnType<typeof setTimeout> | null = null;
-  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean } = {
+  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean; squads: boolean } = {
     overrides: {},
     fillMs: 60_000,
     botsOff: false,
     crowdWaitsForFull: false,
+    squads: false,
   };
   private players: { at: number; n: number } = { at: 0, n: 0 };
   /** The matching rules (ranked replaces these). */
@@ -70,7 +76,7 @@ export class Matchmaker extends DurableObject<Env> {
   /** PLAY (or a player in line asking again with their ticket). `info`: for matching rules (ranked). */
   async next(overrides: LobbyRecord["overrides"], fillMs: number, opts: PlayOptions = {}, ticketId?: string | null, info?: Record<string, unknown>): Promise<PlayAnswer> {
     countCall("mm.next");
-    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull };
+    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull, squads: !!opts.squads };
     const now = Date.now();
     const t = this.q.enqueue(ticketId, now, opts.since !== undefined ? { ...info, since: opts.since } : info);
     const done = this.q.placedIn(t.id);
@@ -130,6 +136,7 @@ export class Matchmaker extends DurableObject<Env> {
 
   /** Seats a group: the seats left in its filling lobby first, then new lobbies. */
   private async seat(key: string, tickets: Ticket[]): Promise<boolean> {
+    if (this.lobbyOptions.squads) return this.seatSquads(key, tickets);
     let rest = tickets;
     const code = this.current.get(key);
     if (code) {
@@ -180,6 +187,48 @@ export class Matchmaker extends DurableObject<Env> {
       rest = rest.slice(n);
     }
     return true;
+  }
+
+  /**
+   * Squads: each ticket is a party (or one player) seated whole. The filling lobby takes the ones that still fit its
+   * squads (one call for the batch); the rest open new lobbies.
+   */
+  private async seatSquads(key: string, tickets: Ticket[]): Promise<boolean> {
+    const groups = (ts: Ticket[]) => ts.map((t) => ({ size: Math.max(1, Math.round(Number(t.info?.size) || 1)), pass: typeof t.info?.pass === "string" ? t.info.pass : "" }));
+    let rest = tickets;
+    const code = this.current.get(key);
+    if (code) {
+      countCall("mm.reserve");
+      const took = new Set(await this.squadsLobby(code).reserve(groups(rest), CAPACITY.queue.reservationMs).catch(() => [] as number[]));
+      if (took.size) {
+        this.placeAll(rest.filter((_, i) => took.has(i)), code);
+        rest = rest.filter((_, i) => !took.has(i));
+      }
+    }
+    while (rest.length) {
+      countCall("mm.create");
+      const fillAt = Date.now() + this.lobbyOptions.fillMs;
+      let took: number[] | false = false;
+      const fresh = await openLobbyCode(async (c) => {
+        took = await this.squadsLobby(c).create(c, { fillAt, reserve: groups(rest), reserveMs: CAPACITY.queue.reservationMs });
+        return took !== false;
+      });
+      const placed = fresh && took ? rest.filter((_, i) => (took as number[]).includes(i)) : [];
+      if (!fresh || !placed.length) {
+        countCall("mm.createFailed");
+        this.q.putBack(rest);
+        return false;
+      }
+      this.current.set(key, fresh);
+      await this.ctx.storage.put("current", Object.fromEntries(this.current));
+      this.placeAll(placed, fresh);
+      rest = rest.filter((t) => !placed.includes(t));
+    }
+    return true;
+  }
+
+  private squadsLobby(code: string) {
+    return this.env.SQUADS.get(this.env.SQUADS.idFromName(code));
   }
 
   private placeAll(tickets: Ticket[], code: string) {

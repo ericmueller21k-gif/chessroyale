@@ -8,3 +8,4 @@ export * from "./schedule.ts";
 export * from "./votes.ts";
 export * from "./match.ts";
 export * from "./bots.ts";
+export * from "./protocol.ts";

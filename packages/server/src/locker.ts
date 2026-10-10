@@ -51,7 +51,9 @@ export async function lockerState(sql: Sql, userId: string): Promise<LockerState
     look[r.slot] = { def: it.def, color: it.color, blemish: it.blemish, seed: it.seed, ...(it.color2 ? { color2: it.color2 } : {}) };
   }
   for (const it of items) if (!it.color2) delete it.color2;
-  return { items, equipped, look, crates: CRATES_FREE ? null : 0, keys: CRATES_FREE ? null : 0 };
+  // (Crates earned, e.g. Squads' placement rewards, are counted in the wallet for when crates stop being free.)
+  const earned = CRATES_FREE ? null : ((await sql.first<{ crates: number | null }>("SELECT crates FROM wallets WHERE user_id = ?", userId).catch(() => null))?.crates ?? 0);
+  return { items, equipped, look, crates: earned, keys: CRATES_FREE ? null : 0 };
 }
 
 /** Opens a crate (free and unlimited while testing). `force` only works while testing. */
