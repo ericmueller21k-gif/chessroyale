@@ -1,8 +1,8 @@
 import type { ComponentChildren } from "preact";
 import { BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
-import { FIRE_BURN_MS, inCheck, powerFxMs, powerMomentMs, pieceAt, sideToMove } from "@chessroyale/chess";
+import { BLOCK, FIRE_BURN_MS, inCheck, powerFxMs, powerMomentMs, pieceAt, sideToMove } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
-import { EFFECTS, animLength, cueAt, darkItem } from "../characters/power-art.ts";
+import { EFFECTS, animLength, blockItem, blockLetter, cueAt, darkItem } from "../characters/power-art.ts";
 import { CANDLE_SHOTS, candleMuzzle } from "../characters/grex.ts";
 import { HOLLOW_CAST_FROM } from "../characters/hollow.ts";
 import { pickLine } from "../characters/boss-beats.ts";
@@ -10,6 +10,7 @@ import type { BossView } from "../game.ts";
 import { BossFace } from "./BossCharacter.tsx";
 import { BoardEffects, BossEffect, BossMoment, SpriteAnim, type BoardItem } from "./BossEffect.tsx";
 import { GodKingPortrait, squareXY } from "./GodKing.tsx";
+import { BigBounce } from "./BigBoy.tsx";
 
 /**
  * Boss powers on screen: what every player sees, from the battle's shared state (NetBoss.powers), so online everyone
@@ -43,7 +44,7 @@ export interface Moment {
   first?: true;
 }
 
-const ORDER: Record<PowerEventKind, number> = { freeze: 0, pie: 0, spark: 0, fireball: 0, dark: 0, warn: 1, blizzard: 2, candle: 2, funhouse: 3, extra: 3 };
+const ORDER: Record<PowerEventKind, number> = { freeze: 0, pie: 0, spark: 0, fireball: 0, dark: 0, block: 0, warn: 1, blizzard: 2, candle: 2, funhouse: 3, extra: 3, bounce: 3 };
 
 /**
  * The moments a boss screen plays, ending at `until` (the screen's end: the crowd's clock starts then), one after
@@ -56,8 +57,10 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   const funhouse = !!p.funhouse && p.funhouse.turn === boss.crowdMoves && p.events.some((e) => e.kind === "funhouse");
   // (Hollow's extra move, after a failed Lights out: its own moment, after the turn's others played with his move.)
   const extra = !funhouse && p.lightsExtra === "played" && p.events.some((e) => e.kind === "extra");
-  const only = funhouse ? "funhouse" : extra ? "extra" : null;
-  const list = p.events.filter((e) => (only ? e.kind === only : e.kind !== "funhouse" && e.kind !== "extra")).sort((a, b) => ORDER[a.kind] - ORDER[b.kind]);
+  // (Big Boy's Big Bounce, at the start of his turn before his move: its own screen.)
+  const bounce = !funhouse && !extra && !!p.bounce && p.bounce.at === boss.crowdMoves && p.events.some((e) => e.kind === "bounce");
+  const only = funhouse ? "funhouse" : extra ? "extra" : bounce ? "bounce" : null;
+  const list = p.events.filter((e) => (only ? e.kind === only : e.kind !== "funhouse" && e.kind !== "extra" && e.kind !== "bounce")).sort((a, b) => ORDER[a.kind] - ORDER[b.kind]);
   let t = until - powerMomentMs(list);
   return list.map((e) => {
     const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}) };
@@ -110,6 +113,7 @@ function appearAt(square: string, moments: readonly Moment[], orientation: "whit
     if (m.kind === "pie" && m.square === square) return m.at + PIE.landAt;
     if (m.kind === "spark" && m.square === square) return m.at + SPARK.landAt;
     if (m.kind === "dark" && m.square === square) return m.at + DARK.landAt;
+    if (m.kind === "block" && m.square === square) return m.at + BLOCK.landAt;
     // (A fireball's landing ends on the tile's first stage: the tile carries on from there.)
     if (m.kind === "fireball" && m.squares?.includes(square)) return m.at + fireballLandAt(m.squares.indexOf(square)) + LAND_MS;
     // The blizzard's sweep crosses the board left to right; each piece ices over as it passes.
@@ -284,6 +288,8 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
     }),
   ];
   const checked = darkNow.length && inCheck(board) ? kingOn(board, sideToMove(board)) : null;
+  // Big Boy's toy block: landing as his toss arrives, sitting while it lasts, puffing away as it goes.
+  const blocks = blockItems(boss, moments, now, orientation);
   return (
     <>
       {shadows.length > 0 && <BoardEffects items={shadows} orientation={orientation} class="pw-shadow-board" />}
@@ -294,6 +300,10 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
       ))}
       {checked && darkNow.some((d) => d.square === checked) && <span class="pw-dark-check" style={onSquare(checked, orientation)} data-square={checked} />}
       {pips !== null && <CandlePips left={pips} />}
+      {blocks.length > 0 && <BoardEffects items={blocks} orientation={orientation} class="pw-fire-board pw-block-board" />}
+      {blocks.map((b) => (
+        <span key={`block-${b.square}`} class="pw-block" style={onSquare(b.square, orientation)} data-square={b.square} data-state={b.anim!.replace(/[A-Z]$/, "")} />
+      ))}
       {fire.length > 0 && <BoardEffects items={tiles} orientation={orientation} class="pw-fire-board" />}
       {/* (One marker a tile: what's on fire, at which stage, and its countdown: the crowd moves left before it burns.) */}
       {fire.map((t) =>
@@ -328,10 +338,41 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
   );
 }
 
+/** When this device saw a toy block go (it puffs away from then, as the next turn begins). */
+const blockGone = new Map<string, number>();
+/** The last toy block each battle showed (so one that has just gone puffs away). */
+const blockLast = new Map<string, { square: string; until: number }>();
+/**
+ * Big Boy's toy block on the board: landing as his toss arrives (its moment), sitting while it lasts, and puffing away
+ * once it's gone (as the turn after its last begins). One canvas over the board, under any banner, never taking a tap.
+ */
+function blockItems(boss: BossView, moments: readonly Moment[], now: number, orientation: "white" | "black"): BoardItem[] {
+  const p = boss.powers;
+  if (!p || p.passive !== "blocks") return [];
+  const key = `${boss.id}:${boss.startMove}:${boss.board.generation}`;
+  const block = p.block ?? null;
+  const out: BoardItem[] = [];
+  if (block) {
+    blockLast.set(key, { square: block.square, until: block.until });
+    const since = appearAt(block.square, moments, orientation);
+    if (now >= since) out.push(blockItem(block.square, since ? "land" : "sit", since));
+  } else {
+    const last = blockLast.get(key);
+    if (last && last.until < p.turn) {
+      const tag = `${key}:${last.square}:${last.until}`;
+      let at = blockGone.get(tag);
+      if (at === undefined) blockGone.set(tag, (at = now));
+      if (now < at + POOF_MS) out.push(blockItem(last.square, "poof", at));
+    }
+  }
+  return out;
+}
+const POOF_MS = animLength(EFFECTS.toyBlock.ch.anims.poofA!);
+
 // ---------------- The moments ----------------
 
 const PIECE_WORD: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
-const ULT_NAME: Record<string, string> = { blizzard: "the Blizzard", funhouse: "the Funhouse", candle: "the Roman Candle", lightsout: "Lights Out" };
+const ULT_NAME: Record<string, string> = { blizzard: "the Blizzard", funhouse: "the Funhouse", candle: "the Roman Candle", lightsout: "Lights Out", bounce: "the Big Bounce" };
 
 /** The square a side's king stands on. */
 function kingOn(fen: string, side: "w" | "b"): string | null {
@@ -357,6 +398,8 @@ const KIT_MOMENT: Record<PowerEventKind, "power" | "ultimateWarn" | "ultimate" |
   candle: "ultimate",
   dark: "power",
   extra: "ultimateHit",
+  block: "power",
+  bounce: "ultimate",
 };
 
 /**
@@ -426,9 +469,11 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
       );
     case "warn": {
       const ult = boss.powers?.ultimate ?? "";
+      // (Big Boy's Big Bounce comes at the start of his turn, after your move.)
+      const when = ult === "bounce" ? "After your move" : "Next turn";
       return (
         <div class="power-moment pm-warn">
-          {t < 1600 && banner("RAGE!", `Next turn: ${ULT_NAME[ult] ?? "its ultimate"}`, "rage")}
+          {t < 1600 && banner("RAGE!", `${when}: ${ULT_NAME[ult] ?? "its ultimate"}`, "rage")}
           {cast("", 0)}
         </div>
       );
@@ -497,6 +542,25 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
         </div>
       );
     }
+    case "block": {
+      const letter = moment.square ? blockLetter(moment.square) : "A";
+      return (
+        <div class="power-moment pm-block">
+          {t < 1500 && banner("TOY BLOCK!", moment.square ? `Blocked: ${moment.square}` : undefined, "toy")}
+          {cast("toss", BLOCK.flyAt)}
+          {moment.square && t >= BLOCK.flyAt && t < BLOCK.landAt && (
+            <Flight name="blockFly" anim={`fly${letter}`} square={moment.square} orientation={orientation} since={moment.at + BLOCK.flyAt} ms={BLOCK.landAt - BLOCK.flyAt} />
+          )}
+        </div>
+      );
+    }
+    case "bounce":
+      return (
+        <div class="power-moment pm-bounce">
+          {t < 1300 && banner("BIG BOUNCE!", undefined, "toy")}
+          <BigBounce boss={boss} moment={moment} now={now} orientation={orientation} />
+        </div>
+      );
     case "extra":
       // Hollow moves twice (the crowd's find rate in Lights out was under lightsOutHold): his banner as it lands.
       return <div class="power-moment pm-extra">{t < 1800 && banner("TWICE!", `${boss.name.replace(/^The /, "")} moves again`, "dark")}</div>;
@@ -546,7 +610,7 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
  * Something flying from the boss's corner of the board (its top-left) to a square: the ice bolt (pointed at its
  * target) or the pie (tumbling), over `ms`.
  */
-function Flight({ name, square, orientation, since, ms, aim = false, from: fromPct }: { name: "iceBolt" | "pieFly" | "sparkFly" | "darkPour"; square: string; orientation: "white" | "black"; since: number; ms: number; aim?: boolean; from?: { x: number; y: number } }) {
+function Flight({ name, anim, square, orientation, since, ms, aim = false, from: fromPct }: { name: "iceBolt" | "pieFly" | "sparkFly" | "darkPour" | "blockFly"; anim?: string; square: string; orientation: "white" | "black"; since: number; ms: number; aim?: boolean; from?: { x: number; y: number } }) {
   const { x, y } = squareXY(square, orientation);
   // (From the boss's corner of the board; Hollow's darkness from the void in his chest, given in % of the board.)
   const from = fromPct ? { x: fromPct.x * 8, y: fromPct.y * 8 } : { x: 60, y: 30 };
@@ -562,7 +626,7 @@ function Flight({ name, square, orientation, since, ms, aim = false, from: fromP
   };
   return (
     <span class={`pw-flight ${name}`} style={style}>
-      <BossEffect name={name} since={since} />
+      <BossEffect name={name} anim={anim} since={since} />
     </span>
   );
 }

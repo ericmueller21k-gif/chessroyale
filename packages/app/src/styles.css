@@ -11029,3 +11029,107 @@ img.qicon {
     line-height: 20px;
   }
 }
+
+/* ---- Big Boy: his toy block, his snack and his Big Bounce ---- */
+
+/* His toss from the board's corner: his frame's own shape. */
+.pm-block .pm-caster {
+  aspect-ratio: 78 / 92;
+}
+/* The toy block's banner: toy-box colours. */
+.fight-banner.power-cut.toy .fb-band {
+  background: repeating-linear-gradient(115deg, #c2410c 0 6cqw, #1d4ed8 6cqw 12cqw, #15803d 12cqw 18cqw);
+  border-color: #fde68a;
+}
+/* The block in flight is lobbed, like the pie. */
+.pw-flight.blockFly {
+  animation-name: pw-lob;
+}
+/* A marker on the block's square (which square, for tests and readers); the block itself is on the canvas. */
+.pw-block {
+  position: absolute;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
+  pointer-events: none;
+}
+.pw-block-board {
+  z-index: 3;
+}
+/* The bounce and the snack: on chessground's own board (eighths of --cg-size), over the pieces, never taking a tap. */
+.bb-layer {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: var(--cg-size, 100%);
+  height: var(--cg-size, 100%);
+  z-index: 8;
+  pointer-events: none;
+}
+.bb-layer > * {
+  position: absolute;
+  pointer-events: none;
+}
+.bb-puffs {
+  inset: 0;
+  z-index: 1;
+}
+/* His shadow, growing on the spot he's coming down on. */
+.bb-shadow {
+  z-index: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(8, 8, 14, 0.85) 0 45%, rgba(8, 8, 14, 0) 72%);
+}
+/* A piece knocked up into the air: the same drawing as the board's (cburnett), a square in size. */
+.bb-layer piece.bb-piece {
+  z-index: 2;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+  filter: drop-shadow(0 0.6cqw 0 rgba(0, 0, 0, 0.35));
+}
+.bb-crash {
+  inset: 0;
+  z-index: 3;
+}
+.bb-boy {
+  z-index: 4;
+  filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3));
+}
+.bb-snack {
+  position: absolute;
+  z-index: 8;
+  pointer-events: none;
+  filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3));
+}
+/* The board bumps as he lands on a spot, and jolts at the crash. */
+.board-area.pw-bump {
+  animation: pw-bump 180ms ease-out 1;
+}
+@keyframes pw-bump {
+  35% {
+    transform: translateY(2px);
+  }
+  70% {
+    transform: translateY(-1px);
+  }
+}
+.board-area.pw-crash {
+  animation: pw-crash 320ms ease-out 1;
+}
+@keyframes pw-crash {
+  15% {
+    transform: translate(-2px, 7px);
+  }
+  35% {
+    transform: translate(3px, -4px);
+  }
+  55% {
+    transform: translate(-2px, 2px);
+  }
+  80% {
+    transform: translate(1px, -1px);
+  }
+}

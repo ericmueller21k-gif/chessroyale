@@ -1,4 +1,4 @@
-import type { BurnEvent, LightsOutTarget, PowerEvent, PowerId } from "@chessroyale/core";
+import type { BounceResult, BurnEvent, LightsOutTarget, PowerEvent, PowerId } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
@@ -271,6 +271,14 @@ export interface NetBossPowers {
    * crowd's turn: "due", then "played" (the turn's `extra` event), or "skipped" (no quiet move within the cap).
    */
   lightsExtra?: "due" | "played" | "skipped";
+  /**
+   * Big Boy (missing for other bosses): his toy block (its square, the crowd turn it landed and its last; nothing may
+   * move onto it or through it), the crowd's centre pawn he ate before move 1, and his Big Bounce once it has happened
+   * (the position before it, the pieces it moved, where he bounced).
+   */
+  block?: { square: string; at: number; until: number } | null;
+  snack?: string | null;
+  bounce?: BounceResult | null;
 }
 
 /**
@@ -558,6 +566,11 @@ export type ServerMessage = { now: number } & (
       funhouse?: boolean;
       /** Hollow's extra move (a failed Lights out): a quiet one within the cap (extraMoveFrom); "" if there's none. */
       extra?: boolean;
+      /**
+       * Big Boy's Big Bounce: score these candidate positions (him to move) and answer with the one picked (bounceFrom),
+       * as `move`; "" when none is within the cap (nothing moves).
+       */
+      bounce?: string[];
     }
   /** Quick chat: a line for you (your own included, echoed back). */
   | { t: "chat"; line: NetChatLine }

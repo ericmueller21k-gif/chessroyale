@@ -116,6 +116,25 @@ export function prewarm(name: EffectName, frames: readonly (readonly [string, nu
   return () => stop();
 }
 
+/**
+ * A character's frames drawn ahead the same way (a boss's power moment played away from his spot, which SpriteAnim
+ * draws: Big Boy's bounce), in the given look. Returns a cancel.
+ */
+export function prewarmSprite(ch: Character, frames: readonly Frame[], look?: string): () => void {
+  let i = 0;
+  let stop = () => {};
+  stop = onEachFrame(() => {
+    const t0 = performance.now();
+    do {
+      const f = frames[i];
+      if (f) frameImage(ch, f, look);
+      i++;
+    } while (i < frames.length && performance.now() - t0 < 4);
+    if (i >= frames.length) stop();
+  });
+  return () => stop();
+}
+
 /** Sounds already played (a frame shown twice, or a new screen, never plays one twice). */
 const played = new Set<string>();
 

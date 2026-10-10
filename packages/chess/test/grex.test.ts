@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type BossPowerSettings, type BossState, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossDef, mulberry32, type BossPowerSettings, type BossState, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   ablaze,
@@ -489,9 +489,11 @@ describe("solo's difficulty", () => {
       const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: base, bossDifficulty: extra } as Settings;
       return new MatchRunner({ settings, rng: mulberry32(4), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] }).boss!;
     };
-    expect(elo(0).elo).toBe(1900);
-    expect(elo(-300).elo).toBe(1600);
-    expect(elo(250).elo).toBe(2150);
+    // (Its own offset under the lobby's strength: whichever boss the draw met.)
+    const offset = bossDef(elo(0).id)!.offset;
+    expect(elo(0).elo).toBe(2000 + offset);
+    expect(elo(-300).elo).toBe(1700 + offset);
+    expect(elo(250).elo).toBe(2250 + offset);
     expect(elo(500, 3000).elo).toBe(3190);
     expect(elo(500).id).toBe(elo(-300).id);
   });

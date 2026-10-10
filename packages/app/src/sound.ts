@@ -12,6 +12,7 @@ import { clownSound, type ClownSound } from "./characters/clown-sounds.ts";
 import { gingerSound, type GingerSound } from "./characters/gingerbread-sounds.ts";
 import { grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds.ts";
 import { hollowSound, type HollowSound } from "./characters/hollow-sounds.ts";
+import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -133,6 +134,7 @@ const clown = (name: ClownSound) => (t: number) => buffer(clownSound(name, ctx!.
 const ginger = (name: GingerSound) => (t: number) => buffer(gingerSound(name, ctx!.sampleRate), t);
 const grex = (name: GrexSound) => (t: number) => buffer(grexSound(name, ctx!.sampleRate), t);
 const hollow = (name: HollowSound) => (t: number) => buffer(hollowSound(name, ctx!.sampleRate), t);
+const bigBoy = (name: BigBoySound) => (t: number) => buffer(bigBoySound(name, ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
 function grexWhistle(t: number) {
   const w = whistlePick(Math.random(), Math.random(), Math.random());
@@ -355,7 +357,20 @@ export type SoundName =
   | "hollowFound"
   | "hollowMiss"
   | "hollowRelight"
-  | "hollowClink";
+  | "hollowClink"
+  // Big Boy (a raid boss, the baby): synthesised, see characters/bigboy-sounds.ts.
+  | "bigboyGiggle"
+  | "bigboySlurp"
+  | "bigboyWail"
+  | "bigboyBoing"
+  | "bigboyCrash"
+  | "bigboyNom"
+  | "bigboyToss"
+  | "bigboyClack"
+  | "bigboySwish"
+  | "bigboyBonk"
+  | "bigboyStomp"
+  | "bigboyPoof";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -441,13 +456,25 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   hollowMiss: hollow("miss"),
   hollowRelight: hollow("relight"),
   hollowClink: hollow("clink"),
+  bigboyGiggle: bigBoy("giggle"),
+  bigboySlurp: bigBoy("slurp"),
+  bigboyWail: bigBoy("wail"),
+  bigboyBoing: bigBoy("boing"),
+  bigboyCrash: bigBoy("crash"),
+  bigboyNom: bigBoy("nom"),
+  bigboyToss: bigBoy("toss"),
+  bigboyClack: bigBoy("clack"),
+  bigboySwish: bigBoy("swish"),
+  bigboyBonk: bigBoy("bonk"),
+  bigboyStomp: bigBoy("stomp"),
+  bigboyPoof: bigBoy("poof"),
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));
   },
 };
 
-/** Synthesised sounds that can be made ahead (warmSounds), by name: Hollow's (his smash took 150 ms to make on a computer). */
+/** Synthesised sounds that can be made ahead (warmSounds), by name: Hollow's (his smash took 150 ms to make on a computer), Big Boy's. */
 const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
   hollowHum: (r) => hollowSound("hum", r),
   hollowCast: (r) => hollowSound("cast", r),
@@ -459,6 +486,18 @@ const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
   hollowMiss: (r) => hollowSound("miss", r),
   hollowRelight: (r) => hollowSound("relight", r),
   hollowClink: (r) => hollowSound("clink", r),
+  bigboyGiggle: (r) => bigBoySound("giggle", r),
+  bigboySlurp: (r) => bigBoySound("slurp", r),
+  bigboyWail: (r) => bigBoySound("wail", r),
+  bigboyBoing: (r) => bigBoySound("boing", r),
+  bigboyCrash: (r) => bigBoySound("crash", r),
+  bigboyNom: (r) => bigBoySound("nom", r),
+  bigboyToss: (r) => bigBoySound("toss", r),
+  bigboyClack: (r) => bigBoySound("clack", r),
+  bigboySwish: (r) => bigBoySound("swish", r),
+  bigboyBonk: (r) => bigBoySound("bonk", r),
+  bigboyStomp: (r) => bigBoySound("stomp", r),
+  bigboyPoof: (r) => bigBoySound("poof", r),
 };
 /**
  * Makes a boss's synthesised sounds ahead of time, one per idle moment, so the first time one plays (a bulb smashed in

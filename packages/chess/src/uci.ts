@@ -188,6 +188,11 @@ export class UciEngine {
     return this.serial(() => this.search(fen, n));
   }
 
+  /** The same at another budget (Big Boy's Big Bounce scores a few positions quickly). */
+  topMovesAt(fen: string, n: number, nodes: number): Promise<MoveScore[]> {
+    return this.serial(() => this.search(fen, n, undefined, nodes));
+  }
+
   /**
    * The engine's best move plus the expected score after each listed move.
    * One search covers the top `topN` moves; any listed move outside them gets

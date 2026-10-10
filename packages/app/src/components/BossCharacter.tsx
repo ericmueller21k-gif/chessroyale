@@ -6,6 +6,7 @@ import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
 import { useFrameNow } from "./Countdown.tsx";
+import { prewarmBigBoy } from "./BigBoy.tsx";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing kitty-corner across the board from
@@ -104,6 +105,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     const m = POWER_MOMENTS[kit.ch.name];
     const fx = m ? [m.power, m.ultimate, m.powerHit, m.ultimateHit, ...Object.values(m.more ?? {})].flatMap((x) => x?.effects ?? []) : [];
     warmSounds([...Object.values(kit.sounds), ...fx.flatMap((e) => Object.values(EFFECTS[e].sounds))]);
+    // (Big Boy's snack, toss and bounce drawn ahead too: his bounce is big, and his snack plays seconds in.)
+    if (kit.ch.id === "bigboy") prewarmBigBoy(kit.ch.name, boss.crowdSide === "b" ? "blackPawn" : undefined);
   }, [kit]);
   // A recolour from the battle's state (Hollow's bulbs still lit), read as it's drawn.
   const lookRef = useRef<() => string>(() => "");

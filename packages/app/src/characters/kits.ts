@@ -7,6 +7,7 @@
  */
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines } from "./boss-beats.ts";
+import { BIGBOY, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.ts";
 import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
@@ -98,6 +99,44 @@ export const BOSS_KITS: Record<string, BossKit> = {
       return n === undefined ? undefined : bulbsLook(n);
     },
   },
+  "Big Boy": {
+    ch: BIGBOY,
+    anims: {
+      entrance: "swing",
+      thinking: "idle",
+      move: "lick",
+      capture: "swing",
+      hurt: "wail",
+      check: "giggle",
+      smug: "idle",
+      rattled: "idle",
+      defeat: "wail",
+      victory: "giggle",
+      strike: "swing",
+      power: "toss",
+      ultimateWarn: "wail",
+      ultimate: "bigBounce",
+      snack: "snack",
+    },
+    sounds: {
+      swing: "bigboySwish",
+      bonk: "bigboyBonk",
+      stomp: "bigboyStomp",
+      wail: "bigboyWail",
+      giggle: "bigboyGiggle",
+      slurp: "bigboySlurp",
+      nom: "bigboyNom",
+      toss: "bigboyToss",
+      boing: "bigboyBoing",
+      whoosh: "bigboyToss",
+      crash: "bigboyCrash",
+    },
+    lines: BIGBOY_LINES,
+    chance: BIGBOY_CHANCE,
+    portrait: { ...BIGBOY_PORTRAIT, anim: "idle", frame: 0 },
+    // His snack is the crowd's pawn: white, or black when the crowd plays Black.
+    lookOf: (boss) => (boss.crowdSide === "b" ? "blackPawn" : undefined),
+  },
 };
 
 /** Test links only (?wip=1&kit=<name>): a kit drawn before its boss is playable, shown in every boss's place. */
@@ -109,8 +148,9 @@ const WIP_KIT = (() => {
     return null;
   }
 })();
-/** The kit a test link shows in every boss's place, if any. */
-export const wipKit = (): BossKit | null => (WIP_KIT ? (BOSS_KITS[WIP_KIT] ?? null) : null);
+/** The kit a test link shows in every boss's place, if any (by its name, spaces optional: `kit=BigBoy`). */
+export const wipKit = (): BossKit | null =>
+  WIP_KIT ? (BOSS_KITS[WIP_KIT] ?? Object.entries(BOSS_KITS).find(([k]) => k.replace(/\s/g, "") === WIP_KIT.replace(/\s/g, ""))?.[1] ?? null) : null;
 /**
  * For a test link's preview of a moment (components/WipPreview.tsx): a look to show instead of the kit's own (his bulbs
  * counting down before the power rules exist).

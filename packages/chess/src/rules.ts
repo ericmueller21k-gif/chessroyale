@@ -134,6 +134,33 @@ export function queenInDanger(fen: string, color: "w" | "b"): boolean {
   return false;
 }
 
+/**
+ * The material `color` has hanging, whoever is to move: each of its pieces (not the king) attacked by a cheaper piece,
+ * or attacked and not defended, by its value (pawn 1 ... queen 9). The Big Bounce's quick check that a thrown piece
+ * didn't land where it's simply taken.
+ */
+export function hangingValue(fen: string, color: "w" | "b"): number {
+  let chess: Chess;
+  try {
+    chess = new Chess(fen, { skipValidation: true });
+  } catch {
+    return 0;
+  }
+  const them = color === "w" ? "b" : "w";
+  const value = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 } as const;
+  let total = 0;
+  for (const row of chess.board()) {
+    for (const sq of row) {
+      if (!sq || sq.color !== color || sq.type === "k") continue;
+      const attackers = chess.attackers(sq.square, them);
+      if (!attackers.length) continue;
+      const cheaper = attackers.some((a) => value[chess.get(a as Square)!.type] < value[sq.type]);
+      if (cheaper || !chess.isAttacked(sq.square, color)) total += value[sq.type];
+    }
+  }
+  return total;
+}
+
 /** Whether the side to move is in check. */
 export function inCheck(fen: string): boolean {
   return new Chess(fen).inCheck();

@@ -15,14 +15,23 @@ export const BOSS_INTRO = { cardMs: 2600, replayMs: 2400, minStepMs: 110, maxSte
 export const CLAIM_MS = 2400;
 
 /**
- * When each part of the intro happens (ms after it starts), for a game `plies` half-moves in. `claimed`: Hollow claims
- * the dark side after the card (`claimAt`), before "START!".
+ * Big Boy's snack in the intro (before move 1): he waddles over to the crowd's centre pawn, grabs it and eats it
+ * ("Nom nom."), beat by beat in ms from its start (the app's SnackTime): he's at the pawn at `grabAt` (it leaves the
+ * board), eats it at `nomAt`, and is back in his corner by the end.
  */
-export function bossIntroTimeline(plies: number, claimed = false) {
+export const SNACK = { walkMs: 1100, grabAt: 1100, nomAt: 1500, ms: 3000 } as const;
+export const SNACK_MS = SNACK.ms;
+
+/**
+ * When each part of the intro happens (ms after it starts), for a game `plies` half-moves in. `claimed`: Hollow claims
+ * the dark side after the card (`claimAt`), before "START!". `snack`: Big Boy eats the crowd's pawn then instead
+ * (from `claimAt`, SNACK_MS).
+ */
+export function bossIntroTimeline(plies: number, claimed = false, snack = false) {
   const step = plies > 0 ? Math.max(BOSS_INTRO.minStepMs, Math.min(BOSS_INTRO.maxStepMs, BOSS_INTRO.replayMs / plies)) : 0;
   const replayAt = BOSS_INTRO.cardMs;
   const claimAt = replayAt + plies * step;
-  const bannerAt = claimAt + (claimed ? CLAIM_MS : 0) + BOSS_INTRO.bannerGapMs;
+  const bannerAt = claimAt + (claimed ? CLAIM_MS : 0) + (snack ? SNACK_MS : 0) + BOSS_INTRO.bannerGapMs;
   return { step, replayAt, claimAt, bannerAt, total: bannerAt + BOSS_INTRO.bannerMs };
 }
 
@@ -42,8 +51,34 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * he speaks and plays the crowd's move; the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
+/**
+ * Big Boy's Big Bounce, beat by beat (ms into its moment, at the start of his turn; nobody's clock runs):
+ *   0         "BIG BOUNCE!" (his banner).
+ *   leapAt    he leaps from his corner; a shadow grows on the first of his three spots (each a 2x2 block of squares).
+ *   lands     he lands on each spot in turn, squashing, then stretches up again: the pieces there are knocked up and
+ *             tumble in the air.
+ *   jumpAt    the last spring, high up and out of sight, his shadow growing over the four centre squares.
+ *   crashAt   the giant fall on the centre: a crash, a shockwave across the board, dust, the board jolts (`jolt` ms).
+ *   settleAt  every piece comes down into the new position, settled by `settledAt`.
+ *   backAt    he bounces back to his corner (gone from the board by `total`); then he plays his move.
+ */
+export const BOUNCE = {
+  leapAt: 1300,
+  lands: [1850, 2450, 3050] as readonly number[],
+  jumpAt: 3050,
+  crashAt: 4100,
+  jolt: 320,
+  settleAt: 4500,
+  settledAt: 5200,
+  backAt: 5350,
+  total: 6200,
+} as const;
+
+/** Big Boy's toy block: the banner, then his toss from the board's corner, the block's flight, and it lands. */
+export const BLOCK = { flyAt: 1450, landAt: 1850 } as const;
+
 // Hollow's extra move (a failed Lights out): his banner over the board as the move lands, then the crowd's turn.
-export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2700, extra: 2200 } as const;
+export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2700, extra: 2200, block: 2300, bounce: BOUNCE.total } as const;
 
 /** Hollow's first cover of the dark holds longer, for his first-cover line ("Don't forget what's there…"). */
 export const DARK_FIRST_EXTRA_MS = 1300;

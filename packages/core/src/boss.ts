@@ -74,9 +74,9 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce";
 /** Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual). */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -106,6 +106,9 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
   { id: "grex", name: "G-REX", icon: "🦖", kit: "G-REX", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
   { id: "hollow", name: "Hollow", icon: "🌑", kit: "Hollow", offset: -100, powers: { passive: "dark", ultimate: "lightsout" } },
+  // Big Boy eats one of the crowd's centre pawns before move 1 (his snack), so he plays further under the lobby's
+  // strength than the others (DECISIONS.md: "Big Boy, built": the boss sim's numbers).
+  { id: "bigboy", name: "Big Boy", icon: "🍭", kit: "Big Boy", offset: -250, powers: { passive: "blocks", ultimate: "bounce" } },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
@@ -243,8 +246,28 @@ export interface BossPowerState {
   tries?: { round: number; by: Record<string, number> };
   /** Hollow's Lights out (his ultimate, at the start of his turn): the test once it has begun. Never sent to screens. */
   lightsOut?: LightsOutTest | null;
+  /** Big Boy's snack: the crowd's centre pawn he ate before move 1 (its square). */
+  snack?: { square: string };
+  /** Big Boy's toy block: its square (empty; nothing may move onto it or slide through it), the crowd turn it landed, its last. */
+  block?: { square: string; at: number; until: number } | null;
+  /** Big Boy's Big Bounce (his ultimate, at the start of his turn, after the crowd's move): what it did, once it has. */
+  bounce?: BounceResult | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
+}
+
+/**
+ * The Big Bounce, once it has happened: after which crowd move (crowdMoves), the position before it (the crowd's move
+ * just played, him to move), the crowd's pieces it moved (each from its square to an empty one; none: nothing moved),
+ * where his three bounces landed (each a 2x2 block, by its lower-left square from White's side), and the crowd's loss
+ * the engine put on it (in pawns; null when nothing moved, or not known here: online the host's engine picked it).
+ */
+export interface BounceResult {
+  at: number;
+  before: string;
+  moves: { from: string; to: string; piece: string }[];
+  spots: string[];
+  loss: number | null;
 }
 
 /** One of Hollow's dark squares: the crowd turn it fell as, and the last crowd turn it covers (darkTurns in all). */
@@ -320,8 +343,11 @@ export interface BurnEvent {
   fizzled?: boolean;
 }
 
-/** `extra`: Hollow's extra move after a failed Lights out (played after his own, before the crowd's turn). */
-export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball" | "dark" | "extra";
+/**
+ * `extra`: Hollow's extra move after a failed Lights out (played after his own, before the crowd's turn). `block`: Big
+ * Boy's toy block landing; `bounce`: his Big Bounce (at the start of his turn, after the crowd's move).
+ */
+export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball" | "dark" | "extra" | "block" | "bounce";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
