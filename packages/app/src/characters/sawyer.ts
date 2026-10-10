@@ -1,8 +1,8 @@
 /**
  * Sawyer, the raccoon boss: after Eric's reference picture, redrawn. A raccoon in a wide, aggressive stance with a
- * mischievous toothy grin, a yellow hard hat, clear safety goggles over his mask, white gloves, a big striped tail, and
- * a red-and-black reciprocating saw held in both hands (no brand marks). Drawn three-quarters on, facing our left as
- * in the reference, light from the top left.
+ * mischievous toothy grin, a yellow hard hat, a bold black bandit mask (no goggles: Eric wanted the mask to read), white
+ * gloves, a big striped tail, and a red-and-black reciprocating saw held in both hands (no brand marks). Drawn
+ * three-quarters on, facing our left as in the reference, light from the top left.
  *
  * Rigging: the head (one per face), the hat, the body and the feet are painted once; the legs and arms from their
  * points (a hip and an ankle; a shoulder, an elbow and a hand), the tail from its swish, and the saw from its angle,
@@ -23,20 +23,17 @@ export const SAWYER_PALETTE: Record<string, string> = {
   e: "#c0aea5", // cream fur: shadow, mid, light
   f: "#e3d5cb",
   g: "#f8f1ea",
-  m: "#2c1f1c", // his mask
-  M: "#4a3733",
-  x: "#0b0808", // pupils, brows, nose
-  w: "#ffffff", // eye whites, teeth, the nose's glint
+  m: "#140e0e", // his bandit mask, and its soft ends
+  M: "#332523",
+  x: "#050303", // pupils, nose, the mouth's line
+  w: "#ffffff", // eye whites, teeth
+  v: "#ffffff", // the glint in his pupils
   u: "#6b1f24", // inside his mouth
   Y: "#f6c21c", // the hard hat: yellow, light, highlight, shadow, deep shadow
   y: "#ffe05a",
   L: "#fff3ad",
   O: "#d39a0b",
   P: "#946404",
-  G: "#d4dae2", // goggles: the rim, its shade, a glint on the glass; the strap
-  H: "#8d96a3",
-  I: "#eef8ff",
-  Z: "#3a3a42",
   j: "#fbf9f5", // gloves: white, shade, the lines between fingers
   J: "#d4cec6",
   i: "#9c948c",
@@ -76,48 +73,41 @@ function stamp(cv: Canvas, cx0: number, cy0: number, rows: readonly string[], x0
   );
 }
 
-/** A rounded rectangle (pixel centres), corners cut by `r`. */
-const inRound = (x0: number, y0: number, x1: number, y1: number, r: number) => (x: number, y: number) => {
-  const px = x + 0.5;
-  const py = y + 0.5;
-  if (px < x0 || px > x1 || py < y0 || py > y1) return false;
-  const dx = Math.max(x0 + r - px, 0, px - (x1 - r));
-  const dy = Math.max(y0 + r - py, 0, py - (y1 - r));
-  return dx * dx + dy * dy <= r * r;
-};
-
 // ---- The head: one face per mood. Everything in drawing space (the ground at y 64).
 
 export type Mood = "grin" | "blink" | "smirk" | "glee" | "fierce" | "squint";
 
-const HX = 14;
+const HX = 12;
 const HY = 4;
-const HEAD_W = 39;
+const HEAD_W = 41;
 const HEAD_H = 32;
 
 /**
- * Inside the goggles, each eye with its brow, stamped from (23, 17) for the far eye (our left) and (33, 17) for the near
- * one. The brows slant down to his nose and the pupils glare inward: angry, up to something.
+ * His eyes inside the mask: [rows, top-left] for the far eye (our left) and the near one. White, the pupils glaring
+ * inward with a glint, the tops cut on a slant by his brows (the white brow fur comes down to his nose): angry, up to
+ * something. `.` leaves the mask.
  */
 const EYES: Record<string, { l: readonly string[]; r: readonly string[] }> = {
-  glare: { l: ["xx.....", ".xxxx..", "..wwwxx", "..wwxxm", "...wxxm"], r: [".......xx", "...xxxxx.", ".xxwwwww.", "mxxxwwww.", "mxxxwww.."] },
-  shut: { l: ["xx.....", ".xxxx..", "....xxx", "..xxxmm", "......."], r: [".......xx", "...xxxxx.", ".xxx.....", "mmmxxxxx.", "........."] },
-  /** His near brow up, a knowing look from the far eye. */
-  sly: { l: ["xx.....", ".xxxx..", "..xxxxx", "..wwxxm", "...wxxm"], r: ["...xxxxx.", "..x....xx", ".xwwwwww.", "mxxxwwww.", "mxxxwww.."] },
-  /** Wide and wild (revving). */
-  wild: { l: ["x......", ".xxx...", ".wwwwxx", ".wwxxwm", "..wxxwm"], r: ["........x", "....xxxx.", "xwwwwwww.", "wxxwwwww.", "mxxwwww.."] },
+  glare: { l: ["ww...", "wwvx.", "wwxxw", ".www."], r: ["...www", ".vxwww", "wxxwww", ".wwww."] },
+  shut: { l: [".....", ".....", "wwwww", "....."], r: ["......", "......", "wwwwww", "......"] },
+  /** His near brow up, a knowing look: the near eye open, the far one narrowed. */
+  sly: { l: [".....", "wwvx.", "wwxxw", "....."], r: ["..wwww", "wvxwww", "wxxwww", ".wwww."] },
+  /** Wide and wild (revving): round, the pupils small and fixed on you. */
+  wild: { l: [".www.", "wwvxw", "wwxxw", ".www."], r: [".wwww.", "wwvxww", "wwxxww", ".wwww."] },
   /** Narrowed (the cut). */
-  narrow: { l: ["xx.....", ".xxxxx.", "..xxxxx", "..wxxxm", "......."], r: [".......xx", "..xxxxxx.", "xxxxxxxx.", "mxxxwww..", "........."] },
+  narrow: { l: [".....", "wwvxw", ".wxx.", "....."], r: ["......", "wvxwww", ".xxww.", "......"] },
 };
-/** The mouth to the right of his nose, stamped from (25, 25): a wide grin full of teeth, rising to his near cheek. */
+const EYE_L: Pt = [23, 19];
+const EYE_R: Pt = [35, 19];
+/** The mouth under his snout, stamped from (19, 26): a wide grin full of teeth, rising to his near cheek. */
 const MOUTHS: Record<string, readonly string[]> = {
-  grin: ["............xx", "xxxxxxxxxxxxx.", ".xwwwwwwwwwwx.", "..xwewwewwex..", "...xxuuuuxx...", ".....xxxx....."],
+  grin: ["................xx", ".xxxxxxxxxxxxxxxx.", "..xwwwwwwwwwwwwx..", "...xwewwewwewwx...", "....xxuuuuuuxx....", "......xxxxxx......"],
   /** Lopsided: the far side pressed shut, the near corner pulled right up, a crease, teeth on that side. */
-  smirk: ["...........x.x", "xxxxxx.....xx.", ".....xxxxwwx..", "......xwwwex..", ".......xxxx...", ".............."],
+  smirk: ["...............x.x", ".xxxxxxxx......xx.", ".........xxxxwwwx..", "..........xwwwex...", "...........xxxx....", ".................."],
   /** Wide open, teeth top and bottom (revving). */
-  glee: ["............xx", "xxxxxxxxxxxxx.", ".xwwwwwwwwwwx.", ".xuuuuuuuuuux.", "..xwwwwwwwwx..", "...xxxxxxxx..."],
+  glee: ["................xx", ".xxxxxxxxxxxxxxxx.", "..xwwwwwwwwwwwwwx.", "..xuuuuuuuuuuuux..", "...xwwwwwwwwwwx...", "....xxxxxxxxxx...."],
   /** Teeth gritted. */
-  grit: ["............xx", "xxxxxxxxxxxxx.", ".xwxwwxwwxwwx.", ".xwxwwxwwxwwx.", "..xxxxxxxxxx..", ".............."],
+  grit: ["................xx", ".xxxxxxxxxxxxxxxx.", "..xwxwwxwwxwwxwx..", "..xwxwwxwwxwwxwx..", "...xxxxxxxxxxxx...", ".................."],
 };
 const FACES: Record<Mood, { eyes: string; mouth: string }> = {
   grin: { eyes: "glare", mouth: "grin" },
@@ -131,46 +121,39 @@ const FACES: Record<Mood, { eyes: string; mouth: string }> = {
 function head(mood: Mood): Part {
   const cv = canvas(HEAD_W, HEAD_H);
   const F = (inside: (x: number, y: number) => boolean, key: (x: number, y: number) => string) => fill(cv, HX, HY, inside, key);
-  const skull = inEllipse(34, 21.5, 15.2, 11.6);
+  const skull = inEllipse(34.5, 21.5, 14.8, 11.6);
   const light = roundLight(31, 17, 16, 12, 0.08);
-  // The ears, behind the hat: dark inside.
-  F(inPoly([[18.5, 16], [20.5, 5.5], [28, 12]]), () => "c");
-  F(inPoly([[20.5, 14], [21.3, 8.5], [25.5, 12.5]]), () => "a");
-  F(inPoly([[41, 11.5], [47.5, 6], [50, 16]]), () => "b");
+  // The ears, behind the hat: white-rimmed, dark inside.
+  F(inPoly([[19.5, 16], [21, 5.5], [28.5, 12]]), () => "f");
+  F(inPoly([[21, 14.5], [21.8, 8.5], [26, 12.5]]), () => "a");
+  F(inPoly([[41, 11.5], [47.5, 6], [50, 16]]), () => "d");
   F(inPoly([[43.5, 12], [47, 8.5], [48.5, 14.5]]), () => "a");
   F(skull, (x, y) => ramp(FUR, light(x, y)));
-  // Spiky cheek fur: cream on his far cheek (our left), grey on the near one.
-  F(inPoly([[22, 18], [16.5, 20.5], [19.5, 21.5], [15.5, 24], [19.5, 25], [17, 27.5], [23, 28], [24, 21]]), (x, y) => (y < 22 ? "g" : "f"));
-  F(inPoly([[46, 19], [52, 22], [49, 23.5], [52, 26], [48.5, 27], [50, 29.5], [44, 30]]), (x) => (x > 49 ? "b" : "c"));
-  // The cream lower face: the muzzle (pointing our left) and the chin.
-  F(inPoly([[18.5, 26], [21, 23.5], [24, 22], [31, 22.5], [38, 22.5], [44, 24.5], [43.5, 29.5], [38, 33], [29, 33.2], [22.5, 30.5]]), (x, y) => (y >= 32 || x > 41 ? "e" : y < 26 ? "g" : "f"));
-  // Light brow fur, and the mask: a dark band across the eyes, lighter at its edges.
-  F(inPoly([[19, 15], [47, 14], [47, 19], [19, 19]]), (x) => (x < 32 ? "g" : "f"));
-  F(inPoly([[19.5, 19.5], [24, 18], [31, 19], [33, 18], [41, 17.5], [46.5, 18], [47, 21.5], [44, 23.5], [38.5, 23.5], [34, 23], [31.5, 24.2], [27, 24], [21.5, 23]]), (x, y) =>
-    x < 21 || x > 45 || y > 22 ? "M" : "m",
+  // White fur: a brow patch over each eye (their lower edges slant down to his nose: the angry brows), his cheeks and
+  // the long pointed snout, with a spiky white tuft on his near cheek. A dark stripe runs down his forehead between the
+  // brows into the mask.
+  F(inPoly([[20, 16.5], [24, 14.6], [31, 15], [31.4, 18.6], [27.5, 17.4], [22, 17.8]]), (x) => (x < 25 ? "g" : "f"));
+  F(inPoly([[35.4, 15], [44, 14.4], [48, 16.4], [47.4, 18.2], [39.5, 17.3], [35, 18.6]]), (x) => (x > 44 ? "e" : "f"));
+  F(inPoly([[46.5, 19], [52.5, 21.5], [49.5, 23], [52.5, 25.5], [49, 26.5], [50.5, 29], [44.5, 30]]), (x) => (x > 50 ? "e" : "f"));
+  F(
+    inPoly([[13.5, 25.2], [17, 23.2], [22.5, 22.8], [27, 24.6], [31, 24.4], [34, 23], [38, 23.6], [42, 24.6], [46.5, 24], [49, 23], [49.5, 27], [46, 30.6], [39, 33.2], [29, 33.4], [22, 31.4], [16.5, 27.6]]),
+    (x, y) => (y >= 32 || x > 44 ? "e" : y < 26 && x < 30 ? "g" : "f"),
   );
+  // The bandit mask: a bold black band across his eyes, from cheek to cheek, dipping at its ends; a thinner bridge over
+  // his nose meets the forehead stripe.
+  F(
+    inPoly([[17.6, 19.6], [22, 17.8], [27.5, 17.4], [31.4, 18.6], [33.2, 17.2], [35, 18.6], [39.5, 17.3], [47.4, 18.2], [50, 20], [49.6, 22.6], [46.6, 24.6], [42, 24.8], [37.6, 23.6], [34, 23.2], [31, 24.6], [27, 25], [22.6, 23.4], [18.4, 22.6]]),
+    (x, y) => (x > 48 || x < 19 ? "M" : "m"),
+  );
+  F(inPoly([[31.6, 9], [34.6, 9], [34.2, 18], [32.2, 18]]), () => "a");
   const f = FACES[mood];
   const eyes = EYES[f.eyes]!;
-  stamp(cv, HX, HY, eyes.l, 23, 17);
-  stamp(cv, HX, HY, eyes.r, 33, 17);
-  // The goggles: two clear lenses (the far one smaller), a grey rim lit from the top left with a dark edge inside along
-  // the top, a glint on each, and the strap round his head.
-  const lensL = inRound(20.5, 14.6, 32.5, 23.6, 2.4);
-  const lensR = inRound(32, 14, 46.5, 23.6, 2.4);
-  const lens = (x: number, y: number) => lensL(x, y) || lensR(x, y);
-  const edge = (x: number, y: number) => !lens(x - 1, y) || !lens(x + 1, y) || !lens(x, y - 1) || !lens(x, y + 1);
-  const rim = (x: number, y: number) => lens(x, y) && (edge(x, y) || (x === 32 && y >= 16 && y <= 21));
-  const ring = (x: number, y: number) => !lens(x, y) && (lens(x - 1, y) || lens(x + 1, y) || lens(x, y - 1) || lens(x, y + 1));
-  F(inPoly([[46, 17.5], [50.5, 17.5], [50.5, 20.5], [46, 20.5]]), (x, y) => (y === 17 || y === 20 ? "k" : "Z"));
-  F(ring, () => "k");
-  F(rim, (x, y) => (y < 17 || x < 22 ? "G" : "H"));
-  F((x, y) => lens(x, y) && !rim(x, y) && rim(x, y - 1) && y < 17, () => "H");
-  stamp(cv, HX, HY, ["I.I", ".I."], 22, 16);
-  stamp(cv, HX, HY, ["III.", "...I"], 34, 15);
-  // The nose: black, at the muzzle's tip, with a glint.
-  stamp(cv, HX, HY, [".xxx.", "xdxxx", "xxxx.", ".xx.."], 20, 24);
+  stamp(cv, HX, HY, eyes.l, EYE_L[0], EYE_L[1]);
+  stamp(cv, HX, HY, eyes.r, EYE_R[0], EYE_R[1]);
+  // The nose: black, at the snout's tip, a grey glint.
+  stamp(cv, HX, HY, [".xxx", "xdxx", "xxxx", ".xx."], 13, 23);
   // The mouth.
-  stamp(cv, HX, HY, MOUTHS[f.mouth]!, 25, 25);
+  stamp(cv, HX, HY, MOUTHS[f.mouth]!, 19, 26);
   return { grid: toGrid(cv) };
 }
 
@@ -470,7 +453,7 @@ export interface SawyerPose {
   /** The head a little further. */
   headDx?: number;
   headDy?: number;
-  /** The hat jolted down a pixel over his goggles (revving). */
+  /** The hat jolted down a pixel over his brow (revving). */
   hatDrop?: number;
   saw?: Partial<SawPose>;
   /** The tail's swish, -2 to 2. */

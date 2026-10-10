@@ -19,6 +19,18 @@ describe("Sawyer (a sprite preview)", () => {
       anim.frames.forEach((f, i) => expect(top(frameKeys(SAWYER, f)), `${name} frame ${i + 1}`).toBeGreaterThanOrEqual(highest));
   });
 
+  it("has no goggles: a bold black bandit mask with his eyes inside it, glinting (Eric, Oct 10)", () => {
+    for (const k of ["G", "H", "I", "Z"]) expect(SAWYER.palette, k).not.toHaveProperty(k);
+    const keys = frameKeys(SAWYER, idle.frames[0]!);
+    const mask = keys.flat().filter((c) => c === "m").length;
+    expect(mask).toBeGreaterThan(80);
+    // Each eye: white with a glint, inside the mask's rows.
+    const rows = keys.map((r) => r.join(""));
+    const eyeRows = rows.filter((r) => r.includes("v"));
+    expect(eyeRows.length).toBeGreaterThan(0);
+    for (const r of eyeRows) expect(r.match(/v/g)!.length).toBe(2);
+  });
+
   it("idles silently: the blade buzzes in and out, the tail swishes, he blinks and smirks", () => {
     const part = (prefix: string) => idle.frames.map((f) => f.layers.find((l) => l.part.startsWith(prefix))!.part);
     const saws = part("saw:");
@@ -44,7 +56,7 @@ describe("Sawyer (a sprite preview)", () => {
     expect(CUT[0]).toBeLessThan(15);
   });
 
-  it("has a portrait inside his frame that shows his hard hat, goggles and grin", () => {
+  it("has a portrait inside his frame that shows his hard hat, bandit mask, eyes and grin", () => {
     const p = BOSS_KITS["Sawyer"]!.portrait;
     expect(p.x).toBeGreaterThanOrEqual(0);
     expect(p.y).toBeGreaterThanOrEqual(0);
@@ -52,9 +64,9 @@ describe("Sawyer (a sprite preview)", () => {
     expect(p.y + p.h).toBeLessThanOrEqual(SAWYER.h);
     const keys = frameKeys(SAWYER, SAWYER.anims[p.anim]!.frames[p.frame]!);
     const inside = keys.slice(p.y, p.y + p.h).flatMap((r) => r.slice(p.x, p.x + p.w));
-    for (const k of ["Y", "G", "w", "x"]) expect(inside, k).toContain(k);
-    // The whole hat.
+    for (const k of ["Y", "m", "w", "v", "x"]) expect(inside, k).toContain(k);
+    // The whole hat, mask and nose.
     const all = (k: string) => keys.flat().filter((c) => c === k).length;
-    expect(inside.filter((c) => c === "Y").length).toBe(all("Y"));
+    for (const k of ["Y", "m"]) expect(inside.filter((c) => c === k).length, k).toBe(all(k));
   });
 });
