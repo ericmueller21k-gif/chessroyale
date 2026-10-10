@@ -110,7 +110,7 @@ const HOP_MS = 520;
 const LAND_MS = 400;
 
 /**
- * Every piece the bounce knocks up: the pieces on each spot as he lands there (those the bounce moves stay up,
+ * Every piece the bounce knocks up (never a king): the pieces on each spot as he lands there (those the bounce moves stay up,
  * tumbling, the rest hop back down onto their squares), the pieces on the middle squares at the crash, and any piece
  * it moves that wasn't under a spot (the shockwave throws it up). The moved ones come down one after another as the
  * pieces settle, each onto its new square.
@@ -122,7 +122,8 @@ export function bounceFlyers(b: Pick<BounceResult, "before" | "moves" | "spots">
   const hit = (sq: string, at: number) => {
     if (taken.has(sq)) return;
     const pc = pieceAt(b.before, sq);
-    if (!pc) return;
+    // (Kings stay put: the board always has both, and the bounce never moves one.)
+    if (!pc || pc.type === "k") return;
     taken.add(sq);
     const to = moved.get(sq);
     out.push({ from: sq, to: to ?? sq, piece: pc, up: at, down: to ? 0 : at + HOP_MS, land: to ? 0 : at + HOP_MS, hop: !to });

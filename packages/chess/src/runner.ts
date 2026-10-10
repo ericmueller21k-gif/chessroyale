@@ -1303,8 +1303,9 @@ export class MatchRunner {
     const result = bounceResult(board.fen, b.crowdSide, p.seed, b.crowdMoves, picked, loss);
     if (picked) {
       const ply = board.history.length;
-      // (The side to move's expected score: his, a little better by the loss when it's known.)
-      const expected = Math.max(0, Math.min(1, board.expected + (loss ?? 0) / 100));
+      // (The side to move's expected score: his, better by the loss (in pawns) when it's known.)
+      const odds = Math.log(Math.min(0.999, Math.max(0.001, board.expected)) / (1 - Math.min(0.999, Math.max(0.001, board.expected))));
+      const expected = loss === null ? board.expected : 1 / (1 + Math.exp(-(odds + loss * BOSS_POWERS.bouncePawnLogit)));
       this.boards.set(id, { ...board, fen: picked.fen, expected, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: picked.fen }] });
     }
     this.state = { ...this.state, boss: { ...b, powers: { ...p, ultAt: b.crowdMoves, bounce: result, events: [...p.events, { kind: "bounce", turn: p.turn }] } } };

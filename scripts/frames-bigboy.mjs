@@ -103,8 +103,10 @@ async function run(name, context) {
   mark("snack", t0 + 2000, Date.now());
   await p.screenshot({ path: join(outDir, `${name}-1-start.png`) });
 
-  // Move 1 (he opens first when the crowd is Black); his reply; the 2nd turn begins with his toy block and the warning.
-  if (!sideB) await play(await pick("g1f3", "b1c3"));
+  // Move 1 (after his opening move when the crowd is Black); his reply; the 2nd turn begins with his toy block and the
+  // warning.
+  await waitUntil((s) => s.kind === "play", 60_000);
+  await play(await pick("g1f3", "b1c3", "g8f6", "b8c6"));
   const block = await waitUntil((s) => s.kind === "boss" && !s.thinking && (s.boss?.powers?.events ?? []).some((e) => e.kind === "block"));
   const ev = block.boss.powers.events.find((e) => e.kind === "block");
   log(`toy block on ${ev.square}; events ${block.boss.powers.events.map((e) => e.kind).join(", ")}; until +${block.until - t0}ms`);

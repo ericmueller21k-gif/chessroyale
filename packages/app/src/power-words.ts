@@ -14,7 +14,7 @@ export const POWER_WORDS: Record<PowerId, string> = {
   candle: "Roman candle",
   dark: "darkens a square",
   lightsout: "lights out",
-  blocks: "tosses toy blocks",
+  blocks: "eats a pawn, toy blocks",
   bounce: "big bounce",
 };
 

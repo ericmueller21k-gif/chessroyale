@@ -218,3 +218,43 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
   }
 });
+
+test("Big Boy on a slow phone: his snack, his toy block and the whole Big Bounce stay within budget, the first time they show", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(4 * 60_000);
+  await page.addInitScript(instrument);
+  // (?power=bounce: the warning as the 2nd turn begins, the bounce after your 2nd move; the first toy block with it.)
+  await page.goto("/?debug&nolanding&clock=60&boss=bigboy&power=bounce&laststand=0");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  /** The frames from now until `until` holds. */
+  const through = async (until: () => Promise<boolean>, ms = 60_000) => {
+    await page.evaluate(() => ((window as any).__perf.frames = []));
+    await expect.poll(until, { timeout: ms }).toBe(true);
+    return frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
+  };
+  const move = async () => {
+    const { fen, allowed } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }));
+    const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && (!allowed || allowed.includes(m.from + m.to)));
+    await page.evaluate((uci) => (window as any).match.submit(uci), legal[0]!.from + legal[0]!.to);
+    await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+  };
+  // The intro: his card, then his snack (the first time he waddles, eats, and his frames show).
+  await page.locator(".boss-intro").waitFor({ timeout: 30_000 });
+  const snack = await through(() => phase(page).then((p) => p === "play"));
+  await move();
+  // His reply, the toy block and the warning.
+  const block = await through(() => phase(page).then((p) => p === "play"));
+  await move();
+  // The bounce: getting ready (the candidates, the engine), the bounce itself, his move.
+  const bounce = await through(() => phase(page).then((p) => p === "play"));
+  const powers = await page.evaluate(() => (window as any).match.boss.powers);
+  expect(powers.bounce).toBeTruthy();
+  const f = (s: { p95: number; slow: number }) => `p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped`;
+  console.log(`Big Boy (slowed phone): snack ${f(snack)}; block and warning ${f(block)}; bounce (${powers.bounce.moves.length} moved) ${f(bounce)}`);
+  for (const [what, s] of [["snack", snack], ["block", block], ["bounce", bounce]] as const) {
+    expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
+    expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
+  }
+});

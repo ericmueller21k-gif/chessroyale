@@ -46,8 +46,8 @@ test("home: Boss alone opens the boss menu; Play with friends offers lobbies (pr
   await page.goto("/");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
-  // A random boss, then the bosses you can meet (Ginger, Boingo, G-REX, Hollow).
-  await expect(menu.locator(".boss-row")).toHaveCount(5);
+  // A random boss, then the bosses you can meet (Ginger, Boingo, G-REX, Hollow, Big Boy).
+  await expect(menu.locator(".boss-row")).toHaveCount(6);
   await menu.getByRole("button", { name: "Close" }).click();
   await page.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
   const sheet = page.getByRole("dialog", { name: "Play with friends" });

@@ -121,9 +121,13 @@ describe("his Big Bounce", () => {
         expect(f.up).toBeLessThan(BOUNCE.settleAt);
         expect(f.land).toBeLessThanOrEqual(BOUNCE.settledAt);
       }
-      // Everything under a spot goes up as he lands there.
+      // Everything under a spot goes up as he lands there, but a king (the board always has both).
       b.spots.forEach((sp, k) =>
-        spotSquares(sp).forEach((sq) => pieceAt(fen, sq) && expect(flyers.find((x) => x.from === sq)!.up).toBeLessThanOrEqual(BOUNCE.lands[k]!)),
+        spotSquares(sp).forEach((sq) => {
+          const pc = pieceAt(fen, sq);
+          if (pc?.type === "k") expect(flyers.some((x) => x.from === sq)).toBe(false);
+          else if (pc) expect(flyers.find((x) => x.from === sq)!.up).toBeLessThanOrEqual(BOUNCE.lands[k]!);
+        }),
       );
       // The board: the position before; less what's in the air; then the new one.
       const m = { kind: "bounce" as const, at: 1000 };

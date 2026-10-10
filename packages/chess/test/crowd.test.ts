@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_TIERS, bossDef, isPlayable, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, VARIABLE_CLOCK, type Settings } from "@chessroyale/core";
-import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
+import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, withoutPiece, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
   let h = 2166136261;
@@ -122,6 +122,20 @@ describe("Crowd mode", () => {
     expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
   });
 
+  it("50 v 50 boss battle against Big Boy: from the starting position, less the pawn of the crowd's he ate", async () => {
+    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "bigboy" };
+    const { runner } = await playKnockouts(settings, 4);
+    const boss = runner.boss!;
+    expect(boss.id).toBe("bigboy");
+    expect(boss.crowdSide).toBe("w");
+    const board = runner.boards.get(runner.state.boards[0]!)!;
+    const snack = boss.powers!.snack!.square;
+    expect(["d2", "e2"]).toContain(snack);
+    expect(board.history).toEqual([]);
+    expect(board.fen).toBe(withoutPiece(START_FEN, snack));
+    expect(board.bases).toEqual([{ ply: 0, fen: board.fen }]);
+  });
+
   it("50 v 50 boss battle: the top 10 play White from an even position of their own game, the boss replies and strikes every 3 moves", async () => {
     // (Boingo, the boss this seed met before Hollow joined the draw.)
     const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "clown" };
@@ -189,8 +203,8 @@ describe("Crowd mode", () => {
     expect(bossShowMs(null, true)).toBeLessThan(600);
     expect(bossShowMs({ captured: "b" }, true)).toBeLessThan(600);
     expect(bossShowMs({ captured: "q" }, true)).toBe(bossShowMs({ captured: "q" }));
-    // The boss's move records what it took.
-    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000 } as Settings;
+    // The boss's move records what it took. (G-REX: the boss this seed met before Big Boy joined the draw.)
+    const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "grex" } as Settings;
     const lib: Opening[] = [{ ...library[0]!, moves: sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]), expected: { 10: 0.52 } }];
     const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fake], library: lib, entrants: [{ id: "h0", name: "H0", isBot: false }] });
     runner.deal();

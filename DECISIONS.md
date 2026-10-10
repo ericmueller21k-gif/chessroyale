@@ -4194,3 +4194,166 @@ the board's top-left, a third of the board wide, growing upward, up for 2.8 s.
   for the extra move and everyone seeing it, a crowd that holds the line, the host's ""), and `e2e/hollow.spec.ts` (the
   meter moving, a failed test bringing "TWICE!" and his second move before yours).
 - Test switch, as before: `?boss=hollow&power=lightsout`. Tap nothing and he moves twice.
+
+## Big Boy, the baby boss (design, Eric, Oct 10, 2026; calls marked "director's call")
+
+A chubby baby in a diaper and a "BIG BOY" crop shirt, armed with a swirly rainbow lollipop. Sprite approved by Eric
+("flawless") from the preview on branch `claude/bigboy-art`. Name not final (it is also a restaurant chain's mark).
+
+### Opening: Snack time
+- Before move 1, he waddles over and eats one of the crowd's centre pawns (d or e, from the match seed): about a pawn's
+  head start. "Nom nom."
+- His strength offset is lowered so his raid stays as hard as the others at the same tier (director's call; set it from
+  a quick sim with the existing boss sim, record the numbers).
+- Standard starting position otherwise; sides as usual.
+
+### Passive: Toy blocks (director's call, approved by Eric with the set)
+- Every 4 turns he tosses a toy block (an ABC block) onto an empty square in the crowd's half, chosen from squares one
+  of the crowd's pieces could legally move to, so it matters a little. It stays 3 turns.
+- Nothing can move onto it or slide through it, for either side.
+- Never leaves either side without a legal move; never blocks the only way out of check (the judge uses the allowed-
+  move filter, like Freeze); the server decides from the seed.
+
+### Ultimate: the Big Bounce (Eric)
+- Fires from the shared rage meter at the start of his turn, like the other bosses' ultimates.
+- He leaps onto the board and bounces 3 times, each landing on a 2x2 block of squares (a shadow grows briefly before
+  each landing). Pieces there are knocked up and tumble. The 4th bounce is a giant fall onto the four centre squares:
+  a crash, a shockwave across the board, dust, the board jolts. Then every piece settles into the new position and he
+  bounces back to his corner and plays his move.
+- The new position is calculated beforehand (Eric): the pieces may be thrown around a lot on screen, but the result
+  is a position whose engine value for the crowd is a little worse, about a pawn and a half at most.
+- Rules for the new position (director's calls):
+  - Only the crowd's pieces move; never a king; no captures (material unchanged).
+  - Each moved piece lands on an empty square within 2 squares of where it stood; pawns only shift sideways along
+    their rank (so pawn structure stays plausible and never reaches the first or last rank); 2 to 6 pieces move.
+  - The crowd's king must not be in check afterwards (it's his move next); castling rights go for any moved king or
+    rook; en passant is cleared.
+  - From the seed, generate a batch of candidate positions, evaluate them with the engine path the boss already uses,
+    and pick the one nearest the target loss (1 pawn) inside the band (0.5 to 1.5 pawns, settings). If none fits,
+    take the smallest loss under the cap; if none is under the cap, the bounces still play but nothing moves.
+- The crash moment isn't a move: unscored, and fair play follows the existing ground rules for power turns.
+
+### Character
+- No real voice: baby sounds (a giggle, a lollipop slurp, a wail, bounce boings, the big crash, a "nom" for the
+  snack), quieter than a move, CC0 credited or synthesised.
+- Short baby lines in his text box: "Mine!", "Nom nom.", "Waaaah!", "Big boy BOUNCE!", and so on.
+
+### Built: Big Boy, playable (Oct 10, 2026)
+
+Built by one delegate across both lanes (`characters` and `god-king`) on the approved sprite (PR from `claude/bigboy`).
+**Big Boy is playable** in every boss mode (the raid online, Solo "Boss alone" and the Solo raid, the Crowd's boss
+final): the random draw is among five bosses. Roster: `bigboy`, icon 🍭, kit `Big Boy` (the preview's kit `BigBoy`
+renamed to his boss name; `?wip=1&kit=BigBoy` still finds it), offset {{OFFSET}}, passive `blocks`, ultimate `bounce`.
+Every number is in `BOSS_POWERS` (`blockEvery` 4, `blockTurns` 3, `bouncePieces` 2-6, `bounceReach` 2,
+`bounceCandidates` 16, `bounceScreenNodes` 15,000, `bounceConfirm` 3, `bounceNodes` 100,000, `bounceLoss` 0.5-1.5,
+`bounceTarget` 1, `bouncePawnLogit` 0.95); the beats both sides time by are in `boss-timing.ts` (`SNACK`, `BOUNCE`,
+`BLOCK`, `POWER_FX.block` 2.3 s, `POWER_FX.bounce` 6.2 s).
+
+**The snack** (`snackSquare`, `startsWithSnack`; the runner's `snackBoard`)
+- A fresh game from the starting position (the raid's card says so), less the crowd's d- or e-pawn, from the seed. The
+  position changes outside a move, so it's a base at ply 0: every replay (the intro's, a newcomer's, stepping back,
+  the game's end) plays from it.
+- **Sides as usual** (my reading of the design): the crowd is White in a raid and in the Crowd's final, as for every
+  boss. With the `?side=b` test switch the crowd plays Black from the same position less its d7 or e7 pawn, so he
+  opens as White.
+- The intro: his card, then the snack (3 s, `SNACK`): he waddles in from the board's edge nearest the pawn, grabs it
+  (it leaves the board at `grabAt`), bites it twice ("nom" at `nomAt` and after), smacks his lips and waddles off; his
+  line ("Nom nom.") in his text box and the dock; then "START!". The pawn in his hand is the crowd's colour (his look
+  `blackPawn`).
+- **His strength offset: {{OFFSET}}** (others −100). {{SIM}}
+
+**Toy blocks** (`chooseBlock`, `blockedBy`, `crowdAllowed`, `bossAllowed`, `prepareTurn`)
+- From the crowd's 2nd turn, every 4th (turns 2, 6, 10…), a block on an empty square of the crowd's half that one of
+  its pieces could move to as the turn begins (a seeded pick), for 3 crowd turns and his replies; it goes as the
+  turn after its last begins (a puff of dust), then the next comes a turn later.
+- Nothing moves onto it or slides through it, either side: a slide along a rank, file or diagonal, a pawn's double
+  step, a castling king's way to his rook's corner. A knight jumps it.
+- **My call: it stops moves, not attacks.** A piece behind it still gives check and pins as in ordinary chess, so the
+  engine, the judge and every device keep playing ordinary chess; the block only takes moves away (like the pie).
+- Never no move, never the only way out of check: a restriction that would leave none lifts for that turn (both
+  sides). The judge, bots and power-up hints use the allowed moves; the screens show no dots onto or through it; a
+  turn with a block is a power turn for fair play.
+- On screen: "TOY BLOCK!" (toy-box stripes), he winds up at the board's corner and throws (`toss`), the block tumbles
+  in (`blockFly`) and clacks down (`toyBlock` land, sit, poof). **My call:** an ABC block, its letter by its square (A
+  red, B blue, C green), so the next one usually looks different.
+
+**The Big Bounce** (`bounceDue`, `bounceCandidates`, `pickBounce`, `bounceSpots`, the runner's `bounceFrom`,
+`applyBounce`; the lobby's `requestBounce`; solo's `bounceTurn`)
+- **When:** the meter full as a crowd turn begins: "RAGE!" that turn ("After your move: the Big Bounce"); after the
+  crowd's move, at the start of his turn, the bounce; then his move. **My call:** the usual one-turn warning, as the
+  design says "like the other bosses' ultimates", landing at the start of his turn as it says too (Hollow's has no
+  warning: Eric's rule for him). The admins' trigger: at the start of his next turn, no warning. `?power=bounce`:
+  warned as the 2nd turn begins, the bounce after the crowd's 2nd move. Once a match; the meter is gone after.
+- **The new position**, as the design says (only the crowd's pieces, never a king, no captures; each to an empty
+  square within 2, pawns only sideways; 2 to 6 of them; the crowd's king not in check; castling rights gone with a moved
+  rook; en passant cleared). **My calls:** a bishop keeps its colour; nothing lands on the toy block; the bounce never
+  gives him check nor leaves him without a move; a try that leaves more of the crowd's material hanging (attacked by
+  something cheaper, or attacked and undefended) than before is dropped before the engine sees it (he'd just take it:
+  far past a pawn and a half). 2 to 6 pieces, even odds.
+- **"A pawn" is measured in log-odds** (`pawnsLost`): the engine's expected score is squeezed near 0 and 1, so a pawn
+  in points of expected score is anything from 20 points in an even game to under 1 in a lopsided one, and the
+  snack makes the crowd's games lopsided early. Measured: the starting position is 0.536 for White, without its d- or
+  e-pawn 0.31 or 0.30 (2,000,000 nodes): 0.95 log-odds a pawn (`bouncePawnLogit`).
+- **The pick:** the loss nearest 1 pawn inside 0.5-1.5. **My reading of "if none fits, take the smallest loss under
+  the cap":** the candidate nearest the band from below (the smallest step short of it), never one that helps the
+  crowd (a literal "smallest" would pick a gain for the crowd whenever there is one); none at all: nothing moves.
+  Never a line with a forced mate either way.
+- **The engine path the boss uses** (each position's top move, the crowd's value one less his), kept to about one of
+  his moves: a glance at all 16 candidates (15,000 nodes), then a proper look (100,000) at the position before and
+  the 3 nearest the target, the pick from those; shared over the device's engines. **My call:** two stages rather than
+  6 candidates at full budget: the same cost, a far better hit rate. Measured on 20 positions (library middlegames and
+  games from the snack, Node, 3 engines): {{BAND}}
+- **Online:** the server works out the candidates from the seed (they're the same everywhere) and sends them in the
+  boss request; the host scores them and answers with the one picked; anything that isn't a candidate, an answer of
+  "", or no host anywhere: the bounces play and nothing moves. The host's word stands, as for his moves.
+- It isn't a move: nothing is scored, fair play never sees it, the crowd's turn count is unchanged, and the history
+  keeps a base where the position changed (`applyBounce`), so every replay keeps the pieces where they landed.
+- **On screen** (`components/BigBoy.tsx`, 6.2 s, nobody's clock running): "BIG BOUNCE!" (1.3 s); he leaps from his
+  corner, his shadow growing on each spot; three landings on 2x2 spots (squash, a boing, dust off its four squares, a
+  bump of the board), the pieces there knocked up: the ones the bounce moves tumble in the air, the rest hop back down;
+  the big spring up off the top, his shadow growing on the four middle squares; the giant fall (he's 40% bigger), the
+  crash (a shockwave ring racing out to the board's corners, a cloud of dust, debris, the board jolting); dazed,
+  stars round his head; the pieces come down one after another onto their new squares as he giggles; he springs back
+  to his corner; then he plays his move. **My calls:** the spots are over the pieces it moves (`bounceSpots`), so
+  they're the ones knocked up (a moved piece under none goes up at the crash); kings never tumble (the board always
+  has both); the eval bar keeps the position before until every piece has landed; the board's own animation is off
+  meanwhile (the pieces land exactly on their squares, then the board takes over); the God King's word on his last
+  move, the blunder check and his queen banner skip that screen.
+
+**His character** (`characters/bigboy.ts`, `bigboy-sounds.ts`, `kits.ts`, `power-art.ts`, `effects.ts`)
+- **The approved look is unchanged:** idle, swing and tantrum frame for frame. New: `snack` (waddle, grab, nom),
+  `toss`, `bigBounce` (crouch, stretch, tuck, squash; the crash flat with the lollipop flung down; dazed stars; the
+  giggle behind his hand), `lick` (a slurp), `giggle`, and `wail` (the tantrum with its wail). New faces (chewing, the
+  bite, "oh", squished, dazed, a giggle), poses (arms up, reaching down, at his mouth, a throw), a little pawn and a
+  block for his hand.
+- **His moments:** his move a slurp of the lollipop (12% a line), a capture, his strike and his entrance the swing (the
+  BONK), check and victory a giggle, hurt, defeat and the rage warning the wail. Thinking is his idle, silent.
+- **Sounds, synthesised (no real voice, no files):** a giggle (five quick "heh"s from a little buzzing voice through
+  vowel formants), a slurp, a wail ("waaah"), a nom (an "n", an "o", an "m"), a boing, the crash (a deep thud, a
+  rumble of dust, toy blocks tumbling), a toss, the block's clack (a light wooden tok, a small bounce, a rattle), a
+  poof, the lollipop's swish and bonk (a squeaky-toy hammer), a stomp. They replace the preview's borrowed sounds. Each
+  is 2.8 to 4.2 dB under a move's mean level with its peak under half a move's, all through `play()` (the mute switch),
+  and none bright (each one's energy under 2.5 kHz; no chimes, no dings). Made ahead in idle moments
+  (`warmSounds`), each a few milliseconds to 40 ms to make.
+- **Lines** (his text box, the dock): baby talk ("Mine!", "Nom nom.", "Waaaah!", "Big boy BOUNCE!", "Bouncy bouncy!",
+  "Peekaboo!", "Catch!", "My toy!", "Big boy mad!"), as rare as the others', the same for everyone.
+- **Drawn ahead:** his snack, toss and bounce frames and the block, puff and crash effects are drawn a slice a frame
+  (`prewarmSprite`, `prewarm`) from when his character first shows (the card), the snack first.
+
+**Checking it**
+- `npm run frames:bigboy -- <dir> [phone|desktop|both] [light|dark] [side=b]` plays Boss alone against him with real
+  taps (`?power=bounce`): the snack, the first block and the warning, a move, the bounce and his move; every painted
+  frame, stills and GIFs.
+- Test switches: `?boss=bigboy` (solo, or a raid link), `&power=bounce` (or `blocks`), `&side=b`; the admins'
+  "Trigger ultimate (testing)".
+- Tests: `packages/chess/test/bigboy.test.ts` (the snack and its base, sides; the blocks' squares, schedule, what they
+  stop, never no move or no way out of check; the generator's legality, kings, captures, reach, pawns, bishops,
+  castling rights, en passant, hanging pieces; the loss in pawns, the band, the fallback, the cap, mates; the two-stage
+  engine look; the spots; the battle: warning, bounce, base, his move, once, the trigger, nothing moving),
+  `packages/server/test/boss-powers-lobby.test.ts` ("Big Boy online": the snack and blocks the same for everyone and in
+  the jobs; the bounce from the host, then his move; "" / junk / no host: nothing moves; the trigger),
+  `packages/app/test/bigboy.test.ts` (the kit, the approved animations unchanged, the snack's and bounce's beats and
+  cues, squash and stretch, the pieces in the air and the board under them, the block, the sounds' loudness, their
+  own names and no bright ones), `e2e/bigboy.spec.ts` (phone and computer: the snack, your move's knock first, the
+  block with no dots onto it and gone after its turns; the bounce from the trigger with pieces in the air, the crash,
+  the jolt, the new position on the board and his sounds through mute), `e2e/perf.spec.ts` ({{PERF}}).

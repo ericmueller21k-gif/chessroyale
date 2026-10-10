@@ -44,7 +44,8 @@ function judge(script: { best?: string; bestExpected: number; blunder: string; b
 
 /** Solo boss raid (just you), the God King with all his charges unless told otherwise. */
 function raid(engine: EngineLike, patch: Partial<Settings> = {}, players = 1) {
-  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, ...patch } as Settings;
+  // (G-REX: the boss this seed met before Big Boy joined the draw.)
+  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "grex", ...patch } as Settings;
   return new MatchRunner({
     settings,
     rng: mulberry32(5),
@@ -325,7 +326,8 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
   for (const [name, moves, san, piece] of cases) {
     it(`${name}: ${san} calls for the Last Stand from move 1`, async () => {
       const runner = new MatchRunner({
-        settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 3190 } as Settings,
+        // (G-REX: the boss this seed met before Big Boy joined the draw.)
+        settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 3190, bossId: "grex" } as Settings,
         rng: mulberry32(1),
         engines: [engine],
         library: [opening(moves)],

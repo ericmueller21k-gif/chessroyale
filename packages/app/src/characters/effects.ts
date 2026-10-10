@@ -1625,7 +1625,7 @@ const TOY_PARTS = (() => {
     add(`${l}:9`, () => toyCube(l, 9, 9, 3));
   }
   for (const w of [8, 14, 20, 24]) add(`shadow${w}`, () => toyShadow(w));
-  for (const r of [2, 3, 4, 5]) for (const k of ["s", "S"] as const) add(`puff${r}${k}`, () => dustPuff(r, k));
+  for (const r of [2, 3, 4, 5, 6, 7, 8]) for (const k of ["s", "S"] as const) add(`puff${r}${k}`, () => dustPuff(r, k));
   return parts;
 })();
 
@@ -1730,12 +1730,12 @@ const BOUNCE_PUFF: Character = {
   },
 };
 
-/** The crash's shockwave: a ring `r` from the board's middle, 3 pixels thick, bright inside, gold outside. */
+/** The crash's shockwave: a ring `r` from the board's middle, 4 pixels thick: a gold rim, bright cream, gold inside. */
 function shockRing(r: number, fade: number): Speck[] {
   const out: Speck[] = [];
   const c = BOARD / 2;
   const seen = new Set<string>();
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0; k < 4; k++) {
     const rr = r - k;
     if (rr <= 0) continue;
     const steps = Math.ceil(2 * Math.PI * rr * 1.3);
@@ -1747,7 +1747,7 @@ function shockRing(r: number, fade: number): Speck[] {
       // (A broken ring as it thins out at the board's edges.)
       if (fade > 0 && (i * 7 + k * 3) % 10 < fade) continue;
       seen.add(`${x},${y}`);
-      out.push([x, y, k === 0 ? "W" : k === 1 ? "A" : "Q"]);
+      out.push([x, y, k === 0 ? "Q" : k <= 2 ? "W" : "A"]);
     }
   }
   return out;
@@ -1762,16 +1762,17 @@ const debris = (t: number): Speck[] =>
     return x < 1 || y < 1 || x > BOARD - 2 || y > BOARD - 2 ? [] : [[x, y, i % 3 ? "s" : "S"], [x + 1, y, "s"]];
   }).flat();
 
-const CRASH_PALETTE = { ...TOY_PALETTE, W: "#fffbeeee", A: "#ffe08acc", Q: "#f2c14e88" } as const;
+const CRASH_PALETTE = { ...TOY_PALETTE, W: "#fffbeef2", A: "#ffd56bdd", Q: "#e8a93ccc" } as const;
 /** The crash's dust cloud round the middle: puffs in a ring, `t` frames on (bigger and further out, then thinning). */
 const crashCloud = (t: number): Layer[] =>
   t > 6
     ? []
-    : Array.from({ length: 10 }, (_, i): Layer => {
-        const a = (i / 10) * 2 * Math.PI;
-        const d = 10 + t * 4;
-        const r = Math.min(5, 3 + Math.floor(t / 2));
-        return { part: `puff${r}${i % 2 ? "s" : "S"}`, x: Math.round(BOARD / 2 + Math.cos(a) * d - r), y: Math.round(BOARD / 2 + Math.sin(a) * d * 0.8 - r - t) };
+    : Array.from({ length: 14 }, (_, i): Layer => {
+        const a = (i / 14) * 2 * Math.PI + (i % 2) * 0.2;
+        const d = 9 + t * 5 + (i % 3) * 2;
+        // (Big billows that overlap into one cloud, thinning out as it spreads.)
+        const r = Math.max(2, Math.min(8, 4 + t - (t > 4 ? (t - 4) * 3 : 0) + (i % 2)));
+        return { part: `puff${r}${i % 3 ? "s" : "S"}`, x: Math.round(BOARD / 2 + Math.cos(a) * d - r), y: Math.round(BOARD / 2 + Math.sin(a) * d * 0.7 - r - t * 2) };
       });
 
 /**
