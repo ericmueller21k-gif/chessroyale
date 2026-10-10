@@ -172,8 +172,10 @@ export interface NetSquadsMatch {
   half: Colour;
   /**
    * Each side's team bank (ms) as the current half began (Armageddon: its own fixed clocks). During a half it drains past
-   * `delayMs` (the free seconds a move) once for each of that squad's moves still being thought about (a duty's players
-   * not all locked in; blockers don't drain it). At 0 the squad is in sudden death: each move within `delayMs`.
+   * `delayMs` (the free seconds a move) once for each of that squad's moves still being thought about (blockers don't
+   * drain it). On screen, a duty whose players haven't all locked in is still being thought about; the exact bank
+   * (the rules count each player's last choice) comes with the "half". At 0 the squad is in sudden death: each move
+   * within `delayMs`.
    */
   banks: [number, number];
   delayMs: number;
