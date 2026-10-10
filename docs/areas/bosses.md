@@ -48,8 +48,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   at once): every line (its powers' moments, its ultimate, its warning, its reactions, Hollow's claim and Lights out
   words, Big Boy's snack) goes into the boss's voice and shows in its text box beside it (in the boss bar on a phone,
   by the board on a computer), on every screen of the battle, also while it stands at the board's corner for a
-  moment. Each line types out, then stays fully readable for 2.5 s plus 50 ms a character (at most 7 s), whatever the
-  screen does next. One line at a time: only a critical line (an ultimate's, Hollow's first cover of the dark, his
+  moment. Each line types out, then stays fully readable for 2.2 s plus 35 ms a character (at most 4.5 s: a short
+  line about 2.5 s, a long one about 4 s; Eric, later on Oct 10: "a few seconds… not that long"), whatever the screen
+  does next. One line at a time: only a critical line (an ultimate's, Hollow's first cover of the dark, his
   claim, the battle's end) cuts in on another; the rest wait their turn, highest first, and lapse after 5 s of waiting.
   A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). The
   dock says the moment's word ("Freeze!"). Lights out's round prompt keeps its own box above the board for the whole
@@ -127,7 +128,8 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,
   `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
 - e2e: `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `boss-character.spec.ts`,
-  `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame),
+  `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
+  gone on time),
   `perf.spec.ts`. Unit: `packages/app/test/speech.test.ts` (the speech rule).
 - Frames: `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both]`, `frames:hollow`,
   `frames:bigboy`, `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`.

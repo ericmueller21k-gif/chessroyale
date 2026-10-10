@@ -61,16 +61,41 @@ const pick = (move: string | null) => new Map([["h0", { move, thinkMs: 1000 }]])
 describe("the God King's Last Stand: the rule", () => {
   it("the bar starts at lastStandLoss (higher while he has charges) and falls to the floor over lastStandDecayMoves", () => {
     const s = { ...DEFAULT_SETTINGS, lastStandLoss: 30, lastStandChargedExtra: 5, lastStandLossFloor: 14, lastStandDecayMoves: 20 };
-    expect(lastStandBar(0, 0, s)).toBe(30);
-    expect(lastStandBar(0, 3, s)).toBe(35);
-    expect(lastStandBar(10, 0, s)).toBe(22);
-    expect(lastStandBar(20, 0, s)).toBe(14);
-    expect(lastStandBar(45, 0, s)).toBe(14);
-    expect(lastStandBar(45, 1, s)).toBe(19);
-    // Never when the crowd was already lost before the move.
-    expect(lastStandDue(60, 0.39, 0, 0, s)).toBe(false);
+    expect(lastStandBar(0.55, 0, 0, s)).toBe(30);
+    expect(lastStandBar(0.55, 0, 3, s)).toBe(35);
+    expect(lastStandBar(0.55, 10, 0, s)).toBe(22);
+    expect(lastStandBar(0.55, 20, 0, s)).toBe(14);
+    expect(lastStandBar(0.55, 45, 0, s)).toBe(14);
+    expect(lastStandBar(0.55, 45, 1, s)).toBe(19);
     expect(lastStandDue(30, 0.4, 0, 0, s)).toBe(true);
     expect(lastStandDue(29.9, 0.6, 0, 0, s)).toBe(false);
+  });
+
+  it("Eric's option 3 (Oct 10): lost only under 20%, and under 40% the bar is half the chances left (all in settings)", () => {
+    const s = DEFAULT_SETTINGS;
+    expect(s).toMatchObject({ lastStandFrom: 20, lastStandShareBelow: 40, lastStandShare: 0.5 });
+    // From 40% up, the plain bar, as before (35 on move 1 with charges).
+    expect(lastStandBar(0.4, 0, 3, s)).toBe(35);
+    expect(lastStandBar(0.8, 0, 3, s)).toBe(35);
+    // Under 40%, half of what's left, when that's lower than the plain bar.
+    expect(lastStandBar(0.39, 0, 3, s)).toBeCloseTo(19.5, 9);
+    expect(lastStandBar(0.25, 0, 3, s)).toBeCloseTo(12.5, 9);
+    expect(lastStandBar(0.2, 0, 0, s)).toBeCloseTo(10, 9);
+    // Late in a long battle with no charges the plain bar (13) can be the lower: it stands.
+    expect(lastStandBar(0.39, s.lastStandDecayMoves, 0, s)).toBe(s.lastStandLossFloor);
+    // A big blunder at 25% (to 5%: 20 points, 80% of what was left) calls for him; a 10-point slip there doesn't.
+    expect(lastStandDue(20, 0.25, 0, 3, s)).toBe(true);
+    expect(lastStandDue(10, 0.25, 0, 3, s)).toBe(false);
+    // Eric's game 1 as PR #129 replayed it: from 19%, the hung queen (9 points). Under 20% is lost: never.
+    expect(lastStandDue(19, 0.19, 0, 3, s)).toBe(false);
+    expect(lastStandDue(10, 0.2, 0, 3, s)).toBe(true);
+    // Eric's game 2: the queen hung on move 1, from 72% to 0: far over the plain bar, as before.
+    expect(lastStandDue(72, 0.72, 0, 3, s)).toBe(true);
+    // The engine's judgement, not the material: a sacrifice it likes gives nothing away, in any position.
+    expect(lastStandDue(0, 0.6, 0, 3, s)).toBe(false);
+    expect(lastStandDue(6, 0.6, 30, 0, s)).toBe(false);
+    expect(lastStandDue(0, 0.3, 0, 3, s)).toBe(false);
+    expect(lastStandDue(5, 0.3, 30, 0, s)).toBe(false);
   });
 
   it("a disaster: the move is taken back, the scores stand, he falls (his charges go), and the crowd picks again without it", async () => {
@@ -108,7 +133,7 @@ describe("the God King's Last Stand: the rule", () => {
     const players = ["h0", "h1", "h2"];
     const picks = new Map(players.map((id, i) => [id, { move: i < 2 ? BLUNDER : "d2d4", thinkMs: 1000 }]));
     const a = raid(engine, {}, 3);
-    const b = raid(engine, { lastStandLoss: 999, lastStandLossFloor: 999 }, 3);
+    const b = raid(engine, { lastStandFrom: 999 }, 3);
     a.deal();
     b.deal();
     const ra = await a.score(picks);
@@ -120,7 +145,7 @@ describe("the God King's Last Stand: the rule", () => {
   });
 
   it("not when the crowd was already lost, nor for a mistake under the bar", async () => {
-    const lost = raid(judge({ bestExpected: 0.38, blunder: BLUNDER, blunderExpected: 0.0 }));
+    const lost = raid(judge({ bestExpected: 0.19, blunder: BLUNDER, blunderExpected: 0.0 }));
     lost.deal();
     expect((await lost.score(pick(BLUNDER))).boards[0]!.lastStand).toBeUndefined();
     expect(lost.bossToMove()).toBe(true);
@@ -133,6 +158,39 @@ describe("the God King's Last Stand: the rule", () => {
     spent.state = { ...spent.state, boss: { ...spent.state.boss!, kingCharges: 0 } };
     spent.deal();
     expect((await spent.score(pick(BLUNDER))).boards[0]!.lastStand).toMatchObject({ loss: 32, bar: 30 });
+  });
+
+  it("in a weak position (20-40%), a move that throws away half the chances left calls for him; a smaller slip doesn't", async () => {
+    // At 25%, Ng5?? leaves the knight to the queen: 25% to 5%, 20 points, far under the plain bar (35) but over half
+    // of what was left (12.5).
+    const weak = raid(judge({ bestExpected: 0.25, blunder: BLUNDER, blunderExpected: 0.05 }));
+    const before = weak.boards.get(0)!.fen;
+    weak.deal();
+    const r = await weak.score(pick(BLUNDER));
+    expect(r.boards[0]!.lastStand).toEqual({ move: BLUNDER, loss: 20, bar: 12.5, before: 0.25, after: 0.05 });
+    expect(weak.boards.get(0)!.fen).toBe(before);
+    expect(weak.boss!.lastStand).toMatchObject({ atMove: 1, charges: 3, bar: 12.5 });
+    // 10 points from 25% (40% of what was left): played.
+    const slip = raid(judge({ bestExpected: 0.25, blunder: BLUNDER, blunderExpected: 0.15 }));
+    slip.deal();
+    expect((await slip.score(pick(BLUNDER))).boards[0]!.lastStand).toBeUndefined();
+    expect(slip.bossToMove()).toBe(true);
+  });
+
+  it("a sacrifice the engine likes never calls for him: in a healthy position, or in a weak one", async () => {
+    // Ng5 gives up the knight, but this judge rates it the best move (as a sound sacrifice is): nothing given away.
+    for (const bestExpected of [0.62, 0.3]) {
+      const sac = raid(judge({ best: BLUNDER, bestExpected, blunder: BLUNDER, blunderExpected: bestExpected }));
+      sac.deal();
+      const r = await sac.score(pick(BLUNDER));
+      expect(r.boards[0]!.bestMove).toBe(BLUNDER);
+      expect(r.boards[0]!.lastStand).toBeUndefined();
+      expect(sac.bossToMove()).toBe(true);
+    }
+    // A speculative one the engine thinks a little worse (6 points, from 62%): still the crowd's to play.
+    const speculative = raid(judge({ bestExpected: 0.62, blunder: BLUNDER, blunderExpected: 0.56 }));
+    speculative.deal();
+    expect((await speculative.score(pick(BLUNDER))).boards[0]!.lastStand).toBeUndefined();
   });
 
   it("the bar falls the longer the battle goes without one: a smaller mistake is enough later on", async () => {
@@ -340,7 +398,7 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
       const r = await runner.score(pick(blunder));
       const stand = r.boards[0]!.lastStand;
       expect(stand, `the judge gave ${blunder} a loss of ${r.boards[0]!.scored.find((m) => m.move === blunder)?.loss}`).toBeDefined();
-      expect(stand!.bar).toBe(lastStandBar(0, 3, runner.settings));
+      expect(stand!.bar).toBe(lastStandBar(stand!.before!, 0, 3, runner.settings));
       expect(stand!.loss).toBeGreaterThan(stand!.bar + 5);
       expect(runner.boards.get(0)!.fen).toBe(fen);
       // What it loses, from the judge's own search: the boss's best reply takes the piece.
@@ -349,4 +407,25 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
       expect(stand!.before! - stand!.after!).toBeCloseTo(stand!.loss / 100, 2);
     }, 60_000);
   }
+
+  it("a sacrifice the engine likes isn't a blunder: Légal's 6.Nxe5!, the queen left to Bxd1, doesn't call for him", async () => {
+    // (Bxd1 loses to Bxf7+ Ke7 Nd5#: the engine rates the queen offer the best move, so it gives nothing away.)
+    const moves = sanLineToUci(["e4", "e5", "Nf3", "d6", "Bc4", "Bg4", "Nc3", "Nc6", "h3", "Bh5"]);
+    const runner = new MatchRunner({
+      settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 3190, bossId: "grex" } as Settings,
+      rng: mulberry32(1),
+      engines: [engine],
+      library: [opening(moves)],
+      entrants: [{ id: "h0", name: "H0", isBot: false }],
+    });
+    const fen = fenAfter(moves);
+    const sac = legalMoves(fen).find((m) => toSan(fen, m) === "Nxe5")!;
+    runner.deal();
+    const r = await runner.score(pick(sac));
+    const b = r.boards[0]!;
+    expect(b.result.playedMove).toBe(sac);
+    expect(b.scored.find((m) => m.move === sac)!.loss).toBeLessThan(5);
+    expect(b.lastStand).toBeUndefined();
+    expect(runner.boards.get(0)!.fen).not.toBe(fen);
+  }, 60_000);
 });

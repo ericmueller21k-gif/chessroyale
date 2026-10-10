@@ -373,3 +373,57 @@ The calls made:
     or a longer lobby. Each is his call.
 - **The sim's lobby times assume a match starts as soon as its two feeder matches are done**, not when the whole
   round is. It saves under a minute on average, and phase 2 should do it.
+
+### Speech: a few seconds, not more (Oct 10, 2026)
+
+Eric, after "Speech that stays up long enough to read": "the message just needs to appear for a few seconds… two,
+three seconds, four, not that long." `SPEECH` in settings.ts: `readMs` 2500 → 2200, `perCharMs` 50 → 35,
+`maxReadMs` 7000 → 4500. The calls made:
+
+- **The times, once typed:** "Freeze!" 2.45 s, a typical line (30 characters) 3.25 s, a 50-character line 3.95 s.
+  The 4.5 s cap is reached at 66 characters, longer than any line today (the longest, 56, rests 4.16 s).
+- **The cap is on the rest after typing,** as the brief put it. Typing is unchanged (28 ms a character: the words
+  can be read as they come), so a line is on screen 2.6 s ("Freeze!") to 5.8 s (the longest) in all.
+- **Everything else stays:** one voice per speaker, lines waiting their turn, critical lines cutting in (never on
+  another critical one), a waiting line lapsing after 5 s, and no box ever hidden to fit.
+- **e2e:** `e2e/boss-speech.spec.ts` still reads the minimum from `SPEECH`; it now also checks that each boss's line
+  starts to fade, or gives way, within 1 s of its time, so a line can't quietly overstay either.
+
+### The Last Stand: Eric's option 3 (Oct 10, 2026)
+
+Eric chose option 3 of "The Last Stand: working as designed; three proposals for Eric". He keeps the engine's
+judgement rather than "piece lost", because players sometimes sacrifice on purpose and a sacrifice the engine likes
+gives nothing away. The "already lost" line drops, and in a weak position the bar is a share of the chances left. The
+numbers (settings.ts): `lastStandFrom` 40 → 20, and two new keys, `lastStandShareBelow` 40 and `lastStandShare` 0.5.
+The calls made:
+
+- **The rule:** from 40% up, the plain bar as before (35 points on move 1 with charges, easing to 18). From 20% to
+  40%, the lower of the plain bar and half the chances left (from 30%, 15 points; from 25%, 12.5). Under 20%, never.
+  Once per game, the charges, the power-ups he leaves and solo and online (one runner) are unchanged.
+- **The lower of the two,** not the share alone: late in a long battle with no charges, the plain bar (13) is under
+  half of 39% (19.5). Dropping under 40% should never make the save harder.
+- **Half, not the 60% the proposal had:** in the 60 recorded sim battles (`reports/last-stand.md`, regenerated from
+  the same games), 11 of the 85 moves made between 20% and 40% gave away half or more of what was left (13 to 31
+  points each); the next six gave away a quarter to a half (9 to 15 points). As each battle's first Last Stand, a share
+  of 0.4 or 0.5 saves the same eight, 0.6 one fewer, 0.7 half of them. A 10-point slip from 30% (a third of what's
+  left) is still the crowd's to play. Battles with a Last Stand: 32 of 60 before, 39 now.
+- **Charges** add their 5 to the plain bar only; in the weak band the share is nearly always the lower anyway.
+- **A step at 40%,** on purpose: on move 1 with charges, a move from 41% needs 35 points and one from 39% needs 19.5.
+  That's the line as Eric drew it. If a playtest finds it odd, raising `lastStandShareBelow` or applying the share
+  above 40% too is a one-number change.
+- **Turning him off** (`?laststand=0`, and the tests that leave a piece to burn) is now `lastStandFrom` over 100: the
+  old way, bars of 999, wouldn't cover the share.
+- **Eric's two games now** (`scripts/repro-last-stand.ts`, the Solo runner's own numbers, Ginger, on a computer):
+  - *Losing on purpose, then the queen:* moves that gave away 4, 9, 21 and 11 points took the crowd from 57% to 12%.
+    The 21 came from 49%, under the plain bar (33.5); the 11 came from 35%, under half of it (17.6). Then the queen,
+    hung from 12%: under 20%, already lost, no Last Stand. In Eric's own game (PR #129's replay) the queen went from
+    19%, also under the line, and cost only 9 points, under half of what was left (9.5) too: neither number alone
+    would have saved that one.
+  - *A bad queen move at the start:* 55% to 4%, 51 points against a bar of 35: Last Stand, as before.
+- **The script** takes `hang=<percent>` (the queen is hung once the chances are under it; 35 by default, Eric's game),
+  reads the bar from `lastStandBar`, and labels each move "ok", "weak" or "already lost". It no longer re-reads the
+  same row after a Last Stand, and it bars the move he took back from the re-pick.
+- **Tests** (`packages/chess/test/last-stand.test.ts`): the bar by the chances left; a big blunder at 25% (to 5%) calls
+  for him with the bar at 12.5, a 10-point slip there doesn't; nothing under 20%; a sacrifice the engine rates best
+  never does, in a healthy position or a weak one, nor a speculative one 6 points worse; and with the real judge,
+  Légal's 6.Nxe5!, the queen left to Bxd1, doesn't call for him.
