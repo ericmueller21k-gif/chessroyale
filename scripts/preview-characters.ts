@@ -1,8 +1,8 @@
 // Boss characters' preview: for each character, an animated GIF per animation and a showreel (4x), a frame sheet
 // (PNG, every frame with its time and cue), and one comparison PNG of them all at phone size on the game's ground.
-//   npm run preview:characters -- [outDir] [ref=reference.png] [scale=4]
+//   npm run preview:characters -- [outDir] [ref=reference.png] [scale=4] [looks=none]
 // A character with recolours (`looks`, such as the God King's black armour) is drawn once per look too, its files
-// named <id>-<look>-*.
+// named <id>-<look>-*. `looks=none` draws each character in its own colours only.
 // `ref` puts a reference picture first in the comparison (its white or transparent background is keyed out).
 // The bosses' power effects (characters/effects.ts) are drawn too, over the game's board (a white pawn under the
 // ice and on the fire tile, so you can see it through), as fx-<id>-<anim>.gif and fx-<id>-sheet.png.
@@ -293,7 +293,7 @@ function lzw(minSize: number, input: Uint8Array): Uint8Array {
 // ---- Output
 let look: string | undefined;
 const frameImg = (ch: Character, f: Frame) => renderFrame(ch, f, { bg: GROUND, look });
-const looksOf = (ch: Character) => [undefined, ...Object.keys(ch.looks ?? {})];
+const looksOf = (ch: Character) => [undefined, ...(opt("looks") === "none" ? [] : Object.keys(ch.looks ?? {}))];
 
 for (const ch of ALL) for (look of looksOf(ch)) {
   const id = look ? `${ch.id}-${look}` : ch.id;

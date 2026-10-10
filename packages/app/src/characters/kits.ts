@@ -7,6 +7,7 @@
  */
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines } from "./boss-beats.ts";
+import { BIGBOY, BIGBOY_PORTRAIT } from "./bigboy.ts";
 import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
@@ -97,6 +98,28 @@ export const BOSS_KITS: Record<string, BossKit> = {
       const n = (boss.powers as { bulbs?: number } | undefined)?.bulbs;
       return n === undefined ? undefined : bulbsLook(n);
     },
+  },
+  // A sprite preview only (?wip=1&kit=BigBoy): no boss, powers, lines or sounds of his own yet. He has three animations,
+  // so every moment plays one of them, and his cues borrow quiet sounds as placeholders.
+  "BigBoy": {
+    ch: BIGBOY,
+    anims: {
+      entrance: "swing",
+      thinking: "idle",
+      move: "swing",
+      capture: "swing",
+      hurt: "tantrum",
+      check: "swing",
+      smug: "idle",
+      rattled: "idle",
+      defeat: "tantrum",
+      victory: "idle",
+      strike: "swing",
+    },
+    sounds: { swing: "clownSlideDown", bonk: "clownSqueak", stomp: "popSoft" },
+    lines: {},
+    chance: {},
+    portrait: { ...BIGBOY_PORTRAIT, anim: "idle", frame: 0 },
   },
 };
 

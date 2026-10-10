@@ -3289,6 +3289,50 @@ shows in a battle; his kit is `BOSS_KITS["Hollow"]`.
   makes a GIF. Tests: `packages/app/test/hollow.test.ts`, `e2e/hollow.spec.ts` (his dark squares hide the piece and never
   take a tap; the night covers every square and lifts again).
 
+### Big Boy, a sprite preview (Oct 10, 2026)
+
+A chubby bald baby from Eric's reference, drawn so Eric can see him before deciding whether to keep this boss. Art only:
+no powers, rules, lines or sounds of his own, and no entry in `packages/core/src/boss.ts`, so he never shows in a
+battle. His kit is `BOSS_KITS["BigBoy"]`, seen only through the test link `?wip=1&kit=BigBoy`.
+
+- **Art** (`characters/bigboy.ts`): about 53 x 69 px (between Ginger and Hollow) in a 78 x 92 frame, from parts like the
+  others, light from the top left. A big bald head with five thin hair tufts, big ears, half-lidded eyes with the
+  pupils turned in a little, a small round nose and big pink lips; a teal crop shirt reading "BIG BOY" with his belly
+  and navel showing under it; a light blue diaper with tabs; bare feet with toes. The rainbow lollipop is in his right
+  hand (on our left), as in the reference. The arms (each with its short sleeve), legs and the lollipop are painted from
+  each pose's points, so a new pose is a few numbers; every part is painted the first time it shows (`lazyParts`).
+  - **Proportions:** the head is a little bigger than the reference's (about 36% of his height against its 32%), like
+    every boss, so the face reads at phone size, and his legs a little shorter, so his wave clears the heading above
+    the boss bar on a phone; the rest follows the reference.
+  - **Kept original:** nothing beyond the reference (its teal shirt, light blue diaper, five tufts and pink lips); no
+    purple, no screwdriver, no three-hair tuft.
+  - **The hair is a lighter brown** than the reference's black, without an outline, so the tufts show on the dark
+    ground.
+- **The shirt stays:** "BIG BOY" is two lines of 4 x 5 pixel letters. Red and teal are about as light as each other, so
+  at first the letters blurred into the shirt at phone size; with a dark red drop shadow they read in the boss bar on
+  an iPhone (checked in the game, `?wip=1&kit=BigBoy`). So the diaper-only version wasn't needed.
+- **The lollipop reads at phone size:** a 17 px candy whose six colours wind out from the middle in a spiral (each a
+  wide band at the rim; a test checks every colour shows), a white glint, a two-pixel stick. Its swirl turns when he
+  waves it.
+- **Animations:**
+  - `idle` (loop, about 5.4 s): he wobbles side to side, dipping at the knees and rocking one heel up; blinks; brings
+    the lollipop to his mouth and licks it twice (eyes shut happily), smacks his lips; wobbles and blinks again; then
+    waves the lollipop high, its swirl spinning, with a grin.
+  - `swing`: a fierce face, he raises the lollipop, pulls it back behind his head and chops it down at his side with a
+    rainbow trail (cue `swing`), BONK on the ground in a burst of stars (cue `bonk`), then holds it up, pleased.
+  - `tantrum`: his lip wobbles, then he goes red and stomps left, right, left, right (cue `stomp` on each, dust), fist
+    pumping, wailing, tears flying, the lollipop shaking; he ends in a pout.
+- **Never above his wave:** the swing first went over his head; on a phone that covered the "BOSS" heading above the
+  bar, so it pulls back behind his head instead, no higher than the wave (a test checks every frame).
+- **Placeholders for the preview only:** every moment plays one of his three animations (his move, a capture, check,
+  a strike and his entrance the swing; hurt and defeat the tantrum; the rest the idle), and his cues borrow quiet
+  existing sounds (Boingo's slide whistle and squeak, the soft pop) because every cue must have one. No lines.
+- **Portrait:** his head, tufts and the whole candy beside it.
+- **In the test link** he takes the place of every boss, but a battle is still that boss's: when Boingo's powers fire,
+  the boss bar hides its character for the power's moment (as it always does) and Big Boy has no moment to play there.
+- Tests: `packages/app/test/bigboy.test.ts` (a preview kit with no boss; never above his wave; the swirl's colours; the
+  portrait), plus the shared character tests.
+
 ### Ideas for later, not built (Eric, Oct 8, 2026)
 
 - **Real boss abilities, never game-breaking:** freezing most of the team for a turn, or making the crowd move a
