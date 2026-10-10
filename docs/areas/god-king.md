@@ -17,23 +17,26 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   of expected score against the best move, by the judge's own numbers), he dives onto the board, takes the blow and
   falls; the move is undone and the crowd picks again with a fresh clock, the move he took back barred. The bar starts
   at `lastStandLoss` (plus `lastStandChargedExtra` while he has charges) and falls to `lastStandLossFloor` over
-  `lastStandDecayMoves` crowd moves; never when the best move was already worth `lastStandFrom` or more (a lost
-  position). Charges he falls with go to the crowd as power-ups. The round's scores stand.
+  `lastStandDecayMoves` crowd moves. In a weak position (the best move worth under `lastStandShareBelow`, 40%) it's
+  `lastStandShare` (half) of the chances left, when that's lower. Never when the best move is worth under
+  `lastStandFrom` (20%: a lost position). Charges he falls with go to the crowd as power-ups. The round's scores
+  stand.
 - **Fair.** A power never changes how a player's own pick was judged, and a move he plays never earns brilliant credit.
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
   power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). Each
   line then follows the speech rule every speaker shares (`speech.tsx`, `SPEECH`; Oct 10): it types out and stays
-  readable for 2.5 s plus 50 ms a character (at most 7 s); a critical line cuts in on a remark or small talk, but
+  readable for 2.2 s plus 35 ms a character (at most 4.5 s); a critical line cuts in on a remark or small talk, but
   waits for another critical line to have its time; the others wait their turn and lapse after 5 s.
-- **Why his Last Stand can seem to come one game and not the next** (Eric, Oct 10; working as designed). He judges
-  the crowd's move as it's played, before the boss replies, by how much it lowers the crowd's chances (the judge's
-  expected score, the eval bar's number), not by pawns. He dives in when one move throws away at least the bar (35
-  points of chances on the first move with charges, easing to 18 by move 22), and only while the crowd's best move
-  still keeps 40% or more; below that the game counts as already lost. A slow slide (several bad moves, each under the
-  bar) takes the chances under 40% without ever calling him, and from there nothing does. And from 19% a hung queen
-  can cost at most 19 points, since chances can't fall below 0. A hung queen from an even position costs 50 to 70
-  points: he saves that. Charges only raise the bar by 5; solo and online are the same; it never waits for the boss to
-  take the piece. `scripts/repro-last-stand.ts` replays both in Solo.
+- **How he judges a blunder** (Eric, Oct 10: option 3 of the Last Stand proposals). He judges the crowd's move as
+  it's played, before the boss replies, by how much it lowers the crowd's chances (the judge's expected score, the eval
+  bar's number), not by the material: players sometimes sacrifice on purpose, and a sacrifice the engine likes gives
+  nothing away. From 40% up, one move must throw away the plain bar (35 points on the first move with charges, easing
+  to 18 by move 22): a hung queen from an even position costs 50 to 70 points. From 20% to 40%, half of the chances
+  left is enough (from 30%, 15 points; from 25%, 12.5), or the plain bar if that's lower. Under 20% the game counts as
+  already lost. Charges only raise the plain bar by 5; solo and online are the same; it never waits for the boss to
+  take the piece. Eric's two games, replayed in Solo by `scripts/repro-last-stand.ts`: losing on purpose (moves giving
+  away 4 to 21 points, none a disaster for where they were played) and then the queen hung from 12% (in Eric's own game,
+  19%): no Last Stand, the game being lost by then; the queen hung on move 1 (55% to 4%): Last Stand.
 - **Looks.** Pixel art in the boss characters' format, in white and black versions (a recolour of the armour only,
   in the crowd's colour). SNES/Fire Emblem style: pixel portraits, slanted cut-in banners, retro sounds, a Press
   Start 2P speech bubble. Drama yes, gore no (cracks, sparks and a few stylised red drops are the limit).
@@ -71,8 +74,10 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - Sheets and GIFs: `npm run preview:characters -- <dir> only=god-king`, `node scripts/preview-god-king.mjs out.png banner=1`.
 - Sims: `packages/sim/scripts/last-stand-sim.ts`, `last-stand-blunders.ts` (`reports/last-stand.md`).
 - Replays in the real Solo app, the runner's own numbers logged move by move: `npx tsx scripts/repro-last-stand.ts
-  [phone|desktop] [boss]` (a slow slide then a hung queen: no Last Stand; a queen hung on move 1: Last Stand).
-- e2e for his lines' time: `e2e/boss-speech.spec.ts` (his opening line held for its full time). Unit:
+  [phone|desktop] [boss] [hang=35]` (a slow slide, then the queen hung once the crowd's chances are under `hang`%:
+  no Last Stand from under 20%; a queen hung on move 1: Last Stand).
+- e2e for his lines' time: `e2e/boss-speech.spec.ts` (his opening line held for its full time; each boss's line gone
+  on time). Unit:
   `packages/app/test/speech.test.ts`.
 
 ## Rules for this area
