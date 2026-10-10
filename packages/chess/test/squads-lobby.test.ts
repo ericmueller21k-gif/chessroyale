@@ -12,6 +12,7 @@ import {
   reportWinner,
   roundDecided,
   clockName,
+  finalClockName,
   rulesFromVotes,
   squadsRng,
   squadsVotes,
@@ -144,6 +145,7 @@ describe("Squads: pre-game votes", () => {
     expect(votes[1]!.options.map((o) => o.id)).toEqual(["fast", "normal", "long"]);
     const c = SQUADS.clocks[1]!;
     expect(votes[1]!.options[1]!.label).toBe(`Normal ${clockName(c)}`);
+    expect(votes[1]!.options[1]!.blurb).toBe(`Rounds 1 and 2: ${clockName(c)}. The final: ${finalClockName(c)}`);
   });
 
   it("writes a clock the way chess players do", () => {
