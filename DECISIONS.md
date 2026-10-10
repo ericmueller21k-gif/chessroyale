@@ -745,6 +745,8 @@ Eric asked for something like the old Call of Duty emblem editor.
 - Tap your icon on your profile ("Edit") to open the builder. The tools are deliberately few: pencil, eraser, fill bucket, colour picker, 1/2/3 px brushes, undo, clear, a 24-colour palette and a custom colour.
 - It saves a PNG data URL (well under 1 KB for most drawings) in the existing `users.icon` column. The server only accepts a real 48 × 48 PNG (signature, IHDR size, base64 only, at most 16 KB). The old emoji stay valid for older accounts.
 - No moderation yet (Eric: worry about that later).
+- **Fill froze the page (Eric, Oct 10, 2026).** Cause: the bucket's colour was a signed number and the pixels unsigned, so "already that colour" never matched; filling an area with its own colour (the second click) re-queued every pixel forever until Chrome ran out of memory.
+- Fix (`src/icon-pixels.ts`): colours are unsigned; the fill is iterative with a visited set, bounded to 48 × 48, and a fill or clear that changes nothing does nothing (no undo step); undo keeps the last 40 steps.
 
 ## Crowd pieces: one spot per square (Oct 5, 2026)
 

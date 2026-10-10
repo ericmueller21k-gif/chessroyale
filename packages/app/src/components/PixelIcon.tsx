@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { ICON_SIZE, type Pixels, floodFill, remember, toHex, toRgba } from "../icon-pixels.ts";
 
-/** Player icons are 48 × 48 pixel drawings, saved as a small PNG. */
-export const ICON_SIZE = 48;
+export { ICON_SIZE };
 
 /** A player's icon: their pixel drawing, or (older accounts) the emoji they picked. */
 export function UserIcon({ icon, class: cls = "" }: { icon: string; class?: string }) {
@@ -10,19 +10,12 @@ export function UserIcon({ icon, class: cls = "" }: { icon: string; class?: stri
 }
 
 type Tool = "pencil" | "eraser" | "fill" | "picker";
-type Pixels = Uint32Array; // one 0xAABBGGRR per pixel (little endian, as ImageData lays it out)
 
 const PALETTE = [
   "#000000", "#ffffff", "#7f7f7f", "#c3c3c3", "#880015", "#ed1c24", "#ff7f27", "#fff200",
   "#22b14c", "#00a2e8", "#3f48cc", "#a349a4", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0",
   "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7", "#f2c14e", "#1e3a8a", "#5b0f24", "#0b0b14",
 ];
-
-const toRgba = (hex: string) => {
-  const n = parseInt(hex.slice(1), 16);
-  return (0xff << 24) | ((n & 0xff) << 16) | (n & 0xff00) | (n >> 16);
-};
-const toHex = (v: number) => "#" + [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff].map((c) => c.toString(16).padStart(2, "0")).join("");
 
 /**
  * The icon builder, like an old console emblem editor: a 48 × 48 grid and a few
@@ -63,10 +56,7 @@ export function IconEditor({ initial, onSave, onCancel }: { initial: string; onS
     im.src = initial;
   }, []);
 
-  const snapshot = () => {
-    history.current.push(pixels.current.slice());
-    if (history.current.length > 40) history.current.shift();
-  };
+  const snapshot = () => remember(history.current, pixels.current.slice());
   const cellAt = (e: PointerEvent) => {
     const r = canvas.current!.getBoundingClientRect();
     return { x: Math.floor(((e.clientX - r.left) / r.width) * ICON_SIZE), y: Math.floor(((e.clientY - r.top) / r.height) * ICON_SIZE) };
@@ -81,35 +71,29 @@ export function IconEditor({ initial, onSave, onCancel }: { initial: string; onS
         if (px >= 0 && py >= 0 && px < ICON_SIZE && py < ICON_SIZE) pixels.current[py * ICON_SIZE + px] = v;
       }
   };
-  const fill = (x: number, y: number) => {
-    const p = pixels.current;
-    const target = p[y * ICON_SIZE + x]!;
-    const v = toRgba(colour);
-    if (target === v) return;
-    const stack = [[x, y]];
-    while (stack.length) {
-      const [cx, cy] = stack.pop()!;
-      if (cx! < 0 || cy! < 0 || cx! >= ICON_SIZE || cy! >= ICON_SIZE || p[cy! * ICON_SIZE + cx!] !== target) continue;
-      p[cy! * ICON_SIZE + cx!] = v;
-      stack.push([cx! + 1, cy!], [cx! - 1, cy!], [cx!, cy! + 1], [cx!, cy! - 1]);
-    }
-  };
   const last = useRef<{ x: number; y: number } | null>(null);
   const down = (e: PointerEvent) => {
     e.preventDefault();
-    const { x, y } = cellAt(e);
+    // (A tap on the canvas's far edge reads as cell 48: keep it on the canvas.)
+    const at = cellAt(e);
+    const x = Math.min(Math.max(at.x, 0), ICON_SIZE - 1);
+    const y = Math.min(Math.max(at.y, 0), ICON_SIZE - 1);
     if (tool === "picker") {
       const v = pixels.current[y * ICON_SIZE + x]!;
       if (v >>> 24) setColour(toHex(v));
       setTool("pencil");
       return;
     }
-    snapshot();
     if (tool === "fill") {
-      fill(x, y);
-      paint();
+      // A fill that changes nothing (the same colour again) is not a step to undo.
+      const before = pixels.current.slice();
+      if (floodFill(pixels.current, x, y, toRgba(colour))) {
+        remember(history.current, before);
+        paint();
+      }
       return;
     }
+    snapshot();
     drawing.current = true;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     last.current = { x, y };
@@ -138,6 +122,7 @@ export function IconEditor({ initial, onSave, onCancel }: { initial: string; onS
     redraw((n) => n + 1);
   };
   const clear = () => {
+    if (!pixels.current.some((v) => v)) return;
     snapshot();
     pixels.current = new Uint32Array(ICON_SIZE * ICON_SIZE);
     paint();
