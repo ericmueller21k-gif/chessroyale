@@ -1041,6 +1041,8 @@ export class MatchRunner {
     const captured = pieceAt(board.fen, m.slice(2, 4))?.type;
     this.bossLast = { move: m, san: toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
+    // (The boss's own after-move effect: Sawyer's split pawn after his first move.)
+    if (this.state.boss?.powers) bossRules(this.state.boss)?.afterBossMove?.(this.battle, m);
     this.preparePowers();
     return m;
   }

@@ -5,15 +5,17 @@
  * moves (down to 3). Crowds of three strengths (expert, club and casual players,
  * modelled as bots that sometimes play a random move). The goal is a boss that's hard but beatable.
  *
- *   npx tsx packages/sim/scripts/boss-sim.ts run <expert|club|casual|beginner> <offsets,comma> <games> <seed> [stumble][,snack]
+ *   npx tsx packages/sim/scripts/boss-sim.ts run <expert|club|casual|beginner> <offsets,comma> <games> <seed> [stumble][,snack][,split]
  *
  * `snack`: Big Boy's opening, the crowd's d- or e-pawn eaten before move 1 (a coin flip per game).
+ * `split`: Sawyer's opening, his first move a pawn move and that pawn sawn in two (a second pawn beside it: splitSquare;
+ *   from the starting position he has all 8, so it comes on his first pawn move once one of his pawns is gone).
  *   npx tsx packages/sim/scripts/boss-sim.ts summary
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { DEFAULT_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng } from "@chessroyale/core";
-import { applyMove, bossMoveFrom, fenAfter, gameEnd, legalMoves, START_FEN, withoutPiece, type Opening } from "@chessroyale/chess";
+import { applyMove, bossMoveFrom, fenAfter, gameEndWith, legalMoves, pieceAt, splitRoom, splitSquare, START_FEN, withPiece, withoutPiece, type Base, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -33,7 +35,7 @@ const CROWDS: Record<string, { skills: number[]; random: number }> = {
   beginner: { skills: spread(30, 90), random: 0.25 },
 };
 
-async function run(kind: string, offsets: number[], games: number, seed: number, stumble: boolean, snack = false) {
+async function run(kind: string, offsets: number[], games: number, seed: number, stumble: boolean, snack = false, split = false) {
   const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
   const engine = await createNodeEngine({ nodes: CROWD_NODES, hashMb: 16 });
   const boss = await createNodeEngine({ nodes: settings.bossNodes, hashMb: 16 });
@@ -66,9 +68,10 @@ async function run(kind: string, offsets: number[], games: number, seed: number,
       const chance = stumble ? bossStumbleChance(elo, settings) : 0;
       // (Big Boy's snack: the crowd's d- or e-pawn gone before move 1.)
       const start = snack ? withoutPiece(START_FEN, rng() < 0.5 ? "d2" : "e2") : START_FEN;
-      const result = await battle(rng, skills, pickSettings, candidates, (fen) => bossMoveFrom(boss, fen, elo, settings.bossNodes, rng() < chance, rng), start);
-      const row = { kind, rating, offset, elo, stumble, ...(snack ? { snack } : {}), ...result };
-      appendFileSync(root + `reports/boss-sim/${kind}-${seed}${snack ? "-snack" : ""}.jsonl`, JSON.stringify(row) + "\n");
+      const splitSeed = Math.floor(rng() * 2 ** 32);
+      const result = await battle(rng, skills, pickSettings, candidates, (fen, allowed) => bossMoveFrom(boss, fen, elo, settings.bossNodes, rng() < chance, rng, undefined, undefined, allowed), start, split ? splitSeed : null);
+      const row = { kind, rating, offset, elo, stumble, ...(snack ? { snack } : {}), ...(split ? { split } : {}), ...result };
+      appendFileSync(root + `reports/boss-sim/${kind}-${seed}${snack ? "-snack" : ""}${split ? "-split" : ""}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }
   }
@@ -81,11 +84,17 @@ async function battle(
   skills: number[],
   pickSettings: typeof settings,
   candidates: (fen: string) => Promise<{ top: { move: string; expected: number }[]; list: { move: string; loss: number }[] }>,
-  bossMove: (fen: string) => Promise<string>,
+  bossMove: (fen: string, allowed: string[] | null) => Promise<string>,
   start: string = START_FEN,
+  split: number | null = null,
 ) {
   let history: string[] = [];
   let fen = start;
+  // (Sawyer's split: the position changes after his first move, a base there.)
+  const bases: Base[] = [{ ply: 0, fen: start }];
+  let splitState: "first" | "waiting" | "done" = "first";
+  let splitAt: number | null = null;
+  const gameEnd = (_start: string, h: readonly string[]) => gameEndWith(h, bases);
   let alive = skills.map((skill, i) => ({ i, skill, recent: [] as number[] }));
   let moves = 0;
   let lastExpected = 0.5;
@@ -111,9 +120,24 @@ async function battle(
       alive = alive.filter((p) => p !== victim);
     }
     if (gameEnd(start, history)) break;
-    const reply = await bossMove(fen);
+    // (Sawyer: his first move a pawn move, then that pawn sawn in two; with no room yet for another pawn of his, his
+    // first pawn move once there is: as the game's rules, bosses/sawyer.ts.)
+    const first = split !== null && history.length === 1;
+    const pawnMoves = first ? legalMoves(fen).filter((m) => pieceAt(fen, m.slice(0, 2))?.type === "p") : [];
+    const reply = await bossMove(fen, pawnMoves.length ? pawnMoves : null);
     history = [...history, reply];
     fen = applyMove(fen, reply);
+    if (split !== null && splitState !== "done") {
+      const pawn = pieceAt(fen, reply.slice(2, 4))?.type === "p" && reply.length === 4;
+      const room = splitRoom(fen, "b");
+      const half = pawn && room ? splitSquare(fen, reply.slice(2, 4), "w", split) : null;
+      if (half) {
+        fen = withPiece(fen, half, { color: "b", type: "p" });
+        bases.push({ ply: history.length, fen });
+        splitState = "done";
+        splitAt = moves;
+      } else if (first) splitState = pawn && !room ? "waiting" : "done";
+    }
   }
   const end = gameEnd(start, history);
   let result: "crowd" | "boss" | "draw";
@@ -123,7 +147,7 @@ async function battle(
     // The move cap: the engine's verdict (White's expected score from the last crowd search).
     result = lastExpected >= 0.6 ? "crowd" : lastExpected <= 0.4 ? "boss" : "draw";
   }
-  return { result, moves, ended: end ?? "cap" };
+  return { result, moves, ended: end ?? "cap", ...(split !== null ? { splitAt } : {}) };
 }
 
 function summary() {
@@ -132,11 +156,11 @@ function summary() {
     readFileSync(`${dir}/${f}`, "utf8")
       .split("\n")
       .filter(Boolean)
-      .map((l) => JSON.parse(l) as { kind: string; rating: number; offset: number; elo: number; result: string; moves: number; ended: string; stumble?: boolean; snack?: boolean }),
+      .map((l) => JSON.parse(l) as { kind: string; rating: number; offset: number; elo: number; result: string; moves: number; ended: string; stumble?: boolean; snack?: boolean; split?: boolean }),
   );
   const groups = new Map<string, typeof rows>();
   for (const r of rows) {
-    const key = `${r.kind}|${r.offset}|${r.stumble ? "s" : ""}${r.snack ? "+snack" : ""}`;
+    const key = `${r.kind}|${r.offset}|${r.stumble ? "s" : ""}${r.snack ? "+snack" : ""}${r.split ? "+split" : ""}`;
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   const lines = [
@@ -159,7 +183,7 @@ function summary() {
     const n = rs.length;
     const pct = (k: string) => `${Math.round((100 * rs.filter((r) => r.result === k).length) / n)}%`;
     const avg = Math.round(rs.reduce((s, r) => s + r.moves, 0) / n);
-    lines.push(`| ${kind} | ${rs[0]!.rating} | ${Number(offset) >= 0 ? "+" : ""}${offset} | ${st?.startsWith("s") ? "stumbles" : "plain"}${st?.endsWith("+snack") ? ", snack (a centre pawn eaten)" : ""} | ${Math.round(rs.reduce((s, r) => s + r.elo, 0) / n)} | ${n} | ${pct("crowd")} | ${pct("draw")} | ${pct("boss")} | ${avg} |`);
+    lines.push(`| ${kind} | ${rs[0]!.rating} | ${Number(offset) >= 0 ? "+" : ""}${offset} | ${st?.startsWith("s") ? "stumbles" : "plain"}${st?.includes("+snack") ? ", snack (a centre pawn eaten)" : ""}${st?.includes("+split") ? ", split (his first pawn sawn in two)" : ""} | ${Math.round(rs.reduce((s, r) => s + r.elo, 0) / n)} | ${n} | ${pct("crowd")} | ${pct("draw")} | ${pct("boss")} | ${avg} |`);
   }
   writeFileSync(root + "reports/boss-calibration.md", lines.join("\n") + "\n");
   console.log(lines.join("\n"));
@@ -167,4 +191,4 @@ function summary() {
 
 const [cmd, kind, offsets, games, seed, mode] = process.argv.slice(2);
 if (cmd === "summary") summary();
-else await run(kind ?? "club", (offsets ?? "0").split(",").map(Number), Number(games ?? 4), Number(seed ?? 1), !!mode?.split(",").includes("stumble"), !!mode?.split(",").includes("snack"));
+else await run(kind ?? "club", (offsets ?? "0").split(",").map(Number), Number(games ?? 4), Number(seed ?? 1), !!mode?.split(",").includes("stumble"), !!mode?.split(",").includes("snack"), !!mode?.split(",").includes("split"));

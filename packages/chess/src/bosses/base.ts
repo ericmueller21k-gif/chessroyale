@@ -197,6 +197,11 @@ export interface BossRules {
   };
   /** In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). */
   afterCrowdMove?(b: Battle, move: string | null): void;
+  /**
+   * In the match: what happens after the boss's own move, before the crowd's next turn is set up (Sawyer saws the pawn of
+   * his first move in two; the halves follow every move).
+   */
+  afterBossMove?(b: Battle, move: string): void;
   /** In the match: its own costs on a round's scores (Hollow's wrong tries into the dark). */
   scoreRound?(b: Battle, players: { playerId: string; roundScore: number }[]): void;
   /**

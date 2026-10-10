@@ -13,6 +13,7 @@ import { gingerSound, type GingerSound } from "./characters/gingerbread-sounds.t
 import { grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds.ts";
 import { hollowSound, type HollowSound } from "./characters/hollow-sounds.ts";
 import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
+import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -135,6 +136,7 @@ const ginger = (name: GingerSound) => (t: number) => buffer(gingerSound(name, ct
 const grex = (name: GrexSound) => (t: number) => buffer(grexSound(name, ctx!.sampleRate), t);
 const hollow = (name: HollowSound) => (t: number) => buffer(hollowSound(name, ctx!.sampleRate), t);
 const bigBoy = (name: BigBoySound) => (t: number) => buffer(bigBoySound(name, ctx!.sampleRate), t);
+const sawyer = (name: SawyerSound) => (t: number) => buffer(sawyerSound(name, ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
 function grexWhistle(t: number) {
   const w = whistlePick(Math.random(), Math.random(), Math.random());
@@ -370,7 +372,16 @@ export type SoundName =
   | "bigboySwish"
   | "bigboyBonk"
   | "bigboyStomp"
-  | "bigboyPoof";
+  | "bigboyPoof"
+  // Sawyer (a raid boss, the raccoon with a saw): synthesised, see characters/sawyer-sounds.ts.
+  | "sawyerRev"
+  | "sawyerSwing"
+  | "sawyerCut"
+  | "sawyerCrack"
+  | "sawyerTape"
+  | "sawyerBigSaw"
+  | "sawyerHop"
+  | "sawyerRejoin";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -468,13 +479,21 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   bigboyBonk: bigBoy("bonk"),
   bigboyStomp: bigBoy("stomp"),
   bigboyPoof: bigBoy("poof"),
+  sawyerRev: sawyer("rev"),
+  sawyerSwing: sawyer("swing"),
+  sawyerCut: sawyer("cut"),
+  sawyerCrack: sawyer("crack"),
+  sawyerTape: sawyer("tape"),
+  sawyerBigSaw: sawyer("bigsaw"),
+  sawyerHop: sawyer("hop"),
+  sawyerRejoin: sawyer("rejoin"),
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));
   },
 };
 
-/** Synthesised sounds that can be made ahead (warmSounds), by name: Hollow's (his smash took 150 ms to make on a computer), Big Boy's. */
+/** Synthesised sounds that can be made ahead (warmSounds), by name: Hollow's (his smash took 150 ms to make on a computer), Big Boy's, Sawyer's. */
 const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
   hollowHum: (r) => hollowSound("hum", r),
   hollowCast: (r) => hollowSound("cast", r),
@@ -498,6 +517,14 @@ const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
   bigboyBonk: (r) => bigBoySound("bonk", r),
   bigboyStomp: (r) => bigBoySound("stomp", r),
   bigboyPoof: (r) => bigBoySound("poof", r),
+  sawyerRev: (r) => sawyerSound("rev", r),
+  sawyerSwing: (r) => sawyerSound("swing", r),
+  sawyerCut: (r) => sawyerSound("cut", r),
+  sawyerCrack: (r) => sawyerSound("crack", r),
+  sawyerTape: (r) => sawyerSound("tape", r),
+  sawyerBigSaw: (r) => sawyerSound("bigsaw", r),
+  sawyerHop: (r) => sawyerSound("hop", r),
+  sawyerRejoin: (r) => sawyerSound("rejoin", r),
 };
 /**
  * Makes a boss's synthesised sounds ahead of time, one per idle moment, so the first time one plays (a bulb smashed in

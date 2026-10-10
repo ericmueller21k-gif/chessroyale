@@ -12,12 +12,14 @@ import { PIE_FLY, PIE_SPLAT } from "./effects/boingo.ts";
 import { CANDLE_SHOT, CANDLE_SHOTS, FIREBALL_FALL, FIRE_SHADOW, FIRE_TILE, PIECE_BURN, SPARK_FLY } from "./effects/grex.ts";
 import { BULB_STRAND, DARK_MISS, DARK_POUR, DARK_SQUARE, NIGHT_LABEL, NIGHT_SQUARE } from "./effects/hollow.ts";
 import { BLOCK_FLY, BOUNCE_CRASH, BOUNCE_PUFF, TOY_BLOCK } from "./effects/bigboy.ts";
+import { BOARD_GAP, SAW_CRACK, SAW_CUT } from "./effects/sawyer.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
 export { SHADOW_R } from "./effects/grex.ts";
 export { NIGHT_TILES, STRAND_H, STRAND_W } from "./effects/hollow.ts";
 export { TOY_LETTER_NAMES, type ToyLetter } from "./effects/bigboy.ts";
+export { CUT_SIDES, GAP_W, type CutSide } from "./effects/sawyer.ts";
 
 /** Every effect sprite, by name. */
 export const EFFECT_SPRITES = {
@@ -43,4 +45,7 @@ export const EFFECT_SPRITES = {
   blockFly: BLOCK_FLY,
   bouncePuff: BOUNCE_PUFF,
   bounceCrash: BOUNCE_CRASH,
+  sawCut: SAW_CUT,
+  sawCrack: SAW_CRACK,
+  boardGap: BOARD_GAP,
 } as const satisfies Record<string, Character>;

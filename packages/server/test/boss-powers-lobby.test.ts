@@ -187,13 +187,13 @@ describe("boss powers online", () => {
       expect(L.core.save().runner!.state.boss!.id).not.toBe("clown");
     }
     const ids = new Set<string>();
-    for (let seed = 1; seed <= 40 && ids.size < 5; seed++) {
+    for (let seed = 1; seed <= 60 && ids.size < 6; seed++) {
       const L = setup({ ...RAID_SETTINGS }, {}, seed);
       L.core.connect(undefined, "A", "computer", false, 1500);
       L.core.message("p1", { t: "start" });
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
-    expect([...ids].sort()).toEqual(["bigboy", "clown", "gingerbread", "grex", "hollow"]);
+    expect([...ids].sort()).toEqual(["bigboy", "clown", "gingerbread", "grex", "hollow", "sawyer"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {
@@ -570,6 +570,77 @@ describe("Big Boy online", () => {
     L.core.message("p1", { t: "bossMove", key: ask.key, move: ask.bounce![0]! });
     expect(L.last("p2", "boss")!.boss.powers!.bounce!.at).toBe(1);
     expect(L.last("p2", "boss")!.boss.powers!.warned).toBe(false);
+    expect(L.core.ultimateTrigger("p1", true)).toBe(false);
+  });
+});
+
+describe("Sawyer online", () => {
+  const toRound = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+    return L.last("p1", "round")!;
+  };
+  const middle = (m: string) => m.charCodeAt(0) - 97 <= 3 !== m.charCodeAt(2) - 97 <= 3;
+
+  it("his first move is a pawn move (the host is told); with all 8 of his pawns still there, the split waits (no ninth pawn), the same for everyone", () => {
+    const L = raid({ bossId: "sawyer" });
+    const r1 = L.last("p1", "round")!;
+    expect(r1.boss!.id).toBe("sawyer");
+    expect(r1.boss!.powers!.split ?? null).toBeNull();
+    crowdMove(L);
+    const req = L.last("p1", "bossRequest")!;
+    expect(req.allowed!.length).toBeGreaterThan(0);
+    for (const m of req.allowed!) expect(pieceAt(req.fen, m.slice(0, 2))!.type).toBe("p");
+    // A host that answers with something else gets the first allowed move played instead.
+    const knight = legalMoves(req.fen).find((m) => pieceAt(req.fen, m.slice(0, 2))!.type === "n")!;
+    L.core.message("p1", { t: "bossMove", key: req.key, move: knight });
+    const b = L.last("p1", "boss")!;
+    expect(b.boss.board.lastMove).toBe(req.allowed![0]);
+    const split = b.boss.powers!.split!;
+    expect(split).toEqual(L.last("p2", "boss")!.boss.powers!.split);
+    // (The opening here, 5 moves into the Ruy Lopez, has taken none of his pawns.)
+    expect(split).toMatchObject({ pawn: req.allowed![0]!.slice(2, 4), square: null, waiting: true });
+    expect([...b.boss.board.fen.split(" ")[0]!].filter((c) => c === "p").length).toBe(8);
+    expect(b.boss.powers!.events.map((e) => e.kind)).not.toContain("split");
+    expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove));
+  });
+
+  it("a saw cut on the 3rd turn: the crowd's moves and the jobs keep off it; the board saw (the test switch) keeps everything on its half", () => {
+    const L = raid({ bossId: "sawyer", bossPowerTest: "boardsaw" });
+    crowdMove(L);
+    hostBoss(L);
+    const r2 = toRound(L);
+    expect(r2.boss!.powers!.warned).toBe(true);
+    crowdMove(L);
+    hostBoss(L);
+    const b = L.last("p1", "boss")!;
+    expect(b.boss.powers!.events.map((e) => e.kind)).toContain("boardsaw");
+    expect(b.boss.powers!.boardSaw).toEqual({ at: 3, until: 3 + BOSS_POWERS.boardSawTurns - 1 });
+    expect(b.until - b.now).toBeGreaterThanOrEqual(POWER_FX.boardsaw);
+    const r3 = toRound(L);
+    const allowed = r3.boss!.powers!.allowed!;
+    expect(allowed.length).toBeGreaterThan(0);
+    for (const m of allowed) expect(middle(m)).toBe(false);
+    expect(legalMoves(r3.board!.fen).some(middle)).toBe(true);
+    const req = crowdMove(L);
+    expect(req.jobs[0]!.allowed).toEqual(allowed);
+    // (Past the boss's strike after the crowd's 3rd move.)
+    for (let i = 0; i < 10 && !L.last("p1", "bossRequest"); i++) L.advance(10_000);
+    hostBoss(L);
+    // The cut that waited a turn for the saw comes on the 4th.
+    const r4 = toRound(L);
+    const cut = r4.boss!.powers!.cut!;
+    expect(cut).toMatchObject({ at: 4, until: 4 + BOSS_POWERS.sawTurns - 1 });
+    expect(r4.boss!.powers!.cut).toEqual(L.last("p2", "round")!.boss!.powers!.cut);
+  });
+
+  it("the admins' trigger: the board saw as the next crowd turn begins, without the warning", () => {
+    const L = raid({ bossId: "sawyer" });
+    expect(L.core.ultimateTrigger("p1", true)).toBe(true);
+    crowdMove(L);
+    hostBoss(L);
+    const b = L.last("p2", "boss")!;
+    expect(b.boss.powers!.boardSaw).toEqual({ at: 2, until: 1 + BOSS_POWERS.boardSawTurns });
+    expect(b.boss.powers!.warned).toBe(false);
     expect(L.core.ultimateTrigger("p1", true)).toBe(false);
   });
 });

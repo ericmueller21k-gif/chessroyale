@@ -9,7 +9,9 @@
  * where it's held and how far the blade has slid out. The gloves ride on the saw's grips, so moving the saw moves his
  * hands. Every part is painted the first time a frame that uses it shows (sprite.ts lazyParts).
  *
- * A sprite preview only (?wip=1&kit=Sawyer): no boss, powers, lines or sounds of his own yet.
+ * His powers' moments (the split pawn, a saw cut, the board saw: components/Sawyer.tsx) reuse his `rev` and `sawDown`,
+ * with a `leap` (onto the board and back) and `boardSaw` (sawing his way up the board) added; his lines are
+ * SAWYER_LINES, his sounds characters/sawyer-sounds.ts.
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
@@ -458,6 +460,10 @@ export interface SawyerPose {
   saw?: Partial<SawPose>;
   /** The tail's swish, -2 to 2. */
   swish?: number;
+  /** His feet moved (a step, tucked up in a leap): each foot's offset, its leg following. */
+  feet?: { l?: Pt; r?: Pt };
+  /** In the air (a leap): no shadow under him (the board draws his shadow where he'll land). */
+  air?: boolean;
 }
 
 const SHOULDER_F: Pt = [29, 31.5];
@@ -483,18 +489,20 @@ export function sawyerLayers(p: SawyerPose): Layer[] {
   const sR = up(SHOULDER_R);
   const armF = limb("arm", [sF, [Math.min(sF[0], gF[0]) - 1.5, (sF[1] + gF[1]) / 2 + 1], gF]);
   const armR = limb("arm", [sR, [Math.max(sR[0], gR[0]) + 3, (sR[1] + gR[1]) / 2 + 0.5], gR]);
-  const legL = limb("leg", [up([31.5, 49]), [27 + lean / 2, 54], [23, 58.5]]);
-  const legR = limb("leg", [up([45, 50]), [50.5 + lean / 2, 54], [55, 58.5]]);
+  const fl = p.feet?.l ?? [0, 0];
+  const fr = p.feet?.r ?? [0, 0];
+  const legL = limb("leg", [up([31.5, 49]), [27 + lean / 2 + fl[0] / 2, 54 + fl[1] / 2], [23 + fl[0], 58.5 + fl[1]]]);
+  const legR = limb("leg", [up([45, 50]), [50.5 + lean / 2 + fr[0] / 2, 54 + fr[1] / 2], [55 + fr[0], 58.5 + fr[1]]]);
   const hx = lean + (p.headDx ?? 0);
   const hy = bob + (p.headDy ?? 0);
   return [
-    at("shadow", 9, GROUND - 2),
+    ...(p.air ? [] : [at("shadow", 9, GROUND - 2)]),
     L(tailLayer(p.swish ?? 0)),
     L(legR),
     at("body", BODY_AT[0] + lean, BODY_AT[1] + bob),
     L(legL),
-    at("foot", 13, GROUND - 6),
-    at("foot", 51.5, GROUND - 6),
+    at("foot", Math.round(13 + fl[0]), Math.round(GROUND - 6 + fl[1])),
+    at("foot", Math.round(51.5 + fr[0]), Math.round(GROUND - 6 + fr[1])),
     L(armF),
     at(`head:${p.mood ?? "grin"}`, HX + hx, HY + hy),
     at("hat", HAT_AT[0] + hx, HAT_AT[1] + hy + (p.hatDrop ?? 0)),
@@ -594,6 +602,74 @@ const sawDown: Anim = {
   ],
 };
 
+/**
+ * A leap (onto the board, and back to his corner: the board moves him along his arc): a crouch, off the ground at
+ * `upAt` with his feet tucked up, down again at `landAt` (cue `hop`: a soft thump), and up straight.
+ */
+export const LEAP = { upAt: 100, landAt: 600 } as const;
+const leap: Anim = {
+  loop: false,
+  frames: [
+    f(100, { mood: "fierce", bob: 2, saw: { at: [27.5, 38], tilt: 16 } }),
+    f(250, { mood: "glee", air: true, feet: { l: [2, -5], r: [-2, -5] }, saw: { tilt: 18 }, swish: 1 }),
+    f(250, { mood: "glee", air: true, feet: { l: [1, -3], r: [-1, -3] }, saw: { tilt: 16 } }),
+    f(90, { mood: "grin", bob: 2, saw: { tilt: 10 } }, { cue: "hop", shake: [0, 1] }),
+    f(110, { mood: "grin", bob: 1 }),
+  ],
+};
+
+/**
+ * The board saw: he saws his way up the board, the blade down and biting (where `CUT` is) the whole way, stepping as
+ * he goes, sawdust bursting off it; the big saw's sound from its first frame (cue `bigsaw`). About BOARD_SAW.runMs long
+ * (the board moves him up the middle).
+ */
+const boardSaw: Anim = {
+  loop: false,
+  frames: Array.from({ length: 19 }, (_, i) => {
+    const step = i % 4;
+    const feet: SawyerPose["feet"] = step === 0 ? { l: [-2, -2] } : step === 2 ? { r: [2, -2] } : {};
+    return f(90, { ...DOWN, bob: step % 2 ? 2 : 1, feet, saw: { ...DOWN.saw, stroke: i % 2 ? 0 : 2 } }, { ...(i === 0 ? { cue: "bigsaw" } : {}), shake: [i % 2 ? 1 : 0, 0], specks: burst(CUT, i % 5, 12) });
+  }),
+};
+
+/**
+ * What he says (his text box: speech.tsx): short, a builder's patter. Reactions are rare (each moment's chance in
+ * SAWYER_CHANCE); a power's moment always has its line. The same line for everyone (picked by the moment).
+ */
+export const SAWYER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
+  entrance: ["Measure twice, cut once.", "Hard hat zone!", "Let's get sawing."],
+  split: ["Two for one!", "Half off!", "Double trouble!"],
+  move: ["Snip.", "Clean cut.", "On the level."],
+  capture: ["Timber!", "Sawed it.", "That's lumber now."],
+  check: ["Cut off!", "Nowhere to run.", "Corner cut!"],
+  hurt: ["Splinters!", "Ow! My thumb!", "Not my good saw!"],
+  thinking: ["Measure twice…", "Where's my pencil?", "Hmm, level…"],
+  smug: ["Built to last.", "Solid work.", "Right on schedule."],
+  rattled: ["Not up to code…", "Wobbly…", "Structural damage!"],
+  defeat: ["Out of order…", "Back to the shop…", "Blunt blade…"],
+  victory: ["Job done!", "Measure twice, win once.", "Signed off!"],
+  strike: ["Timber!", "You're fired!", "Off the job!"],
+  power: ["Mind the gap.", "Keep off the cut!", "Snip snip.", "Clean cut."],
+  ultimateWarn: ["This board's getting renovated.", "Stand back…", "Revving up…"],
+  ultimate: ["Timber!", "Renovation time!", "Down the middle!"],
+};
+export const SAWYER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
+  entrance: 1,
+  move: 0.12,
+  capture: 0.6,
+  check: 0.75,
+  hurt: 0.6,
+  thinking: 0.08,
+  smug: 0.8,
+  rattled: 0.8,
+  defeat: 1,
+  victory: 1,
+  strike: 0.8,
+  power: 0.5,
+  ultimateWarn: 1,
+  ultimate: 1,
+};
+
 export const SAWYER: Character = {
   id: "sawyer",
   name: "Sawyer",
@@ -603,7 +679,7 @@ export const SAWYER: Character = {
   palette: SAWYER_PALETTE,
   halo: "#2c2624",
   parts: PARTS,
-  anims: { idle, rev, sawDown },
+  anims: { idle, rev, sawDown, leap, boardSaw },
 };
 
 /** The part of him a portrait shows (his head and hat), in frame pixels. */

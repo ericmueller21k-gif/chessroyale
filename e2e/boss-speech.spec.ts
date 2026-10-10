@@ -19,6 +19,7 @@ const BOSSES = [
   { id: "grex", name: "G-REX", banner: "SPARKLER!" },
   { id: "hollow", name: "Hollow", banner: "DARKNESS!" },
   { id: "bigboy", name: "Big Boy", banner: "TOY BLOCK!" },
+  { id: "sawyer", name: "Sawyer", banner: "SPLIT PAWN!" },
 ] as const;
 
 type Segment = { text: string; ok: boolean; why: string; from: number; to: number; before: number };
@@ -104,8 +105,8 @@ for (const boss of BOSSES) {
     await page.goto(`/?debug&clock=60&boss=${boss.id}`);
     await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
     await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-    // Best moves until the moment comes (Ginger, Boingo, G-REX and Big Boy as your second turn begins; Hollow after his
-    // first move).
+    // Best moves until the moment comes (Ginger, Boingo, G-REX and Big Boy as your second turn begins, Sawyer's split
+    // too; Hollow after his first move).
     for (let i = 0; i < 4 && !(await speech()).banners[boss.banner]; i++) {
       await playBest(page);
       await expect.poll(async () => !!(await speech()).banners[boss.banner] || (await phase(page)) === "play", { timeout: 60_000 }).toBe(true);

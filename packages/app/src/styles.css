@@ -11138,3 +11138,106 @@ img.qicon {
     transform: translate(1px, -1px);
   }
 }
+
+/* ---- Sawyer: his split pawn, his saw cuts and his board saw ---- */
+
+/* His saw coming down at the board's corner for a cut: his frame's own shape (he's wide: the saw one way, his tail the
+   other). */
+.pm-cut .pm-caster {
+  aspect-ratio: 83 / 73;
+  width: 32%;
+  left: -6%;
+  top: -12%;
+}
+/* His banners: hazard stripes, like a building site. */
+.fight-banner.power-cut.saw .fb-band {
+  background: repeating-linear-gradient(135deg, #b98a06 0 5cqw, #1c1413 5cqw 10cqw);
+  border-color: #fde68a;
+}
+/* The split and the board saw: on chessground's own board (eighths of --cg-size), over the pieces, never taking a tap. */
+.sw-layer {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: var(--cg-size, 100%);
+  height: var(--cg-size, 100%);
+  z-index: 8;
+  pointer-events: none;
+}
+.sw-layer > * {
+  position: absolute;
+  pointer-events: none;
+}
+.sw-shadow {
+  z-index: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(8, 8, 14, 0.85) 0 45%, rgba(8, 8, 14, 0) 72%);
+}
+/* A half of the split pawn in the air: the same drawing as the board's (cburnett), a square in size. */
+.sw-layer piece.sw-half {
+  z-index: 5;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+  filter: drop-shadow(0 0.6cqw 0 rgba(0, 0, 0, 0.35));
+}
+.sw-crack {
+  z-index: 6;
+  width: 12.5%;
+  height: 12.5%;
+}
+.sw-boy {
+  z-index: 4;
+  filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3));
+}
+/* His split pawns as halves, on the board and in the air: each shows the half away from its partner, its sawn face
+   shaded along the cut (the piece's own drawing, darkened, in a thin column at the cut: it follows the pawn's outline). */
+.cg-wrap piece.saw-half-l {
+  clip-path: inset(0 50% 0 0);
+}
+.cg-wrap piece.saw-half-r {
+  clip-path: inset(0 0 0 50%);
+}
+.cg-wrap piece.saw-half-l::after,
+.cg-wrap piece.saw-half-r::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  /* Fresh-cut wood: the white pawn's face toned to tan, the black pawn's turned light and toned the same. */
+  filter: sepia(0.9) saturate(1.6) brightness(0.82);
+}
+.cg-wrap piece.black.saw-half-l::after,
+.cg-wrap piece.black.saw-half-r::after {
+  filter: invert(1) sepia(0.9) saturate(1.6) brightness(0.82);
+}
+.cg-wrap piece.saw-half-l::after {
+  clip-path: inset(0 50% 0 41%);
+}
+.cg-wrap piece.saw-half-r::after {
+  clip-path: inset(0 41% 0 50%);
+}
+/* The cut's groove and tape, and the board saw's gap: under the pieces (z-index 1, the pieces 2, in the board's
+   stacking context), exactly on chessground's board. */
+.board-wrap > .sw-cut-board {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cg-size, 100%);
+  height: var(--cg-size, 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+/* The gap: GAP_W (14) of the board's 256 frame pixels, centred on the line between the d and e files; a shadow round
+   it so the halves read as apart. */
+.board-wrap > .sw-gap {
+  position: absolute;
+  top: 0;
+  left: calc(var(--cg-size, 100%) * 121 / 256);
+  width: calc(var(--cg-size, 100%) * 14 / 256);
+  height: var(--cg-size, 100%);
+  z-index: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.55));
+}

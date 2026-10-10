@@ -12,7 +12,7 @@ import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
 import { HOLLOW, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT, bulbsLook } from "./hollow.ts";
-import { SAWYER, SAWYER_PORTRAIT } from "./sawyer.ts";
+import { SAWYER, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
 
@@ -141,8 +141,6 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // His snack is the crowd's pawn: white, or black when the crowd plays Black.
     lookOf: (boss) => (boss.crowdSide === "b" ? "blackPawn" : undefined),
   },
-  // A sprite preview only (?wip=1&kit=Sawyer): no boss, powers, lines or sounds of his own yet. He has three animations,
-  // so every moment plays one of them, and his cues borrow quiet sounds as placeholders.
   "Sawyer": {
     ch: SAWYER,
     anims: {
@@ -157,10 +155,20 @@ export const BOSS_KITS: Record<string, BossKit> = {
       defeat: "idle",
       victory: "rev",
       strike: "sawDown",
+      power: "sawDown",
+      ultimateWarn: "rev",
+      ultimate: "boardSaw",
+      split: "sawDown",
     },
-    sounds: { rev: "grexFizz", swing: "clownSlideDown", cut: "gingerCrunch" },
-    lines: {},
-    chance: {},
+    sounds: {
+      rev: "sawyerRev",
+      swing: "sawyerSwing",
+      cut: "sawyerCut",
+      hop: "sawyerHop",
+      bigsaw: "sawyerBigSaw",
+    },
+    lines: SAWYER_LINES,
+    chance: SAWYER_CHANCE,
     portrait: { ...SAWYER_PORTRAIT, anim: "idle", frame: 0 },
     wide: true,
   },

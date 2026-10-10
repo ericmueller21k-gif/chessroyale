@@ -6,6 +6,7 @@ import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
 import { prewarmBigBoy } from "./BigBoy.tsx";
+import { prewarmSawyer } from "./Sawyer.tsx";
 import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, useVoice, type Priority } from "../speech.tsx";
 
 /**
@@ -112,6 +113,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     warmSounds([...Object.values(kit.sounds), ...fx.flatMap((e) => Object.values(EFFECTS[e].sounds))]);
     // (Big Boy's snack, toss and bounce drawn ahead too: his bounce is big, and his snack plays seconds in.)
     if (kit.ch.id === "bigboy") prewarmBigBoy(kit.ch.name, boss.crowdSide === "b" ? "blackPawn" : undefined);
+    // (Sawyer's split, cuts and board saw too: the split plays seconds in, after his first move.)
+    if (kit.ch.id === "sawyer") prewarmSawyer(kit.ch.name);
   }, [kit]);
   // A recolour from the battle's state (Hollow's bulbs still lit), read as it's drawn.
   const lookRef = useRef<() => string>(() => "");

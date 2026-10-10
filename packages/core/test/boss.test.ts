@@ -11,8 +11,9 @@ describe("the boss template: who can be met", () => {
     expect(playableBosses([base, { ...base, id: "y", kit: null }, { ...base, id: "z", powers: null }]).map((b) => b.id)).toEqual(["x"]);
   });
 
-  it("today: Ginger (Freeze), Boingo the Clown, G-REX (Fire), Hollow (Darkness) and Big Boy (toy blocks, the Big Bounce)", () => {
-    expect(playableBosses().map((b) => b.id).sort()).toEqual(["bigboy", "clown", "gingerbread", "grex", "hollow"]);
+  it("today: Ginger (Freeze), Boingo the Clown, G-REX (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce) and Sawyer (saw cuts, the board saw)", () => {
+    expect(playableBosses().map((b) => b.id).sort()).toEqual(["bigboy", "clown", "gingerbread", "grex", "hollow", "sawyer"]);
+    expect(BOSS_ROSTER.find((b) => b.id === "sawyer")).toMatchObject({ name: "Sawyer", icon: "🪚", kit: "Sawyer", powers: { passive: "cuts", ultimate: "boardsaw" } });
     expect(BOSS_ROSTER.find((b) => b.id === "bigboy")).toMatchObject({ name: "Big Boy", icon: "🍭", kit: "Big Boy", powers: { passive: "blocks", ultimate: "bounce" } });
     expect(BOSS_ROSTER.find((b) => b.id === "hollow")).toMatchObject({ name: "Hollow", kit: "Hollow", offset: -100, powers: { passive: "dark", ultimate: "lightsout" } });
     expect(BOSS_ROSTER.find((b) => b.id === "grex")!.powers).toEqual({ passive: "sparkler", ultimate: "candle" });
@@ -31,7 +32,7 @@ describe("the boss template: who can be met", () => {
       // A picked boss that isn't playable is never met.
       expect(isPlayable(chooseBoss(i / 100, "golem"))).toBe(true);
     }
-    expect(seen).toEqual(new Set(["bigboy", "clown", "gingerbread", "grex", "hollow"]));
+    expect(seen).toEqual(new Set(["bigboy", "clown", "gingerbread", "grex", "hollow", "sawyer"]));
     expect(chooseBoss(0.99, "clown", "clown").id).toBe("clown");
     // With one playable boss, it's met even if it was the last one.
     const one: BossDef[] = [{ id: "a", name: "A", icon: "a", kit: "A", offset: 0, powers: { passive: "pie", ultimate: "funhouse" } }];
