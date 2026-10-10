@@ -156,3 +156,32 @@ In [`docs/history/ops.md`](docs/history/ops.md). How it works today: [`docs/area
 ## New decisions
 
 Add new sections here (`### Title (date)`), newest last.
+
+### Housekeeping: area pages, history by area, one file per boss (Oct 10, 2026)
+
+Eric approved a housekeeping pass with no player-visible change. The calls made:
+
+- **History split by area, not by month:** every decision so far is from October 2026, so by month would have been
+  one file. Each area's history (`docs/history/<area>.md`) holds its old sections word for word, in order; the index
+  above lists all 80 with links. Code comments that cite `DECISIONS.md, "<section>"` were left as they are: the index
+  resolves them, and a pure refactor leaves the code's comments alone.
+- **Two more area pages than listed,** `engine.md` and `chat.md`, so the `engine` and `social` briefs each point at a
+  page of their own. Classic's notes sit on `crowd.md` (it's frozen until Eric redesigns it).
+- **Lessons:** all 21 are still true, so none was dropped. `.claude/LESSONS.md` keeps every rule, grouped by theme;
+  the stories moved word for word to `docs/history/lessons.md`; each area page repeats the rules for its area.
+- **Ginger's rules file is `ginger.ts`,** not `freeze.ts` as the task list had it: it holds both of her powers (the
+  freeze and the blizzard), and the other files are named after their boss too.
+- **Each boss's hooks only see that boss's battles** (the dispatcher looks the boss up by id). Before, the shared code
+  tested every power's state in turn. The two are the same for every state a battle can reach, since each power's
+  state is only ever set by its own boss; the unit tests, the e2e suite and a comparison of the screens' output on
+  battles with every boss confirm it.
+- **Kept shared, on purpose:** the roster, power ids, event kinds and every boss's state fields in `core/boss.ts`
+  (types every package reads); every number in `BOSS_POWERS` (Eric's one settings file); the protocol
+  (`NetBossPowers`, the boss request's flags), so the lobby's host-engine moments (the funhouse, the extra move, the
+  bounce), the host's handlers in `net.ts` and solo's flows stay where they were (changing them would change the
+  server's messages); the boss screen's handling of the board during the funhouse, the bounce and the burn, and the
+  intro's claim and snack (`screens/Boss.tsx`); and the runner's always-present screen fields for the first three
+  bosses (`frozen`, `pie`, `fire`…), which every client reads. A new boss adds its own through its `view` hook. The
+  "Adding a boss" checklist in `docs/areas/bosses.md` says which shared files a new boss still touches.
+- **`BulbStrip` became `BossBarExtra`,** the boss bar's piece by the rage meter that any boss can fill (only Hollow
+  does, with his bulbs).

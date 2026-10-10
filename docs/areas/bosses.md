@@ -50,19 +50,59 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 
 ## Where the code is
 
-| What | Where |
-| --- | --- |
-| The roster, the playable rule, choosing a boss, strength | `packages/core/src/boss.ts` |
-| Every power's rules (allowed moves, each turn's powers, after-move effects, visibility, judging with allowed moves) | `packages/chess/src/boss-powers.ts` |
-| Timings the server and the screens share (`POWER_FX`, each boss's beats) | `packages/chess/src/boss-timing.ts` |
-| The battle in the match runner (the snack, Hollow's side, the dark's tries, the fire, the funhouse, Lights out, the extra move, the bounce, the boss view) | `packages/chess/src/runner.ts` |
-| Online: the server's side | `packages/server/src/lobby.ts` (the boss's turn, the funhouse/extra/bounce requests to the host, Lights out's rounds), `protocol.ts` |
-| Solo | `packages/app/src/solo.ts` |
-| Each boss's art and sounds | `packages/app/src/characters/<boss>.ts`, `<boss>-sounds.ts`; registered in `characters/index.ts`; the kit (animations per moment, lines, portrait) in `characters/kits.ts` |
-| Power art: each power's moment and effect sprites | `characters/power-art.ts`, `characters/effects.ts`, `components/BossEffect.tsx` |
-| Powers on screen (ice, pie, fire, dark, blocks, banners, the rage meter) | `components/BossPowers.tsx`, `BigBoy.tsx`, `LightsOut.tsx` |
-| The boss screen | `packages/app/src/screens/Boss.tsx` |
-| The boss menu's power words | `packages/app/src/power-words.ts` |
+Each boss lives in its own files, one per layer, on a shared base. The shared files only put them together.
+
+| Layer | Shared | Each boss (Ginger, Boingo, G-REX, Hollow, Big Boy) |
+| --- | --- | --- |
+| The roster, the playable rule, choosing a boss, strength | `packages/core/src/boss.ts` (`BOSS_ROSTER`; power ids, event kinds and every boss's state fields in `BossPowerState`) | its line in `BOSS_ROSTER` |
+| Rules: each turn's powers, allowed moves, what the judge sees, after-move effects, fair-play turns, its opening, its screen fields | `packages/chess/src/bosses/base.ts` (the base boss, `BossRules`, and shared helpers), `bosses/index.ts` (the registry), `boss-powers.ts` (the dispatcher: `prepareTurn`, `crowdAllowed`, `bossAllowed`, `powerTurn`, `icedSquares`, the judge's hooks) | `packages/chess/src/bosses/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts` |
+| Timings the server and the screens share | `packages/chess/src/boss-timing.ts` (`POWER_FX` spreads each boss's `<BOSS>_FX`; `powerFxMs`, `bossIntroTimeline`) | in its rules file (`GINGER_FX`, `FIRE_BURN_MS`, `LIGHTS_OUT`, `CLAIM_MS`, `SNACK`, `BOUNCE`, `BLOCK`…) |
+| Its moments in the match runner (the funhouse, Lights out, the extra move, the bounce) | `packages/chess/src/runner.ts` hands each a `Battle` (base.ts) and keeps one-line methods (`playFunhouse`, `startLightsOut`, `playBounce`…) | `<boss>Battle` in its rules file, with its engine pick (`funhouseMoveFrom`, `extraMoveFrom`, `bounceFrom`) |
+| The lobby server | `packages/server/src/lobby.ts` (the boss's turn; the host-engine requests for the funhouse, the extra move and the bounce), `packages/server/src/bosses/base.ts` (`BossLobby`) | `packages/server/src/bosses/hollow.ts` (dark tries, Lights out) |
+| Solo | `packages/app/src/solo.ts` (drives the same runner; its own timing of Lights out) | |
+| Art and sounds | `characters/index.ts` (`CHARACTERS`), `characters/kits.ts` (`BOSS_KITS`: animations per moment, lines, portrait), `characters/power-art.ts` (each power's moments and effects) | `characters/<boss>.ts`, `<boss>-sounds.ts` (`gingerbread`, `clown`, `grex`, `hollow`, `bigboy`) |
+| Board effect sprites | `characters/effects.ts` (`EFFECT_SPRITES`), `characters/effects/common.ts` | `characters/effects/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts` |
+| Powers on screen: moments, banners, the board layer, the rage meter | `components/BossPowers.tsx` (`momentsOf`, `PowerMoment`, `PowerBoard`, `BossBarExtra`, `dockLine`, the warning), `components/PowerParts.tsx` (`BossUi`, `Moment`, `Flight`, `PowerBanner`), `components/BossEffect.tsx` | `components/Ginger.tsx`, `Boingo.tsx`, `Grex.tsx`, `Hollow.tsx` (+ `LightsOut.tsx`), `BigBoy.tsx` |
+| The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below) | |
+| The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
+
+### The base boss (`packages/chess/src/bosses/base.ts`)
+
+A boss's rules are a `BossRules` object; every hook sees only its own boss's battles and its own state:
+
+| Hook | What it does | Who uses it |
+| --- | --- | --- |
+| `id` | Its `BOSS_ROSTER` id | all |
+| `wearOff(next, t)` | As a crowd turn begins, first: what wore off | Ginger (ice), Boingo (pie), Big Boy (block) |
+| `ultimate(next, t)` | The ultimate's step until it has come: true when it comes now. `warnThenUnleash` is the usual one (warn, then the next turn) | all |
+| `ultimateOnHisTurn` | It comes at the start of the boss's turn instead (the test trigger waits for it) | Hollow, Big Boy |
+| `everyTurn(next, t)` | Every turn after the ultimate's step | G-REX (the barrage) |
+| `passive(next, t)` | The passive's step (it waits a turn if the ultimate came now) | all |
+| `crowdFilter`, `bossStops` | Its limits on the crowd's and the boss's moves (the dispatcher lifts them if none are left) | Ginger, Boingo, Big Boy |
+| `powerTurn` | A turn its powers touch doesn't count for fair play | all but Hollow |
+| `iced` | The squares that show ice | Ginger |
+| `judge` | What the judge must score too, how it ranks and reads moves | G-REX (fire) |
+| `afterCrowdMove(b, move)` | After any crowd move, in the match | G-REX (the burn) |
+| `scoreRound(b, players)` | Its own costs on a round's scores | Hollow (dark tries) |
+| `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack) |
+| `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy |
+
+A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` word, `appearAt`, `own` screen, `line`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer.
+
+### Adding a boss
+
+1. **Design it** with Eric (opening, passive, ultimate) and record it in `DECISIONS.md`.
+2. **Template** (`packages/core/src/boss.ts`): its line in `BOSS_ROSTER` (id, name, icon, kit name, offset, powers); new power ids in `PowerId` and `POWER_IDS`, new moment kinds in `PowerEventKind`, its state's fields in `BossPowerState`.
+3. **Numbers** in `BOSS_POWERS` (`packages/core/src/settings.ts`): every tunable stays there.
+4. **Rules**: `packages/chess/src/bosses/<boss>.ts` with its `BossRules` (start from the closest boss's file), its choose functions (seeded with `powerRoll`), its moments' lengths (`<BOSS>_FX`) and any beats the server and screens share. Register it: one line each in `bosses/index.ts`, `boss-powers.ts` (`export *`) and `boss-timing.ts` (`POWER_FX`). Its screen fields go in `NetBossPowers` (`protocol.ts`) and its `view` hook.
+5. **Character and art**: `characters/<boss>.ts` (+ sounds), in `characters/index.ts` and `BOSS_KITS` (`kits.ts`); its effects in `characters/effects/<boss>.ts`, in `effects.ts` and `power-art.ts`'s `EFFECTS`; its moments in `power-art.ts`.
+6. **Screen**: `components/<Boss>.tsx` with its `BossUi`; add it to `BOSS_UI` and `MOMENT_UI` in `BossPowers.tsx` (the compiler names any moment kind without a view). Its power words in `power-words.ts` (the compiler names a missing one).
+7. **Only if it has a moment of its own beyond these** (and these still mean shared edits, because they're protocol):
+   - one the host's engine plays (like the funhouse, the extra move, the bounce): a `<boss>Battle` with one-line runner methods, the lobby's request, answer and timeout (`lobby.ts`, `bossKind`), the host's handler (`net.ts`) and solo's (`solo.ts`), and the request's flag in `protocol.ts`;
+   - one the server times (like Lights out): `packages/server/src/bosses/<boss>.ts` on `BossLobby`, routed from `lobby.ts`, its messages in `protocol.ts`, and solo's timing in `solo.ts`;
+   - anything that changes the board the boss screen shows, or the intro (like the funhouse's flip, the bounce, the burn, Hollow's claim, Big Boy's snack): `screens/Boss.tsx`.
+8. **Tests**: `packages/chess/test/<boss>.test.ts` (rules: never no legal move, never breaks check, deterministic from the seed, the judge's view), a lobby test in `packages/server/test/boss-powers-lobby.test.ts`, app tests for its character and moments, `e2e/<boss>.spec.ts`. Watch it frame by frame (`npm run frames:powers`, or a `frames-<boss>.mjs`), run `npm run perf:boss -- <dir> <boss id> both 25`, and give Eric the test links (`?boss=<id>`, `?power=<ultimate>`).
+9. **Docs**: its row in the table above, and this checklist if the shape changed.
 
 ## Settings
 

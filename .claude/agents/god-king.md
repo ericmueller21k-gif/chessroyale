@@ -23,7 +23,7 @@ section marked "to build" as your brief.
 | What | Where |
 | --- | --- |
 | His powers' rules, charges, timing | `packages/chess/src/runner.ts` (boss battle), `packages/core/src/settings.ts` (`king*` keys), `packages/chess/src/boss-timing.ts` |
-| Online: the server's side and the messages | `packages/server/src/lobby.ts`, `packages/chess/src/protocol.ts`, `packages/app/src/net.ts` |
+| Online: the server's side and the messages | `packages/server/src/lobby.ts`, a boss's own server moments in `packages/server/src/bosses/<boss>.ts`, `packages/chess/src/protocol.ts`, `packages/app/src/net.ts` |
 | Solo | `packages/app/src/solo.ts`, `packages/app/src/game.ts` |
 | His pixel art: parts, poses, animations, white and black looks, portraits (pure) | `packages/app/src/characters/god-king.ts` (the boss characters' format: `sprite.ts`, `paint.ts`) |
 | Where he's drawn and his on-board animations | `packages/app/src/components/GodKing.tsx` (`GodKingSprite`, `KingSummon`, `GodKingPortrait`), `LastStand.tsx`, `styles.css` (his sections) |
@@ -31,8 +31,8 @@ section marked "to build" as your brief.
 | The dock and his command menu | `packages/app/src/components/BossDock.tsx` |
 | His lines | `packages/app/src/godKing.ts` |
 | The boss template, the playable rule, which boss a match meets | `packages/core/src/boss.ts` (`BOSS_ROSTER`, `isPlayable`, `chooseBoss`, `bossStrength`), `BOSS_POWERS` in `settings.ts`, `packages/app/src/boss-history.ts`, solo's boss menu (`BossMenu` in `screens/Home.tsx`) |
-| Boss powers' rules (allowed moves, each turn's powers, the funhouse's move, judging with allowed moves) | `packages/chess/src/boss-powers.ts`, `funhouseMoveFrom` and the boss parts of `runner.ts`, `POWER_FX` in `boss-timing.ts` |
-| Boss powers on screen (ice, pie, banners, the blizzard, the funhouse, the rage meter) | `packages/app/src/components/BossPowers.tsx`, its section of `styles.css` |
+| Boss powers' rules (allowed moves, each turn's powers, each boss's moments, judging with allowed moves) | one file per boss, `packages/chess/src/bosses/<boss>.ts`, on the base boss (`bosses/base.ts`, registered in `bosses/index.ts`); the dispatcher `boss-powers.ts`; `POWER_FX` in `boss-timing.ts` |
+| Boss powers on screen (ice, pie, banners, the blizzard, the funhouse, the rage meter) | one file per boss, `packages/app/src/components/<Boss>.tsx` (`Ginger`, `Boingo`, `Grex`, `Hollow`, `BigBoy`), put together by `components/BossPowers.tsx` (the shapes in `PowerParts.tsx`); its section of `styles.css` |
 | Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0 only, credited in `CREDITS.md`), `src/sound.ts` |
 | Boss screens | `packages/app/src/screens/Boss.tsx`, the boss parts of `Crowd.tsx` and `Play.tsx` |
 | Previews | `npm run frames:powers -- <dir> [gingerbread\|clown\|both] [phone\|desktop\|both]` (boss powers, frame by frame, GIFs), `npm run frames:hollow -- <dir> [phone\|desktop\|both]` (Hollow's dark and Lights out), `npm run frames:god-king -- <dir> [w\|b] [phone\|desktop\|both] [summon\|laststand\|all] [light\|dark]` (in the game), `npm run preview:characters -- <dir> only=god-king` (GIFs), `node scripts/preview-god-king.mjs out.png banner=1` (sheet) |
@@ -46,6 +46,8 @@ Not yours:
 - Classic mode
 
 If you need one of those changed, say what and why, and stop.
+
+Adding a boss: follow the checklist in `docs/areas/bosses.md` ("Adding a boss").
 
 ## Eric's standing rules for him
 

@@ -25,7 +25,7 @@ bosses work today, the code map and the "adding a boss" checklist). For the why,
 | Which boss has a character: its animations per moment, sounds, lines, portrait | `packages/app/src/characters/kits.ts` |
 | Moments from the shared match state, and line picking (pure) | `packages/app/src/characters/boss-beats.ts` |
 | The character on screen, its text box, its portrait (`BossFace`) | `packages/app/src/components/BossCharacter.tsx`; placed in the boss bar (`BossBar` in `Boss.tsx`), each boss screen's `.board-row` (`BossSide`), and the results |
-| Power art: each power's moment, the board's effect sprites (ice, pies, the blizzard), and playing them | `characters/power-art.ts` (the contract the power rules import), `characters/effects.ts`, `components/BossEffect.tsx` |
+| Power art: each power's moment, the board's effect sprites (ice, pies, the blizzard), and playing them | `characters/power-art.ts` (the contract the power rules import), one file of effect sprites per boss in `characters/effects/<boss>.ts` (registered in `characters/effects.ts`), `components/BossEffect.tsx` |
 | Sound packs | synthesised in `characters/<boss>-sounds.ts`, or CC0 files in `public/sounds/bosses/<boss>/` credited in a `CREDITS.md`; names in `src/sound.ts` |
 | Frame-by-frame check in the game | `scripts/frames-boss-character.mjs` (`npm run frames:character -- <dir> [boss] [phone|desktop|both]`) |
 | Tests | `packages/app/test/characters.test.ts`, `packages/app/test/boss-character.test.ts`, `e2e/boss-character.spec.ts` |
