@@ -157,22 +157,28 @@ export function LightsDock({ lights, graceMs, now }: { lights: LightsView; grace
   );
 }
 
+/** His text box's sizes, each a step smaller (`.lo-line.fit1`…); past the last, it isn't shown. */
+const LINE_FITS = 3;
+
 /**
- * His words in his pixel text box above the board's top-left (each round's prompt, typed). Kept only where it fits:
- * a box that would run off the screen (a long prompt on a narrow phone grows upward) isn't shown; the dock always has
- * the prompt (LightsDock).
+ * His words in his pixel text box above the board's top-left (each round's prompt, typed). The box has its full size
+ * from its first frame (the words not typed yet hold their place, unseen), so it never grows as it types. Whether it
+ * fits is settled once per line, before it's first painted: a box that would run off the screen takes a smaller size,
+ * a step at a time; only one that fits at none (a long prompt on a narrow phone) isn't shown. Nothing checks it again
+ * while the line is up. The dock always has the prompt (LightsDock).
  */
 function LightsLine({ text, at, now }: { text: string; at: number; now: number }) {
   const el = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState(0);
   useLayoutEffect(() => {
-    const e = el.current;
-    if (!e) return;
-    const r = e.getBoundingClientRect();
-    e.style.visibility = r.top < 0 || r.left < 0 || r.right > innerWidth ? "hidden" : "";
-  });
+    const r = el.current?.getBoundingClientRect();
+    if (r && fit <= LINE_FITS && (r.top < 0 || r.left < 0 || r.right > innerWidth)) setFit(fit + 1);
+  }, [fit]);
+  const typed = Math.min(text.length, Math.floor((now - at) / 28) + 1);
   return (
-    <div ref={el} class="pm-line lo-line" role="status" aria-label={text}>
-      {text.slice(0, Math.min(text.length, Math.floor((now - at) / 28) + 1))}
+    <div ref={el} class={`pm-line lo-line${fit ? ` fit${fit}` : ""}`} style={fit > LINE_FITS ? { visibility: "hidden" } : undefined} role="status" aria-label={text} data-fit={fit}>
+      {text.slice(0, typed)}
+      <span class="lo-line-rest">{text.slice(typed)}</span>
     </div>
   );
 }
@@ -241,12 +247,14 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
   const gone = t >= tl.backAt + animLength(backAnim);
   // His words over the board's top-left, in his pixel text box: "It's time.", each round's prompt, the lights back.
   // (As the lights come back: the verdict, the crowd held the light or he moves twice; without a count, his usual line.)
+  // A round's prompt stays up for the whole round, through its answers, until the next round's (or the lights back)
+  // replaces it (Eric, Oct 10); his other lines are up for 2.8 s.
   const verdict = lightsVerdict(lights);
   const verdictBeat = verdict === "held" ? "lightsHeld" : verdict === "failed" ? "lightsFailed" : "lightsBack";
   const line =
-    back ? { text: (pickLine(kit, verdictBeat, `${lights.key}:back`) ?? kit.lines[verdictBeat]?.[0] ?? kit.lines.lightsBack?.[0]) || "Remember that.", at: at + tl.backAt + 300 }
-    : round >= 0 ? { text: findLine(lights.rounds[round]!.targets ?? lights.rounds[round]!.pieces), at: at + tl.rounds[round]!.at }
-    : t >= LIGHTS_OUT.dropAt ? { text: kit.lines.ultimate?.[0] ?? "It's time.", at: at + LIGHTS_OUT.dropAt + 200 }
+    back ? { text: (pickLine(kit, verdictBeat, `${lights.key}:back`) ?? kit.lines[verdictBeat]?.[0] ?? kit.lines.lightsBack?.[0]) || "Remember that.", at: at + tl.backAt + 300, ms: 2800 }
+    : round >= 0 ? { text: findLine(lights.rounds[round]!.targets ?? lights.rounds[round]!.pieces), at: at + tl.rounds[round]!.at, ms: Infinity }
+    : t >= LIGHTS_OUT.dropAt ? { text: kit.lines.ultimate?.[0] ?? "It's time.", at: at + LIGHTS_OUT.dropAt + 200, ms: 2800 }
     : null;
   const tr = round >= 0 ? tl.rounds[round]! : null;
   // Each tap gives you a second more: "+1s" flashes by the bar as it bumps back up.
@@ -278,7 +286,7 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
           )}
         </div>
       )}
-      {line && now >= line.at && now < line.at + 2800 && <LightsLine key={line.text} text={line.text} at={line.at} now={now} />}
+      {line && now >= line.at && now < line.at + line.ms && <LightsLine key={line.text} text={line.text} at={line.at} now={now} />}
       {tr && open && <TimerBar startsAt={at + tr.at} deadline={at + deadline} total={tr.until - tr.at} />}
       {bumpAt > 0 && now < bumpAt + 800 && (
         <span key={`bump-${round}-${used}`} class="lo-plus" aria-hidden="true">

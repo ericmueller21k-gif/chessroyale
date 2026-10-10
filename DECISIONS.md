@@ -4104,6 +4104,12 @@ the board's top-left, a third of the board wide, growing upward, up for 2.8 s.
   and clear of the boss bar, in one fixed box per screen, and it changed with each round. Only at 320 px did the
   longest prompt take the compact list. Before, it was up for about a third of each round, and grew upward over the
   boss bar to 100 px tall.
+- **His text box, fixed** (Eric, Oct 10: on a computer it showed for a moment, then was gone). It was up for 2.8 s at
+  most, and its fit check ran every frame on a box that grew upward as it typed, so a long prompt hid itself once it
+  rose off the top of a computer's screen. Now each round's line stays until the next round's (or the lights back)
+  replaces it; the box has its full size from its first frame, and its fit is settled once, before its first paint,
+  a size smaller rather than hidden (hidden only if it fits at no size down to 8 px: the longest prompts on a 320 px
+  phone). `e2e/hollow.spec.ts` checks it every frame of every round, on a phone and a computer.
 
 **Lights out: miss too much and he moves twice** (Eric's rule, Oct 10)
 - The −10 a piece missed stays.

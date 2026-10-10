@@ -10895,6 +10895,21 @@ img.qicon {
   max-width: 34%;
   z-index: 11;
 }
+/* His box at its full size from its first frame: the words not typed yet hold their place, unseen. A box that would run
+   off the screen takes a smaller size, a step at a time, down to 8 px (LightsLine): on a computer the room above the
+   board stays about 140 px while the board, and the box with it, grows. */
+.lo-line-rest {
+  visibility: hidden;
+}
+.pm-line.lo-line.fit1 {
+  font-size: min(3cqw, max(2.4cqw, 8px));
+}
+.pm-line.lo-line.fit2 {
+  font-size: min(3cqw, max(1.9cqw, 8px));
+}
+.pm-line.lo-line.fit3 {
+  font-size: min(3cqw, max(1.6cqw, 8px));
+}
 /* Lights out: each tap gives you a second more; "+1s" pops up by the bar as it bumps back up. */
 .lo-plus {
   position: absolute;
