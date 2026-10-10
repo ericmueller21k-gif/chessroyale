@@ -52,6 +52,17 @@ on Eric's account.
    - Who builds it: the `item-builder` delegate (it owns `Avatar`), briefed screen by screen. The waiting room and
      the podium first.
 
+9. **Squads** (Eric's design, Oct 10, 2026; [docs/areas/squads.md](docs/areas/squads.md)). A new full mode in the
+   Classic slot of the mode menu (Crowd · Squads · Boss raid): 8 squads of 4 play team chess in a bracket, with no
+   engine in the game. Round 1 Relay (4 boards, one player a move, rotating), round 2 Pairs (2 boards, two pick and
+   a coin chooses), the final Pick and Block (one board, pickers and blockers), Armageddon after a tie.
+   - Phase 1, the rules and a bot simulation: **done** (`packages/chess/src/squads/`, `reports/squads-sim.md`).
+   - Phase 2, the server: the squads lobby, parties (invite link or code), matchmaking, bots, the bracket,
+     spectating, the test controls ("Next round", start at round 2 or the final), placement rewards.
+   - Phase 3, the screens: the menu slot, votes, tiny boards and scouting, the pair and pick-and-block panels, the
+     final's staging.
+   - Phase 4: e2e and polish, then playtests with real players (the sim's open questions: time per lobby, the cap).
+
 ## Later: Eric's ideas (Oct 9, 2026; not started, not queued)
 
 Eric: "too big a change for now". Recorded so they aren't lost; nothing gets built until he says so.
