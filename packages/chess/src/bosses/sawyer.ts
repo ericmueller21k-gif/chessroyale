@@ -2,8 +2,10 @@
  * Sawyer, the raccoon with a saw (BOSS_ROSTER "sawyer"): his rules. He opens with the split pawn: his first move is
  * always a pawn move, and then he saws that pawn in two, a second pawn of his landing on an empty square beside it (the
  * two halves are tracked through the game). The engine plays no position with a ninth pawn a side or a 33rd piece, so
- * while he has all 8 (or the board 32 pieces) the split waits, and comes after his first pawn move once there's room. His passive, saw cuts: every few turns he saws one edge between two
- * neighbouring squares in the crowd's half, and nothing (either side) may move straight across it while it's there
+ * while he has all 8 (or the board 32 pieces) the split waits, and comes after his first pawn move once there's room;
+ * if the pawn he moved has no square to split into, another pawn of his that has one is sawn (chooseSplit). His
+ * passive, saw cuts: every few turns he saws one edge between two neighbouring squares in the crowd's half, and
+ * nothing (either side) may move straight across it while it's there
  * (diagonal moves pass at the corners, knights jump it). His ultimate, the board saw: with the rage meter full, from
  * turn boardSawFrom, and one half of the board more his than the crowd's on material, the warning, then the board is
  * sawn in two between the d and e files: for a few turns no move may cross between the halves, knights included.
@@ -110,6 +112,35 @@ export function splitSquare(fen: string, pawn: string, crowd: Side, seed: number
     });
   if (options.length < 2) return options[0] ?? null;
   return options[powerRoll(seed, "split") < 0.5 ? 0 : 1]!;
+}
+
+/**
+ * Which pawn of his the split saws, and where its new half lands (Eric, Oct 10: "he picks a pawn which has a space
+ * available next to it and splits it"): the pawn he just moved (`moved`) when a square beside it will do
+ * (splitSquare); otherwise another of his pawns that has one, the most central first (the d and e files, then c and
+ * f…), from the seed among those as central. None: null (the split waits for his next pawn move).
+ */
+export function chooseSplit(fen: string, moved: string | null, crowd: Side, seed: number, turn: number): { pawn: string; square: string } | null {
+  if (moved) {
+    const half = splitSquare(fen, moved, crowd, seed);
+    if (half) return { pawn: moved, square: half };
+  }
+  const mine = other(crowd);
+  const options: { pawn: string; square: string }[] = [];
+  for (let f = 0; f < 8; f++)
+    for (let r = 2; r <= 7; r++) {
+      const sq = square(f, r);
+      if (sq === moved) continue;
+      const pc = pieceAt(fen, sq);
+      if (pc?.type !== "p" || pc.color !== mine) continue;
+      const half = splitSquare(fen, sq, crowd, seed);
+      if (half) options.push({ pawn: sq, square: half });
+    }
+  if (!options.length) return null;
+  const off = (sq: string) => Math.abs(file(sq) - 3.5);
+  const most = Math.min(...options.map((o) => off(o.pawn)));
+  const central = options.filter((o) => off(o.pawn) === most).sort((a, b) => (a.pawn < b.pawn ? -1 : 1));
+  return central[Math.floor(powerRoll(seed, "split-pawn", turn) * central.length)]!;
 }
 
 /**
@@ -292,21 +323,23 @@ export const SAWYER: BossRules = {
     const mine = other(boss.crowdSide);
     const first = firstMoveDue(p);
     if (first || p.split?.waiting) {
-      // His first move (always a pawn's), or (no room for another pawn of his then) his first pawn move once there is.
+      // His first move (always a pawn's), or (no room for another pawn of his then, or no pawn with a square to split
+      // into) his next pawn move once there is: the pawn he moved if it can split, else another (chooseSplit).
       const sq = to(move);
       const pc = pieceAt(board.fen, sq);
-      const pawn = pc?.type === "p" && pc.color === mine ? sq : null;
-      const room = splitRoom(board.fen, mine);
-      const half = pawn && room ? splitSquare(board.fen, pawn, boss.crowdSide, p.seed) : null;
-      if (pawn && half) {
+      const moved = pc?.type === "p" && pc.color === mine ? sq : null;
+      const pick = moved && splitRoom(board.fen, mine) ? chooseSplit(board.fen, moved, boss.crowdSide, p.seed, turnOf(boss)) : null;
+      if (pick) {
+        const { pawn, square: half } = pick;
         const fen = withPiece(board.fen, half, { color: mine, type: "p" });
         const ply = board.history.length;
         b.boards.set(id, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen }] });
         const halves: SplitPawn["halves"] = file(half) < file(pawn) ? [{ square: half, side: "a" }, { square: pawn, side: "h" }] : [{ square: pawn, side: "a" }, { square: half, side: "h" }];
         b.state = { ...b.state, boss: { ...boss, powers: { ...p, split: { turn: turnOf(boss), pawn, square: half, halves } } } };
       } else if (first) {
-        // (No split: his first move wasn't a pawn's, or neither square beside it was free; or it waits for room.)
-        const split: SplitPawn = { turn: turnOf(boss), pawn, square: null, halves: [], ...(pawn && !room ? { waiting: true as const } : {}) };
+        // (No split yet: it waits for his next pawn move with room and a pawn to split. His first move wasn't a pawn's
+        // (he had none to move): no split.)
+        const split: SplitPawn = { turn: turnOf(boss), pawn: moved, square: null, halves: [], ...(moved ? { waiting: true as const } : {}) };
         b.state = { ...b.state, boss: { ...boss, powers: { ...p, split } } };
       }
       return;

@@ -15,7 +15,7 @@
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { DEFAULT_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng } from "@chessroyale/core";
-import { applyMove, bossMoveFrom, fenAfter, gameEndWith, legalMoves, pieceAt, splitRoom, splitSquare, START_FEN, withPiece, withoutPiece, type Base, type Opening } from "@chessroyale/chess";
+import { applyMove, bossMoveFrom, chooseSplit, fenAfter, gameEndWith, legalMoves, pieceAt, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -129,14 +129,13 @@ async function battle(
     fen = applyMove(fen, reply);
     if (split !== null && splitState !== "done") {
       const pawn = pieceAt(fen, reply.slice(2, 4))?.type === "p" && reply.length === 4;
-      const room = splitRoom(fen, "b");
-      const half = pawn && room ? splitSquare(fen, reply.slice(2, 4), "w", split) : null;
-      if (half) {
-        fen = withPiece(fen, half, { color: "b", type: "p" });
+      const pick = pawn && splitRoom(fen, "b") ? chooseSplit(fen, reply.slice(2, 4), "w", split, moves + 1) : null;
+      if (pick) {
+        fen = withPiece(fen, pick.square, { color: "b", type: "p" });
         bases.push({ ply: history.length, fen });
         splitState = "done";
         splitAt = moves;
-      } else if (first) splitState = pawn && !room ? "waiting" : "done";
+      } else if (first) splitState = pawn ? "waiting" : "done";
     }
   }
   const end = gameEnd(start, history);

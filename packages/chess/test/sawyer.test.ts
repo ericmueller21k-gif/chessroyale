@@ -7,8 +7,10 @@ import {
   SAW_CUT,
   START_FEN,
   applyMove,
+  SAWYER,
   bossAllowed,
   chooseCut,
+  chooseSplit,
   crossesCut,
   crossesMiddle,
   crowdAllowed,
@@ -147,6 +149,88 @@ describe("Sawyer's split pawn", () => {
     expect(splitRoom(START_FEN.replace("PPPPPPPP", "PPPP1PPP"), "w")).toBe(true);
   });
 
+  it("Eric's call: the pawn he moved when it can split; if not, another of his that can, the most central, from the seed; none: null", () => {
+    // His pawn just moved to a5, the crowd's pawn on b5 beside it: no square. His others: c7, e6 and h7.
+    const fen = "4k3/2p4p/4p3/pP6/8/8/8/4K3 w - - 0 2";
+    expect(splitSquare(fen, "a5", "w", 1)).toBeNull();
+    const seen = new Set<string>();
+    for (let seed = 0; seed < 20; seed++) {
+      const pick = chooseSplit(fen, "a5", "w", seed, 2)!;
+      // e6 is the most central (the e file); c7 (c) and h7 (h) aren't picked.
+      expect(pick.pawn).toBe("e6");
+      expect(pick.square).toBe(splitSquare(fen, "e6", "w", seed));
+      seen.add(pick.square);
+    }
+    expect(seen).toEqual(new Set(["d6", "f6"]));
+    // The pawn he moved can split: always that one, even with a more central pawn about.
+    const own = "4k3/2p4p/4p3/p7/8/8/8/4K3 w - - 0 2";
+    for (let seed = 0; seed < 10; seed++) expect(chooseSplit(own, "a5", "w", seed, 2)).toEqual({ pawn: "a5", square: "b5" });
+    // Two as central (d and e): either, from the seed and the turn; the same answer every time for the same ones.
+    const two = "4k3/7p/3pp3/pP6/8/8/8/4K3 w - - 0 2";
+    const pawns = new Set<string>();
+    for (let seed = 0; seed < 30; seed++) {
+      const pick = chooseSplit(two, "a5", "w", seed, 3)!;
+      expect(chooseSplit(two, "a5", "w", seed, 3)).toEqual(pick);
+      expect(pick).toEqual(pick.pawn === "d6" ? { pawn: "d6", square: "c6" } : { pawn: "e6", square: "f6" });
+      pawns.add(pick.pawn);
+    }
+    expect(pawns).toEqual(new Set(["d6", "e6"]));
+    // A pawn whose squares would all fork or check is passed over like a blocked one: e6's d6 and f6 would hit the
+    // crowd's knights on c5 and g5; c7's b7 and d7 hit nothing.
+    const forks = "4k3/2p4p/4p3/pPN3N1/8/8/8/4K3 w - - 0 2";
+    expect(splitSquare(forks, "e6", "w", 1)).toBeNull();
+    for (let seed = 0; seed < 10; seed++) expect(chooseSplit(forks, "a5", "w", seed, 2)!.pawn).toBe("c7");
+    // No pawn of his can split (a5 and h5 both blocked): null, and no pawn moved: the same search.
+    const none = "4k3/8/8/pP4Pp/8/8/8/4K3 w - - 0 2";
+    expect(chooseSplit(none, "a5", "w", 1, 2)).toBeNull();
+    expect(chooseSplit(none, null, "w", 1, 2)).toBeNull();
+  });
+
+  it("no pawn of his can split: it waits, and comes on his next pawn move that has one (the rules, on a board)", () => {
+    const run = (fen: string, move: string, split: BossPowerState["split"]) => {
+      const boss = bossWith(fen, { split });
+      const b = { state: { boss, boards: [0] }, boards: new Map([[0, { fen, history: [move], bases: [] }]]) };
+      SAWYER.afterBossMove!(b as unknown as Parameters<NonNullable<typeof SAWYER.afterBossMove>>[0], move);
+      return { split: b.state.boss.powers!.split!, fen: b.boards.get(0)!.fen };
+    };
+    // His first move, a6-a5: the crowd's pawns beside both of his: no split, waiting.
+    const blocked = "4k3/8/8/pP4Pp/8/8/8/4K3 w - - 0 2";
+    const first = run(blocked, "a6a5", undefined);
+    expect(first.split).toEqual({ turn: 4, pawn: "a5", square: null, halves: [], waiting: true });
+    expect(first.fen).toBe(blocked);
+    // Waiting, another blocked pawn move: still waiting, nothing changes.
+    const still = run(blocked, "h6h5", first.split);
+    expect(still.split).toEqual(first.split);
+    // Waiting, h5-h4: g4 is free, so h4 is sawn in two now.
+    const open = "4k3/8/8/pP4P1/7p/8/8/4K3 w - - 0 3";
+    const now = run(open, "h5h4", first.split);
+    expect(now.split).toEqual({ turn: 4, pawn: "h4", square: "g4", halves: [{ square: "g4", side: "a" }, { square: "h4", side: "h" }] });
+    expect(pieceAt(now.fen, "g4")).toEqual({ color: "b", type: "p" });
+  });
+
+  it("the pawn he moved can't split: another of his is sawn in two, the moment the same (a whole battle)", async () => {
+    // The Scandinavian, 6.Ne5 e6: e6 has no square (d6 would hit the knight on e5, f6 is his knight's), so c6 (to b6;
+    // d6 hits the knight too) or f7 (to e7) splits.
+    const picked = new Set<string>();
+    for (let seed = 1; seed <= 8; seed++) {
+      const r = raid({ seed });
+      r.deal();
+      await r.score(new Map([["h0", { move: "f3e5", thinkMs: 1000 }]]));
+      expect(splitSquare(applyMove(fenOf(r), "e7e6"), "e6", "w", 1)).toBeNull();
+      r.applyBossMove("e7e6");
+      const split = r.boss!.powers!.split!;
+      expect(split.waiting).toBeUndefined();
+      expect(["c6", "f7"]).toContain(split.pawn);
+      expect(split.square).toBe(split.pawn === "f7" ? "e7" : "b6");
+      expect(pieceAt(fenOf(r), split.square!)).toEqual({ color: "b", type: "p" });
+      expect(r.boss!.powers!.events).toContainEqual({ kind: "split", turn: 2, square: split.square, squares: [split.pawn, split.square] });
+      const board = r.boards.get(0)!;
+      expect(fenAtPly(board.history, board.history.length, board.bases)).toBe(board.fen);
+      picked.add(split.pawn!);
+    }
+    expect(picked).toEqual(new Set(["c6", "f7"]));
+  });
+
   it("with all 8 of his pawns on the board, the split waits, and comes on his first pawn move once one of them is gone", async () => {
     const r = raid({ line: LINE });
     // 6.Bxc6: his first move must be a pawn's: dxc6. Still 8 pawns: no split yet.
@@ -198,8 +282,9 @@ describe("Sawyer's split pawn", () => {
       expect(pieceAt(before, move.slice(0, 2))!.type).toBe("p");
       const split = r.boss!.powers!.split!;
       expect(split.turn).toBe(2);
-      expect(split.pawn).toBe(move.slice(2, 4));
       const plain = applyMove(before, move);
+      // The pawn he moved, unless it had no square to split into (then another of his: see the fallback's tests).
+      if (split.pawn !== move.slice(2, 4)) expect(splitSquare(plain, move.slice(2, 4), "w", r.boss!.powers!.seed)).toBeNull();
       if (split.square) {
         splits++;
         expect(split.square[1]).toBe(split.pawn![1]);

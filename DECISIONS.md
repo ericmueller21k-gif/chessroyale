@@ -536,20 +536,25 @@ A raccoon in a yellow hard hat with a black bandit mask and a red-and-black reci
 **What was built, and the calls made:**
 
 - **Rules** (`packages/chess/src/bosses/sawyer.ts`, on the base boss; numbers `BOSS_POWERS.saw*`, `boardSaw*`):
-  - **The split's ninth-pawn problem (my call, for Eric to confirm).** The engine (Stockfish 19, for his moves, the
-    judge, the eval bar, the hints and the bots, on every device and the engine server) refuses any position with a
+  - **The split waits for room (Eric, Oct 10: "option 1", keep it as built).** The engine (Stockfish 19, for his moves,
+    the judge, the eval bar, the hints and the bots, on every device and the engine server) refuses any position with a
     ninth pawn a side or a 33rd piece ("Unsupported position. BLACK has more than 8 pawns."; "More than 32 pieces"),
     and a search sent one never answers. In 55% of raid openings (5 moves in) he still has all 8 pawns, so the split as
-    designed would break the battle there. So: **the split needs room** (fewer than 8 of his pawns, fewer than 32 pieces:
-    `splitRoom`). After his first move (always a pawn move, as designed) it comes at once when there's room; otherwise
-    it waits and comes after his first pawn move once one of his pawns has gone (`split.waiting`), the same moment.
-    Nothing else changes. Alternatives Eric may prefer: (a) no split at all without room; (b) the split always comes,
-    and the new half replaces one of his other pawns (always seen, no head start); (c) a different engine build (the
-    engine lane's).
+    first designed would have broken the battle there. So **the split needs room** (fewer than 8 of his pawns, fewer
+    than 32 pieces: `splitRoom`): after his first move (always a pawn move) it comes at once when there's room;
+    otherwise it waits (`split.waiting`) and comes after his first pawn move once he has lost a pawn, the same moment.
+    Nothing else changes. (The alternatives put to Eric, not taken: no split at all without room; the new half replacing
+    one of his other pawns; another engine build.)
   - **The split never forks (my call).** The new half never lands where it attacks one of the crowd's pieces (a knight,
     bishop, rook or queen), gives check, or leaves the crowd without a move: the engine measured splits that forked or
     won a piece at once at 4 to 7 pawns, far past "a pawn's head start". Attacking a pawn is ordinary chess and allowed.
-    Neither side allowed: no split now (it waits for his next pawn move with room, as above).
+    A pawn with neither side allowed counts as having no square (next bullet).
+  - **Which pawn splits (Eric, Oct 10: "he only splits after one is captured, then he picks a pawn which has a space
+    available next to it and splits it").** The timing is as above (once he has fewer than 8 pawns, on his pawn move).
+    When it comes: the pawn he just moved, if a square beside it passes the rules above (no fork, no check, the crowd
+    keeps a move); if not, another of his pawns that has one, the most central first (the d and e files, then c and
+    f, and so on), from the seed among pawns as central (`chooseSplit`); if none has one, it waits and tries again on
+    his next pawn move. (Before this, a pawn he moved with no square meant no split at all.)
   - **The halves are tracked** (`split.halves`, `trackHalves`) through every move, his and the crowd's: a half that's
     taken (en passant too) or promotes (a whole piece now) is gone; each keeps its side of the cut (`a`: the one towards
     the a-file).
@@ -613,7 +618,8 @@ A raccoon in a yellow hard hat with a black bandit mask and a red-and-black reci
   time (never cut short by its cap). The split's line comes from a `split` beat of his own.
 - **Test links:** `?boss=sawyer`, `?boss=sawyer&power=boardsaw` (the warning on turn 2, the saw on turn 3), the admins'
   "Trigger ultimate (testing)" (the saw as the next turn begins).
-- **Tests:** `packages/chess/test/sawyer.test.ts` (the split, its room and its square; tracking through captures, en
+- **Tests:** `packages/chess/test/sawyer.test.ts` (the split, its room and its square; another pawn when the one he
+  moved can't split, the most central, and the wait when none can; tracking through captures, en
   passant and promotion; cuts with sliders, pawns, the king, knights and diagonals; checks and pins across a cut; the
   only-legal-moves and only-way-out-of-check lifts; castling; the schedule; the judge's best move always allowed; the
   board saw's trigger, length and test switches), `packages/server/test/boss-powers-lobby.test.ts` ("Sawyer online"),
