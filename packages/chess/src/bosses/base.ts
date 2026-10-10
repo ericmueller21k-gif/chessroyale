@@ -10,7 +10,7 @@
  * - The judge plays by the same rules (judgeTop, judgeCandidates, allowedSearch).
  * - Turns are the crowd's: turn N is the crowd's Nth move of the battle (crowdMoves + 1 while it's being picked).
  */
-import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type PowerId } from "@chessroyale/core";
+import { BOSS_POWERS, bossDef, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type PowerId } from "@chessroyale/core";
 import { pieceAt } from "../rules.ts";
 
 export type Side = "w" | "b";
@@ -37,6 +37,11 @@ export function powerRoll(seed: number, ...parts: readonly (string | number)[]):
     h = Math.imul(h, 0x01000193) >>> 0;
   }
   return mulberry32(h)();
+}
+
+/** The boss's powers, if it has any (its template's passive and ultimate). */
+export function bossPowers(boss: Pick<BossState, "id"> | null | undefined): { passive: PowerId; ultimate: PowerId } | null {
+  return bossDef(boss?.id)?.powers ?? null;
 }
 
 /** The crowd turn being picked now. */

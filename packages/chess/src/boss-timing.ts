@@ -1,5 +1,6 @@
 import { BOSS_POWERS } from "@chessroyale/core";
 import { fenAtPly, pieceAt, type Base } from "./rules.ts";
+import { GINGER_FX } from "./bosses/ginger.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -78,7 +79,7 @@ export const BOUNCE = {
 export const BLOCK = { flyAt: 1450, landAt: 1850 } as const;
 
 // Hollow's extra move (a failed Lights out): his banner over the board as the move lands, then the crowd's turn.
-export const POWER_FX = { freeze: 2300, pie: 2300, warn: 1700, blizzard: 3600, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2700, extra: 2200, block: 2300, bounce: BOUNCE.total } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, pie: 2300, funhouse: 5200, spark: 2300, candle: 7100, fireball: 1700, dark: 2700, extra: 2200, block: 2300, bounce: BOUNCE.total } as const;
 
 /** Hollow's first cover of the dark holds longer, for his first-cover line ("Don't forget what's there…"). */
 export const DARK_FIRST_EXTRA_MS = 1300;
