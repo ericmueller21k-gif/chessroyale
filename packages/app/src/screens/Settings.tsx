@@ -5,7 +5,7 @@ import { InstallCard } from "../components/InstallCard.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut } from "../account.ts";
-import { chatBubbles, chatOff, crowdAnimations, crowdTrail, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail } from "../prefs.ts";
+import { chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn } from "../prefs.ts";
 import { isMuted, onMuteChange, setMuted, unlockAudio } from "../sound.ts";
 import { OPENING_KEY, chosenMode, chosenOpeningMoves, saveMode } from "./Home.tsx";
 import { useAccount } from "./Profile.tsx";
@@ -149,6 +149,7 @@ export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onS
   useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
   const [practice, setPractice] = useState(() => stored("brc.practice", false));
   const [relaxed, setRelaxed] = useState(() => stored("brc.pace", true, "relaxed"));
+  const [evalBar, setEvalBar] = useState(evalBarOn);
   const [mode, setMode] = useState(chosenMode);
   const [anim, setAnim] = useState(crowdAnimations);
   const [trail, setTrail] = useState(crowdTrail);
@@ -215,6 +216,16 @@ export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onS
           }}
         >
           A few seconds to settle on each new board and to watch the chosen move. Off: quick games (solo, and lobbies you create).
+        </Toggle>
+        <Toggle
+          title="Eval bar"
+          checked={evalBar}
+          onChange={(on) => {
+            setEvalBar(on);
+            setEvalBarOn(on);
+          }}
+        >
+          The engine's winning chances in a bar beside the board, in every mode. Off: no bar, and the board takes its room.
         </Toggle>
       </section>
 

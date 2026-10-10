@@ -16,6 +16,7 @@
  * the same keys (an unlit bulb never glints).
  */
 import type { LightsOutTarget } from "@chessroyale/core";
+import { KING_ATTACK } from "@chessroyale/chess";
 import type { Beat } from "./boss-beats.ts";
 import { canvas, ellipse, line, poly, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
@@ -467,7 +468,8 @@ function strand(s: StrandSpec): { wire: { name: string; at: Pt }; glow: { name: 
     return [(1 - t) ** 2 * hx + 2 * (1 - t) * t * mx + t * t * ex, (1 - t) ** 2 * hy + 2 * (1 - t) * t * my + t * t * ey];
   };
   const x0 = Math.floor(Math.min(hx, hx + ends[0][0], hx + ends[1][0]) - 8);
-  const y0 = Math.floor(hy - 4);
+  // (A half flicked up above his hand, as he whips it: the canvas starts above it. Hanging, it starts at the hand.)
+  const y0 = Math.floor(Math.min(hy, hy + ends[0][1] - 6, hy + ends[1][1] - 6) - 4);
   // Where each bulb hangs (its socket's top-left), in drawing space, and the wire point it hangs from: the bulbs
   // alternate either side of the wire on short stems, as in Eric's reference.
   const spots: { at: Pt; wire: Pt; i: number }[] = [];
@@ -481,9 +483,12 @@ function strand(s: StrandSpec): { wire: { name: string; at: Pt }; glow: { name: 
     spots.push({ i, wire: [Math.round(w[0]), Math.round(w[1])], at: [Math.round(w[0]) - 1 + side, Math.round(w[1]) + 1] });
   }
   const bulbs: Pt[] = Array.from({ length: BULBS }, (_, i) => spots.find((sp) => sp.i === i)?.at).filter((b): b is Pt => !!b);
+  // (Wider or taller than usual only when it's flung out: his attack's lashes.)
+  const cw = Math.max(48, Math.ceil(Math.max(hx, hx + ends[0][0], hx + ends[1][0]) + 10 - x0));
+  const chh = Math.max(46, Math.ceil(Math.max(hy, hy + ends[0][1], hy + ends[1][1]) + 12 - y0));
   const paint = () => {
-    const cv = canvas(48, 46);
-    const glow = canvas(48, 46);
+    const cv = canvas(cw, chh);
+    const glow = canvas(cw, chh);
     for (const h of [0, 1] as const) {
       let prev: Pt | null = null;
       for (let t = 0; t <= out + 1e-9; t += 0.02) {
@@ -556,7 +561,7 @@ const FREE: Record<FreeArm, { pts: Pt[]; claws: "open" | "grip" | "point"; front
 };
 
 /** The arm that holds the strand (his left, on our right). */
-export type StrandArm = "hold" | "high" | "swing" | "low" | "up";
+export type StrandArm = "hold" | "high" | "swing" | "low" | "up" | "lash" | "lashLow" | "recoil" | "recoilLow";
 /** The lowest the strand's ends hang (drawing space): its last bulb just above the ground. */
 const STRAND_LOWEST = 62;
 /** Each arm pose, and where the strand's two halves hang from his hand (see StrandSpec). */
@@ -567,6 +572,12 @@ const STRAND_ARM: Record<StrandArm, { pts: Pt[]; ends: [Pt, Pt]; bows: [number, 
   high: { pts: [SHOULDER_R, [52, 21], [51, 11]], ends: [[-4, 24], [9, 21]], bows: [-2, 4] },
   /** Held up in front of him, to smash its bulbs. */
   up: { pts: [SHOULDER_R, [52, 26], [47, 19]], ends: [[-4, 23], [7, 23]], bows: [-3, 4] },
+  // Whipping it at a king a square and a half to our right (his attack; only in HOLLOW_ATTACK's wider frame): cracked
+  // out straight at chest height, then flicked up and back; cracked out low and rising, then dropped and back.
+  lash: { pts: [SHOULDER_R, [54, 30], [61, 33]], ends: [[40, 3], [46, 9]], bows: [-4, 3] },
+  recoil: { pts: [SHOULDER_R, [53, 26], [57, 20]], ends: [[18, -16], [28, -9]], bows: [-4, 3] },
+  lashLow: { pts: [SHOULDER_R, [53, 35], [60, 41]], ends: [[41, -9], [46, -3]], bows: [-3, 4] },
+  recoilLow: { pts: [SHOULDER_R, [52, 34], [56, 42]], ends: [[14, 16], [24, 12]], bows: [3, -3] },
 };
 
 export type Feet = "stand" | "wide" | "step" | "tap" | "crouch";
@@ -1080,6 +1091,58 @@ const lightsBack: Anim = {
   ],
 };
 
+/**
+ * His attack on a king (the God King in his Last Stand, or the crowd's king when Hollow mates it), played ON THE BOARD
+ * beside the king, the king to our right (mirror the whole of him when it's to his left; hide him in his corner
+ * meanwhile), from the shared beats (KING_ATTACK, boss-timing.ts): his shadow grows, he drops in and lands, draws the
+ * strand back over his shoulder, then whips it at the king, back and forth: each lash cracks out straight at chest
+ * height or low and rising (a `lash` cue, his eyes and the void flaring, sparks off the bulbs at its tip), and recoils
+ * up between. The board shows each hit on the king's square (the `lashHit` effect) and a "−N" off the king. After the
+ * last he cackles, crouches and leaps off; the last frame is empty.
+ */
+const LASH_P = (i: number, crack: boolean): HollowPose =>
+  crack
+    ? { arm: i % 2 ? "lashLow" : "lash", free: i % 2 ? "out" : "claw", feet: "wide", crouch: i % 2 ? 2 : 1, mood: i % 3 === 2 ? "laugh" : "roar", size: 2, phase: i, headDx: 1 }
+    : { arm: i % 2 ? "recoilLow" : "recoil", free: "claw", feet: "wide", crouch: 1, mood: "sneer", size: 1, phase: i + 1, headDx: 1 };
+/** Sparks off the bulbs at the strand's tips as it cracks. */
+const tipSparks = (p: HollowPose, big: boolean): Speck[] => {
+  const b = build(p).bulbs;
+  const tips = [b[0], b[BULBS - 1]].filter((x): x is Pt => !!x);
+  return [...tips.flatMap(([x, y], n) => sparkle(x + 1 + n, y + 2, big)), ...bulbGlint(p, 0, true), ...bulbGlint(p, BULBS - 1, true)];
+};
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const frames: Frame[] = [
+    // His shadow grows where he'll land; he drops in (he has left his corner) and lands, crouched.
+    { ms: 100, layers: [], specks: dropShadow(5), cue: "hum" },
+    { ms: 100, layers: [], specks: dropShadow(10) },
+    f(80, { air: 17, free: "up", mood: "roar", feet: "wide", arm: "high", sway: -3 }, { specks: dropShadow(14) }),
+    f(80, { air: 9, free: "up", mood: "roar", feet: "wide", arm: "high", sway: -2 }, { specks: dropShadow(16) }),
+    f(A.landAt - 360, { crouch: 4, free: "out", mood: "roar", feet: "crouch", sway: 2, size: 2 }, { cue: "land", shake: [0, 1], specks: wisps([OX + 32, OY + 64], 0, 8, 22) }),
+    // The strand raised high, ready.
+    f(A.lashAt - A.landAt, { arm: "high", free: "claw", feet: "wide", crouch: 1, mood: "sneer", size: 1, phase: 1, headDx: 1, sway: 4 }, { pal: EYES_HOT }),
+  ];
+  // The lashes: a crack (the hit) and a recoil, back and forth.
+  const crackMs = 90;
+  for (let i = 0; i < A.lashes; i++) {
+    const p = LASH_P(i, true);
+    frames.push(f(crackMs, p, { cue: "lash", shake: [i % 2 ? -1 : 1, 0], pal: i % 2 ? EYES_HOT : { ...EYES_HOT, ...VOID_HOT }, specks: tipSparks(p, i % 3 === 0) }));
+    frames.push(f(A.lashEveryMs - crackMs, LASH_P(i, false), { specks: i % 2 ? [] : bulbGlint(LASH_P(i, false), 4, true) }));
+  }
+  // He cackles, the strand held high and flashing, then crouches and leaps off.
+  const cackle = A.leaveAt - (A.lashAt + A.lashes * A.lashEveryMs);
+  frames.push(f(cackle, { mood: "laugh", free: "fist", arm: "high", headDy: -1, size: 2, phase: 3, sway: 2 }, { pal: { ...BULBS_BRIGHT, ...VOID_HOT } }));
+  const leave = A.ms - A.leaveAt;
+  frames.push(
+    f(leave - 300, { crouch: 3, feet: "crouch", mood: "sneer", phase: 4 }),
+    f(80, { air: 10, free: "up", mood: "grim", feet: "wide", phase: 5, sway: 3 }, { cue: "hum" }),
+    f(80, { air: 17, free: "up", mood: "grim", feet: "wide", phase: 6, sway: 4 }, { specks: dropShadow(10) }),
+    { ms: 80, layers: [], specks: dropShadow(6) },
+    { ms: 60, layers: [] },
+  );
+  return { loop: false, frames };
+})();
+
 export const HOLLOW: Character = {
   id: "hollow",
   name: "Hollow",
@@ -1114,6 +1177,13 @@ export const HOLLOW: Character = {
     lightsBack,
   },
 };
+
+/**
+ * Hollow for his attack on a king (kits.ts: his kit's `kingAttack`): the same drawing, parts and palette, in a frame
+ * wider on the right (`ATTACK_REACH` more), so the strand he whips at the king a square and a half away fits in it.
+ */
+const ATTACK_REACH = 38;
+export const HOLLOW_ATTACK: Character = { ...HOLLOW, id: "hollow-attack", name: "Hollow (his attack)", w: HOLLOW.w + ATTACK_REACH, anims: { kingAttack } };
 
 /** The part of him a portrait shows (his head and the top of his ruff), in frame pixels. */
 export const HOLLOW_PORTRAIT = { x: OX + 13, y: OY - 4, w: 38, h: 34 } as const;
@@ -1151,6 +1221,8 @@ export const HOLLOW_LINES: Partial<Record<Beat, readonly string[]>> = {
   // Lights out's verdict (Eric, Oct 10), as the lights come back: the crowd held the light, or he moves twice.
   lightsHeld: ["The light holds. For now.", "You remembered. This time.", "Hmph. The light holds."],
   lightsFailed: ["You forgot. The dark moves twice.", "Forgotten. I move twice.", "The dark moves twice."],
+  // His attack on a king (the God King in his Last Stand; the crowd's king at his mate), as he lands beside it.
+  kingAttack: ["Shh. Sleep now, little king.", "Into the dark with you.", "Lights out, little king."],
 };
 export const HOLLOW_CHANCE: Partial<Record<Beat, number>> = {
   entrance: 1,
@@ -1174,6 +1246,7 @@ export const HOLLOW_CHANCE: Partial<Record<Beat, number>> = {
   lightsBack: 1,
   lightsHeld: 1,
   lightsFailed: 1,
+  kingAttack: 1,
 };
 
 const PIECE_WORD: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };

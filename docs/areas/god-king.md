@@ -21,6 +21,14 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   `lastStandShare` (half) of the chances left, when that's lower. Never when the best move is worth under
   `lastStandFrom` (20%: a lost position). Charges he falls with go to the crowd as power-ups. The round's scores
   stand.
+- **The Last Stand on screen** (`LAST_STAND` in `boss-timing.ts`, `LastStand.tsx`): the warning, the freeze, his dive
+  onto the piece's square, his cut-in, the piece sliding back, the blow meant for it, his stagger, collapse and fade.
+  The blow is 25 red slashes with red numbers; against a boss whose kit has a `kingAttack` (Hollow, Eric, Oct 10) it is
+  the boss's attack instead: from `LAST_STAND.attackAt` (as the piece slides back) the boss drops in beside him and
+  lashes him ten times (`KingAttack.tsx`, on the shared `KING_ATTACK` beats), a gold "−N" off him each lash in his own
+  strike style (`ks-hp`), his blows on its lashes (his `lastStandAttacked` frames), then it leaps off as he staggers.
+  It fits between the slide and the stagger, so the Last Stand takes no longer and nothing changed on the server. See
+  [bosses.md](bosses.md), "A boss's attack on a king".
 - **Fair.** A power never changes how a player's own pick was judged, and a move he plays never earns brilliant credit.
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
   power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). Each
@@ -70,7 +78,10 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - Unit: `packages/chess/test/last-stand.test.ts`, `packages/app/test/god-king.test.ts`,
   `packages/app/test/god-king-sprite.test.ts`, `packages/server/test/lobby.test.ts`.
 - e2e: `e2e/formats.spec.ts` (the boss final), `e2e/boss-powers.spec.ts`.
-- Frames in the game: `npm run frames:god-king -- <dir> [w|b] [phone|desktop|both] [summon|laststand|all] [light|dark]`.
+- Frames in the game: `npm run frames:god-king -- <dir> [w|b] [phone|desktop|both] [summon|laststand|all] [light|dark]`;
+  a boss's attack in his Last Stand: `npm run frames:king-attack -- <dir> hollow [phone|desktop|both] laststand`.
+- e2e for a boss's attack in his Last Stand: `e2e/king-attack.spec.ts`. Unit: `packages/app/test/king-attack.test.ts`
+  (his blows on its lashes), `packages/chess/test/king-attack.test.ts` (it fits the Last Stand).
 - Sheets and GIFs: `npm run preview:characters -- <dir> only=god-king`, `node scripts/preview-god-king.mjs out.png banner=1`.
 - Sims: `packages/sim/scripts/last-stand-sim.ts`, `last-stand-blunders.ts` (`reports/last-stand.md`).
 - Replays in the real Solo app, the runner's own numbers logged move by move: `npx tsx scripts/repro-last-stand.ts

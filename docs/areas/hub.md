@@ -26,6 +26,12 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   they're wearing (drawn with the real item art), their quick-chat picks. A profile others see never shows an email,
   a sign-in method or anything not on the approved list; a banned player's says "Banned".
 - **Light and dark:** follows the device until you pick (Settings); same layout and accents in both.
+- **The eval bar's switch** (Settings → Playing, "Eval bar"; Eric, Oct 10): on by default. Off, no bar on any board
+  (every mode: the play, reveal, vote, final and boss screens all use `EvalBar`, which draws nothing) and the board
+  takes its room, centred, on a phone and a computer. Only in Settings, never on a board screen. Kept on the device
+  (`prefs.ts`: `evalBarOn`, `brc.evalBar`; accounts keep no preferences). The value is still worked out (the God
+  King's word on how it's going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older
+  apps), from solo's post and the online `hello`, to see later who turns it off and how they play.
 - **The look:** dark ground `#14161b`, panels `#1b1e25` / `#232731`, gold `#f2c14e`, green `#4ade80` for online;
   Archivo and Archivo Black (self-hosted); the "Hun**Chess**" logo with "Chess" in gold.
 
@@ -51,9 +57,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 ## Tests and tools
 
 - Unit: `packages/server/test/accounts.test.ts`, `live.test.ts`, `packages/core/test/profile.test.ts`,
-  `packages/app/test/theme.test.ts`, `under-board.test.ts`.
+  `packages/app/test/theme.test.ts`, `under-board.test.ts`, `king-attack.test.ts` (the eval bar's setting).
 - e2e: `e2e/front-door.spec.ts`, `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`,
-  `install.spec.ts`, `crate-banner.spec.ts`.
+  `install.spec.ts`, `crate-banner.spec.ts`, `eval-bar.spec.ts` (the switch: Settings only, the board's room, phone and
+  computer).
 - Frames: `npm run frames:home`, `frames:queue`.
 - Real-phone check by Eric: `TESTING.md`.
 

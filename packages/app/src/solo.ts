@@ -1,7 +1,7 @@
 import { BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { MatchRunner, boardSlots, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { botRoster, bossIntroTimeline, bossShowMs, bossThinkMs, judgeTaps, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
+import { botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
@@ -509,8 +509,9 @@ export class SoloMatch implements GameView {
     await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
     // before your clock starts.
+    // (At a mate, the boss's attack on your king, if it has one: the result waits for it.)
     const view = this.runner.bossView();
-    const showMs = bossShowMs(view?.lastMove, this.alone) + powerMomentMs(view?.powers?.events);
+    const showMs = bossTurnShowMs(view, this.alone);
     const until = Date.now() + showMs;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until });
     this.timer = setTimeout(() => this.nextRound(), showMs);

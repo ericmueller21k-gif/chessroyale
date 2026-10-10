@@ -80,6 +80,17 @@ describe("accounts", () => {
     expect(p.rating).toBe(1650);
   });
 
+  it("keeps with each result whether the player had the eval bar on (unknown from older apps)", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000);
+    await recordResult(sql, user.id, { mode: "boss", online: false, placement: 1, players: 1, evalBar: true }, 2000);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 3, players: 100, evalBar: false }, 3000);
+    await recordResult(sql, user.id, { mode: "crowd", online: true, placement: 4, players: 100 }, 4000);
+    const rows = await sql.all<{ eval_bar: number | null }>("SELECT eval_bar FROM results WHERE user_id = ? ORDER BY played_at", user.id);
+    expect(rows.map((r) => r.eval_bar)).toEqual([1, 0, null]);
+  });
+
   it("signing in: attaches to the guest, or switches to the existing account and brings the guest's results", async () => {
     const sql = memorySql();
     await ensureSchema(sql);
