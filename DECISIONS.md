@@ -279,6 +279,9 @@ causes, all fixed by one shared rule (`packages/app/src/speech.tsx`, numbers in 
   character, at most 7 s (the brief's numbers), then fades (0.26 s). The fade comes after the readable time.
 - **One voice per speaker,** outliving any screen: the boss's (`bossVoice`) and the God King's. Each says one line at a
   time; a new screen picks a line up where it was.
+- **A line's time runs from when this device says it** (as a boss's animations run from when it first saw their
+  moment), and a line that waited starts when it can show, not at the exact moment the last one ended: a busy frame
+  (the first e2e runs caught one of 240 ms) never eats into its time.
 - **Priorities:** critical cuts in on anything less; everything else waits its turn, highest first, then in the order
   said. **A critical line doesn't cut in on another critical one** (it waits for it), so no line is ever cut by an equal.
   Boss: an ultimate's line, Hollow's first cover (it says how the dark works), his claim, the battle's end are critical;

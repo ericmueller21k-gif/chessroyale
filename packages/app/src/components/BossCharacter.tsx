@@ -151,7 +151,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // own: the moment's line is what the boss says that turn.
   const quiet = stage === "bossMove" && !!boss.powers?.events.length;
   useLayoutEffect(() => {
-    if (beat?.line && !quiet) bossVoice.say(beat.line, `${boss.id}:${boss.startMove}:${beat.key}`, BEAT_PRIORITY[beat.anim] ?? LOW, since);
+    if (beat?.line && !quiet) bossVoice.say(beat.line, `${boss.id}:${boss.startMove}:${beat.key}`, BEAT_PRIORITY[beat.anim] ?? LOW);
   }, [beat?.key]);
   const { line, now } = useVoice(bossVoice);
   if (!kit || !beat) return null;

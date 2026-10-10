@@ -122,7 +122,7 @@ function ClaimDark({ boss, since, now }: { boss: BossView; since: number; now: n
   const lineAt = since + 500;
   const due = now >= lineAt;
   useLayoutEffect(() => {
-    if (due) bossVoice.say(claimLine(boss), `${boss.id}:${boss.startMove}:claim`, CRITICAL, lineAt);
+    if (due) bossVoice.say(claimLine(boss), `${boss.id}:${boss.startMove}:claim`, CRITICAL);
   }, [due]);
   if (!kit?.ch.anims.claimDark) return null;
   return (

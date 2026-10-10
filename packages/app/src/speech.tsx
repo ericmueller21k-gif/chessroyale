@@ -58,8 +58,9 @@ export class Voice {
   private listeners = new Set<() => void>();
 
   /**
-   * Says `text` for the moment `key` (a moment said again, e.g. by a second screen, is ignored), at `at` (when the
-   * moment began; now by default). Returns whether it was taken (shown now, or waiting its turn).
+   * Says `text` for the moment `key` (a moment said again, e.g. by a second screen, is ignored), at `at` (now: a line's
+   * time runs from when this device says it, as a boss's animations run from when it first saw their moment, so a
+   * busy frame never eats into it). Returns whether it was taken (shown now, or waiting its turn).
    */
   say(text: string | null | undefined, key: string, priority: Priority = NORMAL, at = Date.now()): boolean {
     if (!text || this.said.has(key)) return false;
@@ -101,20 +102,17 @@ export class Voice {
     this.now = { text: w.text, key: w.key, priority: w.priority, at, until: at + holdMs(w.text) };
   }
 
+  /**
+   * The line up ends at its time; the next in line starts when it's next looked for (a box looks every frame while a
+   * line is up), so a busy frame at the handover never eats into it. The one up is never restarted.
+   */
   private advance(now: number) {
-    while (this.now && now >= this.now.until) {
-      const free = this.now.until;
-      this.now = null;
-      this.next(free);
-    }
-    if (!this.now) this.next(now);
-  }
-
-  /** The next line in line, starting at `free` (or when it was said, if later); stale ones are dropped. */
-  private next(free: number) {
-    this.queue = this.queue.filter((w) => free - w.saidAt <= SPEECH.waitMs);
+    if (this.now && now >= this.now.until) this.now = null;
+    if (this.now) return;
+    // (Stale ones are dropped.)
+    this.queue = this.queue.filter((w) => now - w.saidAt <= SPEECH.waitMs);
     const w = this.queue.shift();
-    if (w) this.start(w, Math.max(free, w.saidAt));
+    if (w) this.start(w, Math.max(now, w.saidAt));
   }
 }
 
@@ -139,8 +137,8 @@ export function useVoice(voice: Voice): { line: Spoken | null; now: number } {
 }
 
 /** Says a line into a voice once, as it's first drawn (a moment's line from inside its screen); draws nothing. */
-export function Say({ voice, text, sayKey, priority = NORMAL, at }: { voice: Voice; text: string | null | undefined; sayKey: string; priority?: Priority; at: number }) {
-  useLayoutEffect(() => void voice.say(text, sayKey, priority, at), [sayKey]);
+export function Say({ voice, text, sayKey, priority = NORMAL }: { voice: Voice; text: string | null | undefined; sayKey: string; priority?: Priority }) {
+  useLayoutEffect(() => void voice.say(text, sayKey, priority), [sayKey]);
   return null;
 }
 

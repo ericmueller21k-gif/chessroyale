@@ -20,7 +20,7 @@ describe("speech: every line's time, and lines taking turns (Eric, Oct 10: Ginge
     v.say("Snapped it up!", "b", LOW, t + 500);
     v.say("A storm is brewing…", "c", NORMAL, t + 600);
     expect(v.line(t + holdMs("Chill out!") - 1)?.text).toBe("Chill out!");
-    // Highest priority first, then in the order said; each from where the last ended.
+    // Highest priority first, then in the order said, each from when the last has gone.
     const second = t + holdMs("Chill out!");
     expect(v.line(second)).toMatchObject({ text: "A storm is brewing…", at: second });
     // The low one has waited too long by then and is dropped (stale).
@@ -51,13 +51,15 @@ describe("speech: every line's time, and lines taking turns (Eric, Oct 10: Ginge
     expect(v.say("Hmph!", "move:3", LOW, t + 30)).toBe(true);
   });
 
-  it("picks up a line where it was when it's read late (a new screen mid-line), never restarting it", () => {
+  it("picks up a line where it was (a new screen mid-line), and gives the next in line its whole time from when it shows", () => {
     const v = new Voice();
     const t = 1_000_000;
     v.say("You'll crumble!", "intro", NORMAL, t);
     v.say("Cold feet?", "freeze", NORMAL, t + 100);
-    // Nobody looked for a while: the second line started when the first ended, not now.
+    // Looked for mid-line: the same line, from when it started.
+    expect(v.line(t + 1500)).toMatchObject({ text: "You'll crumble!", at: t });
+    // The browser was busy as the first ended (nothing looked for 300 ms): the second starts when it can show.
     const end = t + holdMs("You'll crumble!");
-    expect(v.line(end + 900)).toMatchObject({ text: "Cold feet?", at: end });
+    expect(v.line(end + 300)).toMatchObject({ text: "Cold feet?", at: end + 300, until: end + 300 + holdMs("Cold feet?") });
   });
 });

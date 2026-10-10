@@ -161,7 +161,8 @@ export function useMomentSpeech(boss: BossView, moments: readonly Moment[], now:
   const last = due.at(-1)?.key;
   useLayoutEffect(() => {
     // (Each moment's line once: the voice ignores a moment said again.)
-    for (const m of due) bossVoice.say(powerLine(bossKit(boss.name), m), `${boss.id}:${boss.startMove}:${m.key}`, momentPriority(m), m.at + momentLineAt(m));
+    // (Its time runs from when this device says it, as a boss's animations do: a busy frame never eats into it.)
+    for (const m of due) bossVoice.say(powerLine(bossKit(boss.name), m), `${boss.id}:${boss.startMove}:${m.key}`, momentPriority(m));
   }, [last]);
 }
 

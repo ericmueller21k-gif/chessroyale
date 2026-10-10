@@ -287,7 +287,7 @@ export function SnackTime({ boss, since, now, orientation }: { boss: BossView; s
   const lineAt = since + SNACK.nomAt;
   const due = now >= lineAt;
   useLayoutEffect(() => {
-    if (due) bossVoice.say(snackLine(boss), `${boss.id}:${boss.startMove}:snack`, NORMAL, lineAt);
+    if (due) bossVoice.say(snackLine(boss), `${boss.id}:${boss.startMove}:snack`, NORMAL);
   }, [due]);
   if (!kit?.ch.anims.snack || !sq) return null;
   const ch = kit.ch;

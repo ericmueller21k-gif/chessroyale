@@ -263,9 +263,9 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
           )}
         </div>
       )}
-      {now >= timeAt && <Say voice={bossVoice} text={kit.lines.ultimate?.[0] ?? "It's time."} sayKey={`${said}:time`} priority={CRITICAL} at={timeAt} />}
+      {now >= timeAt && <Say voice={bossVoice} text={kit.lines.ultimate?.[0] ?? "It's time."} sayKey={`${said}:time`} priority={CRITICAL} />}
       {back && now >= backAt && (
-        <Say voice={bossVoice} text={(pickLine(kit, verdictBeat, `${lights.key}:back`) ?? kit.lines[verdictBeat]?.[0] ?? kit.lines.lightsBack?.[0]) || "Remember that."} sayKey={`${said}:back`} priority={NORMAL} at={backAt} />
+        <Say voice={bossVoice} text={(pickLine(kit, verdictBeat, `${lights.key}:back`) ?? kit.lines[verdictBeat]?.[0] ?? kit.lines.lightsBack?.[0]) || "Remember that."} sayKey={`${said}:back`} priority={NORMAL} />
       )}
       {prompt && now >= prompt.at && <SpeechBox key={prompt.text} class="pm-line lo-line" text={prompt.text} at={prompt.at} until={Infinity} now={now} fits={LINE_FITS} />}
       {tr && open && <TimerBar startsAt={at + tr.at} deadline={at + deadline} total={tr.until - tr.at} />}

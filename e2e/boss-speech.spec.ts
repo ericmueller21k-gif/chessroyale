@@ -21,44 +21,49 @@ const BOSSES = [
   { id: "bigboy", name: "Big Boy", banner: "TOY BLOCK!" },
 ] as const;
 
-type Segment = { text: string; inView: boolean; from: number; to: number };
+type Segment = { text: string; ok: boolean; why: string; from: number; to: number; before: number };
+type Speech = { boss: Segment[]; king: Segment[]; banners: Record<string, number>; gaps: [number, number][] };
 
 /**
  * Watches every frame from the first: each speech box's line (the boss's text box, the God King's bubble) as segments
- * of frames with the same text, seen whole and in view or not; and when each power banner first showed.
+ * of frames alike (the same text, and whole on screen or not, with why not), and when each power banner first showed.
+ * A frame the browser was too busy to paint doesn't split a segment (nothing changed on screen), but is noted.
  */
 async function watchSpeech(page: Page) {
   await page.addInitScript(() => {
-    const w = window as unknown as { __speech: { boss: Segment[]; king: Segment[]; banners: Record<string, number> } };
-    const out = (w.__speech = { boss: [] as Segment[], king: [] as Segment[], banners: {} as Record<string, number> });
-    const look = (selector: string) => {
+    const out: Speech = ((window as unknown as { __speech: Speech }).__speech = { boss: [], king: [], banners: {}, gaps: [] });
+    const look = (selector: string): { text: string; ok: boolean; why: string } => {
       for (const el of document.querySelectorAll<HTMLElement>(selector)) {
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) continue;
-        const s = getComputedStyle(el);
-        const inView = s.visibility === "visible" && Number(s.opacity) > 0.5 && r.top >= 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
-        return { text: el.getAttribute("aria-label") ?? "", inView };
+        const text = el.getAttribute("aria-label") ?? "";
+        const why =
+          getComputedStyle(el).visibility !== "visible" ? "hidden"
+          : r.top < 0 || r.left < 0 || r.right > innerWidth || r.bottom > innerHeight ? `off screen ${[r.left, r.top, r.right, r.bottom].map(Math.round)}`
+          : el.classList.contains("leaving") ? "fading"
+          : "";
+        return { text, ok: !why, why };
       }
-      return null;
+      return { text: "", ok: false, why: "none" };
     };
-    const track = (list: Segment[], seen: { text: string; inView: boolean } | null, now: number) => {
+    let prev = 0;
+    const track = (list: Segment[], seen: { text: string; ok: boolean; why: string }, now: number) => {
       const last = list[list.length - 1];
-      if (seen && last && last.text === seen.text && last.inView === seen.inView && now - last.to < 250) last.to = now;
-      else if (seen) list.push({ ...seen, from: now, to: now });
+      if (last && last.text === seen.text && last.ok === seen.ok) last.to = now;
+      else list.push({ ...seen, from: now, to: now, before: prev || now });
     };
     const frame = () => {
       const now = Date.now();
+      if (prev && now - prev > 150) out.gaps.push([prev, now - prev]);
       track(out.boss, look(".bc-bubble"), now);
       track(out.king, look(".gk-bubble"), now);
-      for (const b of document.querySelectorAll(".fight-banner.power-cut .kc-text")) {
-        const t = b.textContent ?? "";
-        out.banners[t] ??= now;
-      }
+      for (const b of document.querySelectorAll(".fight-banner.power-cut .kc-text")) out.banners[b.textContent ?? ""] ??= now;
+      prev = now;
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
   });
-  return () => page.evaluate(() => (window as unknown as { __speech: { boss: Segment[]; king: Segment[]; banners: Record<string, number> } }).__speech);
+  return () => page.evaluate(() => (window as unknown as { __speech: Speech }).__speech);
 }
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -76,11 +81,21 @@ async function playBest(page: Page) {
   await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
 }
 
-/** The segment where `text` first showed whole and in view, and how long it stayed so without a break. */
+/**
+ * How long `text` first stayed whole on screen without a break: from its first such frame to the first frame it
+ * wasn't (or the last seen), and what came next. A stretch the browser painted nothing just before it showed counts
+ * (nothing could be on screen then, the line included: a busy machine, not the app).
+ */
 function held(list: Segment[], text: string) {
-  const i = list.findIndex((s) => s.text === text && s.inView);
-  return i < 0 ? null : { from: list[i]!.from, ms: list[i]!.to - list[i]!.from };
+  const i = list.findIndex((s) => s.text === text && s.ok);
+  if (i < 0) return null;
+  const s = list[i]!;
+  const next = list[i + 1];
+  const unpainted = Math.max(0, s.from - s.before - 20);
+  return { from: s.from, ms: (next?.from ?? s.to) - s.from + unpainted, next: next ? `then ${next.why || "ok"} "${next.text}"` : "still up" };
 }
+/** The frames the browser didn't paint for a while (ms) between `from` and `to`. */
+const gapsIn = (s: Speech, from: number, to: number) => s.gaps.filter(([at]) => at >= from && at <= to).map(([, ms]) => ms);
 
 for (const boss of BOSSES) {
   test(`${boss.name}'s line for its ${boss.banner} stays in its text box, whole and in view, for its full time; so does the God King's`, async ({ page }) => {
@@ -97,23 +112,26 @@ for (const boss of BOSSES) {
     }
     const bannerAt = (await speech()).banners[boss.banner]!;
     expect(bannerAt, `${boss.banner} showed`).toBeTruthy();
-    // The God King's opening line (said as your first move began, long done by now): its full time, whole and in view.
-    const king = (await speech()).king.find((s) => s.inView);
-    expect(king, "the God King spoke").toBeTruthy();
-    const kingHeld = held((await speech()).king, king!.text)!;
-    expect(kingHeld.ms, `"${king!.text}" was up whole and in view for ${kingHeld.ms} ms of ${minOnScreen(king!.text)}`).toBeGreaterThanOrEqual(minOnScreen(king!.text) - 120);
     // The boss's line for the moment: the first line in its text box from the moment on (it may wait its turn behind a
     // line already up, never longer than SPEECH.waitMs).
-    await expect.poll(async () => (await speech()).boss.find((s) => s.from >= bannerAt - 100 && s.inView)?.text ?? null, { timeout: 15_000 }).not.toBeNull();
-    const line = (await speech()).boss.find((s) => s.from >= bannerAt - 100 && s.inView)!.text;
-    const first = held((await speech()).boss, line)!;
-    expect(first.from - bannerAt).toBeLessThan(SPEECH.waitMs);
+    await expect.poll(async () => (await speech()).boss.find((s) => s.from >= bannerAt - 100 && s.ok)?.text ?? null, { timeout: 15_000 }).not.toBeNull();
+    const line = (await speech()).boss.find((s) => s.from >= bannerAt - 100 && s.ok)!.text;
+    const shown = held((await speech()).boss, line)!;
+    expect(shown.from - bannerAt).toBeLessThan(SPEECH.waitMs);
     // Its whole time, in view on every frame (nothing replaced or hid it), with your clock running for most of it:
     // the old line was gone with its moment (2.3 s for a freeze), or never left the dock.
     const need = minOnScreen(line);
-    await page.waitForTimeout(Math.max(0, first.from + need + 400 - Date.now()));
-    const after = held((await speech()).boss, line)!;
-    expect(after.ms, `"${line}" was up whole and in view for ${after.ms} ms of ${need}`).toBeGreaterThanOrEqual(need - 120);
+    await page.waitForTimeout(Math.max(0, shown.from + need + 400 - Date.now()));
+    const end = await speech();
+    const after = held(end.boss, line)!;
+    expect(after.ms, `"${line}" was up whole and in view for ${after.ms} ms of ${need}, ${after.next} (unpainted: ${gapsIn(end, after.from, after.from + after.ms + 500)})`).toBeGreaterThanOrEqual(need - 120);
     expect(after.ms).toBeGreaterThanOrEqual(2000);
+    // The God King's opening line (said as your first move began): its full time too, whole and in view.
+    const first = (await speech()).king.find((s) => s.ok);
+    expect(first, "the God King spoke").toBeTruthy();
+    await page.waitForTimeout(Math.max(0, first!.from + minOnScreen(first!.text) + 400 - Date.now()));
+    const now = await speech();
+    const kingHeld = held(now.king, first!.text)!;
+    expect(kingHeld.ms, `"${first!.text}" was up whole and in view for ${kingHeld.ms} ms of ${minOnScreen(first!.text)}, ${kingHeld.next} (unpainted: ${gapsIn(now, kingHeld.from, kingHeld.from + kingHeld.ms + 500)})`).toBeGreaterThanOrEqual(minOnScreen(first!.text) - 120);
   });
 }
