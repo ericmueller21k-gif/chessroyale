@@ -33,32 +33,29 @@ import {
 import { applyMove, inCheck, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "./rules.ts";
 import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
+import {
+  VALUE,
+  crowdHalf,
+  from,
+  logit,
+  materialOf,
+  meterFull,
+  moveSquares,
+  other,
+  powerRoll,
+  ragePoints,
+  rageTick,
+  testSwitch,
+  to,
+  turnOf,
+  warnThenUnleash,
+  type BossRules,
+  type RageRates,
+  type Side,
+  type TurnContext,
+} from "./bosses/base.ts";
 
-type Side = "w" | "b";
-const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-const other = (s: Side): Side => (s === "w" ? "b" : "w");
-const from = (m: string) => m.slice(0, 2);
-const to = (m: string) => m.slice(2, 4);
-
-/** Material on the board for one side (pawns 1, knights and bishops 3, rooks 5, queens 9). */
-export function materialOf(fen: string, side: Side): number {
-  let total = 0;
-  for (const c of fen.split(" ")[0]!) {
-    const v = VALUE[c.toLowerCase()];
-    if (v && (c === c.toUpperCase()) === (side === "w")) total += v;
-  }
-  return total;
-}
-
-/** A number in [0, 1) from the battle's seed and what it's for: the same on every device and every replay. */
-export function powerRoll(seed: number, ...parts: readonly (string | number)[]): number {
-  let h = (seed >>> 0) ^ 0x9e3779b9;
-  for (const ch of parts.join("|")) {
-    h ^= ch.charCodeAt(0);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return mulberry32(h)();
-}
+export { materialOf, moveSquares, powerRoll, ragePoints, rageTick, type BossRules, type RageRates, type TurnContext };
 
 /** The boss's powers, if it has any (its template's passive and ultimate). */
 export function bossPowers(boss: Pick<BossState, "id"> | null | undefined): { passive: PowerId; ultimate: PowerId } | null {
@@ -69,9 +66,6 @@ export function bossPowers(boss: Pick<BossState, "id"> | null | undefined): { pa
 export function initPowers(seed: number, fen: string, crowdSide: Side): BossPowerState {
   return { seed: seed >>> 0, turn: 0, material: materialOf(fen, other(crowdSide)), lost: 0, nextPassive: BOSS_POWERS.firstPassive, events: [] };
 }
-
-/** The crowd turn being picked now. */
-const turnOf = (boss: Pick<BossState, "crowdMoves">) => boss.crowdMoves + 1;
 
 /** The legal moves of the side not to move (as if it were its turn): what a square would block for the boss. */
 function movesOfOther(fen: string): string[] {
@@ -123,27 +117,6 @@ export function choosePie(fen: string, seed: number, turn: number): string | nul
   return least[Math.floor(powerRoll(seed, "pie", turn) * least.length)]!.sq;
 }
 
-// ---------------- The ultimate's meter ----------------
-
-/** The rates the meter fills at (BOSS_POWERS). */
-export type RageRates = Pick<BossPowerSettings, "rageFull" | "rageOverTime" | "ragePerMove" | "rageAheadMax" | "rageAheadFull" | "ragePerMaterial">;
-
-/**
- * One crowd move's worth of rage over time: ragePerMove, plus up to rageAheadMax more while the crowd is ahead on the
- * judged eval (`judged`: its expected score after the move, 0-1; all of it from rageAheadFull). Nothing with the
- * switch off (rageOverTime).
- */
-export function rageTick(judged: number | undefined, s: RageRates = BOSS_POWERS): number {
-  if (!s.rageOverTime) return 0;
-  const ahead = judged === undefined ? 0 : Math.max(0, Math.min(1, (judged - 0.5) / Math.max(0.01, s.rageAheadFull - 0.5)));
-  return s.ragePerMove + s.rageAheadMax * ahead;
-}
-
-/** Rage points: the charge from time and the eval, plus the boss's own material lost (a queen's worth fills it). */
-export function ragePoints(p: Pick<BossPowerState, "charge" | "lost">, s: RageRates = BOSS_POWERS): number {
-  return (p.charge ?? 0) + p.lost * s.ragePerMaterial;
-}
-
 /**
  * As a crowd turn begins (after the boss's move, or as the battle starts): the rage meter, the ultimate's warning
  * and the ultimate, and the passive. `fen` is the position with the crowd to move. Once per turn: calling it again
@@ -151,11 +124,16 @@ export function ragePoints(p: Pick<BossPowerState, "charge" | "lost">, s: RageRa
  * warned as the second turn begins and unleashed on the third (the passive comes on the second turn anyway).
  * The test trigger (an admin's, `ultNext`) brings the ultimate as this turn begins, without the warning. `lastMove`: the
  * boss's move just played (Hollow covers its piece's square after his first).
+ *
+ * The meter is the same for every boss; the rest is the boss's own rules (BossRules), in this order: what wore off,
+ * the ultimate's step, anything every turn, then the passive (not on the turn the ultimate came, if it was due then:
+ * it waits a turn).
  */
 export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowerSettings = BOSS_POWERS, lastMove: string | null = null): BossState {
   const powers = bossPowers(boss);
   const p = boss.powers;
-  if (!powers || !p) return boss;
+  const rules = bossRules(boss);
+  if (!powers || !p || !rules) return boss;
   const turn = turnOf(boss);
   if (p.turn === turn) return boss;
   const crowd = boss.crowdSide;
@@ -164,130 +142,111 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   // The meter over time: each crowd move since the last turn began, faster while the crowd is ahead on the judged eval.
   const moved = p.turn > 0 ? Math.max(0, turn - p.turn) : 0;
   const charge = (p.charge ?? 0) + moved * rageTick(p.judged, s);
-  const ult = powers.ultimate;
-  // (Lights out comes at the start of his turn, not as the crowd's begins: the trigger waits for it there.)
+  // (An ultimate at the start of the boss's turn keeps the test trigger until then.)
   const { ultNext, ...rest } = p;
-  // (Big Boy's Big Bounce too: the trigger waits for the start of his turn.)
-  const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && (ult === "lightsout" || ult === "bounce") ? { ultNext } : {}) };
-  // What wore off: the ice after its turns (or once its piece is gone), the pie after its turns.
-  if (next.frozen) {
-    const piece = pieceAt(fen, next.frozen.square);
-    if (next.frozen.until < turn || piece?.color !== crowd || piece.type !== next.frozen.piece) next.frozen = null;
-  }
-  if (next.pie && next.pie.until < turn) next.pie = null;
-  if (next.block && next.block.until < turn) next.block = null;
-  // The ultimate: the rage meter full, a warning as this turn begins; the next turn, the ultimate. Once a match.
-  let ultNow = false;
-  if (next.ultAt === undefined && ult === "lightsout") {
-    // Hollow's Lights out: the meter full as this turn begins, it comes at the start of his turn after the crowd's move
-    // (lightsOutDue). The full meter is its only warning (no "RAGE!"). The test switch: the meter fills as the second
-    // turn begins.
-    if (ragePoints(next, s) >= s.rageFull || (test === ult && turn >= 2)) next.ultAt = turn;
-  } else if (next.ultAt === undefined && ult === "bounce") {
-    // Big Boy's Big Bounce: the meter full as a turn begins, its warning ("RAGE!") that turn; it comes at the start of
-    // his turn, after the crowd's move (bounceDue). The test switch: warned as the second turn begins. The trigger
-    // (`ultNext`, kept above): at the start of his next turn, without the warning.
-    if (next.warnAt === undefined && !ultNext && (ragePoints(next, s) >= s.rageFull || (test === ult && turn >= 2))) {
-      next.warnAt = turn;
-      events.push({ kind: "warn", turn });
-    }
-  } else if (next.ultAt === undefined) {
-    if (ultNext) {
-      // (The test trigger: straight to the ultimate.)
-      next.ultAt = turn;
-      ultNow = true;
-    } else if (next.warnAt === undefined) {
-      // (The test switch: warned as the second turn begins, after the boss's first move, as in play.)
-      if (ragePoints(next, s) >= s.rageFull || (test === ult && turn >= 2)) {
-        next.warnAt = turn;
-        events.push({ kind: "warn", turn });
-      }
-    } else if (turn > next.warnAt) {
-      next.ultAt = turn;
-      ultNow = true;
-    }
-    // (The funhouse's moment is the move it plays: added when it's played.)
-    if (ultNow && ult === "blizzard") events.push({ kind: "blizzard", turn });
-    if (ultNow && ult === "candle") {
-      next.candle = { at: turn, left: s.candleShots };
-      events.push({ kind: "candle", turn });
-    }
-  }
-  // The Roman candle's fireballs: a wave a crowd turn from candleDelay turns after it fired, each landing as a fresh fire
-  // tile; each wave's squares picked candleAhead turns before it lands (their shadows growing meanwhile).
-  if (next.candle) {
-    const barrage = candleTurn(next, fen, crowd, turn, s);
-    next.candle = barrage.candle;
-    if (barrage.fire) next.fire = barrage.fire;
-    if (barrage.event) events.push(barrage.event);
-  }
-  // The passive (not on the ultimate's turn: it waits a turn).
-  const passive = powers.passive;
-  if (passive === "dark") {
-    // Hollow's dark: the squares whose turns are over clear; after his first move and every darkEvery-th after it, he
-    // covers another. His bulbs count down to it.
-    const old = next.dark ?? [];
-    next.dark = old.filter((d) => d.until >= turn);
-    next.cleared = old.filter((d) => d.until < turn).map((d) => d.square);
-    const n = hisMoves(turn);
-    if (coversAfter(n, s)) {
-      const square = chooseDark(fen, crowd, p.seed, turn, next.dark, n === 1 && lastMove ? to(lastMove) : null);
-      if (square) {
-        next.dark = [...next.dark, { square, at: turn, until: turn + s.darkTurns - 1 }];
-        events.push({ kind: "dark", turn, square, ...(n === 1 ? { first: true as const } : {}) });
-      }
-    }
-    next.bulbs = bulbsAt(turn, s);
-  } else if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
-  else if (passive === "sparkler") {
-    // A sparkler when no tile is burning, a full turn after the last fire went out; paused through the candle's barrage.
-    const barrage = !!next.candle && (next.candle.left > 0 || !!next.fire?.length);
-    const ready = !next.fire?.length && turn >= next.nextPassive && (next.fireOut === undefined || turn > next.fireOut + s.fireGap);
-    if (!barrage && ready) {
-      const square = chooseSpark(fen, crowd, p.seed, turn, next.fire ?? []);
-      if (square) {
-        next.fire = [{ square, lit: turn }];
-        events.push({ kind: "spark", turn, square });
-        next.nextPassive = turn + s.fireStages + s.fireGap;
-      } else next.nextPassive = turn + 1;
-    }
-  } else if (turn >= next.nextPassive) {
-    if (passive === "freeze") {
-      const pick = chooseFreeze(fen, crowd, p.seed, turn, next.pie?.square);
-      if (pick) {
-        next.frozen = { ...pick, until: turn + s.freezeTurns - 1 };
-        events.push({ kind: "freeze", turn, square: pick.square });
-        const [lo, hi] = s.freezeEvery;
-        next.nextPassive = turn + lo + Math.floor(powerRoll(p.seed, "every", turn) * (hi - lo + 1));
-      } else next.nextPassive = turn + 1;
-    } else if (passive === "pie") {
-      const square = choosePie(fen, p.seed, turn);
-      if (square) {
-        next.pie = { square, until: turn + s.pieTurns - 1 };
-        events.push({ kind: "pie", turn, square });
-        next.nextPassive = turn + s.pieTurns + s.pieGap;
-      } else next.nextPassive = turn + 1;
-    } else if (passive === "blocks" && !next.block) {
-      // Big Boy's toy block: every blockEvery turns, blockTurns turns on the board.
-      const square = chooseBlock(fen, crowd, p.seed, turn);
-      if (square) {
-        next.block = { square, at: turn, until: turn + s.blockTurns - 1 };
-        events.push({ kind: "block", turn, square });
-        next.nextPassive = turn + s.blockEvery;
-      } else next.nextPassive = turn + 1;
-    }
-  }
+  const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && rules.ultimateOnHisTurn ? { ultNext } : {}) };
+  const t: TurnContext = { turn, fen, crowd, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!ultNext, lastMove, s, events };
+  rules.wearOff?.(next, t);
+  const ultNow = next.ultAt === undefined ? rules.ultimate(next, t) : false;
+  rules.everyTurn?.(next, t);
+  if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
+  else rules.passive(next, t);
   return { ...boss, powers: next };
 }
 
+// ---------------- Ginger: freeze and the blizzard ----------------
+
+/** This turn is the blizzard's. */
+export const blizzardNow = (boss: BossState | null | undefined): boolean =>
+  !!boss?.powers && bossPowers(boss)?.ultimate === "blizzard" && boss.powers.ultAt === turnOf(boss);
+
+/** Ginger: a frozen piece every few turns (the freeze), and for one turn only the queen moves (the blizzard). */
+export const GINGER: BossRules = {
+  id: "gingerbread",
+  wearOff(next, t) {
+    // The ice after its turns (or once its piece is gone).
+    if (next.frozen) {
+      const piece = pieceAt(t.fen, next.frozen.square);
+      if (next.frozen.until < t.turn || piece?.color !== t.crowd || piece.type !== next.frozen.piece) next.frozen = null;
+    }
+  },
+  ultimate(next, t) {
+    const now = warnThenUnleash(next, t);
+    if (now) t.events.push({ kind: "blizzard", turn: t.turn });
+    return now;
+  },
+  passive(next, t) {
+    if (t.turn < next.nextPassive) return;
+    const pick = chooseFreeze(t.fen, t.crowd, t.seed, t.turn, next.pie?.square);
+    if (pick) {
+      next.frozen = { ...pick, until: t.turn + t.s.freezeTurns - 1 };
+      t.events.push({ kind: "freeze", turn: t.turn, square: pick.square });
+      const [lo, hi] = t.s.freezeEvery;
+      next.nextPassive = t.turn + lo + Math.floor(powerRoll(t.seed, "every", t.turn) * (hi - lo + 1));
+    } else next.nextPassive = t.turn + 1;
+  },
+  // Frozen pieces can't move; in the blizzard only the queen moves (no queen, or she can't: the king).
+  crowdFilter(allowed, boss, fen) {
+    if (blizzardNow(boss)) {
+      const queen = allowed.filter((m) => pieceAt(fen, from(m))?.type === "q");
+      const king = allowed.filter((m) => pieceAt(fen, from(m))?.type === "k");
+      return queen.length ? queen : king.length ? king : allowed;
+    }
+    const frozen = boss.powers!.frozen;
+    return frozen ? allowed.filter((m) => from(m) !== frozen.square) : allowed;
+  },
+  powerTurn: (boss) => !!boss.powers!.frozen || blizzardNow(boss),
+  // The frozen piece; in the blizzard every crowd piece but the one(s) still free to move.
+  iced(boss, fen, crowdAllowed) {
+    const p = boss.powers!;
+    if (blizzardNow(boss)) {
+      const free = new Set((crowdAllowed({ ...boss, barred: undefined }, fen) ?? []).map(from));
+      const out: string[] = [];
+      for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) {
+        const sq = `${f}${r}`;
+        const piece = pieceAt(fen, sq);
+        if (piece?.color === boss.crowdSide && !free.has(sq)) out.push(sq);
+      }
+      return out;
+    }
+    return p.frozen ? [p.frozen.square] : [];
+  },
+};
+
+// ---------------- Boingo: the pie and the funhouse ----------------
+
+/** Boingo: a pie on a square near the centre (nobody moves onto it), and he plays the crowd's move (the funhouse). */
+export const BOINGO: BossRules = {
+  id: "clown",
+  wearOff(next, t) {
+    // The pie after its turns.
+    if (next.pie && next.pie.until < t.turn) next.pie = null;
+  },
+  // (The funhouse's moment is the move it plays: added when it's played.)
+  ultimate: warnThenUnleash,
+  passive(next, t) {
+    if (t.turn < next.nextPassive) return;
+    const square = choosePie(t.fen, t.seed, t.turn);
+    if (square) {
+      next.pie = { square, until: t.turn + t.s.pieTurns - 1 };
+      t.events.push({ kind: "pie", turn: t.turn, square });
+      next.nextPassive = t.turn + t.s.pieTurns + t.s.pieGap;
+    } else next.nextPassive = t.turn + 1;
+  },
+  // Nobody can move onto the pie, the boss included.
+  crowdFilter(allowed, boss) {
+    const pie = boss.powers!.pie;
+    return pie ? allowed.filter((m) => to(m) !== pie.square) : allowed;
+  },
+  bossStops(boss) {
+    const pie = boss.powers?.pie?.square;
+    return pie ? (m) => to(m) === pie : null;
+  },
+  powerTurn: (boss) => !!boss.powers!.pie || boardFlipped(boss),
+};
+
 // ---------------- G-REX: fire ----------------
 
-/** The crowd's half of the board (ranks 1-4 for White, 5-8 for Black). */
-function crowdHalf(crowd: Side): string[] {
-  const out: string[] = [];
-  for (const f of "abcdefgh") for (let r = crowd === "w" ? 1 : 5; r <= (crowd === "w" ? 4 : 8); r++) out.push(`${f}${r}`);
-  return out;
-}
 const kingSquare = (fen: string, side: Side) => {
   for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) if (pieceAt(fen, `${f}${r}`)?.type === "k" && pieceAt(fen, `${f}${r}`)?.color === side) return `${f}${r}`;
   return null;
@@ -461,11 +420,6 @@ export function fireLoss(fen: string, move: string, burn: readonly string[], cro
   return burnOutcome(after, burn, crowd).burnt.reduce((t, b) => t + (b.piece ? VALUE[b.piece]! : 0), 0);
 }
 
-const logit = (x: number) => {
-  const q = Math.min(0.999, Math.max(0.001, x));
-  return Math.log(q / (1 - q));
-};
-
 /**
  * The judge treats a piece left on a tile ablaze as already gone: a move's expected score with what it leaves to the
  * fire taken off (firePawnLogit log-odds a pawn of value), so saving the piece is never scored as a mistake.
@@ -503,6 +457,41 @@ export function fireEscapes(fen: string, burn: readonly string[]): string[] {
   return legalMoves(fen).filter((m) => on.has(from(m)));
 }
 
+/** G-REX: a burning tile from his sparkler, and a barrage of fireballs from his Roman candle. */
+export const GREX: BossRules = {
+  id: "grex",
+  ultimate(next, t) {
+    const now = warnThenUnleash(next, t);
+    if (now) {
+      next.candle = { at: t.turn, left: t.s.candleShots };
+      t.events.push({ kind: "candle", turn: t.turn });
+    }
+    return now;
+  },
+  // The Roman candle's fireballs: a wave a crowd turn from candleDelay turns after it fired, each landing as a fresh fire
+  // tile; each wave's squares picked candleAhead turns before it lands (their shadows growing meanwhile).
+  everyTurn(next, t) {
+    if (!next.candle) return;
+    const barrage = candleTurn(next, t.fen, t.crowd, t.turn, t.s);
+    next.candle = barrage.candle;
+    if (barrage.fire) next.fire = barrage.fire;
+    if (barrage.event) t.events.push(barrage.event);
+  },
+  // A sparkler when no tile is burning, a full turn after the last fire went out; paused through the candle's barrage.
+  passive(next, t) {
+    const barrage = !!next.candle && (next.candle.left > 0 || !!next.fire?.length);
+    const ready = !next.fire?.length && t.turn >= next.nextPassive && (next.fireOut === undefined || t.turn > next.fireOut + t.s.fireGap);
+    if (!barrage && ready) {
+      const square = chooseSpark(t.fen, t.crowd, t.seed, t.turn, next.fire ?? []);
+      if (square) {
+        next.fire = [{ square, lit: t.turn }];
+        t.events.push({ kind: "spark", turn: t.turn, square });
+        next.nextPassive = t.turn + t.s.fireStages + t.s.fireGap;
+      } else next.nextPassive = t.turn + 1;
+    }
+  },
+  powerTurn: (boss) => !!boss.powers!.fire?.length,
+};
 
 // ---------------- Hollow: the dark ----------------
 
@@ -560,31 +549,6 @@ export function chooseDark(fen: string, crowd: Side, seed: number, turn: number,
 
 /** The dark squares as this crowd turn stands (for the board and the judge of move attempts). */
 export const darkSquares = (boss: Pick<BossState, "powers"> | null | undefined): string[] => (boss?.powers?.dark ?? []).map((d) => d.square);
-
-/**
- * The squares a move touches: where it starts and lands, every square it passes over on its way (a slide along a
- * rank, file or diagonal; a pawn's double step), and a castling king's way on to his rook's corner (`fen` says it's a
- * king). A knight's jump passes over nothing.
- */
-export function moveSquares(move: string, fen?: string): string[] {
-  const a = from(move);
-  const b = to(move);
-  const out = [a, b];
-  const f0 = a.charCodeAt(0) - 97;
-  const r0 = Number(a[1]) - 1;
-  const df = b.charCodeAt(0) - 97 - f0;
-  const dr = Number(b[1]) - 1 - r0;
-  const sq = (f: number, r: number) => `${"abcdefgh"[f]}${r + 1}`;
-  if (df === 0 || dr === 0 || Math.abs(df) === Math.abs(dr)) {
-    const n = Math.max(Math.abs(df), Math.abs(dr));
-    for (let k = 1; k < n; k++) out.push(sq(f0 + Math.sign(df) * k, r0 + Math.sign(dr) * k));
-  }
-  if (fen && dr === 0 && Math.abs(df) === 2 && pieceAt(fen, a)?.type === "k") {
-    // (Castling: his way past the square he lands on, to the rook's corner.)
-    for (let f = f0 + df + Math.sign(df); f >= 0 && f <= 7; f += Math.sign(df)) out.push(sq(f, r0));
-  }
-  return out;
-}
 
 /** A move attempt touches the dark (starts on a dark square, lands on one or passes over one). */
 export const touchesDark = (move: string, dark: readonly string[], fen?: string): boolean => dark.length > 0 && moveSquares(move, fen).some((sq) => dark.includes(sq));
@@ -759,6 +723,35 @@ export const lightsRate = (t: Pick<LightsTally, "found" | "settled">): number | 
 /** The crowd held the light: its find rate over the whole test at or above lightsOutHold (nothing asked: it held). */
 export const lightsHeld = (t: Pick<LightsTally, "found" | "asked">, s: Pick<BossPowerSettings, "lightsOutHold"> = BOSS_POWERS): boolean =>
   t.asked <= 0 || t.found >= s.lightsOutHold * t.asked - 1e-9;
+
+/** Hollow: squares covered in the dark (their pieces hidden), and Lights out, a memory test, at the start of his turn. */
+export const HOLLOW: BossRules = {
+  id: "hollow",
+  ultimateOnHisTurn: true,
+  // Lights out: the meter full as this turn begins, it comes at the start of his turn after the crowd's move
+  // (lightsOutDue). The full meter is its only warning (no "RAGE!"). The test switch: the meter fills as the second turn
+  // begins.
+  ultimate(next, t) {
+    if (meterFull(next, t) || testSwitch(t)) next.ultAt = t.turn;
+    return false;
+  },
+  // The dark: the squares whose turns are over clear; after his first move and every darkEvery-th after it, he covers
+  // another. His bulbs count down to it.
+  passive(next, t) {
+    const old = next.dark ?? [];
+    next.dark = old.filter((d) => d.until >= t.turn);
+    next.cleared = old.filter((d) => d.until < t.turn).map((d) => d.square);
+    const n = hisMoves(t.turn);
+    if (coversAfter(n, t.s)) {
+      const square = chooseDark(t.fen, t.crowd, t.seed, t.turn, next.dark, n === 1 && t.lastMove ? to(t.lastMove) : null);
+      if (square) {
+        next.dark = [...next.dark, { square, at: t.turn, until: t.turn + t.s.darkTurns - 1 }];
+        t.events.push({ kind: "dark", turn: t.turn, square, ...(n === 1 ? { first: true as const } : {}) });
+      }
+    }
+    next.bulbs = bulbsAt(t.turn, t.s);
+  },
+};
 
 // ---------------- Hollow: the extra move (a failed Lights out) ----------------
 
@@ -1110,6 +1103,53 @@ export function bounceResult(before: string, crowd: Side, seed: number, at: numb
   return { at, before, moves, spots: bounceSpots(moves, crowd, seed, at), loss: picked ? loss : null };
 }
 
+/** Big Boy: a toy block nobody can move onto or through, and the Big Bounce at the start of his turn. */
+export const BIGBOY: BossRules = {
+  id: "bigboy",
+  ultimateOnHisTurn: true,
+  wearOff(next, t) {
+    if (next.block && next.block.until < t.turn) next.block = null;
+  },
+  // The Big Bounce: the meter full as a turn begins, its warning ("RAGE!") that turn; it comes at the start of his turn,
+  // after the crowd's move (bounceDue). The test switch: warned as the second turn begins. The trigger (`ultNext`, kept):
+  // at the start of his next turn, without the warning.
+  ultimate(next, t) {
+    if (next.warnAt === undefined && !t.ultNext && (meterFull(next, t) || testSwitch(t))) {
+      next.warnAt = t.turn;
+      t.events.push({ kind: "warn", turn: t.turn });
+    }
+    return false;
+  },
+  // A toy block every blockEvery turns, blockTurns turns on the board.
+  passive(next, t) {
+    if (t.turn < next.nextPassive || next.block) return;
+    const square = chooseBlock(t.fen, t.crowd, t.seed, t.turn);
+    if (square) {
+      next.block = { square, at: t.turn, until: t.turn + t.s.blockTurns - 1 };
+      t.events.push({ kind: "block", turn: t.turn, square });
+      next.nextPassive = t.turn + t.s.blockEvery;
+    } else next.nextPassive = t.turn + 1;
+  },
+  // Nothing moves onto the block or through it, the boss included.
+  crowdFilter(allowed, boss, fen) {
+    const block = boss.powers!.block;
+    return block ? allowed.filter((m) => !blockedBy(m, block.square, fen)) : allowed;
+  },
+  bossStops(boss) {
+    const block = boss.powers?.block?.square;
+    return block ? (m, fen) => blockedBy(m, block, fen) : null;
+  },
+  powerTurn: (boss) => !!boss.powers!.block,
+};
+
+// ---------------- The registry ----------------
+
+/** Every boss with powers, by its BOSS_ROSTER id. */
+const BOSS_RULES: ReadonlyMap<string, BossRules> = new Map([GINGER, BOINGO, GREX, HOLLOW, BIGBOY].map((r) => [r.id, r]));
+
+/** A boss's rules (null: a boss without powers). */
+export const bossRules = (boss: Pick<BossState, "id"> | null | undefined): BossRules | null => (boss?.id ? (BOSS_RULES.get(boss.id) ?? null) : null);
+
 // ---------------- The test trigger ----------------
 
 /**
@@ -1123,10 +1163,6 @@ export function triggerUltimate(boss: BossState | null | undefined): { boss: Bos
   if (p.ultNext) return { boss, ok: true };
   return { boss: { ...boss, powers: { ...p, ultNext: true } }, ok: true };
 }
-
-/** This turn is the blizzard's. */
-export const blizzardNow = (boss: BossState | null | undefined): boolean =>
-  !!boss?.powers && bossPowers(boss)?.ultimate === "blizzard" && boss.powers.ultAt === turnOf(boss);
 
 /** The boss plays the crowd's move this turn (the funhouse), and hasn't yet. */
 export const funhouseDue = (boss: BossState | null | undefined): boolean =>
@@ -1151,13 +1187,8 @@ export function crowdAllowed(boss: BossState | null | undefined, fen: string): s
   const legal = legalMoves(fen);
   let allowed = legal;
   if (p) {
-    if (p.pie) allowed = allowed.filter((m) => to(m) !== p.pie!.square);
-    if (p.block) allowed = allowed.filter((m) => !blockedBy(m, p.block!.square, fen));
-    if (blizzardNow(boss)) {
-      const queen = allowed.filter((m) => pieceAt(fen, from(m))?.type === "q");
-      const king = allowed.filter((m) => pieceAt(fen, from(m))?.type === "k");
-      allowed = queen.length ? queen : king.length ? king : allowed;
-    } else if (p.frozen) allowed = allowed.filter((m) => from(m) !== p.frozen!.square);
+    const filter = bossRules(boss)?.crowdFilter;
+    if (filter) allowed = filter(allowed, boss!, fen);
     if (!allowed.length) allowed = legal;
   }
   if (barred) {
@@ -1173,11 +1204,10 @@ export function crowdAllowed(boss: BossState | null | undefined, fen: string): s
  * when every legal move is allowed. Never none: a restriction that would leave no move lifts.
  */
 export function bossAllowed(boss: BossState | null | undefined, fen: string): string[] | null {
-  const pie = boss?.powers?.pie?.square;
-  const block = boss?.powers?.block?.square;
-  if (!pie && !block) return null;
+  const stops = boss ? (bossRules(boss)?.bossStops?.(boss) ?? null) : null;
+  if (!stops) return null;
   const legal = legalMoves(fen);
-  const allowed = legal.filter((m) => to(m) !== pie && !blockedBy(m, block, fen));
+  const allowed = legal.filter((m) => !stops(m, fen));
   return allowed.length && allowed.length < legal.length ? allowed : null;
 }
 
@@ -1193,24 +1223,14 @@ export const crowdMayPlay = (boss: BossState | null | undefined, fen: string, mo
  */
 export function powerTurn(boss: BossState | null | undefined): boolean {
   const p = boss?.powers;
-  return !!p && (!!p.frozen || !!p.pie || !!p.block || blizzardNow(boss) || boardFlipped(boss) || !!p.fire?.length);
+  return !!p && !!bossRules(boss)?.powerTurn?.(boss!);
 }
 
 /** The squares that show ice: the frozen piece; in the blizzard every crowd piece but the one(s) still free to move. */
 export function icedSquares(boss: BossState | null | undefined, fen: string): string[] {
   const p = boss?.powers;
   if (!p || !boss) return [];
-  if (blizzardNow(boss)) {
-    const free = new Set((crowdAllowed({ ...boss, barred: undefined }, fen) ?? []).map(from));
-    const out: string[] = [];
-    for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) {
-      const sq = `${f}${r}`;
-      const piece = pieceAt(fen, sq);
-      if (piece?.color === boss.crowdSide && !free.has(sq)) out.push(sq);
-    }
-    return out;
-  }
-  return p.frozen ? [p.frozen.square] : [];
+  return bossRules(boss)?.iced?.(boss, fen, crowdAllowed) ?? [];
 }
 
 /** The rage meter, 0 to 1 (full: the warning, then the ultimate); null once the ultimate is spent. */
