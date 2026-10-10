@@ -1230,3 +1230,116 @@ export const FAIRPLAY = {
     banOnePerf: 2400,
   },
 } as const;
+
+/**
+ * Squads (docs/areas/squads.md; DECISIONS.md, "Squads"): 8 squads of 4 play team chess in a bracket. Round 1 is
+ * Relay (4 boards a match, one player a move, everyone moving one board along each turn), round 2 Pairs (2 boards,
+ * two players pick and a coin chooses), the final Pick and Block (one board: two pickers, two blockers). No engine
+ * in the rules: legal moves and mate in one come from the chess library, and a capped board is decided by material.
+ * The rules are in `packages/chess/src/squads/`; every number for the mode is here.
+ */
+export interface SquadsSettings {
+  /** Players in a squad, squads in a lobby (a bracket of three rounds). */
+  squadSize: number;
+  squadCount: number;
+  /** The largest party (invite link or code) that queues together. */
+  partyMax: number;
+  /** Boards in a match: round 1 (Relay), round 2 (Pairs), the final (Pick and Block). Armageddon is always one. */
+  boards: { relay: number; pairs: number; final: number };
+  /** The pre-game votes (Start, Pace, Length): seconds each is open, the result's showing, bots that don't vote. */
+  voteSeconds: number;
+  voteResultSeconds: number;
+  voteBotSkip: number;
+  /** The Pace vote's options, about this many seconds a move, and the one that wins if nobody votes (an index). */
+  paceSeconds: readonly number[];
+  paceDefault: number;
+  /** An Armageddon board is played at this pace (the fastest). */
+  armageddonPaceSeconds: number;
+  /** The Length vote's move cap for rounds 1 and 2, in moves per side played in the match (an opening's don't count). */
+  moveCap: number;
+  /** The silent safety cap on every board, "to the end" and the final included, in moves per side. */
+  safetyCap: number;
+  /** Material for deciding a board at a cap (no engine): pawn, knight, bishop, rook, queen. */
+  material: { p: number; n: number; b: number; r: number; q: number };
+  /** The smallest material lead that wins a board at a cap; less is a draw. */
+  materialLead: number;
+  /** Points for a board: a win, a draw. A squad with more than half a match's points has clinched it. */
+  winPoints: number;
+  drawPoints: number;
+  /** Openings (Start: "same opening", "random openings"): moves per side, and the balance window (as for Classic). */
+  openingMoves: number;
+  openingBalance: readonly [number, number];
+  final: {
+    /** Mercy: no blocks when the side to move has this many legal moves or fewer. */
+    noBlocksAtMoves: number;
+    /** Mercy: a block is cancelled when every other legal move allows mate in one. */
+    cancelBlockBeforeMate: boolean;
+    /** Who sees the choices live: "everyone" (both squads and spectators) or "own" (the acting squad only). */
+    blocksSeenBy: "everyone" | "own";
+    picksSeenBy: "everyone" | "own";
+  };
+  /** Missed actions in a row before a player's seat goes to a bot (every miss is logged on their record). */
+  noShowsBeforeBot: number;
+  /** A bot taking over a no-show's seat plays at this skill (a temperature; see botSkillRange). */
+  replacementBotSkill: number;
+  bots: {
+    /** The bot engine's top moves a squad bot chooses among. */
+    candidates: number;
+    /** A bot picker in the final steers clear of a block it can see with this chance. */
+    avoidBlockChance: number;
+    /** The colour a bot squad takes when it picks Armageddon's colours (a draw counts for Black). */
+    armageddonColour: "w" | "b";
+    /** A bot's thinking time, a share of the move clock (random in the range). */
+    thinkShare: readonly [number, number];
+  };
+  /**
+   * Showing what happened, in seconds: a half's moves landing (Relay), the pair's reveal and coin (Pairs), the
+   * final's reveal (ghost arrows, the lock slamming down, the coin), the bracket between rounds, Armageddon's intro.
+   */
+  moveShowSeconds: number;
+  pairRevealSeconds: number;
+  finalRevealSeconds: number;
+  roundBreakSeconds: number;
+  armageddonIntroSeconds: number;
+}
+
+export const SQUADS: SquadsSettings = {
+  squadSize: 4,
+  squadCount: 8,
+  partyMax: 4,
+  boards: { relay: 4, pairs: 2, final: 1 },
+  voteSeconds: 8,
+  voteResultSeconds: 3.2,
+  voteBotSkip: 0.1,
+  paceSeconds: [10, 15, 25],
+  paceDefault: 1,
+  armageddonPaceSeconds: 10,
+  moveCap: 40,
+  safetyCap: 120,
+  material: { p: 1, n: 3, b: 3, r: 5, q: 9 },
+  materialLead: 1,
+  winPoints: 1,
+  drawPoints: 0.5,
+  openingMoves: 4,
+  openingBalance: [0.4, 0.6],
+  final: {
+    noBlocksAtMoves: 3,
+    cancelBlockBeforeMate: true,
+    // Eric, Oct 10: blocks live to everyone as red arrows, picks only to the picking squad. A setting so it can go back.
+    blocksSeenBy: "everyone",
+    picksSeenBy: "own",
+  },
+  noShowsBeforeBot: 3,
+  replacementBotSkill: 4,
+  bots: {
+    candidates: 8,
+    avoidBlockChance: 0.5,
+    armageddonColour: "b",
+    thinkShare: [0.2, 0.8],
+  },
+  moveShowSeconds: 1,
+  pairRevealSeconds: 3,
+  finalRevealSeconds: 4.5,
+  roundBreakSeconds: 20,
+  armageddonIntroSeconds: 6,
+};
