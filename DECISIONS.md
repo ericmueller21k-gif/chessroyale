@@ -562,6 +562,17 @@ decide (duties, deadlines, clocks, what a miss plays, ties). Nothing links to it
   leaving an alarm failing forever.
 - **The protocol** is its own file (`squads/protocol.ts`) with a version number in every `hello` and `welcome`
   (`SQUADS_PROTOCOL`, 1); an app on another version is told to reload. Crowd's protocol is untouched.
+- **Team clocks** (Eric's one bank per squad for the tournament, built in the rules alongside this) stay entirely in the
+  rules' functions: the server starts them when the bracket is drawn, keeps what each match leaves, and shows them.
+  Every player gets every squad's clock (beside its name and rank on screen): in the lobby view, and a `clocks` message
+  whenever a half begins or ends anywhere. During a half the screen runs a clock down from what it already has (the
+  match's banks and free seconds, its duties, who has locked in); the exact bank comes with each half's result, so the
+  server sends nothing per second.
+- **Out of time is not a no-show.** A move made, but too late for the team clock (sudden death, or the bank ran out
+  during the half), is a miss on the person's record, as the rules say, but doesn't count towards the three no-shows
+  that hand the seat to a bot: they were there. No move at all still does (an absent player in sudden death would
+  otherwise play random moves for their squad for the rest of the lobby). So a half isn't cut short when a bank runs
+  out: anyone still thinking may still make their move until the ceiling, late.
 - **Left for later:** the live line (online, matches running, in queue) and the matchmaker's overload limit don't count
   Squads yet; no quick chat in Squads lobbies; the app's side of bot work arrives with phase 3's screens (until then a
   real lobby's bots use the quick look).

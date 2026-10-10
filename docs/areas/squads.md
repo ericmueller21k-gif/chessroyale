@@ -138,6 +138,12 @@ plays, ties). Nothing links to it until phase 3's screens. The calls are in `DEC
   ends when `halfReady`, or when the last deadline of anyone still choosing has passed; `resolveHalf` plays it with each
   player's thinking time to their last choice, `noteActions` logs misses, everyone gets the `half` (every event public)
   and the show (`moveShowSeconds`, `pairRevealSeconds`, `finalRevealSeconds`), then the next half.
+- **Team clocks** are the rules': `startTeamClocks` when the bracket is drawn, each match's banks from `planMatch`
+  (topped up in later rounds), drained in `resolveHalf`, carried on by `settleTeamClocks` when a match ends. Every
+  player gets every squad's clock (`teamClocks`, and `matchClocks` for squads playing): in the lobby view and a `clocks`
+  message whenever a half begins or ends anywhere. During a half a screen runs a squad's clock down from the match's
+  banks, its duties and who has locked in; the exact bank comes with each `half`. A move made but too late for the
+  team clock (sudden death, or the bank ran out mid-half) is a miss on the record but not a no-show; no move at all is.
 - **Visibility.** Live choices go to each player as `visibleChoices` allows them (Relay and Pairs: their own squad's;
   the final: blocks to everyone, picks to the picking squad). Who has locked in goes to everyone (every squad's clock
   on screen needs who is still thinking).
@@ -162,12 +168,13 @@ plays, ties). Nothing links to it until phase 3's screens. The calls are in `DEC
   a test lobby or after a test control.
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
   e2e, never production), while `SQUADS_LOBBY.testControls` is on: `nextRound` in a lobby (the rules' `endByMaterial` on
-  the earliest round's matches, the next round 3 s later; in the votes: they close), and `POST /api/squads/lobby?
-  start=pairs|final&clock=bank,top-up,free,increment` for a test lobby that fills 5 s after it opens, skipping the rounds before (squads with
-  more people go through).
+  the earliest round's matches, the next round 3 s later; in the votes: they close), and a test lobby,
+  `POST /api/squads/lobby?start=pairs|final&clock=BANK,TOPUP,FREE,INC` (a team clock in seconds), that fills 5 s after
+  it opens, skipping the rounds before (squads with more people go through).
 - **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 1, typed): a lobby socket gets
-  `welcome`, `lobby` (seats, squads, bracket, rules), `vote`/`voteCast`, `match` (a match in full, as you may see it),
-  `turn`, `choices`, `half`, `choiceNo`, `placed`, `results`, `botWork`, `left`, `error`, `closed`, and sends `hello`,
+  `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock), `vote`/`voteCast`, `match` (a match in
+  full, as you may see it), `turn`, `clocks`, `choices`, `half`, `choiceNo`, `placed`, `results`, `botWork`, `left`,
+  `error`, `closed`, and sends `hello`,
   `vote`, `choose`, `lock`, `armageddon`, `speed`, `botTop`, `reclaim`, `leave`, `sync`, `nextRound`. A party socket
   gets `welcome`, `party`, `error`, `closed` and sends `hello`, `queue`, `cancel`, `leave`.
 - **Not yet:** the live line doesn't count Squads lobbies or their players (nor does the matchmaker's overload limit);
@@ -190,11 +197,11 @@ Settings: `SQUADS_LOBBY` in settings.ts (the bracket's intro, rewards, bot work,
 fill, parties); Worker variables `MATCH_FILL_SECONDS` and `SQUADS_TEST`.
 
 Tests: `packages/server/test/squads-lobby.test.ts` (seats and parties, the fill, votes, the bracket, a full bot lobby
-to its results, halves, deadlines, takeover and reclaiming, leaving, flags and ties, the final's visibility,
-Armageddon, the test controls, rewards, bot work on devices), `squads-queue.test.ts` (the queue, parties, D1 rewards),
-`squads-do.test.ts` (the Durable Object: storage per match, restart, closing); e2e `e2e/squads.spec.ts` (a party
-through the real server; a test lobby at the final). The full-lobby run: `npx tsx scripts/squads-headless.ts --url
-http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
+to its results, halves, deadlines, takeover and reclaiming, leaving, team clocks and sudden death, ties, the final's
+visibility, Armageddon, the test controls, rewards, bot work on devices), `squads-queue.test.ts` (the queue, parties,
+D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match, restart, closing); e2e `e2e/squads.spec.ts`
+(a party through the real server; a test lobby at the final). The full-lobby run: `npx tsx scripts/squads-headless.ts
+--url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
 
 ## The design (Eric, Oct 10, 2026)
 
