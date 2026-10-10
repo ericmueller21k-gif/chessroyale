@@ -9,15 +9,33 @@ import type { Colour } from "./board.ts";
  * rules never ask an engine; only a bot deciding what to play does, as in every other mode.
  */
 
-/** The engine's top moves as candidates: each move's loss in points against the best (1 point = 0.01 expected score). */
-export function candidatesFrom(top: readonly MoveScore[]): Candidate[] {
+/**
+ * The engine's top moves as candidates: each move's loss in points against the best (1 point = 0.01 expected score).
+ * In a won position every top move scores about 1, so moves the engine ranks lower lose `wonRankLoss` points a place
+ * (its own order breaks the tie), and a mate it sees is played: a longer one loses `mateStepLoss` points a move, a
+ * move without one `mateMissLoss`. Without this a winning bot wanders and games never end.
+ */
+export function candidatesFrom(top: readonly MoveScore[], s: SquadsSettings = SQUADS): Candidate[] {
   const best = Math.max(...top.map((m) => m.expected));
-  return top.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
+  const won = best >= s.bots.wonAt;
+  const mates = top.flatMap((m) => (m.mate !== undefined && m.mate > 0 ? [m.mate] : []));
+  const quickest = mates.length ? Math.min(...mates) : null;
+  return top.map((m, rank) => {
+    let loss = Math.max(0, (best - m.expected) * 100);
+    if (won) loss = Math.max(loss, rank * s.bots.wonRankLoss);
+    if (quickest !== null) loss = Math.max(loss, m.mate !== undefined && m.mate > 0 ? (m.mate - quickest) * s.bots.mateStepLoss : s.bots.mateMissLoss);
+    return { move: m.move, loss };
+  });
+}
+
+/** A bot's skill in this position: winning, it plays with purpose (its temperature at most `wonSkill`). */
+export function squadBotSkill(top: readonly MoveScore[], skill: number, s: SquadsSettings = SQUADS): number {
+  return Math.max(...top.map((m) => m.expected)) >= s.bots.wonAt ? Math.min(skill, s.bots.wonSkill) : skill;
 }
 
 /** A squad bot's candidates in a position: the bot engine's top moves. */
 export async function squadBotCandidates(engine: EngineLike, fen: string, s: SquadsSettings = SQUADS): Promise<Candidate[]> {
-  return candidatesFrom(await engine.topMoves(fen, s.bots.candidates));
+  return candidatesFrom(await engine.topMoves(fen, s.bots.candidates), s);
 }
 
 /** `botPick` among the moves not in `avoid` (if that leaves nothing legal, among them all). */
@@ -63,10 +81,15 @@ export function botFinalBlock(rng: Rng, candidates: readonly Candidate[], skill:
   return pickAvoiding(rng, candidates, skill, legal, new Set(partnerBlock ? [partnerBlock] : []));
 }
 
-/** A bot's thinking time (ms): a random share of the move clock. */
-export function botThinkShareMs(rng: Rng, paceSeconds: number, s: SquadsSettings = SQUADS): number {
-  const [lo, hi] = s.bots.thinkShare;
-  return Math.round((lo + rng() * (hi - lo)) * paceSeconds * 1000);
+/**
+ * A bot's thinking time (ms): its bank over `movesToGo`, plus `incrementShare` of the increment, times a random factor
+ * in `thinkRange`; at least `minThinkSeconds`, and never past its deadline (it always moves in time).
+ */
+export function squadBotThinkMs(rng: Rng, clock: { bankMs: number; incrementMs: number; deadlineMs: number }, s: SquadsSettings = SQUADS): number {
+  const [lo, hi] = s.bots.thinkRange;
+  const target = (clock.bankMs / s.bots.movesToGo + s.bots.incrementShare * clock.incrementMs) * (lo + rng() * (hi - lo));
+  const ms = Math.max(s.bots.minThinkSeconds * 1000, target);
+  return Math.round(Math.min(ms, clock.deadlineMs * 0.9));
 }
 
 /** The colour a bot squad takes when it picks Armageddon's colours. */

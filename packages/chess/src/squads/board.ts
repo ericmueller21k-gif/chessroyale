@@ -4,21 +4,25 @@ import type { GameEnd } from "../rules.ts";
 
 /**
  * A Squads board: a game from its start (the starting position or an opening's last position), its moves in this
- * match, and how it ended. Pure: chess rules come from chess.js; no engine. Moves are UCI (e2e4, e1g1, e7e8q).
+ * match, each side's chess clock, and how it ended. Pure: chess rules come from chess.js; no engine. Moves are UCI
+ * (e2e4, e1g1, e7e8q).
  */
 
 export type Colour = "w" | "b";
 /** A match's two squads: side 0 and side 1. */
 export type Side = 0 | 1;
 
-/** How a board ended: by the rules of chess, at a cap (decided by material), or by the test-only "Next round". */
-export type BoardEnd = Exclude<GameEnd, null> | "move_cap" | "safety_cap" | "admin";
+/**
+ * How a board ended: by the rules of chess, on time (a flag fall), at the silent safety cap or by the test-only "Next
+ * round" (both decided by material).
+ */
+export type BoardEnd = Exclude<GameEnd, null> | "flag" | "safety_cap" | "admin";
 
 export interface BoardResult {
   /** The colour that won; null for a draw. */
   winner: Colour | null;
   reason: BoardEnd;
-  /** The material count, when a cap (or the admin button) decided it. */
+  /** The material count, when the safety cap (or the admin button) decided it. */
   material?: { w: number; b: number };
 }
 
@@ -41,6 +45,8 @@ export interface SquadsBoard {
   keys: readonly string[];
   /** The side of the match that plays White here. */
   white: Side;
+  /** Each colour's time left on its clock (ms). */
+  clock: { readonly w: number; readonly b: number };
   result: BoardResult | null;
 }
 
@@ -52,8 +58,8 @@ export function positionKey(fen: string): string {
   return fen.split(" ").slice(0, 4).join(" ");
 }
 
-export function newSquadsBoard(id: number, start: BoardStart, white: Side): SquadsBoard {
-  return { id, start, fen: start.fen, moves: [], keys: [positionKey(start.fen)], white, result: null };
+export function newSquadsBoard(id: number, start: BoardStart, white: Side, clock: { w: number; b: number }): SquadsBoard {
+  return { id, start, fen: start.fen, moves: [], keys: [positionKey(start.fen)], white, clock: { ...clock }, result: null };
 }
 
 /** The colour to move on a board. */
@@ -149,8 +155,24 @@ export function materialCount(fen: string, s: SquadsSettings = SQUADS): { w: num
   return out;
 }
 
+/**
+ * Whether `colour` could still mate: anything more than a lone king, or a king with a single knight or bishop (the
+ * usual online rule for a flag fall).
+ */
+export function canMate(fen: string, colour: Colour): boolean {
+  const pieces = [...fen.split(" ")[0]!].filter((ch) => /[pnbrq]/i.test(ch) && (colour === "w" ? ch === ch.toUpperCase() : ch === ch.toLowerCase()));
+  return !(pieces.length === 0 || (pieces.length === 1 && /[nb]/i.test(pieces[0]!)));
+}
+
+/** A flag fall: `colour` ran out of time and loses the board, unless the other side can't mate (then a draw). */
+export function flagFall(board: SquadsBoard, colour: Colour): SquadsBoard {
+  if (board.result) return board;
+  const other = otherColour(colour);
+  return { ...board, clock: { ...board.clock, [colour]: 0 }, result: { winner: canMate(board.fen, other) ? other : null, reason: "flag" } };
+}
+
 /** Ends a live board on material: a lead of `materialLead` or more wins, anything less is a draw (no engine). */
-export function decideByMaterial(board: SquadsBoard, reason: "move_cap" | "safety_cap" | "admin", s: SquadsSettings = SQUADS): SquadsBoard {
+export function decideByMaterial(board: SquadsBoard, reason: "safety_cap" | "admin", s: SquadsSettings = SQUADS): SquadsBoard {
   if (board.result) return board;
   const material = materialCount(board.fen, s);
   const lead = material.w - material.b;

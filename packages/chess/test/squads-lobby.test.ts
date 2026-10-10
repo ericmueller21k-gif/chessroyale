@@ -11,6 +11,7 @@ import {
   relaySeat,
   reportWinner,
   roundDecided,
+  clockName,
   rulesFromVotes,
   squadsRng,
   squadsVotes,
@@ -136,33 +137,40 @@ describe("Squads: the bracket", () => {
 describe("Squads: pre-game votes", () => {
   const votes = squadsVotes();
 
-  it("three votes: Start (3), Pace (from settings) and Length (2)", () => {
-    expect(votes.map((v) => v.id)).toEqual(["start", "pace", "length"]);
+  it("two votes: Start (3 options) and Clock (Fast, Normal, Long from settings)", () => {
+    expect(votes.map((v) => v.id)).toEqual(["start", "clock"]);
     expect(votes[0]!.options.map((o) => o.rule.start)).toEqual(["standard", "same", "random"]);
-    expect(votes[1]!.options.map((o) => o.rule.paceSeconds)).toEqual([...SQUADS.paceSeconds]);
-    expect(votes[2]!.options.map((o) => o.rule.length)).toEqual(["end", "cap"]);
-    expect(votes[2]!.options[1]!.label).toContain(String(SQUADS.moveCap));
+    expect(votes[1]!.options.map((o) => o.rule.clock)).toEqual([...SQUADS.clocks]);
+    expect(votes[1]!.options.map((o) => o.id)).toEqual(["fast", "normal", "long"]);
+    const c = SQUADS.clocks[1]!;
+    expect(votes[1]!.options[1]!.label).toBe(`Normal ${clockName(c)}`);
   });
 
-  it("nobody voting gives the normal start, the middle pace and the move cap", () => {
-    expect(rulesFromVotes({})).toEqual({ start: "standard", paceSeconds: SQUADS.paceSeconds[SQUADS.paceDefault], length: "cap" });
-    expect(rulesFromVotes({ start: 2, pace: 0, length: 0 })).toEqual({ start: "random", paceSeconds: SQUADS.paceSeconds[0], length: "end" });
+  it("writes a clock the way chess players do", () => {
+    expect(clockName({ bankSeconds: 240, incrementSeconds: 2 })).toBe("4+2");
+    expect(clockName({ bankSeconds: 90, incrementSeconds: 1 })).toBe("1:30+1");
+  });
+
+  it("nobody voting gives the normal start and the Normal clock", () => {
+    expect(rulesFromVotes({})).toEqual({ start: "standard", clock: SQUADS.clocks[SQUADS.clockDefault] });
+    expect(SQUADS.clocks[SQUADS.clockDefault]!.id).toBe("normal");
+    expect(rulesFromVotes({ start: 2, clock: 0 })).toEqual({ start: "random", clock: SQUADS.clocks[0] });
   });
 
   it("runs on Crowd's vote machinery: one vote each, bots vote, non-voters join the winner", () => {
-    const pace = votes[1]!;
+    const clock = votes[1]!;
     const everyone = Array.from({ length: 32 }, (_, i) => `p${i}`);
     let cast: { playerId: string; option: number }[] = [];
-    for (const v of botVotes(mulberry32(4), everyone.slice(0, 30), pace.options.length, SQUADS.voteSeconds * 1000, SQUADS.voteBotSkip)) {
+    for (const v of botVotes(mulberry32(4), everyone.slice(0, 30), clock.options.length, SQUADS.voteSeconds * 1000, SQUADS.voteBotSkip)) {
       cast = castPregameVote(cast, { playerId: v.id, option: v.option }, false) ?? cast;
     }
     expect(castPregameVote(cast, { playerId: cast[0]!.playerId, option: (cast[0]!.option + 1) % 3 }, false)).toBeNull();
-    const closed = closePregameVote(cast, everyone, pace, mulberry32(4), (playerId, option) => ({ playerId, option }));
+    const closed = closePregameVote(cast, everyone, clock, mulberry32(4), (playerId, option) => ({ playerId, option }));
     expect(closed.votes).toHaveLength(32);
     expect(closed.joined).toContain("p31");
     const counts = [0, 1, 2].map((o) => cast.filter((v) => v.option === o).length);
     expect(counts[closed.result]).toBe(Math.max(...counts));
-    expect(rulesFromVotes({ pace: closed.result }).paceSeconds).toBe(SQUADS.paceSeconds[closed.result]);
+    expect(rulesFromVotes({ clock: closed.result }).clock).toEqual(SQUADS.clocks[closed.result]);
   });
 });
 
