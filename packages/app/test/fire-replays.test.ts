@@ -20,7 +20,7 @@ describe("replays after a piece burnt", () => {
   });
 
   it("the boss's reactions read the position before the last moves from the base too", () => {
-    const kit = BOSS_KITS["G-REX"]!;
+    const kit = BOSS_KITS["Jefferson"]!;
     for (const stage of ["thinking", "bossMove", "crowd"] as const) {
       expect(() => bossBeat(kit, { stage, fen, history, bases, crowdSide: "w", lastMove: null })).not.toThrow();
     }
