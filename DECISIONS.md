@@ -1020,7 +1020,7 @@ model from CSSLab at the University of Toronto (Chessformer, ICLR 2026). No cali
   (`timeoutMs`), not loaded yet, failed, or a broken worker: today's Stockfish move. A load that takes over 60 s is
   given up for the battle.
 - **Loading:** the worker starts as the battle's intro begins (the model loads during it). The boss menu fetches the
-  files ahead when Maia may play. The service worker doesn't precache them (about 40 MB) but keeps them once fetched,
+  files ahead when Maia may play. The service worker doesn't precache them (about 29 MB to download, 40 MB unpacked) but keeps them once fetched,
   in their own cache named by their contents (an app update keeps it; a new model replaces it). The worker is ended
   after the battle, freeing its few hundred MB.
 - **Testing (admins only):** a Brain picker in Boss alone's boss menu (Default · Stockfish · Maia, no guard · light

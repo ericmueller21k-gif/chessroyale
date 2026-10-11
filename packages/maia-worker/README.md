@@ -77,8 +77,9 @@ sha256 `ba14208b…62524f`), for the non-boss bots later.
 - In onnxruntime-web 1.30.0's WebAssembly, one thread: about **75–85 ms a move** on this machine's CPU (Node and
   headless Chromium alike; the first move about 200 ms), so roughly 0.2–0.35 s on a phone. Loading: about 1–2.5 s.
 - Memory with the model loaded: about 350–450 MB. The game ends the worker after each battle.
-- Download: the model 24.0 MiB (about 20 MB with compression), onnxruntime's WebAssembly 13.6 MiB (about 2.7 MB with
-  brotli), the worker 115 KB. Fetched only for a battle that uses Maia, then kept by the service worker.
+- Download, as served live (measured Oct 11): the model 25.2 MB as it is (Cloudflare doesn't compress `.onnx`; it
+  would only shrink about 20% anyway), onnxruntime's WebAssembly 3.3 MB (brotli; 14.2 MB unpacked), the worker 40 KB
+  (brotli): about 28.5 MB the first time. Fetched only for a battle that uses Maia, then kept by the service worker.
 
 ## The protocol (`src/uci.ts`)
 
