@@ -640,6 +640,12 @@ decide (duties, deadlines, clocks, what a miss plays, ties). Nothing links to it
   Except for someone who isn't there (disconnected, and no move made): that's a no-show as any other, or an absent
   player in sudden death would play random moves for their squad for the rest of the lobby. A half isn't cut short
   when a bank runs out: anyone still thinking may still make their move until the ceiling (late, but there).
+- **Measured through the real server** (`scripts/squads-headless.ts --device` against `wrangler dev`, the Normal clock's
+  numbers, one idle person whose device did the bots' engine work): a full bot lobby took 28.9 minutes from the fill
+  to its results (round 1 over at 11 minutes, round 2 at 21, the final 8 minutes), in line with the sim's 33-minute
+  median. The device answered 1,336 jobs; every board ended in mate. (A run before the duplicate-line fix, its device
+  benched, played most moves from the quick look: boards ran to 150-230 plies by repetition and the lobby past an hour.
+  The quick look is a last resort, not a bot.)
 - **Left for later:** the live line (online, matches running, in queue) and the matchmaker's overload limit don't count
   Squads yet; no quick chat in Squads lobbies; the app's side of bot work arrives with phase 3's screens (until then a
   real lobby's bots use the quick look).
