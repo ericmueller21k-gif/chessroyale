@@ -218,14 +218,14 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
     match.seen.set(seenKey(boss.board), boss.board.ply);
   }, [boss.board.ply]);
   const name = (id: string) => (match.isYou(id) ? "You" : match.nameOf(id));
-  // The God King's word after the blizzard (the queen alone is free; no queen to move: the king) and the funhouse.
+  // The God King's word after the blizzard (one piece free: the queen, the king, or another) and the funhouse.
   const blizzard = moments.find((m) => m.kind === "blizzard");
   const blizzardLine = !!blizzard && now >= blizzard.at + BLIZZARD.lineAt;
   const funLine = !!funhouse && now >= funhouse.at + FUNHOUSE.exitAt;
   useEffect(() => {
     if (!blizzardLine) return;
-    const queenFree = (boss.powers?.allowed ?? []).some((m) => pieceAt(boss.board.fen, m.slice(0, 2))?.type === "q");
-    kingSay(queenFree ? "blizzard" : "blizzardKing", `blizzard-${blizzard!.key}`);
+    const free = new Set((boss.powers?.allowed ?? []).map((m) => pieceAt(boss.board.fen, m.slice(0, 2))?.type));
+    kingSay(free.has("q") ? "blizzard" : free.has("k") && free.size === 1 ? "blizzardKing" : "blizzardOne", `blizzard-${blizzard!.key}`);
   }, [blizzardLine]);
   useEffect(() => {
     if (funLine) kingSay("funhouse", `funhouse-${funhouse!.key}`);

@@ -226,10 +226,16 @@ export interface NetBossPowers {
   ultimate: PowerId;
   /** The crowd turn they're set for (crowd moves + 1). */
   turn: number;
-  /** The rage meter, 0-1 (null once the ultimate is spent); the one-turn warning; the turn the ultimate hit. */
+  /**
+   * The rage meter, 0-1 (full on the ultimate's turn, empty while its effect runs, then filling again; null: no meter);
+   * whether it's held empty now (an ultimate's effect still running: missing from older servers); the one-turn
+   * warning; the turn the ultimate under way hit (null: none under way); how many ultimates have come this battle.
+   */
   rage: number | null;
+  paused?: boolean;
   warned: boolean;
   ultAt: number | null;
+  ults?: number;
   /** A frozen piece's square, a pied square, through which crowd turn. */
   frozen: { square: string; until: number } | null;
   pie: { square: string; until: number } | null;

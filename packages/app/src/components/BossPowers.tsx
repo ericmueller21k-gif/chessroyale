@@ -204,18 +204,48 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
 // ---------------- The rage meter ----------------
 
 /**
- * The boss bar's rage meter: it fills over the battle (faster as the boss loses material or the crowd gets ahead on
- * the judged eval), glows as it nears full, flashes for the one-turn warning, and is gone once the ultimate is spent.
+ * The boss bar's rage meter: it fills over the battle (faster as the boss loses material, the crowd gets ahead on the
+ * judged eval or the God King strikes the boss), glows as it nears full, flashes for the one-turn warning, is full on
+ * the ultimate's turn, then empties and stays empty (dimmed, paused) while the ultimate's effect runs, and fills again
+ * for the next one (Eric, Oct 11: several a battle).
  */
 export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
   const p = boss.powers;
   if (!p || p.rage === null || boss.result) return null;
-  // (Warned or unleashed, it's full: the test switch can bring the ultimate before the meter is.)
-  const pct = p.warned || p.ultAt !== null ? 100 : Math.round(p.rage * 100);
+  // (Warned, it's full: the test switch can bring the ultimate before the meter is. Older servers: null once spent.)
+  const paused = !!p.paused;
+  const now = p.ultAt !== null && !paused;
+  const pct = p.warned || now ? 100 : Math.round(p.rage * 100);
   const glow = pct >= BOSS_POWERS.rageGlowFrom * 100;
+  // As the ultimate comes the bar slides down to nothing from where this device first saw it held empty, carried on by
+  // whichever screen draws it next (a screen change mustn't make it jump).
+  let drain: Record<string, string> | null = null;
+  if (paused) {
+    const key = `${boss.id}:${boss.startMove}:${p.ults ?? 0}`;
+    const t = Date.now();
+    let at = drainSeen.get(key);
+    if (at === undefined) {
+      drainSeen.set(key, (at = t));
+      if (drainSeen.size > 40) drainSeen.delete(drainSeen.keys().next().value!);
+    }
+    if (t - at < RAGE_DRAIN_MS) drain = { width: "0%", animation: `rage-drain ${RAGE_DRAIN_MS}ms ease-in both`, animationDelay: `${at - t}ms` };
+  }
   return (
-    <span class={`rage-meter${glow ? " glow" : ""}${p.warned ? " warned" : ""}${p.ultAt !== null ? " now" : ""}`} role="meter" aria-label={`Rage ${pct}%`} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} title="Rage: when it's full, the boss's ultimate is coming">
-      <i style={{ width: `${pct}%` }} />
+    <span
+      class={`rage-meter${glow ? " glow" : ""}${p.warned ? " warned" : ""}${now ? " now" : ""}${paused ? " paused" : ""}`}
+      role="meter"
+      aria-label={paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      title={paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
+    >
+      <i style={drain ?? { width: `${pct}%` }} />
     </span>
   );
 }
+
+/** How long the meter takes to empty as an ultimate comes (ms). */
+export const RAGE_DRAIN_MS = 900;
+/** When this device first saw each ultimate's meter held empty (by battle and ultimate). */
+const drainSeen = new Map<string, number>();

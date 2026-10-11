@@ -291,8 +291,11 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   expect(await myPoints(page)).toBe(before - 50);
   const p = await powers(page);
   expect(p.lightsAt).toBe(1);
-  expect(p.rage).toBeNull();
-  await expect(btn).toHaveText("Ultimate used (testing)");
+  // The meter spent: empty, held so through this turn (his extra move belonged to the ultimate), then filling again.
+  expect(p.rage).toBe(0);
+  expect(p.paused).toBe(true);
+  await expect(page.locator(".rage-meter.paused")).toBeVisible();
+  await expect(btn).toHaveText("Ultimate under way (testing)");
   expect(errors).toEqual([]);
 });
 

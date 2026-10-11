@@ -76,50 +76,98 @@ function turns(b: BossState, fen: string, n: number, judged?: number, s: BossPow
   return out;
 }
 const kinds = (b: BossState) => b.powers!.events.map((e) => e.kind);
+/**
+ * The meter's rates these tests were written for (5 a crowd move, up to 5 more ahead, a queen's worth a full meter,
+ * every boss at speed 1), so a retune of the shipped numbers (settings.ts) doesn't move them.
+ */
+const S: BossPowerSettings = { ...BOSS_POWERS, ragePerMove: 5, rageAheadMax: 5, ragePerMaterial: 100 / 9, rageStrike: 25, rageSpeed: {} };
 
 describe("the ultimate's meter", () => {
   it("fills a little each crowd move, faster while the crowd is ahead on the judged eval; the switch turns that off", () => {
-    expect(rageTick(undefined)).toBe(BOSS_POWERS.ragePerMove);
-    expect(rageTick(0.5)).toBe(5);
-    expect(rageTick(0.3)).toBe(5);
-    expect(rageTick(0.625)).toBeCloseTo(7.5);
-    expect(rageTick(0.75)).toBe(10);
-    expect(rageTick(0.95)).toBe(10);
-    expect(rageTick(0.75, { ...BOSS_POWERS, rageOverTime: false })).toBe(0);
-    // Material still counts in full: a queen's worth fills it alone.
-    expect(ragePoints({ charge: 0, lost: 9 })).toBeCloseTo(BOSS_POWERS.rageFull);
+    expect(rageTick(undefined, S)).toBe(S.ragePerMove);
+    expect(rageTick(0.5, S)).toBe(5);
+    expect(rageTick(0.3, S)).toBe(5);
+    expect(rageTick(0.625, S)).toBeCloseTo(7.5);
+    expect(rageTick(0.75, S)).toBe(10);
+    expect(rageTick(0.95, S)).toBe(10);
+    expect(rageTick(0.75, { ...S, rageOverTime: false })).toBe(0);
+    // Material counts too: at these rates a queen's worth fills it alone; as shipped, half of it (it fills again and
+    // again now, so trades would bring one ultimate after another).
+    expect(ragePoints({ charge: 0, lost: 9 }, S)).toBeCloseTo(S.rageFull);
+    expect(ragePoints({ charge: 0, lost: 9 })).toBeCloseTo(BOSS_POWERS.rageFull / 2);
   });
 
-  it("on its own, it's full after 20 crowd moves (the warning as turn 21 begins, the ultimate on 22), once a match", () => {
-    const seen = turns(battle("gingerbread", RUY_FEN), RUY_FEN, 40);
-    expect(rageOf(seen[0]!)).toBe(0);
-    expect(rageOf(seen[9]!)).toBeCloseTo(0.45);
-    const warn = seen.findIndex((b) => kinds(b).includes("warn")) + 1;
-    expect(warn).toBe(21);
-    expect(kinds(seen[21]!)).toContain("blizzard");
-    expect(seen.filter((b) => kinds(b).includes("blizzard")).length).toBe(1);
-    expect(rageOf(seen[30]!)).toBeNull();
+  it("on its own, it's full after 20 crowd moves (the warning as turn 21 begins, the ultimate on 22), then empties and fills again: 22, 44, 66", () => {
+    const seen = turns(battle("gingerbread", RUY_FEN), RUY_FEN, 70, undefined, S);
+    const at = (turn: number) => seen[turn - 1]!;
+    expect(rageOf(at(1), S)).toBe(0);
+    expect(rageOf(at(10), S)).toBeCloseTo(0.45);
+    expect(seen.filter((b) => kinds(b).includes("warn")).map((b) => b.powers!.turn)).toEqual([21, 43, 65]);
+    expect(seen.filter((b) => kinds(b).includes("blizzard")).map((b) => b.powers!.turn)).toEqual([22, 44, 66]);
+    // Full on the ultimate's turn; empty as the next begins (it's over); then it fills again from empty.
+    expect(rageOf(at(22), S)).toBe(1);
+    expect(rageOf(at(23), S)).toBe(0);
+    expect(rageOf(at(33), S)).toBeCloseTo(0.5);
+    expect(at(23).powers!.ultAt).toBeUndefined();
+    expect(at(23).powers!.warnAt).toBeUndefined();
+    expect(at(70).powers!.ults).toBe(3);
+  });
+
+  it("each boss fills at its own speed (every gain times it): a faster one is full sooner", () => {
+    const fast: BossPowerSettings = { ...S, rageSpeed: { gingerbread: 2 } };
+    const seen = turns(battle("gingerbread", RUY_FEN), RUY_FEN, 30, undefined, fast);
+    expect(seen.findIndex((b) => kinds(b).includes("warn")) + 1).toBe(11);
+    expect(rageOf(seen[4]!, fast)).toBeCloseTo(0.4);
+    // As shipped, every boss with powers has a speed; Ginger's is a little faster than the usual (Eric, Oct 11).
+    for (const id of ["gingerbread", "clown", "grex", "hollow", "bigboy", "sawyer"]) expect(BOSS_POWERS.rageSpeed[id]).toBeGreaterThan(0);
+    expect(BOSS_POWERS.rageSpeed.gingerbread!).toBeGreaterThan(1);
   });
 
   it("with the crowd well ahead it's full twice as fast; losing material fills it faster still", () => {
-    const ahead = turns(battle("gingerbread", RUY_FEN), RUY_FEN, 20, 0.8);
+    const ahead = turns(battle("gingerbread", RUY_FEN), RUY_FEN, 20, 0.8, S);
     expect(ahead.findIndex((b) => kinds(b).includes("warn")) + 1).toBe(11);
     // A rook down (5 of 9) from the start: 55 points, then 5 a move: full after 9 moves.
     const rookDown = RUY_FEN.replace("r1bqk2r", "r1bqk3");
-    const lost = turns(battle("gingerbread", RUY_FEN), rookDown, 20);
+    const lost = turns(battle("gingerbread", RUY_FEN), rookDown, 20, undefined, S);
     expect(lost.findIndex((b) => kinds(b).includes("warn")) + 1).toBe(10);
   });
 
   it("with the switch off, only material fills it", () => {
-    const off = { ...BOSS_POWERS, rageOverTime: false };
+    const off = { ...S, rageOverTime: false };
     const seen = turns(battle("gingerbread", RUY_FEN), RUY_FEN, 45, 0.9, off);
     expect(seen.some((b) => kinds(b).includes("warn"))).toBe(false);
     expect(rageOf(seen[44]!, off)).toBe(0);
   });
+
+  it("nothing gathers while the ultimate's effect runs: the Roman candle's barrage holds it empty, then it fills again", () => {
+    // Turns 1..60, the crowd well ahead, the position unchanged; after each crowd move the fire burns out as in a match.
+    const seen: BossState[] = [];
+    let g = battle("grex", RUY_FEN);
+    for (let t = 1; t <= 60; t++) {
+      g = prepareTurn({ ...g, crowdMoves: t - 1, powers: { ...g.powers!, judged: 0.9 } }, RUY_FEN, "", S);
+      seen.push(g);
+      g = fireAfterMove({ ...g, crowdMoves: t }, RUY_FEN, null).boss;
+    }
+    const candles = seen.filter((b) => kinds(b).includes("candle")).map((b) => b.powers!.turn);
+    expect(candles[0]).toBe(12);
+    // Through the barrage (its shots still to fall, or fire still burning) the meter is held at nothing, however far
+    // ahead the crowd is; it fills again from the turn the last fire went out.
+    const over = seen.findIndex((b, i) => i + 1 > candles[0]! && b.powers!.ultAt === undefined) + 1;
+    expect(over).toBeGreaterThan(candles[0]! + BOSS_POWERS.candleDelay + BOSS_POWERS.candleWaves.length - 1);
+    for (let turn = candles[0]! + 1; turn < over; turn++) {
+      const b = seen[turn - 1]!;
+      expect((b.powers!.candle?.left ?? 0) > 0 || !!b.powers!.fire?.length).toBe(true);
+      expect(rageOf(b, S)).toBe(0);
+    }
+    expect(rageOf(seen[over - 1]!, S)).toBe(0);
+    expect(rageOf(seen[over]!, S)).toBeCloseTo(0.1);
+    // The next candle: a full meter (10 moves at 10 a move) and the warning after it's over, never during the barrage.
+    expect(candles[1]).toBe(over + 11);
+  });
 });
 
 describe("the test trigger", () => {
-  it("brings the ultimate as the next turn begins, without the warning; once; never after it's spent or the battle's over", () => {
+  it("brings the ultimate as the next turn begins, without the warning; never while one is under way or the battle's over; again once it's over", () => {
     let b = prepareTurn(battle("gingerbread", RUY_FEN), RUY_FEN);
     const t = triggerUltimate(b);
     expect(t.ok).toBe(true);
@@ -134,10 +182,17 @@ describe("the test trigger", () => {
     expect(kinds(b)).not.toContain("warn");
     expect(blizzardNow(b)).toBe(true);
     expect(b.powers!.ultNext).toBeUndefined();
-    // Spent: nothing more.
+    expect(b.powers!.ults).toBe(1);
+    // Under way: nothing (one never overlaps another).
     expect(triggerUltimate(b).ok).toBe(false);
+    // Over as the next turn begins: it can be pulled again, and the blizzard comes again.
     b = prepareTurn({ ...b, crowdMoves: 2 }, RUY_FEN);
-    expect(triggerUltimate(b).ok).toBe(false);
+    expect(blizzardNow(b)).toBe(false);
+    const again = triggerUltimate(b);
+    expect(again.ok).toBe(true);
+    b = prepareTurn({ ...again.boss!, crowdMoves: 3 }, RUY_FEN);
+    expect(kinds(b)).toContain("blizzard");
+    expect(b.powers!.ults).toBe(2);
     expect(triggerUltimate({ ...battle("clown", RUY_FEN), result: "crowd" }).ok).toBe(false);
     expect(triggerUltimate({ ...battle("clown", RUY_FEN), powers: undefined }).ok).toBe(false);
     expect(triggerUltimate(null).ok).toBe(false);
@@ -145,13 +200,14 @@ describe("the test trigger", () => {
 
   it("during the warning turn it changes nothing: the ultimate comes the next turn, once", () => {
     const down = RUY_FEN.replace("r1bqk2r", "r1b1k2r");
-    let b = prepareTurn(battle("clown", RUY_FEN), RUY_FEN);
-    b = prepareTurn({ ...b, crowdMoves: 1 }, down);
+    let b = prepareTurn(battle("clown", RUY_FEN), RUY_FEN, "", S);
+    b = prepareTurn({ ...b, crowdMoves: 1 }, down, "", S);
     expect(kinds(b)).toContain("warn");
     b = triggerUltimate(b).boss!;
-    b = prepareTurn({ ...b, crowdMoves: 2 }, down);
+    b = prepareTurn({ ...b, crowdMoves: 2 }, down, "", S);
     expect(funhouseDue(b)).toBe(true);
     expect(b.powers!.ultAt).toBe(3);
+    expect(b.powers!.ults).toBe(1);
   });
 
   it("in a match: pressed mid-turn it waits for the turn's end, for Ginger and Boingo; after the end it does nothing", async () => {
@@ -171,7 +227,7 @@ describe("the test trigger", () => {
       else expect(runner.funhouseDue()).toBe(true);
       expect(runner.bossView()!.powers!.events.some((e) => e.kind === "warn")).toBe(false);
       expect(runner.triggerUltimate()).toBe(false);
-      // Play it out to the end; the trigger never does anything again, and the board is never left without a move.
+      // Play it out to the end: the board is never left without a move; once the battle's over, the trigger does nothing.
       for (let i = 0; i < 8 && !runner.stageComplete(); i++) {
         if (runner.funhouseDue()) await runner.playFunhouse();
         if (runner.bossToMove()) await runner.playBoss();

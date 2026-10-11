@@ -462,17 +462,32 @@ export const BOSS_POWERS = {
   pieGap: 2,
   /**
    * The ultimate's meter (the rage meter), in rage points: full at rageFull, then a one-turn warning, then the
-   * ultimate, once per match. It fills over time (ragePerMove each crowd move, so on its own it's full after about
-   * 20 crowd moves, around the middle of a battle), faster while the crowd is ahead on the judged eval (up to
-   * rageAheadMax more a move, all of it from rageAheadFull expected score), and with the boss's own material lost
-   * (ragePerMaterial a point: a queen's worth fills it alone, as before). rageOverTime false: material only.
+   * ultimate. It empties as the ultimate comes and fills again for the next (Eric, Oct 11: several a match, like a
+   * game's rage meter); while the ultimate's effect still runs it stays empty (nothing gathers), and one never overlaps
+   * another. It fills over time (ragePerMove each crowd move), faster while the crowd is ahead on the judged eval (up
+   * to rageAheadMax more a move, all of it from rageAheadFull expected score), with the boss's own material lost
+   * (ragePerMaterial a point: a queen's worth is half the meter), and with each of the God King's strikes on the boss
+   * (rageStrike: a quarter of the meter). Every gain is multiplied by the boss's rageSpeed (its ultimate's effect
+   * lasts longer or shorter, so each gets about two ultimates in a typical battle of about 40 crowd moves). Rates set
+   * by estimate (DECISIONS.md, "Rage meters: every boss's ultimate again and again"); not yet tested with the bot sim.
+   * Run the sim at a future date (boss-sim.ts raid). rageOverTime false: material and strikes only.
    */
   rageFull: 100,
   rageOverTime: true,
-  ragePerMove: 5,
-  rageAheadMax: 5,
+  ragePerMove: 4,
+  rageAheadMax: 4,
   rageAheadFull: 0.75,
-  ragePerMaterial: 100 / 9,
+  ragePerMaterial: 100 / 18,
+  rageStrike: 25,
+  /**
+   * How fast each boss's meter fills (every gain times this), by BOSS_ROSTER id (1 when missing). Its ultimate's
+   * effect pauses the meter for its length (the blizzard 1 turn, the funhouse 3, the Roman candle about 13, Lights
+   * out 2, the Big Bounce 1, the board saw 5), so a longer one fills faster to fit two in a typical battle. Ginger a
+   * little faster (Eric, Oct 11: her ultimate's weak; about twice a game). Jefferson's candle burns for about a third
+   * of a battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half
+   * on fire most of the game.
+   */
+  rageSpeed: { gingerbread: 1.1, clown: 1.15, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3 } as Readonly<Record<string, number>>,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**

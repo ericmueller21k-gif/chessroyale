@@ -562,13 +562,16 @@ describe("Sawyer's board saw", () => {
     expect(sawn.powers!.ultAt).toBe(11);
     expect(sawn.powers!.boardSaw).toEqual({ at: 11, until: 15 });
     expect(sawn.powers!.events).toContainEqual({ kind: "boardsaw", turn: 11 });
-    expect(rageOf({ ...sawn, crowdMoves: 11 })).toBeNull();
-    // Through turn 15, then gone.
+    expect(rageOf({ ...sawn, crowdMoves: 11 })).toBe(0);
+    // Through turn 15, then gone; the meter held empty all the while (nothing gathers), filling again from turn 16.
     let s = sawn;
-    for (let t = 12; t <= 16; t++) {
-      s = prepareTurn({ ...s, crowdMoves: t - 1 }, even);
+    for (let t = 12; t <= 17; t++) {
+      s = prepareTurn({ ...s, crowdMoves: t - 1, powers: { ...s.powers!, judged: 0.9 } }, even);
       expect(!!s.powers!.boardSaw).toBe(t <= 15);
       expect(powerTurn(s)).toBe(t <= 15);
+      expect(s.powers!.ultAt === undefined).toBe(t >= 16);
+      if (t <= 16) expect(rageOf(s)).toBe(0);
+      else expect(rageOf(s)).toBeGreaterThan(0);
     }
     expect(powerMomentMs([{ kind: "boardsaw" }])).toBe(BOARD_SAW.total);
   });

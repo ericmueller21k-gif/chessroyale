@@ -251,6 +251,8 @@ export const GREX: BossRules = {
     }
     return now;
   },
+  // The Roman candle runs until its last fireball has landed and every tile has burnt out.
+  ultimateRunning: (p) => (p.candle?.left ?? 0) > 0 || !!p.fire?.length,
   // The Roman candle's fireballs: a wave a crowd turn from candleDelay turns after it fired, each landing as a fresh fire
   // tile; each wave's squares picked candleAhead turns before it lands (their shadows growing meanwhile).
   everyTurn(next, t) {

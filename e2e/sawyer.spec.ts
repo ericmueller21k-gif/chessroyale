@@ -246,7 +246,10 @@ test("Sawyer: the board saw from the admins' trigger, a cut taped over and heali
   // (The split too, on the same turn, when there was room for it.)
   expect(await both.seen()).toEqual({ split: !!(await powers(page)).split?.square, saw: true });
   expect((await powers(page)).boardSaw).toEqual({ at: 2, until: 6 });
-  await expect(btn).toHaveText("Ultimate used (testing)");
+  // Under way while the halves are apart (no other can come meanwhile); the meter empty and held.
+  await expect(btn).toHaveText("Ultimate under way (testing)");
+  await expect(btn).toBeDisabled();
+  expect((await powers(page)).rage).toBe(1);
 
   // The cut on the 3rd turn: raw, then taped (stage 1), more tape (stage 2), then healing away.
   await play(page, await allowedMove(page, ["h2h3", "a2a3"]));

@@ -241,13 +241,25 @@ export interface BossPowerState {
   /** The rage meter: the boss's material when the battle began, and the most of it it has lost since. */
   material: number;
   lost: number;
-  /** The ultimate: warned as this crowd turn began, unleashed at this one. Once per match. */
+  /**
+   * The ultimate on its way or under way: warned as this crowd turn began, unleashed at this one. Both clear once its
+   * effect is over (its rules' ultimateRunning), and the meter fills again for the next one.
+   */
   warnAt?: number;
   ultAt?: number;
+  /** How many ultimates have come this battle (the test switch brings only the first). */
+  ults?: number;
+  /**
+   * The rage points spent so far (BOSS_POWERS): the meter is the rage gathered (ragePoints) less these. Each ultimate
+   * spends all of it, and so does every turn its effect still runs (the meter stays empty meanwhile).
+   */
+  rageUsed?: number;
   /** When the passive fires next (a crowd turn). */
   nextPassive: number;
   /** Freeze: the iced piece (its square and kind), through this crowd turn. */
   frozen?: { square: string; piece: string; until: number } | null;
+  /** Ginger's blizzard: the one crowd piece left free to move (a random one with a move, from the seed), and its turn. */
+  blizzard?: { turn: number; square: string } | null;
   /** Pie: the pied square (nobody may move onto it), through this crowd turn. */
   pie?: { square: string; until: number } | null;
   /** The funhouse: the move the boss played for the crowd, as which crowd turn. */
@@ -255,8 +267,9 @@ export interface BossPowerState {
   /** After the funhouse, the crowd sees the board flipped through this crowd turn. */
   flipUntil?: number;
   /**
-   * The meter's charge from time and the judged eval (rage points, never coming down); the boss's material lost adds
-   * to it (BOSS_POWERS.ragePerMaterial a point). `judged`: the crowd's expected score after its last move, as judged.
+   * The meter's charge from time, the judged eval and the God King's strikes (rage points, never coming down); the
+   * boss's material lost adds to it (BOSS_POWERS.ragePerMaterial a point). `judged`: the crowd's expected score after its
+   * last move, as judged.
    */
   charge?: number;
   judged?: number;
@@ -394,6 +407,11 @@ export interface LightsOutRound {
 export interface LightsOutTest {
   at: number;
   rounds: LightsOutRound[];
+  /**
+   * A Lights out after his first (the ultimate comes again): its own seed, drawn from the battle's and the turn, so
+   * it names other pieces and the bots find others; the first one uses the battle's seed, as ever.
+   */
+  seed?: number;
   missed?: Record<string, number>;
   /** Once over: the pieces found by everyone still in, and the pieces asked of them (the crowd's find rate). */
   found?: number;

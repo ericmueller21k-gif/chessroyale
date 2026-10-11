@@ -161,30 +161,32 @@ export function BossDock({
 
 /**
  * Testing, admins only (ADMIN_EMAILS, as for the fair-play review; online the server checks too): a small plain button
- * that brings the boss's ultimate as the next crowd turn begins, without the warning. Greyed out once it's on its way
- * or spent. BOSS_POWERS.ultimateTestButton false removes it.
+ * that brings the boss's ultimate as the next crowd turn begins, without the warning. Greyed out while one is on its
+ * way or under way (its effect still running); ready again once it's over, as the meter fills again.
+ * BOSS_POWERS.ultimateTestButton false removes it.
  */
 export function UltimateTest({ match }: { match: GameView }) {
   const boss = match.boss;
   const p = boss?.powers;
-  const key = boss ? `${boss.id}:${boss.startMove}:${boss.board.generation}` : "";
+  // (A press is for the next ultimate only: once it has come, the button is ready again.)
+  const key = boss ? `${boss.id}:${boss.startMove}:${boss.board.generation}:${p?.ults ?? 0}` : "";
   const [pressed, setPressed] = useState("");
   if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result) return null;
-  // (Hollow's Lights out: the full meter has it on its way until it has come.)
+  // (Hollow's Lights out: the full meter has it on its way until the test has begun.)
   const lights = p.ultimate === "lightsout";
-  const spent = lights ? p.lightsAt != null : p.ultAt !== null;
-  const coming = !spent && (!!p.ultNext || p.warned || (lights && p.ultAt !== null) || pressed === key);
+  const underWay = p.ultAt !== null && (!lights || (p.lightsAt != null && p.lightsAt >= p.ultAt));
+  const coming = !underWay && (!!p.ultNext || p.warned || (lights && p.ultAt !== null) || pressed === key);
   return (
     <button
       type="button"
       class="ult-test"
-      disabled={spent || coming}
+      disabled={underWay || coming}
       onClick={() => {
         setPressed(key);
         match.triggerUltimate();
       }}
     >
-      {spent ? "Ultimate used (testing)" : coming ? "Ultimate next turn (testing)" : "Trigger ultimate (testing)"}
+      {underWay ? "Ultimate under way (testing)" : coming ? "Ultimate next turn (testing)" : "Trigger ultimate (testing)"}
     </button>
   );
 }

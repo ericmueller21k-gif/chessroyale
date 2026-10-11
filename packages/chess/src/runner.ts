@@ -71,6 +71,8 @@ import {
   powerTurn,
   prepareTurn,
   rageOf,
+  ragePaused,
+  strikeRage,
   bossPowers,
   ablaze,
   bossRules,
@@ -869,8 +871,9 @@ export class MatchRunner {
   /**
    * Boss battle: `playerId` calls for the King's strike, in the middle of the crowd's move. He strikes at once
    * when more than half the crowd has called (bots never start one, but back a human's call with kingBotFollow
-   * chance): a charge is spent and the boss's next move is a weaker one. The move itself goes on: everyone
-   * still picks. One strike per move. Returns whether he struck, and how many have called.
+   * chance): a charge is spent, the boss's next move is a weaker one, and the boss's rage meter gains a chunk
+   * (strikeRage). The move itself goes on: everyone still picks. One strike per move. Returns whether he struck, and
+   * how many have called.
    */
   callStrike(playerId: string): { struck: boolean; calls: number } {
     const b = this.state.boss;
@@ -882,7 +885,7 @@ export class MatchRunner {
     if (calls * 2 <= ids.length) return { struck: false, calls };
     this.state = {
       ...this.state,
-      boss: { ...b, kingCharges: Math.max(0, (b.kingCharges ?? 0) - 1), kingStrikes: [...(b.kingStrikes ?? []), b.crowdMoves + 1], staggerNext: true },
+      boss: strikeRage({ ...b, kingCharges: Math.max(0, (b.kingCharges ?? 0) - 1), kingStrikes: [...(b.kingStrikes ?? []), b.crowdMoves + 1], staggerNext: true }),
     };
     return { struck: true, calls };
   }
@@ -1269,8 +1272,10 @@ export class MatchRunner {
               ultimate: powers.ultimate,
               turn: p.turn,
               rage: rageOf(b),
+              paused: ragePaused(b),
               warned: p.warnAt !== undefined && p.ultAt === undefined,
               ultAt: p.ultAt ?? null,
+              ults: p.ults ?? 0,
               frozen: p.frozen ? { square: p.frozen.square, until: p.frozen.until } : null,
               pie: p.pie ? { square: p.pie.square, until: p.pie.until } : null,
               iced: sideToMove(fen) === b.crowdSide ? icedSquares(b, fen) : p.frozen ? [p.frozen.square] : [],

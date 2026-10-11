@@ -25,9 +25,12 @@ import {
   moveSquares,
   other,
   powerRoll,
+  rageNow,
   ragePoints,
+  rageSpeedOf,
   rageTick,
   turnOf,
+  unleashed,
   type Battle,
   type BossLastMove,
   type BossRules,
@@ -39,7 +42,7 @@ import {
 import { bossRules } from "./bosses/index.ts";
 
 // Every boss's file, and the shared pieces of the base boss, for the whole package.
-export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, ragePoints, rageTick };
+export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, unleashed };
 export type { Battle, BossLastMove, BossRules, JudgedEvaluation, RageRates, TurnContext };
 export * from "./bosses/ginger.ts";
 export * from "./bosses/boingo.ts";
@@ -62,9 +65,10 @@ export function initPowers(seed: number, fen: string, crowdSide: Side): BossPowe
  * The test trigger (an admin's, `ultNext`) brings the ultimate as this turn begins, without the warning. `lastMove`: the
  * boss's move just played (Hollow covers its piece's square after his first).
  *
- * The meter is the same for every boss; the rest is the boss's own rules (BossRules), in this order: what wore off,
- * the ultimate's step, anything every turn, then the passive (not on the turn the ultimate came, if it was due then:
- * it waits a turn).
+ * The meter is the same for every boss; the rest is the boss's own rules (BossRules), in this order: the ultimate
+ * under way (still running: the meter stays empty; over: it clears, and the meter fills again from empty), what wore
+ * off, the ultimate's step, anything every turn, then the passive (not on the turn the ultimate came, if it was due
+ * then: it waits a turn).
  */
 export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowerSettings = BOSS_POWERS, lastMove: string | null = null): BossState {
   const powers = bossPowers(boss);
@@ -82,21 +86,46 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   // (An ultimate at the start of the boss's turn keeps the test trigger until then.)
   const { ultNext, ...rest } = p;
   const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && rules.ultimateOnHisTurn ? { ultNext } : {}) };
-  const t: TurnContext = { turn, fen, crowd, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!ultNext, lastMove, s, events };
+  const t: TurnContext = { turn, fen, crowd, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!ultNext, lastMove, rageSpeed: rageSpeedOf(boss.id, s), s, events };
+  // The ultimate under way: while its effect runs, nothing gathers in the meter (it stays empty); once it's over, the
+  // meter fills again from empty, and the next can come.
+  if (next.ultAt !== undefined) {
+    next.rageUsed = ragePoints(next, s);
+    if (!(rules.ultimateRunning ? rules.ultimateRunning(next, turn) : turn <= next.ultAt)) {
+      delete next.warnAt;
+      delete next.ultAt;
+    }
+  }
   rules.wearOff?.(next, t);
-  const ultNow = next.ultAt === undefined ? rules.ultimate(next, t) : false;
+  const before = next.ultAt;
+  const ultNow = before === undefined ? rules.ultimate(next, t) : false;
+  if (before === undefined && next.ultAt !== undefined) unleashed(next, s);
   rules.everyTurn?.(next, t);
   if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
   else rules.passive(next, t);
   return { ...boss, powers: next };
 }
 
+/** An ultimate has come and its effect still runs (or it's its own turn): no rage gathers. */
+export const ultimateUnderWay = (boss: Pick<BossState, "powers"> | null | undefined): boolean => boss?.powers?.ultAt !== undefined;
+
+/**
+ * The God King strikes the boss: a chunk of rage (BOSS_POWERS.rageStrike, at the boss's speed like every gain), unless
+ * an ultimate is under way (it would be thrown away as the effect ends).
+ */
+export function strikeRage(boss: BossState, s: Pick<BossPowerSettings, "rageStrike"> = BOSS_POWERS): BossState {
+  const p = boss.powers;
+  if (!p || !bossPowers(boss) || ultimateUnderWay(boss)) return boss;
+  return { ...boss, powers: { ...p, charge: (p.charge ?? 0) + s.rageStrike } };
+}
+
 // ---------------- The test trigger ----------------
 
 /**
  * An admin's test trigger: the boss's ultimate comes as the next crowd turn begins, without the warning. Safe at any
- * moment: nothing happens if the boss has no ultimate, it's spent or already on its way, or the battle is over; it
- * only takes effect as a turn begins (prepareTurn), never in the middle of one or of a moment.
+ * moment: nothing happens if the boss has no ultimate, one is already under way (it never overlaps another) or on its
+ * way, or the battle is over; it only takes effect as a turn begins (prepareTurn), never in the middle of one or of a
+ * moment. Once that ultimate's effect is over, it can be pulled again.
  */
 export function triggerUltimate(boss: BossState | null | undefined): { boss: BossState | null | undefined; ok: boolean } {
   const p = boss?.powers;
@@ -164,13 +193,22 @@ export function icedSquares(boss: BossState | null | undefined, fen: string): st
   return bossRules(boss)?.iced?.(boss, fen, crowdAllowed) ?? [];
 }
 
-/** The rage meter, 0 to 1 (full: the warning, then the ultimate); null once the ultimate is spent. */
+/**
+ * The rage meter, 0 to 1 (full: the warning, then the ultimate), null without powers. Full on the ultimate's own
+ * turn; empty from then while its effect runs; then it fills again.
+ */
 export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_POWERS): number | null {
   const p = boss?.powers;
   if (!p || !bossPowers(boss)) return null;
-  if (p.ultAt !== undefined && turnOf(boss!) > p.ultAt) return null;
-  return Math.max(0, Math.min(1, ragePoints(p, s) / s.rageFull));
+  if (p.ultAt !== undefined) return turnOf(boss!) <= p.ultAt ? 1 : 0;
+  return Math.max(0, Math.min(1, rageNow(p, rageSpeedOf(boss!.id, s), s) / s.rageFull));
 }
+
+/** The meter is held empty: an ultimate came and its effect still runs (the screens show it paused). */
+export const ragePaused = (boss: BossState | null | undefined): boolean => {
+  const p = boss?.powers;
+  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt;
+};
 
 // ---------------- The judge plays by the same rules ----------------
 

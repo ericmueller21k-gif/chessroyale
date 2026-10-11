@@ -32,15 +32,27 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   - The clock stands still through every power's moment (`POWER_FX`, `powerMomentMs`): the crowd's clock starts after
     them, solo and online, so a power never costs anyone thinking time.
   - Turns are the crowd's: turn N is the crowd's Nth move of the battle.
-- **The rage meter** fills over time (`ragePerMove` a crowd move, up to `rageAheadMax` more while the crowd is ahead on
-  the judged eval) and with the boss's own material lost (a queen's worth fills it). Full: a "RAGE!" warning, then the
-  ultimate as the next crowd turn begins, once a match. Hollow's Lights out and Big Boy's Big Bounce come at the start
-  of the boss's turn instead (Lights out's only warning is the full meter).
+- **The rage meter** (Eric, Oct 11: several ultimates a battle, like a game's rage meter) fills over time
+  (`ragePerMove` a crowd move, up to `rageAheadMax` more while the crowd is ahead on the judged eval), with the boss's
+  own material lost (`ragePerMaterial`: a queen's worth is half the meter) and with each of the God King's strikes on
+  the boss (`rageStrike`: a quarter of it), every gain times the boss's `rageSpeed`. Full: a "RAGE!" warning, then the
+  ultimate as the next crowd turn begins. Hollow's Lights out and Big Boy's Big Bounce come at the start of the boss's
+  turn instead (Lights out's only warning is the full meter). The meter is full on the ultimate's own turn, then
+  empties; while the ultimate's effect still runs (its rules' `ultimateRunning`: the blizzard and the Big Bounce their
+  own turn, the funhouse through its flipped turns, the Roman candle until its last fire is out, Lights out through
+  the turn after it, the board saw while the halves are apart) it stays empty, dimmed and dashed on screen
+  (`paused`), nothing gathers (strikes included) and no other ultimate can come, the test trigger neither. Once it's
+  over, `warnAt` and `ultAt` clear and the meter fills again from empty for the next (`ults` counts them). The test
+  switch (`?power=`) brings only the first; the test trigger works again once each one is over. Each repeat is fresh:
+  its own turn's seed (Ginger's free piece, Big Boy's candidates, Jefferson's waves), and a later Lights out a seed of
+  its own (other pieces named, other bot finds). **Rates set by estimate; not yet tested with the bot sim. Run the sim
+  at a future date** (`boss-sim.ts raid`, below): the aim is about two ultimates in a typical battle of about 40 crowd
+  moves (Jefferson about one and a half: his barrage lasts about a third of a battle).
 - **The bosses:**
 
 | Boss (id) | Opening | Passive | Ultimate |
 | --- | --- | --- | --- |
-| Ginger (`gingerbread`) | the game so far | **Freeze:** a crowd piece (never the king, one that matters: a pick from the top three) iced for `freezeTurns`, every `freezeEvery` turns from turn 2 | **Blizzard:** for one turn only the queen moves (no queen, or she can't: the king) |
+| Ginger (`gingerbread`) | the game so far | **Freeze:** a crowd piece (never the king, one that matters: a pick from the top three) iced for `freezeTurns`, every `freezeEvery` turns from turn 2 | **Blizzard:** for one turn only one crowd piece moves, at random from the seed among those with a legal move (Eric, Oct 11; it was the queen): never the king nor the frozen piece unless nothing else can move (`chooseBlizzard`); its banner names it ("Only your knight on c3 moves") |
 | Boingo the Clown (`clown`) | the game so far | **Pie:** an empty square near the centre that the fewest moves reach is pied for `pieTurns` (nobody, either side, may move onto it), then `pieGap` clear | **Funhouse:** he plays the crowd's move (weak but recoverable: `funhouseLoss`, never past `funhouseMaxLogit`), unscored; the board shows flipped for `flipTurns` |
 | Jefferson (`grex`; G-REX until Oct 10) | the game so far | **Sparkler:** a tile on the crowd's half catches fire and burns in `fireStages` stages, one a crowd turn; a crowd piece left on it after the crowd's move on the last stage burns (never the king, never one whose loss leaves a king in check: it fizzles) | **Roman candle:** `candleShots` fireballs in waves (`candleWaves`) from `candleDelay` turns later, each wave's squares shown as growing shadows `candleAhead` turns ahead |
 | Hollow (`hollow`) | always Black, from the starting position (he claims the dark side in the intro if the crowd would have been Black) | **The dark:** after his first move he covers the square of the piece he moved, then another every `darkEvery`-th move (a random occupied square, never a king's) for `darkTurns`; pieces there are hidden; a move touching the dark goes unchecked, an illegal one costs `darkTryCost` and the `darkTries`-th ends the turn as a miss | **Lights out:** at the start of his turn, a memory test in rounds (`lightsOutRounds`: find 1, 2, then 3 of his pieces); each piece missed costs `lightsOutMiss`; below `lightsOutHold` found, he plays an extra quiet move (`lightsOutExtraGain`) |
@@ -168,7 +180,9 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 
 ## Settings
 
-`BOSS_POWERS` in `packages/core/src/settings.ts` (every power's numbers), `SAWYER_LOOKS` (how his split looks), the `boss*` keys of `Settings`,
+`BOSS_POWERS` in `packages/core/src/settings.ts` (every power's numbers; the meter: `rageFull`, `ragePerMove`,
+`rageAheadMax`, `rageAheadFull`, `ragePerMaterial`, `rageStrike`, `rageSpeed` by boss), `SAWYER_LOOKS` (how his split
+looks), the `boss*` keys of `Settings`,
 `BOSS_DIFFICULTY`, `BOSS_BRAIN` (each boss's brain, Maia's rating, its sampling, the guards), `BOSS_TIERS` and each
 boss's `offset` in `boss.ts`.
 
@@ -176,7 +190,8 @@ boss's `offset` in `boss.ts`.
 
 - Unit, the brain: `packages/chess/test/boss-brain.test.ts`; the Maia box's own tests in `packages/maia-worker/test/`.
   e2e: `e2e/maia.spec.ts`. Sim: `packages/sim/scripts/maia-sim.ts` (`reports/maia-boss.md`).
-- Unit: `packages/chess/test/boss-powers.test.ts`, `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
+- Unit: `packages/chess/test/boss-powers.test.ts`, `rage.test.ts` (every boss's ultimate again and again, never two at
+  once), `grex.test.ts` (the meter), `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
   `long-match.test.ts`, `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`,
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,
   `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
@@ -193,8 +208,10 @@ boss's `offset` in `boss.ts`.
   `frames:bigboy`, `frames:sawyer`, `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`.
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect).
 - Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] 25`.
-- Sims: `packages/sim/scripts/boss-sim.ts` (modes `snack`, Big Boy's; `split`, Sawyer's), `boss-blunders.ts`
-  (`reports/boss-sim/`, `reports/boss-calibration.md`).
+- Sims: `packages/sim/scripts/boss-sim.ts` (modes `snack`, Big Boy's; `split`, Sawyer's; `raid <boss,ids|all> <games>
+  <seed> <strikes> <tag>`: Solo raids of 50 bots with every power through the match runner, ultimates per game and the
+  crowd's results, `raid-summary <tags>` for the table; built for the rage meter, not yet run for its rates),
+  `boss-blunders.ts` (`reports/boss-sim/`, `reports/boss-calibration.md`).
 
 ## Rules for this area (from `.claude/LESSONS.md`)
 

@@ -1095,3 +1095,71 @@ Three visual fixes Eric asked for from a screenshot of a Hollow battle on a comp
   flashing), so a bulb keeps its colour through every frame. The strip's three bulbs and the lashes take the first
   three bulbs' colours, always three different ones. Lights out still puts a third of the strand out at a time (bulbs
   2, 5, 8 first), now by position rather than colour.
+
+### Rage meters: every boss's ultimate again and again; the King's strikes add rage; Ginger's random free piece (Oct 11, 2026)
+
+Eric: "every boss can ult multiple times a game; that's how a typical rage meter works. When you strike bosses, it
+should build their rage meter faster, like a video game thing. Ginger's ult: it's one piece chosen at random, not the
+queen anymore. His meter should build up a bit faster because his ult's kind of weak: about twice per game." The calls:
+
+- **The cycle.** The meter is full on the ultimate's own turn, then empties. While the ultimate's effect still runs it
+  stays empty and nothing gathers (time, the eval, material lost and strikes alike: anything gathered is let go), and
+  no other ultimate can come, from the meter or the admins' trigger. Once the effect is over, `warnAt` and `ultAt`
+  clear and the meter fills again from empty (`rageUsed` holds what's been spent; `ults` counts them). Rage past full
+  is let go too: an ultimate empties the meter whatever it held.
+- **When an effect is over** (each boss's `ultimateRunning`): the blizzard and the Big Bounce after their own turn; the
+  funhouse after its flipped turns; the Roman candle once its last fireball has landed and every tile has burnt out
+  (about 13 turns); Lights out after the turn that follows it (his extra move belongs to it); the board saw once the
+  halves rejoin.
+- **Repeats are fresh, and nothing assumed "once".** Every choice was already seeded by the turn (Ginger's piece, the
+  funhouse's move, the candle's waves, Big Boy's candidates and spots, the board saw), except Lights out's targets and
+  the bots' finds, which were seeded by the battle alone: a later Lights out gets a seed of its own (`LightsOutTest.seed`,
+  drawn from the battle's and the turn), so it names other pieces; the first stays as it was. The "once" guards became
+  "not this turn again" (`funhouseDue`, `lightsOutDue`, `bounceDue`). The server's Lights out state was already new
+  per test; the screens' moments are keyed by turn. The test switch (`?power=`) brings only the first; the trigger
+  works again once each one is over (its button: "under way" while it runs, then ready).
+- **The King's strike** adds `rageStrike` = 25 (a quarter of the meter), at the boss's speed like every gain, as he
+  strikes (the meter rises at once on every screen); nothing while an ultimate's effect runs.
+- **Ginger's free piece** is random from the seed among the crowd's pieces with a legal move, never the king nor the
+  piece her freeze holds unless nothing else can move (then the king, then the frozen piece). My call on the king:
+  "one piece at random" taken literally would sometimes leave only the king to shuffle, which the old rule kept as the
+  last resort too. The mercy rules stand: in check only pieces that can answer it have moves, and a barred move that was
+  the piece's only one lifts the ice. The banner names it ("Only your knight on c3 moves"), and the God King's line
+  fits it (the queen's lines, the king's, or new `blizzardOne` lines).
+- **The display:** full (pulsing) on the ultimate's turn; its bar then slides down to nothing (the bar's width
+  transition) and the meter is drawn dimmed and dashed (`paused`) while the effect runs; then it fills again. Older
+  servers send `rage: null` once spent, which still hides it.
+- **The rates, by estimate.** Eric changed the plan (to save usage): no sim runs; set the rates by reasoning from
+  typical battle lengths. **Rates set by estimate; not yet tested with the bot sim. Run the sim at a future date**
+  (`npx tsx packages/sim/scripts/boss-sim.ts raid all 20 11 2 <tag>` then `raid-summary <tag>`: Solo raids of 50 bots
+  with every power, built for this and checked on one game, then stopped). Before/after crowd win rates are therefore
+  not measured either.
+  - A typical battle: about 40 crowd moves (Solo raids in `reports/last-stand.md`: 26 to 59, median about 35; the
+    game's boss in `reports/boss-calibration.md`: 44 to 56 on average; the cap is 60).
+  - The new rates: `ragePerMove` 4 (was 5), `rageAheadMax` 4 (was 5), `ragePerMaterial` 100/18 (was 100/9: a queen's
+    worth is now half the meter, since trades would otherwise bring one ultimate after another), `rageStrike` 25. At
+    speed 1 that's about 7 a crowd move in a typical battle: 4 for time, about 0.4 for the eval (a crowd is seldom
+    ahead of a stronger boss), about 1.7 for material (the boss loses about 12 points in 40 moves, mostly trades) and
+    about 0.9 for strikes (about one and a half a battle). A meter fills in about 14 crowd moves.
+  - Each boss's `rageSpeed` makes room for how long its effect pauses the meter (D) and its warning turn (w), so the
+    second ultimate lands around turn 30 and a third only in a battle that runs to the cap:
+
+    | Boss | Speed | Fill (moves) | w | D | Ultimates at about turn | In a 40-move battle |
+    |---|---|---|---|---|---|---|
+    | Ginger | 1.1 (Eric: a bit faster) | 13 | 1 | 1 | 15, 30, 45 | 2 |
+    | Boingo | 1.15 | 12 | 1 | 3 | 14, 30, 46 | 2 |
+    | Jefferson | 1.2 | 12 | 1 | about 13 | 14, 40 | 1 to 2 (about 1.5) |
+    | Hollow | 1 | 14 | 0 | 2 | 15, 31, 47 | 2 |
+    | Big Boy | 1 | 14 | 0 | 1 | 15, 30, 45 | 2 |
+    | Sawyer | 1.3 | 11 | 1 | 5 | 13, 30, 47 (later when no half is his yet) | 2 |
+
+  - Before: one ultimate a battle for every boss, the first from about turn 22 on time alone and sooner with trades
+    (the three sim games run on the old rules before the plan changed had theirs at turns 7, 9 and 14).
+  - **Jefferson gets about one and a half, not two (flagged for Eric):** his Roman candle burns the crowd's half for
+    about 13 turns, a third of a typical battle, and Eric finds it too strong already; two full barrages would keep
+    the crowd's half on fire for most of the game. He gets a second in a battle that lasts (about 40 moves or more).
+    PR C weakens the barrage; his speed can rise then.
+  - **Big Boy keeps two:** each Big Bounce costs the crowd about a pawn (`bounceTarget`), so two is about two pawns, and
+    his Elo offset (−250) already pays for nasty powers.
+  - Crowd win rates: not measured. Expect the crowd to face about one more ultimate a battle than before, so a little
+    harder; every boss's offset is unchanged until the sim says otherwise.

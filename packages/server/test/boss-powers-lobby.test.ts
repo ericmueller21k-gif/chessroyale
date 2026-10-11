@@ -131,15 +131,20 @@ describe("boss powers online", () => {
     const job2 = crowdMove(L).jobs[0]!;
     expect(job2.allowed!.some((m) => m.startsWith(frozen))).toBe(false);
     hostBoss(L);
-    // The blizzard: only the queen moves this turn; every screen ices the rest.
+    // The blizzard: only its free piece (a random one with a move, from the seed) moves this turn; every screen ices
+    // the rest, and everyone is told the same piece.
     const b3 = L.last("p2", "boss")!;
     expect(b3.boss.powers!.events.map((e) => e.kind)).toEqual(["blizzard"]);
+    expect(L.last("p1", "boss")!.boss.powers!.events).toEqual(b3.boss.powers!.events);
+    const free = b3.boss.powers!.events[0]!.square!;
     L.advance(b3.until - L.now + 10);
     const r3 = L.last("p2", "round")!;
     const fen = r3.board!.fen;
     const allowed = r3.boss!.powers!.allowed!;
     expect(allowed.length).toBeGreaterThan(0);
-    for (const m of allowed) expect(pieceAt(fen, m.slice(0, 2))!.type).toBe("q");
+    expect(pieceAt(fen, free)!.color).toBe("w");
+    for (const m of allowed) expect(m.slice(0, 2)).toBe(free);
+    expect(r3.boss!.powers!.iced).not.toContain(free);
     expect(crowdMove(L).jobs[0]!.allowed).toEqual(allowed);
     // Power turns (the freeze, the blizzard) don't count for fair play; the first turn, before any power, does.
     expect(L.core.fairMoves("p1").map((m) => !!m.power)).toEqual([false, true, true]);
@@ -539,7 +544,10 @@ describe("Big Boy online", () => {
     const r3 = toRound(L);
     // (The crowd's two moves and his two: the bounce isn't a move.)
     expect(r3.board!.history.length).toBe(4);
-    expect(r3.boss!.powers!.rage).toBeNull();
+    // The meter spent: it fills again from empty (several ultimates a battle).
+    expect(r3.boss!.powers!.rage).toBe(0);
+    expect(r3.boss!.powers!.ultAt).toBeNull();
+    expect(r3.boss!.powers!.ults).toBe(1);
   });
 
   it("nothing within the cap (the host answers \"\"), anything that isn't a candidate, or no host at all: the bounces play, nothing moves", () => {

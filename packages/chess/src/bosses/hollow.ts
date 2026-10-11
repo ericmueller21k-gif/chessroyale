@@ -7,12 +7,12 @@
  * points, and a crowd that finds too few lets him move twice. Numbers: BOSS_POWERS.dark*, lightsOut*. His art and
  * moments are the app's (characters/hollow.ts, components/LightsOut.tsx, the dark in characters/effects/).
  */
-import { BOSS_POWERS, type BossPowerSettings, type BossState, type DarkSquare, type LightsOutRound, type LightsOutTarget, type LightsOutTest } from "@chessroyale/core";
+import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type DarkSquare, type LightsOutRound, type LightsOutTarget, type LightsOutTest } from "@chessroyale/core";
 import { playOnBoard, type BoardState } from "../boards.ts";
 import { applyMove, inCheck, legalMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { bossPowers, from, meterFull, moveSquares, other, powerRoll, testSwitch, to, type Battle, type BossRules, type Side } from "./base.ts";
+import { bossPowers, from, meterFull, moveSquares, other, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). The extra move: his banner over the board as it lands. */
 export const HOLLOW_FX = { dark: 2700, extra: 2200 } as const;
@@ -100,10 +100,13 @@ export function darkAttempt(fen: string, move: string): string | null {
 
 // ---------------- Lights out ----------------
 
-/** His Lights out comes now: the start of his turn, from the full meter (or the test trigger), once a match. */
+/**
+ * His Lights out comes now: the start of his turn, from the full meter (or the test trigger), and not yet after this
+ * crowd move (an earlier test was another turn's).
+ */
 export const lightsOutDue = (boss: BossState | null | undefined): boolean => {
   const p = boss?.powers;
-  return !!p && !boss!.result && bossPowers(boss)?.ultimate === "lightsout" && !p.lightsOut && (!!p.ultNext || p.ultAt === boss!.crowdMoves);
+  return !!p && !boss!.result && bossPowers(boss)?.ultimate === "lightsout" && p.lightsOut?.at !== boss!.crowdMoves && (!!p.ultNext || p.ultAt === boss!.crowdMoves);
 };
 
 /** Where each kind of his pieces starts, by file (the back rank, or the pawns' rank). */
@@ -266,9 +269,11 @@ export const HOLLOW: BossRules = {
   // (lightsOutDue). The full meter is its only warning (no "RAGE!"). The test switch: the meter fills as the second turn
   // begins.
   ultimate(next, t) {
-    if (meterFull(next, t) || testSwitch(t)) next.ultAt = t.turn;
+    if (meterFull(next, t) || testSwitch(t, next)) next.ultAt = t.turn;
     return false;
   },
+  // Lights out runs through the turn after it (his extra move, if the crowd failed it, comes before that turn's picks).
+  ultimateRunning: (p, turn) => turn <= Math.max(p.ultAt!, p.lightsOut?.at ?? 0) + 1,
   // The dark: the squares whose turns are over clear; after his first move and every darkEvery-th after it, he covers
   // another. His bulbs count down to it.
   passive(next, t) {
@@ -457,14 +462,17 @@ export const hollowBattle = {
 
   /**
    * Lights out begins (the clocks stopped: nobody is picking): its rounds, picked from the battle's seed and the
-   * position. Once a match: the ultimate is spent from here.
+   * position. The meter is spent from here (from the test trigger, the ultimate comes now).
    */
   startLightsOut(b: Battle): LightsOutTest {
     const boss = b.state.boss!;
     const { ultNext: _trigger, ...p } = boss.powers!;
     const fen = b.boards.get(b.state.boards[0]!)!.fen;
-    const test: LightsOutTest = { at: boss.crowdMoves, rounds: chooseLightsOut(fen, boss.crowdSide === "w" ? "b" : "w", p.seed) };
-    b.state = { ...b.state, boss: { ...boss, powers: { ...p, ultAt: p.ultAt ?? boss.crowdMoves, lightsOut: test } } };
+    // (Another Lights out after his first: a seed of its own, so it names other pieces and the bots find others.)
+    const seed = p.lightsOut ? Math.floor(powerRoll(p.seed, "lights-test", boss.crowdMoves) * 2 ** 32) >>> 0 : p.seed;
+    const test: LightsOutTest = { at: boss.crowdMoves, rounds: chooseLightsOut(fen, boss.crowdSide === "w" ? "b" : "w", seed), ...(seed !== p.seed ? { seed } : {}) };
+    const powers: BossPowerState = { ...p, ultAt: p.ultAt ?? boss.crowdMoves, lightsOut: test };
+    b.state = { ...b.state, boss: { ...boss, powers: p.ultAt === undefined ? unleashed(powers) : powers } };
     return test;
   },
 
@@ -481,7 +489,7 @@ export const hollowBattle = {
     const all = test.rounds.reduce((n, r) => n + r.pieces.length, 0);
     const out: Record<string, number> = {};
     const alive = b.alive();
-    for (const pl of alive) out[pl.id] = pl.isBot ? botLightsMisses(p.seed, pl.id, test.rounds) : Math.max(0, Math.min(all, missed[pl.id] ?? all));
+    for (const pl of alive) out[pl.id] = pl.isBot ? botLightsMisses(test.seed ?? p.seed, pl.id, test.rounds) : Math.max(0, Math.min(all, missed[pl.id] ?? all));
     const cost = BOSS_POWERS.lightsOutMiss;
     // The crowd's find rate over the whole test (Eric, Oct 10): under lightsOutHold, he moves twice before its turn.
     const asked = all * alive.length;
@@ -508,7 +516,7 @@ export const hollowBattle = {
       rounds,
       ended,
       alive.filter((pl) => !pl.isBot).map((pl) => people[pl.id] ?? []),
-      alive.filter((pl) => pl.isBot).map((pl) => botLightsFound(p.seed, pl.id, rounds)),
+      alive.filter((pl) => pl.isBot).map((pl) => botLightsFound(p.lightsOut?.seed ?? p.seed, pl.id, rounds)),
     );
   },
 

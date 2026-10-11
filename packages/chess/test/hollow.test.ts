@@ -380,10 +380,16 @@ describe("Hollow's Lights out", () => {
     const test = r.startLightsOut();
     expect(test.at).toBe(2);
     expect(r.lightsOutDue()).toBe(false);
-    // Once: spent, the meter gone.
+    // Spent: the meter empty and held so through the next turn (his extra move, if any, comes before it), then it
+    // fills again.
     await r.playBoss();
-    expect(rageOf(r.boss)).toBeNull();
+    expect(rageOf(r.boss)).toBe(0);
+    expect(r.bossView()!.powers!.paused).toBe(true);
     expect(r.bossView()!.powers!.lightsAt).toBe(2);
+    expect(lightsOutDue(r.boss)).toBe(false);
+    await turn(r, "g1f3");
+    expect(r.boss!.powers!.ultAt).toBeUndefined();
+    expect(r.bossView()!.powers!.paused).toBe(false);
     expect(lightsOutDue(r.boss)).toBe(false);
 
     // The trigger, pressed during the crowd's turn: it comes as his turn begins.
