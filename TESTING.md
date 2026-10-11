@@ -38,7 +38,7 @@ Signed in with your admin account, on your phone:
 
 1. Tap **Boss alone**. Under the difficulty there's **BRAIN · TEST**. Leave it on **Default (Maia for Ginger)**, or pick
    Stockfish / Maia, no guard / Maia, light guard / Maia, full guard. Tap **Ginger**.
-2. The first time, Maia downloads (about 40 MB, kept afterwards) while Ginger's intro plays. Under the God King's dock
+2. The first time, Maia downloads (about 29 MB, kept afterwards) while Ginger's intro plays. Under the God King's dock
    a small line shows what her brain did with each move: "🧠 Maia 1190 · no guard · Maia's #1 · 210 ms". "Stockfish
    (Maia loading)" means Maia wasn't ready yet and Stockfish moved instead.
 3. Tell me: does she feel like a person? Too easy, too hard? Which brain do you prefer? And the ms on the line (under
