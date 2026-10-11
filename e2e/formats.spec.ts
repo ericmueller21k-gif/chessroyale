@@ -129,7 +129,7 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   // your strength plus its own offset. Pick one and it starts.
   const menu = page.getByRole("dialog", { name: "Choose your boss" });
   await expect(menu).toBeVisible();
-  await expect(menu.locator(".boss-row")).toHaveCount(6);
+  await expect(menu.locator(".boss-row")).toHaveCount(7);
   await expect(menu.getByRole("button", { name: /Random boss/ })).toBeVisible();
   await expect(menu.getByRole("button", { name: /Match the group/ })).toHaveCount(0);
   await menu.getByRole("button", { name: /Boingo the Clown/ }).click();

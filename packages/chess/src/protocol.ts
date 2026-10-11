@@ -1,4 +1,4 @@
-import type { BounceResult, BurnEvent, LightsOutTarget, PowerEvent, PowerId } from "@chessroyale/core";
+import type { BounceResult, BurnEvent, LightsOutTarget, PowerEvent, PowerId, SawCut, SplitPawn } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
@@ -279,6 +279,14 @@ export interface NetBossPowers {
   block?: { square: string; at: number; until: number } | null;
   snack?: string | null;
   bounce?: BounceResult | null;
+  /**
+   * Sawyer (missing for other bosses): his split pawn once his first move is played (the pawn, the new half beside it,
+   * and the two halves' squares now), his saw cut (the edge between two squares, its first and last crowd turn), and
+   * the board saw while it lasts (no move may cross between the d and e files).
+   */
+  split?: SplitPawn | null;
+  cut?: SawCut | null;
+  boardSaw?: { at: number; until: number } | null;
 }
 
 /**

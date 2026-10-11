@@ -4,6 +4,7 @@ import { BOINGO_FX } from "./bosses/boingo.ts";
 import { FIRE_BURN_MS, GREX_FX } from "./bosses/grex.ts";
 import { CLAIM_MS, HOLLOW_FX, HOLLOW_FX_EXTRA } from "./bosses/hollow.ts";
 import { BIGBOY_FX, SNACK_MS } from "./bosses/bigboy.ts";
+import { SAWYER_FX } from "./bosses/sawyer.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -44,7 +45,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * he speaks and plays the crowd's move; the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX } as const;
 
 /** How long one power's moment holds the screen (ms). */
 export const powerFxMs = (e: { kind: keyof typeof POWER_FX; first?: boolean }): number => (POWER_FX[e.kind] ?? 0) + (POWER_FX_EXTRA[e.kind]?.(e) ?? 0);
