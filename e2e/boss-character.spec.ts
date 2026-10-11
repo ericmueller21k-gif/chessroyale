@@ -6,7 +6,7 @@ const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ??
 const visibleChar = (p: Page) => p.locator(".boss-char:visible").first();
 const anim = (p: Page) => visibleChar(p).getAttribute("data-anim").catch(() => null);
 
-test("Boingo the Clown: a raid boss as a character, kitty-corner from the God King, on phone and computer", async ({ page }, info) => {
+test("Boingo the Clown: a raid boss as a character, across the board from the God King, on phone and computer", async ({ page }, info) => {
   test.setTimeout(6 * 60_000);
   const phone = info.project.name === "phone";
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
