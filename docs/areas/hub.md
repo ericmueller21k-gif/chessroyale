@@ -7,8 +7,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **The landing page** shows where online play needs signing in (`onlineNeedsSignIn` from `/api/auth/config`) and
   you aren't signed in: sign in, or play against bots as a guest (remembered on the device). An invite link shows it
   even to a guest. `?nolanding` skips it (tests). Guests play Solo and Boss alone.
-- **Home** (built from the approved mockups in `docs/mockups/front-door/`): the mode picker (Crowd 50 v 50, Boss raid,
-  Classic), the Matchmaking row (Default, Bots off, Solo) with its ⓘ, PLAY, "Play with friends", "Boss alone" (solo's
+- **Home** (built from the approved mockups in `docs/mockups/front-door/`): the mode picker (Crowd 50 v 50, Squads,
+  Boss raid: Squads took Classic's spot, Oct 11; Classic still plays with `?mode=classic`), the Matchmaking row (Default,
+  Bots off, Solo) with its ⓘ (with Squads picked: the Party button instead, see [squads.md](squads.md)), PLAY, "Play with friends", "Boss alone" (solo's
   boss menu), the coin pill, your icon, and the live line ("214 online · 9 matches running · 31 in queue") with the
   typical wait under PLAY.
   - **Phone:** one column, big tap targets, no sideways scroll at 320–430 px.

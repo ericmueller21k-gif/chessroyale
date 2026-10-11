@@ -250,13 +250,13 @@ export function QueueScreen({
  * Servers busy (the matchmaker's overload line): no seat yet, so no grid of people. The same header and Cancel as the
  * queue, with "Servers are busy, you're in line: about N s" (the server's estimate, refreshed every few seconds).
  */
-export function QueueLine({ raid, waitSeconds, onCancel }: { raid: boolean; waitSeconds: number; onCancel: () => void }) {
-  const size = raid ? 50 : 100;
+export function QueueLine({ raid, waitSeconds, onCancel, title, seats }: { raid: boolean; waitSeconds: number; onCancel: () => void; title?: string; seats?: number }) {
+  const size = seats ?? (raid ? 50 : 100);
   return (
     <div class={`fd-page fd-queue${raid ? " raid" : ""}`}>
       <header class="fd-page-head">
         <BackButton onClick={onCancel} label="Leave the queue" />
-        <h1 class="fd-queue-mode">{raid ? "Boss raid · up to 50" : "Crowd · 50 v 50"}</h1>
+        <h1 class="fd-queue-mode">{title ?? (raid ? "Boss raid · up to 50" : "Crowd · 50 v 50")}</h1>
         <span class="fd-queue-mute">
           <MuteButton />
         </span>

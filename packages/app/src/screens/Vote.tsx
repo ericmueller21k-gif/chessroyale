@@ -1,5 +1,6 @@
 import { memo } from "preact/compat";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import type { ComponentChildren } from "preact";
 import {
   PREGAME_VOTES,
   clampToZone,
@@ -10,6 +11,7 @@ import {
   voteZoneSpot,
   type BoardSpot,
   type ItemLook,
+  type PregameVote,
 } from "@chessroyale/core";
 import { START_FEN } from "@chessroyale/chess";
 import { Avatar } from "../components/Items.tsx";
@@ -17,7 +19,7 @@ import { Board } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
-import { myTeam, type GameView, type VoteView } from "../game.ts";
+import type { GameView, VoteView } from "../game.ts";
 import { pawnLook } from "../looks.ts";
 import { underBoardView } from "../prefs.ts";
 import { play } from "../sound.ts";
@@ -72,6 +74,25 @@ function PopCount({ n, class: cls }: { n: number; class: string }) {
   );
 }
 
+/** Who votes, as the vote board needs them (a Crowd match's standings, or a Squads lobby's players). */
+export interface VotePlayer {
+  id: string;
+  name?: string;
+  isYou: boolean;
+  isBot: boolean;
+  team?: "w" | "b" | null;
+  look?: ItemLook;
+}
+
+/** What the vote board needs from a match: Crowd's (GameView) or Squads' (its lobby, as screens/Squads.tsx adapts it). */
+export interface VoteHost {
+  standings(): readonly VotePlayer[];
+  isYou(id: string): boolean;
+  castVote(option: number): void;
+  settings: { voteYouScale?: number };
+  evaluate?: GameView["evaluate"];
+}
+
 /**
  * A pre-game vote. The board is empty but for the players: everyone is their own pawn, dressed in their look,
  * White's scattered over ranks 1-2 and Black's over ranks 7-8. Yours is solid and a little bigger (voteYouScale);
@@ -81,11 +102,34 @@ function PopCount({ n, class: cls }: { n: number; class: string }) {
  * You're with the crowd"), then the banner names the winner; between the votes everyone walks back to their spot,
  * and after the last one the pawns fade and the real pieces drop into place for the game.
  */
-export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView }) {
-  const def = PREGAME_VOTES[vote.index]!;
+export function VoteScreen({
+  match,
+  vote,
+  def = PREGAME_VOTES[vote.index]!,
+  next,
+  evalBar = true,
+  extra,
+  below,
+  chime = true,
+}: {
+  match: VoteHost;
+  vote: VoteView;
+  /** The votes being held (Crowd's PREGAME_VOTES by default; Squads' own). */
+  def?: PregameVote;
+  /** What comes after the last vote ("The game begins"), and the next vote's title. */
+  next?: (index: number) => string;
+  /** Crowd's board has its eval bar beside it; Squads has no engine in the game. */
+  evalBar?: boolean;
+  /** Beside the title (Squads' test control). */
+  extra?: ComponentChildren;
+  /** Under the cards (Squads' standings on a phone). */
+  below?: ComponentChildren;
+  /** The result's three tones and the timer's ticks (Crowd's); Squads has neither. */
+  chime?: boolean;
+}) {
   const now = useFrameNow();
   const animate = useCrowdAnimations();
-  const side = myTeam(match) ?? "w";
+  const side = match.standings().find((s) => s.isYou)?.team ?? "w";
   const orientation: Orientation = side === "w" ? "white" : "black";
   const counting = vote.result === null;
   const open = counting && now < vote.until;
@@ -153,7 +197,7 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
 
   const winner = vote.result === null ? null : def.options[vote.result]!;
   useEffect(() => {
-    if (vote.result !== null) play("select");
+    if (vote.result !== null && chime) play("select");
   }, [vote.result]);
 
   const cast = (option: number, spot: BoardSpot) => {
@@ -215,7 +259,7 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
   const myLook = me ? looks.get(me.id)! : pawnLook({ id: "", isYou: true, isBot: false });
   const overZone = dragAt ? voteZoneAt(dragAt) : null;
 
-  const nextLabel = vote.index + 1 < vote.count ? PREGAME_VOTES[vote.index + 1]!.title : "The game begins";
+  const nextLabel = next ? next(vote.index + 1) : vote.index + 1 < vote.count ? PREGAME_VOTES[vote.index + 1]!.title : "The game begins";
   const nextIn = vote.nextAt ? Math.max(0, Math.ceil((vote.nextAt - now) / 1000)) : null;
   const hint = winner
     ? joined.length && now < Math.max(walkedAt, vote.until) + CROWD_LINE_MS
@@ -244,6 +288,7 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
           </span>
           <h1>{def.title}</h1>
         </div>
+        {extra}
         <MuteButton />
       </div>
       <div class="board-area">
@@ -251,9 +296,9 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
           {hint}
         </div>
         <div class={`board-row vote-board-row${dropping ? " dropping" : ""}`}>
-          <EvalBar fen={START_FEN} orientation={side} evaluate={(f) => match.evaluate(f)} />
+          {evalBar && <EvalBar fen={START_FEN} orientation={side} evaluate={match.evaluate ? (f) => match.evaluate!(f) : undefined} />}
           <Board fen={dropping ? START_FEN : EMPTY_FEN} orientation={orientation} animate={false}>
-            {counting && <TimerBar startsAt={vote.startsAt} deadline={vote.until} total={Math.max(1, vote.until - vote.startsAt)} />}
+            {counting && <TimerBar startsAt={vote.startsAt} deadline={vote.until} total={Math.max(1, vote.until - vote.startsAt)} quiet={!chime} />}
             <div
               ref={layer}
               class={`vote-layer${animate ? " animate" : ""}${leaving ? " leaving" : ""}${selected ? " picking" : ""}${dragAt ? " dragging" : ""}`}
@@ -370,6 +415,7 @@ export function VoteScreen({ match, vote }: { match: GameView; vote: VoteView })
           );
         })}
       </div>
+      {below}
     </div>
   );
 }

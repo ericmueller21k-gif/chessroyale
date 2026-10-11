@@ -3,7 +3,7 @@ import { named, test } from "./helpers.ts";
 
 const live = (p: import("@playwright/test").Page) => p.evaluate(() => fetch("/api/live").then((r) => r.json()));
 
-test("home: the live line comes from the server, the mode picker changes the line under PLAY, Classic is coming", async ({ page, browser }) => {
+test("home: the live line comes from the server, the mode picker changes the line under PLAY, Squads in Classic's place", async ({ page, browser }) => {
   await named(page, "Eric");
   await page.goto("/");
   // The logo you can see: the top bar's on a phone, the side menu's on a computer (both are in the page).
@@ -24,12 +24,16 @@ test("home: the live line comes from the server, the mode picker changes the lin
   await expect.poll(async () => (await live(page)).queue, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
   await expect(line).toContainText(/[1-9]\d* in queue/, { timeout: 10_000 });
   await other.close();
-  // The line under PLAY follows the mode; Classic can't be queued for yet.
+  // The line under PLAY follows the mode. Squads took Classic's place (Crowd · Squads · Boss raid): PLAY is its solo
+  // queue, with Party in the Matchmaking row's place.
   await page.getByRole("radio", { name: /Boss raid/ }).click();
   await expect(page.locator(".fd-hint")).toHaveText(/^Join a raid; bots fill the crowd after \d+ s$/);
-  await page.getByRole("radio", { name: /Classic/ }).click();
-  await expect(page.locator(".fd-hint")).toHaveText("Classic is being reworked");
-  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeDisabled();
+  await expect(page.getByRole("radiogroup", { name: "Mode" }).getByRole("radio")).toHaveText([/^Crowd/, /^Squads/, /^Boss raid/]);
+  await page.getByRole("radio", { name: /Squads/ }).click();
+  await expect(page.locator(".fd-hint")).toHaveText(/^Solo queue: you join a squad of 4 · bots fill any empty seat after \d+ s$/);
+  await expect(page.getByRole("button", { name: /^Party/ })).toBeVisible();
+  await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
   await page.getByRole("radio", { name: /Crowd/ }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
   // No sideways scrolling, and big tap targets.

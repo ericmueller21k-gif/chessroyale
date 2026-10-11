@@ -39,6 +39,10 @@ import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
 import { ChatBubble, useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
+import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
+import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
+import { PartySheet } from "./screens/SquadsParty.tsx";
+import { measureSound } from "./sound.ts";
 
 /**
  * Playtest overrides from the URL, e.g. ?rounds=4&clock=15&draw=weighted (handy for quick tests). `matchBoss`: a raid's
@@ -136,6 +140,17 @@ const rejoinCode = (() => {
   return code && /^[A-Z2-9]{5}$/.test(code) && hasSeat(code) ? code : null;
 })();
 
+/** Squads' links: a party's invite (/squads/party/CODE), a lobby to rejoin (/squads/CODE), a test lobby (/squads/test/pairs). */
+const partyLinkCode = location.pathname.match(/^\/squads\/party\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
+const squadsLinkCode = location.pathname.match(/^\/squads\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
+const squadsTestStart = location.pathname.match(/^\/squads\/test\/(relay|pairs|final)\/?$/)?.[1] as "relay" | "pairs" | "final" | undefined;
+/** Opened from scratch at home with a seat in a Squads lobby (or its link): check it's still on, and go back in. */
+const squadsRejoin = (() => {
+  if (squadsLinkCode) return squadsSeat(squadsLinkCode) ? squadsLinkCode : null;
+  if (linkCode || location.pathname !== "/") return null;
+  return currentSquads();
+})();
+
 /** A lobby that has closed (a stale tab, an old link, or the match on screen): the note on the home screen. */
 interface EndedNote {
   code: string;
@@ -187,7 +202,13 @@ export function App() {
   const [invite, setInvite] = useState<"checking" | "open" | null>(() => (!linkCode ? null : hasSeat(linkCode) ? "open" : "checking"));
   const [ended, setEnded] = useState<EndedNote | null>(null);
   /** Opened from scratch with a seat in a match: a moment's splash while we check it's still on. */
-  const [rejoining, setRejoining] = useState(!!rejoinCode);
+  const [rejoining, setRejoining] = useState(!!rejoinCode || !!squadsRejoin || !!squadsTestStart);
+  /** Squads: the lobby you're in, your party (its sheet), and a note when a lobby or party has gone. */
+  const [squads, setSquads] = useState<SquadsClient | null>(null);
+  const [party, setParty] = useState<PartyClient | null>(null);
+  const [partyOpen, setPartyOpen] = useState(!!partyLinkCode);
+  const [partyError, setPartyError] = useState<string | null>(null);
+  const [squadsNote, setSquadsNote] = useState<string | null>(() => (squadsLinkCode && !squadsRejoin ? "That match has ended." : null));
   /**
    * The lobby has closed: home (the address too, so reopening the app lands there) with a note, and your result if
    * you played (from the server, asked before this so the note shows whole, never growing a button a moment later).
@@ -269,6 +290,49 @@ export function App() {
     };
   }, [match]);
 
+  useEffect(() => squads?.subscribe(() => rerender(undefined)), [squads]);
+  useEffect(() => party?.subscribe(() => rerender(undefined)), [party]);
+  // A Squads lobby that has ended or closed: home, with the note.
+  useEffect(() => {
+    if (!squads?.gone) return;
+    const why = squads.gone;
+    squads.dispose();
+    setSquads(null);
+    setSquadsNote(why === "Banned" ? null : why);
+    if (location.pathname !== "/") history.replaceState(null, "", "/");
+  });
+  // Back into a Squads lobby you have a seat in (a reload, the app reopened): if it's still on.
+  useEffect(() => {
+    if (!squadsRejoin) return;
+    void squadsStatus(squadsRejoin).then((st) => {
+      if (st?.open !== false && st?.phase !== "results") joinSquads(squadsRejoin);
+      else {
+        forgetSquads(squadsRejoin);
+        if (squadsLinkCode) setSquadsNote("That match has ended.");
+        if (location.pathname !== "/") history.replaceState(null, "", "/");
+      }
+      setRejoining(false);
+    });
+  }, []);
+  // An invite to a party you're already in (or the party you were in, from its link): straight back in.
+  useEffect(() => {
+    if (partyLinkCode && currentParty() === partyLinkCode) joinParty(partyLinkCode);
+  }, []);
+  // A test lobby's link (/squads/test/pairs): made once your account is known (admins only, or SQUADS_TEST).
+  const testMade = useRef(false);
+  useEffect(() => {
+    if (!squadsTestStart || testMade.current || config === null || (config.accounts && !profile)) return;
+    testMade.current = true;
+    void squadsTestLobby(squadsTestStart, new URLSearchParams(location.search).get("clock")).then((r) => {
+      setRejoining(false);
+      if ("code" in r) joinSquads(r.code);
+      else {
+        history.replaceState(null, "", "/");
+        setSquadsNote("error" in r ? r.error : "Couldn't make a test lobby.");
+      }
+    });
+  }, [config, profile]);
+
   // Warm the engine up in the background so play starts instantly.
   useEffect(() => {
     void enginePool();
@@ -321,6 +385,119 @@ export function App() {
   });
 
   const debug = new URLSearchParams(location.search).has("debug");
+  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, __measureSound: measureSound });
+
+  // ---------------- Squads ----------------
+
+  /** Into a Squads lobby (with your party's pass, to sit with your party). */
+  const joinSquads = (code: string, pass?: string) => {
+    unlockAudio();
+    setSquadsNote(null);
+    setPartyOpen(false);
+    const c = new SquadsClient(code.toUpperCase(), { party: pass ?? null });
+    setSquads((old) => {
+      old?.dispose();
+      return c;
+    });
+    history.replaceState(null, "", `/squads/${c.code}${location.search}`);
+    c.connect();
+  };
+  /** Squads' PLAY: the solo queue (in line while the servers are busy). */
+  const squadsPlay = async () => {
+    unlockAudio();
+    const run = ++lineRun.current;
+    setLoading(true);
+    setError(null);
+    setSquadsNote(null);
+    const r = await squadsQueue(
+      (waitSeconds) => {
+        setLoading(false);
+        setInLine({ mode: "squads", waitSeconds });
+      },
+      () => run !== lineRun.current,
+    );
+    if (run !== lineRun.current || !r) return;
+    setInLine(null);
+    setLoading(false);
+    if ("code" in r) joinSquads(r.code);
+    else if ("banned" in r) showBanNotice();
+    else if ("error" in r) setError(r.error);
+  };
+  const leaveSquads = () => {
+    if (squads && !squads.left && !squads.gone) squads.leave();
+    else squads?.dispose();
+    setSquads(null);
+    history.replaceState(null, "", `/${location.search}`);
+  };
+  /** A party: its sheet, and its socket (placed: everyone joins the lobby with the party's pass). */
+  const partyPlaced = (lobby: string, pass: string) => {
+    setParty(null);
+    joinSquads(lobby, pass);
+  };
+  const joinParty = async (code: string) => {
+    setPartyError(null);
+    setPartyOpen(true);
+    const open = await partyStatus(code);
+    if (open === false) return setPartyError("That party has closed.");
+    const p = new PartyClient(code.toUpperCase(), partyPlaced);
+    setParty((old) => {
+      old?.close();
+      return p;
+    });
+    if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
+    p.connect();
+  };
+  const openParty = () => {
+    unlockAudio();
+    setPartyOpen(true);
+    const code = currentParty();
+    if (code && !party) void joinParty(code);
+  };
+  const makeParty = async () => {
+    setLoading(true);
+    setPartyError(null);
+    const r = await createParty();
+    setLoading(false);
+    if ("banned" in r) return showBanNotice();
+    if ("error" in r) return setPartyError(r.error);
+    void joinParty(r.code);
+  };
+  const closeParty = () => {
+    party?.leave();
+    setParty(null);
+    setPartyOpen(false);
+    setPartyError(null);
+    if (location.pathname.startsWith("/squads/party")) history.replaceState(null, "", `/${location.search}`);
+  };
+  /** After a lobby: queue again alone, or back to your party (its leader queues you all again). */
+  const squadsAgain = () => {
+    const fromParty = !!squads?.party && !!currentParty();
+    leaveSquads();
+    if (fromParty) void joinParty(currentParty()!);
+    else void squadsPlay();
+  };
+  const partySheet = partyOpen && (
+    <PartySheet
+      party={party}
+      joinCode={partyLinkCode}
+      loading={loading}
+      error={partyError ?? party?.error ?? null}
+      onlineLocked={mustSignInToPlayOnline()}
+      admin={!!profile?.admin}
+      onCreate={() => void makeParty()}
+      onJoin={(code) => void joinParty(code)}
+      onTest={(start) => {
+        setPartyOpen(false);
+        void squadsTestLobby(start).then((r) => ("code" in r ? joinSquads(r.code) : setPartyError("error" in r ? r.error : "Couldn't make a test lobby.")));
+      }}
+      onSignIn={() => {
+        setPartyOpen(false);
+        chooseGuest(false);
+      }}
+      onClose={closeParty}
+    />
+  );
+
   const use = (m: AnyMatch) => {
     match?.dispose();
     setEnded(null);
@@ -426,7 +603,7 @@ export function App() {
   const playNowMode = useRef<{ mode: "crowd" | "raid"; type: Exclude<MatchmakingType, "solo"> }>({ mode: "crowd", type: "default" });
   const retriedFor = useRef<AnyMatch | null>(null);
   /** Servers busy: in line for a seat (the queue screen says so, with about how long). */
-  const [inLine, setInLine] = useState<{ mode: "crowd" | "raid"; waitSeconds: number } | null>(null);
+  const [inLine, setInLine] = useState<{ mode: "crowd" | "raid" | "squads"; waitSeconds: number } | null>(null);
   const lineRun = useRef(0);
   const playNow = async (mode: "crowd" | "raid", type: Exclude<MatchmakingType, "solo"> = "default", retry = false, ticket?: string) => {
     playNowTries.current = retry ? playNowTries.current + 1 : 1;
@@ -582,6 +759,7 @@ export function App() {
         k,
         () => {
           if (match) leave();
+          else if (squads) leaveSquads();
           else leaveLine();
           nav[k]();
         },
@@ -589,6 +767,43 @@ export function App() {
     ),
   };
 
+  // (Before any page below, the home screen's frame needs these.)
+  const noLanding = new URLSearchParams(location.search).has("nolanding");
+  const inviteCode = invite === "open" ? linkCode : undefined;
+  const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : "That match has ended.") : (squadsNote ?? undefined);
+  // Squads: the lobby you're in (the waiting room is the home screen's queue, as for Crowd).
+  if (squads && !match) {
+    const overlayS = profileOpen && (
+      <div class="fd-overlay">
+        <FrontFrame>
+          <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+        </FrontFrame>
+      </div>
+    );
+    if (squads.error)
+      return (
+        <div class="screen center">
+          <h1>Can't join</h1>
+          <p class="muted">{squads.error}</p>
+          <button type="button" class="btn btn-primary" onClick={leaveSquads}>
+            Home
+          </button>
+        </div>
+      );
+    if (squadsWaiting(squads.lobby))
+      return (
+        <>
+          {homeFrame(<SquadsQueue client={squads} onCancel={leaveSquads} />)}
+          {overlayS}
+        </>
+      );
+    return (
+      <>
+        <SquadsScreen client={squads} actions={{ onHome: leaveSquads, onAgain: squadsAgain, party: !!squads.party }} />
+        {overlayS}
+      </>
+    );
+  }
   if (!match && soundLab) return <SoundLab onBack={() => setSoundLab(false)} />;
   if (!match && legal) {
     return (
@@ -658,9 +873,6 @@ export function App() {
     );
   }
   // Not signed in, where online play needs it: the landing page (an invite link shows it even to guests).
-  const noLanding = new URLSearchParams(location.search).has("nolanding");
-  const inviteCode = invite === "open" ? linkCode : undefined;
-  const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : "That match has ended.") : undefined;
   if (!match && !noLanding && config?.onlineNeedsSignIn && profile && !profile.user.signedIn && (!guest || (inviteCode && !inviteSkipped))) {
     return (
       <LandingScreen
@@ -681,7 +893,9 @@ export function App() {
    * Home, or home in the queue (`queue`: you pressed PLAY). The same frame and screen either way, so on a computer the
    * side menu, the live panel and your pawn stay put while the play column turns into the queue (and back on Cancel).
    */
-  const home = (queue?: ComponentChildren, chat?: ComponentChildren, side = computer) => (
+  const home = (queue?: ComponentChildren, chat?: ComponentChildren, side = computer) => homeFrame(queue, chat, side);
+  function homeFrame(queue?: ComponentChildren, chat?: ComponentChildren, side = computer) {
+    return (
     // (A phone's queue is the whole screen: no hidden menu or panel to draw again with every arrival.)
     <FrontFrame page={queue ? "queue" : "home"} nav={!queue ? nav : computer ? queueNav : undefined}>
       <HomeScreen
@@ -693,7 +907,9 @@ export function App() {
         error={error}
         joinCode={mustSignInToPlayOnline() ? undefined : inviteCode}
         notice={
-          ended && notice
+          !ended && notice
+            ? { text: notice, onDismiss: () => setSquadsNote(null) }
+            : ended && notice
             ? {
                 text: notice,
                 onDismiss: () => setEnded(null),
@@ -712,15 +928,36 @@ export function App() {
         onSolo={(mode, opts) => void startSolo(mode, opts)}
         onCreateLobby={(mode) => void createLobby(mode)}
         onJoinLobby={(code) => joinLobby(code, { typed: code !== inviteCode })}
+        onSquads={() => void squadsPlay()}
+        onParty={openParty}
         onSignIn={() => chooseGuest(false)}
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
         onShop={() => setShowShop("shop")}
       />
     </FrontFrame>
-  );
+    );
+  }
   // (Always a fragment with the frame first, in the queue or not, so the frame is kept from one to the other.)
-  if (!match && inLine) return <>{home(<QueueLine raid={inLine.mode === "raid"} waitSeconds={inLine.waitSeconds} onCancel={leaveLine} />)}</>;
-  if (!match) return <>{home()}</>;
+  if (!match && inLine)
+    return (
+      <>
+        {home(
+          <QueueLine
+            raid={inLine.mode === "raid"}
+            waitSeconds={inLine.waitSeconds}
+            onCancel={leaveLine}
+            {...(inLine.mode === "squads" ? { title: "Squads · 8 squads of 4", seats: 32 } : {})}
+          />,
+        )}
+      </>
+    );
+  if (!match)
+    return (
+      <>
+        {home()}
+        {partySheet}
+      </>
+    );
 
   // Play now: the lobby started a moment before we got in, so get the next one.
   if (match instanceof NetMatch && match.error && /already started|full/.test(match.error) && playNowTries.current > 0 && playNowTries.current < 3 && retriedFor.current !== match) {

@@ -15,6 +15,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   identical (`JUDGES.tolerance` 0). A disagreement asks a third device and the engine server at once; strikes bench a
   device. Fewer than two capable devices (or `JUDGES.on` false): the lobby's **host** scores every round (`pickHost`
   prefers a connected computer over a phone). Knocked-out players' devices keep judging while their page is open.
+- **Squads' bots** get their engine's top moves from players' devices the same way (the page's one speed check,
+  `engineSpeed()`, then `botWork` jobs on the engine pool; [squads.md](squads.md), "The server" and "The screens").
 - **Close calls are re-checked deeper** before a cut (`recheckCloseCalls()` in `runner.ts`: `recheckLoss`,
   `recheckMax`, `recheckNodes` 700k), only for groups with a human pick. The re-check goes first to the **engine
   server**: native Stockfish 17.1 (full network) in a Cloudflare Container (`engine/Dockerfile`, `engine/server.mjs`,

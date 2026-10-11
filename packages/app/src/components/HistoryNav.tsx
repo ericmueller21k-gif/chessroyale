@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { START_FEN, fenAtPly, type Base } from "@chessroyale/chess";
+import { baseAt, fenAtPly, type Base } from "@chessroyale/chess";
 
 /**
  * Stepping back and forth through a board's game. `ply` is null while showing
@@ -25,8 +25,8 @@ export function useHistoryView(history: readonly string[], bases?: readonly Base
   return {
     browsing: ply !== null,
     ply: at,
-    // (With its bases: a piece G-REX's fire destroyed stays gone.)
-    fen: ply === null ? null : ply === 0 ? START_FEN : fenAtPly(history, ply, bases),
+    // (With its bases: a piece G-REX's fire destroyed stays gone; a board that started from an opening starts there.)
+    fen: ply === null ? null : ply === 0 ? baseAt(0, bases).fen : fenAtPly(history, ply, bases),
     lastMove: ply === null ? null : (history[ply - 1] ?? null),
     go,
     live: () => setPly(null),

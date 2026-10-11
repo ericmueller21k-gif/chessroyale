@@ -11293,3 +11293,936 @@ img.qicon {
 .screen:has(.king-attack.on) .boss-char-sprite {
   visibility: hidden;
 }
+
+/* ==== Squads (docs/areas/squads.md, "The screens"): every class is sq-, so none falls into another screen's rules ==== */
+
+/* A squad's name with its colour. */
+.sq-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.sq-tag i {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 3px;
+  background: var(--sq, #888);
+}
+.sq-tag.you {
+  color: var(--accent);
+}
+/* A team clock. Sudden death: red, pulsing (a shadow, never a colour transition). */
+.sq-clock {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1;
+}
+.sq-clock b {
+  font-size: 0.7em;
+  margin-left: 2px;
+  color: var(--danger);
+  letter-spacing: -1px;
+}
+.sq-clock.low {
+  color: var(--danger);
+}
+.sq-clock.sd {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #dc2626;
+  color: #fff;
+  letter-spacing: 0.06em;
+  font-size: 0.85em;
+  animation: sq-sd 0.9s ease-in-out infinite;
+}
+@keyframes sq-sd {
+  50% {
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.45);
+    transform: scale(1.06);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sq-clock.sd {
+    animation: none;
+  }
+}
+
+/* -- The standings: a side panel on a computer -- */
+.sq-standings {
+  display: grid;
+  gap: 6px;
+}
+.sq-standings-head {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 2px;
+}
+.sq-row {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  border-left: 4px solid var(--sq, #888);
+}
+.sq-row.you {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.sq-row.sd {
+  background: color-mix(in srgb, #dc2626 16%, var(--surface));
+}
+.sq-row.out {
+  opacity: 0.55;
+}
+.sq-row-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.sq-row-pos {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sq-row-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sq-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.sq-member .player-name {
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-member.you {
+  color: var(--accent);
+  font-weight: 800;
+}
+.sq-member.left {
+  text-decoration: line-through;
+}
+.sq-member small {
+  font-size: 10px;
+}
+.sq-arena .sq-side {
+  padding-right: 6px;
+}
+
+/* -- The standings: a phone's strip (a tap shows the whole table) -- */
+.sq-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 3px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sq-strip-chip {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 2px 1px 3px;
+  border-radius: 7px;
+  background: var(--surface);
+  border-top: 3px solid var(--sq, #888);
+}
+.sq-strip-chip.you {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.sq-strip-chip.out {
+  opacity: 0.45;
+}
+.sq-strip-chip.sd {
+  background: #dc2626;
+  color: #fff;
+  animation: sq-sd 0.9s ease-in-out infinite;
+}
+.sq-strip-chip.sd .sq-clock.sd {
+  animation: none;
+  padding: 0;
+  background: none;
+}
+.sq-strip-name {
+  max-width: 100%;
+  font-size: 9px;
+  letter-spacing: -0.2px;
+  font-weight: 700;
+  line-height: 1.05;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-strip-chip .sq-clock {
+  font-size: 11px;
+}
+.sq-strip-chip .sq-clock b {
+  display: none;
+}
+@media (min-width: 1100px) and (min-height: 600px) {
+  .sq-arena .sq-strip {
+    display: none;
+  }
+}
+.sq-sheet {
+  display: grid;
+  gap: 12px;
+}
+
+/* -- Every board in the lobby, tiny, across the top -- */
+.sq-boards {
+  --tb: 46px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.sq-boards.n5,
+.sq-boards.n6,
+.sq-boards.n7,
+.sq-boards.n8 {
+  --tb: calc((var(--col) - 2 * var(--gutter) - 20px - 30px) / 8);
+}
+.sq-boards.n9,
+.sq-boards.n10,
+.sq-boards.n11,
+.sq-boards.n12,
+.sq-boards.n13,
+.sq-boards.n14,
+.sq-boards.n15,
+.sq-boards.n16 {
+  --tb: calc((var(--col) - 2 * var(--gutter) - 6px - 20px - 18px) / 8);
+}
+.sq-match {
+  display: flex;
+  gap: 3px;
+  padding: 5px 3px 3px;
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, var(--sq-a) 0 50%, var(--sq-b) 50% 100%) top / 100% 3px no-repeat,
+    var(--surface);
+}
+.sq-match.ours {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.sq-match.done {
+  opacity: 0.5;
+}
+.sq-tiny {
+  position: relative;
+  display: block;
+  width: var(--tb);
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 3px;
+}
+button.sq-tiny {
+  cursor: pointer;
+}
+.sq-tiny .tiny-board {
+  width: 100%;
+}
+.sq-tiny.on .tiny-board {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.sq-tiny.over .tiny-board {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+.sq-mark {
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%);
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 11px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+.sq-mark.you {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.sq-mark.next {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--line);
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .sq-boards.sq-boards {
+    --tb: 46px;
+    gap: 10px;
+  }
+  .sq-boards.n1,
+  .sq-boards.n2,
+  .sq-boards.n3,
+  .sq-boards.n4 {
+    --tb: 60px;
+  }
+}
+
+/* -- The match screen -- */
+.sq-game {
+  gap: 7px;
+}
+.sq-hud {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  min-height: 40px;
+  min-width: 0;
+  font-size: 15px;
+  cursor: default;
+}
+.sq-hud-vs {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.15;
+}
+.sq-hud-score {
+  flex: none;
+  white-space: nowrap;
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.sq-hud-round {
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sq-next {
+  flex: none;
+  align-self: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.sq-status {
+  line-height: 1.2;
+}
+.sq-game .board-area .board-wrap {
+  width: min(100%, calc(100dvh - 318px));
+  min-width: 250px;
+}
+.sq-game.sq-relay .board-area .board-wrap {
+  width: min(100%, calc(100dvh - 362px));
+}
+.sq-clockline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+.sq-clockline-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.sq-clockline-side .sq-tag {
+  font-weight: 700;
+  color: var(--muted);
+}
+.sq-clockline-side.you .sq-tag {
+  color: var(--accent);
+}
+.sq-clockline .sq-clock {
+  font-size: 15px;
+}
+.sq-free {
+  min-width: 52px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.sq-free.on {
+  background: #15803d;
+  color: #fff;
+}
+.sq-free.running {
+  background: transparent;
+  color: var(--danger);
+}
+.sq-free:empty {
+  visibility: hidden;
+}
+.sq-panel {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.sq-duty {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+.sq-duty > .muted {
+  grid-column: 1 / -1;
+}
+.sq-duty.move {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sq-duty.block {
+  box-shadow: inset 3px 0 0 #c0262d;
+}
+.sq-choices {
+  display: grid;
+  gap: 3px;
+  font-size: 14px;
+}
+.sq-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sq-choice i {
+  width: 14px;
+  height: 4px;
+  flex: none;
+  border-radius: 2px;
+  background: #15781b;
+}
+.sq-choice.partner i {
+  background: #003088;
+}
+.sq-duty.block .sq-choice i {
+  background: #c0262d;
+}
+.sq-choice.none strong {
+  color: var(--muted);
+  font-weight: 600;
+}
+.sq-choice em {
+  color: var(--good);
+  font-style: normal;
+  font-weight: 700;
+}
+.sq-lockin {
+  min-height: 46px;
+  padding: 0 14px;
+}
+/* (A narrow phone: the choices whole, the button under them.) */
+@media (max-width: 380px) {
+  .sq-duty {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* (A phone: what the rules say is said above the board and in the panel's first line; the hint goes.) */
+@media (max-width: 899px) {
+  .sq-duty > .muted {
+    display: none;
+  }
+}
+.sq-explain {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+.sq-note {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface));
+  font-size: 13px;
+}
+.sq-back {
+  min-height: 44px;
+}
+/* An intro, Armageddon: a card in the middle of the board. */
+.sq-banner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 7;
+  width: min(92%, 380px);
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px 14px;
+  border-radius: 16px;
+  background: rgba(12, 14, 18, 0.9);
+  color: #f2f4f8;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+.sq-banner-title {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  color: #f2c14e;
+}
+.sq-is-final .sq-banner-title {
+  font-size: 28px;
+  animation: sq-final-in 600ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes sq-final-in {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+.sq-banner-sub {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 15px;
+}
+.sq-banner .sq-tag.you {
+  color: #f2c14e;
+}
+.sq-banner-teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  font-size: 12px;
+}
+.sq-banner-team {
+  display: grid;
+  gap: 2px;
+}
+.sq-banner-rules {
+  font-size: 12px;
+  color: #c7ccd6;
+  line-height: 1.35;
+}
+.sq-banner-count {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 30px;
+  line-height: 1;
+}
+.sq-arm-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+/* The reveal: the active block slamming down as a red lock on its square (eighths of chessground's board). */
+.sq-lock {
+  position: absolute;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  border-radius: 3px;
+  background: rgba(192, 38, 45, 0.82);
+  color: #fff;
+  pointer-events: none;
+  animation: sq-slam 380ms cubic-bezier(0.3, 0, 0.6, 1.4) both;
+}
+.sq-lock svg {
+  width: 62%;
+  height: 62%;
+}
+.sq-lock.cancelled {
+  animation:
+    sq-slam 380ms cubic-bezier(0.3, 0, 0.6, 1.4) both,
+    sq-crack 600ms 700ms ease-in forwards;
+}
+@keyframes sq-slam {
+  from {
+    transform: scale(2.6) translateY(-30%);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(0.92);
+    opacity: 1;
+  }
+}
+@keyframes sq-crack {
+  to {
+    opacity: 0.15;
+    transform: rotate(-12deg) scale(0.8);
+  }
+}
+.sq-arrows {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--cg-size, 100%);
+  height: var(--cg-size, 100%);
+  z-index: 3;
+  pointer-events: none;
+}
+.sq-reveal-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  z-index: 6;
+  max-width: 94%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(16, 18, 22, 0.8);
+  color: #eef0f4;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+/* Knocked out, through, spectating. */
+.sq-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+.sq-card-title {
+  font-weight: 800;
+  font-size: 16px;
+}
+.sq-card p {
+  margin: 0;
+}
+.sq-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.sq-out {
+  box-shadow: inset 0 0 0 2px var(--danger);
+}
+.sq-out .muted {
+  margin: 0;
+}
+/* The bracket. */
+.sq-bracket {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr;
+  gap: 6px;
+  align-items: center;
+}
+.sq-bracket-round {
+  display: grid;
+  gap: 5px;
+}
+.sq-bracket-title {
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sq-bcard {
+  display: grid;
+  gap: 1px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.sq-bcard.ours {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.sq-bline {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+}
+.sq-bline .sq-tag {
+  overflow: hidden;
+}
+.sq-bline.lost {
+  opacity: 0.5;
+}
+.sq-bline.won {
+  font-weight: 800;
+}
+.sq-bpts {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.sq-bstate {
+  font-size: 10px;
+  color: var(--muted);
+}
+.sq-bcard.playing .sq-bstate {
+  color: var(--good);
+  font-weight: 800;
+}
+/* Results. */
+.sq-results {
+  gap: 12px;
+}
+.sq-places {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+.sq-places li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  border-left: 4px solid var(--sq, #888);
+}
+.sq-places li.you {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.sq-place {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.sq-place-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+/* The waiting room: the squads once formed. */
+.sq-squads-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.sq-squad-box {
+  display: grid;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: var(--fd-panel-2);
+  border-left: 4px solid var(--sq, #888);
+}
+.sq-squad-box.you {
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+}
+.sq-squad-seats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+.sq-seats {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.fd-seat.friend {
+  outline: 2px dashed var(--fd-gold);
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+@media (min-width: 1024px) {
+  .sq-squads-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+/* The party sheet. */
+.sq-invite {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--fd-bg);
+}
+.sq-invite-code {
+  font: 800 24px "Archivo Black", Archivo, sans-serif;
+  letter-spacing: 3px;
+  color: var(--fd-gold-text);
+  -webkit-user-select: text;
+  user-select: text;
+}
+.sq-invite-link {
+  font-size: 12px;
+  color: var(--fd-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.sq-party-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.sq-party-members li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--fd-panel-2);
+  font-weight: 600;
+}
+.sq-party-members li.you {
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+}
+.sq-party-members li.empty {
+  background: transparent;
+  border: 1px dashed var(--fd-line);
+}
+.sq-party-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-party-lead {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fd-gold-text);
+}
+.sq-party-state {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  margin: 0;
+}
+.sq-party-play {
+  height: 56px;
+  font-size: 20px;
+}
+.sq-test {
+  display: grid;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--fd-line);
+}
+.sq-test-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+/* Home: Squads' Party button, in the Matchmaking row's place. */
+.sq-party-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  background: var(--fd-panel);
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+  color: var(--fd-gold-text);
+  font-size: 16px;
+  font-weight: 800;
+}
+.sq-party-btn span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fd-sub);
+}
+
+/* -- A computer: the strip and boards across the top, the board left, the panel right (as Crowd's) -- */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game.sq-game {
+    row-gap: 8px;
+  }
+  .screen.game.sq-game .sq-boards {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .screen.game.sq-game .sq-strip {
+    grid-column: 2;
+    grid-row: 4;
+    align-self: start;
+  }
+  .screen.game.sq-game .sq-panel {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    margin-top: 24px;
+  }
+  .screen.game.sq-game .board-area .board-wrap {
+    width: min(100%, calc(100dvh - 230px));
+  }
+  .screen.game.sq-game.sq-relay .board-area .board-wrap {
+    width: min(100%, calc(100dvh - 250px));
+  }
+}
+
+/* Leaving the lobby (the standings' foot): it asks once more while your squad still plays. */
+.sq-leave {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sq-leave.sure {
+  color: var(--danger);
+}
