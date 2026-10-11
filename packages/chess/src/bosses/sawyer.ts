@@ -337,9 +337,9 @@ export const SAWYER: BossRules = {
         const halves: SplitPawn["halves"] = file(half) < file(pawn) ? [{ square: half, side: "a" }, { square: pawn, side: "h" }] : [{ square: pawn, side: "a" }, { square: half, side: "h" }];
         b.state = { ...b.state, boss: { ...boss, powers: { ...p, split: { turn: turnOf(boss), pawn, square: half, halves } } } };
       } else if (first) {
-        // (No split yet: it waits for his next pawn move with room and a pawn to split. His first move wasn't a pawn's
-        // (he had none to move): no split.)
-        const split: SplitPawn = { turn: turnOf(boss), pawn: moved, square: null, halves: [], ...(moved ? { waiting: true as const } : {}) };
+        // (No split yet: it waits for his next pawn move with room and a pawn to split. That covers a first move that
+        // wasn't a pawn's too: a check with no pawn move out of it lifts the rule.)
+        const split: SplitPawn = { turn: turnOf(boss), pawn: moved, square: null, halves: [], waiting: true };
         b.state = { ...b.state, boss: { ...boss, powers: { ...p, split } } };
       }
       return;

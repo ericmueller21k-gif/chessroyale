@@ -186,7 +186,7 @@ describe("Sawyer's split pawn", () => {
     expect(chooseSplit(none, null, "w", 1, 2)).toBeNull();
   });
 
-  it("no pawn of his can split: it waits, and comes on his next pawn move that has one (the rules, on a board)", () => {
+  it("no pawn of his can split (or his first move wasn't a pawn's): it waits, and comes on his next pawn move that can (the rules, on a board)", () => {
     const run = (fen: string, move: string, split: BossPowerState["split"]) => {
       const boss = bossWith(fen, { split });
       const b = { state: { boss, boards: [0] }, boards: new Map([[0, { fen, history: [move], bases: [] }]]) };
@@ -206,6 +206,11 @@ describe("Sawyer's split pawn", () => {
     const now = run(open, "h5h4", first.split);
     expect(now.split).toEqual({ turn: 4, pawn: "h4", square: "g4", halves: [{ square: "g4", side: "a" }, { square: "h4", side: "h" }] });
     expect(pieceAt(now.fen, "g4")).toEqual({ color: "b", type: "p" });
+    // His first move a king's (a check left him no pawn move, so the rule lifted): it waits too, and comes on his
+    // first pawn move with room.
+    const king = run("4k3/8/8/pP4P1/7p/8/8/4K3 w - - 0 2", "f7e8", undefined);
+    expect(king.split).toEqual({ turn: 4, pawn: null, square: null, halves: [], waiting: true });
+    expect(run(open, "h5h4", king.split).split).toMatchObject({ pawn: "h4", square: "g4" });
   });
 
   it("the pawn he moved can't split: another of his is sawn in two, the moment the same (a whole battle)", async () => {

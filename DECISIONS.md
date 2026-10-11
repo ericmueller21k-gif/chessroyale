@@ -555,6 +555,9 @@ A raccoon in a yellow hard hat with a black bandit mask and a red-and-black reci
     keeps a move); if not, another of his pawns that has one, the most central first (the d and e files, then c and
     f, and so on), from the seed among pawns as central (`chooseSplit`); if none has one, it waits and tries again on
     his next pawn move. (Before this, a pawn he moved with no square meant no split at all.)
+  - **A first move that isn't a pawn's (my call).** His first move is a pawn's unless a check leaves him no pawn move
+    (the rule lifts, like every power's limit). Then too the split waits and comes on his first pawn move with room
+    and a pawn to split, so he always gets it (the e2e found a crowd's Bxf7+ on move 1 losing it for good).
   - **The halves are tracked** (`split.halves`, `trackHalves`) through every move, his and the crowd's: a half that's
     taken (en passant too) or promotes (a whole piece now) is gone; each keeps its side of the cut (`a`: the one towards
     the a-file).

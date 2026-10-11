@@ -289,8 +289,8 @@ export interface BounceResult {
 
 /**
  * Sawyer's split pawn: after his first move (crowd turn `turn` begins with it), the pawn sawn in two (`pawn`: the one
- * he moved, or another of his when it had no square to split into; null: his first move wasn't a pawn's), or later
- * (`waiting`), the new half on `square` beside it (null: no split yet, or none). The
+ * he moved, or another of his when it had no square to split into; null: his first move wasn't a pawn's, a check
+ * leaving him no pawn move), or later (`waiting`), the new half on `square` beside it (null: no split yet). The
  * two halves are tracked through the game (`halves`: each one's square now and which side of the cut it was, "a" the
  * half on the a-file side, "h" the other); a half that's taken or promotes is gone from the list.
  */
@@ -300,10 +300,10 @@ export interface SplitPawn {
   square: string | null;
   halves: { square: string; side: "a" | "h" }[];
   /**
-   * His first move was a pawn move but there was no room yet for another pawn of his (he had all 8, or the board 32
-   * pieces: the engine plays only positions with up to 8 pawns a side and 32 pieces), or no pawn of his had a square
-   * to split into: the split comes after his first pawn move once there is (then `turn`, `pawn` and `square` are
-   * that one's).
+   * No split after his first move: there was no room yet for another pawn of his (he had all 8, or the board 32
+   * pieces: the engine plays only positions with up to 8 pawns a side and 32 pieces), no pawn of his had a square to
+   * split into, or his first move wasn't a pawn's (a check with no pawn move out of it). The split comes after his
+   * first pawn move once there is room and a pawn to split (then `turn`, `pawn` and `square` are that one's).
    */
   waiting?: true;
 }
