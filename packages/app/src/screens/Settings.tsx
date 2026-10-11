@@ -6,7 +6,8 @@ import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut } from "../account.ts";
 import { chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn } from "../prefs.ts";
-import { isMuted, onMuteChange, setMuted, unlockAudio } from "../sound.ts";
+import { isMuted, onMuteChange, previewPieceSound, setMuted, unlockAudio } from "../sound.ts";
+import { PIECE_SOUNDS, pieceSound, setPieceSound, type PieceSoundKind } from "../piece-sounds.ts";
 import { OPENING_KEY, chosenMode, chosenOpeningMoves, saveMode } from "./Home.tsx";
 import { useAccount } from "./Profile.tsx";
 import { setThemePref, useTheme, type ThemePref } from "../theme.ts";
@@ -123,6 +124,44 @@ export function HowToPlay() {
   );
 }
 
+/**
+ * A piece-sound picker (Move sound, Capture sound): each option is a radio (picking it plays it) with its own ▶ to hear
+ * it without picking. Kept on the device; the first option is today's sound.
+ */
+function PieceSoundPicker({ kind, title, children }: { kind: PieceSoundKind; title: string; children: ComponentChildren }) {
+  const [chosen, setChosen] = useState(() => pieceSound(kind).id);
+  return (
+    <div class="ps-picker">
+      <span class="fd-toggle-text">
+        <strong>{title}</strong>
+        <span>{children}</span>
+      </span>
+      <div class="ps-list" role="radiogroup" aria-label={title}>
+        {PIECE_SOUNDS[kind].map((o) => (
+          <div key={o.id} class={`ps-row${chosen === o.id ? " on" : ""}`}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={chosen === o.id}
+              class="ps-choice"
+              onClick={() => {
+                setChosen(setPieceSound(kind, o.id).id);
+                previewPieceSound(kind, o.id);
+              }}
+            >
+              <strong>{o.label}</strong>
+              <span>{o.note}</span>
+            </button>
+            <button type="button" class="ps-play" aria-label={`Play ${o.label}`} onClick={() => previewPieceSound(kind, o.id)}>
+              {"\u25B6\uFE0E"}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Light or dark: Match device (until someone picks), Light or Dark. The same pick as the sun button. */
 const THEMES: { id: ThemePref; label: string }[] = [
   { id: "system", label: "Match device" },
@@ -188,6 +227,12 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
         >
           Piece sounds, ticks, the reveal, and the queue's pops.
         </Toggle>
+        <PieceSoundPicker kind="move" title="Move sound">
+          What a piece makes as it lands, in every mode. Tap {"\u25B6\uFE0E"} to hear one.
+        </PieceSoundPicker>
+        <PieceSoundPicker kind="capture" title="Capture sound">
+          When a piece takes another. Pick any with any move sound.
+        </PieceSoundPicker>
         {onSoundLab && (
           <button type="button" class="fd-row-link" onClick={onSoundLab}>
             🔊 Sound lab: choose the reveal's roulette sound ›

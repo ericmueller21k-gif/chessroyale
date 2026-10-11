@@ -68,6 +68,17 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
 - **Same model, always (Eric, Oct 7):** delegates and every other helper run on the director's own model (the agent
   files say `model: inherit`). Never pick a smaller or cheaper model for any helper, built-in ones included: when
   starting one, leave the model unset or set it to the director's. Eric pays for the top model and wants it on all work.
+- **Effort per task (Eric, Oct 11):** the model stays the same; the *effort* is chosen per task so the weekly usage
+  goes further. Before starting a helper, the director weighs the task and sets the Agent tool's `effort` to `medium`,
+  `high` or `xhigh`: never lower than `medium`, never higher than `xhigh`, and when torn between two, the higher one.
+  Say which and why in one line of the brief.
+  - `xhigh`: rules, scoring, the engine and judge, boss brains and their calibration, odds, coins and wallets, the
+    server, protocol, accounts, stored data and migrations, security, online sync; anything where a bug could break a
+    match or lose a player's data.
+  - `high`: new features or screens with logic or stored settings; animation and timing work; research that needs
+    judgement (licences, design); docs that must match the code exactly (the FAQ); crate item art Eric reviews.
+  - `medium`: CSS, layout and stacking tweaks; text and copy; docs-only updates; small investigations; one obvious bug
+    with a clear fix and a test.
 - **Any other window works only in its own lane** and doesn't act as the director.
 - **Before starting,** check `git log origin/main` and open PRs for work already in flight.
 - Each piece of work goes on its own branch and PR.

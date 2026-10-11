@@ -1,6 +1,6 @@
 /**
- * Game sounds: pieces use recorded wooden knocks (move, capture, castle, from
- * PyChess, GPL-3); every timer uses one clean clock tick; the reveal's
+ * Game sounds: pieces use recorded knocks: the move and capture sounds the player picked in Settings (piece-sounds.ts;
+ * the default is today's wooden knocks from PyChess, GPL-3, as is castling); every timer uses one clean clock tick; the reveal's
  * "selecting move" reel has a roulette-style arpeggio and three tones for the
  * winner (all synthesised with Web Audio, placeholders until real samples). Browsers
  * only allow audio after a tap, so call unlockAudio() from one. The mute
@@ -14,10 +14,26 @@ import { grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds
 import { hollowSound, type HollowSound } from "./characters/hollow-sounds.ts";
 import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
 import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
+import { defaultPieceSound, onPieceSoundChange, pieceSound, pieceSoundOption, type PieceSoundKind } from "./piece-sounds.ts";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 const samples = new Map<string, AudioBuffer>();
+/** Every recorded file, fetched and decoded once, by its path (the piece sounds share them with SAMPLE_FILES). */
+const files = new Map<string, Promise<AudioBuffer | null>>();
+const decoded = new Map<string, AudioBuffer>();
+function loadFile(url: string): Promise<AudioBuffer | null> {
+  let p = files.get(url);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((b) => ctx!.decodeAudioData(b))
+      .then((buf) => (decoded.set(url, buf), buf))
+      .catch(() => (files.delete(url), null));
+    files.set(url, p);
+  }
+  return p;
+}
 const MUTE_KEY = "brc.muted";
 let muted = (() => {
   try {
@@ -78,12 +94,15 @@ export function unlockAudio() {
       soften.frequency.value = 6000;
       master.connect(soften).connect(ctx.destination);
       for (const [name, url] of Object.entries({ ...SAMPLE_FILES, ...(GREX_WHISTLE_FILE ? { grexWhistleFile: GREX_WHISTLE_FILE } : {}) })) {
-        void fetch(url)
-          .then((r) => r.arrayBuffer())
-          .then((b) => ctx!.decodeAudioData(b))
-          .then((buf) => samples.set(name, buf))
-          .catch(() => undefined);
+        void loadFile(url).then((buf) => buf && samples.set(name, buf));
       }
+      // Only the picked move and capture sounds (the others load when previewed), and a new pick as it's made.
+      void loadFile(pieceSound("move").file);
+      void loadFile(pieceSound("capture").file);
+      onPieceSoundChange(() => {
+        void loadFile(pieceSound("move").file);
+        void loadFile(pieceSound("capture").file);
+      });
     }
     void ctx.resume();
   } catch {
@@ -110,7 +129,23 @@ export function onMuteChange(fn: () => void): () => void {
 
 function sample(name: keyof typeof SAMPLE_FILES, at: number, level = 1, rate = 1) {
   const buf = samples.get(name);
-  if (!buf) return;
+  if (buf) startBuffer(buf, at, level, rate);
+}
+/**
+ * The picked move or capture sound. Until it has loaded (or if it can't), today's wooden knock: a move is never
+ * silent because of a pick.
+ */
+function pieceSample(kind: PieceSoundKind, at: number, level = 1, rate = 1) {
+  const buf = decoded.get(pieceSound(kind).file) ?? decoded.get(defaultPieceSound(kind).file);
+  if (buf) startBuffer(buf, at, level, rate);
+}
+/** Castling: today's king-and-rook knock with the default move sound; with another, the picked move sound twice. */
+function castleSample(at: number) {
+  if (pieceSound("move").id === defaultPieceSound("move").id || !decoded.has(pieceSound("move").file)) return sample("castle", at);
+  pieceSample("move", at);
+  pieceSample("move", at + 0.11, 0.8);
+}
+function startBuffer(buf: AudioBuffer, at: number, level: number, rate: number) {
   const src = ctx!.createBufferSource();
   src.buffer = buf;
   src.playbackRate.value = rate;
@@ -118,6 +153,23 @@ function sample(name: keyof typeof SAMPLE_FILES, at: number, level = 1, rate = 1
   g.gain.value = level;
   src.connect(g).connect(master!);
   src.start(at);
+}
+
+/**
+ * Plays one of the piece sounds in Settings' pickers (its ▶, or as it's picked), loading it first if it hasn't been.
+ * A tap asked for it, so it plays even with the game's sound switched off. Tests read `preview:<kind>:<id>` in the log.
+ */
+export function previewPieceSound(kind: PieceSoundKind, id: string): void {
+  const option = pieceSoundOption(kind, id);
+  (globalThis as { __soundLog?: string[] }).__soundLog?.push(`preview:${kind}:${option.id}`);
+  unlockAudio();
+  const c = ctx;
+  if (!c || !master) return;
+  void loadFile(option.file).then(async (buf) => {
+    if (!buf || ctx !== c) return;
+    await c.resume().catch(() => undefined);
+    startBuffer(buf, c.currentTime + 0.005, 1, 1);
+  });
 }
 
 /** Plays synthesised samples (a boss character's sounds, see characters/), at `rate` (a little higher or lower). */
@@ -449,9 +501,9 @@ export type SoundName =
   | "sqSting";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
-  move: (t) => sample("move", t),
-  capture: (t) => sample("capture", t),
-  castle: (t) => sample("castle", t),
+  move: (t) => pieceSample("move", t),
+  capture: (t) => pieceSample("capture", t),
+  castle: castleSample,
   tick: (t) => clockTick(t),
   // One step of the "selecting move" reel: the next note up the arpeggio, with a quick grace note above.
   reel: (t) => {
@@ -487,7 +539,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   menuClose: (t) => sample("menuClose", t, 0.7),
   menuSelect: (t) => sample("menuSelect", t, 0.8),
   gkLeave: (t) => sample("gkLeave", t, 0.6),
-  // The judge's gavel at a cut: two heavy wooden knocks (the piece sounds, pitched down).
+  // The judge's gavel at a cut: two heavy wooden knocks (today's wooden piece sounds, pitched down, whatever the pick).
   gavel: (t) => {
     for (const [dt, level] of [[0, 1], [0.26, 0.85]] as const) {
       sample("capture", t + dt, level, 0.55);
@@ -555,9 +607,9 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   sawyerRejoin: sawyer("rejoin"),
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
-  // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
+  // Every board's move landing after a round: a quick ripple of soft knocks (the picked move sound), one per board.
   ripple: (t) => {
-    for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));
+    for (let i = 0; i < 8; i++) pieceSample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));
   },
 };
 
