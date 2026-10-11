@@ -79,6 +79,11 @@ export interface Settings {
   bossAvoid: string;
   /** Test switch (?power=freeze|blizzard|pie|funhouse|sparkler|candle): that power comes at once (an ultimate after its warning). */
   bossPowerTest: string;
+  /**
+   * Test switch, solo (?mate=1): the boss battle starts after 1.f3 e5 2.g4 with the crowd White and the boss to move, and
+   * the boss plays a mate in one whenever it has one: its attack on the crowd's king, then the result, at once.
+   */
+  bossMateTest?: boolean;
   /** Solo's difficulty (BOSS_DIFFICULTY): Elo on top of the boss's strength, within what the engine plays (0 online). */
   bossDifficulty: number;
   /** Testing, solo only (?wip=1): `bossId` may be a boss whose powers are built but whose art isn't yet (placeholders). */

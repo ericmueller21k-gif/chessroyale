@@ -8,7 +8,7 @@
  */
 import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice } from "./synth.ts";
 
-export type HollowSound = "hum" | "cast" | "whisper" | "pop" | "smash" | "tick" | "found" | "miss" | "relight" | "clink";
+export type HollowSound = "hum" | "cast" | "whisper" | "pop" | "smash" | "tick" | "found" | "miss" | "relight" | "clink" | "lash";
 
 /** Short bursts at the given times, each shaped by `burst(age, i)`. */
 function grains(times: readonly number[], burst: (age: number, i: number) => number): Voice {
@@ -134,10 +134,25 @@ const SOUNDS: Record<HollowSound, (rate: number) => Float32Array> = {
     const b = knock(0.08);
     return render(rate, 0.22, (t) => a(t) + 0.8 * b(t));
   },
+  // A lash of his strand (his attack on a king): a low whoosh sinking as it swings, a dull snap as it lands, and the
+  // wire's dull rattle. No crack of a whip, nothing bright.
+  lash: (rate) => {
+    const whoosh = bandpass(rate, (t) => 620 - 470 * Math.min(1, t / 0.11), 1.4, murk(rate, 1100, 191));
+    const snap = osc(rate, (t) => 60 + 70 * Math.exp(-Math.max(0, t - 0.085) / 0.025), sine);
+    const thud = murk(rate, 260, 193);
+    const r = rng(197);
+    const rattle = grains(Array.from({ length: 5 }, () => 0.09 + r() * 0.08), (age) => Math.exp(-age / 0.012));
+    const wire = lowpass(rate, 500, lowpass(rate, 800, noise(199)));
+    return render(rate, 0.26, (t) => {
+      const swing = Math.min(1, t / 0.05) * Math.max(0, 1 - t / 0.1) ** 1.2;
+      const hit = t < 0.085 ? 0 : Math.exp(-(t - 0.085) / 0.05);
+      return 1.6 * swing * whoosh(t) + hit * (0.9 * snap(t) + 1.4 * thud(t)) + 1.2 * wire(t) * Math.min(1, rattle(t));
+    });
+  },
 };
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<HollowSound, number> = { hum: 0.095, cast: 0.22, whisper: 0.75, pop: 0.32, smash: 0.26, tick: 0.255, found: 0.21, miss: 0.185, relight: 0.116, clink: 0.25 };
+const LEVEL: Record<HollowSound, number> = { hum: 0.095, cast: 0.22, whisper: 0.75, pop: 0.32, smash: 0.26, tick: 0.255, found: 0.21, miss: 0.185, relight: 0.116, clink: 0.25, lash: 0.22 };
 
 const cache = new Map<string, Float32Array>();
 /** The samples for one of his sounds at a sample rate (made once, then reused). */

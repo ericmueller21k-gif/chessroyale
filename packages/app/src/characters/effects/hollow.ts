@@ -1,7 +1,7 @@
 /** Hollow's effects: the dark, his pour and a miss, his strand of bulbs, Lights out's night. See ../effects.ts. */
 import { canvas, ellipse, toGrid } from "../paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
-import { SQUARE } from "./common.ts";
+import { SQUARE, sparkle, type Pt } from "./common.ts";
 
 // ---- Hollow's dark: a square covered in smoke (the passive), the darkness he pours onto it, a miss, his strand of
 // bulbs counting down, and Lights out: the whole board gone to night, square by square, with its found pieces and the
@@ -528,4 +528,93 @@ export const NIGHT_LABEL: Character = {
     return parts;
   })(),
   anims: Object.fromEntries(Object.keys(GLYPHS).map((c) => [c, { loop: true, frames: [{ ms: 1000, layers: [{ part: c, x: 0, y: 0 }] }] } satisfies Anim])),
+};
+
+// ---- A lash of his strand landing on a king (his attack: the God King in his Last Stand, the crowd's king at his
+// mate), one square: the strand's crack across it in one of its bulbs' colours, sparks bursting off its tip.
+
+const LASH_PALETTE = {
+  k: "#00000000",
+  "1": "#ff4a4a", // red, gold, blue: the crack's colour, its edge, its spark
+  "4": "#b3172c",
+  "7": "#ffe0da",
+  "2": "#ffc93a",
+  "5": "#c2830f",
+  "8": "#fff8d6",
+  "3": "#4ab3ff",
+  "6": "#1d5fd0",
+  "9": "#e0f4ff",
+  u: "#5b36a3", // violet, as everything of his
+  U: "#9c6cff",
+  x: "#e9ddff",
+  y: "#e9ddff88",
+  z: "#5b36a366",
+} as const;
+const LASH_COLOURS = [["1", "4", "7"], ["2", "5", "8"], ["3", "6", "9"]] as const;
+
+/**
+ * The crack across the square, coming in from the left edge: `kind` "F" a forehand (straight, a little down, high on
+ * the square), "B" a backhand (low, rising). `n` pixels of it so far (it sweeps in), each with a jag. Returns its points.
+ */
+const crackLine = (kind: "F" | "B", n: number): Pt[] => {
+  const [y0, y1] = kind === "F" ? [11, 16] : [22, 13];
+  const out: Pt[] = [];
+  for (let x = 0; x <= Math.min(26, n); x++) out.push([x, Math.round(y0 + ((y1 - y0) * x) / 26 + (x % 5 === 2 ? 1 : x % 5 === 4 ? -1 : 0))]);
+  return out;
+};
+const lashFrame = (kind: "F" | "B", c: number, step: 0 | 1 | 2): Speck[] => {
+  const [main, edge, hot] = LASH_COLOURS[c]!;
+  const pts = crackLine(kind, step === 0 ? 18 : 26);
+  const tip = pts[pts.length - 1]!;
+  const out: Speck[] = [];
+  if (step < 2)
+    for (const [x, y] of pts) {
+      out.push([x, y, step === 0 ? hot : main], [x, y + 1, step === 0 ? main : edge]);
+      if (step === 0 && x % 3 === 0) out.push([x, y - 1, "x"]);
+    }
+  else for (const [x, y] of pts) if (x % 2 === 0 && x > 6) out.push([x, y, "z"]);
+  // Sparks off the tip: a burst, then flying apart and dimming.
+  const r = [2, 5, 8][step]!;
+  for (let a = 0; a < 8; a++) {
+    const ang = (a / 8) * Math.PI * 2 + c;
+    const px = Math.round(tip[0] + Math.cos(ang) * r);
+    const py = Math.round(tip[1] + Math.sin(ang) * r * 0.8);
+    if (px < 0 || py < 0 || px > 31 || py > 31) continue;
+    out.push([px, py, step === 2 ? "y" : a % 2 ? hot : "U"]);
+    if (step === 0) out.push([px + (a % 2 ? 1 : -1), py, main]);
+  }
+  if (step === 0) out.push(...sparkle(tip[0], tip[1], "x", "U", true));
+  return out;
+};
+/** Mirrored left to right (the lash coming in from the right edge: he stands to the king's right). */
+const flipSpecks = (sp: Speck[]): Speck[] => sp.map(([x, y, k]) => [SQUARE - 1 - x, y, k] as Speck);
+const lashAnims: Record<string, Anim> = {};
+for (const kind of ["F", "B"] as const)
+  for (const side of ["L", "R"] as const)
+    for (let c = 0; c < 3; c++) {
+      const sp = (step: 0 | 1 | 2) => (side === "L" ? lashFrame(kind, c, step) : flipSpecks(lashFrame(kind, c, step)));
+      lashAnims[`hit${kind}${side}${c}`] = {
+        loop: false,
+        frames: [
+          { ms: 50, layers: [], specks: sp(0) },
+          { ms: 70, layers: [], specks: sp(1) },
+          { ms: 60, layers: [], specks: sp(2) },
+          { ms: 20, layers: [] },
+        ],
+      };
+    }
+/**
+ * A lash landing on a king's square: `hit<F|B><L|R><c>`: a forehand (straight, high) or backhand (rising, low), coming
+ * in from the left or the right edge, in bulb colour c (0 red, 1 gold, 2 blue). About 200 ms; ends empty. Over the
+ * piece (or the God King standing there), see-through round its line.
+ */
+export const LASH_HIT: Character = {
+  id: "lash-hit",
+  name: "A lash of Hollow's strand",
+  w: SQUARE,
+  h: SQUARE,
+  foot: [16, 31],
+  palette: LASH_PALETTE,
+  parts: {},
+  anims: lashAnims,
 };

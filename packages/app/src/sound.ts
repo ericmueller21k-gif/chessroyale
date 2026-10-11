@@ -360,6 +360,7 @@ export type SoundName =
   | "hollowMiss"
   | "hollowRelight"
   | "hollowClink"
+  | "hollowLash"
   // Big Boy (a raid boss, the baby): synthesised, see characters/bigboy-sounds.ts.
   | "bigboyGiggle"
   | "bigboySlurp"
@@ -467,6 +468,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   hollowMiss: hollow("miss"),
   hollowRelight: hollow("relight"),
   hollowClink: hollow("clink"),
+  hollowLash: hollow("lash"),
   bigboyGiggle: bigBoy("giggle"),
   bigboySlurp: bigBoy("slurp"),
   bigboyWail: bigBoy("wail"),
@@ -505,6 +507,7 @@ const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
   hollowMiss: (r) => hollowSound("miss", r),
   hollowRelight: (r) => hollowSound("relight", r),
   hollowClink: (r) => hollowSound("clink", r),
+  hollowLash: (r) => hollowSound("lash", r),
   bigboyGiggle: (r) => bigBoySound("giggle", r),
   bigboySlurp: (r) => bigBoySound("slurp", r),
   bigboyWail: (r) => bigBoySound("wail", r),

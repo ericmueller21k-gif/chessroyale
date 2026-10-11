@@ -73,6 +73,20 @@ function setup(settings: Partial<Settings> = {}, icons: Record<string, string> =
 }
 
 describe("lobby", () => {
+  it("keeps whether each player has the eval bar on, from their hello, and from a hello again on coming back", () => {
+    const L = setup();
+    const a = L.core.connect(undefined, "Ann", "computer", false, null, undefined, undefined, null, true);
+    L.core.connect(undefined, "Bo", "phone");
+    expect(L.core.record.humans.map((h) => h.evalBar)).toEqual([true, undefined]);
+    // Ann switched it off and came back (same seat): the newer word counts; a hello that doesn't say keeps it.
+    const token = L.core.record.humans[0]!.token;
+    expect(a.ok).toBe(true);
+    L.core.connect(token, "Ann", "computer", false, null, undefined, undefined, null, false);
+    expect(L.core.record.humans[0]!.evalBar).toBe(false);
+    L.core.connect(token, "Ann", "computer");
+    expect(L.core.record.humans[0]!.evalBar).toBe(false);
+  });
+
   it("lets players join, makes the first the host, and fills empty seats with bots on start", () => {
     const L = setup();
     const a = L.core.connect(undefined, "Ann", "computer");
@@ -472,7 +486,8 @@ describe("lobby: Crowd mode", () => {
 
   it("boss battle online: the host plays the boss's moves, the boss strikes every 3 crowd moves, results carry the outcome", () => {
     const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, bossMaxMoves: 7 });
-    L.core.connect(undefined, "Ann", "computer");
+    // (Ann has switched the eval bar off; Bo's app is from before the setting: it doesn't say.)
+    L.core.connect(undefined, "Ann", "computer", false, null, undefined, undefined, null, false);
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
     L.advance(1000);
@@ -518,6 +533,9 @@ describe("lobby: Crowd mode", () => {
     const stages = CROWD_KNOCKOUTS.boss.length;
     const mine = L.core.humanResults();
     expect(mine).toHaveLength(2);
+    // Whether each had the eval bar on, as their app said when they joined.
+    expect(mine.find((r) => r.playerId === "p1")!.evalBar).toBe(false);
+    expect(mine.find((r) => r.playerId === "p2")!.evalBar).toBeNull();
     for (const r of mine) {
       expect(r.cuts).toBeGreaterThan(0);
       expect(r.cuts).toBeLessThanOrEqual(stages);
