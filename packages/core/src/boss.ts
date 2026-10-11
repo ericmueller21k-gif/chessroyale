@@ -158,6 +158,8 @@ export function chooseBoss(roll: number, wanted?: string | null, avoid?: string 
 
 /** The strongest the engine plays with its strength limited (Stockfish's UCI_Elo ceiling). */
 export const ENGINE_MAX_ELO = 3190;
+/** The weakest it plays (Stockfish's UCI_Elo floor): a boss set below it slips now and then instead (bossStumbleChance). */
+export const ENGINE_MIN_ELO = 1320;
 
 /**
  * The boss's strength: the lobby's (the usual calculation) plus its own offset, plus solo's difficulty (`extra`:

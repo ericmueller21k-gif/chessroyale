@@ -1,0 +1,188 @@
+import { describe, expect, it } from "vitest";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, DEFAULT_SETTINGS, isPlayable, maiaRatingFor } from "@chessroyale/core";
+import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, type FaqSources } from "../src/faq/content.ts";
+import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
+
+/** The FAQ's text, built from these sources. */
+const text = (src: FaqSources = FAQ_DEFAULTS) => faqPlainText(src);
+/** One section's text. */
+const section = (id: string, src: FaqSources = FAQ_DEFAULTS) => {
+  const s = faqPage(src).sections.find((x) => x.id === id)!;
+  return plainText(s.blocks);
+};
+const withSettings = (patch: Partial<typeof DEFAULT_SETTINGS>): FaqSources => ({ ...FAQ_DEFAULTS, settings: { ...FAQ_DEFAULTS.settings, ...patch } });
+
+describe("the FAQ's contents", () => {
+  const page = faqPage();
+  const anchors = faqAnchors(page);
+
+  it("has every section the brief lists, in order", () => {
+    expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "crates", "fair-play", "credits"]);
+  });
+
+  it("every table-of-contents entry has a matching section, and every sub-entry a heading in it", () => {
+    for (const t of page.toc) {
+      const s = page.sections.find((x) => x.id === t.id);
+      expect(s, t.id).toBeDefined();
+      expect(s!.title).toBe(t.title);
+      for (const sub of t.subs) {
+        const h = s!.blocks.find((b) => b.kind === "heading" && b.id === sub.id);
+        expect(h, `${t.id} › ${sub.id}`).toBeDefined();
+        expect(h && h.kind === "heading" && h.text).toBe(sub.title);
+      }
+    }
+  });
+
+  it("every section is in the contents, and every anchor is unique", () => {
+    expect(page.sections.map((s) => s.id)).toEqual(page.toc.map((t) => t.id));
+    expect(new Set(anchors).size).toBe(anchors.length);
+    expect(anchors).not.toContain("contents");
+  });
+
+  it("every link inside the FAQ jumps to an anchor that exists", () => {
+    const links = page.sections.flatMap((s) => linksOf(s.blocks)).filter((h) => h.startsWith("#"));
+    expect(links.length).toBeGreaterThan(3);
+    for (const l of links) expect(anchors, l).toContain(l.slice(1));
+  });
+
+  it("the bosses' sections list their sub-headings; the boss brain section has the handover and the rating gap", () => {
+    const brain = page.toc.find((t) => t.id === "boss-brain")!;
+    expect(brain.subs.map((s) => s.id)).toEqual(expect.arrayContaining(["boss-strength", "stockfish-brain", "maia-brain", "handover", "rating-gap"]));
+    expect(page.toc.find((t) => t.id === "god-king")!.subs.map((s) => s.id)).toContain("last-stand");
+  });
+
+  it("every playable boss has its own block, under its own heading", () => {
+    const powers = page.sections.find((s) => s.id === "boss-powers")!;
+    for (const b of BOSS_ROSTER.filter(isPlayable)) {
+      expect(BOSS_BLOCKS[b.id], b.id).toBeTypeOf("function");
+      expect(anchorsOf(powers.blocks)).toContain(`boss-${b.id}`);
+      expect(section("boss-powers")).toContain(b.name);
+    }
+  });
+
+  it("leaves no markup in the words", () => {
+    const t = text();
+    expect(t).not.toMatch(/\*\*|\]\(#|\{#|\$\{|undefined|NaN|null/);
+  });
+});
+
+const anchorsOf = (blocks: ReturnType<typeof parse>) => blocks.flatMap((b) => (b.kind === "heading" ? [b.id] : []));
+
+describe("the FAQ's numbers come from the settings", () => {
+  it("the Last Stand's thresholds", () => {
+    const s = DEFAULT_SETTINGS;
+    const t = section("god-king");
+    expect(t).toContain(`Under ${s.lastStandFrom}%: no save`);
+    expect(t).toContain(`From ${s.lastStandFrom}% to ${s.lastStandShareBelow}%`);
+    expect(t).toContain(`starts at ${s.lastStandLoss + s.lastStandChargedExtra} with charges`);
+    const moved = section("god-king", withSettings({ lastStandFrom: 15, lastStandShareBelow: 45, lastStandLoss: 40 }));
+    expect(moved).toContain("Under 15%: no save");
+    expect(moved).toContain("From 15% to 45%");
+    expect(moved).toContain(`starts at ${40 + s.lastStandChargedExtra} with charges`);
+  });
+
+  it("the handover: Maia's rating line, its worked example, and where Stockfish takes over", () => {
+    const t = section("boss-brain");
+    const [x0, y0] = BOSS_BRAIN.maiaRating[0]!;
+    expect(t).toContain(`A boss at 2000 plays Maia at ${y0} +`);
+    expect(t).toContain(`= ${maiaRatingFor(2000)}`);
+    expect(t).toContain(`from ${BOSS_BRAIN.stockfishFrom} up: Stockfish`);
+    expect(t).toContain(`from ${x0} to`);
+    const brain = { ...BOSS_BRAIN, maiaRating: [[1400, 1200], [2400, 2000], [2600, 3000]] as const, stockfishFrom: 2900 };
+    const moved = section("boss-brain", { ...FAQ_DEFAULTS, brain });
+    expect(moved).toContain("from 1400 to 2400: Maia = 1200 + 0.8 × (strength − 1400)");
+    expect(moved).toContain("= 1680");
+    expect(moved).toContain("from 2900 up: Stockfish");
+  });
+
+  it("Maia is marked as being tested only while it's off for players", () => {
+    expect(section("boss-brain")).toContain(BOSS_BRAIN.forPlayers ? "New." : "Being tested; coming soon.");
+    const on = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: true } });
+    expect(on).not.toContain("Being tested");
+    const off = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: false } });
+    expect(off).toContain("Being tested; coming soon.");
+  });
+
+  it("the blunder guard, the slips and the strength example", () => {
+    const t = section("boss-brain");
+    expect(t).toContain(`more than ${DEFAULT_SETTINGS.bossMaxLoss} points against the best move`);
+    expect(t).toContain(`below ${DEFAULT_SETTINGS.bossStumbleBelow} a boss sometimes slips`);
+    const moved = section("boss-brain", withSettings({ bossMaxLoss: 12, bossStumbleBelow: 2200 }));
+    expect(moved).toContain("more than 12 points against the best move");
+    expect(moved).toContain("below 2200 a boss sometimes slips");
+    const roster = BOSS_ROSTER.map((b) => (b.id === "bigboy" ? { ...b, offset: -200 } : b));
+    const tier = BOSS_TIERS.find((t) => t > 1750)!;
+    const hard = BOSS_DIFFICULTY.find((d) => d.id === "hard")!.elo;
+    expect(section("boss-brain", { ...FAQ_DEFAULTS, roster })).toContain(`Big Boy at Hard: ${tier} − 200 + ${hard} = ${tier - 200 + hard}`);
+  });
+
+  it("the expected-score formula", () => {
+    expect(eloExpected(0)).toBe(0.5);
+    expect(eloExpected(200)).toBeCloseTo(0.76, 2);
+    expect(eloExpected(400)).toBeCloseTo(0.909, 3);
+    expect(section("boss-brain")).toMatch(new RegExp(`\\n400\\s+${eloExpected(400).toFixed(2)}\\s+${(1 - eloExpected(400)).toFixed(2)}`));
+  });
+
+  it("the powers and the rage meter", () => {
+    const t = section("boss-powers");
+    expect(t).toContain(`can't move for ${BOSS_POWERS.freezeTurns} turns`);
+    expect(t).toContain(`The meter fills to ${BOSS_POWERS.rageFull}`);
+    const moved = section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, freezeTurns: 3, ragePerMove: 4, candleShots: 30 } });
+    expect(moved).toContain("can't move for 3 turns");
+    expect(moved).toContain("- 4 for every crowd move");
+    expect(moved).toContain("30 fireballs");
+    expect(moved).toContain("full after about 25 crowd moves");
+  });
+
+  it("the judge, the re-check and brilliant moves", () => {
+    const t = section("scoring");
+    expect(t).toContain(`A missed move scores −${-DEFAULT_SETTINGS.missedMoveScore}`);
+    const moved = section("scoring", { ...withSettings({ engineNodes: 300_000, recheckMax: 4 }), brilliant: { ...FAQ_DEFAULTS.brilliant, minPickers: 7 } });
+    expect(moved).toContain("300,000 positions");
+    expect(moved).toContain("up to 4 moves a board");
+    expect(moved).toContain("among at least 7 pickers");
+  });
+
+  it("the worked example is scored by the game's own scoring", () => {
+    const t = section("scoring");
+    expect(t).toMatch(/A\s+0\.62\s+0\s+\+10/);
+    expect(t).toMatch(/D\s+0\.30\s+32\s+−22/);
+    expect(t).toContain("(0 + 4 + 4 + 32) / 4 = 10");
+  });
+
+  it("the crates' odds", () => {
+    const crates = FAQ_DEFAULTS.crates.map((c) => ({ ...c, strip: c.strip.map((x) => (x.tier === "common" ? { ...x, weight: 50 } : x)) }));
+    const moved = section("crates", { ...FAQ_DEFAULTS, crates });
+    // Common's weight 50 of 110 in all.
+    expect(moved).toContain(`${((50 / 110) * 100).toFixed(1)}%`);
+  });
+});
+
+describe("the FAQ keeps to how the game works", () => {
+  it("says nothing about how the app talks to the server, admin or test controls", () => {
+    const t = text();
+    expect(t).not.toMatch(/\/api\b|websocket|endpoint|protocol|durable|\bhost\b|admin|secret|token|rate limit|\?[a-z]+=|test switch|trigger ultimate/i);
+  });
+
+  it("is built the same every time (no randomness)", () => {
+    expect(text()).toBe(text());
+    expect(faqSections().map((s) => s.id)).toEqual(faqPage().toc.map((t) => t.id));
+  });
+});
+
+describe("the FAQ's text format", () => {
+  it("headings, lists, tables, formulas, notes and links", () => {
+    const blocks = parse(`### A heading {#here}\n\nSome **bold** and a [link](#here).\n\n- one\n- two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n$ x = 1\n$ y = 2\n\n> **Note.** Planned.`);
+    expect(blocks.map((b) => b.kind)).toEqual(["heading", "para", "list", "table", "formula", "note"]);
+    expect(blocks[0]).toEqual({ kind: "heading", id: "here", text: "A heading" });
+    expect(linksOf(blocks)).toEqual(["#here"]);
+    const table = blocks[3]!;
+    expect(table.kind === "table" && table.rows.length).toBe(1);
+    expect(blocks[4]).toEqual({ kind: "formula", lines: ["x = 1", "y = 2"] });
+    expect(inlineText(blocks[1]!.kind === "para" ? blocks[1]!.inlines : [])).toBe("Some bold and a link.");
+  });
+
+  it("a heading without an id gets one from its words", () => {
+    expect(parse("### The God King's save")[0]).toEqual({ kind: "heading", id: "the-god-king-s-save", text: "The God King's save" });
+  });
+});

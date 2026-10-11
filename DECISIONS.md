@@ -1096,6 +1096,76 @@ Three visual fixes Eric asked for from a screenshot of a Hollow battle on a comp
   three bulbs' colours, always three different ones. Lights out still puts a third of the strand out at a time (bulbs
   2, 5, 8 first), now by position rather than colour.
 
+### Piece sounds you pick: a Move sound and a Capture sound (Eric, Oct 11, 2026)
+
+Eric: "Add a few options: sound packs for the chess sounds … free to use … split them up so you can select whatever
+capture sound and whatever move sound you want", in Settings with a play button.
+
+- **Two pickers in Settings → Sound**, each option a radio with its own ▶: Move sound (Wooden knock, Light wood, Poker
+  chip, Click, Soft) and Capture sound (Double knock, Heavy wood, Chips, Clack, Thud). Today's wooden knocks are the
+  first option and the default, so nothing changes for anyone who doesn't pick. Kept on the device (`brc.moveSound`,
+  `brc.captureSound`, like the mute switch; accounts keep no preferences); an unknown or old id reads as the default.
+  The list and the storage: `packages/app/src/piece-sounds.ts`.
+- **Where the sounds come from (licences first):** two picks of each from Kenney's CC0 packs (*Impact Sounds*, *Casino
+  Audio*), and two of each made for the game by `scripts/piece-sounds.py` (a few decaying partials and a short burst of
+  noise: ours outright). Nothing CC BY, so no credit line is owed in Settings (Kenney's welcome but not required: left
+  out, like the God King's CC0 packs). Every file's source, author and licence: `public/sounds/SOURCES.md`. Lichess's
+  sets are out (AGPL, CC BY-NC-SA or non-free, per its own `COPYING.md`); Freesound's CC0 "Piece Placement" (el_boss)
+  would do but Freesound refused the download from here.
+- **Levelled to today's sounds** (my call): each file starts on its hit and its loudest 30 ms, heard through a phone
+  speaker (high-passed at 200 Hz) and the game's 6 kHz low-pass, matches today's move or capture. Kenney's chips were
+  pitched down a fifth: as recorded, most of them was above the low-pass and they'd have had to clip to be as loud.
+  mp3 like the rest (Safari), 2–4 KB each.
+- **Everywhere a move or capture sounds:** the big board's knock (every mode, replays included) and Classic's ripple
+  of moves across the boards use the pick. **Castling** (my call): today's king-and-rook knock with the default move
+  sound; with another, the picked move sound twice, 110 ms apart (king, then rook), so it matches. **The judge's
+  gavel** at a Crowd cut stays today's wooden knocks pitched down, whatever the pick: it's a gavel on a block, not a
+  piece.
+- **Light:** the first tap loads only the picked two (and today's two, which the gavel uses); the rest load when
+  previewed. Until a picked file has loaded, or if it can't, today's knock plays: a move is never silent because of
+  a pick. (The service worker still precaches every file for offline play: the new ones are 23 KB in all.)
+- **Previews play with the sound switched off** (my call): ▶ is a tap asking to hear it. Picking an option plays it
+  too, like a phone's ringtone list. Mute still silences every sound in a game.
+- **Flagged for Eric: the defaults are GPL-3.0** (PyChess, chosen Oct 2 "the same licence as the app"). Since the
+  Maia decision (Oct 11) the game's source isn't published, which GPL assets in the bundle don't fit. Eric asked to keep
+  today's sound as the default, so it stays; switching the defaults to a CC0 or our own option (Light wood and Heavy
+  wood are the closest) is a one-line change in `piece-sounds.ts` (and castling's knock would need a new file too).
+- **Tests:** `packages/app/test/piece-sounds.test.ts` (storage, fallback, files present, small and credited);
+  `e2e/piece-sounds.spec.ts` (pick, preview, reload, what loads, and every file decoded in the browser: starts on its
+  hit, as loud as the default within 2 dB).
+
+### The FAQ: "How HunChess works", in Settings (Oct 11, 2026)
+
+Eric: "I want to put in the app a full explanation of how things work… call it the FAQ… maybe have a table of
+contents. Put it in the settings." With the maths of how a strong boss switches from Maia to Stockfish first, and how
+the God King's save comes into play. The calls:
+
+- **Where:** Settings → HOW TO PLAY, a row "📖 FAQ · How it works" above the short rules, opening its own page at
+  `/faq` (back goes to Settings; the computer's side menu keeps Settings lit). A link to a heading works too
+  (`/faq#faq-handover`).
+- **One file of words, every number from settings** (`packages/app/src/faq/content.ts`): each section is a function of
+  `FaqSources` (the settings objects: `DEFAULT_SETTINGS`, `BOSS_POWERS`, `BOSS_BRAIN`, `BOSS_ROSTER`, `CRATES`…) that
+  returns its text in a small Markdown-like format (`faq/markdown.ts`: headings with anchors, lists, tables, formula
+  lines, notes, links). No Markdown library (nothing new to download for a page few open). Worked examples are worked
+  out by the game's own functions (`scoreGroup`, `maiaRatingFor`, `bossStrength`, `lastStandBar`, `kingCharges`), so
+  they can't drift; a test builds the FAQ from changed settings and checks the words follow. Two numbers that lived as
+  literals in code are now named so the FAQ can quote them: `BRILLIANT` (scoring.ts) and `ENGINE_MIN_ELO` (boss.ts,
+  used by uci.ts). The boss's top-8 search is a literal in `bossMoveFrom`, so the FAQ says "its best moves" instead.
+- **The contents:** every section, plus the sub-headings of the three Eric cares most about (how a boss decides its
+  moves, the powers, the God King), each a tap-to-jump link; every section ends with "↑ Contents".
+- **What's marked:** Maia is "Being tested; coming soon" while `BOSS_BRAIN.forPlayers` is off (the note flips by
+  itself when it's on); the bridge band between Maia and Stockfish (2600–2800) is "Planned" (today Maia holds at 3000
+  to 2800, then Stockfish). Classic gets one line: off the menu while it's redesigned.
+- **True to the code, where the brief's shorthand differs:** a raid's boss is matched to the people in it (bots never
+  count); the Crowd's boss battle is set from the last ten's ratings in that match, weighted towards the best, minus
+  100, whoever they are (bots among them count, as `startBoss` does). The rating-gap formula is the usual one, shown
+  as a guide to the boss menu's "+N vs you", not something the game computes.
+- **Security:** only how the game works for a player. Nothing on how the app talks to the server (messages, routes,
+  who scores what, the engine server), limits, secrets, admin or test controls, or how cheating is detected; fair play
+  says what happens, not how it's found. A unit test checks the text for the obvious words.
+- **Keeping it true:** a rule change changes the FAQ's words in the same PR (docs/areas/hub.md, `.claude/LESSONS.md`);
+  every playable boss must have its block in `BOSS_BLOCKS` (the test fails without one).
+
 ### Rage meters: every boss's ultimate again and again; the King's strikes add rage; Ginger's random free piece (Oct 11, 2026)
 
 Eric: "every boss can ult multiple times a game; that's how a typical rage meter works. When you strike bosses, it
