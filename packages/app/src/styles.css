@@ -402,7 +402,9 @@ p {
 .cg-wrap coords.files {
   font-size: clamp(9px, 2.6cqw, 14px);
   font-weight: 600;
-  line-height: 1;
+  /* (Normal, not 1: each label's text box, the font's full height, then sits inside its label and so inside its
+     square, whatever the font. With 1, a font with a tall ascent poked its box out over the row's top edge.) */
+  line-height: normal;
   opacity: 1;
 }
 .cg-wrap coords.ranks {
@@ -430,10 +432,10 @@ p {
 /* Tucked into the corners, where the pieces have the least ink: painted on the board, under the pieces (as on a printed
    board), a piece's base just reaches a letter's edge. */
 .cg-wrap coords.ranks coord {
-  padding: 0.12em 0 0 0.18em;
+  padding: 0.06em 0 0 0.18em;
 }
 .cg-wrap coords.files coord {
-  padding: 0 0.15em 0.06em 0;
+  padding: 0 0.15em 0.04em 0;
 }
 /* Each label in the colour that reads on its square. a1 and h8 are dark, so White's way up the odd labels (rank 1 on
    a1, file A on a1) sit on dark squares; Black's way up (rank 1 on h1, file A on a8) the even ones do. */
