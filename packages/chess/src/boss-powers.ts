@@ -46,6 +46,7 @@ export * from "./bosses/boingo.ts";
 export * from "./bosses/grex.ts";
 export * from "./bosses/hollow.ts";
 export * from "./bosses/bigboy.ts";
+export * from "./bosses/sawyer.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */

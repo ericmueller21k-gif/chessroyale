@@ -11,18 +11,25 @@ Rows marked *stumbles* use the game's boss: the target strength can go down to 8
 | expert | 2854 | +0 | plain | 2854 | 6 | 33% | 50% | 17% | 58 |
 | expert | 2854 | +150 | plain | 3004 | 6 | 33% | 33% | 33% | 55 |
 | expert | 2854 | +300 | plain | 3154 | 6 | 17% | 33% | 50% | 53 |
+| expert | 2848 | -100 | stumbles | 2748 | 6 | 0% | 50% | 50% | 53 |
+| expert | 2848 | -250 | stumbles, snack (a centre pawn eaten) | 2598 | 6 | 0% | 33% | 67% | 49 |
+| expert | 2908 | -250 | stumbles, split (his first pawn sawn in two) | 2658 | 3 | 33% | 33% | 33% | 55 |
 | club | 2369 | -300 | plain | 2069 | 6 | 33% | 17% | 50% | 51 |
 | club | 2369 | -150 | plain | 2219 | 6 | 33% | 17% | 50% | 46 |
 | club | 2369 | +0 | plain | 2369 | 6 | 0% | 33% | 67% | 55 |
 | club | 2369 | +150 | plain | 2519 | 6 | 67% | 0% | 33% | 55 |
 | club | 2369 | +300 | plain | 2669 | 6 | 0% | 17% | 83% | 52 |
-| club | 2289 | -100 | stumbles | 2189 | 8 | 38% | 25% | 38% | 55 |
+| club | 2289 | -100 | stumbles | 2189 | 16 | 19% | 13% | 69% | 50 |
+| club | 2289 | -450 | stumbles, snack (a centre pawn eaten) | 1839 | 8 | 0% | 0% | 100% | 33 |
+| club | 2289 | -250 | stumbles, snack (a centre pawn eaten) | 2039 | 8 | 0% | 0% | 100% | 38 |
+| club | 2289 | -100 | stumbles, snack (a centre pawn eaten) | 2189 | 8 | 0% | 0% | 100% | 37 |
 | casual | 1611 | -300 | plain | 1320 | 6 | 0% | 0% | 100% | 49 |
 | casual | 1611 | -150 | plain | 1461 | 6 | 0% | 17% | 83% | 45 |
 | casual | 1611 | +0 | plain | 1611 | 6 | 0% | 0% | 100% | 45 |
 | casual | 1611 | +150 | plain | 1761 | 6 | 0% | 0% | 100% | 42 |
 | casual | 1611 | +300 | plain | 1911 | 6 | 0% | 0% | 100% | 38 |
-| casual | 1647 | -100 | stumbles | 1547 | 8 | 88% | 0% | 13% | 55 |
+| casual | 1647 | -100 | stumbles | 1487 | 16 | 44% | 0% | 56% | 44 |
+| casual | 1527 | -100 | stumbles, snack (a centre pawn eaten) | 1427 | 8 | 0% | 0% | 100% | 31 |
 | beginner | 1415 | -300 | plain | 1320 | 6 | 0% | 17% | 83% | 42 |
 | beginner | 1415 | -150 | plain | 1320 | 6 | 0% | 0% | 100% | 38 |
 | beginner | 1415 | +0 | plain | 1415 | 6 | 0% | 0% | 100% | 33 |
