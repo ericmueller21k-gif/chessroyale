@@ -3,6 +3,9 @@
 // instantly and solo matches work offline. The API is never cached.
 const VERSION = "__VERSION__";
 const FILES = __FILES__;
+// The Maia box (/engine/maia/: the worker, its runtime and the model, about 40 MB): not precached, but kept once
+// fetched (a battle that uses it, or the boss menu's prefetch), in a cache named by its files' contents.
+const MAIA = "__MAIA__";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -17,7 +20,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== MAIA).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -32,6 +35,22 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request).catch(() => caches.match("/").then((cached) => cached || Response.error())),
+    );
+    return;
+  }
+
+  if (url.pathname.startsWith("/engine/maia/")) {
+    event.respondWith(
+      caches.open(MAIA).then((cache) =>
+        cache.match(request).then(
+          (cached) =>
+            cached ||
+            fetch(request).then((res) => {
+              if (res.ok && res.status === 200) cache.put(request, res.clone());
+              return res;
+            }),
+        ),
+      ),
     );
     return;
   }

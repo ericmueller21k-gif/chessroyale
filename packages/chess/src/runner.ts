@@ -58,6 +58,8 @@ import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves
 import { pickOpenings, type Opening } from "./openings.ts";
 import { applyMove, gameEnd, legalMoves, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
+import { BOSS_BRAIN, type BossBrain } from "@chessroyale/core";
+import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
 import {
   allowedSearch,
   bossAllowed,
@@ -1027,10 +1029,21 @@ export class MatchRunner {
     const kind = this.bossMoveKind();
     // (Test switch: a mate in one whenever there is one.)
     const mate = this.settings.bossMateTest ? (this.bossAllowed() ?? legalMoves(fen)).find((m) => gameEnd(applyMove(fen, m), []) === "checkmate") : undefined;
-    const move = mate ?? (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed()));
+    const brain = this.humanBrain;
+    const move =
+      mate ??
+      (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined));
     this.applyBossMove(move, kind === "stagger");
     return move;
   }
+
+  /**
+   * The boss's brain when it isn't plain Stockfish (solo's Boss alone sets it as the battle begins: Maia-3 at a
+   * rating, with its engine; see BOSS_BRAIN). Null: Stockfish, as everywhere else.
+   */
+  humanBrain: { brain: BossBrain; rating: number; engine: HumanEngineLike } | null = null;
+  /** What the brain did with the boss's last move (the admins' debug line). */
+  brainNote: BrainNote | null = null;
 
   /** The moves the boss may play now (a pie stops it too), or null: any legal move. */
   bossAllowed(): string[] | null {
@@ -1486,6 +1499,19 @@ export class MatchRunner {
 
 export type BossMoveKind = "elo" | "stumble" | "stagger";
 
+/**
+ * A human-like brain for the boss's move (bossMoveFrom): Maia's own move (maia-raw) or a guarded one, at `rating`.
+ * When its engine isn't ready, is slow or every candidate is vetoed, the move is today's Stockfish move.
+ */
+export interface BossBrainCall {
+  brain: BossBrain;
+  rating: number;
+  engine: HumanEngineLike;
+  /** BOSS_BRAIN, unless a test or sim passes its own. */
+  settings?: typeof BOSS_BRAIN;
+  onNote?(note: BrainNote): void;
+}
+
 /** The limits on a boss's moves (see bossSlipLoss, bossMaxLoss and bossMaxLogitLoss in settings). */
 export interface BossGuard {
   slipLoss: readonly [number, number];
@@ -1537,14 +1563,39 @@ export async function bossMoveFrom(
   strikeLoss: readonly [number, number] = [5, 15],
   guard: BossGuard = DEFAULT_BOSS_GUARD,
   allowed: readonly string[] | null = null,
+  brain?: BossBrainCall,
 ): Promise<string> {
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
+  // A human-like brain (Maia, BOSS_BRAIN) is asked at once, alongside the top-8 search: never waited on to load,
+  // never longer than its timeout. The King's strike stays Stockfish's (its own step back).
+  const human = brain && brain.brain !== "stockfish" ? brain : null;
+  const asked = performance.now();
+  const ask = human && k !== "stagger" && human.engine.ready() ? human.engine.candidates(fen, human.rating, allowed, { temperature: human.settings?.temperature ?? BOSS_BRAIN.temperature, topP: human.settings?.topP ?? BOSS_BRAIN.topP, multipv: human.settings?.multipv ?? BOSS_BRAIN.multipv }) : null;
   // A boss power can stop the boss too (nobody moves onto a pie): it plays the best of what's allowed.
   const all = await engine.topMoves(fen, 8);
   const ok = allowed ? new Set(allowed) : null;
   let top = ok ? all.filter((m) => ok.has(m.move)) : all;
   if (ok && !top.length) top = await engine.scoreMoves(fen, [...ok]);
   if (!top.length) return allowed?.[0] ?? legalMoves(fen)[0]!;
+  if (human) {
+    const note = { brain: human.brain, rating: human.rating } as const;
+    if (k === "stagger") human.onNote?.({ ...note, by: "stockfish", why: "strike" });
+    else if (!ask) human.onNote?.({ ...note, by: "stockfish", why: human.engine.failed?.() ? "failed" : "not ready" });
+    else {
+      const answer = await within(ask, (human.settings?.timeoutMs ?? BOSS_BRAIN.timeoutMs) - (performance.now() - asked));
+      if (!answer) human.onNote?.({ ...note, by: "stockfish", why: "no answer" });
+      else {
+        const pick = humanBrainMove(human.brain, human.rating, answer, top, allowed, human.settings);
+        if (pick.move) {
+          human.onNote?.({ ...note, by: "maia", ...(pick.rank ? { rank: pick.rank } : {}), vetoed: pick.vetoed, ms: answer.ms });
+          return pick.move;
+        }
+        // (Every candidate vetoed: Stockfish's best, the line with the highest score.)
+        human.onNote?.({ ...note, by: "stockfish", why: "guard", vetoed: pick.vetoed, ms: answer.ms });
+        return [...top].sort((a, b) => b.expected - a.expected)[0]!.move;
+      }
+    }
+  }
   const bestMove = top[0]!.move;
   // A move other than the best is checked once more, head to head with the best in one focused search (the
   // eight-line search spreads itself thin and now and then misjudges a move); failing that, the best is played.

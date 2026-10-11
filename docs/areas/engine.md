@@ -30,6 +30,18 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   each boss's `offset` in `BOSS_ROSTER`; solo's difficulty `BOSS_DIFFICULTY`). Below `bossStumbleBelow` it may slip
   slightly (`bossSlipLoss`). The **blunder guard** (`bossMaxLoss`, `bossMaxLogitLoss`) forbids any move that throws
   material: "It's boss mode, not idiot mode." A power can limit the boss's moves too (it plays the best allowed one).
+- **The boss's brain (Maia prototype, Oct 11; DECISIONS.md, "A human-like boss: Maia-3 for Ginger").** In Boss alone a
+  boss can play with **Maia-3** (CSSLab, University of Toronto: human moves at a rating) instead of Stockfish
+  (`BOSS_BRAIN`, `bossBrainFor`, `maiaRatingFor`). Maia is a separate AGPL program, the **Maia box**
+  (`packages/maia-worker/`, its own README and licence): a module worker at `/engine/maia/` (the official 23M
+  checkpoint converted to int8 ONNX, 24 MiB, run by onnxruntime-web on one thread, about 80 ms a move here). The game
+  only exchanges UCI-style text with it (`HumanUciEngine`). Brains: `stockfish`; `maia-raw` (Maia's own draw at
+  temperature 0.8, top-p 0.9; Ginger's default, Eric); `maia-light` (no move over 25 points / 2 logits); `maia-full`
+  (10 / 1, strict 4 / 0.5 at Maia 3000). The guards veto from the boss's own top-8 search (no extra search): Maia's
+  next likely move, else Stockfish's best. Maia's rating: about 1100 at strength 1400 to 2000 at 2400, 3000 at 2600;
+  Stockfish from 2800. Never waited on: not ready, failed, or no answer in 1.5 s, and today's move is played. Its
+  worker starts with the battle's intro and ends with the battle; the service worker keeps its files once fetched.
+  Admins only until the launch steps (ROADMAP.md).
 - **Judging with a power.** When a boss power limits the crowd's moves, the best move is the best of the allowed ones
   (`judgeTop`, `judgeCandidates`, `allowedSearch` in `boss-powers.ts`); Jefferson's fire counts a piece left to burn as
   gone (`fireJudged`). Shared with the `god-king` lane by agreement.
@@ -46,11 +58,14 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 | Many judges (lobby side) | `packages/server/src/judges.ts` (pure helpers), the flow in `lobby.ts` ("Many judges") |
 | The engine server | `engine/`, `packages/server/src/engine.ts`; routes `/api/engine/ping`, `/api/engine/score` |
 | Ratings from move losses | `packages/core/src/rating.ts`, `rating-curve.ts` |
+| The boss's brain: the rule, the text client | `packages/chess/src/boss-brain.ts`, `human-uci.ts`; `bossMoveFrom` in `runner.ts` |
+| Maia in the browser (start, prefetch, free) | `packages/app/src/maia.ts`, `boss-brain.ts` (the admins' pick) |
+| The Maia box (AGPL: worker, conversion, model) | `packages/maia-worker/` (README.md), built into `/engine/maia/` |
 
 ## Settings
 
-`engineNodes`, `recheck*`, `boss*` (strength, stumble, slip, blunder guard), `BOSS_TIERS`, `BOSS_DIFFICULTY`, `JUDGES`
-in settings.ts; Worker variables `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`.
+`engineNodes`, `recheck*`, `boss*` (strength, stumble, slip, blunder guard), `BOSS_BRAIN` (Maia), `BOSS_TIERS`,
+`BOSS_DIFFICULTY`, `JUDGES` in settings.ts; Worker variables `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`.
 
 ## Tests and tools
 
@@ -59,6 +74,10 @@ in settings.ts; Worker variables `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`.
 - e2e: `e2e/judges.spec.ts` (with containers off).
 - The container: Docker locally, or live via `/api/engine/ping` and `/api/engine/score` with the Access service-token
   headers (never print their values).
+- The brain: `packages/chess/test/boss-brain.test.ts` (the rating line, the brains' choices with made-up candidates,
+  the fallbacks, the text client); `packages/maia-worker/test/` (the encoder against the official tokenizer, the
+  protocol, the int8 model in onnxruntime-web); `e2e/maia.spec.ts`; `npx tsx packages/sim/scripts/maia-sim.ts`
+  (`reports/maia-boss.md`).
 - Sims (`packages/sim/scripts/`, write to `reports/`): `judge-accuracy.ts`, `judge-cuts.ts`, `judge-determinism.ts`,
   `many-judges.ts`, `deep-accuracy.ts`, `deep-timing.ts`, `boss-blunders.ts`, `boss-sim.ts`, `calibrate-rating.ts`.
 
@@ -71,3 +90,5 @@ in settings.ts; Worker variables `ENGINE_DAILY_SEARCHES`, `ENGINE_OFF`.
 - Measure before and after: a judge or boss change comes with a sim's before/after table in `reports/`.
 - Never break the fallback: every server path degrades to the host's own engine.
 - "The engine's best move" is the line with the highest score, not the first line.
+- The Maia box stays a separate program: nothing in the game imports it, and nothing in it imports the game; only
+  text goes between them (Eric's licence decision). Its source is published only with Eric's OK.

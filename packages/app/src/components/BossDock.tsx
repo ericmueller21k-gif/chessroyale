@@ -149,6 +149,7 @@ export function BossDock({
       />
     </div>
     <UltimateTest match={match} />
+    <BrainDebug match={match} />
     </>
   );
 }
@@ -180,6 +181,17 @@ export function UltimateTest({ match }: { match: GameView }) {
     >
       {spent ? "Ultimate used (testing)" : coming ? "Ultimate next turn (testing)" : "Trigger ultimate (testing)"}
     </button>
+  );
+}
+
+/** Testing, admins (Boss alone): the boss's brain at work, e.g. "Maia 1450 · no guard · Maia's #1 · 120 ms". */
+export function BrainDebug({ match }: { match: GameView }) {
+  const line = match.brainLine;
+  if (!line || !account().profile?.admin) return null;
+  return (
+    <div class="brain-debug" aria-label="Boss brain (testing)">
+      🧠 {line}
+    </div>
   );
 }
 
