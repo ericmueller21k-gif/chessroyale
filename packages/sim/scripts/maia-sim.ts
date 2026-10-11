@@ -14,7 +14,7 @@
 import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { BOSS_BRAIN, BOSS_ROSTER, DEFAULT_SETTINGS, bossBrainFor, bossStrength, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type BossBrain } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_ROSTER, DEFAULT_SETTINGS, bossBrainFor, bossStrength, bossStumbleChance, botPick, mulberry32, shuffle, type BossBrain } from "@chessroyale/core";
 import { applyMove, bossGuardFrom, bossMoveFrom, brainLine, fenAfter, gameEnd, HumanUciEngine, legalMoves, START_FEN, type BrainNote, type Opening, type UciTransport } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 
@@ -188,7 +188,7 @@ function summary() {
     const r0 = rs[0]!;
     const ms = rs.map((r) => r.medianMs).sort((a, b) => a - b)[n >> 1];
     const big = (t: number) => Math.round((100 * losses.filter((l) => l > t).length) / Math.max(1, losses.length));
-    return `| ${k} | ${r0.elo}${r0.maiaRating ? ` (Maia ${r0.maiaRating})` : ""} | ${n} | ${score} / ${n} | ${mean(losses).toFixed(1)} | ${big(10)}% / ${big(25)}% | ${estimateRating(losses) ?? "–"} | ${all ? Math.round((100 * maiaMoves) / all) : 0}% | ${vetoed} | ${ms} | ${mean(rs.flatMap((r) => r.playerLoss)).toFixed(1)} |`;
+    return `| ${k} | ${r0.elo}${r0.maiaRating ? ` (Maia ${r0.maiaRating})` : ""} | ${n} | ${score} / ${n} | ${mean(losses).toFixed(1)} | ${big(10)}% / ${big(25)}% | ${all ? Math.round((100 * maiaMoves) / all) : 0}% | ${vetoed} | ${ms} | ${mean(rs.flatMap((r) => r.playerLoss)).toFixed(1)} |`;
   });
   const md = [
     "# Maia-3 as Ginger's brain: sanity runs (Oct 11, 2026)",
@@ -199,11 +199,11 @@ function summary() {
     `${BOSS_BRAIN.temperature}, top-p ${BOSS_BRAIN.topP}). The same openings and colours for every brain; 60 player moves at most, then the`,
     "engine's verdict (75% or more: a win). Every boss move is scored as the judge scores a pick (its loss against the best,",
     "in points, at engineNodes); the loss columns count only moves in a game still to be played (the boss's chances 15–85%",
-    "before it), and \"plays like\" is the game's own rating from move losses (`estimateRating`, rating-curve.ts).",
+    "before it). (Stockfish judging Stockfish's own moves reads them kindly: compare the brains with each other.)",
     "Small samples: a sanity check, not a calibration.",
     "",
-    "| Tier | Player | Brain | Ginger (strength) | Games | Player's score | Boss's mean loss | Moves over 10 / 25 points | Boss plays like | Boss moves by Maia | Vetoed | Median boss move, ms | Player's mean loss |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Tier | Player | Brain | Ginger (strength) | Games | Player's score | Boss's mean loss | Boss moves over 10 / 25 points | Boss moves by Maia | Vetoed | Median boss move, ms | Player's mean loss |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...table,
     "",
     "## A few positions per brain",

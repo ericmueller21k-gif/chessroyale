@@ -1030,6 +1030,14 @@ model from CSSLab at the University of Toronto (Chessformer, ICLR 2026). No cali
 - **Credits (Settings):** "Bosses and bots use Stockfish (GPL-3.0, source) and Maia-3 by CSSLab, University of Toronto
   (AGPL-3.0), each a separate program running in your browser. The source of our Maia box is available on request
   (notice, licence)." Eric asked for both names in one line (bots will use Maia too, later).
+- **What the sanity runs show (`reports/maia-boss.md`; small samples, plain chess, no powers):** raw Maia makes Ginger
+  much easier at these ratings. Against the same strong bot player at tier 1600 (Ginger 1500, Maia 1190), the player
+  scored 1.5 of 8 against today's Stockfish Ginger, 5 of 8 against Maia with no guard, 5 of 8 with the light guard and
+  1.5 of 8 with the full guard. Per move in a live game, raw Maia gave away 10.8 points on average and over 25 points
+  on 21% of its moves (today's Ginger: 1.7 and 1%). Maia's own likeliest move at 1190 already gives away over 25
+  points 8% of the time in such positions; the mild draw makes it 13% (temperature 1: 16%). So keeping her as hard as
+  today on the raw brain means a higher Maia rating: that's for the calibration. A whole boss move took about 0.5–0.8
+  s here with Maia (the top-8 search plus Maia's ~80 ms), against 1.4 s with Stockfish (which adds its UCI_Elo search).
 - **Before Maia reaches players (pre-launch, needs Eric's OK; in ROADMAP.md):** publish the Maia box's source (a public
   repository or a download on the site; until then "on request"), and calibrate every boss.
 
