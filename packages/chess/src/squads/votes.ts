@@ -11,7 +11,7 @@ export type SquadsStart = "standard" | "same" | "random";
 
 export interface SquadsRules {
   start: SquadsStart;
-  /** Every board's chess clock: each side's bank and increment in rounds 1 and 2, and the final's own. */
+  /** The team clock: each squad's starting bank, its top-up a round, the free seconds a move, any increment. */
   clock: SquadsClock;
 }
 
@@ -27,16 +27,24 @@ export interface SquadsVote extends PregameVote {
   options: readonly SquadsVoteOption[];
 }
 
-/** "4+2": minutes (or m:ss) plus the increment in seconds, as chess players write a clock. */
-export function clockName(c: Pick<SquadsClock, "bankSeconds" | "incrementSeconds">): string {
-  const m = Math.floor(c.bankSeconds / 60);
-  const sec = c.bankSeconds % 60;
-  return `${sec ? `${m}:${String(sec).padStart(2, "0")}` : m}+${c.incrementSeconds}`;
+/** A time as chess players write it: "4" (minutes), "1:30", or "0:45". */
+export function minutesName(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const sec = Math.round(seconds % 60);
+  return sec ? `${m}:${String(sec).padStart(2, "0")}` : `${m}`;
 }
 
-/** An option's final clock, written the same way ("4+5"). */
-export const finalClockName = (c: Pick<SquadsClock, "finalBankSeconds" | "finalIncrementSeconds">) =>
-  clockName({ bankSeconds: c.finalBankSeconds, incrementSeconds: c.finalIncrementSeconds });
+/** "4+2": minutes plus the increment in seconds. */
+export function clockName(c: { bankSeconds: number; incrementSeconds: number }): string {
+  return `${minutesName(c.bankSeconds)}+${c.incrementSeconds}`;
+}
+
+/** A Clock option in one line: "Team clock 6 min · +1 min a round · 5 s free a move". */
+export function teamClockLine(c: SquadsClock): string {
+  const parts = [`Team clock ${minutesName(c.bankSeconds)} min`, `+${minutesName(c.topUpSeconds)} min a round`, `${c.delaySeconds} s free a move`];
+  if (c.incrementSeconds) parts.push(`+${c.incrementSeconds} s a move`);
+  return parts.join(" · ");
+}
 
 /** The votes, left to right, with their numbers from settings. */
 export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
@@ -66,9 +74,10 @@ export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
       options: s.clocks.map((c, i) => ({
         id: c.id,
         icon: ["⚡", "⏱️", "🧘"][i] ?? "⏱️",
-        label: `${c.label} ${clockName(c)}`,
-        blurb: `Rounds 1 and 2: ${clockName(c)}. The final: ${finalClockName(c)}`,
-        detail: `Minutes each side, plus seconds a move. Run out of time and you lose that board (a draw if the other side can't mate). Every game is played to the end.`,
+        label: `${c.label} ${minutesName(c.bankSeconds)} min`,
+        blurb: teamClockLine(c),
+        detail:
+          "One clock per squad for the whole tournament: what's left carries into the next round. It runs past the free seconds while your squad thinks, faster when two of you move at once. At zero it's sudden death: every move within the free seconds.",
         patch: {},
         rule: { clock: c },
       })),
