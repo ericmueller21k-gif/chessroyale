@@ -302,6 +302,8 @@ export const HOLLOW: BossRules = {
     ...(p.claimed ? { claimed: true } : {}),
     lightsAt: p.lightsOut ? p.lightsOut.at : null,
     ...(p.lightsOut?.extra ? { lightsExtra: p.lightsOut.extra } : {}),
+    // His lights' colours this battle (looks only): from the seed, 12 bits of it.
+    lights: Math.floor(powerRoll(p.seed, "lights") * 4096),
   }),
 };
 

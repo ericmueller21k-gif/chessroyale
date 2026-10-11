@@ -60,40 +60,38 @@ export function spriteFrameAt(ch: Character, anim: string, then: string | undefi
   return { anim: then!, frame: at(loop.frames, now - cycle * total), tag: `${then}:${cycle}` };
 }
 
-const images = new WeakMap<Frame, ImageData>();
-/** Frames in a look (Hollow's bulbs out), made once each. */
-const lookImages = new WeakMap<Frame, Map<string, ImageData>>();
-function frameImage(ch: Character, frame: Frame, look?: string): ImageData {
-  if (look) {
-    let byLook = lookImages.get(frame);
-    if (!byLook) lookImages.set(frame, (byLook = new Map()));
-    let li = byLook.get(look);
-    if (!li) {
-      const r = renderFrame(ch, frame, { look });
-      byLook.set(look, (li = new ImageData(new Uint8ClampedArray(r.data), r.w, r.h)));
-    }
-    return li;
-  }
-  let img = images.get(frame);
+/**
+ * Each frame's pixels, made once per look (Hollow's bulbs out) and per recolour from the battle (Hollow's lights:
+ * `ch.swap`); a new battle's lights replace the last one's.
+ */
+const images = new WeakMap<Frame, Map<string, ImageData>>();
+function frameImage(ch: Character, frame: Frame, look = ""): ImageData {
+  const swap = ch.swap?.() ?? null;
+  let byLook = images.get(frame);
+  if (!byLook) images.set(frame, (byLook = new Map()));
+  const key = `${swap?.id ?? ""}|${look}`;
+  let img = byLook.get(key);
   if (!img) {
-    const r = renderFrame(ch, frame);
+    const r = renderFrame(ch, frame, { look: look || undefined, swap });
     img = new ImageData(new Uint8ClampedArray(r.data), r.w, r.h);
-    images.set(frame, img);
+    if (swap) for (const k of [...byLook.keys()]) if (!k.startsWith("|") && !k.startsWith(`${swap.id}|`)) byLook.delete(k);
+    byLook.set(key, img);
   }
   return img;
 }
-/** A frame as a little canvas of its own (made once), for drawing onto a shared canvas with drawImage. */
-const canvases = new WeakMap<Frame, HTMLCanvasElement>();
+/** A frame as a little canvas of its own (made once, and again for a new battle's lights), for drawImage. */
+const canvases = new WeakMap<Frame, { id: string; canvas: HTMLCanvasElement }>();
 function frameCanvas(ch: Character, frame: Frame): HTMLCanvasElement {
+  const id = ch.swap?.()?.id ?? "";
   let c = canvases.get(frame);
-  if (!c) {
-    c = document.createElement("canvas");
-    c.width = ch.w;
-    c.height = ch.h;
-    c.getContext("2d")?.putImageData(frameImage(ch, frame), 0, 0);
-    canvases.set(frame, c);
+  if (!c || c.id !== id) {
+    const canvas = document.createElement("canvas");
+    canvas.width = ch.w;
+    canvas.height = ch.h;
+    canvas.getContext("2d")?.putImageData(frameImage(ch, frame), 0, 0);
+    canvases.set(frame, (c = { id, canvas }));
   }
-  return c;
+  return c.canvas;
 }
 /**
  * Draws an effect's frames ahead of time, a slice each animation frame on the shared loop (about 4 ms of work a frame),
@@ -162,13 +160,15 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
     let last = "";
     const draw = () => {
       const s = spriteFrameAt(ch, anim, then, Date.now(), since);
-      const key = `${s.anim}:${s.frame}`;
+      const shown = `${s.anim}:${s.frame}`;
+      // (Drawn again for a new battle's lights too.)
+      const key = `${shown}:${ch.swap?.()?.id ?? ""}`;
       if (key !== last) {
         last = key;
         const frame = ch.anims[s.anim]!.frames[s.frame]!;
         g.clearRect(0, 0, ch.w, ch.h);
         g.putImageData(frameImage(ch, frame, look), 0, 0);
-        cv.current?.setAttribute("data-frame", key);
+        cv.current?.setAttribute("data-frame", shown);
         const sound = frame.cue ? sounds[frame.cue] : undefined;
         const tag = `${ch.id}:${id}:${s.tag}:${s.frame}`;
         if (sound && !played.has(tag)) {

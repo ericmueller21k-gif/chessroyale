@@ -165,7 +165,7 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
   if (leftOne) expect(burnt).toBe(true);
 });
 
-test("on a computer the dock is under the board at every width, the board and dock on screen", async ({ page }) => {
+test("on a computer the dock is under the board at every width, the board and dock on screen, the God King beside it", async ({ page }) => {
   test.skip(test.info().project.name !== "desktop", "a computer's widths");
   await page.goto("/?debug&clock=60&boss=grex");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
@@ -180,6 +180,13 @@ test("on a computer the dock is under the board at every width, the board and do
     expect(dock!.x, `${w}`).toBeLessThan(board!.x + board!.width);
     expect(dock!.x + dock!.width, `${w}`).toBeGreaterThan(board!.x);
     expect(await page.evaluate(() => document.documentElement.scrollWidth), `${w}: no sideways scroll`).toBeLessThanOrEqual(w);
+    // The God King by the board's bottom-right corner (Eric, Oct 11), on screen, clear of the column beside the board.
+    const king = (await page.locator(".gk-unit .gk-unit-btn").boundingBox())!;
+    expect(king.x, `${w}: the God King right of the board`).toBeGreaterThanOrEqual(board!.x + board!.width);
+    expect(Math.abs(king.y + king.height - (board!.y + board!.height)), `${w}: his feet on the board's bottom edge`).toBeLessThanOrEqual(2);
+    expect(king.x + king.width, `${w}: on screen`).toBeLessThanOrEqual(w);
+    const side = await page.locator(".screen.game > .mini-tower:visible, .screen.game > .under-board:visible").first().boundingBox({ timeout: 500 }).catch(() => null);
+    if (side) expect(side.x, `${w}: the column beside the board clear of him`).toBeGreaterThanOrEqual(king.x + king.width);
   }
 });
 

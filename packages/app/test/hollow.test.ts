@@ -53,10 +53,11 @@ describe("Hollow, the Darkness boss", () => {
     const voidOf = (i: number) => idle.frames[i]!.layers.find((l) => l.part.startsWith("void:"))!.part;
     for (let i = 1; i < 8; i++) expect(voidOf(i)).not.toBe(voidOf(i - 1));
     const glints = idle.frames.map((f) => (f.specks ?? []).filter(([, , k]) => BULB_KEYS.some((b) => b[2] === k)).map(([, , k]) => k));
-    expect(new Set(glints.flat()).size).toBe(3);
+    // (Each bulb its own glint key: the glint visits every bulb.)
+    expect(new Set(glints.flat()).size).toBe(BULBS);
   });
 
-  it("counts down on his strand: each look puts about a third of the bulbs out, a colour at a time", () => {
+  it("counts down on his strand: each look puts about a third of the bulbs out", () => {
     const f = anim("idle").frames[0]!;
     // The pixels in a lit bulb's own colours (main, shade, glint).
     const litColours = new Set(BULB_KEYS.flatMap((b) => b.slice(0, 3).map((k) => ch.palette[k]!.toLowerCase())));
@@ -73,7 +74,7 @@ describe("Hollow, the Darkness boss", () => {
     for (let i = 1; i < 4; i++) expect(counts[i]!, `bulbs${3 - i}`).toBeLessThan(counts[i - 1]!);
     expect(counts[3]).toBe(0);
     // A long strand held in the middle (Eric's reference): ten bulbs, five down each half from his hand; each look
-    // puts about a third out (bulb i is colour i % 3: blue first, then gold, then red).
+    // puts about a third out (bulbs 2, 5, 8 first, then 1, 4, 7, then 0, 3, 6, 9).
     expect(BULBS).toBe(10);
     const at = hollowBuild({}).bulbs;
     expect(at).toHaveLength(10);

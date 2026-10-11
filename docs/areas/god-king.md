@@ -5,7 +5,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 ## How it works today
 
 - **Who he is.** The crowd's champion in every boss battle (the raid, the Crowd's boss final, solo's "Boss alone"). He
-  stands in the dock under the board (a computer: by the board), talks now and then, and can be called to act. He is
+  stands in the dock under the board (a computer: by the board's bottom-right corner, mirroring the boss by its
+  bottom-left, his words and menu opening outwards; Eric, Oct 11), talks now and then, and can be called to act. He is
   secondary to the chess: big moments are rare and short, and there is no instruction text on screen.
 - **Charges.** He has up to `kingChargesMax` (3) charges. Power-ups convert to charges (`kingPowerUpsPerCharge`).
   Tapping him opens his command menu: **play this move** (he plays the best move for the crowd, with his bolt) or

@@ -66,7 +66,18 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   round (and the dock).
 - **Same for everyone online:** what a boss does and says on screen comes only from the shared match state
   (`boss-beats.ts`): one-shot animations play once per moment from when the device first saw it, loops run by the
-  clock, lines are picked by a hash of the moment. No new protocol for a boss's looks.
+  clock, lines are picked by a hash of the moment. No new protocol for a boss's looks (Hollow's `lights`, a field of
+  his view, is the one exception: below).
+- **Hollow's lights** (Eric, Oct 11): his ten bulbs take a fresh order of `HOLLOW_LIGHTS`' 8 colours (settings.ts)
+  each battle, never one colour on bulbs within three of each other along the wire (so none lit side by side match as
+  the countdown puts every third one out), the
+  same for everyone: from his view's `lights` (0 to 4095, drawn from the battle's seed). Every place a bulb is drawn
+  takes them (his sprite and moments, his attack and lashes, Lights out, the strip by the boss bar): each bulb has its
+  own palette keys, recoloured as frames are drawn (`characters/lights.ts`, `Swap` in `sprite.ts`). Unit:
+  `packages/app/test/lights.test.ts`.
+- **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
+  bottom-right, mirroring him (feet level, as far from the board); the status box under the board at its width; the
+  column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
 - **A boss's attack on a king** (Eric, Oct 10; Hollow's first, the others keep today's behaviour until they get one):
   purely cosmetic, no rule changes. Its kit's `kingAttack` (`KingAttackKit` in `kits.ts`: the character it's drawn
   from, its animation, its size in frame pixels a square, where it stands, its hit on the king's square) plays on the

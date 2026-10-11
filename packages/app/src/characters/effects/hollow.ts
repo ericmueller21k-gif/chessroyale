@@ -1,4 +1,5 @@
 /** Hollow's effects: the dark, his pour and a miss, his strand of bulbs, Lights out's night. See ../effects.ts. */
+import { DEFAULT_LIGHTS, bulbColour, lightsSwap } from "../lights.ts";
 import { canvas, ellipse, toGrid } from "../paint.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
 import { SQUARE, sparkle, type Pt } from "./common.ts";
@@ -215,22 +216,27 @@ export const DARK_MISS: Character = {
 
 // The strand of bulbs counting down: a wire drooping between two hooks, three bulbs hanging off it.
 
+/**
+ * The strip's bulbs, and a lash's colours, in the lights' default colours (lights.ts): bulb `b` is drawn in
+ * DEFAULT_LIGHTS[b]'s and takes the battle's colour of the strand's bulb `b` (the first three: always three colours).
+ */
+const STRIP_LIT = [0, 1, 2].map((b) => bulbColour(DEFAULT_LIGHTS[b]!));
 const STRAND_PALETTE = {
   k: "#08070c",
   w: "#3b3844",
   W: "#5d5968",
-  "1": "#ff4a4a", // red, gold, blue: main, shade, glint, glow
-  "4": "#b3172c",
-  "7": "#ffe0da",
-  "!": "#ff4a4a66",
-  "2": "#ffc93a",
-  "5": "#c2830f",
-  "8": "#fff8d6",
-  "^": "#ffc93a66",
-  "3": "#4ab3ff",
-  "6": "#1d5fd0",
-  "9": "#e0f4ff",
-  "~": "#4ab3ff66",
+  "1": STRIP_LIT[0]!.glass, // the three bulbs: main, shade, glint, glow
+  "4": STRIP_LIT[0]!.shade,
+  "7": STRIP_LIT[0]!.glint,
+  "!": `${STRIP_LIT[0]!.glass}66`,
+  "2": STRIP_LIT[1]!.glass,
+  "5": STRIP_LIT[1]!.shade,
+  "8": STRIP_LIT[1]!.glint,
+  "^": `${STRIP_LIT[1]!.glass}66`,
+  "3": STRIP_LIT[2]!.glass,
+  "6": STRIP_LIT[2]!.shade,
+  "9": STRIP_LIT[2]!.glint,
+  "~": `${STRIP_LIT[2]!.glass}66`,
   o: "#2e2a36", // out: dark glass
   O: "#1d1a23",
   g: "#463f52",
@@ -301,6 +307,8 @@ export const BULB_STRAND: Character = {
   h: STRAND_H,
   foot: [22, 14],
   palette: STRAND_PALETTE,
+  // (Each bulb in the battle's colour: lights.ts.)
+  swap: lightsSwap(STRAND_KEYS),
   parts: STRIP_PARTS,
   anims: {
     ...Object.fromEntries([3, 2, 1, 0].map((n) => [`lit${n}`, { loop: true, frames: n ? [0, 1, 2, 3].map((i) => strip(n, i === 0 ? 400 : 260, { g: i })) : [strip(0, 600)] } satisfies Anim])),
@@ -535,15 +543,15 @@ export const NIGHT_LABEL: Character = {
 
 const LASH_PALETTE = {
   k: "#00000000",
-  "1": "#ff4a4a", // red, gold, blue: the crack's colour, its edge, its spark
-  "4": "#b3172c",
-  "7": "#ffe0da",
-  "2": "#ffc93a",
-  "5": "#c2830f",
-  "8": "#fff8d6",
-  "3": "#4ab3ff",
-  "6": "#1d5fd0",
-  "9": "#e0f4ff",
+  "1": STRIP_LIT[0]!.glass, // the first three bulbs' colours: the crack's colour, its edge, its spark
+  "4": STRIP_LIT[0]!.shade,
+  "7": STRIP_LIT[0]!.glint,
+  "2": STRIP_LIT[1]!.glass,
+  "5": STRIP_LIT[1]!.shade,
+  "8": STRIP_LIT[1]!.glint,
+  "3": STRIP_LIT[2]!.glass,
+  "6": STRIP_LIT[2]!.shade,
+  "9": STRIP_LIT[2]!.glint,
   u: "#5b36a3", // violet, as everything of his
   U: "#9c6cff",
   x: "#e9ddff",
@@ -605,7 +613,8 @@ for (const kind of ["F", "B"] as const)
     }
 /**
  * A lash landing on a king's square: `hit<F|B><L|R><c>`: a forehand (straight, high) or backhand (rising, low), coming
- * in from the left or the right edge, in bulb colour c (0 red, 1 gold, 2 blue). About 200 ms; ends empty. Over the
+ * in from the left or the right edge, in bulb colour c (the colour of the strand's bulb c: 0, 1 or 2, the battle's
+ * lights; red, yellow and blue before a battle's are known). About 200 ms; ends empty. Over the
  * piece (or the God King standing there), see-through round its line.
  */
 export const LASH_HIT: Character = {
@@ -615,6 +624,8 @@ export const LASH_HIT: Character = {
   h: SQUARE,
   foot: [16, 31],
   palette: LASH_PALETTE,
+  // (In the battle's colours: lights.ts.)
+  swap: lightsSwap(LASH_COLOURS),
   parts: {},
   anims: lashAnims,
 };

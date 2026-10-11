@@ -838,6 +838,15 @@ p {
   flex-direction: column;
   justify-content: flex-end;
 }
+/* The bar is behind everything beside the board (Eric, Oct 11): the boss by the board's corner (his strand, his
+   effects, his words) may overlap it a little, and does so in front of it. The row is a layer of its own, so the bar
+   goes to the back of the row, not behind the page. */
+.board-row {
+  isolation: isolate;
+}
+.board-row > .eval-bar {
+  z-index: -1;
+}
 .eval-bar.flipped {
   justify-content: flex-start;
 }
@@ -4158,11 +4167,28 @@ button.history-label {
 .boss-dock-status .bad {
   color: var(--bad);
 }
-/* Computers: the dock (the status line with « », and the God King) stays under the board at every width, as on a
-   phone (Eric, Oct 9: it had been in the column beside the board, at its top). The board leaves room for it (the dock is
-   134 px tall there, the God King at twice his size), and the column beside the board keeps chat (or, from 900 to
-   1099 px, the scoreboard) from the top. */
+/* Computers: the dock stays under the board at every width (Eric, Oct 9: it had been in the column beside the board,
+   at its top): the status line with « », centred under the board at its width. The God King stands by the board's
+   bottom-right corner instead, mirroring the boss by its bottom-left (Eric, Oct 11: they face each other across the
+   board): his feet on the board's bottom edge like the boss's, his middle as far from the board as the boss's (see
+   .boss-side: `--gk-off`, his box 26 px from the board's edge with the eval bar, 2 px without), his crowns under his
+   feet. The board keeps the room it had (310 px of the height for the rest). The column beside the board (chat, or from
+   900 to 1099 px the scoreboard) keeps clear of him: `--gk-clear`, how far he reaches past the board's column, worked
+   out from the same sums as the board's size (the screen's width less its gutters, the 28 px gap and the 340 px
+   column; the board's width in what's left). */
 @media (min-width: 900px) and (min-height: 600px) {
+  .screen.game:has(> .boss-dock) {
+    --gk-off: 2px;
+    --gk-screen: var(--col);
+    --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 368px);
+    --gk-board: min(var(--gk-column), 100dvh - 310px);
+    /* (His box is 120 px; his cape reaches a few pixels past it.) */
+    --gk-clear: max(0px, var(--gk-off) + 128px - (var(--gk-column) - var(--gk-board)) / 2 - 28px);
+  }
+  .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) {
+    --gk-off: 26px;
+    --gk-board: min(var(--gk-column) - 48px, 100dvh - 310px);
+  }
   .screen.game:has(> .boss-dock) > .board-area {
     grid-row: 3;
   }
@@ -4171,8 +4197,11 @@ button.history-label {
     grid-row: 4;
     align-self: start;
     width: 100%;
-    max-width: calc(min(100% - 48px, 100dvh - 310px) + 48px);
+    max-width: min(100%, 100dvh - 310px);
     justify-self: center;
+  }
+  .screen.game:has(.board-row > .eval-bar) > .boss-dock {
+    max-width: min(100% - 48px, 100dvh - 310px);
   }
   .screen.game:has(> .boss-dock) .board-area .board-wrap {
     width: min(100%, calc(100dvh - 310px));
@@ -4183,6 +4212,13 @@ button.history-label {
   .screen.game:has(> .boss-dock) > .under-board,
   .screen.game:has(> .boss-dock) > .mini-tower {
     grid-row: 3 / 5;
+    margin-left: var(--gk-clear);
+  }
+}
+@media (min-width: 1100px) and (min-height: 600px) {
+  /* (The screen beside the leaderboard: see .arena .screen.) */
+  .arena .screen.game:has(> .boss-dock) {
+    --gk-screen: min(100vw - 380px, 1000px);
   }
 }
 
@@ -4221,9 +4257,13 @@ button.history-label {
 .gk-unit:not(.ready) .god-king {
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
 }
+/* Away (his Last Stand, on the board): gone from his spot at once. (A fade showed him back in it for a moment as his
+   leap ended; and his shadow stays behind no longer as he leaps.) */
 .gk-unit.away .gk-unit-btn {
   opacity: 0;
-  transition: opacity 200ms;
+}
+.gk-unit.leaping .gk-unit-btn {
+  background: none;
 }
 .gk-unit .god-king {
   width: 50px;
@@ -6597,12 +6637,38 @@ button.history-label {
     width: 150px;
   }
 }
-/* A computer: the dock has room, so he stands at twice his size (his pixels doubled, like the boss across the board),
-   the status box keeping its height beside him. */
+/* A computer: he stands at twice his size (his pixels doubled, like the boss across the board), by the board's
+   bottom-right corner (see .boss-dock above): out of the dock's row, which is the status box alone, the board's width. */
 @media (min-width: 900px) and (min-height: 600px) {
   .screen.game .boss-dock {
-    grid-template-columns: minmax(0, 1fr) 120px;
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .screen.game > .boss-dock > .gk-unit {
+    position: absolute;
+    left: calc(100% + var(--gk-off, 26px));
+    /* (The screen's 10 px row gap above the dock, less his crowns' 14 px row: his feet on the board's bottom edge.) */
+    bottom: calc(100% + 10px - 14px);
+    width: 120px;
+  }
+  .screen.game > .boss-dock > .gk-unit.fallen.has-power {
+    bottom: calc(100% + 10px);
+  }
+  /* His words and his menu above him, out from the board as the boss's are (over the board they'd hide pieces). */
+  .screen.game > .boss-dock .gk-bubble {
+    right: auto;
+    left: 4px;
+  }
+  .screen.game > .boss-dock .gk-bubble::after {
+    right: auto;
+    left: 26px;
+  }
+  .screen.game > .boss-dock .gk-command {
+    right: auto;
+    left: 0;
+  }
+  .screen.game > .boss-dock .gk-command::after {
+    right: auto;
+    left: 20px;
   }
   .screen.game .gk-unit {
     height: 134px;
@@ -9924,7 +9990,7 @@ img.qicon {
   border-color: #a3332b;
 }
 
-/* ---- Boss characters (BossCharacter.tsx): a raid boss drawn as pixel art, kitty-corner from the God King. ---- */
+/* ---- Boss characters (BossCharacter.tsx): a raid boss drawn as pixel art, across the board from the God King. ---- */
 .boss-char {
   --bc-scale: 1;
   position: relative;
@@ -9976,7 +10042,7 @@ img.qicon {
 .boss-char.place-results.tall {
   height: 180px;
 }
-/* A computer: by the board's bottom-left corner (the God King is by its top-right). */
+/* A computer: by the board's bottom-left corner (the God King by its bottom-right, mirroring him: see .boss-dock). */
 .boss-side {
   display: none;
 }
