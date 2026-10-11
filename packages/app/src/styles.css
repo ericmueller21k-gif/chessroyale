@@ -393,6 +393,61 @@ p {
   pointer-events: none;
 }
 
+/* ---- The big board's coordinates, inside its edge squares: each rank's number at the top left of its square in the
+   left column, each file's letter at the bottom right of its square in the bottom row (where Hollow's night draws
+   them too), either way up. Chessground's own CSS puts them off the squares (files 24 px to the right, so each letter
+   sat in the next column along and the last one off the board; ranks 20 px up, on the line between rows). Chessground
+   draws them in its container, which is exactly the board, so an eighth of it is exactly a square. ---- */
+.cg-wrap coords.ranks,
+.cg-wrap coords.files {
+  font-size: clamp(9px, 2.6cqw, 14px);
+  font-weight: 600;
+  /* (Normal, not 1: each label's text box, the font's full height, then sits inside its label and so inside its
+     square, whatever the font. With 1, a font with a tall ascent poked its box out over the row's top edge.) */
+  line-height: normal;
+  opacity: 1;
+}
+.cg-wrap coords.ranks {
+  left: 0;
+  top: 0;
+  width: 12.5%;
+  height: 100%;
+}
+.cg-wrap coords.files {
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 12.5%;
+  align-items: flex-end;
+  text-align: right;
+}
+/* (Every label exactly an eighth: a basis of 0, not its text's width.) */
+.cg-wrap coords.ranks coord,
+.cg-wrap coords.files coord {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  transform: none;
+}
+/* Tucked into the corners, where the pieces have the least ink: painted on the board, under the pieces (as on a printed
+   board), a piece's base just reaches a letter's edge. */
+.cg-wrap coords.ranks coord {
+  padding: 0.06em 0 0 0.18em;
+}
+.cg-wrap coords.files coord {
+  padding: 0 0.15em 0.04em 0;
+}
+/* Each label in the colour that reads on its square. a1 and h8 are dark, so White's way up the odd labels (rank 1 on
+   a1, file A on a1) sit on dark squares; Black's way up (rank 1 on h1, file A on a8) the even ones do. */
+.cg-wrap.orientation-white coords:is(.ranks, .files) coord:nth-child(odd),
+.cg-wrap.orientation-black coords:is(.ranks, .files) coord:nth-child(even) {
+  color: rgba(255, 255, 255, 0.92);
+}
+.cg-wrap.orientation-white coords:is(.ranks, .files) coord:nth-child(even),
+.cg-wrap.orientation-black coords:is(.ranks, .files) coord:nth-child(odd) {
+  color: rgba(72, 58, 40, 0.8);
+}
+
 .play-footer {
   display: grid;
   gap: 10px;

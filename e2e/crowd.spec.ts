@@ -1,5 +1,6 @@
 import { devices, expect } from "@playwright/test";
-import { createLobbyFromHome, named, soloFromHome, test } from "./helpers.ts";
+import { Chess } from "chess.js";
+import { createLobbyFromHome, expectCoordsInSquares, named, soloFromHome, test } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -146,6 +147,30 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
   // Everyone placed 1-100.
   const places = await page.evaluate(() => (window as any).match.runner.state.players.map((p: any) => p.placement).sort((a: number, b: number) => a - b));
   expect(places).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+});
+
+test("the board's coordinates sit in their own squares, either way up (Crowd, everyone moves: the board turns to the side to move)", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  await page.goto("/?debug&pace=quick&mode=crowd&turns=all&augments=0&clock=20");
+  await soloFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
+  const seen = new Set<string>();
+  const stopAt = Date.now() + 2 * 60_000;
+  while (seen.size < 2 && Date.now() < stopAt) {
+    if ((await phase(page)) === "play") {
+      const fen: string = await page.evaluate(() => (window as any).match.phase.board.fen);
+      seen.add(await expectCoordsInSquares(page, fen.split(" ")[1] === "w" ? "white" : "black"));
+      // A move (any legal one: the board is what's tested), then the other side's turn.
+      const move = new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""))[0]!;
+      await page.evaluate((mv) => {
+        const m = (window as any).match;
+        if (m.phase.kind === "play") m.submit(mv);
+      }, move);
+      await expect.poll(async () => (await phase(page)) !== "play" || (await page.evaluate(() => (window as any).match.phase.board.fen)) !== fen, { timeout: 40_000 }).toBe(true);
+    }
+    await page.waitForTimeout(200);
+  }
+  expect([...seen].sort()).toEqual(["black", "white"]);
 });
 
 test("the board never moves or resizes during a turn (Crowd and Classic)", async ({ page }) => {

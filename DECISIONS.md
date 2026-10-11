@@ -907,3 +907,24 @@ of bot work and the sounds (docs/areas/squads.md, "The screens"). The calls:
   votes" in the votes (the server's `nextRound`, which closes them). The test lobby: an admin's Party sheet has Relay ·
   Pairs · Final, and a link Eric can open on any device: `/squads/test/pairs` (also `relay`, `final`, and
   `?clock=BANK,TOPUP,FREE,INC` for a team clock in seconds).
+
+### The board's coordinates, inside the edge squares (Oct 11, 2026)
+
+Eric saw it on a Squads Relay board, flipped for Black: the file letters were a column off (none under the first
+column, "H … B" from the second, "A" outside the board) and the rank numbers sat on the lines between rows. It was
+every big board in every mode, either way up: the app never styled chessground's coordinates, and chessground's own
+CSS puts them off the squares (files 24 px to the right across the board's full width, ranks 20 px up). The calls:
+
+- **Where:** each rank's number at the top left of its square in the left column, each file's letter at the bottom
+  right of its square in the bottom row, either way up. That is where Hollow's night draws its own coordinates, so they
+  don't move when the night covers the board. Exactly an eighth each (a flex basis of 0), in chessground's container,
+  which is the board itself.
+- **Under the pieces,** as on a printed board, tucked into the corners, where a piece's base only just reaches a
+  letter's edge. Drawn over the pieces they read badly where they cross one (dark on a black piece, white on a white
+  one).
+- **Colour by the square under each label:** white on the dark squares, dark brown on the light ones (the brown theme's
+  own colouring assumed ranks on the right edge, so it was wrong for the left column). Bold, 9 px on a phone's board,
+  growing with the board to 14 px on a computer.
+- **Tests:** `boardCoords` / `expectCoordsInSquares` in `e2e/helpers.ts` measure each label's text against the square
+  it names; Squads' Relay test checks your board and next turn's (the other way up), and a Crowd "everyone moves" test
+  checks both ways up as the board turns to the side to move. On a phone and a computer.

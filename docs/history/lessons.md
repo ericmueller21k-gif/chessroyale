@@ -596,3 +596,24 @@ each box's owner was traced back to the screen or moment that removed it.
   the mode really has (Boss alone's 0.45 s boss move is a different path from a raid's 1.8 s).
 - Nothing hides a text box to make it fit, and hiding a figure mustn't hide the words beside it: check what else sits
   inside an element you hide.
+
+## Coordinates a column off (Oct 11, 2026)
+
+**Eric saw** (a Squads screenshot, a Relay board flipped for Black on a 390 px phone): the file letters ran "H … B"
+from the second column, with nothing under the first and "A" outside the board on the right, and the rank numbers
+sat on the top edge of each row rather than inside their squares.
+
+**The cause:** the app never styled chessground's coordinates. Chessground's own CSS places them for a page that sets
+them outside the board: files 24 px to the right across the board's full width (on a 300 px board, each letter landed
+in the next column, the last one off the board), ranks 20 px up with each nudged down a little (on the lines between
+rows). Every big board in every mode had it, either way up, from the first build. No test looked at the labels: they
+are text over the board, and every test measured the squares and the pieces.
+
+**How it was found:** each label's text box (a range over its text) measured against the square it names, on a boss
+board (White's way up) and the Squads board (Black's): every file one column along, every rank across two rows.
+
+**The rule:**
+- Anything a library draws on our screens (coordinates, a ghost, a highlight) gets a look against what it marks, with
+  our own CSS, either way up: a library's defaults are made for its own page.
+- Board coordinates sit inside their edge squares; a test measures each label against the square it names, both ways
+  up, on a phone and a computer (`expectCoordsInSquares` in `e2e/helpers.ts`).

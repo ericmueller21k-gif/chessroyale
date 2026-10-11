@@ -269,7 +269,8 @@ door's look; every class is `sq-`.
 | The menu slot | `packages/app/src/screens/Home.tsx` (`MODES`, `chosenHomeMode`); routes in `App.tsx` |
 
 Tests: `packages/app/test/squads-view.test.ts`; e2e `e2e/squads-play.spec.ts` (through the real server with its bots, on
-a phone and a computer: Pairs, the final, a Relay half, Next round, the party, the sounds). Frames:
+a phone and a computer: Pairs, the final, a Relay half with the board's coordinates in their squares both ways up, Next
+round, the party, the sounds). Frames:
 `npm run frames:squads -- <dir> relay|pairs|final|menu|standings http://localhost:8787` against `wrangler dev --var
 SQUADS_TEST:1` (every painted frame, the big board's pieces logged per frame, a GIF). Never beside an e2e run from the
 same checkout without `--persist-to` a folder of its own: two local servers on one `.wrangler/state` lock each other's
