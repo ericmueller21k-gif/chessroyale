@@ -4,6 +4,7 @@
  * fixed budget give the same numbers everywhere.
  */
 
+import { ENGINE_MAX_ELO, ENGINE_MIN_ELO } from "@chessroyale/core";
 import { applyMove, gameEnd } from "./rules.ts";
 
 export interface UciTransport {
@@ -222,7 +223,7 @@ export class UciEngine {
       this.transport.send("ucinewgame");
       this.transport.send("setoption name MultiPV value 1");
       this.transport.send("setoption name UCI_LimitStrength value true");
-      this.transport.send(`setoption name UCI_Elo value ${Math.round(Math.max(1320, Math.min(3190, elo)))}`);
+      this.transport.send(`setoption name UCI_Elo value ${Math.round(Math.max(ENGINE_MIN_ELO, Math.min(ENGINE_MAX_ELO, elo)))}`);
       await this.ready();
       this.transport.send(`position fen ${fen}`);
       const done = this.until((l) => l.startsWith("bestmove"));

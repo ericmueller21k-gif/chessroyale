@@ -140,6 +140,9 @@ export function isDeadRound(result: GroupResult, margin = 1): boolean {
   return Math.max(...losses) - Math.min(...losses) <= margin;
 }
 
+/** What makes a move brilliant (see `brilliance`). The FAQ quotes these, so change them here only. */
+export const BRILLIANT = { minPickers: 6, nearBest: 1.5, maxShare: 0.2, minGap: 8 } as const;
+
 /**
  * A brilliant move: one that separated the field. Among at least `minPickers` picks, the moves within
  * `nearBest` points of the best were found by at most `maxShare` of the pickers, and everyone else gave away
@@ -150,7 +153,7 @@ export function brilliance(
   players: readonly { playerId: string; move: string | null; loss: number | null; usedPowerUp?: boolean }[],
   opts: { minPickers?: number; nearBest?: number; maxShare?: number; minGap?: number } = {},
 ): { moves: string[]; players: string[]; found: number; total: number; othersLoss: number } | null {
-  const { minPickers = 6, nearBest = 1.5, maxShare = 0.2, minGap = 8 } = opts;
+  const { minPickers = BRILLIANT.minPickers, nearBest = BRILLIANT.nearBest, maxShare = BRILLIANT.maxShare, minGap = BRILLIANT.minGap } = opts;
   const picked = players.filter((p) => p.move !== null && p.loss !== null);
   if (picked.length < minPickers) return null;
   const good = picked.filter((p) => p.loss! <= nearBest);

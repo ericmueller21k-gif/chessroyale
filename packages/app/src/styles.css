@@ -7746,6 +7746,171 @@ button.fd-logo {
   border-top: 1px solid color-mix(in srgb, var(--fd-sub) 25%, transparent);
 }
 
+/* -- The FAQ, "How HunChess works" (screens/Faq.tsx): a readable column in the app's type and colours -- */
+.fd-faq {
+  gap: 14px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--fd-sub);
+  /* Words to read and copy (the app's screens are otherwise unselectable). */
+  -webkit-user-select: text;
+  user-select: text;
+}
+.fd-faq .fd-page-head h1 {
+  text-align: center;
+  line-height: 1.25;
+}
+.faq-intro {
+  margin: 0;
+  font-size: 14px;
+}
+.faq-toc {
+  background: var(--fd-panel);
+  border-radius: 14px;
+  padding: 12px 14px 8px;
+  scroll-margin-top: 12px;
+}
+.faq-toc ol {
+  margin: 6px 0 0;
+  padding-left: 22px;
+}
+.faq-toc ol > li::marker {
+  color: var(--fd-muted);
+  font-weight: 800;
+}
+.faq-toc ul {
+  margin: 0 0 4px;
+  padding-left: 14px;
+  list-style: none;
+}
+.faq-toc a {
+  display: block;
+  padding: 8px 0;
+  color: var(--fd-gold-text);
+  font-weight: 800;
+  text-decoration: none;
+  line-height: 1.3;
+}
+.faq-toc ul a {
+  padding: 6px 0;
+  color: var(--fd-text);
+  font-weight: 600;
+  font-size: 14px;
+}
+.faq-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.faq-section p,
+.faq-section ul,
+.faq-section ol {
+  margin: 0;
+}
+.faq-section ul,
+.faq-section ol {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.faq-section strong {
+  color: var(--fd-text);
+}
+.faq-section a {
+  color: var(--fd-gold-text);
+  font-weight: 600;
+}
+.faq-h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--fd-text);
+  scroll-margin-top: 12px;
+}
+.faq-num {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-size: 15px;
+}
+.faq-h3 {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--fd-text);
+  scroll-margin-top: 12px;
+}
+.faq-formula {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--fd-gold);
+  border-radius: 10px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.faq-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--fd-gold-soft);
+  color: var(--fd-text);
+  font-size: 14px;
+}
+.faq-table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  background: var(--fd-panel);
+}
+.faq-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.faq-table th,
+.faq-table td {
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.faq-table th {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fd-muted);
+}
+.faq-table td {
+  border-top: 1px solid var(--fd-line);
+  color: var(--fd-text);
+}
+.faq-top {
+  font-size: 13px;
+}
+.faq-section .faq-top a {
+  display: inline-block;
+  padding: 8px 0;
+  color: var(--fd-muted);
+  text-decoration: none;
+}
+
 /* -- The queue (docs/mockups/front-door/Queue.dc.html) -- */
 .fd-queue {
   gap: 14px;
