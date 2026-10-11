@@ -1,11 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { SAWYER_LOOKS } from "@chessroyale/core";
 import { test, watchFor } from "./helpers.ts";
 
 /**
  * Sawyer, the raccoon with a saw, played alone on a phone and a computer with real taps: his first move a pawn's and
- * the split once there's room for another pawn of his (SPLIT PAWN!, he leaps onto the pawn, it cracks, the two halves
- * come apart and stay drawn as halves), your move's knock first, the board saw (?power=boardsaw: BOARD SAW!, he saws up the middle, the board jolts and splits
+ * the split once there's room for another pawn of his (SPLIT PAWN!, he leaps onto the pawn, it cracks and morphs into
+ * two small whole pawns that land and grow to a pawn's size, or with SAWYER_LOOKS.split "halves" the two halves come
+ * apart and stay drawn as halves), your move's knock first, the board saw (?power=boardsaw: BOARD SAW!, he saws up the middle, the board jolts and splits
  * with a gap; no moves or move dots across it), a saw cut (SAW CUT!, the groove on its edge, no move across it), the
  * cut taped over and healing away and the halves rejoining (the admins' trigger), his sounds through the mute switch.
  */
@@ -65,6 +67,11 @@ async function dotSquares(page: Page): Promise<string[]> {
   return boxes.map(([x, y]) => `${"abcdefgh"[Math.floor(((x! - board.x) / board.width) * 8)]}${8 - Math.floor(((y! - board.y) / board.height) * 8)}`);
 }
 
+/** The split in the air (the morph's small whole pawns, two at once; or a half), and how the board draws the pair after. */
+const morph = SAWYER_LOOKS.split === "morph";
+const inAir = morph ? "piece.sw-mini:not(.saw-half-l):not(.saw-half-r) + piece.sw-mini:not(.saw-half-l):not(.saw-half-r)" : "piece.sw-half";
+const pairLook = morph ? (SAWYER_LOOKS.settle === "small" ? "small" : null) : "halves";
+
 /** A move that takes one of his pawns, if one may (so his split gets its room: the engine plays no ninth pawn). */
 async function takeHisPawn(page: Page): Promise<string | null> {
   await yourMove(page);
@@ -76,7 +83,7 @@ async function takeHisPawn(page: Page): Promise<string | null> {
   return take.sort((a, b) => order.indexOf(a.piece) - order.indexOf(b.piece))[0] ? take[0]!.from + take[0]!.to : null;
 }
 
-test("Sawyer: his first move a pawn's, then the split (two halves, drawn as halves) once there's room; your move's knock; his saw cuts", async ({ page }) => {
+test("Sawyer: his first move a pawn's, then the split (two small whole pawns that grow; or halves) once there's room; your move's knock; his saw cuts", async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -95,7 +102,7 @@ test("Sawyer: his first move a pawn's, then the split (two halves, drawn as halv
     boy: { selector: ".pm-split .sw-boy" },
     saw: { selector: '.sw-layer[data-split="saw"]' },
     crack: { selector: ".sw-layer .sw-crack" },
-    apart: { selector: '.sw-layer[data-split="apart"] piece.sw-half' },
+    apart: { selector: `.sw-layer[data-split="apart"] ${inAir}` },
     line: { selector: ".bc-bubble", text: /Two for one!|Half off!|Double trouble!/ },
   });
   // (A quiet move: its knock is the plain move's.)
@@ -126,7 +133,7 @@ test("Sawyer: his first move a pawn's, then the split (two halves, drawn as halv
       boy: { selector: ".pm-split .sw-boy" },
       saw: { selector: '.sw-layer[data-split="saw"]' },
       crack: { selector: ".sw-layer .sw-crack" },
-      apart: { selector: '.sw-layer[data-split="apart"] piece.sw-half' },
+      apart: { selector: `.sw-layer[data-split="apart"] ${inAir}` },
       line: { selector: ".bc-bubble", text: /Two for one!|Half off!|Double trouble!/ },
     });
     await play(page, (await takeHisPawn(page)) ?? (await allowedMove(page, ["h2h3", "a2a3", "h7h6", "a7a6"])));
@@ -136,16 +143,21 @@ test("Sawyer: his first move a pawn's, then the split (two halves, drawn as halv
   const sp = boss.powers.split;
   expect(sp.square, "the split came").toBeTruthy();
   expect(await split.seen()).toEqual({ banner: true, boy: true, saw: true, crack: true, apart: true, line: true });
-  // The new half beside his pawn, both his, each drawn as its half (the one away from its partner).
+  // The new pawn beside his pawn, both his. The morph's "grow": drawn as ordinary pawns (nothing marked or clipped);
+  // kept small: both marked small; halves: each drawn as its half (the one away from its partner).
   expect(sp.square[1]).toBe(sp.pawn[1]);
   expect(Math.abs(file(sp.square) - file(sp.pawn))).toBe(1);
   const pieces = new Chess(boss.board.fen);
   for (const h of sp.halves) expect(pieces.get(h.square)).toMatchObject({ type: "p", color: mine });
   const halves = await page.evaluate(() => [...document.querySelectorAll("cg-board piece.saw-half-l, cg-board piece.saw-half-r")].map((e) => `${(e as any).cgKey}:${e.classList.contains("saw-half-l") ? "l" : "r"}`).sort());
+  const small = await page.evaluate(() => [...document.querySelectorAll("cg-board piece.saw-small")].map((e) => (e as any).cgKey as string).sort());
   const w = boss.crowdSide === "w";
-  expect(halves).toEqual(sp.halves.map((h: { square: string; side: string }) => `${h.square}:${(h.side === "a") === w ? "l" : "r"}`).sort());
-  const clip = await page.locator("cg-board piece.saw-half-l, cg-board piece.saw-half-r").first().evaluate((e) => getComputedStyle(e).clipPath);
-  expect(clip).toContain("50%");
+  expect(halves).toEqual(pairLook === "halves" ? sp.halves.map((h: { square: string; side: string }) => `${h.square}:${(h.side === "a") === w ? "l" : "r"}`).sort() : []);
+  expect(small).toEqual(pairLook === "small" ? sp.halves.map((h: { square: string }) => h.square).sort() : []);
+  if (pairLook === "halves") {
+    const clip = await page.locator("cg-board piece.saw-half-l, cg-board piece.saw-half-r").first().evaluate((e) => getComputedStyle(e).clipPath);
+    expect(clip).toContain("50%");
+  }
   // (Never a ninth pawn: the engine plays every position.)
   expect([...boss.board.fen.split(" ")[0]].filter((c) => c === (mine === "w" ? "P" : "p")).length).toBeLessThanOrEqual(8);
   expect(errors).toEqual([]);

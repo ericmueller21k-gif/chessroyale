@@ -606,6 +606,17 @@ export const BOSS_POWERS = {
   boardSawTurns: 5,
 } as const;
 
+/**
+ * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the
+ * position are the same either way, and so is the moment's length.
+ * - `split`: "morph" (Eric, Oct 11): the saw goes through the pawn, which squashes and pinches into two smaller whole
+ *   pawns (about half size) that hop to their squares. "halves": the first version, the pawn cut into two halves that
+ *   come apart, and every board then drawing the pair as halves wherever they go. To go back: set "halves".
+ * - `settle` (the morph only): "grow": the small pawns ease up to a normal pawn's size as they land (they're ordinary
+ *   pawns). "small": they stay small, and every board draws the pair small wherever they go.
+ */
+export const SAWYER_LOOKS: { readonly split: "morph" | "halves"; readonly settle: "grow" | "small" } = { split: "morph", settle: "grow" };
+
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */
 export type BossPowerSettings = {
   -readonly [K in keyof typeof BOSS_POWERS]: (typeof BOSS_POWERS)[K] extends boolean ? boolean : (typeof BOSS_POWERS)[K] extends number ? number : (typeof BOSS_POWERS)[K];
