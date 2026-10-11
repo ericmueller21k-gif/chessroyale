@@ -1833,7 +1833,10 @@ button.history-label {
   display: flex;
   justify-content: center;
   background: color-mix(in srgb, var(--text) 8%, transparent);
-  z-index: 3;
+  /* Behind everything on and around the board (Eric, Oct 11, as for the eval bar): the overlays on the squares, a
+     boss's sprite, effects, banners and words, the God King may overlap it a little, and do so in front of it. The wrap
+     isn't a layer of its own, so this is the back of the board's row (a layer: see .board-row), not behind the page. */
+  z-index: -1;
   pointer-events: none;
 }
 .timer-fill {
@@ -10386,12 +10389,22 @@ img.qicon {
   z-index: 2;
   pointer-events: none;
 }
-.pw-ice,
-.pw-pie,
-.pw-frost {
+.pw-pie {
   position: absolute;
   width: 12.5%;
   height: 12.5%;
+  pointer-events: none;
+}
+/* Ginger's ice (and the cold burst as it forms): exactly on its square, in eighths of chessground's own board
+   (--cg-size), never % of the wrap, which can be a few pixels wider (Eric, Oct 11: the blocks didn't line up). The block
+   is the square's shape, the same on every square whatever the piece (characters/effects/ginger.ts). */
+.pw-ice,
+.pw-frost {
+  position: absolute;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
   pointer-events: none;
 }
 /* A freeze: a cold burst on the square as the ice forms. */

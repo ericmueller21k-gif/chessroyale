@@ -206,7 +206,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
       live = false;
     };
   }, [boss.board.fen, thinking]);
-  // The boss takes your queen: its banner, face and roar.
+  // The boss takes your queen: its banner and face.
   const tookQueen = !intro && !thinking && !victim && !funhouse && !bounce && boss.lastMove?.captured === "q";
   // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
   const slewQueen = !intro && !!thinkingNow && !victim && lastMoveTookQueen(history, bases);
@@ -284,10 +284,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
             {snack && t >= tl.claimAt && t < tl.bannerAt && <SnackTime boss={boss} since={snackAt} now={now} orientation={orientation} />}
             {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" />}
-            {slewQueen && (
-              <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} sound="queenGasp" />
-            )}
-            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} sound="queenGasp" />}
+            {/* (The queen banners are silent for now: Eric, Oct 11, the gasp sounded wrong. Its file is kept, unused:
+                queenGasp in sound.ts, public/sounds/banner/queen-gasp.mp3.) */}
+            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} />}
+            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} />}
             {showCard && (
               <div class={`boss-intro${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
                 <span class="boss-intro-icon" aria-hidden="true">
