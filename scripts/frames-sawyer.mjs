@@ -4,7 +4,8 @@
 // cut as the 4th begins, the cut taped over on the 5th and 6th and healing away on the 7th, and the halves rejoining
 // on the 8th. Records every painted frame (Chrome's screencast) and saves stills and a GIF of each moment (and one of
 // the cut healing, turn by turn), plus a timeline.
-//   npm run frames:sawyer -- <out-dir> [phone|desktop|both] [light|dark] [side=b]
+//   npm run frames:sawyer -- <out-dir> [phone|desktop|both] [light|dark] [side=b] [only=split]
+// (only=split: just the split, without the board saw's switch, stopping once it has played.)
 // Read the frames before calling a moment done (.claude/LESSONS.md: watch it frame by frame).
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -15,6 +16,7 @@ import { Chess } from "chess.js";
 
 const args = process.argv.slice(2).filter((a) => !a.includes("="));
 const sideB = process.argv.includes("side=b");
+const onlySplit = process.argv.includes("only=split");
 const [out = "sawyer-frames", which = "both", scheme = "light"] = args;
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
@@ -46,7 +48,7 @@ async function run(name, context) {
     await cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => undefined);
   });
   await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, everyNthFrame: 1, ...(name === "phone" ? { maxWidth: 780, maxHeight: 1688 } : {}) });
-  await p.goto(`${url}?debug&clock=60&nolanding&boss=sawyer&power=boardsaw&laststand=0${sideB ? "&side=b" : ""}`);
+  await p.goto(`${url}?debug&clock=60&nolanding&boss=sawyer${onlySplit ? "" : "&power=boardsaw"}&laststand=0${sideB ? "&side=b" : ""}`);
   // (Clicked again if the first tap came before the page was ready.)
   for (let i = 0; i < 5 && !(await p.evaluate(() => !!window.match)); i++) {
     await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
@@ -133,11 +135,12 @@ async function run(name, context) {
   };
   // Turn by turn: each moment as it comes (the split once there's room; the board saw on the 3rd turn; the first cut;
   // the cut taped over, healing; the halves rejoining), with stills through the split and the board saw.
-  const want = { split: [0, 1300, 1700, 2000, 2200, 2400, 2550, 2700, 2900, 3200, 3600, 4000], boardsaw: [0, 1500, 2000, 2500, 3200, 3600, 4000, 4400, 4800, 4900, 5100, 5400, 5800, 6400], cut: [0, 1500, 1800, 1950, 2100, 2400] };
+  // (The split's from the crack, 2450, every beat of the morph: squash, pinch, apart, the hop, the grow.)
+  const want = { split: [0, 1300, 1700, 2000, 2200, 2400, 2450, 2500, 2550, 2600, 2650, 2700, 2780, 2860, 2950, 3050, 3150, 3250, 3350, 3450, 3600, 4000], boardsaw: [0, 1500, 2000, 2500, 3200, 3600, 4000, 4400, 4800, 4900, 5100, 5400, 5800, 6400], cut: [0, 1500, 1800, 1950, 2100, 2400] };
   const done = new Set();
   let lastCut = null;
   let sawOn = false;
-  for (let turn = 1; turn <= 18 && done.size < 7; turn++) {
+  for (let turn = 1; turn <= 18 && done.size < 7 && !(onlySplit && done.has("split")); turn++) {
     const t = await takeHisPawn();
     await play(done.has("split") || !t ? await pick("h2h3", "a2a3", "h3h4", "a3a4", "h7h6", "a7a6", "h6h5", "a6a5") : t.from + t.to);
     const s = await waitUntil((x) => x.kind === "boss" && !x.thinking && !x.intro, 150_000);
@@ -197,15 +200,17 @@ async function run(name, context) {
     log(`${m.label}: ${list.length} frames`);
   }
   // The cut healing, turn by turn: its moment, then each turn's change (the tape, more tape, healing away).
-  const healDir = join(outDir, `${name}-cut-heals-tick`);
-  rmSync(healDir, { recursive: true, force: true });
-  mkdirSync(healDir, { recursive: true });
-  const heal = ["cut", "tape1", "tape2", "heal"].flatMap((l) => {
-    const m = marks.find((x) => x.label === l);
-    return m ? sample(m.from, m.to) : [];
-  });
-  heal.forEach((f, i) => writeFileSync(join(healDir, `${String(i).padStart(4, "0")}.jpg`), Buffer.from(f.data, "base64")));
-  gif(healDir, join(outDir, `${name}-cut-heals.gif`), width);
+  if (!onlySplit) {
+    const healDir = join(outDir, `${name}-cut-heals-tick`);
+    rmSync(healDir, { recursive: true, force: true });
+    mkdirSync(healDir, { recursive: true });
+    const heal = ["cut", "tape1", "tape2", "heal"].flatMap((l) => {
+      const m = marks.find((x) => x.label === l);
+      return m ? sample(m.from, m.to) : [];
+    });
+    heal.forEach((f, i) => writeFileSync(join(healDir, `${String(i).padStart(4, "0")}.jpg`), Buffer.from(f.data, "base64")));
+    gif(healDir, join(outDir, `${name}-cut-heals.gif`), width);
+  }
   if (errors.length) console.log(`${name}: ${errors.length} page errors`);
   await p.close();
 }
