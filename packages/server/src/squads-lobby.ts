@@ -1003,11 +1003,12 @@ export class SquadsCore {
     const now = this.io.now();
     const out = resolveHalf(lm.m, half.inputs, half.at, this.s);
     const was = new Set(this.r.squads.flatMap((sq) => sq.players.filter((p) => p.replacedByBot).map((p) => p.id)));
-    // A move made, but too late for the team clock (sudden death, or the bank ran out mid-half), is a miss on the
-    // record but not a no-show: the person was there. No move at all is a no-show, as the rules count it.
-    const late = new Set(out.timeouts.filter((id) => half.inputs.choices[id]));
-    this.r.squads = noteActions(this.r.squads, [...out.acted, ...late], out.missed.filter((id) => !late.has(id)), this.s);
-    if (late.size) this.r.squads = this.r.squads.map((sq) => ({ ...sq, players: sq.players.map((p) => (late.has(p.id) ? { ...p, misses: p.misses + 1 } : p)) }));
+    // Out of time (sudden death, or the bank ran out mid-half) is a miss on the record but not a no-show (the rules'
+    // `timeouts`): a slow move never hands a seat to a bot. Unless the person isn't there at all (disconnected, no move):
+    // then it's a no-show as any other, or an absent player in sudden death would play random moves for good.
+    const present = new Set(out.timeouts.filter((id) => !!half.inputs.choices[id] || !!this.human(id)?.connected));
+    this.r.squads = noteActions(this.r.squads, [...out.acted, ...present], out.missed.filter((id) => !present.has(id)), this.s);
+    if (present.size) this.r.squads = this.r.squads.map((sq) => ({ ...sq, players: sq.players.map((p) => (present.has(p.id) ? { ...p, misses: p.misses + 1 } : p)) }));
     const replaced = this.r.squads.flatMap((sq) => sq.players.filter((p) => p.replacedByBot && !was.has(p.id)).map((p) => p.id));
     lm.m = out.match;
     lm.half = null;

@@ -142,8 +142,8 @@ plays, ties). Nothing links to it until phase 3's screens. The calls are in `DEC
   (topped up in later rounds), drained in `resolveHalf`, carried on by `settleTeamClocks` when a match ends. Every
   player gets every squad's clock (`teamClocks`, and `matchClocks` for squads playing): in the lobby view and a `clocks`
   message whenever a half begins or ends anywhere. During a half a screen runs a squad's clock down from the match's
-  banks, its duties and who has locked in; the exact bank comes with each `half`. A move made but too late for the
-  team clock (sudden death, or the bank ran out mid-half) is a miss on the record but not a no-show; no move at all is.
+  banks, its duties and who has locked in; the exact bank comes with each `half`. Out of time (the rules' `timeouts`) is
+  a miss on the record but not a no-show, unless the person is gone (disconnected, no move).
 - **Visibility.** Live choices go to each player as `visibleChoices` allows them (Relay and Pairs: their own squad's;
   the final: blocks to everyone, picks to the picking squad). Who has locked in goes to everyone (every squad's clock
   on screen needs who is still thinking).

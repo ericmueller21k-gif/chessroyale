@@ -570,11 +570,11 @@ decide (duties, deadlines, clocks, what a miss plays, ties). Nothing links to it
   whenever a half begins or ends anywhere. During a half the screen runs a clock down from what it already has (the
   match's banks and free seconds, its duties, who has locked in); the exact bank comes with each half's result, so the
   server sends nothing per second.
-- **Out of time is not a no-show.** A move made, but too late for the team clock (sudden death, or the bank ran out
-  during the half), is a miss on the person's record, as the rules say, but doesn't count towards the three no-shows
-  that hand the seat to a bot: they were there. No move at all still does (an absent player in sudden death would
-  otherwise play random moves for their squad for the rest of the lobby). So a half isn't cut short when a bank runs
-  out: anyone still thinking may still make their move until the ceiling, late.
+- **Out of time is not a no-show** (the rules' `timeouts`, as the team clock's decision asks): a miss on the person's
+  record, but not one of the three no-shows that hand the seat to a bot, so a slow move in sudden death never does.
+  Except for someone who isn't there (disconnected, and no move made): that's a no-show as any other, or an absent
+  player in sudden death would play random moves for their squad for the rest of the lobby. A half isn't cut short
+  when a bank runs out: anyone still thinking may still make their move until the ceiling (late, but there).
 - **Left for later:** the live line (online, matches running, in queue) and the matchmaker's overload limit don't count
   Squads yet; no quick chat in Squads lobbies; the app's side of bot work arrives with phase 3's screens (until then a
   real lobby's bots use the quick look).

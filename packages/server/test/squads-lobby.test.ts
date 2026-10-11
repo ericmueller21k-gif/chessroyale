@@ -253,8 +253,10 @@ describe("squads lobby: playing a half", () => {
     expect(mine).toHaveLength(2);
     // The ceiling bounds a move while the bank lasts.
     expect(mine.every((d) => d.deadline - turn.current.startedAt === SQUADS.moveCeilingSeconds * 1000)).toBe(true);
-    // One mover chooses at 5 s, after the bank ran out (at 4 s): too late, a miss, but not a no-show. The other never moves.
+    // One mover chooses at 5 s, after the bank ran out (at 4 s): too late, a miss, but not a no-show. The other is gone
+    // (disconnected) and never moves: a no-show.
     const [late, absent] = [mine[0]!.players[0]!, mine[1]!.players[0]!];
+    L.core.disconnect(absent);
     L.advance(5_000);
     L.core.message(late, { t: "choose", key: lm.key, seq: turn.current.seq, move: squadsLegalMoves(lm.m.boards[mine[0]!.board]!.fen)[0]! });
     L.runUntil(() => L.all(party[0]!, "half").some((h) => h.key === lm.key && h.seq === 0), 60_000, "the first half");
