@@ -11,23 +11,21 @@ import { squadsLegalMoves } from "@chessroyale/chess/squads";
  */
 
 /**
- * A device's answer to a bot-work job, cleaned: the top moves, best first, each legal and listed once, each expected
- * score in [0, 1]. Null if it doesn't hold together (the device gets a strike).
+ * A device's answer to a bot-work job, cleaned: the top moves, best first, each legal, its expected score in [0, 1].
+ * A move listed twice keeps its first line (the engine interface can report one move on two MultiPV lines; every
+ * device does the same, so answers still compare). Null if it doesn't hold together (the device gets a strike).
  */
 export function cleanTop(fen: string, top: unknown, n: number = SQUADS.bots.candidates): MoveScore[] | null {
   if (!Array.isArray(top) || !top.length || top.length > Math.max(n, 1)) return null;
   const legal = new Set(squadsLegalMoves(fen));
-  const seen = new Set<string>();
   const out: MoveScore[] = [];
   for (const m of top as Partial<MoveScore>[]) {
-    if (!m || typeof m.move !== "string" || !legal.has(m.move) || seen.has(m.move)) return null;
+    if (!m || typeof m.move !== "string" || !legal.has(m.move)) return null;
     if (typeof m.expected !== "number" || !Number.isFinite(m.expected) || m.expected < 0 || m.expected > 1) return null;
     if (m.mate !== undefined && (!Number.isInteger(m.mate) || m.mate === 0)) return null;
-    seen.add(m.move);
+    if (out.some((x) => x.move === m.move)) continue;
     out.push({ move: m.move, expected: m.expected, ...(m.mate !== undefined ? { mate: m.mate } : {}) });
   }
-  // (Fewer lines than asked only when there are fewer legal moves: an engine always fills its MultiPV.)
-  if (out.length < Math.min(n, legal.size)) return null;
   return out;
 }
 

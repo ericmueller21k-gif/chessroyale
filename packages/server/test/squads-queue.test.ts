@@ -7,6 +7,7 @@ import { SquadsCore, newSquadsRecord } from "../src/squads-lobby.ts";
 import { PartyCore, newPartyRecord, partyClosing } from "../src/squads-party.ts";
 import { createGuest, ensureSchema, grantReward, profile, recordResult, shopState, signInWithIdentity } from "../src/accounts.ts";
 import { lockerState } from "../src/locker.ts";
+import { cleanTop } from "../src/squads-bots.ts";
 import { memoryDb } from "./memory-db.ts";
 import { library } from "./squads-fixture.ts";
 
@@ -226,5 +227,27 @@ describe("Squads results and rewards in the database", () => {
     expect(owner.id).toBe(first.user.id);
     expect((await shopState(sql, owner.id)).coins).toBe(60);
     expect((await sql.first<{ crates: number }>("SELECT crates FROM wallets WHERE user_id = ?", owner.id))!.crates).toBe(1);
+  });
+});
+
+describe("a device's answer to bot work", () => {
+  const fen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
+  it("is kept with a move listed twice (the engine interface can report one on two lines) and with fewer lines than asked", () => {
+    const top = [
+      { move: "d2d4", expected: 0.53, reply: "e5d4" },
+      { move: "d2d4", expected: 0.52 },
+      { move: "b1c3", expected: 0.52 },
+    ];
+    expect(cleanTop(fen, top, 8)).toEqual([
+      { move: "d2d4", expected: 0.53 },
+      { move: "b1c3", expected: 0.52 },
+    ]);
+  });
+  it("is refused (a strike) when it doesn't hold together: an illegal move, a score out of range, nothing, too many", () => {
+    expect(cleanTop(fen, [{ move: "a1a1", expected: 0.5 }])).toBeNull();
+    expect(cleanTop(fen, [{ move: "d2d4", expected: 1.5 }])).toBeNull();
+    expect(cleanTop(fen, [])).toBeNull();
+    expect(cleanTop(fen, "nonsense")).toBeNull();
+    expect(cleanTop(fen, Array.from({ length: 9 }, () => ({ move: "d2d4", expected: 0.5 })), 8)).toBeNull();
   });
 });
