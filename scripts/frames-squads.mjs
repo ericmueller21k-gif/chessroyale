@@ -197,7 +197,9 @@ if (mode === "relay") {
 } else if (mode === "standings") {
   await testLobby("relay", "8,0,3,0");
   await waitFor((x) => x.state === "half");
-  await p.waitForTimeout(9000);
+  // (A small bank: some squads reach sudden death within a few halves, so it shows too.)
+  await p.locator(phone ? ".sq-strip-chip.sd" : ".sq-row.sd").first().waitFor({ timeout: 60_000 }).catch(() => undefined);
+  await p.waitForTimeout(1500);
   await p.screenshot({ path: `${out}/standings-${W}.png` });
   if (phone) {
     await p.getByRole("button", { name: /show the standings/ }).click();
