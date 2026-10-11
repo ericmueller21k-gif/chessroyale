@@ -27,6 +27,7 @@ import { account, loadAccount, mustSignInToPlayOnline, playerName, recordSoloRes
 import { difficultyElo } from "./boss-difficulty.ts";
 import { startLive } from "./live.ts";
 import { SettingsScreen } from "./screens/Settings.tsx";
+import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
 import { useAccount } from "./screens/Profile.tsx";
@@ -187,6 +188,8 @@ export function App() {
   const profileOpen = useProfileTarget();
   const [showShop, setShowShop] = useState<false | "shop" | "locker" | "chat">(() => (location.pathname === "/shop" ? "shop" : false));
   const [showSettings, setShowSettings] = useState(() => location.pathname === "/settings");
+  /** The FAQ ("How HunChess works"), opened from Settings; back goes to Settings. */
+  const [showFaq, setShowFaq] = useState(() => location.pathname === "/faq");
   /** The computer's side menu: open the home screen's boss menu or Play with friends. */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(null);
   const [legal, setLegal] = useState<"privacy" | "terms" | null>(() =>
@@ -714,6 +717,7 @@ export function App() {
   const goHome = () => {
     closeProfile();
     setShowSettings(false);
+    setShowFaq(false);
     setShowShop(false);
     if (location.pathname !== "/") history.replaceState(null, "", "/");
   };
@@ -816,6 +820,19 @@ export function App() {
       />
     );
   }
+  if (!match && showFaq) {
+    return (
+      <FrontFrame page="settings" nav={nav}>
+        <FaqScreen
+          onBack={() => {
+            setShowFaq(false);
+            setShowSettings(true);
+            history.replaceState(null, "", "/settings");
+          }}
+        />
+      </FrontFrame>
+    );
+  }
   if (!match && showSettings) {
     return (
       <FrontFrame page="settings" nav={nav}>
@@ -825,6 +842,10 @@ export function App() {
             if (location.pathname === "/settings") history.replaceState(null, "", "/");
           }}
           onSoundLab={() => setSoundLab(true)}
+          onFaq={() => {
+            setShowFaq(true);
+            history.replaceState(null, "", "/faq");
+          }}
         />
       </FrontFrame>
     );

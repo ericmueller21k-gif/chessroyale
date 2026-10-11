@@ -97,6 +97,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 - Everything he shows comes in white and black versions.
 - Tunables in `settings.ts`; timings the server and the screens must agree on in `boss-timing.ts`.
+- The FAQ explains his charges, strike and Last Stand to players (`packages/app/src/faq/content.ts`, "The God King"):
+  a change to his rules changes its words in the same PR.
 - Add a test switch (a `?query` flag) that forces any new moment in solo, so Eric can see it on demand.
 - His words go through his voice (`kingSay`), held by the speech rule; never draw a line in a box a screen owns.
 - Watch every moment frame by frame on a phone (`npm run frames:god-king`), in light and dark mode
