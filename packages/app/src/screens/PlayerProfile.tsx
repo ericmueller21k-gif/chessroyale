@@ -1,8 +1,7 @@
 import { Fragment } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, FAIRPLAY, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, shopItem, tierInfo, type ItemLook } from "@chessroyale/core";
-import { BackButton, DressedPawn, FdButton, GearIcon, RankPill, WORN_ORDER, myHat } from "../components/FrontDoor.tsx";
-import { HattedPawn } from "../components/Cosmetics.tsx";
+import { BOSS_TIERS, FAIRPLAY, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, tierInfo, type ItemLook } from "@chessroyale/core";
+import { BackButton, DressedPawn, FdButton, GearIcon, RankPill, WORN_ORDER } from "../components/FrontDoor.tsx";
 import { ItemArt } from "../components/Items.tsx";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
@@ -36,19 +35,18 @@ function when(at: number, now = Date.now()): string {
 }
 
 /** What they wear, one row per item: the item itself (as it looks on them), slot, colour, purity and tier. */
-function Wearing({ look, hat, own }: { look: ItemLook; hat: string; own: boolean }) {
+function Wearing({ look, own }: { look: ItemLook; own: boolean }) {
   const rows = WORN_ORDER.flatMap((slot) => {
     const it = look[slot];
     const d = it && itemDef(it.def);
     return it && d ? [{ slot, it, d }] : [];
   });
-  const shopHat = !look.head && hat !== "none" ? shopItem(`hat-${hat}`) : undefined;
   return (
     <section class="fd-section" aria-labelledby="wearing-label">
       <h2 class="fd-label" id="wearing-label">
         WEARING
       </h2>
-      {!rows.length && !shopHat && <p class="fd-note">{own ? "Nothing yet. Open a crate in the shop, then wear it from your locker." : "Nothing yet."}</p>}
+      {!rows.length && <p class="fd-note">{own ? "Nothing yet. Open a crate in the shop, then wear it from your locker." : "Nothing yet."}</p>}
       {rows.map(({ slot, it, d }) => {
         const c = itemColor(it.color);
         const c2 = it.color2 ? itemColor(it.color2) : null;
@@ -76,17 +74,6 @@ function Wearing({ look, hat, own }: { look: ItemLook; hat: string; own: boolean
           </div>
         );
       })}
-      {shopHat && (
-        <div class="fd-item">
-          <span class="fd-thumb" aria-hidden="true">
-            <HattedPawn hat={hat} />
-          </span>
-          <span class="fd-item-text">
-            <strong>{shopItem(`hat-${hat}`)!.name}</strong>
-            <span>Head · from the shop</span>
-          </span>
-        </div>
-      )}
     </section>
   );
 }
@@ -369,7 +356,7 @@ export function PlayerProfileScreen({
   const [error, setError] = useState<string | null>(null);
   const [sheet, setSheet] = useState<null | "edit" | "report">(null);
   // Your own reloads when your account changes (a new name, something new to wear).
-  const version = own ? `${me?.user.name}|${JSON.stringify(me?.locker?.look ?? {})}|${me?.shop?.equipped.hat}` : "";
+  const version = own ? `${me?.user.name}|${JSON.stringify(me?.locker?.look ?? {})}` : "";
   useEffect(() => {
     if (!uid) return;
     let live = true;
@@ -419,7 +406,7 @@ export function PlayerProfileScreen({
       <div class="fd-page fd-profile">
         {head}
         <div class="fd-card">
-          <DressedPawn size="profile" shadow look={own ? me?.locker?.look : undefined} hat={own ? myHat(me) : "none"} />
+          <DressedPawn size="profile" shadow look={own ? me?.locker?.look : undefined} />
           <div class="fd-card-name">{own ? (me?.user.name ?? target.name) : target.name}</div>
           <p class="fd-sub">{error ?? "Loading…"}</p>
         </div>
@@ -434,7 +421,7 @@ export function PlayerProfileScreen({
       {/* Two columns on a computer: who they are and what they wear; then their numbers. One column on a phone. */}
       <div class="fd-profile-col">
       <div class="fd-card">
-        <DressedPawn size="profile" shadow look={p.look} hat={p.hat} />
+        <DressedPawn size="profile" shadow look={p.look} />
         <h1 class="fd-card-name">{p.name}</h1>
         <div class="fd-seen">
           <span class={`fd-dot small${p.online ? "" : " off"}`} />
@@ -457,7 +444,7 @@ export function PlayerProfileScreen({
           </div>
         )}
       </div>
-      <Wearing look={p.look} hat={p.hat} own={own} />
+      <Wearing look={p.look} own={own} />
       {/* (The social lane's section: components/ChatPicks.tsx.) */}
       {own && <QuickChatPicks onShop={onShop} focus={target.section === "chat"} />}
       </div>

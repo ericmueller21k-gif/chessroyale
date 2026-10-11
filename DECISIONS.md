@@ -928,3 +928,39 @@ CSS puts them off the squares (files 24 px to the right across the board's full 
 - **Tests:** `boardCoords` / `expectCoordsInSquares` in `e2e/helpers.ts` measure each label's text against the square
   it names; Squads' Relay test checks your board and next turn's (the other way up), and a Crowd "everyone moves" test
   checks both ways up as the board turns to the side to move. On a phone and a computer.
+
+### Beta Crate · Series 001, batch 1: the crate, the old shop hats, a Winter scarf (Oct 11, 2026)
+
+Eric asked for a second crate series built from themes (secret agent and pirate split into parts of different rarity,
+a one-off Smiley Face), with the shop's free pawn hats moved in, one more full theme, and a Winter scarf. It ships in
+batches, so he can check the look after each. The full plan, the odds and the batches are in
+`docs/history/shop-and-crates.md` ("Beta Crate · Series 001"). The calls:
+
+- **Tiers (the director's mapping; Eric asked to confirm):** his four groups onto our top four, in his order. Tommy
+  Gun and Parrot are Mythic, Pirate Hat and Smiley Face Legendary (all four through Fischer Random), Suit and Tie Epic,
+  Dark Shades and Wire Earpiece Rare. A tier is one field in `ITEM_DEFS`.
+- **A tier is now truly one field:** a crate lists all its items once, and each item's tier says where it is (a box,
+  or behind Fischer Random). Fischer Random's odds are per tier (Legendary 80, Mythic 20), shared evenly, exactly
+  Winter's old 40/40/20. Winter's rolls are unchanged.
+- **The pawn hats move into the Beta crate (Eric confirmed):** Party Hat, Wizard Hat and Top Hat Common, Viking Helm
+  and Little Crown Uncommon, now painted like any crate item. The shop's hat slot is retired, with no "No hat" left
+  behind; stored test hats are ignored, never a crash. God King looks stay in the shop. Eric's reason: the shop will
+  later sell other things, such as new boss animations and new attack animations (way down the road), so God King
+  packs belong there, separate from crates. Bots that wore a shop hat now wear the same hat as a crate item.
+- **Same odds as Winter:** boxes 40/26/18/14, Fischer Random 2%. Every tier holds something from batch 1, so the strip
+  stays whole at the same odds all along. If a tier is ever empty, the strip leaves it out (no crash), and a test fails.
+- **The container is a supply box:** a wooden crate with steel corners, a band in the tier's colour and a stencilled
+  star. The crate itself is olive drab, stencilled BETA 001. Beta is listed first, with a one-line blurb and an item
+  count on each crate.
+- **The third theme is Ninja:** it reads at pawn size and makes the playground trio with pirates and agents.
+- **Suit and Tie rolls two colours** (the suit, the tie). **The Wire Earpiece is a head item**, so it can be worn with
+  Dark Shades (face). **The Smiley Face's features turn white on Midnight**, where dark ones vanish.
+- **28 items when complete,** 8/7/5/4 in the boxes, so each tier's items end up rarer than the one below's (5.0, 3.71,
+  3.6, 3.5, 0.8 and 0.2%). In batch 1, the lone Rare and Epic items are 18% and 14%, as Winter's lone Antlers were.
+- **Winter Scarf (Uncommon, face):** pieces gain a `neck` anchor (pawn 34, snowman 30, gingerbread 34), because a
+  scarf sits at the neck, not on the beard line. Face, so it goes with a beanie or a Santa hat. Antlers go from 26% to
+  13%, the Scarf 13%.
+- **Batch 1 odds (Beta):** Party Hat, Wizard Hat, Top Hat 13.3% each; Viking Helm, Little Crown, Eyepatch 8.7% each;
+  Dark Shades 18%; Suit and Tie 14%; Smiley Face 1.6%; Tommy Gun 0.4%.
+- **The fitting sheet** gained a short mode for showing a batch (`sheet=1`: each item as a card and on both pawns,
+  plus whole outfits).

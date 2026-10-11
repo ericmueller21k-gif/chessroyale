@@ -143,3 +143,150 @@ Eric's design, a fun bonus for now: free and unlimited while testing, and fully 
     stores a tier: the locker stores the item (`def`) and the tier comes from `ITEM_DEFS`, as do looks sent to others
     online. No migration; owned items show the new names at once.
   - Odds, items and art are unchanged. A test pins the six names, their order (the locker sorts by it) and colours.
+
+## Crates: Beta Crate · Series 001 (Oct 11, 2026)
+
+Eric (Oct 11): "Let's queue up another crate series called Beta Crate Series 001. Migrate all the free items out and
+into this crate, since players will have free keys anyway to use on these … The idea is themes: secret agent is a
+theme but split into parts of different rarity, same for pirate; smiley face is unique though." Plus: Fischer Random
+"ultra rare" Tommy Gun and Parrot (multi-coloured, both weapons); "most rare" Pirate Hat and Smiley Face; "mythic"
+Suit and Tie; "very rare" Dark Shades and Wire Earpiece; one more full theme and the missing parts, at the usual odds;
+"all we need to build is a new crate instead of a present for that crate; everything else should be reusable." And:
+"Add scarf to winter as uncommon." It ships in batches, so Eric can check the look after each.
+
+- **Tiers (the director's mapping, Eric asked to confirm):** Eric's four groups onto our top four tiers in his order:
+  Tommy Gun + Parrot Mythic, Pirate Hat + Smiley Face Legendary (all four through Fischer Random), Suit and Tie Epic,
+  Dark Shades + Wire Earpiece Rare. His labels don't match our names; his order does.
+- **A tier is one field.** A crate now lists all its items once (`items`), and each item's tier says where it is: in
+  that tier's box, or behind Fischer Random. Fischer Random's odds are per tier (`fischer: [{ tier, weight }]`,
+  Legendary 80, Mythic 20), shared evenly, which is exactly Winter's old 40/40/20, so Winter's rolls are unchanged.
+  Moving an item between Epic and Legendary is one field in `ITEM_DEFS`, nothing else.
+- **"Free items" = the shop's pawn hats (Eric confirmed).** They leave the shop and become Beta crate head items,
+  redrawn as painted regions (colour, blemish, shine), smaller so they fit every skin under the height cap. The shop's
+  hat slot is retired: no "No hat" starter, no `hat` on profiles, avatars or bots. Hats owned or worn from testing are
+  ignored (the shop reads only ids it knows), never a crash. God King looks stay in the shop, because the shop will
+  later sell other things, such as new boss animations and new attack animations (way down the road), so God King
+  packs belong there, separate from crates. Bots that wore a shop hat wear the same hat as a crate item now (their
+  "shop hat" share joined the head share in `BOT_LOOKS`).
+- **Same odds as Winter:** boxes Common 40, Uncommon 26, Rare 18, Epic 14, Fischer Random 2; a box opens to one of
+  its tier's items evenly. Every tier holds something from batch 1, so the strip is whole at the same odds throughout.
+  If a tier were ever empty, the strip leaves it out (`liveStrip`) instead of crashing an open, and a test fails on
+  any live crate with an empty tier.
+- **The container: a supply box.** A wooden crate with steel corners, a band in the tier's colour and a stencilled
+  star, drawn the size and place of a present, so the strip, the odds rows and the unwrap use either (a crate's
+  `look` picks its box and its own crate art). "Supply box", not "crate", since it comes out of a crate. The Beta
+  Crate itself is olive drab, stencilled BETA 001, with rope handles. Beta is listed first (it's new, and it's where
+  the free keys' hats live); each crate shows a one-line blurb and its item count.
+- **The third theme: Ninja.** It reads at pawn size (a coloured band across the face, a hood with an eye slit),
+  splits into seven parts across the tiers, and makes the playground trio with pirates and agents.
+- **Suit and Tie rolls two colours** (the suit, the tie): the name has two parts, and Midnight & Midnight is the
+  classic to chase. **The Wire Earpiece is a head item,** not face, so an agent can wear Dark Shades with it (earpiece,
+  shades, suit and briefcase: one per slot). **The Smiley Face** is a flat dot smiley over the whole head, in its
+  colour; its features are dark, white on Midnight (dark ones vanish there). It's worn under a hat.
+- **The Winter Scarf:** Uncommon, face, at the neck. Pieces gain a fourth anchor, `neck` (pawn 34, where its head
+  meets its collar; snowman 30; gingerbread 34). A face item, so it goes with a beanie or a Santa hat, not a beard.
+  The Uncommon present now holds the Antlers and the Scarf, 13% each (Antlers were 26%).
+- **Checked** on white and black pawns, every skin, in Red, Pearl and Midnight, at 95, 50 and 0% purity. Fixes from
+  the look: the party hat's stripes are a tint of its colour (white ones made a red one a Santa hat), the eyepatch
+  grew (it was a dot on a pawn) and got a light stitched edge (a Midnight patch vanished on a black pawn).
+- **The fitting sheet** has a short mode for showing a batch: `npm run preview:items -- out.png sheet=1 items=…
+  colors=… outfits=a+b;c` (each item as a card and on both pawns, colours in turn, and whole outfits).
+
+### The full list
+
+Colour column: which part takes the rolled colour (everything else is fixed, with outlines).
+
+#### The Classics (from the old shop) · 5
+
+| Item | Tier | Slot | Colour | Description |
+| --- | --- | --- | --- | --- |
+| Party Hat | Common | head | the cone (white stripes, pom-pom) | Every move is a celebration. Even the blunders. |
+| Wizard Hat | Common | head | hat and brim (gold star) | Knows things. Mostly opening theory. |
+| Top Hat | Common | head | the hat (band a shade of it) | A pawn of means. Monocle sold separately. |
+| Viking Helm | Uncommon | head | the helmet (cream horns, brass rim) | Pushes into any zone. The horns are for show; so is the plan. |
+| Little Crown | Uncommon | head | the crown (blue jewel) | Dreaming of promotion. |
+
+#### Secret Agent · 7
+
+| Item | Tier | Slot | Colour | Description |
+| --- | --- | --- | --- | --- |
+| Fake Moustache | Common | face | the moustache | A flawless disguise. Nobody will ever know it's you. |
+| Fedora | Common | head | the hat (dark band) | For trench-coat weather and shadowy endgames. |
+| Briefcase | Uncommon | weapon | the case (gold clasps) | Contents classified. Mostly sandwiches. |
+| Dark Shades | Rare | face | the frames (dark lenses) | Can't see the board. Looks great, though. |
+| Wire Earpiece | Rare | head | earpiece and coiled wire | "The pawn is moving. Repeat: the pawn is moving." |
+| Suit and Tie | Epic | skin | the suit; the tie (2nd colour) | A sharp suit in one colour, the tie in another. Licence to promote. |
+| Tommy Gun | Mythic (Fischer Random) | weapon | the metal; the wood (2nd colour) | A classic drum-fed Tommy gun, metal in one colour, wood in another. For settling the endgame. |
+
+#### Pirate · 8
+
+| Item | Tier | Slot | Colour | Description |
+| --- | --- | --- | --- | --- |
+| Bandana | Common | head | the bandana (white dots) | Tied tight for high seas and long games. |
+| Eyepatch | Uncommon | face | the patch (dark strap) | Half the vision, twice the swagger. |
+| Hook | Uncommon | weapon | the cuff (steel hook) | Terrible for moving pieces. Great for drama. |
+| Cutlass | Rare | weapon | guard and grip (steel blade) | Curved, polished, and strictly for show. |
+| Spyglass | Rare | weapon | the barrel (brass rings) | Spots a fork from three boards away. |
+| Captain's Coat | Epic | skin | the coat (gold buttons, white cravat) | Long, gold-buttoned and made for shouting orders. |
+| Pirate Hat | Legendary (Fischer Random) | head | the tricorn (skull, gold trim) | A captain's tricorn, skull and all. Arr. |
+| Parrot | Mythic (Fischer Random) | weapon | the body; wings and tail (2nd colour) | Perches on your shoulder and repeats your moves back to you. |
+
+#### Ninja · 7
+
+| Item | Tier | Slot | Colour | Description |
+| --- | --- | --- | --- | --- |
+| Ninja Headband | Common | head | band and tails | Long tails, for dramatic wind. |
+| Shuriken | Common | weapon | the star | A throwing star. Not for throwing at the board. |
+| Ninja Mask | Uncommon | face | the mask | Covers everything below the eyes, including your thinking face. |
+| Nunchucks | Uncommon | weapon | the sticks (steel chain) | Two sticks, one chain, zero hand-eye coordination. |
+| Katana | Rare | weapon | hilt wrap and scabbard (steel blade) | Folded a thousand times. Still can't cut through a fortress. |
+| Ninja Hood | Epic | head | the hood | Only the eyes show, and they're calculating. |
+| Ninja Gi | Epic | skin | the gi (black belt) | A wrap-front gi. The belt is black; you've earned it. |
+
+#### One-off · 1
+
+| Item | Tier | Slot | Colour | Description |
+| --- | --- | --- | --- | --- |
+| Smiley Face | Legendary (Fischer Random) | face | the face (dot eyes and smile) | Have a nice game. |
+
+#### Winter Crate · Series 1 · 1 new
+
+| Item | Tier | Slot | Colour | Description |
+| --- | --- | --- | --- | --- |
+| Scarf | Uncommon | face | the scarf (light stripes) | A long knit scarf. Your pawn's mum insisted. |
+
+### Odds, when complete (28 items)
+
+| Box | Chance | Items | Each |
+| --- | --- | --- | --- |
+| Common (grey) | 40% | Party Hat, Wizard Hat, Top Hat, Fake Moustache, Fedora, Bandana, Ninja Headband, Shuriken | 5.0% |
+| Uncommon (green) | 26% | Viking Helm, Little Crown, Briefcase, Eyepatch, Hook, Ninja Mask, Nunchucks | 3.71% |
+| Rare (blue) | 18% | Dark Shades, Wire Earpiece, Cutlass, Spyglass, Katana | 3.6% |
+| Epic (purple) | 14% | Suit and Tie, Captain's Coat, Ninja Hood, Ninja Gi | 3.5% |
+| Fischer Random | 2% | Legendary 80%: Pirate Hat, Smiley Face | 0.8% each |
+| | | Mythic 20%: Tommy Gun, Parrot | 0.2% each |
+
+### Odds after batch 1
+
+| Box | Chance | Items | Each |
+| --- | --- | --- | --- |
+| Common | 40% | Party Hat, Wizard Hat, Top Hat | 13.33% |
+| Uncommon | 26% | Viking Helm, Little Crown, Eyepatch | 8.67% |
+| Rare | 18% | Dark Shades | 18% |
+| Epic | 14% | Suit and Tie | 14% |
+| Fischer Random | 2% | Smiley Face (Legendary) | 1.6% |
+| | | Tommy Gun (Mythic) | 0.4% |
+
+(Until the Rare and Epic boxes fill, a single Rare or Epic item is likelier than a single Common one, as Winter's
+lone Antlers were. It evens out by batch 3.)
+
+Winter, with the Scarf: the Uncommon present holds Antlers and Scarf, 13% each (Antlers was 26%).
+
+### Batches
+
+| Batch | Items | Running total |
+| --- | --- | --- |
+| 1 | Crate, supply box, two-crate page; Winter Scarf; the 5 Classics; Smiley Face, Tommy Gun, Dark Shades, Suit and Tie, Eyepatch | 10 of 28 |
+| 2 | Agent: Fake Moustache, Fedora, Briefcase, Wire Earpiece; Pirate: Bandana, Hook | 16 (agent complete) |
+| 3 | Pirate: Cutlass, Spyglass, Captain's Coat, Pirate Hat, Parrot | 21 (pirate complete) |
+| 4 | Ninja: Headband, Shuriken, Ninja Mask, Nunchucks, Katana, Ninja Hood, Ninja Gi | 28 (complete) |

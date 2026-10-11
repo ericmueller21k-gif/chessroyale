@@ -5,7 +5,7 @@ import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-dif
 import { powersLine } from "../power-words.ts";
 import { BossDifficulty } from "../components/BossDifficulty.tsx";
 import type { ComponentChildren } from "preact";
-import { AccountBar, DressedPawn, FdButton, LiveLine, Logo, RankLine, myHat, wearingNames } from "../components/FrontDoor.tsx";
+import { AccountBar, DressedPawn, FdButton, LiveLine, Logo, RankLine, wearingNames } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 import { BossFace } from "../components/BossCharacter.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
@@ -548,11 +548,11 @@ export function HomeScreen({
     );
   const look = profile?.locker?.look;
   const name = profile?.user.name ?? "Player";
-  const wearing = wearingNames(look, profile?.shop);
+  const wearing = wearingNames(look);
   const queueing = queue !== undefined && queue !== null;
   const hero = (
     <section class="fd-hero" aria-label="You">
-      <DressedPawn look={look} hat={myHat(profile)} size="hero" shadow />
+      <DressedPawn look={look} size="hero" shadow />
       {/* (Your icon to the left of your name and rating, as beside your name in chat.) */}
       <div class="fd-hero-id">
         <span class="fd-hero-icon">

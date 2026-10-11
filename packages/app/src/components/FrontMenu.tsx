@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 import { bossThreat } from "@chessroyale/core";
 import { account } from "../account.ts";
 import { useLive, type PlayingNow } from "../live.ts";
-import { AccountBar, DressedPawn, GearIcon, LiveLine, Logo, myHat } from "./FrontDoor.tsx";
+import { AccountBar, DressedPawn, GearIcon, LiveLine, Logo } from "./FrontDoor.tsx";
 import { GlobalChat } from "./GlobalChat.tsx";
 
 /** Where the computer's side menu can take you. */
@@ -75,7 +75,7 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
             </Icon>
           }
         />
-        <Item label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} hat={myHat(p)} />} />
+        <Item label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} />} />
       </div>
       <div class="fd-menu fd-menu-end">
         <Item label="Settings" on={page === "settings"} onClick={nav.settings} icon={<GearIcon />} />

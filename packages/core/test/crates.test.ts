@@ -1,33 +1,103 @@
 import { describe, expect, it } from "vitest";
-import { CRATES, FISCHER, ITEM_COLORS, ITEM_DEFS, PURITY_BANDS, TIERS, cleanLook, isShiny, itemChance, itemDef, mulberry32, presentChance, presentItems, purity, rollBlemish, rollCrate, stackItems } from "../src/index.ts";
+import {
+  CRATES,
+  FISCHER,
+  ITEM_COLORS,
+  ITEM_DEFS,
+  PURITY_BANDS,
+  TIERS,
+  cleanLook,
+  crateDef,
+  fischerOdds,
+  isShiny,
+  itemChance,
+  itemDef,
+  liveStrip,
+  mulberry32,
+  presentChance,
+  presentItems,
+  purity,
+  rollBlemish,
+  rollCrate,
+  stackItems,
+  type CrateDef,
+} from "../src/index.ts";
 
-const crate = CRATES[0]!;
+const crate = crateDef("winter-1")!;
+const beta = crateDef("beta-001")!;
 
 describe("crates", () => {
-  it("the odds add up, and every item is in the crate", () => {
-    expect(crate.strip.reduce((s, x) => s + x.weight, 0)).toBe(100);
-    expect(crate.fischer.reduce((s, x) => s + x.weight, 0)).toBe(100);
+  it("the odds add up in every crate, and every item is in exactly one crate", () => {
     expect(ITEM_COLORS.reduce((s, x) => s + x.weight, 0)).toBeCloseTo(100);
-    const total = ITEM_DEFS.reduce((s, d) => s + itemChance(crate, d.id), 0);
-    expect(total).toBeCloseTo(1);
-    expect(itemChance(crate, "fire-ice-crown")).toBeCloseTo(0.004);
-    // A present's chance, shared evenly by its items: Common 40% over three, Rare 18% over two.
-    expect(itemChance(crate, "beanie")).toBeCloseTo(0.4 / 3);
-    expect(itemChance(crate, "ski-goggles")).toBeCloseTo(0.09);
-    expect(itemChance(crate, "antlers")).toBeCloseTo(0.26);
+    for (const c of CRATES) {
+      expect(c.strip.reduce((s, x) => s + x.weight, 0)).toBe(100);
+      expect(c.fischer.reduce((s, x) => s + x.weight, 0)).toBe(100);
+      expect(fischerOdds(c).reduce((s, x) => s + x.weight, 0)).toBeCloseTo(100);
+      expect(ITEM_DEFS.reduce((s, d) => s + itemChance(c, d.id), 0)).toBeCloseTo(1);
+      expect(new Set(c.items).size).toBe(c.items.length);
+    }
+    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(1);
+    expect(CRATES.map((c) => c.id)).toEqual(["beta-001", "winter-1"]);
   });
 
-  it("the strip: a present per tier, each rarer than the one below, then Fischer Random at 2%", () => {
-    const tiers = crate.strip.map((x) => x.tier);
-    expect(tiers).toEqual(["common", "uncommon", "rare", "epic", FISCHER]);
-    for (let i = 1; i < crate.strip.length; i++) expect(crate.strip[i]!.weight).toBeLessThan(crate.strip[i - 1]!.weight);
-    expect(presentChance(crate, FISCHER)).toBeCloseTo(0.02);
-    // Every present holds something, and every item in the presents is of a present's tier.
-    for (const t of tiers.filter((t) => t !== FISCHER)) expect(presentItems(crate, t).length).toBeGreaterThan(0);
-    for (const id of crate.items) expect(tiers).toContain(itemDef(id)?.tier);
-    // Legendary and Mythic come only through Fischer Random.
-    for (const d of ITEM_DEFS.filter((d) => d.tier === "legendary" || d.tier === "mythic")) expect(crate.fischer.map((x) => x.item)).toContain(d.id);
+  it("Winter: a present's chance, shared evenly by its items", () => {
+    // Common 40% over three, Uncommon 26% over two (the Scarf joined the Antlers, Oct 11), Rare 18% over two.
+    expect(itemChance(crate, "beanie")).toBeCloseTo(0.4 / 3);
+    expect(itemChance(crate, "antlers")).toBeCloseTo(0.13);
+    expect(itemChance(crate, "scarf")).toBeCloseTo(0.13);
+    expect(itemChance(crate, "ski-goggles")).toBeCloseTo(0.09);
+    // Fischer Random: Legendary 80 (the tube and the cane, 40 each), Mythic 20 (the crown), as before.
+    expect(fischerOdds(crate)).toEqual([
+      { item: "gift-tube", weight: 40 },
+      { item: "candy-cane", weight: 40 },
+      { item: "fire-ice-crown", weight: 20 },
+    ]);
+    expect(itemChance(crate, "fire-ice-crown")).toBeCloseTo(0.004);
+    expect(itemChance(crate, "party-hat")).toBe(0);
+  });
+
+  it("Beta: the same odds as Winter; its supply boxes open evenly, and Fischer Random splits Legendary 80, Mythic 20", () => {
+    expect(beta.strip).toEqual(crate.strip);
+    expect(beta.fischer).toEqual(crate.fischer);
+    expect(itemChance(beta, "party-hat")).toBeCloseTo(0.4 / presentItems(beta, "common").length);
+    expect(itemChance(beta, "eyepatch")).toBeCloseTo(0.26 / presentItems(beta, "uncommon").length);
+    expect(itemChance(beta, "dark-shades")).toBeCloseTo(0.18 / presentItems(beta, "rare").length);
+    expect(itemChance(beta, "suit-and-tie")).toBeCloseTo(0.14 / presentItems(beta, "epic").length);
+    const legendary = beta.items.filter((id) => itemDef(id)?.tier === "legendary").length;
+    const mythic = beta.items.filter((id) => itemDef(id)?.tier === "mythic").length;
+    expect(itemChance(beta, "smiley-face")).toBeCloseTo((0.02 * 0.8) / legendary);
+    expect(itemChance(beta, "tommy-gun")).toBeCloseTo((0.02 * 0.2) / mythic);
+    // The old shop hats are here now (Eric, Oct 11), and none of Winter's items.
+    for (const id of ["party-hat", "wizard-hat", "top-hat", "viking-helm", "little-crown"]) expect(beta.items).toContain(id);
+    expect(itemChance(beta, "antlers")).toBe(0);
+  });
+
+  it("the strip: a box per tier, each rarer than the one below, then Fischer Random at 2%; every tier holds something", () => {
+    for (const c of CRATES) {
+      const tiers = c.strip.map((x) => x.tier);
+      expect(tiers).toEqual(["common", "uncommon", "rare", "epic", FISCHER]);
+      for (let i = 1; i < c.strip.length; i++) expect(c.strip[i]!.weight).toBeLessThan(c.strip[i - 1]!.weight);
+      expect(presentChance(c, FISCHER)).toBeCloseTo(0.02);
+      // A live crate is whole: every box holds something, and so does each tier behind Fischer Random.
+      expect(liveStrip(c)).toEqual(c.strip);
+      for (const t of tiers.filter((t) => t !== FISCHER)) expect(presentItems(c, t).length, `${c.id} ${t}`).toBeGreaterThan(0);
+      for (const f of c.fischer) expect(c.items.some((id) => itemDef(id)?.tier === f.tier), `${c.id} ${f.tier}`).toBe(true);
+    }
     expect(TIERS.length).toBe(6);
+  });
+
+  it("a tier is one field: an item moves between a box and Fischer Random by its tier alone; an empty tier is left out", () => {
+    // A crate being filled: no Epic items and no Mythic one yet.
+    const partial: CrateDef = { ...beta, id: "test", items: ["party-hat", "eyepatch", "dark-shades", "smiley-face"] };
+    expect(liveStrip(partial).map((x) => x.tier)).toEqual(["common", "uncommon", "rare", FISCHER]);
+    expect(fischerOdds(partial)).toEqual([{ item: "smiley-face", weight: 100 }]);
+    expect(ITEM_DEFS.reduce((s, d) => s + itemChance(partial, d.id), 0)).toBeCloseTo(1);
+    const rng = mulberry32(5);
+    for (let i = 0; i < 3000; i++) expect(partial.items).toContain(rollCrate(rng, partial).def);
+    // Nothing behind Fischer Random: the test switch can't land there either.
+    const noFischer: CrateDef = { ...partial, items: ["party-hat"] };
+    expect(liveStrip(noFischer).map((x) => x.tier)).toEqual(["common"]);
+    expect(rollCrate(mulberry32(1), noFischer, { fischer: true })).toMatchObject({ fischer: false, def: "party-hat" });
   });
 
   it("the tiers: Common to Mythic, commonest first, each in its colour", () => {
@@ -76,7 +146,11 @@ describe("crates", () => {
       expect(count[d]! / n).toBeGreaterThan(0.085);
       expect(count[d]! / n).toBeLessThan(0.095);
     }
-    expect(count["antlers"]! / n).toBeCloseTo(0.26, 1);
+    // Uncommon (the Antlers and the Scarf) 26%, 13% each.
+    for (const d of ["antlers", "scarf"]) {
+      expect(count[d]! / n).toBeGreaterThan(0.125);
+      expect(count[d]! / n).toBeLessThan(0.135);
+    }
     // Epic (four items) about 14% in all, 3.5% each.
     const epic = ["snowman", "present", "gingerbread", "chimney"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
     expect(epic).toBeGreaterThan(0.13);
@@ -94,13 +168,39 @@ describe("crates", () => {
     expect(pearl / n).toBeLessThan(0.007);
   });
 
+  it("Beta's rolls land in the right proportions (60,000 opens)", () => {
+    const rng = mulberry32(43);
+    const n = 60_000;
+    const tiers: Record<string, number> = {};
+    for (let i = 0; i < n; i++) {
+      const r = rollCrate(rng, beta);
+      expect(beta.items).toContain(r.def);
+      const t = itemDef(r.def)!.tier;
+      tiers[t] = (tiers[t] ?? 0) + 1;
+    }
+    expect(tiers["common"]! / n).toBeCloseTo(0.4, 1);
+    expect(tiers["uncommon"]! / n).toBeCloseTo(0.26, 1);
+    expect(tiers["rare"]! / n).toBeCloseTo(0.18, 1);
+    expect(tiers["epic"]! / n).toBeCloseTo(0.14, 1);
+    expect(((tiers["legendary"] ?? 0) + (tiers["mythic"] ?? 0)) / n).toBeGreaterThan(0.015);
+    expect(((tiers["legendary"] ?? 0) + (tiers["mythic"] ?? 0)) / n).toBeLessThan(0.025);
+  });
+
   it("the test switches force Fischer Random and a shiny", () => {
     const rng = mulberry32(7);
-    for (let i = 0; i < 50; i++) {
-      const r = rollCrate(rng, crate, { fischer: true, shiny: true });
-      expect(r.fischer).toBe(true);
-      expect(["gift-tube", "candy-cane", "fire-ice-crown"]).toContain(r.def);
-      expect(isShiny(r.blemish)).toBe(true);
+    for (const [c, list] of [
+      [crate, ["gift-tube", "candy-cane", "fire-ice-crown"]],
+      [beta, beta.items.filter((id) => ["legendary", "mythic"].includes(itemDef(id)!.tier))],
+    ] as const) {
+      const seen = new Set<string>();
+      for (let i = 0; i < 200; i++) {
+        const r = rollCrate(rng, c, { fischer: true, shiny: true });
+        expect(r.fischer).toBe(true);
+        expect(list).toContain(r.def);
+        expect(isShiny(r.blemish)).toBe(true);
+        seen.add(r.def);
+      }
+      expect(seen.size).toBe(list.length);
     }
   });
 
@@ -116,6 +216,13 @@ describe("crates", () => {
     }
     expect(twos["present"]).toBeGreaterThan(100);
     expect(twos["ski-goggles"]).toBeGreaterThan(300);
+    // Beta's: the suit (and its tie), and the Tommy Gun (metal and wood).
+    for (let i = 0; i < 400; i++) {
+      const r = rollCrate(rng, beta, { fischer: i % 2 === 0 });
+      expect(r.color2 !== undefined, r.def).toBe(itemDef(r.def)?.colors === 2);
+    }
+    expect(itemDef("suit-and-tie")?.colors).toBe(2);
+    expect(itemDef("tommy-gun")?.colors).toBe(2);
     expect(cleanLook({ head: { def: "present", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBe("cobalt");
     expect(cleanLook({ head: { def: "santa-hat", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBeUndefined();
   });

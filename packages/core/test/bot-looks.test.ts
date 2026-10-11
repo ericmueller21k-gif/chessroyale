@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { BOT_LOOKS, ITEM_DEFS, SHOP_ITEMS, botLook, isShiny, itemDef, type BotLook } from "../src/index.ts";
+import { BOT_LOOKS, ITEM_DEFS, botLook, isShiny, itemDef, type BotLook } from "../src/index.ts";
 
-/** How many things a look puts on: a shop hat (shown only without a crate head piece) and each crate item. */
-const things = (l: BotLook) => Object.keys(l.look).length + (l.hat !== "none" && !l.look.head ? 1 : 0);
+/** How many things a look puts on: each crate item. */
+const things = (l: BotLook) => Object.keys(l.look).length;
 
 describe("bots' outfits", () => {
   const seeds = Array.from({ length: 3000 }, (_, i) => `Bot ${i}`);
@@ -31,11 +31,10 @@ describe("bots' outfits", () => {
     expect(weapons).toBeLessThan(0.1);
   });
 
-  it("only items that exist, in their own slots: shop hats and crate head, face and weapon pieces; no skins, no Mythic, never shiny", () => {
-    const hats = new Set(SHOP_ITEMS.filter((i) => i.slot === "hat").map((i) => i.look.hat));
+  it("only items that exist, in their own slots: crate head, face and weapon pieces (the old shop hats among them); no skins, no Mythic, never shiny", () => {
     const used = new Set<string>();
     for (const l of looks) {
-      expect(hats.has(l.hat)).toBe(true);
+      expect(Object.keys(l)).toEqual(["look"]);
       expect(l.look.skin).toBeUndefined();
       for (const [slot, it] of Object.entries(l.look)) {
         const def = itemDef(it!.def)!;
@@ -45,10 +44,9 @@ describe("bots' outfits", () => {
         expect(it!.color2 !== undefined).toBe(def.colors === 2);
         used.add(def.id);
       }
-      if (l.hat !== "none") used.add(l.hat);
     }
     // Every listed item turns up somewhere.
-    for (const id of [...BOT_LOOKS.head, ...BOT_LOOKS.face, ...BOT_LOOKS.weapon, ...BOT_LOOKS.shopHats]) expect(used.has(id)).toBe(true);
+    for (const id of [...BOT_LOOKS.head, ...BOT_LOOKS.face, ...BOT_LOOKS.weapon]) expect(used.has(id)).toBe(true);
     expect(ITEM_DEFS.filter((d) => used.has(d.id)).every((d) => d.slot !== "skin")).toBe(true);
   });
 });

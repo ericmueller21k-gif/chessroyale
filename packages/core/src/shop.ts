@@ -10,7 +10,7 @@
 import { CHAT_PACKS, chatPackItem, type ChatPicks } from "./chat.ts";
 import { QUICK_CHAT } from "./settings.ts";
 
-export type ShopSlot = "king" | "hat" | "chat";
+export type ShopSlot = "king" | "chat";
 /** The slots you equip one item in (chat packs aren't equipped: you use every one you own). */
 export type EquipSlot = Exclude<ShopSlot, "chat">;
 
@@ -24,7 +24,6 @@ export interface ShopCategory {
 
 export const SHOP_CATEGORIES: readonly ShopCategory[] = [
   { slot: "king", name: "God King effects", blurb: "The colour of his lightning, beam and halo when he answers your call." },
-  { slot: "hat", name: "Pawn hats", blurb: "A hat for your pawn in the pre-game votes." },
   {
     slot: "chat",
     name: "Chat packs",
@@ -42,7 +41,7 @@ export interface ShopItem {
   price: number;
   /** Everyone owns it from the start (one per slot, equipped until you choose another). */
   starter?: boolean;
-  /** How it looks, for the app: colours for King effects, a hat's id for hats, a chat pack's id. */
+  /** How it looks, for the app: colours for King effects, a chat pack's id. */
   look: Record<string, string>;
 }
 
@@ -53,13 +52,8 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   { id: "king-hellfire", slot: "king", name: "Hellfire", description: "He descends wreathed in flame.", price: 600, look: { bolt: "#ffedd5", glow: "#f97316", beam: "#fdba74" } },
   { id: "king-void", slot: "king", name: "Voidborn", description: "Purple light from beyond the board.", price: 600, look: { bolt: "#f3e8ff", glow: "#a855f7", beam: "#d8b4fe" } },
   { id: "king-emerald", slot: "king", name: "Emerald Oath", description: "Green fire of an ancient order.", price: 500, look: { bolt: "#dcfce7", glow: "#22c55e", beam: "#bbf7d0" } },
-  // Pawn hats.
-  { id: "hat-none", slot: "hat", name: "No hat", description: "A pawn, unadorned.", price: 0, starter: true, look: { hat: "none" } },
-  { id: "hat-party", slot: "hat", name: "Party Hat", description: "Every move is a celebration.", price: 150, look: { hat: "party" } },
-  { id: "hat-crown", slot: "hat", name: "Little Crown", description: "Dreaming of promotion.", price: 300, look: { hat: "crown" } },
-  { id: "hat-wizard", slot: "hat", name: "Wizard Hat", description: "Knows things.", price: 250, look: { hat: "wizard" } },
-  { id: "hat-top", slot: "hat", name: "Top Hat", description: "A pawn of means.", price: 250, look: { hat: "top" } },
-  { id: "hat-viking", slot: "hat", name: "Viking Helm", description: "Pushes into any zone.", price: 300, look: { hat: "viking" } },
+  // (The pawn hats moved into the Beta crate, Oct 11, 2026: drawn and worn like any crate item. Ids like "hat-party"
+  // still stored from testing are ignored.)
   // Quick chat packs (core/chat.ts holds their lines; prices are in settings.ts). The free ones everyone has.
   ...CHAT_PACKS.map((p) => ({
     id: chatPackItem(p.id),
@@ -76,10 +70,10 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
 export const SHOP_FREE = true;
 
 /**
- * Pawn hats and God King effects: bought in the shop, worn from the locker, with the crate items (Eric, Oct 8, 2026:
- * one place to wear things, one head).
+ * God King effects: bought in the shop, worn from the locker, with the crate items (Eric, Oct 8, 2026: one place to
+ * wear things). The pawn hats that used to be here are crate items now (Beta Crate, Oct 11, 2026).
  */
-export const LOCKER_SLOTS: readonly EquipSlot[] = ["hat", "king"];
+export const LOCKER_SLOTS: readonly EquipSlot[] = ["king"];
 export const wornFromLocker = (item: ShopItem) => (LOCKER_SLOTS as readonly ShopSlot[]).includes(item.slot);
 
 export function shopItem(id: string): ShopItem | undefined {

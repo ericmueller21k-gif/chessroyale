@@ -1,4 +1,4 @@
-import type { ComponentChildren } from "preact";
+import type { ComponentChildren, JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   CRATES,
@@ -10,9 +10,10 @@ import {
   SLOT_NAMES,
   TIERS,
   crateDef,
-  equippedLook,
+  fischerOdds,
   isShiny,
   itemChance,
+  liveStrip,
   presentChance,
   presentItems,
   itemColor,
@@ -23,6 +24,7 @@ import {
   tierInfo,
   wornFromLocker,
   type CrateDef,
+  type CrateLook,
   type CrateRoll,
   type ItemInstance,
   type ItemSlot,
@@ -30,9 +32,9 @@ import {
   type PresentTier,
 } from "@chessroyale/core";
 import { deleteLockerItems, equipLockerItem, equipShopItem, openCrate } from "../account.ts";
-import { Avatar, CrateArt, FischerArt, ItemArt, KeyArt, PresentArt } from "../components/Items.tsx";
+import { Avatar, BetaCrateArt, FischerArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
-import { HattedPawn, KingEffectPreview } from "../components/Cosmetics.tsx";
+import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play, unlockAudio } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 
@@ -46,6 +48,15 @@ export const colorName = (it: { color: string; color2?: string | null }) => item
 export const finishLine = (it: { color: string; color2?: string | null; blemish: number }) => `${colorName(it)} · Purity ${purity(it.blemish).toFixed(1)}%`;
 
 // ---------------- Crates ----------------
+
+/**
+ * How each crate looks: its own box on the crate page, and the box each tier comes in on the strip (Winter's
+ * presents, Beta's supply boxes; Eric, Oct 11: only the container is new, everything else is reused).
+ */
+const CRATE_LOOKS: Record<CrateLook, { Crate: () => JSX.Element; Box: (p: { color: string }) => JSX.Element; box: string; boxes: string }> = {
+  winter: { Crate: WinterCrateArt, Box: PresentArt, box: "present", boxes: "Presents" },
+  beta: { Crate: BetaCrateArt, Box: SupplyBoxArt, box: "supply box", boxes: "Supply boxes" },
+};
 
 /**
  * A crate opened but not seen yet: the server rolled it, but you left during the spin (Eric, Oct 8). Kept on the
@@ -96,20 +107,26 @@ export function CratesPanel() {
           Keys × {count(locker?.keys)}
         </span>
       </div>
-      {CRATES.map((c) => (
-        <button type="button" key={c.id} class="ff-window crate-row" onClick={() => setOpen(c)}>
-          <span class="crate-row-art">
-            <CrateArt />
-          </span>
-          <span class="crate-row-text">
-            <strong>{c.name}</strong>
-            <span>× {count(locker?.crates)}</span>
-          </span>
-          <span class="ff-cursor" aria-hidden="true">
-            ▶
-          </span>
-        </button>
-      ))}
+      {CRATES.map((c) => {
+        const { Crate } = CRATE_LOOKS[c.look];
+        return (
+          <button type="button" key={c.id} class="ff-window crate-row" data-crate={c.id} onClick={() => setOpen(c)}>
+            <span class="crate-row-art">
+              <Crate />
+            </span>
+            <span class="crate-row-text">
+              <strong>{c.name}</strong>
+              <span class="crate-row-blurb">{c.blurb}</span>
+              <span>
+                {c.items.length} items · × {count(locker?.crates)}
+              </span>
+            </span>
+            <span class="ff-cursor" aria-hidden="true">
+              ▶
+            </span>
+          </button>
+        );
+      })}
       {CRATES_FREE && <p class="shop-note">Crates and keys are unlimited while we test.</p>}
     </div>
   );
@@ -120,7 +137,9 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   const [forceFischer, setForceFischer] = useState(q.get("fischer") === "1");
   const [forceShiny, setForceShiny] = useState(q.get("shiny") === "1");
   const [opening, setOpening] = useState(!!resume);
-  const items = [...crate.items, ...crate.fischer.map((s) => s.item)];
+  const look = CRATE_LOOKS[crate.look];
+  // Commonest first; Legendary and Mythic (Fischer Random) last.
+  const items = [...crate.items].sort((a, b) => tierIndex(a) - tierIndex(b));
   if (opening)
     return <CrateOpening crate={crate} force={{ fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />;
   return (
@@ -130,14 +149,17 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
       </button>
       <div class="ff-window crate-hero">
         <span class="crate-hero-art">
-          <CrateArt />
+          <look.Crate />
         </span>
         <strong>{crate.name}</strong>
+        <span class="small">{crate.blurb}</span>
       </div>
-      <h3 class="ff-title">Presents</h3>
-      <p class="small muted">The crate holds a present for each tier, in its colour. A present opens to one of its tier's items, each as likely as the others.</p>
+      <h3 class="ff-title">{look.boxes}</h3>
+      <p class="small muted">
+        The crate holds a {look.box} for each tier, in its colour. A {look.box} opens to one of its tier's items, each as likely as the others.
+      </p>
       <div class="odds-list">
-        {crate.strip.map(({ tier }) => {
+        {liveStrip(crate).map(({ tier }) => {
           if (tier === FISCHER)
             return (
               <div key={tier} class="odds-row" style={{ "--tier": "#fbbf24" }}>
@@ -156,10 +178,12 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           return (
             <div key={tier} class="odds-row" style={{ "--tier": t.color }}>
               <span class="odds-art">
-                <PresentArt color={t.color} />
+                <look.Box color={t.color} />
               </span>
               <span class="odds-text">
-                <strong>{t.name} present</strong>
+                <strong>
+                  {t.name} {look.box}
+                </strong>
                 <span class="odds-tier">{n === 1 ? "1 item" : `${n} items, ${pct(presentChance(crate, tier) / n)} each`}</span>
               </span>
               <span class="odds-pct">{pct(presentChance(crate, tier))}</span>
@@ -259,13 +283,13 @@ function stripTiles(pick: () => Tile, landTile: Tile, length: number, land: numb
 
 /** The crate's strip: presents by the odds, Fischer Random a little more often than it lands (to tease). */
 const presentTile = (crate: CrateDef) => (): Tile => {
-  const { tier } = pickWeighted(crate.strip.map((x) => (x.tier === FISCHER ? { ...x, weight: x.weight * 3 } : x)));
+  const { tier } = pickWeighted(liveStrip(crate).map((x) => (x.tier === FISCHER ? { ...x, weight: x.weight * 3 } : x)));
   return tier === FISCHER ? { kind: "fischer" } : { kind: "present", tier };
 };
 /** A second spin's decoys: items by their odds. */
 const itemTile = (list: readonly { item: string; weight: number }[]) => (): Tile => ({ kind: "item", def: pickWeighted(list).item, finish: decoyFinish() });
 
-function TileView({ tile }: { tile: Tile }) {
+function TileView({ tile, look }: { tile: Tile; look: CrateLook }) {
   if (tile.kind === "fischer") {
     return (
       <span class="spin-tile fischer">
@@ -276,9 +300,10 @@ function TileView({ tile }: { tile: Tile }) {
   }
   if (tile.kind === "present") {
     const t = tierInfo(tile.tier);
+    const { Box } = CRATE_LOOKS[look];
     return (
       <span class="spin-tile present" style={{ "--tier": t.color }}>
-        <PresentArt color={t.color} />
+        <Box color={t.color} />
         <span class="spin-tile-name">{t.name}</span>
       </span>
     );
@@ -296,7 +321,7 @@ function TileView({ tile }: { tile: Tile }) {
  * The strip: it races past a centre marker, slows (ease-out) and lands on the result, with a click for every
  * tile that passes (fast, then slower and slower).
  */
-function Spin({ tiles, land, ms, onDone }: { tiles: Tile[]; land: number; ms: number; onDone: () => void }) {
+function Spin({ tiles, land, ms, look, onDone }: { tiles: Tile[]; land: number; ms: number; look: CrateLook; onDone: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -329,7 +354,7 @@ function Spin({ tiles, land, ms, onDone }: { tiles: Tile[]; land: number; ms: nu
       <div class="spin-marker" aria-hidden="true" />
       <div class="spin-track" ref={track}>
         {tiles.map((t, i) => (
-          <TileView key={i} tile={t} />
+          <TileView key={i} tile={t} look={look} />
         ))}
       </div>
     </div>
@@ -381,7 +406,7 @@ function CrateOpening({
       tier,
       one: stripTiles(presentTile(crate), roll.fischer ? { kind: "fischer" } : { kind: "present", tier }, 46, 38),
       // Only Fischer Random spins again; a present opens straight to its item (Eric, Oct 7).
-      two: roll.fischer ? stripTiles(itemTile(crate.fischer), { kind: "item", def: item.def, finish }, 30, 24) : [],
+      two: roll.fischer ? stripTiles(itemTile(fischerOdds(crate)), { kind: "item", def: item.def, finish }, 30, 24) : [],
     };
   }, [result]);
   const afterFirst = () => {
@@ -399,15 +424,15 @@ function CrateOpening({
       <h2 class="ff-title">{crate.name}</h2>
       {error && <p class="shop-error">{error}</p>}
       {!result && !error && <p class="muted">Opening…</p>}
-      {strips && stage === "spin" && <Spin key={`a${round}`} tiles={strips.one} land={38} ms={6200} onDone={afterFirst} />}
+      {strips && stage === "spin" && <Spin key={`a${round}`} tiles={strips.one} land={38} ms={6200} look={crate.look} onDone={afterFirst} />}
       {strips && stage === "fischer" && (
         <div class="fischer-stage">
           <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub="Legendary or Mythic" sound="bannerStart" />
         </div>
       )}
-      {strips && stage === "unwrap" && <Unwrap tier={strips.tier} />}
+      {strips && stage === "unwrap" && <Unwrap tier={strips.tier} look={crate.look} />}
       {strips && stage === "spin2" && (
-        <Spin key={`b${round}`} tiles={strips.two} land={24} ms={4800} onDone={() => setStage("reveal")} />
+        <Spin key={`b${round}`} tiles={strips.two} land={24} ms={4800} look={crate.look} onDone={() => setStage("reveal")} />
       )}
       {result && stage === "reveal" && (
         <Reveal
@@ -420,18 +445,21 @@ function CrateOpening({
   );
 }
 
-/** A present unwrapping: it shakes, then bursts open. */
-function Unwrap({ tier }: { tier: PresentTier }) {
+/** A present (or a supply box) opening: it shakes, then bursts open. */
+function Unwrap({ tier, look }: { tier: PresentTier; look: CrateLook }) {
   const t = tierInfo(tier);
+  const { Box, box } = CRATE_LOOKS[look];
   useEffect(() => {
     play("select");
   }, []);
   return (
     <div class="present-stage" style={{ "--tier": t.color }}>
       <span class="present-stage-art">
-        <PresentArt color={t.color} />
+        <Box color={t.color} />
       </span>
-      <strong>{t.name} present</strong>
+      <strong>
+        {t.name} {box}
+      </strong>
     </div>
   );
 }
@@ -491,9 +519,9 @@ const tabName = (t: LockerTab) => (t === "all" ? "All" : t === "king" ? "God Kin
 
 /**
  * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same colour
- * stacked (×3, the purest on top: that's the one you wear). Then what you got in the shop: pawn hats and God King
- * effects. Tap to wear (tap again to take off); hold a crate item (or right-click it) to delete it. One head: a
- * pawn hat and a crate head item take each other off. Your avatar shows the result.
+ * stacked (×3, the purest on top: that's the one you wear). Then what you got in the shop: God King effects. Tap to
+ * wear (tap again to take off); hold a crate item (or right-click it) to delete it. Your avatar shows the result.
+ * (The pawn hats are crate items now, from the Beta crate.)
  */
 export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const { profile } = useAccount();
@@ -501,17 +529,14 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const [deleting, setDeleting] = useState<ItemStack | null>(null);
   const locker = profile?.locker;
   const shop = profile?.shop;
-  const hat = equippedLook(shop, "hat").hat ?? "none";
   if (!locker) return <p class="muted">Your locker needs your account.</p>;
   const top = (s: ItemStack) => s.items[0]!;
   const stacks = stackItems(locker.items)
     .filter((s) => tab === "all" || itemDef(top(s).def)?.slot === tab)
     .sort((a, b) => tierIndex(top(b).def) - tierIndex(top(a).def) || colorIndex(top(b).color) - colorIndex(top(a).color) || top(a).blemish - top(b).blemish);
-  // What you got in the shop: pawn hats ("No hat" is just taking one off) and God King effects.
-  const fromShop = SHOP_ITEMS.filter((i) => wornFromLocker(i) && i.look.hat !== "none" && shop?.owned.includes(i.id)).filter(
-    (i) => tab === "all" || (tab === "head" && i.slot === "hat") || (tab === "king" && i.slot === "king"),
-  );
-  const shopTab = tab === "all" || tab === "head" || tab === "king";
+  // What you got in the shop: God King effects.
+  const fromShop = SHOP_ITEMS.filter((i) => wornFromLocker(i) && shop?.owned.includes(i.id));
+  const shopTab = tab === "all" || tab === "king";
   const wornIn = (s: ItemStack) => {
     const slot = itemDef(top(s).def)!.slot;
     return s.items.some((i) => i.id === locker.equipped[slot]);
@@ -520,10 +545,10 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
     <div class="locker">
       <div class="ff-window locker-preview">
         <span class="locker-avatar">
-          <Avatar look={locker.look} side="w" hat={hat} />
+          <Avatar look={locker.look} side="w" />
         </span>
         <span class="locker-avatar">
-          <Avatar look={locker.look} side="b" hat={hat} />
+          <Avatar look={locker.look} side="b" />
         </span>
       </div>
       <div class="shop-tabs locker-tabs" role="tablist">
@@ -573,7 +598,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
           <h3 class="ff-title locker-subhead">From the shop</h3>
           <div class="locker-grid">
             {fromShop.map((item) => {
-              const worn = shop.equipped[item.slot as "hat" | "king"] === item.id;
+              const worn = shop.equipped.king === item.id;
               return (
                 <button
                   type="button"
@@ -581,22 +606,23 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                   class={`locker-item default${worn ? " worn" : ""}`}
                   onClick={() => {
                     play("menuSelect");
-                    // A pawn hat comes off again; a God King effect stays on until you pick another (he always has one).
-                    if (item.slot === "hat") void equipShopItem(worn ? "hat-none" : item.id);
-                    else if (!worn) void equipShopItem(item.id);
+                    // A God King effect stays on until you pick another (he always has one).
+                    if (!worn) void equipShopItem(item.id);
                   }}
                 >
-                  <span class="locker-default-art">{item.slot === "king" ? <KingEffectPreview look={item.look} /> : <HattedPawn hat={item.look.hat!} />}</span>
+                  <span class="locker-default-art">
+                    <KingEffectPreview look={item.look} />
+                  </span>
                   <strong>{item.name}</strong>
-                  <span class="small muted">{item.slot === "king" ? "God King effect" : "Pawn hat"}</span>
-                  {worn && <span class="locker-worn">{item.slot === "king" ? "On" : "Worn"}</span>}
+                  <span class="small muted">God King effect</span>
+                  {worn && <span class="locker-worn">On</span>}
                 </button>
               );
             })}
           </div>
           {onShop && (
             <p class="muted small">
-              More pawn hats and God King effects in the{" "}
+              More God King effects in the{" "}
               <button type="button" class="link-button" onClick={onShop}>
                 Shop ›
               </button>

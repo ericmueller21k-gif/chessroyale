@@ -832,17 +832,17 @@ export function isRankedMatch(humans: number, seats: number, share: number = RAN
 /**
  * What bots wear on the vote board and the cut screen (core/bot-looks.ts), seeded by the bot's name so a bot always
  * looks the same. Mostly one thing, rarely two, plenty plain (Eric: nothing "crazy decked out"). Only items that
- * already exist: the shop's hats, and the crates' head, face and weapon pieces (no skins: they hide the team's
- * colour; not the Mythic crown: that one stays the players'). See DECISIONS.md, "Vote board follow-ups".
+ * already exist: the crates' head, face and weapon pieces (no skins: they hide the team's colour; nothing Mythic: that
+ * stays the players'). See DECISIONS.md, "Vote board follow-ups". The old shop hats are crate head pieces now (Beta
+ * Crate, Oct 11, 2026), so they're in `head`, and the old "shop hat" share joined the head share.
  */
 export const BOT_LOOKS = {
-  /** Out of 100: nothing on; one shop hat; one crate head piece; one face piece; one weapon; two things. */
-  odds: { plain: 42, shopHat: 24, head: 11, face: 11, weapon: 5, two: 7 },
-  shopHats: ["party", "crown", "wizard", "top", "viking"],
-  head: ["beanie", "antlers", "santa-hat", "present"],
+  /** Out of 100: nothing on; one head piece; one face piece; one weapon; two things. */
+  odds: { plain: 42, head: 35, face: 11, weapon: 5, two: 7 },
+  head: ["party-hat", "little-crown", "wizard-hat", "top-hat", "viking-helm", "beanie", "antlers", "santa-hat", "present"],
   face: ["santa-beard", "ski-goggles"],
   weapon: ["gift-tube", "candy-cane"],
-  /** Two things: a hat (a shop hat or a crate head piece, evenly) and then a face piece, or now and then a weapon. */
+  /** Two things: a head piece and then a face piece, or now and then a weapon. */
   twoWeaponShare: 0.3,
   /** A crate item's purity (%), evenly in this range: clean enough to read on a small pawn, never shiny (90%+). */
   purity: [55, 88],
