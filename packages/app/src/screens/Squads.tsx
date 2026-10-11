@@ -11,6 +11,8 @@ import { ROUND_NAME, placementText, squadColour, squadName, standingsOrder } fro
 import type { VoteView } from "../game.ts";
 import { VoteScreen, type VoteHost, type VotePlayer } from "./Vote.tsx";
 import { SquadsMatchScreen } from "./SquadsMatch.tsx";
+import { useMedia } from "../components/QuickChat.tsx";
+import { SIDE_PANEL } from "../components/SquadsParts.tsx";
 
 /**
  * Squads' screens (docs/areas/squads.md, "The screens"), by the lobby's phase: the waiting room (the queue's seats, 32 of
@@ -262,6 +264,7 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
 
 /** The phases after the waiting room, framed: the standings beside them on a computer. */
 export function SquadsScreen({ client, actions }: { client: SquadsClient; actions: SquadsActions }) {
+  const side = useMedia(SIDE_PANEL);
   const lobby = client.lobby;
   if (!lobby) return <div class="screen center"><p class="muted">Connecting…</p></div>;
   const body =
@@ -278,9 +281,12 @@ export function SquadsScreen({ client, actions }: { client: SquadsClient; action
     );
   return (
     <div class="arena sq-arena">
-      <aside class="tower-side sq-side">
-        <StandingsPanel client={client} onLeave={actions.onHome} />
-      </aside>
+      {/* (Only where it shows: its clocks are drawn ten times a second.) */}
+      {side && (
+        <aside class="tower-side sq-side">
+          <StandingsPanel client={client} onLeave={actions.onHome} />
+        </aside>
+      )}
       {body}
     </div>
   );

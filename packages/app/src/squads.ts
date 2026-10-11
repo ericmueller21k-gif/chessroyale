@@ -321,7 +321,9 @@ export class SquadsClient {
     this.send({ t: "leave" });
     this.left = true;
     forgetSquads(this.code);
-    // (A moment for the message to go before the socket closes.)
+    // (No reconnecting from here on: the server closes the socket, and a new hello without the seat's token would take a
+    // new seat. A moment for the message to go before this side closes it.)
+    this.closed = true;
     setTimeout(() => this.dispose(), 150);
     this.emit();
   }
@@ -803,6 +805,7 @@ export class PartyClient {
     store(partyKey(this.code), null);
     store(`${partyKey(this.code)}.placed`, null);
     if (stored(PARTY_CURRENT) === this.code) store(PARTY_CURRENT, null);
+    this.done = true;
     setTimeout(() => this.close(), 150);
   }
 

@@ -1,5 +1,6 @@
 import { memo } from "preact/compat";
 import { useEffect, useState } from "preact/hooks";
+import { useMedia } from "./QuickChat.tsx";
 import type { NetBracketMatch, NetSquadsLobby } from "@chessroyale/chess/squads";
 import { TinyBoard } from "./TinyBoard.tsx";
 import { PlayerName } from "./PlayerName.tsx";
@@ -26,6 +27,9 @@ import {
  * red and pulsing in sudden death), the standings (a side panel on a computer, a compact strip on a phone, with a sheet
  * of the whole table), every board in the lobby as tiny boards, and the bracket.
  */
+
+/** Where the standings are a side panel (a computer); below it, a strip (a phone). The stylesheet's line too. */
+export const SIDE_PANEL = "(min-width: 1100px) and (min-height: 600px)";
 
 /** Now, every `ms` (the clocks: ten times a second, without redrawing the whole screen). */
 export function useNow(ms = 100, active = true): number {
@@ -147,8 +151,10 @@ export function Member({ client, id }: { client: SquadsClient; id: string }) {
 export function StandingsStrip({ client, onLeave }: { client: SquadsClient; onLeave?: () => void }) {
   const [open, setOpen] = useState(false);
   const lobby = client.lobby;
-  const clocks = useClocks(client);
-  if (!lobby || !lobby.squads.length) return null;
+  // (Not where the side panel shows them: every Squads screen is in the arena, which has it there.)
+  const hidden = useMedia(SIDE_PANEL);
+  const clocks = useClocks(client, !hidden);
+  if (hidden || !lobby || !lobby.squads.length) return null;
   const mine = client.mySquad?.id ?? null;
   return (
     <>
@@ -184,7 +190,8 @@ export function StandingsStrip({ client, onLeave }: { client: SquadsClient; onLe
 }
 
 /** One tiny board, drawn again only when its position, its marks or whether it can be tapped change. */
-const SquadTiny = memo(function SquadTiny({
+const SquadTiny = memo(
+  function SquadTiny({
   fen,
   lastMove,
   label,
@@ -220,7 +227,10 @@ const SquadTiny = memo(function SquadTiny({
       {body}
     </span>
   );
-});
+  },
+  // (A new tap handler each time the screen draws is the same handler: it only says which board to open.)
+  (a, b) => a.fen === b.fen && a.lastMove === b.lastMove && a.label === b.label && a.you === b.you && a.next === b.next && a.on === b.on && a.over === b.over && !a.onTap === !b.onTap,
+);
 
 /**
  * Every board in the lobby as tiny boards across the top, match by match: your squad's match ringed, YOU on your board
