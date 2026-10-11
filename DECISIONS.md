@@ -844,3 +844,66 @@ decide (duties, deadlines, clocks, what a miss plays, ties). Nothing links to it
 - **Left for later:** the live line (online, matches running, in queue) and the matchmaker's overload limit don't count
   Squads yet; no quick chat in Squads lobbies; the app's side of bot work arrives with phase 3's screens (until then a
   real lobby's bots use the quick look).
+
+### Squads, phase 3: the screens (Oct 11, 2026)
+
+Squads is playable: the menu slot, parties, the waiting room, the votes, the standings with every squad's team clock,
+Relay, Pairs, Pick and Block, the final's staging, spectating, the results, the test controls on screen, the app's side
+of bot work and the sounds (docs/areas/squads.md, "The screens"). The calls:
+
+- **The menu.** Squads takes Classic's spot (Crowd · Squads · Boss raid), as Eric's brief says; Classic stays playable
+  by link (`?mode=classic`) while it's reworked, so its tests and solo games still run. With Squads picked, PLAY is the
+  solo queue and the Matchmaking row (Default, Bots off, Solo) gives way to one **Party** button: Squads has no Solo
+  (the server runs it) and always fills with bots, so those choices don't apply. "Play with friends" opens the party
+  too. Guests where online play needs signing in get "Squads is online · Sign in to play".
+- **Parties are a sheet over home**, like "Play with friends": code, invite link (copy, or the phone's share sheet),
+  members with the leader marked, empty seats saying a bot fills them, PLAY for the leader only. Closing it leaves the
+  party. An invite link fills in the code (one tap to join, as Crowd's lobby links do); a device already in the party
+  goes straight back in. When the party is placed its socket closes (members stay members), so a member still in a
+  lobby can't be pulled into the next one; "Back to your party" after the lobby reconnects. A placing is acted on once
+  (remembered per party), so reopening the party never rejoins an old lobby.
+- **Squad names and colours are the app's**, by squad id (Rooks, Knights, Bishops, Queens, Kings, Pawns, Towers,
+  Crowns): the rules number squads, a name and a colour make eight of them tellable apart in a strip at 360 px. One
+  short word each (checked at 360 px in e2e).
+- **Standings:** a side panel on a computer (from 1100 px, where the arena has room, as Crowd's tower), a strip of
+  eight chips on a phone (name and clock; a tap opens the table with members, plus the bracket). Ordered by how far each
+  squad got, a squad still playing above one knocked out at the same stage. Sudden death is a red, pulsing "SD" (the
+  panel says "Sudden death"); the pulse is a shadow and a scale, never a colour transition (LESSONS).
+- **The clock on screen runs from what the client already has** (the server sends nothing per second): each move still
+  being thought about drains past the free seconds; a duty stops draining when its players have all locked in (when
+  this device saw it). The exact bank arrives with each half. ▼, or ▼▼ when two moves drain a bank at once.
+- **No eval bar in Squads**, on the votes or the boards: "no engine in the game". The vote board is Crowd's, given
+  Squads' own votes, every pawn on one side (squads aren't sides).
+- **Tiny boards:** every match's boards in a group with its two squads' colours along the top, your squad's ringed;
+  the latest round's finished matches stay greyed until the next round's start. YOU and NEXT follow the board you're on
+  (during the moment after a turn's second half, still last turn's). Tappable once you've moved or locked in, and
+  whenever you have nothing to choose; a new half that asks something of you brings you back to your board.
+- **What shows at once:** your Relay move is on your board as soon as you make it and stays (the half resolving later
+  plays the same move: no snap-back, checked frame by frame); a pick or block shows at once, kept on top of the
+  server's view until the server has it, so it never blinks out when someone else's choice arrives first.
+- **The reveals** reuse Crowd's ghost-move reveal (`ShadeMoves`): ghost pieces with their pickers' names (a bot's last
+  word, so two tags side by side fit), a reel stepping between the two picks and landing on the coin's, then the move
+  plays with its knock. The final adds ghost arrows for the picks, both blocks, then the active one slamming down as a
+  red lock on its square (or no lock: the mercy rule, a missed block, a cancelled one, said in words). The reveal's
+  words go in the line above the board, not over the squares. Each reveal fits the show the server gives it (3 s
+  Pairs, 4.5 s the final). The reveal draws on its own frames; the rest of the screen is drawn again only at its
+  moments (perf).
+- **Staging:** every match opens with a card over the board for its break (round, squads, one line of rules, the
+  count); the final's is "SQUAD FINAL" with both squads' members. A finished match is marked over once its last half's
+  show ends (the server says so only in the bracket), so a knocked-out player's screen moves on to the live final.
+- **Knocked out** is a sheet (in view on a phone, unlike a card under the board): Spectate the bracket, or Queue
+  again (Back to your party). Leaving mid-match is at the standings' foot and asks again while your squad still plays,
+  since a bot then takes the seat for good.
+- **Sounds:** the big board's own knocks for moves; a quiet tick (`sqTick`, a clock tick at under half the timer's
+  level) at 2 s and 1 s of your free time left while you still have a choice to make (blockers aren't on the clock: no
+  ticks); a short low "dun-dun" sting (`sqSting`, muted brass through a low-pass, no bell partials) when a squad on the
+  big board enters sudden death: the moment its clock hits zero on screen, or the half's `sudden_death` event, once
+  per squad until it's out of it again. Both measured quieter than a move (peak and RMS, rendered offline, in e2e);
+  everything through mute. No chimes: the vote's result tones and timer ticks are off in Squads.
+- **Bot work:** answered from the page's engine pool as Crowd's judging is (one speed check per page, shared), every
+  engine at once; no answer leaves it to the other device or the server's quick look. A knocked-out player's open page
+  keeps answering.
+- **Test controls on screen** only when the server's `welcome` says so: "Next round" beside the match's title, "Skip
+  votes" in the votes (the server's `nextRound`, which closes them). The test lobby: an admin's Party sheet has Relay ·
+  Pairs · Final, and a link Eric can open on any device: `/squads/test/pairs` (also `relay`, `final`, and
+  `?clock=BANK,TOPUP,FREE,INC` for a team clock in seconds).

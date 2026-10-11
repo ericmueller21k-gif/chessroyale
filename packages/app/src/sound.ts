@@ -172,6 +172,67 @@ function clockTick(at: number, level = 0.5) {
   src.start(at);
 }
 
+/**
+ * Squads' sudden-death sting: two low notes falling a fourth ("dun-dun"), a muted brassy buzz through a low-pass, with a
+ * soft thump under the first. Short, clear, quieter than a move, and nothing like a chime (no bright bell partials).
+ */
+function sqSting(at: number) {
+  const c = ctx!;
+  const note = (t: number, f: number, len: number, level: number) => {
+    const o = c.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(f, t);
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(1500, t);
+    lp.frequency.exponentialRampToValueAtTime(500, t + len);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t + 0.012);
+    g.gain.setValueAtTime(level, t + len * 0.45);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(lp).connect(g).connect(master!);
+    o.start(t);
+    o.stop(t + len + 0.02);
+  };
+  note(at, 220, 0.16, 0.09);
+  note(at + 0.17, 165, 0.32, 0.1);
+  tap(at, 160, 0.12);
+}
+
+/**
+ * How loud a sound is (its peak and RMS over where it sounds), rendered offline as it would play: for checking that a
+ * sound stays quieter than a move (e2e/squads-play.spec.ts, through ?debug). A sample must have loaded (unlockAudio).
+ */
+export async function measureSound(name: SoundName, seconds = 1): Promise<{ peak: number; rms: number }> {
+  const real = { ctx, master };
+  const off = new OfflineAudioContext(1, Math.ceil(44100 * seconds), 44100);
+  const g = off.createGain();
+  g.gain.value = 0.9;
+  g.connect(off.destination);
+  ctx = off as unknown as AudioContext;
+  master = g;
+  try {
+    SOUNDS[name](0.005);
+  } finally {
+    ctx = real.ctx;
+    master = real.master;
+  }
+  const data = (await off.startRendering()).getChannelData(0);
+  let peak = 0;
+  let sum = 0;
+  let n = 0;
+  for (const x of data) {
+    const a = Math.abs(x);
+    peak = Math.max(peak, a);
+    if (a > 1e-3) {
+      sum += x * x;
+      n++;
+    }
+  }
+  return { peak, rms: n ? Math.sqrt(sum / n) : 0 };
+}
+
 /** One struck note built from partials: [frequency multiple, level, decay seconds]. */
 function strike(at: number, freq: number, partials: readonly (readonly [number, number, number])[], level: number, opts: { glide?: number; type?: OscillatorType } = {}) {
   const c = ctx!;
@@ -382,7 +443,10 @@ export type SoundName =
   | "sawyerTape"
   | "sawyerBigSaw"
   | "sawyerHop"
-  | "sawyerRejoin";
+  | "sawyerRejoin"
+  // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
+  | "sqTick"
+  | "sqSting";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => sample("move", t),
@@ -489,6 +553,8 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   sawyerBigSaw: sawyer("bigsaw"),
   sawyerHop: sawyer("hop"),
   sawyerRejoin: sawyer("rejoin"),
+  sqTick: (t) => clockTick(t, 0.22),
+  sqSting,
   // Every board's move landing after a round: a quick ripple of soft wooden knocks, one per board.
   ripple: (t) => {
     for (let i = 0; i < 8; i++) sample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));

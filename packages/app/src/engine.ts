@@ -1,5 +1,5 @@
 import { UciEngine, type EngineLike, type MoveScore, type UciTransport } from "@chessroyale/chess";
-import { DEFAULT_SETTINGS } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, JUDGES } from "@chessroyale/core";
 
 const ENGINE_JS = "/engine/stockfish-19-lite-single.js";
 const ENGINE_WASM = "/engine/stockfish-19-lite-single.wasm";
@@ -33,6 +33,17 @@ export function enginePool(): Promise<UciEngine[]> {
     return engines;
   })();
   return pool;
+}
+
+let speedCheck: Promise<number> | null = null;
+
+/**
+ * This page's engine speed check (nodes per second), run once and reported to every lobby it joins (Crowd's many
+ * judges, Squads' bot work), so the lobby gives faster devices more of the work.
+ */
+export function engineSpeed(): Promise<number> {
+  speedCheck ??= enginePool().then(([engine]) => engine!.speed(JUDGES.benchNodes));
+  return speedCheck;
 }
 
 /**

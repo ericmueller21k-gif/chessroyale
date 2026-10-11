@@ -1,10 +1,11 @@
 # Squads
 
-Lane: the director (a new mode; the match screens are the director's). Status: **the rules and a bot simulation are
-built** (pure code): phase 1, then clocks in place of the pace and the move cap, now one team clock per squad for the
-whole tournament (Eric, Oct 10). **The server is built** (phase 2: the lobby, parties, the queue, bots, the bracket,
-the test controls, the protocol; see "The server" below). No screens or menu slot yet: nothing a player sees has
-changed.
+Lane: the director (a new mode; the match screens are the director's). Status: **playable**. The rules and a bot
+simulation (phase 1), then clocks in place of the pace and the move cap, now one team clock per squad for the whole
+tournament (Eric, Oct 10). **The server** (phase 2: the lobby, parties, the queue, bots, the bracket, the test controls,
+the protocol; see "The server" below). **The screens** (phase 3: the menu slot, parties, the waiting room, the votes,
+the standings and team clocks, Relay, Pairs, Pick and Block, the final's staging, spectating, the results, the test
+controls on screen, the app's side of bot work, the sounds; see "The screens" below).
 
 ## How it works today
 
@@ -111,7 +112,7 @@ top-up, free seconds and increment; `clockDefault`; vote timing), `moveCeilingSe
 ## The server (phase 2)
 
 Built around the rules: the server never decides anything the rules decide (duties, deadlines, clocks, what a miss
-plays, ties). Nothing links to it until phase 3's screens. The calls are in `DECISIONS.md`, "Squads, phase 2".
+plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
 
 - **Objects.** One Durable Object per lobby (`SquadsLobby`, binding `SQUADS`) and one per party (`SquadsParty`,
   `PARTIES`). The lobby's logic is pure (`squads-lobby.ts`, `SquadsCore`); the object stores it (the record under
@@ -179,8 +180,7 @@ plays, ties). Nothing links to it until phase 3's screens. The calls are in `DEC
   `vote`, `choose`, `lock`, `armageddon`, `speed`, `botTop`, `reclaim`, `leave`, `sync`, `nextRound`. A party socket
   gets `welcome`, `party`, `error`, `closed` and sends `hello`, `queue`, `cancel`, `leave`.
 - **Not yet:** the live line doesn't count Squads lobbies or their players (nor does the matchmaker's overload limit);
-  no quick chat in Squads lobbies; the app's side of bot work (answering `botWork` from its engine pool) comes with
-  the screens.
+  no quick chat in Squads lobbies.
 
 | What | Where |
 | --- | --- |
@@ -203,6 +203,77 @@ visibility, Armageddon, the test controls, rewards, bot work on devices), `squad
 D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match, restart, closing); e2e `e2e/squads.spec.ts`
 (a party through the real server; a test lobby at the final). The full-lobby run: `npx tsx scripts/squads-headless.ts
 --url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
+
+## The screens (phase 3)
+
+The calls are in `DECISIONS.md`, "Squads, phase 3: the screens". Phone and computer, light and dark, in the front
+door's look; every class is `sq-`.
+
+- **The menu.** Squads takes Classic's spot: Crowd · Squads · Boss raid (Classic still plays with `?mode=classic`).
+  With Squads picked, PLAY is the solo queue (`POST /api/squads/play`; busy: the queue's "you're in line" screen) and
+  the Matchmaking row becomes **Party** (as does "Play with friends"): create a party (its code and invite link,
+  `/squads/party/CODE`, copy or share), or join by code or link; the members (leader, connected); the leader presses
+  PLAY for everyone. When the party is placed, everyone joins the lobby with its pass, the party's socket closes, and
+  after the lobby "Back to your party" reconnects (the leader queues again).
+- **The waiting room** is the home screen's queue (as Crowd's), 32 seats: people as they join (your party's dashed),
+  then the eight squads of four once bots fill. **The votes** use Crowd's vote board (`VoteScreen`, given Squads' own
+  votes, no eval bar, no chimes or ticks): everyone's pawn on one side, three zones, three cards.
+- **Standings everywhere.** Every squad's name (display only, by id: Rooks, Knights, Bishops, Queens, Kings, Pawns,
+  Towers, Crowns, each with a colour), members, where it stands in the bracket, and its team clock counting down
+  (`squads-view.ts`: `liveBank` runs a bank down during a half from the match's banks, its duties and who has locked
+  in; ▼▼ when two moves drain it at once; the exact bank comes with each half). Sudden death turns red and pulses. A
+  computer: a side panel (from 1100 px). A phone: a strip of eight chips (name and clock), tapped for the whole table
+  and the bracket. The standings' foot has "Leave the lobby" (it asks again while your squad still plays: a bot takes
+  your seat for good).
+- **A match** (`screens/SquadsMatch.tsx`): the score and round on top, the strip, every board in the lobby as tiny
+  boards (`TinyBoard`, match by match, your squad's ringed, YOU on your board and NEXT on next turn's; tappable only once
+  you've moved or locked in: one opens full size with "Back to my board"; a new half that asks something of you brings
+  you back), your board full size with « » through its moves (from its own start), and under it both squads' clocks
+  with the free seconds counting down between them. The timer bar over the board is your move's deadline (no ticks).
+  - **Relay:** your move shows on your board at once and stays (no snap-back); "Moved · waiting for the half to end".
+  - **Pairs:** your pick green, your partner's live in blue; their move can't be picked (the board won't take it);
+    lock in. The reveal is Crowd's ghost-move reveal (`ShadeMoves`): both picks slide in with their pickers' names, a
+    reel steps between them and lands on the coin's, then the move plays.
+  - **Pick and Block:** pickers see their partner's pick live; blocks show live to everyone in red; lock in. The
+    reveal: both picks as ghost arrows and ghost pieces, the two blocks, the active one slamming down as a red lock on
+    its square, then the coin (or, if it hit a pick, the other one plays). Its words are in the line above the board.
+  - **Staging:** each match opens with a card over the board (its round, its squads, one line of rules, the count);
+    the final's is "SQUAD FINAL" with both squads' members. Knocked-out squads watch the final on the same screen.
+    Armageddon: the choosing squad's people pick White or Black on the card (the times from settings).
+  - A bot playing your seat (three misses): "Take my seat back" (`reclaim`).
+- **Knocked out:** a sheet with your placement and reward: "Spectate the bracket" or "Queue again" ("Back to your
+  party" for a party). Through and waiting: a card and the bracket, every tiny board to watch. **Results:** every
+  squad's placement and members, yours ringed, your reward, the bracket; Play again or Home.
+- **Test controls on screen** (only when the server's `welcome` says `test`): "Next round" beside the title in a
+  match, "Skip votes" in the votes. A test lobby: an admin's Party sheet has Relay · Pairs · Final, and the link
+  `/squads/test/relay|pairs|final[?clock=BANK,TOPUP,FREE,INC]` opens one (admins on hunchess.com; anyone locally with
+  `SQUADS_TEST`).
+- **Bot work on this device:** after `welcome` the page runs its engine speed check once (`engineSpeed()`, shared with
+  Crowd's judges) and sends `speed`; each `botWork` job is searched on the engine pool (`topMovesAt(fen, n, nodes)`,
+  every engine at once) and answered with `botTop`. A knocked-out player's page keeps answering while it's open.
+- **Sounds:** the normal knocks for moves (the big board's own); `sqTick` in the last two seconds of your free time
+  while you still have a choice to make (not blockers); `sqSting` when a squad on the big board enters sudden death
+  (the moment its clock hits zero on screen, or the half's `sudden_death`). Both quieter than a move
+  (`measureSound`, checked in e2e), both through mute, no chimes anywhere in Squads.
+- **Rejoining:** the seat's token is kept per lobby (`brc.squads.CODE`); a reload or the app reopened at `/` goes back
+  in while the lobby is on (`/squads/CODE` is its address).
+
+| What | Where |
+| --- | --- |
+| The client: the lobby's and the party's sockets, local times, optimistic choices, bot work, sounds | `packages/app/src/squads.ts` |
+| What the screens work out (clocks run down, YOU/NEXT, standings, names) | `packages/app/src/squads-view.ts` |
+| The waiting room, votes, bracket phase, knocked out, results | `packages/app/src/screens/Squads.tsx` |
+| A match: Relay, Pairs, Pick and Block, reveals, staging | `packages/app/src/screens/SquadsMatch.tsx` |
+| The party sheet | `packages/app/src/screens/SquadsParty.tsx` |
+| Standings, clocks, tiny boards, the bracket | `packages/app/src/components/SquadsParts.tsx` |
+| The menu slot | `packages/app/src/screens/Home.tsx` (`MODES`, `chosenHomeMode`); routes in `App.tsx` |
+
+Tests: `packages/app/test/squads-view.test.ts`; e2e `e2e/squads-play.spec.ts` (through the real server with its bots, on
+a phone and a computer: Pairs, the final, a Relay half, Next round, the party, the sounds). Frames:
+`npm run frames:squads -- <dir> relay|pairs|final|menu|standings http://localhost:8787` against `wrangler dev --var
+SQUADS_TEST:1` (every painted frame, the big board's pieces logged per frame, a GIF). Never beside an e2e run from the
+same checkout without `--persist-to` a folder of its own: two local servers on one `.wrangler/state` lock each other's
+storage (SQLITE_BUSY), and the e2e's lobbies fail.
 
 ## The design (Eric, Oct 10, 2026)
 

@@ -1,7 +1,8 @@
 import { LookAways } from "./lookaway.ts";
+import { engineSpeed } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DEFAULT_SETTINGS, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -97,9 +98,6 @@ export function forgetSeat(code: string) {
  * the server has no lobby under that code (closed a while ago, or never was).
  */
 export type LobbyGone = LobbyCloseReason | "unknown";
-
-/** This page's engine speed check (nodes per second), run once and reported to every lobby it joins. */
-let speedCheck: Promise<number> | null = null;
 
 /**
  * A multiplayer match: the lobby server runs the clock and the draw; this
@@ -679,8 +677,8 @@ export class NetMatch implements GameView {
   /** Many judges: this device's speed check, then the lobby is told (nodes per second). */
   private async reportSpeed() {
     try {
-      speedCheck ??= this.engines().then(([engine]) => engine!.speed(JUDGES.benchNodes));
-      this.send({ t: "speed", nps: await speedCheck });
+      await this.engines();
+      this.send({ t: "speed", nps: await engineSpeed() });
     } catch {
       // No engine here: this device doesn't judge.
     }

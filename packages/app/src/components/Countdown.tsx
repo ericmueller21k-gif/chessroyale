@@ -51,10 +51,13 @@ export function TimerBar({
   deadline,
   total,
   frozen,
+  quiet,
 }: {
   startsAt: number;
   deadline: number;
   total: number;
+  /** No ticks (Squads ticks only in the last seconds of the free time). */
+  quiet?: boolean;
   /** The clock stood still from `at` to `until` (the God King's strike); `deadline` already includes it. */
   frozen?: { at: number; until: number };
 }) {
@@ -63,7 +66,7 @@ export function TimerBar({
   const left = Math.max(0, deadline - (frozen && now >= frozen.at && now < frozen.until ? frozen.until : Math.max(now, startsAt)));
   const secs = Math.ceil(left / 1000);
   const frac = total > 0 ? Math.min(1, left / total) : 0;
-  useTicks(secs, TICK_FROM_SECONDS, now >= startsAt);
+  useTicks(secs, TICK_FROM_SECONDS, !quiet && now >= startsAt);
   // Dark green (hue 135) at full time down to red (hue 0) at none.
   const color = `hsl(${Math.round(135 * frac)} 70% ${Math.round(42 - 6 * frac)}%)`;
   // (A new element for each bar: one element can't be drawn in two places.)
