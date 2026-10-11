@@ -53,6 +53,29 @@ export function setCrowdTrail(on: boolean) {
   listeners.forEach((l) => l());
 }
 
+const EVAL_BAR_KEY = "brc.evalBar";
+
+/**
+ * The eval bar (the engine's winning chances, left of the board): on unless switched off in Settings (remembered on
+ * the device). Every screen that shows it reads this; off, the board takes its room.
+ */
+export function evalBarOn(): boolean {
+  try {
+    return localStorage.getItem(EVAL_BAR_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function setEvalBarOn(on: boolean) {
+  try {
+    localStorage.setItem(EVAL_BAR_KEY, on ? "1" : "0");
+  } catch {
+    // Not important: it lasts until a reload.
+  }
+  listeners.forEach((l) => l());
+}
+
 const CHAT_OFF_KEY = "brc.chatOff";
 const CHAT_BUBBLES_KEY = "brc.chatBubbles";
 

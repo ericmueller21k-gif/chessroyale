@@ -87,6 +87,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     bossAvoid: lastBoss() ?? "",
     ...((POWER_IDS as readonly string[]).includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
+    // Testing, solo: ?mate=1, the boss mates you at once (1.f3 e5 2.g4, its move): its attack on your king, then the result.
+    ...(q.get("mate") === "1" ? { bossMateTest: true } : {}),
     // Testing: ?laststand=0, the God King never makes his Last Stand (a test that leaves a piece to burn on purpose).
     ...(q.get("laststand") === "0" ? { lastStandFrom: 999 } : {}),
     // Testing, solo: ?boss=<id>&wip=1 meets a boss whose powers are built before its art is (placeholders show).

@@ -7,6 +7,7 @@ import { play, warmSounds } from "../sound.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
 import { prewarmBigBoy } from "./BigBoy.tsx";
 import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, useVoice, type Priority } from "../speech.tsx";
+import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing kitty-corner across the board from
@@ -112,6 +113,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     warmSounds([...Object.values(kit.sounds), ...fx.flatMap((e) => Object.values(EFFECTS[e].sounds))]);
     // (Big Boy's snack, toss and bounce drawn ahead too: his bounce is big, and his snack plays seconds in.)
     if (kit.ch.id === "bigboy") prewarmBigBoy(kit.ch.name, boss.crowdSide === "b" ? "blackPawn" : undefined);
+    // (Its attack on a king too: the God King's Last Stand, or its mate.)
+    prewarmKingAttack(kit.ch.name);
   }, [kit]);
   // A recolour from the battle's state (Hollow's bulbs still lit), read as it's drawn.
   const lookRef = useRef<() => string>(() => "");
@@ -149,7 +152,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // Its line for this moment goes into its voice: it waits its turn and stays up its time, whatever the screen does
   // next (the boss's turn ends, a power's moment begins). A move that brings a power's moment says nothing of its
   // own: the moment's line is what the boss says that turn.
-  const quiet = stage === "bossMove" && !!boss.powers?.events.length;
+  // (Nor does its mate when it attacks the crowd's king: the attack's line is its word then.)
+  const quiet = stage === "bossMove" && (!!boss.powers?.events.length || mateAttack(boss));
   useLayoutEffect(() => {
     if (beat?.line && !quiet) bossVoice.say(beat.line, `${boss.id}:${boss.startMove}:${beat.key}`, BEAT_PRIORITY[beat.anim] ?? LOW);
   }, [beat?.key]);

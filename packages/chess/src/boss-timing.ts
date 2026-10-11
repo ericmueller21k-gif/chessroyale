@@ -1,4 +1,4 @@
-import { fenAtPly, pieceAt, type Base } from "./rules.ts";
+import { fenAtPly, gameEnd, pieceAt, sideToMove, type Base } from "./rules.ts";
 import { GINGER_FX } from "./bosses/ginger.ts";
 import { BOINGO_FX } from "./bosses/boingo.ts";
 import { FIRE_BURN_MS, GREX_FX } from "./bosses/grex.ts";
@@ -141,6 +141,12 @@ export function bossThinkMs(history: readonly string[], bases?: readonly Base[] 
  */
 const LS_WARN_MS = 1300;
 const after = (ms: number) => LS_WARN_MS + ms;
+/**
+ * With a boss whose character has a `kingAttack` (KING_ATTACKERS; Hollow, Eric, Oct 10), beat 5 is the boss's attack:
+ * from `attackAt` (just as the piece starts sliding back) he drops in beside the God King and lashes him
+ * (KING_ATTACK: the blows land on its lashes, `lastStandAttackHits`), then leaps off as the God King staggers. The
+ * Last Stand lasts no longer: the attack fits between the slide and the stagger.
+ */
 export const LAST_STAND = {
   badgeAt: 80,
   warnMs: LS_WARN_MS,
@@ -154,6 +160,7 @@ export const LAST_STAND = {
   slashAt: after(4650),
   slashes: 25,
   slashEveryMs: 80,
+  attackAt: after(4250),
   crackAt: [after(5050), after(5650), after(6250)] as readonly number[],
   staggerAt: after(6800),
   collapseAt: after(7250),
@@ -179,4 +186,57 @@ export function lastStandHits(seed: string, count: number = LAST_STAND.slashes):
     out.push(6 + ((h >>> 0) % 9));
   }
   return out;
+}
+
+/**
+ * A boss's attack on a king (its character's `kingAttack` moment), ms after it starts: the same beats for every boss
+ * that has one, so the God King's frames, the hit numbers, the sounds and the server's clock agree. His shadow grows
+ * and he drops in beside the king (`landAt`), winds up, then lashes it `lashes` times, the first at `lashAt` and one
+ * every `lashEveryMs` (a hit each: a "−N" pops off the king), cackles, leaps off at `leaveAt` and is gone at `ms`.
+ *
+ * Where it plays: the God King's Last Stand (from LAST_STAND.attackAt, on the God King: the blow meant for the piece)
+ * and the boss's mate (from `mateAt` after its move shows, on the crowd's king, which flickers at each lash, then
+ * topples at the last (`toppleAt`, for `toppleMs`) and fades into the dark; the result waits `mateHoldMs` in all).
+ */
+export const KING_ATTACK = {
+  landAt: 470,
+  lashAt: 560,
+  lashes: 10,
+  lashEveryMs: 170,
+  leaveAt: 2380,
+  ms: 2780,
+  mateAt: 600,
+  toppleAt: 2180,
+  toppleMs: 600,
+  mateHoldMs: 600 + 2780 + 500,
+} as const;
+
+/** When each of the attack's lashes lands, ms after it starts. */
+export const kingAttackHits = (): number[] => Array.from({ length: KING_ATTACK.lashes }, (_, i) => KING_ATTACK.lashAt + i * KING_ATTACK.lashEveryMs);
+
+/** The Last Stand's blows when a boss attacks the God King: its lashes, ms after the crowd's move lands. */
+export const lastStandAttackHits = (): number[] => kingAttackHits().map((t) => LAST_STAND.attackAt + t);
+
+/**
+ * The bosses whose character has a `kingAttack` (the app's BOSS_KITS: a unit test keeps the two the same), by
+ * BOSS_ROSTER id. Hollow first (Eric, Oct 10: to try it before the others get theirs).
+ */
+export const KING_ATTACKERS: readonly string[] = ["hollow"];
+export const hasKingAttack = (bossId: string | null | undefined): boolean => !!bossId && KING_ATTACKERS.includes(bossId);
+
+/** The crowd is checkmated on this board (the boss's move mated it). */
+export const crowdMated = (fen: string, crowdSide: "w" | "b"): boolean => sideToMove(fen) === crowdSide && gameEnd(fen, []) === "checkmate";
+
+/** The boss's attack on the crowd's king plays now: its move has mated the crowd, and its character has the attack. */
+export const mateAttackDue = (boss: { id?: string; crowdSide: "w" | "b"; board: { fen: string }; result?: string | null } | null | undefined): boolean =>
+  !!boss && hasKingAttack(boss.id) && crowdMated(boss.board.fen, boss.crowdSide);
+
+/**
+ * How long the boss's move holds the screen before the crowd's turn (or the result), solo and online: its move (and its
+ * banner if it took the queen), then its powers' moments; at a mate, its attack on the crowd's king if it has one, which
+ * the result waits for (no powers come with a mate).
+ */
+export function bossTurnShowMs(view: { id?: string; crowdSide: "w" | "b"; board: { fen: string }; lastMove?: { captured?: string } | null; powers?: { events: readonly { kind: keyof typeof POWER_FX; first?: boolean }[] } } | null | undefined, alone = false): number {
+  if (mateAttackDue(view)) return KING_ATTACK.mateHoldMs;
+  return bossShowMs(view?.lastMove, alone) + powerMomentMs(view?.powers?.events);
 }

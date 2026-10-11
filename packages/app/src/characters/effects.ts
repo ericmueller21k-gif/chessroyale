@@ -10,7 +10,7 @@ import type { Character } from "./sprite.ts";
 import { BLIZZARD_SWEEP, ICE_BOLT, ICE_OVERLAY } from "./effects/ginger.ts";
 import { PIE_FLY, PIE_SPLAT } from "./effects/boingo.ts";
 import { CANDLE_SHOT, CANDLE_SHOTS, FIREBALL_FALL, FIRE_SHADOW, FIRE_TILE, PIECE_BURN, SPARK_FLY } from "./effects/grex.ts";
-import { BULB_STRAND, DARK_MISS, DARK_POUR, DARK_SQUARE, NIGHT_LABEL, NIGHT_SQUARE } from "./effects/hollow.ts";
+import { BULB_STRAND, DARK_MISS, DARK_POUR, DARK_SQUARE, LASH_HIT, NIGHT_LABEL, NIGHT_SQUARE } from "./effects/hollow.ts";
 import { BLOCK_FLY, BOUNCE_CRASH, BOUNCE_PUFF, TOY_BLOCK } from "./effects/bigboy.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
@@ -39,6 +39,7 @@ export const EFFECT_SPRITES = {
   bulbStrand: BULB_STRAND,
   nightSquare: NIGHT_SQUARE,
   nightLabel: NIGHT_LABEL,
+  lashHit: LASH_HIT,
   toyBlock: TOY_BLOCK,
   blockFly: BLOCK_FLY,
   bouncePuff: BOUNCE_PUFF,

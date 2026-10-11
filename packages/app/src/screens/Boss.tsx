@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
-import { SNACK, bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
+import { KING_ATTACK, SNACK, bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, dockLine, funhouseFlipAt, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackLine, snackPawnShown } from "../components/BigBoy.tsx";
@@ -8,7 +8,8 @@ import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
 import { bossMoveCues, kingSay, resetKingSpeech } from "../godKing.ts";
 import { FightBanner } from "../components/FightBanner.tsx";
-import { GodKingPortrait } from "../components/GodKing.tsx";
+import { GodKingPortrait, kingSquare } from "../components/GodKing.tsx";
+import { KingAttack, mateAttack } from "../components/KingAttack.tsx";
 import { Board } from "../components/Board.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
@@ -168,8 +169,13 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // the boss, so the next random one is another.
   useState(() => intro && (resetKingSpeech(), bossVoice.reset()));
   useState(() => intro && rememberBoss(boss.id, `${boss.id}:${history.join("")}`));
+  // The boss's mate: its attack on the crowd's king (its kit has one), from KING_ATTACK.mateAt after its move shows;
+  // the result waits for it (bossTurnShowMs). No power's moment comes with a mate.
+  const mating = !intro && !thinking && !victim && mateAttack(boss);
+  const mateKing = mating ? kingSquare(boss.board.fen, boss.crowdSide) : null;
+  const attackAt = until - KING_ATTACK.mateHoldMs + KING_ATTACK.mateAt;
   // Boss powers: the moments that come as the turn passes to the crowd (after the boss's move), or the funhouse's own.
-  const moments = useMemo(() => (intro || thinking || victim ? [] : momentsOf(boss, until)), [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim]);
+  const moments = useMemo(() => (intro || thinking || victim || mating ? [] : momentsOf(boss, until)), [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating]);
   const moment = momentAt(moments, now);
   // Each moment's line, into the boss's voice: its text box keeps it up for its time, into the crowd's turn.
   useMomentSpeech(boss, moments, now);
@@ -268,6 +274,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
             {!thinking && !victim && !alone && !funhouse && !bounce && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
             <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
+            {mateKing && <KingAttack boss={boss} square={mateKing} orientation={orientation} startAt={attackAt} now={now} seed={`mate:${boss.board.fen}`} king={boss.crowdSide} />}
             <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
             {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
             {snack && t >= tl.claimAt && t < tl.bannerAt && <SnackTime boss={boss} since={snackAt} now={now} orientation={orientation} />}

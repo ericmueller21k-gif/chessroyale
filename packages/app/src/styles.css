@@ -11133,3 +11133,55 @@ img.qicon {
     transform: translate(1px, -1px);
   }
 }
+
+/* ---- A boss's attack on a king (KingAttack.tsx): the God King in his Last Stand, the crowd's king at the boss's mate ---- */
+
+/* Over the board's pieces (and, in the Last Stand, over the God King on his square), never taking a tap. */
+.king-attack {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+}
+.king-attack .ka-hits {
+  z-index: 3;
+}
+/* The boss beside the king: his frame sized in squares of chessground's board; mirrored when the king is to his left. */
+.ka-boss {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  filter: drop-shadow(0 0.6cqw 0 rgba(0, 0, 0, 0.3));
+}
+.ka-boss.flip {
+  scale: -1 1;
+}
+/* The crowd's king at the mate, in place of the real one (hidden meanwhile): it flickers, topples and fades. */
+.ka-king {
+  position: absolute;
+  z-index: 1;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
+}
+.ka-king piece {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+}
+.board-wrap:has(.ka-king.w) cg-board piece.king.white,
+.board-wrap:has(.ka-king.b) cg-board piece.king.black {
+  opacity: 0;
+}
+/* Its "−N" hits: the God King's strike style (.ks-hp), over everything. */
+.ka-hp {
+  z-index: 4;
+  pointer-events: none;
+}
+/* While he's on the board, his figure in his corner hides (his words stay). */
+.screen:has(.king-attack.on) .boss-char-sprite {
+  visibility: hidden;
+}
