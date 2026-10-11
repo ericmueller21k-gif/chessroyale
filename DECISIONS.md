@@ -466,6 +466,37 @@ The calls, from the sim's tuning runs (`reports/squads-sim.md`):
 - **The early rounds are a scramble:** 20% of Relay boards and 60% of Pairs boards end on time. That's option B's "quick
   early rounds". If Pairs feels decided by the clock in playtests, 1+3 brings it to about 53% for about 2 minutes more.
 
+### Squads: one team clock per squad (Oct 11, 2026)
+
+Eric replaced the per-board clocks with one team clock per squad for the whole tournament, so fast wins pay off later.
+(The brief before it, a per-move delay for Pairs, is folded in as the free seconds.) The calls:
+
+- **Where the bank lives:** on the squad (`Squad.bankMs`). `startTeamClocks` sets it from the voted option,
+  `planMatch` brings it into a match (plus the top-up from round 2 on), and `settleTeamClocks` carries it out.
+  Armageddon's fixed clocks don't touch it.
+- **The drain**, worked out from the thinking times the server passes:
+  - Each of a squad's moves being thought about drains the bank from the free seconds until it's made (the slower
+    picker of a pair), several at once together.
+  - If the bank runs out during the half, the moves still being thought about are cut off (random moves). That's
+    the moment a live server would see.
+  - At zero, each move has only the free seconds; there are no flag falls.
+- **Out of time isn't a no-show.** `resolveHalf` returns `timeouts` among the missed, and the sim leaves them out of
+  the no-show streak, so a slow move in sudden death never hands a seat to a bot. Phase 2 should do the same.
+- **One free-seconds value per option** (3 s for all three), not 5 s for Pairs. At 4-5 s people spend the free time
+  on every move, and a lobby ran 36-45 minutes; at 3 s, 31-33.
+- **No increment** (a setting): +1 s made lobbies longer (40 minutes) for no gain the sim could see.
+- **The options:**
+
+  | Option | Starting bank | Top-up | Free seconds | Median | 90th pct (min) |
+  | --- | --- | --- | --- | --- | --- |
+  | Fast | 3 min | 45 s | 3 | 30.6 | 37.1 |
+  | Normal | 4 min | 1 min | 3 | 33.1 | 39.7 |
+  | Long | 5 min | 1 min | 3 | 31.3 | 37.2 |
+
+  The options differ in pressure, not length: 65%, 48% and 38% of squads reach sudden death, mostly in Pairs.
+- **Ties:** more bank left wins, then a coin. A quarter of ties now go to the coin, because both squads are at zero.
+  If that grates, the next tiebreak could be the squad that reached sudden death later.
+
 ### The eval bar's switch (Oct 10, 2026)
 
 Eric suspects the eval bar may hurt the game more than it helps and wants to be able to find out, so it stays on by

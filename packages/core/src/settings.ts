@@ -1262,22 +1262,26 @@ export const FAIRPLAY = {
 /**
  * Squads (docs/areas/squads.md; DECISIONS.md, "Squads"): 8 squads of 4 play team chess in a bracket. Round 1 is
  * Relay (4 boards a match, one player a move, everyone moving one board along each turn), round 2 Pairs (2 boards,
- * two players pick and a coin chooses), the final Pick and Block (one board: two pickers, two blockers). Every board
- * has a chess clock (a bank and an increment for each side) and is played to the end. No engine in the rules: legal
- * moves and mate in one come from the chess library; only the silent safety cap and the test-only "Next round" fall
- * back on material. The rules are in `packages/chess/src/squads/`; every number for the mode is here.
+ * two players pick and a coin chooses), the final Pick and Block (one board: two pickers, two blockers). Each squad
+ * has one team clock for the whole tournament: a bank that carries from round to round (topped up when it advances),
+ * drained past a few free seconds a move, once for each of its moves being thought about at the same time. At zero
+ * it's sudden death: every move within the free seconds, or it's missed. No flag falls, and every game is played to
+ * the end. No engine in the rules: legal moves and mate in one come from the chess library; only the silent safety
+ * cap and the test-only "Next round" fall back on material. The rules are in `packages/chess/src/squads/`; every
+ * number for the mode is here.
  */
 export interface SquadsClock {
   id: string;
   label: string;
-  /** Rounds 1 and 2: each side's bank on each board, and the increment added after each of its moves. */
+  /** Each squad's team bank at the start of the tournament (seconds). */
   bankSeconds: number;
+  /** Added to a squad's bank when it starts a new round (it advanced). */
+  topUpSeconds: number;
+  /** Free seconds every move before the bank drains; at zero (sudden death), the time to make each move. */
+  delaySeconds: number;
+  /** Credited to the bank after each move made in time (0: none). */
   incrementSeconds: number;
-  /** The final's own, roomier clock (two pickers must agree, and it's the showdown): rarely decided on time. */
-  finalBankSeconds: number;
-  finalIncrementSeconds: number;
 }
-
 export interface SquadsSettings {
   /** Players in a squad, squads in a lobby (a bracket of three rounds). */
   squadSize: number;
@@ -1291,17 +1295,17 @@ export interface SquadsSettings {
   voteResultSeconds: number;
   voteBotSkip: number;
   /**
-   * The Clock vote's options (Eric, Oct 10: Fast, Normal, Long; tuned by the sim), each setting both the early rounds'
-   * clock and the final's, and the one if nobody votes.
+   * The Clock vote's options (Eric, Oct 10: Fast, Normal, Long; tuned by the sim), each setting the team clock: the
+   * starting bank, the top-up a round, the free seconds a move and any increment. And the one if nobody votes.
    */
   clocks: readonly SquadsClock[];
   clockDefault: number;
   /**
-   * The per-move ceiling: nobody can hold up a half longer than this. A mover or picker who hasn't chosen by then
-   * misses (a random legal move; a blocker forfeits), and their side's bank keeps running down meanwhile.
+   * The per-move ceiling while a squad's bank is above zero: nobody can hold up a half longer than this. A mover or
+   * picker who hasn't chosen by then misses (a random legal move; a blocker forfeits), the bank draining meanwhile.
    */
   moveCeilingSeconds: number;
-  /** A missed move (the ceiling reached) earns no increment. */
+  /** A missed move earns no increment. */
   incrementOnMiss: boolean;
   /** The silent safety cap on every board, in moves per side: then material decides (as does "Next round"). */
   safetyCap: number;
@@ -1325,8 +1329,9 @@ export interface SquadsSettings {
     picksSeenBy: "everyone" | "own";
   };
   /**
-   * A drawn final goes to one Armageddon board in the final's format: Black has draw odds, White more time. The squad
-   * with more clock time left in the final picks its colour.
+   * A drawn final goes to one Armageddon board in the final's format, on its own fixed clocks (a bank for each side,
+   * team-clock rules, the lobby's free seconds): Black has draw odds, White more time. The squad with more team bank
+   * left after the final picks its colour.
    */
   armageddon: { whiteSeconds: number; blackSeconds: number; incrementSeconds: number };
   /** Missed actions in a row before a player's seat goes to a bot (every miss is logged on their record). */
@@ -1351,9 +1356,9 @@ export interface SquadsSettings {
     mateStepLoss: number;
     mateMissLoss: number;
     /**
-     * A bot's thinking time: its bank over `movesToGo`, plus `incrementShare` of the increment (low on time, it plays
-     * at about the increment), times a random factor in `thinkRange`, at least `minThinkSeconds`, and never past its
-     * deadline.
+     * A bot's thinking time: its squad's bank over `movesToGo`, plus `incrementShare` of the increment and the free
+     * seconds, times a random factor in `thinkRange`, at least `minThinkSeconds` (but within the free seconds in
+     * sudden death), and never past its deadline.
      */
     movesToGo: number;
     incrementShare: number;
@@ -1379,15 +1384,15 @@ export const SQUADS: SquadsSettings = {
   voteSeconds: 8,
   voteResultSeconds: 3.2,
   voteBotSkip: 0.1,
-  // Eric, Oct 10 (option B): quick early rounds, a roomier final. Tuned by reports/squads-sim.md: every lobby 20-40
-  // minutes, Normal's median 30-35, under about 15% of finals decided on time.
+  // Eric, Oct 10: one team clock per squad for the whole tournament. Tuned by reports/squads-sim.md: every option's
+  // median lobby about 30-36 minutes, its 90th percentile at most 40.
   clocks: [
-    { id: "fast", label: "Fast", bankSeconds: 60, incrementSeconds: 2, finalBankSeconds: 240, finalIncrementSeconds: 3 },
-    { id: "normal", label: "Normal", bankSeconds: 60, incrementSeconds: 2, finalBankSeconds: 240, finalIncrementSeconds: 4 },
-    { id: "long", label: "Long", bankSeconds: 60, incrementSeconds: 2, finalBankSeconds: 270, finalIncrementSeconds: 4 },
+    { id: "fast", label: "Fast", bankSeconds: 180, topUpSeconds: 45, delaySeconds: 3, incrementSeconds: 0 },
+    { id: "normal", label: "Normal", bankSeconds: 240, topUpSeconds: 60, delaySeconds: 3, incrementSeconds: 0 },
+    { id: "long", label: "Long", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 3, incrementSeconds: 0 },
   ],
   clockDefault: 1,
-  // 20 s, not the brief's starting 40: a miss charges the whole ceiling, and at 40 s misses decided most finals on time.
+  // 20 s, not the brief's starting 40, so nobody stalls a half (and a miss doesn't empty a team bank).
   moveCeilingSeconds: 20,
   incrementOnMiss: false,
   safetyCap: 120,
@@ -1416,7 +1421,7 @@ export const SQUADS: SquadsSettings = {
     wonRankLoss: 3,
     mateStepLoss: 5,
     mateMissLoss: 20,
-    movesToGo: 25,
+    movesToGo: 40,
     incrementShare: 0.8,
     thinkRange: [0.5, 1.5],
     minThinkSeconds: 1.5,
