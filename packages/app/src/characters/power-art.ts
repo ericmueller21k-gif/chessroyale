@@ -73,6 +73,10 @@
  *                               bulb goes out, `relight` after the last), and the same on his own strand: his look
  *                               `bulbs3`…`bulbs0` (kit.lookOf, from the battle's state).
  *
+ *   Not a power, but on the board like one: a boss's attack on a king (the God King in his Last Stand, the crowd's king
+ *   at its mate) is its kit's `kingAttack` (kits.ts): Hollow's is HOLLOW_ATTACK's "kingAttack" (hollow.ts), with
+ *   `lashHit` on the king's square at each lash (lashItem()).
+ *
  *   "Big Boy"
  *     power        "toss"       He pulls out a toy block, winds up over his shoulder and throws it; at `toss` it leaves
  *                               his hand: fly `blockFly` (fly<letter>) from him to the square, then play `toyBlock`
@@ -129,6 +133,8 @@
  *                          (loop), close<t>, dawn<t> (ends empty), found, shown (loop), answer, answered (loop),
  *                          where <t> is the square's tile (16 by where it is, light or dark). Use nightItems().
  *   nightLabel     square  a … h, 1 … 8: the night's coordinates, over the tiles (nightItems() places them).
+ *   lashHit        square  hit<F|B><L|R><c> (ends empty, about 200 ms): a lash of Hollow's strand landing on a king,
+ *                          a forehand (high) or backhand (low, rising), from the left or right edge, in bulb colour c.
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
  * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
@@ -285,6 +291,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   bulbStrand: { ch: EFFECT_SPRITES.bulbStrand, covers: "strip", loop: "lit3", counter: { prefix: "lit", max: 3 }, sounds: { pop: "hollowPop", relight: "hollowRelight" } },
   nightSquare: { ch: EFFECT_SPRITES.nightSquare, covers: "square", loop: "night0D", end: "dawn0D", sounds: { found: "hollowFound", answer: "hollowWhisper" } },
   nightLabel: { ch: EFFECT_SPRITES.nightLabel, covers: "square", loop: "a", sounds: {} },
+  lashHit: { ch: EFFECT_SPRITES.lashHit, covers: "square", start: "hitFL0", sounds: {} },
   toyBlock: { ch: EFFECT_SPRITES.toyBlock, covers: "square", start: "landA", loop: "sitA", end: "poofA", sounds: { clack: "bigboyClack", poof: "bigboyPoof" } },
   blockFly: { ch: EFFECT_SPRITES.blockFly, covers: "square", loop: "flyA", sounds: {} },
   bouncePuff: { ch: EFFECT_SPRITES.bouncePuff, covers: "square", start: "puff", sounds: {} },
@@ -432,4 +439,11 @@ export function lightsOutSmashes(a: Anim): number[] {
 export function lightsOutSpot(ch: Character, width = 30): { left: number; top: number; width: number; height: number } {
   const height = (width * ch.h) / ch.w;
   return { left: 50 - (width * ch.foot[0]) / ch.w, top: -(height * ch.foot[1]) / ch.h, width, height };
+}
+
+// ---------------- A boss's attack on a king, for the board ----------------
+
+/** Hollow's i-th lash landing on the king's square, from his side (`from`: he stands to its left or right). */
+export function lashItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "lashHit", anim: `hit${i % 2 ? "B" : "F"}${from}${i % 3}`, since };
 }

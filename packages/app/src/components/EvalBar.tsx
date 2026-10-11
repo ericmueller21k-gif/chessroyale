@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { gameEnd, sideToMove } from "@chessroyale/chess";
 import { enginePool } from "../engine.ts";
+import { evalBarOn, onPrefsChange } from "../prefs.ts";
 
 /**
  * What the bar last showed, and every position's value so far. A screen change
@@ -24,6 +25,10 @@ const remember = (fen: string, w: number) => {
  * `override` shows another value for a moment (White's expected score): the God
  * King's Last Stand plunges the bar to the crowd's chances after a blunder that
  * never stands on the board, and lets it go back as the piece slides back.
+ *
+ * A player can switch the bar off in Settings (prefs.ts, `evalBarOn`): then nothing shows and the board takes its room
+ * (every screen's CSS narrows the board only for `.eval-bar ~ .board-wrap`). The value is still worked out, so what
+ * reads it (`knownEval`: the God King's word on how it's going) is the same either way.
  */
 export function EvalBar({
   fen,
@@ -37,6 +42,8 @@ export function EvalBar({
   override?: number | null;
 }) {
   const [white, setWhite] = useState<number | null>(() => known.get(fen) ?? lastShown);
+  const [on, setOn] = useState(evalBarOn);
+  useEffect(() => onPrefsChange(() => setOn(evalBarOn())), []);
 
   useEffect(() => {
     let live = true;
@@ -76,6 +83,7 @@ export function EvalBar({
     };
   }, [fen]);
 
+  if (!on) return null;
   const shown = override ?? white;
   const w = shown ?? 0.5;
   const label = shown === null ? "…" : `${Math.round(w * 100)}%`;

@@ -30,7 +30,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   engine adjudicates.
 - **Power-ups:** 3 at the start in Crowd (`powerUpsAtStart`); one shows the engine's top 3 moves for that turn.
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
-  tallies, an optional motion trail, the eval bar, the scoreboard and chat under the board. A crowd of one keeps its
+  tallies, an optional motion trail, the eval bar (unless switched off in Settings: [hub.md](hub.md)), the scoreboard
+  and chat under the board. A crowd of one keeps its
   move on the board (no ghost, no snap-back). The board never moves between screens.
 - **Classic** (64 players, 8 boards, rotating) still runs but is frozen: Eric will rework it; don't invest in it.
 

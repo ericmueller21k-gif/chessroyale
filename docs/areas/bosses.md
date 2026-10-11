@@ -44,7 +44,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Test switches:** `?boss=<id>` picks the boss (`?boss=jefferson` too: `BOSS_ALIASES`, read by `bossIdFromLink`);
   `?power=<id>` brings its ultimate early (warned as turn 2 begins, unleashed on turn 3; its passive as usual); admins
   see "Trigger ultimate (testing)" in any boss battle (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next
-  crowd turn begins, no warning).
+  crowd turn begins, no warning). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
+  calls the God King's Last Stand, and Hollow lashes him) and `?boss=hollow&mate=1` (Boss alone from 1.f3 e5 2.g4, the
+  boss to move: he mates at once, lashes your king, then the result; `settings.bossMateTest`, solo only).
 - **What a boss says** (`packages/app/src/speech.tsx`, numbers in `SPEECH`; Eric, Oct 10: Ginger's line came and went
   at once): every line (its powers' moments, its ultimate, its warning, its reactions, Hollow's claim and Lights out
   words, Big Boy's snack) goes into the boss's voice and shows in its text box beside it (in the boss bar on a phone,
@@ -59,6 +61,30 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Same for everyone online:** what a boss does and says on screen comes only from the shared match state
   (`boss-beats.ts`): one-shot animations play once per moment from when the device first saw it, loops run by the
   clock, lines are picked by a hash of the moment. No new protocol for a boss's looks.
+- **A boss's attack on a king** (Eric, Oct 10; Hollow's first, the others keep today's behaviour until they get one):
+  purely cosmetic, no rule changes. Its kit's `kingAttack` (`KingAttackKit` in `kits.ts`: the character it's drawn
+  from, its animation, its size in frame pixels a square, where it stands, its hit on the king's square) plays on the
+  board beside a king, on the beats every boss shares (`KING_ATTACK` in `boss-timing.ts`: it drops in, lashes or
+  strikes ten times, a hit each, and leaps off; 2.78 s), drawn by `components/KingAttack.tsx`: the boss on the side
+  towards the board's middle (mirrored when the king is to its left), each hit on the king's square on one shared
+  canvas (`BoardEffects`), a gold "−N" off the king each hit (the God King's strike style, `ks-hp`), its line into its
+  voice as it lands (`kingAttack` lines, critical), its figure in the corner hidden meanwhile. Two places:
+  - **The God King's Last Stand:** it is the blow meant for the piece, from `LAST_STAND.attackAt`; the Last Stand takes
+    no longer (see [god-king.md](god-king.md)).
+  - **The boss's mate** (Hollow mates the crowd): from `KING_ATTACK.mateAt` after its move shows, on the crowd's king
+    (the real one hidden; a copy flickers at each hit, darker each time, topples at the last and fades as the dark
+    gathers on its square). The result waits for it: solo and the server both hold the mating move for
+    `bossTurnShowMs` (`KING_ATTACK.mateHoldMs`, 3.9 s, for a boss in `KING_ATTACKERS`; any other boss or move as
+    before). No power's moment plays with a mate.
+  - **Hollow's:** `HOLLOW_ATTACK` (`hollow.ts`: his own parts and palette in a frame 38 px wider, so the strand reaches),
+    `kingAttack`: his shadow grows, he drops in, then whips his string of lights at the king back and forth, cracked
+    out straight then low (`lash`, `lashLow`, `recoil`, `recoilLow` strand poses), sparks off its tip, a `lash` cue each
+    (`hollowLash`: a low whoosh and a dull snap, quieter than a move); `lashHit` on the king's square (forehand or
+    backhand, from his side, in a bulb's colour); he cackles and leaps off. 36 frame pixels a square (about 1.8 squares
+    tall), 1.8 squares from the king. Drawn ahead as his battle starts (`prewarmKingAttack`).
+  - **Adding one for another boss:** its kit's `kingAttack` (an animation whose hits land on `kingAttackHits()`, cued,
+    lasting `KING_ATTACK.ms`), its hit effect, its `kingAttack` lines, and its id in `KING_ATTACKERS` (a unit test keeps
+    the two lists the same).
 
 ## Where the code is
 
@@ -78,6 +104,7 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | Powers on screen: moments, banners, the board layer, the rage meter | `components/BossPowers.tsx` (`momentsOf`, `PowerMoment`, `PowerBoard`, `BossBarExtra`, `dockLine`, the warning), `components/PowerParts.tsx` (`BossUi`, `Moment`, `Flight`, `PowerBanner`), `components/BossEffect.tsx` | `components/Ginger.tsx`, `Boingo.tsx`, `Grex.tsx`, `Hollow.tsx` (+ `LightsOut.tsx`), `BigBoy.tsx` |
 | The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below) | |
 | The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
+| A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`) |
 
 ### The base boss (`packages/chess/src/bosses/base.ts`)
 
@@ -114,8 +141,10 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
    - one the host's engine plays (like the funhouse, the extra move, the bounce): a `<boss>Battle` with one-line runner methods, the lobby's request, answer and timeout (`lobby.ts`, `bossKind`), the host's handler (`net.ts`) and solo's (`solo.ts`), and the request's flag in `protocol.ts`;
    - one the server times (like Lights out): `packages/server/src/bosses/<boss>.ts` on `BossLobby`, routed from `lobby.ts`, its messages in `protocol.ts`, and solo's timing in `solo.ts`;
    - anything that changes the board the boss screen shows, or the intro (like the funhouse's flip, the bounce, the burn, Hollow's claim, Big Boy's snack): `screens/Boss.tsx`.
-8. **Tests**: `packages/chess/test/<boss>.test.ts` (rules: never no legal move, never breaks check, deterministic from the seed, the judge's view), a lobby test in `packages/server/test/boss-powers-lobby.test.ts`, app tests for its character and moments, `e2e/<boss>.spec.ts`. Watch it frame by frame (`npm run frames:powers`, or a `frames-<boss>.mjs`), run `npm run perf:boss -- <dir> <boss id> both 25`, and give Eric the test links (`?boss=<id>`, `?power=<ultimate>`).
-9. **Docs**: its row in the table above, and this checklist if the shape changed.
+8. **Its attack on a king** (optional; the boss keeps today's Last Stand and mate without one): see "A boss's attack on
+   a king" above.
+9. **Tests**: `packages/chess/test/<boss>.test.ts` (rules: never no legal move, never breaks check, deterministic from the seed, the judge's view), a lobby test in `packages/server/test/boss-powers-lobby.test.ts`, app tests for its character and moments, `e2e/<boss>.spec.ts`. Watch it frame by frame (`npm run frames:powers`, or a `frames-<boss>.mjs`), run `npm run perf:boss -- <dir> <boss id> both 25`, and give Eric the test links (`?boss=<id>`, `?power=<ultimate>`).
+10. **Docs**: its row in the table above, and this checklist if the shape changed.
 
 ## Settings
 
@@ -128,11 +157,16 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
   `long-match.test.ts`, `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`,
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,
   `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
-- e2e: `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `boss-character.spec.ts`,
+- Unit, a boss's attack on a king: `packages/chess/test/king-attack.test.ts` (the beats, the Last Stand's fit, the
+  mate's hold, the mate switch), `packages/app/test/king-attack.test.ts` (the kit, Hollow's frames on the beats, the God
+  King's blows, the hits).
+- e2e: `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `boss-character.spec.ts`,
   `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
   gone on time),
   `perf.spec.ts`. Unit: `packages/app/test/speech.test.ts` (the speech rule).
-- Frames: `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both]`, `frames:hollow`,
+- Frames: `npm run frames:king-attack -- <dir> hollow [phone|desktop|both] [laststand|mate|both] [light|dark] [gif]`
+  (the page's clock paused and stepped 40 ms at a time: every frame of the attack),
+  `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both]`, `frames:hollow`,
   `frames:bigboy`, `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`.
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect).
 - Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] 25`.

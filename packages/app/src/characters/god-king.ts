@@ -11,7 +11,7 @@
  * blade of fire) hangs off the fist in the pose's direction, so a swing is a list of poses. The cape and tabard
  * ripple; the helmet's wings flap; his eyes glow, flare or go dark. (No back wings: Eric, Oct 9, 2026.)
  */
-import { LAST_STAND } from "@chessroyale/chess";
+import { LAST_STAND, lastStandAttackHits } from "@chessroyale/chess";
 import { canvas, edge, ellipse, inEllipse, line, poly, roundLight, shade, tint, toGrid } from "./paint.ts";
 import { lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
@@ -720,7 +720,7 @@ const rise: Anim = {
  * and a jolt; his armour cracks at LAST_STAND.crackAt), the stagger, the collapse, and lying fallen. Built from the
  * shared timings, so the picture stays in step with the effects and sounds.
  */
-const lastStand: Anim = (() => {
+function lastStandAnim(blows: readonly number[], cracks: readonly number[]): Anim {
   const L = LAST_STAND;
   const t0 = L.fallAt;
   const frames: Frame[] = [];
@@ -729,7 +729,7 @@ const lastStand: Anim = (() => {
     frames.push(f(ms, p, extra));
     t += ms;
   };
-  const cracksAt = (ms: number) => L.crackAt.filter((c) => ms >= c).length;
+  const cracksAt = (ms: number) => cracks.filter((c) => ms >= c).length;
   // The dive: sword point down.
   push(L.crashAt - t0, { arm: "low", flame: "flare", eyes: "hot", bob: -2, flick: 1 });
   // The crash: landed low, sword planted.
@@ -738,13 +738,14 @@ const lastStand: Anim = (() => {
   // Standing guard over the square, sword across him.
   let i = 0;
   while (t + 100 <= L.slashAt) push(100, { arm: "guard", flick: i, wave: wave(i++), eyes: i % 8 === 0 ? "hot" : "glow" });
-  if (L.slashAt > t) push(L.slashAt - t, { arm: "guard", flick: i, eyes: "hot" });
-  // The blows: each lands with a red-white flash and a jolt.
-  for (let b = 0; b < L.slashes; b++) {
+  if (blows[0]! > t) push(blows[0]! - t, { arm: "guard", flick: i, eyes: "hot" });
+  // The blows: each lands with a red-white flash and a jolt, and he holds his guard till the next.
+  for (let b = 0; b < blows.length; b++) {
     const c = cracksAt(t);
-    const p: KingPose = { arm: "guard", flick: b, cracks: c, eyes: b % 3 === 0 ? "hot" : "glow", flame: b > 18 ? "dim" : "lit" };
+    const p: KingPose = { arm: "guard", flick: b, cracks: c, eyes: b % 3 === 0 ? "hot" : "glow", flame: b > blows.length * 0.75 ? "dim" : "lit" };
+    const gap = (blows[b + 1] ?? blows[b]! + L.slashEveryMs) - blows[b]!;
     push(50, { ...p, bob: 1 }, { hit: true, shake: [b % 2 ? 1 : -1, 0], ...(b === 0 ? { cue: "blows" } : {}) });
-    push(L.slashEveryMs - 50, p);
+    push(gap - 50, p);
   }
   // Until the stagger: braced, hurt.
   if (L.staggerAt > t) push(L.staggerAt - t, { arm: "low", flame: "dim", cracks: 3, eyes: "dim", bob: 1 });
@@ -758,6 +759,19 @@ const lastStand: Anim = (() => {
   push(140, { crouch: 6, bob: 4, dx: 1, arm: "plant", flame: "dim", cracks: 3, eyes: "out" });
   frames.push(fallenFrame(Math.max(100, L.fadeAt + L.fadeMs - t - 280), 0), fallenFrame(1000, 1));
   return { loop: false, frames };
+}
+/** The 25 blows, one every LAST_STAND.slashEveryMs from slashAt; his armour cracks at crackAt. */
+const lastStand = lastStandAnim(
+  Array.from({ length: LAST_STAND.slashes }, (_, b) => LAST_STAND.slashAt + b * LAST_STAND.slashEveryMs),
+  LAST_STAND.crackAt,
+);
+/**
+ * Against a boss that attacks him itself (its kit's `kingAttack`: Hollow lashing him with his strand), the blows are its
+ * lashes (lastStandAttackHits), and his armour cracks at the 2nd, 6th and 9th.
+ */
+const lastStandAttacked = (() => {
+  const hits = lastStandAttackHits();
+  return lastStandAnim(hits, [hits[1]!, hits[5]!, hits[8]!]);
 })();
 
 /** His portraits for the banners: sword raised, eyes blazing; and battle-worn (cracked, eyes dim, a few red drops). */
@@ -771,7 +785,7 @@ const portraitHurt: Anim = {
   ],
 };
 
-const ANIMS = { idle, appear, raise, raised, point, slash, lower, leap, lastStand, fallen, rise, portrait, portraitHurt };
+const ANIMS = { idle, appear, raise, raised, point, slash, lower, leap, lastStand, lastStandAttacked, fallen, rise, portrait, portraitHurt };
 export type GodKingAnim = keyof typeof ANIMS;
 
 export const GOD_KING: Character = {

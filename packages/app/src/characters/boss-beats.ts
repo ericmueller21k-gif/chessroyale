@@ -42,7 +42,9 @@ export type Beat =
   | "lightsHeld"
   | "lightsFailed"
   // Big Boy's snack before move 1 (the crowd's pawn, eaten).
-  | "snack";
+  | "snack"
+  // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
+  | "kingAttack";
 /** The loops it rests in between moments. */
 export type Loop = "idle" | "thinking" | "smug" | "rattled" | "defeat" | "victory";
 

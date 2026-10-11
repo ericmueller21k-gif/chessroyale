@@ -332,7 +332,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           {!match.boss && <BoardClock match={match} you={you} turn={null} />}
           {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
           {command && t >= command.startAt - start && <KingCommand {...command} />}
-          {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} />}
+          {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} boss={match.boss} />}
         </Board>
         </div>
       </div>
