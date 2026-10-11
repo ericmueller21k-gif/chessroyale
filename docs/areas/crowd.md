@@ -28,6 +28,13 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 - **The endings.** Team final: `teamFinalSizes` players a side, the weakest out every `teamFinalMovesPerStep`.
   Boss battle: the last 10 against a boss (the God King joins). Duel: the last two. `finalMaxTurns` caps a final; the
   engine adjudicates.
+- **The clock:** each move has its own clock (20 s in Crowd unless the vote changes it, `moveClockAt`; the bars along
+  the board's top and bottom edges, which draw behind everything on and around the board) and each player a **time
+  bank** for the match (`timeBankSeconds`, 10 minutes) with **+5 s added at the start of every move**
+  (`timeIncrementSeconds`). A move
+  takes what you think beyond those 5 s out of the bank (at most 15 s a move); a quicker move adds the rest to it, so
+  the bank can sit near 10:00 all game (Eric asked on Oct 11; see `DECISIONS.md`). The board's clock shows this move's
+  seconds and your bank, draining live from bank + 5 s as you think; the scoreboard's BANK updates after each move.
 - **Power-ups:** 3 at the start in Crowd (`powerUpsAtStart`); one shows the engine's top 3 moves for that turn.
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
   tallies, an optional motion trail, the eval bar (unless switched off in Settings: [hub.md](hub.md)), the scoreboard

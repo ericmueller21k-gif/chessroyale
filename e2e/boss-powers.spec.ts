@@ -29,6 +29,28 @@ async function playBest(page: Page) {
   await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
 }
 
+/**
+ * How far each block of ice is from its square (chessground's own square, which is a few pixels smaller than the wrap
+ * at some sizes): the worst edge in px, and the block sizes (Eric, Oct 11: one block the square's shape, on every square).
+ */
+const iceOffSquares = (p: Page) =>
+  p.evaluate(() => {
+    const board = document.querySelector(".board-area cg-board")!.getBoundingClientRect();
+    const black = !!document.querySelector(".board-area .cg-wrap.orientation-black");
+    const sq = board.width / 8;
+    const ices = [...document.querySelectorAll<HTMLElement>(".power-board .pw-ice")];
+    const off = ices.map((el) => {
+      const s = el.dataset.square ?? "";
+      const f = s.charCodeAt(0) - 97;
+      const r = Number(s[1]) - 1;
+      const x = board.left + (black ? 7 - f : f) * sq;
+      const y = board.top + (black ? r : 7 - r) * sq;
+      const b = el.getBoundingClientRect();
+      return { square: s, off: Math.max(Math.abs(b.left - x), Math.abs(b.top - y), Math.abs(b.right - x - sq), Math.abs(b.bottom - y - sq)) };
+    });
+    return { worst: Math.max(0, ...off.map((o) => o.off)), off, sizes: [...new Set(ices.map((el) => el.getBoundingClientRect().width.toFixed(1)))] };
+  });
+
 /** The power's banner (boss on the left, the moment, the God King on the right). */
 const banner = (p: Page, text: string) => p.locator(".fight-banner.power-cut", { hasText: text });
 
@@ -51,6 +73,7 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   const p2 = await powers(page);
   expect(p2.frozen).toBeTruthy();
   await expect(page.locator(".power-board .pw-ice")).toHaveCount(1);
+  expect((await iceOffSquares(page)).worst).toBeLessThanOrEqual(1);
   expect(p2.allowed.some((m: string) => m.startsWith(p2.frozen.square))).toBe(false);
   // (A move of the iced piece from the engine's unfiltered search, if it has one there: refused.)
   const all = (await engineTop(page, "raw")).top;
@@ -86,6 +109,10 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   expect([...movers].every((c) => c === "Q" || c === "K")).toBe(true);
   expect(p3.iced.length).toBeGreaterThan(5);
   await expect(page.locator(".power-board .pw-ice")).toHaveCount(p3.iced.length);
+  // Every block on its own square within 1 px, all one size, whatever the piece under it.
+  const ice = await iceOffSquares(page);
+  expect(ice.worst, JSON.stringify(ice.off)).toBeLessThanOrEqual(1);
+  expect(ice.sizes).toHaveLength(1);
   await playBest(page);
   // The ice melts as the next turn begins.
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);

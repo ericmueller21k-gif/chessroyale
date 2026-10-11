@@ -50,7 +50,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   in the crowd's colour). SNES/Fire Emblem style: pixel portraits, slanted cut-in banners, retro sounds, a Press
   Start 2P speech bubble. Drama yes, gore no (cracks, sparks and a few stylised red drops are the limit).
 - **The boss battle's presentation:** the intro (the boss's card, the game so far replayed, "START!"), the fight
-  banners (`FightBanner`), the boss's move and its banner when it takes your queen, the dock.
+  banners (`FightBanner`), the boss's move and its banner when it takes your queen, the dock. The queen banners
+  (QUEEN DOWN!, QUEEN SLAIN!) are silent for now (Eric, Oct 11: the gasp sounded wrong; its file is kept, unused).
 
 ## Where the code is
 

@@ -1095,3 +1095,48 @@ Three visual fixes Eric asked for from a screenshot of a Hollow battle on a comp
   flashing), so a bulb keeps its colour through every frame. The strip's three bulbs and the lashes take the first
   three bulbs' colours, always three different ones. Lights out still puts a third of the strand out at a time (bulbs
   2, 5, 8 first), now by position rather than colour.
+
+### Quick fixes: Ginger's ice on its square, the timer bars at the back, the queen banners silent (Oct 11, 2026)
+
+From Eric's screenshot of Ginger's blizzard on a computer, and his word on the queen banner. The calls:
+
+- **Why the ice didn't line up:** each block was already one square-shaped sprite, the same for every piece, but it
+  was placed and sized in % of the board's wrap, which is up to 8 device pixels wider than chessground's own board
+  (the lesson "A ring a few pixels off its square" again). At a board of 552 px in a 555 px wrap, the blocks drifted
+  up to 2.6 px right and down towards the h-file and rank 1, so the king's block on g1 sat flush right and 6 px in on
+  the left, and rank 1's blocks ran into the bar under the board. Now the ice and the cold burst as it forms are
+  placed in eighths of `--cg-size` (`onSquare`), like every other boss's squares: 0 px off on every square, both ways
+  up, on a phone (312 px board in a 314 px wrap) and on computers (456 and 552 px boards). `e2e/boss-powers.spec.ts`
+  checks every block within 1 px of its square, all one size.
+- **The block keeps its one-pixel inset** (1/32 of the square: about 1.2 px on a phone, 2 px on a computer). Flush to
+  the edge, neighbouring blocks would merge into one sheet with doubled outlines; with it, each piece reads as its own
+  block of ice. It's static while frozen (only the glint sweeps across it).
+- **Every timer bar is at the back** (`.timer-bar`, `z-index: -1`), as the eval bar is: the board's wrap isn't a layer
+  of its own, so the bars go to the back of the board's row (a layer, `isolation`), behind the squares' overlays, a
+  boss's sprite, effects, banners and words, and the God King. Nothing moved. Before, the bar under the board drew
+  over the rank-1 ice and the power layer on a phone and over Hollow's sprite on a computer; after, everything that
+  crosses a bar draws over it (checked for all six bosses with their ultimates, phone and computer, and on the
+  Crowd's vote, watching and play screens, where the bars still show whole).
+- **The queen banners are silent** (Eric: the gasp sounded wrong; keep the banners and any other sound). The gasp was
+  the only sound either banner played (QUEEN DOWN! and QUEEN SLAIN!), so they now play nothing; the capture's own
+  sounds and the boss's reaction are unchanged. The clip stays in the repo, unused
+  (`public/sounds/banner/queen-gasp.mp3`, still `queenGasp` in `sound.ts`, so bringing a sound back is one prop on
+  each banner in `screens/Boss.tsx`). It's still fetched with the other samples (8 KB); left so to keep `sound.ts`
+  untouched while its settings are being worked on.
+
+### The Crowd's 10:00 that "goes back to 10 minutes after every move" (Oct 11, 2026): working as designed, not changed
+
+Eric, in a 50 v 50 against bots: a 10-minute timer that seemed to go back to 10:00 after every move. It's your time
+bank (the board's clock at the top right, after this move's seconds, and the scoreboard's BANK), and it works as Eric
+set it on Oct 2: 10 minutes for the match, **+5 s added at the start of every move**, and no move longer than the
+move clock (20 s in Crowd). So a move made in about 5 s costs nothing, a quicker one adds to the bank, and only the
+seconds past 5 drain it, at most 15 s a move. Measured in a solo 50 v 50: moves of 8, 3, 8 and 2 s took the bank
+10:00 → 9:56 → 9:57 → 9:54 → 9:56, and each move's clock opens 5 s above the bank (10:01 on a 9:56 bank) before
+draining. In 50 v 50 you move about 20 times before the final, so even 15 s a move uses only half the bank.
+
+- **Not changed:** the only way to make it "consistently go down" is a rule change, so it's Eric's call. The smallest
+  one: make the 5 s free seconds, as Squads' team clocks already are (the bank stands still for the first 5 s of a
+  move, then drains; unused free seconds aren't banked). `applyRound` would charge `max(0, think − 5 s)`, the board's
+  clock would show the bank holding, then draining, and it would never go up. A display-only change (holding the bank
+  at the start instead of jumping up 5 s) isn't clearly right: under the current rule a quick move still adds to the
+  bank, so it would jump up after the move instead.

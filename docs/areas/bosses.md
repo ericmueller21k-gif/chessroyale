@@ -78,6 +78,11 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
   bottom-right, mirroring him (feet level, as far from the board); the status box under the board at its width; the
   column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
+- **The bars at the back, the ice on its square, the queen banners silent** (Eric, Oct 11): the move clock's bars above
+  and below the board draw behind everything (squares' overlays, the boss, his effects and words, the God King), as the
+  eval bar does. Ginger's ice is one block the square's shape on every square, whatever the piece, placed on
+  chessground's own square (eighths of `--cg-size`). QUEEN DOWN! and QUEEN SLAIN! play no sound for now (the gasp is
+  kept, unused: `queenGasp`).
 - **A boss's attack on a king** (Eric, Oct 10; Hollow's first, the others keep today's behaviour until they get one):
   purely cosmetic, no rule changes. Its kit's `kingAttack` (`KingAttackKit` in `kits.ts`: the character it's drawn
   from, its animation, its size in frame pixels a square, where it stands, its hit on the king's square) plays on the

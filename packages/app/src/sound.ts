@@ -481,7 +481,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gkLastGrunt2: (t) => sample("gkLastGrunt2", t, 0.9),
   gkLastGroan: (t) => sample("gkLastGroan", t, 0.95),
   bannerStart: (t) => sample("bannerStart", t, 0.9),
-  // A queen taken, either way (QUEEN SLAIN!, QUEEN DOWN!): her short gasp, quieter than a move.
+  // A woman's short gasp, quieter than a move. Unused for now (Eric, Oct 11: the queen banners are silent; it sounded wrong).
   queenGasp: (t) => sample("queenGasp", t, 0.9),
   menuOpen: (t) => sample("menuOpen", t, 0.7),
   menuClose: (t) => sample("menuClose", t, 0.7),

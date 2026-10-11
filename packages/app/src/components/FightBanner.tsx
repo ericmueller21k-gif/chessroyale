@@ -5,9 +5,10 @@ import { play, type SoundName } from "../sound.ts";
 /**
  * A fighting-game banner across the board: a slanted band shoots in over speed
  * lines, big italic text slams down with a flash, holds, and the band shoots
- * off the other side (about 1.5 s). "START!" opens a boss battle; the boss's
- * banners ("QUEEN DOWN!") carry its face and its roar; yours ("QUEEN SLAIN!")
- * carry the God King's. Sits over the board.
+ * off the other side (about 1.5 s). "START!" opens a boss battle (with its
+ * whoosh); the boss's banners ("QUEEN DOWN!") carry its face; yours ("QUEEN
+ * SLAIN!") carry the God King's. The queen banners are silent for now (Eric,
+ * Oct 11). Sits over the board.
  */
 export function FightBanner({
   text,
