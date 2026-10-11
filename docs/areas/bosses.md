@@ -69,7 +69,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   clock, lines are picked by a hash of the moment. No new protocol for a boss's looks (Hollow's `lights`, a field of
   his view, is the one exception: below).
 - **Hollow's lights** (Eric, Oct 11): his ten bulbs take a fresh order of `HOLLOW_LIGHTS`' 8 colours (settings.ts)
-  each battle, never one colour on two neighbouring bulbs (nor on the bulb after, on the same side of the wire), the
+  each battle, never one colour on bulbs within three of each other along the wire (so none lit side by side match as
+  the countdown puts every third one out), the
   same for everyone: from his view's `lights` (0 to 4095, drawn from the battle's seed). Every place a bulb is drawn
   takes them (his sprite and moments, his attack and lashes, Lights out, the strip by the boss bar): each bulb has its
   own palette keys, recoloured as frames are drawn (`characters/lights.ts`, `Swap` in `sprite.ts`). Unit:

@@ -5,9 +5,12 @@
  * (an online raid's players all see the same lights; an older server without it: a random order kept for the battle).
  *
  * "Neighbours" (my call: with ten bulbs and eight colours, no colour can be kept off the strand twice): a bulb's
- * colour differs from the next bulb's along the wire either way, and from the one after that too, which hangs on the
- * same side of the wire. Bulbs 0-4 run up the inner half to his hand and 5-9 down the outer half, so 4 and 5 (either
- * side of his hand) are neighbours; the two ends (0 and 9) are not.
+ * colour differs from the next three bulbs' along the wire either way. The next one is its neighbour; the one after
+ * hangs on the same side of the wire; and the countdown to his next cover puts every third bulb out at a time
+ * (`bulbs2` leaves 0, 1, 3, 4, 6, 7, 9 lit, `bulbs1` 0, 3, 6, 9), so bulbs two or three apart end up side by side
+ * among the lit ones. So no two bulbs that ever show next to each other share a colour. Bulbs 0-4 run up the inner
+ * half to his hand and 5-9 down the outer half, so 4 and 5 (either side of his hand) are neighbours; the two ends
+ * (0 and 9) are not.
  *
  * Everything that draws a bulb is drawn in its default colours (DEFAULT_LIGHTS: red, yellow, blue in turn, as he was
  * first drawn; previews and tests see these) and recoloured as its frames are drawn, by a swap of each bulb's own
@@ -63,12 +66,12 @@ function rng(seed: number): () => number {
 
 /**
  * A battle's lights: each bulb's colour, first to last along the wire (an index into HOLLOW_LIGHTS.colours), from
- * `seed`. Every colour equally likely for each bulb, given that it differs from the two bulbs before it (with 3
- * colours or fewer, from the one before it only). The same seed gives the same lights.
+ * `seed`. Every colour equally likely for each bulb, given that it differs from the three bulbs before it (with
+ * fewer than 4 colours, from as many as there's room for). The same seed gives the same lights.
  */
 export function lightsOrder(seed: number, bulbs = LIGHT_BULBS, colours = HOLLOW_LIGHTS.colours.length): number[] {
   const next = rng((seed ^ 0x5bd1e995) >>> 0);
-  const back = colours > 3 ? 2 : 1;
+  const back = Math.max(1, Math.min(3, colours - 1));
   const out: number[] = [];
   for (let i = 0; i < bulbs; i++) {
     const taken = out.slice(Math.max(0, i - back));

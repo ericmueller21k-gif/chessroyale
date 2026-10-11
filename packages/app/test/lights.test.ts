@@ -35,7 +35,7 @@ describe("Hollow's lights", () => {
     expect(LIGHT_BULBS).toBe(BULBS);
   });
 
-  it("never puts one colour on two neighbouring bulbs (nor on the bulb after, on the same side), over every seed", () => {
+  it("never puts one colour on two neighbouring bulbs, nor on bulbs that show side by side as the countdown dims some, over every seed", () => {
     for (const seed of SEEDS) {
       const order = lightsOrder(seed);
       expect(order).toHaveLength(BULBS);
@@ -43,6 +43,7 @@ describe("Hollow's lights", () => {
         expect(Number.isInteger(order[i]) && order[i]! >= 0 && order[i]! < HOLLOW_LIGHTS.colours.length, `${seed}: bulb ${i}`).toBe(true);
         if (i >= 1) expect(order[i], `${seed}: bulbs ${i - 1} and ${i}`).not.toBe(order[i - 1]);
         if (i >= 2) expect(order[i], `${seed}: bulbs ${i - 2} and ${i}`).not.toBe(order[i - 2]);
+        if (i >= 3) expect(order[i], `${seed}: bulbs ${i - 3} and ${i}`).not.toBe(order[i - 3]);
       }
     }
     // (A smaller palette still keeps neighbours apart.)

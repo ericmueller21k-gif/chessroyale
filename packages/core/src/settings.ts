@@ -620,9 +620,9 @@ export const SAWYER_LOOKS: { readonly split: "morph" | "halves"; readonly settle
 /**
  * Hollow's string of Christmas lights (packages/app/src/characters/lights.ts; Eric, Oct 11: random colours each game).
  * Looks only. Each battle his ten bulbs take a fresh order of these colours, the same on every screen of the battle
- * (from the battle's seed), never one colour on two bulbs next to each other along the wire, nor on the bulb after
- * that (it hangs on the same side of the wire). Every place a bulb is drawn takes it: his sprite and its moments, his
- * whip at a king and its lashes, Lights out, the strip of bulbs by the boss bar.
+ * (from the battle's seed), never one colour on two bulbs within three of each other along the wire (so no two bulbs
+ * ever lit side by side match, as the countdown puts every third one out). Every place a bulb is drawn takes it: his
+ * sprite and its moments, his whip at a king and its lashes, Lights out, the strip of bulbs by the boss bar.
  * Each colour: `glass` (lit) and `shade` (the glass's shaded side, darker); a glint (near white) and the glow round a
  * lit bulb (the glass, see-through) are made from `glass`. Bright enough to read on his charcoal fur and on the
  * board's squares; purple and pink kept clear of his own violet. At least 3 colours.

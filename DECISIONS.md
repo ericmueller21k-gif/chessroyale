@@ -1080,8 +1080,10 @@ Three visual fixes Eric asked for from a screenshot of a Hollow battle on a comp
   cyan, each a glass colour and a shade; the glint and glow are made from the glass. Purple and pink are kept bright
   and clear of his own violet.
 - **"Never repeat" means neighbours** (with ten bulbs and eight colours, no order can avoid repeats): a bulb's colour
-  differs from the next bulb's along the wire either way, and from the one after that, which hangs on the same side
-  of the wire. Bulbs 4 and 5 (either side of his hand) count as neighbours; the two ends don't.
+  differs from the next three bulbs' along the wire either way. The next one is its neighbour, but his countdown to
+  the next cover puts every third bulb out at a time (with a third lit, bulbs 0, 3, 6 and 9 show side by side), and
+  the first screenshots had two reds three apart looking like neighbours. Within three, no two bulbs that ever show
+  next to each other match. Bulbs 4 and 5 (either side of his hand) count as neighbours; the two ends don't.
 - **The same lights for everyone in a battle:** Hollow's view sends `lights`, a number from 0 to 4095 drawn from the
   battle's seed (`powerRoll(seed, "lights")`). Only 12 bits, so it can't be used to work out the seed and foresee his
   powers. It's a new optional field, not a new message; an older server without it gets a random order per battle on
