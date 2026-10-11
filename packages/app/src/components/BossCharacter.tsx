@@ -9,11 +9,13 @@ import { prewarmBigBoy } from "./BigBoy.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, useVoice, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
+import { lightsId, syncLights } from "../characters/lights.ts";
 
 /**
- * A raid boss as a character (if it has one: see characters/kits.ts), standing kitty-corner across the board from
- * the God King: on a phone at the left of the boss bar above the board (he's under the board on the right), on a
- * computer by the board's bottom-left corner (he's by its top-right). It never takes a tap and never covers a piece.
+ * A raid boss as a character (if it has one: see characters/kits.ts), standing across the board from the God King: on a
+ * phone at the left of the boss bar above the board (he's under the board on the right), on a computer by the board's
+ * bottom-left corner (he's by its bottom-right, facing him: Eric, Oct 11). It never takes a tap and never covers a
+ * piece.
  *
  * What it does comes from the shared match state (characters/boss-beats.ts): every player sees the same animation
  * and the same line. An animation plays once per moment, from when this device first saw the moment, so a new
@@ -34,16 +36,23 @@ const startOf = (key: string, now = Date.now()) => {
 /** Sounds already played: the phone and computer placements, or a new screen, never play one twice. */
 const played = new Set<string>();
 
-/** Each frame's pixels, made once per look ("" its own colours; Hollow's `bulbs2` puts a bulb out). */
+/**
+ * Each frame's pixels, made once per look ("" its own colours; Hollow's `bulbs2` puts a bulb out) and per recolour
+ * from the battle (Hollow's lights: `ch.swap`).
+ */
 const images = new WeakMap<Frame, Map<string, ImageData>>();
 function frameImage(ch: Character, frame: Frame, look = ""): ImageData {
+  const swap = ch.swap?.() ?? null;
   let byLook = images.get(frame);
   if (!byLook) images.set(frame, (byLook = new Map()));
-  let img = byLook.get(look);
+  const key = `${swap?.id ?? ""}|${look}`;
+  let img = byLook.get(key);
   if (!img) {
-    const r = renderFrame(ch, frame, { look: look || undefined });
+    const r = renderFrame(ch, frame, { look: look || undefined, swap });
     img = new ImageData(new Uint8ClampedArray(r.data), r.w, r.h);
-    byLook.set(look, img);
+    // (A new battle's lights replace the last one's: its frames go.)
+    if (swap) for (const k of [...byLook.keys()]) if (!k.startsWith("|") && !k.startsWith(`${swap.id}|`)) byLook.delete(k);
+    byLook.set(key, img);
   }
   return img;
 }
@@ -90,6 +99,8 @@ export function BossCharacter({ match, place }: { match: GameView; place: "bar" 
 
 function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results" }) {
   const kit = bossKit(boss.name);
+  // This battle's lights (Hollow's bulbs), for everything of his drawn from now on.
+  syncLights(boss);
   const beat = useMemo(
     () =>
       kit &&
@@ -134,7 +145,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       const now = Date.now();
       const s = showing(kit, beat, now, since);
       const look = lookRef.current();
-      const id = `${s.anim}:${s.frame}:${look}`;
+      const id = `${s.anim}:${s.frame}:${look}:${lightsId()}`;
       if (id !== last) {
         last = id;
         const frame = kit.ch.anims[s.anim]!.frames[s.frame]!;
@@ -187,9 +198,8 @@ export function BossFace({ boss, class: cls = "" }: { boss: Pick<BossView, "name
 }
 
 /**
- * A boss with a character, on a computer: standing by the board's bottom-left corner, kitty-corner across the board
- * from the God King (by its top-right). Goes first in a screen's `.board-row`; on a phone it's hidden (the boss bar
- * has him).
+ * A boss with a character, on a computer: standing by the board's bottom-left corner, facing the God King across the
+ * board (by its bottom-right). Goes first in a screen's `.board-row`; on a phone it's hidden (the boss bar has him).
  */
 export function BossSide({ match }: { match: GameView }) {
   if (!hasCharacter(match)) return null;

@@ -617,6 +617,29 @@ export const BOSS_POWERS = {
  */
 export const SAWYER_LOOKS: { readonly split: "morph" | "halves"; readonly settle: "grow" | "small" } = { split: "morph", settle: "grow" };
 
+/**
+ * Hollow's string of Christmas lights (packages/app/src/characters/lights.ts; Eric, Oct 11: random colours each game).
+ * Looks only. Each battle his ten bulbs take a fresh order of these colours, the same on every screen of the battle
+ * (from the battle's seed), never one colour on two bulbs next to each other along the wire, nor on the bulb after
+ * that (it hangs on the same side of the wire). Every place a bulb is drawn takes it: his sprite and its moments, his
+ * whip at a king and its lashes, Lights out, the strip of bulbs by the boss bar.
+ * Each colour: `glass` (lit) and `shade` (the glass's shaded side, darker); a glint (near white) and the glow round a
+ * lit bulb (the glass, see-through) are made from `glass`. Bright enough to read on his charcoal fur and on the
+ * board's squares; purple and pink kept clear of his own violet. At least 3 colours.
+ */
+export const HOLLOW_LIGHTS: { readonly colours: readonly { readonly name: string; readonly glass: string; readonly shade: string }[] } = {
+  colours: [
+    { name: "red", glass: "#ff4a4a", shade: "#b3172c" },
+    { name: "yellow", glass: "#ffe14a", shade: "#c79a0e" },
+    { name: "blue", glass: "#4f8dff", shade: "#2248c4" },
+    { name: "green", glass: "#4fe36c", shade: "#178f3a" },
+    { name: "orange", glass: "#ff9433", shade: "#c2550c" },
+    { name: "purple", glass: "#c477ff", shade: "#7a2fd1" },
+    { name: "pink", glass: "#ff7dcf", shade: "#c22f8b" },
+    { name: "cyan", glass: "#45ecef", shade: "#0f97a3" },
+  ],
+};
+
 /** BOSS_POWERS with room for other numbers (tests, and the switch turned off). */
 export type BossPowerSettings = {
   -readonly [K in keyof typeof BOSS_POWERS]: (typeof BOSS_POWERS)[K] extends boolean ? boolean : (typeof BOSS_POWERS)[K] extends number ? number : (typeof BOSS_POWERS)[K];

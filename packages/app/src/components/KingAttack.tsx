@@ -7,6 +7,7 @@ import type { BossView } from "../game.ts";
 import { BoardEffects, SpriteAnim, prewarm, prewarmSprite } from "./BossEffect.tsx";
 import { onSquare } from "./PowerParts.tsx";
 import { CRITICAL, bossVoice } from "../speech.tsx";
+import { lightsId, syncLights } from "../characters/lights.ts";
 
 /**
  * A boss's attack on a king (its kit's `kingAttack`; Hollow's, Eric, Oct 10), over the board, on the shared beats
@@ -35,13 +36,15 @@ export function kingAttackBeat(t: number): { hit: number; lit: boolean; dim: num
 
 /**
  * A boss's attack drawn ahead (its frames and its hits), a slice each animation frame, as its battle starts: its first
- * drop-in frame paints new parts (about 80 ms on a computer), which would stall a phone the first time it shows. Once.
+ * drop-in frame paints new parts (about 80 ms on a computer), which would stall a phone the first time it shows. Once
+ * per battle's lights (Hollow's bulbs: a new battle's colours are new frames).
  */
 const warmed = new Set<string>();
 export function prewarmKingAttack(name: string): void {
   const ka = bossKit(name)?.kingAttack;
-  if (!ka || warmed.has(name)) return;
-  warmed.add(name);
+  const key = `${name}:${lightsId()}`;
+  if (!ka || warmed.has(key)) return;
+  warmed.add(key);
   prewarmSprite(ka.ch, ka.ch.anims[ka.anim]?.frames ?? []);
   prewarm("lashHit", Object.entries(EFFECTS.lashHit.ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
 }
@@ -81,7 +84,7 @@ export function KingAttack({
   seed,
   king,
 }: {
-  boss: Pick<BossView, "name" | "id" | "startMove">;
+  boss: Pick<BossView, "name" | "id" | "startMove" | "board" | "powers">;
   square: string;
   orientation: "white" | "black";
   startAt: number;
@@ -94,6 +97,8 @@ export function KingAttack({
   const kit = bossKit(boss.name);
   const ka = kit?.kingAttack;
   const t = now - startAt;
+  // (The battle's lights: his bulbs and his lashes in its colours.)
+  syncLights(boss);
   const hp = useMemo(() => lastStandHits(`attack:${seed}`, KING_ATTACK.lashes), [seed]);
   // His line, as he lands: into his voice (his text box, for its time).
   const landed = t >= KING_ATTACK.landAt;

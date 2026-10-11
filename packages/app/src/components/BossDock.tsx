@@ -25,6 +25,11 @@ import { SpeechBox } from "../speech.tsx";
  *   After his Last Stand he lies there fallen, and the charges he had left are
  *   the crowd's power-ups: a ⚡ button with the count, above his fallen figure,
  *   where his menu was (the engine's top 3 moves, as in Crowd).
+ *
+ * On a computer (styles.css, .boss-dock) the status row is the board's width,
+ * centred under it, and the God King stands by the board's bottom-right corner,
+ * facing the boss across the board (Eric, Oct 11); his words and menu open
+ * outwards there. On a phone, as above.
  */
 export function BossDock({
   match,

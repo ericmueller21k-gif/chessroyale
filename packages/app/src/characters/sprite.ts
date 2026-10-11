@@ -78,8 +78,25 @@ export interface Character {
   halo?: string;
   /** Named recolours (palette changes) for whole looks: "frozen", "enraged". */
   looks?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /**
+   * A recolour that changes from battle to battle (Hollow's lights), read as frames are drawn: whatever draws and
+   * caches frames passes it to renderFrame (`swap`) and keys its cache by its id. Null: the palette as it is.
+   */
+  swap?: () => Swap | null;
   parts: Readonly<Record<string, Part>>;
   anims: Readonly<Record<string, Anim>>;
+}
+
+/**
+ * A recolour by colour, key by key: for each palette key, a map from a colour (`#rrggbb`, lower case) to the one it
+ * becomes. It applies to the key's final colour (after the palette, the look and the frame's own changes), keeping its
+ * alpha, so a frame that puts a key out, dims it or flashes it still does. `id` names it for the caches of drawn frames.
+ * Hollow's lights use it: each bulb has keys of its own, drawn in a default colour and swapped to the battle's
+ * (lights.ts).
+ */
+export interface Swap {
+  id: string;
+  keys: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /** Palette keys that mean "nothing here". */
@@ -229,11 +246,16 @@ function hex(c: string): [number, number, number, number] {
 
 /**
  * Draws one frame as RGBA pixels (ImageData-shaped): `bg` fills the empty pixels (transparent if left out);
- * `look` picks a recolour.
+ * `look` picks a recolour; `swap` swaps colours key by key after everything else (Hollow's lights: see Swap).
  */
-export function renderFrame(ch: Character, frame: Frame, opts: { bg?: string; look?: string } = {}): { w: number; h: number; data: Uint8ClampedArray } {
+export function renderFrame(ch: Character, frame: Frame, opts: { bg?: string; look?: string; swap?: Swap | null } = {}): { w: number; h: number; data: Uint8ClampedArray } {
   const pal: Record<string, string> = { ...ch.palette, ...(opts.look ? ch.looks?.[opts.look] : {}), ...frame.pal };
   if (ch.halo) pal[HALO] = ch.halo;
+  for (const [k, to] of Object.entries(opts.swap?.keys ?? {})) {
+    const c = pal[k];
+    const swapped = c ? to[c.slice(0, 7).toLowerCase()] : undefined;
+    if (swapped) pal[k] = swapped + c!.slice(7);
+  }
   const keys = frameKeys(ch, frame);
   const data = new Uint8ClampedArray(ch.w * ch.h * 4);
   const bg = opts.bg ? hex(opts.bg) : null;

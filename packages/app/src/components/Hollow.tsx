@@ -8,6 +8,7 @@ import type { BossView } from "../game.ts";
 import { BoardEffects, BossEffect, BossMoment } from "./BossEffect.tsx";
 import { Flight, at, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL } from "../speech.tsx";
+import { syncLights } from "../characters/lights.ts";
 
 /**
  * Hollow's powers on screen: his cover of the dark (his cast from the board's corner, the darkness pouring onto its
@@ -72,6 +73,8 @@ const bulbSeen = new Map<string, { n: number; from: number; at: number; relightA
 function bulbStrip({ boss, moments }: { boss: BossView; moments: () => Moment[] }) {
   const n = boss.powers?.bulbs;
   if (n === undefined || boss.result) return null;
+  // (In the battle's lights: lights.ts.)
+  syncLights(boss);
   // (On the boss screen that brings a cover: the strip relights as the darkness lands.)
   const cover = moments().find((m) => m.kind === "dark");
   const key = `${boss.id}:${boss.startMove}:${boss.board.generation}`;

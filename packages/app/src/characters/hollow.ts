@@ -3,35 +3,40 @@
  * as an original. The villagers tore him apart; the darkness brought him back and holds him together through the
  * middle, so where his belly was there is a band of violet-black darkness with a void at its heart, slowly swirling.
  * Torn seams across his shoulder, his cheek and his thigh are bound the same way. He carries a long strand of
- * Christmas lights held in the middle, its two halves hanging with five bulbs each (red, gold, blue in turn; Eric's
- * reference), which count down to his next cover of the dark. Glowing gold eyes, a thin violet
- * edge glow (his halo) so he never vanishes on the dark ground. Drawn facing front, light from the top left.
+ * Christmas lights held in the middle, its two halves hanging with five bulbs each (Eric's reference: red, gold,
+ * blue in turn; since Oct 11 the battle's own colours, lights.ts), which count down to his next cover of the dark.
+ * Glowing gold eyes, a thin violet edge glow (his halo) so he never vanishes on the dark ground. Drawn facing front,
+ * light from the top left.
  *
  * Rigging: the head (one per face), ruff, hips and the band of darkness are painted once; the void is painted per
  * swirl phase and size; the arms and legs are painted from their pose's points (a shoulder, an elbow, a hand; a hip, a
  * knee, an ankle) as shaggy strokes; the strand is painted from the hand that holds it. So a new pose is a few numbers.
  *
- * The bulbs have palette keys of their own per colour (main, shade, glint, glow), so a look (`bulbs2`, `bulbs1`,
- * `bulbs0`) puts a colour out (about a third of the strand) without redrawing anything, and their glints are specks in
- * the same keys (an unlit bulb never glints).
+ * Each bulb has palette keys of its own (main, shade, glint, glow), drawn in its default colour (lights.ts,
+ * DEFAULT_LIGHTS: red, yellow, blue in turn): the battle's lights swap them (HOLLOW.swap), and a look (`bulbs2`,
+ * `bulbs1`, `bulbs0`) puts a third of the strand out (bulbs 2, 5, 8 first, then 1, 4, 7, then the rest) without
+ * redrawing anything. Their glints are specks in the same keys (an unlit bulb never glints).
  */
 import type { LightsOutTarget } from "@chessroyale/core";
 import { KING_ATTACK } from "@chessroyale/chess";
 import type { Beat } from "./boss-beats.ts";
+import { DEFAULT_LIGHTS, LIGHT_BULBS, bulbColour, lightsSwap } from "./lights.ts";
 import { canvas, ellipse, line, poly, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
-/** The bulbs' keys by colour: [main, shade, glint, glow]; red, gold, blue (bulb `i` on the strand is colour `i % 3`). */
-export const BULB_KEYS = [
-  ["1", "4", "7", "!"],
-  ["2", "5", "8", "^"],
-  ["3", "6", "9", "~"],
-] as const;
-const BULB_LIT: readonly (readonly [string, string, string, string])[] = [
-  ["#ff4a4a", "#b3172c", "#ffe0da", "#ff4a4a55"], // red
-  ["#ffc93a", "#c2830f", "#fff8d6", "#ffc93a55"], // gold
-  ["#4ab3ff", "#1d5fd0", "#e0f4ff", "#4ab3ff55"], // blue
-];
+/**
+ * Each bulb's keys, by its number on the strand: [main, shade, glint, glow] (letters of their own, past the ASCII ones
+ * his other keys use).
+ */
+export const BULB_KEYS: readonly (readonly [string, string, string, string])[] = Array.from({ length: LIGHT_BULBS }, (_, i) => {
+  const k = (j: number) => String.fromCharCode(0xc0 + 4 * i + j);
+  return [k(0), k(1), k(2), k(3)] as const;
+});
+/** Each bulb lit, in its default colour: [main, shade, glint, glow]. */
+const BULB_LIT: readonly (readonly [string, string, string, string])[] = DEFAULT_LIGHTS.map((c) => {
+  const b = bulbColour(c);
+  return [b.glass, b.shade, b.glint, b.glow] as const;
+});
 /** An unlit bulb: dark glass, no glow. */
 const BULB_OFF = ["#2e2a36", "#1d1a23", "#463f52", "#00000000"] as const;
 
@@ -63,11 +68,11 @@ export const HOLLOW_PALETTE: Record<string, string> = {
 };
 
 /**
- * His bulbs put out a colour at a time, from the last (`bulbs<n>`: n colours still lit: blue goes out first, then gold,
- * then red, about a third of the strand each, as the strip by the board loses a bulb); the dark stance's look is a
+ * His bulbs put out a third of the strand at a time, from the last (`bulbs<n>`: n thirds still lit: bulbs 2, 5 and 8 go
+ * out first, then 1, 4 and 7, then 0, 3, 6 and 9, as the strip by the board loses a bulb); the dark stance's look is a
  * frame palette (DARK).
  */
-const bulbsOff = (from: number): Record<string, string> => Object.fromEntries(BULB_KEYS.slice(from).flatMap((keys) => keys.map((k, i) => [k, BULB_OFF[i]!])));
+const bulbsOff = (from: number): Record<string, string> => Object.fromEntries(BULB_KEYS.filter((_, b) => b % 3 >= from).flatMap((keys) => keys.map((k, i) => [k, BULB_OFF[i]!])));
 export const HOLLOW_LOOKS = { bulbs3: {}, bulbs2: bulbsOff(2), bulbs1: bulbsOff(1), bulbs0: bulbsOff(0) } as const;
 /** The look for `n` lit bulbs on the strip (0 to 3): that many thirds of the strand lit. */
 export const bulbsLook = (n: number) => `bulbs${Math.max(0, Math.min(3, Math.round(n)))}` as keyof typeof HOLLOW_LOOKS;
@@ -413,8 +418,8 @@ function foot(dir: 1 | -1): Part {
 // ---- The strand of lights: a long wire held in the middle, its two halves hanging, five bulbs on each.
 
 /** Bulbs on the strand, numbered along the wire: the inner half from its end up to his hand (0-4), then the outer half
- * from his hand down to its end (5-9). Bulb `i` is colour `i % 3`. */
-export const BULBS = 10;
+ * from his hand down to its end (5-9). Each has its own keys (BULB_KEYS), so each takes its own colour. */
+export const BULBS = LIGHT_BULBS;
 const PER_HALF = BULBS / 2;
 /** Where the bulbs sit along each half, from the hand (0) to the end (1). */
 const ALONG = [0.27, 0.45, 0.63, 0.81, 0.98] as const;
@@ -426,17 +431,17 @@ export const STRAND_SECTIONS: readonly (readonly number[])[] = [
   [7, 8, 9],
 ];
 const ALL_BULBS: readonly number[] = Array.from({ length: BULBS }, (_, i) => i);
-/** A bulb's colour keys. */
-const keysOf = (i: number) => BULB_KEYS[i % 3]!;
+/** A bulb's keys. */
+const keysOf = (i: number) => BULB_KEYS[i]!;
 
-/** A bulb, 4 x 5: a socket on top, glass pointing down; in colour `c`'s keys. */
-const bulbRows = (c: number): string[] => {
-  const [M, S, G] = BULB_KEYS[c]!;
+/** A bulb, 4 x 5: a socket on top, glass pointing down; in bulb `b`'s keys. */
+const bulbRows = (b: number): string[] => {
+  const [M, S, G] = keysOf(b);
   return [".WW.", ".ww.", `${G}${M}${M}${S}`, `${M}${M}${M}${S}`, `.${M}${S}.`];
 };
 /** A smashed bulb: the socket and a few jagged teeth of glass left. */
-const brokenRows = (c: number): string[] => {
-  const [, S] = BULB_KEYS[c]!;
+const brokenRows = (b: number): string[] => {
+  const [, S] = keysOf(b);
   return [".WW.", ".ww.", `${S}.${S}${S}`, `.${S}..`];
 };
 
@@ -500,13 +505,12 @@ function strand(s: StrandSpec): { wire: { name: string; at: Pt }; glow: { name: 
     }
     for (const { at: [X, Y], wire: [wx, wy], i } of spots) {
       const [bx, by] = [X - x0, Y - y0];
-      const c = i % 3;
       const lit = !(s.broken ?? []).includes(i);
       // The stem from the wire to the socket.
       line(cv, wx - x0, wy - y0, bx + (i % 2 === 0 ? 2 : 1), by, "w");
-      const rows = lit ? bulbRows(c) : brokenRows(c);
+      const rows = lit ? bulbRows(i) : brokenRows(i);
       // A little light round a lit bulb: its glass's colour, see-through, either side of it.
-      if (lit) for (const [gx, gy] of [[-1, 3], [4, 3], [-1, 4], [4, 4], [1, 6], [2, 6]] as const) glow[by + gy] && (glow[by + gy]![bx + gx] = BULB_KEYS[c]![3]);
+      if (lit) for (const [gx, gy] of [[-1, 3], [4, 3], [-1, 4], [4, 4], [1, 6], [2, 6]] as const) glow[by + gy] && (glow[by + gy]![bx + gx] = keysOf(i)[3]);
       rows.forEach((row, y) => [...row].forEach((k, x) => k !== "." && cv[by + y] && (cv[by + y]![bx + x] = k)));
     }
     return { wire: { grid: toGrid(cv) } as Part, glow: { grid: toGrid(glow), outline: false } as Part };
@@ -771,8 +775,8 @@ const DUSK_PAL: Record<string, string> = { d: "#121118", c: "#1a1822", C: "#2421
 const FLASH: Record<string, string> = { d: "#5e5868", c: "#8a8494", C: "#b3adbd", h: "#ffffff" };
 /** His bulbs flickering (hurt, a hit): all of them dim for a frame. */
 const FLICKER: Record<string, string> = Object.fromEntries(BULB_KEYS.flatMap((keys) => keys.map((k, i) => [k, i === 3 ? "#00000000" : BULB_OFF[i]!])));
-/** His bulbs flashing bright (victory). */
-const BULBS_BRIGHT: Record<string, string> = { "7": "#ffffff", "8": "#ffffff", "9": "#ffffff", "!": "#ff4a4a99", "^": "#ffc93a99", "~": "#4ab3ff99" };
+/** His bulbs flashing bright (victory): white glints, a stronger glow (in each bulb's colour: the lights swap it). */
+const BULBS_BRIGHT: Record<string, string> = Object.fromEntries(BULB_KEYS.flatMap(([, , glint, glow], b) => [[glint, "#ffffff"], [glow, `${BULB_LIT[b]![0]}99`]]));
 
 // ---- His animations.
 
@@ -1152,6 +1156,8 @@ export const HOLLOW: Character = {
   palette: HOLLOW_PALETTE,
   halo: "#6a46c4",
   looks: HOLLOW_LOOKS,
+  // The battle's lights: each bulb in its colour (lights.ts). His attack (HOLLOW_ATTACK) shares it.
+  swap: lightsSwap(BULB_KEYS),
   parts: PARTS,
   anims: {
     idle,

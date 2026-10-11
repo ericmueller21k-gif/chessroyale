@@ -969,3 +969,41 @@ batches, so he can check the look after each. The full plan, the odds and the ba
   Dark Shades 18%; Suit and Tie 14%; Smiley Face 1.6%; Tommy Gun 0.4%.
 - **The fitting sheet** gained a short mode for showing a batch (`sheet=1`: each item as a card and on both pawns,
   plus whole outfits).
+
+### Boss screen polish: the eval bar at the back, the God King facing the boss, Hollow's lights (Oct 11, 2026)
+
+Three visual fixes Eric asked for from a screenshot of a Hollow battle on a computer. The calls:
+
+- **The eval bar is behind everything beside the board.** The board's row is a layer of its own (`isolation`) and
+  the bar sits at its back (`z-index: -1`), so the boss by the corner, his strand, his effects and his words all draw
+  over it. Nothing moved: Eric likes a sprite overlapping the bar a little.
+- **Computer only, the God King mirrors the boss** (Eric: no room on a phone, so the phone is unchanged). Same
+  breakpoint as every desktop layout (`min-width: 900px` and `min-height: 600px`). His feet on the board's bottom edge
+  like the boss's, his middle as far right of the board as the boss's is left of it (86 px with the eval bar, 62 px
+  without), measured within 2 px at 12 desktop sizes. The status box is the board's width, centred under it. The board
+  keeps its size (the room his old spot in the dock took stays free under the status box); growing it would change
+  every boss screen's layout, so it's left for Eric to ask for.
+- **His words and his menu open outwards** (to the right, away from the board) on a computer, as the boss's do: over
+  the board they would hide pieces. A box that would leave the screen moves back into view as before.
+- **The column beside the board makes room for him.** From 1100 px an online raid's chat (and from 900 to 1099 px the
+  scoreboard) would otherwise sit under him: it starts where he ends (`--gk-clear`, from the same sums as the board's
+  size), up to about 100 px narrower when the board fills its column. Boss alone has nothing there.
+- **The Last Stand's leap:** he no longer shows again in his spot for a moment as his leap ends (a 200 ms fade did
+  that), and his shadow no longer stays behind as a grey dome while he leaps. Both were there before the move too.
+- **Hollow's lights: 8 colours** in `HOLLOW_LIGHTS` (settings.ts): red, yellow, blue, green, orange, purple, pink and
+  cyan, each a glass colour and a shade; the glint and glow are made from the glass. Purple and pink are kept bright
+  and clear of his own violet.
+- **"Never repeat" means neighbours** (with ten bulbs and eight colours, no order can avoid repeats): a bulb's colour
+  differs from the next bulb's along the wire either way, and from the one after that, which hangs on the same side
+  of the wire. Bulbs 4 and 5 (either side of his hand) count as neighbours; the two ends don't.
+- **The same lights for everyone in a battle:** Hollow's view sends `lights`, a number from 0 to 4095 drawn from the
+  battle's seed (`powerRoll(seed, "lights")`). Only 12 bits, so it can't be used to work out the seed and foresee his
+  powers. It's a new optional field, not a new message; an older server without it gets a random order per battle on
+  each device.
+- **Recoloured as drawn, not redrawn:** the art is code-drawn, so each of the ten bulbs got palette keys of its own,
+  drawn in default colours (red, yellow, blue in turn, as before), and a per-key colour swap (`Swap` in sprite.ts)
+  turns them into the battle's colours wherever his frames are drawn: his sprite and every moment, his attack and its
+  lashes, Lights out, the strip by the boss bar. The swap keeps whatever a frame does to a bulb (out, flickering,
+  flashing), so a bulb keeps its colour through every frame. The strip's three bulbs and the lashes take the first
+  three bulbs' colours, always three different ones. Lights out still puts a third of the strand out at a time (bulbs
+  2, 5, 8 first), now by position rather than colour.
