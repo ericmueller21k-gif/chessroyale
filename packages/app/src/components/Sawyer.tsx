@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "preact/hooks";
 import { BOARD_SAW, SAW_CUT, SPLIT, withoutPiece } from "@chessroyale/chess";
-import { BOSS_POWERS, type SawCut, type SplitPawn } from "@chessroyale/core";
+import { BOSS_POWERS, SAWYER_LOOKS, type SawCut, type SplitPawn } from "@chessroyale/core";
 import { CUT, LEAP, SAWYER } from "../characters/sawyer.ts";
 import { bossKit } from "../characters/kits.ts";
 import { EFFECTS, animLength } from "../characters/power-art.ts";
@@ -11,8 +11,10 @@ import { squareXY } from "./GodKing.tsx";
 import { hash, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 
 /**
- * Sawyer on the board: his split pawn after his first move (he leaps onto the pawn, saws it, it cracks, and its two
- * halves come apart onto their squares; the board then draws those two pawns as halves wherever they go), his saw cuts
+ * Sawyer on the board: his split pawn after his first move (he leaps onto the pawn, saws it, it cracks, and it morphs
+ * into two smaller whole pawns that hop onto their squares and grow to a pawn's size; or, with SAWYER_LOOKS.split
+ * "halves", its two halves come apart onto their squares and the board then draws those two pawns as halves wherever
+ * they go), his saw cuts
  * (a groove along one edge of a square, sawn as his saw comes down at the board's corner, taped over turn by turn as it
  * heals) and his board saw (he leaps onto the board, revs, saws his way up between the d and e files, and the board
  * splits with a gap for its turns, then rejoins). All from the shared state (`powers.split`, `cut`, `boardSaw`) and
@@ -104,14 +106,22 @@ function trip(t: number, spot: Pt, upAt: number, backAt: number): { at: Pt; shad
 export const halfClass = (side: "a" | "h", o: Orientation): "saw-half-l" | "saw-half-r" => ((side === "a") === (o === "white") ? "saw-half-l" : "saw-half-r");
 
 /**
- * The board draws his two split pawns as halves wherever they go: each of chessground's piece elements standing on a
- * half's square (one of his pawns) gets its half's class (clipped to that half, its cut face shaded: styles.css), kept
- * in step with every change chessground makes before the browser paints (a MutationObserver's callback runs first).
+ * How every board draws his two split pawns once they've landed (SAWYER_LOOKS): as halves (the "halves" split), small
+ * (the morph, settle "small"), or as the ordinary pawns they are (null: the morph, settle "grow").
  */
-function HalfPawns({ halves, color, orientation, on }: { halves: SplitPawn["halves"]; color: "w" | "b"; orientation: Orientation; on: boolean }) {
+export const pairLook = (looks: typeof SAWYER_LOOKS = SAWYER_LOOKS): "halves" | "small" | null => (looks.split === "halves" ? "halves" : looks.settle === "small" ? "small" : null);
+const PAIR_CLASSES = ["saw-half-l", "saw-half-r", "saw-small"] as const;
+
+/**
+ * The board draws his two split pawns as halves (or small) wherever they go: each of chessground's piece elements
+ * standing on a half's square (one of his pawns) gets its class (clipped to that half, its cut face shaded; or drawn
+ * small: styles.css), kept in step with every change chessground makes before the browser paints (a
+ * MutationObserver's callback runs first).
+ */
+function HalfPawns({ halves, color, orientation, on, look }: { halves: SplitPawn["halves"]; color: "w" | "b"; orientation: Orientation; on: boolean; look: "halves" | "small" }) {
   const ref = useRef<HTMLSpanElement>(null);
   const want = useRef(new Map<string, string>());
-  want.current = on ? new Map(halves.map((h) => [h.square, halfClass(h.side, orientation)])) : new Map();
+  want.current = on ? new Map(halves.map((h) => [h.square, look === "small" ? "saw-small" : halfClass(h.side, orientation)])) : new Map();
   const apply = useRef<() => void>(() => {});
   useLayoutEffect(() => {
     let stop = () => {};
@@ -137,7 +147,7 @@ function HalfPawns({ halves, color, orientation, on }: { halves: SplitPawn["halv
           if (el.tagName !== "PIECE" || el.classList.contains("fading")) continue;
           const node = el as Element & { cgKey?: string; cgPiece?: string };
           const cls = node.cgPiece === pawn && node.cgKey ? want.current.get(node.cgKey) : undefined;
-          for (const c of ["saw-half-l", "saw-half-r"]) if (el.classList.contains(c) !== (c === cls)) el.classList.toggle(c, c === cls);
+          for (const c of PAIR_CLASSES) if (el.classList.contains(c) !== (c === cls)) el.classList.toggle(c, c === cls);
         }
       };
       apply.current();
@@ -145,7 +155,7 @@ function HalfPawns({ halves, color, orientation, on }: { halves: SplitPawn["halv
       watch.observe(wrap, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] });
       stop = () => {
         watch.disconnect();
-        for (const el of Array.from(wrap.querySelectorAll("piece.saw-half-l, piece.saw-half-r"))) el.classList.remove("saw-half-l", "saw-half-r");
+        for (const el of Array.from(wrap.querySelectorAll("piece.saw-half-l, piece.saw-half-r, piece.saw-small"))) el.classList.remove(...PAIR_CLASSES);
       };
     };
     start();
@@ -155,20 +165,38 @@ function HalfPawns({ halves, color, orientation, on }: { halves: SplitPawn["halv
       stop();
     };
   }, [color]);
-  useLayoutEffect(() => apply.current(), [on, orientation, halves.map((h) => h.square + h.side).join()]);
+  useLayoutEffect(() => apply.current(), [on, orientation, look, halves.map((h) => h.square + h.side).join()]);
   return <span ref={ref} class="sw-halves" hidden data-halves={on ? halves.map((h) => `${h.square}:${h.side}`).join(" ") : ""} />;
 }
 
 // ---------------- The split ----------------
 
 /**
+ * The morph (SAWYER_LOOKS.split "morph"), beat by beat in ms after the crack (SPLIT.crackAt), all inside the moment:
+ *   0       the pawn squashes, wide and low, its feet on its square
+ *   pinch   it pinches in the middle into two smaller whole pawns side by side (as wide as it was, overlapping)
+ *   apart   they've popped apart, each MINI of a pawn
+ *   land    they've hopped onto their squares (one stays, the other goes beside it)
+ *   grown   eased up to a pawn's size (settle "grow"); with settle "small" they stay small from `land`
+ * The board's own pawns show from then (`splitSettledAt`); the moment draws its pair, exactly over them, for `overlap`
+ * more (chessground draws a new position a frame later, and a frame with neither is a blink).
+ */
+export const MORPH = { pinch: 110, apart: 330, land: 640, grown: 960, overlap: 60 } as const;
+/** The morph's small pawns, against a pawn (about half). */
+export const MINI = 0.55;
+
+/** When both split pawns are on the board again, ms into the moment (the moment draws them until then). */
+export const splitSettledAt = (looks: typeof SAWYER_LOOKS = SAWYER_LOOKS): number =>
+  looks.split === "halves" ? SPLIT.settledAt : SPLIT.crackAt + (looks.settle === "small" ? MORPH.land : MORPH.grown);
+
+/**
  * The board during the split (its moment `m`, or the boss's move before it): the new half isn't there until the pawn
  * cracks, and from the crack until they've settled both are in the air (the moment draws them). Null: as it is.
  */
-export function splitFen(split: SplitPawn | null | undefined, m: Pick<Moment, "kind" | "at"> | null, now: number, fen: string): string | null {
+export function splitFen(split: SplitPawn | null | undefined, m: Pick<Moment, "kind" | "at"> | null, now: number, fen: string, looks: typeof SAWYER_LOOKS = SAWYER_LOOKS): string | null {
   if (!split?.square || !split.pawn || !m || m.kind !== "split") return null;
   const t = now - m.at;
-  if (t >= SPLIT.settledAt) return null;
+  if (t >= splitSettledAt(looks)) return null;
   const f = withoutPiece(fen, split.square);
   return t >= PAWN_UP ? withoutPiece(f, split.pawn) : f;
 }
@@ -176,9 +204,72 @@ export function splitFen(split: SplitPawn | null | undefined, m: Pick<Moment, "k
 const PAWN_UP = SPLIT.landAt - 100;
 
 /** The board shouldn't animate its own changes while the moment draws the pawn and its halves. */
-export const splitStill = (m: Pick<Moment, "kind" | "at"> | null, now: number): boolean => !!m && m.kind === "split" && now >= m.at + PAWN_UP - 80 && now < m.at + SPLIT.settledAt + 300;
+export const splitStill = (m: Pick<Moment, "kind" | "at"> | null, now: number, looks: typeof SAWYER_LOOKS = SAWYER_LOOKS): boolean =>
+  !!m && m.kind === "split" && now >= m.at + PAWN_UP - 80 && now < m.at + splitSettledAt(looks) + 300;
 
 const PIECE_COLOUR = { w: "white", b: "black" } as const;
+
+/**
+ * A pawn the split's moment draws over the board: which one (`id`), its square, its middle (% of the board), its tilt,
+ * scale and class, and (the morph's) `rim` and `shade`, 0 to 1: a light rim (so a black pawn reads over him) and its
+ * shadow while it's up; both 0, drawn exactly as the board draws a pawn.
+ */
+export type AirPawn = { id: string; sq: string; at: Pt; rot: number; sx: number; sy: number; opacity: number; cls: string; rim?: number; shade?: number };
+
+/**
+ * The morph's pawns at `u` ms after the crack: the pawn at `pawn` squashing, then two small whole pawns, one hopping
+ * back onto `pawn`'s square, the other onto `beside`, then growing to a pawn's size (`grow`) or staying small. Middles
+ * in % of the board; each scales from its feet. Settled (as the board draws them) for MORPH.overlap, then empty.
+ */
+export function morphPawns(u: number, pawn: { sq: string; at: Pt }, beside: { sq: string; at: Pt }, grow = SAWYER_LOOKS.settle === "grow"): AirPawn[] {
+  const end = grow ? MORPH.grown : MORPH.land;
+  if (u < 0 || u >= end + MORPH.overlap) return [];
+  // Its shadow (as the sawn pawn had) until they settle, fading as they grow (kept small: as they come down); the rim
+  // comes up as it squashes and goes with the shadow.
+  const shade = clamp01(grow ? 1 - ease((u - MORPH.land) / (MORPH.grown - MORPH.land)) : 1 - ease((u - MORPH.land + 150) / 150));
+  const rim = shade * (u < MORPH.pinch ? ease(u / MORPH.pinch) : 1);
+  const p = (id: string, sq: string, at: Pt, sx: number, sy: number, rot = 0, opacity = 1): AirPawn => ({ id, sq, at, rot, sx, sy, opacity, cls: "", rim, shade });
+  // The side the new pawn goes to, on screen; how far apart the pair start (overlapping, as wide as the squashed pawn)
+  // and have popped (% of the board: a square is 12.5).
+  const d = beside.at.x >= pawn.at.x ? 1 : -1;
+  const [near, far] = [2, 3.6];
+  if (u < MORPH.pinch) {
+    const k = ease(u / MORPH.pinch);
+    return [p("whole", pawn.sq, pawn.at, 1 + 0.35 * k, 1 - 0.22 * k)];
+  }
+  if (u < MORPH.apart) {
+    const v = (u - MORPH.pinch) / (MORPH.apart - MORPH.pinch);
+    const e = 1 - (1 - v) * (1 - v);
+    const o = near + (far - near) * e;
+    const sx = 0.8 + (MINI - 0.8) * e;
+    const sy = (0.78 + (MINI - 0.78) * e) * (1 + 0.16 * Math.sin(Math.PI * v));
+    const lift = 1.2 * Math.sin(Math.PI * v);
+    const tilt = 6 * d * Math.sin(Math.PI * v);
+    const pair = [p("stay", pawn.sq, { x: pawn.at.x - d * o, y: pawn.at.y - lift }, sx, sy, -tilt), p("new", beside.sq, { x: pawn.at.x + d * o, y: pawn.at.y - lift }, sx, sy, tilt)];
+    // The squashed pawn under the pair, fading as they take its shape.
+    const fade = clamp01((u - MORPH.pinch) / 70);
+    return fade < 1 ? [p("whole", pawn.sq, pawn.at, 1.35, 0.78, 0, 1 - fade), ...pair] : pair;
+  }
+  if (u < MORPH.land) {
+    const w = ease((u - MORPH.apart) / (MORPH.land - MORPH.apart));
+    const hop = Math.sin(Math.PI * w);
+    const from = (k: number): Pt => ({ x: pawn.at.x + k * d * far, y: pawn.at.y });
+    const go = (a: Pt, b: Pt, h: number): Pt => ({ x: a.x + (b.x - a.x) * w, y: a.y + (b.y - a.y) * w - h * hop });
+    return [p("stay", pawn.sq, go(from(-1), pawn.at, 2.5), MINI, MINI, -5 * d * hop), p("new", beside.sq, go(from(1), beside.at, 5), MINI, MINI, 10 * d * hop)];
+  }
+  // Settling: each eases up to a pawn's size on its square (or stays small), a little squash as it lands.
+  const g = grow ? clamp01((u - MORPH.land) / (MORPH.grown - MORPH.land)) : 0;
+  const s = MINI + (1 - MINI) * ease(g);
+  const squash = grow ? 0.08 * Math.sin(Math.PI * Math.min(1, g * 3)) : 0;
+  return [p("stay", pawn.sq, pawn.at, s * (1 + squash), s * (1 - squash)), p("new", beside.sq, beside.at, s * (1 + squash), s * (1 - squash))];
+}
+
+/** The morph's rim and shadow (0 to 1 each): none at 0, as the board draws a pawn. */
+const rimFilter = (rim = 0, shade = 0): string => {
+  const r = Math.round(clamp01(rim) * 100) / 100;
+  const s = Math.round(clamp01(shade) * 35) / 100;
+  return [r > 0 ? `drop-shadow(0 0 0.5cqw rgba(255, 244, 214, ${r}))` : "", s > 0 ? `drop-shadow(0 0.6cqw 0 rgba(0, 0, 0, ${s}))` : ""].filter(Boolean).join(" ") || "none";
+};
 
 function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps) {
   const split = boss.powers?.split;
@@ -186,6 +277,10 @@ function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const mine = boss.crowdSide === "w" ? "b" : "w";
   const pawn = centreOf(split.pawn, orientation);
   const half = centreOf(split.square, orientation);
+  const morph = SAWYER_LOOKS.split === "morph";
+  const settledAt = splitSettledAt();
+  // (The morph draws its pair over the board's own for a moment more: no frame with neither.)
+  const drawnUntil = morph ? settledAt + MORPH.overlap : settledAt;
   // His saw's tip bites the pawn a little below its middle; near the board's right edge he faces right, from its left.
   const flip = pawn.x > 70;
   const spot = feetFor({ x: pawn.x, y: pawn.y + 2.5 }, flip);
@@ -194,29 +289,40 @@ function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const [sq0, sq1] = [split.pawn, split.square];
   const sideOf = (sq: string): "a" | "h" => split.halves.find((h) => h.square === sq)?.side ?? ((sq === sq1) === sq1 < sq0 ? "a" : "h");
   const apart = clamp01((t - SPLIT.crackAt) / (SPLIT.settledAt - SPLIT.crackAt));
-  // The pawn over him as he saws it (shaking as the blade bites), then its two halves in the air, from the crack until
-  // they've settled: one stays (a little hop apart), the other slides over.
+  // The pawn over him as he saws it (shaking as the blade bites), then from the crack until they've settled: the morph
+  // (it squashes into two small whole pawns that hop onto their squares and grow), or its two halves in the air (one
+  // stays, a little hop apart, the other slides over).
   const shake = t >= SPLIT.cutAt && t < SPLIT.crackAt ? (Math.floor(t / 60) % 2 ? 0.5 : -0.5) : 0;
-  const whole = t >= PAWN_UP && t < SPLIT.crackAt ? [{ sq: split.pawn, at: { x: pawn.x + shake, y: pawn.y }, rot: 0, cls: "" }] : [];
-  const halves =
-    t >= SPLIT.crackAt && t < SPLIT.settledAt
-      ? [
-          { sq: split.pawn, at: { x: pawn.x + (pawn.x - half.x) * 0.06 * Math.sin(Math.PI * apart), y: pawn.y - 4 * Math.sin(Math.PI * apart) }, rot: (half.x > pawn.x ? -8 : 8) * Math.sin(Math.PI * apart), cls: halfClass(sideOf(split.pawn), orientation) },
-          { sq: split.square, at: { x: pawn.x + (half.x - pawn.x) * ease(apart), y: pawn.y - 7 * Math.sin(Math.PI * apart) }, rot: (half.x > pawn.x ? 12 : -12) * Math.sin(Math.PI * apart), cls: halfClass(sideOf(split.square), orientation) },
-        ]
-      : whole;
+  const whole: AirPawn[] = t >= PAWN_UP && t < SPLIT.crackAt ? [{ id: "whole", sq: split.pawn, at: { x: pawn.x + shake, y: pawn.y }, rot: 0, sx: 1, sy: 1, opacity: 1, cls: "" }] : [];
+  const air: AirPawn[] =
+    t < SPLIT.crackAt || t >= drawnUntil
+      ? whole
+      : morph
+        ? morphPawns(t - SPLIT.crackAt, { sq: split.pawn, at: pawn }, { sq: split.square, at: half })
+        : [
+            { id: "stay", sq: split.pawn, at: { x: pawn.x + (pawn.x - half.x) * 0.06 * Math.sin(Math.PI * apart), y: pawn.y - 4 * Math.sin(Math.PI * apart) }, rot: (half.x > pawn.x ? -8 : 8) * Math.sin(Math.PI * apart), sx: 1, sy: 1, opacity: 1, cls: halfClass(sideOf(split.pawn), orientation) },
+            { id: "new", sq: split.square, at: { x: pawn.x + (half.x - pawn.x) * ease(apart), y: pawn.y - 7 * Math.sin(Math.PI * apart) }, rot: (half.x > pawn.x ? 12 : -12) * Math.sin(Math.PI * apart), sx: 1, sy: 1, opacity: 1, cls: halfClass(sideOf(split.square), orientation) },
+          ];
   const crackAt = moment.at + SPLIT.crackAt;
   const crackMs = animLength(EFFECTS.sawCrack.ch.anims.crack!);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
   return (
     <div class="power-moment pm-split">
       {t < 1300 && banner("SPLIT PAWN!", "Two for one", "saw")}
-      <div class="cg-wrap sw-layer" aria-hidden="true" data-split={t < SPLIT.crackAt ? "saw" : t < SPLIT.settledAt ? "apart" : "settled"}>
+      <div class="cg-wrap sw-layer" aria-hidden="true" data-look={SAWYER_LOOKS.split} data-split={t < SPLIT.crackAt ? "saw" : t < settledAt ? "apart" : "settled"}>
         {at?.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
-        {halves.map((h) => (
+        {air.map((h) => (
           <piece
-            key={`half-${h.sq}`}
-            class={`sw-half ${PIECE_COLOUR[mine]} pawn ${h.cls}`}
-            style={{ left: `${h.at.x - 6.25}%`, top: `${h.at.y - 6.25}%`, rotate: `${Math.round(h.rot)}deg` }}
+            key={`half-${h.id}`}
+            class={`${morph && t >= SPLIT.crackAt ? "sw-mini" : "sw-half"} ${PIECE_COLOUR[mine]} pawn ${h.cls}`}
+            style={{
+              left: `${h.at.x - 6.25}%`,
+              top: `${h.at.y - 6.25}%`,
+              rotate: `${Math.round(h.rot)}deg`,
+              ...(h.sx !== 1 || h.sy !== 1 ? { scale: `${r2(h.sx)} ${r2(h.sy)}` } : {}),
+              ...(h.opacity < 1 ? { opacity: String(r2(h.opacity)) } : {}),
+              ...(h.rim !== undefined ? { filter: rimFilter(h.rim, h.shade) } : {}),
+            }}
             data-square={h.sq}
           />
         ))}
@@ -403,13 +509,14 @@ export const SAWYER_UI = {
     cut: { order: 0, kit: "power", dock: "Saw cut!", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + SAW_CUT.cutAt : undefined), view: cutMoment },
     boardsaw: { order: 2, kit: "ultimate", dock: "Board saw!", view: boardSawMoment },
   },
-  // Under the pieces: the cut's groove and tape, the gap down the middle. Over them: his split pawns drawn as halves
-  // (once they've landed), and markers for tests and readers.
+  // Under the pieces: the cut's groove and tape, the gap down the middle. Over them: his split pawns drawn as halves or
+  // small (once they've landed; as ordinary pawns with the morph's "grow"), and markers for tests and readers.
   board: ({ boss, p, orientation, now, appearAt, moments }) => {
     const cuts = cutItems(boss, orientation, now, appearAt);
     const gap = gapState(boss, moments, now);
     const splitting = moments.find((m) => m.kind === "split");
-    const halvesOn = !splitting || now >= splitting.at + SPLIT.settledAt;
+    const halvesOn = !splitting || now >= splitting.at + splitSettledAt();
+    const look = pairLook();
     const mine = boss.crowdSide === "w" ? "b" : "w";
     return {
       under: (
@@ -425,7 +532,7 @@ export const SAWYER_UI = {
       over: (
         <>
           {p.cut && <span class="sw-cut" data-cut={`${p.cut.a}-${p.cut.b}`} data-stage={Math.max(0, Math.min(2, p.turn - p.cut.at))} />}
-          {(p.split?.halves.length ?? 0) > 0 && <HalfPawns halves={p.split!.halves} color={mine} orientation={orientation} on={halvesOn} />}
+          {look && (p.split?.halves.length ?? 0) > 0 && <HalfPawns halves={p.split!.halves} color={mine} orientation={orientation} on={halvesOn} look={look} />}
         </>
       ),
     };

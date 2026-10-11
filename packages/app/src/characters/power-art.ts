@@ -106,8 +106,9 @@
  *                               board jolts) and `gap` (loop) while it lasts, `close` as the halves rejoin.
  *     more:
  *       split      "sawDown"    Played ON THE BOARD after his first move (SPLIT): a `leap` onto the pawn, the saw driven
- *                               into it (`cut`), `sawCrack` on its square as it cracks, the two halves coming apart (the
- *                               board's pieces, clipped to halves), a `leap` back. Lines: `kit.lines.split`.
+ *                               into it (`cut`), `sawCrack` on its square as it cracks, the pawn morphing into two
+ *                               small whole pawns that land and grow (SAWYER_LOOKS; "halves": the two halves coming
+ *                               apart, the board's pieces clipped to halves), a `leap` back. Lines: `kit.lines.split`.
  *       leap       "leap"       A hop on or off the board: off the ground at LEAP.upAt, down at LEAP.landAt (`hop`).
  *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER, SPEECH, isPlayable } from "@chessroyale/core";
+import { BOSS_ROSTER, SAWYER_LOOKS, SPEECH, isPlayable } from "@chessroyale/core";
 import { BOARD_SAW, SAW_CUT, SPLIT, START_FEN, pieceAt, withPiece } from "@chessroyale/chess";
 import { CUT, LEAP, SAWYER, SAWYER_LINES } from "../src/characters/sawyer.ts";
 import { SAWYER_SOUNDS, sawyerSound } from "../src/characters/sawyer-sounds.ts";
@@ -8,7 +8,7 @@ import { CUT_SIDES, GAP_W } from "../src/characters/effects.ts";
 import { EFFECTS, POWER_MOMENTS, animLength, cueAt } from "../src/characters/power-art.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { frameKeys } from "../src/characters/sprite.ts";
-import { cutSides, halfClass, splitFen, splitStill } from "../src/components/Sawyer.tsx";
+import { MINI, MORPH, cutSides, halfClass, morphPawns, pairLook, splitFen, splitSettledAt, splitStill } from "../src/components/Sawyer.tsx";
 import { holdMs } from "../src/speech.tsx";
 
 const top = (keys: (string | null)[][]) => keys.findIndex((r) => r.some(Boolean));
@@ -122,12 +122,80 @@ describe("his moments", () => {
     const air = splitFen(split, m, m.at + SPLIT.crackAt + 10, after)!;
     expect(pieceAt(air, "d5")).toBeNull();
     expect(pieceAt(air, "e5")).toBeNull();
-    expect(splitFen(split, m, m.at + SPLIT.settledAt, after)).toBeNull();
+    expect(pieceAt(splitFen(split, m, m.at + splitSettledAt() - 1, after)!, "d5")).toBeNull();
+    expect(splitFen(split, m, m.at + splitSettledAt(), after)).toBeNull();
     expect(splitFen({ ...split, square: null }, m, m.at, after)).toBeNull();
     // The board doesn't animate the crack or the landing; it does the move before them.
     expect(splitStill(m, m.at - 500)).toBe(false);
     expect(splitStill(m, m.at + SPLIT.crackAt)).toBe(true);
-    expect(splitStill(m, m.at + SPLIT.settledAt + 400)).toBe(false);
+    expect(splitStill(m, m.at + splitSettledAt() + 400)).toBe(false);
+    // The first look (halves) lands at SPLIT.settledAt.
+    const halves = { split: "halves", settle: "grow" } as const;
+    expect(splitSettledAt(halves)).toBe(SPLIT.settledAt);
+    expect(splitFen(split, m, m.at + SPLIT.settledAt, after, halves)).toBeNull();
+  });
+
+  it("the split looks like the switch says, the morph by default; every look settles inside the moment", () => {
+    expect(SAWYER_LOOKS).toEqual({ split: "morph", settle: "grow" });
+    expect(pairLook()).toBeNull();
+    expect(pairLook({ split: "morph", settle: "small" })).toBe("small");
+    expect(pairLook({ split: "halves", settle: "grow" })).toBe("halves");
+    for (const split of ["morph", "halves"] as const)
+      for (const settle of ["grow", "small"] as const) {
+        expect(splitSettledAt({ split, settle })).toBeGreaterThan(SPLIT.crackAt);
+        expect(splitSettledAt({ split, settle })).toBeLessThanOrEqual(SPLIT.total);
+      }
+  });
+
+  it("the morph: the pawn squashes, pinches into two small whole pawns, they hop onto their squares and grow to a pawn's size", () => {
+    const pawn = { sq: "e5", at: { x: 56.25, y: 43.75 } };
+    const beside = { sq: "d5", at: { x: 43.75, y: 43.75 } };
+    // Squashing: one pawn, on its square, wider and lower.
+    const squash = morphPawns(MORPH.pinch - 1, pawn, beside);
+    expect(squash).toHaveLength(1);
+    expect(squash[0]!.at).toEqual(pawn.at);
+    expect(squash[0]!.sx).toBeGreaterThan(1.3);
+    expect(squash[0]!.sy).toBeLessThan(0.8);
+    // Popped apart: two small whole pawns (never clipped to halves), the new one on its square's side.
+    const popped = morphPawns(MORPH.apart - 1, pawn, beside);
+    expect(popped.map((p) => p.sq)).toEqual(["e5", "d5"]);
+    for (const p of popped) {
+      expect(p.cls).toBe("");
+      expect(p.sx).toBeCloseTo(MINI, 1);
+      expect(Math.abs(p.at.x - pawn.at.x)).toBeLessThan(6.25);
+    }
+    expect(popped[1]!.at.x).toBeLessThan(popped[0]!.at.x);
+    // Landed, small, on their squares; grown to a pawn's size by the end, exactly where the board's pawns stand.
+    const landed = morphPawns(MORPH.land, pawn, beside);
+    expect(landed.map((p) => [p.sq, p.at])).toEqual([["e5", pawn.at], ["d5", beside.at]]);
+    for (const p of landed) expect(p.sx).toBeCloseTo(MINI, 6);
+    for (const p of landed) expect(p.rim).toBe(1);
+    // Grown, as the board draws them (no rim, no shadow), and drawn a moment more over the board's own (no blink).
+    for (const u of [MORPH.grown, MORPH.grown + MORPH.overlap - 1]) {
+      const grown = morphPawns(u, pawn, beside);
+      expect(grown.map((p) => [p.sq, p.at, p.sx, p.sy, p.rim, p.rot])).toEqual([["e5", pawn.at, 1, 1, 0, 0], ["d5", beside.at, 1, 1, 0, 0]]);
+    }
+    expect(morphPawns(MORPH.grown + MORPH.overlap, pawn, beside)).toEqual([]);
+    expect(splitSettledAt() + MORPH.overlap).toBeLessThanOrEqual(SPLIT.total);
+    // Kept small: settled small as they land.
+    for (const p of morphPawns(MORPH.land, pawn, beside, false)) expect([p.sx, p.rim]).toEqual([MINI, 0]);
+    expect(morphPawns(MORPH.land + MORPH.overlap, pawn, beside, false)).toEqual([]);
+    // Never vanishing, never more than a squash's width, a frame (16 ms) never jumping (no pop), all the way through.
+    let prev: ReturnType<typeof morphPawns> = [];
+    for (let u = MORPH.pinch; u < MORPH.grown; u += 16) {
+      const now = morphPawns(u, pawn, beside);
+      for (const p of now) {
+        expect(p.sx).toBeGreaterThan(0.5);
+        expect(p.sx).toBeLessThan(1.4);
+        expect(p.sy).toBeGreaterThan(0.5);
+        const was = prev.find((q) => q.id === p.id);
+        if (was) {
+          expect(Math.abs(p.sx - was.sx), `${p.id} at ${u}`).toBeLessThan(0.1);
+          expect(Math.hypot(p.at.x - was.at.x, p.at.y - was.at.y), `${p.id} at ${u}`).toBeLessThan(1.5);
+        }
+      }
+      prev = now;
+    }
   });
 
   it("each half shows the side away from its partner, whichever way up the board is", () => {

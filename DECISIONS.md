@@ -929,6 +929,11 @@ CSS puts them off the squares (files 24 px to the right across the board's full 
   it names; Squads' Relay test checks your board and next turn's (the other way up), and a Crowd "everyone moves" test
   checks both ways up as the board turns to the side to move. On a phone and a computer.
 
+### Sawyer's split: a morph, not halves (Oct 11, 2026)
+
+- **Eric asked for it:** the saw goes through the pawn, which squashes and pinches into two smaller whole pawns (about half size) that hop to their squares, all in the same 3.6 s moment. The old cut-in-halves look stays behind one switch, `SAWYER_LOOKS.split` (`"morph"` | `"halves"`, `packages/core/src/settings.ts`); setting `"halves"` brings back the old animation and the half-drawn pair.
+- **My call:** the two small pawns grow back to a pawn's size as they land, and the board then draws them as ordinary pawns (no halves), because the rules treat them as ordinary pawns. If Eric wants them kept small, set `SAWYER_LOOKS.settle` to `"small"`: they stay small on every board.
+
 ### Beta Crate · Series 001, batch 1: the crate, the old shop hats, a Winter scarf (Oct 11, 2026)
 
 Eric asked for a second crate series built from themes (secret agent and pirate split into parts of different rarity,
