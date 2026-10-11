@@ -12,7 +12,7 @@
  *   --play                    the people play their own duties (the engine's best, or a random legal move); else they
  *                             sit idle and a bot takes each seat after its third miss (a full bot lobby)
  *   --device                  each person's client answers bot work with Node's Stockfish, as a phone or computer would
- *   --nodes N                 the device engine's nodes (default 250000, the app's)
+ *   --nodes N                 the device engine's nodes for bot work (default: what each job asks, SQUADS_LOBBY.botWork.nodes)
  *   --pool NAME               the queue's pool (default: a fresh one, so runs never meet)
  *   --out FILE                also write the report (Markdown) there
  *   --timeout S               give up after this long (default 7200: a bot lobby can run over an hour)
@@ -46,9 +46,10 @@ const engines: TopEngine[] = [];
 if (arg("device")) {
   for (let i = 0; i < people; i++) engines.push(await createNodeEngine({ nodes: Number(arg("nodes", String(DEFAULT_SETTINGS.engineNodes))), hashMb: 16 }));
 }
+const nodes = arg("nodes") ? Number(arg("nodes")) : undefined;
 
 const cookies = await Promise.all(Array.from({ length: people }, () => guestCookie(base)));
-const clients = Array.from({ length: people }, (_, i) => new SquadsClient({ base, name: `Head ${i + 1}`, play: !!arg("play"), engine: engines[i], cookie: cookies[i], nps: 900_000 }));
+const clients = Array.from({ length: people }, (_, i) => new SquadsClient({ base, name: `Head ${i + 1}`, play: !!arg("play"), engine: engines[i], cookie: cookies[i], nps: 900_000, ...(nodes ? { nodes } : {}) }));
 
 let code: string;
 if (mode === "test") {

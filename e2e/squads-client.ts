@@ -9,6 +9,7 @@ import type { MoveScore } from "@chessroyale/chess";
 
 export interface TopEngine {
   topMoves(fen: string, n: number): Promise<MoveScore[]>;
+  topMovesAt?(fen: string, n: number, nodes: number): Promise<MoveScore[]>;
 }
 
 export interface ClientOptions {
@@ -20,6 +21,8 @@ export interface ClientOptions {
   /** A device: answers bot work with this engine. */
   engine?: TopEngine;
   nps?: number;
+  /** Search bot work at this many nodes, whatever the job asks (an experiment); else the job's. */
+  nodes?: number;
   /** The session cookie (a guest account from /api/me), so results and rewards are recorded. */
   cookie?: string;
   log?: (line: string) => void;
@@ -173,10 +176,12 @@ export class SquadsClient {
     }
   }
 
-  private async answer(job: { id: string; fen: string; n: number }) {
-    if (!this.o.engine) return;
+  private async answer(job: { id: string; fen: string; n: number; nodes?: number }) {
+    const engine = this.o.engine;
+    if (!engine) return;
     this.stats.botWork++;
-    const top = await this.o.engine.topMoves(job.fen, job.n).catch(() => null);
+    const nodes = this.o.nodes ?? job.nodes;
+    const top = await (nodes && engine.topMovesAt ? engine.topMovesAt(job.fen, job.n, nodes) : engine.topMoves(job.fen, job.n)).catch(() => null);
     if (top) this.send({ t: "botTop", id: job.id, top: top.map((m) => ({ move: m.move, expected: m.expected, ...(m.mate !== undefined ? { mate: m.mate } : {}) })) });
   }
 

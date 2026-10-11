@@ -499,6 +499,8 @@ describe("squads lobby: bots' engine work on players' devices", () => {
     L.runUntil(() => jobs(ids[0]!).some((j) => outside.some((m) => j.id.startsWith(`${m.key}/`))), 10 * 60_000, "a job outside");
     const job = jobs(ids[0]!).find((j) => outside.some((m) => j.id.startsWith(`${m.key}/`)))!;
     expect(jobs(ids[1]!).some((x) => x.id === job.id)).toBe(true);
+    // Every device searches the same: the job says how deep.
+    expect(job).toMatchObject({ n: SQUADS.bots.candidates, nodes: SQUADS_LOBBY.botWork.nodes });
     // The phone isn't asked while two computers can do it.
     expect(jobs(ids[2]!).some((x) => x.id === job.id)).toBe(false);
     const top = fallbackTop(job.fen, job.n);

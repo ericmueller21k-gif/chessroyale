@@ -861,7 +861,7 @@ export class SquadsCore {
         boards.add(d.board);
       }
     }
-    const jobs = new Map<string, { id: string; fen: string; n: number }[]>();
+    const jobs = new Map<string, { id: string; fen: string; n: number; nodes: number }[]>();
     for (const b of boards) this.requestWork(lm, half, b, jobs);
     for (const [device, list] of jobs) this.send(device, { t: "botWork", jobs: list });
     this.touch(lm);
@@ -1247,7 +1247,7 @@ export class SquadsCore {
       .slice(0, n);
   }
 
-  private requestWork(lm: LiveMatch, half: HalfRecord, board: number, out: Map<string, { id: string; fen: string; n: number }[]>) {
+  private requestWork(lm: LiveMatch, half: HalfRecord, board: number, out: Map<string, { id: string; fen: string; n: number; nodes: number }[]>) {
     const fen = lm.m.boards[board]!.fen;
     const id = `${lm.key}/${half.seq}/${board}`;
     const now = this.io.now();
@@ -1266,7 +1266,7 @@ export class SquadsCore {
     half.work[board] = { id, fen, devices, sentAt: now, answers: {}, ...(queued ? { queued: true as const } : {}) };
     for (const d of devices) {
       this.r.devices[d]!.jobs++;
-      out.set(d, [...(out.get(d) ?? []), { id, fen, n: this.s.bots.candidates }]);
+      out.set(d, [...(out.get(d) ?? []), { id, fen, n: this.s.bots.candidates, nodes: SQUADS_LOBBY.botWork.nodes }]);
     }
   }
 
@@ -1289,7 +1289,7 @@ export class SquadsCore {
       return half.startedAt + (times.length ? Math.min(...times) : 0);
     };
     waiting.sort((a, b) => need(a) - need(b));
-    const out = new Map<string, { id: string; fen: string; n: number }[]>();
+    const out = new Map<string, { id: string; fen: string; n: number; nodes: number }[]>();
     let changed = false;
     for (const { lm, job } of waiting) {
       const devices = this.pickDevices(lm, SQUADS_LOBBY.botWork.perJob);
@@ -1299,7 +1299,7 @@ export class SquadsCore {
       job.sentAt = this.io.now();
       for (const d of devices) {
         this.r.devices[d]!.jobs++;
-        out.set(d, [...(out.get(d) ?? []), { id: job.id, fen: job.fen, n: this.s.bots.candidates }]);
+        out.set(d, [...(out.get(d) ?? []), { id: job.id, fen: job.fen, n: this.s.bots.candidates, nodes: SQUADS_LOBBY.botWork.nodes }]);
       }
       this.touch(lm);
       changed = true;
@@ -1390,7 +1390,7 @@ export class SquadsCore {
       job.referee = referee;
       job.refereeAt = now;
       this.r.devices[referee]!.jobs++;
-      this.send(referee, { t: "botWork", jobs: [{ id: job.id, fen: job.fen, n: this.s.bots.candidates }] });
+      this.send(referee, { t: "botWork", jobs: [{ id: job.id, fen: job.fen, n: this.s.bots.candidates, nodes: SQUADS_LOBBY.botWork.nodes }] });
       return false;
     }
     if (valid.length === 1) {

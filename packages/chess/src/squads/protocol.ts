@@ -231,7 +231,7 @@ export type SquadsClientMessage =
   | { t: "armageddon"; key: string; colour: Colour }
   /** This device's engine speed (nodes per second), from its speed check on joining: it can take bot work. */
   | { t: "speed"; nps: number }
-  /** This device's answer to one bot-work job: the bot engine's top moves (topMoves(fen, n)), best first. */
+  /** This device's answer to one bot-work job: the bot engine's top moves (topMovesAt(fen, n, nodes)), best first. */
   | { t: "botTop"; id: string; top: MoveScore[] }
   /** Take your seat back from the bot playing it (a repeat no-show's seat), from the next half. */
   | { t: "reclaim" }
@@ -282,8 +282,11 @@ export type SquadsServerMessage = { now: number } & (
   | { t: "placed"; squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean }
   /** Every placement is decided (by squad id). */
   | { t: "results"; placements: Record<number, SquadsPlacement> }
-  /** Bot work for this device: the bot engine's top `n` moves in each position. Answer each with "botTop". */
-  | { t: "botWork"; jobs: { id: string; fen: string; n: number }[] }
+  /**
+   * Bot work for this device: the bot engine's top `n` moves in each position, searched at `nodes` (topMovesAt; every
+   * device the same, so two answers can be compared exactly). Answer each with "botTop".
+   */
+  | { t: "botWork"; jobs: { id: string; fen: string; n: number; nodes: number }[] }
   /** You left (the socket closes next). */
   | { t: "left" }
   /** Can't join or play on. `ended`: the lobby is over or gone. `banned`: banned for fair play. */

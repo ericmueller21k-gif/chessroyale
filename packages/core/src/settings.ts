@@ -971,6 +971,8 @@ export const SQUADS_LOBBY = {
    * buried; with every device busy, a job goes to fewer devices, or none.
    */
   botWork: {
+    /** The bot engine's search a job asks for (nodes), the same on every device. */
+    nodes: 250_000,
     perJob: 2,
     maxInFlight: { computer: 4, phone: 2 },
     graceMs: 400,
