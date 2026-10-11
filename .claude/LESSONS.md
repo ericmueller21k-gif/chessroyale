@@ -156,3 +156,7 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     still await `topMovesFor` inside an evaluate: move them to `engineTop` when they're next touched.
   - Something on screen for a moment is checked by watching for it from before it can appear (`watchFor`), not by
     looking for it after a wait for something else.
+
+## Explaining the game
+
+- **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.

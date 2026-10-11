@@ -1095,3 +1095,35 @@ Three visual fixes Eric asked for from a screenshot of a Hollow battle on a comp
   flashing), so a bulb keeps its colour through every frame. The strip's three bulbs and the lashes take the first
   three bulbs' colours, always three different ones. Lights out still puts a third of the strand out at a time (bulbs
   2, 5, 8 first), now by position rather than colour.
+
+### The FAQ: "How HunChess works", in Settings (Oct 11, 2026)
+
+Eric: "I want to put in the app a full explanation of how things work… call it the FAQ… maybe have a table of
+contents. Put it in the settings." With the maths of how a strong boss switches from Maia to Stockfish first, and how
+the God King's save comes into play. The calls:
+
+- **Where:** Settings → HOW TO PLAY, a row "📖 FAQ · How it works" above the short rules, opening its own page at
+  `/faq` (back goes to Settings; the computer's side menu keeps Settings lit). A link to a heading works too
+  (`/faq#faq-handover`).
+- **One file of words, every number from settings** (`packages/app/src/faq/content.ts`): each section is a function of
+  `FaqSources` (the settings objects: `DEFAULT_SETTINGS`, `BOSS_POWERS`, `BOSS_BRAIN`, `BOSS_ROSTER`, `CRATES`…) that
+  returns its text in a small Markdown-like format (`faq/markdown.ts`: headings with anchors, lists, tables, formula
+  lines, notes, links). No Markdown library (nothing new to download for a page few open). Worked examples are worked
+  out by the game's own functions (`scoreGroup`, `maiaRatingFor`, `bossStrength`, `lastStandBar`, `kingCharges`), so
+  they can't drift; a test builds the FAQ from changed settings and checks the words follow. Two numbers that lived as
+  literals in code are now named so the FAQ can quote them: `BRILLIANT` (scoring.ts) and `ENGINE_MIN_ELO` (boss.ts,
+  used by uci.ts). The boss's top-8 search is a literal in `bossMoveFrom`, so the FAQ says "its best moves" instead.
+- **The contents:** every section, plus the sub-headings of the three Eric cares most about (how a boss decides its
+  moves, the powers, the God King), each a tap-to-jump link; every section ends with "↑ Contents".
+- **What's marked:** Maia is "Being tested; coming soon" while `BOSS_BRAIN.forPlayers` is off (the note flips by
+  itself when it's on); the bridge band between Maia and Stockfish (2600–2800) is "Planned" (today Maia holds at 3000
+  to 2800, then Stockfish). Classic gets one line: off the menu while it's redesigned.
+- **True to the code, where the brief's shorthand differs:** a raid's boss is matched to the people in it (bots never
+  count); the Crowd's boss battle is set from the last ten's ratings in that match, weighted towards the best, minus
+  100, whoever they are (bots among them count, as `startBoss` does). The rating-gap formula is the usual one, shown
+  as a guide to the boss menu's "+N vs you", not something the game computes.
+- **Security:** only how the game works for a player. Nothing on how the app talks to the server (messages, routes,
+  who scores what, the engine server), limits, secrets, admin or test controls, or how cheating is detected; fair play
+  says what happens, not how it's found. A unit test checks the text for the obvious words.
+- **Keeping it true:** a rule change changes the FAQ's words in the same PR (docs/areas/hub.md, `.claude/LESSONS.md`);
+  every playable boss must have its block in `BOSS_BLOCKS` (the test fails without one).

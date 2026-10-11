@@ -142,8 +142,8 @@ function ThemeChoice() {
   );
 }
 
-/** Settings: the theme, sound, how you play, Crowd's options, how to play, installing, and your sign-in. */
-export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onSoundLab?: () => void }) {
+/** Settings: the theme, sound, how you play, Crowd's options, how to play (and the FAQ), installing, and your sign-in. */
+export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => void; onSoundLab?: () => void; onFaq?: () => void }) {
   const { config, profile } = useAccount();
   const [, rerender] = useState(0);
   useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
@@ -332,6 +332,11 @@ export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onS
 
       <section class="fd-section">
         <h2 class="fd-label">HOW TO PLAY</h2>
+        {onFaq && (
+          <button type="button" class="fd-row-link" onClick={onFaq}>
+            📖 FAQ · How it works ›
+          </button>
+        )}
         <HowToPlay />
       </section>
 

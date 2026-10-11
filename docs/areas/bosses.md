@@ -164,7 +164,9 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 8. **Its attack on a king** (optional; the boss keeps today's Last Stand and mate without one): see "A boss's attack on
    a king" above.
 9. **Tests**: `packages/chess/test/<boss>.test.ts` (rules: never no legal move, never breaks check, deterministic from the seed, the judge's view), a lobby test in `packages/server/test/boss-powers-lobby.test.ts`, app tests for its character and moments, `e2e/<boss>.spec.ts`. Watch it frame by frame (`npm run frames:powers`, or a `frames-<boss>.mjs`), run `npm run perf:boss -- <dir> <boss id> both 25`, and give Eric the test links (`?boss=<id>`, `?power=<ultimate>`).
-10. **Docs**: its row in the table above, and this checklist if the shape changed.
+10. **Docs**: its row in the table above, its block in the FAQ (`BOSS_BLOCKS` in `packages/app/src/faq/content.ts`:
+    its opening, passive and ultimate in a player's words; `faq.test.ts` fails without it), and this checklist if the
+    shape changed. A change to any boss's rules changes its FAQ block in the same PR.
 
 ## Settings
 
