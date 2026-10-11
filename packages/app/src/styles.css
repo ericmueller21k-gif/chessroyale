@@ -7618,6 +7618,79 @@ button.fd-logo {
 .fd-stepper button:disabled {
   opacity: 0.4;
 }
+/* Settings → Sound: the Move sound and Capture sound pickers (each option a radio, with its own ▶). */
+.ps-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--fd-panel);
+  border-radius: 14px;
+  padding: 12px;
+}
+.ps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ps-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+.ps-choice {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 12px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  font: 600 14px Archivo, system-ui, sans-serif;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.ps-choice strong {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ps-choice span {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fd-sub);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ps-row.on .ps-choice {
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+}
+.ps-row.on .ps-choice strong {
+  font-weight: 800;
+}
+.ps-row.on .ps-choice span {
+  color: var(--fd-gold-ink);
+  opacity: 0.8;
+}
+.ps-play {
+  flex: none;
+  width: 48px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--fd-panel-2);
+  color: var(--fd-gold-text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ps-play:active,
+.ps-choice:active {
+  filter: brightness(1.15);
+}
 .fd-stepper output {
   min-width: 24px;
   text-align: center;
