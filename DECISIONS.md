@@ -753,3 +753,94 @@ saves the crowd); doing it again at checkmate was left to us. Calls:
   `?boss=hollow&mate=1` (new, solo: the battle starts after 1.f3 e5 2.g4 with the boss to move, and it plays a mate in
   one whenever it has one: the attack and the result within seconds of the intro). Frames:
   `npm run frames:king-attack` (the page's clock paused and stepped 40 ms a frame).
+
+### Squads, phase 2: the server (Oct 11, 2026)
+
+The Squads lobby, parties, the queue, bots, the bracket, spectating, rewards, the test controls and the protocol
+(`docs/areas/squads.md`, "The server"). The rules stay phase 1's: the server runs them and never decides what they
+decide (duties, deadlines, clocks, what a miss plays, ties). Nothing links to it yet. The calls made:
+
+- **Two new Durable Objects, not the Crowd lobby's.** `SquadsLobby` (one per lobby) and `SquadsParty` (one per party),
+  a new migration tag (`v5`). Crowd's `Lobby` is built around the runner, the host and the judges; Squads shares none
+  of that, so a second class keeps both simple. The pattern is Crowd's: pure logic (`squads-lobby.ts`) under a thin
+  object that stores, times and talks. Each match is stored under its own key and only when it changed (a lobby has up
+  to seven, each with its boards' positions).
+- **Parties are their own small object, not a private lobby's code.** A party has to gather before it queues (a Squads
+  lobby fills a minute after it opens), and its friends may play several lobbies together. So: a code and invite link
+  for the party; the leader queues; the matchmaker holds seats for the whole party under a one-time pass; each member
+  joins the lobby with the pass and lands in one squad. Party and lobby codes are separate namespaces (their routes
+  differ).
+- **The Squads queue is Crowd's matchmaker with groups.** The same object and queue (batches, admission, "busy, you're
+  in line"), under its own name (`squads-default`). Each ticket is a party or one player; a lobby takes a group only if
+  every party still fits the squads whole, checked with the rules' own packing (`formSquads`), since 32 free seats
+  aren't enough (six parties of 3 and five of 2 don't fit). Otherwise the next lobby.
+- **Bots' engine work goes to players' devices, checked against each other** (Eric's computing priorities). A job is one
+  board's position in one half; two devices each, preferring devices outside that match (nobody's engine picks the moves
+  of the bots they play against or beside while anyone else's can), then computers, the least loaded and fastest; a
+  device holds at most 4 unanswered jobs (a phone 2), and the rest wait for a device to answer (the soonest-needed
+  first), so a lobby with one phone still gets engine bots, not the quick look. Boards in the same position (every
+  board's start on the first turn) share one job. Each job says how deep to search (`botWork.nodes`), so every device
+  does the same search. The browser engine is deterministic, so answers must match
+  exactly. Two that disagree: the engine server settles it with one restricted search of their moves (counted in its
+  daily budget), or without it a third device referees; the wrong device gets a strike, and two strikes mean no more
+  work. Only an answer that doesn't hold together is a strike: an illegal move, a score out of range. A move listed
+  twice keeps its first line (the run through the real server found the engine interface does that now and then,
+  and the stricter check had benched an honest device), and fewer lines than asked are fine. One answer stands after 400 ms (like the judges' grace); none after 4 s, or no device at all: the server's own
+  quick look.
+- **The quick look has no engine.** The engine server can't serve routine bot moves: a lobby asks thousands of
+  positions and its budget is 3,000 searches a day. Stockfish in the Worker would be a big change to the engine lane's
+  code and costs CPU on every bot move. So the Worker scores moves by material two plies deep (a capture it can take
+  back costs the taker its piece) and mate in one, with a small nudge to the centre and castling (about 6 ms a position).
+  It's only for when no device can answer: nobody connected, or devices too slow. A bot waits for its devices until
+  1.5 s before its deadline, never longer.
+- **Halves.** A half ends when everyone with a duty has locked in, or when the last deadline of anyone still choosing
+  has passed, plus the network's 300 ms grace (the Crowd lobby's `lateGraceMs`); a choice after a deadline and its
+  grace is refused ("late"). A choice names its half (`seq`), so a late message never lands in the next one. Bots
+  blocking in the final think as if on the picking squad's clock (as in the sim).
+- **Who sees what.** Choices go out as the rules' `visibleChoices` allows each player. Who has locked in goes to
+  everyone: every squad's clock on screen needs to know who is still thinking. A resolved half is public.
+- **Takeover and leaving.** A person whose seat a bot took over (three misses in a row) can take it back from the next
+  half (`reclaim`): the rules' takeover is permanent, but a dropped connection shouldn't cost the rest of the lobby.
+  Leaving while your squad still plays hands the seat to a bot at once (no point in three random moves first).
+  Leaving once your squad is out just goes: you can queue again.
+- **Armageddon's colour** is picked by any person on the choosing squad during the intro, the last pick standing;
+  nobody picks, the bots' Black (draw odds).
+- **Rewards** (unranked; numbers in `SQUADS_LOBBY.rewards`, for Eric to tune): 1st 100 coins and a crate, 2nd 60 and a
+  crate, 3rd-4th 40, 5th-8th 20. Paid when the bracket decides the squad's placement (a squad out in round 1 is paid
+  then), to each person still playing their seat (not one who left, nor a seat a bot has taken over). Every signed-in
+  person on the squad gets the result on their profile (mode "squads", placement 1, 2, 3 or 5 of 8 squads). Coins go
+  in the wallet; crates are counted in a new `wallets.crates` column (an `ALTER TABLE` at runtime, as every column
+  since the first) for when crates stop being free, and move with a guest's coins when they sign in.
+- **Test controls** are gated like the boss battle's trigger: admins (ADMIN_EMAILS), with a settings switch
+  (`SQUADS_LOBBY.testControls`) that removes them everywhere. For local runs and the e2e suite, the Worker variable
+  `SQUADS_TEST=1` lets anyone use them (like `OPS_STATS`: never set in production). "Next round" ends the earliest
+  unfinished round with the rules' `endByMaterial` and starts the next round's matches 3 s later; in the votes it
+  closes them. A test lobby (`POST /api/squads/lobby?start=pairs|final`) skips the rounds before, the squad with more
+  people going through (so testers reach the round they want), and may set its own clock. Nothing is recorded or
+  rewarded in a test lobby, or in any lobby after a test control was used.
+- **A lobby with nobody in it plays on.** As Crowd's: its bots reach the results (people who left may still be placed
+  and paid), and the abandoned cap (180 minutes) is the backstop. A lobby whose fill time comes with nobody connected
+  waits for the next person. Should the rules ever throw in a match, the server ends it by material rather than
+  leaving an alarm failing forever.
+- **The protocol** is its own file (`squads/protocol.ts`) with a version number in every `hello` and `welcome`
+  (`SQUADS_PROTOCOL`, 1); an app on another version is told to reload. Crowd's protocol is untouched.
+- **Team clocks** (Eric's one bank per squad for the tournament, built in the rules alongside this) stay entirely in the
+  rules' functions: the server starts them when the bracket is drawn, keeps what each match leaves, and shows them.
+  Every player gets every squad's clock (beside its name and rank on screen): in the lobby view, and a `clocks` message
+  whenever a half begins or ends anywhere. During a half the screen runs a clock down from what it already has (the
+  match's banks and free seconds, its duties, who has locked in); the exact bank comes with each half's result, so the
+  server sends nothing per second.
+- **Out of time is not a no-show** (the rules' `timeouts`, as the team clock's decision asks): a miss on the person's
+  record, but not one of the three no-shows that hand the seat to a bot, so a slow move in sudden death never does.
+  Except for someone who isn't there (disconnected, and no move made): that's a no-show as any other, or an absent
+  player in sudden death would play random moves for their squad for the rest of the lobby. A half isn't cut short
+  when a bank runs out: anyone still thinking may still make their move until the ceiling (late, but there).
+- **Measured through the real server** (`scripts/squads-headless.ts --device` against `wrangler dev`, the Normal clock's
+  numbers, one idle person whose device did the bots' engine work): a full bot lobby took 28.9 minutes from the fill
+  to its results (round 1 over at 11 minutes, round 2 at 21, the final 8 minutes), in line with the sim's 33-minute
+  median. The device answered 1,336 jobs; every board ended in mate. (A run before the duplicate-line fix, its device
+  benched, played most moves from the quick look: boards ran to 150-230 plies by repetition and the lobby past an hour.
+  The quick look is a last resort, not a bot.)
+- **Left for later:** the live line (online, matches running, in queue) and the matchmaker's overload limit don't count
+  Squads yet; no quick chat in Squads lobbies; the app's side of bot work arrives with phase 3's screens (until then a
+  real lobby's bots use the quick look).

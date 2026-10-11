@@ -20,7 +20,10 @@
       { "name": "MATCHMAKER", "class_name": "Matchmaker" },
       { "name": "ENGINE", "class_name": "EngineServer" },
       // The live line and presence in memory (live-hub.ts): one object, so D1 isn't written on every request.
-      { "name": "LIVE", "class_name": "LiveHub" }
+      { "name": "LIVE", "class_name": "LiveHub" },
+      // Squads: one object per lobby, one per party (squads-do.ts).
+      { "name": "SQUADS", "class_name": "SquadsLobby" },
+      { "name": "PARTIES", "class_name": "SquadsParty" }
     ]
   },
   // The engine server: one vCPU (Stockfish is single-threaded here), asleep after 3 idle minutes.
@@ -29,7 +32,8 @@
     { "tag": "v1", "new_sqlite_classes": ["Lobby"] },
     { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] },
     { "tag": "v3", "new_sqlite_classes": ["EngineServer"] },
-    { "tag": "v4", "new_sqlite_classes": ["LiveHub"] }
+    { "tag": "v4", "new_sqlite_classes": ["LiveHub"] },
+    { "tag": "v5", "new_sqlite_classes": ["SquadsLobby", "SquadsParty"] }
   ],
   // Accounts, profiles and match results (tables are created by the Worker on first use: see accounts.ts).
   "d1_databases": [{ "binding": "DB", "database_name": "hunchess", "database_id": "103097fd-f61b-4296-8b89-bd967ac33142" }],
@@ -60,7 +64,9 @@
         "bindings": [
           { "name": "LOBBIES", "class_name": "Lobby" },
           { "name": "MATCHMAKER", "class_name": "Matchmaker" },
-          { "name": "LIVE", "class_name": "LiveHub" }
+          { "name": "LIVE", "class_name": "LiveHub" },
+          { "name": "SQUADS", "class_name": "SquadsLobby" },
+          { "name": "PARTIES", "class_name": "SquadsParty" }
         ]
       },
       "d1_databases": [{ "binding": "DB", "database_name": "hunchess-staging", "database_id": "STAGING_D1_ID" }],

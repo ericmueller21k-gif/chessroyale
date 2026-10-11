@@ -28,6 +28,10 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   never starts closes after `lobbyIdleMinutes`, an abandoned one after `lobbyAbandonedMinutes`. Closing tells anyone
   still connected, records results on profiles, drops it from the live line and deletes its storage (freeing the code).
   An old link or a reopened tab asks `/api/lobby/CODE` before retrying the socket.
+- **Squads** (`docs/areas/squads.md`, "The server"; no menu entry until its screens): its own queue (`squads-default`,
+  the same matchmaker object) whose tickets are parties (up to 4, under a code and invite link, the leader queuing) or
+  single players, each seated whole in a Squads lobby that still fits it; the lobby fills with bots after
+  `MATCH_FILL_SECONDS`, like Crowd's Default. Routes under `/api/squads/`.
 - **The boss of a raid** is matched to the people only (bots don't count towards its strength), avoiding the boss most
   of its players met last (each sends theirs on joining).
 - **Ranking today** is the rating on your profile (its rank, chart and "Top N%"); there is no ranked mode yet. A match
@@ -43,6 +47,7 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
 | PLAY and its answers, the matchmaker object | `packages/server/src/matchmaker.ts` |
 | The queue (pure): tickets, batches, admission, matching rules | `packages/server/src/queue.ts` |
 | Lobby codes | `packages/server/src/codes.ts` |
+| Squads: parties, the Squads lobby and its queue | `packages/server/src/squads-party.ts`, `squads-lobby.ts`, `squads-do.ts`; `matchmaker.ts` (`seatSquads`) |
 | Joining, filling, the lobby's life, results | `packages/server/src/lobby.ts` (pure), `lobby-do.ts` (Durable Object), routes in `index.ts` |
 | The rating estimate and its curve | `packages/core/src/rating.ts`, `rating-curve.ts`; ranks in `profile.ts` and `RATING_RANKS` |
 | App side: the queue screen, connecting | `packages/app/src/screens/Queue.tsx`, `Lobby.tsx`, `net.ts` |

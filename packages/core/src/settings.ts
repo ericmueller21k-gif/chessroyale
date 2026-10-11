@@ -964,6 +964,62 @@ export const LOBBY_LIFE = {
 } as const;
 
 /**
+ * Squads' server (phase 2; docs/areas/squads.md, "The server"): the lobby around the rules (`SQUADS`, below), its
+ * parties, bot work and rewards. The lobby's life (results kept, idle, abandoned) is LOBBY_LIFE's; the queue's fill
+ * time is MATCH_FILL_SECONDS, as for Crowd.
+ */
+export const SQUADS_LOBBY = {
+  /** The drawn bracket on screen before round 1's matches begin (after the votes). */
+  bracketIntroSeconds: 8,
+  /**
+   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th. Coins go in the wallet; crates are counted
+   * there for when crates stop being free (CRATES_FREE). Each person on the squad still playing their seat when its
+   * placement is decided (not one who left, nor a seat a bot has taken over); none in a lobby a test control touched.
+   */
+  rewards: {
+    1: { coins: 100, crates: 1 },
+    2: { coins: 60, crates: 1 },
+    3: { coins: 40, crates: 0 },
+    5: { coins: 20, crates: 0 },
+  } as Readonly<Record<1 | 2 | 3 | 5, { coins: number; crates: number }>>,
+  /**
+   * Squad bots' engine work (the bot engine's top moves for a board), done on players' devices first (Eric's computing
+   * priorities): `perJob` devices each (computers before phones, devices outside the match before those in it), their
+   * answers compared. The lobby waits `graceMs` after the first answer for the second, `answerMs` for any; two that
+   * disagree go to the engine server (a restricted search of their moves, at `serverNodes`) or a third device, and
+   * the device that was wrong gets a strike (`strikes` and it gets no more work). A bot whose candidates aren't in
+   * `fallbackMarginMs` before its deadline (no devices, none answering) plays from the server's own quick look
+   * (material two moves deep and mate in one: no engine), `fallbackScale` turning its pawns into expected score. A
+   * device holds at most `maxInFlight` unanswered jobs at once (a phone fewer: its battery), so a slow one is never
+   * buried; with every device busy, a job goes to fewer devices, or none.
+   */
+  botWork: {
+    /** The bot engine's search a job asks for (nodes), the same on every device. */
+    nodes: 250_000,
+    perJob: 2,
+    maxInFlight: { computer: 4, phone: 2 },
+    graceMs: 400,
+    answerMs: 4_000,
+    serverNodes: 400_000,
+    strikes: 2,
+    fallbackMarginMs: 1_500,
+    fallbackScale: 0.6,
+  },
+  /**
+   * The test controls (Eric): "Next round" in a match, and a test lobby that starts at round 2 or the final (with its
+   * own clock). Admins (ADMIN_EMAILS) only, or anyone where the Worker variable SQUADS_TEST is "1" (local and e2e,
+   * never production); false removes them everywhere, server too.
+   */
+  testControls: true,
+  /** A test lobby fills with bots this long after it opens (time to join it). */
+  testFillSeconds: 5,
+  /** A party (an invite code or link, up to SQUADS.partyMax): closes after this long with nobody in it. */
+  partyIdleMinutes: 60,
+  /** A party in line asks the matchmaker again this often while it's busy. */
+  partyRetryMs: 3_000,
+};
+
+/**
  * Quick chat in matches and in the lobby before them (preset phrases and emoji only; see DECISIONS.md, "Quick chat
  * in matches" and "Lobby chat"). The server enforces the limits; the app mirrors them to grey out its buttons.
  */

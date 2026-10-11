@@ -1,5 +1,7 @@
-import { BOSS_TIERS, POWER_IDS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { SQUADS_LOBBY, BOSS_TIERS, POWER_IDS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
+import type { SquadsLobby, SquadsParty } from "./squads-do.ts";
+import { parseTestClock } from "./squads-lobby.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 import type { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
@@ -8,7 +10,7 @@ import { d1Sql, ensureSchema, lobbyResult, type User } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
-import { handleAdmin, type AdminEnv } from "./admin.ts";
+import { handleAdmin, isAdmin, type AdminEnv } from "./admin.ts";
 import { deepCheckRun } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
@@ -17,12 +19,18 @@ import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 
 export { Lobby } from "./lobby-do.ts";
+export { SquadsLobby, SquadsParty } from "./squads-do.ts";
 export { Matchmaker } from "./matchmaker.ts";
 export { EngineServer } from "./engine.ts";
 export { LiveHub } from "./live-hub.ts";
 
 export interface Env extends AccountEnv, EngineEnv, AdminEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
+  /** Squads: one object per lobby, and one per party (squads-do.ts). */
+  SQUADS: DurableObjectNamespace<SquadsLobby>;
+  PARTIES: DurableObjectNamespace<SquadsParty>;
+  /** "1" (local and e2e only, never production): anyone may use Squads' test controls (else admins only). */
+  SQUADS_TEST?: string;
   MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   LIVE?: DurableObjectNamespace<LiveHub>;
   ASSETS: Fetcher;
@@ -50,7 +58,11 @@ export default {
     const t = Date.now();
     // Rate limits (limits.ts): a friendly 429 with when to try again.
     const wait = rateLimited(
-      { ip: request.headers.get("cf-connecting-ip"), session: readCookie(request, SESSION_COOKIE), play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby") },
+      {
+        ip: request.headers.get("cf-connecting-ip"),
+        session: readCookie(request, SESSION_COOKIE),
+        play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
+      },
       t,
       rawEnv.LOAD_TEST === "1",
     );
@@ -198,6 +210,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, plain, undefined, keep)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
     }
+    // Squads (docs/areas/squads.md, "The server"): its queue, parties and lobbies, and the test lobby.
+    const squads = await squadsRoute(request, env, url, waitUntil);
+    if (squads) return squads;
     // GET /api/lobby/CODE → { open: true, phase } | 404 { open: false, message }: whether a lobby (an invite link, a
     // stale tab) is still open. Once its match is over, also your result in it, for "See your result".
     const st = url.pathname.match(/^\/api\/lobby\/([A-Z2-9]{5})$/i);
@@ -221,6 +236,64 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     }
     return json({ message: "Not found" }, 404);
   }
+}
+
+/**
+ * Squads (nothing links here until its screens ship, phase 3):
+ *   POST /api/squads/play[?pool=&ticket=] → { code } | busy: the Squads queue, one player (a party queues from its own
+ *     object). Lobbies fill with bots after MATCH_FILL_SECONDS.
+ *   POST /api/squads/party → { code }: a new party (the invite link is /squads/party/CODE).
+ *   GET /api/squads/party/CODE → { open, members, state } | 404; /api/squads/party/CODE/ws: its WebSocket.
+ *   GET /api/squads/lobby/CODE → { open, phase } | 404; /api/squads/lobby/CODE/ws: its WebSocket.
+ *   POST /api/squads/lobby?start=relay|pairs|final&clock=BANK,TOPUP,FREE,INC&keep=S → { code }: a test lobby (test controls:
+ *     admins, or anyone where SQUADS_TEST is "1"; else 404). It fills with bots SQUADS_LOBBY.testFillSeconds after
+ *     it opens, and records and rewards nothing.
+ */
+async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
+  if (!url.pathname.startsWith("/api/squads/")) return null;
+  const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
+  const region = regionOf(request.cf as { continent?: unknown } | undefined);
+  const queue = queueName("squads", "default", url.searchParams.get("pool"), region);
+  if (url.pathname === "/api/squads/play" && request.method === "POST") {
+    const refused = await mayPlay(request, env, waitUntil);
+    if (refused) return refused;
+    const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queue), region ? { locationHint: REGION_HINT[region] } : undefined);
+    const ticket = url.searchParams.get("ticket");
+    try {
+      return json(await mm.next({}, fill * 1000, { squads: true }, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null, { size: 1, pass: "" }));
+    } catch {
+      return json({ message: "Couldn't find a match. Try again." }, 500);
+    }
+  }
+  if (url.pathname === "/api/squads/party" && request.method === "POST") {
+    const refused = await mayPlay(request, env, waitUntil);
+    if (refused) return refused;
+    const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, queue, fill * 1000));
+    return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
+  }
+  if (url.pathname === "/api/squads/lobby" && request.method === "POST") {
+    const me = await accountOf(request, env, waitUntil).catch(() => null);
+    if (!SQUADS_LOBBY.testControls || !(env.SQUADS_TEST === "1" || isAdmin(env, me))) return json({ message: "Not found" }, 404);
+    const start = ({ relay: 0, pairs: 1, final: 2 } as const)[url.searchParams.get("start") as "relay" | "pairs" | "final"] ?? 0;
+    const clock = parseTestClock(url.searchParams.get("clock"));
+    const keep = url.searchParams.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(url.searchParams.get("keep")) || 0)) * 1000 : undefined;
+    const fillAt = Date.now() + SQUADS_LOBBY.testFillSeconds * 1000;
+    const code = await openLobbyCode(async (c) => (await env.SQUADS.get(env.SQUADS.idFromName(c)).create(c, { fillAt, test: { start, ...(clock ? { clock } : {}) }, keepMs: keep })) !== false);
+    return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
+  }
+  const m = url.pathname.match(/^\/api\/squads\/(party|lobby)\/([A-Z2-9]{5})(\/ws)?$/i);
+  if (!m) return json({ message: "Not found" }, 404);
+  const code = m[2]!.toUpperCase();
+  if (m[1] === "party") {
+    const stub = env.PARTIES.get(env.PARTIES.idFromName(code));
+    if (m[3]) return (await stub.status()) ? stub.fetch(request) : json({ message: "We couldn't find that party." }, 404);
+    const status = request.method === "GET" ? await stub.status() : null;
+    return status ? json({ open: true, ...status }) : json({ open: false, message: "That party has closed." }, 404);
+  }
+  const stub = env.SQUADS.get(env.SQUADS.idFromName(code));
+  if (m[3]) return (await stub.exists()) ? stub.fetch(request) : json({ message: "We couldn't find that lobby." }, 404);
+  const status = request.method === "GET" ? await stub.status() : null;
+  return status ? json({ open: true, phase: status.phase }) : json({ open: false, message: MATCH_ENDED }, 404);
 }
 
 /**

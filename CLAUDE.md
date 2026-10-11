@@ -116,7 +116,8 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
 - `packages/app`: the web app (Vite + Preact, chessground board, Stockfish in Web Workers). Screens in `src/screens/`;
   `src/solo.ts` is solo play, `src/net.ts` multiplayer.
 - `packages/server`: `src/lobby.ts` is pure, testable lobby logic; `src/lobby-do.ts` the Durable Object;
-  `src/index.ts` routes `/api/*` and serves the app. Config: `wrangler.jsonc` at the repo root.
+  `src/index.ts` routes `/api/*` and serves the app. Squads' lobby and parties: `src/squads-lobby.ts`,
+  `squads-party.ts` (pure) and `squads-do.ts`. Config: `wrangler.jsonc` at the repo root.
 - `e2e/`: Playwright tests that play full solo and two-player matches on emulated phones.
 
 ```sh

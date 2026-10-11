@@ -174,6 +174,8 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // been searched again.
   { table: "fairplay_matches", column: "deep_queued", type: "INTEGER" },
   { table: "fairplay_matches", column: "deep_done", type: "INTEGER" },
+  // Crates earned (Squads' placement rewards, Oct 10, 2026), counted for when crates stop being free (CRATES_FREE).
+  { table: "wallets", column: "crates", type: "INTEGER NOT NULL DEFAULT 0" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
 ];
@@ -480,7 +482,7 @@ export async function verifyEmailCode(sql: Sql, email: string, code: string, now
 // ---------------- Results and profiles ----------------
 
 export interface MatchResult {
-  mode: "classic" | "crowd" | "boss";
+  mode: "classic" | "crowd" | "boss" | "squads";
   online: boolean;
   placement: number;
   players: number;
@@ -519,7 +521,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   const rating = typeof r.rating === "number" && Number.isFinite(r.rating) ? Math.round(r.rating) : null;
   const cuts = count(r.cuts);
   const strikes = count(r.strikes);
-  const mode = r.mode === "crowd" || r.mode === "boss" ? r.mode : "classic";
+  const mode = r.mode === "crowd" || r.mode === "boss" || r.mode === "squads" ? r.mode : "classic";
   // Only an online match the lobby judged ranked counts (a solo result, posted by the browser, never does).
   const ranked = r.online && r.ranked === true;
   await sql.run(
@@ -894,13 +896,33 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown): Prom
   return { ok: true, shop: await shopState(sql, userId) };
 }
 
-/** A guest's items, equipped choices and coins join the account they sign in to (the account's own choices win). */
+/**
+ * A placement reward (Squads): coins into the wallet, and crates counted there (spendable once crates stop being free).
+ */
+export async function grantReward(sql: Sql, userId: string, coins: number, crates: number): Promise<void> {
+  const c = Math.max(0, Math.round(coins));
+  const k = Math.max(0, Math.round(crates));
+  if (!c && !k) return;
+  await sql.run(
+    "INSERT INTO wallets (user_id, coins, crates) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
+    userId,
+    c,
+    k,
+  );
+}
+
+/** A guest's items, equipped choices, coins and crates join the account they sign in to (the account's own choices win). */
 async function moveShop(sql: Sql, from: string, to: string): Promise<void> {
   await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from);
   await sql.run("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from);
-  const coins = (await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", from))?.coins ?? 0;
-  if (coins > 0) {
-    await sql.run("INSERT INTO wallets (user_id, coins) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins", to, coins);
+  const wallet = await sql.first<{ coins: number; crates: number | null }>("SELECT coins, crates FROM wallets WHERE user_id = ?", from);
+  if ((wallet?.coins ?? 0) > 0 || (wallet?.crates ?? 0) > 0) {
+    await sql.run(
+      "INSERT INTO wallets (user_id, coins, crates) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
+      to,
+      wallet?.coins ?? 0,
+      wallet?.crates ?? 0,
+    );
   }
   await sql.run("INSERT OR IGNORE INTO chat_picks (user_id, lines, emoji) SELECT ?, lines, emoji FROM chat_picks WHERE user_id = ?", to, from);
   await sql.run("DELETE FROM inventory WHERE user_id = ?", from);

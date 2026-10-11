@@ -168,9 +168,10 @@ export class QueueCore {
 /**
  * Which matchmaker a PLAY press goes to: one per mode and matchmaking type ("crowd-default", "raid-botsoff"), so
  * Default and Bots off never share a lobby; a test's own pool (?pool=NAME); and, with CAPACITY.queue.byRegion on, one
- * per continent ("crowd-default@EU"), created near its players. Ranked queues would add their own names here.
+ * per continent ("crowd-default@EU"), created near its players. Squads has its own ("squads-default": parties and solo
+ * players, squads-lobby.ts). Ranked queues would add their own names here.
  */
-export function queueName(mode: "crowd" | "raid", type: "default" | "botsoff", pool?: string | null, region?: string | null): string {
+export function queueName(mode: "crowd" | "raid" | "squads", type: "default" | "botsoff", pool?: string | null, region?: string | null): string {
   const base = `${mode}-${type}${pool && /^[a-z0-9-]{1,24}$/.test(pool) ? `-${pool}` : ""}`;
   return region ? `${base}@${region}` : base;
 }

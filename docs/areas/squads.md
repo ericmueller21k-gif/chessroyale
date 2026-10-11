@@ -2,7 +2,9 @@
 
 Lane: the director (a new mode; the match screens are the director's). Status: **the rules and a bot simulation are
 built** (pure code): phase 1, then clocks in place of the pace and the move cap, now one team clock per squad for the
-whole tournament (Eric, Oct 10). The server is being built on these rules; no screens or menu slot yet.
+whole tournament (Eric, Oct 10). **The server is built** (phase 2: the lobby, parties, the queue, bots, the bracket,
+the test controls, the protocol; see "The server" below). No screens or menu slot yet: nothing a player sees has
+changed.
 
 ## How it works today
 
@@ -105,6 +107,102 @@ top-up, free seconds and increment; `clockDefault`; vote timing), `moveCeilingSe
 - Every random draw goes through `squadsRng` with its own name; never share a stream between decisions.
 - `squadsLegalMoves` uses chess.js internals for speed; the guard test in `squads-match.test.ts` must keep passing.
 - Every number in `SQUADS`, never in the rules.
+
+## The server (phase 2)
+
+Built around the rules: the server never decides anything the rules decide (duties, deadlines, clocks, what a miss
+plays, ties). Nothing links to it until phase 3's screens. The calls are in `DECISIONS.md`, "Squads, phase 2".
+
+- **Objects.** One Durable Object per lobby (`SquadsLobby`, binding `SQUADS`) and one per party (`SquadsParty`,
+  `PARTIES`). The lobby's logic is pure (`squads-lobby.ts`, `SquadsCore`); the object stores it (the record under
+  "lobby", each match under "m:<key>", only those that changed), runs its alarms and talks over hibernating
+  WebSockets (`squads-do.ts`).
+- **The queue.** `POST /api/squads/play` (one player) asks the Squads matchmaker (`squads-default`: the same Matchmaker
+  object and queue as Crowd, so batches, admission and "busy, you're in line" work the same). Each ticket is a group,
+  `{ size, pass }`. A lobby takes a group only if every party in it still fits the squads whole (`partiesFit`: the
+  rules' own `formSquads` packing); otherwise the next lobby. Solo players are parties of one.
+- **Parties.** `POST /api/squads/party` makes one (a 5-character code; the invite link is `/squads/party/CODE`). Up to
+  4 connect to `/api/squads/party/CODE/ws`. The leader (the first in; the next if they leave or drop) sends `queue`:
+  the party asks the matchmaker for seats for everyone connected under a fresh pass (again every
+  `partyRetryMs` while busy), then tells everyone `placed { lobby, pass }`. Each joins the lobby with
+  `hello { party: pass }` and sits in one squad. The leader can queue again after a lobby. A party closes after
+  `partyIdleMinutes` with nobody in it.
+- **A lobby's life.** waiting (people join until the fill time, MATCH_FILL_SECONDS as for Crowd, or 32 people) →
+  filled (`formSquads`: parties whole, bots in every empty seat; the full grid for FRONT_DOOR.fillShowMs) → vote (Start,
+  then Clock, on Crowd's vote machinery; bots vote) → bracket (drawn; round 1's matches after `bracketIntroSeconds`;
+  each later match `roundBreakSeconds` after its second feeder ends) → results. It closes as Crowd's lobbies do
+  (LOBBY_LIFE): 15 minutes after its results, 60 if it never filled, 180 with nobody connected (a bracket left to its
+  bots reaches its results in under an hour).
+- **A half in real time.** `halfDuties` gives who acts and their deadlines; everyone gets `turn`. People `choose` and
+  `lock` (refused after their deadline plus DEFAULT_SETTINGS.lateGraceMs); bots act at `squadBotThinkMs`. The half
+  ends when `halfReady`, or when the last deadline of anyone still choosing has passed; `resolveHalf` plays it with each
+  player's thinking time to their last choice, `noteActions` logs misses, everyone gets the `half` (every event public)
+  and the show (`moveShowSeconds`, `pairRevealSeconds`, `finalRevealSeconds`), then the next half.
+- **Team clocks** are the rules': `startTeamClocks` when the bracket is drawn, each match's banks from `planMatch`
+  (topped up in later rounds), drained in `resolveHalf`, carried on by `settleTeamClocks` when a match ends. Every
+  player gets every squad's clock (`teamClocks`, and `matchClocks` for squads playing): in the lobby view and a `clocks`
+  message whenever a half begins or ends anywhere. During a half a screen runs a squad's clock down from the match's
+  banks, its duties and who has locked in; the exact bank comes with each `half`. Out of time (the rules' `timeouts`) is
+  a miss on the record but not a no-show, unless the person is gone (disconnected, no move).
+- **Visibility.** Live choices go to each player as `visibleChoices` allows them (Relay and Pairs: their own squad's;
+  the final: blocks to everyone, picks to the picking squad). Who has locked in goes to everyone (every squad's clock
+  on screen needs who is still thinking).
+- **Bots.** Every seat a bot plays (a bot, or a person's seat taken over) acts through the rules' `bots.ts` over the
+  bot engine's top moves. The top moves come from players' devices (`botWork`, one job per board per half): two devices
+  each, outside the match first, computers before phones, the least loaded and fastest, none holding more than
+  `maxInFlight` unanswered jobs (the rest wait for a device to answer, the soonest-needed first). Boards in the same
+  position (the first turn's starts) share one job, and each says how deep to search (`nodes`). Answers are checked (`cleanTop`) and compared exactly (the browser engine is
+  deterministic). Two that disagree go to the engine server (one budgeted restricted search of their moves) or, without
+  it, to a third device; the wrong device gets a strike (`strikes`: no more work). One answer stands after `graceMs`;
+  none after `answerMs`, or no device at all: the server's own quick look (`fallbackTop`: material two plies deep and
+  mate in one, no engine). A bot waits for its answer at most until `fallbackMarginMs` before its deadline. Settled
+  positions are remembered.
+- **Missed actions and takeover.** The rules' `noteActions`: three misses in a row and a bot plays the seat. The person
+  can `reclaim` it (from the next half). Leaving while their squad still plays hands the seat to a bot at once.
+- **Armageddon.** A drawn final: the rules' `armageddonChooser`; that squad's people pick a colour during
+  `armageddonIntroSeconds` (the last pick stands; nobody: the bots' Black), then `startArmageddon`.
+- **Spectating and leaving.** Everyone gets every match (the tiny boards). A knocked-out squad's people watch on, or
+  `leave` (their socket closes) and queue again.
+- **Placements and rewards** (unranked). When the bracket decides a squad's placement, each person on it gets a results
+  row (mode "squads", placement 1, 2, 3 or 5 of 8 squads) if signed in, and `SQUADS_LOBBY.rewards` (coins into the
+  wallet, crates counted in `wallets.crates` for when crates stop being free) if still playing their seat. Nothing in
+  a test lobby or after a test control.
+- **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
+  e2e, never production), while `SQUADS_LOBBY.testControls` is on: `nextRound` in a lobby (the rules' `endByMaterial` on
+  the earliest round's matches, the next round 3 s later; in the votes: they close), and a test lobby,
+  `POST /api/squads/lobby?start=pairs|final&clock=BANK,TOPUP,FREE,INC` (a team clock in seconds), that fills 5 s after
+  it opens, skipping the rounds before (squads with more people go through).
+- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 1, typed): a lobby socket gets
+  `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock), `vote`/`voteCast`, `match` (a match in
+  full, as you may see it), `turn`, `clocks`, `choices`, `half`, `choiceNo`, `placed`, `results`, `botWork`, `left`,
+  `error`, `closed`, and sends `hello`,
+  `vote`, `choose`, `lock`, `armageddon`, `speed`, `botTop`, `reclaim`, `leave`, `sync`, `nextRound`. A party socket
+  gets `welcome`, `party`, `error`, `closed` and sends `hello`, `queue`, `cancel`, `leave`.
+- **Not yet:** the live line doesn't count Squads lobbies or their players (nor does the matchmaker's overload limit);
+  no quick chat in Squads lobbies; the app's side of bot work (answering `botWork` from its engine pool) comes with
+  the screens.
+
+| What | Where |
+| --- | --- |
+| The lobby's logic (seats, parties, fill, votes, bracket, halves, bots, Armageddon, rewards, test controls, views) | `packages/server/src/squads-lobby.ts` |
+| Checking and comparing devices' answers; the server's quick look | `packages/server/src/squads-bots.ts` |
+| Parties (pure) | `packages/server/src/squads-party.ts` |
+| The lobby's and the party's Durable Objects | `packages/server/src/squads-do.ts` |
+| The Squads queue (groups seated whole) | `packages/server/src/matchmaker.ts` (`seatSquads`) |
+| Routes (`/api/squads/*`) | `packages/server/src/index.ts` (`squadsRoute`) |
+| Results and rewards in D1 | `packages/server/src/accounts.ts` (`recordResult`, `grantReward`) |
+| The protocol | `packages/chess/src/squads/protocol.ts` |
+| A headless player (tests, the full-lobby run) | `e2e/squads-client.ts`, `scripts/squads-headless.ts` |
+
+Settings: `SQUADS_LOBBY` in settings.ts (the bracket's intro, rewards, bot work, the test controls' switch and test
+fill, parties); Worker variables `MATCH_FILL_SECONDS` and `SQUADS_TEST`.
+
+Tests: `packages/server/test/squads-lobby.test.ts` (seats and parties, the fill, votes, the bracket, a full bot lobby
+to its results, halves, deadlines, takeover and reclaiming, leaving, team clocks and sudden death, ties, the final's
+visibility, Armageddon, the test controls, rewards, bot work on devices), `squads-queue.test.ts` (the queue, parties,
+D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match, restart, closing); e2e `e2e/squads.spec.ts`
+(a party through the real server; a test lobby at the final). The full-lobby run: `npx tsx scripts/squads-headless.ts
+--url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
 
 ## The design (Eric, Oct 10, 2026)
 

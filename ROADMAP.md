@@ -60,7 +60,8 @@ on Eric's account.
      Then clocks in place of the pace and the move cap, now one team clock per squad for the whole tournament (Eric,
      Oct 10): **done**. A lobby takes about 31 minutes (median).
    - Phase 2, the server: the squads lobby, parties (invite link or code), matchmaking, bots, the bracket,
-     spectating, the test controls ("Next round", start at round 2 or the final), placement rewards.
+     spectating, the test controls ("Next round", start at round 2 or the final), placement rewards: **done**
+     (protocol v1 in `packages/chess/src/squads/protocol.ts`; no menu entry yet).
    - Phase 3, the screens: the menu slot, votes, tiny boards and scouting, the pair and pick-and-block panels, the
      final's staging.
    - Phase 4: e2e and polish, then playtests with real players (the sim's open questions: real think times and
