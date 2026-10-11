@@ -1,4 +1,4 @@
-import { SQUADS, type SquadsSettings } from "@chessroyale/core";
+import { SQUADS, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
 import { START_FEN, fenAfter } from "../rules.ts";
 import { pickOpenings, type Opening } from "../openings.ts";
 import {
@@ -6,7 +6,6 @@ import {
   boardPoints,
   colourToMove,
   decideByMaterial,
-  flagFall,
   isLegal,
   newSquadsBoard,
   otherSide,
@@ -30,13 +29,17 @@ import type { SquadsRules } from "./votes.ts";
  * match's seed and the decision's name (`squadsRng`). No engine anywhere: legal moves and mate in one come from
  * chess.js; only the silent safety cap and the test-only "Next round" fall back on material.
  *
- * Every board has a chess clock: each side a bank and an increment. A match is played in turns of two halves: every
+ * The clocks are the squads' team clocks: one bank per squad for the whole tournament (`Squad.bankMs`), brought into
+ * the match (`banks`) and carried out of it (`settleTeamClocks`). A match is played in turns of two halves: every
  * board's White move, then every board's Black move (in the final, the White squad's move, then the Black squad's).
- * In each half the server collects choices (`choose`, `lockIn`) until everyone has locked in or each board's deadline
- * passes (the per-move ceiling, or the side's bank if that's shorter), then `resolveHalf` plays the half with each
- * player's thinking time: the side to move's clock is charged (in Relay the mover's time; in Pairs and the final the
- * slower picker's), a missed move or pick becomes a random legal move with the whole deadline charged, a missed block
- * is forfeited, and a side whose bank runs out loses that board (a draw if the other side can't mate).
+ * In each half the server collects choices (`choose`, `lockIn`) until everyone has locked in or the deadlines pass,
+ * then `resolveHalf` plays the half with each player's thinking time:
+ * - Each move being thought about drains its squad's bank past the free seconds (`delayMs`): a Relay mover, or a pair
+ *   (the slower picker); the final's pickers drain it once, its blockers not at all. Two of a squad's moves being
+ *   thought about at once drain it twice as fast.
+ * - While the bank is above zero, the per-move ceiling bounds a move; if the bank runs out during the half, every
+ *   move of that squad still being thought about is cut off. At zero it's sudden death: each move within the free
+ *   seconds. A move not made in time is a missed action: a random legal move (a blocker forfeits). No flag falls.
  */
 
 /** A squad in a match: its id and its players' ids in seat order. */
@@ -51,11 +54,11 @@ export interface MatchResult {
   points: readonly [number, number];
   /**
    * clinch: passed half the points with boards still going; boards: won on points with every board finished; time:
-   * level on points, more clock time left (rounds 1 and 2); coin: level on points and time; armageddon: the
-   * Armageddon board; admin: the test-only "Next round".
+   * level on points, more team bank left (rounds 1 and 2); coin: level on points and bank; armageddon: the Armageddon
+   * board; admin: the test-only "Next round".
    */
   how: "clinch" | "boards" | "time" | "coin" | "armageddon" | "admin";
-  /** Each side's clock time left across its boards (ms), when it decided a tie. */
+  /** Each side's team bank left (ms), when it decided a tie. */
   timeLeft?: readonly [number, number];
 }
 
@@ -70,9 +73,13 @@ export interface SquadsMatch {
   /** The turn being played (from 0) and its half: "w" (White moves) or "b". */
   turn: number;
   half: Colour;
-  /** One board where Black has draw odds and White more time. */
+  /** One board where Black has draw odds and White more time (fixed clocks, not the team banks). */
   armageddon: boolean;
-  /** Added to a side's bank after each of its moves (ms). */
+  /** Each side's team bank (ms); 0 is sudden death. */
+  banks: readonly [number, number];
+  /** Free time every move before a bank drains (ms); in sudden death, the time to make each move. */
+  delayMs: number;
+  /** Credited to a squad's bank after each move it made in time (ms). */
   incrementMs: number;
   /** The silent safety cap, in moves per side. */
   safetyMoves: number;
@@ -130,8 +137,9 @@ export interface MatchSetup {
   sides: readonly [Lineup, Lineup];
   starts: readonly BoardStart[];
   whites: readonly Side[];
-  /** Each colour's starting bank on every board (ms), and the increment (ms). */
-  clockMs: { w: number; b: number };
+  /** Each side's team bank coming in (ms), the free time a move and the increment (ms). */
+  banksMs: readonly [number, number];
+  delayMs: number;
   incrementMs: number;
   armageddon?: boolean;
 }
@@ -145,10 +153,12 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
     round: o.round,
     format: o.format,
     sides: o.sides,
-    boards: o.starts.map((st, k) => newSquadsBoard(k, st, o.whites[k]!, o.clockMs)),
+    boards: o.starts.map((st, k) => newSquadsBoard(k, st, o.whites[k]!)),
     turn: 0,
     half: "w",
     armageddon: !!o.armageddon,
+    banks: [Math.max(0, o.banksMs[0]), Math.max(0, o.banksMs[1])],
+    delayMs: o.delayMs,
     incrementMs: o.incrementMs,
     safetyMoves: s.safetyCap,
     result: null,
@@ -158,17 +168,50 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
 /** A squad's lineup: its id and players in seat order. */
 export const lineupOf = (sq: Squad): Lineup => ({ squadId: sq.id, seats: sq.players.map((p) => p.id) });
 
+// ---- Team clocks across the tournament ----
+
+/** Every squad's team bank at the start of the tournament, from the voted Clock option. */
+export function startTeamClocks(squads: readonly Squad[], clock: SquadsClock): Squad[] {
+  return squads.map((sq) => ({ ...sq, bankMs: clock.bankSeconds * 1000 }));
+}
+
+/** After a match, its squads carry what's left of their banks into the next round (Armageddon's fixed clocks aside). */
+export function settleTeamClocks(squads: readonly Squad[], m: SquadsMatch): Squad[] {
+  if (m.armageddon) return [...squads];
+  return squads.map((sq) => {
+    const side = m.sides.findIndex((l) => l.squadId === sq.id);
+    return side < 0 ? sq : { ...sq, bankMs: m.banks[side as Side] };
+  });
+}
+
+/** What every player sees beside each squad's name: its bank, and whether it's in sudden death. */
+export interface TeamClock {
+  squadId: number;
+  bankMs: number;
+  suddenDeath: boolean;
+}
+
+/** Every squad's team clock in the lobby (between matches, or for squads not playing). */
+export function teamClocks(squads: readonly Squad[]): TeamClock[] {
+  return squads.map((sq) => ({ squadId: sq.id, bankMs: sq.bankMs, suddenDeath: sq.bankMs <= 0 }));
+}
+
+/** The two squads' clocks in a match, as they stand (live during the match). */
+export function matchClocks(m: SquadsMatch): [TeamClock, TeamClock] {
+  const one = (side: Side): TeamClock => ({ squadId: m.sides[side].squadId, bankMs: m.banks[side], suddenDeath: m.banks[side] <= 0 });
+  return [one(0), one(1)];
+}
+
 /**
- * A bracket match ready to play: round 1 Relay on 4 boards, round 2 Pairs on 2, the final on 1. Rounds 1 and 2 use the
- * voted option's quick clock, the final its own roomier one.
+ * A bracket match ready to play: round 1 Relay on 4 boards, round 2 Pairs on 2, the final on 1. Each squad brings its
+ * team bank, topped up if this is a later round (it advanced).
  */
 export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, squads: readonly [Squad, Squad], library: readonly Opening[], s: SquadsSettings = SQUADS): SquadsMatch {
   const format = ROUND_FORMAT[round];
   const key = `r${round}m${index}`;
   const { starts, whites } = matchStarts(plan, key, s.boards[format], library, s);
   const c = plan.rules.clock;
-  const final = round === 2;
-  const bank = (final ? c.finalBankSeconds : c.bankSeconds) * 1000;
+  const topUp = round > 0 ? c.topUpSeconds * 1000 : 0;
   return createSquadsMatch(
     {
       key,
@@ -178,8 +221,9 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
       sides: [lineupOf(squads[0]), lineupOf(squads[1])],
       starts,
       whites,
-      clockMs: { w: bank, b: bank },
-      incrementMs: (final ? c.finalIncrementSeconds : c.incrementSeconds) * 1000,
+      banksMs: [squads[0].bankMs + topUp, squads[1].bankMs + topUp],
+      delayMs: c.delaySeconds * 1000,
+      incrementMs: c.incrementSeconds * 1000,
     },
     s,
   );
@@ -195,7 +239,10 @@ export interface Duty {
   role: Role;
   /** One player (a Relay move) or two (a pair's picks, the final's pickers or blockers). */
   players: readonly string[];
-  /** How long they have (ms): the per-move ceiling, or (moves and picks) their side's bank if that's shorter. */
+  /**
+   * How long they have (ms): the per-move ceiling; for moves and picks in sudden death (the squad's bank at zero), the
+   * free seconds. (A bank running out during the half cuts its moves off sooner: see `resolveHalf`.)
+   */
   deadlineMs: number;
 }
 
@@ -217,9 +264,10 @@ export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuti
   if (m.result) return out;
   const n = m.boards.length;
   const ceiling = s.moveCeilingSeconds * 1000;
+  const deadline = (side: Side) => (m.banks[side] > 0 ? ceiling : m.delayMs);
   for (const b of m.boards) {
     const side = sideOf(b, m.half);
-    const deadlineMs = Math.min(ceiling, b.clock[m.half]);
+    const deadlineMs = deadline(side);
     if (m.format === "relay") {
       const duty: Duty = { board: b.id, side, role: "move", players: seatsOf(m, side, [relaySeat(n, b.id, m.turn)]), deadlineMs };
       (b.result ? out.scouts : out.duties).push(duty);
@@ -358,8 +406,10 @@ export type SquadsEvent =
     }
   | { kind: "forced"; turn: number; half: Colour; board: number; side: Side; move: string }
   | { kind: "scout"; turn: number; half: Colour; board: number; side: Side; players: readonly string[] }
-  /** A side's clock this half: how long it ran, and what's left (after any increment; 0 on a flag fall). */
-  | { kind: "clock"; turn: number; half: Colour; board: number; side: Side; usedMs: number; leftMs: number }
+  /** A squad's team bank this half: how much its moves drained, what's left (after any increment), sudden death. */
+  | { kind: "bank"; turn: number; half: Colour; side: Side; drainedMs: number; leftMs: number; suddenDeath: boolean }
+  /** A squad's bank ran out: from now on each of its moves must be made within the free seconds. */
+  | { kind: "sudden_death"; turn: number; half: Colour; side: Side }
   | { kind: "board_end"; board: number; result: BoardResult }
   | { kind: "match_end"; result: MatchResult };
 
@@ -369,27 +419,42 @@ export interface HalfOutcome {
   /** Players who acted, and who missed (for each player's record: `noteActions`). */
   acted: string[];
   missed: string[];
+  /**
+   * Of `missed`, those who weren't absent but out of time: in sudden death, or cut off when their squad's bank ran
+   * out. (A slow move under pressure isn't a no-show: leave these out of the no-show streak if you like.)
+   */
+  timeouts: string[];
 }
 
 /**
  * Plays the half being played, from the choices as they stand (everyone locked in, or the deadlines passed).
- * `thinkMs` is each player's thinking time up to their last choice; a player without one used the whole deadline.
+ * `thinkMs` is each player's thinking time up to their last choice; a player without one ran to their deadline.
  */
 export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonly<Record<string, number>> = {}, s: SquadsSettings = SQUADS): HalfOutcome {
   if (m.result) throw new Error(`Match ${m.key} is over`);
-  const ctx: Ctx = { m, s, inputs, thinkMs, boards: [...m.boards], events: [], acted: [], missed: [] };
   const duties = halfDuties(m, s);
+  const ctx: Ctx = { m, s, inputs, thinkMs, boards: [...m.boards], banks: [...m.banks], events: [], acted: [], missed: [], timeouts: [], cutoff: [Infinity, Infinity], earned: [0, 0] };
+  for (const side of [0, 1] as const) drainBank(ctx, side, duties.duties.filter((d) => d.side === side && d.role !== "block"));
   for (const d of duties.scouts) ctx.events.push({ kind: "scout", turn: m.turn, half: m.half, board: d.board, side: d.side, players: d.players });
   for (const id of duties.forced) {
     const b = m.boards[id]!;
     const move = squadsLegalMoves(b.fen)[0]!;
     ctx.events.push({ kind: "forced", turn: m.turn, half: m.half, board: id, side: sideOf(b, m.half), move });
-    play(ctx, id, move, 0, true);
+    play(ctx, id, move);
   }
   for (const d of duties.duties) {
     if (d.role === "move") relayMove(ctx, d);
     else if (m.format === "pairs") pairMove(ctx, d);
     else if (d.role === "pick") pickAndBlock(ctx, d, duties.duties.find((x) => x.role === "block") ?? null, duties.mercy);
+  }
+  for (const side of [0, 1] as const) {
+    if (!ctx.earned[side] || !m.incrementMs) continue;
+    ctx.banks[side] += ctx.earned[side] * m.incrementMs;
+  }
+  for (const e of ctx.events) {
+    if (e.kind !== "bank") continue;
+    e.leftMs = ctx.banks[e.side];
+    e.suddenDeath = ctx.banks[e.side] <= 0;
   }
   return afterHalf(ctx);
 }
@@ -400,61 +465,104 @@ interface Ctx {
   inputs: HalfInputs;
   thinkMs: Readonly<Record<string, number>>;
   boards: SquadsBoard[];
+  banks: [number, number];
   events: SquadsEvent[];
   acted: string[];
   missed: string[];
+  timeouts: string[];
+  /** Each side's moves this half count only if made by this time (ms): the ceiling, its bank running out, or the free seconds. */
+  cutoff: [number, number];
+  /** Moves each side made in time this half (each earns the increment). */
+  earned: [number, number];
 }
 
 const rngFor = (c: Ctx, board: number, what: string) => squadsRng(c.m.seed, c.m.key, c.m.turn, c.m.half, board, what);
 
-/** A player's choice if it's legal here, else null (a miss); logs them as acting or missing. */
-function take(c: Ctx, player: string, fen: string): string | null {
-  const move = c.inputs.choices[player];
-  const ok = !!move && isLegal(fen, move);
-  (ok ? c.acted : c.missed).push(player);
-  return ok ? move! : null;
+/**
+ * When a bank of `bankMs` runs out, if moves ending at `ends` (ms from the half's start) each drain it past `delayMs`
+ * at the same time: the moment, or Infinity if it lasts.
+ */
+export function bankRunsOut(ends: readonly number[], delayMs: number, bankMs: number): number {
+  let t = delayMs;
+  let left = bankMs;
+  const sorted = ends.filter((e) => e > delayMs).sort((a, b) => a - b);
+  let draining = sorted.length;
+  for (const end of sorted) {
+    const span = (end - t) * draining;
+    if (span >= left) return t + left / draining;
+    left -= span;
+    t = end;
+    draining--;
+  }
+  return Infinity;
 }
 
 /**
- * How long the side to move's clock ran: its slower mover or picker, if they all chose; the whole deadline if one of
- * them didn't (the bank keeps running to the ceiling). Null if that empties the bank: a flag fall.
+ * A squad's bank this half. Each of its moves (a Relay mover, a pair, the final's pickers) drains it from the free
+ * seconds until the move is made (its slower player), or to the ceiling if one of them never chose; several at once
+ * drain it together. If it runs out, moves not yet made are cut off; at zero (sudden death) each move has only the
+ * free seconds.
  */
-function clockUsed(c: Ctx, d: Duty, chosen: readonly (string | null)[]): number | null {
-  const bank = c.boards[d.board]!.clock[c.m.half];
-  const used = chosen.every(Boolean) ? Math.min(d.deadlineMs, Math.max(0, ...d.players.map((p) => c.thinkMs[p] ?? 0))) : d.deadlineMs;
-  return used >= bank ? null : used;
+function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
+  const { m, s } = c;
+  if (!duties.length) return;
+  const bank = c.banks[side];
+  const ceiling = s.moveCeilingSeconds * 1000;
+  if (bank <= 0) {
+    c.cutoff[side] = m.delayMs;
+    c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: 0, leftMs: 0, suddenDeath: true });
+    return;
+  }
+  const ends = duties.map((d) => {
+    const fen = c.boards[d.board]!.fen;
+    const all = d.players.every((p) => {
+      const mv = c.inputs.choices[p];
+      return !!mv && isLegal(fen, mv) && (c.thinkMs[p] ?? 0) <= ceiling;
+    });
+    return all ? Math.max(0, ...d.players.map((p) => c.thinkMs[p] ?? 0)) : ceiling;
+  });
+  const out = bankRunsOut(ends, m.delayMs, bank);
+  const drained = ends.reduce((t, e) => t + Math.max(0, Math.min(e, out) - m.delayMs), 0);
+  c.banks[side] = out === Infinity ? bank - drained : 0;
+  c.cutoff[side] = Math.min(ceiling, out);
+  c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: Math.min(bank, drained), leftMs: c.banks[side], suddenDeath: c.banks[side] <= 0 });
+  if (c.banks[side] <= 0) c.events.push({ kind: "sudden_death", turn: m.turn, half: m.half, side });
 }
 
-/** The side to move ran out of time: it loses the board, unless the other side can't mate. */
-function flag(c: Ctx, d: Duty) {
-  const before = c.boards[d.board]!;
-  const next = flagFall(before, c.m.half);
-  c.boards[d.board] = next;
-  c.events.push({ kind: "clock", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, usedMs: before.clock[c.m.half], leftMs: 0 });
-  c.events.push({ kind: "board_end", board: d.board, result: next.result! });
+/**
+ * A player's choice if it's legal here and made in time, else null (a miss); logs them as acting, missing, or out of
+ * time. Blockers aren't on the clock: they have the ceiling.
+ */
+function take(c: Ctx, player: string, fen: string, side: Side, clocked: boolean): string | null {
+  const move = c.inputs.choices[player];
+  const chose = !!move && isLegal(fen, move);
+  const limit = clocked ? c.cutoff[side] : c.s.moveCeilingSeconds * 1000;
+  const inTime = chose && (c.thinkMs[player] ?? 0) <= limit;
+  if (inTime) c.acted.push(player);
+  else {
+    c.missed.push(player);
+    if (chose && clocked) c.timeouts.push(player);
+    else if (clocked && (c.m.banks[side] <= 0 || c.cutoff[side] < c.s.moveCeilingSeconds * 1000)) c.timeouts.push(player);
+  }
+  return inTime ? move! : null;
 }
 
-/** Plays a move and charges the side to move's clock (plus the increment, unless it was a miss). */
-function play(c: Ctx, board: number, move: string, usedMs: number, earned: boolean) {
+function play(c: Ctx, board: number, move: string) {
   const b = c.boards[board]!;
-  const colour = c.m.half;
-  if (colourToMove(b) !== colour) throw new Error(`Board ${board} is out of step with the half`);
-  const leftMs = b.clock[colour] - usedMs + (earned || c.s.incrementOnMiss ? c.m.incrementMs : 0);
-  const next: SquadsBoard = { ...playOnBoard(b, move), clock: { ...b.clock, [colour]: leftMs } };
+  if (colourToMove(b) !== c.m.half) throw new Error(`Board ${board} is out of step with the half`);
+  const next = playOnBoard(b, move);
   c.boards[board] = next;
-  c.events.push({ kind: "clock", turn: c.m.turn, half: colour, board, side: sideOf(b, colour), usedMs, leftMs });
   if (next.result) c.events.push({ kind: "board_end", board, result: next.result });
 }
 
 function relayMove(c: Ctx, d: Duty) {
   const b = c.boards[d.board]!;
   const player = d.players[0]!;
-  const chosen = take(c, player, b.fen);
-  const used = clockUsed(c, d, [chosen]);
-  if (used === null) return flag(c, d);
+  const chosen = take(c, player, b.fen, d.side, true);
   const move = chosen ?? randomLegalMove(b.fen, rngFor(c, d.board, "miss"));
   c.events.push({ kind: "relay", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, player, move, missed: !chosen });
-  play(c, d.board, move, used, !!chosen);
+  if (chosen || c.s.incrementOnMiss) c.earned[d.side]++;
+  play(c, d.board, move);
 }
 
 /** Two picks, always different: a missed slot becomes a random legal move other than the partner's. */
@@ -468,36 +576,33 @@ function twoPicks(c: Ctx, d: Duty, fen: string, p0: string | null, p1In: string 
 
 function pairMove(c: Ctx, d: Duty) {
   const fen = c.boards[d.board]!.fen;
-  const chosen = [take(c, d.players[0]!, fen), take(c, d.players[1]!, fen)] as const;
-  const used = clockUsed(c, d, chosen);
-  if (used === null) return flag(c, d);
+  const chosen = [take(c, d.players[0]!, fen, d.side, true), take(c, d.players[1]!, fen, d.side, true)] as const;
   const { picks, missed } = twoPicks(c, d, fen, chosen[0], chosen[1]);
   const flip = coin(rngFor(c, d.board, "coin"));
   const move = picks[flip];
   c.events.push({ kind: "pair", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, players: d.players, picks, missed, coin: flip, move });
-  play(c, d.board, move, used, !missed.some(Boolean));
+  if (!missed.some(Boolean) || c.s.incrementOnMiss) c.earned[d.side]++;
+  play(c, d.board, move);
 }
 
 /**
  * The final's move: two different picks; two different blocks (or none: the mercy rule); a coin makes one block
  * active (an empty slot blocks nothing); a block is cancelled if every other legal move allows mate in one. If the
- * active block hits a pick the other pick plays, otherwise a coin chooses between the picks. Only the pickers' side
- * runs its clock; blockers have the per-move ceiling.
+ * active block hits a pick the other pick plays, otherwise a coin chooses between the picks. The pickers' squad's bank
+ * drains while they choose; blockers have the per-move ceiling and drain nothing.
  */
 function pickAndBlock(c: Ctx, pick: Duty, block: Duty | null, mercy: "few_moves" | null) {
   const fen = c.boards[pick.board]!.fen;
-  const chosen = [take(c, pick.players[0]!, fen), take(c, pick.players[1]!, fen)] as const;
+  const chosen = [take(c, pick.players[0]!, fen, pick.side, true), take(c, pick.players[1]!, fen, pick.side, true)] as const;
   let blocks: [string | null, string | null] = [null, null];
   let blockMissed: [boolean, boolean] = [false, false];
   if (block) {
-    const b0 = take(c, block.players[0]!, fen);
-    let b1 = take(c, block.players[1]!, fen);
+    const b0 = take(c, block.players[0]!, fen, block.side, false);
+    let b1 = take(c, block.players[1]!, fen, block.side, false);
     if (b1 !== null && b1 === b0) b1 = null;
     blocks = [b0, b1];
     blockMissed = [!b0, !b1];
   }
-  const used = clockUsed(c, pick, chosen);
-  if (used === null) return flag(c, pick);
   const { picks, missed: pickMissed } = twoPicks(c, pick, fen, chosen[0], chosen[1]);
   const blockCoin = coin(rngFor(c, pick.board, "block-coin"));
   const pickCoin = coin(rngFor(c, pick.board, "pick-coin"));
@@ -526,7 +631,8 @@ function pickAndBlock(c: Ctx, pick: Duty, block: Duty | null, mercy: "few_moves"
     coin: hit === null ? pickCoin : null,
     move,
   });
-  play(c, pick.board, move, used, !pickMissed.some(Boolean));
+  if (!pickMissed.some(Boolean) || c.s.incrementOnMiss) c.earned[pick.side]++;
+  play(c, pick.board, move);
 }
 
 /** After a half: the safety cap (decided by material), the result, the next half. */
@@ -538,10 +644,11 @@ function afterHalf(c: Ctx): HalfOutcome {
     c.events.push({ kind: "board_end", board: b.id, result: done.result! });
     return done;
   });
-  const result = matchResultOf({ ...m, boards: c.boards }, s);
+  const banks: [number, number] = [Math.max(0, c.banks[0]), Math.max(0, c.banks[1])];
+  const result = matchResultOf({ ...m, boards: c.boards, banks }, s);
   if (result) c.events.push({ kind: "match_end", result });
-  const match: SquadsMatch = { ...m, boards: c.boards, turn: m.half === "b" ? m.turn + 1 : m.turn, half: m.half === "w" ? "b" : "w", result };
-  return { match, events: c.events, acted: c.acted, missed: c.missed };
+  const match: SquadsMatch = { ...m, boards: c.boards, banks, turn: m.half === "b" ? m.turn + 1 : m.turn, half: m.half === "w" ? "b" : "w", result };
+  return { match, events: c.events, acted: c.acted, missed: c.missed, timeouts: c.timeouts };
 }
 
 /** Each side's points from the finished boards (a win 1, a draw ½). */
@@ -551,29 +658,19 @@ export function matchPoints(boards: readonly SquadsBoard[], s: SquadsSettings = 
   return pts;
 }
 
-/** Each side's clock time left across its boards in the match (ms). */
-export function timeLeft(boards: readonly SquadsBoard[]): [number, number] {
-  const out: [number, number] = [0, 0];
-  for (const b of boards) {
-    out[b.white] += b.clock.w;
-    out[otherSide(b.white)] += b.clock.b;
-  }
-  return out;
-}
-
-/** A level match (rounds 1 and 2): more clock time left wins; exactly level, a seeded coin. */
-function tiebreak(m: Pick<SquadsMatch, "seed" | "key">, boards: readonly SquadsBoard[], points: readonly [number, number], admin: boolean): MatchResult {
-  const left = timeLeft(boards);
-  if (left[0] !== left[1]) return { winner: left[0] > left[1] ? 0 : 1, points, how: admin ? "admin" : "time", timeLeft: left };
-  return { winner: coin(squadsRng(m.seed, m.key, "tiebreak")), points, how: admin ? "admin" : "coin", timeLeft: left };
+/** A level match (rounds 1 and 2): more team bank left wins; exactly level, a seeded coin. */
+function tiebreak(m: Pick<SquadsMatch, "seed" | "key" | "banks">, points: readonly [number, number], admin: boolean): MatchResult {
+  const left = m.banks;
+  if (left[0] !== left[1]) return { winner: left[0] > left[1] ? 0 : 1, points, how: admin ? "admin" : "time", timeLeft: [left[0], left[1]] };
+  return { winner: coin(squadsRng(m.seed, m.key, "tiebreak")), points, how: admin ? "admin" : "coin", timeLeft: [left[0], left[1]] };
 }
 
 /**
  * The match's result, if it's decided. A squad with more than half the points has won (clinched, if boards are
- * still going: the match ends at once). Every board finished and level: in rounds 1 and 2, the squad with more clock
- * time left (a coin if exactly level); a drawn final has no winner yet (Armageddon). Armageddon: a draw is Black's.
+ * still going: the match ends at once). Every board finished and level: in rounds 1 and 2, the squad with more team
+ * bank left (a coin if exactly level); a drawn final has no winner yet (Armageddon). Armageddon: a draw is Black's.
  */
-export function matchResultOf(m: Pick<SquadsMatch, "seed" | "key" | "format" | "armageddon" | "boards">, s: SquadsSettings = SQUADS): MatchResult | null {
+export function matchResultOf(m: Pick<SquadsMatch, "seed" | "key" | "format" | "armageddon" | "boards" | "banks">, s: SquadsSettings = SQUADS): MatchResult | null {
   const { boards } = m;
   const points = matchPoints(boards, s);
   if (m.armageddon) {
@@ -586,15 +683,14 @@ export function matchResultOf(m: Pick<SquadsMatch, "seed" | "key" | "format" | "
     if (points[side] > (boards.length * s.winPoints) / 2) return { winner: side, points, how: all ? "boards" : "clinch" };
   }
   if (!all) return null;
-  return m.format === "final" ? { winner: null, points, how: "boards" } : tiebreak(m, boards, points, false);
+  return m.format === "final" ? { winner: null, points, how: "boards" } : tiebreak(m, points, false);
 }
 
 // ---- A drawn final: Armageddon ----
 
-/** The side that picks Armageddon's colours: the one with more clock time left in the final (a coin if level). */
+/** The side that picks Armageddon's colours: the one with more team bank left after the final (a coin if level). */
 export function armageddonChooser(final: SquadsMatch): Side {
-  const left = timeLeft(final.boards);
-  if (left[0] !== left[1]) return left[0] > left[1] ? 0 : 1;
+  if (final.banks[0] !== final.banks[1]) return final.banks[0] > final.banks[1] ? 0 : 1;
   return coin(squadsRng(final.seed, final.key, "armageddon-chooser"));
 }
 
@@ -606,11 +702,15 @@ export function armageddonStart(plan: SquadsPlan, final: Pick<SquadsMatch, "key"
 }
 
 /**
- * One Armageddon board for a drawn final, in the final's format: Black has draw odds, White more time
- * (`SQUADS.armageddon`). `white` is the side the chooser gave White.
+ * One Armageddon board for a drawn final, in the final's format, on its own fixed clocks (`SQUADS.armageddon`: White
+ * more, Black less, played by team-clock rules with the lobby's free seconds): Black has draw odds. `white` is the side
+ * the chooser gave White.
  */
 export function startArmageddon(final: SquadsMatch, white: Side, start: BoardStart, s: SquadsSettings = SQUADS): SquadsMatch {
   if (final.format !== "final" || final.armageddon || !final.result || final.result.winner !== null) throw new Error(`Match ${final.key} isn't a drawn final`);
+  const banks: [number, number] = [0, 0];
+  banks[white] = s.armageddon.whiteSeconds * 1000;
+  banks[otherSide(white)] = s.armageddon.blackSeconds * 1000;
   return createSquadsMatch(
     {
       key: `${final.key}-armageddon`,
@@ -620,7 +720,8 @@ export function startArmageddon(final: SquadsMatch, white: Side, start: BoardSta
       sides: final.sides,
       starts: [start],
       whites: [white],
-      clockMs: { w: s.armageddon.whiteSeconds * 1000, b: s.armageddon.blackSeconds * 1000 },
+      banksMs: banks,
+      delayMs: final.delayMs,
       incrementMs: s.armageddon.incrementSeconds * 1000,
       armageddon: true,
     },
@@ -632,7 +733,7 @@ export function startArmageddon(final: SquadsMatch, white: Side, start: BoardSta
 
 /**
  * The admin/test "Next round" button: every board still going is decided by material and the match ends. A level
- * result is settled like a round 1 or 2 tie (more clock time left, then a coin), so the bracket can move on.
+ * result is settled like a round 1 or 2 tie (more team bank left, then a coin), so the bracket can move on.
  */
 export function endByMaterial(m: SquadsMatch, s: SquadsSettings = SQUADS): { match: SquadsMatch; events: SquadsEvent[] } {
   if (m.result) return { match: m, events: [] };
@@ -644,7 +745,7 @@ export function endByMaterial(m: SquadsMatch, s: SquadsSettings = SQUADS): { mat
     return done;
   });
   const decided = matchResultOf({ ...m, boards }, s)!;
-  const result: MatchResult = decided.winner !== null ? { ...decided, how: "admin" } : tiebreak(m, boards, decided.points, true);
+  const result: MatchResult = decided.winner !== null ? { ...decided, how: "admin" } : tiebreak(m, decided.points, true);
   events.push({ kind: "match_end", result });
   return { match: { ...m, boards, result }, events };
 }
