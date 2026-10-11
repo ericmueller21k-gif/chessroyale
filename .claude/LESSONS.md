@@ -78,6 +78,11 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     `---cg-width` chessground writes on the wrap), never in % of the wrap.
   - Check an overlay against the square it marks, within 1 px, at a size where the rounding gap is widest (wrap width
     times the display scale just under a multiple of 8), not only at the test phone's size.
+- **Coordinates a column off** (Oct 11, [story](../docs/history/lessons.md#coordinates-a-column-off-oct-11-2026)):
+  - Anything a library draws on our screens (chessground's coordinates, a ghost, a highlight) gets a look against what
+    it marks, with our CSS, either way up: a library's defaults are made for its own page.
+  - Board coordinates sit inside their edge squares. A test measures each label's text against the square it names,
+    both ways up, on a phone and a computer (`expectCoordsInSquares` in `e2e/helpers.ts`).
 - **Names that looked short** (Oct 7, [story](../docs/history/lessons.md#tests-that-leaned-on-a-lucky-seed-and-names-that-looked-short-oct-7-2026)):
   check text that must fit by measuring it in the real font and box, with some room for other fonts (an iPhone's runs
   wider than headless Chrome's), not by counting characters. (The same lesson's rule about seeds is under "Tests".)

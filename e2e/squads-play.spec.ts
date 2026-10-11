@@ -1,6 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { named, test, watchFor } from "./helpers.ts";
+import { expectCoordsInSquares, named, test, watchFor } from "./helpers.ts";
 
 /**
  * Squads played through its screens, on the real server (wrangler dev, SQUADS_TEST on) with its bots: test lobbies
@@ -203,6 +203,11 @@ test("Relay (a test lobby): your move on your board shows at once, then the tiny
   // The tiny boards are tappable now: watch another board full size, then back.
   const others = page.locator("button.sq-tiny:not(.is-you)");
   await expect(others.first()).toBeVisible();
+  // The big board's coordinates sit in their own squares, either way up (the letters were a column off): on your board,
+  // then on next turn's, where your squad has the other colour, so it opens the other way up.
+  const up = await expectCoordsInSquares(page);
+  await page.locator("button.sq-tiny:has(.sq-mark.next)").click();
+  await expectCoordsInSquares(page, up === "white" ? "black" : "white");
   await others.nth(3).click();
   await expect(page.locator(".sq-status")).toContainText(/^Watching Board \d|is over/);
   await page.getByRole("button", { name: "Back to my board" }).click();

@@ -117,3 +117,59 @@ export async function watchFor(page: Page, what: Record<string, { selector: stri
     seen: () => page.evaluate((t) => (window as unknown as { __seen: Record<string, Record<string, boolean>> }).__seen[t]!, tag),
   };
 }
+
+/**
+ * The big board's coordinates, each measured by its text against the square it names (.claude/LESSONS.md,
+ * "Coordinates a column off"): every file's letter inside its own column's square in the bottom row, every rank's
+ * number inside its own row's square in the left column, either way up. Says which way up the board is and which
+ * labels are out of place (none: an empty list). Poll it until the board you mean is on screen.
+ */
+export async function boardCoords(page: Page): Promise<{ orientation: "white" | "black" | null; off: string[] }> {
+  return page.evaluate(() => {
+    const wrap = document.querySelector(".board-area .cg-wrap");
+    const board = wrap?.querySelector("cg-board");
+    if (!wrap || !board) return { orientation: null, off: ["no board"] };
+    const black = wrap.classList.contains("orientation-black");
+    const b = board.getBoundingClientRect();
+    const sq = b.width / 8;
+    const text = (el: Element) => {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      return r.getBoundingClientRect();
+    };
+    // (Half a pixel either way for the text's own rounding.)
+    const inSquare = (t: DOMRect, col: number, row: number) =>
+      t.width > 0 && t.left >= b.left + col * sq - 0.5 && t.right <= b.left + (col + 1) * sq + 0.5 && t.top >= b.top + row * sq - 0.5 && t.bottom <= b.top + (row + 1) * sq + 0.5;
+    const where = (t: DOMRect) => `${Math.round(t.left - b.left)},${Math.round(t.top - b.top)} on a ${Math.round(sq)} px square`;
+    const files = [...wrap.querySelectorAll("coords.files coord")];
+    const ranks = [...wrap.querySelectorAll("coords.ranks coord")];
+    const off: string[] = [];
+    if (files.length !== 8 || ranks.length !== 8) off.push(`${files.length} files and ${ranks.length} ranks`);
+    for (const el of files) {
+      const f = "abcdefgh".indexOf((el.textContent ?? "").trim().toLowerCase());
+      const t = text(el);
+      if (f < 0 || !inSquare(t, black ? 7 - f : f, 7)) off.push(`file ${el.textContent} at ${where(t)}`);
+    }
+    for (const el of ranks) {
+      const r = Number(el.textContent) - 1;
+      const t = text(el);
+      if (!(r >= 0 && r < 8) || !inSquare(t, 0, black ? r : 7 - r)) off.push(`rank ${el.textContent} at ${where(t)}`);
+    }
+    return { orientation: black ? "black" : "white", off };
+  });
+}
+
+/** Waits until the big board (that way up, if given) has every coordinate in its own square; says which way up it is. */
+export async function expectCoordsInSquares(page: Page, orientation?: "white" | "black", timeout = 10_000): Promise<"white" | "black"> {
+  let last: Awaited<ReturnType<typeof boardCoords>> = { orientation: null, off: [] };
+  await expect
+    .poll(
+      async () => {
+        last = await boardCoords(page);
+        return last.off.length === 0 && (!orientation || last.orientation === orientation) ? "in their squares" : `${last.orientation}: ${last.off.join("; ") || "waiting for the board that way up"}`;
+      },
+      { timeout },
+    )
+    .toBe("in their squares");
+  return last.orientation!;
+}
