@@ -2,7 +2,7 @@ import { Component } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FRONT_DOOR, MATCHMAKING, isRankedMatch, rankedMinHumans, type ItemLook, type MatchmakingType, type Settings } from "@chessroyale/core";
 import type { LobbyPlayer } from "@chessroyale/chess";
-import { BackButton, DressedPawn, myHat } from "../components/FrontDoor.tsx";
+import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { account } from "../account.ts";
 import { play } from "../sound.ts";
@@ -65,21 +65,21 @@ function usePops() {
 }
 
 /** A seat's pawn, drawn again only when its look changes (the grid re-renders whenever someone arrives). */
-class SeatPawn extends Component<{ look?: ItemLook; hat: string }> {
-  shouldComponentUpdate(next: { look?: ItemLook; hat: string }) {
-    return next.look !== this.props.look || next.hat !== this.props.hat;
+class SeatPawn extends Component<{ look?: ItemLook }> {
+  shouldComponentUpdate(next: { look?: ItemLook }) {
+    return next.look !== this.props.look;
   }
   render() {
-    return <DressedPawn size="seat" look={this.props.look} hat={this.props.hat} />;
+    return <DressedPawn size="seat" look={this.props.look} />;
   }
 }
 
 /** The grid of seats: filled ones in order, then empty ones. Re-rendered only when someone arrives or leaves. */
-function Seats({ seats, size, me, myLook, hat, looks, bots, trickle }: { seats: LobbyPlayer[]; size: number; me: string | null; myLook?: ItemLook; hat: string; looks: ReadonlyMap<string, ItemLook>; bots: number; trickle?: boolean }) {
+function Seats({ seats, size, me, myLook, looks, bots, trickle }: { seats: LobbyPlayer[]; size: number; me: string | null; myLook?: ItemLook; looks: ReadonlyMap<string, ItemLook>; bots: number; trickle?: boolean }) {
   const pop = usePops();
   // Bots wear what they wear in the match (looks.ts: seeded by their name, the same outfit on the vote board), worked
   // out once each so their pawns aren't redrawn.
-  const botLooks = useRef(new Map<string, { look?: ItemLook; hat: string }>());
+  const botLooks = useRef(new Map<string, { look?: ItemLook }>());
   const botLook = (p: LobbyPlayer) => {
     let l = botLooks.current.get(p.id);
     if (!l) botLooks.current.set(p.id, (l = pawnLook({ id: p.id, name: p.name, isYou: false, isBot: true, look: undefined })));
@@ -98,8 +98,8 @@ function Seats({ seats, size, me, myLook, hat, looks, bots, trickle }: { seats: 
         const you = i === 0 && (p.id === me || p.id === SELF);
         const key = you ? SELF : p.id;
         const delay = pop(key, p.isBot, p.isBot ? botGap : STAGGER_MS);
-        const dress = you ? { look: myLook, hat } : p.isBot ? botLook(p) : { look: looks.get(p.id), hat: "none" };
-        const pawn = <SeatPawn look={dress.look} hat={dress.hat} />;
+        const dress = you ? { look: myLook } : p.isBot ? botLook(p) : { look: looks.get(p.id) };
+        const pawn = <SeatPawn look={dress.look} />;
         const cls = `fd-seat pop${you ? " you" : ""}${p.isBot ? " bot" : ""}`;
         const style = { "--pop-delay": `${Math.round(delay)}ms` };
         // A person's pawn opens their profile; bots are just bots.
@@ -170,10 +170,9 @@ export function QueueScreen({
   const left = match.fillAt ? Math.max(0, Math.ceil((match.fillAt - now) / 1000)) : null;
   const filled = !!match.filledAt;
   const myLook = account().profile?.locker?.look;
-  const hat = myHat(account().profile);
   const grid = useMemo(
-    () => <Seats seats={seats} size={size} me={me} myLook={myLook} hat={hat} looks={match.looks} bots={bots} trickle={type === "solo"} />,
-    [seats, size, me, myLook, hat, bots],
+    () => <Seats seats={seats} size={size} me={me} myLook={myLook} looks={match.looks} bots={bots} trickle={type === "solo"} />,
+    [seats, size, me, myLook, bots],
   );
   const line = filled
     ? raid
@@ -226,7 +225,7 @@ export function QueueScreen({
       <div class="fd-queue-panel">
         {grid}
         <div class="fd-queue-you">
-          <DressedPawn size="card" look={myLook} hat={hat} />
+          <DressedPawn size="card" look={myLook} />
           <div>
             <div class="fd-you-title">You're in · seat 1</div>
             <div class="fd-you-sub">Your pawn is gold-ringed in the grid</div>
@@ -270,9 +269,9 @@ export function QueueLine({ raid, waitSeconds, onCancel, title, seats }: { raid:
         <i style={{ width: "0%" }} />
       </div>
       <div class="fd-queue-panel">
-        <Seats seats={[]} size={size} me={null} hat="none" looks={new Map()} bots={0} />
+        <Seats seats={[]} size={size} me={null} looks={new Map()} bots={0} />
         <div class="fd-queue-you">
-          <DressedPawn size="card" look={account().profile?.locker?.look} hat={myHat(account().profile)} />
+          <DressedPawn size="card" look={account().profile?.locker?.look} />
           <div>
             <div class="fd-you-title">You're in line</div>
             <div class="fd-you-sub">You'll get a seat as soon as one is free</div>

@@ -600,11 +600,11 @@ export function CrowdCut({
       <div class="pawn-grid" role="img" aria-label={`${aliveAfter} players through, ${knockedOut.length} cut`}>
         {seats.map((p) => {
           const side = p.team === "b" ? "b" : "w";
-          const { look, hat } = pawnLook(p);
+          const { look } = pawnLook(p);
           const state = cutNow.has(p.id) ? (slammed ? " cut-now" : " doomed") : p.out ? " gone" : "";
           return (
             <span key={p.id} class={`grid-pawn${state}${p.isYou ? " you" : ""}`} title={p.isYou ? "You" : p.name}>
-              <Avatar look={look} side={side} hat={hat} />
+              <Avatar look={look} side={side} />
             </span>
           );
         })}

@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
-import { equippedLook, itemDef, ratingTier, shopItem, type ItemLook, type ItemSlot, type RankEffect, type ShopState } from "@chessroyale/core";
+import { itemDef, ratingTier, type ItemLook, type ItemSlot, type RankEffect } from "@chessroyale/core";
 import { Avatar } from "./Items.tsx";
-import { account, type Profile } from "../account.ts";
+import { account } from "../account.ts";
 import type { LiveCounts } from "../live.ts";
 
 /**
@@ -53,22 +53,17 @@ export function Coins({ coins }: { coins: number | null }) {
   );
 }
 
-/** The shop hat you wear (shown when no crate item is on your head). */
-export const myHat = (profile: Profile | null | undefined) => equippedLook(profile?.shop, "hat").hat ?? "none";
-
 /**
  * A dressed pawn (the item-builder's Avatar) in a box with room for what sticks out (a weapon, a crown), and an
  * optional shadow under it. `size` picks the box from the stylesheet.
  */
 export function DressedPawn({
   look,
-  hat = "none",
   size,
   shadow,
   side = "w",
 }: {
   look?: ItemLook;
-  hat?: string;
   size: "hero" | "profile" | "ring" | "card" | "seat" | "side";
   shadow?: boolean;
   side?: "w" | "b";
@@ -76,7 +71,7 @@ export function DressedPawn({
   return (
     <span class={`fd-pawn fd-pawn-${size}${shadow ? " shadow" : ""}`} aria-hidden="true">
       <span class="fd-pawn-box">
-        <Avatar look={look} side={side} hat={hat} />
+        <Avatar look={look} side={side} />
       </span>
     </span>
   );
@@ -87,7 +82,7 @@ export function MyPawnButton({ onClick }: { onClick: () => void }) {
   const p = account().profile;
   return (
     <button type="button" class="fd-ring" aria-label="Your profile" onClick={onClick}>
-      <DressedPawn look={p?.locker?.look} hat={myHat(p)} size="ring" />
+      <DressedPawn look={p?.locker?.look} size="ring" />
     </button>
   );
 }
@@ -209,16 +204,13 @@ export function RankLine({ rating }: { rating: number | null }) {
 /** The order worn items are listed in. */
 export const WORN_ORDER: readonly ItemSlot[] = ["skin", "head", "face", "weapon"];
 
-/** What you wear, by name: crate items, then a shop hat if no crate item is on the head. */
-export function wearingNames(look: ItemLook | undefined, shop: Pick<ShopState, "equipped"> | null | undefined): string {
-  const names = WORN_ORDER.flatMap((slot) => {
+/** What you wear, by name. */
+export function wearingNames(look: ItemLook | undefined): string {
+  return WORN_ORDER.flatMap((slot) => {
     const it = look?.[slot];
     const d = it && itemDef(it.def);
     return d ? [d.name] : [];
-  });
-  const hat = shopItem(shop?.equipped?.hat ?? "");
-  if (!look?.head && hat && hat.look.hat && hat.look.hat !== "none") names.splice(look?.skin ? 1 : 0, 0, hat.name);
-  return names.join(", ");
+  }).join(", ");
 }
 
 /** The 44 px back button at the top left of a front-door page. */

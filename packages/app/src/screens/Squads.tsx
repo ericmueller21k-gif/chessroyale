@@ -1,7 +1,7 @@
 import { useMemo, useState } from "preact/hooks";
 import { SQUADS } from "@chessroyale/core";
 import { squadsVotes, type NetSquadsLobby } from "@chessroyale/chess/squads";
-import { BackButton, DressedPawn, myHat } from "../components/FrontDoor.tsx";
+import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { Bracket, Member, SquadTag, StandingsPanel, StandingsStrip, useNow } from "../components/SquadsParts.tsx";
 import { account } from "../account.ts";
@@ -47,17 +47,16 @@ export function SquadsQueue({ client, onCancel }: { client: SquadsClient; onCanc
       ? `Test lobby · starts at ${ROUND_NAME[test.start]} · bots fill in ${left ?? "…"} s`
       : `Finding players · ${left ?? "…"} s, then bots fill the rest`;
   const myLook = account().profile?.locker?.look;
-  const hat = myHat(account().profile);
   // Before the fill: people in the order they joined (you first). After: the eight squads of four.
   const squads = lobby?.squads.length ? lobby.squads : null;
   const pawn = (id: string | null) => {
     if (!id) return <span class="fd-seat empty" />;
     const p = lobby!.players.find((x) => x.id === id)!;
     const you = id === me;
-    const dress = you ? { look: myLook, hat } : pawnLook({ id, name: p.name, isYou: false, isBot: p.isBot, look: client.looks.get(id) });
+    const dress = you ? { look: myLook } : pawnLook({ id, name: p.name, isYou: false, isBot: p.isBot, look: client.looks.get(id) });
     return (
       <span key={id} class={`fd-seat pop${you ? " you" : ""}${p.isBot ? " bot" : ""}${!p.isBot && p.partyId === myParty && !you && myParty ? " friend" : ""}`} title={you ? "You" : p.name}>
-        <DressedPawn size="seat" look={dress.look} hat={dress.hat} />
+        <DressedPawn size="seat" look={dress.look} />
       </span>
     );
   };
@@ -100,7 +99,7 @@ export function SquadsQueue({ client, onCancel }: { client: SquadsClient; onCanc
           </div>
         )}
         <div class="fd-queue-you">
-          <DressedPawn size="card" look={myLook} hat={hat} />
+          <DressedPawn size="card" look={myLook} />
           <div>
             <div class="fd-you-title">You're in{squads ? ` · ${squadName(client.mySquad?.id)}` : ""}</div>
             <div class="fd-you-sub">Squads of 4 play a bracket: Relay, Pairs, then the final</div>

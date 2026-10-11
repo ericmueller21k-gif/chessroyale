@@ -2,7 +2,7 @@ import { useState } from "preact/hooks";
 import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, shopItem, wornFromLocker, type ShopSlot } from "@chessroyale/core";
 import { account, buyShopItem } from "../account.ts";
 import { openProfile } from "../profile-nav.ts";
-import { HattedPawn, KingEffectPreview } from "../components/Cosmetics.tsx";
+import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 import { CratesPanel, LockerPanel } from "./Crates.tsx";
@@ -91,8 +91,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           {error && <p class="shop-error">{error}</p>}
           {slot === "chat" && gotPack && <GotPackNote got={gotPack} />}
           <div class="shop-grid">
-            {/* ("No hat" isn't for sale: you take a hat off in the locker.) */}
-            {SHOP_ITEMS.filter((i) => i.slot === slot && i.look.hat !== "none").map((item) => {
+            {SHOP_ITEMS.filter((i) => i.slot === slot).map((item) => {
               const owned = shop.owned.includes(item.id);
               const equipped = item.slot !== "chat" && shop.equipped[item.slot] === item.id;
               // Chat packs: their lines are the preview, and owning one is all it takes (nothing to equip).
@@ -107,10 +106,8 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
                         ))}
                         {pack.kind !== "emoji" && pack.lines.length > 4 && <span class="more">+{pack.lines.length - 4} more</span>}
                       </div>
-                    ) : item.slot === "king" ? (
-                      <KingEffectPreview look={item.look} />
                     ) : (
-                      <HattedPawn hat={item.look.hat!} />
+                      <KingEffectPreview look={item.look} />
                     )}
                   </div>
                   <strong>{item.name}</strong>

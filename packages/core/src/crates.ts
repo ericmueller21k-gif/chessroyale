@@ -2,8 +2,9 @@ import type { Rng } from "./rng.ts";
 
 /**
  * Crates: cosmetic items in stacked layers of rarity. Every drop rolls three things independently:
- *   1. its tier, which decides the item: the strip lands on a tier's present (Common to Epic), which opens to one
- *      of that tier's items evenly, or on Fischer Random (Legendary and Mythic items only),
+ *   1. its tier, which decides the item: the strip lands on a tier's box (Common to Epic: a present in Winter, a
+ *      supply box in Beta), which opens to one of that tier's items evenly, or on Fischer Random (Legendary and
+ *      Mythic items only),
  *   2. its colour (red and yellow common, Pearl the rarest), and
  *   3. its purity: 100% minus a blemish of 0-100% (blotches over that share of its colour). At 90%+ purity it's
  *      shiny; at 0% it's blotched all over, a darker shade of its colour.
@@ -66,10 +67,12 @@ export interface ItemDef {
 export const behindPiece = (def: string) => itemDef(def)?.layer === "back";
 
 export const ITEM_DEFS: readonly ItemDef[] = [
+  // Winter Crate · Series 1.
   { id: "santa-beard", name: "Santa Beard", tier: "common", slot: "face", description: "Ho ho ho." },
   { id: "beanie", name: "Beanie", tier: "common", slot: "head", description: "A plain knit beanie. Keeps the thinking warm." },
   { id: "tree-tee", name: "Christmas Tree Tee", tier: "common", slot: "skin", description: "Your pawn in a festive T-shirt. The bulbs are the only part that's lit." },
   { id: "antlers", name: "Antlers", tier: "uncommon", slot: "head", description: "Guides the sleigh through the endgame." },
+  { id: "scarf", name: "Scarf", tier: "uncommon", slot: "face", description: "A long knit scarf. Your pawn's mum insisted." },
   { id: "santa-hat", name: "Santa Hat", tier: "rare", slot: "head", description: "Knows who's been naughty in the opening." },
   { id: "ski-goggles", name: "Ski Goggles", tier: "rare", slot: "face", colors: 2, description: "Frame in one colour, see-through lenses in another. For black-diamond lines." },
   { id: "snowman", name: "Snowman", tier: "epic", slot: "skin", description: "Your pawn, built of snow, with a scarf." },
@@ -79,6 +82,18 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "gift-tube", name: "Gift-Wrap Tube", tier: "legendary", slot: "weapon", description: "Wrapping-paper tube, tri-blend stripes. Swing responsibly." },
   { id: "candy-cane", name: "Candy Cane", tier: "legendary", slot: "weapon", description: "White, striped in its colour. Sharpened at one end (allegedly)." },
   { id: "fire-ice-crown", name: "Fire & Ice Crown", tier: "mythic", slot: "head", description: "A crown of winter ice, burning in its own colour." },
+  // Beta Crate · Series 001 (Eric, Oct 11): the old shop's pawn hats, then themes split across the tiers (secret agent,
+  // pirate, ninja) and a one-off Smiley Face. The full plan is in DECISIONS.md; it ships in batches.
+  { id: "party-hat", name: "Party Hat", tier: "common", slot: "head", description: "Every move is a celebration. Even the blunders." },
+  { id: "wizard-hat", name: "Wizard Hat", tier: "common", slot: "head", description: "Knows things. Mostly opening theory." },
+  { id: "top-hat", name: "Top Hat", tier: "common", slot: "head", description: "A pawn of means. Monocle sold separately." },
+  { id: "viking-helm", name: "Viking Helm", tier: "uncommon", slot: "head", description: "Pushes into any zone. The horns are for show; so is the plan." },
+  { id: "little-crown", name: "Little Crown", tier: "uncommon", slot: "head", description: "Dreaming of promotion." },
+  { id: "eyepatch", name: "Eyepatch", tier: "uncommon", slot: "face", description: "Half the vision, twice the swagger." },
+  { id: "dark-shades", name: "Dark Shades", tier: "rare", slot: "face", description: "Can't see the board. Looks great, though." },
+  { id: "suit-and-tie", name: "Suit and Tie", tier: "epic", slot: "skin", colors: 2, description: "A sharp suit in one colour, the tie in another. Licence to promote." },
+  { id: "smiley-face", name: "Smiley Face", tier: "legendary", slot: "face", description: "Have a nice game." },
+  { id: "tommy-gun", name: "Tommy Gun", tier: "mythic", slot: "weapon", colors: 2, description: "A classic drum-fed Tommy gun, metal in one colour, wood in another. For settling the endgame." },
 ];
 
 export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);
@@ -86,27 +101,58 @@ export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);
 /** The strip's special slot: Fischer Random, a second spin for a Legendary or Mythic item. */
 export const FISCHER = "fischer";
 
-/** The tiers that come in presents; Legendary and Mythic come only through Fischer Random. */
+/** The tiers that come in a crate's boxes (presents, supply boxes); Legendary and Mythic come only through Fischer Random. */
 export type PresentTier = "common" | "uncommon" | "rare" | "epic";
+export type FischerTier = "legendary" | "mythic";
+
+/** How a crate looks in the app: its own box on the crate page, and the box each tier comes in on the strip. */
+export type CrateLook = "winter" | "beta";
 
 export interface CrateDef {
   id: string;
   name: string;
+  /** One line under its name, to tell crates apart. */
+  blurb: string;
+  look: CrateLook;
   /**
-   * The strip's odds out of 100: a present for each tier, in its colour, and Fischer Random. Each tier's present is
-   * rarer than the one below. A present opens to one of its tier's items, evenly.
+   * The strip's odds out of 100: a box for each tier, in its colour, and Fischer Random. Each tier's box is rarer
+   * than the one below. A box opens to one of its tier's items, evenly.
    */
   strip: readonly { tier: PresentTier | typeof FISCHER; weight: number }[];
-  /** What the presents hold: the Common to Epic items. */
+  /**
+   * Everything the crate holds. Each item's own tier says where it is: in that tier's box (Common to Epic) or behind
+   * Fischer Random (Legendary, Mythic). So changing an item's tier is one field, in ITEM_DEFS.
+   */
   items: readonly string[];
-  /** Fischer Random's odds out of 100. */
-  fischer: readonly { item: string; weight: number }[];
+  /** Fischer Random's odds out of 100, by tier; a tier's items share its weight evenly. */
+  fischer: readonly { tier: FischerTier; weight: number }[];
 }
 
 export const CRATES: readonly CrateDef[] = [
   {
+    id: "beta-001",
+    name: "Beta Crate · Series 001",
+    blurb: "Secret agents, pirates, the old shop's hats and a smile",
+    look: "beta",
+    // Eric (Oct 11): the same odds as Winter.
+    strip: [
+      { tier: "common", weight: 40 },
+      { tier: "uncommon", weight: 26 },
+      { tier: "rare", weight: 18 },
+      { tier: "epic", weight: 14 },
+      { tier: FISCHER, weight: 2 },
+    ],
+    items: ["party-hat", "wizard-hat", "top-hat", "viking-helm", "little-crown", "eyepatch", "dark-shades", "suit-and-tie", "smiley-face", "tommy-gun"],
+    fischer: [
+      { tier: "legendary", weight: 80 },
+      { tier: "mythic", weight: 20 },
+    ],
+  },
+  {
     id: "winter-1",
     name: "Winter Crate · Series 1",
+    blurb: "Santa, snowmen and a crown of fire and ice",
+    look: "winter",
     // Eric (Oct 6): the strip holds presents by tier, Fischer Random 2%. Epic stays at his 12-15% (14%).
     strip: [
       { tier: "common", weight: 40 },
@@ -115,17 +161,50 @@ export const CRATES: readonly CrateDef[] = [
       { tier: "epic", weight: 14 },
       { tier: FISCHER, weight: 2 },
     ],
-    items: ["santa-beard", "beanie", "tree-tee", "antlers", "santa-hat", "ski-goggles", "snowman", "present", "gingerbread", "chimney"],
+    items: [
+      "santa-beard",
+      "beanie",
+      "tree-tee",
+      "antlers",
+      "scarf",
+      "santa-hat",
+      "ski-goggles",
+      "snowman",
+      "present",
+      "gingerbread",
+      "chimney",
+      "gift-tube",
+      "candy-cane",
+      "fire-ice-crown",
+    ],
+    // (The tube and the cane share Legendary's 80, 40 each; the crown has Mythic's 20.)
     fischer: [
-      { item: "gift-tube", weight: 40 },
-      { item: "candy-cane", weight: 40 },
-      { item: "fire-ice-crown", weight: 20 },
+      { tier: "legendary", weight: 80 },
+      { tier: "mythic", weight: 20 },
     ],
   },
 ];
 
-/** The items a tier's present can hold in a crate. */
-export const presentItems = (crate: CrateDef, tier: string) => crate.items.filter((id) => itemDef(id)?.tier === tier);
+/** A crate's items of one tier: what that tier's box holds, or (Legendary, Mythic) its share of Fischer Random. */
+export const tierItems = (crate: CrateDef, tier: string) => crate.items.filter((id) => itemDef(id)?.tier === tier);
+/** The items a tier's box can hold in a crate. */
+export const presentItems = (crate: CrateDef, tier: string) => (tier === FISCHER ? [] : tierItems(crate, tier));
+
+/** Fischer Random's odds per item (out of 100): each tier's weight shared evenly by its items; empty tiers left out. */
+export function fischerOdds(crate: CrateDef): { item: string; weight: number }[] {
+  const live = crate.fischer.filter((f) => tierItems(crate, f.tier).length > 0);
+  const total = live.reduce((s, f) => s + f.weight, 0);
+  return live.flatMap((f) => {
+    const list = tierItems(crate, f.tier);
+    return list.map((item) => ({ item, weight: (100 * f.weight) / total / list.length }));
+  });
+}
+
+/**
+ * The strip as it rolls: a tier whose box holds nothing (or Fischer Random with nothing behind it) is left out, so a
+ * crate that's still being filled can't land on an empty box. (A test keeps every live crate's tiers filled.)
+ */
+export const liveStrip = (crate: CrateDef) => crate.strip.filter((x) => (x.tier === FISCHER ? fischerOdds(crate).length > 0 : presentItems(crate, x.tier).length > 0));
 
 export const crateDef = (id: string) => CRATES.find((c) => c.id === id);
 
@@ -220,10 +299,11 @@ export interface CrateRoll {
  * `force` (testing only): land on Fischer Random, and/or a shiny purity.
  */
 export function rollCrate(rng: Rng, crate: CrateDef, force: { fischer?: boolean; shiny?: boolean } = {}): CrateRoll {
-  const first = force.fischer ? FISCHER : pick(rng, crate.strip).tier;
+  const odds = fischerOdds(crate);
+  const first = force.fischer && odds.length ? FISCHER : pick(rng, liveStrip(crate)).tier;
   const fischer = first === FISCHER;
   const inside = fischer ? [] : presentItems(crate, first);
-  const def = fischer ? pick(rng, crate.fischer).item : inside[Math.min(inside.length - 1, Math.floor(rng() * inside.length))]!;
+  const def = fischer ? pick(rng, odds).item : inside[Math.min(inside.length - 1, Math.floor(rng() * inside.length))]!;
   const color = pick(rng, ITEM_COLORS).id;
   const blemish = force.shiny ? Math.round(rng() * 99) / 10 : rollBlemish(rng);
   const seed = Math.floor(rng() * 2 ** 31);
@@ -232,19 +312,19 @@ export function rollCrate(rng: Rng, crate: CrateDef, force: { fischer?: boolean;
   return roll;
 }
 
-/** Chance of landing on a tier's present (or Fischer Random), out of 1. */
+/** Chance of landing on a tier's box (or Fischer Random), out of 1. */
 export function presentChance(crate: CrateDef, tier: string): number {
-  const total = crate.strip.reduce((s, x) => s + x.weight, 0);
-  return (crate.strip.find((x) => x.tier === tier)?.weight ?? 0) / total;
+  const strip = liveStrip(crate);
+  const total = strip.reduce((s, x) => s + x.weight, 0);
+  return (strip.find((x) => x.tier === tier)?.weight ?? 0) / total;
 }
 
-/** Chance of a drop's item, out of 1 (for the crate page): its present's chance, shared evenly, or via Fischer Random. */
+/** Chance of a drop's item, out of 1 (for the crate page): its box's chance, shared evenly, or via Fischer Random. */
 export function itemChance(crate: CrateDef, def: string): number {
   const tier = itemDef(def)?.tier;
-  if (tier && crate.items.includes(def)) return presentChance(crate, tier) / presentItems(crate, tier).length;
-  const ft = crate.fischer.reduce((s, x) => s + x.weight, 0);
-  const inner = crate.fischer.find((x) => x.item === def);
-  return inner ? (presentChance(crate, FISCHER) * inner.weight) / ft : 0;
+  if (!tier || !crate.items.includes(def)) return 0;
+  if (tier !== "legendary" && tier !== "mythic") return presentChance(crate, tier) / presentItems(crate, tier).length;
+  return (presentChance(crate, FISCHER) * (fischerOdds(crate).find((x) => x.item === def)?.weight ?? 0)) / 100;
 }
 
 /** What a player wears (votes and the cut screen): an item instance per slot, as sent to others online. */

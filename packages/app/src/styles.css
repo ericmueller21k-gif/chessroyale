@@ -4751,27 +4751,6 @@ button.history-label {
 }
 
 /* ---- Shop cosmetics ---- */
-.pawn-hat {
-  position: absolute;
-  inset: -9% 0 auto 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  overflow: visible;
-}
-.hatted-pawn {
-  position: relative;
-  display: inline-block;
-  width: 64px;
-  height: 64px;
-}
-.hatted-pawn piece {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background-size: cover;
-}
 .king-effect-preview {
   position: relative;
   display: inline-block;
@@ -5519,25 +5498,6 @@ button.history-label {
   aspect-ratio: 1;
   transition: opacity 0.5s, transform 0.5s, filter 0.5s;
 }
-.grid-pawn .hatted-pawn {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.grid-pawn .hatted-pawn piece {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background-size: cover;
-}
-.grid-pawn .pawn-hat {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
 .grid-pawn.gone {
   opacity: 0.14;
   filter: grayscale(1);
@@ -5600,7 +5560,6 @@ button.history-label {
   height: 100%;
 }
 .avatar.cg-wrap > piece,
-.avatar > .pawn-hat,
 .avatar > .avatar-items,
 .avatar > .avatar-skin {
   position: absolute;
@@ -5619,23 +5578,8 @@ button.history-label {
 .avatar > .avatar-skin {
   z-index: 2;
 }
-.avatar > .pawn-hat {
-  z-index: 3;
-}
 .avatar > .avatar-items.front {
   z-index: 4;
-}
-.avatar > .avatar-hat {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-}
-.avatar > .avatar-hat .pawn-hat {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
 }
 
 /* ---- Crates and the locker: Final Fantasy-style windows, like the God King's commands ---- */
@@ -5738,6 +5682,10 @@ button.history-label {
   line-height: 1.5;
   text-shadow: 2px 2px 0 #0b0b1a;
 }
+.crate-row-blurb {
+  font-size: 12px;
+  opacity: 0.85;
+}
 .ff-cursor {
   font-size: 14px;
   animation: ff-blink 0.8s steps(2, end) infinite;
@@ -5764,6 +5712,10 @@ button.history-label {
   font-family: "Press Start 2P", ui-monospace, monospace;
   font-size: 11px;
   text-shadow: 2px 2px 0 #0b0b1a;
+}
+.crate-hero .small {
+  text-align: center;
+  opacity: 0.85;
 }
 .odds-list {
   display: grid;
@@ -6133,10 +6085,6 @@ button.history-label {
 .locker-default-art .king-effect-preview {
   width: 62px;
   height: 62px;
-}
-.locker-default-art .hatted-pawn {
-  width: 56px;
-  height: 56px;
 }
 /* Deleting an item: a dimmed backdrop and an FF-style window with the choices. */
 .locker-dialog-back {
@@ -8020,7 +7968,7 @@ button.fd-logo {
   border-radius: 14px;
   padding: 10px 12px;
 }
-/* The item itself, drawn as it looks on them (crates' ItemArt; a shop hat on its pawn). */
+/* The item itself, drawn as it looks on them (crates' ItemArt). */
 .fd-thumb {
   display: grid;
   place-items: center;
@@ -8033,10 +7981,6 @@ button.fd-logo {
 }
 .fd-nowrap {
   white-space: nowrap;
-}
-.fd-thumb .hatted-pawn {
-  width: 100%;
-  height: 100%;
 }
 .fd-item-text,
 .fd-match-text {

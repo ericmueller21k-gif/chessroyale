@@ -57,10 +57,10 @@ function zoneOnScreen(option: number, orientation: Orientation) {
  * Someone else's pawn: faint (a "ghost"), dressed as they are. It glides when its spot changes (CSS), and pawns
  * lower on the screen stand in front.
  */
-const VotePawn = memo(function VotePawn({ id, left, top, look, hat, side, voted }: { id: string; left: number; top: number; look?: ItemLook; hat: string; side: "w" | "b"; voted: boolean }) {
+const VotePawn = memo(function VotePawn({ id, left, top, look, side, voted }: { id: string; left: number; top: number; look?: ItemLook; side: "w" | "b"; voted: boolean }) {
   return (
     <span class={`vote-pawn${voted ? " in" : ""}`} data-id={id} style={{ left: `${left}%`, top: `${top}%`, zIndex: String(Math.round(top * 10)) }}>
-      <Avatar look={look} side={side} hat={hat} />
+      <Avatar look={look} side={side} />
     </span>
   );
 });
@@ -327,7 +327,7 @@ export function VoteScreen({
                   const spot = voted ? voteZoneSpot(at!.option, pawnSide, at!.k) : spots.get(p.id)!;
                   const { left, top } = onScreen(spot, orientation);
                   const look = looks.get(p.id)!;
-                  return <VotePawn key={p.id} id={p.id} left={left} top={top} look={look.look} hat={look.hat} side={pawnSide} voted={voted} />;
+                  return <VotePawn key={p.id} id={p.id} left={left} top={top} look={look.look} side={pawnSide} voted={voted} />;
                 })}
               </div>
               {/* Each zone's icon and count, on its far half (the other team's): your team's votes and your pawn
@@ -373,7 +373,7 @@ export function VoteScreen({
                   onPointerCancel={onCancel}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Avatar look={myLook.look} side={side} hat={myLook.hat} />
+                  <Avatar look={myLook.look} side={side} />
                 </span>
               )}
             </div>

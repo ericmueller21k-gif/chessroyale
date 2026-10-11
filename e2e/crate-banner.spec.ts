@@ -1,5 +1,37 @@
 import { expect } from "@playwright/test";
+import { crateDef, itemDef } from "@chessroyale/core";
 import { named, test } from "./helpers.ts";
+
+/**
+ * Two crates (Beta Crate · Series 001 joined Winter, Oct 11, 2026): you choose one, its page shows its own boxes
+ * (supply boxes or presents) and odds, and opening it spins its own boxes and lands on one of its own items. On a
+ * phone and a computer, with nothing sideways-scrolling.
+ */
+test("crates: choose either crate; each shows its own boxes, spins them and opens to its own items", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  await named(page, "Two Crates");
+  await page.goto("/shop?crates");
+  await expect(page.locator(".crate-row")).toHaveCount(2);
+  for (const [id, box] of [
+    ["beta-001", ".supply-art"],
+    ["winter-1", ".present-art:not(.supply-art)"],
+  ] as const) {
+    const crate = crateDef(id)!;
+    await page.locator(`.crate-row[data-crate="${id}"]`).click();
+    await expect(page.locator(".crate-hero strong")).toHaveText(crate.name);
+    // A box for each of the four tiers, then Fischer Random, then every item with its chance.
+    await expect(page.locator(`.odds-row ${box}`)).toHaveCount(4);
+    await expect(page.locator(".odds-row")).toHaveCount(5 + crate.items.length);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+    await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
+    await expect(page.locator(`.spin-tile.present ${box}`).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(".reveal-card")).toBeVisible({ timeout: 25_000 });
+    const name = (await page.locator(".reveal-name").textContent())?.trim();
+    expect(crate.items.map((i) => itemDef(i)!.name)).toContain(name);
+    await page.getByRole("button", { name: "▶ Done" }).click();
+    await page.getByRole("button", { name: "‹ Crates" }).click();
+  }
+});
 
 /**
  * The crate opening's "FISCHER RANDOM!" banner fits its words at every width (DECISIONS.md, "The computer's play
@@ -40,7 +72,7 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
   for (const width of widths) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/shop?crates&fischer=1");
-    await page.locator(".crate-row").first().click();
+    await page.locator('.crate-row[data-crate="beta-001"]').click();
     await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
     await expect(page.locator(".fischer-stage")).toBeVisible({ timeout: 20_000 });
     await page.evaluate(() => ((window as any).__fb.length = 0));

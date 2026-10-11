@@ -94,12 +94,11 @@ export async function saveChatPicks(picks: { [K in keyof ChatPicks]?: ChatPicks[
   return shop.chat;
 }
 
-/** Equips a shop item you own (a pawn hat takes a crate item off the head, so the locker is fetched again too). */
+/** Equips a shop item you own (a God King effect). */
 export async function equipShopItem(item: string): Promise<void> {
   if (!state.profile) return;
   const shop = await api<ShopState>("/api/shop/equip", { method: "POST", body: JSON.stringify({ item }) });
-  const locker = state.profile.locker ? await api<Locker>("/api/locker") : undefined;
-  set({ profile: { ...state.profile, shop, ...(locker ? { locker } : {}) } });
+  set({ profile: { ...state.profile, shop } });
 }
 
 export interface Locker {
@@ -117,12 +116,11 @@ export async function openCrate(crate: string, force: { fischer?: boolean; shiny
   return { roll: r.roll, item: r.item };
 }
 
-/** Wears a crate item in its slot (null empties the slot). A head item takes off the pawn hat, so the shop is fetched again too. */
+/** Wears a crate item in its slot (null empties the slot). */
 export async function equipLockerItem(slot: ItemSlot, item: string | null): Promise<void> {
   if (!state.profile) return;
   const locker = await api<Locker>("/api/locker/equip", { method: "POST", body: JSON.stringify({ slot, item }) });
-  const shop = slot === "head" && item ? await api<ShopState>("/api/shop") : undefined;
-  set({ profile: { ...state.profile, locker, ...(shop ? { shop } : {}) } });
+  set({ profile: { ...state.profile, locker } });
 }
 
 /** Deletes crate items you own, for good. */
@@ -198,7 +196,6 @@ export interface PublicProfile {
   id: string;
   name: string;
   look: ItemLook;
-  hat: string;
   joinedAt: number;
   lastSeen: number | null;
   online: boolean;

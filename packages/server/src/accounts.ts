@@ -18,7 +18,6 @@ import {
   chatPicks,
   chatPicksAfterGetting,
   cleanChatPickList,
-  equippedLook,
   ownedChatPacks,
   ratingTier,
   shopItem,
@@ -31,7 +30,7 @@ import {
   type ShopState,
   type StoredChatPicks,
 } from "@chessroyale/core";
-import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, takeOffHeadItem, type LockerState } from "./locker.ts";
+import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerState, moveLocker, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA } from "./fairplay-schema.ts";
 
@@ -656,9 +655,8 @@ export interface RaidStats {
 export interface PublicProfile {
   id: string;
   name: string;
-  /** What they wear: crate items, and the shop hat (shown when no crate item is on the head). */
+  /** What they wear: crate items. */
   look: ItemLook;
-  hat: string;
   joinedAt: number;
   lastSeen: number | null;
   online: boolean;
@@ -778,7 +776,6 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     id: u.id,
     name: u.name,
     look: (await lockerState(sql, u.id)).look,
-    hat: equippedLook(await shopState(sql, u.id), "hat").hat ?? "none",
     joinedAt: u.created_at,
     lastSeen: u.last_seen,
     online: u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
@@ -891,8 +888,6 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown): Prom
   // Chat packs aren't equipped: every one you own is yours to use.
   if (item.slot === "chat") return { ok: true, shop: state };
   await sql.run("INSERT INTO equipped (user_id, slot, item_id) VALUES (?, ?, ?) ON CONFLICT (user_id, slot) DO UPDATE SET item_id = excluded.item_id", userId, item.slot, item.id);
-  // One head: a pawn hat takes off a crate head item (and wearing a crate head item takes off the pawn hat).
-  if (item.slot === "hat" && item.look.hat !== "none") await takeOffHeadItem(sql, userId);
   return { ok: true, shop: await shopState(sql, userId) };
 }
 

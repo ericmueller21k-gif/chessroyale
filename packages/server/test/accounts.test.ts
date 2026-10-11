@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
-import { QUICK_CHAT, defaultChatPicks, itemDef, ownedChatPacks } from "@chessroyale/core";
+import { QUICK_CHAT, crateDef, defaultChatPicks, itemDef, ownedChatPacks } from "@chessroyale/core";
 import {
   isPixelIcon,
   buyItem,
@@ -10,6 +10,7 @@ import {
   shopState,
   ensureSchema,
   profile,
+  publicProfile,
   recordResult,
   signInWithIdentity,
   startEmailCode,
@@ -256,22 +257,21 @@ describe("account API", () => {
     const { user: guest } = await createGuest(sql, 1000, "Guest");
     // Everyone starts with the starters, equipped.
     let shop = await shopState(sql, guest.id);
-    expect(shop.equipped).toEqual({ king: "king-holy", hat: "hat-none" });
-    expect(shop.owned).toEqual(expect.arrayContaining(["king-holy", "hat-none"]));
-    expect(shop.owned).not.toContain("hat-party");
+    expect(shop.equipped).toEqual({ king: "king-holy" });
+    expect(shop.owned).toEqual(expect.arrayContaining(["king-holy"]));
+    expect(shop.owned).not.toContain("king-storm");
     expect(shop.coins).toBe(0);
     // You can't equip what you don't own, or anything not in the shop.
-    expect(await equipItem(sql, guest.id, "hat-crown")).toEqual({ ok: false, message: "Get it first." });
-    expect((await buyItem(sql, guest.id, "hat-nope", 1100)).ok).toBe(false);
+    expect(await equipItem(sql, guest.id, "king-storm")).toEqual({ ok: false, message: "Get it first." });
+    expect((await buyItem(sql, guest.id, "king-nope", 1100)).ok).toBe(false);
     // Get it (free while testing), then equip it (the locker does that, with the crate items).
-    const bought = await buyItem(sql, guest.id, "hat-crown", 1100);
-    expect(bought.ok && bought.shop.owned).toContain("hat-crown");
-    const eq = await equipItem(sql, guest.id, "hat-crown");
-    expect(eq.ok && eq.shop.equipped.hat).toBe("hat-crown");
-    await buyItem(sql, guest.id, "king-storm", 1200);
-    await equipItem(sql, guest.id, "king-storm");
+    const bought = await buyItem(sql, guest.id, "king-storm", 1100);
+    expect(bought.ok && bought.shop.owned).toContain("king-storm");
+    const eq = await equipItem(sql, guest.id, "king-storm");
+    expect(eq.ok && eq.shop.equipped.king).toBe("king-storm");
+    await buyItem(sql, guest.id, "king-void", 1200);
     // The profile carries it, so a match knows your look.
-    expect((await profile(sql, guest)).shop.equipped).toEqual({ king: "king-storm", hat: "hat-crown" });
+    expect((await profile(sql, guest)).shop.equipped).toEqual({ king: "king-storm" });
     // An existing account keeps its own choices; the guest's items join it.
     const account = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, 1300);
     await buyItem(sql, account.id, "king-hellfire", 1300);
@@ -279,27 +279,31 @@ describe("account API", () => {
     const merged = await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, 1400);
     expect(merged.id).toBe(account.id);
     shop = await shopState(sql, account.id);
-    expect(shop.owned).toEqual(expect.arrayContaining(["hat-crown", "king-storm", "king-hellfire"]));
-    expect(shop.equipped).toEqual({ king: "king-hellfire", hat: "hat-crown" });
-    expect((await shopState(sql, guest.id)).owned).not.toContain("hat-crown");
+    expect(shop.owned).toEqual(expect.arrayContaining(["king-void", "king-storm", "king-hellfire"]));
+    expect(shop.equipped).toEqual({ king: "king-hellfire" });
+    expect((await shopState(sql, guest.id)).owned).not.toContain("king-void");
   });
 
-  it("one head: a pawn hat takes off a crate head item, and a crate head item takes off the pawn hat", async () => {
+  it("the old pawn hats (now Beta crate items): stored from testing, they're simply gone, and nothing breaks", async () => {
     const sql = memorySql();
     await ensureSchema(sql);
     const { user } = await createGuest(sql, 1000, "Guest");
-    await sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES ('beanie-1', ?, 'beanie', 'red', 40, 7, 'winter-1', 900)", user.id);
-    for (const hat of ["hat-party", "hat-wizard", "king-void"]) await buyItem(sql, user.id, hat, 950);
-    await equipItem(sql, user.id, "hat-party");
-    const on = await equipLocker(sql, user.id, "head", "beanie-1");
-    expect(on.ok && on.locker.equipped.head).toBe("beanie-1");
-    expect((await shopState(sql, user.id)).equipped.hat).toBe("hat-none");
-    await equipItem(sql, user.id, "hat-wizard");
-    expect((await lockerState(sql, user.id)).equipped.head).toBeUndefined();
-    // Taking the pawn hat off ("No hat") leaves the head bare, and a God King effect doesn't touch it.
-    await equipLocker(sql, user.id, "head", "beanie-1");
-    await equipItem(sql, user.id, "king-void");
-    expect((await lockerState(sql, user.id)).equipped.head).toBe("beanie-1");
+    // Owned and worn before the move, the way the shop stored them.
+    for (const id of ["hat-party", "hat-none", "king-void"]) await sql.run("INSERT INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, 900)", user.id, id);
+    await sql.run("INSERT INTO equipped (user_id, slot, item_id) VALUES (?, 'hat', 'hat-party')", user.id);
+    await sql.run("INSERT INTO equipped (user_id, slot, item_id) VALUES (?, 'king', 'king-void')", user.id);
+    const shop = await shopState(sql, user.id);
+    expect(shop.equipped).toEqual({ king: "king-void" });
+    expect(shop.owned).not.toContain("hat-party");
+    expect((await buyItem(sql, user.id, "hat-crown", 1000)).ok).toBe(false);
+    expect((await equipItem(sql, user.id, "hat-party")).ok).toBe(false);
+    // The profile doesn't carry a hat any more; a crate head item is what's on the head.
+    await sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES ('party-1', ?, 'party-hat', 'red', 40, 7, 'beta-001', 900)", user.id);
+    const on = await equipLocker(sql, user.id, "head", "party-1");
+    expect(on.ok && on.locker.look.head?.def).toBe("party-hat");
+    const pub = await publicProfile(sql, user.id, 1000);
+    expect(pub && "hat" in pub).toBe(false);
+    expect(pub?.look.head?.def).toBe("party-hat");
   });
 
   it("deleting crate items: your own only, for good, taken off first if worn", async () => {
@@ -335,7 +339,7 @@ describe("account API", () => {
     expect(got.ok && got.shop.owned).toContain("chat-godking");
     // Equipping a pack changes nothing: the equipped slots are the King's and the hat's.
     const eq = await equipItem(sql, guest.id, "chat-godking");
-    expect(eq.ok && eq.shop.equipped).toEqual({ king: "king-holy", hat: "hat-none" });
+    expect(eq.ok && eq.shop.equipped).toEqual({ king: "king-holy" });
     shop = await shopState(sql, guest.id);
     expect(ownedChatPacks(shop.owned)).toEqual(["basics", "emoji-basics", "godking"]);
     const account = await signInWithIdentity(sql, guest, "email", "chatty@example.com", {}, 1200);
@@ -386,6 +390,21 @@ describe("account API", () => {
     await setChatPicks(sql, other.id, { lines: ["wow"] });
     await signInWithIdentity(sql, other, "email", "owner@example.com", {}, 1600);
     expect((await shopState(sql, owner.id)).chat.lines).toEqual(["thanks"]);
+  });
+
+  it("two crates: each opens to its own items, Fischer Random included", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Guest");
+    for (const id of ["beta-001", "winter-1"]) {
+      const crate = crateDef(id)!;
+      for (let i = 0; i < 12; i++) {
+        const r = await openCrate(sql, user.id, id, { fischer: i % 3 === 0 }, 1100 + i);
+        if (!r.ok) throw new Error(r.message);
+        expect(crate.items).toContain(r.item.def);
+        if (i % 3 === 0) expect(["legendary", "mythic"]).toContain(itemDef(r.item.def)?.tier);
+      }
+    }
   });
 
   it("the locker: crates open on the server (free while testing), items equip by slot, and a guest's items follow them", async () => {

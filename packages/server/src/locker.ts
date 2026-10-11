@@ -86,11 +86,6 @@ export async function openCrate(
   return { ok: true, roll, item: { id, def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed }, locker: await lockerState(sql, userId) };
 }
 
-/** Takes a crate item off the head (wearing a pawn hat does this: one head). */
-export async function takeOffHeadItem(sql: Sql, userId: string): Promise<void> {
-  await sql.run("DELETE FROM equipped_items WHERE user_id = ? AND slot = 'head'", userId);
-}
-
 /** Equips an item you own in its slot, or (item null) empties the slot. */
 export async function equipLocker(sql: Sql, userId: string, slot: unknown, itemId: unknown): Promise<{ ok: true; locker: LockerState } | { ok: false; message: string }> {
   if (slot !== "head" && slot !== "face" && slot !== "skin" && slot !== "weapon") return { ok: false, message: "No such slot." };
@@ -102,10 +97,6 @@ export async function equipLocker(sql: Sql, userId: string, slot: unknown, itemI
   if (!it) return { ok: false, message: "That isn't yours." };
   if (itemDef(it.def)?.slot !== slot) return { ok: false, message: "That doesn't go there." };
   await sql.run("INSERT INTO equipped_items (user_id, slot, item_id) VALUES (?, ?, ?) ON CONFLICT (user_id, slot) DO UPDATE SET item_id = excluded.item_id", userId, slot, itemId);
-  // One head: a crate head item takes off the pawn hat (the shop's `equipped` table; the starter is "No hat").
-  if (slot === "head") {
-    await sql.run("INSERT INTO equipped (user_id, slot, item_id) VALUES (?, 'hat', 'hat-none') ON CONFLICT (user_id, slot) DO UPDATE SET item_id = excluded.item_id", userId);
-  }
   return { ok: true, locker: await lockerState(sql, userId) };
 }
 
