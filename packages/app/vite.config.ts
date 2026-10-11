@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import preact from "@preact/preset-vite";
 
@@ -18,6 +19,27 @@ function stockfish(): Plugin {
         copyFileSync(join(bin, f), join("public/engine", f));
       }
       copyFileSync(join(dirname(require.resolve("stockfish/package.json")), "Copying.txt"), "public/engine/COPYING.txt");
+    },
+  };
+}
+
+/**
+ * Copies the Maia box (packages/maia-worker, built by its own `npm run build`: a separate program under the AGPL, see
+ * its README) into public/engine/maia/, as it is: the worker, onnxruntime's WebAssembly, the model and the licence.
+ * The game never imports any of it; it starts the worker and exchanges text with it (src/maia.ts).
+ */
+function maiaBox(): Plugin {
+  return {
+    name: "copy-maia-box",
+    buildStart() {
+      const dist = join(dirname(fileURLToPath(import.meta.url)), "../maia-worker/dist");
+      rmSync("public/engine/maia", { recursive: true, force: true });
+      if (!existsSync(join(dist, "maia-worker.js"))) {
+        this.warn("The Maia box isn't built (npm run build -w maia-worker): bosses play Stockfish only.");
+        return;
+      }
+      mkdirSync("public/engine/maia", { recursive: true });
+      for (const f of readdirSync(dist)) copyFileSync(join(dist, f), join("public/engine/maia", f));
     },
   };
 }
@@ -41,15 +63,21 @@ function serviceWorker(): Plugin {
     closeBundle() {
       const files = listFiles(outDir)
         .map((f) => "/" + relative(outDir, f).split("\\").join("/"))
-        // (Not the live window's bot replays: only a computer's home fetches them, so phones never download them.)
-        .filter((f) => f !== "/sw.js" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.startsWith("/replays/"))
+        // (Not the live window's bot replays: only a computer's home fetches them, so phones never download them. Nor
+        // the Maia box: about 40 MB, fetched only for a battle that uses it, then kept in its own cache: MAIA below.)
+        .filter((f) => f !== "/sw.js" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.startsWith("/replays/") && !f.startsWith("/engine/maia/"))
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
         .sort();
       const hash = createHash("sha256");
       for (const f of files) hash.update(f).update(readFileSync(join(outDir, f === "/" ? "index.html" : f)));
+      // The Maia box's cache is named by its own files, so an app update keeps it and a new model replaces it.
+      const maiaDir = join(outDir, "engine/maia");
+      const maia = createHash("sha256");
+      if (existsSync(maiaDir)) for (const f of readdirSync(maiaDir).sort()) maia.update(f).update(readFileSync(join(maiaDir, f)));
       const sw = readFileSync("sw-template.js", "utf8")
         .replace("__VERSION__", `brc-${hash.digest("hex").slice(0, 12)}`)
+        .replace("__MAIA__", `brc-maia-${maia.digest("hex").slice(0, 12)}`)
         .replace("__FILES__", JSON.stringify(files));
       writeFileSync(join(outDir, "sw.js"), sw);
     },
@@ -57,7 +85,7 @@ function serviceWorker(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [stockfish(), preact(), serviceWorker()],
+  plugins: [stockfish(), maiaBox(), preact(), serviceWorker()],
   server: { host: true },
   build: { target: "es2020", chunkSizeWarningLimit: 1000 },
 });

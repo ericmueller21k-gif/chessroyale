@@ -1,5 +1,5 @@
 import { PRIOR_RATING } from "./rating.ts";
-import type { Settings } from "./settings.ts";
+import { BOSS_BRAIN, type BossBrain, type BossBrainSettings, type Settings } from "./settings.ts";
 
 /**
  * Boss battle: the last 10 team up against Stockfish. The boss's strength comes
@@ -165,6 +165,44 @@ export const ENGINE_MAX_ELO = 3190;
  */
 export function bossStrength(base: number, def: Pick<BossDef, "offset"> | null, extra = 0): number {
   return Math.max(800, Math.min(ENGINE_MAX_ELO, Math.round(base + (def?.offset ?? 0) + extra)));
+}
+
+/**
+ * Maia's rating for a boss of this strength (the UCI_Elo Stockfish would play it at), on the lines of
+ * BOSS_BRAIN.maiaRating; null from BOSS_BRAIN.stockfishFrom on (always Stockfish there).
+ */
+export function maiaRatingFor(strength: number, s: Pick<BossBrainSettings, "maiaRating" | "maiaRatingMin" | "stockfishFrom"> = BOSS_BRAIN): number | null {
+  if (strength >= s.stockfishFrom) return null;
+  const pts = s.maiaRating;
+  const [x0, y0] = pts[0]!;
+  if (strength <= x0) {
+    const [x1, y1] = pts[1] ?? [x0 + 1, y0];
+    return Math.max(s.maiaRatingMin, Math.round(y0 + ((strength - x0) * (y1 - y0)) / (x1 - x0)));
+  }
+  for (let i = 1; i < pts.length; i++) {
+    const [xa, ya] = pts[i - 1]!;
+    const [xb, yb] = pts[i]!;
+    if (strength <= xb) return Math.round(ya + ((strength - xa) * (yb - ya)) / (xb - xa));
+  }
+  return pts[pts.length - 1]![1];
+}
+
+/**
+ * A boss's brain in a battle: the one picked (an admin's Brain picker), else the boss's own default (BOSS_BRAIN
+ * .soloDefault; Stockfish for any other), with the rating Maia plays at. Stockfish at or above stockfishFrom whatever
+ * was picked, and wherever Maia isn't on offer (`maia` false: online, a raid with bots, a player while forPlayers is off).
+ */
+export function bossBrainFor(
+  bossId: string,
+  strength: number,
+  picked: BossBrain | "",
+  maia: boolean,
+  s: BossBrainSettings = BOSS_BRAIN,
+): { brain: BossBrain; rating: number | null } {
+  const rating = maiaRatingFor(strength, s);
+  const brain = picked || s.soloDefault[bossId] || "stockfish";
+  if (!maia || rating === null || brain === "stockfish") return { brain: "stockfish", rating: null };
+  return { brain, rating };
 }
 
 /** Threat thresholds: two to a skull, 1 to 5 (the old ten tiers' boundaries). */

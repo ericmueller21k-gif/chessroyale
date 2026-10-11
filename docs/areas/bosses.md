@@ -16,6 +16,11 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   most of the lobby met last).
 - **Strength:** Stockfish at a UCI_Elo from the crowd's ratings, the raid's tiers or solo's difficulty, plus the boss's
   offset, with the blunder guard (see [engine.md](engine.md)).
+- **The brain (Maia prototype, Oct 11):** in Boss alone a boss can play with **Maia-3** instead (a human-like model, a
+  separate AGPL program in its own worker: `packages/maia-worker/`). Ginger's default is Maia, no guard (Eric); the
+  rest are Stockfish. Admins only for now (`BOSS_BRAIN.forPlayers`): a Brain picker in the boss menu and a debug line
+  under the dock. Powers, the judge, the King's strike and the speech don't change. Details in
+  [engine.md](engine.md), "The boss's brain".
 - **The ground rules of every power** (the server decides, the same everywhere):
   - Every power comes from the battle's seed (drawn once, as it starts) and the position, so the server, the solo game
     and every screen work out the same thing (`powerRoll`).
@@ -113,6 +118,7 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | Board effect sprites | `characters/effects.ts` (`EFFECT_SPRITES`), `characters/effects/common.ts` | `characters/effects/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts`, `sawyer.ts` |
 | Speech: every line's time and turn, the text box | `packages/app/src/speech.tsx` (`Voice`, `bossVoice`, `SpeechBox`, `holdMs`); power moments' lines said in `BossPowers.tsx` (`useMomentSpeech`), reactions in `BossCharacter.tsx` | a moment's `line`, `lineAt` and `priority` in its `BossUi` (only when the kit's lines aren't the whole story) |
 | Powers on screen: moments, banners, the board layer, the rage meter | `components/BossPowers.tsx` (`momentsOf`, `PowerMoment`, `PowerBoard`, `BossBarExtra`, `dockLine`, the warning), `components/PowerParts.tsx` (`BossUi`, `Moment`, `Flight`, `PowerBanner`), `components/BossEffect.tsx` | `components/Ginger.tsx`, `Boingo.tsx`, `Grex.tsx`, `Hollow.tsx` (+ `LightsOut.tsx`), `BigBoy.tsx`, `Sawyer.tsx` |
+| The boss's brain (Maia-3 or Stockfish) | `packages/chess/src/boss-brain.ts`, `human-uci.ts`, `bossMoveFrom` (`runner.ts`), `packages/app/src/maia.ts`, `boss-brain.ts`, `components/BossBrain.tsx` (the picker), `BrainDebug` (`BossDock.tsx`); the Maia box `packages/maia-worker/` | its line in `BOSS_BRAIN.soloDefault` (Ginger: `maia-raw`) |
 | The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below; Sawyer's split hides the new half until the crack, and his board saw jolts the board) | |
 | The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
 | A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`) |
@@ -162,10 +168,13 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 ## Settings
 
 `BOSS_POWERS` in `packages/core/src/settings.ts` (every power's numbers), `SAWYER_LOOKS` (how his split looks), the `boss*` keys of `Settings`,
-`BOSS_DIFFICULTY`, `BOSS_TIERS` and each boss's `offset` in `boss.ts`.
+`BOSS_DIFFICULTY`, `BOSS_BRAIN` (each boss's brain, Maia's rating, its sampling, the guards), `BOSS_TIERS` and each
+boss's `offset` in `boss.ts`.
 
 ## Tests and tools
 
+- Unit, the brain: `packages/chess/test/boss-brain.test.ts`; the Maia box's own tests in `packages/maia-worker/test/`.
+  e2e: `e2e/maia.spec.ts`. Sim: `packages/sim/scripts/maia-sim.ts` (`reports/maia-boss.md`).
 - Unit: `packages/chess/test/boss-powers.test.ts`, `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
   `long-match.test.ts`, `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`,
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,

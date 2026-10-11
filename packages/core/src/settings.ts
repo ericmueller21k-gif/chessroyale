@@ -704,6 +704,68 @@ export const BOSS_DIFFICULTY = [
 ] as const;
 export type BossDifficultyId = (typeof BOSS_DIFFICULTY)[number]["id"];
 
+/**
+ * How a boss picks its moves (the Maia prototype, Oct 11; DECISIONS.md, "A human-like boss: Maia-3 for Ginger"):
+ * - `stockfish`: Stockfish at the boss's UCI_Elo with the blunder guard (bossMaxLoss, bossMaxLogitLoss), as always.
+ * - `maia-raw`: Maia-3's own move, drawn mildly from its probabilities (temperature, topP below), no guard: a human's
+ *   strength, a human's mistakes. The default for a boss on the Maia brain (Eric, Oct 11).
+ * - `maia-light`, `maia-full`: Maia's move unless it gives away more than the guard allows against the boss's own
+ *   top-8 Stockfish search (no extra engine work): then Maia's next likely move that passes, else Stockfish's best.
+ */
+export type BossBrain = "stockfish" | "maia-raw" | "maia-light" | "maia-full";
+export const BOSS_BRAINS: readonly BossBrain[] = ["stockfish", "maia-raw", "maia-light", "maia-full"];
+
+export interface BrainGuard {
+  maxLoss: number;
+  maxLogitLoss: number;
+}
+
+export const BOSS_BRAIN = {
+  /**
+   * Boss alone: each boss's brain when nobody picks another (an admin's Brain picker can). Only Ginger is on the
+   * Maia brain in the prototype; every other boss, and every online battle, is Stockfish.
+   */
+  soloDefault: { gingerbread: "maia-raw" } as Readonly<Record<string, BossBrain>>,
+  /**
+   * The Maia brain for players too, not only admins. Off until the launch steps (ROADMAP.md, "Needs Eric": the Maia
+   * box's source published, the bosses calibrated): until then players meet Stockfish as before.
+   */
+  forPlayers: false,
+  /**
+   * Maia's rating for a boss's strength (the UCI_Elo Stockfish would play it at: its tier, its own offset and solo's
+   * difficulty), on straight lines between these points (below the first, along the first line, down to
+   * maiaRatingMin): about 1100 at 1400, 2000 at 2400, 3000 at 2600 and above.
+   */
+  maiaRating: [
+    [1400, 1100],
+    [2400, 2000],
+    [2600, 3000],
+  ] as readonly (readonly [number, number])[],
+  maiaRatingMin: 600,
+  /** From this strength on the boss is always Stockfish (Maia's humans stop well short of it). */
+  stockfishFrom: 2800,
+  /** Maia's own draw from its probabilities: a little sharper than a human's (temperature), and none of the rarest moves (topP). */
+  temperature: 0.8,
+  topP: 0.9,
+  /** The guarded brains try Maia's likeliest moves in turn: at most this many, each at least this probable. */
+  candidates: 5,
+  minP: 0.03,
+  /** Light guard: never a move giving away more than this against Stockfish's best. */
+  light: { maxLoss: 25, maxLogitLoss: 2 } as BrainGuard,
+  /** Full guard: today's blunder guard (bossMaxLoss, bossMaxLogitLoss)… */
+  full: { maxLoss: 10, maxLogitLoss: 1 } as BrainGuard,
+  /** …and a strict one once Maia plays at this rating or more. */
+  strictFrom: 3000,
+  strict: { maxLoss: 4, maxLogitLoss: 0.5 } as BrainGuard,
+  /** Maia's answer is waited for this long at most (from the request, made alongside the top-8 search); then Stockfish. */
+  timeoutMs: 1500,
+  /** The model's load gives up after this long (the boss plays Stockfish meanwhile: nothing ever waits for it). */
+  loadTimeoutMs: 60_000,
+  /** Candidates Maia lists per move. */
+  multipv: 8,
+};
+export type BossBrainSettings = typeof BOSS_BRAIN;
+
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
 

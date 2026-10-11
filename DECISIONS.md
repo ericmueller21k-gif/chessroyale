@@ -970,6 +970,92 @@ batches, so he can check the look after each. The full plan, the odds and the ba
 - **The fitting sheet** gained a short mode for showing a batch (`sheet=1`: each item as a card and on both pawns,
   plus whole outfits).
 
+### A human-like boss: Maia-3 for Ginger (prototype, Oct 11, 2026)
+
+Eric wants to try a boss that plays like a person, not like Stockfish held back, and choose how it should behave by
+playing it on his phone. The prototype: Ginger in Boss alone, her moves picked by **Maia-3**, the human-like chess
+model from CSSLab at the University of Toronto (Chessformer, ICLR 2026). No calibration across all bosses yet.
+
+- **The licence (Eric's decision, followed exactly):** Maia-3's code and weights are AGPL-3.0; Eric won't publish the
+  game's source, and accepts the "separate program" approach. So Maia lives in its own box, `packages/maia-worker/`:
+  its own `LICENSE` (the AGPL text), a `README.md` with the provenance and every conversion step, the conversion
+  script, the worker's source and its tests. It's built to a standalone worker plus the model, served from
+  `/engine/maia/` with `LICENSE.txt` and `NOTICE.txt` beside them, as Stockfish is. The box imports no game code; the
+  game imports none of the box: it starts the worker (`packages/app/src/maia.ts`) and exchanges plain-text,
+  UCI-style lines with it (`uci`, `isready`, `setoption name UCI_Elo|Temperature|TopP|MultiPV`, `position fen`,
+  `go [searchmoves …]` → `info … multipv k … p <probability> pv <move>` lines, then `bestmove`), through
+  `HumanUciEngine` (`packages/chess/src/human-uci.ts`), the same kind of transport as Stockfish's. My call: `p` comes
+  before `pv` (UCI ends an info line with its pv; the game's parser takes either order).
+- **The model:** the official `UofTCSSLab/Maia3-23M` checkpoint, converted by our own script (ONNX, opset 17) and
+  quantised to int8 (onnxruntime's dynamic quantisation). Checked against the official PyTorch model: fp32 matches to
+  5e-5; int8 has the same top move in 106 of 108 positions × ratings (the 2 others near-ties). No third-party export.
+- **Hosting:** the int8 file is 25,191,199 bytes (24.02 MiB), under Cloudflare's 25 MiB per static asset, so it's an
+  ordinary asset: no R2, nothing paid. **Committed to git** (`packages/maia-worker/model/`): Workers Builds deploys
+  from git and can't run PyTorch, so a build-time conversion isn't possible, and a download at build time would make
+  every deploy depend on Hugging Face and on a file we'd have to host somewhere anyway. The cost: about 20 MB of
+  repository per model version (it barely compresses). Git LFS not used (an extra moving part for Workers Builds).
+- **The brains** (`BOSS_BRAIN` in settings.ts, the rule in `boss-brain.ts`, hooked into `bossMoveFrom`):
+  `stockfish` (today's boss), `maia-raw` (Maia's own move, no guard), `maia-light` (no move giving away more than 25
+  points / 2 logits against Stockfish's best), `maia-full` (today's guard, 10 points / 1 logit; strict, 4 points /
+  0.5 logit, at Maia 3000). The guarded ones try Maia's own draw first, then its likeliest other moves (at least 3%, at
+  most 5 tried), and play Stockfish's best only if none pass. The veto reads the top-8 search the boss already runs:
+  no extra engine work, so a move outside the top 8 is turned down rather than searched (my call). The judge, the
+  powers (`allowed`, passed to Maia as `searchmoves`), the King's strike (Stockfish's own step back) and the speech
+  are untouched. Under Maia the stumble roll is ignored: Maia's own mistakes take its place (my call).
+- **Ginger's default is Maia, no guard (Eric, Oct 11):** "the guard existed to stop Stockfish-at-Elo playing well and
+  then randomly suiciding; Maia's mistakes are human ones, so the guard isn't needed." She plays at Maia's natural
+  human strength, mistakes included; her edge comes from her powers. The light and full guards stay, in settings and
+  in the admins' Brain picker, so he can compare.
+- **Mild sampling (my call):** Maia's move is drawn from its own probabilities at temperature 0.8 with top-p 0.9 (the
+  official engine's two options): a little sharper than a human's spread, none of the rarest moves, and it doesn't
+  repeat itself game after game. Both are in `BOSS_BRAIN`.
+- **Maia's rating** follows the boss's strength: about 1100 at 1400, a straight line to 2000 at 2400, then 3000 at
+  2600, held to 2800; from 2800 Stockfish always (`BOSS_BRAIN.maiaRating`, `stockfishFrom`). My call: "strength" is
+  what Stockfish would play the boss at (the tier, the boss's own offset and solo's difficulty), because that's what
+  the earlier measurements matched Maia against, so the offset and the Easy–Hardest picker keep working.
+- **Who meets it (my call):** in the prototype only admins do (`BOSS_BRAIN.forPlayers` false): Maia reaches players
+  only once its source is published (Eric's OK; below) and the bosses are calibrated. Players meet Stockfish exactly
+  as before and never download Maia. Online battles are always Stockfish.
+- **Never waiting for Maia:** it's asked alongside the top-8 search; no answer within 1.5 s of the request
+  (`timeoutMs`), not loaded yet, failed, or a broken worker: today's Stockfish move. A load that takes over 60 s is
+  given up for the battle.
+- **Loading:** the worker starts as the battle's intro begins (the model loads during it). The boss menu fetches the
+  files ahead when Maia may play. The service worker doesn't precache them (about 29 MB to download, 40 MB unpacked) but keeps them once fetched,
+  in their own cache named by their contents (an app update keeps it; a new model replaces it). The worker is ended
+  after the battle, freeing its few hundred MB.
+- **Testing (admins only):** a Brain picker in Boss alone's boss menu (Default · Stockfish · Maia, no guard · light
+  guard · full guard; also `?brain=<id>`), applying to whichever boss you meet (Ginger is the pilot; the rule is the
+  same for every boss), and a debug line under the dock: "Maia 1190 · no guard · Maia's #2 · 90 ms", "guard → Maia's
+  #2", "guard → Stockfish", "Stockfish (Maia loading)".
+- **Credits (Settings):** "Bosses and bots use Stockfish (GPL-3.0, source) and Maia-3 by CSSLab, University of Toronto
+  (AGPL-3.0), each a separate program running in your browser. The source of our Maia box is available on request
+  (notice, licence)." Eric asked for both names in one line (bots will use Maia too, later).
+- **What the sanity runs show (`reports/maia-boss.md`; small samples, plain chess, no powers):** raw Maia makes Ginger
+  much easier at these ratings. Against the same strong bot player at tier 1600 (Ginger 1500, Maia 1190), the player
+  scored 1.5 of 8 against today's Stockfish Ginger, 5 of 8 against Maia with no guard, 5 of 8 with the light guard and
+  1.5 of 8 with the full guard. Per move in a live game, raw Maia gave away 10.8 points on average and over 25 points
+  on 21% of its moves (today's Ginger: 1.7 and 1%). Maia's own likeliest move at 1190 already gives away over 25
+  points 8% of the time in such positions; the mild draw makes it 13% (temperature 1: 16%). So keeping her as hard as
+  today on the raw brain means a higher Maia rating: that's for the calibration. A whole boss move took about 0.5–0.8
+  s here with Maia (the top-8 search plus Maia's ~80 ms), against 1.4 s with Stockfish (which adds its UCI_Elo search).
+- **Before Maia reaches players (pre-launch, needs Eric's OK; in ROADMAP.md):** publish the Maia box's source (a public
+  repository or a download on the site; until then "on request"), and calibrate every boss.
+
+### Maia: the plan beyond the prototype (Eric, Oct 11, 2026)
+
+Recorded with the prototype; not built yet except where it says.
+
+- **Models:** bosses use the 23M model (built). Non-boss bots (Crowd, Squads) will later use the smaller 5M one (the
+  same conversion, `convert.py --model 5m`).
+- **Game quality first:** the boss model isn't shrunk for old phones. A device that can't load Maia, or runs it too
+  slowly, falls back to today's Stockfish brain automatically, so nobody is locked out (built: the fallback above).
+- **Strength:** a boss still follows the crowd's ratings (people only) plus a margin, because a crowd voting together
+  plays above its average; calibration sets the margin later. Above Maia's ceiling Stockfish takes over. Between them
+  a bridge band (around 2600–2800) ramps through Maia with the light guard, then Maia with the strict guard (and
+  perhaps a share of Stockfish moves), so strength never jumps. (The prototype holds Maia 3000 from 2600 to 2800,
+  then Stockfish.)
+- **Credits:** one line naming both, Stockfish and Maia-3, for bosses and bots (built).
+
 ### Boss screen polish: the eval bar at the back, the God King facing the boss, Hollow's lights (Oct 11, 2026)
 
 Three visual fixes Eric asked for from a screenshot of a Hollow battle on a computer. The calls:

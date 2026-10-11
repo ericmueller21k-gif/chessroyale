@@ -369,9 +369,11 @@ export function SettingsScreen({ onBack, onSoundLab }: { onBack: () => void; onS
         </section>
       )}
 
-      <p class="fd-note">
-        Engine: <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0, <a href="https://github.com/official-stockfish/Stockfish">source</a>),
-        running in your browser.
+      <p class="fd-note maia-credit">
+        Bosses and bots use <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0,{" "}
+        <a href="https://github.com/official-stockfish/Stockfish">source</a>) and <a href="https://github.com/CSSLab/maia3">Maia-3</a> by
+        CSSLab, University of Toronto (AGPL-3.0), each a separate program running in your browser. The source of our Maia box is available
+        on request (<a href="/engine/maia/NOTICE.txt">notice</a>, <a href="/engine/maia/LICENSE.txt">licence</a>).
       </p>
     </div>
   );
