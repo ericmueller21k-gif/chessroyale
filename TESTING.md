@@ -43,3 +43,12 @@ Signed in with your admin account, on your phone:
    (Maia loading)" means Maia wasn't ready yet and Stockfish moved instead.
 3. Tell me: does she feel like a person? Too easy, too hard? Which brain do you prefer? And the ms on the line (under
    about 500 ms is fine). Change the brain in the boss menu and play her again to compare.
+
+## Piece sounds (Oct 11, about 3 minutes)
+
+On your phone, with the ringer switch on:
+
+1. **Settings → Sound.** Under **Move sound** and **Capture sound**, tap ▶ beside each option: every one should play
+   at once, about as loud as the others, none harsh or clipped through the phone's speaker.
+2. Pick one of each (picking plays it too), then play a few moves in **Boss alone**: your picks should sound for
+   every move and capture. Tell me which ones you like, and any to drop or replace.
