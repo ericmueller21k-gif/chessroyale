@@ -54,6 +54,11 @@ export interface Squad {
   id: number;
   /** In seat order: seat 0 is the rules' "player 1". */
   players: readonly SquadPlayer[];
+  /**
+   * The squad's team clock (ms): one bank for the whole tournament, carried from match to match
+   * (`startTeamClocks`, `settleTeamClocks`). At zero the squad is in sudden death.
+   */
+  bankMs: number;
 }
 
 /** Whether a seat is played by a bot (a bot, or a no-show's seat taken over). */
@@ -100,7 +105,7 @@ export function formSquads(
       sq.push(seat({ ...bot, isBot: true }, null));
     }
   }
-  return { squads: seats.map((players, id) => ({ id, players: shuffle(rng, players) })), waiting };
+  return { squads: seats.map((players, id) => ({ id, players: shuffle(rng, players), bankMs: 0 })), waiting };
 }
 
 /** Records who acted and who missed: every miss is logged, and `noShowsBeforeBot` in a row hands the seat to a bot. */

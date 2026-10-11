@@ -82,13 +82,14 @@ export function botFinalBlock(rng: Rng, candidates: readonly Candidate[], skill:
 }
 
 /**
- * A bot's thinking time (ms): its bank over `movesToGo`, plus `incrementShare` of the increment, times a random factor
- * in `thinkRange`; at least `minThinkSeconds`, and never past its deadline (it always moves in time).
+ * A bot's thinking time (ms): its squad's bank over `movesToGo`, plus `incrementShare` of the increment and the free
+ * seconds, times a random factor in `thinkRange`; at least `minThinkSeconds`, and never past its deadline (in sudden
+ * death, the free seconds: it always moves in time).
  */
-export function squadBotThinkMs(rng: Rng, clock: { bankMs: number; incrementMs: number; deadlineMs: number }, s: SquadsSettings = SQUADS): number {
+export function squadBotThinkMs(rng: Rng, clock: { bankMs: number; incrementMs: number; delayMs: number; deadlineMs: number }, s: SquadsSettings = SQUADS): number {
   const [lo, hi] = s.bots.thinkRange;
-  const target = (clock.bankMs / s.bots.movesToGo + s.bots.incrementShare * clock.incrementMs) * (lo + rng() * (hi - lo));
-  const ms = Math.max(s.bots.minThinkSeconds * 1000, target);
+  const target = (clock.bankMs / s.bots.movesToGo + s.bots.incrementShare * (clock.incrementMs + clock.delayMs)) * (lo + rng() * (hi - lo));
+  const ms = Math.max(Math.min(s.bots.minThinkSeconds * 1000, clock.delayMs * 0.5), target);
   return Math.round(Math.min(ms, clock.deadlineMs * 0.9));
 }
 
