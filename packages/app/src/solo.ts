@@ -1,5 +1,5 @@
-import { BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
-import { MatchRunner, boardSlots, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, bossBrainFor, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
+import { MatchRunner, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
@@ -10,6 +10,8 @@ import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { crowdMoveCues, kingSay } from "./godKing.ts";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
+import { BRAIN_LABELS, isAdmin, soloBrain } from "./boss-brain.ts";
+import { startMaia } from "./maia.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -188,6 +190,7 @@ export class SoloMatch implements GameView {
   }
 
   dispose() {
+    this.freeBrain();
     if (this.timer) clearTimeout(this.timer);
     this.progress.reset();
     this.listeners.clear();
@@ -326,6 +329,43 @@ export class SoloMatch implements GameView {
   }
 
   // ---------------- Boss battle ----------------
+
+  /** Boss alone: Maia's worker, when the boss plays with the Maia brain (BOSS_BRAIN); closed after the battle. */
+  private maia: HumanUciEngine | null = null;
+  /** The admins' debug line is on (an admin, and Maia or a picked brain in play). */
+  private brainShown = false;
+
+  /**
+   * Boss alone, as the battle begins: the boss's brain. On the Maia brain (Ginger's own; or an admin's pick), Maia's
+   * worker starts loading now, during the intro: the boss plays Stockfish until it's ready, never waiting for it.
+   */
+  private startBrain() {
+    const b = this.runner.state.boss;
+    if (!b || !this.settings.raid || this.raidBots || this.maia) return;
+    const { picked, maia } = soloBrain();
+    const { brain, rating } = bossBrainFor(b.id ?? "", b.elo, picked, maia);
+    this.brainShown = isAdmin() && (brain !== "stockfish" || !!picked);
+    if (brain === "stockfish" || rating === null) return;
+    this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs);
+    if (this.maia) this.runner.humanBrain = { brain, rating, engine: this.maia };
+  }
+
+  /** Frees Maia (its model holds a few hundred MB) once the battle is over. */
+  private freeBrain() {
+    this.maia?.close();
+    this.maia = null;
+    if (this.runner) this.runner.humanBrain = null;
+  }
+
+  /** Testing, admins: what the boss's brain did with its last move ("Maia 1450 · no guard · Maia's #1 · 120 ms"). */
+  get brainLine(): string | null {
+    if (!this.brainShown || !this.runner) return null;
+    const note = this.runner.brainNote;
+    if (note) return brainWords(note);
+    const hb = this.runner.humanBrain;
+    if (!hb) return "Stockfish";
+    return `Maia ${hb.rating} · ${BRAIN_LABELS[hb.brain].replace("Maia, ", "")} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? "failed: Stockfish" : "loading"}`;
+  }
 
   private bossIntroDone = false;
   kingCalled = false;
@@ -578,6 +618,7 @@ export class SoloMatch implements GameView {
       if (!this.bossIntroDone) {
         // The boss arrives: it takes over from an even position of the game just played.
         this.bossIntroDone = true;
+        this.startBrain();
         const powers = this.runner.state.boss?.powers;
         const introMs = bossIntroTimeline(this.runner.boards.get(this.runner.state.boards[0]!)!.history.length, !!powers?.claimed, !!powers?.snack).total;
         this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + introMs, intro: true });
@@ -841,6 +882,7 @@ export class SoloMatch implements GameView {
   }
 
   private finish() {
+    this.freeBrain();
     const winner = this.runner.state.players.find((p) => p.placement === 1);
     this.set({
       kind: "results",

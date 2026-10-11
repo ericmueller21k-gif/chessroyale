@@ -118,6 +118,8 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
 - `packages/server`: `src/lobby.ts` is pure, testable lobby logic; `src/lobby-do.ts` the Durable Object;
   `src/index.ts` routes `/api/*` and serves the app. Squads' lobby and parties: `src/squads-lobby.ts`,
   `squads-party.ts` (pure) and `squads-do.ts`. Config: `wrangler.jsonc` at the repo root.
+- `packages/maia-worker`: the Maia box (Maia-3 in its own Web Worker; AGPL-3.0, its own README and licence). A separate
+  program: the game never imports it, only exchanges UCI-style text with the built worker (`/engine/maia/`).
 - `e2e/`: Playwright tests that play full solo and two-player matches on emulated phones.
 
 ```sh

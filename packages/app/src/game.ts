@@ -229,6 +229,8 @@ export interface GameView {
   triggerUltimate(): void;
   /** You called the King to play this move. */
   readonly kingCalled: boolean;
+  /** Testing, admins (Boss alone): what the boss's brain did with its last move (Maia or Stockfish), or null. */
+  readonly brainLine?: string | null;
   /**
    * Hollow's dark: a move attempt that touches a dark square (starts on one, lands on one or passes over one), sent
    * unchecked: a legal one is your pick; an illegal one costs points and you pick again (see darkNote).
