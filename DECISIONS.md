@@ -522,10 +522,13 @@ decide (duties, deadlines, clocks, what a miss plays, ties). Nothing links to it
   of the bots they play against or beside while anyone else's can), then computers, the least loaded and fastest; a
   device holds at most 4 unanswered jobs (a phone 2), and the rest wait for a device to answer (the soonest-needed
   first), so a lobby with one phone still gets engine bots, not the quick look. Boards in the same position (every
-  board's start on the first turn) share one job. The browser engine is deterministic, so answers must match
+  board's start on the first turn) share one job. Each job says how deep to search (`botWork.nodes`), so every device
+  does the same search. The browser engine is deterministic, so answers must match
   exactly. Two that disagree: the engine server settles it with one restricted search of their moves (counted in its
   daily budget), or without it a third device referees; the wrong device gets a strike, and two strikes mean no more
-  work. One answer stands after 400 ms (like the judges' grace); none after 4 s, or no device at all: the server's own
+  work. Only an answer that doesn't hold together is a strike: an illegal move, a score out of range. A move listed
+  twice keeps its first line (the run through the real server found the engine interface does that now and then,
+  and the stricter check had benched an honest device), and fewer lines than asked are fine. One answer stands after 400 ms (like the judges' grace); none after 4 s, or no device at all: the server's own
   quick look.
 - **The quick look has no engine.** The engine server can't serve routine bot moves: a lobby asks thousands of
   positions and its budget is 3,000 searches a day. Stockfish in the Worker would be a big change to the engine lane's
