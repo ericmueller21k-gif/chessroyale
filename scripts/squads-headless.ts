@@ -15,7 +15,7 @@
  *   --nodes N                 the device engine's nodes (default 250000, the app's)
  *   --pool NAME               the queue's pool (default: a fresh one, so runs never meet)
  *   --out FILE                also write the report (Markdown) there
- *   --timeout S               give up after this long (default 3600)
+ *   --timeout S               give up after this long (default 7200: a bot lobby can run over an hour)
  */
 import { writeFileSync } from "node:fs";
 import { createNodeEngine } from "@chessroyale/chess/node";
@@ -37,7 +37,7 @@ if (/hunchess\.com/i.test(base)) {
 const mode = arg("mode", "queue") as "queue" | "party" | "test";
 const people = Math.max(1, Math.min(mode === "party" ? 4 : 32, Number(arg("people", "1"))));
 const pool = arg("pool", `sq${Date.now().toString(36)}`)!;
-const timeoutMs = Number(arg("timeout", "3600")) * 1000;
+const timeoutMs = Number(arg("timeout", "7200")) * 1000;
 const t0 = Date.now();
 const stamp = () => `${((Date.now() - t0) / 1000).toFixed(1).padStart(7)} s`;
 const log = (line: string) => console.log(`${stamp()}  ${line}`);
