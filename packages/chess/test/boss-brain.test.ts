@@ -41,6 +41,7 @@ const TEST_BRAIN = {
   crowdMargin: 150,
   bridgeFrom: 2600,
   bridgeStrictFrom: 2700,
+  bridgeShareFrom: 2600,
   bridgeStockfishShare: 0.5,
   stockfishFrom: 2800,
 };
@@ -91,6 +92,14 @@ describe("which brain a boss plays with (bossBrainFor)", () => {
     expect(bossBrainFor("grex", 2799, "", true, {}, TEST_BRAIN)).toEqual({ brain: "maia-strict", rating: 2400, stockfishShare: 0.498 });
     expect(bossBrainFor("grex", 2800, "", true, {}, TEST_BRAIN)).toEqual({ brain: "stockfish", rating: null, stockfishShare: 0 });
     expect(bossBrainFor("grex", 3190, "", true, {}, TEST_BRAIN).brain).toBe("stockfish");
+  });
+
+  it("the guard follows the level (a crowd meets it sooner), Stockfish's share the strength", () => {
+    // (A crowd at 2500: level 2650, the light guard already, but no share yet; one player at 2500: no guard.)
+    expect(bossBrainFor("hollow", 2500, "", true, { crowd: true }, TEST_BRAIN)).toEqual({ brain: "maia-light", rating: 2400, stockfishShare: 0 });
+    expect(bossBrainFor("hollow", 2500, "", true, {}, TEST_BRAIN)).toEqual({ brain: "maia-raw", rating: 2400, stockfishShare: 0 });
+    expect(bossBrainFor("hollow", 2560, "", true, { crowd: true }, TEST_BRAIN).brain).toBe("maia-strict");
+    expect(bossBrainFor("hollow", 2700, "", true, { crowd: true }, TEST_BRAIN)).toEqual({ brain: "maia-strict", rating: 2400, stockfishShare: 0.25 });
   });
 
   it("a boss of its own brain (byBoss): Stockfish stays Stockfish", () => {

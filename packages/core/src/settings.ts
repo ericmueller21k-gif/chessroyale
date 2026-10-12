@@ -771,31 +771,34 @@ export const BOSS_BRAIN = {
   /**
    * Maia's rating for a boss's level (its strength, plus crowdMargin for a crowd), on straight lines between these
    * points: below the first along the first line, down to maiaRatingMin; above the last held there (Maia's ceiling).
-   * Calibrated against bot crowds and lone bots in plain chess (reports/maia-calibration.md; DECISIONS.md, "Every boss
-   * on Maia: the calibration"): Maia at the rating on the right is about an even game for a crowd whose level is the
-   * number on the left (the target set on Oct 3: very hard but beatable, before the powers and the God King).
+   * Calibrated against bot crowds and lone bots in plain chess (reports/maia-calibration.md; DECISIONS.md, "Maia bosses
+   * harder"): the boss clearly favoured, the crowd or the lone player scoring about 0.30 before the powers and the God
+   * King (Eric, Oct 12: "people read 'boss' and assume it's a challenge").
    */
   maiaRating: [
     [1800, 600],
-    [2200, 850],
-    [2550, 2100],
+    [2000, 850],
+    [2250, 1100],
+    [2400, 2000],
     [2650, 2500],
   ] as readonly (readonly [number, number])[],
   maiaRatingMin: 600,
   /**
    * A crowd voting together plays above its average member (Eric, Oct 11): in a battle where more than one picks the
-   * crowd's moves (a raid, the Crowd's boss battle; not Boss alone), Maia plays this much above the boss's strength.
+   * crowd's moves (a raid, the Crowd's boss battle; not Boss alone), the boss's level is this much above its strength.
    * Measured: a lone bot needed a Maia about this much weaker than a crowd of its rating (reports/maia-calibration.md).
    */
   crowdMargin: 400,
   /**
-   * The bridge band (Eric, Oct 11): from bridgeFrom to stockfishFrom the boss is Maia with the light guard, then from
-   * bridgeStrictFrom with the strict guard, and a share of its moves today's Stockfish move, growing in a line from
-   * none at bridgeFrom to bridgeStockfishShare just under stockfishFrom, so its strength never jumps. It starts a step
-   * under Eric's "about 2600": in the sims Maia with no guard already fell short of strong crowds from about 2400.
+   * The bridge band (Eric, Oct 11), so the boss's strength never jumps on its way to Stockfish:
+   * - the guard follows the level (where Maia with no guard can't hold a crowd any more, Eric, Oct 12: start the bridge
+   *   earlier rather than lose the challenge): the light guard from bridgeFrom, the strict one from bridgeStrictFrom;
+   * - Stockfish's share of the moves follows the strength: from none at bridgeShareFrom to bridgeStockfishShare just
+   *   under stockfishFrom, so the boss arrives at today's Stockfish boss there.
    */
-  bridgeFrom: 2500,
-  bridgeStrictFrom: 2650,
+  bridgeFrom: 2400,
+  bridgeStrictFrom: 2800,
+  bridgeShareFrom: 2500,
   bridgeStockfishShare: 1,
   /** From this strength on the boss is always Stockfish, as before (Maia's humans stop well short of it). */
   stockfishFrom: 2800,

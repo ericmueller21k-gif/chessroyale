@@ -1593,3 +1593,32 @@ crowds and method; small samples with ± two standard errors, about ±0.3 at 10 
 - **The prototype's sanity runs** (`reports/maia-boss.md`) used one strong bot (2% random moves) against a 1500 boss,
   which is why raw Maia looked much easier there; against crowds of the tier's own strength the picture is the one
   above.
+
+### Maia bosses harder: a boss is a challenge (Eric, Oct 12, 2026)
+
+Eric, after #157 aimed for an even game: "We should be upping the Maia rating. The numbers don't need to be accurate;
+people read 'boss' and assume it's a challenge, so that's the key." The new target (his): the boss clearly favoured in
+plain chess, each crowd and a lone player at its own difficulty scoring about 0.30, before the powers and the God King;
+where Maia alone can't get there, the bridge starts earlier rather than the challenge being lost; Maia with no guard
+wherever it can reach the target on its own. The calls (`reports/maia-calibration.md`, "Harder"):
+
+- **Maia's rating lines** (level → Maia): 600 up to 1800, 850 at 2000, 1100 at 2250, 2000 at 2400, 2500 from 2650.
+  The crowd's margin stays 400.
+- **The guard follows the level, Stockfish's share the strength** (`bandBrain`): the light guard from a level of 2400,
+  the strict one from 2800 (`bridgeFrom`, `bridgeStrictFrom`); Stockfish's share from a strength of 2500
+  (`bridgeShareFrom`, new) to all of the moves just under 2800. So a crowd, whose level is 400 above the boss's
+  strength, meets the guards 400 sooner: a club-level crowd (strength about 2150) already plays a light-guarded Maia,
+  because Maia with no guard can't hold such a crowd under about 0.5 at any rating. One player alone meets the light
+  guard from 2400 and never the strict one (Stockfish takes over from 2800, as before); the share still ramps them
+  into Stockfish.
+- **What the sims say** (8 games a row, fresh openings): the casual crowd 0.25 (Maia 805) and the expert crowd 0.31
+  (strict guard, 57% Stockfish) land on the target; the club crowds 0.19 and 0.06 (light guard) and a club bot alone
+  0.06 (Maia 910) land harder; a casual bot alone is at Maia's floor already (0.13 and 0.00). The light guard is a big
+  step for a club crowd (it removes just the blunders a voting crowd punishes), with nothing between it and Maia with
+  no guard (about 0.5) in this design. Erring harder follows Eric's "rather than losing the challenge". The knobs if
+  real club-level crowds find it too hard: a looser light guard, or the light guard from a higher level; for Boss alone
+  the lines' first points.
+- **Tries along the way** (not shipped): the strict guard from a level of 2550 (the club crowd lost all 8), and the
+  light guard at Maia 2500 from 2400 (0.19 and 0.12). The rows of the shipped rule are the ones in the report.
+- **Everything else stands:** players stay on Stockfish (`forPlayers`), the bridge still hands over to today's
+  Stockfish boss exactly at 2800, the special moves keep their own picks.
