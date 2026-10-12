@@ -31,6 +31,12 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 - **Load-test counters** at `/api/ops/stats` only where `OPS_STATS` is set and the request's `x-ops-key` matches
   (local and staging, never production).
 
+- **Licences** (`LICENSES.md`, audited Oct 12, 2026): every third-party piece that reaches a player's device, from the
+  build's module list and `public/`, its licence and its credit. Nothing GPL, AGPL, LGPL, non-commercial or
+  share-alike compiled into the game's own code (the engines are separate programs with their own notices). A PR that
+  adds or removes a third-party piece updates it, and the notices in `public/licenses/` and the credits in Settings and
+  the FAQ.
+
 ## Where the code is
 
 | What | Where |

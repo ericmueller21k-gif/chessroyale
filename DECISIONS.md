@@ -1403,3 +1403,27 @@ chessground. The calls:
   applied inside chessground's own element). The picker now draws its pieces on both boards.
 - **The board lab** now shows the game's two real boards (`?board=cg`, `?board=own`) beside cm-chessboard; the lab's
   own sketch is gone, and so is its non-commercial "Staunty" piece set (it was only for trying).
+
+### Piece sounds: all wood, nothing GPL; the first tap no longer waits for sound (Oct 12, 2026)
+
+Eric: the pickers' options should be "slightly different wooden sounds, not chips or clicks". And the defaults were
+PyChess's knocks (GPL-3), which a closed-source game can't ship. The calls:
+
+- **Five wooden options each,** from Kenney's CC0 *Impact Sounds* and our own synthesis (`scripts/piece-sounds.py`):
+  moves Light wood (the default; Kenney's light knock), Wooden tap (ours: a short, bright knock, the closest in
+  character to the old one), Bright wood, Ringing wood, Deep wood; captures Heavy wood (the default), Double knock (a
+  light knock then a heavy one, as the old capture was), Short wood, Wood block, Big wood. Poker chip, Chips, Click,
+  Soft, Clack and Thud are gone, and so are the PyChess files. A device that had picked any of them hears the default.
+- **The defaults: Light wood and Heavy wood** (the brief's suggestion, real recorded wood). Measured against the old
+  knocks, Wooden tap and Double knock are closer in brightness and length; they're one tap away in Settings if Eric
+  prefers them, and a one-line change to make them the defaults.
+- **Levelled to the old loudness:** the script now holds the old move and capture's measured loudness (TARGET), since
+  their files are gone.
+- **Castling** with the default is its own file (`castle-wood.mp3`: the Light wood twice, king then rook, 110 ms apart,
+  the second softer), the same pattern castling already had with any other pick.
+- **The gavel** is the default capture and move sounds pitched down a little (0.9 and 0.8), where the old bright knocks
+  were taken down to about half: Kenney's wood is already low, and halving it would boom.
+- **The first tap of a visit** spent 45-210 ms (a 4x slowed phone) making the audio graph and starting 25 downloads
+  inside the tap, so the first move's own frame waited. The graph is now made while the page is idle (it starts
+  suspended and fetches nothing; browsers allow that), the tap only switches it on, and the samples start loading after
+  the tap's frame. Every tap still tries to switch sound on until it's running (iPhones).
