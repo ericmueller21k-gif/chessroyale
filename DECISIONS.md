@@ -1864,6 +1864,11 @@ block when it came later than the last pick. The final's vote is one move being 
 squad's bank once, until its slowest picker's last choice (or to the ceiling if one never picks: the half waits for
 everyone or the time, as before). The free seconds, the per-active-thinker drain, the top-ups and sudden death are as
 they were. The sim: median lobbies 28.6, 30.2 and 31.1 minutes (Fast, Normal, Long), as before v2 (30.6, 33.1, 31.3).
+Through the real server (`scripts/squads-headless.ts --device` against `wrangler dev`, the Normal clock, one idle
+person whose device did the bots' engine work and the judge's): a full bot lobby took 34.6 minutes from the fill to its
+results (round 1 over at 12.6 minutes, round 2 at 25.8, the final 8.5), within the sim's spread (the one run before v2
+took 28.9). The long part was a Pairs match that ended 1-1 and went to the bank (12.8 minutes). The device answered
+1,163 jobs; no errors.
 
 **Test tools.** `/squads/test`, Next round, Skip votes and Cheat lines keep working. Cheat lines while blocking show
 the other squad's best moves after yours (your pick, or a teammate's; none yet, the move handed over). Test lobbies
