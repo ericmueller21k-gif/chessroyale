@@ -1,9 +1,11 @@
 /**
  * The piece sounds a player picks in Settings → Sound: one for a move, one for a capture, chosen separately and kept
- * on the device. Every option is wood (Eric, Oct 12), CC0 (Kenney) or ours; the first of each is the default (Light
- * wood, Heavy wood: Oct 12, 2026, in place of the old GPL knocks). An old or unknown id reads as the default. Files are
- * in public/sounds/pieces/, made by scripts/piece-sounds.py; where each comes from and its licence:
- * public/sounds/SOURCES.md.
+ * on the device. Every option is wood (Eric, Oct 12). The first of each is the default: the classic knocks, PyChess's
+ * (GPL-3.0, credited; Eric, Oct 12: back as the defaults), with their old ids ("wood"), so a device that picked them
+ * before keeps them. Next, three close variations of each classic (pitch, EQ and decay changed a little; GPL-3.0 too),
+ * then the other wooden options (Kenney's CC0, or ours). An old or unknown id reads as the default. Files: the classics
+ * in public/sounds/, the rest in public/sounds/pieces/, made by scripts/piece-sounds.py; where each comes from and its
+ * licence: public/sounds/SOURCES.md.
  *
  * Pure (storage only): sound.ts plays them, Settings shows them.
  */
@@ -21,7 +23,11 @@ export interface PieceSoundOption {
 }
 
 export const MOVE_SOUNDS = [
-  { id: "light-wood", label: "Light wood", note: "A small wooden tap (the default)", file: "/sounds/pieces/move-light-wood.mp3" },
+  { id: "wood", label: "Classic knock", note: "The wooden knock (the default)", file: "/sounds/move.mp3" },
+  { id: "classic-light", label: "Classic light", note: "The classic, a little higher", file: "/sounds/pieces/move-classic-light.mp3" },
+  { id: "classic-deep", label: "Classic deep", note: "The classic, a little lower", file: "/sounds/pieces/move-classic-deep.mp3" },
+  { id: "classic-soft", label: "Classic soft", note: "The classic, softer", file: "/sounds/pieces/move-classic-soft.mp3" },
+  { id: "light-wood", label: "Light wood", note: "A small wooden tap", file: "/sounds/pieces/move-light-wood.mp3" },
   { id: "wood-tap", label: "Wooden tap", note: "Short and bright", file: "/sounds/pieces/move-wood-tap.mp3" },
   { id: "bright-wood", label: "Bright wood", note: "A smaller piece", file: "/sounds/pieces/move-bright-wood.mp3" },
   { id: "ringing-wood", label: "Ringing wood", note: "It rings a little", file: "/sounds/pieces/move-ringing-wood.mp3" },
@@ -29,15 +35,19 @@ export const MOVE_SOUNDS = [
 ] as const satisfies readonly PieceSoundOption[];
 
 export const CAPTURE_SOUNDS = [
-  { id: "heavy-wood", label: "Heavy wood", note: "A big wooden knock (the default)", file: "/sounds/pieces/capture-heavy-wood.mp3" },
-  { id: "double-knock", label: "Double knock", note: "Piece on piece, then the board", file: "/sounds/pieces/capture-double-knock.mp3" },
+  { id: "wood", label: "Classic double knock", note: "Piece on piece, then the board (the default)", file: "/sounds/capture.mp3" },
+  { id: "classic-light-double", label: "Classic light double", note: "The classic, a little higher", file: "/sounds/pieces/capture-classic-light.mp3" },
+  { id: "classic-deep-double", label: "Classic deep double", note: "The classic, a little lower", file: "/sounds/pieces/capture-classic-deep.mp3" },
+  { id: "classic-soft-double", label: "Classic soft double", note: "The classic, softer", file: "/sounds/pieces/capture-classic-soft.mp3" },
+  { id: "heavy-wood", label: "Heavy wood", note: "A big wooden knock", file: "/sounds/pieces/capture-heavy-wood.mp3" },
+  { id: "double-knock", label: "Double knock", note: "A light knock, then a heavy one", file: "/sounds/pieces/capture-double-knock.mp3" },
   { id: "short-wood", label: "Short wood", note: "Heavy, and over quickly", file: "/sounds/pieces/capture-short-wood.mp3" },
   { id: "wood-block", label: "Wood block", note: "Hollow and bright", file: "/sounds/pieces/capture-wood-block.mp3" },
   { id: "big-wood", label: "Big wood", note: "Low and heavy", file: "/sounds/pieces/capture-big-wood.mp3" },
 ] as const satisfies readonly PieceSoundOption[];
 
-/** Castling with the default move sound: two Light wood knocks, king then rook (with another pick, it plays twice). */
-export const CASTLE_SOUND = "/sounds/pieces/castle-wood.mp3";
+/** Castling with the default move sound: the classic king-and-rook knock (with another pick, it plays twice). */
+export const CASTLE_SOUND = "/sounds/castle.mp3";
 
 export const PIECE_SOUNDS: Record<PieceSoundKind, readonly PieceSoundOption[]> = { move: MOVE_SOUNDS, capture: CAPTURE_SOUNDS };
 

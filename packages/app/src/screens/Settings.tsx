@@ -126,7 +126,7 @@ export function HowToPlay() {
 
 /**
  * A piece-sound picker (Move sound, Capture sound): each option is a radio (picking it plays it) with its own ▶ to hear
- * it without picking. Kept on the device; the first option is today's sound.
+ * it without picking. Kept on the device; the first option is the default (the classic knock).
  */
 function PieceSoundPicker({ kind, title, children }: { kind: PieceSoundKind; title: string; children: ComponentChildren }) {
   const [chosen, setChosen] = useState(() => pieceSound(kind).id);
@@ -428,6 +428,11 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
       <p class="fd-note pieces-credit">
         Chess pieces by Colin M.L. Burnett (<a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces">Wikimedia Commons</a>), used
         under the BSD licence (<a href="/licenses/pieces.txt">licence</a>).
+      </p>
+      <p class="fd-note sounds-credit">
+        Classic piece sounds and their variations: <a href="https://github.com/pychess/pychess/tree/master/sounds">PyChess</a> (GPL-3.0). The
+        variations are made from PyChess's sounds by our own script (<a href="/engine/COPYING.txt">licence</a>,{" "}
+        <a href="/sounds/SOURCES.md">how each was made</a>).
       </p>
       <p class="fd-note licences-credit">
         Built with Preact (MIT) and chess.js (BSD), in the Archivo and Press Start 2P fonts (SIL Open Font Licence):{" "}

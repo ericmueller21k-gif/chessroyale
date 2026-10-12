@@ -25,7 +25,8 @@ package, version, licence and size).
 | Stockfish 19 (stockfish.js lite single-threaded WebAssembly build, npm `stockfish` 19.0.0), `engine/` | GPL-3.0 | A separate program in a Web Worker, never compiled into the game. Its licence: `/engine/COPYING.txt`; credited in Settings and the FAQ with its source. |
 | The Maia box (Maia-3 by CSSLab, onnxruntime-web, chess.js), `engine/maia/` | AGPL-3.0 (its bundled parts MIT and BSD) | A separate program (Eric's decision, Oct 11): `/engine/maia/LICENSE.txt`, `NOTICE.txt` (with onnxruntime's and chess.js's notices); credited in Settings and the FAQ; its source on request |
 | Fonts: Archivo, Archivo Black, Press Start 2P, `fonts/` | SIL OFL 1.1 | `fonts/LICENSE.md`; each copyright notice and the licence in `/licenses/third-party.txt` |
-| Piece sounds, `sounds/pieces/` | CC0 1.0 (Kenney's *Impact Sounds*) and ours | `sounds/SOURCES.md` (all wood since Oct 12; the PyChess GPL knocks are gone) |
+| The classic piece sounds (PyChess's knocks, the defaults), `sounds/move.mp3`, `capture.mp3`, `castle.mp3`, and their variations, `sounds/pieces/*-classic-*.mp3` | GPL-3.0 (GPL-3.0 data files: sounds the game plays, never compiled into it; Eric, Oct 12) | `sounds/SOURCES.md` (each file's source and, for the variations, exactly how it was made); the notice in `/licenses/third-party.txt`; the licence's text at `/engine/COPYING.txt`; credited in Settings and the FAQ ("Classic piece sounds and their variations: PyChess (GPL-3.0)", linking PyChess's `sounds/`) |
+| The other piece sounds, `sounds/pieces/` | CC0 1.0 (Kenney's *Impact Sounds*) and ours | `sounds/SOURCES.md` (all wood) |
 | The God King's, banner and menu sounds, `sounds/god-king/`, `banner/`, `menu/` | CC0 1.0 (Juhani Junkala, HaelDB, wintuh) and ours | each folder's `CREDITS.md` (CC0: no credit owed) |
 | Icons, `icons/`; the landing page's demo video and still, `media/`; bot-match replays, `replays/` | ours (made for the game: the icons, a recording of the game, its own bot matches) | |
 | The pieces' and third-party licences, `licenses/` | (the notices themselves) | |
@@ -35,10 +36,15 @@ package, version, licence and size).
 - **Maia's source "on request"**: AGPL-3.0 asks that users who interact with it over a network be offered its source;
   the box runs on the player's own device, and Eric decided how it's offered (DECISIONS.md, the Maia prototype). Not
   changed here.
-- Fixed in this audit: the PyChess knocks (GPL-3) removed (all-wood CC0 sounds instead); the cburnett pieces
+- Fixed in this audit: the cburnett pieces
   re-sourced under BSD (they came in through chessground's GPL CSS); the fonts' copyright notices and licence, and the
   notices for Preact, chess.js and Vite's helper, now ship with the app (`/licenses/third-party.txt`) and are linked
   from Settings and the FAQ.
+- **The PyChess knocks (GPL-3.0) are shipped again** (Eric, Oct 12, 2026: "classic PyChess knocks back as the
+  default, GPL-3.0, credited"). This audit had removed them; Eric brought them back as the defaults, with close
+  variations made from them by `scripts/piece-sounds.py` (GPL-3.0 too). A sound file is data the game plays, not code
+  compiled into it, so the GPL covers the files, not the game: the same separate-file reasoning as Stockfish. Each
+  file's source and how the variations were made are in `sounds/SOURCES.md`; the original WAVs are public at PyChess.
 - Fixed in Phase 2 of the board (Oct 12): **chessground (GPL-3.0-or-later)** is gone, its CSS and its wrapper with it:
   every board is the game's own (`packages/app/src/board/`). The board lab and **cm-chessboard** (MIT) went too. The
   built app has no chessground module, class or style left (checked on the live site).

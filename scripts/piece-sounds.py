@@ -1,17 +1,24 @@
 """
-The piece sounds (Settings: Move sound, Capture sound; castling): makes every file in packages/app/public/sounds/pieces/.
-Every option is wood (Eric, Oct 12: "slightly different wooden sounds, not chips or clicks"), from Kenney's CC0
-*Impact Sounds* or made here (ours, no licence needed). The defaults: "Light wood" (move) and "Heavy wood" (capture);
-castling is two Light wood knocks, king then rook.
+The piece sounds (Settings: Move sound, Capture sound): makes every file in packages/app/public/sounds/pieces/. Every
+option is wood (Eric, Oct 12: "slightly different wooden sounds, not chips or clicks").
 
-Every file is trimmed to start on its hit (so it lands with the piece), faded out, and levelled to the loudness the
-game's knocks have always had: the loudest 30 ms, heard through a phone speaker (high-passed at 200 Hz) and the game's
-own 6 kHz low-pass (TARGET, below: measured from the old PyChess knocks before they were removed, Oct 12, 2026).
-Sources and licences: sounds/SOURCES.md.
+- The defaults are the classic knocks, PyChess's (GPL-3.0; Eric, Oct 12): sounds/move.mp3, capture.mp3 and castle.mp3,
+  kept as they were converted on Oct 2. This script doesn't touch them; it measures their loudness (below).
+- "Classic light", "Classic deep", "Classic soft" (and the captures' "... double"): close variations of the classic
+  knocks, made here from PyChess's original WAVs by a small pitch shift (resampling), a gentle high-shelf EQ and a
+  slightly shorter or longer decay (VARIATIONS, below). Modified PyChess files, so GPL-3.0 too.
+- The rest: Kenney's CC0 *Impact Sounds*, or made here (ours, no licence needed).
 
-    # unzip Kenney's CC0 pack first:  https://kenney.nl/assets/impact-sounds  -> <dir>/kenney-impact/
+Every file is trimmed to start on its hit (so it lands with the piece), faded out, and levelled to the classic knock of
+its kind: the loudest 30 ms, heard through a phone speaker (high-passed at 200 Hz) and the game's own 6 kHz low-pass,
+matches sounds/move.mp3 (moves) or sounds/capture.mp3 (captures). Sources and licences: sounds/SOURCES.md.
+
+    # put the sources in one folder first:
+    #   Kenney's CC0 pack, unzipped: https://kenney.nl/assets/impact-sounds  -> <dir>/kenney-impact/
+    #   PyChess's mov2.wav and capture2.wav (GPL-3.0), from commit 94771355c49a04c3e8fc16dd135fe8ceed78a277 of
+    #   https://github.com/pychess/pychess/tree/master/sounds  -> <dir>/pychess/
     python3 scripts/piece-sounds.py <dir> [name ...]   # needs numpy and ffmpeg; names default to all
-    python3 scripts/piece-sounds.py --ours [name ...]  # only the ones made here (no pack needed)
+    python3 scripts/piece-sounds.py --ours [name ...]  # only the ones made here from nothing (no download needed)
 """
 import glob, math, os, subprocess, sys
 import numpy as np
@@ -58,6 +65,53 @@ def biquad(x, kind, f, q=0.707):
         x2, x1, y2, y1 = x1, v, y1, out
         y[i] = out
     return y
+
+
+def high_shelf(x, f, db):
+    """An RBJ high shelf (slope 1): `db` above about `f`, flat below. Brighter (+) or darker (-)."""
+    A = 10 ** (db / 40)
+    w = 2 * math.pi * f / SR
+    c, sn = math.cos(w), math.sin(w)
+    alpha = sn / 2 * math.sqrt(2)
+    r = 2 * math.sqrt(A) * alpha
+    b = [A * ((A + 1) + (A - 1) * c + r), -2 * A * ((A - 1) + (A + 1) * c), A * ((A + 1) + (A - 1) * c - r)]
+    a = [(A + 1) - (A - 1) * c + r, 2 * ((A - 1) - (A + 1) * c), (A + 1) - (A - 1) * c - r]
+    b0, b1, b2 = (v / a[0] for v in b)
+    a1, a2 = a[1] / a[0], a[2] / a[0]
+    y = np.zeros_like(x)
+    x1 = x2 = y1 = y2 = 0.0
+    for i, v in enumerate(x):
+        out = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1, y2, y1 = x1, v, y1, out
+        y[i] = out
+    return y
+
+
+def hits(x, rise_db=20, quiet=0.02):
+    """Where each knock peaks: the loudest 2 ms within `rise_db` of the loudest, after at least `quiet` s below it."""
+    w = int(0.002 * SR)
+    r = np.sqrt(np.convolve(x * x, np.ones(w) / w, mode="same"))
+    loud = r > r.max() * 10 ** (-rise_db / 20)
+    out, last = [], -10 ** 9
+    for i in np.flatnonzero(loud):
+        if i - last > quiet * SR:
+            j = i + int(np.argmax(r[i:i + int(0.01 * SR)]))
+            out.append(j)
+        last = i
+    return out
+
+
+def decay(x, tau, max_db=6.0):
+    """
+    A shorter (tau > 0) or longer (tau < 0) decay: from each knock's peak to the next knock, the sound is multiplied by
+    exp(-t / tau), where t is the time since that peak (a longer decay's gain is held at `max_db` at most).
+    """
+    g = np.ones(len(x))
+    peaks = hits(x) + [len(x)]
+    for p, q in zip(peaks, peaks[1:]):
+        t = np.arange(q - p) / SR
+        g[p:q] = np.minimum(np.exp(-t / tau), 10 ** (max_db / 20))
+    return x * g
 
 
 def loudness(x):
@@ -119,6 +173,30 @@ def finish(x, length, fade=0.03):
     return x
 
 
+# --- The classic knocks' variations (PyChess, GPL-3.0) ----------------------------------------------------------
+
+# name: (PyChess file, semitones, shelf dB above SHELF_HZ, decay tau seconds: + shorter, - longer). Small on purpose:
+# each should sound like the classic's sibling, not a new sound. (The capture's knocks ring longer than the move's, so
+# the same "a little shorter" takes a gentler tau there.)
+SHELF_HZ = 2500
+VARIATIONS = {
+    # A smaller piece: two semitones up, a little brighter, over a little sooner.
+    "move-classic-light": ("mov2.wav", 2, 3, 0.05),
+    "capture-classic-light": ("capture2.wav", 2, 3, 0.12),
+    # A bigger piece: two semitones down, a little darker, ringing a little longer.
+    "move-classic-deep": ("mov2.wav", -2, -3, -0.05),
+    "capture-classic-deep": ("capture2.wav", -2, -3, -0.06),
+    # Softer: a semitone down, darker, and over a little sooner (as on a felted base).
+    "move-classic-soft": ("mov2.wav", -1, -5, 0.08),
+    "capture-classic-soft": ("capture2.wav", -1, -5, 0.15),
+}
+
+
+def classic_variation(name):
+    src, semis, shelf, tau = VARIATIONS[name]
+    return lambda: trim(decay(high_shelf(pitch(pack(src), semis), SHELF_HZ, shelf), tau))
+
+
 # --- Ours -------------------------------------------------------------------------------------------------------
 
 def wood_tap():
@@ -167,15 +245,14 @@ def wood_block():
     return trim(pitch(pack("impactWood_medium_004.ogg"), 2))
 
 
-def castle_wood():
-    # King, then rook: two Light wood knocks 110 ms apart, the second a little softer (as castling with any other
-    # pick sounds: sound.ts plays it twice).
-    k = light_wood()
-    return place([(0, k, 1.0), (0.11, k, 0.8)], 0.30)
-
-
-# name: (make, kind it's levelled against, length seconds, fade seconds, ours)
+# name: (make, kind it's levelled against, length seconds, fade seconds, ours). The classic variations first.
 FILES = {
+    "move-classic-light": (classic_variation("move-classic-light"), "move", 0.045, 0.012, False),
+    "move-classic-deep": (classic_variation("move-classic-deep"), "move", 0.055, 0.015, False),
+    "move-classic-soft": (classic_variation("move-classic-soft"), "move", 0.045, 0.012, False),
+    "capture-classic-light": (classic_variation("capture-classic-light"), "capture", 0.24, 0.03, False),
+    "capture-classic-deep": (classic_variation("capture-classic-deep"), "capture", 0.30, 0.04, False),
+    "capture-classic-soft": (classic_variation("capture-classic-soft"), "capture", 0.26, 0.03, False),
     "move-light-wood": (light_wood, "move", 0.14, 0.05, False),
     "move-wood-tap": (wood_tap, "move", 0.09, 0.04, True),
     "move-ringing-wood": (ringing_wood, "move", 0.22, 0.10, False),
@@ -186,7 +263,6 @@ FILES = {
     "capture-big-wood": (big_wood, "capture", 0.28, 0.12, False),
     "capture-short-wood": (short_wood, "capture", 0.20, 0.08, False),
     "capture-wood-block": (wood_block, "capture", 0.24, 0.10, False),
-    "castle-wood": (castle_wood, "move", 0.30, 0.10, False),
 }
 
 
@@ -198,13 +274,10 @@ def encode(x, path):
     )
 
 
-# The game's knocks' loudness (dB, as `loudness` measures it): the old move and capture sounds', measured Oct 12, 2026.
-TARGET = {"move": -19.95, "capture": -20.57}
-
-
 def main():
     os.makedirs(OUT, exist_ok=True)
-    target = TARGET
+    # The classic knocks' loudness (dB, as `loudness` measures it): -19.95 (move) and -20.57 (capture).
+    target = {kind: loudness(load(os.path.join(SOUNDS, f"{kind}.mp3"))) for kind in ("move", "capture")}
     print(f"targets: move {target['move']:.1f} dB, capture {target['capture']:.1f} dB")
     for name, (make, kind, length, fade, ours) in FILES.items():
         if ONLY and name not in ONLY:
@@ -219,6 +292,15 @@ def main():
         path = os.path.join(OUT, f"{name}.mp3")
         encode(x, path)
         got = load(path)
+        # The mp3 shifts the loudness by about half a decibel: level what's heard, once more, from the encoded file.
+        miss = target[kind] - loudness(got)
+        if abs(miss) > 0.05:
+            x *= 10 ** (miss / 20)
+            peak = 20 * math.log10(np.abs(x).max())
+            if peak > -1:
+                sys.exit(f"{name}: peak {peak:.1f} dBFS after levelling (would clip)")
+            encode(x, path)
+            got = load(path)
         print(f"{name:20s} {len(x) / SR * 1000:4.0f} ms  peak {peak:5.1f} dBFS  loudness {loudness(got):5.1f} dB  {os.path.getsize(path):5d} bytes")
 
 
