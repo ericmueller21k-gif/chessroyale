@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FRONT_DOOR, SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
+import { FRONT_DOOR, LOBBY_LIFE, SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, halfDuties, squadsLegalMoves, type NetSquadsMatch } from "@chessroyale/chess/squads";
 import { clearTopCache, parseTestClock, partiesFit, squadsClosing, squadsTestAllowed, testLobbyOptions, type LiveMatch } from "../src/squads-lobby.ts";
 import { fallbackTop } from "../src/squads-bots.ts";
@@ -129,10 +129,11 @@ describe("squads lobby: votes and the bracket", () => {
     const start = L.now;
     L.runUntil(() => L.core.record.phase === "results", 3 * 3_600_000, "the results");
     const minutes = (L.now - start) / 60_000;
-    // (These bots play from the server's quick look, far weaker than the devices' engine, so their games run long:
-    // over 8 seeds 43-103 minutes before Squads v2, 45-92 after. A lobby with devices takes about 30: the headless run.)
+    // (These bots play from the server's quick look, far weaker than the devices' engine, so their games run long and
+    // vary: over 8 seeds 43-103 minutes before Squads v2, 41-96 after. What must hold: a bracket left to its bots
+    // reaches its results before the lobby's safety close for a lobby nobody is in. With devices: about 30 minutes.)
     expect(minutes).toBeGreaterThan(15);
-    expect(minutes).toBeLessThan(90);
+    expect(minutes).toBeLessThan(LOBBY_LIFE.lobbyAbandonedMinutes);
     // Squads v2: the bots block now and then, and match a partner on an only move; with no device, no refunds.
     const pairs = L.core.allMatches().filter((m) => m.round === 1);
     expect(pairs.flatMap((m) => m.m.tokenLog).length).toBeGreaterThan(0);

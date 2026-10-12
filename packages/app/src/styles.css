@@ -12245,6 +12245,20 @@ button.sq-tiny {
   gap: 5px;
   line-height: 1.15;
 }
+/* (A narrow phone: under the board each squad is its colour; its name is in the score line above.) */
+@media (max-width: 374px) {
+  .sq-clockline {
+    gap: 5px;
+  }
+  .sq-clockline-side .sq-tag {
+    font-size: 0;
+    gap: 0;
+  }
+  .sq-free {
+    min-width: 44px;
+    padding: 2px 4px;
+  }
+}
 .sq-res {
   display: inline-flex;
   align-items: center;

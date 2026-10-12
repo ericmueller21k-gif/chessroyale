@@ -1873,4 +1873,5 @@ also take `fen=` (the first round's position), `bots=strong` and `seat=white`, s
 token log; the final's one duty; bot-work answers carry each line's reply.
 
 **A test bound:** the full bot lobby unit test (no devices: the server's quick look, far weaker bots) ran 43-103 minutes
-over 8 seeds before v2 and 45-92 after; its upper bound goes from 60 (which seed 11 met by luck) to 90.
+over 8 seeds before v2 and 41-96 after (means 65 and 64). Its upper bound of 60 held only for its own seed, by luck;
+it's now what must hold, the lobby's safety close for a lobby nobody is in (`LOBBY_LIFE.lobbyAbandonedMinutes`, 180).
