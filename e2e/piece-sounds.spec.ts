@@ -66,7 +66,9 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   // Castling with the default: its own file, the Light wood twice (its loudest knock is the Light wood's).
   expect(Math.abs((await level("castle")).peak - wood.peak)).toBeLessThan(0.02);
   await moves.getByRole("radio", { name: /^Wooden tap/ }).click();
-  await expect.poll(async () => Math.abs((await level("move")).peak - wood.peak), { timeout: 10_000 }).toBeGreaterThan(0.05);
+  // (Every option is levelled to the same loudness, so their peaks are close: the Wooden tap's is 0.04 off the Light
+  // wood's, rendered the same way each time.)
+  await expect.poll(async () => Math.abs((await level("move")).peak - wood.peak), { timeout: 10_000 }).toBeGreaterThan(0.02);
   // Castling follows the pick too: two Wooden taps.
   const tap = await level("move");
   expect(Math.abs((await level("castle")).peak - tap.peak)).toBeLessThan(0.01);
