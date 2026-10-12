@@ -330,7 +330,7 @@ function bossBrain(src: FaqSources): FaqSection {
   // The handover table: a boss's strength, Maia's rating alone and for a crowd, the guard and Stockfish's share.
   const plan = (x: number, crowd: boolean) => bossBrainFor("", x, "", true, { crowd }, M);
   const share = (x: number) => plan(x, false).stockfishShare;
-  const strengths = [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, M.bridgeFrom, M.bridgeStrictFrom, Math.round((M.bridgeStrictFrom + M.stockfishFrom) / 2), M.stockfishFrom - 1, M.stockfishFrom, 3000, ceiling]
+  const strengths = [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, M.bridgeFrom, M.bridgeStrictFrom, Math.round((M.bridgeStrictFrom + M.stockfishFrom) / 2), M.stockfishFrom - 1, M.stockfishFrom, 3000, ceiling]
     .filter((x, i, a) => a.indexOf(x) === i && x >= floor && x <= ceiling)
     .sort((a, b) => a - b);
   const handover = strengths

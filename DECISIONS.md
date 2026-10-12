@@ -1500,9 +1500,10 @@ OKs publishing the Maia box's source (AGPL), and admins get Maia on every boss n
   - **Slips:** none under Maia (its own mistakes take their place, as in the prototype). The slip roll still happens,
     so the match's other random draws stay where they were.
   - **The mate test switch** (`?mate=1`): its mate in one, as before.
-- **The bridge band** (`bridgeFrom` 2600, `bridgeStrictFrom` 2700, `stockfishFrom` 2800; `bandBrain`): Maia with the
-  light guard, then with the strict one, and a share of the boss's moves today's Stockfish move instead (with its own
-  guard and slips), growing in a straight line from none at 2600 to `bridgeStockfishShare` just under 2800. Each move's
+- **The bridge band** (`bridgeFrom`, `bridgeStrictFrom`, `stockfishFrom` 2800; `bandBrain`; the numbers are the
+  calibration's, below): Maia with the light guard, then with the strict one, and a share of the boss's moves today's
+  Stockfish move instead (with its own guard and slips), growing in a straight line from none at `bridgeFrom` to
+  `bridgeStockfishShare` just under 2800. Each move's
   draw comes from the match's random source in solo (only in the band, so nothing else's draws move) and from the
   host's on its device online; Maia isn't asked for a move Stockfish plays. An admin's pick plays that brain, no share.
 - **Strength from the people** (Eric's "people only"): the Crowd's boss battle now takes the weighted rating of the
@@ -1548,3 +1549,47 @@ OKs publishing the Maia box's source (AGPL), and admins get Maia on every boss n
   (`boss-powers-lobby.test.ts`: admins only, the host told, new hosts told, no plan on the special requests, players
   under `forPlayers`), and `e2e/maia.spec.ts` (every boss on Maia for an admin on a phone; an online raid on Maia where
   the host's Maia moves reach the other player, who never downloads it).
+
+### Every boss on Maia: the calibration (Oct 12, 2026)
+
+A modest run, as asked (`packages/sim/scripts/maia-calibration.ts`, `reports/maia-calibration.md`; boss-sim.ts's bot
+crowds and method; small samples with ± two standard errors, about ±0.3 at 10 games). The calls:
+
+- **The target (my call, from the record):** the boss battle's own target from Oct 3, "very hard but beatable": a
+  crowd about even with the boss in plain chess (then a club crowd won 38%, drew 25%, lost 38%), the powers, each
+  boss's offset and the God King on top as before. Not "as hard as today's Stockfish boss": with its blunder guard
+  (Oct 5) and slips it beat every beginner, casual and club bot crowd we tried in plain chess (18 games, not a draw)
+  and held the expert crowd to 0.25. A guard-free human boss can't be that hard below Maia's ceiling, and Eric chose
+  "no guard: its edge comes from its powers". So a Maia boss is clearly easier in plain chess than today's Stockfish
+  one; flagged for Eric, with the knobs below.
+- **What was measured:** bot crowds (beginner 1484, casual 1920, club 2266, expert 2771; the boss at the crowd's
+  weighted rating less 100) against today's Stockfish boss and against Maia with no guard at several ratings; the
+  expert crowd also against the light and strict guards at Maia 2700; one bot alone (the casual and club crowds'
+  middle member) at its own rating; and, per move, Maia's loss at nine ratings with each guard. Crowds were about even
+  with Maia at roughly 350 (beginner), a little under 1000 (casual) and 2100 (club); the club crowd scored the same
+  against 2100 and 2600, and the expert crowd beat Maia at 2700 nine times in ten. A lone club bot scored 0.25 against
+  Maia 1000.
+- **Maia's rating lines** (`maiaRating`, the boss's level → Maia): 600 (the floor) up to 1800, 850 at 2200, 2100 at
+  2550, 2500 from 2650 (held: Maia's ceiling). The level is the strength, plus the crowd's margin for a crowd.
+- **The crowd's margin: 400** (`crowdMargin`): a lone bot needed a far weaker Maia than a crowd of its own rating,
+  about 400 of level on the lines. Bots' mistakes are independent random moves, which voting filters out better than
+  real people's (often shared) mistakes, so real crowds may need less: it's the one value to tune for crowds.
+- **The ceiling: Maia 2500.** With no guard Maia stops gaining strength between 2100 and 2700 (per move 2.73 points
+  at 2400, 2.53 at 2700, 2.80 at 3000), and the model has few people up there.
+- **The bridge: 2500 to 2800** (`bridgeFrom` 2500, `bridgeStrictFrom` 2650, `bridgeStockfishShare` 1, `stockfishFrom`
+  2800). A step under Eric's "about 2600–2800", because Maia with no guard at its ceiling already falls short of strong
+  crowds (that 9 in 10). The share of Stockfish's moves grows from none at 2500 to all of them just under 2800, so the
+  boss arrives exactly at today's Stockfish boss there. Against the expert crowd, light guard 0.65, strict 0.35,
+  Stockfish 0.25: each step no bigger than the error bars.
+- **The floor stays 600** (`maiaRatingMin`): the model learned from people rated about that and up; asking for less is
+  outside what it knows. The weakest crowds and players meet a Maia a little stronger than even (the beginner crowd,
+  which plays a random move a quarter of the time, scored 0.13 against 600).
+- **Boss alone:** with no margin, a player of 1500 meets Maia 600 at Normal (the prototype gave Ginger Maia 1190 there,
+  which Eric enjoyed); 1800 meets about 660; Hardest at 1900 about 1560. The lone bots say that's about even (a club bot
+  of 2162 scored 0.50 against the shipped rule's Maia 826). This is the least certain part: Eric's play decides, and
+  the lines' first two points (or Hard and Hardest) are the knob.
+- **Checked:** the shipped rule on fresh openings, 8 games each: the casual crowd 0.38, the club crowd 0.50, the club
+  bot alone 0.50, the expert crowd (in the bridge: strict guard, 90% Stockfish) 0.38. About even everywhere.
+- **The prototype's sanity runs** (`reports/maia-boss.md`) used one strong bot (2% random moves) against a 1500 boss,
+  which is why raw Maia looked much easier there; against crowds of the tier's own strength the picture is the one
+  above.

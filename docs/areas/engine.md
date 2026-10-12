@@ -36,13 +36,14 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   - **The Maia box:** a separate AGPL program (`packages/maia-worker/`, its own README and licence): a module worker at
     `/engine/maia/` (the official 23M checkpoint converted to int8 ONNX, 24 MiB, run by onnxruntime-web on one thread,
     about 80 ms a move here). The game only exchanges UCI-style text with it (`HumanUciEngine`).
-  - **The rule, by the boss's strength** (`BOSS_BRAIN`): below `bridgeFrom` (2600) Maia's own draw (`maia-raw`, no
-    guard: Eric) at temperature 0.8, top-p 0.9; from 2600 the light guard (25 points / 2 logits), from
-    `bridgeStrictFrom` (2700) the strict one (4 / 0.5), with a share of today's Stockfish move growing in a line to
-    `bridgeStockfishShare` just under `stockfishFrom` (2800); from 2800 Stockfish, as before. Maia's rating is
-    `maiaRatingFor(strength + crowdMargin)` (the margin only when more than one picks the crowd's moves), from the
-    calibration (`reports/maia-calibration.md`). The guards veto from the boss's own top-8 search (no extra search):
-    Maia's next likely move, else Stockfish's best.
+  - **The rule, by the boss's strength** (`BOSS_BRAIN`): below `bridgeFrom` (2500) Maia's own draw (`maia-raw`, no
+    guard: Eric) at temperature 0.8, top-p 0.9; from 2500 the light guard (25 points / 2 logits), from
+    `bridgeStrictFrom` (2650) the strict one (4 / 0.5), with a share of today's Stockfish move growing in a line from
+    none at 2500 to all of them (`bridgeStockfishShare`) just under `stockfishFrom` (2800); from 2800 Stockfish, as
+    before. Maia's rating is `maiaRatingFor(strength + crowdMargin)` (the margin, 400, only when more than one picks
+    the crowd's moves): 600 (its floor) up to a level of 1800, 850 at 2200, 2100 at 2550, held at 2500 from 2650
+    (`reports/maia-calibration.md`). The guards veto from the boss's own top-8 search (no extra search): Maia's next
+    likely move, else Stockfish's best.
   - **Within the powers:** Maia is asked for the allowed moves only (`searchmoves`), and nothing else is played; none of
     its moves allowed: today's Stockfish move. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra
     move and Big Boy's bounce keep their own Stockfish picks; Maia's own mistakes replace the slips.

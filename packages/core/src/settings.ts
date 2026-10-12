@@ -769,30 +769,34 @@ export const BOSS_BRAIN = {
    */
   forPlayers: false,
   /**
-   * Maia's rating for a strength on the game's rating scale (Stockfish's, which players' ratings are on too), on
-   * straight lines between these points: below the first along the first line, down to maiaRatingMin; above the last
-   * held there (Maia's ceiling). Measured per move (reports/maia-calibration.md): Maia at the rating on the right
-   * gives away about as much a move as a player rated the number on the left.
+   * Maia's rating for a boss's level (its strength, plus crowdMargin for a crowd), on straight lines between these
+   * points: below the first along the first line, down to maiaRatingMin; above the last held there (Maia's ceiling).
+   * Calibrated against bot crowds and lone bots in plain chess (reports/maia-calibration.md; DECISIONS.md, "Every boss
+   * on Maia: the calibration"): Maia at the rating on the right is about an even game for a crowd whose level is the
+   * number on the left (the target set on Oct 3: very hard but beatable, before the powers and the God King).
    */
   maiaRating: [
-    [1400, 1100],
-    [2400, 2000],
-    [2600, 3000],
+    [1800, 600],
+    [2200, 850],
+    [2550, 2100],
+    [2650, 2500],
   ] as readonly (readonly [number, number])[],
   maiaRatingMin: 600,
   /**
    * A crowd voting together plays above its average member (Eric, Oct 11): in a battle where more than one picks the
    * crowd's moves (a raid, the Crowd's boss battle; not Boss alone), Maia plays this much above the boss's strength.
+   * Measured: a lone bot needed a Maia about this much weaker than a crowd of its rating (reports/maia-calibration.md).
    */
-  crowdMargin: 0,
+  crowdMargin: 400,
   /**
    * The bridge band (Eric, Oct 11): from bridgeFrom to stockfishFrom the boss is Maia with the light guard, then from
    * bridgeStrictFrom with the strict guard, and a share of its moves today's Stockfish move, growing in a line from
-   * none at bridgeFrom to bridgeStockfishShare just under stockfishFrom, so its strength never jumps.
+   * none at bridgeFrom to bridgeStockfishShare just under stockfishFrom, so its strength never jumps. It starts a step
+   * under Eric's "about 2600": in the sims Maia with no guard already fell short of strong crowds from about 2400.
    */
-  bridgeFrom: 2600,
-  bridgeStrictFrom: 2700,
-  bridgeStockfishShare: 0.5,
+  bridgeFrom: 2500,
+  bridgeStrictFrom: 2650,
+  bridgeStockfishShare: 1,
   /** From this strength on the boss is always Stockfish, as before (Maia's humans stop well short of it). */
   stockfishFrom: 2800,
   /** Maia's own draw from its probabilities: a little sharper than a human's (temperature), and none of the rarest moves (topP). */
