@@ -101,19 +101,23 @@ describe("the ultimate's meter", () => {
     expect(ragePoints({ charge: 0, lost: 9 })).toBeCloseTo(BOSS_POWERS.rageFull / 2);
   });
 
-  it("on its own, it's full after 20 crowd moves (the warning as turn 21 begins, the ultimate on 22), then empties and fills again: 22, 44, 66", () => {
+  it("on its own, it's full after 20 crowd moves (the warning as turn 21 begins, the ultimate on 22), then empties and fills again: 22, 46, 70", () => {
     const seen = turns(battle("gingerbread", RUY_FEN), RUY_FEN, 70, undefined, S);
     const at = (turn: number) => seen[turn - 1]!;
     expect(rageOf(at(1), S)).toBe(0);
     expect(rageOf(at(10), S)).toBeCloseTo(0.45);
-    expect(seen.filter((b) => kinds(b).includes("warn")).map((b) => b.powers!.turn)).toEqual([21, 43, 65]);
-    expect(seen.filter((b) => kinds(b).includes("blizzard")).map((b) => b.powers!.turn)).toEqual([22, 44, 66]);
-    // Full on the ultimate's turn; empty as the next begins (it's over); then it fills again from empty.
+    // (The blizzard lasts three turns, the meter empty through them: each next one comes two turns later than a
+    // one-turn ultimate's would.)
+    expect(seen.filter((b) => kinds(b).includes("warn")).map((b) => b.powers!.turn)).toEqual([21, 45, 69]);
+    expect(seen.filter((b) => kinds(b).includes("blizzard")).map((b) => b.powers!.turn)).toEqual([22, 46, 70]);
+    // Full on the ultimate's turn; empty through its effect (22, 23, 24); over as turn 25 begins; then it fills again
+    // from empty.
     expect(rageOf(at(22), S)).toBe(1);
-    expect(rageOf(at(23), S)).toBe(0);
-    expect(rageOf(at(33), S)).toBeCloseTo(0.5);
-    expect(at(23).powers!.ultAt).toBeUndefined();
-    expect(at(23).powers!.warnAt).toBeUndefined();
+    for (const t of [23, 24, 25]) expect(rageOf(at(t), S)).toBe(0);
+    expect(at(24).powers!.ultAt).toBe(22);
+    expect(rageOf(at(35), S)).toBeCloseTo(0.5);
+    expect(at(25).powers!.ultAt).toBeUndefined();
+    expect(at(25).powers!.warnAt).toBeUndefined();
     expect(at(70).powers!.ults).toBe(3);
   });
 
@@ -187,14 +191,23 @@ describe("the test trigger", () => {
     expect(blizzardNow(b)).toBe(true);
     expect(b.powers!.ultNext).toBeUndefined();
     expect(b.powers!.ults).toBe(1);
-    // Under way: nothing (one never overlaps another).
+    // Under way, through its three turns (the ice thawing on the second, gone on the third): nothing (one never
+    // overlaps another).
+    expect(triggerUltimate(b).ok).toBe(false);
+    b = prepareTurn({ ...b, crowdMoves: 2 }, RUY_FEN);
+    expect(kinds(b)).toContain("thaw");
+    expect(blizzardNow(b)).toBe(true);
+    expect(triggerUltimate(b).ok).toBe(false);
+    b = prepareTurn({ ...b, crowdMoves: 3 }, RUY_FEN);
+    expect(kinds(b)).toContain("thaw");
+    expect(blizzardNow(b)).toBe(false);
     expect(triggerUltimate(b).ok).toBe(false);
     // Over as the next turn begins: it can be pulled again, and the blizzard comes again.
-    b = prepareTurn({ ...b, crowdMoves: 2 }, RUY_FEN);
+    b = prepareTurn({ ...b, crowdMoves: 4 }, RUY_FEN);
     expect(blizzardNow(b)).toBe(false);
     const again = triggerUltimate(b);
     expect(again.ok).toBe(true);
-    b = prepareTurn({ ...again.boss!, crowdMoves: 3 }, RUY_FEN);
+    b = prepareTurn({ ...again.boss!, crowdMoves: 5 }, RUY_FEN);
     expect(kinds(b)).toContain("blizzard");
     expect(b.powers!.ults).toBe(2);
     expect(triggerUltimate({ ...battle("clown", RUY_FEN), result: "crowd" }).ok).toBe(false);

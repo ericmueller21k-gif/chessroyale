@@ -191,7 +191,7 @@ export interface BossRules {
   ultimate(next: BossPowerState, t: TurnContext): boolean;
   /**
    * Its ultimate's effect still runs on crowd turn `turn` (it came at `p.ultAt`): the meter stays empty and no other
-   * ultimate can come. Without it, the effect is its own turn only (the blizzard, the Big Bounce). Read from the state
+   * ultimate can come. Without it, the effect is its own turn only (the Big Bounce). Read from the state
    * as the previous turn left it, before anything wears off.
    */
   ultimateRunning?(p: BossPowerState, turn: number, s: BossPowerSettings): boolean;

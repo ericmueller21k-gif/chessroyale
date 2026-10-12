@@ -136,7 +136,7 @@ export function triggerUltimate(boss: BossState | null | undefined): { boss: Bos
 
 /**
  * The moves the crowd may play this turn, or null when every legal move is allowed. Frozen pieces can't move and
- * nobody can move onto the pie; in the blizzard only the queen moves (no queen, or she can't: the king). The God
+ * nobody can move onto the pie; in the blizzard only the pieces its ice doesn't hold move (Ginger's rules). The God
  * King's Last Stand bars the move he took back on top. Never empty: a restriction that would leave no legal move
  * lifts for the turn (and since only legal moves are counted, check is always answered).
  */
@@ -186,7 +186,10 @@ export function powerTurn(boss: BossState | null | undefined): boolean {
   return !!p && !!bossRules(boss)?.powerTurn?.(boss!);
 }
 
-/** The squares that show ice: the frozen piece; in the blizzard every crowd piece but the one(s) still free to move. */
+/**
+ * The squares that show ice: the frozen piece; in the blizzard the crowd's pieces its ice holds (every one but those
+ * free), on the crowd's turn and through the boss's turn after it.
+ */
 export function icedSquares(boss: BossState | null | undefined, fen: string): string[] {
   const p = boss?.powers;
   if (!p || !boss) return [];

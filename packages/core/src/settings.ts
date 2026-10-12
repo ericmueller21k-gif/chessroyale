@@ -458,6 +458,19 @@ export const BOSS_POWERS = {
   freezeTurns: 2,
   freezeEvery: [4, 6] as readonly [number, number],
   /**
+   * The blizzard (Ginger's ultimate; Eric, Oct 12: "Ult lasts 3 turns now: 1 unmelted piece turn 1, turn 2 about 4–5
+   * pieces, then all"): it lasts blizzardTurns crowd turns (at least 2). On each but the last, blizzardFree's entry for
+   * that turn is how many of the crowd's pieces are free in all, a number in its range drawn from the seed (turn 1 one,
+   * turn 2 four or five); the rest are iced. Pieces once free stay free, and the ones that thaw next turn show cracked,
+   * dripping ice the turn before. On the last turn the ice is gone and every piece moves. The meter stays empty through
+   * all of them, and the freeze waits until it's over.
+   */
+  blizzardTurns: 3,
+  blizzardFree: [
+    [1, 1],
+    [4, 5],
+  ] as readonly (readonly [number, number])[],
+  /**
    * Pie: a square near the centre is pied for pieTurns crowd turns (nobody may move onto it). Up to pieMax pies on the
    * board at once (Eric, Oct 11: two), never two on one square; a new one every pieEvery turns while there's room.
    */
@@ -485,13 +498,14 @@ export const BOSS_POWERS = {
   rageStrike: 25,
   /**
    * How fast each boss's meter fills (every gain times this), by BOSS_ROSTER id (1 when missing). Its ultimate's
-   * effect pauses the meter for its length (the blizzard 1 turn, the funhouse 12, the Roman candle about 13, Lights
+   * effect pauses the meter for its length (the blizzard 3 turns, the funhouse 12, the Roman candle about 13, Lights
    * out 2, the Big Bounce 1, the board saw 5), so a longer one fills faster to fit two in a typical battle. Ginger a
-   * little faster (Eric, Oct 11: her ultimate's weak; about twice a game). Jefferson's candle burns for about a third
-   * of a battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half
-   * on fire most of the game.
+   * little faster (Eric, Oct 11: her ultimate's weak; about twice a game), and 1.2 since her blizzard lasts three turns
+   * (Oct 12, by estimate: the second still comes about turn 30). Jefferson's candle burns for about a third of a
+   * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
+   * fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.1, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3 } as Readonly<Record<string, number>>,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**

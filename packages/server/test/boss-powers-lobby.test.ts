@@ -107,7 +107,8 @@ function hostBoss(L: ReturnType<typeof setup>) {
 
 describe("boss powers online", () => {
   it("the gingerbread man: everyone sees the same freeze and blizzard, the clock waits for them, picks and jobs follow the allowed moves", () => {
-    const L = raid({ bossId: "gingerbread", bossPowerTest: "blizzard" });
+    // (The boss's strikes held off: the blizzard's three turns played through without one.)
+    const L = raid({ bossId: "gingerbread", bossPowerTest: "blizzard", bossKillEvery: 99 });
     const r1 = L.last("p1", "round")!;
     expect(r1.boss!.id).toBe("gingerbread");
     expect(r1.boss!.name).toBe("Ginger");
@@ -145,9 +146,53 @@ describe("boss powers online", () => {
     expect(pieceAt(fen, free)!.color).toBe("w");
     for (const m of allowed) expect(m.slice(0, 2)).toBe(free);
     expect(r3.boss!.powers!.iced).not.toContain(free);
+    // The pieces due to thaw next turn: named the same for everyone, among the iced ones.
+    const due = r3.boss!.powers!.thaw!;
+    expect(due.length).toBeGreaterThanOrEqual(3);
+    expect(L.last("p1", "round")!.boss!.powers!.thaw).toEqual(due);
+    for (const sq of due) expect(r3.boss!.powers!.iced).toContain(sq);
     expect(crowdMove(L).jobs[0]!.allowed).toEqual(allowed);
-    // Power turns (the freeze, the blizzard) don't count for fair play; the first turn, before any power, does.
-    expect(L.core.fairMoves("p1").map((m) => !!m.power)).toEqual([false, true, true]);
+    // The boss's turn: the ice stays on for everyone.
+    expect(L.last("p1", "boss")!.boss.powers!.iced).toEqual(r3.boss!.powers!.iced);
+    hostBoss(L);
+    // As turn 4 begins, the thaw (Eric, Oct 12): the same pieces freed for everyone (the cracked ones, from the seed),
+    // the clock waits for it; four or five free in all, only they move, and the rest are due to thaw next turn.
+    const b4 = L.last("p1", "boss")!;
+    expect(L.last("p2", "boss")!.boss.powers).toEqual(b4.boss.powers);
+    expect(b4.boss.powers!.events.map((e) => e.kind)).toEqual(["thaw"]);
+    expect(b4.until - b4.now).toBe(bossShowMs(b4.boss.lastMove) + POWER_FX.thaw);
+    const thawed = b4.boss.powers!.events[0]!.squares!;
+    for (const sq of due) if (pieceAt(b4.boss.board.fen, sq)?.color === "w") expect(thawed).toContain(sq);
+    L.advance(b4.until - L.now + 10);
+    const r4 = L.last("p1", "round")!;
+    expect(L.last("p2", "round")!.boss!.powers).toEqual(r4.boss!.powers);
+    const iced4 = r4.boss!.powers!.iced;
+    const crowd = (fen: string) => [..."abcdefgh"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).filter((sq) => pieceAt(fen, sq)?.color === "w");
+    const free4 = crowd(r4.board!.fen).filter((sq) => !iced4.includes(sq));
+    expect(free4.length).toBeGreaterThanOrEqual(4);
+    expect(free4.length).toBeLessThanOrEqual(6);
+    expect(r4.boss!.powers!.thaw).toEqual(iced4);
+    for (const m of r4.boss!.powers!.allowed!) expect(iced4).not.toContain(m.slice(0, 2));
+    // A move of an iced piece is refused.
+    const stuck = legalMoves(r4.board!.fen).find((m) => iced4.includes(m.slice(0, 2)));
+    if (stuck) {
+      L.core.message("p2", { t: "pick", key: r4.key, move: stuck });
+      expect(L.core.record.round!.picks.p2).toBeUndefined();
+    }
+    expect(crowdMove(L).jobs[0]!.allowed).toEqual(r4.boss!.powers!.allowed);
+    hostBoss(L);
+    // Turn 5, its last: the rest thaw for everyone, every move allowed; the meter still held empty.
+    const b5 = L.last("p2", "boss")!;
+    expect(L.last("p1", "boss")!.boss.powers).toEqual(b5.boss.powers);
+    expect(b5.boss.powers!.events.map((e) => e.kind)).toEqual(["thaw"]);
+    expect(b5.boss.powers!.iced).toEqual([]);
+    expect(b5.boss.powers!.paused).toBe(true);
+    L.advance(b5.until - L.now + 10);
+    expect(L.last("p1", "round")!.boss!.powers!.allowed).toBeNull();
+    crowdMove(L);
+    // Power turns (the freeze, the blizzard and its thaw) don't count for fair play; the first turn, before any
+    // power, and the blizzard's last, with every piece free, do.
+    expect(L.core.fairMoves("p1").map((m) => !!m.power)).toEqual([false, true, true, true, false]);
   });
 
   it("Boingo: his pies kept off by both sides; the funhouse: the host plays the crowd's move once (unscored), the same for everyone, then the board turned for all", () => {

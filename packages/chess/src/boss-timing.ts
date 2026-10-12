@@ -41,7 +41,8 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * Boss powers' moments as the turn passes to the crowd, after the boss's move shows: how long each holds the screen
  * (ms). The crowd's clock starts after them, solo and online, so a power never costs anyone thinking time. A freeze
  * or a pie: its banner and the board effect; the warning: its banner over the full rage meter; the blizzard: its
- * banner, the sweep across the board and the God King's line; the funhouse (a screen of its own, after the move he
+ * banner, the sweep across the board and the God King's line (each thaw after it: its banner and the ice melting
+ * away); the funhouse (a screen of its own, after the move he
  * plays for the crowd): the clown pogos onto the board, it turns upside down, he speaks and the move lands (each later
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).

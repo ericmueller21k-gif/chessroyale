@@ -240,8 +240,13 @@ export interface NetBossPowers {
   frozen: { square: string; until: number } | null;
   pie: { square: string; until: number } | null;
   pies?: { square: string; until: number }[];
-  /** Squares that show ice now (the frozen piece; in the blizzard every crowd piece but the one free to move). */
+  /**
+   * Squares that show ice now (the frozen piece; in Ginger's blizzard every crowd piece its ice holds, through the
+   * boss's turn after too); and of those, the ones that thaw as the next crowd turn begins (cracked and dripping on
+   * screen; missing for other bosses and from older servers).
+   */
   iced: string[];
+  thaw?: string[];
   /**
    * Boingo's funhouse: how far the board is turned clockwise from the crowd's own view this turn (0, 90, 180, 270;
    * missing from older servers), `flipped` when it's 180 (older screens), and the funhouse itself (the turn it came, the

@@ -2,7 +2,9 @@
 // (?power=), played with real taps. Records every frame the browser paints (Chrome's screencast) around each power's
 // moment (the passive and the warning as the second turn begins, the ultimate on the third), saves stills and a GIF of
 // each moment, and prints a timeline of phases and moments.
-//   npm run frames:powers -- <out-dir> [gingerbread|clown|grex|all|both] [phone|desktop|both] [light|dark] [moves]
+//   npm run frames:powers -- <out-dir> [gingerbread|clown|grex|all|both] [phone|desktop|both] [light|dark] [moves] [desktop width]
+// Ginger: the blizzard (?power=blizzard) and its thaw over the two turns after (six crowd moves by default), and the
+// boss's turns between them while the ice is on.
 // G-REX: his sparkler's tile through its stages, a piece left on it burning, a step onto a tile (the God King's
 // warning), the Roman candle (?power=candle) and its five waves of fireballs (12 crowd moves by default).
 // Read the frames before calling a power done (.claude/LESSONS.md: watch it frame by frame).
@@ -13,7 +15,7 @@ import { chromium, devices } from "@playwright/test";
 import { createServer } from "vite";
 import { Chess } from "chess.js";
 
-const [out = "power-frames", bossArg = "both", which = "both", scheme = "light", movesArg] = process.argv.slice(2);
+const [out = "power-frames", bossArg = "both", which = "both", scheme = "light", movesArg, widthArg] = process.argv.slice(2);
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
 process.chdir("packages/app");
@@ -44,7 +46,7 @@ async function run(boss, name, context) {
       const m = window.match;
       const b = m?.boss;
       const burnt = (b?.powers?.burnt ?? []).filter((x) => x.turn === b.crowdMoves);
-      return { kind: m?.phase.kind, until: m?.phase.until ?? 0, thinking: !!m?.phase.thinking, events: b?.powers?.events ?? [], burnt, crowdMoves: b?.crowdMoves, turn: b?.powers?.turn, now: Date.now(), flipped: !!b?.powers?.flipped };
+      return { kind: m?.phase.kind, until: m?.phase.until ?? 0, thinking: !!m?.phase.thinking, events: b?.powers?.events ?? [], burnt, crowdMoves: b?.crowdMoves, turn: b?.powers?.turn, now: Date.now(), flipped: !!b?.powers?.flipped, iced: b?.powers?.iced?.length ?? 0 };
     });
   const waitFor = async (want, ms = 90_000) => {
     const t0 = Date.now();
@@ -95,7 +97,7 @@ async function run(boss, name, context) {
   await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, everyNthFrame: 1 });
   const marks = [];
   // Three crowd moves (Boingo: sixteen, to see every step of the funhouse), watching each boss screen's moments.
-  const moves = Number(movesArg) || (boss === "grex" ? 12 : boss === "clown" ? 16 : 4);
+  const moves = Number(movesArg) || (boss === "grex" ? 12 : boss === "clown" ? 16 : boss === "gingerbread" ? 6 : 4);
   for (let i = 0; i < moves; i++) {
     if ((await move()) === false) break;
     for (let k = 0; k < 400; k++) {
@@ -105,6 +107,14 @@ async function run(boss, name, context) {
         if (!marks.some((m) => m.key === key)) {
           marks.push({ key, from: s.now - 500, to: s.now + 1700, kinds: [s.burnt.some((b) => b.piece) ? "burn" : s.burnt.some((b) => b.fizzled) ? "fizzle" : "burnout", `t${s.crowdMoves}`] });
           console.log(`${tag} +${s.now - t0}ms ${key}: ${JSON.stringify(s.burnt)}`);
+        }
+      }
+      // (Ginger's blizzard: its ice through the boss's turn, while it thinks.)
+      if (s.kind === "boss" && s.thinking && s.iced > 1) {
+        const key = `think:${s.crowdMoves}`;
+        if (!marks.some((m) => m.key === key)) {
+          marks.push({ key, from: s.now - 300, to: s.now + 1500, kinds: ["thinking", `t${s.crowdMoves}`] });
+          console.log(`${tag} +${s.now - t0}ms ${key}: ${s.iced} iced`);
         }
       }
       if (s.kind === "boss" && s.events.length && s.until > s.now) {
@@ -124,7 +134,7 @@ async function run(boss, name, context) {
   const names = new Set();
   for (const m of marks) {
     // (A moment that comes more than once, a wave of fireballs or each step of the funhouse: named by its turn too.)
-    let name = `${tag}-${m.kinds.join("+")}${m.kinds.includes("fireball") || m.kinds.includes("spin") ? `-t${m.key.split(":")[0]}` : ""}`;
+    let name = `${tag}-${m.kinds.join("+")}${m.kinds.includes("fireball") || m.kinds.includes("spin") || m.kinds.includes("thaw") ? `-t${m.key.split(":")[0]}` : ""}`;
     if (names.has(name)) name += `-t${m.key.split(":")[0]}`;
     names.add(name);
     const dir = join(outDir, `${name}-frames`);
@@ -153,7 +163,7 @@ async function run(boss, name, context) {
 
 for (const boss of bossArg === "both" ? ["gingerbread", "clown"] : bossArg === "all" ? ["gingerbread", "clown", "grex"] : [bossArg]) {
   if (which !== "desktop") await run(boss, "phone", { ...devices["iPhone 13"] });
-  if (which !== "phone") await run(boss, "desktop", { viewport: { width: 1440, height: 900 } });
+  if (which !== "phone") await run(boss, "desktop", { viewport: { width: Number(widthArg) || 1440, height: 900 } });
 }
 await browser.close();
 await server.close();

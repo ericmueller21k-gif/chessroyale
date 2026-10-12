@@ -6,6 +6,7 @@ import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
 import { prewarmBigBoy } from "./BigBoy.tsx";
+import { prewarmGinger } from "./Ginger.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, useVoice, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
@@ -127,6 +128,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     if (kit.ch.id === "bigboy") prewarmBigBoy(kit.ch.name, boss.crowdSide === "b" ? "blackPawn" : undefined);
     // (Sawyer's split, cuts and board saw too: the split plays seconds in, after his first move.)
     if (kit.ch.id === "sawyer") prewarmSawyer(kit.ch.name);
+    // (Ginger's ice: its crack, thin ice and thaw.)
+    if (kit.ch.id === "gingerbread") prewarmGinger();
     // (Its attack on a king too: the God King's Last Stand, or its mate.)
     prewarmKingAttack(kit.ch.name);
   }, [kit]);

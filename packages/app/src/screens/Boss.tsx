@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { KING_ATTACK, SNACK, bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, angleView, dockLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, useMomentSpeech } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackLine, snackPawnShown } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
@@ -221,15 +221,21 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
     match.seen.set(seenKey(boss.board), boss.board.ply);
   }, [boss.board.ply]);
   const name = (id: string) => (match.isYou(id) ? "You" : match.nameOf(id));
-  // The God King's word after the blizzard (one piece free: the queen, the king, or another) and the funhouse.
+  // The God King's word after the blizzard (one piece free: the queen, the king, or another), as it thaws (more of
+  // ours free; then the ice gone), and after the funhouse.
   const blizzard = moments.find((m) => m.kind === "blizzard");
   const blizzardLine = !!blizzard && now >= blizzard.at + BLIZZARD.lineAt;
+  const thaw = moments.find((m) => m.kind === "thaw");
+  const thawSaid = !!thaw && now >= thaw.at + THAW.lineAt;
   const funLine = !!funhouse && now >= funhouse.at + FUNHOUSE.exitAt;
   useEffect(() => {
     if (!blizzardLine) return;
     const free = new Set((boss.powers?.allowed ?? []).map((m) => pieceAt(boss.board.fen, m.slice(0, 2))?.type));
     kingSay(free.has("q") ? "blizzard" : free.has("k") && free.size === 1 ? "blizzardKing" : "blizzardOne", `blizzard-${blizzard!.key}`);
   }, [blizzardLine]);
+  useEffect(() => {
+    if (thawSaid) kingSay(thawOver(boss) ? "thawed" : "thaw", `thaw-${thaw!.key}`);
+  }, [thawSaid]);
   useEffect(() => {
     if (funLine) kingSay("funhouse", `funhouse-${funhouse!.key}`);
   }, [funLine]);

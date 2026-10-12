@@ -161,14 +161,15 @@ describe("boss powers: the ground rules", () => {
       expect(legalMoves(fen).some((m) => m.startsWith(sq))).toBe(true);
       expect(pieceAt(fen, sq)?.type).not.toBe("k");
       free.add(sq);
-      const bliz = { ...b, powers: { ...b.powers!, warnAt: 2, ultAt: 3, blizzard: { turn: 3, square: sq } } };
+      const iced = ["a2", "b1", "b2", "c2", "c3", "d1"].filter((x) => x !== sq);
+      const bliz = { ...b, powers: { ...b.powers!, turn: 3, warnAt: 2, ultAt: 3, blizzard: { turn: 3, square: sq, at: 3, iced, next: [] } } };
       expect(blizzardNow(bliz)).toBe(true);
       const a = crowdAllowed(bliz, fen)!;
       expect(a.length).toBeGreaterThan(0);
       for (const m of a) expect(m.slice(0, 2)).toBe(sq);
       // Every other crowd piece shows ice.
-      expect(icedSquares(bliz, fen).sort()).toEqual(["a2", "b1", "b2", "c2", "c3", "d1"].filter((x) => x !== sq));
-      // One turn only.
+      expect(icedSquares(bliz, fen)).toEqual(iced);
+      // Its ice is for its own turn: the next is set up as that turn begins (ginger.test.ts: the thaw).
       expect(blizzardNow({ ...bliz, crowdMoves: 3 })).toBe(false);
     }
     // Different seeds pick different pieces (the queen, the knight, a pawn…): it's no longer always the queen.
@@ -193,7 +194,7 @@ describe("boss powers: the ground rules", () => {
     // The free piece's only move barred (the God King's Last Stand): the ice lifts rather than leave no move.
     const one = "4k3/8/8/8/8/8/P7/4K3 w - - 0 1";
     const b = battle("gingerbread", one, { crowdMoves: 2 });
-    const bliz = { ...b, powers: { ...b.powers!, warnAt: 2, ultAt: 3, blizzard: { turn: 3, square: "a2" } }, barred: "a2a3" };
+    const bliz = { ...b, powers: { ...b.powers!, turn: 3, warnAt: 2, ultAt: 3, blizzard: { turn: 3, square: "a2", at: 3, iced: ["e1"], next: [] } }, barred: "a2a3" };
     const a = crowdAllowed(bliz, one)!;
     expect(a.length).toBeGreaterThan(0);
     expect(a).not.toContain("a2a3");
@@ -213,6 +214,10 @@ describe("boss powers: the ground rules", () => {
       expect(e.square).toBe(chooseBlizzard(down, "w", b.powers!.seed, 3, b.powers!.frozen?.square));
       expect(at(seed).powers!.blizzard).toEqual(b.powers!.blizzard);
       for (const m of crowdAllowed(b, down)!) expect(m.slice(0, 2)).toBe(e.square);
+      // Every other crowd piece iced; three or four of them named to thaw next turn (four or five free in all then).
+      expect(b.powers!.blizzard!.iced).toHaveLength(15);
+      expect(b.powers!.blizzard!.next!.length).toBeGreaterThanOrEqual(3);
+      expect(b.powers!.blizzard!.next!.length).toBeLessThanOrEqual(4);
     }
   });
 
@@ -305,14 +310,15 @@ describe("boss powers: as each turn begins", () => {
     expect(b.powers!.events.map((e) => e.kind)).toContain("blizzard");
     expect(blizzardNow(b)).toBe(true);
     expect(powerTurn(b)).toBe(true);
-    // Spent: the queen's rage is gone with it; the meter fills from nothing (5 a move) and the blizzard comes again.
+    // Spent: the queen's rage is gone with it; the meter stays empty through the blizzard's three turns (3, 4, 5), then
+    // fills from nothing (5 a move) and the blizzard comes again.
     const blizzards: number[] = [];
-    for (let t = 4; t < 50; t++) {
+    for (let t = 4; t < 60; t++) {
       b = prepareTurn({ ...b, crowdMoves: t - 1 }, down, "", S);
-      if (t === 4) expect(rageOf(b, S)).toBe(0);
+      if (t <= 6) expect(rageOf(b, S)).toBe(0);
       if (b.powers!.events.some((e) => e.kind === "blizzard")) blizzards.push(t);
     }
-    expect(blizzards).toEqual([25, 47]);
+    expect(blizzards).toEqual([27, 51]);
     expect(b.powers!.ults).toBe(3);
   });
 
@@ -327,10 +333,13 @@ describe("boss powers: as each turn begins", () => {
     expect(b.powers!.events.map((e) => e.kind)).toContain("warn");
     b = prepareTurn({ ...b, crowdMoves: 2 }, RUY_FEN, "", S);
     expect(blizzardNow(b)).toBe(true);
-    // During it: a strike adds nothing.
-    expect(strikeRage(b, S)).toBe(b);
-    b = prepareTurn({ ...b, crowdMoves: 3 }, RUY_FEN, "", S);
-    expect(rageOf(b, S)).toBe(0);
+    // During it (its three turns, the ice gone on the last): a strike adds nothing.
+    for (let t = 4; t <= 6; t++) {
+      expect(strikeRage(b, S)).toBe(b);
+      b = prepareTurn({ ...b, crowdMoves: t - 1 }, RUY_FEN, "", S);
+      expect(rageOf(b, S)).toBe(0);
+    }
+    expect(b.powers!.ultAt).toBeUndefined();
     // A faster boss's strike counts for more.
     const fast = strikeRage(b, S);
     expect(rageOf(fast, { ...S, rageSpeed: { gingerbread: 1.2 } })).toBeCloseTo(0.3);
@@ -427,6 +436,9 @@ describe("the judge plays by the same rules", () => {
     expect(allowed.every((m) => m.startsWith(free))).toBe(true);
     expect(runner.bossView()!.powers!.iced.length).toBeGreaterThan(5);
     expect(runner.bossView()!.powers!.iced).not.toContain(free);
+    // The pieces due to thaw next turn are among the iced ones, for every screen.
+    expect(runner.bossView()!.powers!.thaw!.length).toBeGreaterThanOrEqual(3);
+    for (const sq of runner.bossView()!.powers!.thaw!) expect(runner.bossView()!.powers!.iced).toContain(sq);
     runner.deal();
     // A move of another piece isn't allowed: it counts as no move. The best is the free piece's; the turn doesn't count
     // for fair play.

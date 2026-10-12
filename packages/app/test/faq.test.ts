@@ -160,6 +160,18 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("not yet tested with bots");
     expect(t).toContain("two ultimates never overlap");
     expect(t).toContain("only one of your pieces may move, picked at random");
+    // Ginger's blizzard (Oct 12): its turns, the count free on its second, the thaw; numbers from the settings.
+    expect(t).toContain(`Blizzard (ultimate): it lasts ${BOSS_POWERS.blizzardTurns} turns.`);
+    expect(t).toContain(`On its second, ${BOSS_POWERS.blizzardFree[1]![0]} or ${BOSS_POWERS.blizzardFree[1]![1]} may move in all`);
+    expect(t).toContain("On its third, the ice is gone and every piece moves again.");
+    expect(t).toContain("The pieces that thaw next turn show cracked, dripping ice the turn before.");
+    expect(t).toContain("in check, one that can get you out of it");
+    expect(t).toContain(`the blizzard's ${BOSS_POWERS.blizzardTurns} turns`);
+    const longer = section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, blizzardTurns: 4, blizzardFree: [[1, 1], [3, 3], [5, 7]] } });
+    expect(longer).toContain("it lasts 4 turns.");
+    expect(longer).toContain("On its second, 3 may move in all");
+    expect(longer).toContain("On its third, 5 to 7 may move in all");
+    expect(longer).toContain("On its fourth, the ice is gone");
     expect(section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, rageStrike: 30 } })).toContain("30 each time the God King strikes the boss");
     expect(section("god-king")).toContain(`${BOSS_POWERS.rageStrike} on its rage meter`);
     // Jefferson's candle: a share on his own half (Oct 11).
