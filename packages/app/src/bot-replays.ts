@@ -33,6 +33,13 @@ export interface ReplayFile {
   replays: Replay[];
 }
 
+/**
+ * Where the live window shows (Eric, Oct 12: "it shouldn't be on mobile, sadly just no room"): a computer's screen, from
+ * 1280 px wide (its room in the play column) and the desktop's 600 px tall, with a mouse (a fine pointer that hovers).
+ * Anywhere else it isn't mounted at all: no board, no timer, no replays fetched.
+ */
+export const LIVE_WINDOW_MEDIA = "(min-width: 1280px) and (min-height: 600px) and (hover: hover) and (pointer: fine)";
+
 export const REPLAYS_URL = "/replays/crowd-bots.json";
 
 type Timing = Pick<typeof LIVE_WINDOW, "plySeconds" | "finalPlySeconds" | "startSeconds" | "endSeconds">;

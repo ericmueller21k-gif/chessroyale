@@ -21,6 +21,8 @@ export interface BoardProps {
   onMove?: (uci: string) => void;
   arrows?: Arrow[];
   small?: boolean;
+  /** No move or capture sound, whatever the sound setting (the home's live window). Small boards are silent too. */
+  silent?: boolean;
   /** Animate changes (off for instant jumps). */
   animate?: boolean;
   /** Drawn over the board (e.g. everyone's picks as see-through pieces). */

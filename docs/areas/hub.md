@@ -17,6 +17,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
     moment (`LIVE_WINDOW`; replays in `packages/app/public/replays/crowd-bots.json`, never fetched on phones).
+    A computer's only (`LIVE_WINDOW_MEDIA`: 1280 px wide, 600 px tall, a mouse; never mounted on a phone or tablet)
+    and always silent, whatever the sound setting (its board is `silent`; Eric, Oct 12).
 - **The live line** is GET `/api/live`: polled every `FRONT_DOOR.livePollMs` while a front-door screen shows it, every
   `heartbeatMs` elsewhere (a match), never while the tab is hidden. The same request says you're here. Online = seen
   within `onlineWindowMs`. The numbers come from the live hub (see [ops.md](ops.md)).
