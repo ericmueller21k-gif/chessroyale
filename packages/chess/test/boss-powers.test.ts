@@ -11,8 +11,8 @@ import {
   chooseFreeze,
   choosePie,
   crowdAllowed,
-  funhouseDue,
-  funhouseMoveFrom,
+  boardAngle,
+  funhouseAngle,
   icedSquares,
   initPowers,
   inCheck,
@@ -256,14 +256,35 @@ describe("boss powers: as each turn begins", () => {
     }
   });
 
-  it("pies for 3 turns, then 2 clear, and repeats", () => {
+  it("pies: each for 3 turns, a new one every 2 turns, up to 2 at once, never two on one square, nobody moves onto one", () => {
     let b = battle("clown", RUY_FEN);
-    const pied: boolean[] = [];
+    const counts: number[] = [];
     for (let turn = 1; turn <= 12; turn++) {
       b = prepareTurn({ ...b, crowdMoves: turn - 1 }, RUY_FEN);
-      pied.push(!!b.powers!.pie);
+      counts.push(b.powers!.pies?.length ?? 0);
     }
-    expect(pied).toEqual([false, true, true, true, false, false, true, true, true, false, false, true]);
+    expect(counts).toEqual([0, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2]);
+    // Over many positions: never more than two, never on one square, each lasts its 3 turns, and no move (either side's)
+    // lands on one.
+    for (const [i, fen] of positions(30, 5).entries()) {
+      let c = battle("clown", fen, {}, 100 + i);
+      const born = new Map<string, number>();
+      for (let turn = 1; turn <= 9; turn++) {
+        c = prepareTurn({ ...c, crowdMoves: turn - 1 }, fen);
+        const pies = c.powers!.pies ?? [];
+        expect(pies.length).toBeLessThanOrEqual(BOSS_POWERS.pieMax);
+        expect(new Set(pies.map((p) => p.square)).size).toBe(pies.length);
+        for (const p of pies) {
+          if (!born.has(`${p.square}:${p.until}`)) born.set(`${p.square}:${p.until}`, turn);
+          expect(p.until - born.get(`${p.square}:${p.until}`)! + 1).toBe(BOSS_POWERS.pieTurns);
+        }
+        const allowed = crowdAllowed(c, fen) ?? legalMoves(fen);
+        if (allowed.length < legalMoves(fen).length) for (const m of allowed) expect(pies.some((p) => p.square === m.slice(2, 4))).toBe(false);
+        const after = applyMove(fen, legalMoves(fen)[0]!);
+        const bossOk = bossAllowed(c, after);
+        if (bossOk) for (const m of bossOk) expect(pies.some((p) => p.square === m.slice(2, 4))).toBe(false);
+      }
+    }
   });
 
   it("the rage meter fills as the boss loses material: a warning, the ultimate the turn after; then it empties and fills again", () => {
@@ -328,9 +349,10 @@ describe("boss powers: as each turn begins", () => {
     expect(b.powers!.warnAt).toBeUndefined();
     b = prepareTurn({ ...b, crowdMoves: 1 }, RUY_FEN, "funhouse");
     expect(b.powers!.warnAt).toBe(2);
-    expect(b.powers!.pie).toBeTruthy(); // the passive's first turn too
+    expect(b.powers!.pies?.length).toBe(1); // the passive's first turn too
     b = prepareTurn({ ...b, crowdMoves: 2 }, RUY_FEN, "funhouse");
-    expect(funhouseDue(b)).toBe(true);
+    expect(b.powers!.events.map((e) => e.kind)).toContain("funhouse");
+    expect(boardAngle(b)).toBe(180);
   });
 });
 
@@ -422,30 +444,6 @@ describe("Boingo's powers", () => {
     };
   }
 
-  it("the funhouse plays a weak but recoverable move: 1 to 2.5 pawns worse, never allowing mate or dropping the queen", async () => {
-    const fen = RUY_FEN;
-    const engine = scripted({
-      d2d4: { expected: 0.62 },
-      // A mate allowed, and a queen left hanging: never.
-      f3g5: { expected: 0.45, mate: -3 },
-      d1e2: { expected: 0.46, reply: "c6d4" },
-      // In range (16 and 20 points worse): one of these.
-      b2b4: { expected: 0.46 },
-      a2a3: { expected: 0.42 },
-      // Too much (40 points worse).
-      a4c6: { expected: 0.22 },
-    });
-    const m = await funhouseMoveFrom(engine, fen);
-    expect(["b2b4", "a2a3"]).toContain(m);
-  });
-
-  it("the funhouse respects the allowed moves (a pie), and plays the only move when there's one", async () => {
-    const engine = fakeEngine();
-    const allowed = legalMoves(RUY_FEN).filter((m) => m.slice(2, 4) !== "d4");
-    expect(allowed).toContain(await funhouseMoveFrom(engine, RUY_FEN, allowed));
-    expect(await funhouseMoveFrom(engine, RUY_FEN, ["h2h3"])).toBe("h2h3");
-  });
-
   it("the boss never moves onto the pie either", async () => {
     const after = applyMove(RUY_FEN, "d2d3");
     const legal = legalMoves(after);
@@ -459,45 +457,62 @@ describe("Boingo's powers", () => {
     }
   });
 
-  it("a funhouse match: warned, the boss plays the crowd's move (unscored), then the board shows flipped for 2 turns", async () => {
-    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "clown", bossPowerTest: "funhouse", lastStandFrom: 999 } as Settings;
+  it("the funhouse's angles: upside down, a quarter turn to its side, a half turn to the other, back; 4 turns a step", () => {
+    const f90 = { turn: 3, side: 90 as const };
+    const f270 = { turn: 3, side: 270 as const };
+    const at = (f: typeof f90 | typeof f270) => Array.from({ length: 18 }, (_, i) => funhouseAngle(f, i + 1));
+    expect(at(f90)).toEqual([0, 0, 180, 180, 180, 180, 90, 90, 90, 90, 270, 270, 270, 270, 0, 0, 0, 0]);
+    expect(at(f270)).toEqual([0, 0, 180, 180, 180, 180, 270, 270, 270, 270, 90, 90, 90, 90, 0, 0, 0, 0]);
+    expect(funhouseAngle(null, 7)).toBe(0);
+    expect(BOSS_POWERS.funhouseStepTurns).toBeGreaterThanOrEqual(3);
+    expect(BOSS_POWERS.funhouseStepTurns).toBeLessThanOrEqual(5);
+    // Its side from the seed: the same for the same seed, both sides across seeds.
+    const side = (seed: number) => {
+      let b = prepareTurn(battle("clown", RUY_FEN, {}, seed), RUY_FEN, "funhouse");
+      b = prepareTurn({ ...b, crowdMoves: 1 }, RUY_FEN, "funhouse");
+      return prepareTurn({ ...b, crowdMoves: 2 }, RUY_FEN, "funhouse").powers!.funhouse!.side;
+    };
+    const sides = Array.from({ length: 24 }, (_, i) => side(i));
+    expect(new Set(sides)).toEqual(new Set([90, 270]));
+    expect(Array.from({ length: 24 }, (_, i) => side(i))).toEqual(sides);
+  });
+
+  it("a funhouse match: no move is played for the crowd; the board turns as each step's turn begins, then stays back; the meter waits", async () => {
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "clown", bossPowerTest: "funhouse", lastStandFrom: 999, bossMaxMoves: 40 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
     expect(runner.boss!.id).toBe("clown");
-    runner.deal();
-    await runner.score(new Map([["h0", { move: "d2d3", thinkMs: 1000 }]]));
-    await runner.playBoss();
-    expect(runner.bossView()!.powers!.warned).toBe(true);
-    runner.deal();
-    await runner.score(new Map([["h0", { move: legalMoves(runner.boards.get(0)!.fen).find((m) => runner.crowdAllowed()?.includes(m) ?? true)!, thinkMs: 1000 }]]));
-    expect(runner.funhouseDue()).toBe(false); // the boss moves first
-    await runner.playBoss();
-    expect(runner.funhouseDue()).toBe(true);
-    const moves = runner.boss!.crowdMoves;
-    const scores = runner.state.players[0]!.finalLosses.length;
-    const m = await runner.playFunhouse();
-    expect(runner.boss!.crowdMoves).toBe(moves + 1);
-    expect(runner.state.players[0]!.finalLosses.length).toBe(scores);
-    expect(runner.boss!.powers!.funhouse!.move).toBe(m);
-    expect(runner.bossView()!.powers!.events.map((e) => e.kind)).toContain("funhouse");
-    expect(runner.funhouseDue()).toBe(false);
-    expect(runner.bossToMove()).toBe(true);
-    await runner.playBoss();
-    expect(boardFlipped(runner.boss)).toBe(true);
-    runner.deal();
-    await runner.score(new Map([["h0", { move: legalMoves(runner.boards.get(0)!.fen)[0]!, thinkMs: 1000 }]]));
-    await runner.playBoss();
-    expect(boardFlipped(runner.boss)).toBe(true);
-    runner.deal();
-    await runner.score(new Map([["h0", { move: legalMoves(runner.boards.get(0)!.fen)[0]!, thinkMs: 1000 }]]));
-    await runner.playBoss();
-    expect(boardFlipped(runner.boss)).toBe(false);
-    // Once a match.
-    for (let i = 0; i < 6; i++) {
+    const seen: { turn: number; angle: number; kinds: string[]; ultAt: number | null; rage: number | null }[] = [];
+    for (let turn = 1; turn <= 18 && !runner.stageComplete(); turn++) {
       runner.deal();
-      await runner.score(new Map([["h0", { move: legalMoves(runner.boards.get(0)!.fen)[0]!, thinkMs: 1000 }]]));
+      const v = runner.bossView()!.powers!;
+      seen.push({ turn: v.turn, angle: v.angle!, kinds: v.events.map((e) => e.kind), ultAt: v.ultAt, rage: v.rage });
+      expect(boardAngle(runner.boss)).toBe(v.angle);
+      // Every turn is the crowd's own pick, scored as usual: the history grows by its move and the boss's.
+      const ply = runner.boards.get(0)!.history.length;
+      const scored = runner.state.players[0]!.finalLosses.length;
+      const fen = runner.boards.get(0)!.fen;
+      await runner.score(new Map([["h0", { move: (runner.crowdAllowed() ?? legalMoves(fen))[0]!, thinkMs: 1000 }]]));
+      expect(runner.boards.get(0)!.history.length).toBe(ply + 1);
+      expect(runner.state.players[0]!.finalLosses.length).toBe(scored + 1);
       if (runner.stageComplete()) break;
       await runner.playBoss();
-      expect(runner.funhouseDue()).toBe(false);
     }
+    expect(seen.length).toBe(18);
+    const f = runner.boss!.powers!.funhouse!;
+    expect(f.turn).toBe(3);
+    const other = f.side === 90 ? 270 : 90;
+    expect(seen.map((x) => x.angle)).toEqual([0, 0, 180, 180, 180, 180, f.side, f.side, f.side, f.side, other, other, other, other, 0, 0, 0, 0]);
+    expect(seen.filter((x) => x.kinds.includes("funhouse")).map((x) => x.turn)).toEqual([3]);
+    expect(seen.filter((x) => x.kinds.includes("spin")).map((x) => x.turn)).toEqual([7, 11, 15]);
+    // The meter: held empty while the board is turned (through turn 14), filling again from 15.
+    for (const x of seen.filter((x) => x.turn > 3 && x.turn < 15)) {
+      expect(x.ultAt).toBe(3);
+      expect(x.rage).toBe(0);
+    }
+    expect(seen.find((x) => x.turn === 15)!.ultAt).toBeNull();
+    expect(seen.find((x) => x.turn === 17)!.rage).toBeGreaterThan(0);
+    // The turns it's turned are power turns (fair play doesn't count them); back the right way up, not for the funhouse.
+    expect(powerTurn({ ...runner.boss!, powers: { ...runner.boss!.powers!, pies: [] } })).toBe(false);
   });
+
 });

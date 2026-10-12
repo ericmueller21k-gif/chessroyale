@@ -2,7 +2,9 @@ import type { BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import { BossFace } from "./BossCharacter.tsx";
 import { BossEffect, BossMoment } from "./BossEffect.tsx";
-import { Flight, at, hash, kitLine, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { funhouseAngle, type BoardAngle } from "@chessroyale/chess";
+import type { QuarterTurn } from "../board-view.ts";
+import { Flight, hash, kitLine, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 
 /**
  * Boingo's powers on screen: the pie (his throw, the pie's flight, the splat, the pie on its square while it lasts) and
@@ -16,34 +18,59 @@ export const PIE = { flyAt: 1450, landAt: 1800 } as const;
 // ---------------- The funhouse's beats (ms into its moment) ----------------
 
 /**
- * The banner first; then Boingo drops onto the board (his kit's `funhouse`: he lands, springs into a spin, and the
- * board spins with him at its `flip` cue), his line, the move he plays for the crowd, and he bounces off.
+ * The funhouse as it comes (the crowd's turn begins): the banner first; then Boingo drops onto the board (his kit's
+ * `funhouse`: he lands, springs into a spin, and the board turns upside down with him at its `flip` cue), his line, and
+ * he bounces off. No move is played for the crowd (Eric, Oct 11).
  */
-export const FUNHOUSE = { clownAt: 1300, flipMs: 700, lineAt: 2700, moveAt: 3500, exitAt: 4500 } as const;
+export const FUNHOUSE = { clownAt: 1300, flipMs: 700, lineAt: 2700, exitAt: 3400 } as const;
+/** Each later step of the funhouse (the board turns again as a crowd turn begins): its banner, then the turn. */
+export const SPIN = { spinAt: 1300, spinMs: 700, lineAt: 1300 } as const;
 
-/** When the board starts its spin (ms into the moment): on the funhouse animation's `flip` cue. */
+/** When the board starts its spin (ms into the funhouse's moment): on the funhouse animation's `flip` cue. */
 export function funhouseFlipAt(kit: BossKit | null): number {
   const a = kit?.ch.anims.funhouse;
   return FUNHOUSE.clownAt + ((a && cueAt(a, "flip")) ?? 620);
 }
 
+/** How a step turns the board: a quarter turn clockwise or anticlockwise, or a half turn. */
+export type Spin = "cw" | "ccw" | "half";
+export const spinOf = (from: BoardAngle, to: BoardAngle): Spin | null => {
+  const d = (to - from + 360) % 360;
+  return d === 90 ? "cw" : d === 270 ? "ccw" : d === 180 ? "half" : null;
+};
+
 /**
- * In the funhouse's moment: whether the board spins (a half turn in its own plane, pieces upside down for a moment),
- * whether it shows flipped yet (the orientation swaps as the spin ends, with nothing transformed, so the board's
- * squares are measured true), and whether the move has been played.
+ * The board's angle as a boss screen shows it, and its spin while it turns: the funhouse's moment (or a later step's)
+ * shows the board as it was until its spin, turns it (a CSS turn of the board in its own plane, the pieces going round
+ * with it for a moment), then shows it at its new angle, drawn untransformed (chessground measures its squares then).
+ * Without one, the angle the battle's powers say. `turn`: the crowd turn the powers are set for.
  */
-export function funhouseBeat(m: Moment | null, now: number, flipAt: number = funhouseFlipAt(null)): { flipped: boolean; flipping: boolean; played: boolean } | null {
-  if (!m || m.kind !== "funhouse") return null;
-  const t = now - m.at;
-  const end = flipAt + FUNHOUSE.flipMs;
-  return { flipped: t >= end, flipping: t >= flipAt && t < end, played: t >= FUNHOUSE.moveAt };
+export function funhouseView(moments: readonly Moment[], now: number, powers: { funhouse: { turn: number; side: 90 | 270 } | null; angle?: BoardAngle; flipped: boolean; turn: number } | null | undefined, kit: BossKit | null): { angle: BoardAngle; spin: Spin | null } {
+  const angle: BoardAngle = powers?.angle ?? (powers?.flipped ? 180 : 0);
+  const m = moments.find((x) => x.kind === "funhouse" || x.kind === "spin");
+  if (!m || !powers) return { angle, spin: null };
+  const from: BoardAngle = m.kind === "funhouse" ? 0 : funhouseAngle(powers.funhouse, powers.turn - 1);
+  const spinAt = m.at + (m.kind === "funhouse" ? funhouseFlipAt(kit) : SPIN.spinAt);
+  const ms = m.kind === "funhouse" ? FUNHOUSE.flipMs : SPIN.spinMs;
+  if (now < spinAt) return { angle: from, spin: null };
+  if (now < spinAt + ms) return { angle: from, spin: spinOf(from, angle) };
+  return { angle, spin: null };
+}
+
+/** The board's chessground orientation and quarter turn for an angle, from the crowd's side. */
+export function angleView(angle: BoardAngle, side: "w" | "b"): { orientation: "white" | "black"; turn: QuarterTurn } {
+  const own = side === "w" ? "white" : "black";
+  const other = side === "w" ? "black" : "white";
+  return { orientation: angle === 180 ? other : own, turn: angle === 90 || angle === 270 ? angle : 0 };
 }
 
 /** Boingo's line in his funhouse (his kit's, if it has some; these otherwise). */
-export const FUNHOUSE_LINES = ["Let me get that for you!", "Welcome to the funhouse!", "Your move? Mine now!", "Honk! I'll drive."];
+export const FUNHOUSE_LINES = ["Welcome to the funhouse!", "Topsy-turvy!", "Which way is up? Hee hee!", "Hold on to your hats!"];
 export function funhouseLine(kit: BossKit | null, key: string): string {
   return kitLine(kit, "ultimate", key) ?? FUNHOUSE_LINES[hash(key) % FUNHOUSE_LINES.length]!;
 }
+/** His line as the board turns again (round to a side, or back the right way up). */
+export const SPIN_LINES = ["Wheee! Round we go!", "Spin the board!", "Dizzy yet? Honk!", "Hold on tight! Hee hee!"];
 
 function pieMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   return (
@@ -59,7 +86,7 @@ function funhouseMoment({ boss, moment, t, banner, anim: kitAnim }: MomentProps)
   // (His line, as he lands on the board, is in his text box: FUNHOUSE.lineAt, said into his voice.)
   return (
     <div class="power-moment pm-funhouse">
-      {t < 1500 && banner("FUNHOUSE!", undefined, "fun")}
+      {t < 1500 && banner("FUNHOUSE!", "Upside down!", "fun")}
       {t >= FUNHOUSE.clownAt && (
         <span class={`pm-pogo${t >= FUNHOUSE.exitAt ? " out" : ""}`}>
           {kitAnim() ? <BossMoment boss={boss.name} anim={kitAnim()!} since={moment.at + FUNHOUSE.clownAt} then="idle" /> : <BossFace boss={boss} />}
@@ -69,30 +96,44 @@ function funhouseMoment({ boss, moment, t, banner, anim: kitAnim }: MomentProps)
   );
 }
 
+/** A later step: the board turns again (round to a side, or back the right way up). */
+function spinMoment({ boss, t, banner }: MomentProps) {
+  const p = boss.powers;
+  const to: BoardAngle = p?.angle ?? 0;
+  const from = funhouseAngle(p?.funhouse ?? null, (p?.turn ?? 0) - 1);
+  const s = spinOf(from, to);
+  const sub = to === 0 ? "Right way up again" : s === "half" ? "To the other side" : s === "cw" ? "A quarter turn right" : "A quarter turn left";
+  return <div class="power-moment pm-spin">{t < SPIN.spinAt && banner(to === 0 ? "BACK AGAIN!" : "SPIN!", sub, "fun")}</div>;
+}
+
 export const BOINGO_UI = {
   id: "clown",
   ultimate: { name: "the Funhouse" },
   moments: {
     pie: { order: 0, kit: "power", dock: "Pie!", appearAt: (m, square) => (m.square === square ? m.at + PIE.landAt : undefined), view: pieMoment },
-    // The funhouse has a screen of its own: after the move he plays for the crowd.
-    funhouse: {
+    // The funhouse, as the crowd's turn begins: the board turns upside down. Then each later step turns it again.
+    funhouse: { order: 3, kit: "ultimate", dock: "Funhouse!", line: (kit, m) => funhouseLine(kit, m.key), lineAt: FUNHOUSE.lineAt, view: funhouseMoment },
+    spin: {
       order: 3,
       kit: "ultimate",
-      dock: "Funhouse!",
-      line: (kit, m) => funhouseLine(kit, m.key),
-      lineAt: FUNHOUSE.lineAt,
-      own: (boss) => !!boss.powers?.funhouse && boss.powers.funhouse.turn === boss.crowdMoves && boss.powers.events.some((e) => e.kind === "funhouse"),
-      view: funhouseMoment,
+      dock: "Spin!",
+      line: (_kit, m) => SPIN_LINES[hash(m.key) % SPIN_LINES.length]!,
+      lineAt: SPIN.lineAt,
+      view: spinMoment,
     },
   },
-  // The pie on its square (pieSplat: the splat, then the pie).
-  board: ({ p, orientation, now, appearAt }) => {
-    const pie = p.pie?.square;
+  // The pies on their squares (pieSplat: the splat, then the pie), in eighths of chessground's board, where the board
+  // shows them however it's turned.
+  board: ({ p, orientation, now, appearAt, turn }) => {
+    const pies = p.pies ?? (p.pie ? [p.pie] : []);
     return {
-      over: pie && now >= appearAt(pie) && (
-        <span key={`pie-${pie}`} class="pw-pie" style={at(pie, orientation)}>
-          <BossEffect name="pieSplat" since={appearAt(pie)} id={pie} />
-        </span>
+      over: pies.map(
+        ({ square }) =>
+          now >= appearAt(square) && (
+            <span key={`pie-${square}`} class="pw-pie" style={onSquare(square, orientation, turn)} data-square={square}>
+              <BossEffect name="pieSplat" since={appearAt(square)} id={square} />
+            </span>
+          ),
       ),
     };
   },

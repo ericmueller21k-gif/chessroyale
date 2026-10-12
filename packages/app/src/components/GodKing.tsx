@@ -1,5 +1,6 @@
+import { BoardTurn, viewSquare, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren } from "preact";
-import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { GOD_KING, GOD_KING_BOX, GOD_KING_PORTRAIT, KING_TIP, commandMoment, kingFrameAt, summonMoment, type GodKingAnim } from "../characters/god-king.ts";
 import { renderFrame, type Frame } from "../characters/sprite.ts";
@@ -79,8 +80,12 @@ export function GodKingFallen({ side, class: cls = "" }: { side: "w" | "b"; clas
   return <GodKingSprite side={side} anim="fallen" class={`fallen ${cls}`} />;
 }
 
-/** Centre of a square on the board in a 0-800 coordinate space, from the given side. */
-export function squareXY(square: string, orientation: "white" | "black") {
+/**
+ * Centre of a square on the board in a 0-800 coordinate space, from the given side; on a board turned a quarter of the
+ * way round (`turn`, Boingo's funhouse: BoardTurn), where the turned board shows it.
+ */
+export function squareXY(real: string, orientation: "white" | "black", turn: QuarterTurn = 0) {
+  const square = viewSquare(real, turn);
   const f = square.charCodeAt(0) - 97;
   const r = Number(square[1]) - 1;
   const col = orientation === "white" ? f : 7 - f;
@@ -178,10 +183,11 @@ export function KingSummon({
   const now = useFrameNow();
   const t = now - startAt;
   const out = now - exitAt;
+  const turn = useContext(BoardTurn);
   const square = now >= moveAt ? kingAfter : kingBefore;
-  const k = squareXY(square, orientation);
-  const k0 = squareXY(kingBefore, orientation);
-  const tg = target ? squareXY(target, orientation) : null;
+  const k = squareXY(square, orientation, turn);
+  const k0 = squareXY(kingBefore, orientation, turn);
+  const tg = target ? squareXY(target, orientation, turn) : null;
   const present = t >= 1300 && out < 700;
   // His own moves on the board: appear, raise the sword, then point it for his bolt or cut once per slash.
   const moment = summonMoment({ appearAt: 1300, raiseAt: KING_CUT_AT, boltAt: mode === "move" && target ? BOLT_AT : undefined, slashAt: mode === "strike" && target ? SLASH_AT : undefined }, t);
@@ -333,6 +339,7 @@ export function KingCommand({
   const C = KING_COMMAND;
   const endAt = strike ? C.strikeLowerAt + 700 : C.lowerAt + 300;
   const ref = useRef<HTMLDivElement>(null);
+  const turn = useContext(BoardTurn);
   // Where his sword's tip is (pointed and raised) and the target square, in the page's pixels. Measured as he starts
   // and when the page changes size or scrolls (his figure and the board don't move otherwise).
   const [geo, setGeo] = useState<{ point: Xy; raised: Xy; at: Xy; u: number } | null>(null);
@@ -342,7 +349,7 @@ export function KingCommand({
       const him = document.querySelector(".gk-unit .gk-unit-btn .god-king")?.getBoundingClientRect();
       if (!board || !him || !board.width) return setGeo(null);
       const tip = ([x, y]: readonly [number, number]): Xy => ({ x: him.left + x * him.width, y: him.top + y * him.height });
-      const sq = squareXY(target, orientation);
+      const sq = squareXY(target, orientation, turn);
       setGeo({ point: tip(KING_TIP.point), raised: tip(KING_TIP.raised), at: { x: board.left + (sq.x / 800) * board.width, y: board.top + (sq.y / 800) * board.height }, u: board.width / 800 });
     };
     measure();

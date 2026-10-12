@@ -14,7 +14,7 @@ import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
-import { DarkCost, PowerBoard, crowdOrientation } from "../components/BossPowers.tsx";
+import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
@@ -125,8 +125,9 @@ export function PlayScreen({
     () => (powerAllowed ? powerAllowed.filter((m) => m !== barred) : barred ? legalMoves(board.fen).filter((m) => m !== barred) : undefined),
     [board.fen, barred, powerAllowed?.join()],
   );
-  // The crowd's view of the board: its own side, or flipped for a while after Boingo's funhouse.
-  const orientation = match.boss ? crowdOrientation(match.boss, side) : side === "w" ? "white" : "black";
+  // The crowd's view of the board: its own side, or turned in Boingo's funhouse (upside down, or a quarter turn).
+  const view = match.boss ? crowdView(match.boss, side) : { orientation: side === "w" ? ("white" as const) : ("black" as const), turn: 0 as const };
+  const orientation = view.orientation;
   const arrows: Arrow[] = [
     ...(!waiting && hint && !history.browsing ? hint.map((h, i) => ({ move: h.move, brush: HINT_BRUSHES[i]!, label: (h.expected * 100).toFixed(1) })) : []),
     ...(barred && !waiting && !history.browsing ? [{ move: barred, brush: "paleGrey" as const, label: "✕" }] : []),
@@ -210,7 +211,7 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)}>
+          <Board fen={fen} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={allowed} onMove={(m) => match.submit(m)} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
             {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} />}

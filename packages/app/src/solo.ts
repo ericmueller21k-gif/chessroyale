@@ -558,17 +558,6 @@ export class SoloMatch implements GameView {
   }
 
   /**
-   * Boingo's funhouse: as the turn passes to you, he plays your move for you (a weak but recoverable one, unscored).
-   * It plays out, then the boss replies.
-   */
-  private async funhouseTurn() {
-    await this.runner.playFunhouse(this.engines[0]);
-    const showMs = powerMomentMs([{ kind: "funhouse" }]);
-    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
-  }
-
-  /**
    * Hollow's extra move (the crowd failed Lights out): after his own move he thinks again, then plays a quiet move that
    * gains him only a little, with its banner; then your turn. None such: he skips it.
    */
@@ -633,7 +622,6 @@ export class SoloMatch implements GameView {
       if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.bossTurn());
       // (A failed Lights out: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
-      if (this.runner.funhouseDue()) return void this.funhouseTurn();
     } else if (this.runner.isFinal()) return void this.finalTurn();
     this.runner.deal();
     this.kingCalled = false;
@@ -859,10 +847,6 @@ export class SoloMatch implements GameView {
         }
         if (this.runner.extraMoveDue()) {
           await this.runner.playExtraMove(this.engines[0]);
-          continue;
-        }
-        if (this.runner.funhouseDue()) {
-          await this.runner.playFunhouse(this.engines[0]);
           continue;
         }
         this.runner.deal();

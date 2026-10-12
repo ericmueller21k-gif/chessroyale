@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useContext, useEffect, useMemo, useState } from "preact/hooks";
+import { BoardTurn } from "../board-view.ts";
 import { LAST_STAND, lastStandAttackHits, lastStandHits, pieceAt, toSan, type NetBoss } from "@chessroyale/chess";
 import { useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingPortrait, GodKingSprite, squareXY } from "./GodKing.tsx";
@@ -79,8 +80,9 @@ export function LastStand({ side, orientation, fen, move, startAt, boss }: { sid
   // The boss's attack instead of the anonymous blows (its kit has one).
   const attack = !!boss && !!bossKit(boss.name)?.kingAttack;
   const line = lastStandLine(seed);
-  const to = squareXY(move.slice(2, 4), orientation);
-  const from = squareXY(move.slice(0, 2), orientation);
+  const turn = useContext(BoardTurn);
+  const to = squareXY(move.slice(2, 4), orientation, turn);
+  const from = squareXY(move.slice(0, 2), orientation, turn);
   const piece = pieceAt(fen, move.slice(0, 2));
   // His sounds, in time with the animation (cues already past stay silent), and his last words as he goes.
   useEffect(() => {

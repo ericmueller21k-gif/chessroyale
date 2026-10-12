@@ -27,10 +27,19 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   - A power never leaves anyone without a legal move and never breaks check: a restriction that would leave no move
     (or no escape from check) lifts for that turn. The king is never frozen.
   - The judge plays by the same rules: the best move is the best of the allowed ones.
-  - A turn the boss plays for the crowd (the funhouse) isn't scored; any turn a power touches doesn't count for fair
-    play (`powerTurn`).
+  - Every crowd turn is the crowd's own pick, scored as usual (the funhouse no longer plays one for it, Oct 11); any
+    turn a power touches doesn't count for fair play (`powerTurn`).
   - The clock stands still through every power's moment (`POWER_FX`, `powerMomentMs`): the crowd's clock starts after
     them, solo and online, so a power never costs anyone thinking time.
+  - **A turned board** (Boingo's funhouse, Oct 11): upside down is the other side's orientation, as before; a quarter
+    turn is drawn by moving every square to where the turned board shows it (`packages/app/src/board-view.ts`:
+    `viewSquare`, `viewFen`), so chessground maps taps and drags exactly as usual and each move is turned back
+    (`Board`'s `turn`). A CSS rotation would have put taps on the wrong squares. The coordinates name the real squares
+    (the bottom edge runs along the ranks), and everything drawn over the board places its squares with the same turn
+    (`squareXY`'s `turn`, `onSquare`, the `BoardTurn` context Board gives what it draws). Each step spins the board in
+    its own plane (`pw-turning-cw`/`ccw`, the half turn's `pw-flipping`), pieces going round with it for a moment as
+    the flip always did, then draws it at its new angle, untransformed. A board made for a turned view is made turned
+    (else every piece flies across it).
   - Turns are the crowd's: turn N is the crowd's Nth move of the battle.
 - **The rage meter** (Eric, Oct 11: several ultimates a battle, like a game's rage meter) fills over time
   (`ragePerMove` a crowd move, up to `rageAheadMax` more while the crowd is ahead on the judged eval), with the boss's
@@ -39,7 +48,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   ultimate as the next crowd turn begins. Hollow's Lights out and Big Boy's Big Bounce come at the start of the boss's
   turn instead (Lights out's only warning is the full meter). The meter is full on the ultimate's own turn, then
   empties; while the ultimate's effect still runs (its rules' `ultimateRunning`: the blizzard and the Big Bounce their
-  own turn, the funhouse through its flipped turns, the Roman candle until its last fire is out, Lights out through
+  own turn, the funhouse until the board is back, the Roman candle until its last fire is out, Lights out through
   the turn after it, the board saw while the halves are apart) it stays empty, dimmed and dashed on screen
   (`paused`), nothing gathers (strikes included) and no other ultimate can come, the test trigger neither. Once it's
   over, `warnAt` and `ultAt` clear and the meter fills again from empty for the next (`ults` counts them). The test
@@ -48,12 +57,13 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   its own (other pieces named, other bot finds). **Rates set by estimate; not yet tested with the bot sim. Run the sim
   at a future date** (`boss-sim.ts raid`, below): the aim is about two ultimates in a typical battle of about 40 crowd
   moves (Jefferson about one and a half: his barrage lasts about a third of a battle).
+  Boingo's meter is the fastest (`rageSpeed` 1.8): his funhouse holds it for 12 turns.
 - **The bosses:**
 
 | Boss (id) | Opening | Passive | Ultimate |
 | --- | --- | --- | --- |
 | Ginger (`gingerbread`) | the game so far | **Freeze:** a crowd piece (never the king, one that matters: a pick from the top three) iced for `freezeTurns`, every `freezeEvery` turns from turn 2 | **Blizzard:** for one turn only one crowd piece moves, at random from the seed among those with a legal move (Eric, Oct 11; it was the queen): never the king nor the frozen piece unless nothing else can move (`chooseBlizzard`); its banner names it ("Only your knight on c3 moves") |
-| Boingo the Clown (`clown`) | the game so far | **Pie:** an empty square near the centre that the fewest moves reach is pied for `pieTurns` (nobody, either side, may move onto it), then `pieGap` clear | **Funhouse:** he plays the crowd's move (weak but recoverable: `funhouseLoss`, never past `funhouseMaxLogit`), unscored; the board shows flipped for `flipTurns` |
+| Boingo the Clown (`clown`) | the game so far | **Pie:** an empty square near the centre that the fewest moves reach is pied for `pieTurns` (nobody, either side, may move onto it); a new one every `pieEvery` turns, up to `pieMax` (2) at once, never two on one square (Eric, Oct 11) | **Funhouse** (Eric, Oct 11): he turns the board round, `funhouseStepTurns` (4) crowd turns a step: upside down as it comes, then a quarter turn to a side from the seed (90° or 270°), then a half turn to the other side, then back where it started, where it stays (`funhouseAngle`, `boardAngle`; a `spin` moment each step). No move is played for the crowd: it plays its own, scored as usual (turned turns don't count for fair play). His meter fills again once the board is back |
 | Jefferson (`grex`; G-REX until Oct 10) | the game so far | **Sparkler:** a tile on the crowd's half catches fire and burns in `fireStages` stages, one a crowd turn; a crowd piece left on it after the crowd's move on the last stage burns (never the king, never one whose loss leaves a king in check: it fizzles) | **Roman candle:** `candleShots` fireballs in waves (`candleWaves`) from `candleDelay` turns later, each wave's squares shown as growing shadows `candleAhead` turns ahead |
 | Hollow (`hollow`) | always Black, from the starting position (he claims the dark side in the intro if the crowd would have been Black) | **The dark:** after his first move he covers the square of the piece he moved, then another every `darkEvery`-th move (a random occupied square, never a king's) for `darkTurns`; pieces there are hidden; a move touching the dark goes unchecked, an illegal one costs `darkTryCost` and the `darkTries`-th ends the turn as a miss | **Lights out:** at the start of his turn, a memory test in rounds (`lightsOutRounds`: find 1, 2, then 3 of his pieces); each piece missed costs `lightsOutMiss`; below `lightsOutHold` found, he plays an extra quiet move (`lightsOutExtraGain`) |
 | Big Boy (`bigboy`) | from the starting position less the crowd's d- or e-pawn, which he eats (his snack) | **Toy blocks:** every `blockEvery` turns from turn 2, a block on an empty square in the crowd's half that a crowd piece could move to, for `blockTurns`; nothing (either side) may move onto it or slide through it; a knight jumps it; it never stops an attack | **Big Bounce:** at the start of his turn (after the warning), `bouncePieces` crowd pieces thrown to empty squares within `bounceReach` (pawns sideways), into a position `bounceLoss` pawns worse for the crowd (nearest `bounceTarget`) |
@@ -129,8 +139,8 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | The roster, the playable rule, choosing a boss, strength | `packages/core/src/boss.ts` (`BOSS_ROSTER`; power ids, event kinds and every boss's state fields in `BossPowerState`) | its line in `BOSS_ROSTER` |
 | Rules: each turn's powers, allowed moves, what the judge sees, after-move effects, fair-play turns, its opening, its screen fields | `packages/chess/src/bosses/base.ts` (the base boss, `BossRules`, and shared helpers), `bosses/index.ts` (the registry), `boss-powers.ts` (the dispatcher: `prepareTurn`, `crowdAllowed`, `bossAllowed`, `powerTurn`, `icedSquares`, the judge's hooks) | `packages/chess/src/bosses/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts`, `sawyer.ts` |
 | Timings the server and the screens share | `packages/chess/src/boss-timing.ts` (`POWER_FX` spreads each boss's `<BOSS>_FX`; `powerFxMs`, `bossIntroTimeline`) | in its rules file (`GINGER_FX`, `FIRE_BURN_MS`, `LIGHTS_OUT`, `CLAIM_MS`, `SNACK`, `BOUNCE`, `BLOCK`, `SPLIT`, `SAW_CUT`, `BOARD_SAW`…) |
-| Its moments in the match runner (the funhouse, Lights out, the extra move, the bounce) | `packages/chess/src/runner.ts` hands each a `Battle` (base.ts) and keeps one-line methods (`playFunhouse`, `startLightsOut`, `playBounce`…) | `<boss>Battle` in its rules file, with its engine pick (`funhouseMoveFrom`, `extraMoveFrom`, `bounceFrom`) |
-| The lobby server | `packages/server/src/lobby.ts` (the boss's turn; the host-engine requests for the funhouse, the extra move and the bounce), `packages/server/src/bosses/base.ts` (`BossLobby`) | `packages/server/src/bosses/hollow.ts` (dark tries, Lights out) |
+| Its moments in the match runner (Lights out, the extra move, the bounce) | `packages/chess/src/runner.ts` hands each a `Battle` (base.ts) and keeps one-line methods (`startLightsOut`, `playBounce`…) | `<boss>Battle` in its rules file, with its engine pick (`extraMoveFrom`, `bounceFrom`) |
+| The lobby server | `packages/server/src/lobby.ts` (the boss's turn; the host-engine requests for the extra move and the bounce), `packages/server/src/bosses/base.ts` (`BossLobby`) | `packages/server/src/bosses/hollow.ts` (dark tries, Lights out) |
 | Solo | `packages/app/src/solo.ts` (drives the same runner; its own timing of Lights out) | |
 | Art and sounds | `characters/index.ts` (`CHARACTERS`), `characters/kits.ts` (`BOSS_KITS`: animations per moment, lines, portrait), `characters/power-art.ts` (each power's moments and effects) | `characters/<boss>.ts`, `<boss>-sounds.ts` (`gingerbread`, `clown`, `grex`, `hollow`, `bigboy`, `sawyer`) |
 | Board effect sprites | `characters/effects.ts` (`EFFECT_SPRITES`), `characters/effects/common.ts` | `characters/effects/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts`, `sawyer.ts` |
@@ -174,9 +184,9 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 5. **Character and art**: `characters/<boss>.ts` (+ sounds), in `characters/index.ts` and `BOSS_KITS` (`kits.ts`); its effects in `characters/effects/<boss>.ts`, in `effects.ts` and `power-art.ts`'s `EFFECTS`; its moments in `power-art.ts`.
 6. **Screen**: `components/<Boss>.tsx` with its `BossUi`; add it to `BOSS_UI` and `MOMENT_UI` in `BossPowers.tsx` (the compiler names any moment kind without a view). Its power words in `power-words.ts` (the compiler names a missing one). Its lines need nothing more: its kit's lines for each moment are said into its voice and held by the speech rule (`speech.tsx`); give a moment `lineAt` if the boss speaks partway through it, and say any other line with `bossVoice.say` (or `<Say>`), never in a box of its own.
 7. **Only if it has a moment of its own beyond these** (and these still mean shared edits, because they're protocol):
-   - one the host's engine plays (like the funhouse, the extra move, the bounce): a `<boss>Battle` with one-line runner methods, the lobby's request, answer and timeout (`lobby.ts`, `bossKind`), the host's handler (`net.ts`) and solo's (`solo.ts`), and the request's flag in `protocol.ts`;
+   - one the host's engine plays (like the extra move, the bounce): a `<boss>Battle` with one-line runner methods, the lobby's request, answer and timeout (`lobby.ts`, `bossKind`), the host's handler (`net.ts`) and solo's (`solo.ts`), and the request's flag in `protocol.ts`;
    - one the server times (like Lights out): `packages/server/src/bosses/<boss>.ts` on `BossLobby`, routed from `lobby.ts`, its messages in `protocol.ts`, and solo's timing in `solo.ts`;
-   - anything that changes the board the boss screen shows, or the intro (like the funhouse's flip, the bounce, the burn, Hollow's claim, Big Boy's snack, Sawyer's split): `screens/Boss.tsx`.
+   - anything that changes the board the boss screen shows, or the intro (like the funhouse's turns, the bounce, the burn, Hollow's claim, Big Boy's snack, Sawyer's split): `screens/Boss.tsx`.
    - anything that changes the position outside a move leaves a base (`afterCrowdMove`, `afterBossMove`, or the boss's own moment), and never a ninth pawn of one side or a 33rd piece (the engine refuses those positions).
 8. **Its attack on a king** (optional; the boss keeps today's Last Stand and mate without one): see "A boss's attack on
    a king" above.
@@ -197,15 +207,17 @@ boss's `offset` in `boss.ts`.
 
 - Unit, the brain: `packages/chess/test/boss-brain.test.ts`; the Maia box's own tests in `packages/maia-worker/test/`.
   e2e: `e2e/maia.spec.ts`. Sim: `packages/sim/scripts/maia-sim.ts` (`reports/maia-boss.md`).
-- Unit: `packages/chess/test/boss-powers.test.ts`, `rage.test.ts` (every boss's ultimate again and again, never two at
-  once), `grex.test.ts` (the meter), `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
+- Unit: `packages/chess/test/boss-powers.test.ts` (Boingo's pies and the funhouse's steps among them), `rage.test.ts`
+  (every boss's ultimate again and again, never two at once), `packages/app/test/board-view.test.ts` (the turned
+  board's squares, moves and coordinates), `grex.test.ts` (the meter), `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
   `long-match.test.ts`, `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`,
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,
   `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
 - Unit, a boss's attack on a king: `packages/chess/test/king-attack.test.ts` (the beats, the Last Stand's fit, the
   mate's hold, the mate switch), `packages/app/test/king-attack.test.ts` (the kit, Hollow's frames on the beats, the God
   King's blows, the hits).
-- e2e: `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
+- e2e: `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
+  0°, 180°, 90° and 270°; the coordinates and pies on their squares at each), `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
   `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
   gone on time),
   `perf.spec.ts`. Unit: `packages/app/test/speech.test.ts` (the speech rule).

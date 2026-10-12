@@ -1,17 +1,20 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import { pieceAt } from "@chessroyale/chess";
+import { BoardTurn, viewSquare, type QuarterTurn } from "../board-view.ts";
 
 const NAMES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 
-/** Board position (percent from the top-left) of a square, from the given side. */
-function at(square: string, orientation: "white" | "black") {
+/** Board position (percent from the top-left) of a square, from the given side (on a turned board, where it's drawn). */
+function at(real: string, orientation: "white" | "black", turn: QuarterTurn = 0) {
+  const square = viewSquare(real, turn);
   const f = square.charCodeAt(0) - 97;
   const r = Number(square[1]) - 1;
   return { left: (orientation === "white" ? f : 7 - f) * 12.5, top: (orientation === "white" ? 7 - r : r) * 12.5 };
 }
 
-/** Column and row (0-7, from the top-left) of a square, from the given side. */
-function cell(square: string, orientation: "white" | "black") {
+/** Column and row (0-7, from the top-left) of a square, from the given side (on a turned board, where it's drawn). */
+function cell(real: string, orientation: "white" | "black", turn: QuarterTurn = 0) {
+  const square = viewSquare(real, turn);
   const f = square.charCodeAt(0) - 97;
   const r = Number(square[1]) - 1;
   return { x: orientation === "white" ? f : 7 - f, y: orientation === "white" ? 7 - r : r };
@@ -46,9 +49,10 @@ export interface GhostPick {
  * extra pick and with a pulse each time one more arrives.
  */
 function Ghost({ fen, move, orientation, count, you, instant, landing, chosenCls }: { fen: string; move: string; orientation: "white" | "black"; count: number; you: boolean; instant: boolean; landing: boolean; chosenCls: string }) {
+  const turn = useContext(BoardTurn);
   const piece = pieceAt(fen, move.slice(0, 2));
   if (!piece) return null;
-  const p = at(move.slice(2, 4), orientation);
+  const p = at(move.slice(2, 4), orientation, turn);
   // 1 pick: faint; more picks: bolder (the stack reads at a glance), up to a cap.
   const weight = Math.min(1, 0.55 + 0.15 * Math.log2(count));
   // With the motion trail, a pick that's flying in shows (or pops) when it lands, not before.
@@ -68,9 +72,10 @@ function Ghost({ fen, move, orientation, count, you, instant, landing, chosenCls
  * exactly where the fixed ghost stands, and it fades out as that ghost appears.
  */
 function Flyer({ move, orientation, cls, you }: { move: string; orientation: "white" | "black"; cls: string; you: boolean }) {
-  const from = cell(move.slice(0, 2), orientation);
-  const to = cell(move.slice(2, 4), orientation);
-  const p = at(move.slice(2, 4), orientation);
+  const turn = useContext(BoardTurn);
+  const from = cell(move.slice(0, 2), orientation, turn);
+  const to = cell(move.slice(2, 4), orientation, turn);
+  const p = at(move.slice(2, 4), orientation, turn);
   const style = { left: `${p.left}%`, top: `${p.top}%`, "--dx": String(from.x - to.x), "--dy": String(from.y - to.y), "--fly-ms": `${FLY_MS}ms` };
   return (
     <>
@@ -83,9 +88,10 @@ function Flyer({ move, orientation, cls, you }: { move: string; orientation: "wh
 
 /** A ghost with animations off: one still piece per picked move. */
 function StillGhost({ fen, move, orientation, chosenCls }: { fen: string; move: string; orientation: "white" | "black"; chosenCls: string }) {
+  const turn = useContext(BoardTurn);
   const piece = pieceAt(fen, move.slice(0, 2));
   if (!piece) return null;
-  const to = at(move.slice(2, 4), orientation);
+  const to = at(move.slice(2, 4), orientation, turn);
   return <piece class={`${piece.color === "w" ? "white" : "black"} ${NAMES[piece.type]} crowd-ghost still${chosenCls}`} style={{ left: `${to.left}%`, top: `${to.top}%` }} />;
 }
 
@@ -124,6 +130,7 @@ export function CrowdGhosts({
   /** Motion trail (with animations on): each new pick flies in from its piece's square. */
   trail?: boolean;
 }) {
+  const turn = useContext(BoardTurn);
   // Motion trail: picks seen so far (those already on screen never fly), and the flights in the air.
   const flown = useRef<Set<string> | null>(null);
   const flights = useRef<Flight[]>([]);
@@ -174,7 +181,7 @@ export function CrowdGhosts({
       )}
       {animate && trail && !chosen && flying.map((f) => <Flyer key={f.key} move={f.move} orientation={orientation} cls={f.cls} you={f.you} />)}
       {tags && [...byMove].map(([move, ps]) => {
-        const to = at(move.slice(2, 4), orientation);
+        const to = at(move.slice(2, 4), orientation, turn);
         // One name (yours if you picked it, else the best-placed) over the square, and "+N" for everyone else on the
         // piece's corner: both inside the square, so neighbouring squares never overlap.
         const top = [...ps].sort((a, b) => Number(b.you) - Number(a.you) || a.rank - b.rank)[0]!;

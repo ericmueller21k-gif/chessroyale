@@ -262,12 +262,13 @@ export interface BossPowerState {
   frozen?: { square: string; piece: string; until: number } | null;
   /** Ginger's blizzard: the one crowd piece left free to move (a random one with a move, from the seed), and its turn. */
   blizzard?: { turn: number; square: string } | null;
-  /** Pie: the pied square (nobody may move onto it), through this crowd turn. */
-  pie?: { square: string; until: number } | null;
-  /** The funhouse: the move the boss played for the crowd, as which crowd turn. */
-  funhouse?: { turn: number; move: string; san: string } | null;
-  /** After the funhouse, the crowd sees the board flipped through this crowd turn. */
-  flipUntil?: number;
+  /** Boingo's pies: each pied square (nobody may move onto it) through its crowd turn; up to BOSS_POWERS.pieMax. */
+  pies?: { square: string; until: number }[];
+  /**
+   * Boingo's funhouse: the crowd turn it came (the board upside down), and the side its quarter turn goes to after
+   * (90: a quarter turn clockwise, 270: anticlockwise); then the other side, then back (boardAngle).
+   */
+  funhouse?: { turn: number; side: 90 | 270 } | null;
   /**
    * The meter's charge from time, the judged eval and the God King's strikes (rage points, never coming down); the
    * boss's material lost adds to it (BOSS_POWERS.ragePerMaterial a point). `judged`: the crowd's expected score after its
@@ -455,7 +456,7 @@ export interface BurnEvent {
  * Boy's toy block landing; `bounce`: his Big Bounce (at the start of his turn, after the crowd's move). `split`:
  * Sawyer saws the pawn of his first move in two; `cut`: a saw cut on an edge; `boardsaw`: his board saw.
  */
-export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spark" | "candle" | "fireball" | "dark" | "extra" | "block" | "bounce" | "split" | "cut" | "boardsaw";
+export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spin" | "spark" | "candle" | "fireball" | "dark" | "extra" | "block" | "bounce" | "split" | "cut" | "boardsaw";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

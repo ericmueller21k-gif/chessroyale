@@ -443,8 +443,8 @@ Plays from the game so far.
   clown: (p) => `
 Plays from the game so far.
 
-- **Pie** (passive): from turn ${p.firstPassive}, an empty square near the centre (the one the fewest moves can reach) gets a pie for ${n(p.pieTurns, "turn")}: nobody, on either side, may move onto it. Then ${n(p.pieGap, "turn")} clear before the next.
-- **Funhouse** (ultimate): he plays your move for you, a weak but recoverable one (giving away ${range(p.funhouseLoss)} points, never more than ${num(p.funhouseMaxLogit)} in log-odds). Nobody is scored that turn. Then you see the board upside down for ${n(p.flipTurns, "turn")}.`,
+- **Pie** (passive): from turn ${p.firstPassive}, an empty square near the centre (the one the fewest moves can reach) gets a pie for ${n(p.pieTurns, "turn")}: nobody, on either side, may move onto it. A new pie every ${n(p.pieEvery, "turn")}, up to ${p.pieMax} on the board at once, never two on one square.
+- **Funhouse** (ultimate): he turns the board round, ${n(p.funhouseStepTurns, "turn")} at a time: upside down first, then a quarter turn to one side (left or right, at random), then a half turn to the other side, then back the right way up, where it stays. You play your own moves all the while (taps and drags work at every angle, and the coordinates name the real squares); they're scored as usual. Once the board is back, his meter fills again.`,
   grex: (p) => `
 Plays from the game so far.
 

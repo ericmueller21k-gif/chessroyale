@@ -663,7 +663,7 @@ export const CLOWN_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonl
   strike: ["Pie in your face!", "Hee hee! Gotcha!"],
   power: ["Pie time!", "Special delivery!", "Extra cream for you!", "Splat! Hee hee!"],
   ultimateWarn: ["Something funny's coming…", "Get ready to laugh…", "Boingo's big finale…"],
-  ultimate: ["Welcome to the funhouse!", "Topsy-turvy!", "Boingo's turn! Hee hee!"],
+  ultimate: ["Welcome to the funhouse!", "Topsy-turvy!", "Round and round we go!"],
 };
 export const CLOWN_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
   entrance: 1,

@@ -85,7 +85,7 @@ import {
   type LightsTally,
   darkSquares,
   bigboyBattle,
-  boingoBattle,
+  funhouseAngle,
   hollowBattle,
   moveLoss,
   type Battle,
@@ -1072,21 +1072,6 @@ export class MatchRunner {
     return m;
   }
 
-  /** Boss battle: the boss plays the crowd's move this turn (its funhouse), before the crowd picks. */
-  funhouseDue(): boolean {
-    return boingoBattle.funhouseDue(this.battle);
-  }
-
-  /** The funhouse: the boss picks the crowd's move (a weak but recoverable one) and plays it. */
-  async playFunhouse(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
-    return boingoBattle.playFunhouse(this.battle, engine);
-  }
-
-  /** Plays the funhouse's move for the crowd (from the host's engine online; see boingoBattle.applyFunhouse). */
-  applyFunhouse(move: string): string {
-    return boingoBattle.applyFunhouse(this.battle, move);
-  }
-
   /** After the crowd's move: the boss's own effect, if it has one (G-REX's fire: what was left on a tile ablaze burns). */
   private afterCrowdMove(move: string | null) {
     const b = this.state.boss;
@@ -1277,10 +1262,13 @@ export class MatchRunner {
               ultAt: p.ultAt ?? null,
               ults: p.ults ?? 0,
               frozen: p.frozen ? { square: p.frozen.square, until: p.frozen.until } : null,
-              pie: p.pie ? { square: p.pie.square, until: p.pie.until } : null,
+              pie: p.pies?.length ? { ...p.pies[p.pies.length - 1]! } : null,
+              pies: (p.pies ?? []).map((x) => ({ ...x })),
               iced: sideToMove(fen) === b.crowdSide ? icedSquares(b, fen) : p.frozen ? [p.frozen.square] : [],
-              flipped: boardFlipped(b),
-              funhouse: p.funhouse ?? null,
+              // (The funhouse's angle as this crowd turn was set up: it turns as the next begins, with its moment.)
+              angle: funhouseAngle(p.funhouse, p.turn),
+              flipped: funhouseAngle(p.funhouse, p.turn) === 180,
+              funhouse: p.funhouse ? { ...p.funhouse } : null,
               events: p.events,
               allowed: sideToMove(fen) === b.crowdSide ? crowdAllowed(b, fen) : null,
               fire: (p.fire ?? []).map((t) => ({ square: t.square, lit: t.lit, stage: fireStage(t, p.turn) })),
