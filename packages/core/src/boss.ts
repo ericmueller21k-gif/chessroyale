@@ -280,8 +280,13 @@ export interface BossPowerState {
   nextPassive: number;
   /** Freeze: the iced piece (its square and kind), through this crowd turn. */
   frozen?: { square: string; piece: string; until: number } | null;
-  /** Ginger's blizzard: the one crowd piece left free to move (a random one with a move, from the seed), and its turn. */
-  blizzard?: { turn: number; square: string } | null;
+  /**
+   * Ginger's blizzard (three turns, thawing; Eric, Oct 12): the crowd turn it came and its first free piece's square
+   * then (a random one with a move, from the seed); and for crowd turn `at` (set as each of its turns begins, until the
+   * ice is gone), `iced`: the crowd's pieces its ice holds (every one but those free), and `next`: those of them that
+   * thaw as the next crowd turn begins (cracked and dripping on screen). Null once the ice is gone.
+   */
+  blizzard?: { turn: number; square: string; at?: number; iced?: string[]; next?: string[] } | null;
   /** Boingo's pies: each pied square (nobody may move onto it) through its crowd turn; up to BOSS_POWERS.pieMax. */
   pies?: { square: string; until: number }[];
   /**
@@ -480,17 +485,18 @@ export interface BurnEvent {
 }
 
 /**
+ * `thaw`: Ginger's blizzard thawing as one of its later turns begins (`squares`: the pieces whose ice melts now).
  * `extra`: Hollow's extra move after a failed Lights out (played after his own, before the crowd's turn). `block`: Big
  * Boy's toy block landing; `bounce`: his Big Bounce (at the start of his turn, after the crowd's move). `split`:
  * Sawyer saws the pawn of his first move in two; `cut`: a saw cut on an edge; `boardsaw`: his board saw.
  */
-export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spin" | "spark" | "candle" | "fireball" | "fireproof" | "dark" | "extra" | "block" | "bounce" | "split" | "cut" | "boardsaw";
+export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "thaw" | "funhouse" | "spin" | "spark" | "candle" | "fireball" | "fireproof" | "dark" | "extra" | "block" | "bounce" | "split" | "cut" | "boardsaw";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
   /** The square it hit (a freeze, a pie, a sparkler). */
   square?: string;
-  /** The squares a wave of fireballs hit. */
+  /** The squares a wave of fireballs hit; the pieces Ginger's blizzard thaws. */
   squares?: string[];
   /** Of those, the ones that fizzled as they landed (the crowd's king stood there): no fire tile. */
   fizzled?: string[];

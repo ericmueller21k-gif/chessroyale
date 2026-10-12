@@ -54,9 +54,9 @@ const iceOffSquares = (p: Page) =>
 /** The power's banner (boss on the left, the moment, the God King on the right). */
 const banner = (p: Page, text: string) => p.locator(".fight-banner.power-cut", { hasText: text });
 
-test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the blizzard: one random piece moves", async ({ page }) => {
-  test.setTimeout(5 * 60_000);
-  await page.goto("/?debug&clock=40&bossMoves=5&boss=gingerbread&power=blizzard");
+test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the blizzard: one random piece moves, then it thaws", async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  await page.goto("/?debug&clock=40&bossMoves=7&boss=gingerbread&power=blizzard");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Ginger");
@@ -121,16 +121,56 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   const ice = await iceOffSquares(page);
   expect(ice.worst, JSON.stringify(ice.off)).toBeLessThanOrEqual(1);
   expect(ice.sizes).toHaveLength(1);
+  // The pieces due to thaw next turn (three or four: four or five free then) show cracked, thin ice; the rest whole.
+  expect(p3.thaw.length).toBeGreaterThanOrEqual(3);
+  expect(p3.thaw.length).toBeLessThanOrEqual(4);
+  await expect(page.locator(".power-board .pw-ice.thawing")).toHaveCount(p3.thaw.length);
+  for (const sq of p3.thaw) await expect(page.locator(`.power-board .pw-ice.thawing[data-square="${sq}"]`)).toHaveCount(1);
   await playBest(page);
-  // The ice melts as the next turn begins; the meter has emptied and fills again (it's not gone).
+  // While the boss thinks, the ice stays on.
+  await expect.poll(async () => (await powers(page))?.iced.length ?? 0, { timeout: 10_000 }).toBeGreaterThan(5);
+  // The thaw as the next turn begins (Eric, Oct 12): its banner names the pieces freed, their ice melts away, and four or
+  // five are free in all; the rest crack (all of it thaws next turn). The meter empty and dashed throughout.
+  await expect(banner(page, "THAWING!")).toBeVisible({ timeout: 30_000 });
+  await expect(banner(page, "THAWING!")).toContainText(/Your .+ (is|are) free|more of your pieces are free/);
+  await expect(page.locator(".power-board .pw-ice.melting").first()).toBeVisible({ timeout: 5_000 });
+  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
+  const p4 = await powers(page);
+  const fen4: string = await page.evaluate(() => (window as any).match.phase.board.fen);
+  const crowd4 = [..."abcdefgh"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).filter((sq) => /[PNBRQK]/.test(pieceOn(fen4, sq) ?? ""));
+  const free4 = crowd4.filter((sq) => !p4.iced.includes(sq));
+  expect(free4.length).toBeGreaterThanOrEqual(4);
+  expect(free4.length).toBeLessThanOrEqual(6);
+  for (const sq of p3.thaw) if (/[PNBRQK]/.test(pieceOn(fen4, sq) ?? "")) expect(free4).toContain(sq);
+  expect(p4.allowed.length).toBeGreaterThan(0);
+  for (const m of p4.allowed) expect(p4.iced).not.toContain(m.slice(0, 2));
+  expect(p4.thaw).toEqual(p4.iced);
+  await expect(page.locator(".power-board .pw-ice")).toHaveCount(p4.iced.length);
+  await expect(page.locator(".power-board .pw-ice.thawing")).toHaveCount(p4.iced.length);
+  expect((await iceOffSquares(page)).worst).toBeLessThanOrEqual(1);
+  expect(p4.rage).toBe(0);
+  expect(p4.paused).toBe(true);
+  await expect(page.locator(".rage-meter.paused")).toBeVisible();
+  await playBest(page);
+  // Its last turn: the rest thaw, the ice is gone, every move allowed; the meter still held empty.
+  await expect(banner(page, "THAWED!")).toBeVisible({ timeout: 30_000 });
+  await expect(banner(page, "THAWED!")).toContainText(/ice is gone/i);
+  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
+  const p5 = await powers(page);
+  expect(p5.iced).toEqual([]);
+  expect(p5.allowed).toBeNull();
+  await expect(page.locator(".power-board .pw-ice")).toHaveCount(0);
+  expect(p5.paused).toBe(true);
+  expect(p5.ultAt).not.toBeNull();
+  await playBest(page);
+  // Over as the next turn begins: the meter has emptied and fills again (it's not gone).
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
   if ((await phase(page)) === "play") {
-    const p4 = await powers(page);
-    expect(p4.iced.length).toBeLessThanOrEqual(1);
-    expect(p4.rage).toBeLessThan(0.5);
-    expect(p4.ultAt).toBeNull();
+    const p6 = await powers(page);
+    expect(p6.rage).toBeLessThan(0.5);
+    expect(p6.ultAt).toBeNull();
     await expect(page.locator(".rage-meter")).toBeVisible();
-    await expect(page.locator(".rage-meter.now, .rage-meter.warned")).toHaveCount(0);
+    await expect(page.locator(".rage-meter.now, .rage-meter.warned, .rage-meter.paused")).toHaveCount(0);
   }
 });
 

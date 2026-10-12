@@ -1637,3 +1637,74 @@ GPL") for these files only. The calls:
   pick plays that pick twice, which for Light wood is the same thing.
 - **The gavel** is the classic capture and move sounds pitched down to about half (0.55 and 0.45), as it was before
   this morning.
+
+### Ginger's Blizzard: three turns, thawing (Eric, Oct 12, 2026)
+
+Eric: "Ult lasts 3 turns now: 1 unmelted piece turn 1, turn 2 about 4–5 pieces, then all. A slight buff to his ult.
+Shows the ice slightly thawing as pieces get closer to being available." The rule, turn by turn (`bosses/ginger.ts`,
+`blizzardStep`; numbers `blizzardTurns` 3 and `blizzardFree` [[1, 1], [4, 5]] in `BOSS_POWERS`):
+
+- **Turn 1** (as it comes): as before, one crowd piece free, a random one with a legal move from the seed, never the
+  king nor the frozen piece unless nothing else can move (`chooseBlizzard`, unchanged); every other crowd piece iced,
+  the king included.
+- **Turn 2:** 4 or 5 of the crowd's pieces free in all, the number drawn from the seed (my call for "about 4–5": the
+  count in all, the first piece included, so 3 or 4 more thaw). The first piece stays free wherever it moved; the
+  pieces that thaw are named the turn before (from turn 1's position, at random, those with a legal move first, never
+  the king nor a piece the freeze will still hold), so the cracked ice the crowd sees on turn 1 is a promise: those
+  pieces always thaw. As turn 2 begins two more rules can thaw more: if fewer than the count are free (the boss took
+  the first piece or a named one), more thaw to make it up, at random, those with a move first, never the king; and
+  if no free piece has a legal move (in check: none can answer it), one that has one thaws too (the mercy rule:
+  `chooseMover`, never the king nor a frozen piece while another will do). So turn 2 has 4 to 6 free, 4 or 5 unless
+  the mercy rule was needed.
+- **Turn 3:** every piece free, the ice gone. It still counts as the Blizzard's (its three turns): the meter stays
+  empty and dimmed and no other ultimate (or the test trigger) can come until turn 4. Nothing limits the crowd's moves
+  on it, so it counts for fair play again (turns 1 and 2 don't).
+- **The freeze waits** while the Blizzard lasts (my call: a "FREEZE!" banner during the thaw, or right after "the ice
+  is gone", would read as a contradiction); it can come from turn 4.
+- **The ice through the boss's turn:** the iced pieces keep their ice (and the cracked ones their cracks) while the
+  boss thinks and moves (`iced` on the boss's turn, `icedSquares`), so nothing flickers off and on between turns, and
+  the melt has ice to melt.
+- **Online:** everything comes from the battle's seed and the position, worked out once on the server; every screen
+  gets the same `iced` and the new `thaw` (NetBossPowers: the iced pieces that thaw next turn) and the same `thaw`
+  event (its `squares`: the pieces freed). Tested in the lobby (`boss-powers-lobby.test.ts`). A battle saved mid-blizzard
+  before this deploy (the old state, its first piece only) is read as before on its own turn, then ends.
+- **The test switch and trigger** are unchanged: `?power=blizzard` warns as turn 2 begins and brings it on turn 3 (the
+  thaw on 4, the ice gone on 5); the admins' trigger brings it as the next turn begins and works again from the turn
+  after its third.
+
+**On screen** (`components/Ginger.tsx`, the ice in `characters/effects/ginger.ts`), checked frame by frame on a phone
+(390 px, light and dark) and a computer (1280 px):
+
+- **Cracked, thin ice** for the pieces due to thaw next turn: still the one block flush with its square (the same rim
+  pixels, placed by `onSquare`), but nearly clear (the piece shows through it plainly, where whole ice tints it
+  blue), its inner rim and frost gone, its edge paler, cracked right across, meltwater running down it and dripping
+  off its bottom edge (`thinning`, a loop). On turn 1 they crack (`crack`: cracks, chips flying, a crackle) as the
+  Blizzard's moment ends, once the sweep has iced the last piece; on turn 2 every piece still iced cracks (all of it
+  thaws next turn).
+- **The melt:** as each later turn begins, a short moment (`thaw`, 2.2 s, the clock stopped as for every power): its
+  banner, then the freed pieces' ice splits, sinks into a puddle and dries up (about 0.66 s), then the next ones
+  crack. The banner (cold, like the Blizzard's): "THAWING!" and the pieces by kind, most valuable first ("Your knight
+  and two pawns are free"; more than three kinds: "Four more of your pieces are free"); on the last, "THAWED!" and "The
+  ice is gone: every piece moves". Its long line wraps under the title (`.thaw .fb-sub`), so the faces stay on the
+  board. The dock says "Thaw!".
+- **Speech** (the shared rule, `speech.tsx`): Ginger grumbles as the ice melts ("Melting? Already?!", "Hmph. Don't get
+  comfy.", "My lovely ice!", "Drip, drip… bah!": her kit's `ultimateHit` lines, normal priority, waiting their turn),
+  and stays in her spot (`pm-stay`: she doesn't step up to cast for it). The God King: new `thaw` lines on turn 2 ("The
+  ice is cracking! More of ours can move.") and `thawed` lines on turn 3 ("The storm has passed. Full strength!");
+  two of his turn-1 lines say "for now", and one points at the cracked ice ("Only one piece moves. The cracked ice goes
+  next.").
+
+**The rage rate, by estimate** (Eric's standing instruction: no bot sim for ultimate rates; DECISIONS, "Rage meters"):
+the meter now stays empty for three turns instead of one. At Ginger's old speed (1.1: a full meter in about 13 crowd
+moves of a typical battle) her Blizzards would come at about turns 15, 32 and 49 instead of 15, 30 and 45, so a
+battle of the usual 35 to 40 moves would more often see only one. Her speed goes to **1.2** (about 12 moves to fill):
+about turns 14, 30 and 46, two in a typical battle as before. **Estimate; not tested with the bot sim.**
+
+Tests: `packages/chess/test/ginger.test.ts` (the three turns over many games: one free, then 4 or 5 with the first still
+free and the cracked ones thawed, then all; a free piece always has a move and the ice is never lifted; the mercy rule
+in check, the king last; the count never thaws the king, and makes up a piece the boss took; the same seed gives the
+same thaw; the freeze waits; the meter empty and the trigger refused through all three turns; in the match runner the
+ice through the boss's turn and the thaw's turn scored by the free pieces' moves), updates in `boss-powers.test.ts`,
+`grex.test.ts`, the lobby test, `gingerbread.test.ts` (the thin ice flush, clearer and dripping; the banner's names)
+and `faq.test.ts`; e2e: `boss-powers.spec.ts` (all three turns on a phone and a computer) and `grex.spec.ts` (the
+trigger through the three turns).

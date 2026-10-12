@@ -46,6 +46,8 @@ export type KingCue =
   | "blizzard"
   | "blizzardKing"
   | "blizzardOne"
+  | "thaw"
+  | "thawed"
   | "funhouse"
   | "fireTile"
   | "mateThreat"
@@ -102,15 +104,17 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   lastWords: ["Finish… it… for me."],
   rise: ["A god does not stay down."],
   // A boss's powers: after the blizzard (one random piece left free: the queen, the king, or another; Eric, Oct 11),
-  // after the funhouse.
+  // as it thaws (Oct 12: more of ours free next turn, then the ice gone), after the funhouse.
   blizzard: [
     "Looks like our queen withstood the storm!",
     "Frozen solid, all but our queen. She's ready.",
     "Ice everywhere, yet the queen still stands!",
     "That storm couldn't touch our queen.",
   ],
-  blizzardKing: ["Frozen solid! Only our king can move.", "The storm spared the king alone. Steady, Majesty."],
-  blizzardOne: ["The storm left us one piece. Make it count!", "All frozen but one. Use it well.", "One of ours broke free of the ice!", "Only one piece moves. That's all we need."],
+  blizzardKing: ["Frozen solid! Only our king can move, for now.", "The storm spared the king alone. Steady, Majesty."],
+  blizzardOne: ["The storm left us one piece. Make it count!", "All frozen but one, for now. Use it well.", "One of ours broke free of the ice!", "Only one piece moves. The cracked ice goes next."],
+  thaw: ["The ice is cracking! More of ours can move.", "A thaw! Our pieces stir again.", "Some of ours are free. The rest soon."],
+  thawed: ["The ice is gone. To arms, all of you!", "Thawed out! Every piece is ours again.", "The storm has passed. Full strength!"],
   funhouse: ["Upside down? Shake it off!", "That clown played our move! We'll fix it.", "He moved for us? Fine. We'll take it from here."],
   // A mate threatened against us (as our move begins), and a queen taken, either way.
   mateThreat: ["Mate is near! Shield the king.", "It threatens mate. Look again!", "Danger at the gate. Guard the king!"],
@@ -155,6 +159,8 @@ const KIND: Record<KingCue, Kind> = {
   blizzard: "critical",
   blizzardKing: "critical",
   blizzardOne: "critical",
+  thaw: "critical",
+  thawed: "critical",
   funhouse: "critical",
   fireTile: "critical",
 };

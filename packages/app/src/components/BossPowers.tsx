@@ -32,7 +32,7 @@ import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
  */
 
 // Each boss's file, for the screens.
-export { FREEZE, BLIZZARD } from "./Ginger.tsx";
+export { FREEZE, BLIZZARD, THAW, MELT_MS, prewarmGinger, thawLine, thawOver } from "./Ginger.tsx";
 export { PIE, FUNHOUSE, FUNHOUSE_LINES, SPIN, angleView, funhouseFlipAt, funhouseLine, funhouseView, spinOf } from "./Boingo.tsx";
 export { BURN, CANDLE, CandlePips, FIREBALL, FireBurn, SPARK, candleShotPath, candleShotTimes, fireCountdown, fireballLandAt, shadowItems, shadowsAt } from "./Grex.tsx";
 export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";

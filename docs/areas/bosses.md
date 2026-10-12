@@ -52,13 +52,13 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   the boss (`rageStrike`: a quarter of it), every gain times the boss's `rageSpeed`. Full: a "RAGE!" warning, then the
   ultimate as the next crowd turn begins. Hollow's Lights out and Big Boy's Big Bounce come at the start of the boss's
   turn instead (Lights out's only warning is the full meter). The meter is full on the ultimate's own turn, then
-  empties; while the ultimate's effect still runs (its rules' `ultimateRunning`: the blizzard and the Big Bounce their
-  own turn, the funhouse until the board is back, the Roman candle until its last fire is out, Lights out through
+  empties; while the ultimate's effect still runs (its rules' `ultimateRunning`: the blizzard its three turns, the Big
+  Bounce its own turn, the funhouse until the board is back, the Roman candle until its last fire is out, Lights out through
   the turn after it, the board saw while the halves are apart) it stays empty, dimmed and dashed on screen
   (`paused`), nothing gathers (strikes included) and no other ultimate can come, the test trigger neither. Once it's
   over, `warnAt` and `ultAt` clear and the meter fills again from empty for the next (`ults` counts them). The test
   switch (`?power=`) brings only the first; the test trigger works again once each one is over. Each repeat is fresh:
-  its own turn's seed (Ginger's free piece, Big Boy's candidates, Jefferson's waves), and a later Lights out a seed of
+  its own turn's seed (Ginger's free piece and thaw, Big Boy's candidates, Jefferson's waves), and a later Lights out a seed of
   its own (other pieces named, other bot finds). **Rates set by estimate; not yet tested with the bot sim. Run the sim
   at a future date** (`boss-sim.ts raid`, below): the aim is about two ultimates in a typical battle of about 40 crowd
   moves (Jefferson about one and a half: his barrage lasts about a third of a battle).
@@ -67,7 +67,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 
 | Boss (id) | Opening | Passive | Ultimate |
 | --- | --- | --- | --- |
-| Ginger (`gingerbread`) | the game so far | **Freeze:** a crowd piece (never the king, one that matters: a pick from the top three) iced for `freezeTurns`, every `freezeEvery` turns from turn 2 | **Blizzard:** for one turn only one crowd piece moves, at random from the seed among those with a legal move (Eric, Oct 11; it was the queen): never the king nor the frozen piece unless nothing else can move (`chooseBlizzard`); its banner names it ("Only your knight on c3 moves") |
+| Ginger (`gingerbread`) | the game so far | **Freeze:** a crowd piece (never the king, one that matters: a pick from the top three) iced for `freezeTurns`, every `freezeEvery` turns from turn 2 | **Blizzard** (three turns, thawing; Eric, Oct 12: `blizzardTurns`, `blizzardFree`; DECISIONS.md, "Ginger's Blizzard: three turns, thawing"): turn 1, only one crowd piece moves, at random from the seed among those with a legal move (Eric, Oct 11; it was the queen): never the king nor the frozen piece unless nothing else can move (`chooseBlizzard`); its banner names it ("Only your knight on c3 moves"). Turn 2, 4 or 5 free in all (from the seed): the first stays free, the pieces named on turn 1 thaw (at random, those with a move first, never the king), more if one was lost to the boss, and one that can move if none can (in check: one that answers it); its moment ("THAWING!") names them. Turn 3, the ice is gone ("THAWED!"), the meter still empty. The pieces due to thaw next turn show cracked, thin, dripping ice; the ice stays on through the boss's turn; the freeze waits until it's over (`blizzardStep`) |
 | Boingo the Clown (`clown`) | the game so far | **Pie:** an empty square near the centre that the fewest moves reach is pied for `pieTurns` (nobody, either side, may move onto it); a new one every `pieEvery` turns, up to `pieMax` (2) at once, never two on one square (Eric, Oct 11) | **Funhouse** (Eric, Oct 11): he turns the board round, `funhouseStepTurns` (4) crowd turns a step: upside down as it comes, then a quarter turn to a side from the seed (90° or 270°), then a half turn to the other side, then back where it started, where it stays (`funhouseAngle`, `boardAngle`; a `spin` moment each step). As it comes he plays the crowd's move for it (Eric, Oct 12: "the forced move is the joke"): a weak but recoverable one (`funhouseMoveFrom`: `funhouseLoss` 1 to 2.5 pawns, never past `funhouseMaxLogit` in log-odds, never a mate allowed or the queen left hanging), unscored, once a funhouse, on a screen of its own with his joke (`FUNHOUSE_LINES`, from the seed); online the host's engine picks it (the boss request's `funhouse`) and everyone gets the same move. Then the crowd plays its own, scored as usual (turned turns don't count for fair play). His meter fills again once the board is back |
 | Jefferson (`grex`; G-REX until Oct 10) | the game so far | **Sparkler:** a tile on the crowd's half catches fire and burns in `fireStages` stages, one a crowd turn; a crowd piece left on it after the crowd's move on the last stage burns (never the king, never one whose loss leaves a king in check: it fizzles) | **Roman candle:** `candleShots` fireballs in waves (`candleWaves`) from `candleDelay` turns later, each wave's squares shown as growing shadows `candleAhead` turns ahead; `candleOwnShare` (0.4) of each wave, rounded, falls on his own half (Eric, Oct 11: too strong; 10 of the 24 there, 14 on the crowd's), where his pieces never burn (a crowd piece there still would). The first time one of his pieces stands in the candle's fire (`fireproof`, once a match) he laughs it off: a `fireproof` moment, his smug look and one of four lines picked from the seed (`FIREPROOF_LINES`; he has no laugh sound of his own, so none) |
 | Hollow (`hollow`) | always Black, from the starting position (he claims the dark side in the intro if the crowd would have been Black) | **The dark:** after his first move he covers the square of the piece he moved, then another every `darkEvery`-th move (a random occupied square, never a king's) for `darkTurns`; pieces there are hidden; a move touching the dark goes unchecked, an illegal one costs `darkTryCost` and the `darkTries`-th ends the turn as a miss | **Lights out:** at the start of his turn, a memory test in rounds (`lightsOutRounds`: find 1, 2, then 3 of his pieces); each piece missed costs `lightsOutMiss`; below `lightsOutHold` found, he plays an extra quiet move (`lightsOutExtraGain`) |
@@ -108,7 +108,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **The bars at the back, the ice on its square, the queen banners silent** (Eric, Oct 11): the move clock's bars above
   and below the board draw behind everything (squares' overlays, the boss, his effects and words, the God King), as the
   eval bar does. Ginger's ice is one block the square's shape on every square, whatever the piece, placed on
-  the board's own square (eighths of `--board-size`). QUEEN DOWN! and QUEEN SLAIN! play no sound for now (the gasp is
+  the board's own square (eighths of `--board-size`); her thin ice (due to thaw) is the same block, clearer and cracked
+  (Oct 12). QUEEN DOWN! and QUEEN SLAIN! play no sound for now (the gasp is
   kept, unused: `queenGasp`).
 - **A boss's attack on a king** (Eric, Oct 10; Hollow's first, the others keep today's behaviour until they get one):
   purely cosmetic, no rule changes. Its kit's `kingAttack` (`KingAttackKit` in `kits.ts`: the character it's drawn
@@ -178,7 +179,7 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack), Sawyer (his cuts from turn 3) |
 | `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy, Sawyer |
 
-A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` word, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself.
+A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` word, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
 
 ### Adding a boss
 
@@ -215,6 +216,9 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   brain in `packages/server/test/boss-powers-lobby.test.ts`; the Maia box's own tests in `packages/maia-worker/test/`.
   e2e: `e2e/maia.spec.ts` (every boss on Maia for an admin; an online raid on Maia; players never load it). Sims:
   `packages/sim/scripts/maia-calibration.ts` (`reports/maia-calibration.md`), `maia-sim.ts` (`reports/maia-boss.md`).
+- Unit, Ginger's blizzard: `packages/chess/test/ginger.test.ts` (its three turns, the thaw's count, the mercy rule,
+  the seed, the meter and the freeze waiting, the match runner's view through the boss's turn); the thin ice and the
+  thaw's banner in `packages/app/test/gingerbread.test.ts`; online in `boss-powers-lobby.test.ts`.
 - Unit: `packages/chess/test/boss-powers.test.ts` (Boingo's pies, the funhouse's steps and its move: once a funhouse,
   unscored, its loss band and cap, among them), `rage.test.ts`
   (every boss's ultimate again and again, never two at once), `packages/app/test/board-view.test.ts` (the turned
@@ -232,7 +236,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   `perf.spec.ts`. Unit: `packages/app/test/speech.test.ts` (the speech rule).
 - Frames: `npm run frames:king-attack -- <dir> hollow [phone|desktop|both] [laststand|mate|both] [light|dark] [gif]`
   (the page's clock paused and stepped 40 ms at a time: every frame of the attack),
-  `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both]`, `frames:hollow`,
+  `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both] [light|dark] [moves] [desktop
+  width]` (Ginger: the blizzard, both thaws and the boss's turns between them, six moves by default), `frames:hollow`,
   `frames:bigboy`, `frames:sawyer`, `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`,
   `frames:rage -- <dir> [boss] [phone|desktop] [moves] [strikes]` (the rage meter: strikes, the warning, the
   ultimate, its slide down and refill, every frame, with the meter's own numbers sampled each frame).

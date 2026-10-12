@@ -1290,7 +1290,8 @@ export class MatchRunner {
               frozen: p.frozen ? { square: p.frozen.square, until: p.frozen.until } : null,
               pie: p.pies?.length ? { ...p.pies[p.pies.length - 1]! } : null,
               pies: (p.pies ?? []).map((x) => ({ ...x })),
-              iced: sideToMove(fen) === b.crowdSide ? icedSquares(b, fen) : p.frozen ? [p.frozen.square] : [],
+              // (Through the boss's turn too: the frozen piece, the blizzard's ice until it thaws.)
+              iced: icedSquares(b, fen),
               // (The funhouse's angle as this crowd turn was set up: it turns as the next begins, with its moment.)
               angle: shownAngle(p.funhouse, p.turn),
               flipped: shownAngle(p.funhouse, p.turn) === 180,
