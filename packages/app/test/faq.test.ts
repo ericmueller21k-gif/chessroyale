@@ -87,24 +87,27 @@ describe("the FAQ's numbers come from the settings", () => {
     const [x0] = M.maiaRating[0]!;
     expect(t).toContain(`from ${x0} to`);
     expect(t).toContain(`= ${maiaRatingFor(2000 + M.crowdMargin)}`);
-    expect(t).toContain(`From ${M.bridgeFrom}: Maia with the light guard`);
+    expect(t).toContain(`A level from ${M.bridgeFrom}: Maia with the light guard`);
     expect(t).toContain(`from ${M.bridgeStrictFrom}: Maia with the strict guard`);
-    expect(t).toContain(`From ${M.stockfishFrom} up: Stockfish`);
+    expect(t).toContain(`A strength from ${M.stockfishFrom} up: Stockfish`);
     expect(t).not.toContain("Planned");
-    const brain = { ...M, maiaRating: [[1400, 1200], [2400, 2000], [2600, 2600]] as const, crowdMargin: 100, bridgeFrom: 2500, bridgeStrictFrom: 2650, stockfishFrom: 2900, bridgeStockfishShare: 0.4 };
+    const brain = { ...M, maiaRating: [[1400, 1200], [2400, 2000], [2600, 2600]] as const, crowdMargin: 100, bridgeFrom: 2500, bridgeStrictFrom: 2650, bridgeShareFrom: 2500, stockfishFrom: 2900, bridgeStockfishShare: 0.4 };
     const moved = section("boss-brain", { ...FAQ_DEFAULTS, brain });
     expect(moved).toContain("from 1400 to 2400: Maia = 1200 + 0.8 × (level − 1400)");
     expect(moved).toContain("from 2600 up: Maia = 2600");
     expect(moved).toContain("level = strength + 100 (a crowd)");
     // (A raid's boss at 2000: level 2100, Maia 1200 + 0.8 × 700.)
     expect(moved).toContain("1200 + 0.8 × (2100 − 1400) = 1200 + 560 = 1760");
-    expect(moved).toContain("From 2500: Maia with the light guard");
+    expect(moved).toContain("A level from 2500: Maia with the light guard");
     expect(moved).toContain("from 2650: Maia with the strict guard");
     expect(moved).toContain("Stockfish's share = 40% × (strength − 2500) / 400");
-    expect(moved).toContain("From 2900 up: Stockfish");
-    // (The table: 2000 alone at Maia 1680, a crowd at 1760, no guard, no Stockfish moves; 2700 a crowd at the ceiling.)
-    expect(moved).toMatch(/\n2000\s+1680\s+1760\s+no guard\s+none/);
-    expect(moved).toMatch(/\n2900\s+Stockfish\s+Stockfish/);
+    expect(moved).toContain("A strength from 2900 up: Stockfish");
+    // (The table: 2000 alone at Maia 1680, a crowd at 1760, no Stockfish moves; at 2400 the crowd's level (2500) meets
+    // the light guard first; 2600 alone light, a crowd strict, a quarter of the moves Stockfish's.)
+    expect(moved).toMatch(/\n2000\s+Maia 1680\s+Maia 1760\s+none/);
+    expect(moved).toMatch(/\n2400\s+Maia 2000\s+Maia 2300, light guard\s+none/);
+    expect(moved).toMatch(/\n2600\s+Maia 2600, light guard\s+Maia 2600, strict guard\s+10%/);
+    expect(moved).toMatch(/\n2900\s+Stockfish\s+Stockfish\s+all/);
   });
 
   it("every boss is on Maia (or the bosses with a brain of their own are named)", () => {

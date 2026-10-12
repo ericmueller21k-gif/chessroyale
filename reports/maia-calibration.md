@@ -2,7 +2,8 @@
 
 Written by `npx tsx packages/sim/scripts/maia-calibration.ts summary` from `reports/maia-calibration/*.jsonl`. A modest
 run by design: small samples, every number with its error bar (± two standard errors), and the choices lean on
-several rows at once, never on one. The choices and why are in DECISIONS.md, "Every boss on Maia: the calibration".
+several rows at once, never on one. The choices and why are in DECISIONS.md, "Every boss on Maia: the calibration"
+and "Maia bosses harder".
 
 **What it measures.**
 
@@ -58,20 +59,25 @@ several rows at once, never on one. The choices and why are in DECISIONS.md, "Ev
 | casual crowd | 1920 | 1820 | maia-raw at Maia 1000 | 10 | 0.35 ± 0.26 | 0.35 ± 0.26 | 2 / 3 / 5 | 2587 | 100% | 590 | 43 |
 | casual crowd | 1920 | 1820 | maia-raw at Maia 1500 | 8 | 0.00 ± 0.00 | 0.00 ± 0.00 | 0 / 0 / 8 | 2486 | 100% | 577 | 29 |
 | casual crowd | 1920 | 1820 | maia-raw at Maia 2000 | 4 | 0.00 ± 0.00 | 0.00 ± 0.00 | 0 / 0 / 4 | 2944 | 100% | 546 | 33 |
-| casual crowd | 1950 | 1850 | the shipped rule: maia-raw at Maia 1029 | 8 | 0.38 ± 0.37 | 0.38 ± 0.37 | 3 / 0 / 5 | 2929 | 100% | 574 | 40 |
+| casual crowd | 1950 | 1850 | the first, even rule: maia-raw at Maia 1029 | 8 | 0.38 ± 0.37 | 0.38 ± 0.37 | 3 / 0 / 5 | 2929 | 100% | 574 | 40 |
+| casual crowd | 1664 | 1564 | the harder rule (shipped): maia-raw at Maia 805 | 8 | 0.25 ± 0.33 | 0.25 ± 0.33 | 2 / 0 / 6 | 2508 | 100% | 526 | 46 |
 | one club player (Boss alone) | 2166 | 2166 | maia-raw at Maia 1000 | 8 | 0.25 ± 0.33 | 0.25 ± 0.33 | 2 / 0 / 6 | 3153 | 100% | 520 | 40 |
 | one club player (Boss alone) | 2166 | 2166 | maia-raw at Maia 1600 | 8 | 0.13 ± 0.25 | 0.12 ± 0.25 | 1 / 0 / 7 | 2915 | 100% | 555 | 32 |
-| one club player (Boss alone) | 2162 | 2162 | the shipped rule: maia-raw at Maia 826 | 8 | 0.50 ± 0.33 | 0.50 ± 0.33 | 3 / 2 / 3 | 3153 | 100% | 558 | 42 |
+| one club player (Boss alone) | 2162 | 2162 | the first, even rule: maia-raw at Maia 826 | 8 | 0.50 ± 0.33 | 0.50 ± 0.33 | 3 / 2 / 3 | 3153 | 100% | 558 | 42 |
+| one club player (Boss alone) | 2060 | 2060 | the harder rule (shipped): maia-raw at Maia 910 | 8 | 0.06 ± 0.13 | 0.06 ± 0.13 | 0 / 1 / 7 | 2404 | 100% | 590 | 29 |
 | club crowd | 2266 | 2166 | Stockfish (today) | 6 | 0.00 ± 0.00 | 0.00 ± 0.00 | 0 / 0 / 6 | 3400 | 0% | 1391 | 42 |
 | club crowd | 2266 | 2166 | maia-raw at Maia 1600 | 10 | 0.75 ± 0.27 | 0.75 ± 0.27 | 7 / 1 / 2 | 3400 | 100% | 562 | 58 |
 | club crowd | 2266 | 2166 | maia-raw at Maia 2100 | 10 | 0.50 ± 0.30 | 0.50 ± 0.30 | 4 / 2 / 4 | 3400 | 100% | 546 | 50 |
 | club crowd | 2266 | 2166 | maia-raw at Maia 2600 | 10 | 0.55 ± 0.31 | 0.55 ± 0.31 | 5 / 1 / 4 | 3400 | 100% | 540 | 60 |
-| club crowd | 2183 | 2083 | the shipped rule: maia-raw at Maia 1861 | 8 | 0.50 ± 0.38 | 0.50 ± 0.38 | 4 / 0 / 4 | 3342 | 100% | 531 | 49 |
+| club crowd | 2266 | 2166 | the harder rule (shipped): maia-light at Maia 2332 | 8 | 0.19 ± 0.26 | 0.19 ± 0.26 | 1 / 1 / 6 | 3400 | 99% | 573 | 37 |
+| club crowd | 2183 | 2083 | the first, even rule: maia-raw at Maia 1861 | 8 | 0.50 ± 0.38 | 0.50 ± 0.38 | 4 / 0 / 4 | 3342 | 100% | 531 | 49 |
+| club crowd | 2305 | 2205 | the harder rule (shipped): maia-light at Maia 2410 | 8 | 0.06 ± 0.13 | 0.06 ± 0.12 | 0 / 1 / 7 | 3400 | 99% | 528 | 42 |
 | expert crowd | 2771 | 2671 | Stockfish (today) | 6 | 0.25 ± 0.22 | 0.25 ± 0.22 | 0 / 3 / 3 | 3400 | 0% | 1367 | 49 |
 | expert crowd | 2771 | 2671 | maia-raw at Maia 2700 | 10 | 0.95 ± 0.10 | 0.95 ± 0.10 | 9 / 1 / 0 | 3400 | 100% | 557 | 56 |
 | expert crowd | 2771 | 2671 | maia-light at Maia 2700 | 10 | 0.65 ± 0.26 | 0.59 ± 0.24 | 5 / 3 / 2 | 3400 | 99% | 546 | 51 |
 | expert crowd | 2771 | 2671 | maia-strict at Maia 2700 | 10 | 0.35 ± 0.26 | 0.34 ± 0.25 | 2 / 3 / 5 | 3400 | 97% | 520 | 51 |
-| expert crowd | 2871 | 2771 | the shipped rule: maia-strict at Maia 2500, 90% Stockfish | 8 | 0.38 ± 0.25 | 0.36 ± 0.23 | 1 / 4 / 3 | 3400 | 8% | 1120 | 55 |
+| expert crowd | 2771 | 2671 | the harder rule (shipped): maia-strict at Maia 2500, 57% Stockfish | 8 | 0.31 ± 0.18 | 0.36 ± 0.16 | 0 / 5 / 3 | 3400 | 38% | 913 | 59 |
+| expert crowd | 2871 | 2771 | the first, even rule: maia-strict at Maia 2500, 90% Stockfish | 8 | 0.38 ± 0.25 | 0.36 ± 0.23 | 1 / 4 / 3 | 3400 | 8% | 1120 | 55 |
 
 Where each is even with Maia (no guard), from the table above:
 
@@ -104,31 +110,51 @@ Where each is even with Maia (no guard), from the table above:
   is a ramp in steps no bigger than the error bars. Per move, the light guard (about 1.5–1.7 points a move at Maia
   2400–2700) is today's boss at 2600 (1.39), the strict one (about 0.4) sharper than today's at 2800 (1.05); the
   bridge's growing share of Stockfish's moves brings it to Stockfish's own at 2800.
-- **The shipped rule, checked on fresh openings** (the rows marked so above, 8 games each): the casual crowd scored
-  0.38, the club crowd 0.50, the club player alone 0.50, the expert crowd (in the bridge, 90% Stockfish) 0.38: about
-  even everywhere, within error bars of about ±0.3 to ±0.4. Small samples: the lines are a starting point for real
-  battles, and `crowdMargin` (crowds) and the lines' first points (Boss alone) are the knobs.
+- **The first rule (#157), checked on fresh openings** ("the first, even rule" above, 8 games each): the casual
+  crowd scored 0.38, the club crowd 0.50, the club player alone 0.50, the expert crowd (in the bridge, 90% Stockfish)
+  0.38: about even everywhere, within error bars of about ±0.3 to ±0.4.
+
+## Harder: the boss clearly favoured (Eric, Oct 12)
+
+Eric, after #157: "We should be upping the Maia rating. The numbers don't need to be accurate; people read 'boss' and
+assume it's a challenge, so that's the key." The new target: each crowd, and a lone player at its own difficulty,
+scoring about 0.30 in plain chess; the bridge earlier where Maia alone can't get there.
+
+- **What changed:** the lines (level → Maia) 600 up to 1800, 850 at 2000, 1100 at 2250, 2000 at 2400, 2500 from
+  2650; the guard now follows the level, so a crowd meets it sooner (light from a level of 2400, strict from 2800);
+  Stockfish's share follows the strength (from 2500 to all of the moves just under 2800); the crowd's margin stays
+  400.
+- **What it gives** ("the harder rule" rows above, 8 games each on fresh openings): the casual crowd 0.25 (Maia
+  805), the expert crowd 0.31 (strict guard, 57% Stockfish): on target. The club crowds 0.19 and 0.06 (the light
+  guard at Maia 2332 and 2410) and the club player alone 0.06 (Maia 910): harder than the target. A casual player
+  alone is at Maia's floor (600) already, 0.13 and 0.00 in the rows above: it can't be made easier.
+- **Why the club crowd overshoots:** with no guard Maia can't hold a club crowd under about 0.5 even at its ceiling
+  (2100 to 2600 above), and the light guard is a big step: it takes away exactly the blunders a voting crowd
+  punishes. Nothing in between in this design, and Eric asked for the bridge earlier rather than a lost challenge.
+  Two tries before this one said the same: the strict guard from a level of 2550 (the club crowd 0 of 8), and the
+  light guard at Maia 2500 (0.19 and 0.12). If real club-level crowds find it too hard, the knobs are a looser
+  light guard or the light guard from a higher level.
 
 ## What the game ships (BOSS_BRAIN)
 
-Maia's rating lines: 1800 → 600, 2200 → 850, 2550 → 2100, 2650 → 2500 (held above the last; never under 600); a crowd's margin 400; the bridge from 2500 (light guard), the strict guard from 2650, Stockfish's share up to 100% just under 2800; Stockfish from 2800.
+Maia's rating lines (level → Maia): 1800 → 600, 2000 → 850, 2250 → 1100, 2400 → 2000, 2650 → 2500 (held above the last; never under 600); a crowd's margin 400; the light guard from a level of 2400, the strict guard from a level of 2800 (a crowd's level only: one player is Stockfish's from a strength of 2800); Stockfish's share from a strength of 2500 up to 100% just under 2800; Stockfish from 2800.
 
 | Boss strength | Boss alone | A crowd |
 | --- | --- | --- |
 | 1000 | maia-raw 600 | maia-raw 600 |
 | 1200 | maia-raw 600 | maia-raw 600 |
 | 1400 | maia-raw 600 | maia-raw 600 |
-| 1600 | maia-raw 600 | maia-raw 725 |
-| 1800 | maia-raw 600 | maia-raw 850 |
-| 2000 | maia-raw 725 | maia-raw 1564 |
-| 2200 | maia-raw 850 | maia-raw 2300 |
-| 2400 | maia-raw 1564 | maia-raw 2500 |
-| 2500 | maia-light 1921 | maia-light 2500 |
-| 2600 | maia-light 2300 (33% Stockfish) | maia-light 2500 (33% Stockfish) |
-| 2650 | maia-strict 2500 (50% Stockfish) | maia-strict 2500 (50% Stockfish) |
-| 2700 | maia-strict 2500 (67% Stockfish) | maia-strict 2500 (67% Stockfish) |
-| 2750 | maia-strict 2500 (83% Stockfish) | maia-strict 2500 (83% Stockfish) |
-| 2799 | maia-strict 2500 (100% Stockfish) | maia-strict 2500 (100% Stockfish) |
+| 1600 | maia-raw 600 | maia-raw 850 |
+| 1800 | maia-raw 600 | maia-raw 1050 |
+| 2000 | maia-raw 850 | maia-light 2000 |
+| 2200 | maia-raw 1050 | maia-light 2400 |
+| 2400 | maia-light 2000 | maia-strict 2500 |
+| 2500 | maia-light 2200 | maia-strict 2500 |
+| 2600 | maia-light 2400 (33% Stockfish) | maia-strict 2500 (33% Stockfish) |
+| 2650 | maia-light 2500 (50% Stockfish) | maia-strict 2500 (50% Stockfish) |
+| 2700 | maia-light 2500 (67% Stockfish) | maia-strict 2500 (67% Stockfish) |
+| 2750 | maia-light 2500 (83% Stockfish) | maia-strict 2500 (83% Stockfish) |
+| 2799 | maia-light 2500 (100% Stockfish) | maia-strict 2500 (100% Stockfish) |
 | 2800 | Stockfish | Stockfish |
 | 3000 | Stockfish | Stockfish |
 

@@ -162,13 +162,16 @@ describe("the bridge band and the top, in a battle", () => {
     return new MatchRunner({ settings, rng: mulberry32(3), engines: [engine], library: [opening(RUY)], entrants });
   };
 
-  it("below the band: Maia, no guard; in it the light, then the strict guard with a growing share of Stockfish; Stockfish from its top", () => {
-    const { bridgeFrom: from, bridgeStrictFrom: strict, stockfishFrom: top } = BOSS_BRAIN;
-    // (Ginger's offset is −100: her strength is the tier less 100.)
+  it("below the band: Maia, no guard; in it the light, then the strict guard (by the level) with a growing share of Stockfish (by the strength); Stockfish from its top", () => {
+    const { bridgeFrom: from, bridgeStrictFrom: strict, bridgeShareFrom: shareFrom, stockfishFrom: top, crowdMargin: margin } = BOSS_BRAIN;
+    // (Ginger's offset is −100: her strength is the tier less 100. Alone, the level is the strength.)
     expect(battle(from - 50).bossBrainPlan("", true)).toMatchObject({ brain: "maia-raw", stockfishShare: 0 });
-    expect(battle(from + 100).bossBrainPlan("", true)).toMatchObject({ brain: "maia-light", stockfishShare: 0 });
-    expect(battle(strict + 100).bossBrainPlan("", true)).toMatchObject({ brain: "maia-strict" });
-    expect(battle(strict + 100).bossBrainPlan("", true)!.stockfishShare).toBeGreaterThan(0);
+    expect(battle(from + 100).bossBrainPlan("", true)).toMatchObject({ brain: "maia-light" });
+    expect(battle(Math.min(shareFrom, from) + 100).bossBrainPlan("", true)!.stockfishShare).toBe(0);
+    // (A crowd: the level is the strength plus the margin, so it meets the strict guard at a lower strength.)
+    const crowdStrict = battle(strict - margin + 100, true).bossBrainPlan("", true)!;
+    expect(crowdStrict.brain).toBe(strict - margin < top ? "maia-strict" : "stockfish");
+    expect(battle(top - 50).bossBrainPlan("", true)!.stockfishShare).toBeGreaterThan(0);
     expect(battle(top + 100).bossBrainPlan("", true)).toEqual({ brain: "stockfish", rating: null, stockfishShare: 0 });
     // A player while it's off for them: Stockfish everywhere.
     expect(battle(1600).bossBrainPlan("", false)).toEqual({ brain: "stockfish", rating: null, stockfishShare: 0 });

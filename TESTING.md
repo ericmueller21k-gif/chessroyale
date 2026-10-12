@@ -37,8 +37,8 @@ Anything odd, a screenshot plus a sentence is all I need.
 Signed in with your admin account, on your phone (players still meet Stockfish; only admins meet Maia for now):
 
 1. Tap **Boss alone**. Under the difficulty there's **BRAIN · TEST**. Leave it on **Default (Maia, no guard)**: every
-   boss now plays with Maia below 2500, then the bridge (light guard, strict guard, a growing share of Stockfish
-   moves), then Stockfish from 2800. Or pick Stockfish / Maia with no, light, full or strict guard to compare. Pick any boss.
+   boss now plays with Maia, set to be clearly favoured (your call, Oct 12: a boss is a challenge), then the bridge
+   (light guard, strict guard, a growing share of Stockfish moves), then Stockfish from 2800. Or pick Stockfish / Maia with no, light, full or strict guard to compare. Pick any boss.
 2. The first time, Maia downloads (about 29 MB, kept afterwards) while the boss's intro plays. Under the God King's
    dock a small line shows what the brain did with each move: "🧠 Maia 1640 · no guard · Maia's #1 · 210 ms".
    "Stockfish (Maia loading)" means Maia wasn't ready yet and Stockfish moved instead.
