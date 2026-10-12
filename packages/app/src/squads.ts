@@ -101,8 +101,11 @@ export async function squadsQueue(onBusy: (waitSeconds: number) => void, cancell
   }
 }
 
-/** Test controls: a test lobby straight at Relay, Pairs or the final (admins; anyone where SQUADS_TEST is on). */
-export async function squadsTestLobby(start: "relay" | "pairs" | "final", clock?: string | null): Promise<SquadsSeatAnswer> {
+/**
+ * Test controls: a test lobby from the first vote (`votes`: bots in every other seat at once), or straight at Relay,
+ * Pairs or the final (admins; anyone where SQUADS_TEST is on).
+ */
+export async function squadsTestLobby(start: "votes" | "relay" | "pairs" | "final", clock?: string | null): Promise<SquadsSeatAnswer> {
   const q = new URLSearchParams({ start });
   if (clock) q.set("clock", clock);
   try {
@@ -140,6 +143,8 @@ export class SquadsClient {
   myId: string | null = null;
   /** You may use the test controls (an admin, or SQUADS_TEST on). */
   test = false;
+  /** "Cheat lines" switched on (test controls only): the engine's top moves wherever you choose, until switched off. */
+  cheatLines = false;
   lobby: NetSquadsLobby | null = null;
   vote: NetSquadsVote | null = null;
   readonly matches = new Map<string, LocalMatch>();
@@ -312,6 +317,12 @@ export class SquadsClient {
     this.send({ t: "nextRound" });
   }
 
+  /** Test controls only: "Cheat lines" on or off (on this device; nothing is sent). */
+  toggleCheatLines() {
+    this.cheatLines = this.test && !this.cheatLines;
+    this.emit();
+  }
+
   reclaim() {
     this.send({ t: "reclaim" });
   }
@@ -420,6 +431,7 @@ export class SquadsClient {
       case "welcome":
         this.myId = msg.playerId;
         this.test = msg.test;
+        if (!msg.test) this.cheatLines = false;
         this.error = null;
         store(seatKey(this.code), msg.token);
         store(CURRENT_KEY, this.code);

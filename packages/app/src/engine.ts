@@ -35,6 +35,21 @@ export function enginePool(): Promise<UciEngine[]> {
   return pool;
 }
 
+let own: Promise<UciEngine> | null = null;
+
+/**
+ * An engine of its own, outside the pool (Squads' cheat lines, a test control): never queued behind the bot work the
+ * pool does for a lobby. Made the first time it's asked for.
+ */
+export function ownEngine(): Promise<UciEngine> {
+  own ??= (async () => {
+    const engine = new UciEngine(workerTransport(), { nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb });
+    await engine.init();
+    return engine;
+  })();
+  return own;
+}
+
 let speedCheck: Promise<number> | null = null;
 
 /**

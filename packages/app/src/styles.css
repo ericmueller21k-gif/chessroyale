@@ -12199,6 +12199,22 @@ button.sq-tiny {
   font-weight: 800;
   cursor: pointer;
 }
+/* Cheat lines (test controls only): the switch, and the engine's top moves beside it while it's on. */
+.sq-cheat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.sq-cheat-btn.on {
+  border-style: solid;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.sq-cheat-lines {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
 .sq-status {
   line-height: 1.2;
 }

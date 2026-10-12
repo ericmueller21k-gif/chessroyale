@@ -32,6 +32,24 @@ Quick tests: add `?rounds=2&clock=15` to the link (before creating a lobby, or f
 
 Anything odd, a screenshot plus a sentence is all I need.
 
+## Squads stress test: the start link and Cheat lines (Oct 12, about 30 minutes)
+
+Signed in with your admin account (players never see any of this):
+
+1. Open **hunchess.com/squads/test** (or `/squads/test/start`). You're seated at once, every other seat a bot, and the
+   first vote (**How do the boards start?**) is up straight away; then the clock vote. Vote, or tap **Skip votes**.
+   From there it's a whole tournament: Relay, Pairs, then the final's Pick and Block (and Armageddon if the final is
+   drawn). **Next round** (top right) ends the current round whenever you like. Add `?clock=90,0,3,0` for a quick
+   team clock (bank, top-up, free seconds, increment, in seconds).
+2. **Cheat lines**: a dashed button above your move panel, whenever you're choosing (your Relay move, your Pairs pick,
+   your pick or block in the final, Armageddon's colours). Tap it: the engine's top 3 moves show as arrows (green
+   best, then blue, then yellow), each with its evaluation for the side to move ("+0.8"; "#3" is mate in 3), and
+   listed under the button as "1 · Nf3 +0.8". When you're **blocking**, they're the picking side's best moves, i.e.
+   the ones worth blocking. It stays on (every new position is worked out again) until you tap it off. Your phone's
+   engine does it; nothing is sent anywhere, and the bots and scoring don't know.
+3. The Party sheet's **TEST LOBBY** row has **Start** too (the same as the link).
+4. Tell me what breaks, especially blocks: what you blocked, what the reveal showed, and whether it felt right.
+
 ## Maia: every boss human-like (Oct 12, about 15 minutes)
 
 Signed in with your admin account, on your phone (players still meet Stockfish; only admins meet Maia for now):

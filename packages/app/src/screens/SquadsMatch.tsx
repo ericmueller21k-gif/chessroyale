@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
-import { SQUADS } from "@chessroyale/core";
-import { applyMove, legalMoves, toSan } from "@chessroyale/chess";
+import { SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
+import { applyMove, legalMoves, toSan, type MoveScore } from "@chessroyale/chess";
 import { minutesName, type Colour, type Side, type SquadsEvent } from "@chessroyale/chess/squads";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
@@ -9,11 +9,16 @@ import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { ClockText, Member, SquadTag, SquadsBoards, StandingsStrip, shownTurn, useNow } from "../components/SquadsParts.tsx";
+import { ownEngine } from "../engine.ts";
 import type { SquadsClient } from "../squads.ts";
 import {
+  CHEAT_BRUSHES,
   FORMAT_NAME,
   ROUND_NAME,
   bankText,
+  cheatArrows,
+  cheatEval,
+  cheatLinesAt,
   colourOf,
   dutyOf,
   liveBank,
@@ -394,6 +399,11 @@ function MatchView({
   const round = `${ROUND_NAME[m.round]} · ${m.armageddon ? "Armageddon" : FORMAT_NAME[m.format]}`;
   const intro = m.state === "break" && m.startsAt !== null && m.startsAt > now;
   const armChoice = m.state === "armageddon" ? m.armageddonChoice : undefined;
+  // Cheat lines (test controls only): the engine's top moves wherever you choose, worked out on this device.
+  const cheatFen = cheatLinesAt(client.test, { choosing, colourChoice: !!armChoice && mySide === armChoice.chooser && !client.me?.botPlays, fen: b.fen });
+  const cheatOn = cheatFen !== null && client.cheatLines;
+  const cheat = useCheatLines(cheatOn ? cheatFen : null);
+  const boardArrows = useMemo(() => (cheatOn && cheat?.length ? [...liveArrows, ...cheatArrows(cheat)] : liveArrows), [liveArrows, cheatOn, cheat]);
   const sideTag = (s: Side) => <SquadTag id={m.sides[s].squadId} you={s === mySide} />;
   return (
     <div class={`screen game sq-game sq-${m.format}${m.round === 2 ? " sq-is-final" : ""}`}>
@@ -422,7 +432,7 @@ function MatchView({
           {status}
         </div>
         <div class="board-row">
-          <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={choosing} moves={allowed} onMove={(mv) => client.choose(m.key, mv)} arrows={liveArrows}>
+          <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={choosing} moves={allowed} onMove={(mv) => client.choose(m.key, mv)} arrows={boardArrows}>
             {choosing && myDeadline && m.current && <TimerBar startsAt={m.current.startedAt} deadline={myDeadline} total={Math.max(1, myDeadline - m.current.startedAt)} quiet />}
             {revealing && reveal && <Reveal client={client} e={reveal} fen={before} orientation={orientation} at={m.last!.at} until={m.last!.until} />}
             {intro && (
@@ -476,6 +486,7 @@ function MatchView({
             Back to my board
           </button>
         )}
+        {cheatFen !== null && <CheatLines on={client.cheatLines} top={cheat} fen={cheatFen} onToggle={() => client.toggleCheatLines()} />}
         {d && m.state === "half" && <DutyPanel client={client} m={m} role={d.duty.role} partner={partner} mine={mineChoice} partnerChoice={partnerChoice} locked={myLocked} fen={b.fen} />}
         {!d && <p class="sq-explain">{rulesLine(m, null)}</p>}
         {client.me?.botPlays && !client.me.isBot && !client.me.left && mySide !== null && (
@@ -496,6 +507,67 @@ function MatchView({
       </div>
     </div>
   );
+}
+
+/** Cheat lines already worked out, by position (a screen change doesn't search again). */
+const cheatSeen = new Map<string, MoveScore[]>();
+
+/** The engine's top moves in `fen` (null: none asked, or still searching), on this device's own engine. */
+function useCheatLines(fen: string | null): MoveScore[] | null {
+  const [found, setFound] = useState<{ fen: string; top: MoveScore[] } | null>(null);
+  useEffect(() => {
+    if (!fen || cheatSeen.has(fen)) return;
+    let live = true;
+    void ownEngine()
+      .then((engine) => engine.topMovesAt(fen, SQUADS_LOBBY.cheatLines.moves, SQUADS_LOBBY.cheatLines.nodes))
+      .then((top) => {
+        if (cheatSeen.size > 200) cheatSeen.clear();
+        cheatSeen.set(fen, top);
+        if (live) setFound({ fen, top });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [fen]);
+  if (!fen) return null;
+  return cheatSeen.get(fen) ?? (found?.fen === fen ? found.top : null);
+}
+
+/** "Cheat lines" (test controls only): the switch, and while it's on the engine's top moves listed (rank, move, eval). */
+function CheatLines({ on, top, fen, onToggle }: { on: boolean; top: MoveScore[] | null; fen: string; onToggle: () => void }) {
+  return (
+    <div class="sq-cheat">
+      <button type="button" class={`sq-next sq-cheat-btn${on ? " on" : ""}`} aria-pressed={on} onClick={onToggle}>
+        Cheat lines
+      </button>
+      {on &&
+        (top === null ? (
+          <span class="muted small">Asking the engine…</span>
+        ) : top.length ? (
+          <ol class="hints sq-cheat-lines">
+            {top.slice(0, CHEAT_BRUSHES.length).map((t, i) => (
+              <li key={t.move} class={`hint-${CHEAT_BRUSHES[i]}`}>
+                <strong>
+                  {i + 1} · {safeSan(fen, t.move)}
+                </strong>
+                <span>{cheatEval(t)}</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <span class="muted small">No moves here.</span>
+        ))}
+    </div>
+  );
+}
+
+function safeSan(fen: string, move: string): string {
+  try {
+    return toSan(fen, move);
+  } catch {
+    return move;
+  }
 }
 
 function safeApply(fen: string, move: string): string {
@@ -542,7 +614,8 @@ function statusLine(
     const partner = d.partner ? (client.isBot(d.partner) ? `${client.nameOf(d.partner)} (bot)` : client.nameOf(d.partner)) : "";
     if (d.duty.role === "move") return m.visible[client.myId!] ? `Moved · ${where} · waiting for the half to end` : `Your move · ${where} · you're ${colour}`;
     if (d.duty.role === "pick") return `Pick with ${partner} · you're ${colour}`;
-    return `Block with ${partner} · ${colour} is picking`;
+    // (A block's duty is the blockers' side: the other side is picking.)
+    return `Block with ${partner} · ${sideWord(colourOf(b, d.duty.side === 0 ? 1 : 0))} is picking`;
   }
   if (scout) return `${where} has finished · you're scouting this turn`;
   if (onMine && side !== null) {

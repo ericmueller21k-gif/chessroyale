@@ -1178,8 +1178,14 @@ export const SQUADS_LOBBY = {
    * never production); false removes them everywhere, server too.
    */
   testControls: true,
-  /** A test lobby fills with bots this long after it opens (time to join it). */
+  /** A test lobby fills with bots this long after it opens (time to join it). Not `start=votes`: that fills at once. */
   testFillSeconds: 5,
+  /**
+   * "Cheat lines" (Eric, Oct 12; test controls only, never for players): the engine's top `moves` in the position you
+   * are choosing in, searched on your own device at `nodes` (the same Stockfish as the power-up hints), drawn as
+   * arrows. It never touches scoring, bots or the server.
+   */
+  cheatLines: { moves: 3, nodes: 300_000 },
   /** A party (an invite code or link, up to SQUADS.partyMax): closes after this long with nobody in it. */
   partyIdleMinutes: 60,
   /** A party in line asks the matchmaker again this often while it's busy. */
