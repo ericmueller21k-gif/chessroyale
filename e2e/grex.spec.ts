@@ -258,6 +258,8 @@ test("an admin's test trigger against Boingo, pressed while the boss thinks: the
   }
   await expect(fun).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
-  expect((await powers(page)).funhouse?.move).toBeTruthy();
+  // (No move played for you: the board turned upside down, your move to make.)
+  expect((await powers(page)).funhouse?.turn).toBeGreaterThan(0);
+  expect((await powers(page)).angle).toBe(180);
   expect(pressedBefore).toBe(true);
 });
