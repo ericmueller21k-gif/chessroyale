@@ -1,16 +1,17 @@
 import { expect } from "@playwright/test";
 import { test } from "./helpers.ts";
-import { CAPTURE_SOUNDS, MOVE_SOUNDS } from "../packages/app/src/piece-sounds.ts";
+import { CAPTURE_SOUNDS, CASTLE_SOUND, MOVE_SOUNDS } from "../packages/app/src/piece-sounds.ts";
 
 /**
- * Settings → Sound: the Move sound and Capture sound pickers (Eric, Oct 11; all wood, Oct 12). Light wood and Heavy
- * wood by default; ▶ plays one
- * without picking it (loading only that file); a pick is kept on the device; the first tap (as a game starts) loads only
- * the picked sounds; and every option's file decodes in the browser, starts on its hit and is as loud as the default.
+ * Settings → Sound: the Move sound and Capture sound pickers (Eric, Oct 11; all wood, Oct 12). The classic knocks
+ * (PyChess's) by default, then their variations and the other wood; ▶ plays one without picking it (loading only that
+ * file); a pick is kept on the device; the first tap (as a game starts) loads only the picked sounds; every option's
+ * file decodes in the browser, starts on its hit and is as loud as the classic; and the classics are credited.
  */
 test.use({ serviceWorkers: "block" }); // (the service worker would precache every file, hiding what the app loads)
 
-const pieceFiles = (urls: string[]) => [...new Set(urls.filter((u) => /\/sounds\/pieces\//.test(u)).map((u) => new URL(u).pathname))].sort();
+/** The piece sounds requested: the classics (sounds/*.mp3) and the rest (sounds/pieces/). */
+const pieceFiles = (urls: string[]) => [...new Set(urls.filter((u) => /\/sounds\/(pieces\/)?[^/]+\.mp3$/.test(new URL(u).pathname)).map((u) => new URL(u).pathname))].sort();
 
 test("piece sounds: pick a move and a capture sound, hear one, and they're kept after a reload", async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
@@ -19,21 +20,24 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   await page.goto("/settings?debug");
   const move = page.getByRole("radiogroup", { name: "Move sound" });
   const capture = page.getByRole("radiogroup", { name: "Capture sound" });
-  await expect(move.getByRole("radio")).toHaveCount(5);
-  await expect(capture.getByRole("radio")).toHaveCount(5);
-  // The defaults until you pick, and nothing loaded before a tap.
-  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Light wood/);
-  await expect(capture.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Heavy wood/);
+  await expect(move.getByRole("radio")).toHaveCount(9);
+  await expect(capture.getByRole("radio")).toHaveCount(9);
+  // The classics until you pick, and nothing loaded before a tap.
+  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Classic knock/);
+  await expect(capture.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Classic double knock/);
   expect(pieceFiles(requested)).toEqual([]);
-  // Every option is wood (Eric, Oct 12).
-  for (const name of await move.getByRole("radio").allTextContents()) expect(name).toMatch(/wood/i);
-  for (const name of await capture.getByRole("radio").allTextContents()) expect(name).toMatch(/wood|knock/i);
+  // The classic first, its three variations next, then the other wood (Eric, Oct 12).
+  const names = (g: typeof move) => g.getByRole("radio").locator("strong").allTextContents();
+  expect(await names(move)).toEqual(MOVE_SOUNDS.map((o) => o.label));
+  expect(await names(capture)).toEqual(CAPTURE_SOUNDS.map((o) => o.label));
+  for (const name of await move.getByRole("radio").allTextContents()) expect(name).toMatch(/wood|knock|classic/i);
+  for (const name of await capture.getByRole("radio").allTextContents()) expect(name).toMatch(/wood|knock|classic/i);
 
   // ▶ plays one without picking it: its file loads then.
   const ringing = page.waitForResponse((r) => r.url().endsWith("/sounds/pieces/move-ringing-wood.mp3") && r.ok());
   await page.getByRole("button", { name: "Play Ringing wood" }).click();
   await ringing;
-  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Light wood/);
+  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Classic knock/);
 
   // Pick one of each (picking plays it too).
   await move.getByRole("radio", { name: /^Wooden tap/ }).click();
@@ -48,37 +52,68 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   await expect(page.getByRole("radiogroup", { name: "Capture sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Double knock/);
   expect(await page.evaluate(() => [localStorage.getItem("brc.moveSound"), localStorage.getItem("brc.captureSound")])).toEqual(["wood-tap", "double-knock"]);
 
-  // The first tap loads the picked sounds, the defaults (the judge's gavel is built from them) and castling's two
-  // knocks, not the other options.
+  // The first tap loads the picked sounds, the classics (the defaults: the judge's gavel is built from them) and
+  // castling's classic knock, not the other options.
   requested.length = 0;
   await page.getByRole("button", { name: "Play Big wood" }).click();
   await expect
     .poll(() => pieceFiles(requested), { timeout: 10_000 })
-    .toEqual(["capture-big-wood", "capture-double-knock", "capture-heavy-wood", "castle-wood", "move-light-wood", "move-wood-tap"].map((p) => `/sounds/pieces/${p}.mp3`));
+    .toEqual(["/sounds/capture.mp3", "/sounds/castle.mp3", "/sounds/move.mp3", "/sounds/pieces/capture-big-wood.mp3", "/sounds/pieces/capture-double-knock.mp3", "/sounds/pieces/move-wood-tap.mp3"]);
 
-  // A move in a game plays the pick: "move", rendered as the game plays it, is the Light wood with that picked, and the
+  // A move in a game plays the pick: "move", rendered as the game plays it, is the classic with that picked, and the
   // Wooden tap once it's picked (and loaded: until then the default stands in).
   const level = (n: string) => page.evaluate((n) => (window as any).__measureSound(n), n) as Promise<{ peak: number; rms: number }>;
   const moves = page.getByRole("radiogroup", { name: "Move sound" });
-  await moves.getByRole("radio", { name: /^Light wood/ }).click();
+  await moves.getByRole("radio", { name: /^Classic knock/ }).click();
   await expect.poll(async () => (await level("move")).peak, { timeout: 10_000 }).toBeGreaterThan(0.05);
-  const wood = await level("move");
-  // Castling with the default: its own file, the Light wood twice (its loudest knock is the Light wood's).
-  expect(Math.abs((await level("castle")).peak - wood.peak)).toBeLessThan(0.02);
+  const classic = await level("move");
+  // Castling with the default: the classic king-and-rook knock, its own file (not the classic move twice).
+  await expect.poll(async () => (await level("castle")).peak, { timeout: 10_000 }).toBeGreaterThan(0.05);
+  const castle = await level("castle");
   await moves.getByRole("radio", { name: /^Wooden tap/ }).click();
-  // (Every option is levelled to the same loudness, so their peaks are close: the Wooden tap's is 0.04 off the Light
-  // wood's, rendered the same way each time.)
-  await expect.poll(async () => Math.abs((await level("move")).peak - wood.peak), { timeout: 10_000 }).toBeGreaterThan(0.02);
-  // Castling follows the pick too: two Wooden taps.
+  // (Every option is levelled to the same loudness, so their peaks are close, but not the same: the Wooden tap's
+  // differs from the classic's, rendered the same way each time.)
+  await expect.poll(async () => Math.abs((await level("move")).peak - classic.peak), { timeout: 10_000 }).toBeGreaterThan(0.02);
+  // Castling follows the pick too: two Wooden taps (the first's peak), no longer the classic castle.
   const tap = await level("move");
   expect(Math.abs((await level("castle")).peak - tap.peak)).toBeLessThan(0.01);
+  expect(Math.abs((await level("castle")).peak - castle.peak)).toBeGreaterThan(0.01);
+  // A variation of the classic plays as picked, too.
+  await moves.getByRole("radio", { name: /^Classic deep/ }).click();
+  await expect.poll(async () => Math.abs((await level("move")).peak - tap.peak), { timeout: 10_000 }).toBeGreaterThan(0.01);
 });
 
-test("piece sounds: every option decodes, starts on its hit and is about as loud as the default", async ({ page }) => {
+test("piece sounds: the classics and their variations are credited to PyChess (GPL-3.0), with the licence served", async ({ page }) => {
+  await page.goto("/settings");
+  const credit = page.locator(".sounds-credit");
+  await expect(credit).toContainText("Classic piece sounds and their variations: PyChess (GPL-3.0)");
+  await expect(credit.getByRole("link", { name: "PyChess" })).toHaveAttribute("href", "https://github.com/pychess/pychess/tree/master/sounds");
+  await expect(credit.getByRole("link", { name: "licence" })).toHaveAttribute("href", "/engine/COPYING.txt");
+  for (const [path, text] of [
+    ["/engine/COPYING.txt", "GNU GENERAL PUBLIC LICENSE"],
+    ["/licenses/third-party.txt", "variations of\n  PyChess's sounds, made by our script"],
+    ["/sounds/SOURCES.md", "A variation of PyChess's sounds, made by our script"],
+  ] as const) {
+    const r = await page.request.get(path);
+    expect(r.ok(), path).toBe(true);
+    expect(await r.text(), path).toContain(text);
+  }
+  // The FAQ's credits say the same.
+  await page.goto("/faq#credits");
+  const faq = page.locator("li", { hasText: "Classic piece sounds and their variations: PyChess (GPL-3.0)." });
+  await expect(faq).toHaveCount(1);
+  await expect(faq.getByRole("link", { name: "PyChess" })).toHaveAttribute("href", "https://github.com/pychess/pychess/tree/master/sounds");
+  await expect(faq.getByRole("link", { name: "licence" })).toHaveAttribute("href", "/engine/COPYING.txt");
+});
+
+test("piece sounds: every option decodes, starts on its hit and is as loud as the classic", async ({ page }) => {
   await page.goto("/settings");
   const paths = [...MOVE_SOUNDS, ...CAPTURE_SOUNDS].map((o) => o.file);
+  expect(paths).toHaveLength(18);
+  paths.push(CASTLE_SOUND);
   // Decoded by the browser (an mp3's padding included) and heard as a phone plays it in the game (high-passed at
-  // 200 Hz, the game's 6 kHz low-pass): the loudest 30 ms, against today's move or capture.
+  // 200 Hz, the game's 6 kHz low-pass): the loudest 30 ms, against the classic move or capture. (Castling's classic
+  // file too, against the move.)
   const measured = await page.evaluate(async (paths) => {
     const out: Record<string, { seconds: number; peak: number; onsetMs: number; loud: number }> = {};
     for (const p of paths) {
@@ -94,9 +129,13 @@ test("piece sounds: every option decodes, starts on its hit and is about as loud
       const hp = off.createBiquadFilter();
       hp.type = "highpass";
       hp.frequency.value = 200;
+      // (Web Audio reads a low- or high-pass's Q in dB: -3.01 dB is the script's Q of 0.707, so this measures what
+      // scripts/piece-sounds.py levels. The default, 1 dB, adds a bump at 200 Hz that reads low wood ~2 dB louder.)
+      hp.Q.value = 20 * Math.log10(Math.SQRT1_2);
       const lp = off.createBiquadFilter();
       lp.type = "lowpass";
       lp.frequency.value = 6000;
+      lp.Q.value = 20 * Math.log10(Math.SQRT1_2);
       src.connect(hp).connect(lp).connect(off.destination);
       src.start(0);
       const y = (await off.startRendering()).getChannelData(0);
@@ -117,9 +156,9 @@ test("piece sounds: every option decodes, starts on its hit and is about as loud
     const r = path.includes("capture") ? ref.capture : ref.move;
     expect(m.seconds, path).toBeLessThan(0.5);
     expect(m.peak, path).toBeLessThan(-1);
-    // On its hit as soon as the default is.
+    // On its hit as soon as the classic is.
     expect(m.onsetMs, path).toBeLessThan(r.onsetMs + 5);
-    // As loud as the default, within a decibel or two.
-    expect(Math.abs(m.loud - r.loud), path).toBeLessThan(2);
+    // As loud as the classic, within a decibel (the classic's variations within half a decibel: they measure 0.1 off).
+    expect(Math.abs(m.loud - r.loud), path).toBeLessThan(path.includes("-classic-") ? 0.5 : 1);
   }
 });

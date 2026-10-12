@@ -33,18 +33,22 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   (`prefs.ts`: `evalBarOn`, `brc.evalBar`; accounts keep no preferences). The value is still worked out (the God
   King's word on how it's going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older
   apps), from solo's post and the online `hello`, to see later who turns it off and how they play.
-- **Piece sounds** (Settings → Sound; Eric, Oct 11; all wood, Oct 12): a **Move sound** and a **Capture sound**
-  picker, chosen separately, each option a radio (picking plays it) with its own ▶. Five each, every one wood (Eric:
-  "slightly different wooden sounds, not chips or clicks"): moves Light wood (the default), Wooden tap, Bright wood,
-  Ringing wood, Deep wood; captures Heavy wood (the default), Double knock, Short wood, Wood block, Big wood. Kept on the
-  device (`piece-sounds.ts`: `brc.moveSound`, `brc.captureSound`; an unknown or removed id reads as the default).
-  `sound.ts` plays the pick for every move and capture (every mode, replays, Classic's ripple); castling is two Light
-  wood knocks with the default move sound (`castle-wood.mp3`), else the picked one twice; the Crowd gavel is the default
-  capture and move sounds, a little lower. Only the picked files and the defaults load (after the first tap's frame),
-  the others when previewed; a pick not loaded yet plays the default. Previews play even with the sound switched off;
-  mute silences everything in a game. The files: `public/sounds/pieces/` (made by `scripts/piece-sounds.py`, levelled
-  to the loudness the game's knocks have always had), every source and licence in `public/sounds/SOURCES.md`: CC0
-  (Kenney) or ours only. The old GPL knocks (PyChess) are gone.
+- **Piece sounds** (Settings → Sound; Eric, Oct 11; all wood, Oct 12; the classics back as the defaults, Oct 12): a
+  **Move sound** and a **Capture sound** picker, chosen separately, each option a radio (picking plays it) with its own
+  ▶. Nine each, every one wood (Eric: "slightly different wooden sounds, not chips or clicks"). Moves: Classic knock
+  (the default), Classic light, Classic deep, Classic soft, Light wood, Wooden tap, Bright wood, Ringing wood, Deep
+  wood. Captures: Classic double knock (the default), Classic light double, Classic deep double, Classic soft double,
+  Heavy wood, Double knock, Short wood, Wood block, Big wood. The classics are PyChess's knocks (GPL-3.0, credited in
+  Settings and the FAQ; id `wood`, as before Oct 12, so an old pick of them still works); the three after each are
+  close variations of it (pitch, EQ and decay changed a little, GPL-3.0 too); the rest are Kenney's (CC0) or ours.
+  Kept on the device (`piece-sounds.ts`: `brc.moveSound`, `brc.captureSound`; an unknown or removed id reads as the
+  default). `sound.ts` plays the pick for every move and capture (every mode, replays, Classic's ripple); castling is
+  the classic king-and-rook knock (`castle.mp3`) with the default move sound, else the picked one twice; the Crowd
+  gavel is the classic capture and move sounds pitched down to about half. Only the picked files and the defaults load
+  (after the first tap's frame), the others when previewed; a pick not loaded yet plays the default. Previews play
+  even with the sound switched off; mute silences everything in a game. The files: the classics in `public/sounds/`,
+  the rest in `public/sounds/pieces/` (made by `scripts/piece-sounds.py`, levelled to the classic of their kind),
+  every source and licence in `public/sounds/SOURCES.md`.
 - **The first tap of a visit** doesn't wait for sound (Oct 12): the audio graph is made while the page is idle
   (`prepareAudio`), so a tap only switches it on; the samples start loading after that tap's frame.
 - **The FAQ, "How HunChess works"** (Eric, Oct 11): Settings → HOW TO PLAY → "📖 FAQ · How it works" (`/faq`; back
@@ -71,7 +75,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 | The live line, app side | `packages/app/src/live.ts` |
 | The FAQ (its words and numbers; the format; the screen) | `packages/app/src/faq/content.ts`, `faq/markdown.ts`, `screens/Faq.tsx` |
 | Light and dark | `packages/app/src/theme.ts` |
-| Piece sounds (the pickers' options, storage) | `packages/app/src/piece-sounds.ts`; played by `sound.ts`; files in `public/sounds/pieces/` from `scripts/piece-sounds.py`; sources in `public/sounds/SOURCES.md` |
+| Piece sounds (the pickers' options, storage) | `packages/app/src/piece-sounds.ts`; played by `sound.ts`; files in `public/sounds/` (the classics) and `public/sounds/pieces/` (from `scripts/piece-sounds.py`); sources in `public/sounds/SOURCES.md` |
 | Bot-match replays | `packages/app/src/bot-replays.ts`; made by `npm run replays:bots` (`packages/sim/scripts/bot-replays.ts`) |
 | Server: profiles, results, the API | `packages/server/src/accounts.ts`, `api.ts` |
 | Server: the live line | `packages/server/src/live-hub.ts`, `live.ts`, `presence.ts` |
@@ -98,8 +102,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 ## Rules for this area
 
 - Phone first, the computer as good: check both in Playwright screenshots, at 320–430 px and 1024 px+.
-- A new piece sound: wood, CC0 or ours (then CC BY, credited in Settings; never GPL or non-commercial); record its
-  source in `public/sounds/SOURCES.md` and level it with `scripts/piece-sounds.py`.
+- A new piece sound: wood, CC0 or ours (then CC BY, credited in Settings; never non-commercial). GPL only as a
+  separate data file, credited, with the licence served, as the PyChess classics and their variations are (Eric's
+  call, Oct 12). Record its source (and, if changed, how) in `public/sounds/SOURCES.md` and level it with
+  `scripts/piece-sounds.py`.
 - Real numbers only: every count, stat and rating comes from the server; never fake one.
 - A number that grows (coins, ratings, counts) is tested at its widest realistic value (fake the server's answer with
   `page.route` if needed); measure a row of fixed-size items at 320 px with that content.

@@ -1,15 +1,17 @@
-HunChess: third-party software and fonts in the app
+HunChess: third-party software, fonts and sounds in the app
 
 The app's own code is HunChess's. It includes the following third-party software and fonts, each under its licence,
 whose text follows. (The chess pieces have their own notice: /licenses/pieces.txt. The chess engines, Stockfish and
 Maia-3, are separate programs with their own notices: /engine/COPYING.txt, /engine/maia/NOTICE.txt and
-/engine/maia/LICENSE.txt. The sounds are CC0 or the game's own: no notice is needed.)
+/engine/maia/LICENSE.txt. The classic piece sounds and their variations are PyChess's, under the GPL-3.0: see "Piece
+sounds" below. The other sounds are CC0 or the game's own: no notice is needed.)
 
 - Preact (https://preactjs.com): MIT licence.
 - chess.js (https://github.com/jhlywa/chess.js): BSD 2-Clause licence.
 - Vite's small runtime helper (https://vite.dev), compiled into the app: MIT licence.
 - Fonts: Archivo, Archivo Black (Omnibus-Type) and Press Start 2P (CodeMan38), from Google Fonts: SIL Open Font
   Licence 1.1.
+- Piece sounds: the classic knocks and their variations, from PyChess: GNU General Public License, version 3.
 
 ================================================================================================================
 Preact
@@ -186,3 +188,22 @@ INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
 DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
+
+================================================================================================================
+Piece sounds: the classic knocks and their variations (PyChess, GNU GPL version 3)
+================================================================================================================
+These sound files are from PyChess (https://github.com/pychess/pychess, its sounds/ folder:
+https://github.com/pychess/pychess/tree/master/sounds), by the PyChess authors, and are licensed under the GNU
+General Public License, version 3. They are separate data files the game plays, not part of the game's code.
+
+- /sounds/move.mp3 ("Classic knock"): PyChess's sounds/mov2.wav, converted to mp3.
+- /sounds/capture.mp3 ("Classic double knock"): PyChess's sounds/capture2.wav, converted to mp3.
+- /sounds/castle.mp3 (castling): PyChess's sounds/castle.wav, converted to mp3.
+- /sounds/pieces/move-classic-light.mp3, move-classic-deep.mp3, move-classic-soft.mp3 and
+  /sounds/pieces/capture-classic-light.mp3, capture-classic-deep.mp3, capture-classic-soft.mp3: variations of
+  PyChess's sounds, made by our script. Modified by HunChess on October 12, 2026, from mov2.wav and capture2.wav:
+  a small pitch shift, a gentle EQ, a slightly shorter or longer decay, and levelled to the classic's loudness.
+  Exactly how each was made: /sounds/SOURCES.md.
+
+The source of each sound (the original WAV files) is at the PyChess link above. The full text of the GNU General
+Public License, version 3: /engine/COPYING.txt.

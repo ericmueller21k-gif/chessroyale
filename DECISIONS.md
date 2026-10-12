@@ -1593,3 +1593,47 @@ crowds and method; small samples with ± two standard errors, about ±0.3 at 10 
 - **The prototype's sanity runs** (`reports/maia-boss.md`) used one strong bot (2% random moves) against a 1500 boss,
   which is why raw Maia looked much easier there; against crowds of the tier's own strength the picture is the one
   above.
+
+### The classic piece sounds are back as the defaults, with close variations (Oct 12, 2026)
+
+**Eric, Oct 12: classic PyChess knocks back as the default, GPL-3.0, credited.** He liked them best. His reasoning: a
+sound file is data the game plays, not code compiled into it, so the GPL covers the files, not the game: the same
+separate-file reasoning as Stockfish. This reverses the morning's removal (above, "Piece sounds: all wood, nothing
+GPL") for these files only. The calls:
+
+- **The classics, restored byte for byte** from before that PR (`sounds/move.mp3`, `capture.mp3`, `castle.mp3`, as
+  converted on Oct 2), are the defaults: Move **Classic knock**, Capture **Classic double knock**; castling with the
+  default move sound plays `castle.mp3` again. They keep their old id (`wood`), so a device that picked them before
+  Oct 12 hears them again. Nothing stored, or an unknown id, also reads as the classic.
+- **Every wood option stays** (Light wood, Wooden tap, Bright wood, Ringing wood, Deep wood; Heavy wood, Double knock,
+  Short wood, Wood block, Big wood), after the classics. A device that picked one (Light wood or Heavy wood included,
+  while they were the defaults) keeps it; one that never picked hears the classic. Kenney's Double knock's note is now
+  "A light knock, then a heavy one", so the two double knocks read differently.
+- **Three variations of each classic,** right after it: **Classic light** (2 semitones up, +3 dB above 2.5 kHz, a
+  slightly shorter decay), **Classic deep** (2 down, −3 dB, a slightly longer decay, at most +6 dB) and **Classic
+  soft** (1 down, −5 dB, a slightly shorter decay); the captures' are "Classic light double", "Classic deep double",
+  "Classic soft double" (the pickers' labels must differ: each ▶ is named by its label). Made by
+  `scripts/piece-sounds.py` from PyChess's original WAVs (not the mp3s, to avoid a second lossy pass), reproducible
+  byte for byte. Measured against the classic (the power-weighted spectral centre): the moves' light +14%, deep −12%,
+  soft −5%; the captures', which have more high end for the EQ to work on, +28%, −28%, −12%. The captures keep their
+  two knocks, up to 12% closer together or further apart; every one is as loud as its classic. They're GPL-3.0
+  (modified PyChess files), credited as "variations of PyChess's sounds, made by our script", with each one's exact
+  recipe in `sounds/SOURCES.md` (the GPL's "modified, and when" notice; with the public WAVs, everything needed to
+  remake them).
+- **The decay of a capture is changed more gently** (a tau of 120–150 ms, not the move's 50–80 ms): the classic
+  capture's low ring is quiet and long, and the move's settings cut it enough to make it a different sound.
+- **Levelled to the classic of its kind,** and once more from the encoded mp3 (the mp3 moved the loudness about half
+  a decibel); the script now measures the classics' files for its target instead of holding their numbers. Kenney's
+  and our files are left as they were (within half a decibel of the classic; the e2e allows two).
+- **The e2e loudness check now measures what the script levels:** Web Audio reads a low- or high-pass's Q in dB, so
+  its default (1 dB) put a bump at 200 Hz the script's filters (Q 0.707) don't have, and read Kenney's low wood about
+  2 dB louder than the classics. With Q set to −3.01 dB the browser's numbers match the script's to 0.01 dB: every
+  option is within half a decibel of its classic, so the check is now 1 dB (0.5 for the variations), not 2.
+- **The licence text is Stockfish's copy** (`/engine/COPYING.txt`, copied from the stockfish package at every build;
+  the same GPL-3.0 text as PyChess's `LICENSE`, only its line endings differ), not a second copy. The notice is in
+  `/licenses/third-party.txt`; Settings and the FAQ credit "Classic piece sounds and their variations: PyChess
+  (GPL-3.0)", linking PyChess's `sounds/` folder, the licence and `sounds/SOURCES.md`.
+- **`castle-wood.mp3` is gone:** it was castling for Light wood as the default, and castling with any non-default
+  pick plays that pick twice, which for Light wood is the same thing.
+- **The gavel** is the classic capture and move sounds pitched down to about half (0.55 and 0.45), as it was before
+  this morning.
