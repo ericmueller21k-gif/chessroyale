@@ -91,12 +91,11 @@ Eric: "too big a change for now". Recorded so they aren't lost; nothing gets bui
 
 ## Needs Eric
 
-- **Maia-3 bosses, before players meet them (pre-launch):** (1) your OK to publish the Maia box's source
+- **Maia-3 bosses, before players meet them (pre-launch):** your OK to publish the Maia box's source
   (`packages/maia-worker/`, AGPL-3.0): a public repository or a download on the site, so the credits line can link it
-  instead of "available on request"; (2) calibrating every boss on the Maia brain (the prototype only matched Ginger
-  roughly; `reports/maia-boss.md`); then `BOSS_BRAIN.forPlayers` on. Until then only admins meet Maia (DECISIONS.md,
-  "A human-like boss: Maia-3 for Ginger"). Also your real-phone check of the prototype (`TESTING.md`, "Maia").
-
+  instead of "available on request"; then `BOSS_BRAIN.forPlayers` on (one value). Every boss is on Maia for admins
+  already, calibrated against bot crowds (DECISIONS.md, "Every boss on Maia"; `reports/maia-calibration.md`). Also
+  your real-phone check (`TESTING.md`, "Maia").
 - **privacy@hunchess.com:** forward it to yourself with Cloudflare Email Routing (free), or name another address.
 - **Workers Paid ($5 a month):** only when real traffic outgrows the free limits.
 - **Privacy policy and terms:** drafted at /privacy and /terms; Eric to read them over.

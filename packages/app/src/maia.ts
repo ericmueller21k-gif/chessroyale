@@ -25,9 +25,13 @@ function workerTransport(onError: (reason: string) => void): UciTransport {
   };
 }
 
+/** The prefetch under way (or done), once per page. */
+let prefetching: Promise<void> | null = null;
+
 /**
  * Starts the Maia worker and loads the model (about 25 MB, from the service worker's cache after the first time):
- * the engine is returned at once and answers moves once ready. Close it after the battle (it holds ~400 MB).
+ * the engine is returned at once and answers moves once ready (the boss plays Stockfish until then). A prefetch still
+ * under way is let finish first, so the files come down once. Close it after the battle (it holds ~400 MB).
  */
 export function startMaia(loadTimeoutMs = 60_000): HumanUciEngine | null {
   if (typeof Worker === "undefined") return null;
@@ -37,15 +41,22 @@ export function startMaia(loadTimeoutMs = 60_000): HumanUciEngine | null {
   } catch {
     return null;
   }
-  void engine.init(loadTimeoutMs);
+  const e = engine;
+  void (prefetching ?? Promise.resolve()).then(() => e.init(loadTimeoutMs));
   return engine;
 }
 
-let prefetched = false;
-
-/** Fetches the Maia box's files ahead of a battle that may use it (into the service worker's cache), once per page. */
+/**
+ * Fetches the Maia box's files ahead of a battle that may use it (into the service worker's cache), once per page: the
+ * boss menu, a raid's lobby (on the device that plays the boss), the Crowd's vote for a boss battle.
+ */
 export function prefetchMaia() {
-  if (prefetched || typeof fetch === "undefined") return;
-  prefetched = true;
-  for (const f of FILES) void fetch(f).then((r) => r.arrayBuffer()).catch(() => (prefetched = false));
+  if (prefetching || typeof fetch === "undefined") return;
+  const done = Promise.all(FILES.map((f) => fetch(f).then((r) => r.arrayBuffer())))
+    .then(() => undefined)
+    .catch(() => {
+      // (Offline, or a file missing: tried again next time.)
+      if (prefetching === done) prefetching = null;
+    });
+  prefetching = done;
 }

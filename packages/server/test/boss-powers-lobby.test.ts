@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
 import { FIRE_BURN_MS, POWER_FX, bossShowMs, extraMoveCandidates, initPowers, legalMoves, lightsOutTimeline, passTurn, pieceAt, sanLineToUci, sideToMove, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -699,5 +699,103 @@ describe("Sawyer online", () => {
     expect(b.boss.powers!.boardSaw).toEqual({ at: 2, until: 1 + BOSS_POWERS.boardSawTurns });
     expect(b.boss.powers!.warned).toBe(false);
     expect(L.core.ultimateTrigger("p1", true)).toBe(false);
+  });
+});
+
+describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players only for a lobby of admins)", () => {
+  /** A raid of people, each an admin or not (as the Durable Object found them), the Last Stand off. */
+  function raidOf(patch: Partial<Settings>, admins: boolean[], rating = 1500) {
+    const L = setup({ ...RAID_SETTINGS, lastStandFrom: 999, ...patch });
+    admins.forEach((a, i) => L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, rating, undefined, undefined, null, null, a));
+    L.core.message("p1", { t: "start" });
+    L.advance(1000);
+    return L;
+  }
+
+  it("a lobby of admins: the host is told the battle's brain as it begins, and the boss's own moves ask for Maia", () => {
+    const L = raidOf({ bossId: "gingerbread" }, [true, true]);
+    const b = L.core.save().runner!.state.boss!;
+    const plan = bossBrainFor("gingerbread", b.elo, "", true, { crowd: true });
+    expect(plan.brain).toBe("maia-raw");
+    // Only the host, as the intro starts (it loads Maia meanwhile).
+    expect(L.last("p1", "bossBrain")!.brain).toEqual({ brain: "maia-raw", rating: plan.rating });
+    expect(L.last("p2", "bossBrain")).toBeUndefined();
+    expect(L.core.record.bossBrain).toEqual({ brain: "maia-raw", rating: plan.rating });
+    // (Two people: a crowd, so Maia's margin.)
+    expect(plan.rating).toBe(maiaRatingFor(b.elo + BOSS_BRAIN.crowdMargin));
+    L.advance(60_000);
+    crowdMove(L);
+    const req = hostBoss(L);
+    expect(req.brain).toEqual({ brain: "maia-raw", rating: plan.rating });
+    // Everyone gets the one move the host played.
+    expect(L.last("p1", "boss")!.boss.board.fen).toBe(L.last("p2", "boss")!.boss.board.fen);
+    expect(L.last("p2", "boss")!.boss.lastMove!.move).toBe((req.allowed ?? legalMoves(req.fen))[0]);
+  });
+
+  it("a lobby with a player in it: Stockfish, as before (no brain sent)", () => {
+    const L = raidOf({ bossId: "gingerbread" }, [true, false]);
+    expect(L.last("p1", "bossBrain")).toBeUndefined();
+    expect(L.core.record.bossBrain).toBeNull();
+    L.advance(60_000);
+    crowdMove(L);
+    expect(hostBoss(L).brain).toBeUndefined();
+  });
+
+  it("once it's on for players (forPlayers, one value), every lobby meets it", () => {
+    const was = BOSS_BRAIN.forPlayers;
+    (BOSS_BRAIN as { forPlayers: boolean }).forPlayers = true;
+    try {
+      const L = raidOf({ bossId: "clown" }, [false, false]);
+      expect(L.last("p1", "bossBrain")!.brain.brain).toBe("maia-raw");
+    } finally {
+      (BOSS_BRAIN as { forPlayers: boolean }).forPlayers = was;
+    }
+  });
+
+  it("a new host is told the brain (it loads Maia then); a reconnecting one too", () => {
+    const L = raidOf({ bossId: "gingerbread" }, [true, true]);
+    L.advance(60_000);
+    L.core.disconnect("p1");
+    expect(L.last("p2", "bossBrain")!.brain.brain).toBe("maia-raw");
+  });
+
+  it("Boingo's funhouse move for the crowd keeps its own engine pick: its request carries no brain", () => {
+    const L = raidOf({ bossId: "clown", bossPowerTest: "funhouse" }, [true, true]);
+    L.advance(60_000);
+    crowdMove(L);
+    expect(hostBoss(L).brain).toBeDefined();
+    L.advance(L.last("p1", "boss")!.until - L.now + 10);
+    crowdMove(L);
+    hostBoss(L);
+    L.advance(L.last("p1", "boss")!.until - L.now + 10);
+    const f = L.last("p1", "bossRequest")!;
+    expect(f.funhouse).toBe(true);
+    expect(f.brain).toBeUndefined();
+  });
+
+  it("Big Boy's bounce keeps its own pick too; a boss in the bridge band plays the strict guard with Stockfish's share", () => {
+    const L = raidOf({ bossId: "bigboy", bossPowerTest: "bounce" }, [true, true]);
+    L.advance(60_000);
+    for (let i = 0; i < 4; i++) {
+      crowdMove(L);
+      for (let k = 0; k < 10 && !L.last("p1", "bossRequest"); k++) L.advance(5_000);
+      const req = L.last("p1", "bossRequest")!;
+      if (req.bounce) {
+        expect(req.brain).toBeUndefined();
+        break;
+      }
+      hostBoss(L);
+      L.advance(L.last("p1", "boss")!.until - L.now + 10);
+    }
+    // (A raid's tier is the weakest above its rating: 2800 for 2750, Ginger 100 under it; 3000 for 2850.)
+    const top = raidOf({ bossId: "gingerbread" }, [true], 2750);
+    expect(top.core.save().runner!.state.boss!.elo).toBe(2700);
+    const brain = top.last("p1", "bossBrain")!.brain;
+    expect(brain.brain).toBe(2700 >= BOSS_BRAIN.bridgeStrictFrom ? "maia-strict" : "maia-light");
+    expect(brain.stockfishShare).toBeGreaterThan(0);
+    const sf = raidOf({ bossId: "gingerbread" }, [true], 2850);
+    expect(sf.core.save().runner!.state.boss!.elo).toBe(2900);
+    expect(sf.last("p1", "bossBrain")).toBeUndefined();
+    expect(sf.core.record.bossBrain).toBeNull();
   });
 });

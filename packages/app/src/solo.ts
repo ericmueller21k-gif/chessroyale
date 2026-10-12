@@ -1,5 +1,5 @@
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, bossBrainFor, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
-import { MatchRunner, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
+import { GUARD_WORDS, MatchRunner, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
@@ -10,8 +10,8 @@ import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { crowdMoveCues, kingSay } from "./godKing.ts";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
-import { BRAIN_LABELS, isAdmin, soloBrain } from "./boss-brain.ts";
-import { startMaia } from "./maia.ts";
+import { isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
+import { prefetchMaia, startMaia } from "./maia.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -213,6 +213,8 @@ export class SoloMatch implements GameView {
    */
   fill(fillMs: number = MATCHMAKING.soloFillMs, holdMs: number = MATCHMAKING.soloHoldMs) {
     this.createRunner();
+    // A boss battle is coming (a Solo raid, or a Crowd match set to end in one): Maia's files ahead, if it may play.
+    if ((this.settings.raid || this.settings.finalFormat === "boss") && maiaAllowed()) prefetchMaia();
     const bots = this.runner.state.players.filter((p) => p.isBot).map((p): LobbyPlayer => ({ id: p.id, name: p.name, isBot: true, connected: true }));
     const me: LobbyPlayer = { id: HUMAN, name: this.playerName, isBot: false, connected: true };
     this.auto = true;
@@ -322,6 +324,8 @@ export class SoloMatch implements GameView {
     const everyone = this.runner.state.players.map((p) => p.id);
     const { result, votes } = closePregameVote(v.votes, everyone, def, this.rng, (playerId, option) => ({ playerId, option, at, side: side.get(playerId)!, joined: true as const }));
     this.runner.patchSettings(def.options[result]!.patch);
+    // (The crowd voted for a boss battle at the end: Maia's files ahead, if it may play.)
+    if (def.options[result]!.patch.finalFormat === "boss" && maiaAllowed()) prefetchMaia();
     const nextAt = at + this.settings.voteResultSeconds * 1000;
     this.voteState = { ...v, votes, result, nextAt };
     this.set({ kind: "vote", vote: this.voteState });
@@ -330,24 +334,24 @@ export class SoloMatch implements GameView {
 
   // ---------------- Boss battle ----------------
 
-  /** Boss alone: Maia's worker, when the boss plays with the Maia brain (BOSS_BRAIN); closed after the battle. */
+  /** Maia's worker, when the boss plays with the Maia brain (BOSS_BRAIN); closed after the battle. */
   private maia: HumanUciEngine | null = null;
-  /** The admins' debug line is on (an admin, and Maia or a picked brain in play). */
+  /** The admins' debug line is on. */
   private brainShown = false;
 
   /**
-   * Boss alone, as the battle begins: the boss's brain. On the Maia brain (Ginger's own; or an admin's pick), Maia's
+   * Any boss battle, as it begins (Boss alone, a Solo raid, the Crowd's boss battle): the boss's brain. On the Maia
+   * brain (every boss's own, for an admin until it's on for players; in Boss alone an admin may pick another), Maia's
    * worker starts loading now, during the intro: the boss plays Stockfish until it's ready, never waiting for it.
    */
   private startBrain() {
-    const b = this.runner.state.boss;
-    if (!b || !this.settings.raid || this.raidBots || this.maia) return;
-    const { picked, maia } = soloBrain();
-    const { brain, rating } = bossBrainFor(b.id ?? "", b.elo, picked, maia);
-    this.brainShown = isAdmin() && (brain !== "stockfish" || !!picked);
-    if (brain === "stockfish" || rating === null) return;
+    if (!this.runner.state.boss || this.maia) return;
+    const { picked, maia } = soloBrain(this.settings.raid && !this.raidBots);
+    const plan = this.runner.bossBrainPlan(picked, maia)!;
+    this.brainShown = isAdmin();
+    if (plan.brain === "stockfish" || plan.rating === null) return;
     this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs);
-    if (this.maia) this.runner.humanBrain = { brain, rating, engine: this.maia };
+    if (this.maia) this.runner.humanBrain = { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}), engine: this.maia };
   }
 
   /** Frees Maia (its model holds a few hundred MB) once the battle is over. */
@@ -364,7 +368,8 @@ export class SoloMatch implements GameView {
     if (note) return brainWords(note);
     const hb = this.runner.humanBrain;
     if (!hb) return "Stockfish";
-    return `Maia ${hb.rating} · ${BRAIN_LABELS[hb.brain].replace("Maia, ", "")} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? "failed: Stockfish" : "loading"}`;
+    const share = hb.stockfishShare ? ` · ${Math.round(hb.stockfishShare * 100)}% Stockfish` : "";
+    return `Maia ${hb.rating} · ${GUARD_WORDS[hb.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? "failed: Stockfish" : "loading"}`;
   }
 
   private bossIntroDone = false;

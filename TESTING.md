@@ -32,17 +32,20 @@ Quick tests: add `?rounds=2&clock=15` to the link (before creating a lobby, or f
 
 Anything odd, a screenshot plus a sentence is all I need.
 
-## Maia: a human-like Ginger (Oct 11, about 10 minutes)
+## Maia: every boss human-like (Oct 12, about 15 minutes)
 
-Signed in with your admin account, on your phone:
+Signed in with your admin account, on your phone (players still meet Stockfish; only admins meet Maia for now):
 
-1. Tap **Boss alone**. Under the difficulty there's **BRAIN · TEST**. Leave it on **Default (Maia for Ginger)**, or pick
-   Stockfish / Maia, no guard / Maia, light guard / Maia, full guard. Tap **Ginger**.
-2. The first time, Maia downloads (about 29 MB, kept afterwards) while Ginger's intro plays. Under the God King's dock
-   a small line shows what her brain did with each move: "🧠 Maia 1190 · no guard · Maia's #1 · 210 ms". "Stockfish
-   (Maia loading)" means Maia wasn't ready yet and Stockfish moved instead.
-3. Tell me: does she feel like a person? Too easy, too hard? Which brain do you prefer? And the ms on the line (under
-   about 500 ms is fine). Change the brain in the boss menu and play her again to compare.
+1. Tap **Boss alone**. Under the difficulty there's **BRAIN · TEST**. Leave it on **Default (Maia, no guard)**: every
+   boss now plays with Maia below 2500, then the bridge (light guard, strict guard, a growing share of Stockfish
+   moves), then Stockfish from 2800. Or pick Stockfish / Maia with no, light, full or strict guard to compare. Pick any boss.
+2. The first time, Maia downloads (about 29 MB, kept afterwards) while the boss's intro plays. Under the God King's
+   dock a small line shows what the brain did with each move: "🧠 Maia 1640 · no guard · Maia's #1 · 210 ms".
+   "Stockfish (Maia loading)" means Maia wasn't ready yet and Stockfish moved instead.
+3. Try a **Solo raid** too (the same line shows), and, if you like, a private raid online with only you in it (your
+   phone plays the boss's moves with Maia; a raid with anyone else in it stays Stockfish until it's on for players).
+4. Tell me: do the bosses feel like people? Too easy, too hard, at your usual difficulty? And the ms on the line
+   (under about 500 ms is fine).
 
 ## Piece sounds (Oct 11, about 3 minutes)
 

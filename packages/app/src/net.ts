@@ -2,7 +2,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_POWERS, DEFAULT_SETTINGS, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, PREGAME_VOTES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -38,6 +38,11 @@ import {
   judgeTaps,
   lightsDeadline,
   lightsOutTimeline,
+  brainLine as brainWords,
+  GUARD_WORDS,
+  type BrainNote,
+  type HumanUciEngine,
+  type NetBossBrain,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
@@ -46,6 +51,8 @@ import { evalBarOn } from "./prefs.ts";
 import { RoundProgress } from "./progress.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { MatchChat } from "./chat.ts";
+import { isAdmin, maiaAllowed } from "./boss-brain.ts";
+import { prefetchMaia, startMaia } from "./maia.ts";
 
 /** Your result in a lobby's match (once it's over), from the server: for "See your result". */
 export interface LobbyResult {
@@ -345,6 +352,7 @@ export class NetMatch implements GameView {
 
   dispose() {
     this.closed = true;
+    this.freeBrain();
     if (this.retryTimer) clearTimeout(this.retryTimer);
     document.removeEventListener("visibilitychange", this.onVisible);
     this.chat.dispose();
@@ -400,6 +408,8 @@ export class NetMatch implements GameView {
         this.filledAt = m.filledAt ? this.local(m.filledAt) : null;
         this.botsOff = !!m.botsOff;
         if (!m.started && this.phase.kind !== "lobby") this.phase = { kind: "lobby" };
+        // A raid's lobby: Maia's files ahead on a device that may play the boss with it.
+        if (this.settings.raid) this.maiaAhead();
         return this.emit();
       case "opening":
         return this.setPhase({ kind: "opening", boards: m.boards.map((b) => this.toView(b)) });
@@ -500,6 +510,8 @@ export class NetMatch implements GameView {
       case "vote": {
         this.standingsList = m.standings;
         const v = m.vote;
+        // (The crowd voted for a boss battle at the end: Maia's files ahead, on a device that may play it.)
+        if (v.result !== null && PREGAME_VOTES[v.index]?.options[v.result]?.patch.finalFormat === "boss") this.maiaAhead();
         this.voteState = { ...v, startsAt: this.local(v.startsAt), until: this.local(v.until), votes: v.votes.map((x) => ({ ...x, at: this.local(x.at) })), ...(v.nextAt ? { nextAt: this.local(v.nextAt) } : {}) };
         // Keep your own vote if the server's copy hasn't caught up yet.
         if (this.myVoteLocal && this.myVoteLocal.key === v.key && !this.voteState.votes.some((x) => x.playerId === this.myId)) {
@@ -562,7 +574,10 @@ export class NetMatch implements GameView {
       case "bossRequest":
         if (m.extra) return void this.hostExtra(m.key, m.fen);
         if (m.bounce) return void this.hostBounce(m.key, m.fen, m.bounce);
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain);
+      case "bossBrain":
+        // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
+        return void this.useBrain(m.brain);
       case "chat":
         return this.chat.onLine(m.line);
       case "chatLog":
@@ -570,6 +585,7 @@ export class NetMatch implements GameView {
       case "chatNo":
         return this.chat.onRefused(m.say, m.reason, m.retryAt);
       case "results":
+        this.freeBrain();
         if (this.myId) {
           this.placement = m.placements[this.myId] ?? this.placement;
           this.lossesByStage = m.lossesByStage[this.myId] ?? [];
@@ -630,19 +646,64 @@ export class NetMatch implements GameView {
 
   // ---------------- Host work ----------------
 
-  /** Boss battle, host only: play the boss's move with this device's engine at the boss's strength. */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger", allowed: string[] | null = null, funhouse = false) {
+  /**
+   * Boss battle, host only: play the boss's move with this device's engine at the boss's strength, or on the Maia
+   * brain (`brain`, the lobby's plan for the battle) with Maia, never waiting for it (Stockfish's move meanwhile).
+   */
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger", allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain) {
     try {
       const [engine] = await this.engines();
+      if (brain) this.useBrain(brain);
+      const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), engine: this.maia, onNote: (n: BrainNote) => (this.brainNote = n) } : undefined;
       // Boingo's funhouse: the crowd's move, played for it (a weak but recoverable one); else the boss's own (a pie
       // stops it too). The server sends the one move to everyone.
       const move = funhouse
         ? await funhouseMoveFrom(engine!, fen, allowed)
-        : await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed);
+        : await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia);
       this.send({ t: "bossMove", key, move });
+      this.emit();
     } catch {
       // No engine here: the server asks someone else, or plays a random move.
     }
+  }
+
+  // ---------------- The boss's brain (host only) ----------------
+
+  /** Maia's worker, on the device that plays the boss with it; closed when the match ends. */
+  private maia: HumanUciEngine | null = null;
+  /** The battle's brain, as the lobby sent it. */
+  private bossPlan: NetBossBrain | null = null;
+  /** What the brain did with the boss's last move here (the admins' debug line). */
+  private brainNote: BrainNote | null = null;
+
+  /**
+   * The lobby's plan for the battle (on the Maia brain): start loading Maia, once, if this device may run it at all
+   * (an admin, or everyone once forPlayers is on). A device that may not plays Stockfish's move, as before.
+   */
+  private useBrain(plan: NetBossBrain) {
+    if (!maiaAllowed()) return;
+    this.bossPlan = plan;
+    if (!this.maia) this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs);
+  }
+
+  /** Frees Maia (its model holds a few hundred MB). */
+  private freeBrain() {
+    this.maia?.close();
+    this.maia = null;
+  }
+
+  /** Maia's files fetched ahead (a raid's lobby, the Crowd's vote for a boss battle): admins' devices, or the host's once it's on for players. */
+  private maiaAhead() {
+    if (isAdmin() || (BOSS_BRAIN.forPlayers && this.isHost)) prefetchMaia();
+  }
+
+  /** Testing, admins: what the boss's brain did with its last move, on the device that plays the boss. */
+  get brainLine(): string | null {
+    if (!isAdmin() || !this.bossPlan || !this.boss) return null;
+    if (this.brainNote) return brainWords(this.brainNote);
+    const p = this.bossPlan;
+    const share = p.stockfishShare ? ` · ${Math.round(p.stockfishShare * 100)}% Stockfish` : "";
+    return `Maia ${p.rating} · ${GUARD_WORDS[p.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? "failed: Stockfish" : "loading"}`;
   }
 
   /** Hollow's extra move (a failed Lights out), host only: a quiet move within the cap, or "" (he skips it). */

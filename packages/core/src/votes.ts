@@ -56,7 +56,7 @@ export const PREGAME_VOTES: readonly PregameVote[] = [
         id: "boss",
         icon: "👹",
         label: "Boss battle",
-        blurb: "Top 10 team up against a Stockfish boss",
+        blurb: "Top 10 team up against a boss",
         patch: { finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss },
       },
       {

@@ -1467,3 +1467,129 @@ Eric, Oct 12: the forced move is the joke; restored. The calls:
   play for you? Hee hee!", "Whoopsie, my hand slipped... on YOUR piece!", "Honk honk! I'll drive this one!", "Your
   move? I made it for you. You're welcome!". The God King's answer is back too: "That clown played our move! We'll
   fix it."
+
+### Every boss on Maia: the rule, the bridge band, online, loading (Eric, Oct 12, 2026)
+
+Eric played Ginger on Maia and wants every boss on it, up to the strength where Stockfish has to take over. His calls
+(Oct 11–12), followed exactly: no guard by default (Maia's mistakes are human ones; a boss's edge comes from its
+powers; the guards stay); Stockfish at the top (from about 2800, today's boss with its guard); a bridge band between
+them (about 2600–2800: Maia with the light guard, then the strict guard, maybe a share of Stockfish's moves); strength
+from the crowd's ratings (people only), the raid tier or the solo difficulty, plus each boss's offset, plus a margin
+for a crowd; bosses on the 23M model (the 5M one for Crowd and Squads bots comes later); game quality over old
+phones (a device that can't load Maia, or runs it too slowly, plays Stockfish); players stay on Stockfish until he
+OKs publishing the Maia box's source (AGPL), and admins get Maia on every boss now. My calls:
+
+- **Every boss's brain is one setting:** `BOSS_BRAIN.brain` (`maia-raw`), with `byBoss` for an exception (none). The
+  prototype's per-boss `soloDefault` is gone. The guards stay as brains for the bridge and the admins' picker, and the
+  strict guard is now a brain of its own (`maia-strict`, 4 points / 0.5 logit): the prototype's "the full guard turns
+  strict at Maia 3000" rule is gone, because the bridge needs the strict guard at a strength, and one guard per brain
+  is simpler to read and test.
+- **Maia picks the boss's normal moves, within its powers' limits** (pies, toy blocks, saw cuts and the board saw,
+  Sawyer's first pawn move): it's asked for the allowed moves only (`searchmoves`), and the boss never plays anything
+  else, even if a broken worker named another. If none of Maia's moves is allowed, the boss plays **today's Stockfish
+  move** (the prototype played Stockfish's best there; the brief asks for today's move). Every candidate vetoed by a
+  guard still means Stockfish's best, as in the prototype (the guard is there to keep the boss strong).
+- **The special moves, one by one** (unchanged unless said):
+  - **The King's strike:** Stockfish's own step back (5–15 points). It's the God King's power, and its size is the
+    design; Maia has no notion of "a move N points worse".
+  - **Boingo's funhouse move for the crowd:** `funhouseMoveFrom`, as restored on Oct 12 (the brief: leave it). It's
+    the crowd's move, weak but recoverable by design, not the boss's.
+  - **Hollow's extra move after Lights out:** `extraMoveFrom` (a quiet move gaining at most `lightsOutExtraGain`). A
+    capped gain needs scored moves; Maia can't promise "quiet and small".
+  - **Big Boy's bounce:** `bounceFrom` (a position from scored candidates in a loss band), not a move at all.
+  - **Slips:** none under Maia (its own mistakes take their place, as in the prototype). The slip roll still happens,
+    so the match's other random draws stay where they were.
+  - **The mate test switch** (`?mate=1`): its mate in one, as before.
+- **The bridge band** (`bridgeFrom`, `bridgeStrictFrom`, `stockfishFrom` 2800; `bandBrain`; the numbers are the
+  calibration's, below): Maia with the light guard, then with the strict one, and a share of the boss's moves today's
+  Stockfish move instead (with its own guard and slips), growing in a straight line from none at `bridgeFrom` to
+  `bridgeStockfishShare` just under 2800. Each move's
+  draw comes from the match's random source in solo (only in the band, so nothing else's draws move) and from the
+  host's on its device online; Maia isn't asked for a move Stockfish plays. An admin's pick plays that brain, no share.
+- **Strength from the people** (Eric's "people only"): the Crowd's boss battle now takes the weighted rating of the
+  people among the last ten (bots only if no person is left among them). It used to count the bots too. This moves
+  today's Stockfish bosses in the Crowd's boss battle as well, towards the people's own strength, which is the point.
+  A raid already counted people only.
+- **The crowd's margin** (`crowdMargin`, set by the calibration): Maia plays at `maiaRatingFor(strength + margin)` when
+  more than one picks the crowd's moves (a raid, solo or online, and the Crowd's boss battle); in Boss alone (and a raid
+  of one) at `maiaRatingFor(strength)`. A crowd voting together plays above its average member; a lone player doesn't.
+- **Where it plays:** every boss battle. Solo: Boss alone, a Solo raid and the Crowd's boss battle (the battle's brain
+  is chosen as its intro begins, `startBrain`; a battle simulated after you're out stays Stockfish: nobody watches it,
+  and nothing need download). Online: the lobby decides the battle's plan once, as it begins (`bossBrainNow`, kept in
+  the lobby's record so a revived lobby keeps it), tells the host's device at once (`bossBrain`, so it loads Maia during
+  the intro), and every request for the boss's own move carries the plan; the host's device plays Maia's move and the
+  server sends that one move to everyone, as it always has. A new host, or the host back after a reload, is told again.
+  The funhouse move, the extra move and the bounce requests carry no plan.
+- **Who meets it while it's off for players** (`forPlayers` false): an admin's device, on every boss in every solo
+  mode; online only a lobby whose people are all admins (my call: a lobby with a player in it meets Stockfish, so no
+  player meets Maia, or downloads it, before Eric's OK and the source being published; Eric can test online alone in a
+  private raid, or with his own devices). A device that may not run Maia (a player's) never downloads it and plays
+  Stockfish's move even if asked to play Maia. `MAIA_TEST=1` (wrangler dev, for the e2e; never production) counts
+  everyone as an admin for the lobby's choice, like `SQUADS_TEST`; only an admin's app still runs Maia.
+- **The one value for players: `BOSS_BRAIN.forPlayers`.** Turned on, every boss plays Maia for everyone, solo and
+  online (only the host's device loads it online), with the same rule. What must happen first: Eric's OK to publish the
+  Maia box's source (`packages/maia-worker/`, AGPL-3.0: a public repository or a download on the site, then the credits
+  link it instead of "on request"). The Crowd's vote and the Settings rules now say "a boss" rather than "a Stockfish
+  boss", so nothing else needs changing that day.
+- **Loading:** Maia's files (about 29 MB) are fetched ahead when a battle on Maia may come: Boss alone's menu (when a
+  boss below 2800 may be met), the raid you make from the menu, a Solo raid's queue, a raid's lobby and the Crowd's vote
+  for a boss battle (on a device that may run it: an admin's, or once it's on for players the host's). A battle that
+  starts while a prefetch is still under way lets it finish before the worker loads, so the files come down once. The
+  service worker keeps them (unchanged). The worker, a few hundred MB, is closed when the battle ends (solo: its result;
+  online: the results, or leaving). The fallback stays at 1.5 s (`timeoutMs`): nothing ever waits for Maia, so an old
+  or slow phone simply plays Stockfish's moves.
+- **The admins' tools:** the BRAIN · TEST picker (Boss alone's menu) works on every boss: Default (each boss's own:
+  Maia, no guard, with the bridge and Stockfish at the top), Stockfish, or Maia with no, light, full or strict guard (at
+  the boss's Maia rating, no share). The debug line shows in every solo boss battle for an admin and online on the
+  host's device: "Maia 1640 · no guard · Maia's #2 · 90 ms", "Maia 2450 · strict guard · 25% Stockfish · Stockfish
+  (bridge share)", "… Stockfish (none of Maia's moves allowed)".
+- **Tests:** every playable boss through a long battle with every power on a Maia that names a forbidden move first
+  (`maia-bosses.test.ts`: never played; the strike, the funhouse move, the extra move and the bounce never ask Maia;
+  Sawyer's first ask is pawn moves only), the rule and the bridge (`boss-brain.test.ts`), the online plan
+  (`boss-powers-lobby.test.ts`: admins only, the host told, new hosts told, no plan on the special requests, players
+  under `forPlayers`), and `e2e/maia.spec.ts` (every boss on Maia for an admin on a phone; an online raid on Maia where
+  the host's Maia moves reach the other player, who never downloads it).
+
+### Every boss on Maia: the calibration (Oct 12, 2026)
+
+A modest run, as asked (`packages/sim/scripts/maia-calibration.ts`, `reports/maia-calibration.md`; boss-sim.ts's bot
+crowds and method; small samples with ± two standard errors, about ±0.3 at 10 games). The calls:
+
+- **The target (my call, from the record):** the boss battle's own target from Oct 3, "very hard but beatable": a
+  crowd about even with the boss in plain chess (then a club crowd won 38%, drew 25%, lost 38%), the powers, each
+  boss's offset and the God King on top as before. Not "as hard as today's Stockfish boss": with its blunder guard
+  (Oct 5) and slips it beat every beginner, casual and club bot crowd we tried in plain chess (18 games, not a draw)
+  and held the expert crowd to 0.25. A guard-free human boss can't be that hard below Maia's ceiling, and Eric chose
+  "no guard: its edge comes from its powers". So a Maia boss is clearly easier in plain chess than today's Stockfish
+  one; flagged for Eric, with the knobs below.
+- **What was measured:** bot crowds (beginner 1484, casual 1920, club 2266, expert 2771; the boss at the crowd's
+  weighted rating less 100) against today's Stockfish boss and against Maia with no guard at several ratings; the
+  expert crowd also against the light and strict guards at Maia 2700; one bot alone (the casual and club crowds'
+  middle member) at its own rating; and, per move, Maia's loss at nine ratings with each guard. Crowds were about even
+  with Maia at roughly 350 (beginner), a little under 1000 (casual) and 2100 (club); the club crowd scored the same
+  against 2100 and 2600, and the expert crowd beat Maia at 2700 nine times in ten. A lone club bot scored 0.25 against
+  Maia 1000.
+- **Maia's rating lines** (`maiaRating`, the boss's level → Maia): 600 (the floor) up to 1800, 850 at 2200, 2100 at
+  2550, 2500 from 2650 (held: Maia's ceiling). The level is the strength, plus the crowd's margin for a crowd.
+- **The crowd's margin: 400** (`crowdMargin`): a lone bot needed a far weaker Maia than a crowd of its own rating,
+  about 400 of level on the lines. Bots' mistakes are independent random moves, which voting filters out better than
+  real people's (often shared) mistakes, so real crowds may need less: it's the one value to tune for crowds.
+- **The ceiling: Maia 2500.** With no guard Maia stops gaining strength between 2100 and 2700 (per move 2.73 points
+  at 2400, 2.53 at 2700, 2.80 at 3000), and the model has few people up there.
+- **The bridge: 2500 to 2800** (`bridgeFrom` 2500, `bridgeStrictFrom` 2650, `bridgeStockfishShare` 1, `stockfishFrom`
+  2800). A step under Eric's "about 2600–2800", because Maia with no guard at its ceiling already falls short of strong
+  crowds (that 9 in 10). The share of Stockfish's moves grows from none at 2500 to all of them just under 2800, so the
+  boss arrives exactly at today's Stockfish boss there. Against the expert crowd, light guard 0.65, strict 0.35,
+  Stockfish 0.25: each step no bigger than the error bars.
+- **The floor stays 600** (`maiaRatingMin`): the model learned from people rated about that and up; asking for less is
+  outside what it knows. The weakest crowds and players meet a Maia a little stronger than even (the beginner crowd,
+  which plays a random move a quarter of the time, scored 0.13 against 600).
+- **Boss alone:** with no margin, a player of 1500 meets Maia 600 at Normal (the prototype gave Ginger Maia 1190 there,
+  which Eric enjoyed); 1800 meets about 660; Hardest at 1900 about 1560. The lone bots say that's about even (a club bot
+  of 2162 scored 0.50 against the shipped rule's Maia 826). This is the least certain part: Eric's play decides, and
+  the lines' first two points (or Hard and Hardest) are the knob.
+- **Checked:** the shipped rule on fresh openings, 8 games each: the casual crowd 0.38, the club crowd 0.50, the club
+  bot alone 0.50, the expert crowd (in the bridge: strict guard, 90% Stockfish) 0.38. About even everywhere.
+- **The prototype's sanity runs** (`reports/maia-boss.md`) used one strong bot (2% random moves) against a 1500 boss,
+  which is why raw Maia looked much easier there; against crowds of the tier's own strength the picture is the one
+  above.

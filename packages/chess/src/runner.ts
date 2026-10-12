@@ -58,7 +58,7 @@ import { BOSS_OPENING, boardEnd, boardStatus, newBoard, playOnBoard, recentMoves
 import { pickOpenings, type Opening } from "./openings.ts";
 import { applyMove, gameEnd, legalMoves, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
-import { BOSS_BRAIN, type BossBrain } from "@chessroyale/core";
+import { BOSS_BRAIN, bossBrainFor, type BossBrain, type BossBrainPlan } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
 import {
   allowedSearch,
@@ -1045,9 +1045,19 @@ export class MatchRunner {
    * The boss's brain when it isn't plain Stockfish (solo's Boss alone sets it as the battle begins: Maia-3 at a
    * rating, with its engine; see BOSS_BRAIN). Null: Stockfish, as everywhere else.
    */
-  humanBrain: { brain: BossBrain; rating: number; engine: HumanEngineLike } | null = null;
+  humanBrain: { brain: BossBrain; rating: number; stockfishShare?: number; engine: HumanEngineLike } | null = null;
   /** What the brain did with the boss's last move (the admins' debug line). */
   brainNote: BrainNote | null = null;
+
+  /**
+   * How the boss plays this battle (bossBrainFor): an admin's pick (`picked`, "" for the boss's own), and whether Maia
+   * may play here at all; a crowd's margin when more than one picks the crowd's moves (not Boss alone).
+   */
+  bossBrainPlan(picked: BossBrain | "", maia: boolean): BossBrainPlan | null {
+    const b = this.state.boss;
+    if (!b) return null;
+    return bossBrainFor(b.id ?? "", b.elo, picked, maia, { crowd: this.alive().length > 1 });
+  }
 
   /** The moves the boss may play now (a pie stops it too), or null: any legal move. */
   bossAllowed(): string[] | null {
@@ -1316,7 +1326,9 @@ export class MatchRunner {
     const opening = { ...BOSS_OPENING, moves: old.history.slice(0, startPly), expected: { [startPly]: old.evals?.[startPly] ?? 0.5 } };
     this.boards.set(id, { ...newBoard(id, opening, startPly, old.generation + 1), opening: BOSS_OPENING });
     const setUp = start?.setUp?.(this.battle, { boardId: id, seed, crowdSide: "w", generation: old.generation + 1 }) ?? null;
-    const tier = bossElo(alive.map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
+    // From the people's ratings (Eric, Oct 12: "the crowd's ratings, people only"); all bots left: theirs.
+    const people = alive.filter((p) => !p.isBot);
+    const tier = bossElo((people.length ? people : alive).map((p) => estimateRating(p.lossesByStage.flat())), this.settings);
     const elo = bossStrength(tier, def, this.settings.bossDifficulty);
     this.bossLast = null;
     this.state = {
@@ -1510,12 +1522,15 @@ export type BossMoveKind = "elo" | "stumble" | "stagger";
 
 /**
  * A human-like brain for the boss's move (bossMoveFrom): Maia's own move (maia-raw) or a guarded one, at `rating`.
- * When its engine isn't ready, is slow or every candidate is vetoed, the move is today's Stockfish move.
+ * When its engine isn't ready, is slow, or none of its moves is allowed, the move is today's Stockfish move; every
+ * candidate vetoed by a guard: Stockfish's best.
  */
 export interface BossBrainCall {
   brain: BossBrain;
   rating: number;
   engine: HumanEngineLike;
+  /** The bridge band: this share of the moves (drawn per move) is today's Stockfish move, Maia not asked. */
+  stockfishShare?: number;
   /** BOSS_BRAIN, unless a test or sim passes its own. */
   settings?: typeof BOSS_BRAIN;
   onNote?(note: BrainNote): void;
@@ -1561,6 +1576,9 @@ function pickByLoss(top: readonly MoveScore[], range: readonly [number, number],
  * away `strikeLoss` points: a clear step back. Every move then passes the blunder guard: Stockfish's limited
  * strength picks some moves that hang a piece or the queen; one that gives away more than the guard allows is
  * swapped for a slip. A boss loses on mistakes, never by throwing material away.
+ * With a human-like `brain` (Maia, BOSS_BRAIN), its moves replace the "elo" and "stumble" ones (Maia's own mistakes
+ * take the slips' place), within what `allowed` leaves; the strike, the bridge band's share and every fallback are
+ * Stockfish's, as above.
  */
 export async function bossMoveFrom(
   engine: EngineLike,
@@ -1568,7 +1586,7 @@ export async function bossMoveFrom(
   elo: number,
   nodes: number,
   kind: BossMoveKind | boolean,
-  _rng: Rng = Math.random,
+  rng: Rng = Math.random,
   strikeLoss: readonly [number, number] = [5, 15],
   guard: BossGuard = DEFAULT_BOSS_GUARD,
   allowed: readonly string[] | null = null,
@@ -1576,10 +1594,12 @@ export async function bossMoveFrom(
 ): Promise<string> {
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
   // A human-like brain (Maia, BOSS_BRAIN) is asked at once, alongside the top-8 search: never waited on to load,
-  // never longer than its timeout. The King's strike stays Stockfish's (its own step back).
+  // never longer than its timeout. The King's strike stays Stockfish's (its own step back), and so does the bridge
+  // band's share of moves (drawn first: Maia isn't asked for those).
   const human = brain && brain.brain !== "stockfish" ? brain : null;
+  const share = human && k !== "stagger" && (human.stockfishShare ?? 0) > 0 ? rng() < human.stockfishShare! : false;
   const asked = performance.now();
-  const ask = human && k !== "stagger" && human.engine.ready() ? human.engine.candidates(fen, human.rating, allowed, { temperature: human.settings?.temperature ?? BOSS_BRAIN.temperature, topP: human.settings?.topP ?? BOSS_BRAIN.topP, multipv: human.settings?.multipv ?? BOSS_BRAIN.multipv }) : null;
+  const ask = human && k !== "stagger" && !share && human.engine.ready() ? human.engine.candidates(fen, human.rating, allowed, { temperature: human.settings?.temperature ?? BOSS_BRAIN.temperature, topP: human.settings?.topP ?? BOSS_BRAIN.topP, multipv: human.settings?.multipv ?? BOSS_BRAIN.multipv }) : null;
   // A boss power can stop the boss too (nobody moves onto a pie): it plays the best of what's allowed.
   const all = await engine.topMoves(fen, 8);
   const ok = allowed ? new Set(allowed) : null;
@@ -1587,21 +1607,24 @@ export async function bossMoveFrom(
   if (ok && !top.length) top = await engine.scoreMoves(fen, [...ok]);
   if (!top.length) return allowed?.[0] ?? legalMoves(fen)[0]!;
   if (human) {
-    const note = { brain: human.brain, rating: human.rating } as const;
+    const note = { brain: human.brain, rating: human.rating, ...(human.stockfishShare ? { share: human.stockfishShare } : {}) } as const;
     if (k === "stagger") human.onNote?.({ ...note, by: "stockfish", why: "strike" });
+    else if (share) human.onNote?.({ ...note, by: "stockfish", why: "share" });
     else if (!ask) human.onNote?.({ ...note, by: "stockfish", why: human.engine.failed?.() ? "failed" : "not ready" });
     else {
       const answer = await within(ask, (human.settings?.timeoutMs ?? BOSS_BRAIN.timeoutMs) - (performance.now() - asked));
       if (!answer) human.onNote?.({ ...note, by: "stockfish", why: "no answer" });
       else {
-        const pick = humanBrainMove(human.brain, human.rating, answer, top, allowed, human.settings);
+        const pick = humanBrainMove(human.brain, answer, top, allowed, human.settings);
         if (pick.move) {
           human.onNote?.({ ...note, by: "maia", ...(pick.rank ? { rank: pick.rank } : {}), vetoed: pick.vetoed, ms: answer.ms });
           return pick.move;
         }
-        // (Every candidate vetoed: Stockfish's best, the line with the highest score.)
-        human.onNote?.({ ...note, by: "stockfish", why: "guard", vetoed: pick.vetoed, ms: answer.ms });
-        return [...top].sort((a, b) => b.expected - a.expected)[0]!.move;
+        const why = "why" in pick ? pick.why : "guard";
+        human.onNote?.({ ...note, by: "stockfish", why, vetoed: pick.vetoed, ms: answer.ms });
+        // (Every candidate vetoed by the guard: Stockfish's best, the line with the highest score. None of Maia's
+        // moves allowed: today's Stockfish move, below.)
+        if (why === "guard") return [...top].sort((a, b) => b.expected - a.expected)[0]!.move;
       }
     }
   }

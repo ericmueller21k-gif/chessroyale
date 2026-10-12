@@ -2,7 +2,7 @@ import { hollowLobby } from "./bosses/hollow.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LOBBY_LIFE, MATCHMAKING, isRankedMatch, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LOBBY_LIFE, MATCHMAKING, isRankedMatch, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   botRoster,
@@ -47,6 +47,7 @@ import {
   type JudgeJob,
   type JudgeReport,
   type MoveScore,
+  type NetBossBrain,
 } from "@chessroyale/chess";
 import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
 
@@ -132,6 +133,8 @@ export interface Human {
   evalBar?: boolean;
   /** When they dropped (not connected since). */
   goneAt?: number;
+  /** An admin (ADMIN_EMAILS, as the Durable Object found on connecting): a lobby of admins only meets the Maia boss. */
+  admin?: boolean;
 }
 
 export type Timer =
@@ -237,6 +240,11 @@ export interface LobbyRecord {
   bossPending?: string;
   bossMinAt?: number;
   bossIntroDone?: boolean;
+  /**
+   * The boss's brain for this battle, decided as it begins (bossBrainFor; BOSS_BRAIN): Maia (with its rating, and the
+   * bridge band's share of Stockfish's moves) for the host to play with, or null for Stockfish as before.
+   */
+  bossBrain?: NetBossBrain | null;
   /**
    * Hollow's Lights out in progress (the boss's turn, before his move; the phase stays "boss"): when it began, how many
    * rounds have ended (their answers shown), and each player's taps, round by round.
@@ -585,6 +593,7 @@ export class LobbyCore {
     userId?: string,
     lastBoss: string | null = null,
     evalBar: boolean | null = null,
+    admin = false,
   ) {
     this.r.activeAt = this.io.now();
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
@@ -593,6 +602,8 @@ export class LobbyCore {
     if (existing) {
       existing.connected = true;
       delete existing.goneAt;
+      if (admin) existing.admin = true;
+      else delete existing.admin;
       if (look !== undefined) existing.look = cleanLook(look);
       if (bossDef(lastBoss)) existing.lastBoss = lastBoss;
       if (evalBar !== null) existing.evalBar = evalBar;
@@ -631,6 +642,7 @@ export class LobbyCore {
       joinedAt: this.io.now(),
       ...(bossDef(lastBoss) ? { lastBoss } : {}),
       ...(evalBar !== null ? { evalBar } : {}),
+      ...(admin ? { admin: true } : {}),
     });
     if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [id]: userId };
     if (!this.r.hostId) this.r.hostId = id;
@@ -691,6 +703,8 @@ export class LobbyCore {
       this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest });
     }
     if (this.r.phase === "boss" && this.r.bossKey) this.sendBossRequest(host);
+    // (A new host, or the host back after a reload: the battle's brain, so it loads Maia now.)
+    if (this.r.bossBrain && this.r.bossIntroDone && this.r.phase !== "results") this.io.send(host, { t: "bossBrain", brain: this.r.bossBrain });
   }
 
   /**
@@ -1025,7 +1039,23 @@ export class LobbyCore {
       ...(this.r.bossKind === "extra" ? { extra: true } : {}),
       ...(this.r.bossKind === "bounce" ? { bounce: this.r.bounceCandidates ?? [] } : {}),
       ...(allowed && this.r.bossKind !== "bounce" ? { allowed } : {}),
+      // (Only the boss's own moves are Maia's: the funhouse's move for the crowd, Hollow's extra move and Big Boy's
+      // bounce keep their own engine picks.)
+      ...(this.r.bossBrain && !funhouse && this.r.bossKind !== "extra" && this.r.bossKind !== "bounce" ? { brain: this.r.bossBrain } : {}),
     });
+  }
+
+  /**
+   * The boss's brain for the battle about to begin (BOSS_BRAIN, bossBrainFor): Maia for a lobby of admins only (Eric
+   * tests it), and for everyone once it's on for players (forPlayers); null for Stockfish. The host's device plays
+   * it, and the server sends its one move to everyone.
+   */
+  private bossBrainNow(): NetBossBrain | null {
+    const people = this.r.humans;
+    const maia = BOSS_BRAIN.forPlayers || (people.length > 0 && people.every((h) => h.admin));
+    const plan = this.runner?.bossBrainPlan("", maia);
+    if (!plan || plan.rating === null || plan.brain === "stockfish") return null;
+    return { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}) };
   }
 
   /**
@@ -1156,6 +1186,10 @@ export class LobbyCore {
         // The boss arrives: it takes over from an even position of the game just played.
         this.r.bossIntroDone = true;
         this.r.phase = "boss";
+        // Its brain for the battle: on Maia, the host starts loading it during the intro.
+        this.r.bossBrain = this.bossBrainNow();
+        const host = this.hostNow();
+        if (this.r.bossBrain && host) this.io.send(host, { t: "bossBrain", brain: this.r.bossBrain });
         const until = this.io.now() + bossIntroTimeline(runner.boards.get(runner.state.boards[0]!)!.history.length, !!runner.boss.powers?.claimed, !!runner.boss.powers?.snack).total;
         this.broadcast({ ...this.bossMessage(until), intro: true } as Outgoing);
         return this.setTimer("nextRound", until);

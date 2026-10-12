@@ -30,18 +30,34 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   each boss's `offset` in `BOSS_ROSTER`; solo's difficulty `BOSS_DIFFICULTY`). Below `bossStumbleBelow` it may slip
   slightly (`bossSlipLoss`). The **blunder guard** (`bossMaxLoss`, `bossMaxLogitLoss`) forbids any move that throws
   material: "It's boss mode, not idiot mode." A power can limit the boss's moves too (it plays the best allowed one).
-- **The boss's brain (Maia prototype, Oct 11; DECISIONS.md, "A human-like boss: Maia-3 for Ginger").** In Boss alone a
-  boss can play with **Maia-3** (CSSLab, University of Toronto: human moves at a rating) instead of Stockfish
-  (`BOSS_BRAIN`, `bossBrainFor`, `maiaRatingFor`). Maia is a separate AGPL program, the **Maia box**
-  (`packages/maia-worker/`, its own README and licence): a module worker at `/engine/maia/` (the official 23M
-  checkpoint converted to int8 ONNX, 24 MiB, run by onnxruntime-web on one thread, about 80 ms a move here). The game
-  only exchanges UCI-style text with it (`HumanUciEngine`). Brains: `stockfish`; `maia-raw` (Maia's own draw at
-  temperature 0.8, top-p 0.9; Ginger's default, Eric); `maia-light` (no move over 25 points / 2 logits); `maia-full`
-  (10 / 1, strict 4 / 0.5 at Maia 3000). The guards veto from the boss's own top-8 search (no extra search): Maia's
-  next likely move, else Stockfish's best. Maia's rating: about 1100 at strength 1400 to 2000 at 2400, 3000 at 2600;
-  Stockfish from 2800. Never waited on: not ready, failed, or no answer in 1.5 s, and today's move is played. Its
-  worker starts with the battle's intro and ends with the battle; the service worker keeps its files once fetched.
-  Admins only until the launch steps (ROADMAP.md).
+- **The boss's brain (DECISIONS.md: "A human-like boss: Maia-3 for Ginger", Oct 11; "Every boss on Maia", Oct 12).**
+  Every boss plays its normal moves with **Maia-3** (CSSLab, University of Toronto: human moves at a rating), not
+  Stockfish, up to the strength where Stockfish must take over (`BOSS_BRAIN`, `bossBrainFor`, `maiaRatingFor`).
+  - **The Maia box:** a separate AGPL program (`packages/maia-worker/`, its own README and licence): a module worker at
+    `/engine/maia/` (the official 23M checkpoint converted to int8 ONNX, 24 MiB, run by onnxruntime-web on one thread,
+    about 80 ms a move here). The game only exchanges UCI-style text with it (`HumanUciEngine`).
+  - **The rule, by the boss's strength** (`BOSS_BRAIN`): below `bridgeFrom` (2500) Maia's own draw (`maia-raw`, no
+    guard: Eric) at temperature 0.8, top-p 0.9; from 2500 the light guard (25 points / 2 logits), from
+    `bridgeStrictFrom` (2650) the strict one (4 / 0.5), with a share of today's Stockfish move growing in a line from
+    none at 2500 to all of them (`bridgeStockfishShare`) just under `stockfishFrom` (2800); from 2800 Stockfish, as
+    before. Maia's rating is `maiaRatingFor(strength + crowdMargin)` (the margin, 400, only when more than one picks
+    the crowd's moves): 600 (its floor) up to a level of 1800, 850 at 2200, 2100 at 2550, held at 2500 from 2650
+    (`reports/maia-calibration.md`). The guards veto from the boss's own top-8 search (no extra search): Maia's next
+    likely move, else Stockfish's best.
+  - **Within the powers:** Maia is asked for the allowed moves only (`searchmoves`), and nothing else is played; none of
+    its moves allowed: today's Stockfish move. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra
+    move and Big Boy's bounce keep their own Stockfish picks; Maia's own mistakes replace the slips.
+  - **Never waited on:** not ready, failed, or no answer in 1.5 s (`timeoutMs`): today's move. A slow or old device
+    falls back to Stockfish this way, move by move.
+  - **Where:** every boss battle, solo (`startBrain` in `solo.ts`, the runner's `humanBrain`) and online (the lobby
+    decides the battle's plan once, `bossBrainNow`; the host is told as the intro starts, `bossBrain`, and each boss
+    request carries it; the host's device plays Maia's move and the server sends that one move to everyone).
+  - **Who:** players meet Stockfish until `forPlayers` is on (Eric's OK first: the Maia box's source published); an
+    admin's device meets Maia on every boss in every mode, online in a lobby of admins only (`MAIA_TEST=1` in
+    `wrangler dev` for the e2e). A device that may not run Maia never downloads it and plays Stockfish's move as host.
+  - **Loading:** the files are fetched ahead when a battle on Maia may come (the boss menu, a Solo raid's queue, a raid
+    lobby on a device that may run it, the Crowd's vote for a boss battle); the worker starts as the battle's intro
+    begins (a prefetch under way finishes first) and ends with the battle; the service worker keeps the files.
 - **Judging with a power.** When a boss power limits the crowd's moves, the best move is the best of the allowed ones
   (`judgeTop`, `judgeCandidates`, `allowedSearch` in `boss-powers.ts`); Jefferson's fire counts a piece left to burn as
   gone (`fireJudged`). Shared with the `god-king` lane by agreement.
@@ -59,7 +75,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 | The engine server | `engine/`, `packages/server/src/engine.ts`; routes `/api/engine/ping`, `/api/engine/score` |
 | Ratings from move losses | `packages/core/src/rating.ts`, `rating-curve.ts` |
 | The boss's brain: the rule, the text client | `packages/chess/src/boss-brain.ts`, `human-uci.ts`; `bossMoveFrom` in `runner.ts` |
-| Maia in the browser (start, prefetch, free) | `packages/app/src/maia.ts`, `boss-brain.ts` (the admins' pick) |
+| Maia in the browser (start, prefetch, free) | `packages/app/src/maia.ts`, `boss-brain.ts` (who may run it; the admins' pick), `solo.ts` (`startBrain`), `net.ts` (`useBrain`, `hostBoss`) |
+| The online plan | `packages/server/src/lobby.ts` (`bossBrainNow`, the `bossBrain` message, the boss request's `brain`) |
 | The Maia box (AGPL: worker, conversion, model) | `packages/maia-worker/` (README.md), built into `/engine/maia/` |
 
 ## Settings
@@ -74,9 +91,11 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - e2e: `e2e/judges.spec.ts` (with containers off).
 - The container: Docker locally, or live via `/api/engine/ping` and `/api/engine/score` with the Access service-token
   headers (never print their values).
-- The brain: `packages/chess/test/boss-brain.test.ts` (the rating line, the brains' choices with made-up candidates,
-  the fallbacks, the text client); `packages/maia-worker/test/` (the encoder against the official tokenizer, the
-  protocol, the int8 model in onnxruntime-web); `e2e/maia.spec.ts`; `npx tsx packages/sim/scripts/maia-sim.ts`
+- The brain: `packages/chess/test/boss-brain.test.ts` (the rating lines, the bridge, the brains' choices with made-up
+  candidates, the fallbacks, the text client), `maia-bosses.test.ts` (every boss's Maia path in a battle),
+  `packages/server/test/boss-powers-lobby.test.ts` ("the boss's brain online"); `packages/maia-worker/test/` (the
+  encoder against the official tokenizer, the protocol, the int8 model in onnxruntime-web); `e2e/maia.spec.ts`;
+  `npx tsx packages/sim/scripts/maia-calibration.ts` (`reports/maia-calibration.md`), `maia-sim.ts`
   (`reports/maia-boss.md`).
 - Sims (`packages/sim/scripts/`, write to `reports/`): `judge-accuracy.ts`, `judge-cuts.ts`, `judge-determinism.ts`,
   `many-judges.ts`, `deep-accuracy.ts`, `deep-timing.ts`, `boss-blunders.ts`, `boss-sim.ts`, `calibrate-rating.ts`.
