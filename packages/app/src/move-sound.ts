@@ -41,6 +41,15 @@ export function knockFor(prev: string | null, fen: string, lastMove: string | nu
   return moveKnock(before, fen, lastMove, mounted);
 }
 
+/**
+ * What a board plays as it shows `fen`: nothing on a small board or a `silent` one (the home's live window, Eric,
+ * Oct 12: "audio should be disabled on it"), whatever the sound setting; and neither counts as the big board shown.
+ */
+export function boardKnock(prev: string | null, fen: string, lastMove: string | null | undefined, { small, silent }: { small?: boolean; silent?: boolean } = {}): "move" | "capture" | "castle" | null {
+  if (small || silent) return null;
+  return knockFor(prev, fen, lastMove);
+}
+
 /** Tests: forget what was shown. */
 export function resetKnocks() {
   shown = null;

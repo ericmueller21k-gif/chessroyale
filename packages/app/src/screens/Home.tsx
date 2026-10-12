@@ -14,6 +14,7 @@ import { BossFace } from "../components/BossCharacter.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
+import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
 
 export const OPENING_KEY = "brc.openingMoves";
 const MODE_KEY = "brc.mode";
@@ -479,8 +480,9 @@ export function HomeScreen({
   const live = useLive();
   // (The same line as the stylesheet's frame: from 1024 px the side menu has the shop and your profile.)
   const computer = useMedia("(min-width: 1024px)");
-  // (From 1280 px the play column sits beside your card, with room at its top for the live window.)
-  const wide = useMedia("(min-width: 1280px)");
+  // (From 1280 px the play column sits beside your card, with room at its top for the live window: a computer's only,
+  // never a phone's or a tablet's, LIVE_WINDOW_MEDIA.)
+  const wide = useMedia(LIVE_WINDOW_MEDIA);
   const [mode, setModeState] = useState<HomeMode>(chosenHomeMode);
   const squads = mode === "squads";
   const pickMode = (m: HomeMode) => {

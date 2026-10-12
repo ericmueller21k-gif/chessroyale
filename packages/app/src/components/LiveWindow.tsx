@@ -8,7 +8,8 @@ import { Board } from "./Board.tsx";
  * The computer's live window, at the top of the home's play column (Eric, Oct 9; DECISIONS.md, "The live window"): a
  * real match when one is running (its board and the crowd's votes, from the live line the home already polls), else a
  * bot match played back from a recording, labelled "Bot match", on a cycle set by the clock so everyone sees the same
- * moment. No engine, nothing per frame: it redraws when the shown move changes.
+ * moment. No engine, nothing per frame: it redraws when the shown move changes. Silent (Eric, Oct 12): its moves and
+ * captures never make a sound, whatever the sound setting. Mounted only on a computer (LIVE_WINDOW_MEDIA).
  */
 export function LiveWindow() {
   const live = useLive();
@@ -61,7 +62,7 @@ export function LiveWindow() {
       </header>
       <div class="fd-livewin-board">
         <div class="fd-livewin-sq">
-          <Board key={r.id} fen={v.fen} lastMove={v.lastMove} orientation="white" small />
+          <Board key={r.id} fen={v.fen} lastMove={v.lastMove} orientation="white" small silent />
         </div>
       </div>
       <p class="fd-livewin-line">{line}</p>
@@ -87,7 +88,7 @@ function RealMatch({ match }: { match: NonNullable<LiveCounts["featured"]> }) {
       </header>
       <div class="fd-livewin-board">
         <div class="fd-livewin-sq">
-          <Board fen={b.fen} lastMove={b.lastMove} orientation="white" small />
+          <Board fen={b.fen} lastMove={b.lastMove} orientation="white" small silent />
         </div>
       </div>
       <p class="fd-livewin-line">
