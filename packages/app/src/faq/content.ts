@@ -314,7 +314,7 @@ function bossBrain(src: FaqSources): FaqSection {
     .map(([id, brain]) => `${bossById(id).name} (${brain === "stockfish" ? "Stockfish" : `Maia with ${guardName[brain]}`})`);
   const everyBoss = M.brain === "stockfish" ? "no boss" : `every boss${others.length ? ` except ${others.join(", ")}` : ""}`;
   const maiaNote = M.forPlayers
-    ? `> **New.** ${everyBoss[0]!.toUpperCase()}${everyBoss.slice(1)} plays with Maia, ${guardName[M.brain]}, up to ${M.bridgeFrom}; then [the bridge](#handover) hands it over to Stockfish, which plays from ${M.stockfishFrom} up.`
+    ? `> **New.** ${everyBoss[0]!.toUpperCase()}${everyBoss.slice(1)} plays with Maia, ${guardName[M.brain]}, up to a level of ${M.bridgeFrom}; then [the bridge](#handover) hands it over to Stockfish, which plays from ${M.stockfishFrom} up.`
     : `> **Being tested; coming soon.** Maia isn't switched on for players yet: until it is, every boss you meet plays with Stockfish, as above. In the test, ${everyBoss} plays with Maia, ${guardName[M.brain]}, in every mode, with [the bridge](#handover) up to Stockfish.`;
   // Maia's rating: the lines between BOSS_BRAIN.maiaRating's points, held at the last (its ceiling).
   const pts = M.maiaRating;
@@ -329,16 +329,16 @@ function bossBrain(src: FaqSources): FaqSection {
   const margin = M.crowdMargin;
   // The handover table: a boss's strength, Maia's rating alone and for a crowd, the guard and Stockfish's share.
   const plan = (x: number, crowd: boolean) => bossBrainFor("", x, "", true, { crowd }, M);
-  const share = (x: number) => plan(x, false).stockfishShare;
-  const strengths = [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, M.bridgeFrom, M.bridgeStrictFrom, Math.round((M.bridgeStrictFrom + M.stockfishFrom) / 2), M.stockfishFrom - 1, M.stockfishFrom, 3000, ceiling]
+  const strengths = [1000, 1200, 1400, 1600, 1800, 2000, 2100, 2200, 2400, 2500, 2600, 2700, M.stockfishFrom - 1, M.stockfishFrom, 3000, ceiling]
     .filter((x, i, a) => a.indexOf(x) === i && x >= floor && x <= ceiling)
     .sort((a, b) => a - b);
+  const shortGuard: Record<string, string> = { "maia-raw": "", "maia-light": ", light guard", "maia-full": ", full guard", "maia-strict": ", strict guard", stockfish: "" };
+  const cell = (p: ReturnType<typeof plan>) => (p.brain === "stockfish" ? "Stockfish" : `Maia ${p.rating}${shortGuard[p.brain]}`);
   const handover = strengths
     .map((x) => {
       const a = plan(x, false);
       const c = plan(x, true);
-      if (a.brain === "stockfish") return `| ${x} | Stockfish | Stockfish | its own blunder guard | all |`;
-      return `| ${x} | ${a.rating} | ${c.rating} | ${guardName[a.brain]} | ${a.stockfishShare ? pct(a.stockfishShare, 0) : "none"} |`;
+      return `| ${x} | ${cell(a)} | ${cell(c)} | ${a.brain === "stockfish" ? "all" : a.stockfishShare ? pct(a.stockfishShare, 0) : "none"} |`;
     })
     .join("\n");
   // The worked example: a raid's boss at 2000, alone and for a crowd.
@@ -351,7 +351,8 @@ function bossBrain(src: FaqSources): FaqSection {
   const exMaia = maiaRatingFor(exLevel, M);
   const exHeld = exLevel >= lastX;
   // The bridge's worked example: its middle.
-  const midBridge = Math.round((M.bridgeStrictFrom + M.stockfishFrom) / 2);
+  const midBridge = Math.round((M.bridgeShareFrom + M.stockfishFrom) / 2);
+  const midPlan = plan(midBridge, true);
   const guard = (g: { maxLoss: number; maxLogitLoss: number }) => `${n(g.maxLoss, "point")} | ${num(g.maxLogitLoss)}`;
   const gaps = [0, 100, 200, 400].map((d) => `| ${d} | ${es(eloExpected(d))} | ${es(1 - eloExpected(d))} |`).join("\n");
   const youVs = gingerElo - you;
@@ -430,19 +431,19 @@ ${lines.join("\n")}
 
 (Below ${pts[0]![0]} the first line carries on down, to no lower than ${M.maiaRatingMin}.) Maia models people, and even the strongest people stop well short of what a top boss must play, so its rating stops rising at ${lastY}, and Stockfish takes over at the top. In between, **the bridge** hands the boss over gradually, so its strength never jumps:
 
-- **Below ${M.bridgeFrom}:** Maia, ${guardName[M.brain]}.
-- **From ${M.bridgeFrom}:** Maia with the light guard; **from ${M.bridgeStrictFrom}:** Maia with the strict guard.
-- **Across the bridge,** a growing share of the boss's moves are its usual Stockfish move instead, up to ${pct(M.bridgeStockfishShare, 0)} just under ${M.stockfishFrom}:
+- **A level below ${M.bridgeFrom}:** Maia, ${guardName[M.brain]}.
+- **A level from ${M.bridgeFrom}:** Maia with the light guard; **from ${M.bridgeStrictFrom}:** Maia with the strict guard. The guard follows the level, so a crowd meets it sooner than one player: where Maia alone could no longer hold a strong crowd, the guard keeps the boss a challenge.
+- **A strength over ${M.bridgeShareFrom}:** a growing share of the boss's moves are its usual Stockfish move instead, up to ${pct(M.bridgeStockfishShare, 0)} just under ${M.stockfishFrom}:
 
-$ Stockfish's share = ${pct(M.bridgeStockfishShare, 0)} × (strength − ${M.bridgeFrom}) / ${M.stockfishFrom - M.bridgeFrom}
+$ Stockfish's share = ${pct(M.bridgeStockfishShare, 0)} × (strength − ${M.bridgeShareFrom}) / ${M.stockfishFrom - M.bridgeShareFrom}
 
-- **From ${M.stockfishFrom} up:** Stockfish, with its blunder guard, as above.
+- **A strength from ${M.stockfishFrom} up:** Stockfish, with its blunder guard, as above.
 
-| Boss strength | Maia, Boss alone | Maia, a crowd | Guard | Stockfish's moves |
-|---|---|---|---|---|
+| Boss strength | Boss alone | A crowd | Stockfish's moves |
+|---|---|---|---|
 ${handover}
 
-**Worked example.** A raid's boss at ${exStrength}: its level is ${exStrength}${margin ? ` + ${num(margin)} = ${exLevel}` : ""}, so it plays Maia at ${exHeld ? `its ceiling, **${exMaia}**` : `${ey0} + ${num(exSlope, 3)} × (${exLevel} − ${ex0}) = ${ey0} + ${num(exSlope * (exLevel - ex0))} = **${exMaia}**`}. A boss at ${midBridge} plays Maia at ${plan(midBridge, true).rating} with the strict guard, and ${pct(share(midBridge), 0)} of its moves are Stockfish's.
+**Worked example.** A raid's boss at ${exStrength}: its level is ${exStrength}${margin ? ` + ${num(margin)} = ${exLevel}` : ""}, so it plays Maia at ${exHeld ? `its ceiling, **${exMaia}**` : `${ey0} + ${num(exSlope, 3)} × (${exLevel} − ${ex0}) = ${ey0} + ${num(exSlope * (exLevel - ex0))} = **${exMaia}**`}${plan(exStrength, true).brain === M.brain ? "" : `, with ${guardName[plan(exStrength, true).brain]}`}. A crowd's boss at ${midBridge} plays Maia at ${midPlan.rating}${shortGuard[midPlan.brain]}, and ${pct(midPlan.stockfishShare, 0)} of its moves are Stockfish's.
 
 These numbers come from simulated battles against crowds of bots, and may be tuned as real battles come in.
 

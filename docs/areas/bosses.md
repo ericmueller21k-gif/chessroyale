@@ -19,8 +19,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   [engine.md](engine.md)).
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
   with **Maia-3** (a human-like model, a separate AGPL program in its own worker: `packages/maia-worker/`), no guard,
-  at a Maia rating for its strength (plus a crowd's margin), then the bridge band (light guard, strict guard, a
-  growing share of Stockfish's moves), then Stockfish from 2800 (`BOSS_BRAIN`). Maia picks only among the moves its
+  at a Maia rating for its level (its strength, plus a crowd's margin), clearly favoured in plain chess (Eric, Oct 12:
+  "boss = a challenge"), then the bridge band (light guard, strict guard by the level; a growing share of Stockfish's
+  moves by the strength), then Stockfish from 2800 (`BOSS_BRAIN`). Maia picks only among the moves its
   powers leave it. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra move and Big Boy's bounce
   keep their own Stockfish picks; Maia's own mistakes replace the slips. Players meet Stockfish until
   `BOSS_BRAIN.forPlayers` is on (needs Eric's OK: the Maia box's source published); admins meet Maia on every boss,

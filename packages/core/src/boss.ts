@@ -196,21 +196,24 @@ export interface BossBrainPlan {
   stockfishShare: number;
 }
 
-/** The brain at a strength when nobody picked one (BOSS_BRAIN: the boss's own, the bridge band, then Stockfish). */
-export function bandBrain(bossId: string, strength: number, s: BossBrainSettings = BOSS_BRAIN): { brain: BossBrain; stockfishShare: number } {
+/**
+ * The brain when nobody picked one (BOSS_BRAIN): the boss's own below the bridge, then the light and the strict guard by
+ * the level, a share of Stockfish's moves by the strength, and Stockfish from stockfishFrom.
+ */
+export function bandBrain(bossId: string, strength: number, level: number = strength, s: BossBrainSettings = BOSS_BRAIN): { brain: BossBrain; stockfishShare: number } {
   const own = s.byBoss[bossId] ?? s.brain;
   if (strength >= s.stockfishFrom || own === "stockfish") return { brain: "stockfish", stockfishShare: 0 };
-  if (strength < s.bridgeFrom) return { brain: own, stockfishShare: 0 };
-  // The bridge: the light guard, then the strict one, and a growing share of Stockfish's moves.
-  const share = (s.bridgeStockfishShare * (strength - s.bridgeFrom)) / Math.max(1, s.stockfishFrom - s.bridgeFrom);
-  return { brain: strength < s.bridgeStrictFrom ? "maia-light" : "maia-strict", stockfishShare: Math.round(share * 1000) / 1000 };
+  const share = strength <= s.bridgeShareFrom ? 0 : (s.bridgeStockfishShare * (strength - s.bridgeShareFrom)) / Math.max(1, s.stockfishFrom - s.bridgeShareFrom);
+  const brain = level < s.bridgeFrom ? own : level < s.bridgeStrictFrom ? "maia-light" : "maia-strict";
+  return { brain, stockfishShare: Math.round(share * 1000) / 1000 };
 }
 
 /**
  * A boss's brain in a battle (BOSS_BRAIN): the one picked (an admin's Brain picker: that brain, no bridge share), else
  * the boss's own with the bridge band; Stockfish from stockfishFrom whatever was picked, and wherever Maia isn't on
- * offer (`maia` false: a player while forPlayers is off, a lobby with one). Maia plays at the strength's rating on
- * its own scale, plus crowdMargin when a crowd (`crowd`: more than one picking its moves) plays the boss.
+ * offer (`maia` false: a player while forPlayers is off, a lobby with one). The level is the strength, plus
+ * crowdMargin when a crowd (`crowd`: more than one picking its moves) plays the boss: Maia plays at the level's rating,
+ * and the bridge's guard follows the level too.
  */
 export function bossBrainFor(
   bossId: string,
@@ -222,9 +225,10 @@ export function bossBrainFor(
 ): BossBrainPlan {
   const stockfish: BossBrainPlan = { brain: "stockfish", rating: null, stockfishShare: 0 };
   if (!maia || strength >= s.stockfishFrom) return stockfish;
-  const { brain, stockfishShare } = picked ? { brain: picked, stockfishShare: 0 } : bandBrain(bossId, strength, s);
+  const level = strength + (opts.crowd ? s.crowdMargin : 0);
+  const { brain, stockfishShare } = picked ? { brain: picked, stockfishShare: 0 } : bandBrain(bossId, strength, level, s);
   if (brain === "stockfish") return stockfish;
-  return { brain, rating: maiaRatingFor(strength + (opts.crowd ? s.crowdMargin : 0), s), stockfishShare };
+  return { brain, rating: maiaRatingFor(level, s), stockfishShare };
 }
 
 /** Threat thresholds: two to a skull, 1 to 5 (the old ten tiers' boundaries). */

@@ -373,6 +373,7 @@ export function movesTables(): string[] {
 interface GameRow {
   kind: string;
   config: string;
+  seed: number;
   rating: number;
   members: number[];
   strength: number;
@@ -395,8 +396,10 @@ const labelOf = (config: string) => Number(config.split("@")[1] ?? 0);
 function groupsOf(rows: GameRow[]): Map<string, GameRow[]> {
   const groups = new Map<string, GameRow[]>();
   const brainOrder = ["sf", "maia-raw", "maia-light", "maia-full", "maia-strict", "game"];
-  for (const r of [...rows].sort((a, b) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || brainOrder.indexOf(a.config.split("@")[0]!) - brainOrder.indexOf(b.config.split("@")[0]!) || labelOf(a.config) - labelOf(b.config))) {
-    const k = `${r.kind}|${r.config}`;
+  for (const r of [...rows].sort((a, b) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || brainOrder.indexOf(a.config.split("@")[0]!) - brainOrder.indexOf(b.config.split("@")[0]!) || labelOf(a.config) - labelOf(b.config) || a.seed - b.seed)) {
+    // (The game's own rule, by the seed it was checked on: seed 2 the first, even rule (#157); seeds 1 and 3 the
+    // harder one shipped after it.)
+    const k = `${r.kind}|${r.config}${r.config === "game" ? `#${r.seed}` : ""}`;
     groups.set(k, [...(groups.get(k) ?? []), r]);
   }
   return groups;
@@ -415,7 +418,9 @@ export function gamesTables(): string[] {
     const w = rs.filter((r) => r.score === 1).length;
     const d = rs.filter((r) => r.score === 0.5).length;
     const plan = rs[0]!.plan;
-    const label = config === "sf" ? "Stockfish (today)" : config === "game" ? `the shipped rule: ${plan?.rating ? `${plan.brain} at Maia ${plan.rating}` : "Stockfish"}${plan?.stockfishShare ? `, ${Math.round(plan.stockfishShare * 100)}% Stockfish` : ""}` : config!.replace("@", " at Maia ");
+    const game = config!.startsWith("game");
+    const which = config === "game#2" ? "the first, even rule" : "the harder rule (shipped)";
+    const label = config === "sf" ? "Stockfish (today)" : game ? `${which}: ${plan?.rating ? `${plan.brain} at Maia ${plan.rating}` : "Stockfish"}${plan?.stockfishShare ? `, ${Math.round(plan.stockfishShare * 100)}% Stockfish` : ""}` : config!.replace("@", " at Maia ");
     const plays = ratingForLoss(mean(rs.flatMap((r) => r.played)));
     const maiaShare = Math.round((100 * rs.reduce((a, r) => a + r.maia, 0)) / Math.max(1, rs.reduce((a, r) => a + r.maia + r.stockfish, 0)));
     const ms = rs.map((r) => r.bossMs).sort((a, b) => a - b)[n >> 1];
@@ -491,7 +496,8 @@ const REPORT_HEAD: string[] = [
   "",
   "Written by `npx tsx packages/sim/scripts/maia-calibration.ts summary` from `reports/maia-calibration/*.jsonl`. A modest",
   "run by design: small samples, every number with its error bar (± two standard errors), and the choices lean on",
-  "several rows at once, never on one. The choices and why are in DECISIONS.md, \"Every boss on Maia: the calibration\".",
+  "several rows at once, never on one. The choices and why are in DECISIONS.md, \"Every boss on Maia: the calibration\"",
+  "and \"Maia bosses harder\".",
   "",
   "**What it measures.**",
   "",
@@ -540,14 +546,34 @@ function REPORT_TAIL(): string[] {
     "  is a ramp in steps no bigger than the error bars. Per move, the light guard (about 1.5–1.7 points a move at Maia",
     "  2400–2700) is today's boss at 2600 (1.39), the strict one (about 0.4) sharper than today's at 2800 (1.05); the",
     "  bridge's growing share of Stockfish's moves brings it to Stockfish's own at 2800.",
-    "- **The shipped rule, checked on fresh openings** (the rows marked so above, 8 games each): the casual crowd scored",
-    "  0.38, the club crowd 0.50, the club player alone 0.50, the expert crowd (in the bridge, 90% Stockfish) 0.38: about",
-    "  even everywhere, within error bars of about ±0.3 to ±0.4. Small samples: the lines are a starting point for real",
-    "  battles, and `crowdMargin` (crowds) and the lines' first points (Boss alone) are the knobs.",
+    "- **The first rule (#157), checked on fresh openings** (\"the first, even rule\" above, 8 games each): the casual",
+    "  crowd scored 0.38, the club crowd 0.50, the club player alone 0.50, the expert crowd (in the bridge, 90% Stockfish)",
+    "  0.38: about even everywhere, within error bars of about ±0.3 to ±0.4.",
+    "",
+    "## Harder: the boss clearly favoured (Eric, Oct 12)",
+    "",
+    "Eric, after #157: \"We should be upping the Maia rating. The numbers don't need to be accurate; people read 'boss' and",
+    "assume it's a challenge, so that's the key.\" The new target: each crowd, and a lone player at its own difficulty,",
+    "scoring about 0.30 in plain chess; the bridge earlier where Maia alone can't get there.",
+    "",
+    "- **What changed:** the lines (level → Maia) 600 up to 1800, 850 at 2000, 1100 at 2250, 2000 at 2400, 2500 from",
+    "  2650; the guard now follows the level, so a crowd meets it sooner (light from a level of 2400, strict from 2800);",
+    "  Stockfish's share follows the strength (from 2500 to all of the moves just under 2800); the crowd's margin stays",
+    "  400.",
+    "- **What it gives** (\"the harder rule\" rows above, 8 games each on fresh openings): the casual crowd 0.25 (Maia",
+    "  805), the expert crowd 0.31 (strict guard, 57% Stockfish): on target. The club crowds 0.19 and 0.06 (the light",
+    "  guard at Maia 2332 and 2410) and the club player alone 0.06 (Maia 910): harder than the target. A casual player",
+    "  alone is at Maia's floor (600) already, 0.13 and 0.00 in the rows above: it can't be made easier.",
+    "- **Why the club crowd overshoots:** with no guard Maia can't hold a club crowd under about 0.5 even at its ceiling",
+    "  (2100 to 2600 above), and the light guard is a big step: it takes away exactly the blunders a voting crowd",
+    "  punishes. Nothing in between in this design, and Eric asked for the bridge earlier rather than a lost challenge.",
+    "  Two tries before this one said the same: the strict guard from a level of 2550 (the club crowd 0 of 8), and the",
+    "  light guard at Maia 2500 (0.19 and 0.12). If real club-level crowds find it too hard, the knobs are a looser",
+    "  light guard or the light guard from a higher level.",
     "",
     "## What the game ships (BOSS_BRAIN)",
     "",
-    `Maia's rating lines: ${M.maiaRating.map(([x, y]) => `${x} → ${y}`).join(", ")} (held above the last; never under ${M.maiaRatingMin}); a crowd's margin ${M.crowdMargin}; the bridge from ${M.bridgeFrom} (light guard), the strict guard from ${M.bridgeStrictFrom}, Stockfish's share up to ${Math.round(M.bridgeStockfishShare * 100)}% just under ${M.stockfishFrom}; Stockfish from ${M.stockfishFrom}.`,
+    `Maia's rating lines (level → Maia): ${M.maiaRating.map(([x, y]) => `${x} → ${y}`).join(", ")} (held above the last; never under ${M.maiaRatingMin}); a crowd's margin ${M.crowdMargin}; the light guard from a level of ${M.bridgeFrom}, the strict guard from a level of ${M.bridgeStrictFrom} (a crowd's level only: one player is Stockfish's from a strength of ${M.stockfishFrom}); Stockfish's share from a strength of ${M.bridgeShareFrom} up to ${Math.round(M.bridgeStockfishShare * 100)}% just under ${M.stockfishFrom}; Stockfish from ${M.stockfishFrom}.`,
     "",
     "| Boss strength | Boss alone | A crowd |",
     "| --- | --- | --- |",
