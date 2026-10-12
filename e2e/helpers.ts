@@ -18,6 +18,46 @@ export const test = base.extend<{ closeOwnContexts: void }>({
 });
 
 /**
+ * The big board's parts, as selectors that match either board the game can draw: chessground's or our own
+ * (BOARD.impl in settings.ts; `VITE_BOARD=own npm run e2e` runs the whole suite on ours). Tests use these, never one
+ * board's own element names.
+ */
+export const BOARD_SEL = {
+  /** The board element, with its `orientation-white` / `orientation-black` class. */
+  wrap: ":is(.cg-wrap, .hb)",
+  /** Exactly the 64 squares (a hair smaller than the wrap). */
+  squares: ":is(cg-board, .hb-board)",
+  /** The drawn board with its coordinates and arrows (the same box as the squares). */
+  container: ":is(cg-container, .hb-container)",
+  /** A piece on the board (`piece.white.pawn`, `.fading` while a captured one fades). */
+  piece: ":is(cg-board, .hb-board) piece",
+  /** A square's highlight (`square.move-dest`, `.selected`, `.last-move`, `.oc` on an occupied destination). */
+  square: ":is(cg-board, .hb-board) square",
+  /** The arrows' shafts. */
+  arrowLine: ":is(svg.cg-shapes, svg.hb-shapes) line",
+  /** The coordinates along the bottom and up the side. */
+  fileCoord: ":is(coords.files coord, .hb-files .hb-coord)",
+  rankCoord: ":is(coords.ranks coord, .hb-ranks .hb-coord)",
+} as const;
+
+/**
+ * Plays `move` in the page's match while it's your turn (on `fen`, if given; nothing to play: nothing happens). Work a
+ * move out in one evaluate (it may await the engine) and play it with this, never inside that awaited evaluate: the
+ * move starts a render before Chrome has taken the evaluate's answer, and under a busy render Chrome can lose the answer
+ * to its garbage collector ("Promise was collected", which Playwright reports as "Execution context was destroyed").
+ */
+export async function submitMove(page: Page, move: string | null | undefined, fen?: string) {
+  if (!move) return;
+  await page.evaluate(
+    ([mv, f]) => {
+      const m = (window as any).match;
+      if (m.phase.kind === "play" && (!f || m.phase.board.fen === f)) m.submit(mv);
+    },
+    [move, fen ?? null] as const,
+  );
+}
+
+/**
  * The front door, as a player uses it. Your name is your profile's: `named` sets the one a fresh device's guest
  * account is made with (before the first visit).
  */
@@ -127,9 +167,9 @@ export async function watchFor(page: Page, what: Record<string, { selector: stri
  * list). Poll it until the board you mean is on screen.
  */
 export async function boardCoords(page: Page): Promise<{ orientation: "white" | "black" | null; turn: number; off: string[] }> {
-  return page.evaluate(() => {
-    const wrap = document.querySelector(".board-area .cg-wrap");
-    const board = wrap?.querySelector("cg-board");
+  return page.evaluate((sel) => {
+    const wrap = document.querySelector(`.board-area ${sel.wrap}`);
+    const board = wrap?.querySelector(sel.squares);
     if (!wrap || !board) return { orientation: null, turn: 0, off: ["no board"] };
     const black = wrap.classList.contains("orientation-black");
     const turn = Number((wrap.closest(".board-wrap") as HTMLElement | null)?.dataset.turn ?? 0);
@@ -140,7 +180,7 @@ export async function boardCoords(page: Page): Promise<{ orientation: "white" | 
       r.selectNodeContents(el);
       return r.getBoundingClientRect();
     };
-    // The real square drawn in a column and row (from the top-left): chessground's key there, turned back.
+    // The real square drawn in a column and row (from the top-left): the view's square there, turned back.
     const realAt = (col: number, row: number) => {
       const F = black ? 7 - col : col;
       const R = black ? row : 7 - row;
@@ -152,8 +192,8 @@ export async function boardCoords(page: Page): Promise<{ orientation: "white" | 
     const inSquare = (t: DOMRect, col: number, row: number) =>
       t.width > 0 && t.left >= b.left + col * sq - 0.5 && t.right <= b.left + (col + 1) * sq + 0.5 && t.top >= b.top + row * sq - 0.5 && t.bottom <= b.top + (row + 1) * sq + 0.5;
     const where = (t: DOMRect) => `${Math.round(t.left - b.left)},${Math.round(t.top - b.top)} on a ${Math.round(sq)} px square`;
-    const files = [...wrap.querySelectorAll("coords.files coord")];
-    const ranks = [...wrap.querySelectorAll("coords.ranks coord")];
+    const files = [...wrap.querySelectorAll(sel.fileCoord)];
+    const ranks = [...wrap.querySelectorAll(sel.rankCoord)];
     const off: string[] = [];
     if (files.length !== 8 || ranks.length !== 8) off.push(`${files.length} bottom and ${ranks.length} side labels`);
     const bottom = files.map((el) => (el.textContent ?? "").trim().toLowerCase());
@@ -172,7 +212,7 @@ export async function boardCoords(page: Page): Promise<{ orientation: "white" | 
       if (row === undefined || !inSquare(t, 0, row)) off.push(`side ${label} at ${where(t)}`);
     });
     return { orientation: black ? "black" : "white", turn, off };
-  });
+  }, BOARD_SEL);
 }
 
 /** Waits until the big board (that way up, if given) has every coordinate in its own square; says which way up it is. */

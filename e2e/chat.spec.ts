@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { named, test } from "./helpers.ts";
+import { BOARD_SEL, named, test } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 const team = (p: Page) => p.evaluate(() => (window as any).match.standings().find((s: any) => s.isYou)?.team as "w" | "b");
@@ -52,7 +52,7 @@ async function tapMove(p: Page): Promise<string> {
   const side = fen.split(" ")[1];
   const moves = new Chess(fen).moves({ verbose: true }).filter((m) => !m.promotion);
   const mv = moves.find((m) => m.piece === "n") ?? moves[0]!;
-  const box = (await rect(p, ".board-area cg-board"))!;
+  const box = (await rect(p, `.board-area ${BOARD_SEL.squares}`))!;
   const at = (sq: string) => {
     const f = sq.charCodeAt(0) - 97;
     const r = Number(sq[1]) - 1;
@@ -156,7 +156,7 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await expect(phone.locator(".under-board.ub-split .mini-tower.narrow")).toBeVisible();
   const split = phone.locator(".under-board.ub-split .qchat-split");
   await expect(split).toBeVisible();
-  expect(overlaps((await rect(phone, ".qchat-split"))!, (await rect(phone, ".board-area cg-board"))!)).toBe(false);
+  expect(overlaps((await rect(phone, ".qchat-split"))!, (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!)).toBe(false);
   // Exactly the lines picked in the profile, in that order; the emoji picked.
   await expect(phone.locator(".qchat-split .qrow:not(.emoji) .qchip")).toHaveText(phonePicks);
   await expect(phone.locator(".qchat-split .qrow.emoji .qchip")).toHaveText(["👍", "👏", "😂", "😮", "😬", "🔥", "🎉"]);
@@ -229,7 +229,7 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await phone.locator(".qto button", { hasText: "Team" }).click();
 
   // The phone, chat full width: the emoji in one row, no scrolling; the board still takes a move by two taps.
-  const boardBefore = (await rect(phone, ".board-area cg-board"))!;
+  const boardBefore = (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!;
   await phone.getByRole("button", { name: "Chat full width" }).click();
   await expect(phone.locator(".under-board.ub-chat .qchat-full")).toBeVisible();
   await expect(phone.locator(".under-board .mini-tower")).toHaveCount(0);
@@ -237,12 +237,12 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   expect(await emojiRow.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
   expect(new Set(await emojiRow.locator(".qchip").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))).size).toBe(1);
   await untilMyTurn(phone, desk);
-  expect(overlaps((await rect(phone, ".qchat-full"))!, (await rect(phone, ".board-area cg-board"))!)).toBe(false);
+  expect(overlaps((await rect(phone, ".qchat-full"))!, (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!)).toBe(false);
   const picked = () => phone.evaluate(() => (window as any).__picked ?? []);
   const first = await tapMove(phone);
   await expect.poll(picked).toEqual([first]);
   // The board never moved or resized for chat.
-  expect(await rect(phone, ".board-area cg-board")).toEqual(boardBefore);
+  expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
 
   // Scoreboard full width (chat hidden): a new line shows as a bubble under the top bar, never over the board, and a
   // move made while it shows still lands.
@@ -255,7 +255,7 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   const bubble = phone.locator(".qbubble");
   await expect(bubble).toBeVisible();
   await expect(bubble).toContainText("GG");
-  expect(overlaps((await rect(phone, ".qbubble"))!, (await rect(phone, ".board-area cg-board"))!)).toBe(false);
+  expect(overlaps((await rect(phone, ".qbubble"))!, (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!)).toBe(false);
   // It lets taps through.
   expect(await bubble.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
   const second = await tapMove(phone);
@@ -267,5 +267,5 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await expect(phone.locator(".under-board.ub-split .qchat-split")).toBeVisible();
   await expect(phone.locator(".qchat-split .qline", { hasText: "GG" }).filter({ hasText: "Desky" })).toBeVisible();
   await expect(unread).toHaveCount(0);
-  expect(await rect(phone, ".board-area cg-board")).toEqual(boardBefore);
+  expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
 });

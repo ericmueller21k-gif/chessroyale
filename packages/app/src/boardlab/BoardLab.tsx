@@ -1,7 +1,8 @@
 /**
  * Board lab (/boardlab, throwaway, not linked anywhere): try candidate boards by feel. Play both sides from the start.
- * ?board=cg (today's game board) | cm (cm-chessboard) | own (written here), plus anim, drag, dots and pieces options
- * for cm and own. Remove or admin-gate before a public launch (DECISIONS.md).
+ * ?board=cg (the game's chessground board) | own (the game's own board, board/OwnBoard.tsx: Eric's pick, Oct 12) | cm
+ * (cm-chessboard), plus anim, drag and dots options for cm. Both game boards are the real ones, as the game sets them
+ * up. Remove or admin-gate before a public launch (DECISIONS.md).
  */
 import type { ComponentType } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
@@ -13,6 +14,8 @@ import type { LabBoardProps, LabOpts } from "./types.ts";
 import "./boardlab.css";
 
 type BoardKind = LabOpts["board"] | "cg";
+/** The game's own boards (not the lab's options). */
+const GAME_BOARDS: readonly BoardKind[] = ["cg", "own"];
 type Opts = Omit<LabOpts, "board"> & { board: BoardKind };
 
 const CHOICES: { [K in keyof Opts]: readonly Opts[K][] } = {
@@ -20,7 +23,7 @@ const CHOICES: { [K in keyof Opts]: readonly Opts[K][] } = {
   anim: ["fast", "normal", "slow"],
   drag: ["on", "off"],
   dots: ["on", "off"],
-  pieces: ["game", "cm"],
+  pieces: ["game"],
 };
 const DEFAULTS: Opts = { board: "cg", anim: "normal", drag: "on", dots: "on", pieces: "game" };
 
@@ -85,10 +88,9 @@ export function BoardLab() {
 
   // The board's code loads only when it's picked.
   useEffect(() => {
-    if (opts.board === "cg") return;
+    if (opts.board !== "cm") return;
     let on = true;
-    const load = opts.board === "cm" ? import("./CmBoard.tsx").then((m) => m.CmBoard) : import("./OwnBoard.tsx").then((m) => m.OwnBoard);
-    void load.then((C) => on && setImpl({ kind: opts.board, C }));
+    void import("./CmBoard.tsx").then((m) => on && setImpl({ kind: "cm", C: m.CmBoard }));
     return () => {
       on = false;
     };
@@ -117,7 +119,7 @@ export function BoardLab() {
     fen,
     lastMove,
     orientation,
-    opts: { ...opts, board: opts.board === "cm" ? "cm" : "own" },
+    opts: { ...opts, board: "cm" },
     dests,
     check,
     onMove: (from, to) => playUci(from + to, true),
@@ -127,7 +129,7 @@ export function BoardLab() {
     <div class="bl-page" data-ply={moves.length} data-fen={fen}>
       <div class="bl-chips">
         {(Object.keys(CHOICES) as (keyof Opts)[]).map((k) => (
-          <div class={`bl-group${k !== "board" && opts.board === "cg" ? " bl-off" : ""}`} key={k}>
+          <div class={`bl-group${k !== "board" && GAME_BOARDS.includes(opts.board) ? " bl-off" : ""}`} key={k}>
             <span class="bl-label">{k}</span>
             {CHOICES[k].map((v) => (
               <button type="button" key={v} class={`bl-chip${opts[k] === v ? " bl-chip-on" : ""}`} data-opt={`${k}=${v}`} onClick={() => set(k, v)}>
@@ -138,8 +140,8 @@ export function BoardLab() {
         ))}
       </div>
       <div class="bl-board" data-board={opts.board}>
-        {opts.board === "cg" ? (
-          <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive onMove={(uci) => playUci(uci, false)} />
+        {GAME_BOARDS.includes(opts.board) ? (
+          <Board key={opts.board} impl={opts.board === "own" ? "own" : "chessground"} fen={fen} orientation={orientation} lastMove={lastMove} interactive onMove={(uci) => playUci(uci, false)} />
         ) : Impl?.kind === opts.board ? (
           <Impl.C {...boardProps} />
         ) : null}
@@ -157,8 +159,10 @@ export function BoardLab() {
         </button>
       </div>
       <p class="bl-note">
-        Board lab. {opts.board === "cg" ? "cg is today's game board as the game sets it up (220 ms slides, promotion picker); the other options apply to cm and own." : "Pawns promote to a queen."}
-        {opts.board !== "cg" && opts.pieces === "cm" && " These pieces (Staunty) are non-commercial only: to try, not to ship."}
+        Board lab.{" "}
+        {GAME_BOARDS.includes(opts.board)
+          ? `${opts.board === "cg" ? "cg is the chessground board" : "own is our own board"} as the game sets it up (220 ms slides, promotion picker); the other options apply to cm.`
+          : "Pawns promote to a queen."}
       </p>
     </div>
   );

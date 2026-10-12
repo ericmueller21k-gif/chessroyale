@@ -1,4 +1,5 @@
 import { BoardTurn, viewSquare, type QuarterTurn } from "../board-view.ts";
+import { boardSquares } from "../board/dom.ts";
 import type { ComponentChildren } from "preact";
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
@@ -345,7 +346,7 @@ export function KingCommand({
   const [geo, setGeo] = useState<{ point: Xy; raised: Xy; at: Xy; u: number } | null>(null);
   useLayoutEffect(() => {
     const measure = () => {
-      const board = ref.current?.closest(".board-wrap")?.querySelector("cg-board")?.getBoundingClientRect();
+      const board = boardSquares(ref.current)?.getBoundingClientRect();
       const him = document.querySelector(".gk-unit .gk-unit-btn .god-king")?.getBoundingClientRect();
       if (!board || !him || !board.width) return setGeo(null);
       const tip = ([x, y]: readonly [number, number]): Xy => ({ x: him.left + x * him.width, y: him.top + y * him.height });

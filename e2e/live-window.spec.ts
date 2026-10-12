@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { named, test } from "./helpers.ts";
+import { BOARD_SEL, named, test } from "./helpers.ts";
 
 /**
  * The computer's live window at the top of the home's play column (DECISIONS.md, "The live window"): a bot match
@@ -76,11 +76,11 @@ test("computer: a bot match plays in the live window above the buttons, labelled
   const win = page.getByRole("region", { name: "Bot match, a recording" });
   await expect(win).toBeVisible();
   const look = () =>
-    page.evaluate(() => ({
+    page.evaluate((squares) => ({
       nodes: document.getElementsByTagName("*").length,
       animations: document.getAnimations().length,
-      fen: (document.querySelector(".fd-livewin cg-board")?.innerHTML.length ?? 0) > 0,
-    }));
+      fen: (document.querySelector(`.fd-livewin ${squares}`)?.innerHTML.length ?? 0) > 0,
+    }), BOARD_SEL.squares);
   const first = await look();
   const line0 = await win.locator(".fd-livewin-line").textContent();
   const meta0 = await win.locator(".fd-livewin-meta").textContent();

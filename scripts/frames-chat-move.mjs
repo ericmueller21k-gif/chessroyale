@@ -86,8 +86,8 @@ const sampler = (async () => {
     const s = await p
       .evaluate(() => {
         const r = (el) => (el ? (({ x, y, width, height }) => ({ x: Math.round(x), y: Math.round(y), w: Math.round(width), h: Math.round(height) }))(el.getBoundingClientRect()) : null);
-        const pieces = [...document.querySelectorAll(".board-area cg-board piece")].map((e) => `${e.className}@${e.style.transform}`).sort().join("|");
-        return { k: window.match?.phase.kind, pieces, board: r(document.querySelector(".board-area cg-board")), bubble: r(document.querySelector(".qbubble")), text: document.querySelector(".qbubble")?.textContent ?? "" };
+        const pieces = [...document.querySelectorAll(".board-area :is(cg-board, .hb-board) piece")].map((e) => `${e.className}@${e.style.transform}`).sort().join("|");
+        return { k: window.match?.phase.kind, pieces, board: r(document.querySelector(".board-area :is(cg-board, .hb-board)")), bubble: r(document.querySelector(".qbubble")), text: document.querySelector(".qbubble")?.textContent ?? "" };
       })
       .catch(() => null);
     if (s) {
@@ -125,7 +125,7 @@ for (let m = 0; m < moves; m++) {
   const side = fen.split(" ")[1];
   const all = new Chess(fen).moves({ verbose: true }).filter((x) => !x.promotion);
   const mv = all.find((x) => x.piece === "n" || x.piece === "b") ?? all[0];
-  const box = await p.locator(".board-area cg-board").first().boundingBox();
+  const box = await p.locator(".board-area :is(cg-board, .hb-board)").first().boundingBox();
   const sq = (s) => {
     const f = s.charCodeAt(0) - 97;
     const r = Number(s[1]) - 1;

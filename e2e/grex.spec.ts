@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { engineTop, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, engineTop, test, watchFor } from "./helpers.ts";
 
 /**
  * Jefferson (id "grex"; G-REX until Oct 10), the Fire boss, played through alone on a phone and a computer: his sparkler's tile burning in stages with its
@@ -103,7 +103,7 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
   await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "24");
   await expect(page.locator(".power-board .pw-fire.stage-2 .pw-count")).toHaveText("2");
   // The pips stand in the gutter right of the board: never over it, its timer bar or the eval bar.
-  const [pips, board, evalBar, timer] = await Promise.all([".power-board .pw-pips", "cg-board", ".eval-bar", ".timer-bar"].map((s) => page.locator(s).first().boundingBox()));
+  const [pips, board, evalBar, timer] = await Promise.all([".power-board .pw-pips", BOARD_SEL.squares, ".eval-bar", ".timer-bar"].map((s) => page.locator(s).first().boundingBox()));
   expect(pips!.x).toBeGreaterThanOrEqual(board!.x + board!.width - 0.5);
   expect(pips!.x + pips!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   expect(pips!.height).toBeGreaterThan(pips!.width * 10);

@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { soloFromHome, test } from "./helpers.ts";
+import { BOARD_SEL, soloFromHome, test } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const centre = async (p: Page, sel: string, nth = 0) => {
@@ -48,7 +48,7 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible();
   // An empty board: no pieces, only the players' pawns, both teams on their own two ranks.
-  await expect(page.locator("cg-board piece")).toHaveCount(0);
+  await expect(page.locator(BOARD_SEL.piece)).toHaveCount(0);
   await expect(page.locator(".vote-pawn")).toHaveCount(100);
   // Yours: the same pawn, fully solid and a little bigger (voteYouScale), on top of everyone else's (which are faint).
   // No tag, no ring, no glow, no bob (Eric: tapping a card works too, so nobody loses their pawn).
@@ -153,7 +153,7 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
 
   // The game begins: the pawns are gone, the real pieces are on their squares, and the board hasn't moved.
   await expect.poll(() => phase(page), { timeout: 20_000 }).toMatch(/play|watching/);
-  await expect(page.locator("cg-board piece")).toHaveCount(32);
+  await expect(page.locator(BOARD_SEL.piece)).toHaveCount(32);
   await expect(page.locator(".vote-pawn")).toHaveCount(0);
   expect(await boardBox(page)).toEqual(voteBoard);
   // The clock is the voted speed's: Normal 20 s, Variable 10 s on move 1, Bullet 10 s.

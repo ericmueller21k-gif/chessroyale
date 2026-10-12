@@ -10,6 +10,7 @@ import { BoardEffects, BossMoment, prewarm } from "./BossEffect.tsx";
 import { PowerBanner } from "./PowerParts.tsx";
 import { TimerBar } from "./Countdown.tsx";
 import { CRITICAL, NORMAL, Say, SpeechBox, bossVoice } from "../speech.tsx";
+import { boardSquares } from "../board/dom.ts";
 
 /**
  * Hollow's Lights out on the board, from the shared state (the server's test and timing, solo's alike): the game paused,
@@ -37,7 +38,7 @@ function firstSeen(key: string, now: number): number {
   return t;
 }
 
-/** The square under a point of the board (chessground's board box, from either side). */
+/** The square under a point of the board (its squares' box, from either side). */
 function squareAtPoint(el: Element, x: number, y: number, orientation: "white" | "black"): string | null {
   const r = el.getBoundingClientRect();
   const col = Math.floor(((x - r.left) / r.width) * 8);
@@ -280,8 +281,8 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
           role="grid"
           aria-label="Tap where his pieces are"
           onPointerDown={(e) => {
-            const cg = (e.currentTarget as HTMLElement).parentElement?.querySelector("cg-board");
-            const sq = cg ? squareAtPoint(cg, e.clientX, e.clientY, orientation) : null;
+            const squares = boardSquares(e.currentTarget as HTMLElement);
+            const sq = squares ? squareAtPoint(squares, e.clientX, e.clientY, orientation) : null;
             if (sq) onTap(sq);
           }}
         />

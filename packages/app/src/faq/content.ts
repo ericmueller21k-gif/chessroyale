@@ -661,6 +661,7 @@ function credits(src: FaqSources): FaqSection {
     body: `
 - **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish)). It runs as a separate program in your browser.
 - **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [some bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; the source of our Maia box is available on request ([notice](/engine/maia/NOTICE.txt), [licence](/engine/maia/LICENSE.txt)).
+- **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD licence ([licence](/licenses/pieces.txt)).
 - The same credits are at the foot of Settings.
 `,
   };

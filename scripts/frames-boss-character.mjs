@@ -77,7 +77,7 @@ async function run(name, context) {
   const c = new Chess(fen);
   const moves = c.moves({ verbose: true });
   const mv = moves.find((m) => m.captured) ?? moves.find((m) => m.piece === "n" || m.piece === "b") ?? moves[0];
-  const board = await p.locator("cg-board").first().boundingBox();
+  const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
   const flip = (await p.evaluate(() => window.match.boss?.crowdSide)) === "b";
   const sq = (s) => {
     const f = s.charCodeAt(0) - 97;
@@ -194,7 +194,7 @@ async function perf(p, name, sq, board, fen) {
   // The storm: 14 tiles burning at every stage on the crowd's side, fireballs falling, rockets, the sparkler, the shots left, the candle on the board.
   const ranks = crowd === "w" ? ["1", "2", "3"] : ["8", "7", "6"];
   const squares = ["a", "b", "c", "d", "e", "f", "g", "h"].flatMap((f) => ranks.map((r) => f + r)).filter((_, i) => i % 12 !== 5).slice(0, 14);
-  const orientation = (await p.evaluate(() => document.querySelector(".cg-wrap")?.classList.contains("orientation-black"))) ? "black" : "white";
+  const orientation = (await p.evaluate(() => document.querySelector(":is(.cg-wrap, .hb)")?.classList.contains("orientation-black"))) ? "black" : "white";
   const items = [
     // The tiles all on one canvas over the board (BoardEffects), a piece burning on one of them.
     {

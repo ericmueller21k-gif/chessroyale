@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { test } from "./helpers.ts";
+import { BOARD_SEL, test } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
 
 /**
@@ -86,7 +86,7 @@ test("a long boss battle on a slow phone: nothing grows, and late frames stay wi
   );
   const late = await settle();
   // A piece dragged round the board for two seconds (and put back), the frames measured.
-  const board = (await page.locator("cg-board").first().boundingBox())!;
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   const piece = new Chess(fen).moves({ verbose: true })[0]!.from;
   const at = (sq: string) => ({ x: board.x + (sq.charCodeAt(0) - 96.5) * (board.width / 8), y: board.y + (8.5 - Number(sq[1])) * (board.height / 8) });
   await page.evaluate(() => ((window as any).__perf.frames = []));
@@ -190,7 +190,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   const late = await page.evaluate(counts);
   const idle = await frames(1500);
   // A piece dragged round the board for two seconds (and put back).
-  const board = (await page.locator("cg-board").first().boundingBox())!;
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   const piece = new Chess(fen).moves({ verbose: true })[0]!.from;
   const at = (sq: string) => ({ x: board.x + (sq.charCodeAt(0) - 96.5) * (board.width / 8), y: board.y + (8.5 - Number(sq[1])) * (board.height / 8) });
   await page.evaluate(() => ((window as any).__perf.frames = []));
