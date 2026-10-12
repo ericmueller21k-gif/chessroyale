@@ -2,7 +2,7 @@ import { pieceAt } from "@chessroyale/chess";
 import { EFFECTS, animLength } from "../characters/power-art.ts";
 import { BossEffect, SpriteAnim } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
-import { Flight, PIECE_WORD, at, type BossUi, type MomentProps } from "./PowerParts.tsx";
+import { Flight, PIECE_WORD, onSquare, type BossUi, type MomentProps } from "./PowerParts.tsx";
 
 /**
  * Ginger's powers on screen: the freeze (her cast, the ice bolt to the piece, the ice forming on it and shimmering
@@ -22,7 +22,7 @@ function freezeMoment({ boss, moment, t, orientation, banner, cast }: MomentProp
       {t < 1500 && banner("FREEZE!", piece ? `Your ${PIECE_WORD[piece.type]} is frozen` : undefined, "cold")}
       {cast("freeze", FREEZE.boltAt)}
       {moment.square && t >= FREEZE.boltAt && t < FREEZE.iceAt && <Flight name="iceBolt" square={moment.square} orientation={orientation} since={moment.at + FREEZE.boltAt} ms={FREEZE.iceAt - FREEZE.boltAt} aim />}
-      {moment.square && t >= FREEZE.iceAt - 60 && t < FREEZE.iceAt + 900 && <span class="pw-frost" style={{ ...at(moment.square, orientation), animationDelay: `${FREEZE.iceAt - 60 - t}ms` }} />}
+      {moment.square && t >= FREEZE.iceAt - 60 && t < FREEZE.iceAt + 900 && <span class="pw-frost" style={{ ...onSquare(moment.square, orientation), animationDelay: `${FREEZE.iceAt - 60 - t}ms` }} />}
     </div>
   );
 }
@@ -53,7 +53,8 @@ export const GINGER_UI = {
     // The blizzard's sweep crosses the board left to right; each piece ices over as it passes.
     blizzard: { order: 2, kit: "ultimate", dock: "Blizzard!", appearAt: (m, square, orientation) => m.at + BLIZZARD.sweepAt + (squareXY(square, orientation).x / 800) * BLIZZARD.sweepMs, view: blizzardMoment },
   },
-  // Ice over frozen pieces (the characters' iceOverlay: it forms, then shimmers while it lasts).
+  // Ice over frozen pieces (the characters' iceOverlay: it forms, then shimmers while it lasts): one block the shape of
+  // the square, the same on every square whatever the piece, placed on chessground's own square (eighths of --cg-size).
   board: ({ boss, p, board, orientation, moments, now, appearAt }) => {
     const iced = p.iced.filter((sq) => pieceAt(board, sq)?.color === boss.crowdSide);
     const blizzard = moments.some((m) => m.kind === "blizzard");
@@ -63,7 +64,7 @@ export const GINGER_UI = {
         if (now < t) return null;
         const fx = EFFECTS.iceOverlay;
         return (
-          <span key={`ice-${sq}`} class="pw-ice" style={at(sq, orientation)}>
+          <span key={`ice-${sq}`} class="pw-ice" style={onSquare(sq, orientation)} data-square={sq}>
             {/* (In the blizzard a dozen pieces ice over at once: the sweep's wind is their sound, not a dozen crackles.) */}
             <SpriteAnim ch={fx.ch} anim={fx.start!} then={fx.loop} since={t} sounds={blizzard ? {} : fx.sounds} id={sq} />
           </span>
