@@ -266,9 +266,10 @@ export interface BossPowerState {
   pies?: { square: string; until: number }[];
   /**
    * Boingo's funhouse: the crowd turn it came (the board upside down), and the side its quarter turn goes to after
-   * (90: a quarter turn clockwise, 270: anticlockwise); then the other side, then back (boardAngle).
+   * (90: a quarter turn clockwise, 270: anticlockwise); then the other side, then back (boardAngle). `move`/`san`: the
+   * crowd's move he played for it on that first turn (Eric, Oct 12: "the forced move is the joke"), once played.
    */
-  funhouse?: { turn: number; side: 90 | 270 } | null;
+  funhouse?: { turn: number; side: 90 | 270; move?: string; san?: string } | null;
   /**
    * The meter's charge from time, the judged eval and the God King's strikes (rage points, never coming down); the
    * boss's material lost adds to it (BOSS_POWERS.ragePerMaterial a point). `judged`: the crowd's expected score after its
@@ -475,7 +476,10 @@ export interface PowerEvent {
   fizzled?: string[];
   /** Hollow's first cover of the dark (the square of the piece he just moved, with his first-cover line). */
   first?: true;
-  /** Jefferson's fireproof laugh: which of his lines (0-4095 from the seed; the app takes it modulo its lines). */
+  /**
+   * Which of the boss's lines (0-4095 from the seed; the app takes it modulo its lines): Jefferson's fireproof laugh,
+   * Boingo's joke as his funhouse plays the crowd's move.
+   */
   pick?: number;
 }
 

@@ -245,11 +245,11 @@ export interface NetBossPowers {
   /**
    * Boingo's funhouse: how far the board is turned clockwise from the crowd's own view this turn (0, 90, 180, 270;
    * missing from older servers), `flipped` when it's 180 (older screens), and the funhouse itself (the turn it came, the
-   * side of its quarter turn).
+   * side of its quarter turn, and the crowd's move he played for it as it came: `move`, `san`).
    */
   angle?: 0 | 90 | 180 | 270;
   flipped: boolean;
-  funhouse: { turn: number; side: 90 | 270 } | null;
+  funhouse: { turn: number; side: 90 | 270; move?: string; san?: string } | null;
   /** What happened as this turn began (a freeze, a pie, the warning, the blizzard, the funhouse): each plays once. */
   events: PowerEvent[];
   /** The crowd's turn: the moves it may play (null: any legal move). */
@@ -589,6 +589,8 @@ export type ServerMessage = { now: number } & (
       stagger?: boolean;
       /** A boss power limits the boss's moves (a pie): play one of these. */
       allowed?: string[];
+      /** Boingo's funhouse: play the crowd's move for it, a weak but recoverable one (funhouseMoveFrom) from `allowed`. */
+      funhouse?: boolean;
       /** Hollow's extra move (a failed Lights out): a quiet one within the cap (extraMoveFrom); "" if there's none. */
       extra?: boolean;
       /**

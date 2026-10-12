@@ -23,6 +23,7 @@ import {
   ownShots,
   shadowStage,
   boardAngle,
+  funhouseDue,
   initPowers,
   legalMoves,
   newBoard,
@@ -208,7 +209,9 @@ describe("the test trigger", () => {
     expect(kinds(b)).toContain("warn");
     b = triggerUltimate(b).boss!;
     b = prepareTurn({ ...b, crowdMoves: 2 }, down, "", S);
-    expect(kinds(b)).toContain("funhouse");
+    // (The funhouse's moment comes with the move he plays for the crowd: due now.)
+    expect(b.powers!.funhouse?.turn).toBe(3);
+    expect(funhouseDue(b)).toBe(true);
     expect(boardAngle(b)).toBe(180);
     expect(b.powers!.ultAt).toBe(3);
     expect(b.powers!.ults).toBe(1);
@@ -235,6 +238,11 @@ describe("the test trigger", () => {
       for (let i = 0; i < 8 && !runner.stageComplete(); i++) {
         if (runner.bossToMove()) await runner.playBoss();
         if (runner.stageComplete()) break;
+        // (Boingo's funhouse: his move for the crowd first.)
+        if (runner.funhouseDue()) {
+          await runner.playFunhouse();
+          continue;
+        }
         runner.deal();
         const allowed = runner.crowdAllowed() ?? legalMoves(runner.boards.get(0)!.fen);
         expect(allowed.length).toBeGreaterThan(0);

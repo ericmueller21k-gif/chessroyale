@@ -1442,3 +1442,28 @@ frames checked, the measurements with no regressions). The calls:
 - **If it ever has to go back:** the whole of Phase 2 is one merge commit, so `git revert -m 1 <that merge>` on `main`
   (then push; `main` deploys) puts chessground back as it was at the end of Phase 1, with the switch (off by default:
   chessground drawn) and the lab. Nothing else depends on it.
+
+### Boingo's funhouse: the forced move is back (Oct 12, 2026)
+
+Eric, Oct 12: the forced move is the joke; restored. The calls:
+
+- **When:** once a funhouse, as it comes (the crowd's turn T, when the board turns upside down): he plays the crowd's
+  move for it, then his own; the crowd plays its own from T+1. Each repeat ultimate (a new funhouse once the board is
+  back) plays one again, once. It's the crowd's move on the board, but nobody picked it, so nobody is scored for it (the
+  "Not scored." line is back, under "Plays your move: Nf3" beside his icon: the old "Boingo the Clown plays your
+  move: Nf3" was cut off before the move in a phone's dock).
+- **Which move:** restored as it was before Oct 11 (`funhouseMoveFrom`): weak but recoverable, 1 to 2.5 pawns worse
+  than the best (`funhouseLoss` [10, 25]), never past `funhouseMaxLogit` 1.6 in log-odds, never a move that allows a
+  forced mate or leaves the queen hanging, from the allowed moves (a pie still blocks it).
+- **Online:** the host's engine picks it (the boss request's `funhouse` flag, from the crowd's allowed moves), the
+  server plays it and sends the same move to everyone; with no engine anywhere, a random allowed move, as for the boss.
+- **The rotation:** unchanged, 4 turns a step counted from T, so his move is the first of the upside-down step's 4
+  turns (the crowd plays 3 upside down, then 4 at each quarter turn, then back). The meter waits as before.
+- **His screen:** the funhouse is a screen of its own again, after his move for the crowd (5.2 s): the banner, he pogos
+  on, the board turns upside down, his joke, the move lands, he bounces off; then his own move. Until then his previous
+  move shows the board the right way up (`shownAngle`): the board turns in his moment, not before it.
+- **His joke** (`FUNHOUSE_LINES`, picked from the battle's seed as the event's `pick`, like Jefferson's laugh, so the
+  same for everyone in a lobby): "Oops! Did I just
+  play for you? Hee hee!", "Whoopsie, my hand slipped... on YOUR piece!", "Honk honk! I'll drive this one!", "Your
+  move? I made it for you. You're welcome!". The God King's answer is back too: "That clown played our move! We'll
+  fix it."

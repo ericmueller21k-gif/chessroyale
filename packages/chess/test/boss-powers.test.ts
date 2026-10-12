@@ -13,6 +13,10 @@ import {
   crowdAllowed,
   boardAngle,
   funhouseAngle,
+  funhouseDue,
+  funhouseMoveFrom,
+  funhousePlayed,
+  shownAngle,
   icedSquares,
   initPowers,
   inCheck,
@@ -351,8 +355,13 @@ describe("boss powers: as each turn begins", () => {
     expect(b.powers!.warnAt).toBe(2);
     expect(b.powers!.pies?.length).toBe(1); // the passive's first turn too
     b = prepareTurn({ ...b, crowdMoves: 2 }, RUY_FEN, "funhouse");
-    expect(b.powers!.events.map((e) => e.kind)).toContain("funhouse");
+    expect(b.powers!.funhouse!.turn).toBe(3);
     expect(boardAngle(b)).toBe(180);
+    // Its move is due (its moment comes with that move, so a screen shows the board the right way up till then).
+    expect(funhouseDue(b)).toBe(true);
+    expect(b.powers!.events.map((e) => e.kind)).not.toContain("funhouse");
+    expect(shownAngle(b.powers!.funhouse, 3)).toBe(0);
+    expect(shownAngle({ ...b.powers!.funhouse!, move: "d2d3", san: "d3" }, 3)).toBe(180);
   });
 });
 
@@ -457,6 +466,44 @@ describe("Boingo's powers", () => {
     }
   });
 
+  it("the funhouse plays a weak but recoverable move: 1 to 2.5 pawns worse, never allowing mate or dropping the queen", async () => {
+    const fen = RUY_FEN;
+    const engine = scripted({
+      d2d4: { expected: 0.62 },
+      // A mate allowed, and a queen left hanging: never.
+      f3g5: { expected: 0.45, mate: -3 },
+      d1e2: { expected: 0.46, reply: "c6d4" },
+      // In range (16 and 20 points worse): one of these.
+      b2b4: { expected: 0.46 },
+      a2a3: { expected: 0.42 },
+      // Too much (40 points worse).
+      a4c6: { expected: 0.22 },
+    });
+    const m = await funhouseMoveFrom(engine, fen);
+    expect(["b2b4", "a2a3"]).toContain(m);
+    expect(BOSS_POWERS.funhouseLoss).toEqual([10, 25]);
+  });
+
+  it("the funhouse's cap: never more than funhouseMaxLogit in log-odds (a lost cause stays a fight)", async () => {
+    // Far ahead (0.95): 20 points down is 1.85 in log-odds, past the cap (1.6); 10 points down (1.21) is within it.
+    const engine = scripted({
+      d2d4: { expected: 0.95 },
+      b2b4: { expected: 0.85 },
+      a2a3: { expected: 0.75 },
+      a4c6: { expected: 0.74 },
+    });
+    // (Everything else scores 0.56 to 0.6: 35+ points down, past the range and the cap.)
+    expect(await funhouseMoveFrom(engine, RUY_FEN)).toBe("b2b4");
+    expect(BOSS_POWERS.funhouseMaxLogit).toBe(1.6);
+  });
+
+  it("the funhouse respects the allowed moves (a pie), and plays the only move when there's one", async () => {
+    const engine = fakeEngine();
+    const allowed = legalMoves(RUY_FEN).filter((m) => m.slice(2, 4) !== "d4");
+    expect(allowed).toContain(await funhouseMoveFrom(engine, RUY_FEN, allowed));
+    expect(await funhouseMoveFrom(engine, RUY_FEN, ["h2h3"])).toBe("h2h3");
+  });
+
   it("the funhouse's angles: upside down, a quarter turn to its side, a half turn to the other, back; 4 turns a step", () => {
     const f90 = { turn: 3, side: 90 as const };
     const f270 = { turn: 3, side: 270 as const };
@@ -477,33 +524,67 @@ describe("Boingo's powers", () => {
     expect(Array.from({ length: 24 }, (_, i) => side(i))).toEqual(sides);
   });
 
-  it("a funhouse match: no move is played for the crowd; the board turns as each step's turn begins, then stays back; the meter waits", async () => {
+  it("a funhouse match: as it comes he plays the crowd's move (unscored, once), then the board turns 4 turns a step and stays back; the meter waits", async () => {
     const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "clown", bossPowerTest: "funhouse", lastStandFrom: 999, bossMaxMoves: 40 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
     expect(runner.boss!.id).toBe("clown");
     const seen: { turn: number; angle: number; kinds: string[]; ultAt: number | null; rage: number | null }[] = [];
-    for (let turn = 1; turn <= 18 && !runner.stageComplete(); turn++) {
+    const forced: { turn: number; move: string }[] = [];
+    for (let i = 0; i < 40 && seen.length < 17 && !runner.stageComplete(); i++) {
+      if (runner.funhouseDue()) {
+        // Before it: the board still the right way up on screen, and nobody's move.
+        expect(runner.bossView()!.powers!.angle).toBe(0);
+        expect(runner.bossToMove()).toBe(false);
+        const moves = runner.boss!.crowdMoves;
+        const ply = runner.boards.get(0)!.history.length;
+        const scored = runner.state.players[0]!.finalLosses.length;
+        const allowed = runner.crowdAllowed() ?? legalMoves(runner.boards.get(0)!.fen);
+        const m = await runner.playFunhouse();
+        forced.push({ turn: moves + 1, move: m });
+        expect(allowed).toContain(m);
+        // On the board as the crowd's move, unscored; its moment now; the boss to reply.
+        expect(runner.boards.get(0)!.history.length).toBe(ply + 1);
+        expect(runner.boards.get(0)!.history.at(-1)).toBe(m);
+        expect(runner.boss!.crowdMoves).toBe(moves + 1);
+        expect(runner.state.players[0]!.finalLosses.length).toBe(scored);
+        const v = runner.bossView()!.powers!;
+        expect(v.funhouse!.move).toBe(m);
+        expect(v.funhouse!.san).toBeTruthy();
+        expect(v.events.map((e) => e.kind)).toContain("funhouse");
+        // (His joke, from the seed: the same on every screen.)
+        const pick = v.events.find((e) => e.kind === "funhouse")!.pick!;
+        expect(pick).toBeGreaterThanOrEqual(0);
+        expect(pick).toBeLessThan(4096);
+        expect(funhousePlayed(runner.boss!, m, "x").powers!.events.at(-1)!.pick).toBe(pick);
+        expect(v.angle).toBe(180);
+        expect(runner.funhouseDue()).toBe(false);
+        expect(runner.bossToMove()).toBe(true);
+        await runner.playBoss();
+        continue;
+      }
       runner.deal();
       const v = runner.bossView()!.powers!;
       seen.push({ turn: v.turn, angle: v.angle!, kinds: v.events.map((e) => e.kind), ultAt: v.ultAt, rage: v.rage });
       expect(boardAngle(runner.boss)).toBe(v.angle);
-      // Every turn is the crowd's own pick, scored as usual: the history grows by its move and the boss's.
-      const ply = runner.boards.get(0)!.history.length;
+      // Every other turn is the crowd's own pick, scored as usual.
       const scored = runner.state.players[0]!.finalLosses.length;
       const fen = runner.boards.get(0)!.fen;
       await runner.score(new Map([["h0", { move: (runner.crowdAllowed() ?? legalMoves(fen))[0]!, thinkMs: 1000 }]]));
-      expect(runner.boards.get(0)!.history.length).toBe(ply + 1);
       expect(runner.state.players[0]!.finalLosses.length).toBe(scored + 1);
       if (runner.stageComplete()) break;
       await runner.playBoss();
     }
-    expect(seen.length).toBe(18);
+    // Once, as the funhouse came (turn 3).
+    expect(forced.map((x) => x.turn)).toEqual([3]);
+    expect(seen.map((x) => x.turn)).toEqual([1, 2, ...Array.from({ length: 15 }, (_, i) => i + 4)]);
     const f = runner.boss!.powers!.funhouse!;
     expect(f.turn).toBe(3);
+    expect(f.move).toBe(forced[0]!.move);
     const other = f.side === 90 ? 270 : 90;
-    expect(seen.map((x) => x.angle)).toEqual([0, 0, 180, 180, 180, 180, f.side, f.side, f.side, f.side, other, other, other, other, 0, 0, 0, 0]);
-    expect(seen.filter((x) => x.kinds.includes("funhouse")).map((x) => x.turn)).toEqual([3]);
+    // Turn 3 was his: the crowd plays on from turn 4, upside down through turn 6, then 4 turns a step.
+    expect(seen.map((x) => x.angle)).toEqual([0, 0, 180, 180, 180, f.side, f.side, f.side, f.side, other, other, other, other, 0, 0, 0, 0]);
     expect(seen.filter((x) => x.kinds.includes("spin")).map((x) => x.turn)).toEqual([7, 11, 15]);
+    expect(seen.some((x) => x.kinds.includes("funhouse"))).toBe(false);
     // The meter: held empty while the board is turned (through turn 14), filling again from 15.
     for (const x of seen.filter((x) => x.turn > 3 && x.turn < 15)) {
       expect(x.ultAt).toBe(3);
@@ -513,6 +594,38 @@ describe("Boingo's powers", () => {
     expect(seen.find((x) => x.turn === 17)!.rage).toBeGreaterThan(0);
     // The turns it's turned are power turns (fair play doesn't count them); back the right way up, not for the funhouse.
     expect(powerTurn({ ...runner.boss!, powers: { ...runner.boss!.powers!, pies: [] } })).toBe(false);
+  });
+
+  it("each funhouse plays the crowd's move exactly once: a repeat ultimate plays it again, once", async () => {
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "clown", lastStandFrom: 999, bossMaxMoves: 60 } as Settings;
+    const runner = new MatchRunner({ settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
+    const forced: number[] = [];
+    const funhouses = new Set<number>();
+    for (let i = 0; i < 200 && !runner.stageComplete() && funhouses.size < 3; i++) {
+      // (The admins' trigger whenever it may be pulled: a funhouse after each one ends.)
+      runner.triggerUltimate();
+      if (runner.bossToMove()) {
+        await runner.playBoss();
+        const f = runner.boss!.powers!.funhouse;
+        if (f) funhouses.add(f.turn);
+        continue;
+      }
+      if (runner.funhouseDue()) {
+        forced.push(runner.boss!.crowdMoves + 1);
+        await runner.playFunhouse();
+        expect(runner.funhouseDue()).toBe(false);
+        continue;
+      }
+      runner.deal();
+      const fen = runner.boards.get(0)!.fen;
+      await runner.score(new Map([["h0", { move: [...(runner.crowdAllowed() ?? legalMoves(fen))].sort()[0]!, thinkMs: 1000 }]]));
+    }
+    // One forced move per funhouse, on the turn it came (the last one's may still be to come as the loop stops).
+    const turns = [...funhouses].sort((a, b) => a - b);
+    expect(turns.length).toBeGreaterThanOrEqual(2);
+    expect(forced).toEqual(turns.slice(0, forced.length));
+    expect(forced.length).toBeGreaterThanOrEqual(turns.length - 1);
+    expect(forced.length).toBeGreaterThanOrEqual(2);
   });
 
 });

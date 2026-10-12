@@ -502,10 +502,15 @@ export const BOSS_POWERS = {
   /**
    * The funhouse (Boingo's ultimate; Eric, Oct 11): he turns the board round in steps, funhouseStepTurns crowd turns
    * apart: upside down (180°) as it comes, then a quarter turn to a side picked from the seed (90° or 270°), then a half
-   * turn to the other side, then back to the start, where it stays. No move is played for the crowd. The meter fills
-   * again once the board is back.
+   * turn to the other side, then back to the start, where it stays. As it comes he plays the crowd's first move for it
+   * (Eric, Oct 12: "the forced move is the joke"), one move per funhouse, unscored; the crowd plays its own from the next
+   * turn. The meter fills again once the board is back.
    */
   funhouseStepTurns: 4,
+  /** The funhouse's move: one that gives away this many points against the best (1 to 2.5 pawns)... */
+  funhouseLoss: [10, 25] as readonly [number, number],
+  /** ...and never one that gives away more than this in log-odds (a lost cause stays a fight). */
+  funhouseMaxLogit: 1.6,
   /**
    * G-REX's fire tiles: a tile burns in fireStages stages, one a crowd turn (a singe, more burn, ablaze); after the
    * crowd's move on its last stage, a crowd piece still on it is destroyed (never the king: it fizzles). Then
