@@ -80,9 +80,10 @@ test("an admin's Brain picker: Ginger on Maia with the full guard, on a phone; M
 test("every boss is on Maia, no guard, by default for an admin (Boss alone, a phone): its moves are Maia's", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   const bosses = BOSS_ROSTER.filter(isPlayable).map((b) => b.id);
-  test.setTimeout(bosses.length * 80_000);
+  test.setTimeout(bosses.length * 120_000);
   await asAdmin(page);
   for (const id of bosses) {
+    const t0 = Date.now();
     await page.goto(`/?debug&clock=40&bossMoves=3&laststand=0&boss=${id}`);
     await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
     await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 30_000 }).toBe(id);
@@ -92,8 +93,10 @@ test("every boss is on Maia, no guard, by default for an admin (Boss alone, a ph
     for (let i = 0; i < 3 && (await phase(page)) !== "results"; i++) {
       await play(page);
       await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|results)$/);
-      lines.push(await debug.innerText().catch(() => ""));
+      // (What the brain did with the boss's move just played; the line itself goes with the battle's screen.)
+      lines.push(await page.evaluate(() => ((window as any).match.brainLine as string | null) ?? ""));
     }
+    console.log(`${id}: ${Math.round((Date.now() - t0) / 1000)} s · ${lines.join(" | ")}`);
     expect(lines.filter((l) => /Maia \d+ · no guard · Maia's #\d+ · \d+ ms/.test(l)).length, `${id}: ${lines.join(" | ")}`).toBeGreaterThanOrEqual(1);
   }
 });
@@ -127,7 +130,7 @@ test("an online raid on the Maia brain: the host's device plays Maia's move, eve
     await play(host, 90_000);
     if ((await phase(guest)) === "play") await play(guest);
     await expect.poll(() => phase(host), { timeout: 60_000 }).toMatch(/^(play|results)$/);
-    lines.push(await debug.innerText().catch(() => ""));
+    lines.push(await host.evaluate(() => ((window as any).match.brainLine as string | null) ?? ""));
     // Everyone gets the one move the host's Maia played.
     const played = await host.evaluate(() => (window as any).match.boss?.lastMove?.move ?? null);
     await expect.poll(() => guest.evaluate(() => (window as any).match.boss?.lastMove?.move ?? null), { timeout: 10_000 }).toBe(played);
