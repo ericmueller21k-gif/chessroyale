@@ -1,17 +1,18 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { createLobbyFromHome, joinFromInvite, named, test } from "./helpers.ts";
+import { createLobbyFromHome, joinFromInvite, named, submitMove, test } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
 /** Best move for the position on screen, from this page's own engine. */
 async function playBest(p: Page) {
-  await p.evaluate(async () => {
+  const pick = await p.evaluate(async () => {
     const m = (window as any).match;
     const fen = m.phase.board.fen;
     const [engine] = await m.engines();
     const [top] = await engine.topMoves(fen, 1);
-    m.submit(top.move);
+    return { fen, move: top.move as string };
   });
+  await submitMove(p, pick.move, pick.fen);
 }
 
 test("two players in a lobby with 30 bots play a whole match; a reload rejoins the same seat", async ({ browser }) => {

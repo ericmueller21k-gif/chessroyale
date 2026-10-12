@@ -41,6 +41,23 @@ export const BOARD_SEL = {
 } as const;
 
 /**
+ * Plays `move` in the page's match while it's your turn (on `fen`, if given; nothing to play: nothing happens). Work a
+ * move out in one evaluate (it may await the engine) and play it with this, never inside that awaited evaluate: the
+ * move starts a render before Chrome has taken the evaluate's answer, and under a busy render Chrome can lose the answer
+ * to its garbage collector ("Promise was collected", which Playwright reports as "Execution context was destroyed").
+ */
+export async function submitMove(page: Page, move: string | null | undefined, fen?: string) {
+  if (!move) return;
+  await page.evaluate(
+    ([mv, f]) => {
+      const m = (window as any).match;
+      if (m.phase.kind === "play" && (!f || m.phase.board.fen === f)) m.submit(mv);
+    },
+    [move, fen ?? null] as const,
+  );
+}
+
+/**
  * The front door, as a player uses it. Your name is your profile's: `named` sets the one a fresh device's guest
  * account is made with (before the first visit).
  */

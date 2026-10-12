@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { BOARD_SEL, createLobbyFromHome, named, soloFromHome, test } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, named, soloFromHome, submitMove, test } from "./helpers.ts";
 
 /** page.evaluate that shrugs off a dropped execution context (seen under heavy load while the page carries on). */
 async function safely<T>(f: () => Promise<T>, fallback: T): Promise<T> {
@@ -223,10 +223,9 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   const move: string = await page.evaluate(async () => {
     const m = (window as any).match;
     const top = await m.runner.topMovesFor(m.phase.board.fen);
-    const mv = top[top.length - 1].move;
-    m.submit(mv);
-    return mv;
+    return top[top.length - 1].move;
   });
+  await submitMove(page, move, fen);
   // On everyone's screen: first the warning (the ?? badge on the piece's square, the dock in plain words), then he
   // crashes onto the square, his banner, the blow, and he falls into the dock.
   await expect(page.getByRole("alert", { name: /The God King's Last Stand/ })).toBeVisible({ timeout: 30_000 });
@@ -241,7 +240,8 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   // The eval bar plunges to your chances after the move (ringed red) while the warning is up.
   await expect(page.locator(".eval-bar.plunged")).toBeVisible();
   await expect(page.getByRole("alert", { name: /^Last stand:/ })).toBeVisible({ timeout: 8_000 });
-  await expect(page.locator(".ls-dmg").first()).toBeVisible({ timeout: 6_000 });
+  // (Each blow's "−N": the God King's own, or the boss's when it attacks him itself, like Hollow.)
+  await expect(page.locator(".ls-dmg, .ka-hp").first()).toBeVisible({ timeout: 6_000 });
   await expect(page.getByRole("img", { name: "The God King has fallen" })).toBeVisible({ timeout: 8_000 });
   await expect(page.getByRole("status", { name: "Finish… it… for me." })).toBeVisible({ timeout: 3_000 });
   // Then the same position again, a full clock, his charges gone, the move he took back barred.

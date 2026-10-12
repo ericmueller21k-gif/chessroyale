@@ -1,6 +1,6 @@
 import { devices, expect } from "@playwright/test";
 import { Chess } from "chess.js";
-import { createLobbyFromHome, expectCoordsInSquares, named, soloFromHome, test } from "./helpers.ts";
+import { createLobbyFromHome, expectCoordsInSquares, named, soloFromHome, submitMove, test } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -124,16 +124,17 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
     if (p === "play") {
       // The game starts from the initial position, with no other boards beside it.
       await expect(page.locator(".boards-strip")).toHaveCount(0);
-      await page.evaluate(async () => {
+      const pick = await page.evaluate(async () => {
         const m = (window as any).match;
-        if (m.phase.kind !== "play") return;
+        if (m.phase.kind !== "play") return null;
         // The best move if the engine answers quickly; any legal move otherwise (a busy test machine mustn't miss the clock).
         const fen = m.phase.board.fen;
         const top = await Promise.race([m.runner.topMovesFor(fen), new Promise((r) => setTimeout(() => r(null), 12000))]);
         // (A teammate bot's planned pick is a legal move in the same position.)
         const fallback = [...(m.runner.planned?.values() ?? [])][0];
-        if (m.phase.kind === "play") m.submit(top ? (top as any)[0].move : fallback);
+        return { fen, move: (top ? (top as any)[0].move : fallback) as string };
       });
+      await submitMove(page, pick?.move, pick?.fen);
     } else if (p === "reveal") {
       // The live poll shows (unless the short quick-pace reveal has already moved on).
       await expect.poll(async () => (await phase(page)) !== "reveal" || (await page.locator(".poll-row").first().isVisible())).toBe(true);
@@ -188,7 +189,8 @@ test("the board never moves or resizes during a turn (Crowd and Classic)", async
         if (k === "play" && !(window as any).__sub && Date.now() > m.phase.startsAt + 1000) {
           (window as any).__sub = 1;
           const top = await m.runner.topMovesFor(m.phase.board.fen);
-          if (m.phase.kind === "play") m.submit(top[0].move);
+          // (Played after this evaluate has answered: see submitMove.)
+          setTimeout(() => m.phase.kind === "play" && m.submit(top[0].move));
           setTimeout(() => ((window as any).__sub = 0), 500);
         }
         const r = document.querySelector(".board-wrap .board")?.getBoundingClientRect();

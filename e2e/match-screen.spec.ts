@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, soloFromHome, test } from "./helpers.ts";
+import { BOARD_SEL, soloFromHome, submitMove, test } from "./helpers.ts";
 
 /**
  * The match screen's board furniture (Eric, Oct 9, 2026): the green ring on the move the crowd played sits exactly on
@@ -85,11 +85,11 @@ test("the reveal's ring sits exactly on its square at two widths; the bars and t
   expect(f.textCut, where).toBe(false);
 
   // The crowd's move lands with the ring on its square. Hold the reveal there and look at two widths.
-  await page.evaluate(async () => {
+  const best: string = await page.evaluate(async () => {
     const m = (window as any).match;
-    const top = await m.runner.topMovesFor(m.phase.board.fen);
-    if (m.phase.kind === "play") m.submit(top[0].move);
+    return (await m.runner.topMovesFor(m.phase.board.fen))[0].move;
   });
+  await submitMove(page, best);
   await expect(page.locator(".square-ring")).toBeVisible({ timeout: 60_000 });
   await page.evaluate(() => clearTimeout((window as any).match.timer));
   await page.waitForTimeout(700); // (its entrance)
