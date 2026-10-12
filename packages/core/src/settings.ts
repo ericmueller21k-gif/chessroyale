@@ -1640,8 +1640,9 @@ export interface SquadsSettings {
     sameMoveGap: number;
     /**
      * Blocks, sparingly: a bot blocks the other squad's likely best reply to its own move (the engine line's second
-     * move) with `blockChance`, or `sharpChance` when that reply captures or checks; never spending below `blockReserve`
-     * unless it's sharp; never the king, never one a mercy rule would lift.
+     * move) with `blockChance` a move, or `sharpChance` when that reply captures or checks (shared among the players
+     * choosing that move: a pair's two, the final's four); never spending below `blockReserve` unless it's sharp;
+     * never the king, never one a mercy rule would lift.
      */
     blockChance: number;
     sharpChance: number;
@@ -1726,8 +1727,8 @@ export const SQUADS: SquadsSettings = {
   bots: {
     candidates: 8,
     sameMoveGap: 0.3,
-    blockChance: 0.15,
-    sharpChance: 0.5,
+    blockChance: 0.04,
+    sharpChance: 0.15,
     blockReserve: 2,
     copyHumanChance: 0.35,
     armageddonColour: "b",

@@ -13,6 +13,8 @@ import {
   type PartyServerMessage,
   type SquadsClientMessage,
   type SquadsPlacement,
+  type BlockError,
+  type BlockLift,
   type SquadsBlock,
   type SquadsServerMessage,
 } from "@chessroyale/chess/squads";
@@ -145,7 +147,7 @@ const REFUSED: Record<string, string> = {
   stale: "That half is over.",
 };
 
-const BLOCK_REFUSED: Record<string, string> = {
+const BLOCK_REFUSED: Record<BlockError | "late" | "stale", string> = {
   block_taken: "That move is already blocked.",
   bank: "Not enough block points left.",
   king: "The king's moves can't be blocked (castling can).",
@@ -325,22 +327,16 @@ export class SquadsClient {
   }
 
   /**
-   * Block one of the other squad's moves on your board this half (from and to: "g8f6"). It shows at once, paid from
-   * your squad's bank; the server confirms it to everyone (or refuses it: "blockNo").
+   * Block one of the other squad's moves on your board this half (from and to: "g8f6"), paid from your squad's bank:
+   * the server tells everyone at once ("block"), or says why not ("blockNo").
    */
   block(key: string, board: number, move: string) {
     const m = this.matches.get(key);
     if (!m?.current || !this.myId) return;
     const d = dutyOf(m, this.myId);
     if (!d || d.duty.board !== board || m.placed.some((b) => b.board === board && b.move === move)) return;
-    const seq = m.current.seq;
-    this.send({ t: "block", key, seq, board, move });
-    this.pendingBlocks.push({ key, seq, board, move });
-    this.emit();
+    this.send({ t: "block", key, seq: m.current.seq, board, move });
   }
-
-  /** Blocks you've sent that the server hasn't confirmed yet (shown at once, as yours). */
-  pendingBlocks: { key: string; seq: number; board: number; move: string }[] = [];
 
   /** Lock in your pick (the half ends early once everyone with a duty has). */
   lock(key: string) {
@@ -424,7 +420,6 @@ export class SquadsClient {
   private freshHalf(m: LocalMatch) {
     this.server.set(m.key, { visible: {}, locked: [] });
     if (this.mine?.key === m.key) this.mine = null;
-    this.pendingBlocks = this.pendingBlocks.filter((b) => b.key !== m.key);
     m.visible = {};
     m.locked = [];
     m.lockedAt = {};
@@ -524,7 +519,6 @@ export class SquadsClient {
       }
       case "block": {
         const had = this.matches.get(msg.key);
-        this.pendingBlocks = this.pendingBlocks.filter((b) => !(b.key === msg.key && b.board === msg.block.board && b.move === msg.block.move));
         if (!had?.current || had.current.seq !== msg.seq || had.placed.some((b) => b.board === msg.block.board && b.move === msg.block.move)) break;
         const m: LocalMatch = { ...had, placed: [...had.placed, msg.block], blockAt: { ...had.blockAt, [blockKey(msg.block)]: Date.now() } };
         this.matches.set(m.key, m);
@@ -536,7 +530,6 @@ export class SquadsClient {
         break;
       }
       case "blockNo": {
-        this.pendingBlocks = this.pendingBlocks.filter((b) => !(b.key === msg.key && b.move === msg.move));
         if (msg.reason !== "stale") this.note = { text: BLOCK_REFUSED[msg.reason] ?? "That block was refused.", at: Date.now(), kind: "no" };
         break;
       }
@@ -760,7 +753,7 @@ export const TICK_FREE_FROM = 3;
 export const blockKey = (b: Pick<SquadsBlock, "board" | "move">) => `${b.board}/${b.move}`;
 
 /** Why a block was lifted, in words. */
-const LIFTED = { impossible: "that move isn't possible now", check: "they're in check", no_move: "it would have left no move", mate: "it would have left only moves that allow mate" } as const;
+const LIFTED: Record<BlockLift, string> = { impossible: "that move isn't possible now", check: "they're in check", no_move: "it would have left no move", mate: "it would have left only moves that allow mate" };
 
 // ---------------- Parties ----------------
 

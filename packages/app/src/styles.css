@@ -12756,28 +12756,22 @@ button.sq-tiny {
 .sq-pick-tag.you {
   background: #15781b;
 }
-/* A block placed or lifted: a short banner along the top of the board, both squads. */
-.sq-block-banner {
-  position: absolute;
-  left: 50%;
-  top: 8px;
-  z-index: 7;
+/* A block placed or lifted: said in the line above the board for a few seconds, both squads. */
+.sq-status-block {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  max-width: 94%;
-  transform: translateX(-50%);
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(120, 18, 24, 0.9);
-  color: #fff;
-  font-size: 13px;
+  gap: 5px;
+  color: #c0262d;
   font-weight: 800;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
+  line-height: 1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sq-status-block {
+    color: #f07a7a;
+  }
+}
+:root[data-theme="dark"] .sq-status-block {
+  color: #f07a7a;
 }
 .sq-arrows {
   position: absolute;

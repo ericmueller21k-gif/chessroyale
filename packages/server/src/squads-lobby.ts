@@ -1102,7 +1102,8 @@ export class SquadsCore {
     // Now and then a block of the other squad's likely best reply (before its own move: Relay's is made at once).
     const reply = top.find((t) => t.move === move)?.reply;
     const bank = blockBankNow(m, half.inputs, d.duty.side, this.s);
-    const blockMove = bank > 0 ? botBlock(squadsRng(m.seed, m.key, m.turn, m.half, board, "bot-block", bot), { fen, ownMove: move, reply, bank }, this.s) : null;
+    const share = 1 / d.duty.players.length;
+    const blockMove = bank > 0 ? botBlock(squadsRng(m.seed, m.key, m.turn, m.half, board, "bot-block", bot), { fen, ownMove: move, reply, bank, share }, this.s) : null;
     if (blockMove) {
       const b = placeBlock(m, half.inputs, bot, board, blockMove, elapsed, this.s);
       if ("inputs" in b) {

@@ -110,40 +110,4 @@ test("a player (not a test player) never gets Cheat lines: no button, and switch
   await expect(arrows(page)).toHaveCount(0);
 });
 
-test("blocking in the final: Cheat lines show the picking side's best moves (the ones worth blocking)", async ({ page }) => {
-  test.setTimeout(300_000);
-  await named(page, "Eric");
-  await page.goto("/squads/test/final?nolanding&debug&clock=90,0,3,0");
-  await page.getByRole("button", { name: "Skip votes" }).click({ timeout: 30_000 });
-  let last: string | null = null;
-  for (let i = 0; i < 10; i++) {
-    const d = await nextDuty(page, last);
-    last = d.at;
-    await page.evaluate((moves) => ((window as any).__legal = moves), new Chess(d.fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? "")));
-    const cheat = page.getByRole("button", { name: "Cheat lines" });
-    if ((await cheat.getAttribute("aria-pressed")) !== "true") await cheat.click();
-    if (d.role !== "block") {
-      // A pick: any legal move but your partner's, locked in (so the half moves on).
-      await page.evaluate((key) => {
-        const s = (window as any).squads;
-        const m = s.matches.get(key);
-        const duty = m.current.duties.find((x: any) => x.players.includes(s.myId));
-        const partner = m.visible[duty.players.find((p: string) => p !== s.myId)];
-        const move = (window as any).__legal.find((mv: string) => mv !== partner);
-        s.choose(key, move);
-        s.lock(key);
-      }, d.at.split("/")[0]!);
-      continue;
-    }
-    // The side to move is the pickers' (the other squad), and every line is one of its moves.
-    const toMove = d.fen.split(" ")[1] === "w" ? "White" : "Black";
-    await expect(page.locator(".sq-status")).toContainText(`${toMove} is picking`);
-    await expect(arrows(page)).toHaveCount(3, { timeout: 30_000 });
-    const legal = new Chess(d.fen).moves({ verbose: true }).map((m) => m.san);
-    const sans = (await page.locator(".sq-cheat-lines li strong").allTextContents()).map((t) => t.replace(/^\d · /, ""));
-    expect(sans).toHaveLength(3);
-    for (const san of sans) expect(legal).toContain(san);
-    return;
-  }
-  throw new Error("never asked to block");
-});
+// (Cheat lines while choosing a block: e2e/squads-v2.spec.ts.)

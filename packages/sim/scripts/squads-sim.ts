@@ -287,7 +287,7 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
         }
         // Now and then a block of the other squad's likely reply, before the move.
         const bank = blockBankNow(m, inputs, a.d.side, s);
-        const block = bank > 0 ? botBlock(rng, { fen, ownMove: move, reply: top.find((t) => t.move === move)?.reply, bank }, s) : null;
+        const block = bank > 0 ? botBlock(rng, { fen, ownMove: move, reply: top.find((t) => t.move === move)?.reply, bank, share: 1 / a.d.players.length }, s) : null;
         if (block) {
           const b = placeBlock(m, inputs, a.p, a.d.board, block, Math.round(a.t), s);
           if ("inputs" in b) inputs = b.inputs;

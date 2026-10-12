@@ -1778,3 +1778,99 @@ engine's best moves on demand ("I'm bad at chess and need infinite cheat moves")
 - **A fix found on the way:** the block line above the board named the blockers' own colour as the one picking ("Block
   with Pam · White is picking" while Black picked): a block's duty carries the blockers' side. It now names the other
   side, the one whose move it is.
+
+### Squads v2: same-move tokens, move blocks, the final a majority vote (Eric, Oct 12, 2026)
+
+Eric's goals: "The game never slows down; everything happens seamlessly. Might be a little hectic at times, but not too
+crazy, because chess is already tough." It should feel like real chess as much as possible. Eliminations and
+power-ups are for a later version, not built. What he set, and the calls made where he didn't (DEFAULT: one setting
+each in `SQUADS`, so he can change it):
+
+**Same-move tokens (Pairs).** Before, partners had to pick different moves and a coin played one, so a must-play move
+could be lost to a coin.
+- 5 per squad per match (Eric; `tokens.perMatch`). Both partners locking the same move: it plays, no coin, a token
+  burns automatically (no button). At 0, picks must differ, as before: the board won't take the partner's move and the
+  panel says "No same-move tokens left: pick a different move". One legal move still plays itself (no token). A
+  missed pick is still a random move other than the partner's, so a miss never burns one.
+- **The refund (DEFAULT `refundGap` 0.37 of expected score).** Eric: "about 2 pawns' worth on the judge's
+  expected-score scale". The judge's scale is expected score (1 point = 0.01), and a pawn near a level position is
+  0.95 log-odds of it (measured for the bosses: `BOSS_POWERS.bouncePawnLogit`), so two pawns down from level is 0.5 to
+  0.13: a gap of 0.37. The move is the only real one if it's the best among the moves that could be played and every
+  other is worse by at least that. In expected score, not pawns, on purpose: in a won (or lost) position every move
+  scores about the same, so "keeps the mate" against "still +5" isn't an only move (Eric's "the ONLY objective move,
+  all alternatives massively worse"), while a recapture in a level game is (the Scotch's Qxd4: 0.58 against 0.00).
+- **The judge's work on players' devices.** The verdict takes the bot engine's top moves for the position (the same
+  job as the bots' work, 8 lines at 250k nodes, two devices compared exactly), reusing the half's own bot work on that
+  board when there was any, or a remembered answer; else devices outside the match first, the token's own squad last.
+  No device answering in time: no refund, and the breakdown says "no device could judge it". The server's quick look
+  (material, no engine) never judges a token.
+- **When:** the verdict shows once the pair's reveal is over (`pairRevealSeconds`, 3 s): "Token refunded: only move".
+- **The breakdown** (both squads, after the match; between matches and on the results): every use, its move,
+  refunded or not, and why in pawns' worth (`pawnWorth` 0.185, half the gap, so 2.0 is the line): "Qxd4: refunded,
+  every other move lost at least 3.1 pawns", "e4: not refunded, Nf3 was within 0.3", "…Nf3 was better by 0.6 pawns",
+  "…Qg4 mates too", "…no device could judge it".
+- **Bots** match their partner only when the partner's move is the bot's own best and beats the next by
+  `bots.sameMoveGap` (0.3, a little under the refund line: a bot spends a token where a person might). The sim: bots
+  use 1-2 a match, 75-80% refunded.
+
+**Move blocks, every round (Relay, Pairs, the final).** The old Pick and Block (blockers, two blocks and a coin,
+`blocksSeenBy`, `picksSeenBy`, `avoidBlockChance`, no blocks at 3 legal moves) is gone. Eric changed the brief's piece
+blocks to move blocks: "It's not a full piece block ever. You tap their piece and play the move you wanna block."
+- A 5-point bank per squad per match (Eric; `blocks.bankPerMatch`; a match can be given its own, `MatchSetup.blockBanks`,
+  so a mode can set 0 or top it up). Cost by the piece making the move: pawn 1; knight, bishop or rook 2; queen 3
+  (Eric); castling 2 (Eric: "let's allow castling to be blocked for 2 tokens"; `castlingCost`, null to turn it off);
+  the king's ordinary moves never.
+- **As many a turn as the bank allows** (Eric: "one big blocking play, high risk high reward, changeable later";
+  `maxPerTurn` null, a number to cap it). The same move twice on a board is refused.
+- **Who and when (DEFAULT):** any of the squad's players with a duty on that board, before the squad's move there is
+  settled: in Relay before the move is made, in Pairs and the final while any of them hasn't locked in. The first tap
+  wins (nothing is taken back), paid at once, and everyone sees it at once.
+- **What a block can name (DEFAULT):** it's placed before your own move, so it names a move they might have after it:
+  any square the piece could reach by how it moves (a slider up to and onto the first piece in its way, either
+  colour, since your move may take it; a pawn's pushes and both diagonals; a knight's jumps), or castling while they
+  still have the right. A promotion block covers every piece. The cost is the piece's.
+- **It takes effect** on the other squad's next turn on that board, and is gone after it: that piece to that square
+  can't be played (the piece's other moves can). A miss, a forced move or a bot never plays it.
+- **Lifted and refunded, announced:** when it wouldn't take effect (DEFAULT, the director's: "if your own move makes
+  the blocked move impossible anyway, refund the block": the piece taken, the way shut, the game over); and by the
+  mercy rules on the turn's blocks on that board together (Eric): while they would leave no move, or only moves that
+  allow mate in one, the most recent still standing is lifted, until that's no longer so. **In check (DEFAULT
+  `liftInCheck`):** the brief's "if they're in check, a piece that can answer the check can't be blocked", carried to
+  move blocks: in check every legal move answers it, so every block is lifted. Eric's move-block message listed only
+  the two mercy rules; this one is kept as a setting he can turn off. You pay only for blocks that take effect.
+- **The look (Eric):** each blocked move is an arrow from the piece to the square, both squads, from the moment it's
+  placed until the other squad has played its move: it draws like a move arrow, then keeps redrawing itself slowly
+  and softly (a 2.6 s loop at about 55% strength), the lock fading in and out on it (35-90%). Its beat is kept from when
+  it was first seen, so the screen drawing again never restarts it. Watched frame by frame on a phone (dark) and a
+  computer (light): one draw, then the loop, through your move, the show and their half, gone the frame their move
+  lands; no flash. The short "banner" is the line above the board for 2.6 s ("You blocked Qd8–f6 (−3)", "Knights
+  blocked your Qd8–f6", "Block lifted: it would have left no move (refunded)"): drawn over the board it hid the very
+  piece it named.
+- **Each squad's block points and tokens** show under its clock, both squads, always.
+- **Bots** block sparingly: the other squad's likely reply to their own move (the engine line's second move, now
+  carried in bot-work answers), with `blockChance` 0.04 a move, or `sharpChance` 0.15 when that reply captures or
+  checks, shared among the players choosing the move (the final's four), keeping `blockReserve` 2 unless it's sharp,
+  never a king's move or one a mercy rule would lift. The sim: 1.5-3 blocks a squad a match.
+
+**The final: a majority vote** (Eric). Every player of the squad picks; teammates' picks show live to their own squad
+only, as arrows with the teammate's name, with Copy; when all have locked or time runs out, the most picked move
+plays. A tie: a seeded coin between the tied moves (Eric confirmed, "random between the tied moves"; `final.tie`).
+Players who didn't pick don't count; nobody picked: a random move. No tokens. Blocks as in every round. Armageddon for
+a drawn final as before, a vote too, each squad keeping the block bank the final left it (DEFAULT: the same match).
+Bots vote at their skill and copy a person's pick on their squad with `copyHumanChance` 0.35.
+
+**The clocks (unchanged rules, how the new pieces fit).** A block is thinking time: the move's time runs to the
+block when it came later than the last pick. The final's vote is one move being thought about, so it drains its
+squad's bank once, until its slowest picker's last choice (or to the ceiling if one never picks: the half waits for
+everyone or the time, as before). The free seconds, the per-active-thinker drain, the top-ups and sudden death are as
+they were. The sim: median lobbies 28.6, 30.2 and 31.1 minutes (Fast, Normal, Long), as before v2 (30.6, 33.1, 31.3).
+
+**Test tools.** `/squads/test`, Next round, Skip votes and Cheat lines keep working. Cheat lines while blocking show
+the other squad's best moves after yours (your pick, or a teammate's; none yet, the move handed over). Test lobbies
+also take `fen=` (the first round's position), `bots=strong` and `seat=white`, so e2e can count on what happens.
+
+**Protocol 2** (`SQUADS_PROTOCOL`): `block` both ways, `blockNo`, `token`; the match's tokens, block banks, blocks and
+token log; the final's one duty; bot-work answers carry each line's reply.
+
+**A test bound:** the full bot lobby unit test (no devices: the server's quick look, far weaker bots) ran 43-103 minutes
+over 8 seeds before v2 and 45-92 after; its upper bound goes from 60 (which seed 11 met by luck) to 90.

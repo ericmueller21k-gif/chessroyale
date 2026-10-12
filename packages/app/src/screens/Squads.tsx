@@ -190,7 +190,10 @@ function SquadsBracketPhase({ client, actions }: { client: SquadsClient; actions
   const lobby = client.lobby!;
   const mine = client.mySquad;
   const placed = client.placed && client.placed.placement !== 1 ? client.placed : null;
-  const live = mine ? [...client.matches.values()].some((m) => m.state !== "over" && m.sides.some((s) => s.squadId === mine.id)) : false;
+  const current = mine ? [...client.matches.values()].find((m) => m.state !== "over" && m.sides.some((s) => s.squadId === mine.id)) : undefined;
+  const live = !!current;
+  // Between matches (none on, or the next one's intro): the last match's token breakdown.
+  const between = !current || (current.state === "break" && current.format !== "pairs");
   const through = !!mine && !live && !placed && lobby.bracket.some((b) => b.squads.includes(mine.id) && b.state !== "over");
   const panel = (
     <>
@@ -214,7 +217,7 @@ function SquadsBracketPhase({ client, actions }: { client: SquadsClient; actions
           <p class="muted small">Your next match starts once the other one ends. Tap any tiny board to watch it.</p>
         </div>
       )}
-      {(!live || placed) && <MyTokens client={client} />}
+      {(between || placed) && <MyTokens client={client} />}
       {(!live || placed) && <Bracket lobby={lobby} mine={mine?.id ?? null} />}
     </>
   );

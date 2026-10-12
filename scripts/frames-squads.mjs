@@ -1,8 +1,11 @@
 // Frame-by-frame check of Squads' screens, played the way a player plays them (real taps), against a running server
 // with the test switch on (npx wrangler dev --var SQUADS_TEST:1 ...):
-//   npm run frames:squads -- <out-dir> <relay|pairs|final|menu|standings> [url=http://localhost:8787] [width=390] [scheme=dark]
+//   npm run frames:squads -- <out-dir> <relay|pairs|final|block|token|menu|standings> [url=http://localhost:8787] [width=390] [scheme=dark]
 // relay: your move (it must show at once and never snap back), then scouting a tiny board and back.
-// pairs: your pick, lock in, the coin-flip reveal. final: picks and blocks until a reveal where the lock slams down.
+// pairs: your pick, lock in, the coin-flip reveal. final: your vote, lock in, the vote's reveal.
+// block: from the Scotch recapture, Block, their queen, f6: the arrow draws, keeps redrawing with its lock pulsing,
+// through your move and theirs, until they've moved (each frame's arrows are logged too). token: the same move as your
+// bot partner there (Qxd4): the same-move reveal and, a few seconds later, the refund.
 // menu: the home screen's Squads card and a party with a friend in it. standings: every squad's clock (and sudden death).
 // Every painted frame is recorded (Chrome's screencast); the big board's pieces are logged on every animation frame,
 // and the timeline printed: a piece that moves twice, jumps back or flickers shows as an extra change. A GIF of the
@@ -33,10 +36,15 @@ await p.addInitScript(() => {
   const tick = () => {
     const ps = [...document.querySelectorAll(".board-area .hb-board piece")].map((e) => `${e.className}@${e.style.transform}`).sort().join("|");
     const status = document.querySelector(".sq-status")?.textContent ?? "";
-    const key = `${ps}#${status}`;
+    // Blocked moves' arrows: which, and the first one's dash and lock (to the hundredth: each change is a frame).
+    const arrows = [...document.querySelectorAll(".board-area .sq-block-arrow")];
+    const first = arrows[0];
+    const r2 = (x) => Math.round(Number(x) * 100) / 100;
+    const blocks = arrows.length ? `${arrows.map((a) => a.dataset.move).join(",")} dash ${r2(parseFloat(getComputedStyle(first.querySelector(".sq-block-shaft")).strokeDashoffset))} lock ${r2(getComputedStyle(first.querySelector(".sq-block-lock")).opacity)}` : "";
+    const key = `${ps}#${status}#${blocks}`;
     if (key !== last) {
       last = key;
-      log.push({ t: performance.now() + performance.timeOrigin, n: ps ? ps.split("|").length : 0, ps, status });
+      log.push({ t: performance.now() + performance.timeOrigin, n: ps ? ps.split("|").length : 0, ps, status, blocks });
     }
     requestAnimationFrame(tick);
   };
@@ -89,13 +97,15 @@ async function flashes(frames) {
   for (let i = 1; i < lum.length - 1; i++) if (Math.abs(lum[i] - lum[i - 1]) > 30 && Math.abs(lum[i + 1] - lum[i - 1]) < 10) out.push(i);
   return out;
 }
+let blocksOnly = false;
 async function timeline(since) {
   const log = await p.evaluate(() => window.__pieces);
   const rows = log.filter((r) => r.t >= since);
   let prev = null;
   for (const r of rows) {
     const changed = prev && prev.ps !== r.ps ? diff(prev.ps, r.ps) : "";
-    console.log(`${String(Math.round(r.t - since)).padStart(6)} ms  ${String(r.n).padStart(2)} pieces  ${r.status.padEnd(48).slice(0, 48)}  ${changed}`);
+    if (!changed && prev && prev.status === r.status && !blocksOnly) continue;
+    console.log(`${String(Math.round(r.t - since)).padStart(6)} ms  ${String(r.n).padStart(2)} pieces  ${r.status.padEnd(48).slice(0, 48)}  ${changed}${r.blocks ? `  [${r.blocks}]` : ""}`);
     prev = r;
   }
 }
@@ -134,8 +144,10 @@ async function tap(sq) {
   await p.mouse.click(box.x + ((black ? 7 - f : f) + 0.5) * (box.width / 8), box.y + ((black ? r : 7 - r) + 0.5) * (box.height / 8));
 }
 const legal = (fen) => new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
-async function testLobby(start, clock = "120,0,3,0") {
-  await p.goto(`${url}/squads/test/${start}?nolanding&debug&clock=${clock}`);
+/** 1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.Nxd4 Nxd4: White's only good move is Qxd4. */
+const SCOTCH = "r1bqkbnr/pppp1ppp/8/8/3nP3/8/PPP2PPP/RNBQKB1R w KQkq - 0 5";
+async function testLobby(start, clock = "120,0,3,0", extra = "") {
+  await p.goto(`${url}/squads/test/${start}?nolanding&debug&clock=${clock}${extra}`);
   await p.getByRole("button", { name: "Skip votes" }).click({ timeout: 40_000 });
   await waitFor((s) => s.phase === "bracket");
 }
@@ -175,25 +187,61 @@ if (mode === "relay") {
     last = `${s.key}/${s.seq}`;
     await p.waitForTimeout(800);
     const since = Date.now();
-    let locks = 0;
     const { frames } = await record(async () => {
       await pick(s);
       await p.waitForTimeout(500);
       await p.getByRole("button", { name: /^Lock in my/ }).click().catch(() => undefined);
       await waitFor((x) => x.state === "show" || `${x.key}/${x.seq}` !== last, 40_000);
-      for (let k = 0; k < 40; k++) {
-        locks += await p.locator(".sq-lock").count();
-        await p.waitForTimeout(150);
-      }
+      await p.waitForTimeout(6000);
     });
-    console.log(`half ${last}: ${s.duty.role}, lock seen ${locks > 0}`);
-    if (mode === "pairs" || locks > 0) {
-      await timeline(since);
-      console.log("flashes at frames", await flashes(frames));
-      gif(frames, `${mode}-${W}`);
-      break;
-    }
+    console.log(`half ${last}: ${s.duty.role}`);
+    await timeline(since);
+    console.log("flashes at frames", await flashes(frames));
+    gif(frames, `${mode}-${W}`);
+    break;
   }
+} else if (mode === "block") {
+  blocksOnly = true;
+  await testLobby("relay", "120,0,3,0", `&bots=strong&seat=white&fen=${encodeURIComponent(SCOTCH)}`);
+  const s = await waitFor((x) => x.duty?.role === "move");
+  await p.waitForTimeout(1200);
+  const since = Date.now();
+  const { frames } = await record(async () => {
+    await p.getByRole("button", { name: /^Block · / }).click();
+    await p.waitForTimeout(500);
+    await tap("d8");
+    await p.waitForTimeout(500);
+    await tap("f6");
+    // The arrow draws, then keeps redrawing softly: watch two of its loops.
+    await p.waitForTimeout(5600);
+    await p.getByRole("button", { name: "Done blocking" }).click();
+    await tap("d1");
+    await tap("d4");
+    // Through your half's end and theirs, until they've moved (the arrow goes then).
+    await waitFor((x) => x.state === "half" && x.seq !== s.seq, 60_000);
+    await waitFor((x) => x.state !== "half" || x.seq !== s.seq + 1, 60_000);
+    await p.waitForTimeout(2500);
+  });
+  await timeline(since);
+  console.log("flashes at frames", await flashes(frames));
+  gif(frames, `block-${W}`, 20);
+} else if (mode === "token") {
+  await testLobby("pairs", "120,0,3,0", `&bots=strong&seat=white&fen=${encodeURIComponent(SCOTCH)}`);
+  const s = await waitFor((x) => x.duty?.role === "pick");
+  await p.waitForTimeout(800);
+  const since = Date.now();
+  const { frames } = await record(async () => {
+    await tap("d1");
+    await tap("d4");
+    await p.waitForTimeout(800);
+    await p.getByRole("button", { name: "Lock in my pick" }).click().catch(() => undefined);
+    await waitFor((x) => x.state === "show" || x.seq !== s.seq, 40_000);
+    await p.locator(".sq-note.news").waitFor({ timeout: 20_000 }).catch(() => undefined);
+    await p.waitForTimeout(1500);
+  });
+  await timeline(since);
+  console.log("flashes at frames", await flashes(frames));
+  gif(frames, `token-${W}`);
 } else if (mode === "standings") {
   await testLobby("relay", "8,0,3,0");
   await waitFor((x) => x.state === "half");

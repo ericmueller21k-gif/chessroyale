@@ -91,9 +91,10 @@ export function botVotePick(rng: Rng, candidates: readonly Candidate[], skill: n
  * A bot's block, sparingly: the other squad's likely best reply to the bot's own move (`reply`: the second move of the
  * engine's line for it), if that's a move a block can name (blocks.ts), affordable, and would take effect after the
  * move (no mercy rule lifts it). It blocks with `bots.blockChance`, or `sharpChance` if the reply captures or gives
- * check, and keeps `blockReserve` in its bank unless the reply is sharp. Null: no block.
+ * check (times `share`: a move chosen by several, each of them a share), and keeps `blockReserve` in its bank unless
+ * the reply is sharp. Null: no block.
  */
-export function botBlock(rng: Rng, o: { fen: string; ownMove: string; reply: string | undefined; bank: number }, s: SquadsSettings = SQUADS): string | null {
+export function botBlock(rng: Rng, o: { fen: string; ownMove: string; reply: string | undefined; bank: number; share?: number }, s: SquadsSettings = SQUADS): string | null {
   const reply = o.reply?.slice(0, 4);
   if (!reply || !/^[a-h][1-8][a-h][1-8]$/.test(reply)) return null;
   const them: Colour = o.fen.split(" ")[1] === "w" ? "b" : "w";
@@ -116,7 +117,7 @@ export function botBlock(rng: Rng, o: { fen: string; ownMove: string; reply: str
     return null;
   }
   if (!sharp && o.bank - c.cost < s.bots.blockReserve) return null;
-  return rng() < (sharp ? s.bots.sharpChance : s.bots.blockChance) ? reply : null;
+  return rng() < (sharp ? s.bots.sharpChance : s.bots.blockChance) * (o.share ?? 1) ? reply : null;
 }
 
 /**

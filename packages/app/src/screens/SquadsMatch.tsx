@@ -258,7 +258,7 @@ function Banner({ title, sub, until, children }: { title: string; sub?: Componen
 
 /** One line of plain-language rules for each format. */
 function rulesLine(m: LocalMatch): string {
-  if (m.format === "relay") return "Each turn you make one move, one board along. Before it, you can block one of their moves.";
+  if (m.format === "relay") return "Each turn you make one move, one board along. Before it, you can block some of their moves.";
   if (m.format === "pairs") return "You and your partner each pick; a coin plays one. Pick the same move and it plays for sure: a token.";
   return "Your whole squad votes: the most picked move plays (a tie: a coin). Copy a teammate with a tap.";
 }
@@ -453,7 +453,15 @@ function MatchView({
       <SquadsBoards client={client} watching={`${m.key}/${boardId}`} onWatch={canWatch ? onWatch : null} />
       <div class="board-area">
         <div class="opening-name sq-status" aria-live="polite">
-          {status}
+          {/* (A block placed or lifted: said here for a few seconds, both squads; the reveal's words come first.) */}
+          {banner && !revealing ? (
+            <span class="sq-status-block" key={banner.at}>
+              <LockIcon size={13} />
+              {banner.text}
+            </span>
+          ) : (
+            status
+          )}
         </div>
         <div class="board-row">
           <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={choosing && !blocking} moves={allowed} onMove={(mv) => client.choose(m.key, mv)} arrows={boardArrows}>
@@ -471,12 +479,7 @@ function MatchView({
                 onBlock={(mv) => client.block(m.key, boardId, mv)}
               />
             )}
-            {banner && (
-              <div class="sq-block-banner" role="status" key={banner.at}>
-                <LockIcon size={14} />
-                {banner.text}
-              </div>
-            )}
+
             {intro && (
               <Banner
                 title={m.round === 2 ? "SQUAD FINAL" : `${ROUND_NAME[m.round]} · ${FORMAT_NAME[m.format]}`}
