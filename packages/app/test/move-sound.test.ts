@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyMove } from "@chessroyale/chess";
-import { knockFor, moveKnock, resetKnocks } from "../src/move-sound.ts";
+import { boardKnock, knockFor, moveKnock, resetKnocks } from "../src/move-sound.ts";
+import { LIVE_WINDOW_MEDIA } from "../src/bot-replays.ts";
 
 const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const after = (fen: string, ...moves: string[]) => moves.reduce((f, m) => applyMove(f, m), fen);
@@ -47,5 +48,26 @@ describe("a board that takes over from another screen (Eric, Oct 10: your move a
     expect(knockFor(null, after(START, "d2d4"), "d2d4")).toBe("move");
     // (Now the last shown is after d4: a board of a game that went c4 instead doesn't follow from it.)
     expect(knockFor(null, after(START, "c2c4"), "c2c4")).toBeNull();
+  });
+});
+
+describe("silent boards (the home's live window, Eric, Oct 12)", () => {
+  beforeEach(() => resetKnocks());
+  it("a silent or small board never knocks, and doesn't count as the big board shown; a big one still does", () => {
+    const e4 = after(START, "e2e4");
+    expect(boardKnock(START, e4, "e2e4", { silent: true })).toBeNull();
+    expect(boardKnock(START, e4, "e2e4", { small: true, silent: true })).toBeNull();
+    expect(boardKnock(START, e4, "e2e4", { small: true })).toBeNull();
+    const exd5 = after(START, "e2e4", "d7d5");
+    expect(boardKnock(exd5, after(exd5, "e4d5"), "e4d5", { silent: true })).toBeNull();
+    // (A big board mounting next doesn't take over the silent one's move.)
+    expect(boardKnock(null, e4, "e2e4")).toBeNull();
+    expect(boardKnock(START, e4, "e2e4")).toBe("move");
+    expect(boardKnock(exd5, after(exd5, "e4d5"), "e4d5")).toBe("capture");
+  });
+  it("the live window is a computer's only: 1280 px wide, the desktop's height, a mouse", () => {
+    expect(LIVE_WINDOW_MEDIA).toContain("(min-width: 1280px)");
+    expect(LIVE_WINDOW_MEDIA).toContain("(min-height: 600px)");
+    expect(LIVE_WINDOW_MEDIA).toContain("(pointer: fine)");
   });
 });

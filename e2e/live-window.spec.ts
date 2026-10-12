@@ -18,17 +18,27 @@ const noRealMatch = (p: Page) =>
     await route.fulfill({ response: res, json: { ...body, featured: null } });
   });
 
-test("computer: a bot match plays in the live window above the buttons, labelled as one; light on the page; none below 1280 px or on a phone", async ({ page }) => {
+/** Move, capture and castling sounds played so far (window.__soundLog, from sound.ts). */
+const knocks = (p: Page) => p.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => /^(move|capture|castle):/.test(l)));
+
+test("computer: a bot match plays in the live window above the buttons, labelled as one, silent; light on the page; none below 1280 px or on a phone", async ({ page }) => {
   await named(page, "Watcher");
+  await page.addInitScript(() => ((window as any).__soundLog = []));
   if (!desktop()) {
-    // A phone: no window, and the replays aren't even fetched.
+    // A phone (Eric, Oct 12: "it shouldn't be on mobile"): no window, no board, the replays aren't even fetched, and
+    // nothing knocks. Not even a phone or tablet whose screen is a computer's width (a touch screen, no mouse).
     let fetched = false;
     page.on("request", (r) => r.url().includes("/replays/") && (fetched = true));
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-    await page.waitForTimeout(1500);
-    await expect(page.locator(".fd-livewin")).toHaveCount(0);
-    expect(fetched).toBe(false);
+    for (const size of [null, { width: 1366, height: 1024 }]) {
+      if (size) await page.setViewportSize(size);
+      await page.goto("/");
+      await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+      await page.waitForTimeout(size ? 1500 : 12_000);
+      await expect(page.locator(".fd-livewin")).toHaveCount(0);
+      await expect(page.locator(".board-wrap")).toHaveCount(0);
+      expect(fetched).toBe(false);
+      expect(await knocks(page)).toEqual([]);
+    }
     return;
   }
   test.setTimeout(2 * 60_000);
@@ -71,10 +81,13 @@ test("computer: a bot match plays in the live window above the buttons, labelled
     expect(await sideways(page)).toBe(0);
   }
   // Light on the page: a move changes about every 6-9 s; over two changes nothing piles up (nodes, animations, timers).
+  // And silent (Eric, Oct 12): with the sound on and unlocked by a tap, its moves make no sound.
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
   const win = page.getByRole("region", { name: "Bot match, a recording" });
   await expect(win).toBeVisible();
+  await win.click();
+  await expect.poll(() => page.evaluate(() => (window as any).__soundLog !== undefined)).toBe(true);
   const look = () =>
     page.evaluate((squares) => ({
       nodes: document.getElementsByTagName("*").length,
@@ -93,6 +106,7 @@ test("computer: a bot match plays in the live window above the buttons, labelled
   expect(later.fen).toBe(true);
   expect(later.nodes - first.nodes).toBeLessThan(40);
   expect(later.animations).toBeLessThanOrEqual(first.animations + 2);
+  expect(await knocks(page)).toEqual([]);
 });
 
 test("computer: a real match running shows in the live window as Live (no Bot match label), with the crowd's votes; back to a bot match after", async ({ page, browser }) => {

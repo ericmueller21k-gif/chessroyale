@@ -1738,6 +1738,24 @@ ice through the boss's turn and the thaw's turn scored by the free pieces' moves
 and `faq.test.ts`; e2e: `boss-powers.spec.ts` (all three turns on a phone and a computer) and `grex.spec.ts` (the
 trigger through the three turns).
 
+### The live window: a computer's only, and silent (Eric, Oct 12, 2026)
+
+Eric: "On the main URL on mobile, the main screen, I hear pieces moving from the bot game being shown. It shouldn't be
+on mobile (sadly just no room), and audio should be disabled on it by default."
+
+- **Where it shows:** only where `LIVE_WINDOW_MEDIA` matches: 1280 px wide (its room in the play column, as before),
+  the desktop's 600 px tall, and a mouse (`hover: hover` and `pointer: fine`). Before, the width alone decided, so a
+  touch screen reporting a computer's width (a tablet, a big phone, a phone browser's desktop mode) got it. Anywhere
+  else it isn't mounted: no board, no timer, no replays fetched. Tablets lose it too; they're the same "no room to
+  spare, a finger not a mouse" case, and the window is a nice-to-have.
+- **Silent, whatever the sound setting:** its board is `silent` (`boardKnock` in `move-sound.ts` returns nothing for a
+  silent or small board, and neither counts as the big board shown, so a game's board never takes a knock from it).
+  Its board was already `small`, which skipped the knock, so the sound Eric heard most likely came from a device the
+  old width-only test let through; `silent` makes the rule explicit rather than a side effect of the size.
+- **No speaker toggle:** its header row (tag, mode, move count) is already cut short with "…" at 1280 px, and the
+  window is something to glance at, not to listen to. Easy to add later if someone asks.
+- **Games unchanged:** every board in a match still plays the picked move and capture sounds (e2e `sound.spec.ts`).
+
 ### Squads test tools: the start link and Cheat lines (Eric, Oct 12, 2026)
 
 Eric wanted to stress-test Squads alone: a link that drops him straight into a full lobby at the first vote, and the
