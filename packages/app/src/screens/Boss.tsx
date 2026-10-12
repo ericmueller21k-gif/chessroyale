@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { KING_ATTACK, SNACK, bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, dockLine, funhouseFlipAt, PowerBoard, PowerMoment, RageMeter, crowdOrientation, funhouseBeat, momentAt, momentsOf, useMomentSpeech } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, angleView, dockLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackLine, snackPawnShown } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
@@ -183,18 +183,18 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const funhouse = moments.find((m) => m.kind === "funhouse") ?? null;
   // (Big Boy's Big Bounce, before his move: as far as the rest of the screen goes, his last move isn't news.)
   const bounce = moments.find((m) => m.kind === "bounce") ?? null;
-  const fun = funhouseBeat(funhouse && now >= funhouse.at ? funhouse : null, now, funhouseFlipAt(bossKit(boss.name)));
-  const funMove = funhouse ? boss.powers?.funhouse : null;
+  // Boingo's funhouse and its later steps: the board as it was until its spin, the spin, then the new angle.
+  const fun = funhouseView(moments, now, boss.powers, bossKit(boss.name));
   // The God King's word on the boss's move.
   const kingCues = useMemo(() => {
     const m = boss.lastMove;
-    if (intro || thinking || victim || !m || funhouse || bounce) return [];
+    if (intro || thinking || victim || !m || bounce) return [];
     // (A check is said as your move begins: turnCues.)
     return bossMoveCues(boss.board.fen, m);
   }, [boss.board.fen, thinking, intro, victim]);
   // A boss blunder: the engine's numbers before and after its move (the eval bar's, already worked out or cheap).
   useEffect(() => {
-    if (intro || thinking || victim || funhouse || bounce || !boss.lastMove || history.length !== boss.board.ply) return;
+    if (intro || thinking || victim || bounce || !boss.lastMove || history.length !== boss.board.ply) return;
     let live = true;
     const before = fenAtPly(history, history.length - 1, bases);
     void Promise.all([match.evaluate(before), match.evaluate(boss.board.fen)]).then(([w0, w1]) => {
@@ -207,7 +207,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
     };
   }, [boss.board.fen, thinking]);
   // The boss takes your queen: its banner and face.
-  const tookQueen = !intro && !thinking && !victim && !funhouse && !bounce && boss.lastMove?.captured === "q";
+  const tookQueen = !intro && !thinking && !victim && !bounce && boss.lastMove?.captured === "q";
   // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it).
   const slewQueen = !intro && !!thinkingNow && !victim && lastMoveTookQueen(history, bases);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
@@ -230,11 +230,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   useEffect(() => {
     if (funLine) kingSay("funhouse", `funhouse-${funhouse!.key}`);
   }, [funLine]);
-  // The board: the crowd's view (flipped for a while after the funhouse); in the funhouse it flips as he lands, and
-  // the move he plays for the crowd lands at its beat.
-  const unflipped = boss.crowdSide === "w" ? "white" : "black";
-  const flippedView = unflipped === "white" ? "black" : "white";
-  const orientation = fun ? (fun.flipped ? flippedView : unflipped) : intro ? unflipped : crowdOrientation(boss, boss.crowdSide);
+  // The board: the crowd's view (in Boingo's funhouse turned upside down, then a quarter turn either way, then back:
+  // each step turns it as its moment reaches its spin).
+  const view = intro ? angleView(0, boss.crowdSide) : angleView(fun.angle, boss.crowdSide);
+  const orientation = view.orientation;
   // G-REX's fire after the crowd's move (while the boss thinks): a piece left on a tile ablaze burns, shown on the
   // board until its flare; a tile under the king fizzles. The God King's warning the first time a piece steps onto one.
   const burnt = thinking && !intro && !victim ? (boss.powers?.burnt ?? []).filter((b) => b.turn === boss.crowdMoves) : [];
@@ -244,9 +243,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   useEffect(() => {
     if (thinking && stepped !== null && stepped === boss.crowdMoves) kingSay("fireTile", `fire-tile-${boss.id}-${stepped}`);
   }, [thinking, stepped]);
-  const fenPlain = fun && !fun.played ? fenAtPly(history, history.length - 1, bases) : introFen;
+  const fenPlain = introFen;
   const fenShown = burning.length && now < burnAt + BURN.goneAt ? burning.reduce((f, b) => withPiece(f, b.square, { color: boss.crowdSide, type: b.piece! }), fenPlain) : fenPlain;
-  const lastShown = fun ? (fun.played ? funMove?.move ?? introLast : null) : introLast;
+  const lastShown = introLast;
   // The Big Bounce: the board before it, less the pieces up in the air, then the new position as they come down; the
   // eval bar keeps the position before it until they've all settled. The board jolts as he lands and at the crash.
   const bounceShown = bounceFen(boss.powers?.bounce, bounce && now >= bounce.at ? bounce : null, now, boss.board.fen);
@@ -270,14 +269,14 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class="opening-name">
           <BossHeading side={boss.crowdSide} note={lights ? "lights out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
         </div>
-        <div class={`board-row${fun?.flipping ? " pw-flipping" : ""}`}>
+        <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           <BossSide match={match} />
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} lastMove={lastShown} animate={!bounceShown && !splitStill(split, now)}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={lastShown} animate={!bounceShown && !splitStill(split, now)}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
-            {!thinking && !victim && !alone && !funhouse && !bounce && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
+            {!thinking && !victim && !alone && !bounce && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
             <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
             {mateKing && <KingAttack boss={boss} square={mateKing} orientation={orientation} startAt={attackAt} now={now} seed={`mate:${boss.board.fen}`} king={boss.crowdSide} />}
             <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
@@ -343,10 +342,6 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 </>
               ) : intro ? (
                 <strong>{boss.raid ? "All of you vs the boss." : "Ten of you vs the boss."}</strong>
-              ) : funMove ? (
-                <>
-                  {boss.icon} {boss.name.replace(/^The /, "")} plays <strong>your</strong> move{fun?.played ? <>: <strong>{funMove.san}</strong></> : "…"}
-                </>
               ) : moment ? (
                 <>
                   {boss.icon} <strong>{dockLine(moment)}</strong>
@@ -372,9 +367,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             <span class="dock-line muted">
               {intro
                 ? `Worst mover struck every ${match.settings.bossKillEvery} moves.`
-                : funMove
-                  ? "Not scored."
-                  : victim
+                : victim
                   ? youStruck
                     ? `You played worst. You finish ${match.placement}${ordinal(match.placement ?? 0)}.`
                     : "Worst moves since its last strike."

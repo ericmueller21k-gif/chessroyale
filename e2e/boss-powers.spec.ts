@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { createLobbyFromHome, engineTop, test } from "./helpers.ts";
+import { createLobbyFromHome, engineTop, expectCoordsInSquares, test } from "./helpers.ts";
 
 /**
  * Boss powers, played through: the gingerbread man's freeze and blizzard, Boingo's pie and funhouse, alone (solo) on a
@@ -134,9 +134,96 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   }
 });
 
-test("Boingo: a pie nobody can move onto, the warning, then the funhouse plays your move and the board shows flipped", async ({ page }) => {
+/**
+ * Where a real square is on screen (its centre), on the big board as it's drawn now: either way up, and turned a
+ * quarter of the way round in Boingo's funhouse (the board's data-turn: 90 or 270), as Board draws it (board-view.ts).
+ */
+const squareOnScreen = (p: Page, square: string) =>
+  p.evaluate((sq) => {
+    const wrap = document.querySelector(".board-area .cg-wrap")!;
+    const b = wrap.querySelector("cg-board")!.getBoundingClientRect();
+    const black = wrap.classList.contains("orientation-black");
+    const turn = Number((wrap.closest(".board-wrap") as HTMLElement | null)?.dataset.turn ?? 0);
+    const f = sq.charCodeAt(0) - 97;
+    const r = Number(sq[1]) - 1;
+    const [F, R] = turn === 90 ? [r, 7 - f] : turn === 270 ? [7 - r, f] : [f, r];
+    const col = black ? 7 - F : F;
+    const row = black ? R : 7 - R;
+    return { x: b.left + (col + 0.5) * (b.width / 8), y: b.top + (row + 0.5) * (b.height / 8), size: b.width / 8 };
+  }, square);
+
+/** How far each pie is from its square, wherever the board is turned (the worst edge in px), and how many there are. */
+const piesOffSquares = (p: Page) =>
+  p.evaluate(() => {
+    const wrap = document.querySelector(".board-area .cg-wrap")!;
+    const board = wrap.querySelector("cg-board")!.getBoundingClientRect();
+    const black = wrap.classList.contains("orientation-black");
+    const turn = Number((wrap.closest(".board-wrap") as HTMLElement | null)?.dataset.turn ?? 0);
+    const sq = board.width / 8;
+    const pies = [...document.querySelectorAll<HTMLElement>(".power-board .pw-pie")];
+    const off = pies.map((el) => {
+      const s = el.dataset.square ?? "";
+      const f = s.charCodeAt(0) - 97;
+      const r = Number(s[1]) - 1;
+      const [F, R] = turn === 90 ? [r, 7 - f] : turn === 270 ? [7 - r, f] : [f, r];
+      const x = board.left + (black ? 7 - F : F) * sq;
+      const y = board.top + (black ? R : 7 - R) * sq;
+      const b = el.getBoundingClientRect();
+      return { square: s, off: Math.max(Math.abs(b.left - x), Math.abs(b.top - y), Math.abs(b.right - x - sq), Math.abs(b.bottom - y - sq)) };
+    });
+    return { worst: Math.max(0, ...off.map((o) => o.off)), off, count: pies.length };
+  });
+
+/** A finger dragging from one point to another (touch events, as a phone sends them). */
+async function touchDrag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+  const cdp = await page.context().newCDPSession(page);
+  const point = (x: number, y: number) => [{ x, y, id: 1, radiusX: 2, radiusY: 2, force: 1 }];
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(from.x, from.y) });
+  for (let i = 1; i <= 8; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(from.x + ((to.x - from.x) * i) / 8, from.y + ((to.y - from.y) * i) / 8) });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await cdp.detach();
+}
+
+/**
+ * Your move, played by hand on the board as it's drawn now: the engine's best allowed move, by two taps (`tap`) or a
+ * drag (`drag`; on a phone a finger's, on a computer the mouse's). Returns the move, once the game has it.
+ */
+async function playByHand(page: Page, how: "tap" | "drag", phone: boolean): Promise<string> {
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  await page.locator(".cc-banner", { hasText: "Round start" }).waitFor({ state: "detached", timeout: 15_000 }).catch(() => undefined);
+  await page.waitForTimeout(400);
+  const { top } = await engineTop(page);
+  const move = top[0]!.move;
+  const plies: number = await page.evaluate(() => (window as any).match.runner.boards.get(0).history.length);
+  const a = await squareOnScreen(page, move.slice(0, 2));
+  const b = await squareOnScreen(page, move.slice(2, 4));
+  if (how === "tap") {
+    if (phone) {
+      await page.touchscreen.tap(a.x, a.y);
+      await page.touchscreen.tap(b.x, b.y);
+    } else {
+      await page.mouse.click(a.x, a.y);
+      await page.mouse.click(b.x, b.y);
+    }
+  } else if (phone) await touchDrag(page, a, b);
+  else {
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move((a.x + b.x) / 2, (a.y + b.y) / 2, { steps: 5 });
+    await page.mouse.move(b.x, b.y, { steps: 5 });
+    await page.mouse.up();
+  }
+  // (A promotion asks for the piece: a queen.)
+  const promo = page.locator(".promo-piece.q");
+  if (await promo.isVisible().catch(() => false)) await promo.click();
+  // The game has the move you meant: the square you touched was the square you meant.
+  await expect.poll(() => page.evaluate((n) => (window as any).match.runner.boards.get(0).history[n] ?? null, plies), { timeout: 15_000 }).toBe(move.slice(0, 4) + (move.length > 4 ? move[4] : ""));
+  return move;
+}
+
+test("Boingo: pies nobody can move onto (up to two, on their squares), the warning, then the funhouse turns the board upside down; no move is played for you", async ({ page }) => {
   test.setTimeout(5 * 60_000);
-  await page.goto("/?debug&clock=40&bossMoves=6&boss=clown&power=funhouse");
+  await page.goto("/?debug&clock=40&bossMoves=8&boss=clown&power=funhouse&laststand=0");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Boingo the Clown");
@@ -147,38 +234,68 @@ test("Boingo: a pie nobody can move onto, the warning, then the funhouse plays y
   await expect(banner(page, "RAGE!")).toBeVisible({ timeout: 10_000 });
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   const p2 = await powers(page);
-  expect(p2.pie).toBeTruthy();
-  if (p2.allowed) expect(p2.allowed.some((m: string) => m.slice(2, 4) === p2.pie.square)).toBe(false);
-  const scoredBefore: number = await page.evaluate(() => (window as any).match.moves.length);
+  expect(p2.pies).toHaveLength(1);
+  if (p2.allowed) expect(p2.allowed.some((m: string) => p2.pies.some((x: { square: string }) => x.square === m.slice(2, 4)))).toBe(false);
+  const pie2 = await piesOffSquares(page);
+  expect(pie2.worst, JSON.stringify(pie2.off)).toBeLessThanOrEqual(1);
+  const plies: number = await page.evaluate(() => (window as any).match.runner.boards.get(0).history.length);
 
   await playBest(page);
-  // The funhouse: the banner, then Boingo drops onto the board, it spins, his line (in his text box), and he plays
-  // your move.
+  // The funhouse as your turn begins: the banner, then Boingo drops onto the board and it turns upside down, his line.
   await expect(banner(page, "FUNHOUSE!")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".pm-pogo")).toBeVisible({ timeout: 5_000 });
-  await expect(page.locator(".bc-bubble:visible")).toContainText(/Welcome to the funhouse!|Topsy-turvy!|Boingo's turn!/, { timeout: 6_000 });
-  const fun = await page.evaluate(() => (window as any).match.runner.state.boss.powers.funhouse);
-  expect(fun.move).toMatch(/^[a-h][1-8][a-h][1-8]/);
-  // Not scored: no move of yours was added for it.
+  await expect(page.locator(".bc-bubble:visible")).toContainText(/funhouse|Topsy-turvy|Round and round|Which way|hats/i, { timeout: 6_000 });
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
-  expect(await page.evaluate(() => (window as any).match.moves.length)).toBe(scoredBefore + 1);
-  // Flipped for your next two turns: you play White, seen from Black's side.
+  // No move was played for you: only yours and his so far.
+  expect(await page.evaluate(() => (window as any).match.runner.boards.get(0).history.length)).toBe(plies + 2);
+  const p3 = await powers(page);
+  expect(p3.angle).toBe(180);
+  // Two pies now (a new one every other turn), on their squares, the board upside down: you play White from Black's side.
+  expect(p3.pies.length).toBeGreaterThanOrEqual(1);
+  expect(p3.pies.length).toBeLessThanOrEqual(2);
+  expect(new Set(p3.pies.map((x: { square: string }) => x.square)).size).toBe(p3.pies.length);
   await expect(page.locator(".board-area .cg-wrap.orientation-black")).toBeVisible();
-  expect((await powers(page)).flipped).toBe(true);
-  await playBest(page);
-  await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
-  if ((await phase(page)) === "play") {
-    expect((await powers(page)).flipped).toBe(true);
-    await playBest(page);
-    await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
-    if ((await phase(page)) === "play") {
-      expect((await powers(page)).flipped).toBe(false);
-      await expect(page.locator(".board-area .cg-wrap.orientation-white")).toBeVisible();
-    }
-  }
+  await expectCoordsInSquares(page, "black", 10_000, 0);
+  const pie3 = await piesOffSquares(page);
+  expect(pie3.worst, JSON.stringify(pie3.off)).toBeLessThanOrEqual(1);
 });
 
-test("Boingo online: the host plays the crowd's move in his funhouse, and everyone sees it", async ({ page }) => {
+test("Boingo's funhouse at every angle: a move by tap and a move by drag, the coordinates and the pies on their squares", async ({ page }, info) => {
+  test.setTimeout(12 * 60_000);
+  const phone = info.project.name === "phone";
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=90&bossMoves=20&boss=clown&power=funhouse&laststand=0");
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
+  // Turns 1-2 the right way up, 3-6 upside down, 7-10 a quarter turn to his side, 11-14 to the other, 15 on back.
+  const angles: number[] = [];
+  const played: string[] = [];
+  for (let turn = 1; turn <= 16; turn++) {
+    await expect.poll(() => phase(page), { timeout: 90_000 }).toMatch(/play|results/);
+    if ((await phase(page)) !== "play") break;
+    const p = await powers(page);
+    angles.push(p.angle);
+    const turned = p.angle === 90 || p.angle === 270 ? p.angle : 0;
+    await expectCoordsInSquares(page, p.angle === 180 ? "black" : "white", 10_000, turned);
+    const pies = await piesOffSquares(page);
+    expect(pies.worst, `turn ${turn}: ${JSON.stringify(pies.off)}`).toBeLessThanOrEqual(1);
+    expect(pies.count).toBeLessThanOrEqual(2);
+    // At each angle: the step's first turn by taps, its second by a drag; the rest by the engine's best move.
+    const step = turn <= 2 ? turn - 1 : turn >= 15 ? turn - 15 : (turn - 3) % 4;
+    if (step === 0) played.push(`${p.angle}:tap:${await playByHand(page, "tap", phone)}`);
+    else if (step === 1) played.push(`${p.angle}:drag:${await playByHand(page, "drag", phone)}`);
+    else await playBest(page);
+  }
+  const side = angles[6];
+  expect([90, 270]).toContain(side);
+  expect(angles.slice(0, 16)).toEqual([0, 0, 180, 180, 180, 180, side, side, side, side, 360 - side!, 360 - side!, 360 - side!, 360 - side!, 0, 0]);
+  console.log(info.project.name, JSON.stringify(played));
+  for (const a of [0, 180, 90, 270]) for (const how of ["tap", "drag"]) expect(played.some((x) => x.startsWith(`${a}:${how}:`)), `${a}° by ${how}`).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("Boingo online: the funhouse turns the board for everyone as your turn begins; no move is played for you", async ({ page }) => {
   test.setTimeout(6 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   await page.goto("/?debug&pace=quick&mode=raid&boss=clown&power=funhouse&bossMoves=4&clock=30");
@@ -191,7 +308,7 @@ test("Boingo online: the host plays the crowd's move in his funhouse, and everyo
   await expect(page.locator(".pm-pogo")).toBeVisible({ timeout: 5_000 });
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   const p = await powers(page);
-  expect(p.funhouse?.move).toBeTruthy();
-  expect(p.flipped).toBe(true);
+  expect(p.funhouse?.turn).toBe(3);
+  expect(p.angle).toBe(180);
   await expect(page.locator(".board-area .cg-wrap.orientation-black")).toBeVisible();
 });

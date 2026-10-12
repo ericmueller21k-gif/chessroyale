@@ -7,6 +7,7 @@ import type { Key } from "chessground/types";
 import { legalMoves, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { play } from "../sound.ts";
 import { knockFor } from "../move-sound.ts";
+import { BoardTurn, coordLabel, realSquare, viewFen, viewMove, viewSquare, type QuarterTurn } from "../board-view.ts";
 
 export interface Arrow {
   move: string;
@@ -39,17 +40,22 @@ interface BoardProps {
    */
   dark?: readonly string[];
   onDarkTry?: (uci: string) => void;
+  /**
+   * The board turned a quarter of the way round, clockwise (Boingo's funhouse): every square is drawn where the turned
+   * board shows it, and taps, drags and moves are turned back (board-view.ts). The coordinates name the real squares.
+   */
+  turn?: QuarterTurn;
 }
 
 const sq = (s: string) => s as Key;
 
-function destsFor(fen: string, only?: readonly string[], dark: readonly string[] = []): Map<Key, Key[]> {
+function destsFor(fen: string, only?: readonly string[], dark: readonly string[] = [], turn: QuarterTurn = 0): Map<Key, Key[]> {
   const dests = new Map<Key, Key[]>();
   for (const m of only ?? legalMoves(fen)) {
     // (Hollow's dark: no dots from, onto or past a dark square: they'd give its piece away.)
     if (touchesDark(m, dark, fen)) continue;
-    const from = sq(m.slice(0, 2));
-    const to = sq(m.slice(2, 4));
+    const from = sq(viewSquare(m.slice(0, 2), turn));
+    const to = sq(viewSquare(m.slice(2, 4), turn));
     const list = dests.get(from) ?? [];
     if (!list.includes(to)) list.push(to);
     dests.set(from, list);
@@ -57,17 +63,17 @@ function destsFor(fen: string, only?: readonly string[], dark: readonly string[]
   return dests;
 }
 
-function shapesFor(arrows: Arrow[] = []): DrawShape[] {
+function shapesFor(arrows: Arrow[] = [], turn: QuarterTurn = 0): DrawShape[] {
   return arrows.map((a) => ({
-    orig: sq(a.move.slice(0, 2)),
-    dest: sq(a.move.slice(2, 4)),
+    orig: sq(viewSquare(a.move.slice(0, 2), turn)),
+    dest: sq(viewSquare(a.move.slice(2, 4), turn)),
     brush: a.brush,
     ...(a.label ? { label: { text: a.label } } : {}),
   }));
 }
 
 /** Chessground board. Tap a piece then a square, or drag. Pawns reaching the last rank open a promotion picker. */
-export function Board({ fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry }: BoardProps) {
+export function Board({ fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0 }: BoardProps) {
   const el = useRef<HTMLDivElement>(null);
   const api = useRef<Api | null>(null);
   const [promotion, setPromotion] = useState<{ from: string; to: string; dark?: boolean } | null>(null);
@@ -78,8 +84,10 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
   // Hollow's dark: a dark square tapped (selected without picking anything up), and the board as it should be now.
   const [darkSel, setDarkSel] = useState<string | null>(null);
   const darkOn = !!interactive && !!dark?.length && !!onDarkTry;
-  const live = useRef({ fen, dark: dark ?? [], darkOn, darkSel, sync: () => {} });
-  live.current = { ...live.current, fen, dark: dark ?? [], darkOn, darkSel };
+  const live = useRef({ fen, dark: dark ?? [], darkOn, darkSel, turn, sync: () => {} });
+  live.current = { ...live.current, fen, dark: dark ?? [], darkOn, darkSel, turn };
+  // (The turn the board was last drawn at: a new turn moves every piece at once, not as a move.)
+  const drawnTurn = useRef<QuarterTurn>(turn);
   const prevFen = useRef<string | null>(null);
   const lastSound = useRef(0);
 
@@ -103,7 +111,8 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
   // first paint, so every new board (each phase of a match is its own screen) showed one frame with no board at all.
   useLayoutEffect(() => {
     api.current = Chessground(el.current!, {
-      fen,
+      // (Already turned, if the board is: a board made unturned and then turned flies every piece across it.)
+      fen: viewFen(fen, turn),
       orientation,
       coordinates: !small,
       // Input is wired up only when a board is created interactive, so big boards always are;
@@ -122,7 +131,11 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
       // the wrap: a ring placed in % of the wrap drifted off its square by a few pixels toward the board's far side.
       addDimensionsCssVarsTo: el.current!.parentElement!,
     });
-    const resize = new ResizeObserver(() => api.current?.redrawAll());
+    // (Redrawing makes chessground's coordinates afresh: named for a turned board again.)
+    const resize = new ResizeObserver(() => {
+      api.current?.redrawAll();
+      relabel(el.current, live.current.turn);
+    });
     resize.observe(el.current!);
     return () => {
       resize.disconnect();
@@ -134,18 +147,21 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
     const color = sideToMove(fen) === "w" ? "white" : "black";
     const only = moves;
     const darkList = darkOn ? (dark ?? []) : [];
+    // (A new turn of the board: its pieces jump to their new squares, never fly there as if moved.)
+    const turned = drawnTurn.current !== turn;
+    drawnTurn.current = turn;
     const sync = () =>
       api.current?.set({
-        fen,
+        fen: viewFen(fen, turn),
         orientation,
         turnColor: color,
         selectable: { enabled: !!interactive },
-        animation: { enabled: animate, duration: 220 },
-        lastMove: lastMove ? [sq(lastMove.slice(0, 2)), sq(lastMove.slice(2, 4))] : undefined,
+        animation: { enabled: animate && !turned, duration: 220 },
+        lastMove: lastMove ? [sq(viewSquare(lastMove.slice(0, 2), turn)), sq(viewSquare(lastMove.slice(2, 4), turn))] : undefined,
         highlight: {
           lastMove: true,
           check: true,
-          custom: new Map([...Object.entries(marks ?? {}), ...(darkSel && darkOn ? [[darkSel, "selected"] as const] : [])].map(([k, v]) => [sq(k), v])),
+          custom: new Map([...Object.entries(marks ?? {}), ...(darkSel && darkOn ? [[darkSel, "selected"] as const] : [])].map(([k, v]) => [sq(viewSquare(k, turn)), v])),
         },
         check: undefined,
         movable: {
@@ -153,9 +169,12 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
           // (Hollow's dark: any square takes a drop, and the attempt is judged below: one touching the dark goes out
           // unchecked, an ordinary illegal one goes back.)
           free: darkList.length > 0,
-          dests: interactive ? destsFor(fen, moves, darkList) : new Map(),
+          dests: interactive ? destsFor(fen, moves, darkList, turn) : new Map(),
           events: {
-            after: (from, to) => {
+            // (Chessground's squares are the view's: turned back to the real ones.)
+            after: (viewFrom, viewTo) => {
+              const from = realSquare(viewFrom, turn);
+              const to = realSquare(viewTo, turn);
               if (darkList.length && touchesDark(from + to, darkList, fen)) {
                 sync();
                 const piece = pieceAt(fen, from);
@@ -174,8 +193,9 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
       });
     live.current.sync = () => void sync();
     sync();
-    api.current?.setAutoShapes(shapesFor(arrows));
-  }, [fen, orientation, lastMove, interactive, arrows, animate, moves?.join(), JSON.stringify(marks ?? null), darkOn, dark?.join(), darkSel]);
+    api.current?.setAutoShapes(shapesFor(arrows, turn));
+    relabel(el.current, turn);
+  }, [fen, orientation, lastMove, interactive, arrows, animate, moves?.join(), JSON.stringify(marks ?? null), darkOn, dark?.join(), darkSel, turn]);
 
   // A new position or the dark changing: no dark square stays selected.
   useLayoutEffect(() => setDarkSel(null), [fen, dark?.join(), interactive]);
@@ -192,8 +212,9 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
       if (!s.darkOn || !api.current) return;
       const t = "touches" in e ? e.touches[0] : e;
       if (!t) return;
-      const key = api.current.getKeyAtDomPos([t.clientX, t.clientY]) as string | undefined;
-      if (!key) return;
+      const viewKey = api.current.getKeyAtDomPos([t.clientX, t.clientY]) as string | undefined;
+      if (!viewKey) return;
+      const key = realSquare(viewKey, s.turn);
       const mine = pieceAt(s.fen, key)?.color === sideToMove(s.fen) && !s.dark.includes(key);
       const stop = () => {
         e.stopPropagation();
@@ -209,7 +230,8 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
         stop();
         return onDarkRef.current?.(s.darkSel + key);
       }
-      const held = api.current.state.selected as string | undefined;
+      const heldView = api.current.state.selected as string | undefined;
+      const held = heldView ? realSquare(heldView, s.turn) : undefined;
       if (held && key !== held && mine) return void api.current.selectSquare(null);
       if (s.dark.includes(key) && !held) {
         stop();
@@ -233,9 +255,9 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
 
   const white = sideToMove(fen) === "w";
   return (
-    <div class={`board-wrap ${small ? "board-small" : ""}`} data-dark-sel={darkSel ?? undefined}>
+    <div class={`board-wrap ${small ? "board-small" : ""}`} data-dark-sel={darkSel ?? undefined} data-turn={turn || undefined}>
       <div ref={el} class="board" />
-      {children}
+      <BoardTurn.Provider value={turn}>{children}</BoardTurn.Provider>
       {promotion && (
         <div class="promo" role="dialog" aria-label="Promote to">
           {(["q", "r", "b", "n"] as const).map((p) => (
@@ -247,6 +269,23 @@ export function Board({ fen, orientation, lastMove, interactive, moves, onMove, 
       )}
     </div>
   );
+}
+
+/**
+ * Chessground's coordinates on a turned board name the real squares (coordLabel): its edge along the bottom runs along
+ * the real ranks, the one at the side along the real files. What chessground wrote is kept on each label, so naming
+ * them again (after a redraw, or a new turn) starts from it.
+ */
+function relabel(board: HTMLElement | null, turn: QuarterTurn) {
+  const wrap = board;
+  if (!wrap) return;
+  for (const kind of ["files", "ranks"] as const) {
+    for (const c of wrap.querySelectorAll<HTMLElement>(`coords.${kind} coord`)) {
+      const own = (c.dataset.cg ??= c.textContent ?? "");
+      const label = coordLabel(own, kind, turn);
+      if (c.textContent !== label) c.textContent = label;
+    }
+  }
 }
 
 declare module "preact" {

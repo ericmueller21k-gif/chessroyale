@@ -20,7 +20,7 @@ import {
   fireRanked,
   fireShadows,
   shadowStage,
-  funhouseDue,
+  boardAngle,
   initPowers,
   legalMoves,
   newBoard,
@@ -205,7 +205,8 @@ describe("the test trigger", () => {
     expect(kinds(b)).toContain("warn");
     b = triggerUltimate(b).boss!;
     b = prepareTurn({ ...b, crowdMoves: 2 }, down, "", S);
-    expect(funhouseDue(b)).toBe(true);
+    expect(kinds(b)).toContain("funhouse");
+    expect(boardAngle(b)).toBe(180);
     expect(b.powers!.ultAt).toBe(3);
     expect(b.powers!.ults).toBe(1);
   });
@@ -218,18 +219,17 @@ describe("the test trigger", () => {
       const before = runner.crowdAllowed();
       expect(runner.triggerUltimate()).toBe(true);
       expect(runner.crowdAllowed()).toEqual(before);
-      expect(runner.funhouseDue()).toBe(false);
+      expect(boardAngle(runner.boss)).toBe(0);
       await runner.score(new Map([["h0", { move: legalMoves(runner.boards.get(0)!.fen)[0]!, thinkMs: 1000 }]]));
       // While the boss is to move: still nothing; pressing again changes nothing.
       expect(runner.triggerUltimate()).toBe(true);
       await runner.playBoss();
       if (id === "gingerbread") expect(blizzardNow(runner.boss)).toBe(true);
-      else expect(runner.funhouseDue()).toBe(true);
+      else expect(boardAngle(runner.boss)).toBe(180);
       expect(runner.bossView()!.powers!.events.some((e) => e.kind === "warn")).toBe(false);
       expect(runner.triggerUltimate()).toBe(false);
       // Play it out to the end: the board is never left without a move; once the battle's over, the trigger does nothing.
       for (let i = 0; i < 8 && !runner.stageComplete(); i++) {
-        if (runner.funhouseDue()) await runner.playFunhouse();
         if (runner.bossToMove()) await runner.playBoss();
         if (runner.stageComplete()) break;
         runner.deal();

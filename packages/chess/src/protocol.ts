@@ -236,15 +236,20 @@ export interface NetBossPowers {
   warned: boolean;
   ultAt: number | null;
   ults?: number;
-  /** A frozen piece's square, a pied square, through which crowd turn. */
+  /** A frozen piece's square, through which crowd turn; Boingo's pies (`pie`: the newest, for older screens). */
   frozen: { square: string; until: number } | null;
   pie: { square: string; until: number } | null;
+  pies?: { square: string; until: number }[];
   /** Squares that show ice now (the frozen piece; in the blizzard every crowd piece but the one free to move). */
   iced: string[];
-  /** After the funhouse: the crowd sees the board flipped. */
+  /**
+   * Boingo's funhouse: how far the board is turned clockwise from the crowd's own view this turn (0, 90, 180, 270;
+   * missing from older servers), `flipped` when it's 180 (older screens), and the funhouse itself (the turn it came, the
+   * side of its quarter turn).
+   */
+  angle?: 0 | 90 | 180 | 270;
   flipped: boolean;
-  /** The move the boss played for the crowd in its funhouse. */
-  funhouse: { turn: number; move: string; san: string } | null;
+  funhouse: { turn: number; side: 90 | 270 } | null;
   /** What happened as this turn began (a freeze, a pie, the warning, the blizzard, the funhouse): each plays once. */
   events: PowerEvent[];
   /** The crowd's turn: the moves it may play (null: any legal move). */
@@ -584,8 +589,6 @@ export type ServerMessage = { now: number } & (
       stagger?: boolean;
       /** A boss power limits the boss's moves (a pie): play one of these. */
       allowed?: string[];
-      /** Boingo's funhouse: play the crowd's move for it, a weak but recoverable one (funhouseMoveFrom) from `allowed`. */
-      funhouse?: boolean;
       /** Hollow's extra move (a failed Lights out): a quiet one within the cap (extraMoveFrom); "" if there's none. */
       extra?: boolean;
       /**

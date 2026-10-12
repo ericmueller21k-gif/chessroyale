@@ -150,38 +150,34 @@ describe("boss powers online", () => {
     expect(L.core.fairMoves("p1").map((m) => !!m.power)).toEqual([false, true, true]);
   });
 
-  it("Boingo: the host plays the crowd's move in his funhouse (unscored), everyone sees it, then the board shows flipped", () => {
+  it("Boingo: his pies kept off by both sides; the funhouse turns the board for everyone as the crowd's turn begins, no move played for it", () => {
     const L = raid({ bossId: "clown", bossPowerTest: "funhouse" });
     crowdMove(L);
     hostBoss(L);
     const warned = L.last("p1", "boss")!;
     expect(warned.boss.powers!.events.map((e) => e.kind).sort()).toEqual(["pie", "warn"]);
-    const pie = warned.boss.powers!.pie!.square;
+    const pie = warned.boss.powers!.pies![0]!.square;
+    expect(warned.boss.powers!.pie!.square).toBe(pie);
     L.advance(warned.until - L.now + 10);
     const r2 = L.last("p1", "round")!;
     expect((r2.boss!.powers!.allowed ?? legalMoves(r2.board!.fen)).some((m) => m.slice(2, 4) === pie)).toBe(false);
     crowdMove(L);
     const req = hostBoss(L);
-    // The boss never moves onto the pie either.
+    // The boss never moves onto the pie either; nobody is asked to play the crowd's move.
     if (req.allowed) expect(req.allowed.some((m) => m.slice(2, 4) === pie)).toBe(false);
-    L.advance(L.last("p1", "boss")!.until - L.now + 10);
-    // The funhouse: the host is asked for the crowd's move (from the allowed ones), nobody picks.
-    const f = L.last("p1", "bossRequest")!;
-    expect(f.funhouse).toBe(true);
-    expect(L.core.record.phase).toBe("boss");
-    const scoresBefore = L.core.save().runner!.state.players.map((p) => p.finalLosses.length);
-    hostBoss(L);
     const fun = L.last("p2", "boss")!;
-    expect(fun.boss.powers!.funhouse).toBeTruthy();
     expect(fun.boss.powers!.events.map((e) => e.kind)).toContain("funhouse");
-    expect(fun.until - fun.now).toBe(POWER_FX.funhouse);
-    expect(L.core.save().runner!.state.players.map((p) => p.finalLosses.length)).toEqual(scoresBefore);
-    // Then the boss replies, and the crowd's next two turns show the board flipped.
+    expect(fun.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
+    expect(fun.boss.powers!.angle).toBe(180);
+    expect(fun.boss.powers!.flipped).toBe(true);
+    expect(fun.until - fun.now).toBeGreaterThanOrEqual(POWER_FX.funhouse);
+    expect(L.inbox.get("p1")!.some((m) => m.t === "bossRequest")).toBe(false);
+    // Then the crowd's own turn, on the turned board: everyone picks as usual.
     L.advance(fun.until - L.now + 10);
-    hostBoss(L);
-    L.advance(L.last("p1", "boss")!.until - L.now + 10);
-    expect(L.last("p1", "round")!.boss!.powers!.flipped).toBe(true);
-    expect(L.last("p2", "round")!.boss!.powers!.flipped).toBe(true);
+    const r3 = L.last("p1", "round")!;
+    expect(r3.boss!.powers!.angle).toBe(180);
+    expect(L.last("p2", "round")!.boss!.powers!.angle).toBe(180);
+    expect(L.core.record.phase).toBe("play");
   });
 
   it("a random boss avoids the one most of the lobby met last; only playable bosses are met", () => {

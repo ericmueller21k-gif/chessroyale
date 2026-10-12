@@ -194,7 +194,7 @@ export interface BossRules {
    * ultimate can come. Without it, the effect is its own turn only (the blizzard, the Big Bounce). Read from the state
    * as the previous turn left it, before anything wears off.
    */
-  ultimateRunning?(p: BossPowerState, turn: number): boolean;
+  ultimateRunning?(p: BossPowerState, turn: number, s: BossPowerSettings): boolean;
   /** Every turn after the ultimate's step (G-REX's barrage). */
   everyTurn?(next: BossPowerState, t: TurnContext): void;
   /** The passive's step. */

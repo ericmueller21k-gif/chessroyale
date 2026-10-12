@@ -1,3 +1,5 @@
+import { useContext } from "preact/hooks";
+import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren, JSX } from "preact";
 import type { PowerEventKind } from "@chessroyale/core";
 import type { BossKit } from "../characters/kits.ts";
@@ -77,6 +79,8 @@ export interface BoardLayerProps {
   /** The position the board shows. */
   board: string;
   orientation: "white" | "black";
+  /** The board's quarter turn (Boingo's funhouse): place squares with it (onSquare). */
+  turn: QuarterTurn;
   moments: readonly Moment[];
   now: number;
   /** When a square's ice, pie, fire… appears during a moment (ms, wall clock); 0: it's simply there. */
@@ -96,13 +100,16 @@ export interface BossUi {
   board?: (p: BoardLayerProps) => { under?: ComponentChildren; over: ComponentChildren };
 }
 
-export const at = (square: string, orientation: "white" | "black") => {
-  const { x, y } = squareXY(square, orientation);
+export const at = (square: string, orientation: "white" | "black", turn: QuarterTurn = 0) => {
+  const { x, y } = squareXY(square, orientation, turn);
   return { left: `${(x - 50) / 8}%`, top: `${(y - 50) / 8}%` };
 };
-/** A square's column and row on chessground's own board (eighths of --cg-size: exactly on it at any size). */
-export const onSquare = (square: string, orientation: "white" | "black") => {
-  const { x, y } = squareXY(square, orientation);
+/**
+ * A square's column and row on chessground's own board (eighths of --cg-size: exactly on it at any size); on a turned
+ * board (`turn`: BoardTurn), where it's drawn.
+ */
+export const onSquare = (square: string, orientation: "white" | "black", turn: QuarterTurn = 0) => {
+  const { x, y } = squareXY(square, orientation, turn);
   return { "--sq-x": String((x - 50) / 100), "--sq-y": String((y - 50) / 100) };
 };
 
@@ -137,7 +144,7 @@ export function kitLine(kit: BossKit | null, moment: KitMoment, key: string): st
  * target) or the pie (tumbling), over `ms`.
  */
 export function Flight({ name, anim, square, orientation, since, ms, aim = false, from: fromPct }: { name: "iceBolt" | "pieFly" | "sparkFly" | "darkPour" | "blockFly"; anim?: string; square: string; orientation: "white" | "black"; since: number; ms: number; aim?: boolean; from?: { x: number; y: number } }) {
-  const { x, y } = squareXY(square, orientation);
+  const { x, y } = squareXY(square, orientation, useContext(BoardTurn));
   // (From the boss's corner of the board; Hollow's darkness from the void in his chest, given in % of the board.)
   const from = fromPct ? { x: fromPct.x * 8, y: fromPct.y * 8 } : { x: 60, y: 30 };
   const angle = (Math.atan2(y - from.y, x - from.x) * 180) / Math.PI;

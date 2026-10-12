@@ -111,7 +111,7 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   ],
   blizzardKing: ["Frozen solid! Only our king can move.", "The storm spared the king alone. Steady, Majesty."],
   blizzardOne: ["The storm left us one piece. Make it count!", "All frozen but one. Use it well.", "One of ours broke free of the ice!", "Only one piece moves. That's all we need."],
-  funhouse: ["Upside down? Shake it off!", "That clown played our move! We'll fix it.", "Hold on, the board's spinning. Eyes up!"],
+  funhouse: ["Upside down? Shake it off!", "That clown's spinning the board! Eyes on the pieces.", "Hold on, the board's spinning. Eyes up!"],
   // A mate threatened against us (as our move begins), and a queen taken, either way.
   mateThreat: ["Mate is near! Shield the king.", "It threatens mate. Look again!", "Danger at the gate. Guard the king!"],
   queenLost: ["Our queen has fallen. Fight on!", "The queen! She'll be avenged.", "They took the queen. Hold the line."],

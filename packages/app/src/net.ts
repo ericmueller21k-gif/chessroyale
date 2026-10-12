@@ -22,7 +22,6 @@ import {
   recheckCloseCalls,
   repliesFrom,
   bossMoveFrom,
-  funhouseMoveFrom,
   extraMoveFrom,
   bounceFrom,
   allowedSearch,
@@ -562,7 +561,7 @@ export class NetMatch implements GameView {
       case "bossRequest":
         if (m.extra) return void this.hostExtra(m.key, m.fen);
         if (m.bounce) return void this.hostBounce(m.key, m.fen, m.bounce);
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null);
       case "chat":
         return this.chat.onLine(m.line);
       case "chatLog":
@@ -631,14 +630,11 @@ export class NetMatch implements GameView {
   // ---------------- Host work ----------------
 
   /** Boss battle, host only: play the boss's move with this device's engine at the boss's strength. */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger", allowed: string[] | null = null, funhouse = false) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger", allowed: string[] | null = null) {
     try {
       const [engine] = await this.engines();
-      // Boingo's funhouse: the crowd's move, played for it (a weak but recoverable one); else the boss's own (a pie
-      // stops it too).
-      const move = funhouse
-        ? await funhouseMoveFrom(engine!, fen, allowed)
-        : await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed);
+      // (A pie stops the boss's moves too.)
+      const move = await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed);
       this.send({ t: "bossMove", key, move });
     } catch {
       // No engine here: the server asks someone else, or plays a random move.

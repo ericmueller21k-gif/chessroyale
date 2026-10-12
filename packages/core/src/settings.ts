@@ -457,9 +457,13 @@ export const BOSS_POWERS = {
   /** Freeze: a crowd piece (never the king) is iced for this many crowd turns, every 4 to 6 turns (from its start). */
   freezeTurns: 2,
   freezeEvery: [4, 6] as readonly [number, number],
-  /** Pie: a square near the centre is pied for this many crowd turns (nobody may move onto it), then this many clear. */
+  /**
+   * Pie: a square near the centre is pied for pieTurns crowd turns (nobody may move onto it). Up to pieMax pies on the
+   * board at once (Eric, Oct 11: two), never two on one square; a new one every pieEvery turns while there's room.
+   */
   pieTurns: 3,
-  pieGap: 2,
+  pieEvery: 2,
+  pieMax: 2,
   /**
    * The ultimate's meter (the rage meter), in rage points: full at rageFull, then a one-turn warning, then the
    * ultimate. It empties as the ultimate comes and fills again for the next (Eric, Oct 11: several a match, like a
@@ -481,13 +485,13 @@ export const BOSS_POWERS = {
   rageStrike: 25,
   /**
    * How fast each boss's meter fills (every gain times this), by BOSS_ROSTER id (1 when missing). Its ultimate's
-   * effect pauses the meter for its length (the blizzard 1 turn, the funhouse 3, the Roman candle about 13, Lights
+   * effect pauses the meter for its length (the blizzard 1 turn, the funhouse 12, the Roman candle about 13, Lights
    * out 2, the Big Bounce 1, the board saw 5), so a longer one fills faster to fit two in a typical battle. Ginger a
    * little faster (Eric, Oct 11: her ultimate's weak; about twice a game). Jefferson's candle burns for about a third
    * of a battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half
    * on fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.1, clown: 1.15, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.1, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3 } as Readonly<Record<string, number>>,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**
@@ -495,12 +499,13 @@ export const BOSS_POWERS = {
    * brings the boss's ultimate as the next crowd turn begins (no warning). false removes it everywhere, server too.
    */
   ultimateTestButton: true,
-  /** The funhouse: the boss plays the crowd's move, one that gives away this many points against the best (1 to 2.5 pawns). */
-  funhouseLoss: [10, 25] as readonly [number, number],
-  /** ...and never one that gives away more than this in log-odds (a lost cause stays a fight). */
-  funhouseMaxLogit: 1.6,
-  /** After the funhouse the crowd sees the board flipped for this many of its turns. */
-  flipTurns: 2,
+  /**
+   * The funhouse (Boingo's ultimate; Eric, Oct 11): he turns the board round in steps, funhouseStepTurns crowd turns
+   * apart: upside down (180°) as it comes, then a quarter turn to a side picked from the seed (90° or 270°), then a half
+   * turn to the other side, then back to the start, where it stays. No move is played for the crowd. The meter fills
+   * again once the board is back.
+   */
+  funhouseStepTurns: 4,
   /**
    * G-REX's fire tiles: a tile burns in fireStages stages, one a crowd turn (a singe, more burn, ablaze); after the
    * crowd's move on its last stage, a crowd piece still on it is destroyed (never the king: it fizzles). Then

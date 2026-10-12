@@ -91,7 +91,7 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   // meter fills again from empty, and the next can come.
   if (next.ultAt !== undefined) {
     next.rageUsed = ragePoints(next, s);
-    if (!(rules.ultimateRunning ? rules.ultimateRunning(next, turn) : turn <= next.ultAt)) {
+    if (!(rules.ultimateRunning ? rules.ultimateRunning(next, turn, s) : turn <= next.ultAt)) {
       delete next.warnAt;
       delete next.ultAt;
     }

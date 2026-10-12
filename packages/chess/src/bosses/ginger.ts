@@ -69,7 +69,7 @@ export const GINGER: BossRules = {
   },
   passive(next, t) {
     if (t.turn < next.nextPassive) return;
-    const pick = chooseFreeze(t.fen, t.crowd, t.seed, t.turn, next.pie?.square);
+    const pick = chooseFreeze(t.fen, t.crowd, t.seed, t.turn, next.pies?.[0]?.square);
     if (pick) {
       next.frozen = { ...pick, until: t.turn + t.s.freezeTurns - 1 };
       t.events.push({ kind: "freeze", turn: t.turn, square: pick.square });

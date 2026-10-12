@@ -10390,10 +10390,14 @@ img.qicon {
   z-index: 2;
   pointer-events: none;
 }
+/* Boingo's pies: exactly on their squares, in eighths of chessground's own board (--cg-size), never % of the wrap (the
+   wrap can be a few pixels wider), wherever the funhouse has turned the board (onSquare). */
 .pw-pie {
   position: absolute;
-  width: 12.5%;
-  height: 12.5%;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
   pointer-events: none;
 }
 /* Ginger's ice (and the cold burst as it forms): exactly on its square, in eighths of chessground's own board
@@ -10546,6 +10550,38 @@ img.qicon {
   }
   100% {
     transform: rotate(180deg) scale(1);
+  }
+}
+
+/* The funhouse's later steps: a quarter turn of the board in its own plane, clockwise or anticlockwise (the pieces go
+   round with it for a moment), then it's drawn at its new angle, untransformed (Board's turn: chessground measures its
+   squares then). Shrunk at the halfway point so its corners stay in its box. */
+.pw-turning-cw .board-wrap {
+  animation: pw-quarter-cw 700ms cubic-bezier(0.55, 0, 0.35, 1) both;
+}
+.pw-turning-ccw .board-wrap {
+  animation: pw-quarter-ccw 700ms cubic-bezier(0.55, 0, 0.35, 1) both;
+}
+@keyframes pw-quarter-cw {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(45deg) scale(0.72);
+  }
+  100% {
+    transform: rotate(90deg) scale(1);
+  }
+}
+@keyframes pw-quarter-ccw {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(-45deg) scale(0.72);
+  }
+  100% {
+    transform: rotate(-90deg) scale(1);
   }
 }
 

@@ -1284,3 +1284,40 @@ queen anymore. His meter should build up a bit faster because his ult's kind of 
     his Elo offset (−250) already pays for nasty powers.
   - Crowd win rates: not measured. Expect the crowd to face about one more ultimate a battle than before, so a little
     harder; every boss's offset is unchanged until the sim says otherwise.
+
+### Boingo: two pies, and the funhouse turns the board round (Oct 11, 2026)
+
+Eric: "Up to two pies on the board at once for the clown. Funhouse ultimate: he rotates the board. First he flips it
+upside down, like he normally does. A few turns later he turns it 90 degrees to one side, left or right. Then he does
+a 180, so now it's on the side we haven't done yet. A few more turns after that, it goes back to the start, and we
+leave it there. And he doesn't play any extra moves during this time." The calls:
+
+- **Two pies.** Each pie keeps its rules (an empty square near the centre that the fewest moves reach, `pieTurns` 3
+  turns, nobody on either side moves onto it). The cadence was "3 on, 2 clear" (one pie at a time); now a new pie
+  every `pieEvery` = 2 turns while fewer than `pieMax` = 2 are down, never on a square already pied, so there are two
+  on the board every other turn. The state is `pies` (a list); screens get `pies`, and `pie` (the newest) for older
+  ones. The pies are placed like Ginger's ice now (PR #148): in eighths of chessground's board (`onSquare`), exact at
+  any size, and turned with the board.
+- **The funhouse's steps:** `funhouseStepTurns` = 4 crowd turns a step (Eric said "a few"; the middle of 3 to 5).
+  180° as it comes (turn T), the quarter turn to his side on T+4 (90° clockwise or 270°, from the seed), the half turn
+  to the other side on T+8, back on T+12, where it stays. Each step is a short moment as the crowd's turn begins
+  (`spin`: "SPIN!" naming the way it turns, or "BACK AGAIN!"), then the board turns. Its effect runs until it's back:
+  the meter fills again from T+12.
+- **No forced move:** the move he played for the crowd is gone, with everything that served it (the host's funhouse
+  request, `funhouseMoveFrom`, its settings, the "Not scored" line). Today's funhouse turn wasn't scored only because
+  nobody picked it; now the crowd picks every turn, so every turn is scored as usual. The turned turns don't count for
+  fair play (a power turn, as the flipped ones were).
+- **How the 90° board works:** chessground maps a tap or a drag from its own box and draws only two ways up, so a
+  CSS rotation of the board would put taps on the wrong squares. A quarter turn is drawn by moving every square where
+  the turned board shows it (`board-view.ts`), and every move chessground reports is turned back. Tapping and dragging
+  are exact at every angle, phone and computer (e2e: a move by tap and by drag at 0°, 180°, 90° and 270°, with touch on
+  the phone). The coordinates name the real squares: on a quarter turn the bottom edge runs along the ranks and the
+  side along the files, and the e2e coordinate check now handles a turned board.
+- **Pieces stay upright:** today's flip spins the board with its pieces (upside down for a moment) and then draws it
+  from the other side with the pieces upright. The quarter turns do the same: the board turns in its own plane
+  (700 ms, shrinking at the halfway point so its corners stay in its box), then is drawn at its new angle,
+  untransformed. Found in the frames: a board made for a turned view first drew the position unturned and flew every
+  piece across it; it's made turned now.
+- **His meter:** the funhouse now holds it for 12 turns, so `rageSpeed` for Boingo goes to 1.8 (by estimate, as the
+  others: about two funhouses in a typical battle, the first around turn 10). Rates set by estimate; not yet tested
+  with the bot sim. Run the sim at a future date.

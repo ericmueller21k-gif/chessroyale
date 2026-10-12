@@ -59,10 +59,11 @@ async function run(boss, name, context) {
     if (!(await waitFor(["play"], 60_000))) return false;
     await p.locator(".cc-banner", { hasText: "Round start" }).waitFor({ state: "detached", timeout: 15000 }).catch(() => undefined);
     await p.waitForTimeout(500);
-    const { allowed, fen, orientation, fire } = await p.evaluate(() => {
+    const { allowed, fen, orientation, fire, turn } = await p.evaluate(() => {
       const m = window.match;
       const fen = m.phase.board.fen;
-      return { allowed: m.boss?.powers?.allowed ?? null, fen, fire: m.boss?.powers?.fire ?? [], orientation: document.querySelector(".cg-wrap")?.classList.contains("orientation-black") ? "black" : "white" };
+      const turn = Number(document.querySelector(".board-area .board-wrap")?.dataset.turn ?? 0);
+      return { allowed: m.boss?.powers?.allowed ?? null, fen, fire: m.boss?.powers?.fire ?? [], orientation: document.querySelector(".cg-wrap")?.classList.contains("orientation-black") ? "black" : "white", turn };
     });
     const chess = new Chess(fen);
     let options = allowed ?? chess.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
@@ -76,9 +77,11 @@ async function run(boss, name, context) {
     if (!pick) return;
     const board = await p.locator("cg-board").first().boundingBox();
     const flip = orientation === "black";
+    // (Boingo's funhouse turns the board a quarter of the way round: a square is where the turned board draws it.)
     const at = (s) => {
-      const f = s.charCodeAt(0) - 97;
-      const r = Number(s[1]) - 1;
+      const f0 = s.charCodeAt(0) - 97;
+      const r0 = Number(s[1]) - 1;
+      const [f, r] = turn === 90 ? [r0, 7 - f0] : turn === 270 ? [7 - r0, f0] : [f0, r0];
       return { x: board.x + ((flip ? 7 - f : f) + 0.5) * (board.width / 8), y: board.y + ((flip ? r : 7 - r) + 0.5) * (board.height / 8) };
     };
     // Two taps; again if the board wasn't taking moves yet.
@@ -91,8 +94,8 @@ async function run(boss, name, context) {
   };
   await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, everyNthFrame: 1 });
   const marks = [];
-  // Three crowd moves (or four, to see the board flipped after the funhouse), watching each boss screen's moments.
-  const moves = Number(movesArg) || (boss === "grex" ? 12 : 4);
+  // Three crowd moves (Boingo: sixteen, to see every step of the funhouse), watching each boss screen's moments.
+  const moves = Number(movesArg) || (boss === "grex" ? 12 : boss === "clown" ? 16 : 4);
   for (let i = 0; i < moves; i++) {
     if ((await move()) === false) break;
     for (let k = 0; k < 400; k++) {
@@ -118,8 +121,12 @@ async function run(boss, name, context) {
   }
   await cdp.send("Page.stopScreencast");
   // Each moment: its frames, a few stills and a GIF.
+  const names = new Set();
   for (const m of marks) {
-    const name = `${tag}-${m.kinds.join("+")}${m.kinds.includes("fireball") ? `-t${m.key.split(":")[0]}` : ""}`;
+    // (A moment that comes more than once, a wave of fireballs or each step of the funhouse: named by its turn too.)
+    let name = `${tag}-${m.kinds.join("+")}${m.kinds.includes("fireball") || m.kinds.includes("spin") ? `-t${m.key.split(":")[0]}` : ""}`;
+    if (names.has(name)) name += `-t${m.key.split(":")[0]}`;
+    names.add(name);
     const dir = join(outDir, `${name}-frames`);
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });

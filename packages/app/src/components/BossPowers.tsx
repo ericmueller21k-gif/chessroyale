@@ -1,12 +1,13 @@
 import type { ComponentChildren } from "preact";
-import { useLayoutEffect, useRef } from "preact/hooks";
+import { useContext, useLayoutEffect, useRef } from "preact/hooks";
+import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import { BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
 import { powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { BossMoment } from "./BossEffect.tsx";
-import { BOINGO_UI } from "./Boingo.tsx";
+import { BOINGO_UI, angleView } from "./Boingo.tsx";
 import { BIGBOY_UI } from "./BigBoy.tsx";
 import { GINGER_UI } from "./Ginger.tsx";
 import { GREX_UI } from "./Grex.tsx";
@@ -32,7 +33,7 @@ import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 
 // Each boss's file, for the screens.
 export { FREEZE, BLIZZARD } from "./Ginger.tsx";
-export { PIE, FUNHOUSE, FUNHOUSE_LINES, funhouseBeat, funhouseFlipAt, funhouseLine } from "./Boingo.tsx";
+export { PIE, FUNHOUSE, FUNHOUSE_LINES, SPIN, angleView, funhouseFlipAt, funhouseLine, funhouseView, spinOf } from "./Boingo.tsx";
 export { BURN, CANDLE, CandlePips, FIREBALL, FireBurn, SPARK, candleShotPath, candleShotTimes, fireCountdown, fireballLandAt, shadowItems, shadowsAt } from "./Grex.tsx";
 export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";
 export { PowerBanner, type Moment } from "./PowerParts.tsx";
@@ -93,11 +94,15 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
 /** The moment playing at `now`, if any. */
 export const momentAt = (moments: readonly Moment[], now: number) => moments.find((m) => now >= m.at && now < m.at + m.ms) ?? null;
 
-/** The board as the crowd sees it: from its own side, or (after Boingo's funhouse) flipped for a couple of turns. */
-export function crowdOrientation(boss: Pick<BossView, "powers"> | null | undefined, side: "w" | "b"): "white" | "black" {
-  const s = boss?.powers?.flipped ? (side === "w" ? "b" : "w") : side;
-  return s === "w" ? "white" : "black";
+/**
+ * The board as the crowd sees it: from its own side, or (in Boingo's funhouse) turned: upside down (the other side's
+ * orientation), or a quarter turn either way (Board's `turn`). Older servers send only `flipped`.
+ */
+export function crowdView(boss: Pick<BossView, "powers"> | null | undefined, side: "w" | "b"): { orientation: "white" | "black"; turn: QuarterTurn } {
+  const p = boss?.powers;
+  return angleView(p?.angle ?? (p?.flipped ? 180 : 0), side);
 }
+
 
 // ---------------- The board layer ----------------
 
@@ -115,7 +120,8 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
   const p = boss.powers;
   if (!p) return null;
   const board = fen ?? boss.board.fen;
-  const layer = bossUi(boss)?.board?.({ boss, p, board, orientation, moments, now, appearAt: (square) => appearAt(square, moments, orientation) }) ?? null;
+  const turn = useContext(BoardTurn);
+  const layer = bossUi(boss)?.board?.({ boss, p, board, orientation, turn, moments, now, appearAt: (square) => appearAt(square, moments, orientation) }) ?? null;
   return (
     <>
       {layer?.under}

@@ -226,8 +226,8 @@ export interface LobbyRecord {
   /** Boss battle: the boss move the host owes the server. */
   bossKey?: string;
   bossStumble?: boolean;
-  /** "funhouse": the host plays the crowd's move for Boingo (his ultimate); "bounce": it picks Big Boy's Big Bounce. */
-  bossKind?: "elo" | "stumble" | "stagger" | "funhouse" | "extra" | "bounce";
+  /** "extra": the host plays Hollow's extra move; "bounce": it picks Big Boy's Big Bounce. */
+  bossKind?: "elo" | "stumble" | "stagger" | "extra" | "bounce";
   /** Big Boy's Big Bounce: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
@@ -1008,9 +1008,8 @@ export class LobbyCore {
   private sendBossRequest(host: string) {
     const runner = this.runner!;
     const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
-    const funhouse = this.r.bossKind === "funhouse";
-    // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for them.
-    const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
+    // A power limits the boss's moves (a pie).
+    const allowed = runner.bossAllowed();
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
@@ -1018,7 +1017,6 @@ export class LobbyCore {
       elo: runner.boss!.elo,
       nodes: this.settings.bossNodes,
       ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : {}),
-      ...(funhouse ? { funhouse: true } : {}),
       ...(this.r.bossKind === "extra" ? { extra: true } : {}),
       ...(this.r.bossKind === "bounce" ? { bounce: this.r.bounceCandidates ?? [] } : {}),
       ...(allowed && this.r.bossKind !== "bounce" ? { allowed } : {}),
@@ -1060,21 +1058,6 @@ export class LobbyCore {
     this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
-  /**
-   * Boingo's funhouse: as the turn passes to the crowd, the boss plays its move for it. The host's engine picks a
-   * weak but recoverable move (as it plays the boss's), everyone sees the funhouse, and then the boss replies.
-   */
-  private requestFunhouse() {
-    this.r.phase = "boss";
-    this.r.bossKey = `f-${++this.r.counter}`;
-    this.r.bossKind = "funhouse";
-    this.r.bossMinAt = undefined;
-    const host = this.hostNow();
-    this.r.hostId = host;
-    if (host) this.sendBossRequest(host);
-    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
-  }
-
   private playBoss(move: string) {
     this.r.bossKey = undefined;
     if (this.r.bossKind === "bounce") {
@@ -1094,14 +1077,6 @@ export class LobbyCore {
       const played = this.runner!.applyExtraMove(move || null);
       const until = this.io.now() + (played ? powerMomentMs([{ kind: "extra" }]) : 0);
       if (played) this.broadcast(this.bossMessage(until));
-      return this.setTimer("nextRound", until);
-    }
-    if (this.r.bossKind === "funhouse") {
-      // The crowd's move, played by the boss: unscored; the funhouse plays out, then the boss replies.
-      this.r.bossKind = undefined;
-      this.runner!.applyFunhouse(move);
-      const until = this.io.now() + powerMomentMs([{ kind: "funhouse" }]);
-      this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
     // Too soon (your queen banner is still up): hold the move until then.
@@ -1129,11 +1104,11 @@ export class LobbyCore {
       this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
       return;
     }
-    // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in its funhouse, the
-    // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
+    // Nobody can run the engine: the boss plays a random allowed move so the match can go on. His extra move needs the
+    // engine to stay small: without one, he skips it.
     const runner = this.runner!;
     if (this.r.bossKind === "extra" || this.r.bossKind === "bounce") return this.playBoss("");
-    const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
+    const legal = runner.bossAllowed() ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
 
@@ -1164,7 +1139,6 @@ export class LobbyCore {
       if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : this.requestBoss();
       // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
-      if (runner.funhouseDue()) return this.requestFunhouse();
     }
     if (this.r.augmentVotes) {
       // Crowd augments: the cut's vote sets the move clock from now on.
