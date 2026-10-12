@@ -1,11 +1,13 @@
-import { expect, type Page } from "@playwright/test";
+import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { test } from "./helpers.ts";
+import { BOSS_ROSTER, isPlayable } from "@chessroyale/core";
+import { createLobbyFromHome, joinFromInvite, named, test } from "./helpers.ts";
 
 /**
- * The Maia prototype (DECISIONS.md, "A human-like boss: Maia-3 for Ginger"): an admin picks the boss's brain in Boss
- * alone's boss menu, meets Ginger on a phone, and Maia's moves come through (the Maia box's worker, spoken to in text,
- * vetoed by the full guard where it must be); its debug line says so. Players never load Maia.
+ * The Maia boss (DECISIONS.md, "A human-like boss: Maia-3 for Ginger", Oct 11; "Every boss on Maia", Oct 12): for an
+ * admin every boss plays with Maia by default, in Boss alone and online (the host's device plays it, everyone gets its
+ * one move); an admin can pick another brain in Boss alone's boss menu, and a debug line says what the brain did.
+ * Maia's moves come through the Maia box's worker, spoken to in text. Players never load Maia.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 
@@ -20,8 +22,8 @@ async function asAdmin(page: Page) {
 }
 
 /** Waits for your move and plays a legal one (one a power allows). */
-async function play(page: Page) {
-  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+async function play(page: Page, timeout = 60_000) {
+  await expect.poll(() => phase(page), { timeout }).toBe("play");
   const { fen, allowed } = await page.evaluate(() => {
     const m = (window as any).match;
     return { fen: m.phase.board.fen as string, allowed: (m.boss?.powers?.allowed ?? null) as string[] | null };
@@ -73,6 +75,67 @@ test("an admin's Brain picker: Ginger on Maia with the full guard, on a phone; M
   const box = await debug.boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+});
+
+test("every boss is on Maia, no guard, by default for an admin (Boss alone, a phone): its moves are Maia's", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
+  const bosses = BOSS_ROSTER.filter(isPlayable).map((b) => b.id);
+  test.setTimeout(bosses.length * 80_000);
+  await asAdmin(page);
+  for (const id of bosses) {
+    await page.goto(`/?debug&clock=40&bossMoves=3&laststand=0&boss=${id}`);
+    await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 30_000 }).toBe(id);
+    const debug = page.locator(".brain-debug");
+    await expect(debug, id).toContainText(/Maia \d+ · no guard/, { timeout: 30_000 });
+    const lines: string[] = [];
+    for (let i = 0; i < 3 && (await phase(page)) !== "results"; i++) {
+      await play(page);
+      await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|results)$/);
+      lines.push(await debug.innerText().catch(() => ""));
+    }
+    expect(lines.filter((l) => /Maia \d+ · no guard · Maia's #\d+ · \d+ ms/.test(l)).length, `${id}: ${lines.join(" | ")}`).toBeGreaterThanOrEqual(1);
+  }
+});
+
+test("an online raid on the Maia brain: the host's device plays Maia's move, everyone gets the same one, a player's never loads it", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "one run covers both devices");
+  test.setTimeout(5 * 60_000);
+  // (wrangler dev's MAIA_TEST counts everyone as an admin for the lobby's choice; only the admin's app may run Maia.)
+  const hostCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const guestCtx = await browser.newContext({ ...devices["iPhone 13"], browserName: undefined } as any);
+  const host = await hostCtx.newPage();
+  const guest = await guestCtx.newPage();
+  await asAdmin(host);
+  const guestMaia: string[] = [];
+  guest.on("request", (r) => r.url().includes("/engine/maia/") && guestMaia.push(r.url()));
+  await named(host, "Hosty");
+  await named(guest, "Guesty");
+  await host.goto("/?debug&pace=quick&mode=raid&boss=gingerbread&bossMoves=4&clock=40&laststand=0");
+  await createLobbyFromHome(host);
+  await expect(host.getByRole("heading", { name: /^Lobby / })).toBeVisible();
+  const code = (await host.locator(".invite-code").textContent())!.trim();
+  await guest.goto(`/lobby/${code}?debug`);
+  await joinFromInvite(guest);
+  await expect(host.locator(".lobby-players li")).toHaveCount(2);
+  await host.getByRole("button", { name: /^Start with 2 players/ }).click();
+  const debug = host.locator(".brain-debug");
+  await expect(debug).toContainText(/Maia \d+ · no guard/, { timeout: 60_000 });
+  const lines: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    if ((await phase(host)) === "results") break;
+    await play(host, 90_000);
+    if ((await phase(guest)) === "play") await play(guest);
+    await expect.poll(() => phase(host), { timeout: 60_000 }).toMatch(/^(play|results)$/);
+    lines.push(await debug.innerText().catch(() => ""));
+    // Everyone gets the one move the host's Maia played.
+    const played = await host.evaluate(() => (window as any).match.boss?.lastMove?.move ?? null);
+    await expect.poll(() => guest.evaluate(() => (window as any).match.boss?.lastMove?.move ?? null), { timeout: 10_000 }).toBe(played);
+  }
+  expect(lines.filter((l) => /Maia \d+ · no guard · Maia's #\d+ · \d+ ms/.test(l)).length, lines.join(" | ")).toBeGreaterThanOrEqual(1);
+  // The player's device never downloaded Maia, and shows no debug line.
+  expect(guestMaia).toEqual([]);
+  await expect(guest.locator(".brain-debug")).toHaveCount(0);
 });
 
 test("players meet Stockfish: no Brain picker, no Maia download, no debug line", async ({ page }) => {

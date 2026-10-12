@@ -31,6 +31,12 @@ export interface Env extends AccountEnv, EngineEnv, AdminEnv {
   PARTIES: DurableObjectNamespace<SquadsParty>;
   /** "1" (local and e2e only, never production): anyone may use Squads' test controls (else admins only). */
   SQUADS_TEST?: string;
+  /**
+   * "1" (local and e2e only, never production): everyone in a lobby counts as an admin for the Maia boss (BOSS_BRAIN:
+   * a lobby of admins only meets it while it's off for players), so a test can play an online battle on Maia. Only a
+   * device that may run Maia (an admin's, in the app) loads it; the rest play Stockfish's move as host.
+   */
+  MAIA_TEST?: string;
   MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   LIVE?: DurableObjectNamespace<LiveHub>;
   ASSETS: Fetcher;

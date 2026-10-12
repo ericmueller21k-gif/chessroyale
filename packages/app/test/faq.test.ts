@@ -81,18 +81,36 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain(`starts at ${40 + s.lastStandChargedExtra} with charges`);
   });
 
-  it("the handover: Maia's rating line, its worked example, and where Stockfish takes over", () => {
+  it("the handover: Maia's rating lines, the crowd's margin, the worked example, the bridge and where Stockfish takes over", () => {
     const t = section("boss-brain");
-    const [x0, y0] = BOSS_BRAIN.maiaRating[0]!;
-    expect(t).toContain(`A boss at 2000 plays Maia at ${y0} +`);
-    expect(t).toContain(`= ${maiaRatingFor(2000)}`);
-    expect(t).toContain(`from ${BOSS_BRAIN.stockfishFrom} up: Stockfish`);
+    const M = BOSS_BRAIN;
+    const [x0] = M.maiaRating[0]!;
     expect(t).toContain(`from ${x0} to`);
-    const brain = { ...BOSS_BRAIN, maiaRating: [[1400, 1200], [2400, 2000], [2600, 3000]] as const, stockfishFrom: 2900 };
+    expect(t).toContain(`= ${maiaRatingFor(2000 + M.crowdMargin)}`);
+    expect(t).toContain(`From ${M.bridgeFrom}: Maia with the light guard`);
+    expect(t).toContain(`from ${M.bridgeStrictFrom}: Maia with the strict guard`);
+    expect(t).toContain(`From ${M.stockfishFrom} up: Stockfish`);
+    expect(t).not.toContain("Planned");
+    const brain = { ...M, maiaRating: [[1400, 1200], [2400, 2000], [2600, 2600]] as const, crowdMargin: 100, bridgeFrom: 2500, bridgeStrictFrom: 2650, stockfishFrom: 2900, bridgeStockfishShare: 0.4 };
     const moved = section("boss-brain", { ...FAQ_DEFAULTS, brain });
-    expect(moved).toContain("from 1400 to 2400: Maia = 1200 + 0.8 × (strength − 1400)");
-    expect(moved).toContain("= 1680");
-    expect(moved).toContain("from 2900 up: Stockfish");
+    expect(moved).toContain("from 1400 to 2400: Maia = 1200 + 0.8 × (level − 1400)");
+    expect(moved).toContain("from 2600 up: Maia = 2600");
+    expect(moved).toContain("level = strength + 100 (a crowd)");
+    // (A raid's boss at 2000: level 2100, Maia 1200 + 0.8 × 700.)
+    expect(moved).toContain("1200 + 0.8 × (2100 − 1400) = 1200 + 560 = 1760");
+    expect(moved).toContain("From 2500: Maia with the light guard");
+    expect(moved).toContain("from 2650: Maia with the strict guard");
+    expect(moved).toContain("Stockfish's share = 40% × (strength − 2500) / 400");
+    expect(moved).toContain("From 2900 up: Stockfish");
+    // (The table: 2000 alone at Maia 1680, a crowd at 1760, no guard, no Stockfish moves; 2700 a crowd at the ceiling.)
+    expect(moved).toMatch(/\n2000\s+1680\s+1760\s+no guard\s+none/);
+    expect(moved).toMatch(/\n2900\s+Stockfish\s+Stockfish/);
+  });
+
+  it("every boss is on Maia (or the bosses with a brain of their own are named)", () => {
+    expect(section("boss-brain")).toContain(BOSS_BRAIN.forPlayers ? "Every boss plays with Maia" : "In the test, every boss plays with Maia");
+    const own = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, byBoss: { hollow: "stockfish" } } });
+    expect(own).toContain("every boss except Hollow (Stockfish) plays with Maia");
   });
 
   it("Maia is marked as being tested only while it's off for players", () => {

@@ -23,7 +23,7 @@ export type ModeChoiceId = GameMode | "raid";
 /**
  * How a Crowd 50 v 50 match ends (chosen by the pre-game vote):
  * - team: the top 8 play on, 4v4 with teammates taking turns, shrinking to 3v3 and then 2v2, which plays to the end
- * - boss: the top 10 team up on a fresh board against a Stockfish boss, which strikes down the weakest every few moves
+ * - boss: the top 10 team up on a fresh board against a boss (BOSS_BRAIN: Maia or Stockfish), which strikes down the weakest every few moves
  * - duel: the best player on each side plays 1v1 to the end
  */
 export type FinalFormat = "team" | "boss" | "duel";
@@ -737,15 +737,17 @@ export const BOSS_DIFFICULTY = [
 export type BossDifficultyId = (typeof BOSS_DIFFICULTY)[number]["id"];
 
 /**
- * How a boss picks its moves (the Maia prototype, Oct 11; DECISIONS.md, "A human-like boss: Maia-3 for Ginger"):
+ * How a boss picks its moves (DECISIONS.md: "A human-like boss: Maia-3 for Ginger", Oct 11; "Every boss on Maia",
+ * Oct 12):
  * - `stockfish`: Stockfish at the boss's UCI_Elo with the blunder guard (bossMaxLoss, bossMaxLogitLoss), as always.
  * - `maia-raw`: Maia-3's own move, drawn mildly from its probabilities (temperature, topP below), no guard: a human's
- *   strength, a human's mistakes. The default for a boss on the Maia brain (Eric, Oct 11).
- * - `maia-light`, `maia-full`: Maia's move unless it gives away more than the guard allows against the boss's own
- *   top-8 Stockfish search (no extra engine work): then Maia's next likely move that passes, else Stockfish's best.
+ *   strength, a human's mistakes. Every boss's brain (Eric, Oct 12).
+ * - `maia-light`, `maia-full`, `maia-strict`: Maia's move unless it gives away more than the guard allows against the
+ *   boss's own top-8 Stockfish search (no extra engine work): then Maia's next likely move that passes, else
+ *   Stockfish's best. The bridge band plays the light guard, then the strict one.
  */
-export type BossBrain = "stockfish" | "maia-raw" | "maia-light" | "maia-full";
-export const BOSS_BRAINS: readonly BossBrain[] = ["stockfish", "maia-raw", "maia-light", "maia-full"];
+export type BossBrain = "stockfish" | "maia-raw" | "maia-light" | "maia-full" | "maia-strict";
+export const BOSS_BRAINS: readonly BossBrain[] = ["stockfish", "maia-raw", "maia-light", "maia-full", "maia-strict"];
 
 export interface BrainGuard {
   maxLoss: number;
@@ -754,19 +756,23 @@ export interface BrainGuard {
 
 export const BOSS_BRAIN = {
   /**
-   * Boss alone: each boss's brain when nobody picks another (an admin's Brain picker can). Only Ginger is on the
-   * Maia brain in the prototype; every other boss, and every online battle, is Stockfish.
+   * Every boss's brain (Eric, Oct 12: every boss on Maia, no guard; "Maia's mistakes are human ones", the boss's edge
+   * comes from its powers). The guards' settings stay below, for the bridge band and the admins' Brain picker.
    */
-  soloDefault: { gingerbread: "maia-raw" } as Readonly<Record<string, BossBrain>>,
+  brain: "maia-raw" as BossBrain,
+  /** A boss on another brain than `brain` (by BOSS_ROSTER id): none. */
+  byBoss: {} as Readonly<Record<string, BossBrain>>,
   /**
-   * The Maia brain for players too, not only admins. Off until the launch steps (ROADMAP.md, "Needs Eric": the Maia
-   * box's source published, the bosses calibrated): until then players meet Stockfish as before.
+   * The Maia brain for players too, not only admins: the one value that switches it on. Off until the launch step
+   * (ROADMAP.md, "Needs Eric": the Maia box's source published under the AGPL, with Eric's OK): until then players
+   * meet Stockfish as before and never download Maia; admins meet Maia on every boss, in every mode.
    */
   forPlayers: false,
   /**
-   * Maia's rating for a boss's strength (the UCI_Elo Stockfish would play it at: its tier, its own offset and solo's
-   * difficulty), on straight lines between these points (below the first, along the first line, down to
-   * maiaRatingMin): about 1100 at 1400, 2000 at 2400, 3000 at 2600 and above.
+   * Maia's rating for a strength on the game's rating scale (Stockfish's, which players' ratings are on too), on
+   * straight lines between these points: below the first along the first line, down to maiaRatingMin; above the last
+   * held there (Maia's ceiling). Measured per move (reports/maia-calibration.md): Maia at the rating on the right
+   * gives away about as much a move as a player rated the number on the left.
    */
   maiaRating: [
     [1400, 1100],
@@ -774,7 +780,20 @@ export const BOSS_BRAIN = {
     [2600, 3000],
   ] as readonly (readonly [number, number])[],
   maiaRatingMin: 600,
-  /** From this strength on the boss is always Stockfish (Maia's humans stop well short of it). */
+  /**
+   * A crowd voting together plays above its average member (Eric, Oct 11): in a battle where more than one picks the
+   * crowd's moves (a raid, the Crowd's boss battle; not Boss alone), Maia plays this much above the boss's strength.
+   */
+  crowdMargin: 0,
+  /**
+   * The bridge band (Eric, Oct 11): from bridgeFrom to stockfishFrom the boss is Maia with the light guard, then from
+   * bridgeStrictFrom with the strict guard, and a share of its moves today's Stockfish move, growing in a line from
+   * none at bridgeFrom to bridgeStockfishShare just under stockfishFrom, so its strength never jumps.
+   */
+  bridgeFrom: 2600,
+  bridgeStrictFrom: 2700,
+  bridgeStockfishShare: 0.5,
+  /** From this strength on the boss is always Stockfish, as before (Maia's humans stop well short of it). */
   stockfishFrom: 2800,
   /** Maia's own draw from its probabilities: a little sharper than a human's (temperature), and none of the rarest moves (topP). */
   temperature: 0.8,
@@ -784,10 +803,9 @@ export const BOSS_BRAIN = {
   minP: 0.03,
   /** Light guard: never a move giving away more than this against Stockfish's best. */
   light: { maxLoss: 25, maxLogitLoss: 2 } as BrainGuard,
-  /** Full guard: today's blunder guard (bossMaxLoss, bossMaxLogitLoss)… */
+  /** Full guard: today's blunder guard (bossMaxLoss, bossMaxLogitLoss). */
   full: { maxLoss: 10, maxLogitLoss: 1 } as BrainGuard,
-  /** …and a strict one once Maia plays at this rating or more. */
-  strictFrom: 3000,
+  /** Strict guard: only about 4 points (the bridge band's top). */
   strict: { maxLoss: 4, maxLogitLoss: 0.5 } as BrainGuard,
   /** Maia's answer is waited for this long at most (from the request, made alongside the top-8 search); then Stockfish. */
   timeoutMs: 1500,

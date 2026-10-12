@@ -3,7 +3,8 @@ import { account } from "./account.ts";
 
 /**
  * Testing, admins only: the boss's brain in Boss alone (the Brain picker in the boss menu, or ?brain=<id>), "" for
- * each boss's own (BOSS_BRAIN.soloDefault: Ginger is Maia, no guard). Remembered on this device.
+ * each boss's own (BOSS_BRAIN: every boss on Maia, no guard, the bridge band, Stockfish at the top). Remembered on
+ * this device.
  */
 const KEY = "brc.bossBrain";
 const known = (v: unknown): v is BossBrain => (BOSS_BRAINS as readonly unknown[]).includes(v);
@@ -13,6 +14,7 @@ export const BRAIN_LABELS: Record<BossBrain, string> = {
   "maia-raw": "Maia, no guard",
   "maia-light": "Maia, light guard",
   "maia-full": "Maia, full guard",
+  "maia-strict": "Maia, strict guard",
 };
 
 export const isAdmin = () => !!account().profile?.admin;
@@ -40,19 +42,21 @@ export function rememberBrain(v: BossBrain | "") {
 }
 
 /**
- * The brain this device's Boss alone asks for: an admin's pick (or each boss's own); a player meets each boss's own
- * only once the Maia brain is on for players (BOSS_BRAIN.forPlayers), else Stockfish as before. `maia`: whether Maia
- * may be used at all here.
+ * Whether this device may run Maia at all: an admin's (Maia on every boss, Eric, Oct 12); a player's only once the
+ * Maia brain is on for players (BOSS_BRAIN.forPlayers). A player's device never downloads it before that.
  */
-export function soloBrain(): { picked: BossBrain | ""; maia: boolean } {
-  if (isAdmin()) return { picked: pickedBrain(), maia: true };
-  return { picked: "", maia: BOSS_BRAIN.forPlayers };
+export const maiaAllowed = () => BOSS_BRAIN.forPlayers || isAdmin();
+
+/**
+ * The brain a solo boss battle asks for: an admin's pick in Boss alone (`bossAlone`; elsewhere each boss's own), and
+ * whether Maia may play here.
+ */
+export function soloBrain(bossAlone: boolean): { picked: BossBrain | ""; maia: boolean } {
+  return { picked: bossAlone && isAdmin() ? pickedBrain() : "", maia: maiaAllowed() };
 }
 
-/** Whether a Boss alone battle against this boss ("" random) could use Maia (to fetch its files ahead). */
-export function maiaLikely(bossId: string): boolean {
-  const { picked, maia } = soloBrain();
-  if (!maia) return false;
-  if (picked) return picked !== "stockfish";
-  return !bossId || bossId in BOSS_BRAIN.soloDefault;
+/** Whether a Boss alone battle at one of these strengths could use Maia (to fetch its files ahead). */
+export function maiaLikely(strengths: readonly number[]): boolean {
+  const { picked, maia } = soloBrain(true);
+  return maia && picked !== "stockfish" && strengths.some((s) => s < BOSS_BRAIN.stockfishFrom);
 }

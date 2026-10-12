@@ -36,6 +36,7 @@ import {
   SQUADS,
   TIERS,
   VARIABLE_CLOCK,
+  bossBrainFor,
   bossStrength,
   bossStumbleChance,
   clockStepRanges,
@@ -305,33 +306,52 @@ function bossBrain(src: FaqSources): FaqSection {
   const gLogit = logit(from) - logit(to);
   const blocked = !(gPoints <= S.bossMaxLoss && (gLogit <= S.bossMaxLogitLoss || gPoints <= 2));
   const stumbleAt = [1500, 1900, 2000].filter((e) => e < S.bossStumbleBelow).map((e) => `${pct(bossStumbleChance(e, S), 0)} at ${e}`);
-  // Maia for players yet? (Until then it's marked "Being tested".) Which bosses default to it, and with what guard.
-  const guardName: Record<string, string> = { "maia-raw": "no guard", "maia-light": "the light guard", "maia-full": "the full guard" };
-  const maiaBosses = Object.entries(M.soloDefault)
-    .filter(([, brain]) => brain !== "stockfish")
-    .map(([id, brain]) => `${src.roster.find((b) => b.id === id)?.name ?? id} (${guardName[brain] ?? brain})`);
+  // Maia for players yet? (Until then it's marked "Being tested".) Every boss is on it (BOSS_BRAIN.brain), unless one
+  // has its own brain (byBoss).
+  const guardName: Record<string, string> = { "maia-raw": "no guard", "maia-light": "the light guard", "maia-full": "the full guard", "maia-strict": "the strict guard", stockfish: "Stockfish" };
+  const others = Object.entries(M.byBoss)
+    .filter(([id, brain]) => brain !== M.brain && playable.some((b) => b.id === id))
+    .map(([id, brain]) => `${bossById(id).name} (${brain === "stockfish" ? "Stockfish" : `Maia with ${guardName[brain]}`})`);
+  const everyBoss = M.brain === "stockfish" ? "no boss" : `every boss${others.length ? ` except ${others.join(", ")}` : ""}`;
   const maiaNote = M.forPlayers
-    ? `> **New.** In Boss alone, ${maiaBosses.join(", ") || "no boss yet"} ${maiaBosses.length === 1 ? "plays" : "play"} with Maia; online battles and every other boss play with Stockfish.`
-    : `> **Being tested; coming soon.** Maia isn't switched on for players yet: until it is, every boss you meet plays with Stockfish, as above. In the test, only Boss alone uses it (online battles stay Stockfish), and the first ${maiaBosses.length === 1 ? "boss" : "bosses"} on it: ${maiaBosses.join(", ") || "none yet"}.`;
-  // Maia's rating: the lines between BOSS_BRAIN.maiaRating's points, then held, then Stockfish.
+    ? `> **New.** ${everyBoss[0]!.toUpperCase()}${everyBoss.slice(1)} plays with Maia, ${guardName[M.brain]}, up to ${M.bridgeFrom}; then [the bridge](#handover) hands it over to Stockfish, which plays from ${M.stockfishFrom} up.`
+    : `> **Being tested; coming soon.** Maia isn't switched on for players yet: until it is, every boss you meet plays with Stockfish, as above. In the test, ${everyBoss} plays with Maia, ${guardName[M.brain]}, in every mode, with [the bridge](#handover) up to Stockfish.`;
+  // Maia's rating: the lines between BOSS_BRAIN.maiaRating's points, held at the last (its ceiling).
   const pts = M.maiaRating;
   const lines: string[] = [];
   for (let i = 1; i < pts.length; i++) {
     const [xa, ya] = pts[i - 1]!;
     const [xb, yb] = pts[i]!;
-    lines.push(`$ from ${xa} to ${xb}: Maia = ${ya} + ${num((yb - ya) / (xb - xa), 3)} × (strength − ${xa})`);
+    lines.push(`$ from ${xa} to ${xb}: Maia = ${ya} + ${num((yb - ya) / (xb - xa), 3)} × (level − ${xa})`);
   }
   const [lastX, lastY] = pts.at(-1)!;
-  if (lastX < M.stockfishFrom) lines.push(`$ from ${lastX} to ${M.stockfishFrom}: Maia = ${lastY}`);
-  lines.push(`$ from ${M.stockfishFrom} up: Stockfish`);
-  const strengths = [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2500, 2600, 2700, M.stockfishFrom, 3000, ceiling].filter((x, i, a) => a.indexOf(x) === i).sort((a, b) => a - b);
-  const handover = strengths.map((x) => `| ${x} | ${maiaRatingFor(x, M) ?? "Stockfish"} |`).join("\n");
+  lines.push(`$ from ${lastX} up: Maia = ${lastY}`);
+  const margin = M.crowdMargin;
+  // The handover table: a boss's strength, Maia's rating alone and for a crowd, the guard and Stockfish's share.
+  const plan = (x: number, crowd: boolean) => bossBrainFor("", x, "", true, { crowd }, M);
+  const share = (x: number) => plan(x, false).stockfishShare;
+  const strengths = [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, M.bridgeFrom, M.bridgeStrictFrom, Math.round((M.bridgeStrictFrom + M.stockfishFrom) / 2), M.stockfishFrom - 1, M.stockfishFrom, 3000, ceiling]
+    .filter((x, i, a) => a.indexOf(x) === i && x >= floor && x <= ceiling)
+    .sort((a, b) => a - b);
+  const handover = strengths
+    .map((x) => {
+      const a = plan(x, false);
+      const c = plan(x, true);
+      if (a.brain === "stockfish") return `| ${x} | Stockfish | Stockfish | its own blunder guard | all |`;
+      return `| ${x} | ${a.rating} | ${c.rating} | ${guardName[a.brain]} | ${a.stockfishShare ? pct(a.stockfishShare, 0) : "none"} |`;
+    })
+    .join("\n");
+  // The worked example: a raid's boss at 2000, alone and for a crowd.
   const exStrength = 2000;
-  const seg = pts.findIndex(([x]) => x >= exStrength);
-  const [ex0, ey0] = pts[Math.max(0, seg - 1)]!;
-  const [ex1, ey1] = pts[Math.max(1, seg)]!;
+  const exLevel = exStrength + margin;
+  const seg = Math.max(1, pts.findIndex(([x]) => x >= exLevel));
+  const [ex0, ey0] = pts[Math.min(seg, pts.length - 1) - 1]!;
+  const [ex1, ey1] = pts[Math.min(seg, pts.length - 1)]!;
   const exSlope = (ey1 - ey0) / (ex1 - ex0);
-  const exMaia = maiaRatingFor(exStrength, M);
+  const exMaia = maiaRatingFor(exLevel, M);
+  const exHeld = exLevel >= lastX;
+  // The bridge's worked example: its middle.
+  const midBridge = Math.round((M.bridgeStrictFrom + M.stockfishFrom) / 2);
   const guard = (g: { maxLoss: number; maxLogitLoss: number }) => `${n(g.maxLoss, "point")} | ${num(g.maxLogitLoss)}`;
   const gaps = [0, 100, 200, 400].map((d) => `| ${d} | ${es(eloExpected(d))} | ${es(1 - eloExpected(d))} |`).join("\n");
   const youVs = gingerElo - you;
@@ -348,7 +368,7 @@ A boss's strength is a rating on Stockfish's scale, set as the battle starts:
 
 - **A boss raid** is matched to the people in it (bots never count): the boss comes in at the weakest of its tiers that's stronger than their average rating. The tiers: ${tiers.join(", ")}.
 - **A Solo raid and Boss alone** work the same way from your own rating (unrated, ${src.priorRating}).
-- **The Crowd's boss battle** comes from how the last ${finalists} played that match: a weighted average of their ratings (the best counts ${finalists} times, the next ${finalists - 1}, down to the weakest once), ${S.bossEloOffset < 0 ? "minus" : "plus"} ${Math.abs(S.bossEloOffset)} (a crowd picking together plays better than its average member), kept within ${range(S.bossEloRange)}. The weighting makes it a real fight for the best players.
+- **The Crowd's boss battle** comes from how the people among the last ${finalists} played that match (bots count only if no person is left among them): a weighted average of their ratings (the best counts ${finalists} times, the next ${finalists - 1}, down to the weakest once), ${S.bossEloOffset < 0 ? "minus" : "plus"} ${Math.abs(S.bossEloOffset)} (a crowd picking together plays better than its average member), kept within ${range(S.bossEloRange)}. The weighting makes it a real fight for the best players.
 - Then each boss's **offset** is added: bosses with nastier powers play a little weaker underneath.
 - **Boss alone** adds your difficulty too: ${diffs}.
 - The result always stays between ${floor} and ${ceiling}.
@@ -365,7 +385,7 @@ The boss menu shows each boss's strength and how far it is from yours ("+200 vs 
 
 ### Brain 1: Stockfish at a set strength {#stockfish-brain}
 
-${M.forPlayers ? "Most bosses play with Stockfish." : "Every boss you meet today plays with Stockfish."} Stockfish can hold itself back to a rating (from ${src.engineMinElo} up to ${ceiling}), and the boss asks it for a move at the boss's strength. Three safety rails keep it fair and fun:
+${M.forPlayers ? `A boss at ${M.stockfishFrom} or more plays with Stockfish, and so do some of the moves in [the bridge](#handover) below it.` : "Every boss you meet today plays with Stockfish."} Stockfish can hold itself back to a rating (from ${src.engineMinElo} up to ${ceiling}), and the boss asks it for a move at the boss's strength. Three safety rails keep it fair and fun:
 
 - **The blunder guard.** Held-back Stockfish now and then simply hangs a piece. It's boss mode, not idiot mode: no boss move may give away more than ${n(S.bossMaxLoss, "point")} against the best move, nor more than ${num(S.bossMaxLogitLoss)} in **log-odds**. A move that would is swapped for a small slip.
 - **Slips for weaker bosses.** Stockfish can't play below ${src.engineMinElo}, which is still too strong for a boss meant to be beatable at 1400. So below ${S.bossStumbleBelow} a boss sometimes slips on purpose: a small inaccuracy of ${range(S.bossSlipLoss)} points from its best few moves, never a blunder.
@@ -385,36 +405,46 @@ Going from ${pct(from, 0)} to ${pct(to, 0)} is only ${num(gPoints, 1)} points, b
 
 ${maiaNote}
 
-**Maia-3**, by the CSSLab at the University of Toronto, learned from human games to predict the move a person of a given rating would play. Held-back Stockfish plays like a strong engine with sudden lapses; Maia plays like a person, plans and mistakes included. A Maia boss picks its move like this:
+**Maia-3**, by the CSSLab at the University of Toronto, learned from human games to predict the move a person of a given rating would play. Held-back Stockfish plays like a strong engine with sudden lapses; Maia plays like a person, plans and mistakes included. There's no blunder guard by default: Maia's mistakes are human ones, and a boss's edge comes from its powers. A Maia boss picks its move like this:
 
 1. Maia is asked for its likeliest moves at the boss's Maia rating ([the handover](#handover)), and draws one from its own probabilities, a little sharper than a real person (temperature ${num(M.temperature)}) and never one of the rarest (only from the likeliest moves that together make up ${pct(M.topP, 0)} of the chances).
-2. A **guard** may veto that move, judged against the boss's own Stockfish search of its best moves (a move outside that search is turned down). With a guard, Maia's next likeliest moves are tried in turn (at most ${M.candidates} in all, each at least ${pct(M.minP, 0)} likely); if none passes, the boss plays Stockfish's best.
-3. If Maia hasn't loaded, fails, or takes more than ${num(M.timeoutMs / 1000)} s, the boss plays its usual Stockfish move. Nobody ever waits for it.
+2. **Powers:** Maia only picks among the moves a power leaves the boss (a pie, a toy block, a saw cut, Sawyer's first pawn move). If none of its likeliest moves is allowed, the boss plays its usual Stockfish move.
+3. A **guard**, where there is one ([the bridge](#handover)), may veto that move, judged against the boss's own Stockfish search of its best moves (a move outside that search is turned down). Maia's next likeliest moves are then tried in turn (at most ${M.candidates} in all, each at least ${pct(M.minP, 0)} likely); if none passes, the boss plays Stockfish's best.
+4. If Maia hasn't loaded, fails, or takes more than ${num(M.timeoutMs / 1000)} s (an older phone, say), the boss plays its usual Stockfish move. Nobody ever waits for it.
+
+A Maia boss doesn't slip on purpose: its own mistakes take the slips' place. Its special moments keep their own engine picks: the move it makes when the God King strikes it, Boingo's move for the crowd as his funhouse comes, Hollow's extra move after Lights out and Big Boy's Big Bounce.
 
 | Guard | Never gives away more than | Nor more log-odds than |
 |---|---|---|
-| None | no limit: Maia's mistakes are human ones | no limit |
+| None (every boss's own) | no limit: Maia's mistakes are human ones | no limit |
 | Light | ${guard(M.light)} |
 | Full | ${guard(M.full)} |
-| Full, at Maia ${M.strictFrom} or more | ${guard(M.strict)} |
+| Strict | ${guard(M.strict)} |
 
 ### The handover: from Maia to Stockfish {#handover}
 
-A boss's strength is on Stockfish's scale; Maia's ratings are on a human scale, and the two don't line up one to one. So a Maia boss plays at a Maia rating that rises with its strength, along straight lines:
+A boss's strength is on Stockfish's scale, the one your rating is on; Maia's ratings are on a human scale, and the two don't line up one to one. So a Maia boss plays at a Maia rating that rises with its **level**, along straight lines. The level is the boss's strength${margin ? `, plus ${num(margin)} when a crowd plays it (a raid or the Crowd's boss battle: a crowd voting together plays above its average member); in Boss alone it's the strength itself` : ""}.
 
+$ level = strength${margin ? ` + ${num(margin)} (a crowd)` : ""}
 ${lines.join("\n")}
 
-(Below ${pts[0]![0]} the first line carries on down, to no lower than ${M.maiaRatingMin}.) From ${M.stockfishFrom} the boss is always Stockfish: Maia models people, and even the strongest people stop well short of what a top boss must play.
+(Below ${pts[0]![0]} the first line carries on down, to no lower than ${M.maiaRatingMin}.) Maia models people, and even the strongest people stop well short of what a top boss must play, so its rating stops rising at ${lastY}, and Stockfish takes over at the top. In between, **the bridge** hands the boss over gradually, so its strength never jumps:
 
-| Boss strength | Maia plays at |
-|---|---|
+- **Below ${M.bridgeFrom}:** Maia, ${guardName[M.brain]}.
+- **From ${M.bridgeFrom}:** Maia with the light guard; **from ${M.bridgeStrictFrom}:** Maia with the strict guard.
+- **Across the bridge,** a growing share of the boss's moves are its usual Stockfish move instead, up to ${pct(M.bridgeStockfishShare, 0)} just under ${M.stockfishFrom}:
+
+$ Stockfish's share = ${pct(M.bridgeStockfishShare, 0)} × (strength − ${M.bridgeFrom}) / ${M.stockfishFrom - M.bridgeFrom}
+
+- **From ${M.stockfishFrom} up:** Stockfish, with its blunder guard, as above.
+
+| Boss strength | Maia, Boss alone | Maia, a crowd | Guard | Stockfish's moves |
+|---|---|---|---|---|
 ${handover}
 
-**Worked example.** A boss at ${exStrength} plays Maia at ${ey0} + ${num(exSlope, 3)} × (${exStrength} − ${ex0}) = ${ey0} + ${num(exSlope * (exStrength - ex0))} = **${exMaia}**.
+**Worked example.** A raid's boss at ${exStrength}: its level is ${exStrength}${margin ? ` + ${num(margin)} = ${exLevel}` : ""}, so it plays Maia at ${exHeld ? `its ceiling, **${exMaia}**` : `${ey0} + ${num(exSlope, 3)} × (${exLevel} − ${ex0}) = ${ey0} + ${num(exSlope * (exLevel - ex0))} = **${exMaia}**`}. A boss at ${midBridge} plays Maia at ${plan(midBridge, true).rating} with the strict guard, and ${pct(share(midBridge), 0)} of its moves are Stockfish's.
 
-> **Planned: a gradual bridge.** Today Maia holds at ${lastY} from ${lastX} to ${M.stockfishFrom}, and Stockfish takes over at ${M.stockfishFrom}. The plan is a bridge band (around ${lastX} to ${M.stockfishFrom}) that ramps through Maia with the light guard, then Maia with the strict guard (perhaps with a share of Stockfish's moves), so a boss's strength never jumps. Not built yet.
-
-These lines come from early test runs; calibrating every boss may move them.
+These numbers come from simulated battles against crowds of bots, and may be tuned as real battles come in.
 
 ### What a rating gap means {#rating-gap}
 
@@ -660,7 +690,7 @@ function credits(src: FaqSources): FaqSection {
     title: "Credits and licences",
     body: `
 - **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish), [this build's source](https://github.com/nmrugg/stockfish.js): stockfish.js 19, [licence](/engine/COPYING.txt)). It runs as a separate program in your browser.
-- **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [some bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; the source of our Maia box is available on request ([notice](/engine/maia/NOTICE.txt), [licence](/engine/maia/LICENSE.txt)).
+- **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [the bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; the source of our Maia box is available on request ([notice](/engine/maia/NOTICE.txt), [licence](/engine/maia/LICENSE.txt)).
 - **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD licence ([licence](/licenses/pieces.txt)).
 - **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font Licence) ([licences](/licenses/third-party.txt)). Its sounds are free of rights (CC0) or the game's own.
 - The same credits are at the foot of Settings.

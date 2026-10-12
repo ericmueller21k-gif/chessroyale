@@ -170,41 +170,61 @@ export function bossStrength(base: number, def: Pick<BossDef, "offset"> | null, 
 }
 
 /**
- * Maia's rating for a boss of this strength (the UCI_Elo Stockfish would play it at), on the lines of
- * BOSS_BRAIN.maiaRating; null from BOSS_BRAIN.stockfishFrom on (always Stockfish there).
+ * Maia's rating for a strength on the game's rating scale (BOSS_BRAIN.maiaRating's lines): below the first point along
+ * the first line, never under maiaRatingMin; above the last point held there (Maia's ceiling).
  */
-export function maiaRatingFor(strength: number, s: Pick<BossBrainSettings, "maiaRating" | "maiaRatingMin" | "stockfishFrom"> = BOSS_BRAIN): number | null {
-  if (strength >= s.stockfishFrom) return null;
+export function maiaRatingFor(level: number, s: Pick<BossBrainSettings, "maiaRating" | "maiaRatingMin"> = BOSS_BRAIN): number {
   const pts = s.maiaRating;
   const [x0, y0] = pts[0]!;
-  if (strength <= x0) {
+  if (level <= x0) {
     const [x1, y1] = pts[1] ?? [x0 + 1, y0];
-    return Math.max(s.maiaRatingMin, Math.round(y0 + ((strength - x0) * (y1 - y0)) / (x1 - x0)));
+    return Math.max(s.maiaRatingMin, Math.round(y0 + ((level - x0) * (y1 - y0)) / (x1 - x0)));
   }
   for (let i = 1; i < pts.length; i++) {
     const [xa, ya] = pts[i - 1]!;
     const [xb, yb] = pts[i]!;
-    if (strength <= xb) return Math.round(ya + ((strength - xa) * (yb - ya)) / (xb - xa));
+    if (level <= xb) return Math.round(ya + ((level - xa) * (yb - ya)) / (xb - xa));
   }
   return pts[pts.length - 1]![1];
 }
 
+/** How a boss plays a battle: its brain, the rating Maia plays at (null: Stockfish), and the bridge's share of Stockfish's moves. */
+export interface BossBrainPlan {
+  brain: BossBrain;
+  rating: number | null;
+  /** The share of its moves that are today's Stockfish move instead (the bridge band; 0 elsewhere). */
+  stockfishShare: number;
+}
+
+/** The brain at a strength when nobody picked one (BOSS_BRAIN: the boss's own, the bridge band, then Stockfish). */
+export function bandBrain(bossId: string, strength: number, s: BossBrainSettings = BOSS_BRAIN): { brain: BossBrain; stockfishShare: number } {
+  const own = s.byBoss[bossId] ?? s.brain;
+  if (strength >= s.stockfishFrom || own === "stockfish") return { brain: "stockfish", stockfishShare: 0 };
+  if (strength < s.bridgeFrom) return { brain: own, stockfishShare: 0 };
+  // The bridge: the light guard, then the strict one, and a growing share of Stockfish's moves.
+  const share = (s.bridgeStockfishShare * (strength - s.bridgeFrom)) / Math.max(1, s.stockfishFrom - s.bridgeFrom);
+  return { brain: strength < s.bridgeStrictFrom ? "maia-light" : "maia-strict", stockfishShare: Math.round(share * 1000) / 1000 };
+}
+
 /**
- * A boss's brain in a battle: the one picked (an admin's Brain picker), else the boss's own default (BOSS_BRAIN
- * .soloDefault; Stockfish for any other), with the rating Maia plays at. Stockfish at or above stockfishFrom whatever
- * was picked, and wherever Maia isn't on offer (`maia` false: online, a raid with bots, a player while forPlayers is off).
+ * A boss's brain in a battle (BOSS_BRAIN): the one picked (an admin's Brain picker: that brain, no bridge share), else
+ * the boss's own with the bridge band; Stockfish from stockfishFrom whatever was picked, and wherever Maia isn't on
+ * offer (`maia` false: a player while forPlayers is off, a lobby with one). Maia plays at the strength's rating on
+ * its own scale, plus crowdMargin when a crowd (`crowd`: more than one picking its moves) plays the boss.
  */
 export function bossBrainFor(
   bossId: string,
   strength: number,
   picked: BossBrain | "",
   maia: boolean,
+  opts: { crowd?: boolean } = {},
   s: BossBrainSettings = BOSS_BRAIN,
-): { brain: BossBrain; rating: number | null } {
-  const rating = maiaRatingFor(strength, s);
-  const brain = picked || s.soloDefault[bossId] || "stockfish";
-  if (!maia || rating === null || brain === "stockfish") return { brain: "stockfish", rating: null };
-  return { brain, rating };
+): BossBrainPlan {
+  const stockfish: BossBrainPlan = { brain: "stockfish", rating: null, stockfishShare: 0 };
+  if (!maia || strength >= s.stockfishFrom) return stockfish;
+  const { brain, stockfishShare } = picked ? { brain: picked, stockfishShare: 0 } : bandBrain(bossId, strength, s);
+  if (brain === "stockfish") return stockfish;
+  return { brain, rating: maiaRatingFor(strength + (opts.crowd ? s.crowdMargin : 0), s), stockfishShare };
 }
 
 /** Threat thresholds: two to a skull, 1 to 5 (the old ten tiers' boundaries). */

@@ -14,13 +14,18 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   underneath) and its powers: a **passive** and an **ultimate**. Only a **playable** boss (`isPlayable`: a complete
   kit and powers) is ever chosen, in every mode. A random boss avoids the one met last (`chooseBoss`; online, the boss
   most of the lobby met last).
-- **Strength:** Stockfish at a UCI_Elo from the crowd's ratings, the raid's tiers or solo's difficulty, plus the boss's
-  offset, with the blunder guard (see [engine.md](engine.md)).
-- **The brain (Maia prototype, Oct 11):** in Boss alone a boss can play with **Maia-3** instead (a human-like model, a
-  separate AGPL program in its own worker: `packages/maia-worker/`). Ginger's default is Maia, no guard (Eric); the
-  rest are Stockfish. Admins only for now (`BOSS_BRAIN.forPlayers`): a Brain picker in the boss menu and a debug line
-  under the dock. Powers, the judge, the King's strike and the speech don't change. Details in
-  [engine.md](engine.md), "The boss's brain".
+- **Strength:** a rating on Stockfish's scale from the crowd's ratings (people only; Eric, Oct 12), the raid's tiers or
+  solo's difficulty, plus the boss's offset. Stockfish plays it at that UCI_Elo with the blunder guard (see
+  [engine.md](engine.md)).
+- **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
+  with **Maia-3** (a human-like model, a separate AGPL program in its own worker: `packages/maia-worker/`), no guard,
+  at a Maia rating for its strength (plus a crowd's margin), then the bridge band (light guard, strict guard, a
+  growing share of Stockfish's moves), then Stockfish from 2800 (`BOSS_BRAIN`). Maia picks only among the moves its
+  powers leave it. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra move and Big Boy's bounce
+  keep their own Stockfish picks; Maia's own mistakes replace the slips. Players meet Stockfish until
+  `BOSS_BRAIN.forPlayers` is on (needs Eric's OK: the Maia box's source published); admins meet Maia on every boss,
+  in every mode (online: in a lobby of admins only). The Brain picker in Boss alone's menu and a debug line are
+  admins' test tools. Details in [engine.md](engine.md), "The boss's brain".
 - **The ground rules of every power** (the server decides, the same everywhere):
   - Every power comes from the battle's seed (drawn once, as it starts) and the position, so the server, the solo game
     and every screen work out the same thing (`powerRoll`).
@@ -146,7 +151,7 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | Board effect sprites | `characters/effects.ts` (`EFFECT_SPRITES`), `characters/effects/common.ts` | `characters/effects/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts`, `sawyer.ts` |
 | Speech: every line's time and turn, the text box | `packages/app/src/speech.tsx` (`Voice`, `bossVoice`, `SpeechBox`, `holdMs`); power moments' lines said in `BossPowers.tsx` (`useMomentSpeech`), reactions in `BossCharacter.tsx` | a moment's `line`, `lineAt` and `priority` in its `BossUi` (only when the kit's lines aren't the whole story) |
 | Powers on screen: moments, banners, the board layer, the rage meter | `components/BossPowers.tsx` (`momentsOf`, `PowerMoment`, `PowerBoard`, `BossBarExtra`, `dockLine`, the warning), `components/PowerParts.tsx` (`BossUi`, `Moment`, `Flight`, `PowerBanner`), `components/BossEffect.tsx` | `components/Ginger.tsx`, `Boingo.tsx`, `Grex.tsx`, `Hollow.tsx` (+ `LightsOut.tsx`), `BigBoy.tsx`, `Sawyer.tsx` |
-| The boss's brain (Maia-3 or Stockfish) | `packages/chess/src/boss-brain.ts`, `human-uci.ts`, `bossMoveFrom` (`runner.ts`), `packages/app/src/maia.ts`, `boss-brain.ts`, `components/BossBrain.tsx` (the picker), `BrainDebug` (`BossDock.tsx`); the Maia box `packages/maia-worker/` | its line in `BOSS_BRAIN.soloDefault` (Ginger: `maia-raw`) |
+| The boss's brain (Maia-3 or Stockfish) | `bossBrainFor` (core `boss.ts`), `packages/chess/src/boss-brain.ts`, `human-uci.ts`, `bossMoveFrom` and `bossBrainPlan` (`runner.ts`); online the lobby's `bossBrainNow` and the host's `hostBoss` (`net.ts`); solo `startBrain` (`solo.ts`); `packages/app/src/maia.ts`, `boss-brain.ts`, `components/BossBrain.tsx` (the picker), `BrainDebug` (`BossDock.tsx`); the Maia box `packages/maia-worker/` | none (every boss: `BOSS_BRAIN.brain`; an exception would go in `BOSS_BRAIN.byBoss`) |
 | The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below; Sawyer's split hides the new half until the crack, and his board saw jolts the board) | |
 | The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
 | A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`) |
@@ -200,13 +205,16 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 `BOSS_POWERS` in `packages/core/src/settings.ts` (every power's numbers; the meter: `rageFull`, `ragePerMove`,
 `rageAheadMax`, `rageAheadFull`, `ragePerMaterial`, `rageStrike`, `rageSpeed` by boss), `SAWYER_LOOKS` (how his split
 looks), the `boss*` keys of `Settings`,
-`BOSS_DIFFICULTY`, `BOSS_BRAIN` (each boss's brain, Maia's rating, its sampling, the guards), `BOSS_TIERS` and each
-boss's `offset` in `boss.ts`.
+`BOSS_DIFFICULTY`, `BOSS_BRAIN` (every boss's brain, Maia's rating and the crowd's margin, the bridge band, its
+sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `boss.ts`.
 
 ## Tests and tools
 
-- Unit, the brain: `packages/chess/test/boss-brain.test.ts`; the Maia box's own tests in `packages/maia-worker/test/`.
-  e2e: `e2e/maia.spec.ts`. Sim: `packages/sim/scripts/maia-sim.ts` (`reports/maia-boss.md`).
+- Unit, the brain: `packages/chess/test/boss-brain.test.ts` (the rule, the bridge, the guards, the fallbacks),
+  `maia-bosses.test.ts` (every boss's Maia path: its powers' limits kept, its special moves untouched), the online
+  brain in `packages/server/test/boss-powers-lobby.test.ts`; the Maia box's own tests in `packages/maia-worker/test/`.
+  e2e: `e2e/maia.spec.ts` (every boss on Maia for an admin; an online raid on Maia; players never load it). Sims:
+  `packages/sim/scripts/maia-calibration.ts` (`reports/maia-calibration.md`), `maia-sim.ts` (`reports/maia-boss.md`).
 - Unit: `packages/chess/test/boss-powers.test.ts` (Boingo's pies, the funhouse's steps and its move: once a funhouse,
   unscored, its loss band and cap, among them), `rage.test.ts`
   (every boss's ultimate again and again, never two at once), `packages/app/test/board-view.test.ts` (the turned

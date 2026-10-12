@@ -5,7 +5,7 @@ import { chosenDifficulty, difficultyElo, rememberDifficulty } from "../boss-dif
 import { powersLine } from "../power-words.ts";
 import { BossDifficulty } from "../components/BossDifficulty.tsx";
 import { BossBrainPicker } from "../components/BossBrain.tsx";
-import { isAdmin, maiaLikely, pickedBrain, rememberBrain } from "../boss-brain.ts";
+import { isAdmin, maiaAllowed, maiaLikely, pickedBrain, rememberBrain } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
 import { AccountBar, DressedPawn, FdButton, LiveLine, Logo, RankLine, wearingNames } from "../components/FrontDoor.tsx";
@@ -161,11 +161,13 @@ export function BossMenu({
   // Solo: a difficulty on top of the boss's strength (online, the lobby's strength stands).
   const [difficulty, setDifficulty] = useState(chosenDifficulty);
   const extra = forRaid ? 0 : difficultyElo(difficulty);
-  // Testing, admins (Boss alone): the boss's brain (Stockfish or Maia-3); Maia's files fetched ahead when it may play.
+  // Testing, admins (Boss alone): the boss's brain (Maia-3 or Stockfish). Maia's files are fetched ahead when it may
+  // play: Boss alone below Stockfish's strengths; a raid you make on a device that may run it (you're its host).
   const [brain, setBrain] = useState(pickedBrain);
   const picked = useRef<HTMLButtonElement>(null);
+  const maiaAhead = () => (forRaid ? maiaAllowed() : maiaLikely(bosses.map((b) => bossStrength(base, b, extra))));
   useEffect(() => {
-    if (!forRaid && maiaLikely(value)) prefetchMaia();
+    if (maiaAhead()) prefetchMaia();
     picked.current?.scrollIntoView({ block: "nearest" });
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
@@ -201,7 +203,7 @@ export function BossMenu({
             onChange={(b) => {
               rememberBrain(b);
               setBrain(b);
-              if (maiaLikely(value)) prefetchMaia();
+              if (maiaAhead()) prefetchMaia();
             }}
           />
         )}

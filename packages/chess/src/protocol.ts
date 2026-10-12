@@ -1,4 +1,4 @@
-import type { BounceResult, BurnEvent, LightsOutTarget, PowerEvent, PowerId, SawCut, SplitPawn } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, LightsOutTarget, PowerEvent, PowerId, SawCut, SplitPawn } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
@@ -424,6 +424,14 @@ export type ClientMessage =
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
 
+/** A battle on the Maia brain, as the lobby tells the host's device (bossBrainFor's plan). */
+export interface NetBossBrain {
+  brain: BossBrain;
+  rating: number;
+  /** The bridge band's share of moves that are today's Stockfish move. */
+  stockfishShare?: number;
+}
+
 export type ServerMessage = { now: number } & (
   | { t: "welcome"; playerId: string; token: string; code: string }
   | {
@@ -598,7 +606,14 @@ export type ServerMessage = { now: number } & (
        * as `move`; "" when none is within the cap (nothing moves).
        */
       bounce?: string[];
+      /** The boss's own move on the Maia brain (BOSS_BRAIN): with Maia, at this rating (the lobby decides, once a battle). */
+      brain?: NetBossBrain;
     }
+  /**
+   * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading
+   * Maia during the intro, so the first move can be Maia's.
+   */
+  | { t: "bossBrain"; brain: NetBossBrain }
   /** Quick chat: a line for you (your own included, echoed back). */
   | { t: "chat"; line: NetChatLine }
   /**

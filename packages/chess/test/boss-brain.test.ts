@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, bossBrainFor, maiaRatingFor } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_ROSTER, bossBrainFor, isPlayable, maiaRatingFor } from "@chessroyale/core";
 import { describe, expect, it } from "vitest";
 import {
   bossMoveFrom,
@@ -29,83 +29,140 @@ const TOP = [
 
 const answer = (best: string | null, moves: [string, number][], ms = 90): HumanAnswer => ({ best, moves: moves.map(([move, p]) => ({ move, p })), ms });
 
-describe("Maia's rating for a boss's strength (BOSS_BRAIN.maiaRating)", () => {
-  it("about 1100 at 1400, rising in a line to 2000 at 2400, then 3000 at 2600; Stockfish from 2800", () => {
-    expect(maiaRatingFor(1400)).toBe(1100);
-    expect(maiaRatingFor(1900)).toBe(1550);
-    expect(maiaRatingFor(2400)).toBe(2000);
-    expect(maiaRatingFor(2500)).toBe(2500);
-    expect(maiaRatingFor(2600)).toBe(3000);
-    expect(maiaRatingFor(2700)).toBe(3000);
-    expect(maiaRatingFor(2800)).toBeNull();
-    expect(maiaRatingFor(3190)).toBeNull();
+/** A handover to test the rules with (BOSS_BRAIN's own numbers come from the calibration and may move). */
+const TEST_BRAIN = {
+  ...BOSS_BRAIN,
+  maiaRating: [
+    [1400, 1200],
+    [2000, 1800],
+    [2400, 2400],
+  ] as const,
+  maiaRatingMin: 600,
+  crowdMargin: 150,
+  bridgeFrom: 2600,
+  bridgeStrictFrom: 2700,
+  bridgeStockfishShare: 0.5,
+  stockfishFrom: 2800,
+};
+
+describe("Maia's rating for a strength (BOSS_BRAIN.maiaRating)", () => {
+  it("along the lines between the points; held at the last (Maia's ceiling)", () => {
+    expect(maiaRatingFor(1400, TEST_BRAIN)).toBe(1200);
+    expect(maiaRatingFor(1700, TEST_BRAIN)).toBe(1500);
+    expect(maiaRatingFor(2200, TEST_BRAIN)).toBe(2100);
+    expect(maiaRatingFor(2400, TEST_BRAIN)).toBe(2400);
+    expect(maiaRatingFor(2700, TEST_BRAIN)).toBe(2400);
   });
 
   it("below the first point, along the first line, never under the floor", () => {
-    expect(maiaRatingFor(1300)).toBe(1010);
-    expect(maiaRatingFor(800)).toBe(BOSS_BRAIN.maiaRatingMin);
+    expect(maiaRatingFor(1300, TEST_BRAIN)).toBe(1100);
+    expect(maiaRatingFor(500, TEST_BRAIN)).toBe(600);
+  });
+
+  it("the shipped lines rise (never fall) with strength, within Maia's range", () => {
+    let last = 0;
+    for (let x = 600; x <= BOSS_BRAIN.stockfishFrom; x += 25) {
+      const m = maiaRatingFor(x);
+      expect(m).toBeGreaterThanOrEqual(last);
+      expect(m).toBeGreaterThanOrEqual(BOSS_BRAIN.maiaRatingMin);
+      expect(m).toBeLessThanOrEqual(3200);
+      last = m;
+    }
   });
 });
 
 describe("which brain a boss plays with (bossBrainFor)", () => {
-  it("Ginger is on the Maia brain, no guard, by default (Eric, Oct 11); other bosses are Stockfish", () => {
-    expect(bossBrainFor("gingerbread", 1300, "", true)).toEqual({ brain: "maia-raw", rating: 1010 });
-    expect(bossBrainFor("clown", 1300, "", true)).toEqual({ brain: "stockfish", rating: null });
+  it("every playable boss is on Maia, no guard, by default (Eric, Oct 12), below the bridge", () => {
+    for (const b of BOSS_ROSTER.filter(isPlayable)) expect(bossBrainFor(b.id, 1700, "", true, {}, TEST_BRAIN)).toEqual({ brain: "maia-raw", rating: 1500, stockfishShare: 0 });
+    expect(BOSS_BRAIN.brain).toBe("maia-raw");
+    expect(BOSS_BRAIN.byBoss).toEqual({});
   });
 
-  it("a pick (the admins' Brain picker) wins over the default, for any boss", () => {
-    expect(bossBrainFor("gingerbread", 2300, "maia-full", true)).toEqual({ brain: "maia-full", rating: 1910 });
-    expect(bossBrainFor("gingerbread", 2300, "stockfish", true).brain).toBe("stockfish");
-    expect(bossBrainFor("clown", 2300, "maia-light", true).brain).toBe("maia-light");
+  it("a crowd (more than one picking its moves) meets Maia its margin higher; one player doesn't", () => {
+    expect(bossBrainFor("clown", 1700, "", true, { crowd: true }, TEST_BRAIN).rating).toBe(maiaRatingFor(1850, TEST_BRAIN));
+    expect(bossBrainFor("clown", 1700, "", true, { crowd: false }, TEST_BRAIN).rating).toBe(1500);
   });
 
-  it("Stockfish at 2800 and up whatever was picked, and wherever Maia isn't on offer", () => {
-    expect(bossBrainFor("gingerbread", 2800, "maia-raw", true).brain).toBe("stockfish");
-    expect(bossBrainFor("gingerbread", 1500, "maia-raw", false).brain).toBe("stockfish");
+  it("the bridge band: the light guard, then the strict one, a share of Stockfish growing to its top; Stockfish from 2800", () => {
+    expect(bossBrainFor("grex", 2599, "", true, {}, TEST_BRAIN)).toMatchObject({ brain: "maia-raw", stockfishShare: 0 });
+    expect(bossBrainFor("grex", 2600, "", true, {}, TEST_BRAIN)).toEqual({ brain: "maia-light", rating: 2400, stockfishShare: 0 });
+    expect(bossBrainFor("grex", 2650, "", true, {}, TEST_BRAIN)).toEqual({ brain: "maia-light", rating: 2400, stockfishShare: 0.125 });
+    expect(bossBrainFor("grex", 2700, "", true, {}, TEST_BRAIN)).toEqual({ brain: "maia-strict", rating: 2400, stockfishShare: 0.25 });
+    expect(bossBrainFor("grex", 2799, "", true, {}, TEST_BRAIN)).toEqual({ brain: "maia-strict", rating: 2400, stockfishShare: 0.498 });
+    expect(bossBrainFor("grex", 2800, "", true, {}, TEST_BRAIN)).toEqual({ brain: "stockfish", rating: null, stockfishShare: 0 });
+    expect(bossBrainFor("grex", 3190, "", true, {}, TEST_BRAIN).brain).toBe("stockfish");
+  });
+
+  it("a boss of its own brain (byBoss): Stockfish stays Stockfish", () => {
+    const s = { ...TEST_BRAIN, byBoss: { hollow: "stockfish" as const, clown: "maia-full" as const } };
+    expect(bossBrainFor("hollow", 1700, "", true, {}, s).brain).toBe("stockfish");
+    expect(bossBrainFor("clown", 1700, "", true, {}, s).brain).toBe("maia-full");
+    expect(bossBrainFor("gingerbread", 1700, "", true, {}, s).brain).toBe("maia-raw");
+  });
+
+  it("a pick (the admins' Brain picker) wins over the default for any boss, without the bridge's share", () => {
+    expect(bossBrainFor("gingerbread", 2300, "maia-full", true, {}, TEST_BRAIN)).toEqual({ brain: "maia-full", rating: 2250, stockfishShare: 0 });
+    expect(bossBrainFor("sawyer", 2750, "maia-raw", true, {}, TEST_BRAIN)).toEqual({ brain: "maia-raw", rating: 2400, stockfishShare: 0 });
+    expect(bossBrainFor("gingerbread", 2300, "stockfish", true, {}, TEST_BRAIN).brain).toBe("stockfish");
+    expect(bossBrainFor("clown", 2300, "maia-strict", true, {}, TEST_BRAIN).brain).toBe("maia-strict");
+  });
+
+  it("Stockfish from 2800 whatever was picked, and wherever Maia isn't on offer (a player while it's off for them)", () => {
+    expect(bossBrainFor("gingerbread", 2800, "maia-raw", true, {}, TEST_BRAIN).brain).toBe("stockfish");
+    expect(bossBrainFor("gingerbread", 1500, "maia-raw", false, {}, TEST_BRAIN)).toEqual({ brain: "stockfish", rating: null, stockfishShare: 0 });
+    expect(bossBrainFor("gingerbread", 1500, "", false)).toEqual({ brain: "stockfish", rating: null, stockfishShare: 0 });
+  });
+
+  it("players stay on Stockfish until it's switched on for them (one value: BOSS_BRAIN.forPlayers)", () => {
+    expect(BOSS_BRAIN.forPlayers).toBe(false);
   });
 });
 
 describe("the brain's choice from Maia's candidates and the boss's top-8 (humanBrainMove)", () => {
   it("no guard: Maia's own draw, even a move Stockfish thinks is poor", () => {
-    expect(humanBrainMove("maia-raw", 1200, answer("g2g4", [["e2e4", 0.5], ["g2g4", 0.1]]), TOP, null)).toEqual({ move: "g2g4", rank: 2, vetoed: 0 });
+    expect(humanBrainMove("maia-raw", answer("g2g4", [["e2e4", 0.5], ["g2g4", 0.1]]), TOP, null)).toEqual({ move: "g2g4", rank: 2, vetoed: 0 });
   });
 
   it("light guard (25 points): keeps a 15-point human move, turns down a 30-point one for Maia's next likely move", () => {
-    expect(humanBrainMove("maia-light", 1200, answer("b1c3", [["b1c3", 0.4], ["e2e4", 0.3]]), TOP, null)).toEqual({ move: "b1c3", rank: 1, vetoed: 0 });
-    expect(humanBrainMove("maia-light", 1200, answer("g2g4", [["g2g4", 0.4], ["c2c4", 0.3]]), TOP, null)).toEqual({ move: "c2c4", rank: 2, vetoed: 1 });
+    expect(humanBrainMove("maia-light", answer("b1c3", [["b1c3", 0.4], ["e2e4", 0.3]]), TOP, null)).toEqual({ move: "b1c3", rank: 1, vetoed: 0 });
+    expect(humanBrainMove("maia-light", answer("g2g4", [["g2g4", 0.4], ["c2c4", 0.3]]), TOP, null)).toEqual({ move: "c2c4", rank: 2, vetoed: 1 });
   });
 
   it("full guard (10 points, 1 logit): today's guard", () => {
-    expect(humanBrainMove("maia-full", 1500, answer("c2c4", [["c2c4", 0.5], ["b1c3", 0.2], ["d2d4", 0.2]]), TOP, null)).toEqual({ move: "c2c4", rank: 1, vetoed: 0 });
-    expect(humanBrainMove("maia-full", 1500, answer("b1c3", [["b1c3", 0.5], ["f2f3", 0.2], ["d2d4", 0.2]]), TOP, null)).toEqual({ move: "d2d4", rank: 3, vetoed: 2 });
+    expect(humanBrainMove("maia-full", answer("c2c4", [["c2c4", 0.5], ["b1c3", 0.2], ["d2d4", 0.2]]), TOP, null)).toEqual({ move: "c2c4", rank: 1, vetoed: 0 });
+    expect(humanBrainMove("maia-full", answer("b1c3", [["b1c3", 0.5], ["f2f3", 0.2], ["d2d4", 0.2]]), TOP, null)).toEqual({ move: "d2d4", rank: 3, vetoed: 2 });
   });
 
-  it("full guard, strict at Maia 3000: only about 4 points", () => {
-    expect(brainGuard("maia-full", 3000)).toEqual(BOSS_BRAIN.strict);
-    expect(brainGuard("maia-full", 2999)).toEqual(BOSS_BRAIN.full);
-    expect(humanBrainMove("maia-full", 3000, answer("c2c4", [["c2c4", 0.5], ["g1f3", 0.3]]), TOP, null)).toEqual({ move: "g1f3", rank: 2, vetoed: 1 });
+  it("strict guard (the bridge's top): only about 4 points", () => {
+    expect(brainGuard("maia-strict")).toEqual(BOSS_BRAIN.strict);
+    expect(brainGuard("maia-full")).toEqual(BOSS_BRAIN.full);
+    expect(brainGuard("maia-light")).toEqual(BOSS_BRAIN.light);
+    expect(brainGuard("maia-raw")).toBeNull();
+    expect(humanBrainMove("maia-strict", answer("c2c4", [["c2c4", 0.5], ["g1f3", 0.3]]), TOP, null)).toEqual({ move: "g1f3", rank: 2, vetoed: 1 });
   });
 
-  it("only candidates of at least 3%, at most 5 tried; none passing: Stockfish's best (null)", () => {
+  it("only candidates of at least 3%, at most 5 tried; none passing: Stockfish's best (null, the guard)", () => {
     const many = answer("a2a4", [["a2a4", 0.3], ["g2g4", 0.2], ["f2f3", 0.2], ["b1c3", 0.1], ["h2h3", 0.1], ["e2e4", 0.05], ["d2d4", 0.02]]);
     // (Tried: a2a4, g2g4, f2f3, b1c3 (all over 10 points) and h2h3 (outside the top 8). e2e4 would pass but is the sixth.)
-    expect(humanBrainMove("maia-full", 1500, many, TOP, null)).toEqual({ move: null, vetoed: 5 });
+    expect(humanBrainMove("maia-full", many, TOP, null)).toEqual({ move: null, vetoed: 5, why: "guard" });
     const rare = answer("g2g4", [["g2g4", 0.9], ["e2e4", 0.02]]);
-    expect(humanBrainMove("maia-full", 1500, rare, TOP, null)).toEqual({ move: null, vetoed: 1 });
+    expect(humanBrainMove("maia-full", rare, TOP, null)).toEqual({ move: null, vetoed: 1, why: "guard" });
   });
 
   it("a move outside the top 8 is turned down (no extra search for it)", () => {
-    expect(humanBrainMove("maia-light", 1500, answer("h2h3", [["h2h3", 0.6], ["e2e4", 0.3]]), TOP, null)).toEqual({ move: "e2e4", rank: 2, vetoed: 1 });
+    expect(humanBrainMove("maia-light", answer("h2h3", [["h2h3", 0.6], ["e2e4", 0.3]]), TOP, null)).toEqual({ move: "e2e4", rank: 2, vetoed: 1 });
   });
 
-  it("never a move a power forbids, even if Maia names it", () => {
-    expect(humanBrainMove("maia-raw", 1500, answer("e2e4", [["e2e4", 0.6], ["d2d4", 0.3]]), TOP, ["d2d4", "g1f3"])).toEqual({ move: "d2d4", rank: 2, vetoed: 0 });
-    expect(humanBrainMove("maia-full", 1500, answer("e2e4", [["e2e4", 0.6], ["d2d4", 0.3]]), TOP.filter((t) => t.move !== "e2e4"), ["d2d4", "g1f3"])).toEqual({ move: "d2d4", rank: 2, vetoed: 0 });
+  it("never a move a power forbids, even if Maia names it; none of its moves allowed: null (today's move)", () => {
+    expect(humanBrainMove("maia-raw", answer("e2e4", [["e2e4", 0.6], ["d2d4", 0.3]]), TOP, ["d2d4", "g1f3"])).toEqual({ move: "d2d4", rank: 2, vetoed: 0 });
+    expect(humanBrainMove("maia-full", answer("e2e4", [["e2e4", 0.6], ["d2d4", 0.3]]), TOP.filter((t) => t.move !== "e2e4"), ["d2d4", "g1f3"])).toEqual({ move: "d2d4", rank: 2, vetoed: 0 });
+    expect(humanBrainMove("maia-raw", answer("e2e4", [["e2e4", 0.6]]), TOP, ["g1f3"])).toEqual({ move: null, vetoed: 0, why: "none allowed" });
+    expect(humanBrainMove("maia-light", answer("e2e4", [["e2e4", 0.6]]), TOP, ["g1f3"])).toEqual({ move: null, vetoed: 0, why: "none allowed" });
   });
 
   it("the guard measures against the best score, not the first line", () => {
     const top = [{ move: "g1f3", expected: 0.5 }, { move: "e2e4", expected: 0.62 }];
-    expect(humanBrainMove("maia-full", 1500, answer("g1f3", [["g1f3", 0.9]]), top, null)).toEqual({ move: null, vetoed: 1 });
+    expect(humanBrainMove("maia-full", answer("g1f3", [["g1f3", 0.9]]), top, null)).toEqual({ move: null, vetoed: 1, why: "guard" });
   });
 });
 
@@ -196,6 +253,31 @@ describe("the boss's move with a Maia brain (bossMoveFrom)", () => {
     expect(maia.asked).toEqual([]);
     expect(["c2c4", "b1c3"]).toContain(move);
     expect(notes[0]!.why).toBe("strike");
+  });
+
+  it("the bridge's share of moves: today's Stockfish move, Maia not asked (drawn per move)", async () => {
+    const maia = fakeMaia(answer("g2g4", [["g2g4", 0.9]]));
+    const notes: BrainNote[] = [];
+    const call = (roll: number) =>
+      bossMoveFrom(scripted("d2d4"), START_FEN, 2750, 1000, "elo", () => roll, [5, 15], undefined, null, { brain: "maia-strict", rating: 2400, stockfishShare: 0.375, engine: maia, settings, onNote: (n) => notes.push(n) });
+    expect(await call(0.2)).toBe("d2d4");
+    expect(maia.asked).toEqual([]);
+    // (Not drawn: Maia's move, here vetoed by the strict guard for Stockfish's best.)
+    expect(await call(0.5)).toBe("e2e4");
+    expect(maia.asked).toHaveLength(1);
+    expect(notes.map(brainLine)).toEqual(["Maia 2400 · strict guard · 38% Stockfish · Stockfish (bridge share)", "Maia 2400 · strict guard · 38% Stockfish · guard → Stockfish · 90 ms"]);
+  });
+
+  it("none of Maia's moves allowed: today's Stockfish move", async () => {
+    let note: BrainNote | null = null;
+    const move = await bossMoveFrom(scripted("d2d4"), START_FEN, 1400, 1000, "elo", Math.random, [5, 15], undefined, ["d2d4", "g1f3"], { brain: "maia-raw", rating: 1100, engine: fakeMaia(answer("e2e4", [["e2e4", 0.9]])), settings, onNote: (n) => (note = n) });
+    expect(move).toBe("d2d4");
+    expect(brainLine(note!)).toBe("Maia 1100 · no guard · Stockfish (none of Maia's moves allowed) · 90 ms");
+  });
+
+  it("a slip's roll is Maia's own mistakes under Maia: its move is played", async () => {
+    const move = await bossMoveFrom(scripted("d2d4"), START_FEN, 1400, 1000, "stumble", Math.random, [5, 15], undefined, null, { brain: "maia-raw", rating: 1100, engine: fakeMaia(answer("b1c3", [["b1c3", 0.9]])), settings });
+    expect(move).toBe("b1c3");
   });
 
   it("a power's limits go to Maia (searchmoves) and the move stays within them", async () => {
