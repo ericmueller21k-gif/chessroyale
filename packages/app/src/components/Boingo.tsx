@@ -4,7 +4,7 @@ import { BossFace } from "./BossCharacter.tsx";
 import { BossEffect, BossMoment } from "./BossEffect.tsx";
 import { funhouseAngle, type BoardAngle } from "@chessroyale/chess";
 import type { QuarterTurn } from "../board-view.ts";
-import { Flight, hash, kitLine, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { Flight, hash, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 
 /**
  * Boingo's powers on screen: the pie (his throw, the pie's flight, the splat, the pie on its square while it lasts) and
@@ -18,11 +18,12 @@ export const PIE = { flyAt: 1450, landAt: 1800 } as const;
 // ---------------- The funhouse's beats (ms into its moment) ----------------
 
 /**
- * The funhouse as it comes (the crowd's turn begins): the banner first; then Boingo drops onto the board (his kit's
- * `funhouse`: he lands, springs into a spin, and the board turns upside down with him at its `flip` cue), his line, and
- * he bounces off. No move is played for the crowd (Eric, Oct 11).
+ * The funhouse as it comes, on a screen of its own (the crowd's turn about to begin): the banner first; then Boingo
+ * drops onto the board (his kit's `funhouse`: he lands, springs into a spin, and the board turns upside down with him at
+ * its `flip` cue), his joke, the crowd's move he plays for it (Eric, Oct 12: "the forced move is the joke"), and he
+ * bounces off. Then he replies with his own move.
  */
-export const FUNHOUSE = { clownAt: 1300, flipMs: 700, lineAt: 2700, exitAt: 3400 } as const;
+export const FUNHOUSE = { clownAt: 1300, flipMs: 700, lineAt: 2700, moveAt: 3500, exitAt: 4500 } as const;
 /** Each later step of the funhouse (the board turns again as a crowd turn begins): its banner, then the turn. */
 export const SPIN = { spinAt: 1300, spinMs: 700, lineAt: 1300 } as const;
 
@@ -64,10 +65,18 @@ export function angleView(angle: BoardAngle, side: "w" | "b"): { orientation: "w
   return { orientation: angle === 180 ? other : own, turn: angle === 90 || angle === 270 ? angle : 0 };
 }
 
-/** Boingo's line in his funhouse (his kit's, if it has some; these otherwise). */
-export const FUNHOUSE_LINES = ["Welcome to the funhouse!", "Topsy-turvy!", "Which way is up? Hee hee!", "Hold on to your hats!"];
-export function funhouseLine(kit: BossKit | null, key: string): string {
-  return kitLine(kit, "ultimate", key) ?? FUNHOUSE_LINES[hash(key) % FUNHOUSE_LINES.length]!;
+/**
+ * Boingo's joke as he plays the crowd's move in his funhouse: one of these, picked from the battle's seed (the event's
+ * `pick`), so every screen in a lobby hears the same one.
+ */
+export const FUNHOUSE_LINES = [
+  "Oops! Did I just play for you? Hee hee!",
+  "Whoopsie, my hand slipped... on YOUR piece!",
+  "Honk honk! I'll drive this one!",
+  "Your move? I made it for you. You're welcome!",
+];
+export function funhouseLine(m: Pick<Moment, "key" | "pick">): string {
+  return FUNHOUSE_LINES[(m.pick ?? hash(m.key)) % FUNHOUSE_LINES.length]!;
 }
 /** His line as the board turns again (round to a side, or back the right way up). */
 export const SPIN_LINES = ["Wheee! Round we go!", "Spin the board!", "Dizzy yet? Honk!", "Hold on tight! Hee hee!"];
@@ -111,8 +120,17 @@ export const BOINGO_UI = {
   ultimate: { name: "the Funhouse" },
   moments: {
     pie: { order: 0, kit: "power", dock: "Pie!", appearAt: (m, square) => (m.square === square ? m.at + PIE.landAt : undefined), view: pieMoment },
-    // The funhouse, as the crowd's turn begins: the board turns upside down. Then each later step turns it again.
-    funhouse: { order: 3, kit: "ultimate", dock: "Funhouse!", line: (kit, m) => funhouseLine(kit, m.key), lineAt: FUNHOUSE.lineAt, view: funhouseMoment },
+    // The funhouse has a screen of its own, after the move he plays for the crowd: the board turns upside down and the
+    // move lands. Then each later step turns it again as a crowd turn begins.
+    funhouse: {
+      order: 3,
+      kit: "ultimate",
+      dock: "Funhouse!",
+      line: (_kit, m) => funhouseLine(m),
+      lineAt: FUNHOUSE.lineAt,
+      own: (boss) => !!boss.powers?.funhouse?.move && boss.powers.funhouse.turn === boss.crowdMoves && boss.powers.events.some((e) => e.kind === "funhouse"),
+      view: funhouseMoment,
+    },
     spin: {
       order: 3,
       kit: "ultimate",

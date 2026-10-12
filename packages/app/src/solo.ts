@@ -574,6 +574,17 @@ export class SoloMatch implements GameView {
   }
 
   /**
+   * Boingo's funhouse (as it comes, your turn about to begin): he plays your move for you (a weak but recoverable one,
+   * unscored) on a screen of its own, then he replies. No engine answer: the first allowed move, as online.
+   */
+  private async funhouseTurn() {
+    await this.runner.playFunhouse(this.engines[0]).catch(() => this.runner.applyFunhouse(""));
+    const showMs = powerMomentMs([{ kind: "funhouse" }]);
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
+    this.timer = setTimeout(() => this.nextRound(), showMs);
+  }
+
+  /**
    * Big Boy's Big Bounce (at the start of his turn, after your move): he gets ready (thinking) while this device's
    * engines score the candidate positions, then the bounce plays out (nobody's clock runs), then his move. No engine
    * answer: the bounces play and nothing moves, as online.
@@ -622,6 +633,8 @@ export class SoloMatch implements GameView {
       if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.bossTurn());
       // (A failed Lights out: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
+      // (Boingo's funhouse: his move for you, as your turn begins.)
+      if (this.runner.funhouseDue()) return void this.funhouseTurn();
     } else if (this.runner.isFinal()) return void this.finalTurn();
     this.runner.deal();
     this.kingCalled = false;
@@ -847,6 +860,10 @@ export class SoloMatch implements GameView {
         }
         if (this.runner.extraMoveDue()) {
           await this.runner.playExtraMove(this.engines[0]);
+          continue;
+        }
+        if (this.runner.funhouseDue()) {
+          await this.runner.playFunhouse(this.engines[0]).catch(() => this.runner.applyFunhouse(""));
           continue;
         }
         this.runner.deal();

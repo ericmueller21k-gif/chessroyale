@@ -76,6 +76,10 @@ describe("every boss's ultimate, again and again", () => {
           await r.playExtraMove();
           continue;
         }
+        if (r.funhouseDue()) {
+          await r.playFunhouse();
+          continue;
+        }
         r.deal();
         const fen = r.boards.get(0)!.fen;
         const allowed = r.crowdAllowed() ?? legalMoves(fen);

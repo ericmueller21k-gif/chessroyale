@@ -85,7 +85,8 @@ import {
   type LightsTally,
   darkSquares,
   bigboyBattle,
-  funhouseAngle,
+  boingoBattle,
+  shownAngle,
   hollowBattle,
   moveLoss,
   type Battle,
@@ -1124,6 +1125,21 @@ export class MatchRunner {
     return hollowBattle.applyExtraMove(this.battle, move);
   }
 
+  /** Boingo's funhouse: he plays the crowd's move this turn (the funhouse's first, once), before the crowd picks. */
+  funhouseDue(): boolean {
+    return boingoBattle.funhouseDue(this.battle);
+  }
+
+  /** The funhouse: the boss picks the crowd's move (a weak but recoverable one) and plays it. */
+  async playFunhouse(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
+    return boingoBattle.playFunhouse(this.battle, engine);
+  }
+
+  /** Plays the funhouse's move for the crowd (from the host's engine online; see boingoBattle.applyFunhouse). */
+  applyFunhouse(move: string): string {
+    return boingoBattle.applyFunhouse(this.battle, move);
+  }
+
   /** Big Boy's Big Bounce is due: the start of his turn (the crowd has moved), from the warning or the test trigger. */
   bounceDue(): boolean {
     return bigboyBattle.bounceDue(this.battle);
@@ -1266,8 +1282,8 @@ export class MatchRunner {
               pies: (p.pies ?? []).map((x) => ({ ...x })),
               iced: sideToMove(fen) === b.crowdSide ? icedSquares(b, fen) : p.frozen ? [p.frozen.square] : [],
               // (The funhouse's angle as this crowd turn was set up: it turns as the next begins, with its moment.)
-              angle: funhouseAngle(p.funhouse, p.turn),
-              flipped: funhouseAngle(p.funhouse, p.turn) === 180,
+              angle: shownAngle(p.funhouse, p.turn),
+              flipped: shownAngle(p.funhouse, p.turn) === 180,
               funhouse: p.funhouse ? { ...p.funhouse } : null,
               events: p.events,
               allowed: sideToMove(fen) === b.crowdSide ? crowdAllowed(b, fen) : null,
