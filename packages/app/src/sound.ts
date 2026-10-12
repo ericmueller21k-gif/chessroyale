@@ -1,6 +1,6 @@
 /**
  * Game sounds: pieces use recorded knocks: the move and capture sounds the player picked in Settings (piece-sounds.ts;
- * all wood, CC0 or ours; castling is two knocks); every timer uses one clean clock tick; the reveal's
+ * all wood; the defaults are the classic PyChess knocks, GPL-3.0, as is castling's); every timer uses one clean clock tick; the reveal's
  * "selecting move" reel has a roulette-style arpeggio and three tones for the
  * winner (all synthesised with Web Audio, placeholders until real samples). Browsers
  * only allow audio after a tap, so call unlockAudio() from one. The mute
@@ -45,7 +45,7 @@ let muted = (() => {
 const listeners = new Set<() => void>();
 
 const SAMPLE_FILES = {
-  // The default move and capture sounds (the judge's gavel is made from them) and castling's two knocks.
+  // The default move and capture sounds (the classic knocks: the judge's gavel is made from them) and castling's.
   move: MOVE_SOUNDS[0].file,
   capture: CAPTURE_SOUNDS[0].file,
   castle: CASTLE_SOUND,
@@ -178,7 +178,7 @@ function pieceSample(kind: PieceSoundKind, at: number, level = 1, rate = 1) {
   const buf = decoded.get(pieceSound(kind).file) ?? decoded.get(defaultPieceSound(kind).file);
   if (buf) startBuffer(buf, at, level, rate);
 }
-/** Castling: the default's two knocks (king, then rook) with the default move sound; with another, the pick twice. */
+/** Castling: the classic king-and-rook knock with the default move sound; with another, the picked move sound twice. */
 function castleSample(at: number) {
   if (pieceSound("move").id === defaultPieceSound("move").id || !decoded.has(pieceSound("move").file)) return sample("castle", at);
   pieceSample("move", at);
@@ -578,12 +578,12 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   menuClose: (t) => sample("menuClose", t, 0.7),
   menuSelect: (t) => sample("menuSelect", t, 0.8),
   gkLeave: (t) => sample("gkLeave", t, 0.6),
-  // The judge's gavel at a cut: two heavy wooden knocks (the default capture and move sounds, a little lower, whatever
-  // the pick). (Already low wood: pitched down only a little, where the old bright knocks went down to half.)
+  // The judge's gavel at a cut: two heavy wooden knocks (the classic capture and move sounds, pitched down to about
+  // half, whatever the pick: as it was before Oct 12, the classics being the defaults again).
   gavel: (t) => {
     for (const [dt, level] of [[0, 1], [0.26, 0.85]] as const) {
-      sample("capture", t + dt, level, 0.9);
-      sample("move", t + dt, level * 0.8, 0.8);
+      sample("capture", t + dt, level, 0.55);
+      sample("move", t + dt, level * 0.8, 0.45);
     }
   },
   // The queue: a pawn pops into its seat (a short soft "pop"), and a bot's, quieter.
