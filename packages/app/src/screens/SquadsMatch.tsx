@@ -182,7 +182,7 @@ const ARROW_COLOUR: Record<Arrow["brush"], string> = {
 
 /**
  * Arrows the reveal draws itself (the Board's own arrows are its props, and the reveal runs on its own frames so the
- * rest of the screen isn't drawn sixty times a second): an SVG over the squares, in eighths of chessground's board.
+ * rest of the screen isn't drawn sixty times a second): an SVG over the squares, in eighths of the board's own size.
  */
 function BoardArrows({ arrows, orientation }: { arrows: Arrow[]; orientation: "white" | "black" }) {
   if (!arrows.length) return null;
@@ -203,7 +203,7 @@ function BoardArrows({ arrows, orientation }: { arrows: Arrow[]; orientation: "w
         const from = c(a.move.slice(0, 2));
         const to = c(a.move.slice(2, 4));
         const len = Math.hypot(to.x - from.x, to.y - from.y) || 1;
-        // (Stop short of the target's centre, so the head sits on the square, as chessground's do.)
+        // (Stop short of the target's centre, so the head sits on the square, as the board's do.)
         const end = { x: to.x - ((to.x - from.x) / len) * 0.32, y: to.y - ((to.y - from.y) / len) * 0.32 };
         return <line key={`${a.move}${a.brush}`} x1={from.x} y1={from.y} x2={end.x} y2={end.y} stroke={ARROW_COLOUR[a.brush]} stroke-width="0.16" stroke-linecap="round" opacity="0.8" marker-end={`url(#sq-head-${a.brush})`} />;
       })}

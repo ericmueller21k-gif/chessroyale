@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { coordLabel, realMove, realSquare, viewFen, viewMove, viewSquare, type QuarterTurn } from "../src/board-view.ts";
+import { coordLabel, realSquare, viewSquare, type QuarterTurn } from "../src/board-view.ts";
 import { squareXY } from "../src/components/GodKing.tsx";
 
 const SQUARES = [..."abcdefgh"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`));
-/** Where chessground draws a key (its column and row from the top-left), either way up. */
+/** Where the board draws a square seen unturned (its column and row from the top-left), either way up. */
 const cell = (key: string, orientation: "white" | "black") => {
   const f = key.charCodeAt(0) - 97;
   const r = Number(key[1]) - 1;
@@ -41,41 +41,10 @@ describe("a board turned a quarter of the way round (Boingo's funhouse)", () => 
     }
   });
 
-  it("moves turn to the view and back, a promotion's piece kept", () => {
-    for (const turn of [0, 90, 270] as QuarterTurn[]) {
-      for (const m of ["e2e4", "g1f3", "e1g1", "a7a8q"]) expect(realMove(viewMove(m, turn), turn)).toBe(m);
-    }
-    expect(viewMove("a7a8q", 90)).toBe(`${viewSquare("a7", 90)}${viewSquare("a8", 90)}q`);
-  });
-
-  it("the position's pieces sit on their view squares (the rest of the FEN kept)", () => {
-    const fen = "r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 6 6";
-    const pieces = (f: string) => {
-      const out = new Map<string, string>();
-      f.split(" ")[0]!.split("/").forEach((row, i) => {
-        let file = 0;
-        for (const c of row) {
-          if (/\d/.test(c)) file += Number(c);
-          else out.set(`${"abcdefgh"[file++]}${8 - i}`, c);
-        }
-      });
-      return out;
-    };
-    expect(viewFen(fen, 0)).toBe(fen);
-    for (const turn of [90, 270] as QuarterTurn[]) {
-      const v = viewFen(fen, turn);
-      expect(v.split(" ").slice(1)).toEqual(fen.split(" ").slice(1));
-      const real = pieces(fen);
-      const shown = pieces(v);
-      expect(shown.size).toBe(real.size);
-      for (const [sq, p] of real) expect(shown.get(viewSquare(sq, turn))).toBe(p);
-    }
-  });
-
   it("the coordinates name the real squares along each edge, from either side", () => {
     for (const orientation of ["white", "black"] as const) {
       for (const turn of [90, 270] as QuarterTurn[]) {
-        // Chessground's bottom labels ("files") sit under the bottom row; its side labels ("ranks") by the first column.
+        // The bottom labels ("files") sit along the bottom row; the side labels ("ranks") by the first column.
         for (const f of "abcdefgh") {
           const key = `${f}${orientation === "white" ? 1 : 8}`;
           const real = realSquare(key, turn);

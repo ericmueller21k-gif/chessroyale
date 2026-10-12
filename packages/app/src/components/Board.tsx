@@ -1,22 +1,14 @@
 import { useLayoutEffect, useRef } from "preact/hooks";
-import type { BoardImpl } from "@chessroyale/core";
 import { play } from "../sound.ts";
 import { knockFor } from "../move-sound.ts";
-import { boardImpl } from "../board/impl.ts";
 import { OwnBoard } from "../board/OwnBoard.tsx";
 import type { BoardProps } from "../board/types.ts";
-import { CgBoard } from "./CgBoard.tsx";
 
 export type { Arrow, BoardProps } from "../board/types.ts";
 
-/**
- * The board every screen draws: chessground's (CgBoard) or our own (board/OwnBoard.tsx), as BOARD.impl and this
- * device's choice say (board/impl.ts). Both take the same props and look and feel the same. A board keeps the one it
- * was made with until it goes (a screen made after a switch draws the other).
- */
-export function Board({ impl: force, ...props }: BoardProps & { /** This board whatever the device's choice (the board lab). */ impl?: BoardImpl }) {
+/** The board every screen draws (board/OwnBoard.tsx: docs/areas/board.md), and the knock for every move it shows. */
+export function Board(props: BoardProps) {
   const { fen, lastMove, small } = props;
-  const impl = useRef(force ?? boardImpl()).current;
   const prevFen = useRef<string | null>(null);
   const lastSound = useRef(0);
 
@@ -36,5 +28,5 @@ export function Board({ impl: force, ...props }: BoardProps & { /** This board w
     play(knock);
   }, [fen]);
 
-  return impl === "own" ? <OwnBoard {...props} /> : <CgBoard {...props} />;
+  return <OwnBoard {...props} />;
 }

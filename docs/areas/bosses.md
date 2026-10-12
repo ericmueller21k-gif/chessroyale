@@ -34,7 +34,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   - **A turned board** (Boingo's funhouse, Oct 11): upside down is the other side's orientation, as before; a quarter
     turn is drawn by moving every square to where the turned board shows it (`packages/app/src/board-view.ts`:
     `viewSquare`, `viewFen`), so the board maps taps and drags exactly as usual and each move is turned back
-    (`Board`'s `turn`; our own board does it natively, chessground through a turned FEN: [board.md](board.md)). A CSS rotation would have put taps on the wrong squares. The coordinates name the real squares
+    (`Board`'s `turn`: [board.md](board.md)). A CSS rotation would have put taps on the wrong squares. The coordinates name the real squares
     (the bottom edge runs along the ranks), and everything drawn over the board places its squares with the same turn
     (`squareXY`'s `turn`, `onSquare`, the `BoardTurn` context Board gives what it draws). Each step spins the board in
     its own plane (`pw-turning-cw`/`ccw`, the half turn's `pw-flipping`), pieces going round with it for a moment as
@@ -103,7 +103,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **The bars at the back, the ice on its square, the queen banners silent** (Eric, Oct 11): the move clock's bars above
   and below the board draw behind everything (squares' overlays, the boss, his effects and words, the God King), as the
   eval bar does. Ginger's ice is one block the square's shape on every square, whatever the piece, placed on
-  chessground's own square (eighths of `--cg-size`). QUEEN DOWN! and QUEEN SLAIN! play no sound for now (the gasp is
+  the board's own square (eighths of `--board-size`). QUEEN DOWN! and QUEEN SLAIN! play no sound for now (the gasp is
   kept, unused: `queenGasp`).
 - **A boss's attack on a king** (Eric, Oct 10; Hollow's first, the others keep today's behaviour until they get one):
   purely cosmetic, no rule changes. Its kit's `kingAttack` (`KingAttackKit` in `kits.ts`: the character it's drawn

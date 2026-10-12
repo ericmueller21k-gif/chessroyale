@@ -9,7 +9,7 @@ export interface Arrow {
   label?: string;
 }
 
-/** The big board's props: the same for both boards (chessground's, components/CgBoard.tsx, and ours, OwnBoard.tsx). */
+/** The board's props (components/Board.tsx, board/OwnBoard.tsx). */
 export interface BoardProps {
   fen: string;
   orientation: "white" | "black";

@@ -9,5 +9,6 @@ alternate moves and the best average move quality wins.
 - Deploying (Cloudflare, free): `DEPLOY.md`. Checking on a real phone: `TESTING.md`.
 - Developer notes and commands: `CLAUDE.md`.
 
-Licences: Stockfish (GPL-3) and chessground (GPL-3), so this app is GPL-3 too; chess.js (BSD-2); opening names
-from Lichess chess-openings (CC0). Details in `packages/chess/data/SOURCES.md`.
+Licences: every third-party piece of the app, its licence and how it's used is in `LICENSES.md` (the game's own
+source isn't published; Stockfish, GPL-3, and Maia-3, AGPL-3, are separate programs with their own notices). Data
+sources: `packages/chess/data/SOURCES.md`.

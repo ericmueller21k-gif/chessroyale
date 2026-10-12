@@ -25,7 +25,6 @@ import {
   type BoardPiece,
   type PressBoard,
 } from "../src/board/logic.ts";
-import { parseBoardImpl } from "../src/board/impl.ts";
 
 const TURNS: QuarterTurn[] = [0, 90, 270];
 const SIDES = ["white", "black"] as const;
@@ -317,15 +316,5 @@ describe("arrows", () => {
     expect(a!.label!.text).toBe("52.1");
     expect(a!.label!.x).toBeCloseTo(0.5, 6);
     expect(a!.label!.y).toBeCloseTo(0.5 + 33 / 64, 6);
-  });
-});
-
-describe("the switch", () => {
-  it("reads own, cg and chessground; anything else is nothing", () => {
-    expect(parseBoardImpl("own")).toBe("own");
-    expect(parseBoardImpl("cg")).toBe("chessground");
-    expect(parseBoardImpl("chessground")).toBe("chessground");
-    expect(parseBoardImpl("x")).toBeNull();
-    expect(parseBoardImpl(null)).toBeNull();
   });
 });

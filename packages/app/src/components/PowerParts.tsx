@@ -107,7 +107,7 @@ export const at = (square: string, orientation: "white" | "black", turn: Quarter
   return { left: `${(x - 50) / 8}%`, top: `${(y - 50) / 8}%` };
 };
 /**
- * A square's column and row on chessground's own board (eighths of --cg-size: exactly on it at any size); on a turned
+ * A square's column and row on the board's own squares (eighths of --board-size: exactly on it at any size); on a turned
  * board (`turn`: BoardTurn), where it's drawn.
  */
 export const onSquare = (square: string, orientation: "white" | "black", turn: QuarterTurn = 0) => {

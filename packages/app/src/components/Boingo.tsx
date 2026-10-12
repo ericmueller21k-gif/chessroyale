@@ -42,7 +42,7 @@ export const spinOf = (from: BoardAngle, to: BoardAngle): Spin | null => {
 /**
  * The board's angle as a boss screen shows it, and its spin while it turns: the funhouse's moment (or a later step's)
  * shows the board as it was until its spin, turns it (a CSS turn of the board in its own plane, the pieces going round
- * with it for a moment), then shows it at its new angle, drawn untransformed (chessground measures its squares then).
+ * with it for a moment), then shows it at its new angle, drawn untransformed (the board's squares are placed then).
  * Without one, the angle the battle's powers say. `turn`: the crowd turn the powers are set for.
  */
 export function funhouseView(moments: readonly Moment[], now: number, powers: { funhouse: { turn: number; side: 90 | 270 } | null; angle?: BoardAngle; flipped: boolean; turn: number } | null | undefined, kit: BossKit | null): { angle: BoardAngle; spin: Spin | null } {
@@ -57,7 +57,7 @@ export function funhouseView(moments: readonly Moment[], now: number, powers: { 
   return { angle, spin: null };
 }
 
-/** The board's chessground orientation and quarter turn for an angle, from the crowd's side. */
+/** The board's orientation and quarter turn for an angle, from the crowd's side. */
 export function angleView(angle: BoardAngle, side: "w" | "b"): { orientation: "white" | "black"; turn: QuarterTurn } {
   const own = side === "w" ? "white" : "black";
   const other = side === "w" ? "black" : "white";
@@ -122,7 +122,7 @@ export const BOINGO_UI = {
       view: spinMoment,
     },
   },
-  // The pies on their squares (pieSplat: the splat, then the pie), in eighths of chessground's board, where the board
+  // The pies on their squares (pieSplat: the splat, then the pie), in eighths of the board's own size, where the board
   // shows them however it's turned.
   board: ({ p, orientation, now, appearAt, turn }) => {
     const pies = p.pies ?? (p.pie ? [p.pie] : []);

@@ -366,9 +366,9 @@ p {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  /* Chessground's board size, which it writes on the wrap (---cg-width) each time it sizes the board: a whole
-     multiple of 8 device pixels, a hair smaller than the wrap. Every overlay on the squares is sized by it. */
-  --cg-size: var(---cg-width, 100%);
+  /* The board's drawn size, which it writes on the wrap (--board-width) each time it sizes itself: a whole multiple of
+     8 device pixels, a hair smaller than the wrap. Every overlay on the squares is sized by it. */
+  --board-size: var(--board-width, 100%);
 }
 
 /* On a phone, size the main board so the controls below it stay on screen. */
@@ -390,70 +390,15 @@ p {
   pointer-events: none;
 }
 
-/* ---- The big board's coordinates, inside its edge squares: each rank's number at the top left of its square in the
-   left column, each file's letter at the bottom right of its square in the bottom row (where Hollow's night draws
-   them too), either way up. Chessground's own CSS puts them off the squares (files 24 px to the right, so each letter
-   sat in the next column along and the last one off the board; ranks 20 px up, on the line between rows). Chessground
-   draws them in its container, which is exactly the board, so an eighth of it is exactly a square. ---- */
-.cg-wrap coords.ranks,
-.cg-wrap coords.files {
-  font-size: clamp(9px, 2.6cqw, 14px);
-  font-weight: 600;
-  /* (Normal, not 1: each label's text box, the font's full height, then sits inside its label and so inside its
-     square, whatever the font. With 1, a font with a tall ascent poked its box out over the row's top edge.) */
-  line-height: normal;
-  opacity: 1;
-}
-.cg-wrap coords.ranks {
-  left: 0;
-  top: 0;
-  width: 12.5%;
-  height: 100%;
-}
-.cg-wrap coords.files {
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 12.5%;
-  align-items: flex-end;
-  text-align: right;
-}
-/* (Every label exactly an eighth: a basis of 0, not its text's width.) */
-.cg-wrap coords.ranks coord,
-.cg-wrap coords.files coord {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 0;
-  transform: none;
-}
-/* Tucked into the corners, where the pieces have the least ink: painted on the board, under the pieces (as on a printed
-   board), a piece's base just reaches a letter's edge. */
-.cg-wrap coords.ranks coord {
-  padding: 0.06em 0 0 0.18em;
-}
-.cg-wrap coords.files coord {
-  padding: 0 0.15em 0.04em 0;
-}
-/* Each label in the colour that reads on its square. a1 and h8 are dark, so White's way up the odd labels (rank 1 on
-   a1, file A on a1) sit on dark squares; Black's way up (rank 1 on h1, file A on a8) the even ones do. */
-.cg-wrap.orientation-white coords:is(.ranks, .files) coord:nth-child(odd),
-.cg-wrap.orientation-black coords:is(.ranks, .files) coord:nth-child(even) {
-  color: rgba(255, 255, 255, 0.92);
-}
-.cg-wrap.orientation-white coords:is(.ranks, .files) coord:nth-child(even),
-.cg-wrap.orientation-black coords:is(.ranks, .files) coord:nth-child(odd) {
-  color: rgba(72, 58, 40, 0.8);
-}
-
-/* ---- Our own board (board/OwnBoard.tsx, BOARD.impl "own"): the same look as chessground's above, the same stacking
-   (the pieces at z-index 2, sliding 8, dragged 11, a captured one fading at 1; nothing here makes a layer of its own,
-   so everything drawn over the board stacks with the pieces as before). The pieces' art: board/pieces.css. ---- */
+/* ---- The board (board/OwnBoard.tsx; docs/areas/board.md). Its stacking: the pieces at z-index 2, sliding 8, dragged
+   11, a captured one fading at 1; nothing here makes a layer of its own, so everything drawn over the board stacks with
+   the pieces. The pieces' art and the base for anything else drawn with them (.hb-pieces): board/pieces.css. ---- */
 .hb {
   box-sizing: content-box;
   position: relative;
   display: block;
 }
-/* Exactly the board: sized by the board itself (a whole multiple of 8 device pixels, written as ---cg-width). */
+/* Exactly the board: sized by the board itself (a whole multiple of 8 device pixels, written as --board-width). */
 .hb-container {
   position: absolute;
   top: 0;
@@ -567,9 +512,10 @@ p {
   overflow: visible;
   z-index: 9;
 }
-/* The coordinates, inside their edge squares, as the chessground board's are styled above: each rank's number at the
-   top left of its square in the left column, each file's letter at the bottom right of its square in the bottom row,
-   either way up; under the pieces; white on dark squares, dark brown on light ones. */
+/* The coordinates, inside their edge squares (DECISIONS.md, Oct 11): each rank's number at the top left of its square in
+   the left column, each file's letter at the bottom right of its square in the bottom row, either way up and turned;
+   painted on the board, under the pieces, tucked into the corners where the pieces have the least ink; white on dark
+   squares, dark brown on light ones; bold, 9 px on a phone's board, growing with the board to 14 px on a computer. */
 .hb-coords {
   position: absolute;
   display: flex;
@@ -1610,11 +1556,11 @@ p {
 
 .shade-layer {
   position: absolute !important;
-  /* Exactly chessground's board (it rounds its size to whole device pixels), so overlay pieces sit on its squares. */
+  /* Exactly the board's squares (it rounds its size to whole device pixels), so overlay pieces sit on its squares. */
   top: 0;
   left: 0;
-  width: var(--cg-size, 100%);
-  height: var(--cg-size, 100%);
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
   pointer-events: none;
   z-index: 3;
 }
@@ -1783,14 +1729,14 @@ button.history-label {
   opacity: 0.12;
   transition: opacity 0.4s;
 }
-/* Exactly on its square: eighths of chessground's own board (--cg-size), at any size, zoom or display scale. Square
+/* Exactly on its square: eighths of the board's own size (--board-size), at any size, zoom or display scale. Square
    corners and the glow inside, so nothing of it reads as wider than the square. */
 .square-ring {
   position: absolute;
-  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--cg-size, 100%) / 8);
-  height: calc(var(--cg-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
   box-sizing: border-box;
   border: 4px solid #2fd27a;
   border-radius: 2px;
@@ -1993,8 +1939,8 @@ button.history-label {
 .timer-bar {
   position: absolute;
   left: 0;
-  /* (Chessground's board, not the wrap: up to 8 device pixels narrower. See .board-wrap.) */
-  width: var(--cg-size, 100%);
+  /* (The board's squares, not the wrap: up to 8 device pixels narrower. See .board-wrap.) */
+  width: var(--board-size, 100%);
   top: calc(-1 * var(--timer-bar-h));
   height: var(--timer-bar-h);
   border-radius: 2px;
@@ -2013,7 +1959,7 @@ button.history-label {
 }
 /* The mirror under the board (TIMER_BAR_BELOW in components/Countdown.tsx turns it off). */
 .timer-bar.below {
-  top: var(--cg-size, 100%);
+  top: var(--board-size, 100%);
 }
 
 /* ---- The small clock at the board's top right: this move's seconds and your bank (components/BoardClock.tsx) ---- */
@@ -2022,8 +1968,8 @@ button.history-label {
    the bar, and out of the layout (absolute), so nothing moves when it comes and goes. */
 .board-clock {
   position: absolute;
-  /* (Level with chessground's right edge, a hair inside the wrap's.) */
-  right: calc(100% - var(--cg-size, 100%));
+  /* (Level with the board's right edge, a hair inside the wrap's.) */
+  right: calc(100% - var(--board-size, 100%));
   bottom: calc(100% + 7px);
   height: 17px;
   box-sizing: border-box;
@@ -3452,12 +3398,12 @@ button.history-label {
     opacity: 0;
   }
 }
-/* The hand-off: the real pieces drop into place, pawns first. (`translate`, not `transform`: chessground places
+/* The hand-off: the real pieces drop into place, pawns first. (`translate`, not `transform`: the board places
    pieces with transform.) */
-.vote-board-row.dropping :is(cg-board, .hb-board) piece {
+.vote-board-row.dropping .hb-board piece {
   animation: piece-drop 380ms cubic-bezier(0.25, 0.9, 0.35, 1.12) both;
 }
-.vote-board-row.dropping :is(cg-board, .hb-board) piece:not(.pawn) {
+.vote-board-row.dropping .hb-board piece:not(.pawn) {
   animation-delay: 110ms;
 }
 @keyframes piece-drop {
@@ -3771,7 +3717,7 @@ button.history-label {
   .vote-layer.animate .vote-pawn.vote-me {
     transition: opacity 280ms ease-in;
   }
-  .vote-board-row.dropping :is(cg-board, .hb-board) piece {
+  .vote-board-row.dropping .hb-board piece {
     animation: vote-fade-in 300ms ease-out both;
   }
   .vote-zone-count.pop,
@@ -4174,8 +4120,8 @@ button.history-label {
   }
 }
 /* While the God King stands in his place, the real king is hidden. */
-.board-wrap:has(.king-summon.hide-king-w) :is(cg-board, .hb-board) piece.king.white,
-.board-wrap:has(.king-summon.hide-king-b) :is(cg-board, .hb-board) piece.king.black {
+.board-wrap:has(.king-summon.hide-king-w) .hb-board piece.king.white,
+.board-wrap:has(.king-summon.hide-king-b) .hb-board piece.king.black {
   opacity: 0;
 }
 .ks-fx {
@@ -5769,7 +5715,7 @@ button.history-label {
   width: 100%;
   height: 100%;
 }
-.avatar.cg-wrap > piece,
+.avatar.hb-pieces > piece,
 .avatar > .avatar-items,
 .avatar > .avatar-skin {
   position: absolute;
@@ -5780,11 +5726,11 @@ button.history-label {
   overflow: visible;
 }
 /* Layers: items flagged "back" (a cape) behind the piece; the piece (or a skin); then hats, beards and weapons in
-   front. (Chessground gives every piece z-index 2, so these are explicit.) */
+   front. (The pieces' base gives every piece z-index 2, so these are explicit.) */
 .avatar > .avatar-items.back {
   z-index: 1;
 }
-.avatar.cg-wrap > piece,
+.avatar.hb-pieces > piece,
 .avatar > .avatar-skin {
   z-index: 2;
 }
@@ -6365,7 +6311,7 @@ button.history-label {
 }
 /* 0. The warning: the blundered piece's square pulses red under it (three beats, then a steady red), and a red
    "??" badge pops on its corner (like a chess site's blunder mark). */
-.board-wrap :is(cg-board, .hb-board) square.ls-blunder {
+.board-wrap .hb-board square.ls-blunder {
   background: rgba(222, 38, 38, 0.62);
   animation: ls-blunder-pulse 433ms ease-in-out 3;
 }
@@ -10559,26 +10505,26 @@ img.qicon {
   z-index: 2;
   pointer-events: none;
 }
-/* Boingo's pies: exactly on their squares, in eighths of chessground's own board (--cg-size), never % of the wrap (the
+/* Boingo's pies: exactly on their squares, in eighths of the board's own size (--board-size), never % of the wrap (the
    wrap can be a few pixels wider), wherever the funhouse has turned the board (onSquare). */
 .pw-pie {
   position: absolute;
-  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--cg-size, 100%) / 8);
-  height: calc(var(--cg-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
   pointer-events: none;
 }
-/* Ginger's ice (and the cold burst as it forms): exactly on its square, in eighths of chessground's own board
-   (--cg-size), never % of the wrap, which can be a few pixels wider (Eric, Oct 11: the blocks didn't line up). The block
+/* Ginger's ice (and the cold burst as it forms): exactly on its square, in eighths of the board's own size
+   (--board-size), never % of the wrap, which can be a few pixels wider (Eric, Oct 11: the blocks didn't line up). The block
    is the square's shape, the same on every square whatever the piece (characters/effects/ginger.ts). */
 .pw-ice,
 .pw-frost {
   position: absolute;
-  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--cg-size, 100%) / 8);
-  height: calc(var(--cg-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
   pointer-events: none;
 }
 /* A freeze: a cold burst on the square as the ice forms. */
@@ -10703,7 +10649,7 @@ img.qicon {
   pointer-events: none;
 }
 /* The board flips: a half turn in its own plane (the pieces upside down for a moment), then the board is drawn from
-   the other side, untransformed (chessground measures its squares then). */
+   the other side, untransformed (the board's squares are placed then). */
 .pw-flipping .board-wrap {
   animation: pw-spin 700ms cubic-bezier(0.55, 0, 0.35, 1) both;
 }
@@ -10723,7 +10669,7 @@ img.qicon {
 }
 
 /* The funhouse's later steps: a quarter turn of the board in its own plane, clockwise or anticlockwise (the pieces go
-   round with it for a moment), then it's drawn at its new angle, untransformed (Board's turn: chessground measures its
+   round with it for a moment), then it's drawn at its new angle, untransformed (Board's turn: the board places its
    squares then). Shrunk at the halfway point so its corners stay in its box. */
 .pw-turning-cw .board-wrap {
   animation: pw-quarter-cw 700ms cubic-bezier(0.55, 0, 0.35, 1) both;
@@ -10837,10 +10783,10 @@ img.qicon {
 /* Jefferson's piece standing in his candle's fire, unharmed, as he laughs it off: a cool glint over its square. */
 .pw-fireproof {
   position: absolute;
-  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--cg-size, 100%) / 8);
-  height: calc(var(--cg-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
   border-radius: 18%;
   box-shadow:
     inset 0 0 0 2px rgba(186, 230, 253, 0.95),
@@ -10867,13 +10813,13 @@ img.qicon {
 /* ---------------- G-REX's fire (BossPowers.tsx, the characters' sprites) ---------------- */
 
 /* The fire tiles (and a piece burning on one, a fireball landing): one canvas over the whole board. */
-/* G-REX's fire on one canvas: exactly chessground's board (eighths of --cg-size), so a tile sits on its square. */
+/* G-REX's fire on one canvas: exactly the board's squares (eighths of --board-size), so a tile sits on its square. */
 .pw-fire-board {
   position: absolute;
   top: 0;
   left: 0;
-  width: var(--cg-size, 100%);
-  height: var(--cg-size, 100%);
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
   z-index: 1;
 }
 /* The Roman candle's fireballs' shadows, on a canvas of their own under the pieces (z-index 1, the pieces 2, in the
@@ -10882,8 +10828,8 @@ img.qicon {
   position: absolute;
   top: 0;
   left: 0;
-  width: var(--cg-size, 100%);
-  height: var(--cg-size, 100%);
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -10892,15 +10838,15 @@ img.qicon {
   z-index: 4;
 }
 /* Markers on the tiles' squares (which squares are on fire, at which stage, what burnt; where shadows are), exactly
-   on chessground's squares. A tile's carries its countdown. */
+   on the board's squares. A tile's carries its countdown. */
 .pw-fire,
 .pw-burn,
 .pw-shadow {
   position: absolute;
-  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--cg-size, 100%) / 8);
-  height: calc(var(--cg-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
   display: grid;
   place-items: center;
   pointer-events: none;
@@ -10908,9 +10854,9 @@ img.qicon {
 /* The countdown on a burning tile (the crowd moves left before it burns: 3, 2, 1; 0 as it burns): small, a little
    see-through and outlined, in the middle, so it reads on any tile and the piece under it still shows what it is. */
 .pw-count {
-  font: 800 calc(var(--cg-size, 100%) / 8 * 0.34) / 1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 800 calc(var(--board-size, 100%) / 8 * 0.34) / 1 system-ui, -apple-system, "Segoe UI", sans-serif;
   color: rgba(255, 248, 230, 0.86);
-  -webkit-text-stroke: max(1.5px, calc(var(--cg-size, 100%) / 8 * 0.05)) rgba(42, 13, 5, 0.82);
+  -webkit-text-stroke: max(1.5px, calc(var(--board-size, 100%) / 8 * 0.05)) rgba(42, 13, 5, 0.82);
   paint-order: stroke fill;
   text-shadow: 0 0 3px rgba(42, 13, 5, 0.45);
   opacity: 0.88;
@@ -11001,10 +10947,10 @@ img.qicon {
 .pw-pips {
   position: absolute;
   z-index: 9;
-  left: calc(var(--cg-size, 100%) + 5px);
-  top: calc(var(--cg-size, 100%) / 2);
+  left: calc(var(--board-size, 100%) + 5px);
+  top: calc(var(--board-size, 100%) / 2);
   translate: 0 -50%;
-  width: min(16px, calc(var(--cg-size, 100%) * 7 / 146));
+  width: min(16px, calc(var(--board-size, 100%) * 7 / 146));
   aspect-ratio: 7 / 146;
   pointer-events: none;
   filter: drop-shadow(0.15cqw 0.15cqw 0 rgba(0, 0, 0, 0.4));
@@ -11388,10 +11334,10 @@ img.qicon {
 .pw-dark-check,
 .pw-cost {
   position: absolute;
-  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--cg-size, 100%) / 8);
-  height: calc(var(--cg-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
   pointer-events: none;
 }
 /* Check still shows on a king in the dark: the board's red glow, over the dark. */
@@ -11420,9 +11366,9 @@ img.qicon {
   display: grid;
   place-items: center;
   z-index: 6;
-  font: 800 calc(var(--cg-size, 100%) / 8 * 0.42) / 1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 800 calc(var(--board-size, 100%) / 8 * 0.42) / 1 system-ui, -apple-system, "Segoe UI", sans-serif;
   color: #fecdd3;
-  -webkit-text-stroke: max(1.5px, calc(var(--cg-size, 100%) / 8 * 0.05)) #4c0519;
+  -webkit-text-stroke: max(1.5px, calc(var(--board-size, 100%) / 8 * 0.05)) #4c0519;
   paint-order: stroke fill;
   text-shadow: 0 0 6px rgba(190, 18, 60, 0.75);
   animation: pw-cost-rise 1600ms ease-out both;
@@ -11538,8 +11484,8 @@ img.qicon {
   position: absolute;
   top: 0;
   left: 0;
-  width: var(--cg-size, 100%);
-  height: var(--cg-size, 100%);
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
   z-index: 9;
   cursor: pointer;
   touch-action: none;
@@ -11646,22 +11592,22 @@ img.qicon {
 /* A marker on the block's square (which square, for tests and readers); the block itself is on the canvas. */
 .pw-block {
   position: absolute;
-  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--cg-size, 100%) / 8);
-  height: calc(var(--cg-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
   pointer-events: none;
 }
 .pw-block-board {
   z-index: 3;
 }
-/* The bounce and the snack: on chessground's own board (eighths of --cg-size), over the pieces, never taking a tap. */
+/* The bounce and the snack: on the board's own squares (eighths of --board-size), over the pieces, never taking a tap. */
 .bb-layer {
   position: absolute !important;
   top: 0;
   left: 0;
-  width: var(--cg-size, 100%);
-  height: var(--cg-size, 100%);
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
   z-index: 8;
   pointer-events: none;
 }
@@ -11747,13 +11693,13 @@ img.qicon {
   background: repeating-linear-gradient(135deg, #b98a06 0 5cqw, #1c1413 5cqw 10cqw);
   border-color: #fde68a;
 }
-/* The split and the board saw: on chessground's own board (eighths of --cg-size), over the pieces, never taking a tap. */
+/* The split and the board saw: on the board's own squares (eighths of --board-size), over the pieces, never taking a tap. */
 .sw-layer {
   position: absolute !important;
   top: 0;
   left: 0;
-  width: var(--cg-size, 100%);
-  height: var(--cg-size, 100%);
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
   z-index: 8;
   pointer-events: none;
 }
@@ -11791,14 +11737,14 @@ img.qicon {
 }
 /* His split pawns as halves, on the board and in the air: each shows the half away from its partner, its sawn face
    shaded along the cut (the piece's own drawing, darkened, in a thin column at the cut: it follows the pawn's outline). */
-:is(.cg-wrap, .hb) piece.saw-half-l {
+:is(.hb, .hb-pieces) piece.saw-half-l {
   clip-path: inset(0 50% 0 0);
 }
-:is(.cg-wrap, .hb) piece.saw-half-r {
+:is(.hb, .hb-pieces) piece.saw-half-r {
   clip-path: inset(0 0 0 50%);
 }
-:is(.cg-wrap, .hb) piece.saw-half-l::after,
-:is(.cg-wrap, .hb) piece.saw-half-r::after {
+:is(.hb, .hb-pieces) piece.saw-half-l::after,
+:is(.hb, .hb-pieces) piece.saw-half-r::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -11806,31 +11752,31 @@ img.qicon {
   /* Fresh-cut wood: the white pawn's face toned to tan, the black pawn's turned light and toned the same. */
   filter: sepia(0.9) saturate(1.6) brightness(0.82);
 }
-:is(.cg-wrap, .hb) piece.black.saw-half-l::after,
-:is(.cg-wrap, .hb) piece.black.saw-half-r::after {
+:is(.hb, .hb-pieces) piece.black.saw-half-l::after,
+:is(.hb, .hb-pieces) piece.black.saw-half-r::after {
   filter: invert(1) sepia(0.9) saturate(1.6) brightness(0.82);
 }
-:is(.cg-wrap, .hb) piece.saw-half-l::after {
+:is(.hb, .hb-pieces) piece.saw-half-l::after {
   clip-path: inset(0 50% 0 41%);
 }
-:is(.cg-wrap, .hb) piece.saw-half-r::after {
+:is(.hb, .hb-pieces) piece.saw-half-r::after {
   clip-path: inset(0 41% 0 50%);
 }
 /* His split pawns kept small on the board (SAWYER_LOOKS.settle "small"): the pawn's drawing at the morph's MINI (0.55),
-   its feet where a pawn's are; no transform (chessground places pieces with one). */
-:is(.cg-wrap, .hb) piece.saw-small {
+   its feet where a pawn's are; no transform (the board places pieces with one). */
+:is(.hb, .hb-pieces) piece.saw-small {
   background-size: 55% 55%;
   background-position: 50% 88%;
   background-repeat: no-repeat;
 }
 /* The cut's groove and tape, and the board saw's gap: under the pieces (z-index 1, the pieces 2, in the board's
-   stacking context), exactly on chessground's board. */
+   stacking context), exactly on the board's squares. */
 .board-wrap > .sw-cut-board {
   position: absolute;
   top: 0;
   left: 0;
-  width: var(--cg-size, 100%);
-  height: var(--cg-size, 100%);
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -11839,9 +11785,9 @@ img.qicon {
 .board-wrap > .sw-gap {
   position: absolute;
   top: 0;
-  left: calc(var(--cg-size, 100%) * 121 / 256);
-  width: calc(var(--cg-size, 100%) * 14 / 256);
-  height: var(--cg-size, 100%);
+  left: calc(var(--board-size, 100%) * 121 / 256);
+  width: calc(var(--board-size, 100%) * 14 / 256);
+  height: var(--board-size, 100%);
   z-index: 1;
   pointer-events: none;
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.55));
@@ -11859,7 +11805,7 @@ img.qicon {
 .king-attack .ka-hits {
   z-index: 3;
 }
-/* The boss beside the king: his frame sized in squares of chessground's board; mirrored when the king is to his left. */
+/* The boss beside the king: his frame sized in squares of the board; mirrored when the king is to his left. */
 .ka-boss {
   position: absolute;
   z-index: 2;
@@ -11873,10 +11819,10 @@ img.qicon {
 .ka-king {
   position: absolute;
   z-index: 1;
-  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--cg-size, 100%) / 8);
-  height: calc(var(--cg-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
 }
 .ka-king piece {
   position: absolute;
@@ -11885,8 +11831,8 @@ img.qicon {
   height: 100%;
   background-size: cover;
 }
-.board-wrap:has(.ka-king.w) :is(cg-board, .hb-board) piece.king.white,
-.board-wrap:has(.ka-king.b) :is(cg-board, .hb-board) piece.king.black {
+.board-wrap:has(.ka-king.w) .hb-board piece.king.white,
+.board-wrap:has(.ka-king.b) .hb-board piece.king.black {
   opacity: 0;
 }
 /* Its "−N" hits: the God King's strike style (.ks-hp), over everything. */
@@ -12461,13 +12407,13 @@ button.sq-tiny {
   gap: 8px;
   width: 100%;
 }
-/* The reveal: the active block slamming down as a red lock on its square (eighths of chessground's board). */
+/* The reveal: the active block slamming down as a red lock on its square (eighths of the board's own size). */
 .sq-lock {
   position: absolute;
-  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--cg-size, 100%) / 8);
-  height: calc(var(--cg-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
   z-index: 5;
   display: grid;
   place-items: center;
@@ -12506,8 +12452,8 @@ button.sq-tiny {
   position: absolute;
   left: 0;
   top: 0;
-  width: var(--cg-size, 100%);
-  height: var(--cg-size, 100%);
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
   z-index: 3;
   pointer-events: none;
 }

@@ -54,7 +54,7 @@ function ringOff(p: Page) {
 test("the reveal's ring sits exactly on its square at two widths; the bars and the board's clock stay off the squares", async ({ browser }, info) => {
   test.setTimeout(3 * 60_000);
   const phone = info.project.name === "phone";
-  // Chessground draws the squares in a box it rounds down to a whole multiple of 8 device pixels, a little smaller
+  // The board draws the squares in a box it rounds down to a whole multiple of 8 device pixels, a little smaller
   // than the board's wrap, and the old ring was placed in % of the wrap. The sizes are picked where that gap is
   // widest: a phone (3 device pixels to a pixel) where it's 2.3 px, and a computer at a 125% display scale, as Eric's
   // is, where it's 5-6 px.

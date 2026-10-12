@@ -6,7 +6,7 @@
 | `openings.json` | The opening library, generated from the TSVs by `scripts/build-openings.ts` | This repo | Same as the TSVs (CC0) |
 | Stockfish 19 (stockfish.js, lite single-threaded WebAssembly build) | Scoring moves, bots | https://github.com/nmrugg/stockfish.js (npm `stockfish`); Stockfish source: https://github.com/official-stockfish/Stockfish | GPL-3.0 |
 | chess.js | Move generation and rules | https://github.com/jhlywa/chess.js | BSD-2-Clause |
-| chessground 9 | The board (packages/app) | https://github.com/lichess-org/chessground | GPL-3.0-or-later |
+| The cburnett chess pieces (Colin M.L. Burnett) | The pieces on the board (packages/app; the board itself is the game's own since Oct 12, 2026, replacing chessground) | Wikimedia Commons; file by file in `packages/app/src/board/pieces/SOURCES.md` | BSD (3-clause) |
 | Preact | UI framework (packages/app) | https://github.com/preactjs/preact | MIT |
 | `packages/app/public/sounds/pieces/*.mp3` | Every move, capture and castling sound (all wood) | Kenney's *Impact Sounds* (https://kenney.nl), and our own (`scripts/piece-sounds.py`); file by file in `packages/app/public/sounds/SOURCES.md` | CC0 1.0, and ours |
 

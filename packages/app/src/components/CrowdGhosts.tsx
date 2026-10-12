@@ -161,7 +161,7 @@ export function CrowdGhosts({
   for (const p of picks) byMove.set(p.move, [...(byMove.get(p.move) ?? []), p]);
   const cls = (move: string) => (chosen ? (move === chosen ? " chosen" : " not-chosen") : "");
   return (
-    <div class={`cg-wrap shade-layer crowd-layer${faint ? " faint" : ""}`} aria-hidden="true">
+    <div class={`hb-pieces shade-layer crowd-layer${faint ? " faint" : ""}`} aria-hidden="true">
       {[...byMove].map(([move, ps]) =>
         animate ? (
           <Ghost

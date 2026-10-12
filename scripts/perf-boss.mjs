@@ -188,14 +188,14 @@ async function run(kind, name, context, throttle) {
       return {
         allowed: p?.allowed ?? null,
         fen: m.phase.board.fen,
-        orientation: document.querySelector(":is(.cg-wrap, .hb)")?.classList.contains("orientation-black") ? "black" : "white",
+        orientation: document.querySelector(".hb")?.classList.contains("orientation-black") ? "black" : "white",
         events: (p?.events ?? []).filter((e) => e.turn === p.turn).map((e) => e.kind),
       };
     });
     seen.add(fen.split(" ").slice(0, 4).join(" "));
     const options = allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
     const pick = (await player.best(fen, options)) ?? pickMove(fen, options, seen);
-    const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
+    const board = await p.locator(".hb-board").first().boundingBox();
     const flip = orientation === "black";
     const at = (s) => {
       const f = s.charCodeAt(0) - 97;

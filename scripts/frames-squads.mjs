@@ -31,7 +31,7 @@ await p.addInitScript(() => {
   const log = (window.__pieces = []);
   let last = "";
   const tick = () => {
-    const ps = [...document.querySelectorAll(".board-area :is(cg-board, .hb-board) piece")].map((e) => `${e.className}@${e.style.transform}`).sort().join("|");
+    const ps = [...document.querySelectorAll(".board-area .hb-board piece")].map((e) => `${e.className}@${e.style.transform}`).sort().join("|");
     const status = document.querySelector(".sq-status")?.textContent ?? "";
     const key = `${ps}#${status}`;
     if (key !== last) {
@@ -127,8 +127,8 @@ async function waitFor(test, ms = 90_000) {
   }
 }
 async function tap(sq) {
-  const box = await p.locator(".board-area :is(cg-board, .hb-board)").boundingBox();
-  const black = await p.locator(".board-area :is(.cg-wrap, .hb)").evaluate((el) => el.classList.contains("orientation-black"));
+  const box = await p.locator(".board-area .hb-board").boundingBox();
+  const black = await p.locator(".board-area .hb").evaluate((el) => el.classList.contains("orientation-black"));
   const f = sq.charCodeAt(0) - 97;
   const r = Number(sq[1]) - 1;
   await p.mouse.click(box.x + ((black ? 7 - f : f) + 0.5) * (box.width / 8), box.y + ((black ? r : 7 - r) + 0.5) * (box.height / 8));

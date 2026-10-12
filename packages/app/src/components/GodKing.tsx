@@ -286,7 +286,7 @@ export function KingSummon({
         </div>
       )}
       {out >= 350 && out < 900 && (
-        <span class="ks-plain cg-wrap" style={{ left: pct(k.x - 50), top: pct(k.y - 50) }} aria-hidden="true">
+        <span class="ks-plain hb-pieces" style={{ left: pct(k.x - 50), top: pct(k.y - 50) }} aria-hidden="true">
           <piece class={`${side === "w" ? "white" : "black"} king`} />
         </span>
       )}
@@ -491,7 +491,7 @@ export function KingCutIn({
           <span class="fb-text kc-text">{mode === "move" ? san : "STRIKE!"}</span>
         </span>
         {mode === "move" && piece ? (
-          <span class="kc-target cg-wrap">
+          <span class="kc-target hb-pieces">
             <piece class={`${side === "w" ? "white" : "black"} ${PIECE_NAMES[piece]}`} />
           </span>
         ) : (

@@ -4,9 +4,9 @@
  * point, the board's size, which pieces slide where when the position changes, the moves a tap or a drag may make, and
  * the arrows' geometry.
  *
- * The behaviour and numbers follow the board the game used before (chessground: its 3 px drag threshold, its 220 ms
- * slides with a cubic ease in and out, its arrows' widths and colours), measured against it in the board lab
- * (/boardlab), so a player can't tell the two apart. None of its code is used.
+ * The behaviour and numbers follow the board the game used before (its 3 px drag threshold, its 220 ms slides with a
+ * cubic ease in and out, its arrows' widths and colours), measured against it side by side (Oct 12, 2026), so a player
+ * couldn't tell the two apart.
  */
 import { legalMoves, touchesDark } from "@chessroyale/chess";
 import { realSquare, viewSquare, type QuarterTurn } from "../board-view.ts";
@@ -89,7 +89,7 @@ export function squareCentre(square: string, box: Box, orientation: Orientation,
 /**
  * The board's drawn size for a box `width` px wide on a screen of `dpr` device pixels a CSS pixel: a whole multiple of
  * 8 device pixels (every square a whole number of them, so square edges are crisp), up to 8 device pixels smaller than
- * the box. Everything drawn over the squares sizes itself by it (--cg-size).
+ * the box. Everything drawn over the squares sizes itself by it (--board-size).
  */
 export const boardSize = (width: number, dpr: number) => (Math.floor((width * dpr) / 8) * 8) / dpr;
 

@@ -75,9 +75,9 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 ## Rules for this area (from `.claude/LESSONS.md`)
 
 - Watch any change to a board, a move or an animation frame by frame with real taps, including the plain move.
-- No opacity entrance on screens that replace each other; chessground and canvases are set up in layout effects.
+- No opacity entrance on screens that replace each other; the board's size and canvases are set up in layout effects.
 - When one screen hands the board to the next, both give it the same frame; measure the board's box on both.
-- Overlays on squares size themselves in eighths of the board's own size (`--cg-size`), never % of the wrap.
+- Overlays on squares size themselves in eighths of the board's own size (`--board-size`), never % of the wrap.
 - Board coordinates sit inside their edge squares, either way up; measure each label against its square (`expectCoordsInSquares`).
 - Check one-line rows at 360 px with their widest real content (names, six-digit scores).
 - Nothing read while rendering may grow with the match; never replay from move 0 (`fenAtPly`).

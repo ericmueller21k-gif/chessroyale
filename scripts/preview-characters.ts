@@ -340,7 +340,7 @@ for (const ch of ALL) for (look of looksOf(ch)) {
   console.log(`${id}: ${Object.entries(ch.anims).map(([n, a]) => `${n} ${a.frames.length}f`).join(", ")}`);
 }
 
-// ---- The power effects, over the board (chessground's brown squares), at the same scale.
+// ---- The power effects, over the board (its brown squares), at the same scale.
 const LIGHT = "#f0d9b5";
 const DARK = "#b58863";
 /** The board under an effect: one light square (a white pawn on it under the ice), or the whole board. */

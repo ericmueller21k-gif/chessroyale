@@ -125,7 +125,7 @@ export function KingAttack({
   const footY = row + 1 - 0.04;
   const footFrac = left ? ch.foot[0] / ch.w : 1 - ch.foot[0] / ch.w;
   const box = { x: footX - w * footFrac, y: footY - h * (ch.foot[1] / ch.h) };
-  const sq = (v: number) => `calc(var(--cg-size, 100%) * ${v.toFixed(4)} / 8)`;
+  const sq = (v: number) => `calc(var(--board-size, 100%) * ${v.toFixed(4)} / 8)`;
   const hits = kingAttackHits();
   const beat = kingAttackBeat(t);
   const items: SquareItem[] = [];
@@ -152,7 +152,7 @@ export function KingAttack({
     <div class={`king-attack${him ? " on" : ""}`} aria-hidden="true" data-hit={beat.hit} data-from={from} data-start={startAt}>
       <BoardEffects items={items} orientation={orientation} class="pw-fire-board ka-hits" />
       {king && (
-        <span class={`ka-king cg-wrap ${king}`} style={kingStyle} data-square={square}>
+        <span class={`ka-king hb-pieces ${king}`} style={kingStyle} data-square={square}>
           <piece class={`${king === "w" ? "white" : "black"} king`} />
         </span>
       )}

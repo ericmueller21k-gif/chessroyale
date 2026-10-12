@@ -529,7 +529,7 @@ export function ChatBubble({ match }: { match: GameView }) {
     if (!el) return;
     const screen = document.querySelector(".screen");
     const bar = document.querySelector(".screen .hud-row")?.getBoundingClientRect();
-    const board = document.querySelector(".screen cg-container, .screen .hb-container, .screen .board-wrap")?.getBoundingClientRect();
+    const board = document.querySelector(".screen .hb-container, .screen .board-wrap")?.getBoundingClientRect();
     const area = screen?.getBoundingClientRect();
     const h = el.offsetHeight;
     let top = bar ? bar.bottom + 2 : Math.max(4, (area?.top ?? 0) + 4);

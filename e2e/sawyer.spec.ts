@@ -149,9 +149,8 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
   expect(Math.abs(file(sp.square) - file(sp.pawn))).toBe(1);
   const pieces = new Chess(boss.board.fen);
   for (const h of sp.halves) expect(pieces.get(h.square)).toMatchObject({ type: "p", color: mine });
-  // (A piece's square: ours says it, chessground keeps it on the element.)
-  const halves = await page.evaluate((pieces) => [...document.querySelectorAll<HTMLElement>(`${pieces}.saw-half-l, ${pieces}.saw-half-r`)].map((e) => `${e.dataset.square ?? (e as any).cgKey}:${e.classList.contains("saw-half-l") ? "l" : "r"}`).sort(), BOARD_SEL.piece);
-  const small = await page.evaluate((pieces) => [...document.querySelectorAll<HTMLElement>(`${pieces}.saw-small`)].map((e) => (e.dataset.square ?? (e as any).cgKey) as string).sort(), BOARD_SEL.piece);
+  const halves = await page.evaluate((pieces) => [...document.querySelectorAll<HTMLElement>(`${pieces}.saw-half-l, ${pieces}.saw-half-r`)].map((e) => `${e.dataset.square}:${e.classList.contains("saw-half-l") ? "l" : "r"}`).sort(), BOARD_SEL.piece);
+  const small = await page.evaluate((pieces) => [...document.querySelectorAll<HTMLElement>(`${pieces}.saw-small`)].map((e) => e.dataset.square as string).sort(), BOARD_SEL.piece);
   const w = boss.crowdSide === "w";
   expect(halves).toEqual(pairLook === "halves" ? sp.halves.map((h: { square: string; side: string }) => `${h.square}:${(h.side === "a") === w ? "l" : "r"}`).sort() : []);
   expect(small).toEqual(pairLook === "small" ? sp.halves.map((h: { square: string }) => h.square).sort() : []);

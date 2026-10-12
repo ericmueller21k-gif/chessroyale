@@ -54,7 +54,7 @@ async function run(name, context) {
     history.replaceState(null, "", u);
   }, moment);
   // (A redraw picks it up: the play screen redraws several times a second.)
-  const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
+  const board = await p.locator(".hb-board").first().boundingBox();
   const vw = p.viewportSize().width;
   const clip = name === "phone" ? { x: 0, y: Math.max(0, board.y - 170), width: vw, height: board.height + 180 } : { x: Math.max(0, board.x - 330), y: Math.max(0, board.y - 190), width: Math.min(vw, board.width + 420), height: board.height + 210 };
   if (perf) {

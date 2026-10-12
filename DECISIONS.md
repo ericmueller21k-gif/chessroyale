@@ -1427,3 +1427,18 @@ PyChess's knocks (GPL-3), which a closed-source game can't ship. The calls:
   inside the tap, so the first move's own frame waited. The graph is now made while the page is idle (it starts
   suspended and fetches nothing; browsers allow that), the tap only switches it on, and the samples start loading after
   the tap's frame. Every tap still tries to switch sound on until it's running (iPhones).
+
+### Our own board, the only board (Phase 2 of replacing chessground, Oct 12, 2026)
+
+Eric approved Phase 2 for the same night, once Phase 1 was proven (the full e2e on both boards, every boss effect's
+frames checked, the measurements with no regressions). The calls:
+
+- **Our board is the board,** with no switch: `BOARD.impl`, the admin toggle and `?board=` are gone (a device that kept
+  a choice simply draws ours). Chessground is removed completely: the dependency, its CSS, its wrapper, every
+  `cg-*` name (`--cg-size` is `--board-size`, `---cg-width` is `--board-width`; the layers drawn with pieces are
+  `.hb-pieces`, with the piece base chessground's CSS used to give them), and every trace of it in the built app.
+- **The board lab is removed** (`/boardlab`): its job, choosing the board, is done, and it was a debugging page anyone
+  could open (the pre-launch item from Oct 12). cm-chessboard goes with it.
+- **If it ever has to go back:** the whole of Phase 2 is one merge commit, so `git revert -m 1 <that merge>` on `main`
+  (then push; `main` deploys) puts chessground back as it was at the end of Phase 1, with the switch (off by default:
+  chessground drawn) and the lab. Nothing else depends on it.

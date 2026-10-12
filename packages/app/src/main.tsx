@@ -1,6 +1,4 @@
 import { render } from "preact";
-import "chessground/assets/chessground.base.css";
-import "chessground/assets/chessground.brown.css";
 import "./board/pieces.css";
 import { App } from "./App.tsx";
 import { BanNotice } from "./components/FairPlay.tsx";
@@ -19,16 +17,11 @@ watchTheme();
 // own frame.
 prepareAudio();
 for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, () => audioUnlocked() || unlockAudio(), { passive: true });
-// /boardlab: a throwaway page for trying boards (src/boardlab/, loaded only here). Not linked anywhere.
-if (/^\/boardlab\/?$/.test(location.pathname)) {
-  void import("./boardlab/BoardLab.tsx").then(({ BoardLab }) => render(<BoardLab />, document.getElementById("app")!));
-} else {
-  // (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up.)
-  render(
-    <>
-      <App />
-      <BanNotice />
-    </>,
-    document.getElementById("app")!,
-  );
-}
+// (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up.)
+render(
+  <>
+    <App />
+    <BanNotice />
+  </>,
+  document.getElementById("app")!,
+);
