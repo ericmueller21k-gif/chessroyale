@@ -464,13 +464,31 @@ So a boss 200 above you expects about ${pct(eloExpected(200), 0)} in a straight 
 
 // ---------------- The bosses, one block each ----------------
 
+/** Ginger's blizzard in a player's words: its turns, how many pieces are free on each, the thaw (BOSS_POWERS). */
+function blizzardWords(p: BossPowerSettings): string {
+  const turns = Math.max(2, Math.round(p.blizzardTurns));
+  const free = (k: number) => p.blizzardFree[Math.min(k, p.blizzardFree.length - 1)] ?? ([1, 1] as const);
+  const count = ([lo, hi]: readonly [number, number]) => (lo === hi ? num(lo) : hi === lo + 1 ? `${num(lo)} or ${num(hi)}` : `${num(lo)} to ${num(hi)}`);
+  const nth = (k: number) => ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"][k] ?? ordinal(k + 1);
+  const first = free(0);
+  const parts = [
+    first[0] === 1 && first[1] === 1
+      ? "On its first turn, only one of your pieces may move, picked at random from those that have a move (never your king nor the frozen piece, unless nothing else can move); its banner names it."
+      : `On its first turn, ${count(first)} of your pieces may move, picked at random, those with a move first (never your king nor the frozen piece, unless nothing else can move).`,
+  ];
+  for (let k = 1; k < turns - 1; k++)
+    parts.push(`On its ${nth(k)}, ${count(free(k))} may move in all: the pieces already free stay free, and more thaw, picked at random, those with a move first (never your king, unless it's the only piece that can move); the banner names them.`);
+  parts.push(`On its ${nth(turns - 1)}, the ice is gone and every piece moves again.`);
+  return `it lasts ${n(turns, "turn")}. ${parts.join(" ")} The pieces that thaw next turn show cracked, dripping ice the turn before. A piece that can move is always free: in check, one that can get you out of it. The freeze waits until the blizzard is over.`;
+}
+
 /** One block per boss (by its BOSS_ROSTER id): its opening, passive and ultimate, in a player's words. */
 export const BOSS_BLOCKS: Record<string, (p: BossPowerSettings, b: BossDef) => string> = {
   gingerbread: (p) => `
 Plays from the game so far.
 
 - **Freeze** (passive): from turn ${p.firstPassive}, one of your pieces that matters (one of your three most valuable, mobile pieces; never the king) is iced and can't move for ${n(p.freezeTurns, "turn")}. Then again every ${range(p.freezeEvery)} turns.
-- **Blizzard** (ultimate): for one turn, only one of your pieces may move, picked at random from those that have a move (never your king nor the frozen piece, unless nothing else can move). Its banner names the piece. In check, only a piece that can get you out of it is picked.`,
+- **Blizzard** (ultimate): ${blizzardWords(p)}`,
   clown: (p) => `
 Plays from the game so far.
 
@@ -544,7 +562,7 @@ In a level game (at ×1) it's full after about ${n(level, "crowd move")}; with t
 }
 When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's and Big Boy's ultimates come at the start of their own turn instead (Lights out's only warning is the full meter), and Sawyer's needs more than a full meter (below).
 
-Then the meter empties and fills again for the next one. While an ultimate is still under way (the Roman candle's fireballs still falling or burning, the board flipped or sawn in two, Lights out and the extra move after it) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap.
+Then the meter empties and fills again for the next one. While an ultimate is still under way (the blizzard's ${n(Math.max(2, Math.round(p.blizzardTurns)), "turn")}, the Roman candle's fireballs still falling or burning, the board flipped or sawn in two, Lights out and the extra move after it) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap.
 
 ${blocks}
 ${later.length ? `\n### Still to come {#bosses-later}\n\n${n(later.length, "more boss", "more bosses")} are waiting for their art and powers: ${later.join(", ")}.` : ""}

@@ -18,6 +18,9 @@ const ICE_PALETTE = {
   c: "#2a6fb0", // cracks
   d: "#9fdcff", // meltwater
   p: "#9fdcff80",
+  t: "#c4ecff12", // thin ice (about to thaw), barely there
+  T: "#7fcfff1c",
+  w: "#9fdcff8c", // meltwater running down its face
 } as const;
 
 /** Inside a rounded square from (x0, y0) to (x1, y1) (inclusive), corner radius r. */
@@ -67,6 +70,33 @@ function iceBlock(h: number, cracks = 0): Part {
   return { grid: toGrid(cv) };
 }
 
+/**
+ * Thin ice, about to thaw (the blizzard's pieces due to thaw next turn): the same block, flush with its square, but
+ * nearly clear (the piece shows through it plainly), its inner rim and frost gone, cracked right across, meltwater
+ * running down its face from the cracks.
+ */
+function thinBlock(): Part {
+  const cv = canvas(28, 28);
+  const inside = inRounded(0, 0, 27, 27, 3);
+  for (let y = 0; y < 28; y++)
+    for (let x = 0; x < 28; x++) {
+      if (!inside(x, y)) continue;
+      const edgeTL = !inside(x - 1, y) || !inside(x, y - 1);
+      const edgeBR = !inside(x + 1, y) || !inside(x, y + 1);
+      cv[y]![x] = edgeTL ? "i" : edgeBR ? "J" : x + y < 24 ? "t" : "T";
+    }
+  // One short shine streak (the full block has three).
+  for (let t = 0; t < 6; t++) cv[11 - t]![3 + t] = "F";
+  const lines = canvas(28, 28);
+  for (const crack of CRACKS) crack.forEach((p, n) => n > 0 && line(lines, crack[n - 1]![0], crack[n - 1]![1], p[0], p[1], "c"));
+  lines.forEach((row, y) => row.forEach((k, x) => k === "c" && inside(x, y) && (cv[y]![x] = "c")));
+  // Meltwater runs from the cracks' ends down to the bottom edge.
+  for (const [x, y0] of [[13, 17], [19, 18], [6, 14]] as const) for (let y = y0; y < 27; y++) if (cv[y]![x] !== "c") cv[y]![x] = "w";
+  // And pools along the bottom.
+  for (let x = 4; x < 24; x++) if (cv[26]![x] !== "c" && (x * 5) % 7 !== 0) cv[26]![x] = "w";
+  return { grid: toGrid(cv) };
+}
+
 /** Frost creeping in from the edges (no outline yet): `depth` pixels deep. */
 function frostEdge(depth: number): Part {
   const cv = canvas(28, 28);
@@ -97,6 +127,7 @@ const ICE_PARTS: Record<string, Part> = {
   crack3: iceBlock(28, 3),
   melt20: iceBlock(20, 3),
   melt12: iceBlock(12, 2),
+  thin: thinBlock(),
   frost2: frostEdge(2),
   frost4: frostEdge(4),
   puddle24: puddle(24),
@@ -123,6 +154,18 @@ const drips = (n: number, y0: number): Speck[] =>
 /** Chips of ice flying off as it cracks. */
 const chips = (t: number): Speck[] =>
   [[-1, -1], [1, -1.2], [1.3, 0.3], [-1.2, 0.5]].map(([vx, vy], i): Speck => [Math.round(16 + vx! * (8 + t * 4)), Math.round(16 + vy! * (8 + t * 4) + t * t), i % 2 ? "i" : "F"]);
+
+/**
+ * A drop of meltwater at x, falling off the block's bottom edge: forming on it (0), stretching below it (1), falling
+ * free (2); anything else, none.
+ */
+const drop = (x: number, phase: number): Speck[] =>
+  phase === 0 ? [[x, 29, "d"]] : phase === 1 ? [[x, 29, "w"], [x, 30, "d"]] : phase === 2 ? [[x, 31, "d"]] : [];
+/** Thin ice's edge: its outline and shaded rim paler (the block's edge where it was, so it stays flush with its square). */
+const THIN_EDGE = { k: "#4f90c8", J: "#74b6ea" } as const;
+/** The melting block as thin ice (its fill nearly clear, its inner rim gone, its edge paler). */
+const THIN_PAL = { ...THIN_EDGE, a: "#c4ecff12", A: "#7fcfff1c", I: "#7fd3ff59" } as const;
+const thin = (extra: Partial<Frame> = {}, ms = 100): Frame => ({ ms, layers: [{ part: "thin", x: 2, y: 2 }], ...extra, pal: { ...THIN_EDGE, ...extra.pal } });
 
 const fadeIce = (alpha: string): Record<string, string> => ({
   p: `#9fdcff${alpha}`,
@@ -161,15 +204,47 @@ export const ICE_OVERLAY: Character = {
         ice("block", { specks: glint(0.9) }, 70),
       ],
     },
-    /** The ice thaws: it cracks, chips fly, it melts down to a puddle and dries up. The last frame is empty. */
+    /**
+     * The ice weakens (the blizzard's pieces due to thaw next turn): it cracks, chips fly, and it thins to nearly clear
+     * (into `thinning`).
+     */
+    crack: {
+      loop: false,
+      frames: [
+        ice("crack1", { cue: "crackle", shake: [1, 0] }, 90),
+        ice("crack2", { specks: chips(0), shake: [-1, 0] }, 90),
+        ice("crack3", { specks: chips(1), pal: { a: "#c4ecff30", A: "#7fcfff40", I: "#7fd3ff99", k: "#3a77ad" } }, 100),
+        thin({ specks: [...chips(2), ...drop(15, 0)] }, 120),
+      ],
+    },
+    /**
+     * Thin ice, due to thaw as the next turn begins: the block still flush with its square, nearly clear, cracked right
+     * across, meltwater running down it and dripping off its bottom edge. Loops while it lasts.
+     */
+    thinning: {
+      loop: true,
+      frames: [
+        thin({ specks: drop(15, 0) }, 220),
+        thin({ specks: drop(15, 1) }, 150),
+        thin({ specks: [...drop(15, 2), ...drop(23, 0)] }, 150),
+        thin({ specks: drop(23, 1) }, 220),
+        thin({ specks: [...drop(23, 2), ...drop(8, 0)] }, 150),
+        thin({ specks: drop(8, 1) }, 150),
+        thin({ specks: drop(8, 2) }, 150),
+        thin({}, 260),
+      ],
+    },
+    /**
+     * The ice thaws (from thin ice: the blizzard's pieces as they're freed): it splits, chips fly, it melts down to a
+     * puddle and dries up. The last frame is empty.
+     */
     thaw: {
       loop: false,
       frames: [
-        ice("crack1", { cue: "crackle" }, 90),
-        ice("crack2", { specks: chips(0), shake: [1, 0] }, 90),
-        ice("crack3", { specks: chips(1), shake: [-1, 0] }, 90),
-        { ms: 100, layers: [{ part: "melt20", x: 2, y: 2 }], specks: [...chips(2), ...drips(2, 29)] },
-        { ms: 100, layers: [{ part: "melt12", x: 2, y: 2 }], specks: drips(4, 29) },
+        thin({ cue: "crackle", specks: chips(0), shake: [1, 0] }, 90),
+        thin({ specks: [...chips(1), ...drop(15, 1), ...drop(23, 2)], shake: [-1, 0] }, 90),
+        { ms: 100, layers: [{ part: "melt20", x: 2, y: 2 }], pal: THIN_PAL, specks: [...chips(2), ...drips(2, 29)] },
+        { ms: 100, layers: [{ part: "melt12", x: 2, y: 2 }], pal: THIN_PAL, specks: drips(4, 29) },
         { ms: 110, layers: [{ part: "puddle24", x: 4, y: 26 }], specks: drips(3, 24) },
         { ms: 110, layers: [{ part: "puddle16", x: 8, y: 26 }], pal: fadeIce("80") },
         { ms: 60, layers: [] },

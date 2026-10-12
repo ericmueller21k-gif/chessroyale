@@ -7,6 +7,8 @@ import { bossKit } from "../src/characters/kits.ts";
 import { EFFECT_NAMES, EFFECTS, POWER_MOMENTS, animLength, cueAt } from "../src/characters/power-art.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 import { spriteFrameAt } from "../src/components/BossEffect.tsx";
+import { BLIZZARD, MELT_MS, THAW, thawLine } from "../src/components/Ginger.tsx";
+import { GINGER_FX } from "@chessroyale/chess";
 
 const ginger = bossKit("Ginger")!;
 const clown = bossKit("Boingo the Clown")!;
@@ -20,7 +22,8 @@ describe("Ginger, the Freeze boss", () => {
   });
 
   it("has short lines for every moment, never instructions, rare on his plain moves", () => {
-    for (const m of MOMENTS) {
+    // (ultimateHit: as the blizzard's ice thaws, Oct 12; he has no animation of his own for it.)
+    for (const m of [...MOMENTS, "ultimateHit" as Beat]) {
       expect(ginger.lines[m]?.length, m).toBeGreaterThan(1);
       for (const l of ginger.lines[m]!) {
         expect(l.length, l).toBeLessThanOrEqual(28);
@@ -149,6 +152,51 @@ describe("the effect sprites", () => {
     expect(alpha(16, 1)).toBe(255);
     // Over the board, the see-through ice is blended in.
     expect(renderFrame(ice, ice.anims.frozen!.frames[0]!, { bg: "#f0d9b5" }).data[(20 * SQUARE + 16) * 4 + 3]).toBe(255);
+  });
+});
+
+describe("the blizzard's thaw (Eric, Oct 12: the ice thawing as pieces get closer to free)", () => {
+  const ice = EFFECTS.iceOverlay.ch;
+  const at = (frame: Parameters<typeof renderFrame>[1]) => {
+    const img = renderFrame(ice, frame);
+    return (x: number, y: number) => img.data[(y * SQUARE + x) * 4 + 3]!;
+  };
+
+  it("thin ice (due to thaw next turn) stays flush with its square, but the piece shows through it more plainly; it drips", () => {
+    const frozen = at(ice.anims.frozen!.frames[0]!);
+    const thinning = ice.anims.thinning!;
+    expect(thinning.loop).toBe(true);
+    for (const f of thinning.frames) {
+      const thin = at(f);
+      // The same block: its rim on the same pixels as the frozen ice's, round every edge.
+      for (const [x, y] of [[16, 1], [16, 30], [1, 16], [30, 16]] as const) expect(thin(x, y), `${x},${y}`).toBe(frozen(x, y));
+      // Clearer in the middle.
+      expect(thin(16, 20)).toBeLessThan(frozen(16, 20));
+      expect(thin(16, 20)).toBeGreaterThan(0);
+    }
+    // Drops of meltwater fall off its bottom edge (below the block, where frozen ice has nothing).
+    expect(frozen(15, 31)).toBe(0);
+    expect(thinning.frames.some((f) => at(f)(15, 31) > 0)).toBe(true);
+    // It cracks into it (with a crackle) and melts away from it to nothing: the stages and the end the board layer plays.
+    expect(EFFECTS.iceOverlay.stages).toEqual([{ loop: "frozen" }, { loop: "thinning", into: "crack" }]);
+    expect(ice.anims.crack!.frames[0]!.cue).toBe("crackle");
+    expect(renderFrame(ice, ice.anims.crack!.frames.at(-1)!).data).toEqual(renderFrame(ice, { ...thinning.frames[0]!, specks: ice.anims.crack!.frames.at(-1)!.specks }).data);
+    expect(ice.anims.thaw!.frames[0]!.cue).toBe("crackle");
+    // Each within its moment: the thaw's melt and its cracks, the blizzard's cracks.
+    expect(THAW.crackAt + animLength(ice.anims.crack!)).toBeLessThanOrEqual(GINGER_FX.thaw);
+    expect(THAW.meltAt + MELT_MS).toBeLessThanOrEqual(GINGER_FX.thaw);
+    expect(BLIZZARD.crackAt + animLength(ice.anims.crack!)).toBeLessThanOrEqual(GINGER_FX.blizzard);
+    // The blizzard's last piece has iced over before the cracks show.
+    expect(BLIZZARD.crackAt).toBeGreaterThanOrEqual(BLIZZARD.sweepAt + BLIZZARD.sweepMs + animLength(ice.anims.freeze!) - 100);
+  });
+
+  it("names the pieces a thaw frees in its banner, most valuable first; more than three kinds, how many", () => {
+    const fen = "4k3/8/8/8/8/2N5/PPP5/1K1Q3R w - - 0 1";
+    expect(thawLine(fen, ["c3", "a2", "b2"])).toBe("Your knight and two pawns are free");
+    expect(thawLine(fen, ["a2"])).toBe("Your pawn is free");
+    expect(thawLine(fen, ["h1", "c3", "c2"])).toBe("Your rook, knight and pawn are free");
+    expect(thawLine(fen, ["d1", "h1", "c3", "c2"])).toBe("Four more of your pieces are free");
+    expect(thawLine(fen, [])).toBeUndefined();
   });
 });
 

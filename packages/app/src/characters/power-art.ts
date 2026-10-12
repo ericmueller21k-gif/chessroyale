@@ -19,7 +19,9 @@
  *     ultimateWarn "check"      His frosty cane thrusts, for the warning.
  *     ultimate     "blizzard"   Cane raised high, a whirl of snow round him that bursts outwards at `release`:
  *                               play `blizzardSweep` across the board from then, and ice every piece (iceOverlay)
- *                               as the sweep passes; the queen stays clear.
+ *                               as the sweep passes but the one left free. The pieces due to thaw next turn crack
+ *                               (iceOverlay crack, then thinning (loop) while they wait); as each later turn begins,
+ *                               those thaw (iceOverlay thaw), and the ones due next crack.
  *   "Jefferson"
  *     power        "ignite"     He winds up the outer sparkler and throws it at the board; at `throw` it leaves his
  *                               hand: fly `sparkFly` to the square, then play `fireTile` ignite (it lands as stage
@@ -118,7 +120,8 @@
  * EFFECTS, each a sprite whose frame is exactly the area it covers (one square, or the whole board), with its
  * animations in the order they play:
  *
- *   iceOverlay     square  freeze, frozen (loop), thaw (ends empty). See-through: the piece shows under it.
+ *   iceOverlay     square  freeze, frozen (loop), crack into thinning (loop: thin, dripping ice about to thaw),
+ *                           thaw (ends empty). See-through: the piece shows under it.
  *   iceBolt        square  fly (loop). Points right: rotate it towards its target as it flies.
  *   blizzardSweep  board   sweep (one-shot, about 1.3 s, ends empty). Cloud and snow cross left to right.
  *   pieSplat       square  splat, pied (loop), fade (ends empty). On an empty square.
@@ -294,7 +297,7 @@ export interface Effect {
 }
 
 export const EFFECTS: Record<EffectName, Effect> = {
-  iceOverlay: { ch: EFFECT_SPRITES.iceOverlay, covers: "square", start: "freeze", loop: "frozen", end: "thaw", sounds: { crackle: "gingerCrackle" } },
+  iceOverlay: { ch: EFFECT_SPRITES.iceOverlay, covers: "square", start: "freeze", loop: "frozen", stages: [{ loop: "frozen" }, { loop: "thinning", into: "crack" }], end: "thaw", sounds: { crackle: "gingerCrackle" } },
   iceBolt: { ch: EFFECT_SPRITES.iceBolt, covers: "square", loop: "fly", sounds: {} },
   blizzardSweep: { ch: EFFECT_SPRITES.blizzardSweep, covers: "board", start: "sweep", sounds: { wind: "gingerWind" } },
   pieSplat: { ch: EFFECT_SPRITES.pieSplat, covers: "square", start: "splat", loop: "pied", end: "fade", sounds: { splat: "clownSplat" } },

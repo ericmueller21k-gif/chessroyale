@@ -10591,7 +10591,8 @@ img.qicon {
   position: absolute;
   inset: 0;
 }
-/* The boss steps up to the board's top-left corner (its side) to cast; its usual spot is empty for the moment. */
+/* The boss steps up to the board's top-left corner (its side) to cast; its usual spot is empty for the moment (not in a
+   moment he doesn't cast in, `pm-stay`: Ginger's thaw). */
 .pm-caster {
   position: absolute;
   z-index: 8;
@@ -10602,7 +10603,7 @@ img.qicon {
   pointer-events: none;
   filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3));
 }
-.screen:has(.power-moment) .boss-char-sprite {
+.screen:has(.power-moment:not(.pm-stay)) .boss-char-sprite {
   visibility: hidden;
 }
 /* Boingo's funhouse: he drops onto the middle of the board (his animation), and bounces off at the end. */
@@ -10744,6 +10745,12 @@ img.qicon {
 }
 .fight-banner.power-cut .fb-sub {
   font-size: 3.4cqw;
+}
+/* Ginger's thaw names the pieces it frees: a line that can run longer than its title, so it wraps under it rather than
+   widening the words and pushing the faces off the board. */
+.fight-banner.power-cut.thaw .fb-sub {
+  max-width: 50cqw;
+  text-align: center;
 }
 /* The rage meter in the boss bar: fills as the boss loses material; flashes for the warning. */
 .rage-meter {

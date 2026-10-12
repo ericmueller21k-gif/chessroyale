@@ -757,7 +757,8 @@ export const GINGER_PORTRAIT = { x: OX + 8, y: OY, w: 40, h: 30 } as const;
 
 /**
  * His lines: short, cold and cross, never instructions, rare (each moment's chance of a line is in GINGER_CHANCE).
- * `power` is a piece frozen, `ultimateWarn` the blizzard coming, `ultimate` the blizzard itself.
+ * `power` is a piece frozen, `ultimateWarn` the blizzard coming, `ultimate` the blizzard itself, `ultimateHit` its ice
+ * thawing on the turns after (Oct 12).
  */
 export const GINGER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
   entrance: ["Ginger is here!", "You'll crumble!", "Fresh out of the freezer!"],
@@ -774,6 +775,7 @@ export const GINGER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readon
   power: ["Freeze!", "Chill out!", "Stay frosty!", "On ice you go!", "Cold feet?"],
   ultimateWarn: ["A storm is brewing…", "Feel that chill?", "Wrap up warm…", "The frost is coming…"],
   ultimate: ["BLIZZARD!", "Let it snow!", "Freeze, all of you!", "Snow day! Ha!"],
+  ultimateHit: ["Melting? Already?!", "Hmph. Don't get comfy.", "My lovely ice!", "Drip, drip… bah!"],
 };
 export const GINGER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
   entrance: 1,
@@ -790,4 +792,5 @@ export const GINGER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, numbe
   power: 0.5,
   ultimateWarn: 1,
   ultimate: 1,
+  ultimateHit: 1,
 };
