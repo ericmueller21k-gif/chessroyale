@@ -1450,7 +1450,8 @@ Eric, Oct 12: the forced move is the joke; restored. The calls:
 - **When:** once a funhouse, as it comes (the crowd's turn T, when the board turns upside down): he plays the crowd's
   move for it, then his own; the crowd plays its own from T+1. Each repeat ultimate (a new funhouse once the board is
   back) plays one again, once. It's the crowd's move on the board, but nobody picked it, so nobody is scored for it (the
-  "Not scored." line is back under his "plays your move: …").
+  "Not scored." line is back, under "Plays your move: Nf3" beside his icon: the old "Boingo the Clown plays your
+  move: Nf3" was cut off before the move in a phone's dock).
 - **Which move:** restored as it was before Oct 11 (`funhouseMoveFrom`): weak but recoverable, 1 to 2.5 pawns worse
   than the best (`funhouseLoss` [10, 25]), never past `funhouseMaxLogit` 1.6 in log-odds, never a move that allows a
   forced mate or leaves the queen hanging, from the allowed moves (a pie still blocks it).

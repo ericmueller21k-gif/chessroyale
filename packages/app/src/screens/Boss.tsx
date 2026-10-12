@@ -346,8 +346,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               ) : intro ? (
                 <strong>{boss.raid ? "All of you vs the boss." : "Ten of you vs the boss."}</strong>
               ) : funMove?.move ? (
+                // (Short enough for a phone's dock with the move in it: his icon says who.)
                 <>
-                  {boss.icon} {boss.name.replace(/^The /, "")} plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
+                  {boss.icon} Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
                 </>
               ) : moment ? (
                 <>

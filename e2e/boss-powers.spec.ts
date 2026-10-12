@@ -250,7 +250,7 @@ test("Boingo: pies nobody can move onto (up to two, on their squares), the warni
   await expect(page.getByText("Not scored.")).toBeVisible();
   const fun = await page.evaluate(() => (window as any).match.runner.state.boss.powers.funhouse);
   expect(fun.move).toMatch(/^[a-h][1-8][a-h][1-8]/);
-  await expect(page.locator(".dock-line", { hasText: "plays your move" })).toContainText(`plays your move: ${fun.san}`, { timeout: 6_000 });
+  await expect(page.locator(".dock-line", { hasText: "Plays your move" })).toContainText(`Plays your move: ${fun.san}`, { timeout: 6_000 });
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
   // Your move, his, the one he played for you and his reply; only yours was scored.
   expect(await page.evaluate(() => (window as any).match.runner.boards.get(0).history.length)).toBe(plies + 4);
@@ -320,7 +320,7 @@ test("Boingo online: the funhouse turns the board for everyone and the host play
   await expect(banner(page, "FUNHOUSE!")).toBeVisible({ timeout: 60_000 });
   await expect(page.locator(".pm-pogo")).toBeVisible({ timeout: 5_000 });
   await expect(page.getByText("Not scored.")).toBeVisible();
-  await expect(page.locator(".dock-line", { hasText: "plays your move" })).toContainText(/plays your move: \S+/, { timeout: 6_000 });
+  await expect(page.locator(".dock-line", { hasText: "Plays your move" })).toContainText(/Plays your move: \S+/, { timeout: 6_000 });
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   const p = await powers(page);
   expect(p.funhouse?.turn).toBe(3);
