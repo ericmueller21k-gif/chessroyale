@@ -5,7 +5,7 @@ import "./board/pieces.css";
 import { App } from "./App.tsx";
 import { BanNotice } from "./components/FairPlay.tsx";
 import { setUpInstall } from "./install.ts";
-import { audioRunning, unlockAudio } from "./sound.ts";
+import { audioUnlocked, prepareAudio, unlockAudio } from "./sound.ts";
 import { watchTheme } from "./theme.ts";
 import "./styles.css";
 
@@ -14,8 +14,11 @@ setUpInstall();
 // while nothing is picked.
 watchTheme();
 // Browsers allow sound only after a tap. iPhones don't count every event as one (a pointerdown alone isn't
-// enough), so every tap tries until sound is on (cheap once it is).
-for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, () => audioRunning() || unlockAudio(), { passive: true });
+// enough), so every tap tries until sound is on (cheap once it is). The audio graph is made beforehand, while the page
+// is idle, so the first tap (often a game's first move) only switches it on and starts the samples loading after its
+// own frame.
+prepareAudio();
+for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, () => audioUnlocked() || unlockAudio(), { passive: true });
 // /boardlab: a throwaway page for trying boards (src/boardlab/, loaded only here). Not linked anywhere.
 if (/^\/boardlab\/?$/.test(location.pathname)) {
   void import("./boardlab/BoardLab.tsx").then(({ BoardLab }) => render(<BoardLab />, document.getElementById("app")!));

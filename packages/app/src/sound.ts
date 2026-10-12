@@ -1,6 +1,6 @@
 /**
  * Game sounds: pieces use recorded knocks: the move and capture sounds the player picked in Settings (piece-sounds.ts;
- * the default is today's wooden knocks from PyChess, GPL-3, as is castling); every timer uses one clean clock tick; the reveal's
+ * all wood, CC0 or ours; castling is two knocks); every timer uses one clean clock tick; the reveal's
  * "selecting move" reel has a roulette-style arpeggio and three tones for the
  * winner (all synthesised with Web Audio, placeholders until real samples). Browsers
  * only allow audio after a tap, so call unlockAudio() from one. The mute
@@ -14,7 +14,7 @@ import { grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds
 import { hollowSound, type HollowSound } from "./characters/hollow-sounds.ts";
 import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
 import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
-import { defaultPieceSound, onPieceSoundChange, pieceSound, pieceSoundOption, type PieceSoundKind } from "./piece-sounds.ts";
+import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSoundChange, pieceSound, pieceSoundOption, type PieceSoundKind } from "./piece-sounds.ts";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -45,9 +45,10 @@ let muted = (() => {
 const listeners = new Set<() => void>();
 
 const SAMPLE_FILES = {
-  move: "/sounds/move.mp3",
-  capture: "/sounds/capture.mp3",
-  castle: "/sounds/castle.mp3",
+  // The default move and capture sounds (the judge's gavel is made from them) and castling's two knocks.
+  move: MOVE_SOUNDS[0].file,
+  capture: CAPTURE_SOUNDS[0].file,
+  castle: CASTLE_SOUND,
   // The God King (boss battle): CC0 retro cuts, see public/sounds/god-king/CREDITS.md.
   gkSummon: "/sounds/god-king/summon.mp3",
   gkAppear: "/sounds/god-king/appear.mp3",
@@ -81,34 +82,72 @@ const SAMPLE_FILES = {
 const GREX_WHISTLE_FILE: string | null = null;
 const GREX_WHISTLE_FILE_LEVEL = 0.15;
 
-/** Call from a tap so browsers allow sound later. Also loads the recorded samples. */
-export function unlockAudio() {
-  try {
-    if (!ctx) {
-      ctx = new AudioContext();
-      master = ctx.createGain();
-      master.gain.value = 0.9;
-      // A gentle low-pass keeps every sound soft on phone speakers.
-      const soften = ctx.createBiquadFilter();
-      soften.type = "lowpass";
-      soften.frequency.value = 6000;
-      master.connect(soften).connect(ctx.destination);
-      for (const [name, url] of Object.entries({ ...SAMPLE_FILES, ...(GREX_WHISTLE_FILE ? { grexWhistleFile: GREX_WHISTLE_FILE } : {}) })) {
-        void loadFile(url).then((buf) => buf && samples.set(name, buf));
-      }
-      // Only the picked move and capture sounds (the others load when previewed), and a new pick as it's made.
+/** The audio graph, made once (prepareAudio, while the page is idle; failing that, on the first tap). */
+function ensureContext() {
+  if (ctx) return;
+  ctx = new AudioContext();
+  master = ctx.createGain();
+  master.gain.value = 0.9;
+  // A gentle low-pass keeps every sound soft on phone speakers.
+  const soften = ctx.createBiquadFilter();
+  soften.type = "lowpass";
+  soften.frequency.value = 6000;
+  master.connect(soften).connect(ctx.destination);
+}
+
+let loading = false;
+/** Fetches and decodes the recorded samples: once, after the first tap's frame (none of it holds up that tap). */
+function loadSamples() {
+  if (loading) return;
+  loading = true;
+  const go = () => {
+    for (const [name, url] of Object.entries({ ...SAMPLE_FILES, ...(GREX_WHISTLE_FILE ? { grexWhistleFile: GREX_WHISTLE_FILE } : {}) })) {
+      void loadFile(url).then((buf) => buf && samples.set(name, buf));
+    }
+    // Only the picked move and capture sounds (the others load when previewed), and a new pick as it's made.
+    void loadFile(pieceSound("move").file);
+    void loadFile(pieceSound("capture").file);
+    onPieceSoundChange(() => {
       void loadFile(pieceSound("move").file);
       void loadFile(pieceSound("capture").file);
-      onPieceSoundChange(() => {
-        void loadFile(pieceSound("move").file);
-        void loadFile(pieceSound("capture").file);
-      });
+    });
+  };
+  // (After the next paint: the tap's own work, a piece picked up or a button pressed, shows first.)
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => setTimeout(go, 0));
+  else setTimeout(go, 0);
+}
+
+/**
+ * Makes the audio graph while the page is idle, before any tap, so the first tap of a visit only has to switch sound
+ * on: making it cost 45-210 ms (a slowed phone) inside the first tap, the first move's own frame waited for it. The
+ * graph starts suspended; nothing is fetched or played until a tap (unlockAudio).
+ */
+export function prepareAudio() {
+  const make = () => {
+    try {
+      ensureContext();
+    } catch {
+      // No audio on this device: the game works silently.
     }
-    void ctx.resume();
+  };
+  const idle = (globalThis as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  if (idle) idle(make, { timeout: 2000 });
+  else setTimeout(make, 1000);
+}
+
+/** Call from a tap so browsers allow sound later. Also loads the recorded samples (after the tap's frame). */
+export function unlockAudio() {
+  try {
+    ensureContext();
+    void ctx!.resume();
+    loadSamples();
   } catch {
     // No audio on this device: the game works silently.
   }
 }
+
+/** Sound is on and its samples are loading or loaded: a tap has nothing more to do. */
+export const audioUnlocked = () => loading && ctx?.state === "running";
 
 export const isMuted = () => muted;
 /** Sound is on (the audio context is running). */
@@ -139,7 +178,7 @@ function pieceSample(kind: PieceSoundKind, at: number, level = 1, rate = 1) {
   const buf = decoded.get(pieceSound(kind).file) ?? decoded.get(defaultPieceSound(kind).file);
   if (buf) startBuffer(buf, at, level, rate);
 }
-/** Castling: today's king-and-rook knock with the default move sound; with another, the picked move sound twice. */
+/** Castling: the default's two knocks (king, then rook) with the default move sound; with another, the pick twice. */
 function castleSample(at: number) {
   if (pieceSound("move").id === defaultPieceSound("move").id || !decoded.has(pieceSound("move").file)) return sample("castle", at);
   pieceSample("move", at);
@@ -539,11 +578,12 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   menuClose: (t) => sample("menuClose", t, 0.7),
   menuSelect: (t) => sample("menuSelect", t, 0.8),
   gkLeave: (t) => sample("gkLeave", t, 0.6),
-  // The judge's gavel at a cut: two heavy wooden knocks (today's wooden piece sounds, pitched down, whatever the pick).
+  // The judge's gavel at a cut: two heavy wooden knocks (the default capture and move sounds, a little lower, whatever
+  // the pick). (Already low wood: pitched down only a little, where the old bright knocks went down to half.)
   gavel: (t) => {
     for (const [dt, level] of [[0, 1], [0.26, 0.85]] as const) {
-      sample("capture", t + dt, level, 0.55);
-      sample("move", t + dt, level * 0.8, 0.45);
+      sample("capture", t + dt, level, 0.9);
+      sample("move", t + dt, level * 0.8, 0.8);
     }
   },
   // The queue: a pawn pops into its seat (a short soft "pop"), and a bot's, quieter.

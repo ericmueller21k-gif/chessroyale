@@ -659,9 +659,10 @@ function credits(src: FaqSources): FaqSection {
     id: "credits",
     title: "Credits and licences",
     body: `
-- **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish)). It runs as a separate program in your browser.
+- **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish), [this build's source](https://github.com/nmrugg/stockfish.js): stockfish.js 19, [licence](/engine/COPYING.txt)). It runs as a separate program in your browser.
 - **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [some bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; the source of our Maia box is available on request ([notice](/engine/maia/NOTICE.txt), [licence](/engine/maia/LICENSE.txt)).
 - **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD licence ([licence](/licenses/pieces.txt)).
+- **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font Licence) ([licences](/licenses/third-party.txt)). Its sounds are free of rights (CC0) or the game's own.
 - The same credits are at the foot of Settings.
 `,
   };

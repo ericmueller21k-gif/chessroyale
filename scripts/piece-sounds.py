@@ -1,20 +1,17 @@
 """
-The piece-sound picks in Settings (Move sound, Capture sound): makes every file in packages/app/public/sounds/pieces/.
-Today's wooden knocks (sounds/move.mp3, sounds/capture.mp3) stay the defaults and aren't touched.
+The piece sounds (Settings: Move sound, Capture sound; castling): makes every file in packages/app/public/sounds/pieces/.
+Every option is wood (Eric, Oct 12: "slightly different wooden sounds, not chips or clicks"), from Kenney's CC0
+*Impact Sounds* or made here (ours, no licence needed). The defaults: "Light wood" (move) and "Heavy wood" (capture);
+castling is two Light wood knocks, king then rook.
 
-- Ours (synthesised here, no licence needed): move "Click" and "Soft", capture "Clack" and "Thud". Struck wood is a
-  few decaying partials plus a very short burst of filtered noise for the contact.
-- Kenney's (CC0): move "Light wood" and "Poker chip", capture "Heavy wood" and "Chips", cut from two packs.
+Every file is trimmed to start on its hit (so it lands with the piece), faded out, and levelled to the loudness the
+game's knocks have always had: the loudest 30 ms, heard through a phone speaker (high-passed at 200 Hz) and the game's
+own 6 kHz low-pass (TARGET, below: measured from the old PyChess knocks before they were removed, Oct 12, 2026).
+Sources and licences: sounds/SOURCES.md.
 
-Every file is trimmed to start on its hit (so it lands with the piece), faded out, and levelled to the default it
-sits beside: the loudest 30 ms, heard through a phone speaker (high-passed at 200 Hz) and the game's own 6 kHz
-low-pass, matches today's move (for moves) or capture (for captures). Sources and licences: sounds/SOURCES.md.
-
-    # unzip both CC0 packs into one folder first:
-    #   https://kenney.nl/assets/impact-sounds  -> <dir>/kenney-impact/
-    #   https://kenney.nl/assets/casino-audio   -> <dir>/kenney-casino/
+    # unzip Kenney's CC0 pack first:  https://kenney.nl/assets/impact-sounds  -> <dir>/kenney-impact/
     python3 scripts/piece-sounds.py <dir> [name ...]   # needs numpy and ffmpeg; names default to all
-    python3 scripts/piece-sounds.py --ours [name ...]  # only the synthesised ones (no packs needed)
+    python3 scripts/piece-sounds.py --ours [name ...]  # only the ones made here (no pack needed)
 """
 import glob, math, os, subprocess, sys
 import numpy as np
@@ -124,27 +121,9 @@ def finish(x, length, fade=0.03):
 
 # --- Ours -------------------------------------------------------------------------------------------------------
 
-def click():
-    """A crisp, bright knock: a hard wooden piece set down smartly."""
-    return strike([(1320, 1.0, 0.016), (2950, 0.45, 0.007), (4420, 0.18, 0.004), (560, 0.35, 0.022)], 0.12, noise=(0.5, 0.0005, "bandpass", 3200))
-
-
-def soft():
-    """A felt-bottomed piece: low, round and short, with only a whisper of contact."""
-    return strike([(310, 1.0, 0.034), (720, 0.5, 0.014), (1560, 0.15, 0.006)], 0.16, noise=(0.25, 0.002, "lowpass", 1400), attack=0.0015, seed=2)
-
-
-def clack():
-    """Piece knocks piece (bright, hard), then sets down with the Click."""
-    hit = strike([(2050, 1.0, 0.009), (3180, 0.6, 0.006), (4700, 0.3, 0.003), (980, 0.35, 0.012)], 0.06, noise=(0.8, 0.0004, "bandpass", 3800), seed=3)
-    return place([(0, hit, 1.0), (0.06, click(), 0.8)], 0.2)
-
-
-def thud():
-    """A small knock, then a heavy, low wooden landing."""
-    knock = strike([(900, 1.0, 0.008), (2100, 0.4, 0.004)], 0.05, noise=(0.3, 0.0005, "bandpass", 2500), seed=4)
-    land = strike([(190, 1.0, 0.06), (470, 0.7, 0.03), (1080, 0.3, 0.012), (2400, 0.08, 0.005)], 0.22, noise=(0.35, 0.003, "lowpass", 1800), attack=0.001, seed=5)
-    return place([(0, knock, 0.5), (0.035, land, 1.0)], 0.25)
+def wood_tap():
+    """A short, bright wooden knock (as the game's first knock was: about 13 ms to fall 20 dB, centred near 1.2 kHz)."""
+    return strike([(1180, 1.0, 0.0075), (2650, 0.42, 0.0042), (610, 0.55, 0.011), (4100, 0.12, 0.0025)], 0.09, noise=(0.45, 0.0005, "bandpass", 2600), seed=6)
 
 
 # --- Kenney's (CC0) ---------------------------------------------------------------------------------------------
@@ -153,30 +132,61 @@ def light_wood():
     return trim(pack("impactWood_light_000.ogg"))
 
 
+def ringing_wood():
+    return trim(pack("impactWood_light_004.ogg"))
+
+
+def deep_wood():
+    return trim(pack("impactWood_light_003.ogg"))
+
+
+def bright_wood():
+    # A smaller piece: pitched up three semitones.
+    return trim(pitch(pack("impactWood_light_002.ogg"), 3))
+
+
 def heavy_wood():
     return trim(pack("impactWood_medium_002.ogg"))
 
 
-def poker_chip():
-    # The file starts with 85 ms of a hand sliding the chip: the hit is where it lands.
-    return trim(pack("chip-lay-3.ogg"), -12)
+def double_knock():
+    # Piece on piece, then the board: a light knock, then a heavy one 45 ms later (as the old capture did).
+    return place([(0, light_wood(), 0.7), (0.045, trim(pack("impactWood_medium_000.ogg")), 1.0)], 0.32)
 
 
-def chips():
-    # Pitched down a fifth (bigger, heavier chips): as recorded, most of it is above the game's 6 kHz low-pass.
-    return trim(pitch(pack("chips-collide-2.ogg"), -7))
+def big_wood():
+    return trim(pack("impactWood_heavy_003.ogg"))
+
+
+def short_wood():
+    return trim(pack("impactWood_medium_003.ogg"))
+
+
+def wood_block():
+    # A hollow block: pitched up two semitones.
+    return trim(pitch(pack("impactWood_medium_004.ogg"), 2))
+
+
+def castle_wood():
+    # King, then rook: two Light wood knocks 110 ms apart, the second a little softer (as castling with any other
+    # pick sounds: sound.ts plays it twice).
+    k = light_wood()
+    return place([(0, k, 1.0), (0.11, k, 0.8)], 0.30)
 
 
 # name: (make, kind it's levelled against, length seconds, fade seconds, ours)
 FILES = {
-    "move-click": (click, "move", 0.10, 0.04, True),
-    "move-soft": (soft, "move", 0.14, 0.05, True),
     "move-light-wood": (light_wood, "move", 0.14, 0.05, False),
-    "move-poker-chip": (poker_chip, "move", 0.16, 0.06, False),
-    "capture-clack": (clack, "capture", 0.18, 0.05, True),
-    "capture-thud": (thud, "capture", 0.24, 0.08, True),
+    "move-wood-tap": (wood_tap, "move", 0.09, 0.04, True),
+    "move-ringing-wood": (ringing_wood, "move", 0.22, 0.10, False),
+    "move-deep-wood": (deep_wood, "move", 0.18, 0.08, False),
+    "move-bright-wood": (bright_wood, "move", 0.14, 0.05, False),
     "capture-heavy-wood": (heavy_wood, "capture", 0.26, 0.10, False),
-    "capture-chips": (chips, "capture", 0.20, 0.08, False),
+    "capture-double-knock": (double_knock, "capture", 0.30, 0.10, False),
+    "capture-big-wood": (big_wood, "capture", 0.28, 0.12, False),
+    "capture-short-wood": (short_wood, "capture", 0.20, 0.08, False),
+    "capture-wood-block": (wood_block, "capture", 0.24, 0.10, False),
+    "castle-wood": (castle_wood, "move", 0.30, 0.10, False),
 }
 
 
@@ -188,9 +198,13 @@ def encode(x, path):
     )
 
 
+# The game's knocks' loudness (dB, as `loudness` measures it): the old move and capture sounds', measured Oct 12, 2026.
+TARGET = {"move": -19.95, "capture": -20.57}
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
-    target = {k: loudness(load(os.path.join(SOUNDS, f"{k}.mp3"))) for k in ("move", "capture")}
+    target = TARGET
     print(f"targets: move {target['move']:.1f} dB, capture {target['capture']:.1f} dB")
     for name, (make, kind, length, fade, ours) in FILES.items():
         if ONLY and name not in ONLY:

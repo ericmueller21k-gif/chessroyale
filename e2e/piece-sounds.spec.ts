@@ -3,13 +3,14 @@ import { test } from "./helpers.ts";
 import { CAPTURE_SOUNDS, MOVE_SOUNDS } from "../packages/app/src/piece-sounds.ts";
 
 /**
- * Settings → Sound: the Move sound and Capture sound pickers (Eric, Oct 11). Today's sounds by default; ▶ plays one
+ * Settings → Sound: the Move sound and Capture sound pickers (Eric, Oct 11; all wood, Oct 12). Light wood and Heavy
+ * wood by default; ▶ plays one
  * without picking it (loading only that file); a pick is kept on the device; the first tap (as a game starts) loads only
  * the picked sounds; and every option's file decodes in the browser, starts on its hit and is as loud as the default.
  */
 test.use({ serviceWorkers: "block" }); // (the service worker would precache every file, hiding what the app loads)
 
-const pieceFiles = (urls: string[]) => [...new Set(urls.filter((u) => /\/sounds\/(pieces\/|move\.mp3|capture\.mp3)/.test(u)).map((u) => new URL(u).pathname))].sort();
+const pieceFiles = (urls: string[]) => [...new Set(urls.filter((u) => /\/sounds\/pieces\//.test(u)).map((u) => new URL(u).pathname))].sort();
 
 test("piece sounds: pick a move and a capture sound, hear one, and they're kept after a reload", async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
@@ -20,47 +21,57 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   const capture = page.getByRole("radiogroup", { name: "Capture sound" });
   await expect(move.getByRole("radio")).toHaveCount(5);
   await expect(capture.getByRole("radio")).toHaveCount(5);
-  // Today's sounds until you pick, and nothing loaded before a tap.
-  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Wooden knock/);
-  await expect(capture.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Double knock/);
+  // The defaults until you pick, and nothing loaded before a tap.
+  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Light wood/);
+  await expect(capture.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Heavy wood/);
   expect(pieceFiles(requested)).toEqual([]);
+  // Every option is wood (Eric, Oct 12).
+  for (const name of await move.getByRole("radio").allTextContents()) expect(name).toMatch(/wood/i);
+  for (const name of await capture.getByRole("radio").allTextContents()) expect(name).toMatch(/wood|knock/i);
 
   // ▶ plays one without picking it: its file loads then.
-  const chip = page.waitForResponse((r) => r.url().endsWith("/sounds/pieces/move-poker-chip.mp3") && r.ok());
-  await page.getByRole("button", { name: "Play Poker chip" }).click();
-  await chip;
-  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Wooden knock/);
+  const ringing = page.waitForResponse((r) => r.url().endsWith("/sounds/pieces/move-ringing-wood.mp3") && r.ok());
+  await page.getByRole("button", { name: "Play Ringing wood" }).click();
+  await ringing;
+  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Light wood/);
 
   // Pick one of each (picking plays it too).
-  await move.getByRole("radio", { name: /^Click/ }).click();
-  await capture.getByRole("radio", { name: /^Heavy wood/ }).click();
-  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Click/);
-  await expect(capture.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Heavy wood/);
-  expect(await page.evaluate(() => (window as any).__soundLog)).toEqual(["preview:move:poker-chip", "preview:move:click", "preview:capture:heavy-wood"]);
+  await move.getByRole("radio", { name: /^Wooden tap/ }).click();
+  await capture.getByRole("radio", { name: /^Double knock/ }).click();
+  await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Wooden tap/);
+  await expect(capture.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Double knock/);
+  expect(await page.evaluate(() => (window as any).__soundLog)).toEqual(["preview:move:ringing-wood", "preview:move:wood-tap", "preview:capture:double-knock"]);
 
   // Kept on the device: the same after a reload.
   await page.reload();
-  await expect(page.getByRole("radiogroup", { name: "Move sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Click/);
-  await expect(page.getByRole("radiogroup", { name: "Capture sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Heavy wood/);
-  expect(await page.evaluate(() => [localStorage.getItem("brc.moveSound"), localStorage.getItem("brc.captureSound")])).toEqual(["click", "heavy-wood"]);
+  await expect(page.getByRole("radiogroup", { name: "Move sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Wooden tap/);
+  await expect(page.getByRole("radiogroup", { name: "Capture sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Double knock/);
+  expect(await page.evaluate(() => [localStorage.getItem("brc.moveSound"), localStorage.getItem("brc.captureSound")])).toEqual(["wood-tap", "double-knock"]);
 
-  // The first tap loads the picked sounds and today's two (the judge's gavel is built from them), not the other options.
+  // The first tap loads the picked sounds, the defaults (the judge's gavel is built from them) and castling's two
+  // knocks, not the other options.
   requested.length = 0;
-  await page.getByRole("button", { name: "Play Thud" }).click();
-  await expect.poll(() => pieceFiles(requested), { timeout: 10_000 }).toEqual(["/capture.mp3", "/move.mp3", "/pieces/capture-heavy-wood.mp3", "/pieces/capture-thud.mp3", "/pieces/move-click.mp3"].map((p) => `/sounds${p}`));
+  await page.getByRole("button", { name: "Play Big wood" }).click();
+  await expect
+    .poll(() => pieceFiles(requested), { timeout: 10_000 })
+    .toEqual(["capture-big-wood", "capture-double-knock", "capture-heavy-wood", "castle-wood", "move-light-wood", "move-wood-tap"].map((p) => `/sounds/pieces/${p}.mp3`));
 
-  // A move in a game plays the pick: "move", rendered as the game plays it, is today's knock with the Wooden knock picked,
-  // and the Click once it's picked (and loaded: until then today's knock stands in).
+  // A move in a game plays the pick: "move", rendered as the game plays it, is the Light wood with that picked, and the
+  // Wooden tap once it's picked (and loaded: until then the default stands in).
   const level = (n: string) => page.evaluate((n) => (window as any).__measureSound(n), n) as Promise<{ peak: number; rms: number }>;
   const moves = page.getByRole("radiogroup", { name: "Move sound" });
-  await moves.getByRole("radio", { name: /^Wooden knock/ }).click();
+  await moves.getByRole("radio", { name: /^Light wood/ }).click();
   await expect.poll(async () => (await level("move")).peak, { timeout: 10_000 }).toBeGreaterThan(0.05);
   const wood = await level("move");
-  await moves.getByRole("radio", { name: /^Click/ }).click();
-  await expect.poll(async () => Math.abs((await level("move")).peak - wood.peak), { timeout: 10_000 }).toBeGreaterThan(0.05);
-  // Castling follows the pick too: two Clicks (its loudest knock is the Click's), not today's king-and-rook.
-  const click = await level("move");
-  expect(Math.abs((await level("castle")).peak - click.peak)).toBeLessThan(0.01);
+  // Castling with the default: its own file, the Light wood twice (its loudest knock is the Light wood's).
+  expect(Math.abs((await level("castle")).peak - wood.peak)).toBeLessThan(0.02);
+  await moves.getByRole("radio", { name: /^Wooden tap/ }).click();
+  // (Every option is levelled to the same loudness, so their peaks are close: the Wooden tap's is 0.04 off the Light
+  // wood's, rendered the same way each time.)
+  await expect.poll(async () => Math.abs((await level("move")).peak - wood.peak), { timeout: 10_000 }).toBeGreaterThan(0.02);
+  // Castling follows the pick too: two Wooden taps.
+  const tap = await level("move");
+  expect(Math.abs((await level("castle")).peak - tap.peak)).toBeLessThan(0.01);
 });
 
 test("piece sounds: every option decodes, starts on its hit and is about as loud as the default", async ({ page }) => {
@@ -101,7 +112,7 @@ test("piece sounds: every option decodes, starts on its hit and is about as loud
     }
     return out;
   }, paths);
-  const ref = { move: measured["/sounds/move.mp3"]!, capture: measured["/sounds/capture.mp3"]! };
+  const ref = { move: measured[MOVE_SOUNDS[0].file]!, capture: measured[CAPTURE_SOUNDS[0].file]! };
   for (const [path, m] of Object.entries(measured)) {
     const r = path.includes("capture") ? ref.capture : ref.move;
     expect(m.seconds, path).toBeLessThan(0.5);

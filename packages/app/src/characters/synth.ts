@@ -5,7 +5,7 @@
 
 export type Voice = (t: number) => number;
 
-/** The move sample's level (public/sounds/move.mp3, measured with ffmpeg): peak -3.9 dBFS, mean -21.3 dBFS. */
+/** The game's old move sample's level (measured with ffmpeg before it was replaced, Oct 12): peak -3.9 dBFS, mean -21.3 dBFS. */
 export const MOVE_PEAK = 0.64;
 export const MOVE_MEAN_DB = -21.3;
 

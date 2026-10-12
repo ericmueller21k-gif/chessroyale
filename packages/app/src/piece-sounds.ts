@@ -1,8 +1,9 @@
 /**
  * The piece sounds a player picks in Settings → Sound: one for a move, one for a capture, chosen separately and kept
- * on the device. The first option of each is today's wooden knock, the default, so nothing changes for anyone who
- * doesn't pick. Files are in public/sounds/ (the new ones in sounds/pieces/, made by scripts/piece-sounds.py); where
- * each comes from and its licence: public/sounds/SOURCES.md.
+ * on the device. Every option is wood (Eric, Oct 12), CC0 (Kenney) or ours; the first of each is the default (Light
+ * wood, Heavy wood: Oct 12, 2026, in place of the old GPL knocks). An old or unknown id reads as the default. Files are
+ * in public/sounds/pieces/, made by scripts/piece-sounds.py; where each comes from and its licence:
+ * public/sounds/SOURCES.md.
  *
  * Pure (storage only): sound.ts plays them, Settings shows them.
  */
@@ -20,27 +21,30 @@ export interface PieceSoundOption {
 }
 
 export const MOVE_SOUNDS = [
-  { id: "wood", label: "Wooden knock", note: "The default", file: "/sounds/move.mp3" },
-  { id: "light-wood", label: "Light wood", note: "A small wooden tap", file: "/sounds/pieces/move-light-wood.mp3" },
-  { id: "poker-chip", label: "Poker chip", note: "A chip set down", file: "/sounds/pieces/move-poker-chip.mp3" },
-  { id: "click", label: "Click", note: "Crisp and bright", file: "/sounds/pieces/move-click.mp3" },
-  { id: "soft", label: "Soft", note: "Felt on wood", file: "/sounds/pieces/move-soft.mp3" },
+  { id: "light-wood", label: "Light wood", note: "A small wooden tap (the default)", file: "/sounds/pieces/move-light-wood.mp3" },
+  { id: "wood-tap", label: "Wooden tap", note: "Short and bright", file: "/sounds/pieces/move-wood-tap.mp3" },
+  { id: "bright-wood", label: "Bright wood", note: "A smaller piece", file: "/sounds/pieces/move-bright-wood.mp3" },
+  { id: "ringing-wood", label: "Ringing wood", note: "It rings a little", file: "/sounds/pieces/move-ringing-wood.mp3" },
+  { id: "deep-wood", label: "Deep wood", note: "Lower and rounder", file: "/sounds/pieces/move-deep-wood.mp3" },
 ] as const satisfies readonly PieceSoundOption[];
 
 export const CAPTURE_SOUNDS = [
-  { id: "wood", label: "Double knock", note: "The default", file: "/sounds/capture.mp3" },
-  { id: "heavy-wood", label: "Heavy wood", note: "A big wooden knock", file: "/sounds/pieces/capture-heavy-wood.mp3" },
-  { id: "chips", label: "Chips", note: "Chip on chip", file: "/sounds/pieces/capture-chips.mp3" },
-  { id: "clack", label: "Clack", note: "Piece hits piece", file: "/sounds/pieces/capture-clack.mp3" },
-  { id: "thud", label: "Thud", note: "Low and heavy", file: "/sounds/pieces/capture-thud.mp3" },
+  { id: "heavy-wood", label: "Heavy wood", note: "A big wooden knock (the default)", file: "/sounds/pieces/capture-heavy-wood.mp3" },
+  { id: "double-knock", label: "Double knock", note: "Piece on piece, then the board", file: "/sounds/pieces/capture-double-knock.mp3" },
+  { id: "short-wood", label: "Short wood", note: "Heavy, and over quickly", file: "/sounds/pieces/capture-short-wood.mp3" },
+  { id: "wood-block", label: "Wood block", note: "Hollow and bright", file: "/sounds/pieces/capture-wood-block.mp3" },
+  { id: "big-wood", label: "Big wood", note: "Low and heavy", file: "/sounds/pieces/capture-big-wood.mp3" },
 ] as const satisfies readonly PieceSoundOption[];
+
+/** Castling with the default move sound: two Light wood knocks, king then rook (with another pick, it plays twice). */
+export const CASTLE_SOUND = "/sounds/pieces/castle-wood.mp3";
 
 export const PIECE_SOUNDS: Record<PieceSoundKind, readonly PieceSoundOption[]> = { move: MOVE_SOUNDS, capture: CAPTURE_SOUNDS };
 
 /** Where each pick is kept on the device. */
 export const PIECE_SOUND_KEYS: Record<PieceSoundKind, string> = { move: "brc.moveSound", capture: "brc.captureSound" };
 
-/** The default: today's sound, the first option. */
+/** The default: the first option. */
 export const defaultPieceSound = (kind: PieceSoundKind): PieceSoundOption => PIECE_SOUNDS[kind][0]!;
 
 /** The option with this id, or the default for anything else (an old or unknown id, nothing stored). */

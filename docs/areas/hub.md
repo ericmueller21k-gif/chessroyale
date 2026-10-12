@@ -33,15 +33,20 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   (`prefs.ts`: `evalBarOn`, `brc.evalBar`; accounts keep no preferences). The value is still worked out (the God
   King's word on how it's going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older
   apps), from solo's post and the online `hello`, to see later who turns it off and how they play.
-- **Piece sounds** (Settings → Sound; Eric, Oct 11): a **Move sound** and a **Capture sound** picker, chosen
-  separately, each option a radio (picking plays it) with its own ▶. Five each; the first is today's wooden knock, the
-  default. Kept on the device (`piece-sounds.ts`: `brc.moveSound`, `brc.captureSound`; an unknown id reads as the
-  default). `sound.ts` plays the pick for every move and capture (every mode, replays, Classic's ripple); castling is
-  today's knock with the default move sound, else the picked one twice; the Crowd gavel stays wooden. Only the picked
-  files load (on the first tap), the others when previewed; a pick not loaded yet plays today's knock. Previews play
-  even with the sound switched off; mute silences everything in a game. The files: `public/sounds/` (today's) and
-  `public/sounds/pieces/` (made by `scripts/piece-sounds.py`, levelled to today's), every source and licence in
-  `public/sounds/SOURCES.md`: CC0 or ours only.
+- **Piece sounds** (Settings → Sound; Eric, Oct 11; all wood, Oct 12): a **Move sound** and a **Capture sound**
+  picker, chosen separately, each option a radio (picking plays it) with its own ▶. Five each, every one wood (Eric:
+  "slightly different wooden sounds, not chips or clicks"): moves Light wood (the default), Wooden tap, Bright wood,
+  Ringing wood, Deep wood; captures Heavy wood (the default), Double knock, Short wood, Wood block, Big wood. Kept on the
+  device (`piece-sounds.ts`: `brc.moveSound`, `brc.captureSound`; an unknown or removed id reads as the default).
+  `sound.ts` plays the pick for every move and capture (every mode, replays, Classic's ripple); castling is two Light
+  wood knocks with the default move sound (`castle-wood.mp3`), else the picked one twice; the Crowd gavel is the default
+  capture and move sounds, a little lower. Only the picked files and the defaults load (after the first tap's frame),
+  the others when previewed; a pick not loaded yet plays the default. Previews play even with the sound switched off;
+  mute silences everything in a game. The files: `public/sounds/pieces/` (made by `scripts/piece-sounds.py`, levelled
+  to the loudness the game's knocks have always had), every source and licence in `public/sounds/SOURCES.md`: CC0
+  (Kenney) or ours only. The old GPL knocks (PyChess) are gone.
+- **The first tap of a visit** doesn't wait for sound (Oct 12): the audio graph is made while the page is idle
+  (`prepareAudio`), so a tap only switches it on; the samples start loading after that tap's frame.
 - **The FAQ, "How HunChess works"** (Eric, Oct 11): Settings → HOW TO PLAY → "📖 FAQ · How it works" (`/faq`; back
   goes to Settings). A long page for the curious: a table of contents with tap-to-jump links, then the modes, how
   moves are scored (with the maths and a worked example), how a boss decides its moves (its strength, Stockfish and
@@ -93,8 +98,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 ## Rules for this area
 
 - Phone first, the computer as good: check both in Playwright screenshots, at 320–430 px and 1024 px+.
-- A new piece sound: CC0 or ours first (then CC BY, credited in Settings); record its source in
-  `public/sounds/SOURCES.md` and level it with `scripts/piece-sounds.py`.
+- A new piece sound: wood, CC0 or ours (then CC BY, credited in Settings; never GPL or non-commercial); record its
+  source in `public/sounds/SOURCES.md` and level it with `scripts/piece-sounds.py`.
 - Real numbers only: every count, stat and rating comes from the server; never fake one.
 - A number that grows (coins, ratings, counts) is tested at its widest realistic value (fake the server's answer with
   `page.route` if needed); measure a row of fixed-size items at 320 px with that content.
