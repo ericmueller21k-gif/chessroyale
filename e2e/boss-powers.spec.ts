@@ -54,6 +54,37 @@ const iceOffSquares = (p: Page) =>
 /** The power's banner (boss on the left, the moment, the God King on the right). */
 const banner = (p: Page, text: string) => p.locator(".fight-banner.power-cut", { hasText: text });
 
+/**
+ * Every square where `selector` (a block on the power layer) shows from now on, sorted: watched from before it can
+ * appear, as watchFor does. A thaw's melt is on screen for about two thirds of a second, 1.3 s into its moment, and a
+ * look after the banner (polls 0.1, 0.25, 0.5, then 1 s apart) can jump right over it (.claude/LESSONS.md, "A
+ * navigation that never happened"; docs/history/lessons.md, "A melt the test blinked through").
+ */
+async function watchSquares(page: Page, selector: string) {
+  const tag = Math.random().toString(36).slice(2);
+  await page.evaluate(
+    ({ tag, selector }) => {
+      const w = window as unknown as { __squares?: Record<string, string[]> };
+      const seen: string[] = ((w.__squares ??= {})[tag] = []);
+      const check = () => {
+        for (const el of document.querySelectorAll<HTMLElement>(selector)) {
+          const sq = el.dataset.square;
+          if (sq && !seen.includes(sq)) seen.push(sq);
+        }
+      };
+      check();
+      const obs = new MutationObserver(check);
+      obs.observe(document.body, { subtree: true, childList: true, attributes: true });
+      setTimeout(() => obs.disconnect(), 180_000);
+    },
+    { tag, selector },
+  );
+  return { squares: () => page.evaluate((t) => [...(window as unknown as { __squares: Record<string, string[]> }).__squares[t]!].sort(), tag) };
+}
+
+/** The squares this turn's thaw names (its moment's: the pieces it frees). */
+const thawSquares = async (p: Page): Promise<string[]> => [...(((await powers(p))?.events.find((e: { kind: string }) => e.kind === "thaw")?.squares ?? []) as string[])].sort();
+
 test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the blizzard: one random piece moves, then it thaws", async ({ page }) => {
   test.setTimeout(6 * 60_000);
   await page.goto("/?debug&clock=40&bossMoves=7&boss=gingerbread&power=blizzard");
@@ -126,14 +157,20 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   expect(p3.thaw.length).toBeLessThanOrEqual(4);
   await expect(page.locator(".power-board .pw-ice.thawing")).toHaveCount(p3.thaw.length);
   for (const sq of p3.thaw) await expect(page.locator(`.power-board .pw-ice.thawing[data-square="${sq}"]`)).toHaveCount(1);
+  // (Each thaw's melt is watched for from before the boss's move: it's on screen for about two thirds of a second.)
+  const melt4 = await watchSquares(page, ".power-board .pw-ice.melting");
   await playBest(page);
   // While the boss thinks, the ice stays on.
   await expect.poll(async () => (await powers(page))?.iced.length ?? 0, { timeout: 10_000 }).toBeGreaterThan(5);
-  // The thaw as the next turn begins (Eric, Oct 12): its banner names the pieces freed, their ice melts away, and four or
-  // five are free in all; the rest crack (all of it thaws next turn). The meter empty and dashed throughout.
+  // The thaw as the next turn begins (Eric, Oct 12): its banner names the pieces freed, their ice melts away (each of
+  // them, and only them), and four or five are free in all; the rest crack (all of it thaws next turn). The meter empty
+  // and dashed throughout.
   await expect(banner(page, "THAWING!")).toBeVisible({ timeout: 30_000 });
   await expect(banner(page, "THAWING!")).toContainText(/Your .+ (is|are) free|more of your pieces are free/);
-  await expect(page.locator(".power-board .pw-ice.melting").first()).toBeVisible({ timeout: 5_000 });
+  const thawed4 = await thawSquares(page);
+  expect(thawed4.length).toBeGreaterThan(0);
+  for (const sq of thawed4) expect(p3.iced).toContain(sq);
+  await expect.poll(() => melt4.squares(), { timeout: 10_000 }).toEqual(thawed4);
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   const p4 = await powers(page);
   const fen4: string = await page.evaluate(() => (window as any).match.phase.board.fen);
@@ -151,10 +188,15 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   expect(p4.rage).toBe(0);
   expect(p4.paused).toBe(true);
   await expect(page.locator(".rage-meter.paused")).toBeVisible();
+  const melt5 = await watchSquares(page, ".power-board .pw-ice.melting");
   await playBest(page);
-  // Its last turn: the rest thaw, the ice is gone, every move allowed; the meter still held empty.
+  // Its last turn: the rest thaw (their ice melts away), the ice is gone, every move allowed; the meter still held empty.
   await expect(banner(page, "THAWED!")).toBeVisible({ timeout: 30_000 });
   await expect(banner(page, "THAWED!")).toContainText(/ice is gone/i);
+  const thawed5 = await thawSquares(page);
+  expect(thawed5.length).toBeGreaterThan(0);
+  for (const sq of thawed5) expect(p4.iced).toContain(sq);
+  await expect.poll(() => melt5.squares(), { timeout: 10_000 }).toEqual(thawed5);
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   const p5 = await powers(page);
   expect(p5.iced).toEqual([]);

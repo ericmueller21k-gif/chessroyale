@@ -266,3 +266,6 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - A boss's words go into its voice (`speech.tsx`), never into a box a screen or a moment owns: a line lives as long as
   the rule says, not as long as the screen that said it. Nothing hides a speech box to make it fit: it shrinks, then
   moves into view. Test a line's whole time on screen, every frame (`e2e/boss-speech.spec.ts`).
+- A power's moment that shows something for less than about a second (a thaw's melt) is checked by watching for it from
+  before the boss's move (`watchFor`, `watchSquares`), never by `toBeVisible` after its banner: its looks are up to a
+  second apart (Oct 12, "A melt the test blinked through").
