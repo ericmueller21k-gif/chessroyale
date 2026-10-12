@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useLayoutEffect } from "preact/hooks";
+import { useLayoutEffect, useRef } from "preact/hooks";
 import { BOSS_POWERS, type PowerEventKind } from "@chessroyale/core";
 import { powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
@@ -204,18 +204,58 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
 // ---------------- The rage meter ----------------
 
 /**
- * The boss bar's rage meter: it fills over the battle (faster as the boss loses material or the crowd gets ahead on
- * the judged eval), glows as it nears full, flashes for the one-turn warning, and is gone once the ultimate is spent.
+ * The boss bar's rage meter: it fills over the battle (faster as the boss loses material, the crowd gets ahead on the
+ * judged eval or the God King strikes the boss), glows as it nears full, flashes for the one-turn warning, is full on
+ * the ultimate's turn, then empties and stays empty (dimmed, paused) while the ultimate's effect runs, and fills again
+ * for the next one (Eric, Oct 11: several a battle).
  */
 export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
   const p = boss.powers;
-  if (!p || p.rage === null || boss.result) return null;
-  // (Warned or unleashed, it's full: the test switch can bring the ultimate before the meter is.)
-  const pct = p.warned || p.ultAt !== null ? 100 : Math.round(p.rage * 100);
+  const bar = useRef<HTMLElement>(null);
+  const show = !!p && p.rage !== null && !boss.result;
+  // (Warned, it's full: the test switch can bring the ultimate before the meter is. Older servers: null once spent.)
+  const paused = !!p?.paused;
+  const now = !!p && p.ultAt !== null && !paused;
+  const pct = !p || !show ? 0 : p.warned || now ? 100 : Math.round((p.rage ?? 0) * 100);
+  // The meter only drops when an ultimate empties it: from what this device last showed, it holds a moment (the screen
+  // it drops on is a busy first frame: a slide would be half over before it's seen), then slides down on the page's
+  // own clock, carried on by whichever screen draws it next, however soon the next turn comes (a screen change or a
+  // slow first frame mustn't make it jump).
+  const key = `${boss.id}:${boss.startMove}`;
+  const t = performance.now();
+  const last = show ? meterShown.get(key) : undefined;
+  let drain = last?.drain && t - last.drain.start < RAGE_DRAIN.ms ? last.drain : null;
+  if (!drain && last && pct < last.pct - 1) drain = { from: last.pct, start: t + RAGE_DRAIN.holdMs };
+  if (show) {
+    meterShown.set(key, { pct, drain });
+    if (meterShown.size > 20) meterShown.delete(meterShown.keys().next().value!);
+  }
+  useLayoutEffect(() => {
+    const el = bar.current;
+    if (!el || !drain || typeof el.animate !== "function") return;
+    const a = el.animate([{ width: `${drain.from}%` }, { width: `${pct}%` }], { duration: RAGE_DRAIN.ms, easing: "ease-in-out", fill: "both" });
+    a.startTime = drain.start;
+    return () => a.cancel();
+  }, [drain?.start, pct, show]);
+  if (!show) return null;
   const glow = pct >= BOSS_POWERS.rageGlowFrom * 100;
   return (
-    <span class={`rage-meter${glow ? " glow" : ""}${p.warned ? " warned" : ""}${p.ultAt !== null ? " now" : ""}`} role="meter" aria-label={`Rage ${pct}%`} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} title="Rage: when it's full, the boss's ultimate is coming">
-      <i style={{ width: `${pct}%` }} />
+    <span
+      class={`rage-meter${glow ? " glow" : ""}${p!.warned ? " warned" : ""}${now ? " now" : ""}${paused ? " paused" : ""}`}
+      role="meter"
+      aria-label={paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      title={paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
+    >
+      {/* (No width transition while it slides down: a transition would override the slide.) */}
+      <i ref={bar} style={drain ? { width: `${pct}%`, transition: "none" } : { width: `${pct}%` }} />
     </span>
   );
 }
+
+/** As an ultimate comes, the meter stays where it was for `holdMs` from its first showing, then empties over `ms`. */
+export const RAGE_DRAIN = { holdMs: 400, ms: 900 } as const;
+/** What each battle's meter last showed on this device, and its slide down while one runs (from `start`, page time). */
+const meterShown = new Map<string, { pct: number; drain: { from: number; start: number } | null }>();

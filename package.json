@@ -21,6 +21,7 @@
     "frames:wip": "node scripts/frames-wip.mjs",
     "frames:god-king": "node scripts/frames-god-king.mjs",
     "frames:powers": "node scripts/frames-boss-powers.mjs",
+    "frames:rage": "node scripts/frames-rage.mjs",
     "frames:hollow": "node scripts/frames-hollow.mjs",
     "frames:king-attack": "node scripts/frames-king-attack.mjs",
     "frames:bigboy": "node scripts/frames-bigboy.mjs",

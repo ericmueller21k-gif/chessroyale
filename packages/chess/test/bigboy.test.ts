@@ -449,15 +449,19 @@ describe("Big Boy's Big Bounce in a battle", () => {
     expect(r.boss!.powers!.ultAt).toBe(2);
     expect(r.boss!.powers!.events.at(-1)).toEqual({ kind: "bounce", turn: 2 });
     expect(r.bossView()!.powers!.bounce).toEqual(res);
-    // The meter is spent.
-    expect(rageOf(r.boss)).toBeNull();
+    // The meter is spent: empty (held so while the bounce plays), then it fills again from the next turn.
+    expect(rageOf(r.boss)).toBe(0);
+    expect(r.bossView()!.powers!.paused).toBe(true);
+    expect(r.boss!.powers!.ults).toBe(1);
     expect(powerMomentMs([{ kind: "bounce" }])).toBe(BOUNCE.total);
     // He plays his move from the new position; the game replays through it.
     await r.playBoss();
     const board = r.boards.get(0)!;
     expect(fenAtPly(board.history, board.history.length, board.bases)).toBe(board.fen);
     expect(board.history.length).toBe(ply + 1);
-    // Once a match.
+    expect(r.boss!.powers!.ultAt).toBeUndefined();
+    expect(r.bossView()!.powers!.paused).toBe(false);
+    // The test switch brings only the first; the next must wait for the meter to fill again.
     for (let i = 0; i < 6 && !r.isOver(); i++) {
       await turn(r);
       expect(r.boss!.powers!.bounce!.at).toBe(2);
@@ -475,7 +479,17 @@ describe("Big Boy's Big Bounce in a battle", () => {
     expect(r.bounceDue()).toBe(true);
     await r.playBounce();
     expect(r.boss!.powers!.ultNext).toBeUndefined();
+    // Under way: nothing. Over as the crowd's next turn begins: it can be pulled again, and the bounce comes again.
     expect(r.triggerUltimate()).toBe(false);
+    await r.playBoss();
+    expect(r.boss!.powers!.ultAt).toBeUndefined();
+    expect(r.triggerUltimate()).toBe(true);
+    r.deal();
+    await r.score(new Map([["h0", { move: [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort()[0]!, thinkMs: 1000 }]]));
+    expect(r.bounceDue()).toBe(true);
+    const again = await r.playBounce();
+    expect(again.at).toBe(r.boss!.crowdMoves);
+    expect(r.boss!.powers!.ults).toBe(2);
   });
 
   it("the trigger pressed while he thinks: through his move and the next crowd turn, then the bounce", () => {

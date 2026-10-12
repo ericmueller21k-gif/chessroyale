@@ -617,3 +617,20 @@ board (White's way up) and the Squads board (Black's): every file one column alo
   our own CSS, either way up: a library's defaults are made for its own page.
 - Board coordinates sit inside their edge squares; a test measures each label against the square it names, both ways
   up, on a phone and a computer (`expectCoordsInSquares` in `e2e/helpers.ts`).
+
+## A rage meter drawn at a fifth of its colour (Oct 11, 2026)
+
+**Found while** watching the rage meter frame by frame for repeat ultimates (PR "rage meters"): its bar was a dull
+brown at every fill, and as it emptied the change was hard to see. True-colour screenshots of the meter alone showed
+the same, so it wasn't the screencast's compression.
+
+**The cause:** the boss bar's threat skulls are `<i>` elements, dimmed by `.boss-threat i { opacity: 0.22 }` (the
+skulls not lit). The rage meter sits inside the same `.boss-threat` box, and its bar is an `<i>` too: the rule caught
+it, so the meter has been drawn at 22% opacity since it was built. No test looked at its colour, only at its width and
+classes.
+
+**The rule:**
+- A rule on a bare element under a box (`.box i`) also styles every component nested in that box. Style children by a
+  child selector or a class of their own (`.boss-threat > i`), and check the computed style of what sits inside.
+- When a number on screen is drawn (a meter, a bar), look at it in true colour, alone and enlarged, not only in a
+  frame of the whole screen.

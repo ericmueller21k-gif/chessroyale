@@ -45,6 +45,7 @@ export type KingCue =
   | "rise"
   | "blizzard"
   | "blizzardKing"
+  | "blizzardOne"
   | "funhouse"
   | "fireTile"
   | "mateThreat"
@@ -100,7 +101,8 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   lastStand: ["Fall back! This blow is mine.", "Not while I stand!", "Retreat — I'll hold the line!", "Go! I'll take it from here."],
   lastWords: ["Finish… it… for me."],
   rise: ["A god does not stay down."],
-  // A boss's powers: after the blizzard (the queen alone is free; with no queen to move, the king), after the funhouse.
+  // A boss's powers: after the blizzard (one random piece left free: the queen, the king, or another; Eric, Oct 11),
+  // after the funhouse.
   blizzard: [
     "Looks like our queen withstood the storm!",
     "Frozen solid, all but our queen. She's ready.",
@@ -108,6 +110,7 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
     "That storm couldn't touch our queen.",
   ],
   blizzardKing: ["Frozen solid! Only our king can move.", "The storm spared the king alone. Steady, Majesty."],
+  blizzardOne: ["The storm left us one piece. Make it count!", "All frozen but one. Use it well.", "One of ours broke free of the ice!", "Only one piece moves. That's all we need."],
   funhouse: ["Upside down? Shake it off!", "That clown played our move! We'll fix it.", "Hold on, the board's spinning. Eyes up!"],
   // A mate threatened against us (as our move begins), and a queen taken, either way.
   mateThreat: ["Mate is near! Shield the king.", "It threatens mate. Look again!", "Danger at the gate. Guard the king!"],
@@ -151,6 +154,7 @@ const KIND: Record<KingCue, Kind> = {
   rise: "critical",
   blizzard: "critical",
   blizzardKing: "critical",
+  blizzardOne: "critical",
   funhouse: "critical",
   fireTile: "critical",
 };

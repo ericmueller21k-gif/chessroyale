@@ -439,7 +439,7 @@ export const BOSS_BLOCKS: Record<string, (p: BossPowerSettings, b: BossDef) => s
 Plays from the game so far.
 
 - **Freeze** (passive): from turn ${p.firstPassive}, one of your pieces that matters (one of your three most valuable, mobile pieces; never the king) is iced and can't move for ${n(p.freezeTurns, "turn")}. Then again every ${range(p.freezeEvery)} turns.
-- **Blizzard** (ultimate): for one turn, only your queen may move (no queen, or she can't: your king).`,
+- **Blizzard** (ultimate): for one turn, only one of your pieces may move, picked at random from those that have a move (never your king nor the frozen piece, unless nothing else can move). Its banner names the piece. In check, only a piece that can get you out of it is picked.`,
   clown: (p) => `
 Plays from the game so far.
 
@@ -474,6 +474,7 @@ function bossPowers(src: FaqSources): FaqSection {
   const level = Math.ceil(p.rageFull / (p.ragePerMove || 1));
   const ahead = Math.ceil(p.rageFull / (p.ragePerMove + p.rageAheadMax || 1));
   const queen = 9 * p.ragePerMaterial >= p.rageFull;
+  const speeds = playable.map((b) => `${b.name} ×${num(p.rageSpeed[b.id] ?? 1)}`).join(", ");
   const blocks = playable
     .map((b) => {
       const words = BOSS_BLOCKS[b.id];
@@ -487,7 +488,7 @@ function bossPowers(src: FaqSources): FaqSection {
     body: `
 ### How powers work {#power-rules}
 
-Every boss has a **passive** power that comes every few turns and an **ultimate** that comes once a battle, when its rage meter is full. Turns count the crowd's moves: turn 1 is the crowd's first move of the battle. For every boss:
+Every boss has a **passive** power that comes every few turns and an **ultimate** that comes whenever its rage meter is full, again and again. Turns count the crowd's moves: turn 1 is the crowd's first move of the battle. For every boss:
 
 - Every power is decided by the game from the battle's own random draw and the position, so everyone sees exactly the same thing.
 - A power never leaves anyone without a legal move and never stops you getting out of check: a limit that would lifts for that turn. Your king is never frozen.
@@ -497,17 +498,22 @@ Every boss has a **passive** power that comes every few turns and an **ultimate*
 ### The rage meter {#rage-meter}
 
 The meter fills to ${p.rageFull}${p.rageOverTime ? `:\n\n- ${p.ragePerMove} for every crowd move,\n- up to ${p.rageAheadMax} more a move while the crowd is ahead (by the judge's expected score: nothing at 0.50, all of it from ${num(p.rageAheadFull)}),` : ":\n"}
-- ${num(p.ragePerMaterial)} for every point of material the boss loses (a pawn is 1, a knight or bishop 3, a rook 5, a queen 9)${queen ? ": taking his queen fills it on its own" : ""}.
+- ${num(p.ragePerMaterial)} for every point of material the boss loses (a pawn is 1, a knight or bishop 3, a rook 5, a queen 9)${queen ? ": taking his queen fills it on its own" : `: taking his queen fills ${pct((9 * p.ragePerMaterial) / p.rageFull, 0)} of it`},
+- ${p.rageStrike} each time the God King strikes the boss ([his strike](#king-charges)).
+
+Each boss's meter fills at its own speed (everything above times it): ${speeds}. The ones whose ultimates last longer fill faster, so each gets about two in a typical battle (Jefferson about one and a half: his barrage lasts longest). These rates are estimates, not yet tested with bots.
 ${
   p.rageOverTime
     ? `
 $ rage a crowd move = ${p.ragePerMove} + ${p.rageAheadMax} × the crowd's lead, where the lead = (expected score − 0.5) / ${num(p.rageAheadFull - 0.5)}, from 0 to 1
 
-In a level game it's full after about ${n(level, "crowd move")}; with the crowd well ahead, after about ${ahead}.
+In a level game (at ×1) it's full after about ${n(level, "crowd move")}; with the crowd well ahead, after about ${ahead}.
 `
     : ""
 }
-When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Once a battle. Hollow's and Big Boy's ultimates come at the start of their own turn instead (Lights out's only warning is the full meter), and Sawyer's needs more than a full meter (below).
+When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's and Big Boy's ultimates come at the start of their own turn instead (Lights out's only warning is the full meter), and Sawyer's needs more than a full meter (below).
+
+Then the meter empties and fills again for the next one. While an ultimate is still under way (the Roman candle's fireballs still falling or burning, the board flipped or sawn in two, Lights out and the extra move after it) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap.
 
 ${blocks}
 ${later.length ? `\n### Still to come {#bosses-later}\n\n${n(later.length, "more boss", "more bosses")} are waiting for their art and powers: ${later.join(", ")}.` : ""}
@@ -543,7 +549,7 @@ The crowd's champion in every boss battle: raids, the Crowd's boss battle and Bo
 He has up to ${n(S.kingChargesMax, "charge")}. In a raid or Boss alone he starts with ${S.kingChargesMax}. In the Crowd's boss battle, the finalists' leftover power-ups become his charges: one for every ${S.kingPowerUpsPerCharge}, rounded, at least ${kingCharges(0, S)} and at most ${S.kingChargesMax}. Tap him to open his menu:
 
 - **Play this move:** he plays the engine's best move for the crowd, at full strength (stronger than the boss).
-- **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move.
+- **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move. It enrages the boss too: ${src.powers.rageStrike} on its [rage meter](#rage-meter) (unless an ultimate is under way).
 
 Either needs **more than half the crowd** to call him. Bots back a person's call ${pct(S.kingBotFollow, 0)} of the time, and call him to play themselves when the crowd's popular move would give away ${n(S.kingBotLoss, "point")} or more. In Boss alone, your call is enough. If you call him to play instead of picking, you sit that turn out: no score either way, and it isn't a miss. The clock stands still while he acts, and a move he plays is never brilliant.
 

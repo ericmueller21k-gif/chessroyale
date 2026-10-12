@@ -278,7 +278,7 @@ export const SAWYER: BossRules = {
     };
     if (t.ultNext) return unleash();
     if (next.warnAt === undefined) {
-      if (boardSawReady(next, t) || testSwitch(t)) {
+      if (boardSawReady(next, t) || testSwitch(t, next)) {
         next.warnAt = t.turn;
         t.events.push({ kind: "warn", turn: t.turn });
       }
@@ -286,6 +286,8 @@ export const SAWYER: BossRules = {
     }
     return t.turn > next.warnAt ? unleash() : false;
   },
+  // The board saw runs while the halves are apart.
+  ultimateRunning: (p, turn) => turn <= (p.boardSaw?.until ?? p.ultAt!),
   // The split, as the turn after his first move begins (its moment plays after that move).
   everyTurn(next, t) {
     if (next.split?.square && next.split.turn === t.turn) t.events.push({ kind: "split", turn: t.turn, square: next.split.square, ...(next.split.pawn ? { squares: [next.split.pawn, next.split.square] } : {}) });

@@ -208,7 +208,7 @@ test("the test trigger is hidden from players", async ({ page }) => {
   await expect(page.locator(".ult-test")).toHaveCount(0);
 });
 
-test("an admin's test trigger against Ginger, pressed during your turn: the blizzard next turn, no warning; twice is once", async ({ page }) => {
+test("an admin's test trigger against Ginger, pressed during your turn: the blizzard next turn, no warning; twice is once; again once it's over", async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await asAdmin(page);
   await page.goto("/?debug&clock=40&bossMoves=6&boss=gingerbread");
@@ -225,8 +225,19 @@ test("an admin's test trigger against Ginger, pressed during your turn: the bliz
   await expect(banner(page, "BLIZZARD!")).toBeVisible({ timeout: 30_000 });
   await expect(banner(page, "RAGE!")).toHaveCount(0);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
-  await expect(btn).toHaveText("Ultimate used (testing)");
+  await expect(btn).toHaveText("Ultimate under way (testing)");
   expect((await powers(page)).allowed.length).toBeGreaterThan(0);
+  // Over as the next turn begins: the meter emptied (filling again), the trigger ready, and the blizzard comes again.
+  await play(page);
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
+  await expect(btn).toHaveText("Trigger ultimate (testing)");
+  expect((await powers(page)).rage).toBeLessThan(0.5);
+  await btn.click();
+  await expect(btn).toHaveText("Ultimate next turn (testing)");
+  await play(page);
+  await expect(banner(page, "BLIZZARD!")).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
+  expect((await powers(page)).ults).toBe(2);
 });
 
 test("an admin's test trigger against Boingo, pressed while the boss thinks: the funhouse", async ({ page }) => {

@@ -27,10 +27,12 @@ function freezeMoment({ boss, moment, t, orientation, banner, cast }: MomentProp
   );
 }
 
-function blizzardMoment({ moment, t, banner, cast }: MomentProps) {
+function blizzardMoment({ boss, moment, t, banner, cast }: MomentProps) {
+  // (Its one free piece, at random: named in the banner, since it's no longer always the queen.)
+  const piece = moment.square ? pieceAt(boss.board.fen, moment.square) : null;
   return (
     <div class="power-moment pm-blizzard">
-      {t < 1500 && banner("BLIZZARD!", undefined, "cold")}
+      {t < 1500 && banner("BLIZZARD!", piece ? `Only your ${PIECE_WORD[piece.type]} on ${moment.square} moves` : undefined, "cold")}
       {cast("blizzard", BLIZZARD.sweepAt)}
       {t >= BLIZZARD.sweepAt && t < BLIZZARD.sweepAt + BLIZZARD.sweepMs && (
         <span class="pw-clip">

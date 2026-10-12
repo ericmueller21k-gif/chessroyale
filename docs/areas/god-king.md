@@ -11,7 +11,11 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - **Charges.** He has up to `kingChargesMax` (3) charges. Power-ups convert to charges (`kingPowerUpsPerCharge`).
   Tapping him opens his command menu: **play this move** (he plays the best move for the crowd, with his bolt) or
   **strike the boss** (three bolts and slashes on the boss's king: the boss's next move is weakened by
-  `kingStrikeLoss`). Bots in the crowd follow him (`kingBotLoss`, `kingBotFollow`).
+  `kingStrikeLoss`, and the boss's rage meter gains `BOSS_POWERS.rageStrike`, a quarter of it, at the boss's
+  `rageSpeed`: Eric, Oct 11, "like a video game"; nothing while an ultimate's effect runs; `strikeRage` in
+  `boss-powers.ts`, from `callStrike` in the runner). Bots in the crowd follow him (`kingBotLoss`, `kingBotFollow`).
+- **His word after Ginger's blizzard** names what the storm left free: the queen's lines, the king's
+  (`blizzardKing`), or another piece's (`blizzardOne`), from the moves allowed.
 - **The clock stands still** while he acts, for everyone, solo and online: a move lengthens the reveal by
   `KING_COMMAND.moveMs`, a strike stops every deadline for `kingStrikeMs`. Nothing he does costs anyone time.
 - **His Last Stand.** Always armed, once per game. If the crowd's played move gives away at least the bar (in points

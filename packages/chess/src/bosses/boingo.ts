@@ -45,9 +45,9 @@ export function choosePie(fen: string, seed: number, turn: number): string | nul
   return least[Math.floor(powerRoll(seed, "pie", turn) * least.length)]!.sq;
 }
 
-/** The boss plays the crowd's move this turn (the funhouse), and hasn't yet. */
+/** The boss plays the crowd's move this turn (the funhouse), and hasn't yet (an earlier funhouse was another turn's). */
 export const funhouseDue = (boss: BossState | null | undefined): boolean =>
-  !!boss?.powers && !boss.result && bossPowers(boss)?.ultimate === "funhouse" && boss.powers.ultAt === turnOf(boss) && !boss.powers.funhouse;
+  !!boss?.powers && !boss.result && bossPowers(boss)?.ultimate === "funhouse" && boss.powers.ultAt === turnOf(boss) && boss.powers.funhouse?.turn !== turnOf(boss);
 
 /** After the funhouse, the crowd sees the board flipped for its next few turns. */
 export const boardFlipped = (boss: BossState | null | undefined): boolean => {
@@ -75,6 +75,8 @@ export const BOINGO: BossRules = {
   },
   // (The funhouse's moment is the move it plays: added when it's played.)
   ultimate: warnThenUnleash,
+  // The funhouse runs through the turns the board shows flipped after it.
+  ultimateRunning: (p, turn) => turn <= (p.funhouse && p.funhouse.turn >= p.ultAt! && p.flipUntil !== undefined ? p.flipUntil : p.ultAt!),
   passive(next, t) {
     if (t.turn < next.nextPassive) return;
     const square = choosePie(t.fen, t.seed, t.turn);

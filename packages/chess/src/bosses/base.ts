@@ -113,7 +113,7 @@ export function moveLoss(best: number, got: number): { points: number; logit: nu
 // ---------------- The ultimate's meter ----------------
 
 /** The rates the meter fills at (BOSS_POWERS). */
-export type RageRates = Pick<BossPowerSettings, "rageFull" | "rageOverTime" | "ragePerMove" | "rageAheadMax" | "rageAheadFull" | "ragePerMaterial">;
+export type RageRates = Pick<BossPowerSettings, "rageFull" | "rageOverTime" | "ragePerMove" | "rageAheadMax" | "rageAheadFull" | "ragePerMaterial" | "rageSpeed">;
 
 /**
  * One crowd move's worth of rage over time: ragePerMove, plus up to rageAheadMax more while the crowd is ahead on the
@@ -126,9 +126,20 @@ export function rageTick(judged: number | undefined, s: RageRates = BOSS_POWERS)
   return s.ragePerMove + s.rageAheadMax * ahead;
 }
 
-/** Rage points: the charge from time and the eval, plus the boss's own material lost (a queen's worth fills it). */
-export function ragePoints(p: Pick<BossPowerState, "charge" | "lost">, s: RageRates = BOSS_POWERS): number {
+/** Rage points gathered all battle: the charge from time, the eval and strikes, plus the boss's own material lost. */
+export function ragePoints(p: Pick<BossPowerState, "charge" | "lost">, s: Pick<RageRates, "ragePerMaterial"> = BOSS_POWERS): number {
   return (p.charge ?? 0) + p.lost * s.ragePerMaterial;
+}
+
+/** How fast a boss's meter fills (BOSS_POWERS.rageSpeed: every gain times this). */
+export const rageSpeedOf = (id: string | undefined, s: Pick<RageRates, "rageSpeed"> = BOSS_POWERS): number => (id && s.rageSpeed[id]) || 1;
+
+/**
+ * The meter now, in rage points: what was gathered since the last ultimate spent it (and since its effect ended),
+ * times the boss's speed. 0 to rageFull and past it (a full meter waits for its ultimate).
+ */
+export function rageNow(p: Pick<BossPowerState, "charge" | "lost" | "rageUsed">, speed: number, s: Pick<RageRates, "ragePerMaterial"> = BOSS_POWERS): number {
+  return Math.max(0, ragePoints(p, s) - (p.rageUsed ?? 0)) * speed;
 }
 
 // ---------------- The base boss ----------------
@@ -150,6 +161,8 @@ export interface TurnContext {
   ultNext: boolean;
   /** The boss's move just played (Hollow covers its piece's square after his first). */
   lastMove: string | null;
+  /** How fast this boss's meter fills (rageSpeedOf). */
+  rageSpeed: number;
   s: BossPowerSettings;
   events: PowerEvent[];
 }
@@ -170,10 +183,18 @@ export interface BossRules {
   /** As a crowd turn begins, first: what wore off (its passive's state after its turns). */
   wearOff?(next: BossPowerState, t: TurnContext): void;
   /**
-   * The ultimate's step as a crowd turn begins, while it hasn't come yet (`ultAt` unset): the meter, the warning, the
-   * trigger, the test switch. True when it comes now (the passive then waits a turn if it was due).
+   * The ultimate's step as a crowd turn begins, while none is under way (`ultAt` unset): the meter, the warning, the
+   * trigger, the test switch. True when it comes now (the passive then waits a turn if it was due). It comes again and
+   * again: once its effect is over (ultimateRunning) the dispatcher clears `warnAt` and `ultAt`, and the meter fills
+   * again from empty.
    */
   ultimate(next: BossPowerState, t: TurnContext): boolean;
+  /**
+   * Its ultimate's effect still runs on crowd turn `turn` (it came at `p.ultAt`): the meter stays empty and no other
+   * ultimate can come. Without it, the effect is its own turn only (the blizzard, the Big Bounce). Read from the state
+   * as the previous turn left it, before anything wears off.
+   */
+  ultimateRunning?(p: BossPowerState, turn: number): boolean;
   /** Every turn after the ultimate's step (G-REX's barrage). */
   everyTurn?(next: BossPowerState, t: TurnContext): void;
   /** The passive's step. */
@@ -225,15 +246,30 @@ export interface JudgedEvaluation {
   expectedAfter: Record<string, number>;
 }
 
-/** The rage meter is full. */
-export const meterFull = (next: BossPowerState, t: Pick<TurnContext, "s">): boolean => ragePoints(next, t.s) >= t.s.rageFull;
+/**
+ * An ultimate has come (its `ultAt` just set): one more this battle, and the meter is spent. The dispatcher calls it
+ * as a turn begins; a boss's rules call it when theirs comes outside one (Lights out from the test trigger, the Big
+ * Bounce).
+ */
+export function unleashed(next: BossPowerState, s: Pick<RageRates, "ragePerMaterial"> = BOSS_POWERS): BossPowerState {
+  next.ults = (next.ults ?? 0) + 1;
+  next.rageUsed = ragePoints(next, s);
+  return next;
+}
 
-/** The test switch brings this boss's ultimate: warned (or due) as the second turn begins, after the boss's first move. */
-export const testSwitch = (t: Pick<TurnContext, "test" | "ultimate" | "turn">): boolean => t.test === t.ultimate && t.turn >= 2;
+/** The rage meter is full. */
+export const meterFull = (next: BossPowerState, t: Pick<TurnContext, "s" | "rageSpeed">): boolean => rageNow(next, t.rageSpeed, t.s) >= t.s.rageFull;
+
+/**
+ * The test switch brings this boss's ultimate: warned (or due) as the second turn begins, after the boss's first move.
+ * Only its first: the ones after come from the meter.
+ */
+export const testSwitch = (t: Pick<TurnContext, "test" | "ultimate" | "turn">, p?: Pick<BossPowerState, "ults">): boolean => t.test === t.ultimate && t.turn >= 2 && !p?.ults;
 
 /**
  * The usual ultimate (the blizzard, the funhouse, the Roman candle): the meter full (or the test switch), a warning as
- * this turn begins; the next turn, the ultimate. The test trigger: straight to it. Once a match. True when it comes now.
+ * this turn begins; the next turn, the ultimate. The test trigger: straight to it. Again whenever the meter fills
+ * again. True when it comes now.
  */
 export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
   if (t.ultNext) {
@@ -241,7 +277,7 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
     return true;
   }
   if (next.warnAt === undefined) {
-    if (meterFull(next, t) || testSwitch(t)) {
+    if (meterFull(next, t) || testSwitch(t, next)) {
       next.warnAt = t.turn;
       t.events.push({ kind: "warn", turn: t.turn });
     }

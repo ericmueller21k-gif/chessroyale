@@ -54,13 +54,15 @@ const iceOffSquares = (p: Page) =>
 /** The power's banner (boss on the left, the moment, the God King on the right). */
 const banner = (p: Page, text: string) => p.locator(".fight-banner.power-cut", { hasText: text });
 
-test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the blizzard: only the queen moves", async ({ page }) => {
+test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the blizzard: one random piece moves", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await page.goto("/?debug&clock=40&bossMoves=5&boss=gingerbread&power=blizzard");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Ginger");
   await expect(page.locator(".rage-meter")).toBeVisible();
+  // Its bar in full colour (the threat skulls' dimming once caught it too: it sat at 22%).
+  expect(await page.locator(".rage-meter i").first().evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
 
   await playBest(page);
   // As the second turn begins: FREEZE!, then RAGE! (its ultimate next turn); the clock waits for them.
@@ -83,11 +85,13 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   expect(await phase(page)).toBe("play");
 
   await playBest(page);
-  // The blizzard: its banner, the sweep across the board, and every crowd piece iced but the queen.
+  // The blizzard: its banner naming the one piece left free (at random from the seed), the sweep across the board,
+  // and every crowd piece iced but that one; the meter full on its turn.
   await expect(banner(page, "BLIZZARD!")).toBeVisible({ timeout: 30_000 });
+  await expect(banner(page, "BLIZZARD!")).toContainText(/Only your (pawn|knight|bishop|rook|queen|king) on [a-h][1-8] moves/);
   await expect(page.locator(".pw-sweep")).toBeVisible({ timeout: 5_000 });
-  // The God King names the one piece the storm left free.
-  await expect(page.locator(".gk-bubble")).toContainText(/queen|king/i, { timeout: 6_000 });
+  // The God King speaks of the piece the storm left free.
+  await expect(page.locator(".gk-bubble")).toContainText(/queen|king|one/i, { timeout: 6_000 });
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   const p3 = await powers(page);
   const fen3: string = await page.evaluate(() => (window as any).match.phase.board.fen);
@@ -105,18 +109,29 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
     return null;
   };
   expect(p3.allowed.length).toBeGreaterThan(0);
-  const movers = new Set(p3.allowed.map((m: string) => pieceOn(fen3, m.slice(0, 2))));
-  expect([...movers].every((c) => c === "Q" || c === "K")).toBe(true);
+  const free = p3.events.find((e: { kind: string }) => e.kind === "blizzard").square as string;
+  expect(pieceOn(fen3, free)).toMatch(/[PNBRQK]/);
+  expect(p3.allowed.every((m: string) => m.slice(0, 2) === free)).toBe(true);
+  expect(p3.iced).not.toContain(free);
   expect(p3.iced.length).toBeGreaterThan(5);
   await expect(page.locator(".power-board .pw-ice")).toHaveCount(p3.iced.length);
+  expect(p3.rage).toBe(1);
+  await expect(page.locator(".rage-meter.now")).toBeVisible();
   // Every block on its own square within 1 px, all one size, whatever the piece under it.
   const ice = await iceOffSquares(page);
   expect(ice.worst, JSON.stringify(ice.off)).toBeLessThanOrEqual(1);
   expect(ice.sizes).toHaveLength(1);
   await playBest(page);
-  // The ice melts as the next turn begins.
+  // The ice melts as the next turn begins; the meter has emptied and fills again (it's not gone).
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
-  if ((await phase(page)) === "play") expect((await powers(page)).iced.length).toBeLessThanOrEqual(1);
+  if ((await phase(page)) === "play") {
+    const p4 = await powers(page);
+    expect(p4.iced.length).toBeLessThanOrEqual(1);
+    expect(p4.rage).toBeLessThan(0.5);
+    expect(p4.ultAt).toBeNull();
+    await expect(page.locator(".rage-meter")).toBeVisible();
+    await expect(page.locator(".rage-meter.now, .rage-meter.warned")).toHaveCount(0);
+  }
 });
 
 test("Boingo: a pie nobody can move onto, the warning, then the funhouse plays your move and the board shows flipped", async ({ page }) => {

@@ -1,8 +1,8 @@
 /**
  * Ginger, the Freeze boss (BOSS_ROSTER "gingerbread"): her rules. Her passive, the freeze, ices one of the crowd's
- * pieces that matters for a couple of turns, every few turns; her ultimate, the blizzard, leaves only the queen free to
- * move for one turn (no queen, or she can't: the king). Numbers: BOSS_POWERS.freeze*. Her art and moments are the
- * app's (characters/gingerbread.ts, the ice and the blizzard in characters/effects/).
+ * pieces that matters for a couple of turns, every few turns; her ultimate, the blizzard, ices every crowd piece but
+ * one for one turn: a random one that has a move (Eric, Oct 11; it was the queen). Numbers: BOSS_POWERS.freeze*. Her
+ * art and moments are the app's (characters/gingerbread.ts, the ice and the blizzard in characters/effects/).
  */
 import type { BossState } from "@chessroyale/core";
 import { legalMoves, pieceAt } from "../rules.ts";
@@ -31,11 +31,24 @@ export function chooseFreeze(fen: string, crowdSide: Side, seed: number, turn: n
   return { square: pick.square, piece: pick.piece!.type };
 }
 
+/**
+ * The blizzard's free piece: one of the crowd's pieces with a legal move, at random from the seed (the same on every
+ * device). Never the king nor the piece the freeze holds, unless nothing else can move (then the king, then the frozen
+ * piece); null when the crowd has no move at all.
+ */
+export function chooseBlizzard(fen: string, crowdSide: Side, seed: number, turn: number, frozen?: string | null): string | null {
+  const movers = [...new Set(legalMoves(fen).map(from))].filter((sq) => pieceAt(fen, sq)?.color === crowdSide).sort();
+  const pieces = movers.filter((sq) => pieceAt(fen, sq)?.type !== "k" && sq !== frozen);
+  const king = movers.filter((sq) => pieceAt(fen, sq)?.type === "k");
+  const pool = pieces.length ? pieces : king.length ? king : movers;
+  return pool.length ? pool[Math.floor(powerRoll(seed, "blizzard", turn) * pool.length)]! : null;
+}
+
 /** This turn is the blizzard's. */
 export const blizzardNow = (boss: BossState | null | undefined): boolean =>
   !!boss?.powers && bossPowers(boss)?.ultimate === "blizzard" && boss.powers.ultAt === turnOf(boss);
 
-/** Ginger: a frozen piece every few turns (the freeze), and for one turn only the queen moves (the blizzard). */
+/** Ginger: a frozen piece every few turns (the freeze), and for one turn only one random piece moves (the blizzard). */
 export const GINGER: BossRules = {
   id: "gingerbread",
   wearOff(next, t) {
@@ -47,7 +60,11 @@ export const GINGER: BossRules = {
   },
   ultimate(next, t) {
     const now = warnThenUnleash(next, t);
-    if (now) t.events.push({ kind: "blizzard", turn: t.turn });
+    if (now) {
+      const square = chooseBlizzard(t.fen, t.crowd, t.seed, t.turn, next.frozen?.square);
+      next.blizzard = square ? { turn: t.turn, square } : null;
+      t.events.push({ kind: "blizzard", turn: t.turn, ...(square ? { square } : {}) });
+    }
     return now;
   },
   passive(next, t) {
@@ -60,22 +77,22 @@ export const GINGER: BossRules = {
       next.nextPassive = t.turn + lo + Math.floor(powerRoll(t.seed, "every", t.turn) * (hi - lo + 1));
     } else next.nextPassive = t.turn + 1;
   },
-  // Frozen pieces can't move; in the blizzard only the queen moves (no queen, or she can't: the king).
+  // Frozen pieces can't move; in the blizzard only its free piece moves (it can't: everything, as the dispatcher lifts it).
   crowdFilter(allowed, boss, fen) {
     if (blizzardNow(boss)) {
-      const queen = allowed.filter((m) => pieceAt(fen, from(m))?.type === "q");
-      const king = allowed.filter((m) => pieceAt(fen, from(m))?.type === "k");
-      return queen.length ? queen : king.length ? king : allowed;
+      const free = boss.powers!.blizzard?.square;
+      return free ? allowed.filter((m) => from(m) === free) : allowed;
     }
     const frozen = boss.powers!.frozen;
     return frozen ? allowed.filter((m) => from(m) !== frozen.square) : allowed;
   },
   powerTurn: (boss) => !!boss.powers!.frozen || blizzardNow(boss),
-  // The frozen piece; in the blizzard every crowd piece but the one(s) still free to move.
+  // The frozen piece; in the blizzard every crowd piece but the one(s) still free to move (the ice lifted: every piece
+  // with a move).
   iced(boss, fen, crowdAllowed) {
     const p = boss.powers!;
     if (blizzardNow(boss)) {
-      const free = new Set((crowdAllowed({ ...boss, barred: undefined }, fen) ?? []).map(from));
+      const free = new Set((crowdAllowed({ ...boss, barred: undefined }, fen) ?? legalMoves(fen)).map(from));
       const out: string[] = [];
       for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) {
         const sq = `${f}${r}`;

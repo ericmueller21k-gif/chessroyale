@@ -180,8 +180,10 @@ test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, 
   await page.waitForTimeout(500);
   const shown = await page.locator("cg-board piece:not(.ghost):not(.fading)").count();
   expect(shown).toBe(c.board().flat().filter(Boolean).length);
-  expect((await powers(page)).rage).toBeNull();
-  await expect(btn).toHaveText("Ultimate used (testing)");
+  // The meter spent: empty, filling again for the next; the trigger ready again for it.
+  expect((await powers(page)).rage).toBe(0);
+  expect((await powers(page)).ults).toBe(1);
+  await expect(btn).toHaveText("Trigger ultimate (testing)");
   // His sounds came (the boing, the crash), and through the mute switch, silent.
   const log = await soundsHeard(page);
   const his = log.filter((x) => x.startsWith("bigboy"));

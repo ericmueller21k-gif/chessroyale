@@ -14,8 +14,8 @@
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
-import { DEFAULT_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng } from "@chessroyale/core";
-import { applyMove, bossMoveFrom, chooseSplit, fenAfter, gameEndWith, legalMoves, pieceAt, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type Opening } from "@chessroyale/chess";
+import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
+import { MatchRunner, applyMove, bossMoveFrom, botRoster, chooseSplit, fenAfter, gameEndWith, legalMoves, pieceAt, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -188,6 +188,125 @@ function summary() {
   console.log(lines.join("\n"));
 }
 
+// ---------------- Raids with every power (the rage meter's tuning) ----------------
+
+/** The judge's and the boss's search in the raid sims (a little under the game's 250,000, for time). */
+const RAID_NODES = 120_000;
+/** Each boss's ultimate, as the raid sim sees it come: a moment as a turn begins, or one the match runner plays. */
+const ULT_EVENTS = new Set(["blizzard", "candle", "boardsaw"]);
+
+/**
+ * A Solo raid with every power, as solo plays one with nobody watching (simulateRest): 50 bots (the Solo raid's own
+ * roster) against the boss at its usual raid strength, through the match runner, so the rage meter, the passives and
+ * the ultimates are the game's own. `strikes`: the God King's strikes the crowd calls (at random crowd turns 6 to 30,
+ * from a source of its own so the games stay paired across settings). Rows go to reports/boss-sim/raid-<tag>.jsonl.
+ */
+async function raid(bosses: string[], games: number, seed: number, strikes: number, tag: string) {
+  const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
+  const engines = [await createNodeEngine({ nodes: RAID_NODES, hashMb: 16 })];
+  mkdirSync(root + "reports/boss-sim", { recursive: true });
+  for (const bossId of bosses) {
+    for (let g = 0; g < games; g++) {
+      const rng = mulberry32(seed * 7919 + g);
+      const strikeRng = mulberry32(seed * 104729 + g);
+      const strikeTurns = new Set<number>();
+      while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
+      const s = { ...settings, ...RAID_SETTINGS, bossId, engineNodes: RAID_NODES, bossNodes: RAID_NODES } as Settings;
+      const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, s.lobbySize, s) });
+      const ults: { kind: string; turn: number }[] = [];
+      let seen = -1;
+      const look = () => {
+        const p = runner.boss?.powers;
+        if (!p || p.turn === seen) return;
+        seen = p.turn;
+        for (const e of p.events) if (ULT_EVENTS.has(e.kind)) ults.push({ kind: e.kind, turn: e.turn });
+      };
+      look();
+      let struck = 0;
+      let result: string | null = null;
+      const t0 = Date.now();
+      while (!runner.isOver()) {
+        if (runner.stageComplete()) {
+          result = runner.finishBossBattle();
+          break;
+        }
+        if (runner.bossToMove()) {
+          if (runner.lightsOutDue()) {
+            ults.push({ kind: "lightsout", turn: runner.boss!.crowdMoves });
+            runner.startLightsOut();
+            runner.finishLightsOut({});
+          }
+          if (runner.bounceDue()) {
+            ults.push({ kind: "bounce", turn: runner.boss!.crowdMoves });
+            await runner.playBounce(engines).catch(() => runner.applyBounce(null));
+          }
+          await runner.playBoss(engines[0]);
+          look();
+          continue;
+        }
+        if (runner.extraMoveDue()) {
+          await runner.playExtraMove(engines[0]);
+          continue;
+        }
+        if (runner.funhouseDue()) {
+          ults.push({ kind: "funhouse", turn: runner.boss!.crowdMoves + 1 });
+          await runner.playFunhouse(engines[0]);
+          continue;
+        }
+        runner.deal();
+        // (The crowd calls the God King's strike: bots call until more than half of the crowd has.)
+        if (strikeTurns.has(runner.boss!.crowdMoves + 1) && (runner.boss!.kingCharges ?? 0) > 0) {
+          for (const p of runner.alive()) {
+            if (runner.callStrike(p.id).struck) {
+              struck++;
+              break;
+            }
+          }
+        }
+        await runner.score(new Map());
+        if (runner.bossKillDue()) runner.bossKill();
+      }
+      const b = runner.boss!;
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000) };
+      appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
+      console.log(JSON.stringify(row));
+    }
+  }
+  engines.forEach((e) => e.close());
+}
+
+/** The raid sims' table: ultimates per game and crowd results, by boss and run (tag). */
+function raidSummary(tags: string[]): string[] {
+  const dir = root + "reports/boss-sim";
+  type Row = { boss: string; tag: string; strikes: number; result: string; moves: number; ults: number; ultTurns: number[] };
+  const rows: Row[] = readdirSync(dir)
+    .filter((f) => f.startsWith("raid-") && tags.includes(f.slice(5, -6)))
+    .flatMap((f) => readFileSync(`${dir}/${f}`, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as Row));
+  const out: string[] = [
+    "| Boss | Run | Games | Strikes a game | Ultimates a game | Games with 0 / 1 / 2 / 3+ | First at (median turn) | Crowd wins | Draws | Boss wins | Avg crowd moves |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
+  ];
+  const median = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]! : "-");
+  for (const def of BOSS_ROSTER.filter((d) => d.powers && d.kit)) {
+    for (const tag of tags) {
+      const rs = rows.filter((r) => r.boss === def.id && r.tag === tag);
+      if (!rs.length) continue;
+      const n = rs.length;
+      const pct = (k: string) => `${Math.round((100 * rs.filter((r) => r.result === k).length) / n)}%`;
+      const dist = [0, 1, 2].map((k) => rs.filter((r) => r.ults === k).length).concat(rs.filter((r) => r.ults >= 3).length).join(" / ");
+      const avg = (f: (r: Row) => number) => (rs.reduce((t, r) => t + f(r), 0) / n).toFixed(1);
+      out.push(`| ${def.name} | ${tag} | ${n} | ${avg((r) => r.strikes)} | ${avg((r) => r.ults)} | ${dist} | ${median(rs.filter((r) => r.ults).map((r) => r.ultTurns[0]!))} | ${pct("crowd")} | ${pct("draw")} | ${pct("boss")} | ${Math.round(rs.reduce((t, r) => t + r.moves, 0) / n)} |`);
+    }
+  }
+  console.log(out.join("\n"));
+  return out;
+}
+
 const [cmd, kind, offsets, games, seed, mode] = process.argv.slice(2);
 if (cmd === "summary") summary();
+else if (cmd === "raid") {
+  // npx tsx packages/sim/scripts/boss-sim.ts raid <boss,ids|all> <games> <seed> <strikes> <tag>
+  const ids = !kind || kind === "all" ? BOSS_ROSTER.filter((d) => d.powers && d.kit).map((d) => d.id) : kind.split(",");
+  await raid(ids, Number(offsets ?? 4), Number(games ?? 1), Number(seed ?? 2), mode ?? "test");
+} else if (cmd === "raid-summary") raidSummary((kind ?? "").split(","));
 else await run(kind ?? "club", (offsets ?? "0").split(",").map(Number), Number(games ?? 4), Number(seed ?? 1), !!mode?.split(",").includes("stumble"), !!mode?.split(",").includes("snack"), !!mode?.split(",").includes("split"));

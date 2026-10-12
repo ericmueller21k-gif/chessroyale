@@ -12,7 +12,7 @@ import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { legalMoves, pieceAt, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { bossPowers, crowdHalf, logit, meterFull, moveSquares, other, powerRoll, testSwitch, to, type Battle, type BossRules, type Side } from "./base.ts";
+import { bossPowers, crowdHalf, logit, meterFull, moveSquares, other, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 
 /**
  * Big Boy's snack in the intro (before move 1): he waddles over to the crowd's centre pawn, grabs it and eats it
@@ -87,11 +87,11 @@ export const blockSquare = (boss: Pick<BossState, "powers"> | null | undefined):
 
 /**
  * The Big Bounce is due: the start of his turn (the crowd has just moved) on the turn the rage meter warned, or after
- * the test trigger. Once a match.
+ * the test trigger, and not played yet this time (`ultAt` is set as it lands, and clears as the next turn begins).
  */
 export const bounceDue = (boss: BossState | null | undefined): boolean => {
   const p = boss?.powers;
-  return !!p && !boss!.result && bossPowers(boss)?.ultimate === "bounce" && !p.bounce && p.ultAt === undefined && (!!p.ultNext || (p.warnAt !== undefined && p.warnAt === boss!.crowdMoves));
+  return !!p && !boss!.result && bossPowers(boss)?.ultimate === "bounce" && p.ultAt === undefined && (!!p.ultNext || (p.warnAt !== undefined && p.warnAt === boss!.crowdMoves));
 };
 
 /** One of the Big Bounce's candidate positions (him to move) and the crowd's pieces it moved, each from and to. */
@@ -366,7 +366,7 @@ export const BIGBOY: BossRules = {
   // after the crowd's move (bounceDue). The test switch: warned as the second turn begins. The trigger (`ultNext`, kept):
   // at the start of his next turn, without the warning.
   ultimate(next, t) {
-    if (next.warnAt === undefined && !t.ultNext && (meterFull(next, t) || testSwitch(t))) {
+    if (next.warnAt === undefined && !t.ultNext && (meterFull(next, t) || testSwitch(t, next))) {
       next.warnAt = t.turn;
       t.events.push({ kind: "warn", turn: t.turn });
     }
@@ -499,7 +499,8 @@ export const bigboyBattle = {
    * The Big Bounce lands (from the host's engine online): the crowd's pieces where the picked candidate has them (a base
    * on the board: the position changes between moves), or, with no pick (none within the cap, no engine anywhere, or
    * anything that isn't one of the candidates), nothing moves; the bounces play either way. It isn't a move: nothing is
-   * scored, fair play never sees it, and he plays his move after it. Once a match: the meter is spent.
+   * scored, fair play never sees it, and he plays his move after it. The meter is spent (it fills again from the next
+   * turn).
    */
   applyBounce(b: Battle, pick: string | null, loss: number | null = null): BounceResult {
     const boss = b.state.boss!;
@@ -515,7 +516,7 @@ export const bigboyBattle = {
       const expected = loss === null ? board.expected : 1 / (1 + Math.exp(-(odds + loss * BOSS_POWERS.bouncePawnLogit)));
       b.boards.set(id, { ...board, fen: picked.fen, expected, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: picked.fen }] });
     }
-    b.state = { ...b.state, boss: { ...boss, powers: { ...p, ultAt: boss.crowdMoves, bounce: result, events: [...p.events, { kind: "bounce", turn: p.turn }] } } };
+    b.state = { ...b.state, boss: { ...boss, powers: unleashed({ ...p, ultAt: boss.crowdMoves, bounce: result, events: [...p.events, { kind: "bounce", turn: p.turn }] }) } };
     return result;
   },
 };
