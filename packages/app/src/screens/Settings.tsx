@@ -444,7 +444,7 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
         CSSLab, University of Toronto (AGPL-3.0), each a separate program running in your browser. The source of our Maia box is available
         on request (<a href="/engine/maia/NOTICE.txt">notice</a>, <a href="/engine/maia/LICENSE.txt">licence</a>).
       </p>
-      <p class="fd-note maia-credit pieces-credit">
+      <p class="fd-note pieces-credit">
         Chess pieces by Colin M.L. Burnett (<a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces">Wikimedia Commons</a>), used
         under the BSD licence (<a href="/licenses/pieces.txt">licence</a>).
       </p>
