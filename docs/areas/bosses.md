@@ -207,15 +207,17 @@ boss's `offset` in `boss.ts`.
 
 - Unit, the brain: `packages/chess/test/boss-brain.test.ts`; the Maia box's own tests in `packages/maia-worker/test/`.
   e2e: `e2e/maia.spec.ts`. Sim: `packages/sim/scripts/maia-sim.ts` (`reports/maia-boss.md`).
-- Unit: `packages/chess/test/boss-powers.test.ts`, `rage.test.ts` (every boss's ultimate again and again, never two at
-  once), `grex.test.ts` (the meter), `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
+- Unit: `packages/chess/test/boss-powers.test.ts` (Boingo's pies and the funhouse's steps among them), `rage.test.ts`
+  (every boss's ultimate again and again, never two at once), `packages/app/test/board-view.test.ts` (the turned
+  board's squares, moves and coordinates), `grex.test.ts` (the meter), `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
   `long-match.test.ts`, `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`,
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,
   `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
 - Unit, a boss's attack on a king: `packages/chess/test/king-attack.test.ts` (the beats, the Last Stand's fit, the
   mate's hold, the mate switch), `packages/app/test/king-attack.test.ts` (the kit, Hollow's frames on the beats, the God
   King's blows, the hits).
-- e2e: `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
+- e2e: `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
+  0°, 180°, 90° and 270°; the coordinates and pies on their squares at each), `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
   `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
   gone on time),
   `perf.spec.ts`. Unit: `packages/app/test/speech.test.ts` (the speech rule).
