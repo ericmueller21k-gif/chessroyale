@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FRONT_DOOR, SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, halfDuties, squadsLegalMoves, type NetSquadsMatch } from "@chessroyale/chess/squads";
-import { clearTopCache, parseTestClock, partiesFit, squadsClosing, type LiveMatch } from "../src/squads-lobby.ts";
+import { clearTopCache, parseTestClock, partiesFit, squadsClosing, squadsTestAllowed, testLobbyOptions, type LiveMatch } from "../src/squads-lobby.ts";
 import { fallbackTop } from "../src/squads-bots.ts";
 import { squadsLobby } from "./squads-fixture.ts";
 
@@ -439,6 +439,51 @@ describe("squads lobby: the test controls", () => {
     } finally {
       SQUADS_LOBBY.testControls = was;
     }
+  });
+});
+
+describe("squads lobby: the test lobby from the first vote (/squads/test)", () => {
+  it("only test players may open one: an admin, or anyone where SQUADS_TEST is on; never with the switch off", () => {
+    expect(squadsTestAllowed(undefined, true)).toBe(true);
+    expect(squadsTestAllowed("1", false)).toBe(true);
+    expect(squadsTestAllowed(undefined, false)).toBe(false);
+    expect(squadsTestAllowed("0", false)).toBe(false);
+    const was = SQUADS_LOBBY.testControls;
+    SQUADS_LOBBY.testControls = false;
+    try {
+      expect(squadsTestAllowed(undefined, true)).toBe(false);
+      expect(squadsTestAllowed("1", true)).toBe(false);
+    } finally {
+      SQUADS_LOBBY.testControls = was;
+    }
+  });
+
+  it("start=votes fills at once from round 1; the round links still wait for others to join", () => {
+    const now = 5_000_000;
+    expect(testLobbyOptions(new URLSearchParams("start=votes"), now)).toEqual({ fillAt: now, test: { start: 0 } });
+    expect(testLobbyOptions(new URLSearchParams("start=relay"), now)).toEqual({ fillAt: now + SQUADS_LOBBY.testFillSeconds * 1000, test: { start: 0 } });
+    expect(testLobbyOptions(new URLSearchParams("start=final&clock=60,10,2,0&keep=30"), now)).toMatchObject({ test: { start: 2, clock: { bankSeconds: 60 } }, keepMs: 30_000 });
+  });
+
+  it("its opener is seated with bots in every other seat at once, then lands on the first vote; Skip votes and Next round still work", () => {
+    const L = squadsLobby({ test: { start: 0 }, fillInMs: 0 });
+    const eric = L.join("Eric", { test: true, userId: "u1" });
+    expect(L.core.record.phase).toBe("filled");
+    const seats = L.core.record.squads.flatMap((sq) => sq.players);
+    expect(seats).toHaveLength(SQUADS.squadCount * SQUADS.squadSize);
+    expect(seats.filter((p) => p.isBot)).toHaveLength(seats.length - 1);
+    expect(seats.find((p) => !p.isBot)!.id).toBe(eric);
+    L.advance(FRONT_DOOR.fillShowMs);
+    expect(L.core.record.phase).toBe("vote");
+    expect(L.last(eric, "vote")!.vote).toMatchObject({ index: 0, id: "start" });
+    expect(L.last(eric, "welcome")!.test).toBe(true);
+    // Skip votes, then Next round: the bracket from round 1, then on to round 2.
+    L.core.message(eric, { t: "nextRound" });
+    expect(L.core.record.phase).toBe("bracket");
+    expect(L.core.allMatches().filter((m) => m.round === 0)).toHaveLength(4);
+    L.advance(SQUADS_LOBBY.bracketIntroSeconds * 1000 + 5_000);
+    L.core.message(eric, { t: "nextRound" });
+    expect(L.core.allMatches().filter((m) => m.round === 1)).toHaveLength(2);
   });
 });
 

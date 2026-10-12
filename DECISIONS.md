@@ -1755,3 +1755,26 @@ on mobile (sadly just no room), and audio should be disabled on it by default."
 - **No speaker toggle:** its header row (tag, mode, move count) is already cut short with "…" at 1280 px, and the
   window is something to glance at, not to listen to. Easy to add later if someone asks.
 - **Games unchanged:** every board in a match still plays the picked move and capture sounds (e2e `sound.spec.ts`).
+
+### Squads test tools: the start link and Cheat lines (Eric, Oct 12, 2026)
+
+Eric wanted to stress-test Squads alone: a link that drops him straight into a full lobby at the first vote, and the
+engine's best moves on demand ("I'm bad at chess and need infinite cheat moves").
+
+- **The link is `/squads/test` (also `/squads/test/start`)**, the server's `start=votes`: a test lobby whose fill time
+  is the moment it's made, so the opener's connection fills it (bots in every other seat) and the votes follow after
+  the usual full-grid moment (1.8 s, kept: it's the same screen players see). The other test links keep their 5 s wait
+  for others to join. Admin-only, like every test control (`squadsTestAllowed`).
+- **Cheat lines show the evaluation on the arrow and the rank by colour,** not "1 · +0.8" on the arrow: the board's
+  arrow labels sit in a small disc sized for 3-4 characters (the power-up hints' "52.1"), and 7 characters there would
+  be unreadable on a phone. The full "1 · Nf3 +0.8" is listed under the button, in the same colours.
+- **Evaluations in pawns, approximately,** for the side to move: the engine gives an expected score (win + half the
+  draws), turned back into pawns on Stockfish's scale (+1.00 is about a 50% win, an expected score of about 0.75).
+  Good enough to compare moves; the chess package's engine interface stays as it is.
+- **An engine of its own** for the lines, not the shared pool: the pool does the lobby's bot work at every half's start,
+  exactly when Eric would want his lines. 300,000 nodes (`SQUADS_LOBBY.cheatLines`).
+- **For a block,** the position is the picking side's to move, so its top moves are the ones worth blocking: the same
+  search, no special case.
+- **A fix found on the way:** the block line above the board named the blockers' own colour as the one picking ("Block
+  with Pam · White is picking" while Black picked): a block's duty carries the blockers' side. It now names the other
+  side, the one whose move it is.

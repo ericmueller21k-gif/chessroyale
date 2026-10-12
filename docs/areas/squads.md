@@ -169,10 +169,12 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   wallet, crates counted in `wallets.crates` for when crates stop being free) if still playing their seat. Nothing in
   a test lobby or after a test control.
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
-  e2e, never production), while `SQUADS_LOBBY.testControls` is on: `nextRound` in a lobby (the rules' `endByMaterial` on
-  the earliest round's matches, the next round 3 s later; in the votes: they close), and a test lobby,
-  `POST /api/squads/lobby?start=pairs|final&clock=BANK,TOPUP,FREE,INC` (a team clock in seconds), that fills 5 s after
-  it opens, skipping the rounds before (squads with more people go through).
+  e2e, never production), while `SQUADS_LOBBY.testControls` is on (`squadsTestAllowed`): `nextRound` in a lobby (the
+  rules' `endByMaterial` on the earliest round's matches, the next round 3 s later; in the votes: they close), and a
+  test lobby, `POST /api/squads/lobby?start=votes|relay|pairs|final&clock=BANK,TOPUP,FREE,INC` (a team clock in
+  seconds; `testLobbyOptions`), that fills 5 s after it opens, skipping the rounds before (squads with more people go
+  through). `start=votes` (Eric, Oct 12) fills the moment its opener connects (`fillAt` = now): seated, bots in every
+  other seat, the first vote after the full grid's moment, then the whole tournament.
 - **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 1, typed): a lobby socket gets
   `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock), `vote`/`voteCast`, `match` (a match in
   full, as you may see it), `turn`, `clocks`, `choices`, `half`, `choiceNo`, `placed`, `results`, `botWork`, `left`,
@@ -201,7 +203,8 @@ Tests: `packages/server/test/squads-lobby.test.ts` (seats and parties, the fill,
 to its results, halves, deadlines, takeover and reclaiming, leaving, team clocks and sudden death, ties, the final's
 visibility, Armageddon, the test controls, rewards, bot work on devices), `squads-queue.test.ts` (the queue, parties,
 D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match, restart, closing); e2e `e2e/squads.spec.ts`
-(a party through the real server; a test lobby at the final). The full-lobby run: `npx tsx scripts/squads-headless.ts
+(a party through the real server; a test lobby at the final); `e2e/squads-test-tools.spec.ts` (the start link and
+Cheat lines, and a player without them). The full-lobby run: `npx tsx scripts/squads-headless.ts
 --url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
 
 ## The screens (phase 3)
@@ -245,9 +248,17 @@ door's look; every class is `sq-`.
   party" for a party). Through and waiting: a card and the bracket, every tiny board to watch. **Results:** every
   squad's placement and members, yours ringed, your reward, the bracket; Play again or Home.
 - **Test controls on screen** (only when the server's `welcome` says `test`): "Next round" beside the title in a
-  match, "Skip votes" in the votes. A test lobby: an admin's Party sheet has Relay · Pairs · Final, and the link
-  `/squads/test/relay|pairs|final[?clock=BANK,TOPUP,FREE,INC]` opens one (admins on hunchess.com; anyone locally with
-  `SQUADS_TEST`).
+  match, "Skip votes" in the votes. A test lobby: an admin's Party sheet has Start · Relay · Pairs · Final, and the link
+  `/squads/test[/start|relay|pairs|final][?clock=BANK,TOPUP,FREE,INC]` opens one (admins on hunchess.com; anyone
+  locally with `SQUADS_TEST`); `/squads/test` alone (or `/start`) is the whole tournament from the first vote.
+- **Cheat lines** (test controls only, Eric Oct 12): a switch in the panel wherever you choose (`cheatLinesAt`: your
+  Relay move, a Pairs or final pick, a block, Armageddon's colours). On, it draws the engine's top 3 in the position
+  (`SQUADS_LOBBY.cheatLines`: moves, nodes) as arrows coloured by rank (green, blue, yellow, as the power-up hints),
+  each labelled with its evaluation for the side to move (`cheatEval`: pawns turned back from the expected score, or
+  a mate), and lists them as "1 · Nf3 +0.8". For a block the position's side to move is the pickers', so its lines are
+  the moves worth blocking. It stays on (`SquadsClient.cheatLines`, this device only) until switched off, searching
+  each new position on an engine of its own (`ownEngine()`, never queued behind bot work). Nothing is sent; scoring,
+  bots and the server never see it. A page whose `welcome` says no `test` never shows it, and the switch can't turn on.
 - **Bot work on this device:** after `welcome` the page runs its engine speed check once (`engineSpeed()`, shared with
   Crowd's judges) and sends `speed`; each `botWork` job is searched on the engine pool (`topMovesAt(fen, n, nodes)`,
   every engine at once) and answered with `botTop`. A knocked-out player's page keeps answering while it's open.

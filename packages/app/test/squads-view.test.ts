@@ -4,6 +4,9 @@ import { START_FEN } from "@chessroyale/chess";
 import {
   SQUAD_NAMES,
   bankText,
+  cheatArrows,
+  cheatEval,
+  cheatLinesAt,
   drainRate,
   liveBank,
   movesOfHalf,
@@ -15,6 +18,7 @@ import {
   standingsOrder,
   type LocalMatch,
 } from "../src/squads-view.ts";
+import { SquadsClient } from "../src/squads.ts";
 
 /** A match as the client keeps it: two squads of four, `boards` boards, a half begun at t=0. */
 function match(over: Partial<LocalMatch> = {}, boards = 4): LocalMatch {
@@ -165,5 +169,47 @@ describe("Squads screens: words and numbers", () => {
     expect(movesOfHalf(events as never, 0)).toEqual(["e2e4"]);
     expect(movesOfHalf(events as never, 1)).toEqual(["e1f1"]);
     expect(movesOfHalf(events as never, 2)).toEqual([]);
+  });
+});
+
+describe("cheat lines (test controls only)", () => {
+  const fen = START_FEN;
+  it("only a test player gets them, and only while choosing (a move, a pick, a block, Armageddon's colours)", () => {
+    for (const choosing of [true, false]) for (const colourChoice of [true, false]) expect(cheatLinesAt(false, { choosing, colourChoice, fen })).toBeNull();
+    expect(cheatLinesAt(true, { choosing: true, colourChoice: false, fen })).toBe(fen);
+    expect(cheatLinesAt(true, { choosing: false, colourChoice: true, fen })).toBe(fen);
+    expect(cheatLinesAt(true, { choosing: false, colourChoice: false, fen })).toBeNull();
+  });
+
+  it("a player's switch never turns on; a test player's toggles until switched off", () => {
+    const player = new SquadsClient("ABCDE");
+    player.toggleCheatLines();
+    expect(player.cheatLines).toBe(false);
+    const eric = new SquadsClient("ABCDE");
+    eric.test = true;
+    eric.toggleCheatLines();
+    expect(eric.cheatLines).toBe(true);
+    eric.toggleCheatLines();
+    expect(eric.cheatLines).toBe(false);
+  });
+
+  it("draws the top 3 as arrows coloured by rank, each labelled with its evaluation for the side to move", () => {
+    expect(cheatEval({ expected: 0.5 })).toBe("0.0");
+    expect(cheatEval({ expected: 0.75 })).toBe("+1.0");
+    expect(cheatEval({ expected: 0.25 })).toBe("−1.0");
+    expect(cheatEval({ expected: 1, mate: 3 })).toBe("#3");
+    expect(cheatEval({ expected: 0, mate: -2 })).toBe("#-2");
+    const arrows = cheatArrows([
+      { move: "e2e4", expected: 0.6 },
+      { move: "d2d4", expected: 0.58 },
+      { move: "g1f3", expected: 0.55 },
+      { move: "a2a3", expected: 0.4 },
+    ]);
+    expect(arrows.map((a) => [a.move, a.brush])).toEqual([
+      ["e2e4", "green"],
+      ["d2d4", "blue"],
+      ["g1f3", "yellow"],
+    ]);
+    expect(arrows.every((a) => /^[+−]\d\.\d$/.test(a.label!))).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
-import { SQUADS_LOBBY, BOSS_TIERS, POWER_IDS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { BOSS_TIERS, POWER_IDS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, MAX_OPENING_MOVES, PACE_SETTINGS, definedOnly, modeSettings, speedOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { Lobby } from "./lobby-do.ts";
 import type { SquadsLobby, SquadsParty } from "./squads-do.ts";
-import { parseTestClock } from "./squads-lobby.ts";
+import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 import type { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
@@ -251,9 +251,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
  *   POST /api/squads/party → { code }: a new party (the invite link is /squads/party/CODE).
  *   GET /api/squads/party/CODE → { open, members, state } | 404; /api/squads/party/CODE/ws: its WebSocket.
  *   GET /api/squads/lobby/CODE → { open, phase } | 404; /api/squads/lobby/CODE/ws: its WebSocket.
- *   POST /api/squads/lobby?start=relay|pairs|final&clock=BANK,TOPUP,FREE,INC&keep=S → { code }: a test lobby (test controls:
- *     admins, or anyone where SQUADS_TEST is "1"; else 404). It fills with bots SQUADS_LOBBY.testFillSeconds after
- *     it opens, and records and rewards nothing.
+ *   POST /api/squads/lobby?start=votes|relay|pairs|final&clock=BANK,TOPUP,FREE,INC&keep=S → { code }: a test lobby
+ *     (test controls: admins, or anyone where SQUADS_TEST is "1"; else 404). It fills with bots SQUADS_LOBBY.testFillSeconds
+ *     after it opens (start=votes: as soon as its opener connects, at the first vote), and records and rewards nothing.
  */
 async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
   if (!url.pathname.startsWith("/api/squads/")) return null;
@@ -279,12 +279,9 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   }
   if (url.pathname === "/api/squads/lobby" && request.method === "POST") {
     const me = await accountOf(request, env, waitUntil).catch(() => null);
-    if (!SQUADS_LOBBY.testControls || !(env.SQUADS_TEST === "1" || isAdmin(env, me))) return json({ message: "Not found" }, 404);
-    const start = ({ relay: 0, pairs: 1, final: 2 } as const)[url.searchParams.get("start") as "relay" | "pairs" | "final"] ?? 0;
-    const clock = parseTestClock(url.searchParams.get("clock"));
-    const keep = url.searchParams.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(url.searchParams.get("keep")) || 0)) * 1000 : undefined;
-    const fillAt = Date.now() + SQUADS_LOBBY.testFillSeconds * 1000;
-    const code = await openLobbyCode(async (c) => (await env.SQUADS.get(env.SQUADS.idFromName(c)).create(c, { fillAt, test: { start, ...(clock ? { clock } : {}) }, keepMs: keep })) !== false);
+    if (!squadsTestAllowed(env.SQUADS_TEST, isAdmin(env, me))) return json({ message: "Not found" }, 404);
+    const opts = testLobbyOptions(url.searchParams, Date.now());
+    const code = await openLobbyCode(async (c) => (await env.SQUADS.get(env.SQUADS.idFromName(c)).create(c, opts)) !== false);
     return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
   }
   const m = url.pathname.match(/^\/api\/squads\/(party|lobby)\/([A-Z2-9]{5})(\/ws)?$/i);

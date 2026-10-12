@@ -13,6 +13,8 @@ import {
   type SquadsEvent,
   type SquadsPlacement,
 } from "@chessroyale/chess/squads";
+import type { MoveScore } from "@chessroyale/chess";
+import type { Arrow } from "./board/types.ts";
 
 /**
  * What Squads' screens work out from the lobby as the server sends it (docs/areas/squads.md, "The screens"): pure, so
@@ -227,4 +229,35 @@ export function matchFor(matches: readonly LocalMatch[], squadId: number | null)
     if (live) return live;
   }
   return null;
+}
+
+/**
+ * "Cheat lines" (test controls only, Eric Oct 12): the position whose engine lines to show, or null for no button. Only
+ * for a test player (the server's `welcome` says `test`: an admin, or SQUADS_TEST), and only while they choose
+ * something: their Relay move, a Pairs or final pick, a block (the position is the picking side's, so its top moves
+ * are the ones worth blocking), or Armageddon's colours.
+ */
+export function cheatLinesAt(test: boolean, s: { choosing: boolean; colourChoice: boolean; fen: string }): string | null {
+  return test && (s.choosing || s.colourChoice) ? s.fen : null;
+}
+
+/** The colours of the cheat lines, best first (the power-up hints' own). */
+export const CHEAT_BRUSHES = ["green", "blue", "yellow"] as const;
+
+/**
+ * A line's evaluation for the side to move, in pawns ("+0.8"), or a mate ("#3"; "#-2": the mover is mated). The engine
+ * gives an expected score (win + half the draws); this turns it back into pawns on Stockfish's scale, where +1.00 is
+ * about a 50% win (an expected score of about 0.75): approximate, and enough to rank and compare.
+ */
+export function cheatEval(t: Pick<MoveScore, "expected" | "mate">): string {
+  if (t.mate !== undefined) return `#${t.mate}`;
+  const e = Math.min(0.999, Math.max(0.001, t.expected));
+  const pawns = Math.max(-9.9, Math.min(9.9, Math.log(e / (1 - e)) / Math.log(3)));
+  const r = Math.round(pawns * 10) / 10;
+  return r === 0 ? "0.0" : `${r > 0 ? "+" : "−"}${Math.abs(r).toFixed(1)}`;
+}
+
+/** The cheat lines as the board's arrows: best first, coloured by rank, each labelled with its evaluation. */
+export function cheatArrows(top: readonly Pick<MoveScore, "move" | "expected" | "mate">[]): Arrow[] {
+  return top.slice(0, CHEAT_BRUSHES.length).map((t, i) => ({ move: t.move, brush: CHEAT_BRUSHES[i]!, label: cheatEval(t) }));
 }

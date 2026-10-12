@@ -141,10 +141,18 @@ const rejoinCode = (() => {
   return code && /^[A-Z2-9]{5}$/.test(code) && hasSeat(code) ? code : null;
 })();
 
-/** Squads' links: a party's invite (/squads/party/CODE), a lobby to rejoin (/squads/CODE), a test lobby (/squads/test/pairs). */
+/**
+ * Squads' links: a party's invite (/squads/party/CODE), a lobby to rejoin (/squads/CODE), a test lobby (/squads/test/pairs;
+ * /squads/test or /squads/test/start: the whole tournament from the first vote, bots in every other seat at once).
+ */
 const partyLinkCode = location.pathname.match(/^\/squads\/party\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
 const squadsLinkCode = location.pathname.match(/^\/squads\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
-const squadsTestStart = location.pathname.match(/^\/squads\/test\/(relay|pairs|final)\/?$/)?.[1] as "relay" | "pairs" | "final" | undefined;
+const squadsTestStart = ((m) => (m ? (m[1] === undefined || m[1] === "start" ? "votes" : m[1]) : undefined))(location.pathname.match(/^\/squads\/test(?:\/(start|relay|pairs|final))?\/?$/)) as
+  | "votes"
+  | "relay"
+  | "pairs"
+  | "final"
+  | undefined;
 /** Opened from scratch at home with a seat in a Squads lobby (or its link): check it's still on, and go back in. */
 const squadsRejoin = (() => {
   if (squadsLinkCode) return squadsSeat(squadsLinkCode) ? squadsLinkCode : null;
@@ -321,7 +329,7 @@ export function App() {
   useEffect(() => {
     if (partyLinkCode && currentParty() === partyLinkCode) joinParty(partyLinkCode);
   }, []);
-  // A test lobby's link (/squads/test/pairs): made once your account is known (admins only, or SQUADS_TEST).
+  // A test lobby's link (/squads/test/pairs, /squads/test): made once your account is known (admins only, or SQUADS_TEST).
   const testMade = useRef(false);
   useEffect(() => {
     if (!squadsTestStart || testMade.current || config === null || (config.accounts && !profile)) return;

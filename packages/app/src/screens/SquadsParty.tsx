@@ -30,7 +30,7 @@ export function PartySheet({
   admin?: boolean;
   onCreate: () => void;
   onJoin: (code: string) => void;
-  onTest: (start: "relay" | "pairs" | "final") => void;
+  onTest: (start: "votes" | "relay" | "pairs" | "final") => void;
   onSignIn: () => void;
   onClose: () => void;
 }) {
@@ -150,9 +150,9 @@ export function PartySheet({
               <div class="sq-test" aria-label="Test lobbies">
                 <span class="fd-label">TEST LOBBY</span>
                 <div class="sq-test-row">
-                  {(["relay", "pairs", "final"] as const).map((s) => (
+                  {(["votes", "relay", "pairs", "final"] as const).map((s) => (
                     <FdButton key={s} class="small" disabled={loading} onClick={() => onTest(s)}>
-                      {s === "relay" ? "Relay" : s === "pairs" ? "Pairs" : "Final"}
+                      {s === "votes" ? "Start" : s === "relay" ? "Relay" : s === "pairs" ? "Pairs" : "Final"}
                     </FdButton>
                   ))}
                 </div>

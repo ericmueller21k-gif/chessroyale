@@ -311,6 +311,29 @@ export function parseTestClock(text: string | null): SquadsClock | null {
   return { id: "test", label: "Test", bankSeconds: bank, topUpSeconds: topUp, delaySeconds: delay, incrementSeconds: inc };
 }
 
+/** May this person open a test lobby: the test controls' switch is on, and an admin (or SQUADS_TEST is "1" here). */
+export function squadsTestAllowed(squadsTest: string | undefined, admin: boolean): boolean {
+  return SQUADS_LOBBY.testControls && (squadsTest === "1" || admin);
+}
+
+/**
+ * A test lobby's options from its request (POST /api/squads/lobby?start=…&clock=…&keep=…). `start=votes` (Eric, Oct
+ * 12): the whole tournament from the first vote, bots in every other seat the moment its opener connects (no fill
+ * wait). `relay|pairs|final`: that round, filled after SQUADS_LOBBY.testFillSeconds (time for others to join), the
+ * rounds before skipped (relay skips none: it has the votes too, after the wait).
+ */
+export function testLobbyOptions(q: URLSearchParams, now: number): { fillAt: number; test: NonNullable<SquadsRecord["test"]>; keepMs?: number } {
+  const which = q.get("start");
+  const start = ({ votes: 0, relay: 0, pairs: 1, final: 2 } as const)[which as "votes" | "relay" | "pairs" | "final"] ?? 0;
+  const clock = parseTestClock(q.get("clock"));
+  const keepMs = q.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(q.get("keep")) || 0)) * 1000 : undefined;
+  return {
+    fillAt: which === "votes" ? now : now + SQUADS_LOBBY.testFillSeconds * 1000,
+    test: { start, ...(clock ? { clock } : {}) },
+    ...(keepMs !== undefined ? { keepMs } : {}),
+  };
+}
+
 /** The engine's top moves for positions the devices (or the server) have settled, shared by the lobbies here. */
 const TOP_CACHE = new Map<string, MoveScore[]>();
 const cacheTop = (fen: string, top: MoveScore[]) => {
