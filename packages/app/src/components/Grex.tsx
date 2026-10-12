@@ -8,6 +8,7 @@ import { BossFace } from "./BossCharacter.tsx";
 import { BoardEffects, BossEffect, BossMoment, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
 import { Flight, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { CRITICAL } from "../speech.tsx";
 
 /**
  * G-REX's fire on screen (the characters' sprites): the tiles in their stages on one canvas, each with a small
@@ -239,6 +240,25 @@ function fireballMoment({ moment, now, orientation, cast }: MomentProps) {
   );
 }
 
+/**
+ * Jefferson laughs it off (Eric, Oct 11): the first time in a match one of his own pieces sits on fire from his Roman
+ * candle (his pieces never burn), one of these, picked from the battle's seed (the moment's `pick`). Once a match.
+ */
+export const FIREPROOF_LINES = ["Ha! My pieces don't burn. Perks!", "Fireproof! Did I forget to say?", "Hot? Not for my team. Ha!", "Mine are fire-rated. Yours? Ha!"];
+export const fireproofLine = (pick: number | undefined) => FIREPROOF_LINES[(pick ?? 0) % FIREPROOF_LINES.length]!;
+
+/** His smug look by the board's corner as he says it, and a cool glint over his piece standing in the flames. */
+function fireproofMoment({ boss, moment, t, orientation }: MomentProps) {
+  return (
+    <div class="power-moment pm-fireproof">
+      <span class="pm-caster">
+        <BossMoment boss={boss.name} anim="smug" since={moment.at} then="idle" />
+      </span>
+      {moment.square && t < 1800 && <span class="pw-fireproof" style={{ ...onSquare(moment.square, orientation), animationDelay: `${-t}ms` }} data-square={moment.square} />}
+    </div>
+  );
+}
+
 export const GREX_UI = {
   id: "grex",
   ultimate: { name: "the Roman Candle" },
@@ -253,6 +273,8 @@ export const GREX_UI = {
       view: fireballMoment,
     },
     candle: { order: 2, kit: "ultimate", dock: "Roman candle!", view: candleMoment },
+    // (Once a match, so it isn't lost in a queue: it cuts in like an ultimate's line.)
+    fireproof: { order: 4, kit: "ultimateHit", dock: "Fireproof!", line: (_kit, m) => fireproofLine(m.pick), lineAt: 150, priority: () => CRITICAL, view: fireproofMoment },
   },
   board: ({ boss, p, orientation, moments, now, appearAt }) => {
     // His fire tiles, each in its stage (a singe, more burn, ablaze), drawn as it lands: all on one canvas.

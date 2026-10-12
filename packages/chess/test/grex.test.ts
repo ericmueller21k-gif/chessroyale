@@ -19,6 +19,8 @@ import {
   fireLoss,
   fireRanked,
   fireShadows,
+  fireproofSquare,
+  ownShots,
   shadowStage,
   boardAngle,
   initPowers,
@@ -27,6 +29,7 @@ import {
   netBoard,
   pieceAt,
   playOnBoard,
+  powerRoll as powerRollOf,
   powerTurn,
   prepareTurn,
   rageOf,
@@ -371,22 +374,27 @@ describe("the Roman candle", () => {
     expect(w.at(-1)).toBe(1);
   });
 
-  it("3 crowd moves after the launch they fall a wave a turn, each a stage-1 fire tile, never on the king, spread out", () => {
+  it("3 crowd moves after the launch they fall a wave a turn, each a stage-1 fire tile, never on the king, spread out; some on his own half", () => {
     const states = barrage(18);
     const b2 = states.get(2)!;
     expect(kinds(b2)).toEqual(["candle"]);
     expect(b2.powers!.candle).toMatchObject({ at: 2, left: 24 });
     const waves: number[] = [];
     const sparks: number[] = [];
+    let mine = 0;
     for (let t = 3; t <= 18; t++) {
       const b = states.get(t)!;
       const wave = b.powers!.events.find((e) => e.kind === "fireball");
       waves.push(wave ? wave.squares!.length : 0);
       if (kinds(b).includes("spark")) sparks.push(t);
+      // (Each wave: candleOwnShare of it, rounded, on his half; the rest on the crowd's.)
+      const own = (wave?.squares ?? []).filter((sq) => Number(sq[1]) > 4);
+      expect(own.length).toBe(wave ? ownShots(wave.squares!.length) : 0);
+      mine += own.length;
       for (const sq of wave?.squares ?? []) {
-        expect(Number(sq[1])).toBeLessThanOrEqual(4);
         expect(pieceAt(RUY_FEN, sq)?.type === "k" && pieceAt(RUY_FEN, sq)?.color === "w").toBe(false);
         expect(b.powers!.fire!.find((x) => x.square === sq)!.lit).toBe(t);
+        expect(b.powers!.fire!.find((x) => x.square === sq)!.candle).toBe(true);
       }
       // No two tiles on one square; within a wave, none next to another.
       const squares = (b.powers!.fire ?? []).map((x) => x.square);
@@ -396,6 +404,9 @@ describe("the Roman candle", () => {
     // Fired as turn 2 began: none as the 3rd and 4th begin; then 1, 2, 3, 4, 4, 4, 3, 2, 1 from the 5th.
     expect(waves.slice(0, 11)).toEqual([0, 0, 1, 2, 3, 4, 4, 4, 3, 2, 1]);
     expect(waves.reduce((x, y) => x + y, 0)).toBe(24);
+    // As shipped: 10 of the 24 on his own half, 14 on the crowd's (all 24 fell on the crowd's before, Oct 11).
+    expect(mine).toBe(BOSS_POWERS.candleWaves.reduce((n, w) => n + ownShots(w), 0));
+    expect(mine).toBe(10);
     expect(states.get(13)!.powers!.candle!.left).toBe(0);
     // The shots still up as each turn begins (the pips): 24 until the first lands, then down to 0.
     expect([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((t) => states.get(t)!.powers!.candle!.left)).toEqual([24, 24, 24, 23, 21, 18, 14, 10, 6, 3, 1, 0]);
@@ -470,6 +481,52 @@ describe("the Roman candle", () => {
     expect(all).not.toContain("g1");
     // The whole barrage is the same from the same seed, picked ahead or not.
     expect(JSON.stringify(barrage(13, RUY_FEN, 3).get(13))).toBe(JSON.stringify(barrage(13, RUY_FEN, 3).get(13)));
+  });
+});
+
+describe("Jefferson's candle on his own half, and his fireproof laugh (Eric, Oct 11)", () => {
+  it("a wave's own share falls on his half, the rest on the crowd's: never the crowd king's square, spread, the same from the seed", () => {
+    for (let seed = 0; seed < 40; seed++) {
+      const sq = chooseFireballs(RUY_FEN, "w", seed, 6, 4, [], 2);
+      expect(sq).toHaveLength(4);
+      expect(new Set(sq).size).toBe(4);
+      // The crowd's first (the same squares as a wave with none on his half), then his.
+      expect(sq.slice(0, 2).every((x) => Number(x[1]) <= 4)).toBe(true);
+      expect(sq.slice(2).every((x) => Number(x[1]) >= 5)).toBe(true);
+      expect(sq.slice(0, 2)).toEqual(chooseFireballs(RUY_FEN, "w", seed, 6, 2));
+      expect(chooseFireballs(RUY_FEN, "w", seed, 6, 4, [], 2)).toEqual(sq);
+      expect(sq).not.toContain("g1");
+    }
+    // A black crowd: his half is ranks 1-4.
+    for (const x of chooseFireballs(RUY_FEN, "b", 3, 6, 4, [], 4)) expect(Number(x[1])).toBeLessThanOrEqual(4);
+    // As shipped: about four in ten of each wave, rounded.
+    expect(BOSS_POWERS.candleWaves.map((w) => ownShots(w))).toEqual([0, 1, 1, 2, 2, 2, 1, 1, 0]);
+  });
+
+  it("his pieces never burn: a tile ablaze under one of his does nothing", () => {
+    // (A black pawn on e5 in this position: the crowd is White.)
+    expect(burnOutcome(RUY_FEN, ["e5"], "w").burnt).toEqual([]);
+    expect(burnOutcome(RUY_FEN, ["e5"], "w").fen).toBe(RUY_FEN);
+  });
+
+  it("the first time one of his pieces sits on the candle's fire: his laugh, once a match, its line from the seed", () => {
+    const start = battle("grex", RUY_FEN, { crowdMoves: 3 }, 11);
+    const powers = { ...start.powers!, turn: 3, ultAt: 2, candle: { at: 2, left: 6, next: 9, waves: [] }, fire: [{ square: "e5", lit: 3, candle: true as const }, { square: "a1", lit: 3, candle: true as const }] };
+    let b = prepareTurn({ ...start, powers }, RUY_FEN);
+    expect(b.powers!.fireproof).toEqual({ turn: 4, square: "e5", pick: Math.floor(powerRollOf(11, "fireproof") * 4096) });
+    expect(b.powers!.events).toContainEqual({ kind: "fireproof", turn: 4, square: "e5", pick: b.powers!.fireproof!.pick });
+    // Never again, though his pieces stand in the fire still.
+    b = prepareTurn({ ...b, crowdMoves: 4 }, RUY_FEN);
+    expect(kinds(b)).not.toContain("fireproof");
+    expect(b.powers!.fireproof!.turn).toBe(4);
+    // His sparkler's fire doesn't count (only the candle's), nor the crowd's own pieces on the candle's.
+    expect(fireproofSquare([{ square: "e5", lit: 3 }], RUY_FEN, "w")).toBeNull();
+    expect(fireproofSquare([{ square: "e4", lit: 3, candle: true }], RUY_FEN, "w")).toBeNull();
+    expect(fireproofSquare([{ square: "e4", lit: 3, candle: true }, { square: "f6", lit: 3, candle: true }], RUY_FEN, "w")).toBe("f6");
+    // The same seed, the same line; another seed may pick another.
+    const pickOf = (seed: number) => prepareTurn({ ...start, powers: { ...powers, seed } }, RUY_FEN).powers!.fireproof!.pick;
+    expect(pickOf(11)).toBe(pickOf(11));
+    expect(new Set(Array.from({ length: 20 }, (_, i) => pickOf(i) % 4)).size).toBeGreaterThan(1);
   });
 });
 

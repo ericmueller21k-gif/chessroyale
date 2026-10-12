@@ -27,6 +27,8 @@ export interface Moment {
   fizzled?: string[];
   /** Hollow's first cover of the dark. */
   first?: true;
+  /** Jefferson's fireproof laugh: which of his lines (from the seed). */
+  pick?: number;
 }
 
 /** Which of a boss kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */
@@ -63,7 +65,7 @@ export interface MomentUi {
   /** It plays on a screen of its own (the funhouse, his extra move, the Big Bounce) when this says so. */
   own?: (boss: BossView) => boolean;
   /** Its line, when the kit's lines for its moment aren't the whole story (Hollow's first cover of the dark). */
-  line?: (kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first">) => string | null;
+  line?: (kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick">) => string | null;
   /** When the boss says its line (ms into the moment: as it begins unless given), into its voice (speech.tsx). */
   lineAt?: number;
   /** How much its line matters (speech.tsx): an ultimate's cuts in on another line, anything else waits its turn. */

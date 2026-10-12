@@ -449,7 +449,7 @@ Plays from the game so far.
 Plays from the game so far.
 
 - **Sparkler** (passive): from turn ${p.firstPassive}, a square on your half catches fire and burns in ${n(p.fireStages, "stage")}, one a turn. A piece of yours still on it after your move on the last stage burns (never your king, nor a piece whose loss would leave a king in check: then it fizzles). The judge counts a piece left to burn as already gone, so moving it off is never a mistake. The next sparkler comes ${n(p.fireGap, "turn")} after a fire goes out.
-- **Roman candle** (ultimate): ${p.candleShots} fireballs in waves of ${p.candleWaves.join(", ")}, one wave a turn, from ${n(p.candleDelay, "turn")} after he fires. Each wave's squares show as growing shadows ${n(p.candleAhead, "turn")} ahead, and each fireball lands as a fresh fire (never on your king's square as it's picked; if your king stands there when it lands, it fizzles).`,
+- **Roman candle** (ultimate): ${p.candleShots} fireballs in waves of ${p.candleWaves.join(", ")}, one wave a turn, from ${n(p.candleDelay, "turn")} after he fires. About ${pct(p.candleOwnShare, 0)} of each wave falls on his own half (his pieces never burn: the first time one stands in that fire, he laughs about it), the rest on yours. Each wave's squares show as growing shadows ${n(p.candleAhead, "turn")} ahead, and each fireball lands as a fresh fire (never on your king's square as it's picked; if your king stands there when it lands, it fizzles). A piece of yours left on any of his fires burns, wherever it is.`,
   hollow: (p) => `
 Always plays Black, from the starting position: if you'd have been Black, he claims the dark side before move 1.
 

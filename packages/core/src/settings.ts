@@ -523,6 +523,13 @@ export const BOSS_POWERS = {
   candleWaves: [1, 2, 3, 4, 4, 4, 3, 2, 1] as readonly number[],
   candleDelay: 3,
   /**
+   * The share of each wave's fireballs that fall on his own half (Eric, Oct 11: his ultimate was too strong). His pieces
+   * never burn, so those are mostly wasted (a crowd piece standing there still would). Rounded per wave: 0.4 sends 10
+   * of the 24 to his half (waves 0, 1, 1, 2, 2, 2, 1, 1, 0) and 14 to the crowd's, where all 24 fell before. Set by
+   * estimate; not yet tested with the bot sim.
+   */
+  candleOwnShare: 0.4,
+  /**
    * Each wave's squares are picked this many crowd turns before it lands (at most candleDelay), and show a shadow
    * that grows each turn: small, bigger, bigger again, then the fireball drops onto it.
    */
