@@ -39,7 +39,7 @@ async function open(context, extra) {
 /** From `from` to `to` ms after `startAt` (the page's clock), a frame of the board every STEP ms, the clock paused between. */
 async function strip(p, tag, startAt, from, to) {
   await p.clock.pauseAt(startAt + from);
-  const board = await p.locator("cg-board").first().boundingBox();
+  const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
   const vw = p.viewportSize();
   const x = Math.max(0, board.x - 40);
   const y = Math.max(0, board.y - 120);
@@ -73,7 +73,7 @@ async function tapMove(p) {
   const fen = await p.evaluate(() => window.match.phase.board.fen);
   const moves = new Chess(fen).moves({ verbose: true });
   const mv = moves.find((m) => m.piece === "n") ?? moves[0];
-  const board = await p.locator("cg-board").first().boundingBox();
+  const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
   const sq = (s) => ({ x: board.x + (s.charCodeAt(0) - 97 + 0.5) * (board.width / 8), y: board.y + (7 - (Number(s[1]) - 1) + 0.5) * (board.height / 8) });
   await p.mouse.click(sq(mv.from).x, sq(mv.from).y);
   await p.mouse.click(sq(mv.to).x, sq(mv.to).y);

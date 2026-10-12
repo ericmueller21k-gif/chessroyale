@@ -445,6 +445,175 @@ p {
   color: rgba(72, 58, 40, 0.8);
 }
 
+/* ---- Our own board (board/OwnBoard.tsx, BOARD.impl "own"): the same look as chessground's above, the same stacking
+   (the pieces at z-index 2, sliding 8, dragged 11, a captured one fading at 1; nothing here makes a layer of its own,
+   so everything drawn over the board stacks with the pieces as before). The pieces' art: board/pieces.css. ---- */
+.hb {
+  box-sizing: content-box;
+  position: relative;
+  display: block;
+}
+/* Exactly the board: sized by the board itself (a whole multiple of 8 device pixels, written as ---cg-width). */
+.hb-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.hb-board {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  line-height: 0;
+  /* The light squares; the dark ones are 20 % black over them (OwnBoard's SQUARES_SVG), as the brown board's are. */
+  background-color: #f0d9b5;
+  background-size: cover;
+}
+.hb-manipulable .hb-board {
+  cursor: pointer;
+}
+.hb square {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+}
+.hb square.move-dest {
+  pointer-events: auto;
+}
+.hb square.last-move {
+  background-color: rgba(155, 199, 0, 0.41);
+  will-change: transform;
+}
+.hb square.selected {
+  background-color: rgba(20, 85, 30, 0.5);
+}
+.hb square.move-dest {
+  background: radial-gradient(rgba(20, 85, 30, 0.5) 22%, #208530 0, rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0) 0);
+}
+.hb square.oc.move-dest {
+  background: radial-gradient(transparent 0%, transparent 80%, rgba(20, 85, 0, 0.3) 80%);
+}
+.hb square.move-dest:hover {
+  background: rgba(20, 85, 30, 0.3);
+}
+.hb square.check {
+  background: radial-gradient(ellipse at center, rgba(255, 0, 0, 1) 0%, rgba(231, 0, 0, 1) 25%, rgba(169, 0, 0, 0) 89%, rgba(158, 0, 0, 0) 100%);
+}
+.hb piece {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+  z-index: 2;
+  will-change: transform;
+  pointer-events: none;
+  /* A move slides: 220 ms on a cubic ease in and out (SLIDE_MS in board/logic.ts), as before. */
+  transition: transform 220ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+.hb-jump piece,
+.hb piece.ghost {
+  transition: none;
+}
+.hb piece.anim {
+  z-index: 8;
+}
+.hb piece.dragging {
+  cursor: move;
+  z-index: 11 !important;
+  transition: none;
+}
+/* A captured piece fades under the one taking it. */
+.hb piece.fading {
+  z-index: 1;
+  transition: none;
+  animation: hb-fade 220ms ease forwards;
+}
+@keyframes hb-fade {
+  to {
+    opacity: 0;
+  }
+}
+.hb piece.ghost {
+  opacity: 0.3;
+}
+.hb-shapes,
+.hb-labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.hb-shapes {
+  overflow: hidden;
+  opacity: 0.6;
+  z-index: 2;
+}
+/* (Over a sliding piece, under a dragged one.) */
+.hb-labels {
+  overflow: visible;
+  z-index: 9;
+}
+/* The coordinates, inside their edge squares, as the chessground board's are styled above: each rank's number at the
+   top left of its square in the left column, each file's letter at the bottom right of its square in the bottom row,
+   either way up; under the pieces; white on dark squares, dark brown on light ones. */
+.hb-coords {
+  position: absolute;
+  display: flex;
+  pointer-events: none;
+  font-family: sans-serif;
+  font-size: clamp(9px, 2.6cqw, 14px);
+  font-weight: 600;
+  line-height: normal;
+}
+.hb-ranks {
+  left: 0;
+  top: 0;
+  width: 12.5%;
+  height: 100%;
+  flex-flow: column;
+}
+.hb-files {
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 12.5%;
+  flex-flow: row;
+  align-items: flex-end;
+  text-align: right;
+  text-transform: uppercase;
+}
+.hb-coord {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+.hb-ranks .hb-coord {
+  padding: 0.06em 0 0 0.18em;
+}
+.hb-files .hb-coord {
+  padding: 0 0.15em 0.04em 0;
+}
+.hb-coord.hb-on-dark {
+  color: rgba(255, 255, 255, 0.92);
+}
+.hb-coord.hb-on-light {
+  color: rgba(72, 58, 40, 0.8);
+}
+
 .play-footer {
   display: grid;
   gap: 10px;
@@ -3285,10 +3454,10 @@ button.history-label {
 }
 /* The hand-off: the real pieces drop into place, pawns first. (`translate`, not `transform`: chessground places
    pieces with transform.) */
-.vote-board-row.dropping cg-board piece {
+.vote-board-row.dropping :is(cg-board, .hb-board) piece {
   animation: piece-drop 380ms cubic-bezier(0.25, 0.9, 0.35, 1.12) both;
 }
-.vote-board-row.dropping cg-board piece:not(.pawn) {
+.vote-board-row.dropping :is(cg-board, .hb-board) piece:not(.pawn) {
   animation-delay: 110ms;
 }
 @keyframes piece-drop {
@@ -3602,7 +3771,7 @@ button.history-label {
   .vote-layer.animate .vote-pawn.vote-me {
     transition: opacity 280ms ease-in;
   }
-  .vote-board-row.dropping cg-board piece {
+  .vote-board-row.dropping :is(cg-board, .hb-board) piece {
     animation: vote-fade-in 300ms ease-out both;
   }
   .vote-zone-count.pop,
@@ -4005,8 +4174,8 @@ button.history-label {
   }
 }
 /* While the God King stands in his place, the real king is hidden. */
-.board-wrap:has(.king-summon.hide-king-w) cg-board piece.king.white,
-.board-wrap:has(.king-summon.hide-king-b) cg-board piece.king.black {
+.board-wrap:has(.king-summon.hide-king-w) :is(cg-board, .hb-board) piece.king.white,
+.board-wrap:has(.king-summon.hide-king-b) :is(cg-board, .hb-board) piece.king.black {
   opacity: 0;
 }
 .ks-fx {
@@ -6196,7 +6365,7 @@ button.history-label {
 }
 /* 0. The warning: the blundered piece's square pulses red under it (three beats, then a steady red), and a red
    "??" badge pops on its corner (like a chess site's blunder mark). */
-.board-wrap cg-board square.ls-blunder {
+.board-wrap :is(cg-board, .hb-board) square.ls-blunder {
   background: rgba(222, 38, 38, 0.62);
   animation: ls-blunder-pulse 433ms ease-in-out 3;
 }
@@ -11622,14 +11791,14 @@ img.qicon {
 }
 /* His split pawns as halves, on the board and in the air: each shows the half away from its partner, its sawn face
    shaded along the cut (the piece's own drawing, darkened, in a thin column at the cut: it follows the pawn's outline). */
-.cg-wrap piece.saw-half-l {
+:is(.cg-wrap, .hb) piece.saw-half-l {
   clip-path: inset(0 50% 0 0);
 }
-.cg-wrap piece.saw-half-r {
+:is(.cg-wrap, .hb) piece.saw-half-r {
   clip-path: inset(0 0 0 50%);
 }
-.cg-wrap piece.saw-half-l::after,
-.cg-wrap piece.saw-half-r::after {
+:is(.cg-wrap, .hb) piece.saw-half-l::after,
+:is(.cg-wrap, .hb) piece.saw-half-r::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -11637,19 +11806,19 @@ img.qicon {
   /* Fresh-cut wood: the white pawn's face toned to tan, the black pawn's turned light and toned the same. */
   filter: sepia(0.9) saturate(1.6) brightness(0.82);
 }
-.cg-wrap piece.black.saw-half-l::after,
-.cg-wrap piece.black.saw-half-r::after {
+:is(.cg-wrap, .hb) piece.black.saw-half-l::after,
+:is(.cg-wrap, .hb) piece.black.saw-half-r::after {
   filter: invert(1) sepia(0.9) saturate(1.6) brightness(0.82);
 }
-.cg-wrap piece.saw-half-l::after {
+:is(.cg-wrap, .hb) piece.saw-half-l::after {
   clip-path: inset(0 50% 0 41%);
 }
-.cg-wrap piece.saw-half-r::after {
+:is(.cg-wrap, .hb) piece.saw-half-r::after {
   clip-path: inset(0 41% 0 50%);
 }
 /* His split pawns kept small on the board (SAWYER_LOOKS.settle "small"): the pawn's drawing at the morph's MINI (0.55),
    its feet where a pawn's are; no transform (chessground places pieces with one). */
-.cg-wrap piece.saw-small {
+:is(.cg-wrap, .hb) piece.saw-small {
   background-size: 55% 55%;
   background-position: 50% 88%;
   background-repeat: no-repeat;
@@ -11716,8 +11885,8 @@ img.qicon {
   height: 100%;
   background-size: cover;
 }
-.board-wrap:has(.ka-king.w) cg-board piece.king.white,
-.board-wrap:has(.ka-king.b) cg-board piece.king.black {
+.board-wrap:has(.ka-king.w) :is(cg-board, .hb-board) piece.king.white,
+.board-wrap:has(.ka-king.b) :is(cg-board, .hb-board) piece.king.black {
   opacity: 0;
 }
 /* Its "−N" hits: the God King's strike style (.ks-hp), over everything. */

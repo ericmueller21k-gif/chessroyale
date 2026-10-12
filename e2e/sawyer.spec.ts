@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { SAWYER_LOOKS } from "@chessroyale/core";
-import { test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, test, watchFor } from "./helpers.ts";
 
 /**
  * Sawyer, the raccoon with a saw, played alone on a phone and a computer with real taps: his first move a pawn's and
@@ -16,7 +16,7 @@ const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers
 const soundsHeard = (p: Page) => p.evaluate(() => ((window as any).__soundLog ?? []) as string[]);
 
 async function squareAt(page: Page, square: string) {
-  const board = (await page.locator("cg-board").first().boundingBox())!;
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   const flip = (await page.evaluate(() => (window as any).match.boss?.crowdSide)) === "b";
   const f = square.charCodeAt(0) - 97;
   const r = Number(square[1]) - 1;
@@ -62,8 +62,8 @@ const coveredBetween = (page: Page, a: string, b: string, canvas: string, k = 0.
   );
 /** The move dots on screen now, as squares (from their boxes). */
 async function dotSquares(page: Page): Promise<string[]> {
-  const board = (await page.locator("cg-board").first().boundingBox())!;
-  const boxes = await page.locator("cg-board square.move-dest").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }));
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
+  const boxes = await page.locator(`${BOARD_SEL.square}.move-dest`).evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }));
   return boxes.map(([x, y]) => `${"abcdefgh"[Math.floor(((x! - board.x) / board.width) * 8)]}${8 - Math.floor(((y! - board.y) / board.height) * 8)}`);
 }
 
@@ -149,13 +149,14 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
   expect(Math.abs(file(sp.square) - file(sp.pawn))).toBe(1);
   const pieces = new Chess(boss.board.fen);
   for (const h of sp.halves) expect(pieces.get(h.square)).toMatchObject({ type: "p", color: mine });
-  const halves = await page.evaluate(() => [...document.querySelectorAll("cg-board piece.saw-half-l, cg-board piece.saw-half-r")].map((e) => `${(e as any).cgKey}:${e.classList.contains("saw-half-l") ? "l" : "r"}`).sort());
-  const small = await page.evaluate(() => [...document.querySelectorAll("cg-board piece.saw-small")].map((e) => (e as any).cgKey as string).sort());
+  // (A piece's square: ours says it, chessground keeps it on the element.)
+  const halves = await page.evaluate((pieces) => [...document.querySelectorAll<HTMLElement>(`${pieces}.saw-half-l, ${pieces}.saw-half-r`)].map((e) => `${e.dataset.square ?? (e as any).cgKey}:${e.classList.contains("saw-half-l") ? "l" : "r"}`).sort(), BOARD_SEL.piece);
+  const small = await page.evaluate((pieces) => [...document.querySelectorAll<HTMLElement>(`${pieces}.saw-small`)].map((e) => (e.dataset.square ?? (e as any).cgKey) as string).sort(), BOARD_SEL.piece);
   const w = boss.crowdSide === "w";
   expect(halves).toEqual(pairLook === "halves" ? sp.halves.map((h: { square: string; side: string }) => `${h.square}:${(h.side === "a") === w ? "l" : "r"}`).sort() : []);
   expect(small).toEqual(pairLook === "small" ? sp.halves.map((h: { square: string }) => h.square).sort() : []);
   if (pairLook === "halves") {
-    const clip = await page.locator("cg-board piece.saw-half-l, cg-board piece.saw-half-r").first().evaluate((e) => getComputedStyle(e).clipPath);
+    const clip = await page.locator(`${BOARD_SEL.piece}.saw-half-l, ${BOARD_SEL.piece}.saw-half-r`).first().evaluate((e) => getComputedStyle(e).clipPath);
     expect(clip).toContain("50%");
   }
   // (Never a ninth pawn: the engine plays every position.)
@@ -192,7 +193,7 @@ test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board spl
   await expect(page.locator('.sw-gap[data-state="gap"]')).toBeVisible();
   // The gap sits on the line between the d and e files, the board's whole height.
   const gap = (await page.locator(".sw-gap").boundingBox())!;
-  const board = (await page.locator("cg-board").first().boundingBox())!;
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   expect(Math.abs(gap.x + gap.width / 2 - (board.x + board.width / 2))).toBeLessThanOrEqual(1.5);
   expect(gap.height).toBeGreaterThan(board.height - 2);
   // Nothing crosses it: not in the allowed moves, no move dots across it.
@@ -202,7 +203,7 @@ test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board spl
   const across = new Chess(fen3).moves({ verbose: true }).find((m) => crossesMiddle(m.from + m.to) && p3.allowed.some((a: string) => a.startsWith(m.from)));
   expect(across, "a piece with a move across the middle").toBeTruthy();
   await tap(page, across!.from);
-  await expect(page.locator("cg-board square.move-dest").first()).toBeVisible();
+  await expect(page.locator(`${BOARD_SEL.square}.move-dest`).first()).toBeVisible();
   for (const sq of await dotSquares(page)) expect(file(sq) <= 3, `${across!.from} → ${sq}`).toBe(file(across!.from) <= 3);
   await tap(page, across!.from);
   // The cut due on the 3rd turn waited for the saw: it comes on the 4th.

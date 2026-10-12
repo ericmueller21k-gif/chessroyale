@@ -1,12 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { soloFromHome } from "./helpers.ts";
+import { BOARD_SEL, soloFromHome } from "./helpers.ts";
 
 /**
  * Clicks a move on the main board: tap the piece (again if nothing was picked up: the board takes moves a moment
  * after its countdown ends), then the target square.
  */
 async function clickMove(page: Page, uci: string) {
-  const wrap = page.locator(".board-area .cg-wrap").first();
+  const wrap = page.locator(`.board-area ${BOARD_SEL.wrap}`).first();
   const box = (await wrap.boundingBox())!;
   const black = ((await wrap.getAttribute("class")) ?? "").includes("orientation-black");
   const at = (sq: string) => {
@@ -18,7 +18,7 @@ async function clickMove(page: Page, uci: string) {
   };
   const from = at(uci.slice(0, 2));
   const to = at(uci.slice(2, 4));
-  const picked = page.locator(".board-area .cg-wrap square.selected");
+  const picked = page.locator(`.board-area ${BOARD_SEL.square}.selected`);
   await expect(async () => {
     if (!(await picked.count())) await page.mouse.click(from.x, from.y);
     await expect(picked).toHaveCount(1, { timeout: 1000 });

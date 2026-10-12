@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { test } from "./helpers.ts";
+import { BOARD_SEL, test } from "./helpers.ts";
 
 /**
  * The eval bar's switch (Eric, Oct 10): on by default, in Settings only (never on a board screen); off, no bar on any
@@ -15,11 +15,11 @@ async function boardNow(page: Page) {
   await page.waitForTimeout(400);
   // (No switch for it on the board's screen: it's in Settings only.)
   await expect(page.getByRole("switch", { name: /Eval bar/ })).toHaveCount(0);
-  return page.evaluate(() => {
-    const board = document.querySelector("cg-board")!.getBoundingClientRect();
+  return page.evaluate((squares) => {
+    const board = document.querySelector(squares)!.getBoundingClientRect();
     const row = document.querySelector(".board-row")!.getBoundingClientRect();
     return { bars: document.querySelectorAll(".eval-bar").length, width: board.width, left: board.left - row.left, right: row.right - board.right, overflow: document.documentElement.scrollWidth - innerWidth };
-  });
+  }, BOARD_SEL.squares);
 }
 
 test("the eval bar: on by default, switched off in Settings, and the board takes its room", async ({ page }, info) => {

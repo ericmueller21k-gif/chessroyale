@@ -56,10 +56,10 @@ const waitFor = async (want, ms = 90_000) => {
 /** One move with two taps (an allowed one). */
 const move = async () => {
   await p.waitForTimeout(400);
-  const { allowed, fen, flip } = await p.evaluate(() => ({ allowed: window.match.boss?.powers?.allowed ?? null, fen: window.match.phase.board.fen, flip: !!document.querySelector(".cg-wrap.orientation-black") }));
+  const { allowed, fen, flip } = await p.evaluate(() => ({ allowed: window.match.boss?.powers?.allowed ?? null, fen: window.match.phase.board.fen, flip: !!document.querySelector(":is(.cg-wrap, .hb).orientation-black") }));
   const options = allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
   const pick = options[Math.floor(options.length / 3)] ?? options[0];
-  const board = await p.locator("cg-board").first().boundingBox();
+  const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
   const at = (s) => {
     const f = s.charCodeAt(0) - 97;
     const r = Number(s[1]) - 1;

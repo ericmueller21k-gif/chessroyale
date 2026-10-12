@@ -33,8 +33,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
     them, solo and online, so a power never costs anyone thinking time.
   - **A turned board** (Boingo's funhouse, Oct 11): upside down is the other side's orientation, as before; a quarter
     turn is drawn by moving every square to where the turned board shows it (`packages/app/src/board-view.ts`:
-    `viewSquare`, `viewFen`), so chessground maps taps and drags exactly as usual and each move is turned back
-    (`Board`'s `turn`). A CSS rotation would have put taps on the wrong squares. The coordinates name the real squares
+    `viewSquare`, `viewFen`), so the board maps taps and drags exactly as usual and each move is turned back
+    (`Board`'s `turn`; our own board does it natively, chessground through a turned FEN: [board.md](board.md)). A CSS rotation would have put taps on the wrong squares. The coordinates name the real squares
     (the bottom edge runs along the ranks), and everything drawn over the board places its squares with the same turn
     (`squareXY`'s `turn`, `onSquare`, the `BoardTurn` context Board gives what it draws). Each step spins the board in
     its own plane (`pw-turning-cw`/`ccw`, the half turn's `pw-flipping`), pieces going round with it for a moment as
@@ -241,7 +241,7 @@ boss's `offset` in `boss.ts`.
 
 - Anything that changes the position outside a move (a burn, a snack, a bounce) leaves a base, and nothing replays a
   board's history from move 0: use `fenAtPly(history, ply, bases)`. Grep for `fenAfter(` and `.history` and check each.
-- Never change what chessground draws (orientation, size) while a transform is on it or an ancestor.
+- Never change what the board draws (orientation, size) while a transform is on it or an ancestor.
 - An effect that can appear many times at once goes on a shared canvas (`BoardEffects`), never a loop per sprite.
 - Measure a new effect's first showing on a slowed phone; draw many new frames ahead, a slice a frame; make a boss's
   sounds before their cue; nothing a boss needs only in its battle is made when the app loads.

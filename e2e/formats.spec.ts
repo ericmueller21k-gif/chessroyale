@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { createLobbyFromHome, named, soloFromHome, test } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, named, soloFromHome, test } from "./helpers.ts";
 
 /** page.evaluate that shrugs off a dropped execution context (seen under heavy load while the page carries on). */
 async function safely<T>(f: () => Promise<T>, fallback: T): Promise<T> {
@@ -266,7 +266,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   await power.click();
   await expect.poll(() => page.evaluate(() => (window as any).match.hint?.length ?? 0), { timeout: 15_000 }).toBe(3);
   await expect(page.getByRole("button", { name: /Power-up in use/ })).toBeVisible();
-  await expect.poll(() => page.locator(".board-row cg-container svg.cg-shapes line").count()).toBe(4);
+  await expect.poll(() => page.locator(`.board-row ${BOARD_SEL.arrowLine}`).count()).toBe(4);
   const seen = new Set<string>();
   await playToResults(page, seen, 5);
   expect(await phase(page)).toBe("results");
@@ -287,7 +287,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   const facts = page.locator(".ls-card-facts");
   await expect(facts).toContainText("Your move");
   await expect(facts).toContainText("Your chances");
-  await expect(page.locator(".ls-card .mini cg-container svg.cg-shapes line").first()).toBeAttached();
+  await expect(page.locator(`.ls-card .mini ${BOARD_SEL.arrowLine}`).first()).toBeAttached();
 });
 
 test("boss battle (online): the host's browser plays the boss", async ({ page }) => {

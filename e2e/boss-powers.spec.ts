@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { createLobbyFromHome, engineTop, expectCoordsInSquares, test } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test } from "./helpers.ts";
 
 /**
  * Boss powers, played through: the gingerbread man's freeze and blizzard, Boingo's pie and funhouse, alone (solo) on a
@@ -30,13 +30,13 @@ async function playBest(page: Page) {
 }
 
 /**
- * How far each block of ice is from its square (chessground's own square, which is a few pixels smaller than the wrap
+ * How far each block of ice is from its square (the board's own square, which is a few pixels smaller than the wrap
  * at some sizes): the worst edge in px, and the block sizes (Eric, Oct 11: one block the square's shape, on every square).
  */
 const iceOffSquares = (p: Page) =>
-  p.evaluate(() => {
-    const board = document.querySelector(".board-area cg-board")!.getBoundingClientRect();
-    const black = !!document.querySelector(".board-area .cg-wrap.orientation-black");
+  p.evaluate((sel) => {
+    const board = document.querySelector(`.board-area ${sel.squares}`)!.getBoundingClientRect();
+    const black = !!document.querySelector(`.board-area ${sel.wrap}.orientation-black`);
     const sq = board.width / 8;
     const ices = [...document.querySelectorAll<HTMLElement>(".power-board .pw-ice")];
     const off = ices.map((el) => {
@@ -49,7 +49,7 @@ const iceOffSquares = (p: Page) =>
       return { square: s, off: Math.max(Math.abs(b.left - x), Math.abs(b.top - y), Math.abs(b.right - x - sq), Math.abs(b.bottom - y - sq)) };
     });
     return { worst: Math.max(0, ...off.map((o) => o.off)), off, sizes: [...new Set(ices.map((el) => el.getBoundingClientRect().width.toFixed(1)))] };
-  });
+  }, BOARD_SEL);
 
 /** The power's banner (boss on the left, the moment, the God King on the right). */
 const banner = (p: Page, text: string) => p.locator(".fight-banner.power-cut", { hasText: text });
@@ -139,9 +139,9 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
  * quarter of the way round in Boingo's funhouse (the board's data-turn: 90 or 270), as Board draws it (board-view.ts).
  */
 const squareOnScreen = (p: Page, square: string) =>
-  p.evaluate((sq) => {
-    const wrap = document.querySelector(".board-area .cg-wrap")!;
-    const b = wrap.querySelector("cg-board")!.getBoundingClientRect();
+  p.evaluate(([sq, sel]) => {
+    const wrap = document.querySelector(`.board-area ${sel.wrap}`)!;
+    const b = wrap.querySelector(sel.squares)!.getBoundingClientRect();
     const black = wrap.classList.contains("orientation-black");
     const turn = Number((wrap.closest(".board-wrap") as HTMLElement | null)?.dataset.turn ?? 0);
     const f = sq.charCodeAt(0) - 97;
@@ -150,13 +150,13 @@ const squareOnScreen = (p: Page, square: string) =>
     const col = black ? 7 - F : F;
     const row = black ? R : 7 - R;
     return { x: b.left + (col + 0.5) * (b.width / 8), y: b.top + (row + 0.5) * (b.height / 8), size: b.width / 8 };
-  }, square);
+  }, [square, BOARD_SEL] as const);
 
 /** How far each pie is from its square, wherever the board is turned (the worst edge in px), and how many there are. */
 const piesOffSquares = (p: Page) =>
-  p.evaluate(() => {
-    const wrap = document.querySelector(".board-area .cg-wrap")!;
-    const board = wrap.querySelector("cg-board")!.getBoundingClientRect();
+  p.evaluate((sel) => {
+    const wrap = document.querySelector(`.board-area ${sel.wrap}`)!;
+    const board = wrap.querySelector(sel.squares)!.getBoundingClientRect();
     const black = wrap.classList.contains("orientation-black");
     const turn = Number((wrap.closest(".board-wrap") as HTMLElement | null)?.dataset.turn ?? 0);
     const sq = board.width / 8;
@@ -172,7 +172,7 @@ const piesOffSquares = (p: Page) =>
       return { square: s, off: Math.max(Math.abs(b.left - x), Math.abs(b.top - y), Math.abs(b.right - x - sq), Math.abs(b.bottom - y - sq)) };
     });
     return { worst: Math.max(0, ...off.map((o) => o.off)), off, count: pies.length };
-  });
+  }, BOARD_SEL);
 
 /** A finger dragging from one point to another (touch events, as a phone sends them). */
 async function touchDrag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
@@ -254,7 +254,7 @@ test("Boingo: pies nobody can move onto (up to two, on their squares), the warni
   expect(p3.pies.length).toBeGreaterThanOrEqual(1);
   expect(p3.pies.length).toBeLessThanOrEqual(2);
   expect(new Set(p3.pies.map((x: { square: string }) => x.square)).size).toBe(p3.pies.length);
-  await expect(page.locator(".board-area .cg-wrap.orientation-black")).toBeVisible();
+  await expect(page.locator(`.board-area ${BOARD_SEL.wrap}.orientation-black`)).toBeVisible();
   await expectCoordsInSquares(page, "black", 10_000, 0);
   const pie3 = await piesOffSquares(page);
   expect(pie3.worst, JSON.stringify(pie3.off)).toBeLessThanOrEqual(1);
@@ -310,5 +310,5 @@ test("Boingo online: the funhouse turns the board for everyone as your turn begi
   const p = await powers(page);
   expect(p.funhouse?.turn).toBe(3);
   expect(p.angle).toBe(180);
-  await expect(page.locator(".board-area .cg-wrap.orientation-black")).toBeVisible();
+  await expect(page.locator(`.board-area ${BOARD_SEL.wrap}.orientation-black`)).toBeVisible();
 });

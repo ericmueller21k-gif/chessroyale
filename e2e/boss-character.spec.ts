@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { test } from "./helpers.ts";
+import { BOARD_SEL, test } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 /** The character the player sees (one placement shows per layout: the boss bar on a phone, by the board on a computer). */
@@ -27,7 +27,7 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
   expect(await char.evaluate((e) => getComputedStyle(e).pointerEvents)).toBe("none");
   expect(await char.locator("canvas").evaluate((e) => getComputedStyle(e).pointerEvents)).toBe("none");
   const box = (await char.boundingBox())!;
-  const board = (await page.locator("cg-board").first().boundingBox())!;
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   const king = (await page.locator(".gk-unit").first().boundingBox())!;
   if (phone) {
     expect(box.y + box.height).toBeLessThanOrEqual(board.y);

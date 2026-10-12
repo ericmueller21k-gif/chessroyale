@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, test, watchFor } from "./helpers.ts";
 
 /**
  * Big Boy, the baby boss, played alone on a phone and a computer with real taps: his snack before move 1 (he waddles
@@ -14,7 +14,7 @@ const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers
 const soundsHeard = (p: Page) => p.evaluate(() => ((window as any).__soundLog ?? []) as string[]);
 
 async function squareAt(page: Page, square: string) {
-  const board = (await page.locator("cg-board").first().boundingBox())!;
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   const flip = (await page.evaluate(() => (window as any).match.boss?.crowdSide)) === "b";
   const f = square.charCodeAt(0) - 97;
   const r = Number(square[1]) - 1;
@@ -72,9 +72,9 @@ test("Big Boy's snack before move 1, your move's knock, and his toy block (no do
   const snack: string = boss.powers.snack;
   expect(["d2", "e2"]).toContain(snack);
   // The pawn is on the board during his card, until he grabs it.
-  await expect(page.locator("cg-board piece.white.pawn")).toHaveCount(8);
+  await expect(page.locator(`${BOARD_SEL.piece}.white.pawn`)).toHaveCount(8);
   await expect.poll(async () => (await snackSeen.seen()).snack, { timeout: 15_000 }).toBe(true);
-  await expect(page.locator("cg-board piece.white.pawn")).toHaveCount(7, { timeout: 5000 });
+  await expect(page.locator(`${BOARD_SEL.piece}.white.pawn`)).toHaveCount(7, { timeout: 5000 });
   await expect.poll(async () => (await snackSeen.seen()).nom, { timeout: 5000 }).toBe(true);
   expect(new Chess(boss.board.fen).get(snack as never)).toBeFalsy();
 
@@ -103,11 +103,11 @@ test("Big Boy's snack before move 1, your move's knock, and his toy block (no do
   const onto = new Chess(fen).moves({ verbose: true }).find((m) => m.to === sq && p2.allowed.some((a: string) => a.startsWith(m.from)));
   if (onto) {
     await tap(page, onto.from);
-    await expect(page.locator("cg-board square.move-dest").first()).toBeVisible();
-    const dots = await page.locator("cg-board square.move-dest").count();
+    await expect(page.locator(`${BOARD_SEL.square}.move-dest`).first()).toBeVisible();
+    const dots = await page.locator(`${BOARD_SEL.square}.move-dest`).count();
     expect(dots).toBeGreaterThan(0);
     const blocked = await squareAt(page, sq);
-    const dotsThere = await page.locator("cg-board square.move-dest").evaluateAll(
+    const dotsThere = await page.locator(`${BOARD_SEL.square}.move-dest`).evaluateAll(
       (els, [x, y]) => els.filter((e) => { const r = e.getBoundingClientRect(); return x! > r.left && x! < r.right && y! > r.top && y! < r.bottom; }).length,
       [blocked.x, blocked.y],
     );
@@ -176,9 +176,9 @@ test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, 
     // (Unless he has moved it on since: his move's piece is his own, so a thrown piece of yours stays put.)
     expect(c.get(m.to as never), `${m.from}-${m.to}`).toMatchObject({ color: "w", type: m.piece });
   }
-  // The board shows it: chessground's pieces are the position's.
+  // The board shows it: its pieces are the position's.
   await page.waitForTimeout(500);
-  const shown = await page.locator("cg-board piece:not(.ghost):not(.fading)").count();
+  const shown = await page.locator(`${BOARD_SEL.piece}:not(.ghost):not(.fading)`).count();
   expect(shown).toBe(c.board().flat().filter(Boolean).length);
   // The meter spent: empty, filling again for the next; the trigger ready again for it.
   expect((await powers(page)).rage).toBe(0);

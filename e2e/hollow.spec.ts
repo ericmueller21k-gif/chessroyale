@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { createLobbyFromHome, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, createLobbyFromHome, test, watchFor } from "./helpers.ts";
 
 /**
  * Hollow, the Darkness boss, played alone on a phone and a computer with real taps: his first cover of the dark (the
@@ -15,7 +15,7 @@ const myPoints = (p: Page) => p.evaluate(() => (window as any).match.standings()
 
 /** A square's middle on screen. */
 async function squareAt(page: Page, square: string) {
-  const board = (await page.locator("cg-board").first().boundingBox())!;
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   const flip = (await page.evaluate(() => (window as any).match.boss?.crowdSide)) === "b";
   const f = square.charCodeAt(0) - 97;
   const r = Number(square[1]) - 1;
@@ -108,8 +108,8 @@ test("Hollow's dark: his first cover, a dark square selected, a wrong attempt (-
   // Tapped, the dark square is selected: the green glow round it, no move dots, nothing picked up.
   await tap(page, sq);
   await expect(page.locator(".board-wrap").first()).toHaveAttribute("data-dark-sel", sq);
-  await expect(page.locator("cg-board square.selected")).toHaveCount(1);
-  await expect(page.locator("cg-board square.move-dest")).toHaveCount(0);
+  await expect(page.locator(`${BOARD_SEL.square}.selected`)).toHaveCount(1);
+  await expect(page.locator(`${BOARD_SEL.square}.move-dest`)).toHaveCount(0);
   // A move from it that isn't legal (it's his piece): -5, and you pick again.
   const before = await myPoints(page);
   await tap(page, empties(await fenNow(page), ["a3", "h3", "a4", "h4"])[0]!);
@@ -126,7 +126,7 @@ test("Hollow's dark: his first cover, a dark square selected, a wrong attempt (-
   await expect(page.locator('.power-board .pw-dark[data-square="g1"]')).toHaveCount(1);
   await tap(page, "g1");
   await expect(page.locator(".board-wrap").first()).toHaveAttribute("data-dark-sel", "g1");
-  await expect(page.locator("cg-board square.move-dest")).toHaveCount(0);
+  await expect(page.locator(`${BOARD_SEL.square}.move-dest`)).toHaveCount(0);
   await tap(page, "f3");
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
   await expect.poll(() => page.evaluate(() => (window as any).match.moves.at(-1)?.move), { timeout: 30_000 }).toBe("g1f3");

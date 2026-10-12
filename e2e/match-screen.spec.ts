@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { soloFromHome, test } from "./helpers.ts";
+import { BOARD_SEL, soloFromHome, test } from "./helpers.ts";
 
 /**
  * The match screen's board furniture (Eric, Oct 9, 2026): the green ring on the move the crowd played sits exactly on
@@ -15,7 +15,7 @@ type Box = { left: number; top: number; right: number; bottom: number; width: nu
 
 /** The board's furniture while a move is being chosen: the board, the bars, the clock and the line above. */
 function furniture(p: Page) {
-  return p.evaluate(() => {
+  return p.evaluate((sel) => {
     const box = (e: Element | null): Box | null => {
       if (!e) return null;
       const r = e.getBoundingClientRect();
@@ -28,7 +28,7 @@ function furniture(p: Page) {
     range.selectNodeContents(line);
     const text = [...range.getClientRects()].filter((r) => r.width > 0);
     return {
-      board: box(area.querySelector("cg-container")),
+      board: box(area.querySelector(sel.container)),
       bars: [...area.querySelectorAll(".timer-bar")].map(box) as Box[],
       clock: box(area.querySelector(".board-clock")),
       clockText: (area.querySelector(".board-clock") as HTMLElement | null)?.innerText ?? "",
@@ -36,19 +36,19 @@ function furniture(p: Page) {
       textCut: line.scrollWidth > line.clientWidth + 0.5,
       line: (line as HTMLElement).innerText,
     };
-  });
+  }, BOARD_SEL);
 }
 
 /** How far the reveal's ring is from the square it marks (the move's own last-move square): the worst edge, in px. */
 function ringOff(p: Page) {
-  return p.evaluate(() => {
+  return p.evaluate((sel) => {
     const ring = document.querySelector(".square-ring")!.getBoundingClientRect();
-    const squares = [...document.querySelectorAll(".board-area cg-board square.last-move")].map((s) => s.getBoundingClientRect());
+    const squares = [...document.querySelectorAll(`.board-area ${sel.square}.last-move`)].map((s) => s.getBoundingClientRect());
     const off = (s: DOMRect) => Math.max(Math.abs(s.left - ring.left), Math.abs(s.top - ring.top), Math.abs(s.right - ring.right), Math.abs(s.bottom - ring.bottom));
-    const board = document.querySelector(".board-area cg-container")!.getBoundingClientRect().width;
+    const board = document.querySelector(`.board-area ${sel.container}`)!.getBoundingClientRect().width;
     const wrap = document.querySelector(".board-area .board-wrap")!.getBoundingClientRect().width;
     return { off: Math.min(...squares.map(off)), size: ring.width, board, wrap, flipped: !!document.querySelector(".board-area .orientation-black") };
-  });
+  }, BOARD_SEL);
 }
 
 test("the reveal's ring sits exactly on its square at two widths; the bars and the board's clock stay off the squares", async ({ browser }, info) => {

@@ -9,6 +9,7 @@ import type { BossView } from "../game.ts";
 import { BoardEffects, BossEffect, BossMoment, SpriteAnim, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
 import { hash, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { BOARD_SQUARES, boardPieces } from "../board/dom.ts";
 
 /**
  * Sawyer on the board: his split pawn after his first move (he leaps onto the pawn, saws it, it cracks, and it morphs
@@ -113,10 +114,10 @@ export const pairLook = (looks: typeof SAWYER_LOOKS = SAWYER_LOOKS): "halves" | 
 const PAIR_CLASSES = ["saw-half-l", "saw-half-r", "saw-small"] as const;
 
 /**
- * The board draws his two split pawns as halves (or small) wherever they go: each of chessground's piece elements
+ * The board draws his two split pawns as halves (or small) wherever they go: each of the board's piece elements
  * standing on a half's square (one of his pawns) gets its class (clipped to that half, its cut face shaded; or drawn
- * small: styles.css), kept in step with every change chessground makes before the browser paints (a
- * MutationObserver's callback runs first).
+ * small: styles.css), kept in step with every change the board makes before the browser paints (a MutationObserver's
+ * callback runs first). Either board (chessground's or ours: board/dom.ts finds their pieces).
  */
 function HalfPawns({ halves, color, orientation, on, look }: { halves: SplitPawn["halves"]; color: "w" | "b"; orientation: Orientation; on: boolean; look: "halves" | "small" }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -132,8 +133,8 @@ function HalfPawns({ halves, color, orientation, on, look }: { halves: SplitPawn
       if (!live) return;
       // (The board's own element: chessground draws a new cg-board inside it whenever it redraws everything, on a
       // resize too, so the board is looked up afresh each time.)
-      const wrap = ref.current?.closest(".board-wrap")?.querySelector(".board");
-      if (!wrap?.querySelector("cg-board")) {
+      const wrap = ref.current?.closest(".board-wrap");
+      if (!wrap?.querySelector(BOARD_SQUARES)) {
         // (This layer's effects run before the board's own, which builds chessground: on a new screen it's there by
         // the end of this commit, before the paint; failing that, a frame later.)
         if (tries++ === 0) queueMicrotask(start);
@@ -141,18 +142,15 @@ function HalfPawns({ halves, color, orientation, on, look }: { halves: SplitPawn
         return;
       }
       apply.current = () => {
-        const board = wrap.querySelector("cg-board");
-        if (!board) return;
-        for (const el of Array.from(board.children)) {
-          if (el.tagName !== "PIECE" || el.classList.contains("fading")) continue;
-          const node = el as Element & { cgKey?: string; cgPiece?: string };
-          const cls = node.cgPiece === pawn && node.cgKey ? want.current.get(node.cgKey) : undefined;
+        for (const { el, square, name } of boardPieces(wrap)) {
+          const cls = name === pawn ? want.current.get(square) : undefined;
           for (const c of PAIR_CLASSES) if (el.classList.contains(c) !== (c === cls)) el.classList.toggle(c, c === cls);
         }
       };
       apply.current();
       const watch = new MutationObserver(() => apply.current());
-      watch.observe(wrap, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] });
+      // (Our board redraws a piece's classes when it slides or is dragged: those are put back too.)
+      watch.observe(wrap, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "data-square"] });
       stop = () => {
         watch.disconnect();
         for (const el of Array.from(wrap.querySelectorAll("piece.saw-half-l, piece.saw-half-r, piece.saw-small"))) el.classList.remove(...PAIR_CLASSES);

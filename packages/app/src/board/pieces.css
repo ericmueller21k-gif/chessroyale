@@ -1,0 +1,42 @@
+/*
+ * The pieces: the cburnett set by Colin M.L. Burnett, under the BSD licence (board/pieces/LICENSE.txt; where each file
+ * comes from: board/pieces/SOURCES.md). Every <piece class="white pawn"> in the game: on either board (chessground's
+ * .cg-wrap, ours .hb), on everything drawn over it (layers marked .cg-wrap) and in the promotion picker. The build
+ * inlines each file, so the pieces show on the board's first frame.
+ */
+:is(.cg-wrap, .hb, .promo-piece) piece.pawn.white {
+  background-image: url("./pieces/cburnett/Chess_plt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.pawn.black {
+  background-image: url("./pieces/cburnett/Chess_pdt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.knight.white {
+  background-image: url("./pieces/cburnett/Chess_nlt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.knight.black {
+  background-image: url("./pieces/cburnett/Chess_ndt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.bishop.white {
+  background-image: url("./pieces/cburnett/Chess_blt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.bishop.black {
+  background-image: url("./pieces/cburnett/Chess_bdt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.rook.white {
+  background-image: url("./pieces/cburnett/Chess_rlt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.rook.black {
+  background-image: url("./pieces/cburnett/Chess_rdt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.queen.white {
+  background-image: url("./pieces/cburnett/Chess_qlt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.queen.black {
+  background-image: url("./pieces/cburnett/Chess_qdt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.king.white {
+  background-image: url("./pieces/cburnett/Chess_klt45.svg");
+}
+:is(.cg-wrap, .hb, .promo-piece) piece.king.black {
+  background-image: url("./pieces/cburnett/Chess_kdt45.svg");
+}

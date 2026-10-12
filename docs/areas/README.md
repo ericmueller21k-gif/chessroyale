@@ -9,6 +9,7 @@ and `docs/history/`.
 | Bosses and their powers (the template, each boss, the battle's rules, art and moments) | [bosses.md](bosses.md) | `god-king` (rules, screens), `characters` (art, sounds), `engine` (strength) |
 | The God King and the boss battle's presentation | [god-king.md](god-king.md) | `god-king` |
 | The match: Crowd, 50 v 50, the raid's flow, scoring and the cut (and frozen Classic) | [crowd.md](crowd.md) | the director |
+| The board every screen draws (ours and chessground's, the switch between them, the pieces) | [board.md](board.md) | the director |
 | Squads: 8 squads of 4 in a bracket (Relay, Pairs, Pick and Block); the rules, the sim and the server | [squads.md](squads.md) | the director |
 | Matchmaking, lobbies and ranked | [matchmaking.md](matchmaking.md) | `hub` (joining), `ranked` (matching rules) |
 | The front door: home, queue, profiles, the live line | [hub.md](hub.md) | `hub` |

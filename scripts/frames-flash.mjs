@@ -71,8 +71,8 @@ for (let m = 0; m < moves; m++) {
   // (Not the move a Last Stand took back: it can't be picked again.)
   const all = c.moves({ verbose: true }).filter((x) => x.from + x.to + (x.promotion ?? "") !== barred);
   const mv = all.find((x) => x.piece === "n" || x.piece === "b") ?? all[0];
-  const box = await p.locator("cg-board").first().boundingBox();
-  const black = await p.evaluate(() => !!document.querySelector(".cg-wrap.orientation-black"));
+  const box = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
+  const black = await p.evaluate(() => !!document.querySelector(":is(.cg-wrap, .hb).orientation-black"));
   const sq = (s) => {
     const f = s.charCodeAt(0) - 97;
     const r = Number(s[1]) - 1;

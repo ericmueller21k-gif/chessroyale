@@ -38,7 +38,7 @@ async function open(context, extra = "") {
  * times (ms) for a full screenshot at the device's own scale, to see his pixels.
  */
 async function strip(p, tag, ms, stills = []) {
-  const board = await p.locator("cg-board").first().boundingBox();
+  const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
   const dock = await p.locator(".boss-dock").first().boundingBox();
   const vw = p.viewportSize();
   const x = Math.max(0, Math.min(board.x, dock?.x ?? board.x) - 30);
@@ -62,7 +62,7 @@ async function tapMove(p) {
   const fen = await p.evaluate(() => window.match.phase.board.fen);
   const moves = new Chess(fen).moves({ verbose: true });
   const mv = moves.find((m) => m.piece === "n") ?? moves[0];
-  const board = await p.locator("cg-board").first().boundingBox();
+  const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
   const flip = side === "b";
   const sq = (s) => {
     const f = s.charCodeAt(0) - 97;

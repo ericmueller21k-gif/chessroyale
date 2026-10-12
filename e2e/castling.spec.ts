@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { soloFromHome } from "./helpers.ts";
+import { BOARD_SEL, soloFromHome } from "./helpers.ts";
 const FEN = "r3k2r/pppq1ppp/2npbn2/2b1p3/2B1P3/2NPBN2/PPPQ1PPP/R3K2R w KQkq - 6 8";
 test("castling registers by tap-tap and by drag", async ({ page }, info) => {
   await page.goto("/?debug&mode=classic");
@@ -15,7 +15,7 @@ test("castling registers by tap-tap and by drag", async ({ page }, info) => {
     m.set({ kind: "play", board, startsAt: Date.now() - 1, deadline: Date.now() + 60000, allowedMs: 60000 });
   }, FEN);
   await page.waitForTimeout(500);
-  const wrap = page.locator(".board-area .cg-wrap").first();
+  const wrap = page.locator(`.board-area ${BOARD_SEL.wrap}`).first();
   const box = (await wrap.boundingBox())!;
   const at = (sq: string) => ({ x: box.x + (sq.charCodeAt(0) - 97 + 0.5) * box.width / 8, y: box.y + (8 - Number(sq[1]) + 0.5) * box.height / 8 });
   // Tap-tap castling.

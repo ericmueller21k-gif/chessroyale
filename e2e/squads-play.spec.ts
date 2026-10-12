@@ -1,6 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { expectCoordsInSquares, named, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, expectCoordsInSquares, named, test, watchFor } from "./helpers.ts";
 
 /**
  * Squads played through its screens, on the real server (wrangler dev, SQUADS_TEST on) with its bots: test lobbies
@@ -43,10 +43,10 @@ const seen = (page: Page): Promise<Seen> =>
     };
   });
 
-/** A tap on a square of the big board (chessground's own board, either way up). */
+/** A tap on a square of the big board (its squares' own box, either way up). */
 async function tapSquare(page: Page, sq: string) {
-  const box = (await page.locator(".board-area cg-board").boundingBox())!;
-  const black = await page.locator(".board-area .cg-wrap").evaluate((el) => el.classList.contains("orientation-black"));
+  const box = (await page.locator(`.board-area ${BOARD_SEL.squares}`).boundingBox())!;
+  const black = await page.locator(`.board-area ${BOARD_SEL.wrap}`).evaluate((el) => el.classList.contains("orientation-black"));
   const f = sq.charCodeAt(0) - 97;
   const r = Number(sq[1]) - 1;
   const x = black ? 7 - f : f;

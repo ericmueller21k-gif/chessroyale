@@ -1358,3 +1358,48 @@ how his don't burn, but just once per match, when it triggers." The calls:
   say?", "Hot? Not for my team. Ha!", "Mine are fire-rated. Yours? Ha!".
 - **His meter** stays at `rageSpeed` 1.2 (PR A): the barrage still lasts about 13 turns, so two full ones would keep
   fire on the board most of a typical battle.
+
+### Our own board, behind a switch (Phase 1 of replacing chessground, Oct 12, 2026)
+
+Chessground is GPL-3 and is compiled into the app, which would force the game's source open at a public launch. Eric
+tried three boards side by side in the board lab and couldn't tell them apart, so he chose our own. Phase 1 builds it
+for real, behind a switch, at full parity; Phase 2 (after Eric's OK on his phones) makes it the default and removes
+chessground. The calls:
+
+- **One switch, every screen:** `BOARD.impl` ("chessground" by default for now). `components/Board.tsx` picks the
+  board for every screen that draws one (Crowd, raids, Boss alone, Squads, replays, votes, the finals, the God King's
+  moments, Classic, and the small boards: the mini boards and the live window drew chessground too, so they follow the
+  switch; the tiny boards are our own SVG already). A board keeps the one it was made with. Admins switch their device
+  in Settings → "Testing (admins)"; `?board=own` / `?board=cg` switches any device and is kept on it (`brc.board`), so
+  a link survives every screen (the other test switches only last one load, but this one has to outlive a whole visit
+  to be useful). `VITE_BOARD=own` at build time makes ours the default: the e2e suite's second run.
+- **The same props and the same behaviour where the game relies on it:** a tap-tap move goes as the second press goes
+  down; a move you make stays shown until the game next tells the board anything (as chessground's did; so the Crowd's
+  pick still goes back while a solo move stays); the selection survives a new position; after a dragged move the next
+  drag starts at once; a dropped piece lands at once and a drop where it can't go goes straight back; a touch on a
+  piece, near one or with one selected doesn't scroll the page, one elsewhere can. The numbers are the lab's: 220 ms
+  slides on a cubic ease in and out, a 3 px drag threshold, a fade on the captured piece.
+- **The same elements and stacking,** so nothing drawn over the board needed to change: pieces are `<piece class="white
+  pawn">` at z-index 2 (8 sliding, 11 dragged, 1 fading), highlights are `<square>` with the same classes (and each
+  `marks` class), arrows are drawn with chessground's measured widths, colours and see-through-ness, and the board
+  writes its size as `---cg-width` (`--cg-size` stays the name everything reads, until Phase 2 renames it everywhere at
+  once). Only four places looked inside chessground's own elements (the God King's strike and Lights out measuring
+  `cg-board`, the chat bubble, Sawyer's split pawns); they now ask `board/dom.ts`, which finds either board.
+- **Boingo's quarter turns are built in** (board-view.ts's mapping): squares are drawn where the turned view shows them
+  and taps are turned back, with no rewritten FEN.
+- **Its size is measured without transforms** (the computed width, then a ResizeObserver's content box), where
+  chessground measured its box on screen: a board inside a turning or jolting row keeps its size (the Oct 8 lesson's
+  failure can't happen to it).
+- **The check glow** (`BOARD.checkHighlight`): the game's board never showed it (the wrapper cleared it on every
+  update), so it stays off on both boards for parity; it's one setting if Eric wants it.
+- **The pieces:** the cburnett set came in through chessground's CSS (GPL). The same drawings now come from their own
+  source, Wikimedia Commons, where Colin M.L. Burnett offers them under a choice of licences; we use the BSD one
+  (`board/pieces/`: the twelve files, `LICENSE.txt`, `SOURCES.md` with every URL and checksum). Chessground's copies
+  had one change, the black pieces' white details toned to `#ececec`; we made the same one-colour change so nothing
+  looks different (measured: the only remaining differences are a pixel of anti-aliasing at the outlines). Credited in
+  Settings and the FAQ, the licence served at `/licenses/pieces.txt`. Both boards draw them (chessground's own piece
+  CSS is gone already).
+- **A bug found on the way: the promotion picker showed four empty buttons** on the game's board (its pieces' art only
+  applied inside chessground's own element). The picker now draws its pieces on both boards.
+- **The board lab** now shows the game's two real boards (`?board=cg`, `?board=own`) beside cm-chessboard; the lab's
+  own sketch is gone, and so is its non-commercial "Staunty" piece set (it was only for trying).

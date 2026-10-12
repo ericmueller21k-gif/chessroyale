@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { test } from "./helpers.ts";
+import { BOARD_SEL, test } from "./helpers.ts";
 
 /**
  * A boss's attack on a king (Hollow's; Eric, Oct 10), played alone on a phone and a computer with real taps, watched
@@ -19,12 +19,12 @@ const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ??
 
 /** Samples the page every animation frame from now on: what the attack shows, against its own start. */
 async function sample(page: Page) {
-  await page.evaluate(() => {
+  await page.evaluate((pieces) => {
     const w = window as any;
     w.__ka = [];
     const tick = () => {
       const a = document.querySelector(".king-attack");
-      const real = [...document.querySelectorAll("cg-board piece.king")].map((k) => ({ white: k.classList.contains("white"), opacity: getComputedStyle(k).opacity }));
+      const real = [...document.querySelectorAll(`${pieces}.king`)].map((k) => ({ white: k.classList.contains("white"), opacity: getComputedStyle(k).opacity }));
       const corner = document.querySelector(".boss-char-sprite");
       const copy = document.querySelector(".ka-king");
       w.__ka.push({
@@ -46,7 +46,7 @@ async function sample(page: Page) {
       if (w.__ka.length < 20000) requestAnimationFrame(tick);
     };
     tick();
-  });
+  }, BOARD_SEL.piece);
   return () => page.evaluate(() => (window as any).__ka as any[]);
 }
 
@@ -93,7 +93,7 @@ test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls
   // A knight out: the Last Stand (the test switch) on whatever you play.
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
   const mv = new Chess(fen).moves({ verbose: true }).find((m) => m.piece === "n")!;
-  const board = (await page.locator("cg-board").first().boundingBox())!;
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   const at = (sq: string) => ({ x: board.x + (sq.charCodeAt(0) - 97 + 0.5) * (board.width / 8), y: board.y + (8 - Number(sq[1]) + 0.5) * (board.height / 8) });
   await page.mouse.click(at(mv.from).x, at(mv.from).y);
   await page.mouse.click(at(mv.to).x, at(mv.to).y);
