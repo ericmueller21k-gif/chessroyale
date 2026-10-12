@@ -166,7 +166,7 @@ export function boardPoints(board: SquadsBoard, side: Side, s: SquadsSettings = 
   return sideOf(board, board.result.winner) === side ? s.winPoints : 0;
 }
 
-/** A random legal move (a missed move or pick), never one of `exclude` unless nothing else is legal. */
+/** A random legal move, never one of `exclude` unless nothing else is legal. (Missed moves use the match's own, which leaves a blocked move out.) */
 export function randomLegalMove(fen: string, rng: Rng, exclude: readonly string[] = []): string {
   const legal = squadsLegalMoves(fen);
   if (!legal.length) throw new Error(`No legal moves in ${fen}`);
@@ -196,14 +196,4 @@ export function allowsMateInOneSlow(fen: string, move: string): boolean {
   const chess = new Chess(fen);
   moveIn(chess, move);
   return !chess.isGameOver() && chess.moves().some((san) => san.endsWith("#"));
-}
-
-/**
- * The final's mercy rule: a block on `block` is cancelled when every other legal move allows mate in one (blocking
- * it would leave the squad nothing but moves that get mated). Stops at the first move that doesn't.
- */
-export function blockCancelledByMate(fen: string, block: string): boolean {
-  const others = squadsLegalMoves(fen).filter((m) => m !== block);
-  if (!others.length) return true;
-  return others.every((m) => allowsMateInOne(fen, m));
 }

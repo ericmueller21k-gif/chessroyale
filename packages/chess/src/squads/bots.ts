@@ -1,12 +1,16 @@
+import { Chess } from "chess.js";
 import { DEFAULT_SETTINGS, SQUADS, botPick, type Candidate, type Rng, type SquadsSettings } from "@chessroyale/core";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
+import { blockLift, checkBlock, isBlocked } from "./blocks.ts";
 import type { Colour } from "./board.ts";
 
 /**
  * Squad bots: the existing bot engine (the engine's top moves, then `botPick` at the bot's skill: a temperature over
- * each move's loss) making Relay moves, pair picks (never the partner's), and the final's picks and blocks. The game's
- * rules never ask an engine; only a bot deciding what to play does, as in every other mode.
+ * each move's loss) making Relay moves, pair picks (different from the partner's, unless it's an only move and the
+ * squad has a same-move token), the final's votes (sometimes copying a person on the squad), and now and then a block
+ * of the other squad's likely best reply. The game's rules never ask an engine; only a bot deciding what to play does,
+ * as in every other mode.
  */
 
 /**
@@ -50,35 +54,69 @@ export function botRelayMove(rng: Rng, candidates: readonly Candidate[], skill: 
   return pickAvoiding(rng, candidates, skill, legal, new Set());
 }
 
-/** Pairs: the bot's pick, never the move its partner has already picked. */
-export function botPairPick(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], partnerPick: string | null): string {
+/** The engine's top moves a bot may play here: blocks in effect take their moves' lines away. */
+export const topAllowed = (top: readonly MoveScore[], blocks: readonly string[]): MoveScore[] => top.filter((t) => !isBlocked(t.move, blocks));
+
+/**
+ * Only-move-like (for a bot deciding whether to spend a same-move token): `move` is the engine's best here and beats
+ * every other line by at least `bots.sameMoveGap` of expected score.
+ */
+export function isOnlyMove(top: readonly MoveScore[], move: string, s: SquadsSettings = SQUADS): boolean {
+  const sorted = [...top].sort((a, b) => b.expected - a.expected);
+  if (sorted[0]?.move !== move) return false;
+  const next = sorted[1];
+  return !next || sorted[0]!.expected - next.expected >= s.bots.sameMoveGap - 1e-9;
+}
+
+/**
+ * Pairs: the bot's pick. Its partner's move only when `sameMove` (an only move, and the squad has a token: the caller
+ * decides with `isOnlyMove`); otherwise never the move its partner has already picked.
+ */
+export function botPairPick(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], partnerPick: string | null, sameMove = false): string {
+  if (sameMove && partnerPick && legal.includes(partnerPick)) return partnerPick;
   return pickAvoiding(rng, candidates, skill, legal, new Set(partnerPick ? [partnerPick] : []));
 }
 
 /**
- * The final: a picker's pick, never its partner's; and with `avoidBlockChance`, none of the blocks it can see (blocks
- * show live to everyone, unless the visibility setting hides them).
+ * The final's vote: with `bots.copyHumanChance`, a pick a person on the squad has already made (the more of them on
+ * it, the likelier), so the bots feel like teammates; otherwise its own pick at its skill.
  */
-export function botFinalPick(
-  rng: Rng,
-  candidates: readonly Candidate[],
-  skill: number,
-  legal: readonly string[],
-  partnerPick: string | null,
-  seenBlocks: readonly string[],
-  s: SquadsSettings = SQUADS,
-): string {
-  const avoid = new Set(partnerPick ? [partnerPick] : []);
-  if (seenBlocks.length && rng() < s.bots.avoidBlockChance) for (const b of seenBlocks) avoid.add(b);
-  return pickAvoiding(rng, candidates, skill, legal, avoid);
+export function botVotePick(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], humanPicks: readonly string[], s: SquadsSettings = SQUADS): string {
+  const copyable = humanPicks.filter((m) => legal.includes(m));
+  if (copyable.length && rng() < s.bots.copyHumanChance) return copyable[Math.floor(rng() * copyable.length)]!;
+  return pickAvoiding(rng, candidates, skill, legal, new Set());
 }
 
 /**
- * The final: a blocker's block, a move of the side to move that the bot thinks the pickers will want (the same
- * weighting as a pick: a strong bot blocks the best move), never its partner's block.
+ * A bot's block, sparingly: the other squad's likely best reply to the bot's own move (`reply`: the second move of the
+ * engine's line for it), if that's a move a block can name (blocks.ts), affordable, and would take effect after the
+ * move (no mercy rule lifts it). It blocks with `bots.blockChance`, or `sharpChance` if the reply captures or gives
+ * check, and keeps `blockReserve` in its bank unless the reply is sharp. Null: no block.
  */
-export function botFinalBlock(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], partnerBlock: string | null): string {
-  return pickAvoiding(rng, candidates, skill, legal, new Set(partnerBlock ? [partnerBlock] : []));
+export function botBlock(rng: Rng, o: { fen: string; ownMove: string; reply: string | undefined; bank: number }, s: SquadsSettings = SQUADS): string | null {
+  const reply = o.reply?.slice(0, 4);
+  if (!reply || !/^[a-h][1-8][a-h][1-8]$/.test(reply)) return null;
+  const them: Colour = o.fen.split(" ")[1] === "w" ? "b" : "w";
+  const c = checkBlock(o.fen, them, reply, s);
+  if ("error" in c || c.cost > o.bank) return null;
+  let after: Chess;
+  try {
+    after = new Chess(o.fen);
+    after.move({ from: o.ownMove.slice(0, 2), to: o.ownMove.slice(2, 4), promotion: o.ownMove[4] });
+  } catch {
+    return null;
+  }
+  const fenAfter = after.fen();
+  if (blockLift(fenAfter, reply, s)) return null;
+  let sharp = !!after.get(reply.slice(2, 4) as never);
+  try {
+    after.move({ from: reply.slice(0, 2), to: reply.slice(2, 4), promotion: "q" });
+    sharp ||= after.inCheck();
+  } catch {
+    return null;
+  }
+  if (!sharp && o.bank - c.cost < s.bots.blockReserve) return null;
+  return rng() < (sharp ? s.bots.sharpChance : s.bots.blockChance) ? reply : null;
 }
 
 /**

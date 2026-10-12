@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
-import type { NetDuty, NetSquadsLobby, NetSquadsHalf, NetTeamClock } from "@chessroyale/chess/squads";
-import { START_FEN } from "@chessroyale/chess";
+import type { NetDuty, NetSquadsLobby, NetSquadsHalf, NetTeamClock, SquadsBlock, TokenUse } from "@chessroyale/chess/squads";
+import { START_FEN, applyMove, inCheck } from "@chessroyale/chess";
 import {
   SQUAD_NAMES,
   bankText,
   cheatArrows,
   cheatEval,
   cheatLinesAt,
+  blockBankNow,
+  blockCheatFen,
+  blockName,
+  blocksShown,
   drainRate,
+  dutyOf,
   liveBank,
+  tokenWords,
   movesOfHalf,
   myBoards,
   points,
@@ -38,6 +44,10 @@ function match(over: Partial<LocalMatch> = {}, boards = 4): LocalMatch {
     banks: [60_000, 60_000],
     delayMs: 3000,
     incrementMs: 0,
+    tokens: boards === 2 ? [5, 5] : null,
+    blockBanks: [5, 5],
+    blocks: [],
+    tokenLog: [],
     state: "half",
     startsAt: null,
     current: null,
@@ -46,13 +56,15 @@ function match(over: Partial<LocalMatch> = {}, boards = 4): LocalMatch {
     locked: [],
     lockedAt: {},
     choiceAt: {},
+    placed: [],
+    blockAt: {},
     last: null,
     ...over,
   };
 }
 
 const duty = (board: number, side: 0 | 1, players: string[], role: NetDuty["role"] = "move", deadline = 20_000): NetDuty => ({ board, side, role, players, deadline });
-const half = (duties: NetDuty[]): NetSquadsHalf => ({ seq: 0, turn: 0, half: "w", startedAt: 0, duties, scouts: [], mercy: null, forced: [] });
+const half = (duties: NetDuty[]): NetSquadsHalf => ({ seq: 0, turn: 0, half: "w", startedAt: 0, duties, scouts: [], forced: [] });
 
 describe("Squads screens: the team clock as the screen runs it", () => {
   it("drains past the free seconds, once for each move being thought about (twice as fast with two)", () => {
@@ -67,12 +79,16 @@ describe("Squads screens: the team clock as the screen runs it", () => {
     expect(drainRate(m, 1, 5000)).toBe(1);
   });
 
-  it("a move locked in stops draining when it was locked; blockers never drain", () => {
-    const m = match({ current: half([duty(0, 0, ["a0", "a1"], "pick"), duty(0, 1, ["b2", "b3"], "block")]), locked: ["a0", "a1", "b2"], lockedAt: { a0: 4000, a1: 6000, b2: 9000 } }, 1);
-    // The pair's slower picker locked at 6 s: 3 s drained, then still.
+  it("a move locked in stops draining when it was locked (the final's vote: when its last picker locked); the other squad's stands still", () => {
+    const m = match({ current: half([duty(0, 0, ["a0", "a1", "a2", "a3"], "pick")]), locked: ["a0", "a1", "a2", "a3"], lockedAt: { a0: 4000, a1: 6000, a2: 2000, a3: 5000 } }, 1);
+    // The squad's slowest picker locked at 6 s: 3 s drained, then still.
     expect(liveBank(m, 0, 10_000)).toBe(57_000);
     expect(drainRate(m, 0, 10_000)).toBe(0);
     expect(liveBank(m, 1, 10_000)).toBe(60_000);
+    // Still voting: it drains.
+    const voting = { ...m, locked: ["a0"] };
+    expect(drainRate(voting, 0, 10_000)).toBe(1);
+    expect(dutyOf(voting, "a2")).toMatchObject({ partner: null, team: ["a0", "a1", "a3"] });
   });
 
   it("stops at zero (sudden death), and in sudden death shows zero", () => {
@@ -169,6 +185,50 @@ describe("Squads screens: words and numbers", () => {
     expect(movesOfHalf(events as never, 0)).toEqual(["e2e4"]);
     expect(movesOfHalf(events as never, 1)).toEqual(["e1f1"]);
     expect(movesOfHalf(events as never, 2)).toEqual([]);
+  });
+});
+
+describe("Squads v2 on screen: blocks and tokens", () => {
+  const blk = (o: Partial<SquadsBlock> = {}): SquadsBlock => ({ board: 0, side: 0, by: "a0", move: "g8f6", piece: "n", cost: 2, ...o });
+
+  it("each squad's block bank now: the match's, less this half's blocks (paid at once); both squads see both", () => {
+    const m = match({ placed: [blk(), blk({ move: "e7e5", piece: "p", cost: 1 }), blk({ board: 1, side: 1, move: "e2e4", piece: "p", cost: 1 })] });
+    expect(blockBankNow(m, 0)).toBe(2);
+    expect(blockBankNow(m, 1)).toBe(4);
+  });
+
+  it("the blocks on a board: in effect this half and placed this half, until the other squad has moved", () => {
+    const inEffect = blk({ board: 2, side: 1, move: "d2d4", piece: "p", cost: 1 });
+    const m = match({ blocks: [inEffect], placed: [blk({ board: 2, move: "b8c6" }), blk({ board: 3 })] });
+    expect(blocksShown(m, 2).map((b) => b.move)).toEqual(["d2d4", "b8c6"]);
+    expect(blocksShown(m, 0)).toEqual([]);
+  });
+
+  it("a blocked move in a few characters", () => {
+    expect(blockName(blk())).toBe("Ng8–f6");
+    expect(blockName(blk({ move: "e7e5", piece: "p" }))).toBe("e7–e5");
+    expect(blockName(blk({ move: "e8g8", piece: "k" }))).toBe("O-O");
+    expect(blockName(blk({ move: "e1c1", piece: "k" }))).toBe("O-O-O");
+  });
+
+  it("cheat lines while blocking: the other squad's moves after yours, or with none yet, the move handed over", () => {
+    expect(blockCheatFen(START_FEN, "e2e4", applyMove, inCheck)).toBe(applyMove(START_FEN, "e2e4"));
+    expect(blockCheatFen(START_FEN, null, applyMove, inCheck)!.split(" ").slice(0, 4)).toEqual([START_FEN.split(" ")[0], "b", "KQkq", "-"]);
+    // In check, the move can't be handed over: no lines until you've picked.
+    expect(blockCheatFen("4k3/8/8/8/8/8/4q3/4K3 w - - 0 1", null, applyMove, inCheck)).toBeNull();
+  });
+
+  it("the post-match token breakdown: every use, refunded or not, why, with numbers", () => {
+    const use = (verdict: TokenUse["verdict"], move = "e2e4"): TokenUse => ({ turn: 0, half: "w", board: 0, side: 0, players: ["a0", "a1"], move, fen: START_FEN, blocked: [], verdict });
+    expect(tokenWords(use({ refunded: true, why: "only_move", rival: "d2d4", pawns: 2.1 }))).toBe("e4: refunded, every other move lost at least 2.1 pawns");
+    expect(tokenWords(use({ refunded: false, why: "close", rival: "g1f3", pawns: 0.3 }))).toBe("e4: not refunded, Nf3 was within 0.3");
+    expect(tokenWords(use({ refunded: false, why: "close", rival: "g1f3", pawns: 0 }))).toBe("e4: not refunded, Nf3 was just as good");
+    expect(tokenWords(use({ refunded: false, why: "close", rival: "g1f3", pawns: 0, mate: true }))).toBe("e4: not refunded, Nf3 mates too");
+    expect(tokenWords(use({ refunded: false, why: "better", rival: "g1f3", pawns: 0.6 }))).toBe("e4: not refunded, Nf3 was better by 0.6 pawns");
+    expect(tokenWords(use({ refunded: false, why: "better", rival: "g1f3", pawns: 1, atLeast: true }))).toBe("e4: not refunded, Nf3 was better by at least 1.0 pawn");
+    expect(tokenWords(use({ refunded: false, why: "no_judge" }))).toBe("e4: not refunded, no device could judge it");
+    expect(tokenWords(use({ refunded: false, why: "unranked" }))).toBe("e4: not refunded, the judge couldn't rank the other moves");
+    expect(tokenWords(use(null))).toBe("e4: waiting for the judge");
   });
 });
 

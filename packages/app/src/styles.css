@@ -12232,11 +12232,63 @@ button.sq-tiny {
   font-size: 12px;
   color: var(--text);
 }
+/* Each squad: its tag and clock, and under them its block bank and (Pairs) its same-move tokens. */
 .sq-clockline-side {
+  display: inline-grid;
+  justify-items: center;
+  gap: 0;
+  white-space: nowrap;
+}
+.sq-clockline-top {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  white-space: nowrap;
+  line-height: 1.15;
+}
+.sq-res {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sq-res-bank,
+.sq-res-tokens {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.sq-res-bank .sq-lock-icon,
+.sq-token-icon {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+.sq-res-bank {
+  color: #c0262d;
+}
+.sq-res-tokens {
+  color: #b7791f;
+}
+.sq-res-tokens.none {
+  opacity: 0.5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sq-res-bank {
+    color: #f07a7a;
+  }
+  :root:not([data-theme="light"]) .sq-res-tokens {
+    color: #f2c14e;
+  }
+}
+:root[data-theme="dark"] .sq-res-bank {
+  color: #f07a7a;
+}
+:root[data-theme="dark"] .sq-res-tokens {
+  color: #f2c14e;
 }
 .sq-clockline-side .sq-tag {
   font-weight: 700;
@@ -12290,8 +12342,57 @@ button.sq-tiny {
 .sq-duty.move {
   grid-template-columns: minmax(0, 1fr);
 }
-.sq-duty.block {
-  box-shadow: inset 3px 0 0 #c0262d;
+.sq-block-btn {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  border: 2px solid #c0262d;
+  color: #c0262d;
+  background: transparent;
+  font-weight: 800;
+}
+.sq-block-btn.on {
+  background: #c0262d;
+  color: #fff;
+}
+.sq-block-btn:disabled {
+  border-color: var(--muted);
+  color: var(--muted);
+  opacity: 0.7;
+}
+.sq-placed {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #c0262d;
+}
+.sq-same {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b7791f;
+}
+.sq-same.none {
+  color: var(--danger);
+}
+.sq-copy {
+  margin-left: auto;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
 }
 .sq-choices {
   display: grid;
@@ -12316,9 +12417,6 @@ button.sq-tiny {
 }
 .sq-choice.partner i {
   background: #003088;
-}
-.sq-duty.block .sq-choice i {
-  background: #c0262d;
 }
 .sq-choice.none strong {
   color: var(--muted);
@@ -12356,6 +12454,37 @@ button.sq-tiny {
   border-radius: 10px;
   background: color-mix(in srgb, var(--danger) 16%, var(--surface));
   font-size: 13px;
+}
+.sq-note.news {
+  background: color-mix(in srgb, #b7791f 18%, var(--surface));
+  font-weight: 700;
+}
+/* The post-match breakdown of a Pairs match's same-move tokens. */
+.sq-token-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.sq-token-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+}
+.sq-token-list li.refunded span:last-child {
+  color: var(--good);
+}
+.sq-token-list li.pending span:last-child {
+  color: var(--muted);
+}
+.sq-token-who {
+  font-weight: 800;
+  color: var(--muted);
+}
+.sq-token-list li.ours .sq-token-who {
+  color: var(--accent);
 }
 .sq-back {
   min-height: 44px;
@@ -12430,46 +12559,225 @@ button.sq-tiny {
   gap: 8px;
   width: 100%;
 }
-/* The reveal: the active block slamming down as a red lock on its square (eighths of the board's own size). */
-.sq-lock {
+/*
+ * Move blocks: each blocked move is an arrow from the piece to its square that draws like a move arrow, then keeps
+ * redrawing itself slowly and softly, a lock fading in and out on it, from when it's placed until the other squad has
+ * moved. --sq-age (a negative delay, set once when it's first drawn) keeps every arrow's beat across redraws.
+ */
+.sq-block-arrows {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 4;
+  pointer-events: none;
+}
+.sq-block-shaft {
+  fill: none;
+  stroke: #c0262d;
+  stroke-width: 0.15;
+  stroke-linecap: round;
+  stroke-dasharray: 1 1;
+  animation:
+    sq-block-draw 450ms ease-out var(--sq-age, 0ms) both,
+    sq-block-redraw 2600ms linear var(--sq-age-loop, 450ms) infinite;
+}
+.sq-block-head {
+  fill: #c0262d;
+  animation:
+    sq-block-head-in 450ms ease-out var(--sq-age, 0ms) both,
+    sq-block-head 2600ms linear var(--sq-age-loop, 450ms) infinite;
+}
+.sq-block-lock {
+  animation: sq-block-lock 2600ms ease-in-out var(--sq-age, 0ms) infinite both;
+}
+.sq-block-lock circle {
+  fill: #9f1d24;
+}
+@keyframes sq-block-draw {
+  from {
+    stroke-dashoffset: 1;
+    opacity: 0.85;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 0.85;
+  }
+}
+/* Drawn: it softens, holds, fades; then draws itself again, slowly, from the piece. */
+@keyframes sq-block-redraw {
+  0% {
+    stroke-dashoffset: 0;
+    opacity: 0.85;
+  }
+  15%,
+  30% {
+    stroke-dashoffset: 0;
+    opacity: 0.55;
+  }
+  42% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+  43% {
+    stroke-dashoffset: 1;
+    opacity: 0.55;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.55;
+  }
+}
+@keyframes sq-block-head-in {
+  0%,
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0.85;
+  }
+}
+@keyframes sq-block-head {
+  0% {
+    opacity: 0.85;
+  }
+  15%,
+  30% {
+    opacity: 0.55;
+  }
+  42%,
+  97% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0.55;
+  }
+}
+@keyframes sq-block-lock {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sq-block-shaft,
+  .sq-block-head,
+  .sq-block-lock {
+    animation: none;
+    opacity: 0.6;
+    stroke-dashoffset: 0;
+  }
+}
+/* Choosing a block: their pieces that can be blocked ringed with the cost, then the chosen one's squares as dots. */
+.sq-block-picker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 6;
+  pointer-events: none;
+}
+.sq-bp-piece,
+.sq-bp-target {
   position: absolute;
   left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
   top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
   width: calc(var(--board-size, 100%) / 8);
   height: calc(var(--board-size, 100%) / 8);
-  z-index: 5;
-  display: grid;
-  place-items: center;
-  border-radius: 3px;
-  background: rgba(192, 38, 45, 0.82);
+  padding: 0;
+  border: none;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.sq-bp-piece {
+  box-shadow: inset 0 0 0 calc(var(--board-size, 320px) / 110) rgba(192, 38, 45, 0.7);
+  border-radius: 4px;
+}
+.sq-bp-piece.on {
+  background: rgba(192, 38, 45, 0.35);
+  box-shadow: inset 0 0 0 calc(var(--board-size, 320px) / 80) #c0262d;
+}
+.sq-bp-cost {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  min-width: 1.4em;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #c0262d;
   color: #fff;
+  font-size: max(10px, calc(var(--board-size, 320px) / 34));
+  font-weight: 800;
+  line-height: 1.4;
+}
+.sq-bp-target::after {
+  content: "";
+  position: absolute;
+  left: 34%;
+  top: 34%;
+  width: 32%;
+  height: 32%;
+  border-radius: 50%;
+  background: rgba(192, 38, 45, 0.75);
+}
+/* The final: teammates' picks named where they land. */
+.sq-pick-tags {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 5;
   pointer-events: none;
-  animation: sq-slam 380ms cubic-bezier(0.3, 0, 0.6, 1.4) both;
 }
-.sq-lock svg {
-  width: 62%;
-  height: 62%;
+.sq-pick-tag {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * (var(--sq-x, 0) + 0.5) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  transform: translate(-50%, -55%);
+  max-width: calc(var(--board-size, 320px) * 0.4);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #003088;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.sq-lock.cancelled {
-  animation:
-    sq-slam 380ms cubic-bezier(0.3, 0, 0.6, 1.4) both,
-    sq-crack 600ms 700ms ease-in forwards;
+.sq-pick-tag.you {
+  background: #15781b;
 }
-@keyframes sq-slam {
-  from {
-    transform: scale(2.6) translateY(-30%);
-    opacity: 0;
-  }
-  70% {
-    transform: scale(0.92);
-    opacity: 1;
-  }
-}
-@keyframes sq-crack {
-  to {
-    opacity: 0.15;
-    transform: rotate(-12deg) scale(0.8);
-  }
+/* A block placed or lifted: a short banner along the top of the board, both squads. */
+.sq-block-banner {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 94%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(120, 18, 24, 0.9);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 .sq-arrows {
   position: absolute;

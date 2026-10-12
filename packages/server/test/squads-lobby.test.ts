@@ -129,8 +129,15 @@ describe("squads lobby: votes and the bracket", () => {
     const start = L.now;
     L.runUntil(() => L.core.record.phase === "results", 3 * 3_600_000, "the results");
     const minutes = (L.now - start) / 60_000;
+    // (These bots play from the server's quick look, far weaker than the devices' engine, so their games run long:
+    // over 8 seeds 43-103 minutes before Squads v2, 45-92 after. A lobby with devices takes about 30: the headless run.)
     expect(minutes).toBeGreaterThan(15);
-    expect(minutes).toBeLessThan(60);
+    expect(minutes).toBeLessThan(90);
+    // Squads v2: the bots block now and then, and match a partner on an only move; with no device, no refunds.
+    const pairs = L.core.allMatches().filter((m) => m.round === 1);
+    expect(pairs.flatMap((m) => m.m.tokenLog).length).toBeGreaterThan(0);
+    expect(pairs.flatMap((m) => m.m.tokenLog).every((u) => u.verdict?.why === "no_judge")).toBe(true);
+    expect(L.core.allMatches().some((m) => m.m.blockBanks.some((b) => b < SQUADS.blocks.bankPerMatch))).toBe(true);
     const places = Object.values(L.core.record.placed).sort();
     expect(places).toEqual([1, 2, 3, 3, 5, 5, 5, 5]);
     const matches = L.core.allMatches();
@@ -334,8 +341,10 @@ describe("squads lobby: the final, Armageddon and visibility", () => {
     const fin = L.core.match("r2m0")!;
     expect(fin.state).toBe("half");
     const turn = L.last(solo, "turn")!.current;
-    const pick = turn.duties.find((d) => d.role === "pick")!;
-    const block = turn.duties.find((d) => d.role === "block");
+    // The majority vote: one duty, the whole squad to move.
+    expect(turn.duties).toHaveLength(1);
+    const pick = turn.duties[0]!;
+    expect(pick.players).toHaveLength(4);
     const fen = fin.m.boards[0]!.fen;
     const legal = squadsLegalMoves(fen);
     const pickers = pick.players;
@@ -346,14 +355,13 @@ describe("squads lobby: the final, Armageddon and visibility", () => {
     // Picks: only the picking squad.
     for (const id of pickSide) expect(L.last(id, "choices")!.visible[pickers[0]!]).toBe(legal[0]);
     for (const id of [...otherSide, solo]) expect(L.last(id, "choices")!.visible[pickers[0]!]).toBeUndefined();
-    // The partner can't pick the same move.
+    // A teammate can copy it (no tokens in the final).
     L.core.message(pickers[1]!, { t: "choose", key: "r2m0", seq: turn.seq, move: legal[0]! });
-    expect(L.last(pickers[1]!, "choiceNo")).toMatchObject({ reason: "taken_by_partner" });
-    if (block) {
-      // Blocks: everyone, spectators included.
-      L.core.message(block.players[0]!, { t: "choose", key: "r2m0", seq: turn.seq, move: legal[1]! });
-      for (const id of [...red, ...blue, solo]) expect(L.last(id, "choices")!.visible[block.players[0]!]).toBe(legal[1]);
-    }
+    expect(L.last(pickers[1]!, "choiceNo")).toBeUndefined();
+    for (const id of pickSide) expect(L.last(id, "choices")!.visible[pickers[1]!]).toBe(legal[0]);
+    // The other squad has nothing to choose.
+    L.core.message(otherSide[0]!, { t: "choose", key: "r2m0", seq: turn.seq, move: legal[1]! });
+    expect(L.last(otherSide[0]!, "choiceNo")).toMatchObject({ reason: "no_duty" });
   });
 
   it("a drawn final goes to Armageddon: the squad with more time left picks its colour, then one board decides", () => {

@@ -1507,15 +1507,17 @@ export const FAIRPLAY = {
 } as const;
 
 /**
- * Squads (docs/areas/squads.md; DECISIONS.md, "Squads"): 8 squads of 4 play team chess in a bracket. Round 1 is
- * Relay (4 boards a match, one player a move, everyone moving one board along each turn), round 2 Pairs (2 boards,
- * two players pick and a coin chooses), the final Pick and Block (one board: two pickers, two blockers). Each squad
- * has one team clock for the whole tournament: a bank that carries from round to round (topped up when it advances),
- * drained past a few free seconds a move, once for each of its moves being thought about at the same time. At zero
- * it's sudden death: every move within the free seconds, or it's missed. No flag falls, and every game is played to
- * the end. No engine in the rules: legal moves and mate in one come from the chess library; only the silent safety
- * cap and the test-only "Next round" fall back on material. The rules are in `packages/chess/src/squads/`; every
- * number for the mode is here.
+ * Squads (docs/areas/squads.md; DECISIONS.md, "Squads" and "Squads v2"): 8 squads of 4 play team chess in a bracket.
+ * Round 1 is Relay (4 boards a match, one player a move, everyone moving one board along each turn), round 2 Pairs
+ * (2 boards, two players pick and a coin chooses, unless both pick the same move: a same-move token), the final a
+ * majority vote (one board, the whole squad picks, the most popular pick plays). In every round a squad may block one
+ * of the other squad's moves before its own move (a block bank per match). Each squad has one team clock for the
+ * whole tournament: a bank that carries from round to round (topped up when it advances), drained past a few free
+ * seconds a move, once for each of its moves being thought about at the same time. At zero it's sudden death: every
+ * move within the free seconds, or it's missed. No flag falls, and every game is played to the end. No engine in the
+ * rules but one: a same-move token's refund takes the judge's top moves (from players' devices) as data; legal moves
+ * and mate in one come from the chess library; only the silent safety cap and the test-only "Next round" fall back on
+ * material. The rules are in `packages/chess/src/squads/`; every number for the mode is here.
  */
 export interface SquadsClock {
   id: string;
@@ -1535,7 +1537,7 @@ export interface SquadsSettings {
   squadCount: number;
   /** The largest party (invite link or code) that queues together. */
   partyMax: number;
-  /** Boards in a match: round 1 (Relay), round 2 (Pairs), the final (Pick and Block). Armageddon is always one. */
+  /** Boards in a match: round 1 (Relay), round 2 (Pairs), the final (the majority vote). Armageddon is always one. */
   boards: { relay: number; pairs: number; final: number };
   /** The pre-game votes (Start, Clock): seconds each is open, the result's showing, bots that don't vote. */
   voteSeconds: number;
@@ -1549,7 +1551,7 @@ export interface SquadsSettings {
   clockDefault: number;
   /**
    * The per-move ceiling while a squad's bank is above zero: nobody can hold up a half longer than this. A mover or
-   * picker who hasn't chosen by then misses (a random legal move; a blocker forfeits), the bank draining meanwhile.
+   * picker who hasn't chosen by then misses (a random legal move), the bank draining meanwhile.
    */
   moveCeilingSeconds: number;
   /** A missed move earns no increment. */
@@ -1566,14 +1568,57 @@ export interface SquadsSettings {
   /** Openings (Start: "same opening", "random openings"): moves per side, and the balance window (as for Classic). */
   openingMoves: number;
   openingBalance: readonly [number, number];
+  /**
+   * Pairs' same-move tokens (Eric, Oct 12): partners may both pick the same move while their squad has a token; it
+   * plays (no coin) and burns one automatically. At none, picks must differ. After the move the judge's top moves (the
+   * bot engine's, from players' devices, as for bots) decide a refund: the move was the only real one if it was the
+   * best and every other legal move was worse by at least `refundGap` of expected score. No judge, no refund.
+   */
+  tokens: {
+    /** Each squad's tokens per Pairs match. */
+    perMatch: number;
+    /**
+     * The only-move gap, in expected score (0 to 1; the judge's scale, 1 point = 0.01). About two pawns' worth: from a
+     * level position two pawns down is 0.5 to 0.13 (0.95 log-odds a pawn: BOSS_POWERS.bouncePawnLogit), a gap of 0.37.
+     */
+    refundGap: number;
+    /** One pawn's worth of expected score near a level position: the breakdown's words ("lost at least 2.1 pawns"). */
+    pawnWorth: number;
+  };
+  /**
+   * Move blocks, every round (Eric, Oct 12: "You tap their piece and play the move you wanna block"). On its squad's
+   * turn on a board, before its move there is settled, any of its players on that board may block moves of the other
+   * squad: that piece to that square can't be played on their next turn there (the piece's other moves stay legal).
+   * Paid at once from the squad's block bank for the match, by the piece making the move; the king's ordinary moves
+   * never, castling at `castlingCost`. A block that doesn't take effect is lifted and refunded: the squad's own move
+   * made it impossible, the game ended, or a mercy rule.
+   */
+  blocks: {
+    /**
+     * Each squad's block bank coming into a match (Armageddon carries on with what the final left). A mode can set it
+     * to 0 (no blocks) or pass a match its own (`MatchSetup.blockBanks`).
+     */
+    bankPerMatch: number;
+    /** A block's cost by the piece making the move (the king's ordinary moves can never be blocked). */
+    cost: { p: number; n: number; b: number; r: number; q: number };
+    /** Castling as a block (Eric: "let's allow castling to be blocked for 2 tokens"); null: castling can't be blocked. */
+    castlingCost: number | null;
+    /**
+     * Blocks a squad may place on one board in one turn; null: as many as its bank allows (Eric, Oct 12: "one big
+     * blocking play, high risk high reward, changeable later").
+     */
+    maxPerTurn: number | null;
+    /**
+     * Mercy, on a turn's blocks together: if they'd leave no move, or only moves allowing mate in one, the most recent
+     * are lifted (refunded) until that's no longer so.
+     */
+    liftBeforeMate: boolean;
+    /** Mercy (the brief's "a piece that can answer the check can't be blocked"): in check, every move answers it: lifted. */
+    liftInCheck: boolean;
+  };
+  /** The final: everyone picks, the most picked move plays; a tie for the most, a seeded coin between the tied moves. */
   final: {
-    /** Mercy: no blocks when the side to move has this many legal moves or fewer. */
-    noBlocksAtMoves: number;
-    /** Mercy: a block is cancelled when every other legal move allows mate in one. */
-    cancelBlockBeforeMate: boolean;
-    /** Who sees the choices live: "everyone" (both squads and spectators) or "own" (the acting squad only). */
-    blocksSeenBy: "everyone" | "own";
-    picksSeenBy: "everyone" | "own";
+    tie: "coin";
   };
   /**
    * A drawn final goes to one Armageddon board in the final's format, on its own fixed clocks (a bank for each side,
@@ -1588,8 +1633,21 @@ export interface SquadsSettings {
   bots: {
     /** The bot engine's top moves a squad bot chooses among. */
     candidates: number;
-    /** A bot picker in the final steers clear of a block it can see with this chance. */
-    avoidBlockChance: number;
+    /**
+     * Pairs: a bot picks its partner's move (a same-move token, while the squad has one) only when that move is its own
+     * top move and beats the next by at least this much expected score (only-move-like); otherwise picks differ.
+     */
+    sameMoveGap: number;
+    /**
+     * Blocks, sparingly: a bot blocks the other squad's likely best reply to its own move (the engine line's second
+     * move) with `blockChance`, or `sharpChance` when that reply captures or checks; never spending below `blockReserve`
+     * unless it's sharp; never the king, never one a mercy rule would lift.
+     */
+    blockChance: number;
+    sharpChance: number;
+    blockReserve: number;
+    /** The final: a bot copies a human teammate's pick (one already made) with this chance, so it feels like a teammate. */
+    copyHumanChance: number;
     /** The colour a bot squad takes when it picks Armageddon's colours. */
     armageddonColour: "w" | "b";
     /**
@@ -1614,7 +1672,8 @@ export interface SquadsSettings {
   };
   /**
    * Showing what happened, in seconds: a half's moves landing (Relay), the pair's reveal and coin (Pairs), the
-   * final's reveal (ghost arrows, the lock slamming down, the coin), the bracket between matches, Armageddon's intro.
+   * final's reveal (every pick as a ghost with its pickers' names, the count, a coin for a tie), the bracket between
+   * matches, Armageddon's intro.
    */
   moveShowSeconds: number;
   pairRevealSeconds: number;
@@ -1649,19 +1708,28 @@ export const SQUADS: SquadsSettings = {
   drawPoints: 0.5,
   openingMoves: 4,
   openingBalance: [0.4, 0.6],
-  final: {
-    noBlocksAtMoves: 3,
-    cancelBlockBeforeMate: true,
-    // Eric, Oct 10: blocks live to everyone as red arrows, picks only to the picking squad. A setting so it can go back.
-    blocksSeenBy: "everyone",
-    picksSeenBy: "own",
+  // Eric, Oct 12 (Squads v2): 5 tokens a Pairs match; a refund at about two pawns' worth (DECISIONS.md, "Squads v2").
+  tokens: { perMatch: 5, refundGap: 0.37, pawnWorth: 0.185 },
+  // Eric, Oct 12: a 5-point bank per match; pawn 1, knight, bishop or rook 2, queen 3, castling 2, the king never.
+  blocks: {
+    bankPerMatch: 5,
+    cost: { p: 1, n: 2, b: 2, r: 2, q: 3 },
+    castlingCost: 2,
+    maxPerTurn: null,
+    liftBeforeMate: true,
+    liftInCheck: true,
   },
+  final: { tie: "coin" },
   armageddon: { whiteSeconds: 90, blackSeconds: 60, incrementSeconds: 1 },
   noShowsBeforeBot: 3,
   replacementBotSkill: 4,
   bots: {
     candidates: 8,
-    avoidBlockChance: 0.5,
+    sameMoveGap: 0.3,
+    blockChance: 0.15,
+    sharpChance: 0.5,
+    blockReserve: 2,
+    copyHumanChance: 0.35,
     armageddonColour: "b",
     wonAt: 0.9,
     wonSkill: 2,

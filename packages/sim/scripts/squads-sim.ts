@@ -2,8 +2,8 @@
  * Squads: full 32-player lobbies played through the real rules (`@chessroyale/chess/squads`) at three skill mixes
  * and every Clock option. Every seat is a person played by a bot: the bot engine chooses (Stockfish's top moves at
  * `nodes`, then botPick at the player's skill), and a simple model stands in for how a person uses the team clock and
- * how often they miss (below). The rules never ask the engine; the engine also judges which of two picks was better,
- * for this report only.
+ * how often they miss (below). The rules never ask the engine, but for a same-move token's refund (the judge's top
+ * moves, given as data: here this engine's); the engine also judges which of two picks was better, for this report.
  *
  * Run: npm run sim:squads -- [lobbies per setting = 12] [nodes = 10000] [clocks: "bank|top-up|free|increment,..." with
  * the bank and top-up as m:ss, e.g. "6:00|1:00|5|0"] (about 35 minutes on 4 cores). Writes reports/squads-sim.md, or the
@@ -18,32 +18,39 @@ import {
   NO_INPUTS,
   armageddonChooser,
   armageddonStart,
+  blockBankNow,
+  blocksOn,
   botArmageddonColour,
-  botFinalBlock,
-  botFinalPick,
+  botBlock,
   botPairPick,
   botRelayMove,
+  botVotePick,
   candidatesFrom,
   choose,
   drawBracket,
   formSquads,
   halfDuties,
+  isOnlyMove,
+  judgeTokenUse,
   lockIn,
   minutesName,
+  movesAllowed,
   noteActions,
   otherSide,
   planLobby,
+  placeBlock,
   planMatch,
   reportWinner,
   resolveHalf,
   settleTeamClocks,
+  settleTokenUse,
   squadBotSkill,
-  squadsLegalMoves,
   squadsRng,
   startArmageddon,
   startTeamClocks,
   teamClockLine,
-  visibleChoices,
+  tokensLeft,
+  topAllowed,
   winnerSquad,
   type Bracket,
   type Squad,
@@ -141,18 +148,25 @@ interface PairStat {
   weakerPlayed: boolean;
   missedSlot: boolean;
 }
-interface FinalStat {
-  mercy: boolean;
-  blocks: number;
-  blockHits: number;
-  anyHit: boolean;
-  activeHit: boolean;
-  /** The active block hit the better pick (by 1+ point), the worse one, or picks level with each other. */
-  activeHitBetter: boolean;
-  activeHitWorse: boolean;
-  cancelled: boolean;
-  forfeits: number;
+/** A final's vote: how many picks counted, the most for one move, a tie (a coin), nobody picking. */
+interface VoteStat {
+  counted: number;
+  most: number;
+  tie: boolean;
+  random: boolean;
+  /** The move played was worse (1+ point) than the best move anyone picked. */
   worsePlayed: boolean;
+}
+/** A same-move token: refunded or not, and why. */
+interface TokenStat {
+  refunded: boolean;
+  why: string;
+}
+/** A block: its round, cost and outcome ("on", or why it was lifted). */
+interface BlockStat {
+  round: number;
+  cost: number;
+  outcome: string;
 }
 interface MatchStat {
   seconds: number;
@@ -183,7 +197,11 @@ interface LobbyStat {
   /** For each squad: the round it first reached sudden death (null: never), and the last round it played. */
   suddenDeath: { round: number | null; lastRound: number }[];
   pairs: PairStat[];
-  finals: FinalStat[];
+  votes: VoteStat[];
+  tokens: TokenStat[];
+  blocks: BlockStat[];
+  /** Squad-matches played (each squad in each match), by round: the blocks per match's denominator. */
+  squadMatches: [number, number, number];
 }
 
 const showSeconds: Record<SquadsFormat, (s: SquadsSettings) => number> = {
@@ -216,7 +234,10 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
     sdMoves: [0, 0, 0],
     suddenDeath: squads.map(() => ({ round: null, lastRound: 0 })),
     pairs: [],
-    finals: [],
+    votes: [],
+    tokens: [],
+    blocks: [],
+    squadMatches: [0, 0, 0],
   };
   const player = (id: string) => squads.flatMap((x) => x.players).find((p) => p.id === id)!;
 
@@ -228,10 +249,8 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
       const fens = m.boards.map((b) => b.fen);
       const acts = duties.duties.flatMap((d) =>
         d.players.map((p, slot) => {
-          // Blockers think as their opponents would, on nobody's clock.
-          const clockSide = d.role === "block" ? otherSide(d.side) : d.side;
-          const bank = m.banks[clockSide];
-          const sudden = bank <= 0 && d.role !== "block";
+          const bank = m.banks[d.side];
+          const sudden = bank <= 0;
           const think = sudden
             ? Math.max(1_000, m.delayMs * (SD_RANGE[0] + rng() * (SD_RANGE[1] - SD_RANGE[0])))
             : Math.max(MIN_THINK_S * 1000, (bank / BANK_MOVES + INC_SHARE * (m.delayMs + m.incrementMs)) * (THINK_RANGE[0] + rng() * (THINK_RANGE[1] - THINK_RANGE[0])));
@@ -241,7 +260,6 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
         }),
       );
       for (const d of duties.duties) {
-        if (d.role === "block") continue;
         out.drainMoves[m.round]++;
         if (m.banks[d.side] <= 0) out.sdMoves[m.round]++;
       }
@@ -251,21 +269,29 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
       for (const a of acts) {
         if (a.miss) continue;
         const fen = fens[a.d.board]!;
-        const legal = squadsLegalMoves(fen);
-        const top = await lab.topMoves(fen);
+        const legal = movesAllowed(m, a.d.board);
+        let top = topAllowed(await lab.topMoves(fen), blocksOn(m, a.d.board));
+        if (!top.length) top = legal.slice(0, 1).map((move) => ({ move, expected: 0.5 }));
         const cands: Candidate[] = candidatesFrom(top, s);
         const who = player(a.p);
         const skill = squadBotSkill(top, who.replacedByBot ? s.replacementBotSkill : (who.skill ?? s.replacementBotSkill), s);
-        const partner = a.d.players[1 - a.slot] ?? null;
+        const partner = a.d.players.length === 2 ? (a.d.players[1 - a.slot] ?? null) : null;
         const partnerChoice = partner ? (inputs.choices[partner] ?? null) : null;
         let move: string;
         if (a.d.role === "move") move = botRelayMove(rng, cands, skill, legal);
-        else if (m.format === "pairs") move = botPairPick(rng, cands, skill, legal, partnerChoice);
-        else if (a.d.role === "pick") {
-          const seen = visibleChoices(m, inputs, a.d.side, s);
-          const blockers = duties.duties.find((x) => x.role === "block")?.players ?? [];
-          move = botFinalPick(rng, cands, skill, legal, partnerChoice, blockers.flatMap((b) => (seen[b] ? [seen[b]!] : [])), s);
-        } else move = botFinalBlock(rng, cands, skill, legal, partnerChoice);
+        else if (m.format === "pairs") move = botPairPick(rng, cands, skill, legal, partnerChoice, !!partnerChoice && tokensLeft(m, a.d.side) > 0 && isOnlyMove(top, partnerChoice, s));
+        else {
+          // (Every seat here stands for a person: a bot copies a teammate's pick as it would a person's.)
+          const picks = a.d.players.filter((p) => p !== a.p).flatMap((p) => (inputs.choices[p] ? [inputs.choices[p]!] : []));
+          move = botVotePick(rng, cands, skill, legal, picks, s);
+        }
+        // Now and then a block of the other squad's likely reply, before the move.
+        const bank = blockBankNow(m, inputs, a.d.side, s);
+        const block = bank > 0 ? botBlock(rng, { fen, ownMove: move, reply: top.find((t) => t.move === move)?.reply, bank }, s) : null;
+        if (block) {
+          const b = placeBlock(m, inputs, a.p, a.d.board, block, Math.round(a.t), s);
+          if ("inputs" in b) inputs = b.inputs;
+        }
         const r = choose(m, inputs, a.p, move, s);
         if ("inputs" in r) {
           inputs = lockIn(r.inputs, a.p);
@@ -287,38 +313,35 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
           const sd = out.suddenDeath[m.sides[e.side].squadId]!;
           sd.round ??= m.round;
         }
-        await judge(e, fens);
+        await judge(e, fens, m.round);
       }
       m = res.match;
+      // Same-move tokens: the judge (this engine's top moves; on players' devices in a real lobby), at once.
+      for (const i of res.tokensUsed) {
+        const use = m.tokenLog[i]!;
+        const verdict = judgeTokenUse(use, await lab.topMoves(use.fen), s);
+        m = settleTokenUse(m, i, verdict);
+        out.tokens.push({ refunded: verdict.refunded, why: verdict.why });
+      }
     }
     return { match: m, seconds };
   }
 
-  async function judge(e: SquadsEvent, fens: readonly string[]) {
-    if (e.kind === "pair") {
+  async function judge(e: SquadsEvent, fens: readonly string[], round: number) {
+    if (e.kind === "pair" && !e.same) {
       const [e0, e1] = await lab.expected(fens[e.board]!, e.picks);
       const played = e.coin === 0 ? e0! : e1!;
       const other = e.coin === 0 ? e1! : e0!;
       out.pairs.push({ diff: Math.abs(e0! - e1!) * 100, weakerPlayed: played < other, missedSlot: e.missed.some(Boolean) });
     }
-    if (e.kind === "pickblock") {
-      const [e0, e1] = await lab.expected(fens[e.board]!, e.picks);
-      const exp = [e0!, e1!];
-      const placed = e.blocks.filter((b): b is string => !!b);
-      const playedIdx = e.picks.indexOf(e.move);
-      out.finals.push({
-        mercy: e.mercy !== null,
-        blocks: placed.length,
-        blockHits: placed.filter((b) => e.picks.includes(b)).length,
-        anyHit: placed.some((b) => e.picks.includes(b)),
-        activeHit: e.hit !== null,
-        activeHitBetter: e.hit !== null && exp[e.hit]! - exp[1 - e.hit]! >= 0.01,
-        activeHitWorse: e.hit !== null && exp[1 - e.hit]! - exp[e.hit]! >= 0.01,
-        cancelled: e.cancelled,
-        forfeits: e.blockMissed.filter(Boolean).length,
-        worsePlayed: exp[1 - playedIdx]! - exp[playedIdx]! >= 0.01,
-      });
+    if (e.kind === "vote") {
+      const picked = e.tally.map((t) => t.move);
+      const exp = picked.length ? await lab.expected(fens[e.board]!, picked) : [];
+      const best = Math.max(0, ...exp);
+      const played = exp[picked.indexOf(e.move)] ?? best;
+      out.votes.push({ counted: e.picks.filter(Boolean).length, most: e.tally[0]?.votes ?? 0, tie: e.coin !== null, random: e.random, worsePlayed: best - played >= 0.01 });
     }
+    if (e.kind === "block") out.blocks.push({ round, cost: e.cost, outcome: e.outcome });
   }
 
   // Each match's length, then the lobby's: a match starts as soon as its two feeder matches (and the bracket's show) are done.
@@ -330,6 +353,7 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
     for (const bm of bracket[round]!) {
       const pair = [squads[bm.squads[0]!]!, squads[bm.squads[1]!]!] as const;
       for (const sq of pair) out.suddenDeath[sq.id]!.lastRound = round;
+      out.squadMatches[round] += 2;
       const planned = planMatch(plan, round, bm.index, pair, library, s);
       const played = await play(planned);
       let m = played.match;
@@ -414,27 +438,28 @@ push(
   `${results.length} full lobbies of 32 (8 squads of 4), ${LOBBIES} for every skill mix × Clock option, from`,
   "`packages/sim/scripts/squads-sim.ts` (`npm run sim:squads`), through the real rules in `packages/chess/src/squads/`.",
   "Each lobby plays the whole bracket: round 1 Relay (4 matches on 4 boards), round 2 Pairs (2 matches on 2 boards),",
-  "the final (Pick and Block), and an Armageddon board after a drawn final. Every game is played to the end (the silent",
+  "the final (a majority vote), and an Armageddon board after a drawn final. Every game is played to the end (the silent",
   "safety cap at move 120 aside). Start votes rotate between the normal start, one opening and random openings.",
   "",
   "**The team clock.** Each squad has one bank for the whole tournament, carried from round to round and topped up",
   "when it advances. Each of its moves being thought about drains it past the free seconds (a Relay mover, a pair, the",
-  "final's pickers; two at once drain it twice as fast). At zero it's sudden death: every move within the free seconds,",
+  "final's voting squad; two at once drain it twice as fast). At zero it's sudden death: every move within the free seconds,",
   "or it's a random move. No flag falls. The options:",
   ...CLOCKS.map((c) => `- ${c.label}: ${teamClockLine(c)}.`),
   "",
   "**How the seats are played.** Every seat is a person played by a bot: the bot engine (Stockfish 19 lite at",
   `${NODES.toLocaleString("en")} nodes, its top ${SQUADS.bots.candidates} moves) then \`botPick\` at the person's skill, a temperature over each move's loss:`,
   "Strong T 0.25–2, Mixed T 0.25–32 (the usual bot spread), Casual T 4–32. Winning, a bot plays with purpose (the",
-  "engine's order breaks ties between moves that all win, and it plays a mate it sees). The rules never ask the engine;",
-  "the engine also judges which of two picks was better, for this report only.",
+  "engine's order breaks ties between moves that all win, and it plays a mate it sees). In Pairs it matches its partner",
+  "(a same-move token) only on an only move; in the final it sometimes copies a teammate; now and then it blocks the",
+  "other squad's likely reply (`bots.ts`). The rules never ask the engine, but for a token's refund (the judge's top",
+  "moves: here this engine's); the engine also judges which of two picks was better, for this report only.",
   "",
   "**A person's clock use and misses are assumptions** (there's no real Squads data yet):",
   `- With bank left, a person thinks for their squad's bank / ${BANK_MOVES} + ${INC_SHARE} × (the free seconds + any increment), times a`,
   `  random factor of ${THINK_RANGE[0]}–${THINK_RANGE[1]}, at least ${MIN_THINK_S} s.`,
   `- In sudden death they try to beat the free seconds: ${SD_RANGE[0]}–${SD_RANGE[1]} of them, at least 1 s; past them it's missed.`,
   `- Past the per-move ceiling (${S.moveCeilingSeconds} s) it's missed. They also miss outright (a distraction) ${pct(MISS_CHANCE)} of the time.`,
-  "- Blockers think the same way, on nobody's clock.",
   "",
   `A half lasts as long as its slowest player, plus the show: ${S.moveShowSeconds} s for a Relay half's moves, ${S.pairRevealSeconds} s for the pair's reveal,`,
   `${S.finalRevealSeconds} s for the final's reveal. A match starts as soon as its two feeder matches are done, after ${S.roundBreakSeconds} s of bracket; ${f1(2 * (S.voteSeconds + S.voteResultSeconds))} s of votes come first.`,
@@ -569,32 +594,40 @@ table(
   }),
 );
 
-push("## The final: picks, blocks and the mercy rules", "", "Per move of the final (and its Armageddon), forced moves left out.", "");
+push("## Round 2: same-move tokens", "", `${S.tokens.perMatch} per squad per Pairs match. Refunded when the judge finds an only move (every other move ${S.tokens.refundGap} of expected score worse).`, "");
 table(
-  ["Mix", "Moves", "No blocks (3 or fewer legal moves)", "A block hits a pick", "Blocks that hit a pick", "Active block hits a pick", "…the better pick", "…the worse pick", "…picks level", "Block cancelled (mate in one)", "Forfeited blocks", "The worse pick played (1+ point)"],
+  ["Mix", "Tokens burned per squad per match", "Refunded", "Not refunded: another move close", "…another move better", "…unranked or no judge"],
   MIXES.map((mx) => {
-    const fs = sel((r) => r.cfg.mix === mx.id).flatMap((r) => r.finals);
-    const n = Math.max(1, fs.length);
-    const placed = fs.reduce((t, f) => t + f.blocks, 0);
-    const hits = fs.filter((f) => f.activeHit);
-    const better = hits.filter((f) => f.activeHitBetter).length;
-    const worse = hits.filter((f) => f.activeHitWorse).length;
-    const slots = fs.filter((f) => !f.mercy).length * 2;
-    const cancelled = fs.filter((f) => f.cancelled).length;
-    return [
-      mx.label,
-      String(fs.length),
-      pct(fs.filter((f) => f.mercy).length / n),
-      pct(fs.filter((f) => f.anyHit).length / n),
-      pct(fs.reduce((t, f) => t + f.blockHits, 0) / Math.max(1, placed)),
-      pct(hits.length / n),
-      pct(better / n),
-      pct(worse / n),
-      pct((hits.length - better - worse) / n),
-      `${cancelled} (${pct(cancelled / n)})`,
-      pct(fs.reduce((t, f) => t + f.forfeits, 0) / Math.max(1, slots)),
-      pct(fs.filter((f) => f.worsePlayed).length / n),
-    ];
+    const rs = sel((r) => r.cfg.mix === mx.id);
+    const ts = rs.flatMap((r) => r.tokens);
+    const n = Math.max(1, ts.length);
+    const sm = rs.reduce((t, r) => t + r.squadMatches[1], 0);
+    return [mx.label, f1(ts.length / Math.max(1, sm)), pct(ts.filter((t) => t.refunded).length / n), pct(ts.filter((t) => t.why === "close").length / n), pct(ts.filter((t) => t.why === "better").length / n), pct(ts.filter((t) => t.why === "unranked" || t.why === "no_judge").length / n)];
+  }),
+);
+
+push("## Blocks (every round)", "", `A ${S.blocks.bankPerMatch}-point bank per squad per match. Bots block sparingly: the other squad's likely reply to their own move.`, "");
+table(
+  ["Mix", "Round", "Blocks per squad per match", "Points spent per squad per match", "In effect", "Lifted: impossible after the move", "…in check", "…no move left", "…mate in one"],
+  MIXES.flatMap((mx) =>
+    [0, 1, 2].map((i) => {
+      const rs = sel((r) => r.cfg.mix === mx.id);
+      const bs = rs.flatMap((r) => r.blocks.filter((b) => b.round === i));
+      const sm = Math.max(1, rs.reduce((t, r) => t + r.squadMatches[i]!, 0));
+      const n = Math.max(1, bs.length);
+      const share = (o: string) => pct(bs.filter((b) => b.outcome === o).length / n);
+      return [mx.label, roundNames[i]!, f1(bs.length / sm), f1(bs.filter((b) => b.outcome === "on").reduce((t, b) => t + b.cost, 0) / sm), share("on"), share("impossible"), share("check"), share("no_move"), share("mate")];
+    }),
+  ),
+);
+
+push("## The final: the vote", "", "Per move of the final (and its Armageddon), forced moves left out.", "");
+table(
+  ["Mix", "Moves", "Picks counted (mean)", "A clear majority (3+ of 4)", "2 of 4 on the top move", "A tie (the coin)", "Nobody picked", "The move played worse than the best pick (1+ point)"],
+  MIXES.map((mx) => {
+    const vs = sel((r) => r.cfg.mix === mx.id).flatMap((r) => r.votes);
+    const n = Math.max(1, vs.length);
+    return [mx.label, String(vs.length), f1(mean(vs.map((v) => v.counted))), pct(vs.filter((v) => v.most >= 3).length / n), pct(vs.filter((v) => v.most === 2 && !v.tie).length / n), pct(vs.filter((v) => v.tie).length / n), pct(vs.filter((v) => v.random).length / n), pct(vs.filter((v) => v.worsePlayed).length / n)];
   }),
 );
 push("The \"what this means for fun\" section is written by hand below this line.", "", "<!-- squads-sim: end of generated tables -->", "");

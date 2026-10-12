@@ -1,9 +1,11 @@
 import type { ItemLook } from "@chessroyale/core";
 import type { LobbyCloseReason } from "../protocol.ts";
 import type { MoveScore } from "../uci.ts";
+import type { BlockError, SquadsBlock } from "./blocks.ts";
 import type { BoardResult, Colour, Side } from "./board.ts";
 import type { SquadsFormat, SquadsRound } from "./lobby.ts";
 import type { ChoiceError, MatchResult, Role, SquadsEvent } from "./match.ts";
+import type { TokenUse } from "./tokens.ts";
 import type { SquadsRules, SquadsVoteId } from "./votes.ts";
 
 /**
@@ -16,8 +18,11 @@ import type { SquadsRules, SquadsVoteId } from "./votes.ts";
  * UCI. `hello` carries the app's protocol version (`v`); a server that doesn't speak it says so ("error").
  *
  * Version 1 (Oct 10, 2026): the first (team clocks: one bank per squad for the whole tournament).
+ * Version 2 (Oct 12, 2026): Squads v2. Same-move tokens in Pairs (`tokens`, `tokenLog`, "token"), move blocks in every
+ * round (`block` both ways, "blockNo", `blockBanks`, `blocks`, `placed`), the final a majority vote (one duty for the
+ * whole squad; the "vote" event); bot work answers carry the engine line's reply.
  */
-export const SQUADS_PROTOCOL = 1;
+export const SQUADS_PROTOCOL = 2;
 
 /** A squad's placement: 1st, 2nd, 3rd-4th (out in round 2), 5th-8th (out in round 1). */
 export type SquadsPlacement = 1 | 2 | 3 | 5;
@@ -132,7 +137,7 @@ export interface NetSquadsBoard {
   result: BoardResult | null;
 }
 
-/** Who acts in a half on a board: a Relay move (one player), a pair's picks, the final's picks or blocks. */
+/** Who acts in a half on a board: a Relay move (one player), a pair's picks, the final's vote (the whole squad). */
 export interface NetDuty {
   board: number;
   side: Side;
@@ -152,9 +157,7 @@ export interface NetSquadsHalf {
   duties: NetDuty[];
   /** Whoever's turn it would be on a finished board: they sit this half out (and scout). */
   scouts: NetDuty[];
-  /** The final's mercy rule: no blocks this move (the side to move has few legal moves). */
-  mercy: "few_moves" | null;
-  /** Boards whose side to move has one legal move: it plays itself. */
+  /** Boards whose side to move has one move it may play (a block counted): it plays itself. */
   forced: number[];
 }
 
@@ -181,6 +184,14 @@ export interface NetSquadsMatch {
   delayMs: number;
   /** Credited to a squad's bank after each move it made in time. */
   incrementMs: number;
+  /** Each side's same-move tokens left (Pairs; null elsewhere). */
+  tokens: [number, number] | null;
+  /** Each side's block bank as the current half began (blocks placed this half, `placed`, are paid from it at once). */
+  blockBanks: [number, number];
+  /** Blocks in effect this half (placed last half by the other side): those moves can't be played. */
+  blocks: SquadsBlock[];
+  /** Every same-move token burned this match and, once in, the judge's verdict: the post-match breakdown. */
+  tokenLog: TokenUse[];
   /**
    * break: about to start (the first half at `startsAt`); half: a half is being played (`current`); show: the half's
    * moves landing, the reveal and the coin (the next half at `startsAt`); armageddon: a drawn final, its Armageddon's
@@ -221,17 +232,25 @@ export type SquadsClientMessage =
   /** A pre-game vote: the option this player chose. */
   | { t: "vote"; key: string; option: number }
   /**
-   * Your move (Relay: made once, final), pick or block (Pairs, the final: can change until the half ends; never your
-   * partner's). `key` is the match, `seq` the half. Refused: "choiceNo".
+   * Your move (Relay: made once, final) or pick (Pairs, the final: can change until the half ends; in Pairs your
+   * partner's only with a same-move token left). `key` is the match, `seq` the half. Refused: "choiceNo".
    */
   | { t: "choose"; key: string; seq: number; move: string }
-  /** Locks in your pick or block (the half ends early once everyone with a duty has locked in). */
+  /** Locks in your pick (the half ends early once everyone with a duty has locked in). */
   | { t: "lock"; key: string; seq: number }
+  /**
+   * Blocks one move of the other squad on your board this half (from and to: "g8f6"; castling as the king's move),
+   * before your squad's move there is settled. The first block on a board each turn stands. Refused: "blockNo".
+   */
+  | { t: "block"; key: string; seq: number; board: number; move: string }
   /** A drawn final: your squad picks Armageddon's colour (the side that picks: see `armageddonChoice`; the last pick stands). */
   | { t: "armageddon"; key: string; colour: Colour }
   /** This device's engine speed (nodes per second), from its speed check on joining: it can take bot work. */
   | { t: "speed"; nps: number }
-  /** This device's answer to one bot-work job: the bot engine's top moves (topMovesAt(fen, n, nodes)), best first. */
+  /**
+   * This device's answer to one bot-work job: the bot engine's top moves (topMovesAt(fen, n, nodes)), best first, each
+   * with its line's reply when the engine gave one. (The same jobs judge same-move tokens.)
+   */
   | { t: "botTop"; id: string; top: MoveScore[] }
   /** Take your seat back from the bot playing it (a repeat no-show's seat), from the next half. */
   | { t: "reclaim" }
@@ -258,10 +277,10 @@ export type SquadsServerMessage = { now: number } & (
   | { t: "voteCast"; key: string; playerId: string; option: number; at: number; squad: number }
   /**
    * A match in full, as you may see it: on (re)joining, when it starts, and when it changes state (Armageddon). `visible`:
-   * the choices you may see so far this half (Relay and Pairs: your own squad's; the final: blocks to everyone, picks to
-   * the picking squad), `locked` who has locked in.
+   * the choices you may see so far this half (your own squad's), `locked` who has locked in, `placed` the blocks placed
+   * this half (everyone sees them).
    */
-  | { t: "match"; match: NetSquadsMatch; visible: Record<string, string>; locked: string[] }
+  | { t: "match"; match: NetSquadsMatch; visible: Record<string, string>; locked: string[]; placed: SquadsBlock[] }
   /** A new half has begun in a match (its duties and deadlines, and both squads' banks as it began). */
   | { t: "turn"; key: string; current: NetSquadsHalf; banks: [number, number] }
   /** Every squad's team clock: as the bracket starts, and whenever a half begins or ends anywhere or a match ends. */
@@ -275,6 +294,15 @@ export type SquadsServerMessage = { now: number } & (
   | { t: "half"; key: string; seq: number; events: SquadsEvent[]; acted: string[]; missed: string[]; replaced: string[]; match: NetSquadsMatch }
   /** Your choice was refused: the rules' reason, `late` (your time was up) or `stale` (not the half being played). */
   | { t: "choiceNo"; key: string; seq: number; move: string; reason: ChoiceError | "late" | "stale" }
+  /** A block placed (to everyone, at once): its squad's block bank now. */
+  | { t: "block"; key: string; seq: number; block: SquadsBlock; bank: number }
+  /** Your block was refused: the rules' reason, `late` or `stale`. */
+  | { t: "blockNo"; key: string; seq: number; move: string; reason: BlockError | "late" | "stale" }
+  /**
+   * The judge's verdict on a same-move token (`index` in the match's `tokenLog`), a few seconds after its move: `use`
+   * with its verdict, and both squads' tokens now (a refund gives one back).
+   */
+  | { t: "token"; key: string; index: number; use: TokenUse; tokens: [number, number] | null }
   /**
    * Your squad's placement is decided (it's out, or it won): your reward (coins, crates), `recorded` if it went on your
    * profile (signed in, still playing your seat, not a test lobby).

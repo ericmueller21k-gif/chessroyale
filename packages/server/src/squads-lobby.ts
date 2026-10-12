@@ -1,19 +1,23 @@
 import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, botVotes, castPregameVote, cleanLook, closePregameVote, shuffle, type ItemLook, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
 import { botRoster, type LobbyCloseReason, type MoveScore, type Opening } from "@chessroyale/chess";
+import { Chess } from "chess.js";
 import {
   NO_INPUTS,
   ROUND_FORMAT,
   SQUADS_PROTOCOL,
   armageddonChooser,
   armageddonStart,
+  blockBankNow,
+  blocksOn,
   botArmageddonColour,
-  botFinalBlock,
-  botFinalPick,
+  botBlock,
   botPairPick,
   botRelayMove,
   botSkillOf,
+  botVotePick,
   candidatesFrom,
   choose,
+  createSquadsMatch,
   coin,
   drawBracket,
   dutyOf,
@@ -21,9 +25,14 @@ import {
   formSquads,
   halfDuties,
   halfReady,
+  isOnlyMove,
+  judgeTokenUse,
   lockIn,
+  movesAllowed,
   noteActions,
   otherSide,
+  placeBlock,
+  placedBlocks,
   placements,
   planLobby,
   planMatch,
@@ -31,6 +40,7 @@ import {
   reportWinner,
   resolveHalf,
   rulesFromVotes,
+  settleTokenUse,
   squadBotSkill,
   squadBotThinkMs,
   squadsLegalMoves,
@@ -41,6 +51,8 @@ import {
   settleTeamClocks,
   startTeamClocks,
   teamClocks,
+  tokensLeft,
+  topAllowed,
   visibleChoices,
   winnerSquad,
   type Bracket,
@@ -78,7 +90,8 @@ import { cleanTop, distanceFromVerdict, fallbackTop, topsAgree, verdictMovesOf }
  * The Durable Object (squads-do.ts) stores `record` and the matches between events and calls `alarm()` at `nextAlarm`.
  *
  * Bots' engine work goes to players' devices (Eric's computing priorities), two per job, compared; the engine server
- * settles two that disagree; with no device, a bot plays from the server's own quick look (squads-bots.ts).
+ * settles two that disagree; with no device, a bot plays from the server's own quick look (squads-bots.ts). The same
+ * jobs judge Pairs' same-move tokens (the judge's top moves for the position; no device, no refund).
  */
 
 export type SquadsOutgoing = SquadsServerMessage extends infer M ? (M extends { now: number } ? Omit<M, "now"> : never) : never;
@@ -156,6 +169,15 @@ export interface WorkJob {
   follows?: string;
 }
 
+/**
+ * The judge's work on a same-move token (`index` in the match's tokenLog): a bot-work job for the position it was
+ * played in, and when its verdict may be shown (after the pair's reveal).
+ */
+export interface JudgeJob extends WorkJob {
+  index: number;
+  notBefore: number;
+}
+
 /** The half being played in a match. */
 export interface HalfRecord {
   seq: number;
@@ -183,6 +205,8 @@ export interface LiveMatch {
   /** A drawn final, kept while its Armageddon is played. */
   drawn?: SquadsMatch;
   arm?: { chooser: Side; until: number; colour: Colour | null };
+  /** Same-move tokens waiting for the judge, by their index in the match's tokenLog (a finished match's too). */
+  judge?: Record<number, JudgeJob>;
 }
 
 /** A reward to write: a results row (when `recorded`) and coins and crates, for one person. */
@@ -233,8 +257,12 @@ export interface SquadsRecord {
   placed: Record<number, SquadsPlacement>;
   /** Rewards for the Durable Object to write (it empties this). */
   rewardQueue: SquadsReward[];
-  /** A test lobby: where it starts, and its own clock. */
-  test?: { start: SquadsRound; clock?: SquadsClock };
+  /**
+   * A test lobby: where it starts, its own clock, the position its first round's boards start from (`fen`), its bots
+   * all at the strongest skill (`strong`), and its opener playing White on their first board (`white`): so a test can
+   * count on what happens.
+   */
+  test?: { start: SquadsRound; clock?: SquadsClock; fen?: string; strong?: boolean; white?: boolean };
   /** A test control was used here: nothing more is recorded or rewarded. */
   testUsed?: boolean;
   /** The last time a person did anything here (when an idle or abandoned lobby closes). */
@@ -316,20 +344,35 @@ export function squadsTestAllowed(squadsTest: string | undefined, admin: boolean
   return SQUADS_LOBBY.testControls && (squadsTest === "1" || admin);
 }
 
+/** A test lobby's starting position (?fen=): a legal position, White to move, with moves to play; else null. */
+export function parseTestFen(text: string | null): string | null {
+  const fen = text?.trim();
+  if (!fen || fen.length > 100) return null;
+  try {
+    const c = new Chess(fen);
+    return c.turn() === "w" && !c.isGameOver() ? c.fen() : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * A test lobby's options from its request (POST /api/squads/lobby?start=…&clock=…&keep=…). `start=votes` (Eric, Oct
- * 12): the whole tournament from the first vote, bots in every other seat the moment its opener connects (no fill
- * wait). `relay|pairs|final`: that round, filled after SQUADS_LOBBY.testFillSeconds (time for others to join), the
- * rounds before skipped (relay skips none: it has the votes too, after the wait).
+ * A test lobby's options from its request (POST /api/squads/lobby?start=…&clock=…&keep=…&fen=…&bots=strong).
+ * `start=votes` (Eric, Oct 12): the whole tournament from the first vote, bots in every other seat the moment its
+ * opener connects (no fill wait). `relay|pairs|final`: that round, filled after SQUADS_LOBBY.testFillSeconds (time for
+ * others to join), the rounds before skipped (relay skips none: it has the votes too, after the wait). `fen`: the first
+ * round's boards start from that position (tests); `bots=strong`: every bot at the strongest skill; `seat=white`: the
+ * opener plays White on their board in the first round's first half (their match's squads swapped if need be).
  */
 export function testLobbyOptions(q: URLSearchParams, now: number): { fillAt: number; test: NonNullable<SquadsRecord["test"]>; keepMs?: number } {
   const which = q.get("start");
   const start = ({ votes: 0, relay: 0, pairs: 1, final: 2 } as const)[which as "votes" | "relay" | "pairs" | "final"] ?? 0;
   const clock = parseTestClock(q.get("clock"));
+  const fen = parseTestFen(q.get("fen"));
   const keepMs = q.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(q.get("keep")) || 0)) * 1000 : undefined;
   return {
     fillAt: which === "votes" ? now : now + SQUADS_LOBBY.testFillSeconds * 1000,
-    test: { start, ...(clock ? { clock } : {}) },
+    test: { start, ...(clock ? { clock } : {}), ...(fen ? { fen } : {}), ...(q.get("bots") === "strong" ? { strong: true } : {}), ...(q.get("seat") === "white" ? { white: true } : {}) },
     ...(keepMs !== undefined ? { keepMs } : {}),
   };
 }
@@ -342,6 +385,8 @@ const cacheTop = (fen: string, top: MoveScore[]) => {
 };
 /** For tests: forget the shared cache. */
 export const clearTopCache = () => TOP_CACHE.clear();
+
+const mineIn = (m: SquadsMatch, id: string) => m.sides.some((x) => x.seats.includes(id));
 
 export const SQUADS_FULL = "This lobby is full.";
 export const SQUADS_STARTED = "This match has already started.";
@@ -547,7 +592,7 @@ export class SquadsCore {
     this.r.activeAt = this.io.now();
     this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
     // Bot work it owed goes elsewhere (or another answer stands).
-    for (const lm of this.liveMatches()) if (lm.half) for (const job of Object.values(lm.half.work)) this.settle(lm, job);
+    for (const { lm, job } of this.liveJobs()) this.settle(lm, job);
     this.pump();
   }
 
@@ -571,6 +616,9 @@ export class SquadsCore {
         break;
       case "lock":
         this.humanLock(id, msg.key, msg.seq);
+        break;
+      case "block":
+        this.humanBlock(id, msg.key, msg.seq, msg.board, msg.move);
         break;
       case "armageddon":
         this.armageddonColour(id, msg.key, msg.colour);
@@ -614,6 +662,7 @@ export class SquadsCore {
       if (lm.state === "armageddon" && lm.arm) times.push(lm.arm.until);
       if (lm.state === "half" && lm.half) times.push(...this.halfWakes(lm));
     }
+    for (const lm of this.allMatches()) times.push(...this.judgeWakes(lm));
     // (Everything due has just been done: a time already past would only wake the object to do nothing, over and over.)
     return times.length ? Math.max(Math.min(...times), this.io.now() + 20) : null;
   }
@@ -633,6 +682,7 @@ export class SquadsCore {
       }
       if (this.assignQueued()) changed = true;
       for (const lm of this.liveMatches()) if (this.advance(lm, now)) changed = true;
+      for (const lm of this.allMatches()) if (lm.judge && this.judgeDue(lm, now)) changed = true;
       if (!changed) return;
     }
   }
@@ -666,7 +716,8 @@ export class SquadsCore {
       .map(([pid, p]) => ({ id: pid, members: p.members.map((id) => ({ id, name: this.human(id)!.name, isBot: false, skill: null })) }));
     // Bots for every seat (their skills shuffled, so the empty seats get a spread), taken in order for the empty ones.
     const rng = squadsRng(this.r.seed, "bots");
-    const roster: SquadsEntrant[] = shuffle(rng, botRoster(rng, seats, DEFAULT_SETTINGS)).map((b) => ({ id: b.id, name: b.name, isBot: true, skill: b.skill ?? DEFAULT_SETTINGS.botSkillRange[1] }));
+    const strong = this.r.test?.strong ? DEFAULT_SETTINGS.botSkillRange[0] : null;
+    const roster: SquadsEntrant[] = shuffle(rng, botRoster(rng, seats, DEFAULT_SETTINGS)).map((b) => ({ id: b.id, name: b.name, isBot: true, skill: strong ?? b.skill ?? DEFAULT_SETTINGS.botSkillRange[1] }));
     const { squads, waiting } = formSquads(parties, roster, squadsRng(this.r.seed, "form"), this.s);
     // (Never with the seats the lobby gives out; but anyone who couldn't be placed is told, not stranded.)
     for (const p of waiting) {
@@ -804,7 +855,20 @@ export class SquadsCore {
     if (a === null || b === null) return;
     const key = `r${round}m${index}`;
     if (this.matches.has(key)) return;
-    const m = planMatch(this.r.plan!, round, index, [this.r.squads[a]!, this.r.squads[b]!], this.library, this.s);
+    let planned = planMatch(this.r.plan!, round, index, [this.r.squads[a]!, this.r.squads[b]!], this.library, this.s);
+    // A test lobby's opener White on their first board (tests): the squads swapped if they'd have Black.
+    const opener = this.r.humans[0]?.id;
+    if (this.r.test?.white && round === this.r.test.start && opener && mineIn(planned, opener) && !halfDuties(planned, this.s).duties.some((d) => d.players.includes(opener))) {
+      planned = planMatch(this.r.plan!, round, index, [this.r.squads[b]!, this.r.squads[a]!], this.library, this.s);
+    }
+    // A test lobby's own position for its first round (tests).
+    const fen = this.r.test?.fen && round === this.r.test.start ? this.r.test.fen : null;
+    const m = fen
+      ? createSquadsMatch(
+          { ...planned, starts: planned.boards.map(() => ({ fen, openingId: null })), whites: planned.boards.map((x) => x.white), banksMs: planned.banks, blockBanks: planned.blockBanks },
+          this.s,
+        )
+      : planned;
     const lm: LiveMatch = { key, round, index, m, state: "break", startsAt, seq: 0, half: null };
     this.matches.set(key, lm);
     this.r.matchKeys.push(key);
@@ -878,8 +942,7 @@ export class SquadsCore {
     for (const d of duties.duties) {
       for (const p of d.players) {
         if (!this.botPlays(p)) continue;
-        // (Blockers think as if on the picking squad's clock, as in the sim; nobody charges them for it.)
-        const bankMs = m.banks[d.role === "block" ? otherSide(d.side) : d.side];
+        const bankMs = m.banks[d.side];
         half.bots[p] = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: m.delayMs, deadlineMs: d.deadlineMs }, this.s);
         boards.add(d.board);
       }
@@ -961,7 +1024,27 @@ export class SquadsCore {
     this.sendChoices(lm, d.duty);
   }
 
-  /** Live choices, each player the ones they may see (their own side's; the final's blocks for everyone), and who has locked in. */
+  /**
+   * A person blocks one of the other squad's moves on their board this half (the rules' `placeBlock`: their duty's
+   * board, before their squad's move there is settled, paid at once). Everyone hears of it at once.
+   */
+  private humanBlock(id: string, key: string, seq: number, board: number, move: string) {
+    const lm = this.matches.get(key);
+    const no = (reason: Extract<SquadsOutgoing, { t: "blockNo" }>["reason"]) => this.send(id, { t: "blockNo", key, seq, move: String(move), reason });
+    if (!lm || lm.state !== "half" || !lm.half || lm.half.seq !== seq) return no("stale");
+    if (typeof move !== "string" || !Number.isInteger(board)) return no("not_a_move");
+    const d = dutyOf(lm.m, id, this.s);
+    if (!d || this.botPlays(id)) return no("no_duty");
+    const elapsed = this.io.now() - lm.half.startedAt;
+    if (elapsed > d.duty.deadlineMs + DEFAULT_SETTINGS.lateGraceMs) return no("late");
+    const r = placeBlock(lm.m, lm.half.inputs, id, board, move, Math.min(elapsed, d.duty.deadlineMs), this.s);
+    if ("error" in r) return no(r.error);
+    lm.half.inputs = r.inputs;
+    this.touch(lm);
+    this.sendAll({ t: "block", key, seq, block: r.block, bank: blockBankNow(lm.m, lm.half.inputs, r.block.side, this.s) });
+  }
+
+  /** Live choices, each player the ones they may see (their own squad's), and who has locked in. */
   private sendChoices(lm: LiveMatch, duty: Duty) {
     const half = lm.half!;
     void duty;
@@ -997,25 +1080,40 @@ export class SquadsCore {
     const board = d.duty.board;
     const fen = m.boards[board]!.fen;
     const job = half.work[board];
-    const top = job?.top ?? fallbackTop(fen, this.s.bots.candidates, this.s);
-    const legal = squadsLegalMoves(fen);
+    // The moves blocks take away this half are out of its choice (the quick look's lines, if the devices' leave none).
+    const blocked = blocksOn(m, board);
+    const allowed = movesAllowed(m, board);
+    let top = topAllowed(job?.top ?? fallbackTop(fen, this.s.bots.candidates, this.s), blocked);
+    if (!top.length) top = topAllowed(fallbackTop(fen, squadsLegalMoves(fen).length, this.s), blocked).slice(0, this.s.bots.candidates);
     const p = this.player(bot);
     const skill = squadBotSkill(top, p ? botSkillOf(p, this.s) : this.s.replacementBotSkill, this.s);
     const cands = candidatesFrom(top, this.s);
     const rng = squadsRng(m.seed, m.key, m.turn, m.half, board, "bot", bot);
     const partner = d.partner ? (half.inputs.choices[d.partner] ?? null) : null;
     let move: string;
-    if (d.duty.role === "move") move = botRelayMove(rng, cands, skill, legal);
-    else if (m.format === "pairs") move = botPairPick(rng, cands, skill, legal, partner);
-    else if (d.duty.role === "pick") {
-      const seen = visibleChoices(m, half.inputs, d.duty.side, this.s);
-      const blockers = halfDuties(m, this.s).duties.find((x) => x.role === "block" && x.board === board)?.players ?? [];
-      move = botFinalPick(rng, cands, skill, legal, partner, blockers.flatMap((b) => (seen[b] ? [seen[b]!] : [])), this.s);
-    } else move = botFinalBlock(rng, cands, skill, legal, partner);
+    if (d.duty.role === "move") move = botRelayMove(rng, cands, skill, allowed);
+    else if (m.format === "pairs") move = botPairPick(rng, cands, skill, allowed, partner, !!partner && tokensLeft(m, d.duty.side) > 0 && isOnlyMove(top, partner, this.s));
+    else {
+      // The final's vote: sometimes a pick a person on the squad has made (so the bots feel like teammates).
+      const humans = d.team.filter((id) => !this.botPlays(id)).flatMap((id) => (half.inputs.choices[id] ? [half.inputs.choices[id]!] : []));
+      move = botVotePick(rng, cands, skill, allowed, humans, this.s);
+    }
+    const elapsed = Math.min(this.io.now() - half.startedAt, d.duty.deadlineMs);
+    // Now and then a block of the other squad's likely best reply (before its own move: Relay's is made at once).
+    const reply = top.find((t) => t.move === move)?.reply;
+    const bank = blockBankNow(m, half.inputs, d.duty.side, this.s);
+    const blockMove = bank > 0 ? botBlock(squadsRng(m.seed, m.key, m.turn, m.half, board, "bot-block", bot), { fen, ownMove: move, reply, bank }, this.s) : null;
+    if (blockMove) {
+      const b = placeBlock(m, half.inputs, bot, board, blockMove, elapsed, this.s);
+      if ("inputs" in b) {
+        half.inputs = b.inputs;
+        this.sendAll({ t: "block", key: lm.key, seq: half.seq, block: b.block, bank: blockBankNow(m, half.inputs, b.block.side, this.s) });
+      }
+    }
     const r = choose(m, half.inputs, bot, move, this.s);
     if ("error" in r) return;
     half.inputs = lockIn(r.inputs, bot);
-    half.at[bot] = Math.min(this.io.now() - half.startedAt, d.duty.deadlineMs);
+    half.at[bot] = elapsed;
     this.touch(lm);
     this.sendChoices(lm, d.duty);
   }
@@ -1037,11 +1135,86 @@ export class SquadsCore {
     lm.half = null;
     lm.state = "show";
     lm.startsAt = now + showMs(lm, this.s);
+    // Same-move tokens burned this half go to the judge (its verdict after the reveal).
+    const jobs = new Map<string, { id: string; fen: string; n: number; nodes: number }[]>();
+    for (const index of out.tokensUsed) this.requestJudge(lm, index, half, jobs);
+    for (const [device, list] of jobs) this.send(device, { t: "botWork", jobs: list });
     this.touch(lm);
     this.sendAll({ t: "half", key: lm.key, seq: half.seq, events: out.events, acted: out.acted, missed: out.missed, replaced, match: this.netMatch(lm, false) });
     if (replaced.length) this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
     if (lm.m.result) this.matchOver(lm);
     else this.sendClocks();
+  }
+
+  // ---------------- Same-move tokens: the judge ----------------
+
+  /**
+   * Asks the judge about a same-move token: the bot engine's top moves for the position it was played in, from the
+   * half's own bot work on that board if it had any (the judge's existing work), else remembered, else devices (two,
+   * outside the match first, the token's own squad last). Its verdict shows once the reveal is over (`notBefore`).
+   */
+  private requestJudge(lm: LiveMatch, index: number, half: HalfRecord | null, out: Map<string, { id: string; fen: string; n: number; nodes: number }[]>) {
+    const use = lm.m.tokenLog[index];
+    if (!use) return;
+    const now = this.io.now();
+    const id = `${lm.key}/t/${index}`;
+    const base = { id, fen: use.fen, sentAt: now, answers: {}, index, notBefore: now + showMs(lm, this.s) };
+    const own = half?.work[use.board];
+    const judge = (lm.judge ??= {});
+    if (own?.top && own.how && own.how !== "fallback" && own.fen === use.fen) {
+      judge[index] = { ...base, devices: [], top: own.top, how: own.how };
+      return;
+    }
+    const cached = TOP_CACHE.get(use.fen);
+    if (cached) {
+      judge[index] = { ...base, devices: [], top: cached, how: "cached" };
+      return;
+    }
+    const devices = this.pickDevices(lm, SQUADS_LOBBY.botWork.perJob, [], new Set(lm.m.sides[use.side].seats));
+    const queued = !devices.length && Object.keys(this.r.devices).some((d) => this.deviceUp(d));
+    judge[index] = { ...base, devices, ...(queued ? { queued: true as const } : {}) };
+    for (const d of devices) {
+      this.r.devices[d]!.jobs++;
+      out.set(d, [...(out.get(d) ?? []), { id, fen: use.fen, n: this.s.bots.candidates, nodes: SQUADS_LOBBY.botWork.nodes }]);
+    }
+  }
+
+  /** When a match's judge work is next due: its devices' answers (the grace, the time limit), then its verdicts. */
+  private judgeWakes(lm: LiveMatch): number[] {
+    const out: number[] = [];
+    for (const job of Object.values(lm.judge ?? {})) {
+      if (job.how) {
+        out.push(job.notBefore);
+        continue;
+      }
+      if (job.queued) continue;
+      if (job.firstAt !== undefined) out.push(job.firstAt + SQUADS_LOBBY.botWork.graceMs);
+      out.push(job.sentAt + SQUADS_LOBBY.botWork.answerMs);
+      if (job.refereeAt !== undefined) out.push(job.refereeAt + SQUADS_LOBBY.botWork.answerMs);
+    }
+    return out;
+  }
+
+  /**
+   * A match's judge work: settles what can be, and once the reveal is over gives each verdict (the rules'
+   * `judgeTokenUse`: no answer from any device, no refund), refunding the token if it was the only move. Everyone hears.
+   */
+  private judgeDue(lm: LiveMatch, now: number): boolean {
+    let changed = false;
+    for (const job of Object.values(lm.judge ?? {})) {
+      if (!job.how && this.settle(lm, job)) changed = true;
+      if (!job.how || now < job.notBefore) continue;
+      const use = lm.m.tokenLog[job.index];
+      delete lm.judge![job.index];
+      changed = true;
+      if (!use || use.verdict) continue;
+      lm.m = settleTokenUse(lm.m, job.index, judgeTokenUse(use, job.how === "fallback" ? null : (job.top ?? null), this.s));
+      const m = lm.m;
+      this.sendAll({ t: "token", key: lm.key, index: job.index, use: m.tokenLog[job.index]!, tokens: m.tokens ? [m.tokens[0], m.tokens[1]] : null });
+    }
+    if (lm.judge && !Object.keys(lm.judge).length) delete lm.judge;
+    if (changed) this.touch(lm);
+    return changed;
   }
 
   // ---------------- A match's end ----------------
@@ -1238,21 +1411,19 @@ export class SquadsCore {
   /** Jobs a device holds unanswered right now (every live match's half). */
   private inFlight(): Map<string, number> {
     const out = new Map<string, number>();
-    for (const lm of this.liveMatches()) {
-      for (const job of Object.values(lm.half?.work ?? {})) {
-        if (job.how) continue;
-        for (const d of [...job.devices, ...(job.referee ? [job.referee] : [])]) if (!(d in job.answers)) out.set(d, (out.get(d) ?? 0) + 1);
-      }
+    for (const { job } of this.liveJobs()) {
+      if (job.how) continue;
+      for (const d of [...job.devices, ...(job.referee ? [job.referee] : [])]) if (!(d in job.answers)) out.set(d, (out.get(d) ?? 0) + 1);
     }
     return out;
   }
 
   /**
    * Devices for a job, best first: outside this match before those in it (nobody's engine decides the bots they play
-   * against or beside, while anyone else's can), computers before phones, the least loaded, the fastest. None holding
-   * its most unanswered jobs already.
+   * against or beside, while anyone else's can), and `last` (a token's own squad, judging its refund) after those;
+   * computers before phones, the least loaded, the fastest. None holding its most unanswered jobs already.
    */
-  private pickDevices(lm: LiveMatch, n: number, exclude: readonly string[] = []): string[] {
+  private pickDevices(lm: LiveMatch, n: number, exclude: readonly string[] = [], last: ReadonlySet<string> = new Set()): string[] {
     const inMatch = new Set(lm.m.sides.flatMap((x) => x.seats));
     const busy = this.inFlight();
     const cap = SQUADS_LOBBY.botWork.maxInFlight;
@@ -1261,7 +1432,7 @@ export class SquadsCore {
       .sort((a, b) => {
         const da = this.r.devices[a]!;
         const db = this.r.devices[b]!;
-        const key = (id: string, d: { nps: number; jobs: number }) => [inMatch.has(id) ? 1 : 0, this.human(id)!.device === "phone" ? 1 : 0, d.jobs, -d.nps];
+        const key = (id: string, d: { nps: number; jobs: number }) => [last.has(id) ? 2 : inMatch.has(id) ? 1 : 0, this.human(id)!.device === "phone" ? 1 : 0, d.jobs, -d.nps];
         const ka = key(a, da);
         const kb = key(b, db);
         for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i]! - kb[i]!;
@@ -1279,7 +1450,7 @@ export class SquadsCore {
       half.work[board] = { id, fen, devices: [], sentAt: now, answers: {}, top: cached, how: "cached" };
       return;
     }
-    const twin = this.liveJobs().find(({ job }) => job.fen === fen && !job.how && !job.follows && job.id !== id);
+    const twin = this.liveJobs().find(({ job, judge }) => !judge && job.fen === fen && !job.how && !job.follows && job.id !== id);
     if (twin) {
       half.work[board] = { id, fen, devices: [], sentAt: now, answers: {}, follows: twin.job.id };
       return;
@@ -1293,9 +1464,12 @@ export class SquadsCore {
     }
   }
 
-  /** Every bot-work job of the halves being played. */
-  private liveJobs(): { lm: LiveMatch; job: WorkJob }[] {
-    return this.liveMatches().flatMap((lm) => Object.values(lm.half?.work ?? {}).map((job) => ({ lm, job })));
+  /** Every bot-work job of the halves being played, and every token waiting for the judge (finished matches too). */
+  private liveJobs(): { lm: LiveMatch; job: WorkJob; judge?: JudgeJob }[] {
+    return [
+      ...this.liveMatches().flatMap((lm) => Object.values(lm.half?.work ?? {}).map((job) => ({ lm, job }))),
+      ...this.allMatches().flatMap((lm) => Object.values(lm.judge ?? {}).map((job) => ({ lm, job, judge: job }))),
+    ];
   }
 
   /**
@@ -1305,8 +1479,10 @@ export class SquadsCore {
   private assignQueued(): boolean {
     const waiting = this.liveJobs().filter(({ job }) => job.queued && !job.how);
     if (!waiting.length) return false;
-    const need = ({ lm, job }: { lm: LiveMatch; job: WorkJob }) => {
-      const half = lm.half!;
+    const need = ({ lm, job, judge }: { lm: LiveMatch; job: WorkJob; judge?: JudgeJob }) => {
+      if (judge) return judge.notBefore;
+      const half = lm.half;
+      if (!half) return Infinity;
       const board = Number(job.id.split("/")[2]);
       const times = Object.entries(half.bots).filter(([b]) => dutyOf(lm.m, b, this.s)?.duty.board === board).map(([, t]) => t);
       return half.startedAt + (times.length ? Math.min(...times) : 0);
@@ -1314,8 +1490,9 @@ export class SquadsCore {
     waiting.sort((a, b) => need(a) - need(b));
     const out = new Map<string, { id: string; fen: string; n: number; nodes: number }[]>();
     let changed = false;
-    for (const { lm, job } of waiting) {
-      const devices = this.pickDevices(lm, SQUADS_LOBBY.botWork.perJob);
+    for (const { lm, job, judge } of waiting) {
+      const use = judge ? lm.m.tokenLog[judge.index] : undefined;
+      const devices = this.pickDevices(lm, SQUADS_LOBBY.botWork.perJob, [], new Set(use ? lm.m.sides[use.side].seats : []));
       if (!devices.length) break;
       delete job.queued;
       job.devices = devices;
@@ -1334,7 +1511,7 @@ export class SquadsCore {
   private jobById(id: string): { lm: LiveMatch; job: WorkJob } | null {
     const [key, seq, board] = String(id).split("/");
     const lm = key ? this.matches.get(key) : undefined;
-    const job = lm?.half && String(lm.half.seq) === seq ? lm.half.work[Number(board)] : undefined;
+    const job = seq === "t" ? lm?.judge?.[Number(board)] : lm?.half && String(lm.half.seq) === seq ? lm.half.work[Number(board)] : undefined;
     return lm && job && job.id === id ? { lm, job } : null;
   }
 
@@ -1522,7 +1699,6 @@ export class SquadsCore {
       startedAt: half.startedAt,
       duties: duties.duties.map((d) => this.netDuty(lm, d)),
       scouts: duties.scouts.map((d) => this.netDuty(lm, d)),
-      mercy: duties.mercy,
       forced: duties.forced,
     };
   }
@@ -1559,12 +1735,16 @@ export class SquadsCore {
       result: m.result,
       banks: [m.banks[0], m.banks[1]],
       delayMs: m.delayMs,
+      tokens: m.tokens ? [m.tokens[0], m.tokens[1]] : null,
+      blockBanks: [m.blockBanks[0], m.blockBanks[1]],
+      blocks: m.blocks.map((b) => ({ ...b })),
+      tokenLog: m.tokenLog.map((u) => ({ ...u, players: [...u.players], blocked: [...u.blocked] })),
       ...(lm.drawn ? { drawnFinal: { points: [lm.drawn.result!.points[0], lm.drawn.result!.points[1]] as [number, number], timeLeft: [lm.drawn.banks[0], lm.drawn.banks[1]] as [number, number] } } : {}),
       ...(lm.arm ? { armageddonChoice: { ...lm.arm } } : {}),
     };
   }
 
-  /** A match as `id` may see it (their own side's choices; the final's blocks for everyone). */
+  /** A match as `id` may see it (their own squad's choices; the blocks placed this half, for everyone). */
   private matchMessage(lm: LiveMatch, id: string, withMoves: boolean): SquadsOutgoing {
     const half = lm.half;
     return {
@@ -1572,6 +1752,7 @@ export class SquadsCore {
       match: this.netMatch(lm, withMoves),
       visible: half ? visibleChoices(lm.m, half.inputs, this.sideIn(lm, id), this.s) : {},
       locked: half ? Object.keys(half.inputs.locked).filter((p) => half.inputs.locked[p]) : [],
+      placed: half ? placedBlocks(lm.m, half.inputs, this.s) : [],
     };
   }
 }

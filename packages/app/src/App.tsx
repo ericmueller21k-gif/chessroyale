@@ -334,7 +334,7 @@ export function App() {
   useEffect(() => {
     if (!squadsTestStart || testMade.current || config === null || (config.accounts && !profile)) return;
     testMade.current = true;
-    void squadsTestLobby(squadsTestStart, new URLSearchParams(location.search).get("clock")).then((r) => {
+    void squadsTestLobby(squadsTestStart, new URLSearchParams(location.search).get("clock"), new URLSearchParams(location.search)).then((r) => {
       setRejoining(false);
       if ("code" in r) joinSquads(r.code);
       else {
