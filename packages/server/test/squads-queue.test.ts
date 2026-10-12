@@ -239,9 +239,14 @@ describe("a device's answer to bot work", () => {
       { move: "b1c3", expected: 0.52 },
     ];
     expect(cleanTop(fen, top, 8)).toEqual([
-      { move: "d2d4", expected: 0.53 },
+      { move: "d2d4", expected: 0.53, reply: "e5d4" },
       { move: "b1c3", expected: 0.52 },
     ]);
+  });
+  it("keeps each line's reply (the bots block with it); a reply that isn't a move's shape is refused", () => {
+    expect(cleanTop(fen, [{ move: "d2d4", expected: 0.5, reply: "e7e5" }])).toEqual([{ move: "d2d4", expected: 0.5, reply: "e7e5" }]);
+    expect(cleanTop(fen, [{ move: "d2d4", expected: 0.5, reply: "nonsense" }])).toBeNull();
+    expect(cleanTop(fen, [{ move: "d2d4", expected: 0.5, reply: 7 }])).toBeNull();
   });
   it("is refused (a strike) when it doesn't hold together: an illegal move, a score out of range, nothing, too many", () => {
     expect(cleanTop(fen, [{ move: "a1a1", expected: 0.5 }])).toBeNull();

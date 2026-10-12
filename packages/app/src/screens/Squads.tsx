@@ -11,6 +11,7 @@ import { ROUND_NAME, placementText, squadColour, squadName, standingsOrder } fro
 import type { VoteView } from "../game.ts";
 import { VoteScreen, type VoteHost, type VotePlayer } from "./Vote.tsx";
 import { SquadsMatchScreen } from "./SquadsMatch.tsx";
+import { TokenBreakdown } from "../components/SquadsBlocks.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { SIDE_PANEL } from "../components/SquadsParts.tsx";
 
@@ -175,13 +176,24 @@ function OutCard({ client, actions, onSpectate }: { client: SquadsClient; action
   );
 }
 
+/** Your squad's finished Pairs match's same-move tokens, every use and the judge's verdict (the post-match breakdown). */
+function MyTokens({ client }: { client: SquadsClient }) {
+  const sq = client.mySquad;
+  const m = sq ? [...client.matches.values()].find((x) => x.format === "pairs" && x.state === "over" && x.sides.some((s) => s.squadId === sq.id)) : undefined;
+  if (!m || !m.tokenLog.length) return null;
+  return <TokenBreakdown log={m.tokenLog} sides={m.sides} mine={m.sides.findIndex((s) => s.squadId === sq!.id)} />;
+}
+
 /** The bracket phase: your match, or watching (with the bracket in the panel). */
 function SquadsBracketPhase({ client, actions }: { client: SquadsClient; actions: SquadsActions }) {
   const [spectating, setSpectating] = useState(false);
   const lobby = client.lobby!;
   const mine = client.mySquad;
   const placed = client.placed && client.placed.placement !== 1 ? client.placed : null;
-  const live = mine ? [...client.matches.values()].some((m) => m.state !== "over" && m.sides.some((s) => s.squadId === mine.id)) : false;
+  const current = mine ? [...client.matches.values()].find((m) => m.state !== "over" && m.sides.some((s) => s.squadId === mine.id)) : undefined;
+  const live = !!current;
+  // Between matches (none on, or the next one's intro): the last match's token breakdown.
+  const between = !current || (current.state === "break" && current.format !== "pairs");
   const through = !!mine && !live && !placed && lobby.bracket.some((b) => b.squads.includes(mine.id) && b.state !== "over");
   const panel = (
     <>
@@ -205,6 +217,7 @@ function SquadsBracketPhase({ client, actions }: { client: SquadsClient; actions
           <p class="muted small">Your next match starts once the other one ends. Tap any tiny board to watch it.</p>
         </div>
       )}
+      {(between || placed) && <MyTokens client={client} />}
       {(!live || placed) && <Bracket lobby={lobby} mine={mine?.id ?? null} />}
     </>
   );
@@ -248,6 +261,7 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
           );
         })}
       </ol>
+      <MyTokens client={client} />
       <Bracket lobby={lobby} mine={mine} />
       <div class="sq-card-actions">
         <button type="button" class="fd-btn primary" onClick={actions.onAgain}>

@@ -11,9 +11,10 @@ import { squadsLegalMoves } from "@chessroyale/chess/squads";
  */
 
 /**
- * A device's answer to a bot-work job, cleaned: the top moves, best first, each legal, its expected score in [0, 1].
- * A move listed twice keeps its first line (the engine interface can report one move on two MultiPV lines; every
- * device does the same, so answers still compare). Null if it doesn't hold together (the device gets a strike).
+ * A device's answer to a bot-work job, cleaned: the top moves, best first, each legal, its expected score in [0, 1],
+ * and its line's reply if it gave one (a move's shape: the bots read it, to block). A move listed twice keeps its
+ * first line (the engine interface can report one move on two MultiPV lines; every device does the same, so answers
+ * still compare). Null if it doesn't hold together (the device gets a strike).
  */
 export function cleanTop(fen: string, top: unknown, n: number = SQUADS.bots.candidates): MoveScore[] | null {
   if (!Array.isArray(top) || !top.length || top.length > Math.max(n, 1)) return null;
@@ -23,18 +24,19 @@ export function cleanTop(fen: string, top: unknown, n: number = SQUADS.bots.cand
     if (!m || typeof m.move !== "string" || !legal.has(m.move)) return null;
     if (typeof m.expected !== "number" || !Number.isFinite(m.expected) || m.expected < 0 || m.expected > 1) return null;
     if (m.mate !== undefined && (!Number.isInteger(m.mate) || m.mate === 0)) return null;
+    if (m.reply !== undefined && (typeof m.reply !== "string" || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(m.reply))) return null;
     if (out.some((x) => x.move === m.move)) continue;
-    out.push({ move: m.move, expected: m.expected, ...(m.mate !== undefined ? { mate: m.mate } : {}) });
+    out.push({ move: m.move, expected: m.expected, ...(m.mate !== undefined ? { mate: m.mate } : {}), ...(m.reply !== undefined ? { reply: m.reply } : {}) });
   }
   return out;
 }
 
 /**
  * Two devices' answers agree: the same moves in the same order, every expected score within `tolerance` (the browser
- * engine is deterministic: JUDGES.tolerance is 0, an exact match), the same mates.
+ * engine is deterministic: JUDGES.tolerance is 0, an exact match), the same mates and replies.
  */
 export function topsAgree(a: readonly MoveScore[], b: readonly MoveScore[], tolerance: number = JUDGES.tolerance): boolean {
-  return a.length === b.length && a.every((m, i) => m.move === b[i]!.move && Math.abs(m.expected - b[i]!.expected) <= tolerance + 1e-12 && m.mate === b[i]!.mate);
+  return a.length === b.length && a.every((m, i) => m.move === b[i]!.move && Math.abs(m.expected - b[i]!.expected) <= tolerance + 1e-12 && m.mate === b[i]!.mate && m.reply === b[i]!.reply);
 }
 
 /** The moves to put to the engine server when two answers disagree: both lists, alternately, at most 8 (its limit). */
@@ -119,6 +121,7 @@ const known = new Map<string, MoveScore[]>();
  * once (a capture we can take back costs them their piece; a mate in one counts as the game); a mating move wins outright, a stalemate or a dead draw is level. The
  * lead becomes an expected score through a logistic (`fallbackScale` per pawn), so `candidatesFrom` and `botPick`
  * treat it as they treat the engine's top moves. Weak, but it takes free material, keeps its pieces and mates in one.
+ * Each move's reply is the opponent's biggest threat after it (what a bot would block), if any.
  */
 export function fallbackTop(fen: string, n: number = SQUADS.bots.candidates, s: SquadsSettings = SQUADS, scale: number = SQUADS_LOBBY.botWork.fallbackScale): MoveScore[] {
   const hit = known.get(fen);
@@ -135,6 +138,7 @@ export function fallbackTop(fen: string, n: number = SQUADS.bots.candidates, s: 
       const replies = it._moves({ legal: true });
       let score: number;
       let mate: number | undefined;
+      let reply: string | undefined;
       if (!replies.length) {
         score = chess.inCheck() ? MATE : 0;
         if (chess.inCheck()) mate = 1;
@@ -150,14 +154,17 @@ export function fallbackTop(fen: string, n: number = SQUADS.bots.candidates, s: 
           // (A capture we can answer by taking back costs them the capturing piece: only the difference counts.)
           else if (r.captured && chess.isAttacked(square(r.to) as never, us)) g -= VALUE[r.promotion ?? r.piece]!;
           it._undoMove();
-          if (g > threat) threat = g;
+          if (g > threat) {
+            threat = g;
+            reply = uciOf(r);
+          }
           if (threat >= MATE) break;
         }
         if (threat >= MATE) mate = -1;
         score = base + gainOf(m) - threat + nudge(m);
       }
       it._undoMove();
-      scored.push({ move: uciOf(m), expected: score >= MATE ? 1 : score <= -MATE ? 0 : expected(score), ...(mate !== undefined ? { mate } : {}) });
+      scored.push({ move: uciOf(m), expected: score >= MATE ? 1 : score <= -MATE ? 0 : expected(score), ...(mate !== undefined ? { mate } : {}), ...(reply ? { reply } : {}) });
     }
   } else {
     // (chess.js without its internals: the public API, slower.)

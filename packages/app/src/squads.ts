@@ -13,13 +13,16 @@ import {
   type PartyServerMessage,
   type SquadsClientMessage,
   type SquadsPlacement,
+  type BlockError,
+  type BlockLift,
+  type SquadsBlock,
   type SquadsServerMessage,
 } from "@chessroyale/chess/squads";
 import { account, playerName } from "./account.ts";
 import { enginePool, engineSpeed } from "./engine.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { play } from "./sound.ts";
-import { dutyOf, liveBank, movesOfHalf, sideIn, squadOf, type LocalBoard, type LocalMatch } from "./squads-view.ts";
+import { blockName, dutyOf, liveBank, movesOfHalf, sideIn, squadName, squadOf, type LocalBoard, type LocalMatch } from "./squads-view.ts";
 
 /**
  * Squads on this device (docs/areas/squads.md, "The screens"): the lobby's socket and everything the screens draw from
@@ -103,11 +106,16 @@ export async function squadsQueue(onBusy: (waitSeconds: number) => void, cancell
 
 /**
  * Test controls: a test lobby from the first vote (`votes`: bots in every other seat at once), or straight at Relay,
- * Pairs or the final (admins; anyone where SQUADS_TEST is on).
+ * Pairs or the final (admins; anyone where SQUADS_TEST is on). `extra`: the link's own test options, passed on (`fen`:
+ * the first round's position; `bots=strong`; `seat=white`: you play White on your first board), for tests.
  */
-export async function squadsTestLobby(start: "votes" | "relay" | "pairs" | "final", clock?: string | null): Promise<SquadsSeatAnswer> {
+export async function squadsTestLobby(start: "votes" | "relay" | "pairs" | "final", clock?: string | null, extra?: URLSearchParams): Promise<SquadsSeatAnswer> {
   const q = new URLSearchParams({ start });
   if (clock) q.set("clock", clock);
+  for (const k of ["fen", "bots", "seat"]) {
+    const v = extra?.get(k);
+    if (v) q.set(k, v);
+  }
   try {
     const res = await fetch(`/api/squads/lobby?${q}`, { method: "POST" });
     const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
@@ -118,20 +126,39 @@ export async function squadsTestLobby(start: "votes" | "relay" | "pairs" | "fina
   }
 }
 
-/** A "pick refused" note for the screen (the rules' reason, in words), shown for a moment. */
+/**
+ * A note for the screen, shown for a moment: a choice or block refused (the rules' reason, in words: `kind` "no"), or
+ * news (a block placed or lifted, a token refunded: "news").
+ */
 export interface SquadsNote {
   text: string;
   at: number;
+  kind?: "no" | "news";
 }
 
 const REFUSED: Record<string, string> = {
-  taken_by_partner: "Your partner has that move: pick another.",
+  no_tokens: "No same-move tokens left: pick a different move.",
+  blocked: "That move is blocked this turn.",
   illegal: "That move isn't legal here.",
   late: "Too late: your time was up.",
   no_duty: "It's not your turn to choose.",
   already_moved: "You've already moved.",
   match_over: "The match is over.",
   stale: "That half is over.",
+};
+
+const BLOCK_REFUSED: Record<BlockError | "late" | "stale", string> = {
+  block_taken: "That move is already blocked.",
+  bank: "Not enough block points left.",
+  king: "The king's moves can't be blocked (castling can).",
+  not_a_move: "That piece can't move there.",
+  no_piece: "Tap one of their pieces.",
+  locked: "Your squad's move is locked in.",
+  already_moved: "You've already moved.",
+  no_duty: "You can block only on your own board, on your turn.",
+  late: "Too late: your time was up.",
+  stale: "That half is over.",
+  match_over: "The match is over.",
 };
 
 /**
@@ -167,6 +194,8 @@ export class SquadsClient {
   /** Each match's choices and locks as the server last said (the screen shows them with `mine` on top). */
   private server = new Map<string, { visible: Record<string, string>; locked: string[] }>();
   note: SquadsNote | null = null;
+  /** A short banner over a board: a block placed or lifted (both squads see it). */
+  banner: { key: string; board: number; text: string; at: number } | null = null;
   /** Your party's pass in this lobby (you sit with your party). */
   readonly party: string | null;
   /** The match the screen shows on its big board (whose squads' sudden death is heard). */
@@ -297,7 +326,19 @@ export class SquadsClient {
     this.emit();
   }
 
-  /** Lock in your pick or block (the half ends early once everyone with a duty has). */
+  /**
+   * Block one of the other squad's moves on your board this half (from and to: "g8f6"), paid from your squad's bank:
+   * the server tells everyone at once ("block"), or says why not ("blockNo").
+   */
+  block(key: string, board: number, move: string) {
+    const m = this.matches.get(key);
+    if (!m?.current || !this.myId) return;
+    const d = dutyOf(m, this.myId);
+    if (!d || d.duty.board !== board || m.placed.some((b) => b.board === board && b.move === move)) return;
+    this.send({ t: "block", key, seq: m.current.seq, board, move });
+  }
+
+  /** Lock in your pick (the half ends early once everyone with a duty has). */
   lock(key: string) {
     const m = this.matches.get(key);
     if (!m?.current || !this.myId || !m.visible[this.myId]) return;
@@ -375,7 +416,7 @@ export class SquadsClient {
     this.showChoices(m);
   }
 
-  /** A new half (or a half played): nothing chosen yet. */
+  /** A new half (or a half played): nothing chosen yet, no blocks placed. */
   private freshHalf(m: LocalMatch) {
     this.server.set(m.key, { visible: {}, locked: [] });
     if (this.mine?.key === m.key) this.mine = null;
@@ -383,6 +424,7 @@ export class SquadsClient {
     m.locked = [];
     m.lockedAt = {};
     m.choiceAt = {};
+    m.placed = [];
   }
 
   private localHalf(h: NetSquadsHalf | null): NetSquadsHalf | null {
@@ -406,6 +448,8 @@ export class SquadsClient {
       locked: [],
       lockedAt: {},
       choiceAt: {},
+      placed: [],
+      blockAt: {},
       last: null,
     };
   }
@@ -463,9 +507,40 @@ export class SquadsClient {
           m.lockedAt = had!.lockedAt;
           m.choiceAt = had!.choiceAt;
           m.visible = had!.visible;
+          m.blockAt = had!.blockAt;
         } else if (this.mine?.key === m.key) this.mine = null;
+        m.placed = msg.placed ?? [];
+        // (Blocks in effect keep their first moment on screen: their arrows keep drawing on the same beat.)
+        if (had) for (const b of m.blocks) m.blockAt[blockKey(b)] ??= had.blockAt[blockKey(b)] ?? Date.now();
+        for (const b of m.placed) m.blockAt[blockKey(b)] ??= Date.now();
         this.serverChoices(m, msg.visible, msg.locked);
         this.matches.set(m.key, m);
+        break;
+      }
+      case "block": {
+        const had = this.matches.get(msg.key);
+        if (!had?.current || had.current.seq !== msg.seq || had.placed.some((b) => b.board === msg.block.board && b.move === msg.block.move)) break;
+        const m: LocalMatch = { ...had, placed: [...had.placed, msg.block], blockAt: { ...had.blockAt, [blockKey(msg.block)]: Date.now() } };
+        this.matches.set(m.key, m);
+        // Both squads hear of it: a short banner.
+        const by = msg.block.by === this.myId ? "You" : this.nameOf(msg.block.by);
+        const squad = squadName(m.sides[msg.block.side].squadId);
+        const mine = sideIn(m, this.myId) === msg.block.side;
+        this.banner = { key: m.key, board: msg.block.board, at: Date.now(), text: mine ? `${by} blocked ${blockName(msg.block)} (−${msg.block.cost})` : `${squad} blocked your ${blockName(msg.block)}` };
+        break;
+      }
+      case "blockNo": {
+        if (msg.reason !== "stale") this.note = { text: BLOCK_REFUSED[msg.reason] ?? "That block was refused.", at: Date.now(), kind: "no" };
+        break;
+      }
+      case "token": {
+        const had = this.matches.get(msg.key);
+        if (!had) break;
+        const tokenLog = had.tokenLog.map((u, i) => (i === msg.index ? msg.use : u));
+        if (msg.index >= tokenLog.length) tokenLog[msg.index] = msg.use;
+        this.matches.set(msg.key, { ...had, tokenLog, tokens: msg.tokens });
+        // The squad that used it hears of a refund (a small note); everyone sees its tokens back.
+        if (msg.use.verdict?.refunded && sideIn(had, this.myId) === msg.use.side) this.note = { text: "Token refunded: only move", at: Date.now(), kind: "news" };
         break;
       }
       case "turn": {
@@ -473,6 +548,8 @@ export class SquadsClient {
         if (!had) break;
         const m: LocalMatch = { ...had, state: "half", startsAt: null, current: this.localHalf(msg.current), banks: msg.banks };
         this.freshHalf(m);
+        // (The blocks placed last half are in effect now: their arrows carry on from when they were placed.)
+        m.blockAt = Object.fromEntries(m.blocks.map((b) => [blockKey(b), had.blockAt[blockKey(b)] ?? Date.now()]));
         this.matches.set(m.key, m);
         break;
       }
@@ -500,7 +577,7 @@ export class SquadsClient {
             this.matches.set(m.key, m);
           }
         }
-        if (msg.reason !== "stale") this.note = { text: REFUSED[msg.reason] ?? "That choice was refused.", at: Date.now() };
+        if (msg.reason !== "stale") this.note = { text: REFUSED[msg.reason] ?? "That choice was refused.", at: Date.now(), kind: "no" };
         break;
       }
       case "placed":
@@ -546,7 +623,13 @@ export class SquadsClient {
     });
     m.last = { seq: msg.seq, events: msg.events, before, at: Date.now(), until: m.startsAt ?? Date.now(), missed: msg.missed };
     this.freshHalf(m);
+    // Blocks just placed carry on (in effect now) from when they were placed.
+    m.blockAt = Object.fromEntries(m.blocks.map((b) => [blockKey(b), had?.blockAt[blockKey(b)] ?? Date.now()]));
     this.matches.set(m.key, m);
+    // A block lifted (a mercy rule, or your move made it impossible): announced, refunded.
+    const me = sideIn(m, this.myId);
+    const lifted = msg.events.find((e): e is Extract<typeof e, { kind: "block" }> => e.kind === "block" && e.outcome !== "on" && me !== null && (e.outcome !== "impossible" || e.side === me));
+    if (lifted && lifted.outcome !== "on") this.banner = { key: m.key, board: lifted.board, at: Date.now(), text: `Block lifted: ${LIFTED[lifted.outcome]} (refunded)` };
     if (off) this.sync();
     // Decided (a winner): over once its last half has been shown (the server says so only in the lobby's bracket). A
     // drawn final isn't: its Armageddon comes as a "match".
@@ -606,8 +689,6 @@ export class SquadsClient {
     }
     const d = this.myId ? dutyOf(m, this.myId) : null;
     if (!d || m.locked.includes(this.myId!)) return;
-    // (Blockers aren't on the clock: no ticks.)
-    if (d.duty.role === "block") return;
     const left = m.current.startedAt + m.delayMs - now;
     const secs = Math.ceil(left / 1000);
     if (left <= 0 || secs > TICK_FREE_FROM || secs >= Math.ceil(m.delayMs / 1000)) return;
@@ -647,7 +728,7 @@ export class SquadsClient {
             const top: MoveScore[] | null = await engine.topMovesAt(job.fen, job.n, job.nodes).catch(() => null);
             // (No answer: another device's stands, or the lobby's quick look.)
             if (top?.length) this.botAnswers++;
-            if (top?.length) this.send({ t: "botTop", id: job.id, top: top.map((x) => ({ move: x.move, expected: x.expected, ...(x.mate !== undefined ? { mate: x.mate } : {}) })) });
+            if (top?.length) this.send({ t: "botTop", id: job.id, top: top.map((x) => ({ move: x.move, expected: x.expected, ...(x.mate !== undefined ? { mate: x.mate } : {}), ...(x.reply ? { reply: x.reply } : {}) })) });
           }
         }),
       );
@@ -667,6 +748,12 @@ export class SquadsClient {
 
 /** Ticks in the last this-many seconds of your free time. */
 export const TICK_FREE_FROM = 3;
+
+/** A block's identity on screen (its arrow's beat is kept by it). */
+export const blockKey = (b: Pick<SquadsBlock, "board" | "move">) => `${b.board}/${b.move}`;
+
+/** Why a block was lifted, in words. */
+const LIFTED: Record<BlockLift, string> = { impossible: "that move isn't possible now", check: "they're in check", no_move: "it would have left no move", mate: "it would have left only moves that allow mate" };
 
 // ---------------- Parties ----------------
 

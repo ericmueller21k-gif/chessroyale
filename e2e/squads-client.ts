@@ -182,7 +182,7 @@ export class SquadsClient {
     this.stats.botWork++;
     const nodes = this.o.nodes ?? job.nodes;
     const top = await (nodes && engine.topMovesAt ? engine.topMovesAt(job.fen, job.n, nodes) : engine.topMoves(job.fen, job.n)).catch(() => null);
-    if (top) this.send({ t: "botTop", id: job.id, top: top.map((m) => ({ move: m.move, expected: m.expected, ...(m.mate !== undefined ? { mate: m.mate } : {}) })) });
+    if (top) this.send({ t: "botTop", id: job.id, top: top.map((m) => ({ move: m.move, expected: m.expected, ...(m.mate !== undefined ? { mate: m.mate } : {}), ...(m.reply ? { reply: m.reply } : {}) })) });
   }
 
   private onTurn(m: NetSquadsMatch) {
@@ -205,7 +205,7 @@ export class SquadsClient {
         this.send({ t: "choose", key: m.key, seq, move });
         this.send({ t: "lock", key: m.key, seq });
         this.stats.chosen++;
-        // (A pick the partner already has is refused: the next one.)
+        // (A pick refused, e.g. a blocked move: the next one.)
         await new Promise((r) => setTimeout(r, 300));
         if (this.stats.refused === before) break;
       }
@@ -213,9 +213,9 @@ export class SquadsClient {
   }
 }
 
-/** The moves a half added to board `i`, from its events (a forced move, a Relay move, a pair's or the final's move). */
+/** The moves a half added to board `i`, from its events (a forced move, a Relay move, a pair's move or the final's vote). */
 function movesOf(msg: Extract<SquadsServerMessage, { t: "half" }>, i: number): string[] {
-  return msg.events.flatMap((e) => (e.kind === "relay" || e.kind === "pair" || e.kind === "pickblock" || e.kind === "forced") && e.board === i ? [e.move] : []);
+  return msg.events.flatMap((e) => (e.kind === "relay" || e.kind === "pair" || e.kind === "vote" || e.kind === "forced") && e.board === i ? [e.move] : []);
 }
 
 /** A party member's socket: its party view, and the lobby and pass once the leader's queueing places it. */

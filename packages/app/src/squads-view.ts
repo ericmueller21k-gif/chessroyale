@@ -2,6 +2,8 @@ import {
   pairSchedule,
   relayBoardOf,
   type Colour,
+  type SquadsBlock,
+  type TokenUse,
   type NetBracketMatch,
   type NetDuty,
   type NetSquad,
@@ -13,7 +15,7 @@ import {
   type SquadsEvent,
   type SquadsPlacement,
 } from "@chessroyale/chess/squads";
-import type { MoveScore } from "@chessroyale/chess";
+import { toSan, type MoveScore } from "@chessroyale/chess";
 import type { Arrow } from "./board/types.ts";
 
 /**
@@ -35,6 +37,9 @@ export interface LocalMatch extends Omit<NetSquadsMatch, "boards"> {
   lockedAt: Record<string, number>;
   /** When each visible choice last changed (local). */
   choiceAt: Record<string, number>;
+  /** Blocks placed this half (everyone sees them at once), and when each block on screen was first seen (its arrow's beat). */
+  placed: SquadsBlock[];
+  blockAt: Record<string, number>;
   /** The last half played: its events, every board's position before it, when it arrived and when its show ends. */
   last: { seq: number; events: SquadsEvent[]; before: string[]; at: number; until: number; missed: string[] } | null;
 }
@@ -48,7 +53,7 @@ export const SQUAD_COLOURS = ["#ef4444", "#3b82f6", "#22c55e", "#eab308", "#a855
 export const squadName = (id: number | null | undefined) => (id == null ? "?" : (SQUAD_NAMES[id % SQUAD_NAMES.length] ?? `Squad ${id + 1}`));
 export const squadColour = (id: number | null | undefined) => (id == null ? "#888" : (SQUAD_COLOURS[id % SQUAD_COLOURS.length] ?? "#888"));
 
-export const FORMAT_NAME = { relay: "Relay", pairs: "Pairs", final: "Pick and Block" } as const;
+export const FORMAT_NAME = { relay: "Relay", pairs: "Pairs", final: "Team vote" } as const;
 export const ROUND_NAME = ["Round 1", "Round 2", "Final"] as const;
 
 export function placementText(p: SquadsPlacement): string {
@@ -107,12 +112,13 @@ export function myBoards(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "
   return { you: 0, next: null };
 }
 
-/** Your duty in the half being played, and your partner (Pairs, the final), if any. */
-export function dutyOf(m: Pick<NetSquadsMatch, "state" | "current">, playerId: string | null): { duty: NetDuty; partner: string | null } | null {
+/** Your duty in the half being played, your partner (Pairs) if any, and the rest of your squad on it (the final's vote). */
+export function dutyOf(m: Pick<NetSquadsMatch, "state" | "current">, playerId: string | null): { duty: NetDuty; partner: string | null; team: string[] } | null {
   if (!playerId || m.state !== "half" || !m.current) return null;
   for (const duty of m.current.duties) {
-    const i = duty.players.indexOf(playerId);
-    if (i >= 0) return { duty, partner: duty.players[1 - i] ?? null };
+    if (!duty.players.includes(playerId)) continue;
+    const team = duty.players.filter((p) => p !== playerId);
+    return { duty, partner: duty.players.length === 2 ? team[0]! : null, team };
   }
   return null;
 }
@@ -125,8 +131,8 @@ export function scouting(m: Pick<NetSquadsMatch, "state" | "current">, playerId:
 
 /**
  * A side's team bank now (ms), as the screen runs it during a half: from the bank as the half began, each of the
- * side's moves still being thought about (a duty whose players haven't all locked in; blockers never count) drains it
- * past the free seconds; a move locked in stopped draining when it was. The exact bank comes with the half's result.
+ * side's moves still being thought about (a duty whose players haven't all locked in) drains it past the free seconds;
+ * a move locked in stopped draining when it was. The exact bank comes with the half's result.
  */
 export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked" | "lockedAt">, side: Side, now: number): number {
   const start = m.banks[side];
@@ -135,7 +141,7 @@ export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "de
   const t = now - t0;
   let drained = 0;
   for (const d of m.current.duties) {
-    if (d.side !== side || d.role === "block") continue;
+    if (d.side !== side) continue;
     const done = d.players.every((p) => m.locked.includes(p));
     const end = done ? Math.max(...d.players.map((p) => (m.lockedAt[p] ?? now) - t0)) : Math.min(t, d.deadline - t0);
     drained += Math.max(0, Math.min(end, t) - m.delayMs);
@@ -147,7 +153,7 @@ export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "de
 export function drainRate(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked">, side: Side, now: number): number {
   if (m.state !== "half" || !m.current || m.banks[side] <= 0) return 0;
   if (now - m.current.startedAt <= m.delayMs) return 0;
-  return m.current.duties.filter((d) => d.side === side && d.role !== "block" && !d.players.every((p) => m.locked.includes(p)) && now < d.deadline).length;
+  return m.current.duties.filter((d) => d.side === side && !d.players.every((p) => m.locked.includes(p)) && now < d.deadline).length;
 }
 
 /** A squad's team clock for the screen: its bank now, sudden death, and whether it's running (draining). */
@@ -218,7 +224,81 @@ export function shownMatches(matches: readonly LocalMatch[]): LocalMatch[] {
 
 /** The moves a half added to board `i`, from its events (a forced move, a Relay move, a pair's or the final's move). */
 export function movesOfHalf(events: readonly SquadsEvent[], i: number): string[] {
-  return events.flatMap((e) => ((e.kind === "relay" || e.kind === "pair" || e.kind === "pickblock" || e.kind === "forced") && e.board === i ? [e.move] : []));
+  return events.flatMap((e) => ((e.kind === "relay" || e.kind === "pair" || e.kind === "vote" || e.kind === "forced") && e.board === i ? [e.move] : []));
+}
+
+// ---------------- Squads v2: blocks and tokens ----------------
+
+/** A side's block bank now: the match's, less the blocks it has placed this half (paid at once). */
+export function blockBankNow(m: Pick<LocalMatch, "blockBanks" | "placed">, side: Side): number {
+  return m.blockBanks[side] - m.placed.filter((b) => b.side === side).reduce((t, b) => t + b.cost, 0);
+}
+
+/** The blocks on a board now: those in effect this half, and those placed this half (for the other side's next turn). */
+export function blocksShown(m: Pick<LocalMatch, "blocks" | "placed">, board: number): SquadsBlock[] {
+  return [...m.blocks, ...m.placed].filter((b) => b.board === board);
+}
+
+const PIECE_LETTER = { p: "", n: "N", b: "B", r: "R", q: "Q", k: "K" } as const;
+
+/** A blocked move in a few characters: "Ng8–f6", "e7–e5", castling "O-O" or "O-O-O". */
+export function blockName(b: Pick<SquadsBlock, "move" | "piece">): string {
+  if (b.piece === "k") return b.move[2] === "g" ? "O-O" : "O-O-O";
+  return `${PIECE_LETTER[b.piece]}${b.move.slice(0, 2)}–${b.move.slice(2, 4)}`;
+}
+
+/**
+ * The position whose engine lines help choose a block (Cheat lines while blocking): the other squad's moves after your
+ * squad's (your own pick or move if you've made one, else your partner's or a teammate's), or with nobody's yet, the
+ * position with the move handed over (a "null move": their threats as things stand). Null if that can't be made (in
+ * check: handing over the move would leave your king in check).
+ */
+export function blockCheatFen(fen: string, ownMove: string | null, apply: (fen: string, move: string) => string, inCheck: (fen: string) => boolean): string | null {
+  if (ownMove) {
+    try {
+      return apply(fen, ownMove);
+    } catch {
+      return null;
+    }
+  }
+  if (inCheck(fen)) return null;
+  const parts = fen.split(" ");
+  parts[1] = parts[1] === "w" ? "b" : "w";
+  parts[3] = "-";
+  return parts.join(" ");
+}
+
+/** A same-move token's move in the breakdown (its SAN in the position it was played in). */
+const sanOf = (fen: string, move: string) => {
+  try {
+    return toSan(fen, move);
+  } catch {
+    return move;
+  }
+};
+
+/**
+ * A token use in the post-match breakdown, in plain words with numbers: "Rxd4: refunded, every other move lost at
+ * least 2.1 pawns"; "e5: not refunded, Nf3 was within 0.3"; "e5: waiting for the judge".
+ */
+export function tokenWords(u: Pick<TokenUse, "fen" | "move" | "verdict">): string {
+  const move = sanOf(u.fen, u.move);
+  const v = u.verdict;
+  if (!v) return `${move}: waiting for the judge`;
+  const rival = v.rival ? sanOf(u.fen, v.rival) : null;
+  const pawns = (x: number | undefined) => `${(x ?? 0).toFixed(1)} ${x === 1 ? "pawn" : "pawns"}`;
+  switch (v.why) {
+    case "only_move":
+      return `${move}: refunded, every other move lost at least ${pawns(v.pawns)}`;
+    case "close":
+      return v.mate ? `${move}: not refunded, ${rival} mates too` : v.pawns ? `${move}: not refunded, ${rival} was within ${(v.pawns ?? 0).toFixed(1)}` : `${move}: not refunded, ${rival} was just as good`;
+    case "better":
+      return `${move}: not refunded, ${rival} was better by ${v.atLeast ? "at least " : ""}${pawns(v.pawns)}`;
+    case "unranked":
+      return `${move}: not refunded, the judge couldn't rank the other moves`;
+    case "no_judge":
+      return `${move}: not refunded, no device could judge it`;
+  }
 }
 
 /** The match on screen for a player: their squad's live one, else (spectating) the latest live match, final first. */

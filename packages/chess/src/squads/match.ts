@@ -2,44 +2,49 @@ import { SQUADS, type SquadsClock, type SquadsSettings } from "@chessroyale/core
 import { START_FEN, fenAfter } from "../rules.ts";
 import { pickOpenings, type Opening } from "../openings.ts";
 import {
-  blockCancelledByMate,
   boardPoints,
   colourToMove,
   decideByMaterial,
-  isLegal,
   newSquadsBoard,
   otherSide,
   playOnBoard,
-  randomLegalMove,
   sideOf,
-  squadsLegalMoves,
   type BoardResult,
   type BoardStart,
   type Colour,
   type Side,
   type SquadsBoard,
 } from "./board.ts";
+import { allowedMoves, checkBlock, isBlocked, liftBlocks, type BlockError, type BlockLift, type BlockPiece, type SquadsBlock } from "./blocks.ts";
 import { ROUND_FORMAT, coin, squadsRng, type Squad, type SquadsFormat, type SquadsRound } from "./lobby.ts";
 import { pairSchedule, relaySeat } from "./schedule.ts";
+import type { TokenUse, TokenVerdict } from "./tokens.ts";
 import type { SquadsRules } from "./votes.ts";
 
 /**
- * One Squads match between two squads, in its round's format: Relay (round 1), Pairs (round 2) or Pick and Block
+ * One Squads match between two squads, in its round's format: Relay (round 1), Pairs (round 2) or the majority vote
  * (the final), or the Armageddon board after a drawn final. Pure and replayable: every random draw comes from the
- * match's seed and the decision's name (`squadsRng`). No engine anywhere: legal moves and mate in one come from
- * chess.js; only the silent safety cap and the test-only "Next round" fall back on material.
+ * match's seed and the decision's name (`squadsRng`). No engine: legal moves and mate in one come from chess.js; only
+ * the silent safety cap and the test-only "Next round" fall back on material; a same-move token's refund weighs the
+ * judge's top moves, given as data (`settleTokenUse`).
+ *
+ * Squads v2 (Eric, Oct 12): Pairs partners may pick the same move while their squad has a token (it plays, a token
+ * burns, the judge may refund it); in every round a squad may block one move of the other squad's on a board before
+ * its own move there (`placeBlock`; blocks.ts), paid from its block bank for the match; the final is a majority vote of
+ * the whole squad.
  *
  * The clocks are the squads' team clocks: one bank per squad for the whole tournament (`Squad.bankMs`), brought into
  * the match (`banks`) and carried out of it (`settleTeamClocks`). A match is played in turns of two halves: every
  * board's White move, then every board's Black move (in the final, the White squad's move, then the Black squad's).
  * In each half the server collects choices (`choose`, `lockIn`) until everyone has locked in or the deadlines pass,
  * then `resolveHalf` plays the half with each player's thinking time:
- * - Each move being thought about drains its squad's bank past the free seconds (`delayMs`): a Relay mover, or a pair
- *   (the slower picker); the final's pickers drain it once, its blockers not at all. Two of a squad's moves being
- *   thought about at once drain it twice as fast.
+ * - Each move being thought about drains its squad's bank past the free seconds (`delayMs`): a Relay mover, a pair
+ *   (the slower picker), the final's squad (its slowest picker). Placing a block is thinking time too: the move's
+ *   time runs to the block if that came later. Two of a squad's moves being thought about at once drain it twice as
+ *   fast.
  * - While the bank is above zero, the per-move ceiling bounds a move; if the bank runs out during the half, every
  *   move of that squad still being thought about is cut off. At zero it's sudden death: each move within the free
- *   seconds. A move not made in time is a missed action: a random legal move (a blocker forfeits). No flag falls.
+ *   seconds. A move not made in time is a missed action: a random legal move. No flag falls.
  */
 
 /** A squad in a match: its id and its players' ids in seat order. */
@@ -83,6 +88,14 @@ export interface SquadsMatch {
   incrementMs: number;
   /** The silent safety cap, in moves per side. */
   safetyMoves: number;
+  /** Each side's same-move tokens left (Pairs only; null in other formats). */
+  tokens: readonly [number, number] | null;
+  /** Each side's block bank left (blocks being placed this half are paid from it when the half is played). */
+  blockBanks: readonly [number, number];
+  /** Blocks in effect this half: these moves of the side to move can't be played on those boards. */
+  blocks: readonly SquadsBlock[];
+  /** Every same-move token burned this match, and the judge's verdict once it's in (the post-match breakdown). */
+  tokenLog: readonly TokenUse[];
   result: MatchResult | null;
 }
 
@@ -142,6 +155,8 @@ export interface MatchSetup {
   delayMs: number;
   incrementMs: number;
   armageddon?: boolean;
+  /** Each side's block bank coming in (Armageddon: what the final left); default the bank for a match. */
+  blockBanks?: readonly [number, number];
 }
 
 export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): SquadsMatch {
@@ -161,6 +176,10 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
     delayMs: o.delayMs,
     incrementMs: o.incrementMs,
     safetyMoves: s.safetyCap,
+    tokens: o.format === "pairs" && !o.armageddon ? [s.tokens.perMatch, s.tokens.perMatch] : null,
+    blockBanks: o.blockBanks ? [o.blockBanks[0], o.blockBanks[1]] : [s.blocks.bankPerMatch, s.blocks.bankPerMatch],
+    blocks: [],
+    tokenLog: [],
     result: null,
   };
 }
@@ -231,13 +250,13 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
 
 // ---- Who acts this half ----
 
-export type Role = "move" | "pick" | "block";
+export type Role = "move" | "pick";
 
 export interface Duty {
   board: number;
   side: Side;
   role: Role;
-  /** One player (a Relay move) or two (a pair's picks, the final's pickers or blockers). */
+  /** One player (a Relay move), two (a pair's picks) or the whole squad (the final's vote). */
   players: readonly string[];
   /**
    * How long they have (ms): the per-move ceiling; for moves and picks in sudden death (the squad's bank at zero), the
@@ -250,17 +269,21 @@ export interface HalfDuties {
   duties: Duty[];
   /** Whoever's turn it would be on a finished board: they sit this half out (and scout). */
   scouts: Duty[];
-  /** The final's mercy rule: no blocks this move (the side to move has few legal moves). */
-  mercy: "few_moves" | null;
-  /** Boards whose side to move has only one legal move: it plays itself (Pairs and the final). */
+  /** Boards whose side to move has only one move it may play (a block counted): it plays itself (Pairs and the final). */
   forced: number[];
 }
+
+/** The blocks in effect on a board this half: the moves the side to move can't play there. */
+export const blocksOn = (m: Pick<SquadsMatch, "blocks">, board: number): string[] => m.blocks.filter((b) => b.board === board).map((b) => b.move);
+
+/** The moves the side to move may play on a board this half: every legal move but the blocked ones. */
+export const movesAllowed = (m: Pick<SquadsMatch, "blocks" | "boards">, board: number): readonly string[] => allowedMoves(m.boards[board]!.fen, blocksOn(m, board));
 
 const seatsOf = (m: SquadsMatch, side: Side, seats: readonly number[]) => seats.map((i) => m.sides[side].seats[i]!);
 
 /** Who acts in the half being played, board by board, and their deadlines. */
 export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuties {
-  const out: HalfDuties = { duties: [], scouts: [], mercy: null, forced: [] };
+  const out: HalfDuties = { duties: [], scouts: [], forced: [] };
   if (m.result) return out;
   const n = m.boards.length;
   const ceiling = s.moveCeilingSeconds * 1000;
@@ -273,64 +296,124 @@ export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuti
       (b.result ? out.scouts : out.duties).push(duty);
       continue;
     }
-    const [slot0, slot1] = pairSchedule(m.turn);
     if (m.format === "pairs") {
+      const [slot0, slot1] = pairSchedule(m.turn);
       const duty: Duty = { board: b.id, side, role: "pick", players: seatsOf(m, side, n === 1 ? slot0 : b.id === 0 ? slot0 : slot1), deadlineMs };
       if (b.result) out.scouts.push(duty);
-      else if (squadsLegalMoves(b.fen).length === 1) out.forced.push(b.id);
+      else if (movesAllowed(m, b.id).length === 1) out.forced.push(b.id);
       else out.duties.push(duty);
       continue;
     }
-    // The final: the side to move's slot-0 pair picks; the other squad's slot-1 pair blocks.
+    // The final: the whole squad to move votes.
     if (b.result) continue;
-    const legal = squadsLegalMoves(b.fen).length;
-    if (legal === 1) {
+    if (movesAllowed(m, b.id).length === 1) {
       out.forced.push(b.id);
       continue;
     }
-    out.duties.push({ board: b.id, side, role: "pick", players: seatsOf(m, side, slot0), deadlineMs });
-    if (legal <= s.final.noBlocksAtMoves) out.mercy = "few_moves";
-    else out.duties.push({ board: b.id, side: otherSide(side), role: "block", players: seatsOf(m, otherSide(side), slot1), deadlineMs: ceiling });
+    out.duties.push({ board: b.id, side, role: "pick", players: [...m.sides[side].seats], deadlineMs });
   }
   return out;
 }
 
-/** A player's duty this half, and their partner (Pairs, the final), if any. */
-export function dutyOf(m: SquadsMatch, playerId: string, s: SquadsSettings = SQUADS): { duty: Duty; partner: string | null } | null {
+/** A player's duty this half, and their partner (Pairs), if any; in the final, `team` is the rest of the squad. */
+export function dutyOf(m: SquadsMatch, playerId: string, s: SquadsSettings = SQUADS): { duty: Duty; partner: string | null; team: string[] } | null {
   for (const duty of halfDuties(m, s).duties) {
     const i = duty.players.indexOf(playerId);
-    if (i >= 0) return { duty, partner: duty.players[1 - i] ?? null };
+    if (i < 0) continue;
+    const team = duty.players.filter((p) => p !== playerId);
+    return { duty, partner: duty.players.length === 2 ? team[0]! : null, team };
   }
   return null;
 }
 
 // ---- Choices during a half ----
 
-/** What players have chosen so far this half (a move, a pick or a block), and who has locked in. */
+/** A block placed this half: by whom, on which board, the move, and when (ms after the half began: thinking time). */
+export interface PlacedBlock {
+  board: number;
+  by: string;
+  move: string;
+  at: number;
+}
+
+/** What players have chosen so far this half (a move or a pick), who has locked in, and the blocks placed. */
 export interface HalfInputs {
   choices: Readonly<Record<string, string>>;
   locked: Readonly<Record<string, boolean>>;
+  blocks: readonly PlacedBlock[];
 }
 
-export const NO_INPUTS: HalfInputs = { choices: {}, locked: {} };
+export const NO_INPUTS: HalfInputs = { choices: {}, locked: {}, blocks: [] };
 
-export type ChoiceError = "match_over" | "no_duty" | "illegal" | "taken_by_partner" | "already_moved";
+/** blocked: a block in effect takes that move away this half; no_tokens: your partner's move, and no same-move token left. */
+export type ChoiceError = "match_over" | "no_duty" | "illegal" | "blocked" | "no_tokens" | "already_moved";
 
 /**
- * A player chooses during the half. Relay: their move (made once, locked at once). Pairs and the final: a pick or
- * a block, which can change until the half ends (a change unlocks it); never the move their partner has chosen.
+ * A player chooses during the half. Relay: their move (made once, locked at once). Pairs and the final: a pick, which
+ * can change until the half ends (a change unlocks it). Pairs: your partner's move only while your squad has a
+ * same-move token. Never a move a block takes away.
  */
 export function choose(m: SquadsMatch, inputs: HalfInputs, playerId: string, move: string, s: SquadsSettings = SQUADS): { inputs: HalfInputs } | { error: ChoiceError } {
   if (m.result) return { error: "match_over" };
   const d = dutyOf(m, playerId, s);
   if (!d) return { error: "no_duty" };
-  if (!isLegal(m.boards[d.duty.board]!.fen, move)) return { error: "illegal" };
+  const legal = allowedMoves(m.boards[d.duty.board]!.fen, null);
+  if (!legal.includes(move)) return { error: "illegal" };
+  if (isBlocked(move, blocksOn(m, d.duty.board))) return { error: "blocked" };
   if (d.duty.role === "move") {
     if (inputs.choices[playerId]) return { error: "already_moved" };
-    return { inputs: { choices: { ...inputs.choices, [playerId]: move }, locked: { ...inputs.locked, [playerId]: true } } };
+    return { inputs: { ...inputs, choices: { ...inputs.choices, [playerId]: move }, locked: { ...inputs.locked, [playerId]: true } } };
   }
-  if (d.partner && inputs.choices[d.partner] === move) return { error: "taken_by_partner" };
-  return { inputs: { choices: { ...inputs.choices, [playerId]: move }, locked: { ...inputs.locked, [playerId]: false } } };
+  if (m.format === "pairs" && d.partner && inputs.choices[d.partner] === move && tokensLeft(m, d.duty.side) <= 0) return { error: "no_tokens" };
+  return { inputs: { ...inputs, choices: { ...inputs.choices, [playerId]: move }, locked: { ...inputs.locked, [playerId]: false } } };
+}
+
+/** A side's same-move tokens left (0 outside Pairs). */
+export const tokensLeft = (m: Pick<SquadsMatch, "tokens">, side: Side): number => m.tokens?.[side] ?? 0;
+
+/** A side's block bank now: the match's, less the blocks it has placed this half (paid at once). */
+export function blockBankNow(m: Pick<SquadsMatch, "blockBanks" | "boards" | "half">, inputs: Pick<HalfInputs, "blocks">, side: Side, s: SquadsSettings = SQUADS): number {
+  let bank = m.blockBanks[side];
+  for (const b of inputs.blocks) {
+    const board = m.boards[b.board];
+    if (!board || sideOf(board, m.half) !== side) continue;
+    const c = checkBlock(board.fen, m.half === "w" ? "b" : "w", b.move, s);
+    if ("cost" in c) bank -= c.cost;
+  }
+  return bank;
+}
+
+/**
+ * A player blocks one move of the other squad on their board this half (blocks.ts), paid at once from the squad's
+ * block bank: as many a turn as the bank allows (or `blocks.maxPerTurn`), each a different move, none taken back. Any
+ * of the squad's players with a duty on that board may place one, before the squad's move there is settled: in Relay
+ * before the move is made, in Pairs and the final while any of them hasn't locked in. `at` is when (ms after the half
+ * began): it counts as thinking time.
+ */
+export function placeBlock(m: SquadsMatch, inputs: HalfInputs, playerId: string, board: number, move: string, at: number, s: SquadsSettings = SQUADS): { inputs: HalfInputs; block: SquadsBlock } | { error: BlockError } {
+  if (m.result) return { error: "match_over" };
+  const d = dutyOf(m, playerId, s);
+  if (!d || d.duty.board !== board) return { error: "no_duty" };
+  if (d.duty.role === "move" && inputs.choices[playerId]) return { error: "already_moved" };
+  if (d.duty.players.every((p) => inputs.locked[p])) return { error: "locked" };
+  const here = inputs.blocks.filter((b) => b.board === board);
+  if (here.some((b) => b.move === move) || (s.blocks.maxPerTurn !== null && here.length >= s.blocks.maxPerTurn)) return { error: "block_taken" };
+  const fen = m.boards[board]!.fen;
+  const c = checkBlock(fen, m.half === "w" ? "b" : "w", move, s);
+  if ("error" in c) return c;
+  if (blockBankNow(m, inputs, d.duty.side, s) < c.cost) return { error: "bank" };
+  const placed: PlacedBlock = { board, by: playerId, move, at: Math.max(0, at) };
+  return { inputs: { ...inputs, blocks: [...inputs.blocks, placed] }, block: { board, side: d.duty.side, by: playerId, move, piece: c.piece, cost: c.cost } };
+}
+
+/** The blocks placed this half, as everyone sees them (blocks are public: both squads and spectators). */
+export function placedBlocks(m: SquadsMatch, inputs: Pick<HalfInputs, "blocks">, s: SquadsSettings = SQUADS): SquadsBlock[] {
+  return inputs.blocks.flatMap((b) => {
+    const board = m.boards[b.board];
+    if (!board) return [];
+    const c = checkBlock(board.fen, m.half === "w" ? "b" : "w", b.move, s);
+    return "cost" in c ? [{ board: b.board, side: sideOf(board, m.half), by: b.by, move: b.move, piece: c.piece, cost: c.cost }] : [];
+  });
 }
 
 /** A player locks in their current choice (nothing to lock without one). */
@@ -345,16 +428,13 @@ export function halfReady(m: SquadsMatch, inputs: HalfInputs, s: SquadsSettings 
 }
 
 /**
- * The choices a viewer sees live (a squad's member: their side; a spectator: null). Relay and Pairs: only their own
- * squad's. The final: blocks and picks as the settings say (Eric, Oct 10: blocks to everyone as red arrows, picks to
- * the picking squad only).
+ * The choices a viewer sees live (a squad's member: their side; a spectator: null): only their own squad's, in every
+ * round (the final: teammates' picks as they're made). Blocks are public (`placedBlocks`).
  */
 export function visibleChoices(m: SquadsMatch, inputs: HalfInputs, viewer: Side | null, s: SquadsSettings = SQUADS): Record<string, string> {
   const out: Record<string, string> = {};
   for (const d of halfDuties(m, s).duties) {
-    const own = viewer === d.side;
-    const seen = m.format !== "final" ? own : (d.role === "block" ? s.final.blocksSeenBy : s.final.picksSeenBy) === "everyone" || own;
-    if (!seen) continue;
+    if (viewer !== d.side) continue;
     for (const p of d.players) if (inputs.choices[p]) out[p] = inputs.choices[p]!;
   }
   return out;
@@ -371,39 +451,40 @@ export type SquadsEvent =
       board: number;
       side: Side;
       players: readonly string[];
-      /** The two picks as played (a missed slot holds its random move). */
+      /** The two picks as played (a missed slot holds its random move); the same move twice when `same`. */
       picks: readonly [string, string];
       missed: readonly [boolean, boolean];
-      /** Which pick the coin played. */
-      coin: 0 | 1;
-      move: string;
-    }
-  | {
-      kind: "pickblock";
-      turn: number;
-      half: Colour;
-      board: number;
-      /** The picking side (the side to move). */
-      side: Side;
-      pickers: readonly string[];
-      /** Empty when the mercy rule took the blocks away. */
-      blockers: readonly string[];
-      picks: readonly [string, string];
-      pickMissed: readonly [boolean, boolean];
-      /** A forfeited block is null. */
-      blocks: readonly [string | null, string | null];
-      blockMissed: readonly [boolean, boolean];
-      mercy: "few_moves" | null;
-      /** Which block the coin made active (null: no blocks this move). */
-      active: 0 | 1 | null;
-      /** The active block was cancelled: every other legal move allows mate in one. */
-      cancelled: boolean;
-      /** Which pick the active block hit (the other one played); null if it hit neither. */
-      hit: 0 | 1 | null;
-      /** Which pick the coin played, when the block hit neither; null otherwise. */
+      /** Both picked the same move: it played without a coin, and a token burned (`token`: its place in the log). */
+      same: boolean;
+      token: number | null;
+      /** Which pick the coin played (null: the same move, no coin). */
       coin: 0 | 1 | null;
       move: string;
     }
+  | {
+      kind: "vote";
+      turn: number;
+      half: Colour;
+      board: number;
+      side: Side;
+      players: readonly string[];
+      /** Each player's pick as it counted (null: none in time, so it didn't count). */
+      picks: readonly (string | null)[];
+      /** Every move picked and its votes, most first. */
+      tally: readonly { move: string; votes: number }[];
+      /** The moves tied for the most votes (one: a clear winner). */
+      tied: readonly string[];
+      /** A tie: which of `tied` the coin played. */
+      coin: number | null;
+      /** Nobody picked: a random move played. */
+      random: boolean;
+      move: string;
+    }
+  /**
+   * A block placed this half, after the blocking side's move: in effect on the other side's next turn there ("on"),
+   * or lifted and refunded (why).
+   */
+  | { kind: "block"; turn: number; half: Colour; board: number; side: Side; by: string; move: string; piece: BlockPiece; cost: number; outcome: "on" | BlockLift }
   | { kind: "forced"; turn: number; half: Colour; board: number; side: Side; move: string }
   | { kind: "scout"; turn: number; half: Colour; board: number; side: Side; players: readonly string[] }
   /** A squad's team bank this half: how much its moves drained, what's left (after any increment), sudden death. */
@@ -416,6 +497,8 @@ export type SquadsEvent =
 export interface HalfOutcome {
   match: SquadsMatch;
   events: SquadsEvent[];
+  /** Tokens burned this half (indices into the match's `tokenLog`): each waits for the judge (`settleTokenUse`). */
+  tokensUsed: number[];
   /** Players who acted, and who missed (for each player's record: `noteActions`). */
   acted: string[];
   missed: string[];
@@ -433,20 +516,55 @@ export interface HalfOutcome {
 export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonly<Record<string, number>> = {}, s: SquadsSettings = SQUADS): HalfOutcome {
   if (m.result) throw new Error(`Match ${m.key} is over`);
   const duties = halfDuties(m, s);
-  const ctx: Ctx = { m, s, inputs, thinkMs, boards: [...m.boards], banks: [...m.banks], events: [], acted: [], missed: [], timeouts: [], cutoff: [Infinity, Infinity], earned: [0, 0] };
-  for (const side of [0, 1] as const) drainBank(ctx, side, duties.duties.filter((d) => d.side === side && d.role !== "block"));
+  const placed = placedBlocks(m, inputs, s);
+  const ctx: Ctx = {
+    m,
+    s,
+    inputs,
+    thinkMs,
+    boards: [...m.boards],
+    banks: [...m.banks],
+    events: [],
+    acted: [],
+    missed: [],
+    timeouts: [],
+    cutoff: [Infinity, Infinity],
+    earned: [0, 0],
+    tokens: m.tokens ? [m.tokens[0], m.tokens[1]] : null,
+    tokenLog: [...m.tokenLog],
+    tokensUsed: [],
+    blockBanks: [m.blockBanks[0], m.blockBanks[1]],
+  };
+  for (const side of [0, 1] as const) drainBank(ctx, side, duties.duties.filter((d) => d.side === side));
   for (const d of duties.scouts) ctx.events.push({ kind: "scout", turn: m.turn, half: m.half, board: d.board, side: d.side, players: d.players });
   for (const id of duties.forced) {
     const b = m.boards[id]!;
-    const move = squadsLegalMoves(b.fen)[0]!;
+    const move = movesAllowed(m, id)[0]!;
     ctx.events.push({ kind: "forced", turn: m.turn, half: m.half, board: id, side: sideOf(b, m.half), move });
     play(ctx, id, move);
   }
   for (const d of duties.duties) {
     if (d.role === "move") relayMove(ctx, d);
     else if (m.format === "pairs") pairMove(ctx, d);
-    else if (d.role === "pick") pickAndBlock(ctx, d, duties.duties.find((x) => x.role === "block") ?? null, duties.mercy);
+    else voteMove(ctx, d);
   }
+  // The blocks placed this half: paid, then in effect on the other side's next turn, or lifted and refunded (each
+  // board's together, by the mercy rules: the most recent first).
+  const next: SquadsBlock[] = [];
+  for (const board of new Set(placed.map((b) => b.board))) {
+    const here = placed.filter((b) => b.board === board);
+    const after = ctx.boards[board]!;
+    const lifts = after.result ? here.map((): BlockLift => "impossible") : liftBlocks(after.fen, here.map((b) => b.move), s);
+    here.forEach((b, i) => {
+      const lift = lifts[i] ?? null;
+      if (!lift) {
+        ctx.blockBanks[b.side] -= b.cost;
+        next.push(b);
+      }
+      ctx.events.push({ kind: "block", turn: m.turn, half: m.half, board: b.board, side: b.side, by: b.by, move: b.move, piece: b.piece, cost: b.cost, outcome: lift ?? "on" });
+    });
+  }
+  ctx.nextBlocks = next;
   for (const side of [0, 1] as const) {
     if (!ctx.earned[side] || !m.incrementMs) continue;
     ctx.banks[side] += ctx.earned[side] * m.incrementMs;
@@ -474,6 +592,12 @@ interface Ctx {
   cutoff: [number, number];
   /** Moves each side made in time this half (each earns the increment). */
   earned: [number, number];
+  tokens: [number, number] | null;
+  tokenLog: TokenUse[];
+  tokensUsed: number[];
+  blockBanks: [number, number];
+  /** The blocks in effect on the next half. */
+  nextBlocks?: SquadsBlock[];
 }
 
 const rngFor = (c: Ctx, board: number, what: string) => squadsRng(c.m.seed, c.m.key, c.m.turn, c.m.half, board, what);
@@ -498,10 +622,10 @@ export function bankRunsOut(ends: readonly number[], delayMs: number, bankMs: nu
 }
 
 /**
- * A squad's bank this half. Each of its moves (a Relay mover, a pair, the final's pickers) drains it from the free
- * seconds until the move is made (its slower player), or to the ceiling if one of them never chose; several at once
- * drain it together. If it runs out, moves not yet made are cut off; at zero (sudden death) each move has only the
- * free seconds.
+ * A squad's bank this half. Each of its moves (a Relay mover, a pair, the final's squad) drains it from the free
+ * seconds until the move is made (its slowest player, or a block placed later, which is thinking time too), or to the
+ * ceiling if one of them never chose; several at once drain it together. If it runs out, moves not yet made are cut
+ * off; at zero (sudden death) each move has only the free seconds.
  */
 function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
   const { m, s } = c;
@@ -514,12 +638,13 @@ function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
     return;
   }
   const ends = duties.map((d) => {
-    const fen = c.boards[d.board]!.fen;
+    const allowed = movesAllowed(m, d.board);
     const all = d.players.every((p) => {
       const mv = c.inputs.choices[p];
-      return !!mv && isLegal(fen, mv) && (c.thinkMs[p] ?? 0) <= ceiling;
+      return !!mv && allowed.includes(mv) && (c.thinkMs[p] ?? 0) <= ceiling;
     });
-    return all ? Math.max(0, ...d.players.map((p) => c.thinkMs[p] ?? 0)) : ceiling;
+    const blockAt = Math.max(0, ...c.inputs.blocks.filter((b) => b.board === d.board && d.players.includes(b.by)).map((b) => b.at));
+    return all ? Math.min(ceiling, Math.max(blockAt, ...d.players.map((p) => c.thinkMs[p] ?? 0))) : ceiling;
   });
   const out = bankRunsOut(ends, m.delayMs, bank);
   const drained = ends.reduce((t, e) => t + Math.max(0, Math.min(e, out) - m.delayMs), 0);
@@ -530,21 +655,30 @@ function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
 }
 
 /**
- * A player's choice if it's legal here and made in time, else null (a miss); logs them as acting, missing, or out of
- * time. Blockers aren't on the clock: they have the ceiling.
+ * A player's choice if it may be played here (legal, not blocked) and was made in time, else null (a miss); logs them
+ * as acting, missing, or out of time.
  */
-function take(c: Ctx, player: string, fen: string, side: Side, clocked: boolean): string | null {
+function take(c: Ctx, player: string, board: number, side: Side): string | null {
   const move = c.inputs.choices[player];
-  const chose = !!move && isLegal(fen, move);
-  const limit = clocked ? c.cutoff[side] : c.s.moveCeilingSeconds * 1000;
+  const chose = !!move && movesAllowed(c.m, board).includes(move);
+  const limit = c.cutoff[side];
   const inTime = chose && (c.thinkMs[player] ?? 0) <= limit;
   if (inTime) c.acted.push(player);
   else {
     c.missed.push(player);
-    if (chose && clocked) c.timeouts.push(player);
-    else if (clocked && (c.m.banks[side] <= 0 || c.cutoff[side] < c.s.moveCeilingSeconds * 1000)) c.timeouts.push(player);
+    if (chose) c.timeouts.push(player);
+    else if (c.m.banks[side] <= 0 || c.cutoff[side] < c.s.moveCeilingSeconds * 1000) c.timeouts.push(player);
   }
   return inTime ? move! : null;
+}
+
+/** A random move that may be played on a board this half (a missed move or pick), never one of `exclude` unless nothing else may. */
+function randomAllowed(c: Ctx, board: number, what: string, exclude: readonly string[] = []): string {
+  const allowed = movesAllowed(c.m, board);
+  if (!allowed.length) throw new Error(`No moves on board ${board}`);
+  const open = allowed.filter((mv) => !exclude.includes(mv));
+  const from = open.length ? open : allowed;
+  return from[Math.floor(rngFor(c, board, what)() * from.length)]!;
 }
 
 function play(c: Ctx, board: number, move: string) {
@@ -556,83 +690,73 @@ function play(c: Ctx, board: number, move: string) {
 }
 
 function relayMove(c: Ctx, d: Duty) {
-  const b = c.boards[d.board]!;
   const player = d.players[0]!;
-  const chosen = take(c, player, b.fen, d.side, true);
-  const move = chosen ?? randomLegalMove(b.fen, rngFor(c, d.board, "miss"));
+  const chosen = take(c, player, d.board, d.side);
+  const move = chosen ?? randomAllowed(c, d.board, "miss");
   c.events.push({ kind: "relay", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, player, move, missed: !chosen });
   if (chosen || c.s.incrementOnMiss) c.earned[d.side]++;
   play(c, d.board, move);
 }
 
-/** Two picks, always different: a missed slot becomes a random legal move other than the partner's. */
-function twoPicks(c: Ctx, d: Duty, fen: string, p0: string | null, p1In: string | null): { picks: [string, string]; missed: [boolean, boolean] } {
-  // (The inputs never allow it, but two equal picks can't both stand: the second slot is then a miss.)
+/** Two picks, different: a missed slot becomes a random move other than the partner's. */
+function twoPicks(c: Ctx, d: Duty, p0: string | null, p1In: string | null): { picks: [string, string]; missed: [boolean, boolean] } {
+  // (Two equal picks stand only on a token, handled before this: here the second slot is then a miss.)
   const p1 = p1In !== null && p1In === p0 ? null : p1In;
-  const m0 = p0 ?? randomLegalMove(fen, rngFor(c, d.board, "miss-0"), p1 ? [p1] : []);
-  const m1 = p1 ?? randomLegalMove(fen, rngFor(c, d.board, "miss-1"), [m0]);
+  const m0 = p0 ?? randomAllowed(c, d.board, "miss-0", p1 ? [p1] : []);
+  const m1 = p1 ?? randomAllowed(c, d.board, "miss-1", [m0]);
   return { picks: [m0, m1], missed: [!p0, !p1] };
 }
 
+/**
+ * A pair's move. Both picked the same move with a token left: it plays (no coin) and a token burns, logged for the
+ * judge. Otherwise two different picks (a missed slot a random move other than the partner's) and a coin plays one.
+ */
 function pairMove(c: Ctx, d: Duty) {
-  const fen = c.boards[d.board]!.fen;
-  const chosen = [take(c, d.players[0]!, fen, d.side, true), take(c, d.players[1]!, fen, d.side, true)] as const;
-  const { picks, missed } = twoPicks(c, d, fen, chosen[0], chosen[1]);
+  const chosen = [take(c, d.players[0]!, d.board, d.side), take(c, d.players[1]!, d.board, d.side)] as const;
+  const base = { turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, players: d.players };
+  if (chosen[0] && chosen[0] === chosen[1] && c.tokens && c.tokens[d.side] > 0) {
+    const move = chosen[0];
+    c.tokens[d.side]--;
+    const token = c.tokenLog.length;
+    c.tokenLog.push({ ...base, move, fen: c.boards[d.board]!.fen, blocked: blocksOn(c.m, d.board), verdict: null });
+    c.tokensUsed.push(token);
+    c.events.push({ kind: "pair", ...base, picks: [move, move], missed: [false, false], same: true, token, coin: null, move });
+    c.earned[d.side]++;
+    play(c, d.board, move);
+    return;
+  }
+  const { picks, missed } = twoPicks(c, d, chosen[0], chosen[1]);
   const flip = coin(rngFor(c, d.board, "coin"));
   const move = picks[flip];
-  c.events.push({ kind: "pair", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, players: d.players, picks, missed, coin: flip, move });
+  c.events.push({ kind: "pair", ...base, picks, missed, same: false, token: null, coin: flip, move });
   if (!missed.some(Boolean) || c.s.incrementOnMiss) c.earned[d.side]++;
   play(c, d.board, move);
 }
 
 /**
- * The final's move: two different picks; two different blocks (or none: the mercy rule); a coin makes one block
- * active (an empty slot blocks nothing); a block is cancelled if every other legal move allows mate in one. If the
- * active block hits a pick the other pick plays, otherwise a coin chooses between the picks. The pickers' squad's bank
- * drains while they choose; blockers have the per-move ceiling and drain nothing.
+ * The final's move, a majority vote: every pick made in time counts once; the most picked move plays; a tie for the
+ * most, a seeded coin between the tied moves (`final.tie`); nobody picked, a random move. Copying a teammate is the
+ * point: no tokens here.
  */
-function pickAndBlock(c: Ctx, pick: Duty, block: Duty | null, mercy: "few_moves" | null) {
-  const fen = c.boards[pick.board]!.fen;
-  const chosen = [take(c, pick.players[0]!, fen, pick.side, true), take(c, pick.players[1]!, fen, pick.side, true)] as const;
-  let blocks: [string | null, string | null] = [null, null];
-  let blockMissed: [boolean, boolean] = [false, false];
-  if (block) {
-    const b0 = take(c, block.players[0]!, fen, block.side, false);
-    let b1 = take(c, block.players[1]!, fen, block.side, false);
-    if (b1 !== null && b1 === b0) b1 = null;
-    blocks = [b0, b1];
-    blockMissed = [!b0, !b1];
-  }
-  const { picks, missed: pickMissed } = twoPicks(c, pick, fen, chosen[0], chosen[1]);
-  const blockCoin = coin(rngFor(c, pick.board, "block-coin"));
-  const pickCoin = coin(rngFor(c, pick.board, "pick-coin"));
-  const active = block ? blockCoin : null;
-  const activeMove = active === null ? null : blocks[active];
-  const cancelled = !!activeMove && c.s.final.cancelBlockBeforeMate && blockCancelledByMate(fen, activeMove);
-  const effective = cancelled ? null : activeMove;
-  const hit: 0 | 1 | null = effective === null ? null : effective === picks[0] ? 0 : effective === picks[1] ? 1 : null;
-  const move = hit === 0 ? picks[1] : hit === 1 ? picks[0] : picks[pickCoin];
-  c.events.push({
-    kind: "pickblock",
-    turn: c.m.turn,
-    half: c.m.half,
-    board: pick.board,
-    side: pick.side,
-    pickers: pick.players,
-    blockers: block?.players ?? [],
-    picks,
-    pickMissed,
-    blocks,
-    blockMissed,
-    mercy,
-    active,
-    cancelled,
-    hit,
-    coin: hit === null ? pickCoin : null,
-    move,
-  });
-  if (!pickMissed.some(Boolean) || c.s.incrementOnMiss) c.earned[pick.side]++;
-  play(c, pick.board, move);
+function voteMove(c: Ctx, d: Duty) {
+  const picks = d.players.map((p) => take(c, p, d.board, d.side));
+  const counts = new Map<string, number>();
+  for (const p of picks) if (p) counts.set(p, (counts.get(p) ?? 0) + 1);
+  // Most votes first; level ones in the order they were first picked (seat order).
+  const tally = [...counts].map(([move, votes]) => ({ move, votes })).sort((a, b) => b.votes - a.votes);
+  const random = !tally.length;
+  const most = tally[0]?.votes ?? 0;
+  const tied = tally.filter((t) => t.votes === most).map((t) => t.move);
+  let coinAt: number | null = null;
+  let move: string;
+  if (random) move = randomAllowed(c, d.board, "vote-random");
+  else if (tied.length > 1) {
+    coinAt = Math.floor(rngFor(c, d.board, "vote-tie")() * tied.length);
+    move = tied[coinAt]!;
+  } else move = tied[0]!;
+  c.events.push({ kind: "vote", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, players: d.players, picks, tally, tied: random ? [] : tied, coin: coinAt, random, move });
+  if (!random || c.s.incrementOnMiss) c.earned[d.side]++;
+  play(c, d.board, move);
 }
 
 /** After a half: the safety cap (decided by material), the result, the next half. */
@@ -647,8 +771,35 @@ function afterHalf(c: Ctx): HalfOutcome {
   const banks: [number, number] = [Math.max(0, c.banks[0]), Math.max(0, c.banks[1])];
   const result = matchResultOf({ ...m, boards: c.boards, banks }, s);
   if (result) c.events.push({ kind: "match_end", result });
-  const match: SquadsMatch = { ...m, boards: c.boards, banks, turn: m.half === "b" ? m.turn + 1 : m.turn, half: m.half === "w" ? "b" : "w", result };
-  return { match, events: c.events, acted: c.acted, missed: c.missed, timeouts: c.timeouts };
+  const match: SquadsMatch = {
+    ...m,
+    boards: c.boards,
+    banks,
+    turn: m.half === "b" ? m.turn + 1 : m.turn,
+    half: m.half === "w" ? "b" : "w",
+    tokens: c.tokens,
+    tokenLog: c.tokenLog,
+    blockBanks: [c.blockBanks[0], c.blockBanks[1]],
+    blocks: result ? [] : (c.nextBlocks ?? []),
+    result,
+  };
+  return { match, events: c.events, tokensUsed: c.tokensUsed, acted: c.acted, missed: c.missed, timeouts: c.timeouts };
+}
+
+// ---- Same-move tokens: the judge's verdict ----
+
+/**
+ * The judge's verdict on a token use (tokens.ts: `judgeTokenUse`) lands on the match: logged for the breakdown, and a
+ * refund gives the squad its token back (a finished match keeps the log). A use already judged is left as it is.
+ */
+export function settleTokenUse(m: SquadsMatch, index: number, verdict: TokenVerdict): SquadsMatch {
+  const use = m.tokenLog[index];
+  if (!use || use.verdict) return m;
+  const tokenLog = m.tokenLog.map((u, i) => (i === index ? { ...u, verdict } : u));
+  if (!verdict.refunded || !m.tokens) return { ...m, tokenLog };
+  const tokens: [number, number] = [m.tokens[0], m.tokens[1]];
+  tokens[use.side]++;
+  return { ...m, tokenLog, tokens };
 }
 
 /** Each side's points from the finished boards (a win 1, a draw ½). */
@@ -704,7 +855,7 @@ export function armageddonStart(plan: SquadsPlan, final: Pick<SquadsMatch, "key"
 /**
  * One Armageddon board for a drawn final, in the final's format, on its own fixed clocks (`SQUADS.armageddon`: White
  * more, Black less, played by team-clock rules with the lobby's free seconds): Black has draw odds. `white` is the side
- * the chooser gave White.
+ * the chooser gave White. Each squad carries on with the block bank the final left it (the same match).
  */
 export function startArmageddon(final: SquadsMatch, white: Side, start: BoardStart, s: SquadsSettings = SQUADS): SquadsMatch {
   if (final.format !== "final" || final.armageddon || !final.result || final.result.winner !== null) throw new Error(`Match ${final.key} isn't a drawn final`);
@@ -724,6 +875,7 @@ export function startArmageddon(final: SquadsMatch, white: Side, start: BoardSta
       delayMs: final.delayMs,
       incrementMs: s.armageddon.incrementSeconds * 1000,
       armageddon: true,
+      blockBanks: final.blockBanks,
     },
     s,
   );
@@ -747,7 +899,7 @@ export function endByMaterial(m: SquadsMatch, s: SquadsSettings = SQUADS): { mat
   const decided = matchResultOf({ ...m, boards }, s)!;
   const result: MatchResult = decided.winner !== null ? { ...decided, how: "admin" } : tiebreak(m, decided.points, true);
   events.push({ kind: "match_end", result });
-  return { match: { ...m, boards, result }, events };
+  return { match: { ...m, boards, blocks: [], result }, events };
 }
 
 /** The winning squad's id. */

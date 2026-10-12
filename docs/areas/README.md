@@ -10,7 +10,7 @@ and `docs/history/`.
 | The God King and the boss battle's presentation | [god-king.md](god-king.md) | `god-king` |
 | The match: Crowd, 50 v 50, the raid's flow, scoring and the cut (and frozen Classic) | [crowd.md](crowd.md) | the director |
 | The board every screen draws (taps, drags, animation, overlays' sizes, the pieces) | [board.md](board.md) | the director |
-| Squads: 8 squads of 4 in a bracket (Relay, Pairs, Pick and Block); the rules, the sim and the server | [squads.md](squads.md) | the director |
+| Squads: 8 squads of 4 in a bracket (Relay, Pairs, the team vote; tokens and blocks); the rules, the sim and the server | [squads.md](squads.md) | the director |
 | Matchmaking, lobbies and ranked | [matchmaking.md](matchmaking.md) | `hub` (joining), `ranked` (matching rules) |
 | The front door: home, queue, profiles, the live line | [hub.md](hub.md) | `hub` |
 | Accounts and sign-in | [accounts.md](accounts.md) | `hub` |

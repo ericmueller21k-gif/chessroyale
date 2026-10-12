@@ -476,17 +476,19 @@ describe("Squads round 2: Pairs", () => {
     }
   });
 
-  it("the pair rule: both pick, you can't pick your partner's move, a change unlocks, everyone locked resolves", () => {
+  it("the pair rule: both pick, your partner's move only with a same-move token left, a change unlocks, everyone locked resolves", () => {
     const m = pairs();
+    expect(m.tokens).toEqual([SQUADS.tokens.perMatch, SQUADS.tokens.perMatch]);
     let inp = NO_INPUTS;
-    const step = (id: string, mv: string) => {
-      const r = choose(m, inp, id, mv);
+    const step = (id: string, mv: string, mm: SquadsMatch = m) => {
+      const r = choose(mm, inp, id, mv);
       if ("error" in r) return r.error;
       inp = r.inputs;
       return "ok";
     };
     expect(step("a0", "e2e4")).toBe("ok");
-    expect(step("a1", "e2e4")).toBe("taken_by_partner");
+    expect(step("a1", "e2e4", { ...m, tokens: [0, 5] })).toBe("no_tokens");
+    expect(step("a1", "e2e4")).toBe("ok");
     expect(step("a1", "d2d4")).toBe("ok");
     inp = lockIn(lockIn(inp, "a0"), "a1");
     expect(step("a1", "c2c4")).toBe("ok");
@@ -494,7 +496,7 @@ describe("Squads round 2: Pairs", () => {
     inp = lockIn(inp, "a1");
     expect(halfReady(m, inp)).toBe(false);
     expect(step("b2", "g1f3")).toBe("ok");
-    expect(step("b3", "g1f3")).toBe("taken_by_partner");
+    expect(step("b3", "g1f3", { ...m, tokens: [5, 0] })).toBe("no_tokens");
     expect(step("b3", "b1c3")).toBe("ok");
     inp = lockIn(lockIn(inp, "b2"), "b3");
     expect(halfReady(m, inp)).toBe(true);
@@ -513,7 +515,8 @@ describe("Squads round 2: Pairs", () => {
       const out = resolveHalf(m, inputs(m, { a0: "e2e4", a1: "d2d4", b2: "g1f3", b3: "b1c3" }));
       const e = ofKind(out.events, "pair").find((x) => x.board === 0)!;
       expect(e.picks).toEqual(["e2e4", "d2d4"]);
-      expect(e.move).toBe(e.picks[e.coin]);
+      expect(e.move).toBe(e.picks[e.coin!]);
+      expect(e.same).toBe(false);
       expect(out.match.boards[0]!.moves).toEqual([e.move]);
       seen.add(e.move);
       expect(resolveHalf(m, inputs(m, { a0: "e2e4", a1: "d2d4", b2: "g1f3", b3: "b1c3" }))).toEqual(out);

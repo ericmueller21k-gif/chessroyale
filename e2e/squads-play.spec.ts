@@ -5,7 +5,8 @@ import { BOARD_SEL, expectCoordsInSquares, named, test, watchFor } from "./helpe
 /**
  * Squads played through its screens, on the real server (wrangler dev, SQUADS_TEST on) with its bots: test lobbies
  * straight at Pairs and at the final, a Relay half, the test control "Next round", the party, and the mode's sounds.
- * Every move is a real tap on the board. On a phone and a computer (docs/areas/squads.md, "The screens").
+ * Every move is a real tap on the board. On a phone and a computer (docs/areas/squads.md, "The screens"). Squads v2's
+ * tokens, blocks and the vote in play: e2e/squads-v2.spec.ts.
  */
 
 const run = Date.now().toString(36).slice(-5);
@@ -15,7 +16,7 @@ interface Seen {
   key: string | null;
   state: string | null;
   seq: number | null;
-  duty: { board: number; role: "move" | "pick" | "block"; partner: string | null } | null;
+  duty: { board: number; role: "move" | "pick"; partner: string | null } | null;
   fen: string | null;
   mine: string | null;
   partner: string | null;
@@ -29,7 +30,7 @@ const seen = (page: Page): Promise<Seen> =>
     if (!s?.lobby) return { phase: null, key: null, state: null, seq: null, duty: null, fen: null, mine: null, partner: null, locked: false };
     const m = [...s.matches.values()].find((x: any) => x.state !== "over" && x.sides.some((sd: any) => sd.seats.includes(s.myId)));
     const d = m?.state === "half" ? m.current?.duties.find((x: any) => x.players.includes(s.myId)) : null;
-    const partner = d?.players.find((x: string) => x !== s.myId) ?? null;
+    const partner = d?.players.length === 2 ? d.players.find((x: string) => x !== s.myId) : null;
     return {
       phase: s.lobby.phase,
       key: m?.key ?? null,
@@ -98,7 +99,7 @@ async function fits(page: Page) {
   expect(cut).toEqual([]);
 }
 
-test("Pairs (a test lobby): your partner's pick shows live, you can't take it, lock in, then the coin-flip reveal; Next round moves on", async ({ page }) => {
+test("Pairs (a test lobby): your partner's pick shows live, both squads' tokens and block points show, lock in a different pick, then the coin-flip reveal; Next round moves on", async ({ page }) => {
   test.setTimeout(240_000);
   await testLobby(page, "pairs");
   // Every squad's clock is on screen (the strip on a phone, the side panel on a computer).
@@ -115,12 +116,11 @@ test("Pairs (a test lobby): your partner's pick shows live, you can't take it, l
   await expect.poll(async () => (await seen(page)).partner, { timeout: 30_000 }).not.toBeNull();
   const partner = (await seen(page)).partner!;
   await expect(page.locator(".sq-choice.partner strong")).not.toHaveText("thinking…");
-  // Their move can't be picked: the board doesn't take it.
-  await tapMove(page, partner);
-  await page.waitForTimeout(400);
-  expect((await seen(page)).mine).not.toBe(partner);
-  // Yours: tap it, then lock in.
-  // (A different piece from theirs: tapping theirs left it picked up, and a second tap on it would put it down.)
+  // Each squad's same-move tokens and block points, under the board for both squads.
+  await expect(page.locator(".sq-clockline .sq-res-tokens")).toHaveText(["×5", "×5"]);
+  // (A bot may already have spent some: each bank is what is left, out of the match's 5.)
+  await expect(page.locator(".sq-clockline .sq-res-bank")).toHaveText([/^[0-5]$/, /^[0-5]$/]);
+  // Yours, different from theirs (the same move would use a token): tap it, then lock in.
   const mine = legal(s.fen!).find((m) => m.slice(0, 2) !== partner.slice(0, 2) && m.length === 4)!;
   const reveal = await watchFor(page, {
     flipping: { selector: ".sq-status", text: /Flipping the coin/ },
@@ -145,37 +145,40 @@ test("Pairs (a test lobby): your partner's pick shows live, you can't take it, l
   await fits(page);
 });
 
-test("the final (a test lobby): pick or block, blocks in red for everyone, lock in, the lock slams down, then the coin", async ({ page }) => {
+test("the final (a test lobby): the whole squad votes, teammates' picks named on the board, copy one, lock in, the most picked plays", async ({ page }) => {
   test.setTimeout(300_000);
   await testLobby(page, "final");
   const reveal = await watchFor(page, {
     intro: { selector: ".sq-banner-title", text: /SQUAD FINAL/ },
-    lock: { selector: ".sq-lock" },
-    picks: { selector: ".sq-status", text: /Two picks, two blocks/ },
-    decided: { selector: ".sq-status", text: /plays/ },
+    tags: { selector: ".sq-pick-tag" },
+    decided: { selector: ".sq-status", text: /plays|A tie|Nobody picked/ },
   });
-  const roles = new Set<string>();
-  let last: string | null = null;
-  for (let i = 0; i < 6 && !(roles.has("pick") && roles.has("block") && (await reveal.seen()).lock); i++) {
-    const s = await nextDuty(page, last, 120_000);
-    last = `${s.key}/${s.seq}`;
-    roles.add(s.duty!.role);
-    await expect(page.locator(".sq-status")).toContainText(s.duty!.role === "pick" ? /^Pick with / : /^Block with /);
-    if (s.duty!.role === "block") await expect(page.locator(".sq-duty.block")).toBeVisible();
-    // Your partner's choice shows live (a pick to its squad; a block to everyone, in red).
-    await expect.poll(async () => (await seen(page)).partner, { timeout: 30_000 }).not.toBeNull();
-    const partner = (await seen(page)).partner!;
-    const mine = legal(s.fen!).find((m) => m !== partner && m.length === 4)!;
-    await tapMove(page, mine);
-    await expect.poll(async () => (await seen(page)).mine).toBe(mine);
-    await page.getByRole("button", { name: s.duty!.role === "pick" ? "Lock in my pick" : "Lock in my block" }).click();
-    await expect.poll(async () => {
-      const now = await seen(page);
-      return now.locked || `${now.key}/${now.seq}` !== last || now.state !== "half";
-    }).toBe(true);
-  }
-  expect([...roles].sort()).toEqual(["block", "pick"]);
-  await expect.poll(() => reveal.seen(), { timeout: 60_000 }).toEqual({ intro: true, lock: true, picks: true, decided: true });
+  const s = await nextDuty(page, null, 120_000);
+  expect(s.duty!.role).toBe("pick");
+  await expect(page.locator(".sq-status")).toContainText(/^Vote with your squad/);
+  // Teammates' picks come in live (bots), each named where it lands; copy one.
+  const copy = page.getByRole("button", { name: /^Copy / }).first();
+  await expect(copy).toBeVisible({ timeout: 30_000 });
+  const theirs = await page.evaluate(() => {
+    const sq = (window as any).squads;
+    const m = [...sq.matches.values()].find((x: any) => x.state === "half" && x.sides.some((sd: any) => sd.seats.includes(sq.myId)));
+    return Object.entries(m.visible as Record<string, string>).find(([id]) => id !== sq.myId)?.[1] ?? null;
+  });
+  expect(theirs).not.toBeNull();
+  await copy.click();
+  await expect.poll(async () => (await seen(page)).mine).not.toBeNull();
+  await page.getByRole("button", { name: "Lock in my vote" }).click();
+  // The vote: the most picked move plays, and it is one of the picks made.
+  await expect.poll(async () => (await seen(page)).seq !== s.seq || (await seen(page)).state !== "half", { timeout: 60_000 }).toBe(true);
+  const vote = await page.evaluate((key) => {
+    const sq = (window as any).squads;
+    const m = sq.matches.get(key);
+    return m.last?.events.find((e: any) => e.kind === "vote") ?? null;
+  }, s.key);
+  expect(vote).not.toBeNull();
+  expect(vote.picks).toContain(vote.move);
+  expect(vote.tally[0].votes).toBe(vote.tally.find((t: any) => t.move === vote.move).votes);
+  await expect.poll(() => reveal.seen(), { timeout: 60_000 }).toEqual({ intro: true, tags: true, decided: true });
   await fits(page);
   // Next round ends the final: the results, every squad placed.
   await page.getByRole("button", { name: "Next round" }).click();

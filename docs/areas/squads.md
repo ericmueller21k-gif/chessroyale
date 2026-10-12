@@ -4,15 +4,18 @@ Lane: the director (a new mode; the match screens are the director's). Status: *
 simulation (phase 1), then clocks in place of the pace and the move cap, now one team clock per squad for the whole
 tournament (Eric, Oct 10). **The server** (phase 2: the lobby, parties, the queue, bots, the bracket, the test controls,
 the protocol; see "The server" below). **The screens** (phase 3: the menu slot, parties, the waiting room, the votes,
-the standings and team clocks, Relay, Pairs, Pick and Block, the final's staging, spectating, the results, the test
-controls on screen, the app's side of bot work, the sounds; see "The screens" below).
+the standings and team clocks, Relay, Pairs, the final's staging, spectating, the results, the test controls on
+screen, the app's side of bot work, the sounds; see "The screens" below). **Squads v2** (Eric, Oct 12; DECISIONS.md,
+"Squads v2"): same-move tokens in Pairs (refunded by the judge on players' devices), move blocks in every round, and
+the final a majority vote of the whole squad; the old Pick and Block is gone.
 
 ## How it works today
 
 - **Pure rules in `packages/chess/src/squads/`**, imported as `@chessroyale/chess/squads`. They live in the chess
   package because they need chess.js (legal moves, mate in one) and the opening library; `core` stays chess-free.
-  **No engine in the rules**: every game is played to the end, and nobody loses on time; only the silent safety cap
-  and the test-only "Next round" fall back on material. "Better pick" exists only in the sim.
+  **No engine in the rules but one**: a same-move token's refund weighs the judge's top moves, given to the rules as
+  data (`judgeTokenUse`); every game is played to the end, and nobody loses on time; only the silent safety cap and
+  the test-only "Next round" fall back on material. "Better pick" exists only in the sim.
 - **Lobby** (`lobby.ts`): `formSquads` packs parties (1-4) into 8 squads of 4, largest first, each into the squad with
   the fewest free seats it fits (people end up with people); parties that don't fit wait; bots fill every empty seat;
   seats are shuffled. `drawBracket` (seeded, unranked), `reportWinner`, `placements` (1, 2, 3 = 3rd-4th, 5 = 5th-8th).
@@ -26,10 +29,11 @@ controls on screen, the app's side of bot work, the sounds; see "The screens" be
   when a squad starts a new round. The Clock option sets the starting bank, the top-up, the free seconds a move (a
   delay) and any increment.
   - **Draining.** Each of a squad's moves being thought about drains its bank past the free seconds: a Relay mover,
-    a pair (the slower picker), the final's pickers. Blockers drain nothing. Two of a squad's moves being thought
-    about at once (Relay's two movers each half) drain it twice as fast (`bankRunsOut`).
+    a pair (the slower picker), the final's voting squad (its slowest picker). Placing a block is thinking time too: a
+    move's time runs to the block if that came later. Two of a squad's moves being thought about at once (Relay's two
+    movers each half) drain it twice as fast (`bankRunsOut`).
   - **The per-move ceiling** (`moveCeilingSeconds`) bounds every move while the bank lasts. A mover or picker who
-    hasn't chosen by then misses (a random legal move), the bank draining meanwhile; a blocker forfeits.
+    hasn't chosen by then misses (a random move it may play), the bank draining meanwhile.
   - **Sudden death.** If the bank runs out during a half, the squad's moves still being thought about are cut off
     (random moves). At zero, each move must be made within the free seconds, or it's missed. There are no flag
     falls; an increment, if set, can lift a squad back out.
@@ -45,41 +49,63 @@ controls on screen, the app's side of bot work, the sounds; see "The screens" be
   - **Relay** (round 1, 4 boards): seat i is on board (i + turn) mod 4 (`relaySeat`). Side 0 is White on boards 1 and
     3, so every player alternates colours turn by turn and each half two of a squad move. A finished board: whoever's
     turn it would be there scouts.
-  - **Pairs** (round 2, 2 boards) and **the final** share `pairSchedule`: partners 1+2, 1+3, 1+4 (and the other two),
-    player 1's pair alternating slots. Pairs: slot 0 plays board 1, slot 1 board 2. Final: slot 0 picks on its
-    squad's move, slot 1 blocks on the other's. Two picks always differ; a missed pick is a random legal move other
-    than the partner's; a coin plays one.
-  - **Pick and Block**: two different blocks (a missed one is forfeited); a coin makes one active (an empty slot
-    blocks nothing); a block is cancelled if every other legal move allows mate in one; the active block hitting a
-    pick plays the other pick, otherwise a coin. No blocks at 3 or fewer legal moves. One legal move plays itself.
+  - **Pairs** (round 2, 2 boards): `pairSchedule`: partners 1+2, 1+3, 1+4 (and the other two), player 1's pair
+    alternating slots; slot 0 plays board 1, slot 1 board 2. Each picks; a coin plays one. A missed pick is a random
+    move other than the partner's. One move to play: it plays itself.
+  - **Same-move tokens** (Pairs; `tokens.ts`): each squad has `tokens.perMatch` (5) a match. Both partners on the same
+    move with a token left: it plays (no coin) and a token burns, logged in the match's `tokenLog`. At 0, picks must
+    differ (`choose`: "no_tokens"). After the half the server asks the judge (`judgeTokenUse` over the bot engine's
+    top moves for the position, from players' devices): the best move, and every other worse by `refundGap` (0.37 of
+    expected score, about two pawns from level), refunds it (`settleTokenUse`); no judge, no refund. Every use, its
+    verdict and its numbers (pawns' worth: the gap over `pawnWorth`) make the post-match breakdown.
+  - **The final** (one board): the whole squad to move votes (one duty, four players). Every pick made in time counts
+    once; the most picked move plays; a tie for the most, a seeded coin between the tied moves; nobody picked, a
+    random move (the "vote" event). Picks show live to their own squad only. No tokens.
+  - **Move blocks** (every round; `blocks.ts`): on its turn on a board, before its move there is settled, any of a
+    squad's players with a duty there may block moves of the other squad (`placeBlock`): a piece to a square, by how
+    the piece moves (a slider up to and onto the first piece in its way, a pawn's pushes and diagonals, castling while
+    they have the right). Paid at once from the squad's block bank for the match (`blocks.bankPerMatch`, 5; pawn 1,
+    knight, bishop or rook 2, queen 3, castling 2, the king's ordinary moves never), as many a turn as the bank allows
+    (`maxPerTurn` null). After the squad's move, each board's blocks are weighed together (`liftBlocks`): one whose
+    move isn't possible any more is lifted; in check, all are; then, while they'd leave no move or only moves allowing
+    mate in one, the most recent is lifted. Lifted blocks are refunded ("block" events say which and why). The rest are
+    in effect on the other squad's next turn there (`m.blocks`: `choose` refuses them, "blocked"; misses, forced moves
+    and bots never play them), then gone.
   - **The safety cap** (120 moves per side) is the only cap: material decides a board still going then.
   - **Clinch**: more than half the points ends the match at once. **Ties** in rounds 1 and 2: the squad with more
     team bank left at the end of the match, a seeded coin if exactly level; no Armageddon. **A drawn final**: one
-    Armageddon board in Pick and Block on its own fixed clocks (`startArmageddon`: White 1:30, Black 1:00, +1 s, by
-    team-clock rules with the lobby's free seconds; a draw is Black's). The squad with more team bank left picks its
-    colour (`armageddonChooser`). `endByMaterial` is the test-only "Next round" (a level result goes to bank, then a
-    coin).
-- **What the sim says** (`reports/squads-sim.md`):
-  - Median lobbies take 31-33 minutes on every option (Fast 3 min, Normal 4, Long 5; 3 free seconds); every 90th
-    percentile is under 40.
-  - 38-65% of squads reach sudden death, mostly in Pairs, and 5-12% of moves are made in it.
-  - Faster round 1 winners carry more bank forward (19-39 s against 10-16 s).
-  - Ties go to the bank, a quarter of them to the coin.
-- **Bots** (`bots.ts`): the existing bot engine (Stockfish's top moves, then `botPick` at a skill) for Relay moves,
-  pair picks (never the partner's), final picks (avoiding a visible block with `avoidBlockChance`) and blocks (aimed
-  at the best moves, never the partner's). Winning, a bot plays with purpose (`squadBotSkill` caps its temperature;
-  `candidatesFrom` breaks ties by the engine's order and plays a mate it sees). `squadBotThinkMs` paces a bot by its
-  clock. Bots take Black when they choose Armageddon's colours.
+    Armageddon board, a vote too, on its own fixed clocks (`startArmageddon`: White 1:30, Black 1:00, +1 s, by
+    team-clock rules with the lobby's free seconds; a draw is Black's), each squad keeping the block bank the final
+    left it. The squad with more team bank left picks its colour (`armageddonChooser`). `endByMaterial` is the
+    test-only "Next round" (a level result goes to bank, then a coin).
+- **What the sim says** (`reports/squads-sim.md`, Squads v2):
+  - Median lobbies take 29-31 minutes on every option (Fast 3 min, Normal 4, Long 5; 3 free seconds); every 90th
+    percentile is at most 40.
+  - 46-64% of squads reach sudden death, mostly in Pairs, and 7-13% of moves are made in it.
+  - Bots use 1-2 same-move tokens a Pairs match, 75-80% refunded; they spend 2.6-4.7 of their 5 block points a match.
+  - The final's vote: a clear majority on 54-72% of moves, the coin on 12-16%.
+  - Ties go to the bank, a quarter to a third of them to the coin.
+- **Bots** (`bots.ts`): the existing bot engine (Stockfish's top moves, then `botPick` at a skill; blocked moves left
+  out, `topAllowed`) for Relay moves, pair picks (never the partner's, unless it's the bot's own best move and an only
+  move, `isOnlyMove` at `bots.sameMoveGap`, with a token left: then the same), and the final's votes (`botVotePick`:
+  sometimes a person's pick on the squad, `copyHumanChance`). Blocks, sparingly (`botBlock`): the other squad's
+  likely reply to the bot's own move (the engine line's second move), at `blockChance` a move or `sharpChance` for a
+  capture or a check (shared among the players choosing that move), keeping `blockReserve` unless sharp, never one a
+  mercy rule would lift. Winning, a bot plays with purpose (`squadBotSkill` caps its temperature; `candidatesFrom`
+  breaks ties by the engine's order and plays a mate it sees). `squadBotThinkMs` paces a bot by its clock. Bots take
+  Black when they choose Armageddon's colours.
 
 ## Where the code is
 
 | What | Where |
 | --- | --- |
 | Boards, end detection, material, mate in one, fast legal moves | `packages/chess/src/squads/board.ts` |
+| Move blocks: what a block can name and costs, allowed moves, the mercy rules (`liftBlocks`) | `packages/chess/src/squads/blocks.ts` |
+| Same-move tokens: the judge's verdict (`judgeTokenUse`), the breakdown's numbers | `packages/chess/src/squads/tokens.ts` |
 | Squads, parties, the bracket, records, seeded randomness | `packages/chess/src/squads/lobby.ts` |
 | Who plays where (Relay rotation, the pair schedule) | `packages/chess/src/squads/schedule.ts` |
 | The votes | `packages/chess/src/squads/votes.ts` |
-| Matches: setup, team clocks (bring in, drain, sudden death, carry out, views), duties, choices, visibility, resolution, clinch, ties, Armageddon | `packages/chess/src/squads/match.ts` |
+| Matches: setup, team clocks (bring in, drain, sudden death, carry out, views), duties, choices, blocks placed, visibility, resolution (tokens, the vote, blocks), clinch, ties, Armageddon | `packages/chess/src/squads/match.ts` |
 | Squad bots | `packages/chess/src/squads/bots.ts` |
 | The bot simulation | `packages/sim/scripts/squads-sim.ts` → `reports/squads-sim.md` |
 
@@ -87,24 +113,30 @@ controls on screen, the app's side of bot work, the sounds; see "The screens" be
 
 `SQUADS` in `packages/core/src/settings.ts`: sizes and boards, the votes (`clocks`: each option's starting bank,
 top-up, free seconds and increment; `clockDefault`; vote timing), `moveCeilingSeconds`, `incrementOnMiss`,
-`safetyCap`, `material`, `materialLead`, points, openings, `final` (the mercy rules and visibility: `blocksSeenBy`,
-`picksSeenBy`), `armageddon` (the drawn final's fixed clocks), `noShowsBeforeBot`, `replacementBotSkill`, `bots`
-(choosing, winning with purpose, pacing), and the show times.
+`safetyCap`, `material`, `materialLead`, points, openings, `tokens` (per match, `refundGap`, `pawnWorth`), `blocks`
+(`bankPerMatch`, `cost`, `castlingCost`, `maxPerTurn`, `liftBeforeMate`, `liftInCheck`), `final` (`tie`),
+`armageddon` (the drawn final's fixed clocks), `noShowsBeforeBot`, `replacementBotSkill`, `bots` (choosing, same
+moves, blocks, copying in the final, winning with purpose, pacing), and the show times. A mode can give a match its
+own block banks (`MatchSetup.blockBanks`: 0 for none) without touching the rules.
 
 ## Tests and tools
 
 - Unit: `packages/chess/test/squads-lobby.test.ts` (squads, records, bracket, votes, schedules),
   `squads-match.test.ts` (boards, starts, the team clock: top-up, carry-over, the views, free seconds, the double
   drain, a bank running out mid-half, sudden death, the ceiling, the increment; Relay, Pairs, the safety cap, clinch,
-  the bank tiebreak), `squads-final.test.ts` (Pick and Block, the final's clock, the mercy rules, visibility,
-  castling and promotion, missed actions, the drawn-final Armageddon, replay, bots).
+  the bank tiebreak), `squads-final.test.ts` (the final's vote: majorities, ties, missed picks, nobody picking,
+  visibility, copying, the clock, castling and promotion, the drawn-final Armageddon, replay, bots),
+  `squads-v2.test.ts` (tokens: burn, the 0-token rule, refunds and their threshold, the breakdown's data; blocks:
+  costs, the king, castling, several a turn, the mercy rules together with refunds, visibility, thinking time; bots'
+  same moves and blocks).
 - Sim: `npm run sim:squads -- [lobbies] [nodes] [clocks]` (about 30 minutes at the defaults; `SQUADS_SIM_SET`,
   `SQUADS_SIM_MIXES` and `SQUADS_SIM_OUT` for tuning runs). Its tables are generated; the notes after the marker in
   `reports/squads-sim.md` are written by hand and kept across runs.
 
 ## Rules for this area
 
-- No engine in the game's rules. Bots may use the bot engine; only the sim may judge picks.
+- No engine in the game's rules, but a token's refund, which takes the judge's numbers as data. Bots may use the bot
+  engine; only the sim judges picks.
 - Every random draw goes through `squadsRng` with its own name; never share a stream between decisions.
 - `squadsLegalMoves` uses chess.js internals for speed; the guard test in `squads-match.test.ts` must keep passing.
 - Every number in `SQUADS`, never in the rules.
@@ -134,20 +166,29 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   each later match `roundBreakSeconds` after its second feeder ends) → results. It closes as Crowd's lobbies do
   (LOBBY_LIFE): 15 minutes after its results, 60 if it never filled, 180 with nobody connected (a bracket left to its
   bots reaches its results in under an hour).
-- **A half in real time.** `halfDuties` gives who acts and their deadlines; everyone gets `turn`. People `choose` and
-  `lock` (refused after their deadline plus DEFAULT_SETTINGS.lateGraceMs); bots act at `squadBotThinkMs`. The half
-  ends when `halfReady`, or when the last deadline of anyone still choosing has passed; `resolveHalf` plays it with each
-  player's thinking time to their last choice, `noteActions` logs misses, everyone gets the `half` (every event public)
-  and the show (`moveShowSeconds`, `pairRevealSeconds`, `finalRevealSeconds`), then the next half.
+- **A half in real time.** `halfDuties` gives who acts and their deadlines; everyone gets `turn`. People `choose`,
+  `lock` and `block` (refused after their deadline plus DEFAULT_SETTINGS.lateGraceMs); a block placed goes to everyone
+  at once (`block`, with the squad's bank), a refused one back (`blockNo`). Bots act at `squadBotThinkMs` (a block, if
+  any, just before their move). The half ends when `halfReady`, or when the last deadline of anyone still choosing has
+  passed; `resolveHalf` plays it with each player's thinking time to their last choice, `noteActions` logs misses,
+  everyone gets the `half` (every event public) and the show (`moveShowSeconds`, `pairRevealSeconds`,
+  `finalRevealSeconds`), then the next half.
+- **The judge for same-move tokens.** Each token burned goes to the judge as a bot-work job for the position it was
+  played in (`requestJudge`, `LiveMatch.judge`): the half's own bot work on that board if it had any, else the
+  remembered answer, else two devices (outside the match first, the token's own squad last), compared like any bot
+  work. Once the pair's reveal is over (`notBefore`), the rules' verdict lands (`settleTokenUse`) and everyone gets
+  `token` (the use, its verdict, both squads' tokens). No device answering: no refund ("no_judge"). A finished match's
+  tokens are still judged, for its breakdown.
 - **Team clocks** are the rules': `startTeamClocks` when the bracket is drawn, each match's banks from `planMatch`
   (topped up in later rounds), drained in `resolveHalf`, carried on by `settleTeamClocks` when a match ends. Every
   player gets every squad's clock (`teamClocks`, and `matchClocks` for squads playing): in the lobby view and a `clocks`
   message whenever a half begins or ends anywhere. During a half a screen runs a squad's clock down from the match's
   banks, its duties and who has locked in; the exact bank comes with each `half`. Out of time (the rules' `timeouts`) is
   a miss on the record but not a no-show, unless the person is gone (disconnected, no move).
-- **Visibility.** Live choices go to each player as `visibleChoices` allows them (Relay and Pairs: their own squad's;
-  the final: blocks to everyone, picks to the picking squad). Who has locked in goes to everyone (every squad's clock
-  on screen needs who is still thinking).
+- **Visibility.** Live choices go to each player as `visibleChoices` allows them: their own squad's, in every round.
+  Blocks are public: placed ones (`block`, and `placed` in a `match`) and those in effect (`NetSquadsMatch.blocks`),
+  with each squad's block bank and tokens, for everyone. Who has locked in goes to everyone (every squad's clock on
+  screen needs who is still thinking).
 - **Bots.** Every seat a bot plays (a bot, or a person's seat taken over) acts through the rules' `bots.ts` over the
   bot engine's top moves. The top moves come from players' devices (`botWork`, one job per board per half): two devices
   each, outside the match first, computers before phones, the least loaded and fastest, none holding more than
@@ -173,13 +214,15 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   rules' `endByMaterial` on the earliest round's matches, the next round 3 s later; in the votes: they close), and a
   test lobby, `POST /api/squads/lobby?start=votes|relay|pairs|final&clock=BANK,TOPUP,FREE,INC` (a team clock in
   seconds; `testLobbyOptions`), that fills 5 s after it opens, skipping the rounds before (squads with more people go
-  through). `start=votes` (Eric, Oct 12) fills the moment its opener connects (`fillAt` = now): seated, bots in every
+  through). For tests also `fen=` (the first round's boards start there: a legal position, White to move),
+  `bots=strong` (every bot at the strongest skill) and `seat=white` (the opener plays White on their first board). `start=votes` (Eric, Oct 12) fills the moment its opener connects (`fillAt` = now): seated, bots in every
   other seat, the first vote after the full grid's moment, then the whole tournament.
-- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 1, typed): a lobby socket gets
+- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 2, typed): a lobby socket gets
   `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock), `vote`/`voteCast`, `match` (a match in
-  full, as you may see it), `turn`, `clocks`, `choices`, `half`, `choiceNo`, `placed`, `results`, `botWork`, `left`,
-  `error`, `closed`, and sends `hello`,
-  `vote`, `choose`, `lock`, `armageddon`, `speed`, `botTop`, `reclaim`, `leave`, `sync`, `nextRound`. A party socket
+  full, as you may see it: tokens, block banks, blocks in effect and placed, the token log), `turn`, `clocks`,
+  `choices`, `half`, `choiceNo`, `block`, `blockNo`, `token`, `placed`, `results`, `botWork`, `left`, `error`,
+  `closed`, and sends `hello`, `vote`, `choose`, `lock`, `block`, `armageddon`, `speed`, `botTop` (each line with its
+  reply), `reclaim`, `leave`, `sync`, `nextRound`. A party socket
   gets `welcome`, `party`, `error`, `closed` and sends `hello`, `queue`, `cancel`, `leave`.
 - **Not yet:** the live line doesn't count Squads lobbies or their players (nor does the matchmaker's overload limit);
   no quick chat in Squads lobbies.
@@ -201,10 +244,13 @@ fill, parties); Worker variables `MATCH_FILL_SECONDS` and `SQUADS_TEST`.
 
 Tests: `packages/server/test/squads-lobby.test.ts` (seats and parties, the fill, votes, the bracket, a full bot lobby
 to its results, halves, deadlines, takeover and reclaiming, leaving, team clocks and sudden death, ties, the final's
-visibility, Armageddon, the test controls, rewards, bot work on devices), `squads-queue.test.ts` (the queue, parties,
-D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match, restart, closing); e2e `e2e/squads.spec.ts`
-(a party through the real server; a test lobby at the final); `e2e/squads-test-tools.spec.ts` (the start link and
-Cheat lines, and a player without them). The full-lobby run: `npx tsx scripts/squads-headless.ts
+visibility, Armageddon, the test controls, rewards, bot work on devices), `squads-v2-lobby.test.ts` (tokens through
+the server and the judge on devices: refunded, kept, no judge; blocks placed, seen, paid, refused, lifted, in effect;
+the final's vote with a block; test lobbies' position, strong bots and White seat; what each side sees),
+`squads-queue.test.ts` (the queue, parties, D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match,
+restart, closing); e2e `e2e/squads.spec.ts` (a party through the real server; a test lobby at the final);
+`e2e/squads-test-tools.spec.ts` (the start link and Cheat lines, and a player without them); `e2e/squads-v2.spec.ts`
+(a token burned and refunded, a block and its arrow until they've moved, Cheat lines while blocking). The full-lobby run: `npx tsx scripts/squads-headless.ts
 --url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
 
 ## The screens (phase 3)
@@ -234,12 +280,24 @@ door's look; every class is `sq-`.
   you back), your board full size with « » through its moves (from its own start), and under it both squads' clocks
   with the free seconds counting down between them. The timer bar over the board is your move's deadline (no ticks).
   - **Relay:** your move shows on your board at once and stays (no snap-back); "Moved · waiting for the half to end".
-  - **Pairs:** your pick green, your partner's live in blue; their move can't be picked (the board won't take it);
-    lock in. The reveal is Crowd's ghost-move reveal (`ShadeMoves`): both picks slide in with their pickers' names, a
-    reel steps between them and lands on the coin's, then the move plays.
-  - **Pick and Block:** pickers see their partner's pick live; blocks show live to everyone in red; lock in. The
-    reveal: both picks as ghost arrows and ghost pieces, the two blocks, the active one slamming down as a red lock on
-    its square, then the coin (or, if it hit a pick, the other one plays). Its words are in the line above the board.
+  - **Pairs:** your pick green, your partner's live in blue; lock in. Their move too: "Same move: it plays for sure,
+    and uses a token"; with none left the board won't take it ("No same-move tokens left: pick a different move").
+    The reveal is Crowd's ghost-move reveal (`ShadeMoves`): both picks slide in with their pickers' names, a reel steps
+    between them and lands on the coin's, then the move plays; the same move: one ghost with both names, no coin
+    ("Same move: Qxd4 plays · a token used"). A refund a few seconds later: "Token refunded: only move".
+  - **The final:** "Vote with your squad"; teammates' picks live as blue arrows with their names where they land
+    (`PickTags`), each with Copy in the panel; lock in. The reveal: every pick as a ghost with its voters' names, then
+    the most picked lands ("Nf3 plays · 3 of 4 votes"), or a reel between the tied moves lands on the coin's.
+  - **Blocks** (`components/SquadsBlocks.tsx`): Block (with the squad's points) in the panel while your squad's move
+    there isn't settled; their pieces that can be blocked are ringed with their cost; tap one, then a dot where it
+    could go; as many as the points allow, then Done blocking. Every blocked move shows to everyone as an arrow from the
+    piece to the square that draws like a move arrow, then keeps redrawing itself slowly and softly with a lock pulsing
+    on it (`BlockArrows`, the beat kept from when it was placed), through your turn and theirs until they've moved.
+    The line above the board says it for a few seconds ("You blocked Qd8–f6 (−3)", "Knights blocked your Qd8–f6",
+    "Block lifted: it would have left no move (refunded)").
+  - **Each squad's block points and tokens** under its clock, both squads, always (`SquadResources`).
+  - **The token breakdown** after a Pairs match (`TokenBreakdown`; between matches, and on the results): every use,
+    refunded or not, why, with numbers ("Qxd4: refunded, every other move lost at least 3.1 pawns").
   - **Staging:** each match opens with a card over the board (its round, its squads, one line of rules, the count);
     the final's is "SQUAD FINAL" with both squads' members. Knocked-out squads watch the final on the same screen.
     Armageddon: the choosing squad's people pick White or Black on the card (the times from settings).
@@ -255,8 +313,8 @@ door's look; every class is `sq-`.
   Relay move, a Pairs or final pick, a block, Armageddon's colours). On, it draws the engine's top 3 in the position
   (`SQUADS_LOBBY.cheatLines`: moves, nodes) as arrows coloured by rank (green, blue, yellow, as the power-up hints),
   each labelled with its evaluation for the side to move (`cheatEval`: pawns turned back from the expected score, or
-  a mate), and lists them as "1 · Nf3 +0.8". For a block the position's side to move is the pickers', so its lines are
-  the moves worth blocking. It stays on (`SquadsClient.cheatLines`, this device only) until switched off, searching
+  a mate), and lists them as "1 · Nf3 +0.8". While blocking, the lines are the other squad's moves after yours (your
+  pick, or a teammate's; with none yet, the move handed over: `blockCheatFen`), the ones worth blocking. It stays on (`SquadsClient.cheatLines`, this device only) until switched off, searching
   each new position on an engine of its own (`ownEngine()`, never queued behind bot work). Nothing is sent; scoring,
   bots and the server never see it. A page whose `welcome` says no `test` never shows it, and the switch can't turn on.
 - **Bot work on this device:** after `welcome` the page runs its engine speed check once (`engineSpeed()`, shared with
@@ -274,7 +332,8 @@ door's look; every class is `sq-`.
 | The client: the lobby's and the party's sockets, local times, optimistic choices, bot work, sounds | `packages/app/src/squads.ts` |
 | What the screens work out (clocks run down, YOU/NEXT, standings, names) | `packages/app/src/squads-view.ts` |
 | The waiting room, votes, bracket phase, knocked out, results | `packages/app/src/screens/Squads.tsx` |
-| A match: Relay, Pairs, Pick and Block, reveals, staging | `packages/app/src/screens/SquadsMatch.tsx` |
+| A match: Relay, Pairs, the final's vote, reveals, staging, blocking | `packages/app/src/screens/SquadsMatch.tsx` |
+| Blocked moves' arrows, the block picker, pick tags, block points and tokens, the token breakdown | `packages/app/src/components/SquadsBlocks.tsx` |
 | The party sheet | `packages/app/src/screens/SquadsParty.tsx` |
 | Standings, clocks, tiny boards, the bracket | `packages/app/src/components/SquadsParts.tsx` |
 | The menu slot | `packages/app/src/screens/Home.tsx` (`MODES`, `chosenHomeMode`); routes in `App.tsx` |
@@ -282,14 +341,18 @@ door's look; every class is `sq-`.
 Tests: `packages/app/test/squads-view.test.ts`; e2e `e2e/squads-play.spec.ts` (through the real server with its bots, on
 a phone and a computer: Pairs, the final, a Relay half with the board's coordinates in their squares both ways up, Next
 round, the party, the sounds). Frames:
-`npm run frames:squads -- <dir> relay|pairs|final|menu|standings http://localhost:8787` against `wrangler dev --var
-SQUADS_TEST:1` (every painted frame, the big board's pieces logged per frame, a GIF). Never beside an e2e run from the
+`npm run frames:squads -- <dir> relay|pairs|final|block|token|menu|standings http://localhost:8787` against `wrangler
+dev --var SQUADS_TEST:1` (every painted frame, the big board's pieces and blocked moves' arrows logged per frame, a
+GIF). Never beside an e2e run from the
 same checkout without `--persist-to` a folder of its own: two local servers on one `.wrangler/state` lock each other's
 storage (SQLITE_BUSY), and the e2e's lobbies fail.
 
 ## The design (Eric, Oct 10, 2026)
 
 The brief, as given (calls marked "director's call"). Phase 1's own calls are in `DECISIONS.md`, "Squads".
+
+**Changed since (Eric, Oct 12, Squads v2):** same-move tokens in Pairs, move blocks in every round, and the final a
+majority vote of the whole squad, replacing Pick and Block below (DECISIONS.md, "Squads v2").
 
 **Changed since (Eric, Oct 10, after phase 1's sim):** chess clocks replace the per-move pace and the move cap; one
 Clock vote (Fast, Normal, Long) replaces the Pace and Length votes; every game is played to the end; ties in rounds 1

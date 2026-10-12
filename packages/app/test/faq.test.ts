@@ -203,9 +203,31 @@ describe("the FAQ's numbers come from the settings", () => {
   });
 });
 
+describe("the FAQ on Squads (v2: tokens, blocks, the team vote)", () => {
+  it("its numbers come from the settings", () => {
+    const Q = FAQ_DEFAULTS.squads;
+    const t = section("modes");
+    expect(t).toContain(`${Q.tokens.perMatch} tokens for the match`);
+    expect(t).toContain(`${Q.blocks.bankPerMatch} block points a match`);
+    expect(t).toContain("the team vote");
+    expect(t).toContain("a tie is settled by a coin");
+    expect(t).not.toContain("Pick and Block");
+    const changed = section("modes", { ...FAQ_DEFAULTS, squads: { ...Q, tokens: { ...Q.tokens, perMatch: 3 }, blocks: { ...Q.blocks, bankPerMatch: 7, maxPerTurn: 2, castlingCost: null, cost: { ...Q.blocks.cost, q: 4 } } } });
+    expect(changed).toContain("3 tokens for the match");
+    expect(changed).toContain("7 block points a match");
+    expect(changed).toContain("4 for a queen's;");
+    expect(changed).toContain("Up to 2 blocks a turn");
+    expect(changed).not.toContain("for castling");
+  });
+});
+
 describe("the FAQ keeps to how the game works", () => {
   it("says nothing about how the app talks to the server, admin or test controls", () => {
-    const t = text();
+    // ("Token" alone is a login's; Squads' same-move tokens are a rule of the game, so a line about them may say it.)
+    const t = text()
+      .split("\n")
+      .map((l) => (/same-move/i.test(l) ? l.replace(/\btokens?\b/gi, "") : l))
+      .join("\n");
     expect(t).not.toMatch(/\/api\b|websocket|endpoint|protocol|durable|\bhost\b|admin|secret|token|rate limit|\?[a-z]+=|test switch|trigger ultimate/i);
   });
 
