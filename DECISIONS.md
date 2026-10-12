@@ -1211,6 +1211,14 @@ draining. In 50 v 50 you move about 20 times before the final, so even 15 s a mo
   at the start instead of jumping up 5 s) isn't clearly right: under the current rule a quick move still adds to the
   bank, so it would jump up after the move instead.
 
+### A board lab at /boardlab, for choosing chessground's replacement (Oct 12, 2026): throwaway; remove or admin-gate before a public launch
+
+A bare page, not linked anywhere, where Eric can feel candidate boards on his phone: today's board (`?board=cg`),
+cm-chessboard (`?board=cm`, MIT) and one written from scratch (`?board=own`), with chips for slide speed, drag, move
+dots and piece set. Chessground is GPL-3, which doesn't fit a closed-source game. Its code is in
+`packages/app/src/boardlab/` and loads only on that path (`main.tsx`), so the game's bundle doesn't grow. It must be
+removed or put behind an admin check before a public launch: it's a debugging page anyone could open.
+
 ### Rage meters: every boss's ultimate again and again; the King's strikes add rage; Ginger's random free piece (Oct 11, 2026)
 
 Eric: "every boss can ult multiple times a game; that's how a typical rage meter works. When you strike bosses, it
