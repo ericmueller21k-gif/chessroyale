@@ -16,11 +16,16 @@ watchTheme();
 // Browsers allow sound only after a tap. iPhones don't count every event as one (a pointerdown alone isn't
 // enough), so every tap tries until sound is on (cheap once it is).
 for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, () => audioRunning() || unlockAudio(), { passive: true });
-// (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up.)
-render(
-  <>
-    <App />
-    <BanNotice />
-  </>,
-  document.getElementById("app")!,
-);
+// /boardlab: a throwaway page for trying boards (src/boardlab/, loaded only here). Not linked anywhere.
+if (/^\/boardlab\/?$/.test(location.pathname)) {
+  void import("./boardlab/BoardLab.tsx").then(({ BoardLab }) => render(<BoardLab />, document.getElementById("app")!));
+} else {
+  // (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up.)
+  render(
+    <>
+      <App />
+      <BanNotice />
+    </>,
+    document.getElementById("app")!,
+  );
+}

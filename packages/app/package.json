@@ -12,6 +12,7 @@
     "@chessroyale/chess": "*",
     "@chessroyale/core": "*",
     "chessground": "^9.2.1",
+    "cm-chessboard": "8.15.3",
     "preact": "^10.24.0"
   },
   "devDependencies": {
