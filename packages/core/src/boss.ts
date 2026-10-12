@@ -295,6 +295,11 @@ export interface BossPowerState {
   /** The first crowd turn a crowd piece stepped onto a burning tile (the God King's warning, once a match). */
   stepped?: number;
   /**
+   * Jefferson's laugh (once a match): the crowd turn one of his own pieces first sat on fire from his Roman candle, and
+   * the line he says, picked from the seed (`pick`, 0-4095: the app takes it modulo its lines).
+   */
+  fireproof?: { turn: number; square: string; pick: number };
+  /**
    * Hollow's dark: the squares covered (the dark belongs to the square, not the piece), each with the crowd turn it fell
    * as and the last crowd turn it covers; and the squares whose dark cleared as this turn began.
    */
@@ -441,6 +446,8 @@ export interface CandleWave {
 export interface FireTile {
   square: string;
   lit: number;
+  /** It fell from his Roman candle (not his sparkler). */
+  candle?: true;
 }
 
 /** After a crowd move: a piece the fire destroyed (`piece` its kind), a tile that fizzled under the king, or one that just burnt out (neither). */
@@ -456,7 +463,7 @@ export interface BurnEvent {
  * Boy's toy block landing; `bounce`: his Big Bounce (at the start of his turn, after the crowd's move). `split`:
  * Sawyer saws the pawn of his first move in two; `cut`: a saw cut on an edge; `boardsaw`: his board saw.
  */
-export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spin" | "spark" | "candle" | "fireball" | "dark" | "extra" | "block" | "bounce" | "split" | "cut" | "boardsaw";
+export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "funhouse" | "spin" | "spark" | "candle" | "fireball" | "fireproof" | "dark" | "extra" | "block" | "bounce" | "split" | "cut" | "boardsaw";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -468,6 +475,8 @@ export interface PowerEvent {
   fizzled?: string[];
   /** Hollow's first cover of the dark (the square of the piece he just moved, with his first-cover line). */
   first?: true;
+  /** Jefferson's fireproof laugh: which of his lines (0-4095 from the seed; the app takes it modulo its lines). */
+  pick?: number;
 }
 
 /** The settings behind the God King's Last Stand. */

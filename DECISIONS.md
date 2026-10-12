@@ -1329,3 +1329,32 @@ leave it there. And he doesn't play any extra moves during this time." The calls
 - **His meter:** the funhouse now holds it for 12 turns, so `rageSpeed` for Boingo goes to 1.8 (by estimate, as the
   others: about two funhouses in a typical battle, the first around turn 10). Rates set by estimate; not yet tested
   with the bot sim. Run the sim at a future date.
+
+### Jefferson: a weaker Roman candle, some of it on his own side, and his laugh (Oct 11, 2026)
+
+Eric: "Jefferson's ult is too strong. It should also land on his side a bit. It also seems his pieces are immune; I
+think that's fine. But add some drops to his side. When his piece is on one, he laughs and says something witty about
+how his don't burn, but just once per match, when it triggers." The calls:
+
+- **How much lands on his side:** `candleOwnShare` = 0.4 of each wave, rounded per wave (0, 1, 1, 2, 2, 2, 1, 1, 0 of
+  the 1, 2, 3, 4, 4, 4, 3, 2, 1): 10 of the 24 fall on his half and 14 on the crowd's, where all 24 fell before. That's
+  42% fewer per barrage on the crowd's half. With about one and a half barrages in a typical battle now (PR A), it's
+  about 21 fireballs a battle on the crowd's half against 24 before (and in a battle where he fires once, 14 against 24).
+  So it's clearly less punishing per barrage, and a little less per battle. Set by estimate; not yet tested with the
+  bot sim. Run the sim at a future date. The waves, their timing and the shadows are unchanged. The crowd's squares are
+  picked first, as before, so with no share the barrage would be exactly the old one.
+- **What a drop on his half does:** a real fire tile, like any other. His pieces never burn (as before), so it's mostly
+  wasted, but a crowd piece that wanders into his camp and stays on one still burns. One rule everywhere ("his fire burns
+  your pieces") seemed clearer than tiles that do nothing.
+- **His laugh:** the first crowd turn on which one of his pieces stands on a tile from the candle (a fireball landing
+  on it, or his piece moving onto one), a `fireproof` moment as that turn begins: his smug look by the board's corner, a
+  cool glint over the piece, the dock's "Fireproof!" and one of four lines in his text box (the shared speech rule:
+  `SPEECH` timing, said as a critical line so a busy moment never drops it). Once a match. The line is picked from the
+  battle's seed (`fireproof.pick`, 12 bits, which the app takes modulo its lines), the same on every screen. His
+  sparkler's fire doesn't count, only the candle's.
+- **No laugh sound:** Jefferson has none of his own. The only laugh sound is Boingo's kazoo, which would be the wrong
+  character, so there's none, as the brief allowed.
+- **The lines** (`FIREPROOF_LINES` in `Grex.tsx`): "Ha! My pieces don't burn. Perks!", "Fireproof! Did I forget to
+  say?", "Hot? Not for my team. Ha!", "Mine are fire-rated. Yours? Ha!".
+- **His meter** stays at `rageSpeed` 1.2 (PR A): the barrage still lasts about 13 turns, so two full ones would keep
+  fire on the board most of a typical battle.

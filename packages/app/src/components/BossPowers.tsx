@@ -85,7 +85,7 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   const list = p.events.filter((e) => (only ? e.kind === only : !MOMENT_UI[e.kind].own)).sort((a, b) => MOMENT_UI[a.kind].order - MOMENT_UI[b.kind].order);
   let t = until - powerMomentMs(list);
   return list.map((e) => {
-    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}) };
+    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}) };
     t += m.ms;
     return m;
   });
@@ -140,7 +140,7 @@ export function BossBarExtra({ boss, until = 0 }: { boss: BossView; until?: numb
 // ---------------- The moments ----------------
 
 /** The boss's line for a power's moment (its kit's), the same on every screen; null without one. */
-export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first">): string | null {
+export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick">): string | null {
   const ui = MOMENT_UI[m.kind];
   return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
 }

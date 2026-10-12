@@ -10665,6 +10665,36 @@ img.qicon {
   border-color: rgba(255, 255, 255, 0.25);
   opacity: 0.7;
 }
+/* Jefferson's piece standing in his candle's fire, unharmed, as he laughs it off: a cool glint over its square. */
+.pw-fireproof {
+  position: absolute;
+  left: calc(var(--cg-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--cg-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--cg-size, 100%) / 8);
+  height: calc(var(--cg-size, 100%) / 8);
+  border-radius: 18%;
+  box-shadow:
+    inset 0 0 0 2px rgba(186, 230, 253, 0.95),
+    0 0 12px 3px rgba(125, 211, 252, 0.75);
+  pointer-events: none;
+  animation: pw-fireproof 1800ms ease-out both;
+}
+@keyframes pw-fireproof {
+  0% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 /* ---------------- G-REX's fire (BossPowers.tsx, the characters' sprites) ---------------- */
 
 /* The fire tiles (and a piece burning on one, a fireball landing): one canvas over the whole board. */

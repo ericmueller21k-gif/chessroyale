@@ -399,3 +399,20 @@ describe("his name is Jefferson (Eric, Oct 10: he was G-REX; his id, files and s
     expect(old(html)).toBe(false);
   });
 });
+
+describe("Jefferson laughs it off (Oct 11): his pieces don't burn", () => {
+  it("has 3 or 4 short lines about it, never instructions, one picked from the battle's seed, the same on every screen", async () => {
+    const { FIREPROOF_LINES, fireproofLine } = await import("../src/components/Grex.tsx");
+    const { powerLine } = await import("../src/components/BossPowers.tsx");
+    expect(FIREPROOF_LINES.length).toBeGreaterThanOrEqual(3);
+    expect(FIREPROOF_LINES.length).toBeLessThanOrEqual(4);
+    for (const l of FIREPROOF_LINES) {
+      expect(l.length).toBeLessThanOrEqual(36);
+      expect(l).toMatch(/burn|fire|hot/i);
+    }
+    // The pick comes from the battle's state (the seed's), taken modulo the lines: the same pick, the same line.
+    for (let pick = 0; pick < 12; pick++) expect(fireproofLine(pick)).toBe(FIREPROOF_LINES[pick % FIREPROOF_LINES.length]);
+    // It's the moment's line, said into his voice like any moment's.
+    expect(powerLine(grex, { kind: "fireproof", key: "grex:fireproof:9", pick: 6 })).toBe(fireproofLine(6));
+  });
+});

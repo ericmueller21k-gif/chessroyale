@@ -119,7 +119,12 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
   const shadowed = new Map<number, string[]>([[6, [p3.shadows[0].square]]]);
   let burnt = false;
   let leftOne = false;
-  for (let turn = 4; turn <= 11; turn++) {
+  // Some of each wave falls on his own half (Eric, Oct 11); the first time one of his pieces stands in that fire he
+  // laughs it off, once, in his text box.
+  let onHisHalf = 0;
+  const laughs: number[] = [];
+  const laugh = await watchFor(page, { line: { selector: ".bc-bubble", text: /Ha! My pieces don't burn|Fireproof! Did I forget|Hot\? Not for my team|Mine are fire-rated/ } });
+  for (let turn = 4; turn <= 13; turn++) {
     // (The match can end early: a mate.)
     await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
     if ((await phase(page)) !== "play") break;
@@ -144,6 +149,8 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
     // What landed this turn is what was shadowed for it (but a square the crowd's king stands on: it fizzles).
     const wave = p.events.find((e: { kind: string }) => e.kind === "fireball");
     if (shadowed.has(p.turn)) expect(wave?.squares, `turn ${p.turn}`).toEqual(shadowed.get(p.turn));
+    onHisHalf += (wave?.squares ?? []).filter((sq: string) => Number(sq[1]) >= 5).length;
+    if (p.events.some((e: { kind: string }) => e.kind === "fireproof")) laughs.push(p.turn);
     for (const sq of wave?.squares ?? []) if (!wave.fizzled?.includes(sq)) expect(p.fire.find((t: { square: string }) => t.square === sq)?.stage).toBe(1);
     // Every shadow on the board, at its size: the turn it lands is 3 turns out for the smallest.
     for (const sh of p.shadows) {
@@ -160,9 +167,14 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
   }
   // (Fired on turn 3: none as the 4th and 5th begin; then 1, 2, 3, 4, 4, 4, 3, 2 and the last 1, a turn each from the 6th.)
   const want: Record<number, number> = { 4: 24, 5: 24, 6: 23, 7: 21, 8: 18, 9: 14, 10: 10, 11: 6, 12: 3 };
-  for (const [turn, n] of left) expect(n, `shots up as turn ${turn} begins`).toBe(want[turn]);
+  for (const [turn, n] of left) if (want[turn] !== undefined) expect(n, `shots up as turn ${turn} begins`).toBe(want[turn]);
   expect(left.size).toBeGreaterThanOrEqual(5);
   if (leftOne) expect(burnt).toBe(true);
+  // Fireballs on his half too, and his laugh at most once; when it came, his line was in his text box.
+  if (left.size >= 7) expect(onHisHalf).toBeGreaterThan(0);
+  expect(laughs.length).toBeLessThanOrEqual(1);
+  if (laughs.length) expect((await laugh.seen()).line).toBe(true);
+  console.log(`fireballs on his half: ${onHisHalf}; his laugh on turn ${laughs[0] ?? "none"}`);
 });
 
 test("on a computer the dock is under the board at every width, the board and dock on screen, the God King beside it", async ({ page }) => {

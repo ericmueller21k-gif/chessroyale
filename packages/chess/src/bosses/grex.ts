@@ -3,7 +3,7 @@
  * fire: it burns in stages, one a crowd turn, and a crowd piece left on it after the crowd's move on the last stage
  * burns (never the king, nor a piece whose loss would leave a king in check: the tile fizzles). His ultimate, the Roman
  * candle, rains fireballs in waves, each wave's squares shown as growing shadows a few turns ahead; each lands as a fresh
- * tile. The judge counts a piece left to burn as already gone, so saving it is never a mistake. Numbers:
+ * tile, some on his own half (his pieces never burn: the first time one sits on the candle's fire, he laughs it off). The judge counts a piece left to burn as already gone, so saving it is never a mistake. Numbers:
  * BOSS_POWERS.fire*, candle*. His art and moments are the app's (characters/grex.ts, the fire in characters/effects/).
  */
 import {
@@ -22,7 +22,7 @@ import type { MoveScore } from "../uci.ts";
 import { VALUE, crowdHalf, from, logit, other, powerRoll, to, turnOf, warnThenUnleash, type BossRules, type Side } from "./base.ts";
 
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
-export const GREX_FX = { spark: 2300, candle: 7100, fireball: 1700 } as const;
+export const GREX_FX = { spark: 2300, candle: 7100, fireball: 1700, fireproof: 2200 } as const;
 
 /**
  * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
@@ -45,24 +45,34 @@ export function chooseSpark(fen: string, crowd: Side, seed: number, turn: number
 }
 
 /**
- * A wave of the Roman candle's fireballs: `n` squares on the crowd's half, never the crowd king's, never one already on
- * fire, spread out (none next to another tile if it can be helped). The same everywhere, from the seed.
+ * A wave of the Roman candle's fireballs: `n` squares, `own` of them on his own half (Eric, Oct 11: his pieces never
+ * burn, so those are mostly wasted) and the rest on the crowd's; never the crowd king's square, never one already on
+ * fire, spread out (none next to another tile if it can be helped). The same everywhere, from the seed. The crowd's
+ * come first (as they always did: with `own` 0, the same squares as before).
  */
-export function chooseFireballs(fen: string, crowd: Side, seed: number, turn: number, n: number, fire: readonly FireTile[] = []): string[] {
+export function chooseFireballs(fen: string, crowd: Side, seed: number, turn: number, n: number, fire: readonly FireTile[] = [], own: number = 0): string[] {
   const king = kingSquare(fen, crowd);
   const taken = fire.map((t) => t.square);
   const out: string[] = [];
-  for (let i = 0; i < n; i++) {
-    const free = crowdHalf(crowd).filter((sq) => sq !== king && !taken.includes(sq) && !out.includes(sq));
-    if (!free.length) break;
-    // (Away from every tile if it can be; else at least from this wave's.)
-    const spread = free.filter((sq) => [...taken, ...out].every((t) => apart(sq, t) >= 2));
-    const inWave = free.filter((sq) => out.every((t) => apart(sq, t) >= 2));
-    const pool = spread.length ? spread : inWave.length ? inWave : free;
-    out.push(pool[Math.floor(powerRoll(seed, "fireball", turn, i) * pool.length)]!);
-  }
+  const mine = Math.max(0, Math.min(n, own));
+  const pick = (half: string[], count: number, key: string) => {
+    for (let i = 0; i < count; i++) {
+      const free = half.filter((sq) => sq !== king && !taken.includes(sq) && !out.includes(sq));
+      if (!free.length) break;
+      // (Away from every tile if it can be; else at least from this wave's.)
+      const spread = free.filter((sq) => [...taken, ...out].every((t) => apart(sq, t) >= 2));
+      const inWave = free.filter((sq) => out.every((t) => apart(sq, t) >= 2));
+      const pool = spread.length ? spread : inWave.length ? inWave : free;
+      out.push(pool[Math.floor(powerRoll(seed, key, turn, i) * pool.length)]!);
+    }
+  };
+  pick(crowdHalf(crowd), n - mine, "fireball");
+  pick(crowdHalf(other(crowd)), mine, "fireball-own");
   return out;
 }
+
+/** How many of a wave's fireballs fall on his own half (candleOwnShare of them, rounded). */
+export const ownShots = (shots: number, s: Pick<BossPowerSettings, "candleOwnShare"> = BOSS_POWERS) => Math.round(shots * s.candleOwnShare);
 
 /** The crowd turn wave `i` of the Roman candle's schedule lands on (he fired on crowd turn `at`). */
 export const candleLands = (at: number, i: number, s: Pick<BossPowerSettings, "candleDelay"> = BOSS_POWERS) => at + s.candleDelay + i;
@@ -79,7 +89,7 @@ export function candleTurn(
   fen: string,
   crowd: Side,
   turn: number,
-  s: Pick<BossPowerSettings, "candleWaves" | "candleDelay" | "candleAhead" | "fireStages"> = BOSS_POWERS,
+  s: Pick<BossPowerSettings, "candleWaves" | "candleDelay" | "candleAhead" | "fireStages" | "candleOwnShare"> = BOSS_POWERS,
 ): { candle: BossPowerState["candle"]; fire: FireTile[] | undefined; event: PowerEvent | null } {
   const c = p.candle;
   if (!c) return { candle: c, fire: p.fire, event: null };
@@ -94,7 +104,7 @@ export function candleTurn(
     const burning = new Set((fire ?? []).map((t) => t.square));
     const squares = due.flatMap((w) => w.squares);
     const fizzled = squares.filter((sq) => sq === king || burning.has(sq));
-    fire = [...(fire ?? []), ...squares.filter((sq) => !fizzled.includes(sq)).map((square) => ({ square, lit: turn }))];
+    fire = [...(fire ?? []), ...squares.filter((sq) => !fizzled.includes(sq)).map((square) => ({ square, lit: turn, candle: true as const }))];
     left = Math.max(0, left - due.reduce((t, w) => t + w.shots, 0));
     waves = waves.filter((w) => w.lands > turn);
     event = { kind: "fireball", turn, squares, ...(fizzled.length ? { fizzled } : {}) };
@@ -111,11 +121,17 @@ export function candleTurn(
       ...(fire ?? []).filter((t) => t.lit + s.fireStages - 1 >= lands),
       ...waves.flatMap((w) => w.squares.map((square) => ({ square, lit: w.lands }))),
     ];
-    waves = [...waves, { lands, shots, squares: chooseFireballs(fen, crowd, p.seed, lands, shots, taken) }];
+    waves = [...waves, { lands, shots, squares: chooseFireballs(fen, crowd, p.seed, lands, shots, taken, ownShots(shots, s)) }];
     unpicked -= shots;
     nextWave++;
   }
   return { candle: { ...c, left, next: nextWave, waves }, fire, event };
+}
+
+/** One of his own pieces sitting on a tile from his Roman candle (its square, the first in square order), or null. */
+export function fireproofSquare(fire: readonly FireTile[] | undefined, fen: string, crowd: Side): string | null {
+  const his = other(crowd);
+  return (fire ?? []).filter((t) => t.candle && pieceAt(fen, t.square)?.color === his).map((t) => t.square).sort()[0] ?? null;
 }
 
 /** A shadow's size on a crowd turn: 1 (small) when its wave is candleAhead turns out, up to candleAhead (lands next turn). */
@@ -261,6 +277,12 @@ export const GREX: BossRules = {
     next.candle = barrage.candle;
     if (barrage.fire) next.fire = barrage.fire;
     if (barrage.event) t.events.push(barrage.event);
+    // The first time one of his own pieces sits on fire from the candle: he laughs it off (once a match).
+    const on = next.fireproof ? null : fireproofSquare(next.fire, t.fen, t.crowd);
+    if (on) {
+      next.fireproof = { turn: t.turn, square: on, pick: Math.floor(powerRoll(t.seed, "fireproof") * 4096) };
+      t.events.push({ kind: "fireproof", turn: t.turn, square: on, pick: next.fireproof.pick });
+    }
   },
   // A sparkler when no tile is burning, a full turn after the last fire went out; paused through the candle's barrage.
   passive(next, t) {
