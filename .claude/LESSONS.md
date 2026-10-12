@@ -160,6 +160,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     still await `topMovesFor` inside an evaluate: move them to `engineTop` when they're next touched.
   - Something on screen for a moment is checked by watching for it from before it can appear (`watchFor`), not by
     looking for it after a wait for something else.
+- **A melt the test blinked through** (Oct 12, [story](../docs/history/lessons.md#a-melt-the-test-blinked-through-oct-12-2026)):
+  - A longer timeout doesn't make `toBeVisible` a watch: Playwright looks 0.1, 0.25 and 0.5 s apart, then once a
+    second, so anything on screen for less than about a second (a melt, a flash) can fall between two looks.
+    Watch for it from before it can appear (`watchFor`, or `watchSquares` in `boss-powers.spec.ts` for which squares).
+  - Before blaming the game for a test that fails now and then, log every frame of the moment in the page and the
+    test's own times next to it: where the two don't overlap is the answer.
 
 ## Explaining the game
 

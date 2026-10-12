@@ -634,3 +634,37 @@ classes.
   child selector or a class of their own (`.boss-threat > i`), and check the computed style of what sits inside.
 - When a number on screen is drawn (a meter, a bar), look at it in true colour, alone and enlarged, not only in a
   frame of the whole screen.
+
+## A melt the test blinked through (Oct 12, 2026)
+
+**Seen:** after Ginger's three-turn Blizzard (PR #160), `e2e/boss-powers.spec.ts` "the gingerbread man (Freeze)…"
+failed now and then, on main (2 of 6 runs) and more often on another branch that touched no boss code (5 of 6): the
+first thaw's banner showed, then `.pw-ice.melting` "never appeared". It looked like it might depend on the seed, so
+the question was whether the thaw rule misbehaved in some games.
+
+**The cause:** the test, not the game. A thaw's melt is on screen for about 0.67 s, 1.3 s into its 2.2 s moment
+(`THAW.meltAt`, `MELT_MS`). The test waited for the banner, then for the melting ice with `toBeVisible({ timeout:
+5_000 })`. That looks at once, then 0.1, 0.25, 0.5 and 1 s apart, so its looks fall about 0, 0.1, 0.35, 0.85 and
+1.85 s after it starts. When the banner was caught between about 0.1 and 0.45 s after it appeared, the look at 0.85 s
+came before the melt and the one at 1.85 s after it. When the banner is caught depends on how the earlier waits line
+up with the boss's thinking, which moves a little with anything else on the branch, not on the seed. PR #160 broke a
+rule that was already written ("A navigation that never happened": watch for something brief from before it can
+appear).
+
+**How it was found:** a copy of the test logged, every frame from before the boss's move, the melting and cracked
+blocks, the banner and the phase, next to the times of the test's own check. In 8 runs the melt showed every time, as
+many blocks as the thaw named, from 1.32 s into it (666 ms long where the log ran to its end); the one failure had
+started its check 247 ms after the banner, and its looks at 0.85 and 1.85 s fell either side of the melt. A sweep of
+3,200 blizzards in the rules (random play, and a boss that takes a crowd piece whenever it can) found every later turn
+thawing what it should: never nothing on the second, everything on the last.
+
+**The fix:** the test watches for melting ice from before the boss's move (`watchSquares`, a MutationObserver, as
+`watchFor` does) and checks that exactly the squares the thaw names melted, for both thaws (THAWING! and THAWED!). A
+control run that looked only 2.5 s after each banner, with nothing melting on screen any more, still passed. Nothing
+in the game changed.
+
+**The rule:**
+- A longer timeout doesn't make `toBeVisible` a watch: anything on screen for less than about a second can fall
+  between two of its looks. Watch for it from before it can appear.
+- Before blaming the game for a test that fails now and then, log every frame of the moment in the page and the test's
+  own times next to it: where the two don't overlap is the answer.
