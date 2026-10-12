@@ -67,7 +67,7 @@ const poll = (async () => {
           banner: !!document.querySelector(".vote-banner"),
           me: r ? `${Math.round(r.x + r.width / 2)},${Math.round(r.y + r.height / 2)} ${Math.round(r.width)}px` : "-",
           counts: [...document.querySelectorAll(".vote-zone-count")].map((e) => e.textContent).join("/"),
-          pieces: document.querySelectorAll(":is(cg-board, .hb-board) piece").length,
+          pieces: document.querySelectorAll(".hb-board piece").length,
           box: wrap ? `${wrap.x.toFixed(1)},${wrap.y.toFixed(1)} ${wrap.width.toFixed(1)}` : "-",
         };
       })

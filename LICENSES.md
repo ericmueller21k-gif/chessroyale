@@ -14,8 +14,6 @@ Oct 12, 2026; update it in the same PR as anything that adds or removes a third-
 | chess.js | 1.4.0 | BSD-2-Clause | main chunk (its licence comment kept in it too) | `/licenses/third-party.txt` |
 | Vite's runtime helper (module preloading) | 5.4.21 | MIT | main chunk | `/licenses/third-party.txt` |
 | The cburnett pieces (Colin M.L. Burnett) | Commons, 2006 | BSD (3-clause), chosen from the author's GFDL / BSD / GPL | the CSS (inlined) | `/licenses/pieces.txt`, Settings and the FAQ; `packages/app/src/board/pieces/SOURCES.md` |
-| **chessground** | 9.2.1 | **GPL-3.0-or-later** | main chunk, and its CSS | **Flagged: being removed.** Our own board replaces it (Phase 1: behind a switch, PR #153; Phase 2 removes it). Until then it can't ship in a public launch |
-| cm-chessboard | 8.15.3 | MIT | the board lab's own chunk only (`/boardlab`) | goes with the lab (Phase 2) |
 
 Nothing else: the build's module list has no other package (`npm run build`; the audit script lists each module's
 package, version, licence and size).
@@ -34,10 +32,6 @@ package, version, licence and size).
 
 ## Flagged
 
-- **chessground (GPL-3)** is still in the main chunk while our board is behind its switch (Phase 1). Phase 2 removes it,
-  its CSS and every trace of it from the bundle.
-- **cm-chessboard (MIT)** and the board lab ship as a lazy chunk anyone can open at `/boardlab`. Fine by its licence;
-  the lab goes in Phase 2.
 - **Maia's source "on request"**: AGPL-3.0 asks that users who interact with it over a network be offered its source;
   the box runs on the player's own device, and Eric decided how it's offered (DECISIONS.md, the Maia prototype). Not
   changed here.
@@ -45,3 +39,6 @@ package, version, licence and size).
   re-sourced under BSD (they came in through chessground's GPL CSS); the fonts' copyright notices and licence, and the
   notices for Preact, chess.js and Vite's helper, now ship with the app (`/licenses/third-party.txt`) and are linked
   from Settings and the FAQ.
+- Fixed in Phase 2 of the board (Oct 12): **chessground (GPL-3.0-or-later)** is gone, its CSS and its wrapper with it:
+  every board is the game's own (`packages/app/src/board/`). The board lab and **cm-chessboard** (MIT) went too. The
+  built app has no chessground module, class or style left (checked on the live site).

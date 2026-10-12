@@ -19,7 +19,7 @@ import { BOARD_SQUARES, boardPieces } from "../board/dom.ts";
  * (a groove along one edge of a square, sawn as his saw comes down at the board's corner, taped over turn by turn as it
  * heals) and his board saw (he leaps onto the board, revs, saws his way up between the d and e files, and the board
  * splits with a gap for its turns, then rejoins). All from the shared state (`powers.split`, `cut`, `boardSaw`) and
- * the moment's start, so everyone online sees the same thing. Everything sits in eighths of chessground's board.
+ * the moment's start, so everyone online sees the same thing. Everything sits in eighths of the board's own size.
  * His rules: packages/chess/src/bosses/sawyer.ts.
  */
 
@@ -117,7 +117,7 @@ const PAIR_CLASSES = ["saw-half-l", "saw-half-r", "saw-small"] as const;
  * The board draws his two split pawns as halves (or small) wherever they go: each of the board's piece elements
  * standing on a half's square (one of his pawns) gets its class (clipped to that half, its cut face shaded; or drawn
  * small: styles.css), kept in step with every change the board makes before the browser paints (a MutationObserver's
- * callback runs first). Either board (chessground's or ours: board/dom.ts finds their pieces).
+ * callback runs first). board/dom.ts finds the board's pieces.
  */
 function HalfPawns({ halves, color, orientation, on, look }: { halves: SplitPawn["halves"]; color: "w" | "b"; orientation: Orientation; on: boolean; look: "halves" | "small" }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -131,12 +131,11 @@ function HalfPawns({ halves, color, orientation, on, look }: { halves: SplitPawn
     const pawn = `${color === "w" ? "white" : "black"} pawn`;
     const start = () => {
       if (!live) return;
-      // (The board's own element: chessground draws a new cg-board inside it whenever it redraws everything, on a
-      // resize too, so the board is looked up afresh each time.)
+      // (The board's squares, looked up afresh each time.)
       const wrap = ref.current?.closest(".board-wrap");
       if (!wrap?.querySelector(BOARD_SQUARES)) {
-        // (This layer's effects run before the board's own, which builds chessground: on a new screen it's there by
-        // the end of this commit, before the paint; failing that, a frame later.)
+        // (This layer's effects can run before the board is in the page: on a new screen it's there by the end of
+        // this commit, before the paint; failing that, a frame later.)
         if (tries++ === 0) queueMicrotask(start);
         else if (tries < 30) requestAnimationFrame(start);
         return;
@@ -177,7 +176,7 @@ function HalfPawns({ halves, color, orientation, on, look }: { halves: SplitPawn
  *   land    they've hopped onto their squares (one stays, the other goes beside it)
  *   grown   eased up to a pawn's size (settle "grow"); with settle "small" they stay small from `land`
  * The board's own pawns show from then (`splitSettledAt`); the moment draws its pair, exactly over them, for `overlap`
- * more (chessground draws a new position a frame later, and a frame with neither is a blink).
+ * more (the board draws a new position as it comes, and a frame with neither is a blink).
  */
 export const MORPH = { pinch: 110, apart: 330, land: 640, grown: 960, overlap: 60 } as const;
 /** The morph's small pawns, against a pawn (about half). */
@@ -307,7 +306,7 @@ function splitMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   return (
     <div class="power-moment pm-split">
       {t < 1300 && banner("SPLIT PAWN!", "Two for one", "saw")}
-      <div class="cg-wrap sw-layer" aria-hidden="true" data-look={SAWYER_LOOKS.split} data-split={t < SPLIT.crackAt ? "saw" : t < settledAt ? "apart" : "settled"}>
+      <div class="hb-pieces sw-layer" aria-hidden="true" data-look={SAWYER_LOOKS.split} data-split={t < SPLIT.crackAt ? "saw" : t < settledAt ? "apart" : "settled"}>
         {at?.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {air.map((h) => (
           <piece
@@ -462,7 +461,7 @@ function boardSawMoment({ boss, moment, t, banner }: MomentProps) {
   return (
     <div class="power-moment pm-boardsaw">
       {t < 1500 && banner("BOARD SAW!", `No crossing the middle for ${BOSS_POWERS.boardSawTurns} turns`, "saw")}
-      <div class="cg-wrap sw-layer" aria-hidden="true" data-boardsaw={t < BOARD_SAW.runAt ? "rev" : t < BOARD_SAW.splitAt ? "run" : "split"}>
+      <div class="hb-pieces sw-layer" aria-hidden="true" data-boardsaw={t < BOARD_SAW.runAt ? "rev" : t < BOARD_SAW.splitAt ? "run" : "split"}>
         {at?.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {at && <Figure boss={boss} at={at.at} flip={false} anim={anim.anim} since={anim.since} id="boardsaw" />}
       </div>

@@ -47,7 +47,7 @@ export function ShadeMoves({
     return () => clearTimeout(t);
   }, [fen]);
   return (
-    <div class="cg-wrap shade-layer" aria-hidden="true">
+    <div class="hb-pieces shade-layer" aria-hidden="true">
       {moves.map((m) => {
         const piece = pieceAt(fen, m.move.slice(0, 2));
         if (!piece) return null;
@@ -84,8 +84,8 @@ export function ShadeMoves({
 }
 
 /**
- * A green ring around a square (where the chosen move landed). Placed and sized in eighths of chessground's own board
- * (--cg-size), not of the wrap, so it sits exactly on the square at any size, zoom or display scale.
+ * A green ring around a square (where the chosen move landed). Placed and sized in eighths of the board's own size
+ * (--board-size), not of the wrap, so it sits exactly on the square at any size, zoom or display scale.
  */
 export function SquareRing({ square, orientation }: { square: string; orientation: "white" | "black" }) {
   const p = at(square, orientation, useContext(BoardTurn));

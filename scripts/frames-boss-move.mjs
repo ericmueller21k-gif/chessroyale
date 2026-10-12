@@ -27,11 +27,11 @@ const c = new Chess(fen);
 const all = c.moves({ verbose: true });
 const mv = all.find((m) => m.piece === "n" || m.piece === "b") ?? all[0];
 console.log("fen", fen, "move", mv.from + mv.to);
-const box = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
+const box = await p.locator(".hb-board").first().boundingBox();
 const sq = (s) => ({ x: box.x + (s.charCodeAt(0) - 97 + 0.5) * (box.width / 8), y: box.y + (8 - Number(s[1]) + 0.5) * (box.height / 8) });
 const snap = () =>
   p.evaluate(() => {
-    const ps = [...document.querySelectorAll(":is(cg-board, .hb-board) piece")].map((e) => `${e.className}@${e.style.transform}`).sort().join("|");
+    const ps = [...document.querySelectorAll(".hb-board piece")].map((e) => `${e.className}@${e.style.transform}`).sort().join("|");
     return { k: window.match?.phase.kind, ps };
   });
 await p.mouse.click(sq(mv.from).x, sq(mv.from).y);

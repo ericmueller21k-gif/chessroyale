@@ -77,8 +77,8 @@ async function run(name, context) {
     throw new Error(`${name}: timed out at ${JSON.stringify({ kind: s?.kind, intro: s?.intro, thinking: s?.thinking })}`);
   };
   const at = async (sq) => {
-    const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
-    const flip = await p.evaluate(() => document.querySelector(":is(.cg-wrap, .hb)")?.classList.contains("orientation-black"));
+    const board = await p.locator(".hb-board").first().boundingBox();
+    const flip = await p.evaluate(() => document.querySelector(".hb")?.classList.contains("orientation-black"));
     const f = sq.charCodeAt(0) - 97;
     const r = Number(sq[1]) - 1;
     return { x: board.x + ((flip ? 7 - f : f) + 0.5) * (board.width / 8), y: board.y + ((flip ? r : 7 - r) + 0.5) * (board.height / 8) };

@@ -184,7 +184,7 @@ export function LastStand({ side, orientation, fen, move, startAt, boss }: { sid
         })}
       </svg>
       {showPiece && (
-        <span class="ls-piece cg-wrap" style={{ left: pct(px - 50), top: pct(py - 50) }} aria-hidden="true">
+        <span class="ls-piece hb-pieces" style={{ left: pct(px - 50), top: pct(py - 50) }} aria-hidden="true">
           <piece class={`${side === "w" ? "white" : "black"} ${PIECE_NAMES[piece.type]}`} />
         </span>
       )}

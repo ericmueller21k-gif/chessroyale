@@ -124,7 +124,7 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
   `@chessroyale/chess/squads`; see `docs/areas/squads.md`).
 - `packages/sim`: bot simulation that writes `reports/playtest.md`; `scripts/calibrate-rating.ts` fits the engine-rating
   curve (`packages/core/src/rating-curve.ts`, report in `reports/rating-calibration.md`) against Stockfish's UCI_Elo.
-- `packages/app`: the web app (Vite + Preact, chessground board, Stockfish in Web Workers). Screens in `src/screens/`;
+- `packages/app`: the web app (Vite + Preact, our own board in `src/board/`, Stockfish in Web Workers). Screens in `src/screens/`;
   `src/solo.ts` is solo play, `src/net.ts` multiplayer.
 - `packages/server`: `src/lobby.ts` is pure, testable lobby logic; `src/lobby-do.ts` the Durable Object;
   `src/index.ts` routes `/api/*` and serves the app. Squads' lobby and parties: `src/squads-lobby.ts`,

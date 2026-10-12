@@ -18,26 +18,25 @@ export const test = base.extend<{ closeOwnContexts: void }>({
 });
 
 /**
- * The big board's parts, as selectors that match either board the game can draw: chessground's or our own
- * (BOARD.impl in settings.ts; `VITE_BOARD=own npm run e2e` runs the whole suite on ours). Tests use these, never one
- * board's own element names.
+ * The board's parts, as selectors (board/OwnBoard.tsx: docs/areas/board.md). Tests use these, so a change to the
+ * board's elements is one change here.
  */
 export const BOARD_SEL = {
   /** The board element, with its `orientation-white` / `orientation-black` class. */
-  wrap: ":is(.cg-wrap, .hb)",
+  wrap: ".hb",
   /** Exactly the 64 squares (a hair smaller than the wrap). */
-  squares: ":is(cg-board, .hb-board)",
+  squares: ".hb-board",
   /** The drawn board with its coordinates and arrows (the same box as the squares). */
-  container: ":is(cg-container, .hb-container)",
+  container: ".hb-container",
   /** A piece on the board (`piece.white.pawn`, `.fading` while a captured one fades). */
-  piece: ":is(cg-board, .hb-board) piece",
+  piece: ".hb-board piece",
   /** A square's highlight (`square.move-dest`, `.selected`, `.last-move`, `.oc` on an occupied destination). */
-  square: ":is(cg-board, .hb-board) square",
+  square: ".hb-board square",
   /** The arrows' shafts. */
-  arrowLine: ":is(svg.cg-shapes, svg.hb-shapes) line",
+  arrowLine: "svg.hb-shapes line",
   /** The coordinates along the bottom and up the side. */
-  fileCoord: ":is(coords.files coord, .hb-files .hb-coord)",
-  rankCoord: ":is(coords.ranks coord, .hb-ranks .hb-coord)",
+  fileCoord: ".hb-files .hb-coord",
+  rankCoord: ".hb-ranks .hb-coord",
 } as const;
 
 /**

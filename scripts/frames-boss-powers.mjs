@@ -63,7 +63,7 @@ async function run(boss, name, context) {
       const m = window.match;
       const fen = m.phase.board.fen;
       const turn = Number(document.querySelector(".board-area .board-wrap")?.dataset.turn ?? 0);
-      return { allowed: m.boss?.powers?.allowed ?? null, fen, fire: m.boss?.powers?.fire ?? [], orientation: document.querySelector(":is(.cg-wrap, .hb)")?.classList.contains("orientation-black") ? "black" : "white", turn };
+      return { allowed: m.boss?.powers?.allowed ?? null, fen, fire: m.boss?.powers?.fire ?? [], orientation: document.querySelector(".hb")?.classList.contains("orientation-black") ? "black" : "white", turn };
     });
     const chess = new Chess(fen);
     let options = allowed ?? chess.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
@@ -75,7 +75,7 @@ async function run(boss, name, context) {
     const step = options.filter((m) => burning.includes(m.slice(2, 4)) && chess.get(m.slice(0, 2))?.type !== "k");
     const pick = step[0] ?? options[Math.floor(options.length / 3)] ?? options[0];
     if (!pick) return;
-    const board = await p.locator(":is(cg-board, .hb-board)").first().boundingBox();
+    const board = await p.locator(".hb-board").first().boundingBox();
     const flip = orientation === "black";
     // (Boingo's funhouse turns the board a quarter of the way round: a square is where the turned board draws it.)
     const at = (s) => {

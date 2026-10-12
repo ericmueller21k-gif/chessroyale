@@ -1,5 +1,4 @@
 import { render } from "preact";
-import "chessground/assets/chessground.base.css";
 import "../board/pieces.css";
 import "../styles.css";
 import { ITEM_DEFS, SLOT_NAMES, itemColor, itemDef, tierInfo, type ItemLook } from "@chessroyale/core";

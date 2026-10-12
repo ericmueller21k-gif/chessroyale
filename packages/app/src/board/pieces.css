@@ -1,42 +1,62 @@
 /*
  * The pieces: the cburnett set by Colin M.L. Burnett, under the BSD licence (board/pieces/LICENSE.txt; where each file
- * comes from: board/pieces/SOURCES.md). Every <piece class="white pawn"> in the game: on either board (chessground's
- * .cg-wrap, ours .hb), on everything drawn over it (layers marked .cg-wrap) and in the promotion picker. The build
- * inlines each file, so the pieces show on the board's first frame.
+ * comes from: board/pieces/SOURCES.md). Every <piece class="white pawn"> in the game: on the board (.hb), on everything
+ * drawn over it or elsewhere with pieces (marked .hb-pieces) and in the promotion picker. The build inlines each file,
+ * so the pieces show on the board's first frame.
  */
-:is(.cg-wrap, .hb, .promo-piece) piece.pawn.white {
+
+/* Anything drawn with the board's pieces (a layer over the squares, a ghost, an avatar): its pieces each a square of
+   it, placed by their own left/top or transform, over the squares (z-index 2, as the board's pieces), never taking a
+   tap. (Before the board's own styles and styles.css, which build on it.) */
+.hb-pieces {
+  box-sizing: content-box;
+  position: relative;
+  display: block;
+}
+.hb-pieces piece {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+  z-index: 2;
+  will-change: transform;
+  pointer-events: none;
+}
+:is(.hb, .hb-pieces, .promo-piece) piece.pawn.white {
   background-image: url("./pieces/cburnett/Chess_plt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.pawn.black {
+:is(.hb, .hb-pieces, .promo-piece) piece.pawn.black {
   background-image: url("./pieces/cburnett/Chess_pdt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.knight.white {
+:is(.hb, .hb-pieces, .promo-piece) piece.knight.white {
   background-image: url("./pieces/cburnett/Chess_nlt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.knight.black {
+:is(.hb, .hb-pieces, .promo-piece) piece.knight.black {
   background-image: url("./pieces/cburnett/Chess_ndt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.bishop.white {
+:is(.hb, .hb-pieces, .promo-piece) piece.bishop.white {
   background-image: url("./pieces/cburnett/Chess_blt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.bishop.black {
+:is(.hb, .hb-pieces, .promo-piece) piece.bishop.black {
   background-image: url("./pieces/cburnett/Chess_bdt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.rook.white {
+:is(.hb, .hb-pieces, .promo-piece) piece.rook.white {
   background-image: url("./pieces/cburnett/Chess_rlt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.rook.black {
+:is(.hb, .hb-pieces, .promo-piece) piece.rook.black {
   background-image: url("./pieces/cburnett/Chess_rdt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.queen.white {
+:is(.hb, .hb-pieces, .promo-piece) piece.queen.white {
   background-image: url("./pieces/cburnett/Chess_qlt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.queen.black {
+:is(.hb, .hb-pieces, .promo-piece) piece.queen.black {
   background-image: url("./pieces/cburnett/Chess_qdt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.king.white {
+:is(.hb, .hb-pieces, .promo-piece) piece.king.white {
   background-image: url("./pieces/cburnett/Chess_klt45.svg");
 }
-:is(.cg-wrap, .hb, .promo-piece) piece.king.black {
+:is(.hb, .hb-pieces, .promo-piece) piece.king.black {
   background-image: url("./pieces/cburnett/Chess_kdt45.svg");
 }

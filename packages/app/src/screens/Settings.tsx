@@ -11,7 +11,6 @@ import { PIECE_SOUNDS, pieceSound, setPieceSound, type PieceSoundKind } from "..
 import { OPENING_KEY, chosenMode, chosenOpeningMoves, saveMode } from "./Home.tsx";
 import { useAccount } from "./Profile.tsx";
 import { setThemePref, useTheme, type ThemePref } from "../theme.ts";
-import { boardImpl, defaultBoardImpl, setBoardImpl } from "../board/impl.ts";
 
 /** A setting you switch on or off: a title, what it does, and the switch. */
 function Toggle({ title, checked, disabled, onChange, children }: { title: string; checked: boolean; disabled?: boolean; onChange: (on: boolean) => void; children?: ComponentChildren }) {
@@ -197,7 +196,6 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
   const [bubbles, setBubbles] = useState(chatBubbles);
   const [openingMoves, setOpeningMoves] = useState(chosenOpeningMoves);
   const [busy, setBusy] = useState(false);
-  const [ownBoard, setOwnBoard] = useState(() => boardImpl() === "own");
   const changeMode = (patch: Partial<typeof mode>) => {
     const next = { ...mode, ...patch };
     setMode(next);
@@ -376,23 +374,6 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
           </div>
         </div>
       </section>
-
-      {profile?.admin && (
-        <section class="fd-section fd-testing">
-          <h2 class="fd-label">TESTING (ADMINS)</h2>
-          <Toggle
-            title="Our own board"
-            checked={ownBoard}
-            onChange={(on) => {
-              setOwnBoard(on);
-              // (The default needs nothing kept: this device then follows it.)
-              setBoardImpl(on === (defaultBoardImpl() === "own") ? null : on ? "own" : "chessground");
-            }}
-          >
-            The board that replaces chessground, on every screen of this device from the next board on. Also with ?board=own (or ?board=cg) in the address.
-          </Toggle>
-        </section>
-      )}
 
       <section class="fd-section">
         <h2 class="fd-label">HOW TO PLAY</h2>

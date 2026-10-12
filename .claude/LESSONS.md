@@ -17,13 +17,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Do this for the most common path (one plain move), not only for the new feature: a feature can be perfect and the
     plain move next to it still broken.
 - **A white flash between moves** (Oct 6, [story](../docs/history/lessons.md#a-white-flash-between-moves-oct-6-2026)):
-  - Anything imperative that draws what a player sees on a screen's first frame (chessground, a canvas, measured
+  - Anything imperative that draws what a player sees on a screen's first frame (the board's size, a canvas, measured
     sizes) goes in `useLayoutEffect`, not `useEffect`.
   - No opacity entrance on screens that replace each other during play.
   - Check a change to screens or transitions with `npm run frames:flash` in light **and** dark mode: a blink that's
     invisible in one scheme is glaring in the other.
 - **A board that vanished after it flipped** (Oct 8, [story](../docs/history/lessons.md#a-board-that-vanished-after-it-flipped-oct-8-2026)):
-  never change what chessground draws (its orientation, its size) while a transform is on it or an ancestor. Animate
+  never change what the board draws (its orientation, its size) while a transform is on it or an ancestor. Animate
   it, then change it once the transform is gone, and watch the frames after the change too.
 - **A move that went silent, a card that said "undefined", a prompt gone too soon** (Oct 10, [story](../docs/history/lessons.md#a-move-that-went-silent-a-card-that-said-undefined-a-prompt-gone-too-soon-oct-10-2026)):
   - A table keyed by a closed set (powers, events, beats) is typed by that set (`Record<PowerId, …>`), so a new member
@@ -74,13 +74,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     it.
   - When something new joins a row of fixed-size items, measure the row at 320 px with that widest content first.
 - **A ring a few pixels off its square** (Oct 9, [story](../docs/history/lessons.md#a-ring-a-few-pixels-off-its-square-oct-9-2026)):
-  - Anything drawn over the squares sizes and places itself in eighths of chessground's board (`--cg-size`, from the
-    `---cg-width` chessground writes on the wrap), never in % of the wrap.
+  - Anything drawn over the squares sizes and places itself in eighths of the board's own size (`--board-size`, from
+    the `--board-width` the board writes on the wrap), never in % of the wrap.
   - Check an overlay against the square it marks, within 1 px, at a size where the rounding gap is widest (wrap width
     times the display scale just under a multiple of 8), not only at the test phone's size.
 - **Coordinates a column off** (Oct 11, [story](../docs/history/lessons.md#coordinates-a-column-off-oct-11-2026)):
-  - Anything a library draws on our screens (chessground's coordinates, a ghost, a highlight) gets a look against what
-    it marks, with our CSS, either way up: a library's defaults are made for its own page.
+  - Anything a library draws on our screens (a board's coordinates, a ghost, a highlight) gets a look against what it
+    marks, with our CSS, either way up: a library's defaults are made for its own page.
   - Board coordinates sit inside their edge squares. A test measures each label's text against the square it names,
     both ways up, on a phone and a computer (`expectCoordsInSquares` in `e2e/helpers.ts`).
 - **A rage meter drawn at a fifth of its colour** (Oct 11, [story](../docs/history/lessons.md#a-rage-meter-drawn-at-a-fifth-of-its-colour-oct-11-2026)):

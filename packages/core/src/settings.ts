@@ -1631,14 +1631,7 @@ export const SQUADS: SquadsSettings = {
 };
 
 /**
- * The big board (Oct 12, 2026; DECISIONS.md, "Our own board"). Chessground (GPL-3) is being replaced by a board of our
- * own (`packages/app/src/board/`), with the same props, looks and feel (220 ms slides, a 3 px drag threshold, the same
- * dots, rings, arrows and coordinates), so the game can stay closed-source.
- * - `impl`: which board every screen draws: "chessground" (today's) until Eric has played on "own" on his phones.
- *   Admins switch their own device in Settings → Testing; `?board=own` (or `?board=cg`) in the address does the same
- *   on any device and is kept there. A test run can build with VITE_BOARD=own.
- * - `checkHighlight`: the red glow under a king in check. Off, as the game has always been (its board was set up never
- *   to show it); one switch for both boards.
+ * The board (Oct 12, 2026; docs/areas/board.md). `checkHighlight`: the red glow under a king in check. Off, as the game
+ * has always been (its board was set up never to show it).
  */
-export type BoardImpl = "chessground" | "own";
-export const BOARD: { readonly impl: BoardImpl; readonly checkHighlight: boolean } = { impl: "chessground", checkHighlight: false };
+export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: false };

@@ -54,7 +54,7 @@ export const GINGER_UI = {
     blizzard: { order: 2, kit: "ultimate", dock: "Blizzard!", appearAt: (m, square, orientation) => m.at + BLIZZARD.sweepAt + (squareXY(square, orientation).x / 800) * BLIZZARD.sweepMs, view: blizzardMoment },
   },
   // Ice over frozen pieces (the characters' iceOverlay: it forms, then shimmers while it lasts): one block the shape of
-  // the square, the same on every square whatever the piece, placed on chessground's own square (eighths of --cg-size).
+  // the square, the same on every square whatever the piece, placed on the board's own square (eighths of --board-size).
   board: ({ boss, p, board, orientation, moments, now, appearAt }) => {
     const iced = p.iced.filter((sq) => pieceAt(board, sq)?.color === boss.crowdSide);
     const blizzard = moments.some((m) => m.kind === "blizzard");

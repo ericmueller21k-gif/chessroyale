@@ -928,7 +928,7 @@ export function Avatar({ look, side = "w" }: { look?: ItemLook; side?: "w" | "b"
     </svg>
   );
   return (
-    <span class="avatar cg-wrap" aria-hidden="true">
+    <span class="avatar hb-pieces" aria-hidden="true">
       {layer(true)}
       {skin ? (
         <svg class="avatar-skin" viewBox="0 0 100 100">

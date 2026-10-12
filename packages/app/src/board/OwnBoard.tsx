@@ -1,15 +1,15 @@
 /**
- * HunChess's own board (BOARD.impl "own"): plain elements, CSS transitions and pointer events, with the same props as
- * the chessground board it replaces (types.ts) and its look and feel, measured in the board lab: 220 ms slides on a
+ * HunChess's board (docs/areas/board.md): plain elements, CSS transitions and pointer events. It replaced chessground
+ * (GPL-3) on Oct 12, 2026, with the same look and feel, measured side by side in the board lab: 220 ms slides on a
  * cubic ease in and out, a captured piece fading, a 3 px drag threshold, a dropped piece landing at once and an illegal
- * one going straight back, the same dots, rings, highlights, arrows and coordinates. Nothing of chessground's code is
- * used; its behaviour is, where the game relies on it:
+ * one going straight back, the same dots, rings, highlights, arrows and coordinates. Its behaviour, where the game
+ * relies on it:
  * - Taps and drags: a tap selects a piece of the side to move (its dots show), a second tap on a dot moves it (as the
  *   press goes down); or drag it. A move you make stays on the board until the game next tells the board anything
- *   (`local`), as before: a game that keeps the position (the Crowd) sees it go back, one that plays it keeps it.
+ *   (`local`): a game that keeps the position (the Crowd) sees it go back, one that plays it keeps it.
  * - Pieces keep their identity between positions, so a move slides the piece that moved (castling's rook too).
  * - The board is drawn a whole multiple of 8 device pixels wide (crisp squares) and writes that size on the wrap
- *   (---cg-width, read as --cg-size by everything drawn over the squares, styles.css).
+ *   (--board-width, read as --board-size by everything drawn over the squares, styles.css).
  * - Boingo's quarter turns are built in: every square is drawn where the turned board shows it (board-view.ts), taps
  *   are turned back, and the coordinates name the real squares.
  * - Hollow's dark: a dark square tapped is selected (no piece lifted, no dots); any attempt touching the dark goes to
@@ -347,8 +347,8 @@ export function OwnBoard({ fen, orientation, lastMove, interactive, moves, onMov
       const height = h > 0 ? width * (h / w) : width;
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
-      wrap.style.setProperty("---cg-width", `${width}px`);
-      wrap.style.setProperty("---cg-height", `${height}px`);
+      wrap.style.setProperty("--board-width", `${width}px`);
+      wrap.style.setProperty("--board-height", `${height}px`);
     };
     const cs = getComputedStyle(root);
     size(parseFloat(cs.width), parseFloat(cs.height));

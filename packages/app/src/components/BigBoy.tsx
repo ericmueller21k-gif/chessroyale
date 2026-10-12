@@ -16,7 +16,7 @@ import { NORMAL, bossVoice } from "../speech.tsx";
  * and his Big Bounce (three bounces on 2x2 spots, the pieces there knocked up and tumbling; a giant fall onto the four
  * middle squares, a shockwave, dust and a jolt; every piece settling into the new position; and off he bounces). All
  * from the shared state (`powers.snack`, `powers.bounce`) and the moment's start, so everyone online sees the same
- * thing. Everything sits in eighths of chessground's board (`.bb-layer`), so a piece that lands is exactly on its square
+ * thing. Everything sits in eighths of the board's own size (`.bb-layer`), so a piece that lands is exactly on its square
  * when the board takes over from it.
  */
 
@@ -216,7 +216,7 @@ export function BigBounce({ boss, moment, now, orientation }: { boss: BossView; 
   if (now >= crashAt && now < crashAt + PUFF_MS) for (const sq of spotSquares(CENTRE_SPOT)) puffs.push({ square: sq, name: "bouncePuff", since: crashAt, quiet: true });
   const flyers = bounceFlyers(b);
   return (
-    <div class="cg-wrap bb-layer" aria-hidden="true" data-bounce={t < BOUNCE.settledAt ? "on" : "settled"}>
+    <div class="hb-pieces bb-layer" aria-hidden="true" data-bounce={t < BOUNCE.settledAt ? "on" : "settled"}>
       {path.shadow && path.shown && (
         <span
           class="bb-shadow"
