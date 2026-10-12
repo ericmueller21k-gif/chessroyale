@@ -113,6 +113,8 @@ if (box && frames.length) {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   frames.forEach((f, i) => writeFileSync(join(dir, `${String(i).padStart(5, "0")}.jpg`), Buffer.from(f.data, "base64")));
+  // (Each frame's time from the start, to match against the timeline.)
+  writeFileSync(join(dir, "times.txt"), frames.map((f, i) => `${String(i).padStart(5, "0")} +${Math.round(f.t - t0)}ms`).join("\n") + "\n");
   // (Screencast frames are in CSS pixels, scaled by the page's zoom; the crop is the meter with room round it.)
   const pad = 60;
   const crop = `crop=${Math.round(box.width + 2 * pad)}:${Math.round(box.height + 40)}:${Math.max(0, Math.round(box.x - pad))}:${Math.max(0, Math.round(box.y - 20))}`;
@@ -120,7 +122,7 @@ if (box && frames.length) {
   try {
     execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", "15", "-i", join(dir, "%05d.jpg"), "-vf", `${crop},scale=iw*4:-1:flags=neighbor,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse`, join(outDir, `${tag}-meter.gif`)]);
     for (const c of changes) {
-      const k = frames.findIndex((f) => f.t >= c.t + 700);
+      const k = frames.findIndex((f) => f.t >= c.t + 60);
       if (k < 0) continue;
       const name = `${tag}-t${c.turn}-${(c.cls || "plain").replace(/\s+/g, "+")}-${Math.round(c.fill ?? 0)}.png`;
       execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", join(dir, `${String(k).padStart(5, "0")}.jpg`), "-vf", `${crop},scale=iw*4:-1:flags=neighbor`, join(outDir, name)]);

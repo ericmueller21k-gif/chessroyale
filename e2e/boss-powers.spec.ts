@@ -39,6 +39,8 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Ginger");
   await expect(page.locator(".rage-meter")).toBeVisible();
+  // Its bar in full colour (the threat skulls' dimming once caught it too: it sat at 22%).
+  expect(await page.locator(".rage-meter i").first().evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
 
   await playBest(page);
   // As the second turn begins: FREEZE!, then RAGE! (its ultimate next turn); the clock waits for them.

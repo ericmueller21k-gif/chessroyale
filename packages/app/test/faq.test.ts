@@ -132,6 +132,15 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("- 4 for every crowd move");
     expect(moved).toContain("30 fireballs");
     expect(moved).toContain("full after about 25 crowd moves");
+    // Again and again (Eric, Oct 11), the King's strikes, each boss's speed, and the rates' standing.
+    expect(t).toContain("again and again");
+    expect(t).toContain(`${BOSS_POWERS.rageStrike} each time the God King strikes the boss`);
+    expect(t).toContain(`Ginger ×${BOSS_POWERS.rageSpeed.gingerbread}`);
+    expect(t).toContain("not yet tested with bots");
+    expect(t).toContain("two ultimates never overlap");
+    expect(t).toContain("only one of your pieces may move, picked at random");
+    expect(section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, rageStrike: 30 } })).toContain("30 each time the God King strikes the boss");
+    expect(section("god-king")).toContain(`${BOSS_POWERS.rageStrike} on its rage meter`);
   });
 
   it("the judge, the re-check and brilliant moves", () => {

@@ -83,6 +83,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     it marks, with our CSS, either way up: a library's defaults are made for its own page.
   - Board coordinates sit inside their edge squares. A test measures each label's text against the square it names,
     both ways up, on a phone and a computer (`expectCoordsInSquares` in `e2e/helpers.ts`).
+- **A rage meter drawn at a fifth of its colour** (Oct 11, [story](../docs/history/lessons.md#a-rage-meter-drawn-at-a-fifth-of-its-colour-oct-11-2026)):
+  - A rule on a bare element under a box (`.box i`) styles every component nested in that box too: use a child
+    selector or a class of its own, and check the computed style of what sits inside.
+  - Look at a drawn number (a meter, a bar) in true colour, alone and enlarged, not only in a frame of the whole screen.
 - **Names that looked short** (Oct 7, [story](../docs/history/lessons.md#tests-that-leaned-on-a-lucky-seed-and-names-that-looked-short-oct-7-2026)):
   check text that must fit by measuring it in the real font and box, with some room for other fonts (an iPhone's runs
   wider than headless Chrome's), not by counting characters. (The same lesson's rule about seeds is under "Tests".)

@@ -207,7 +207,9 @@ boss's `offset` in `boss.ts`.
 - Frames: `npm run frames:king-attack -- <dir> hollow [phone|desktop|both] [laststand|mate|both] [light|dark] [gif]`
   (the page's clock paused and stepped 40 ms at a time: every frame of the attack),
   `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both]`, `frames:hollow`,
-  `frames:bigboy`, `frames:sawyer`, `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`.
+  `frames:bigboy`, `frames:sawyer`, `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`,
+  `frames:rage -- <dir> [boss] [phone|desktop] [moves] [strikes]` (the rage meter: strikes, the warning, the
+  ultimate, its slide down and refill, every frame, with the meter's own numbers sampled each frame).
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect).
 - Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] 25`.
 - Sims: `packages/sim/scripts/boss-sim.ts` (modes `snack`, Big Boy's; `split`, Sawyer's; `raid <boss,ids|all> <games>

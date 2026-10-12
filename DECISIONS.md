@@ -1196,9 +1196,15 @@ queen anymore. His meter should build up a bit faster because his ult's kind of 
   last resort too. The mercy rules stand: in check only pieces that can answer it have moves, and a barred move that was
   the piece's only one lifts the ice. The banner names it ("Only your knight on c3 moves"), and the God King's line
   fits it (the queen's lines, the king's, or new `blizzardOne` lines).
-- **The display:** full (pulsing) on the ultimate's turn; its bar then slides down to nothing (the bar's width
-  transition) and the meter is drawn dimmed and dashed (`paused`) while the effect runs; then it fills again. Older
-  servers send `rage: null` once spent, which still hides it.
+- **The display:** full (pulsing) on the ultimate's turn. As it's spent the meter turns dimmed and dashed (`paused`),
+  holds full for 0.4 s, then its bar slides down to nothing over 0.9 s (`RAGE_DRAIN`, on the page's clock, so a
+  screen change or the next turn coming quickly doesn't cut it: the first tries jumped or lost half the slide to the
+  busy first frame of the next screen); it stays empty while the effect runs, then fills again. Each strike shows as a
+  jump of a quarter. Older servers send `rage: null` once spent, which still hides it.
+- **The meter's bar was always drawn at 22%** (found in the frames): the threat skulls' dimming rule
+  (`.boss-threat i`) caught its `<i>` too. Now it's `.boss-threat > i`, and the bar shows its real orange and red
+  (lesson recorded). On a phone, a boss's line in the bar's text box can cover the meter while it's said (as before);
+  the slide is then seen only on a computer, and the empty, dashed meter after it everywhere.
 - **The rates, by estimate.** Eric changed the plan (to save usage): no sim runs; set the rates by reasoning from
   typical battle lengths. **Rates set by estimate; not yet tested with the bot sim. Run the sim at a future date**
   (`npx tsx packages/sim/scripts/boss-sim.ts raid all 20 11 2 <tag>` then `raid-summary <tag>`: Solo raids of 50 bots
