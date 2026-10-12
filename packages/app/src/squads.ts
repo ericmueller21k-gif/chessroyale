@@ -1,5 +1,5 @@
-import type { ItemLook } from "@chessroyale/core";
-import type { MoveScore } from "@chessroyale/chess";
+import type { ItemLook, MercItem } from "@chessroyale/core";
+import { toSan, type MoveScore } from "@chessroyale/chess";
 import {
   SQUADS_PROTOCOL,
   type Colour,
@@ -13,8 +13,11 @@ import {
   type PartyServerMessage,
   type SquadsClientMessage,
   type SquadsPlacement,
+  type AssistError,
   type BlockError,
   type BlockLift,
+  type NetWallet,
+  type ShopError,
   type SquadsBlock,
   type SquadsServerMessage,
 } from "@chessroyale/chess/squads";
@@ -22,7 +25,7 @@ import { account, playerName } from "./account.ts";
 import { enginePool, engineSpeed } from "./engine.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { play } from "./sound.ts";
-import { blockName, dutyOf, liveBank, movesOfHalf, sideIn, squadName, squadOf, type LocalBoard, type LocalMatch } from "./squads-view.ts";
+import { blockName, coinText, dutyOf, freeMs, itemText, liveBank, movesOfHalf, sideIn, squadName, squadOf, type LocalBoard, type LocalMatch } from "./squads-view.ts";
 
 /**
  * Squads on this device (docs/areas/squads.md, "The screens"): the lobby's socket and everything the screens draw from
@@ -107,12 +110,13 @@ export async function squadsQueue(onBusy: (waitSeconds: number) => void, cancell
 /**
  * Test controls: a test lobby from the first vote (`votes`: bots in every other seat at once), or straight at Relay,
  * Pairs or the final (admins; anyone where SQUADS_TEST is on). `extra`: the link's own test options, passed on (`fen`:
- * the first round's position; `bots=strong`; `seat=white`: you play White on your first board), for tests.
+ * the first round's position; `bots=strong`; `seat=white`: you play White on your first board; `mode=mercenary` or
+ * `classic`: that mode, no Mode vote).
  */
 export async function squadsTestLobby(start: "votes" | "relay" | "pairs" | "final", clock?: string | null, extra?: URLSearchParams): Promise<SquadsSeatAnswer> {
   const q = new URLSearchParams({ start });
   if (clock) q.set("clock", clock);
-  for (const k of ["fen", "bots", "seat"]) {
+  for (const k of ["fen", "bots", "seat", "mode"]) {
     const v = extra?.get(k);
     if (v) q.set(k, v);
   }
@@ -145,6 +149,25 @@ const REFUSED: Record<string, string> = {
   already_moved: "You've already moved.",
   match_over: "The match is over.",
   stale: "That half is over.",
+};
+
+const ASSIST_REFUSED: Record<AssistError | "late" | "stale", string> = {
+  no_tokens: "Your squad has no Stockfish tokens left.",
+  shown: "Your Stockfish lines are already on screen.",
+  locked: "You've locked in already.",
+  already_moved: "You've already moved.",
+  no_duty: "It's not your turn to choose.",
+  match_over: "The match is over.",
+  late: "Too late: your time was up.",
+  stale: "That half is over.",
+};
+
+const SHOP_REFUSED: Record<ShopError, string> = {
+  closed: "The shop is closed: your next match has started.",
+  cap: "That's as many as one round allows.",
+  coins: "Not enough coins.",
+  none: "None of those to put back.",
+  unknown_item: "That item isn't in the shop.",
 };
 
 const BLOCK_REFUSED: Record<BlockError | "late" | "stale", string> = {
@@ -194,8 +217,14 @@ export class SquadsClient {
   /** Each match's choices and locks as the server last said (the screen shows them with `mine` on top). */
   private server = new Map<string, { visible: Record<string, string>; locked: string[] }>();
   note: SquadsNote | null = null;
-  /** A short banner over a board: a block placed or lifted (both squads see it). */
-  banner: { key: string; board: number; text: string; at: number } | null = null;
+  /** A short banner over a board: a block placed or lifted, a shield, a brilliant move (both squads see it). */
+  banner: { key: string; board: number; text: string; at: number; kind?: "brilliant" | "shield" } | null = null;
+  /** Mercenary: every squad's wallet and shop (empty in Classic). */
+  wallets: NetWallet[] = [];
+  /** Mercenary: purchases in your squad's shop as they happen (by whom), newest last. */
+  shopLog: { by: string; item: MercItem; price: number; undo: boolean; at: number }[] = [];
+  /** Mercenary: catch-up coins your squad was given (shown in the shop), by round of the match they came with. */
+  catchUp: { coins: number; against: number; at: number } | null = null;
   /** Your party's pass in this lobby (you sit with your party). */
   readonly party: string | null;
   /** The match the screen shows on its big board (whose squads' sudden death is heard). */
@@ -350,6 +379,18 @@ export class SquadsClient {
     this.emit();
   }
 
+  /** Mercenary: use one of your squad's Stockfish tokens on your decision this half (the server says yes: "assist"). */
+  useStockfish(key: string) {
+    const m = this.matches.get(key);
+    if (!m?.current) return;
+    this.send({ t: "assist", key, seq: m.current.seq });
+  }
+
+  /** Mercenary: buy one of an item for your squad's next match (or put one back), from your squad's wallet. */
+  buy(item: MercItem, undo = false) {
+    this.send(undo ? { t: "unbuy", item } : { t: "buy", item });
+  }
+
   armageddon(key: string, colour: Colour) {
     this.send({ t: "armageddon", key, colour });
   }
@@ -425,6 +466,7 @@ export class SquadsClient {
     m.lockedAt = {};
     m.choiceAt = {};
     m.placed = [];
+    m.assisting = [];
   }
 
   private localHalf(h: NetSquadsHalf | null): NetSquadsHalf | null {
@@ -451,6 +493,7 @@ export class SquadsClient {
       placed: [],
       blockAt: {},
       last: null,
+      assisting: [],
     };
   }
 
@@ -462,7 +505,12 @@ export class SquadsClient {
       filledAt: l.filledAt === null ? null : this.local(l.filledAt),
       bracket: l.bracket.map((b) => (b.startsAt ? { ...b, startsAt: this.local(b.startsAt) } : b)),
       clocks: l.clocks.map((c) => this.localClock(c)),
+      wallets: this.localWallets(l.wallets ?? []),
     };
+  }
+
+  private localWallets(ws: readonly NetWallet[]): NetWallet[] {
+    return ws.map((w) => (w.shop?.until ? { ...w, shop: { ...w.shop, until: this.local(w.shop.until) } } : w));
   }
 
   private localClock(c: NetTeamClock): NetTeamClock {
@@ -484,6 +532,7 @@ export class SquadsClient {
       case "lobby":
         this.lobby = this.localLobby(msg.lobby);
         if (msg.lobby.clocks.length) this.clocks = this.lobby.clocks;
+        this.wallets = this.lobby.wallets;
         if (msg.lobby.phase !== "vote") this.vote = null;
         break;
       case "vote": {
@@ -510,6 +559,7 @@ export class SquadsClient {
           m.blockAt = had!.blockAt;
         } else if (this.mine?.key === m.key) this.mine = null;
         m.placed = msg.placed ?? [];
+        m.assisting = msg.assisting ?? [];
         // (Blocks in effect keep their first moment on screen: their arrows keep drawing on the same beat.)
         if (had) for (const b of m.blocks) m.blockAt[blockKey(b)] ??= had.blockAt[blockKey(b)] ?? Date.now();
         for (const b of m.placed) m.blockAt[blockKey(b)] ??= Date.now();
@@ -527,6 +577,37 @@ export class SquadsClient {
         const squad = squadName(m.sides[msg.block.side].squadId);
         const mine = sideIn(m, this.myId) === msg.block.side;
         this.banner = { key: m.key, board: msg.block.board, at: Date.now(), text: mine ? `${by} blocked ${blockName(msg.block)} (−${msg.block.cost})` : `${squad} blocked your ${blockName(msg.block)}` };
+        break;
+      }
+      case "assist": {
+        const had = this.matches.get(msg.key);
+        if (!had?.current || had.current.seq !== msg.seq) break;
+        // (Who used one is public: everyone's count goes down. The lines show only on `shownTo`'s screens.)
+        const m: LocalMatch = { ...had, assisting: [...had.assisting.filter((a) => !(a.board === msg.use.board && a.by === msg.use.by)), msg.use] };
+        this.matches.set(m.key, m);
+        if (this.myId && msg.use.shownTo.includes(this.myId) && msg.use.by !== this.myId) this.note = { text: `${this.nameOf(msg.use.by)} used a Stockfish token: your squad's top moves are on the board`, at: Date.now(), kind: "news" };
+        break;
+      }
+      case "assistNo":
+        if (msg.reason !== "stale") this.note = { text: ASSIST_REFUSED[msg.reason] ?? "That token wasn't used.", at: Date.now(), kind: "no" };
+        break;
+      case "wallets":
+        this.wallets = this.localWallets(msg.wallets);
+        break;
+      case "bought":
+        this.shopLog = [...this.shopLog.slice(-11), { by: msg.by, item: msg.item, price: msg.price, undo: msg.undo, at: Date.now() }];
+        break;
+      case "shopNo":
+        this.note = { text: SHOP_REFUSED[msg.reason] ?? "That wasn't bought.", at: Date.now(), kind: "no" };
+        break;
+      case "coins": {
+        if (msg.why === "catch_up" && msg.squadId === this.mySquad?.id) this.catchUp = { coins: msg.coins, against: msg.against ?? -1, at: Date.now() };
+        if (msg.why === "brilliant" && msg.key && msg.board !== undefined) {
+          const m = this.matches.get(msg.key);
+          const who = (msg.by ?? []).map((id) => (id === this.myId ? "you" : this.nameOf(id))).join(" and ");
+          const san = m && msg.move ? sanBefore(m, msg.board, msg.move) : (msg.move ?? "");
+          this.banner = { key: msg.key, board: msg.board, at: Date.now(), kind: "brilliant", text: `Brilliant! ${san}${who ? ` by ${who}` : ""}: +${coinText(msg.coins)} coins for ${squadName(msg.squadId)}` };
+        }
         break;
       }
       case "blockNo": {
@@ -626,10 +707,23 @@ export class SquadsClient {
     // Blocks just placed carry on (in effect now) from when they were placed.
     m.blockAt = Object.fromEntries(m.blocks.map((b) => [blockKey(b), had?.blockAt[blockKey(b)] ?? Date.now()]));
     this.matches.set(m.key, m);
-    // A block lifted (a mercy rule, or your move made it impossible): announced, refunded.
+    // A block lifted (a mercy rule, or your move made it impossible): announced, refunded. One a shield cancelled:
+    // announced to both squads (its points stay spent).
     const me = sideIn(m, this.myId);
-    const lifted = msg.events.find((e): e is Extract<typeof e, { kind: "block" }> => e.kind === "block" && e.outcome !== "on" && me !== null && (e.outcome !== "impossible" || e.side === me));
-    if (lifted && lifted.outcome !== "on") this.banner = { key: m.key, board: lifted.board, at: Date.now(), text: `Block lifted: ${LIFTED[lifted.outcome]} (refunded)` };
+    const blocks = msg.events.filter((e): e is Extract<typeof e, { kind: "block" }> => e.kind === "block");
+    const shielded = blocks.find((e) => e.outcome === "shielded");
+    const lifted = blocks.find((e) => e.outcome !== "on" && e.outcome !== "shielded" && me !== null && (e.outcome !== "impossible" || e.side === me));
+    if (shielded) {
+      const ours = me === shielded.side;
+      const text = ours
+        ? `${possessive(squadName(m.sides[shielded.side === 0 ? 1 : 0].squadId))} shield cancelled your block on ${blockName(shielded)} (−${shielded.cost})`
+        : me !== null
+          ? `Your shield cancelled ${possessive(squadName(m.sides[shielded.side].squadId))} block on your ${blockName(shielded)}`
+          : `A shield cancelled ${possessive(squadName(m.sides[shielded.side].squadId))} block on ${blockName(shielded)}`;
+      this.banner = { key: m.key, board: shielded.board, at: Date.now(), kind: "shield", text };
+      // (The line above the board is that board's; the squads in the match hear of it wherever they're looking.)
+      if (me !== null) this.note = { text, at: Date.now(), kind: "news" };
+    } else if (lifted && lifted.outcome !== "on" && lifted.outcome !== "shielded") this.banner = { key: m.key, board: lifted.board, at: Date.now(), text: `Block lifted: ${LIFTED[lifted.outcome]} (refunded)` };
     if (off) this.sync();
     // Decided (a winner): over once its last half has been shown (the server says so only in the lobby's bracket). A
     // drawn final isn't: its Armageddon comes as a "match".
@@ -689,9 +783,10 @@ export class SquadsClient {
     }
     const d = this.myId ? dutyOf(m, this.myId) : null;
     if (!d || m.locked.includes(this.myId!)) return;
-    const left = m.current.startedAt + m.delayMs - now;
+    const free = freeMs(m, d.duty.side);
+    const left = m.current.startedAt + free - now;
     const secs = Math.ceil(left / 1000);
-    if (left <= 0 || secs > TICK_FREE_FROM || secs >= Math.ceil(m.delayMs / 1000)) return;
+    if (left <= 0 || secs > TICK_FREE_FROM || secs >= Math.ceil(free / 1000)) return;
     const mark = `${m.key}/${m.current.seq}/${secs}`;
     if (this.lastTick === mark) return;
     this.lastTick = mark;
@@ -919,3 +1014,19 @@ export class PartyClient {
     }
   }
 }
+
+/** "Knights'" (every squad's name is a plural), "Pam's". */
+export const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
+
+/** A move in a board's position before it (the brilliant move just played): SAN if it reads, else as sent. */
+function sanBefore(m: LocalMatch, board: number, move: string): string {
+  const b = m.boards[board];
+  const fen = m.last?.before[board] ?? null;
+  try {
+    return fen && b ? toSan(fen, move) : move;
+  } catch {
+    return move;
+  }
+}
+
+export { itemText };

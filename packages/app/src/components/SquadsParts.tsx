@@ -1,7 +1,8 @@
 import { memo } from "preact/compat";
 import { useEffect, useState } from "preact/hooks";
 import { useMedia } from "./QuickChat.tsx";
-import type { NetBracketMatch, NetSquadsLobby } from "@chessroyale/chess/squads";
+import type { NetBracketMatch, NetSquadsLobby, NetWallet } from "@chessroyale/chess/squads";
+import { Coins } from "./SquadsBlocks.tsx";
 import { TinyBoard } from "./TinyBoard.tsx";
 import { PlayerName } from "./PlayerName.tsx";
 import type { SquadsClient } from "../squads.ts";
@@ -88,6 +89,8 @@ export function StandingsPanel({ client, onLeave }: { client: SquadsClient; onLe
   if (!lobby || !lobby.squads.length) return null;
   const mine = client.mySquad?.id ?? null;
   const delay = lobby.rules ? lobby.rules.clock.delaySeconds * 1000 : 3000;
+  // (Mercenary: every squad's coins, for everyone.)
+  const wallets = client.wallets;
   return (
     <section class="sq-standings" aria-label="Squads">
       <h2 class="sq-standings-head">
@@ -101,6 +104,7 @@ export function StandingsPanel({ client, onLeave }: { client: SquadsClient; onLe
             <div class="sq-row-top">
               <SquadTag id={id} you={id === mine} />
               <span class="sq-row-pos">{standingLine(lobby, id)}</span>
+              {wallets.length > 0 && <SquadCoins wallets={wallets} id={id} />}
               <ClockText clock={clock} delayMs={delay} />
             </div>
             <div class="sq-row-members">
@@ -345,3 +349,9 @@ function BracketCard({ b, mine, now }: { b: NetBracketMatch; mine: number | null
 
 /** "1st", "5th–8th": a placement in words. */
 export const placementWords = placementText;
+
+/** Mercenary: a squad's coins in the standings. */
+function SquadCoins({ wallets, id }: { wallets: readonly NetWallet[]; id: number }) {
+  const w = wallets.find((x) => x.squadId === id);
+  return w ? <Coins n={w.coins} class="small" /> : null;
+}

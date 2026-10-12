@@ -1,6 +1,6 @@
 import { useMemo, useState } from "preact/hooks";
 import { blockCost, blockTargets, piecesOf, type BlockPiece, type Colour, type SquadsBlock, type TokenUse } from "@chessroyale/chess/squads";
-import { blockName, tokenWords, squadName } from "../squads-view.ts";
+import { blockName, coinText, tokenWords, squadName } from "../squads-view.ts";
 
 /**
  * Squads v2 on the board (docs/areas/squads.md, "The screens"): move blocks drawn as soft arrows that keep drawing
@@ -172,17 +172,40 @@ export function PickTags({ picks, orientation }: { picks: readonly { move: strin
   );
 }
 
+/** A coin (Mercenary), for prices and wallets. */
+export function CoinIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg class="mc-coin" width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="7" fill="currentColor" />
+      <circle cx="8" cy="8" r="4.3" fill="none" stroke="var(--mc-coin-ring, rgba(0,0,0,0.28))" stroke-width="1.6" />
+    </svg>
+  );
+}
+
+/** "1,240" with a coin (Mercenary). */
+export function Coins({ n, class: cls = "" }: { n: number; class?: string }) {
+  return (
+    <span class={`mc-coins ${cls}`} aria-label={`${coinText(n)} coins`}>
+      <CoinIcon />
+      {coinText(n)}
+    </span>
+  );
+}
+
 /**
- * Each squad's block bank (a lock and the points left) and, in Pairs, its same-move tokens (×N), shown under the board
- * beside the clocks for both squads at all times.
+ * Each squad's block bank (a lock and the points left; none in Classic) and, in Pairs, its same-move tokens (×N), shown
+ * under the board beside the clocks for both squads at all times.
  */
-export function SquadResources({ bank, tokens, you }: { bank: number; tokens: number | null; you?: boolean }) {
+export function SquadResources({ bank, tokens, you }: { bank: number | null; tokens: number | null; you?: boolean }) {
+  if (bank === null && tokens === null) return null;
   return (
     <span class={`sq-res${you ? " you" : ""}`}>
-      <span class="sq-res-bank" title={`Block points left: ${bank}`} aria-label={`${bank} block points`}>
-        <LockIcon />
-        {bank}
-      </span>
+      {bank !== null && (
+        <span class="sq-res-bank" title={`Block points left: ${bank}`} aria-label={`${bank} block points`}>
+          <LockIcon />
+          {bank}
+        </span>
+      )}
       {tokens !== null && (
         <span class={`sq-res-tokens${tokens ? "" : " none"}`} title={`Same-move tokens left: ${tokens}`} aria-label={`${tokens} same-move tokens`}>
           <TokenIcon />×{tokens}

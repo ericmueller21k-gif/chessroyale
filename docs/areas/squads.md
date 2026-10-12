@@ -7,7 +7,10 @@ the protocol; see "The server" below). **The screens** (phase 3: the menu slot, 
 the standings and team clocks, Relay, Pairs, the final's staging, spectating, the results, the test controls on
 screen, the app's side of bot work, the sounds; see "The screens" below). **Squads v2** (Eric, Oct 12; DECISIONS.md,
 "Squads v2"): same-move tokens in Pairs (refunded by the judge on players' devices), move blocks in every round, and
-the final a majority vote of the whole squad; the old Pick and Block is gone.
+the final a majority vote of the whole squad; the old Pick and Block is gone. **Modes** (Eric, Oct 12; DECISIONS.md,
+"Squads modes: Classic and Mercenary"): the first vote picks **Classic** (just chess: same-move tokens, no blocks, no
+coins) or **Mercenary** (coins, a team shop between rounds, items for the next match; blocks on), and shows a third
+mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `mercenary` everywhere.
 
 ## How it works today
 
@@ -22,8 +25,11 @@ the final a majority vote of the whole squad; the old Pick and Block is gone.
   `noteActions` logs every miss; `noShowsBeforeBot` (3) in a row hands the seat to a bot (`replacedByBot`).
 - **Seeded randomness**: `squadsRng(seed, ...names)` gives each decision its own stream (match, turn, half, board,
   what's drawn), so the server can replay any decision from the lobby's seed, and adding a draw never moves others.
-- **Votes** (`votes.ts`): Start and Clock as `PregameVote`s, run by Crowd's machinery (`castPregameVote`,
-  `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: normal start, the Normal clock.
+- **Votes** (`votes.ts`): Mode, Start and Clock as `PregameVote`s, run by Crowd's machinery (`castPregameVote`,
+  `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: Classic, the normal start, the
+  Normal clock. The Mode vote's third option is `disabled` ("Coming soon": shown, never votable: `votable`). Bots vote
+  on the mode by a lean drawn per lobby (`botModeVotes`, `modeVote.classicLean`: most lobbies' bots lean Classic). A test
+  lobby's bots sit the Mode vote out (its opener decides), and its link's `mode=` skips it (`heldVotes`).
 - **The team clock** (Eric, Oct 10): one bank per squad for the whole tournament (`Squad.bankMs`), carried from
   match to match (`startTeamClocks`, then `planMatch` brings it in, `settleTeamClocks` takes it out), with a top-up
   when a squad starts a new round. The Clock option sets the starting bank, the top-up, the free seconds a move (a
@@ -61,7 +67,7 @@ the final a majority vote of the whole squad; the old Pick and Block is gone.
   - **The final** (one board): the whole squad to move votes (one duty, four players). Every pick made in time counts
     once; the most picked move plays; a tie for the most, a seeded coin between the tied moves; nobody picked, a
     random move (the "vote" event). Picks show live to their own squad only. No tokens.
-  - **Move blocks** (every round; `blocks.ts`): on its turn on a board, before its move there is settled, any of a
+  - **Move blocks** (Mercenary, every round; `blocks.ts`; Classic's block bank is 0, so none): on its turn on a board, before its move there is settled, any of a
     squad's players with a duty there may block moves of the other squad (`placeBlock`): a piece to a square, by how
     the piece moves (a slider up to and onto the first piece in its way, a pawn's pushes and diagonals, castling while
     they have the right). Paid at once from the squad's block bank for the match (`blocks.bankPerMatch`, 5; pawn 1,
@@ -78,6 +84,32 @@ the final a majority vote of the whole squad; the old Pick and Block is gone.
     team-clock rules with the lobby's free seconds; a draw is Black's), each squad keeping the block bank the final
     left it. The squad with more team bank left picks its colour (`armageddonChooser`). `endByMaterial` is the
     test-only "Next round" (a level result goes to bank, then a coin).
+- **Mercenary** (`mercenary.ts`; numbers `SQUADS.mercenary`; the calibration `reports/squads-mercenary.md`):
+  - **The wallet.** One per squad for the tournament, shared by its players (`Wallet`: coins, `earned` by play and by
+    round, catch-up, what it has `bought` this tournament, its `cart` for the next match). Coins left carry on.
+  - **Earning.** The match's rules emit "coins" events (a Mercenary match only): a capture by the piece taken (en
+    passant a pawn), a board won and more for a mate, a drawn board to each side, the match won. A **brilliant move**
+    (`brilliantCandidate`, then `isBrilliant` over the judge's top moves): a quiet move (no capture, not out of check),
+    from ply `brilliant.fromPly`, the best by `brilliant.gap` of expected score over every other move in a position
+    still in the balance, found without a Stockfish token. **Catch-up** (`catchUpCoins`) as a match of round 2 or the
+    final is set: the squad that has earned less by play gets a share of the gap (spending never counts).
+  - **The shop.** Open from a squad's match's end until its next match's first half (the wait that's there anyway),
+    for squads still in, never before round 1. `buyItem`/`unbuyItem`: each item's price rises by `priceStep` for every
+    one bought before this tournament (`itemPrice`); at most `items[x].cap` in one cart. `takeCart` as the match starts:
+    the cart becomes the match's kit (`applyKits`): time coins into the team bank, block points into the block bank, a
+    breather multiplying the side's free seconds (`delays`, `delayOf`: the drain, and sudden death's time a move),
+    Stockfish tokens and shields. A drawn final's Armageddon carries the final's on.
+  - **The Stockfish token** (`useStockfish`): on your own decision this half (your move before it's made, your pick or
+    vote before you lock in), paid at once; one a player a half (the final: one for the squad). Its lines are your top
+    moves in your position, your side to move (`tokenLines`: blocked moves out, never a reply), shown to you (the
+    final: the whole squad, `assistShownTo`), worked out on each such device. Logged in the match's `assists`, and the
+    events' `assisted` say whose choice had them on screen (`isAssisted`): never brilliant, never fair-play evidence.
+  - **The shield** acts as the half is played: the first block placed against its squad that would take effect (the
+    mercy rules and lifts weighed first) is "shielded": not in effect, its points still spent.
+  - **Bots** (`botShop`, `botUsesStockfish`): a squad of bots shops a few seconds into its window, saving some rounds,
+    spending most of its wallet in the final; blocks and time most, a Stockfish token now and then. A bot uses one of
+    its squad's tokens rarely (more when the engine's best stands out) and then plays the best move. Never for a squad
+    with people playing.
 - **What the sim says** (`reports/squads-sim.md`, Squads v2):
   - Median lobbies take 29-31 minutes on every option (Fast 3 min, Normal 4, Long 5; 3 free seconds); every 90th
     percentile is at most 40.
@@ -107,6 +139,7 @@ the final a majority vote of the whole squad; the old Pick and Block is gone.
 | The votes | `packages/chess/src/squads/votes.ts` |
 | Matches: setup, team clocks (bring in, drain, sudden death, carry out, views), duties, choices, blocks placed, visibility, resolution (tokens, the vote, blocks), clinch, ties, Armageddon | `packages/chess/src/squads/match.ts` |
 | Squad bots | `packages/chess/src/squads/bots.ts` |
+| Mercenary: earning, brilliant moves, wallets, the shop, catch-up, the bots' shopping, a token's lines | `packages/chess/src/squads/mercenary.ts` |
 | The bot simulation | `packages/sim/scripts/squads-sim.ts` → `reports/squads-sim.md` |
 
 ## Settings
@@ -116,8 +149,9 @@ top-up, free seconds and increment; `clockDefault`; vote timing), `moveCeilingSe
 `safetyCap`, `material`, `materialLead`, points, openings, `tokens` (per match, `refundGap`, `pawnWorth`), `blocks`
 (`bankPerMatch`, `cost`, `castlingCost`, `maxPerTurn`, `liftBeforeMate`, `liftInCheck`), `final` (`tie`),
 `armageddon` (the drawn final's fixed clocks), `noShowsBeforeBot`, `replacementBotSkill`, `bots` (choosing, same
-moves, blocks, copying in the final, winning with purpose, pacing), and the show times. A mode can give a match its
-own block banks (`MatchSetup.blockBanks`: 0 for none) without touching the rules.
+moves, blocks, copying in the final, winning with purpose, pacing), `modeVote` (the bots' lean), `mercenary` (earnings, catch-up, the price step, each item's price and cap, what
+each item gives, the token's search, the test wallet, the bots' shopping and token use), and the show times. A mode
+gives a match its own block banks (`MatchSetup.blockBanks`: 0 in Classic) without touching the rules.
 
 ## Tests and tools
 
@@ -128,7 +162,9 @@ own block banks (`MatchSetup.blockBanks`: 0 for none) without touching the rules
   visibility, copying, the clock, castling and promotion, the drawn-final Armageddon, replay, bots),
   `squads-v2.test.ts` (tokens: burn, the 0-token rule, refunds and their threshold, the breakdown's data; blocks:
   costs, the king, castling, several a turn, the mercy rules together with refunds, visibility, thinking time; bots'
-  same moves and blocks).
+  same moves and blocks), `squads-mercenary.test.ts` (the Mode vote and Classic's no blocks; coins, catch-up, the
+  wallet carried on; the shop's caps, prices and putting back; the kit for the next match only; every item; the
+  Stockfish token never showing the other squad's moves; fair play leaving assisted moves out; the bots' shopping).
 - Sim: `npm run sim:squads -- [lobbies] [nodes] [clocks]` (about 30 minutes at the defaults; `SQUADS_SIM_SET`,
   `SQUADS_SIM_MIXES` and `SQUADS_SIM_OUT` for tuning runs). Its tables are generated; the notes after the marker in
   `reports/squads-sim.md` are written by hand and kept across runs.
@@ -215,14 +251,35 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   test lobby, `POST /api/squads/lobby?start=votes|relay|pairs|final&clock=BANK,TOPUP,FREE,INC` (a team clock in
   seconds; `testLobbyOptions`), that fills 5 s after it opens, skipping the rounds before (squads with more people go
   through). For tests also `fen=` (the first round's boards start there: a legal position, White to move),
-  `bots=strong` (every bot at the strongest skill) and `seat=white` (the opener plays White on their first board). `start=votes` (Eric, Oct 12) fills the moment its opener connects (`fillAt` = now): seated, bots in every
-  other seat, the first vote after the full grid's moment, then the whole tournament.
-- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 2, typed): a lobby socket gets
-  `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock), `vote`/`voteCast`, `match` (a match in
-  full, as you may see it: tokens, block banks, blocks in effect and placed, the token log), `turn`, `clocks`,
-  `choices`, `half`, `choiceNo`, `block`, `blockNo`, `token`, `placed`, `results`, `botWork`, `left`, `error`,
-  `closed`, and sends `hello`, `vote`, `choose`, `lock`, `block`, `armageddon`, `speed`, `botTop` (each line with its
-  reply), `reclaim`, `leave`, `sync`, `nextRound`. A party socket
+  `bots=strong` (every bot at the strongest skill), `bots=blocks` (bots block whenever they can; `bots=strong,blocks`
+  for both) and `seat=white` (the opener plays White on their first board). `mode=mercenary|classic` sets the mode
+  (no Mode vote); without it the Mode vote is held and the bots sit it out, so the opener's vote decides. A Mercenary
+  test lobby that starts at Pairs or the final gives the squads still in a test wallet (`mercenary.testWallet`) and an
+  intro of `SQUADS_LOBBY.testShopSeconds` to shop in. `start=votes` (Eric, Oct 12) fills the moment its opener
+  connects (`fillAt` = now): seated, bots in every other seat, the first vote after the full grid's moment, then the
+  whole tournament.
+- **Mercenary** (the record's `wallets`, one per squad; `botShop` times). Each half's "coins" events go into the
+  wallets (`earnFrom`), and everyone gets `wallets` (every squad's: coins, earned, cart, bought, its shop). A squad's
+  shop (`shopOf`) is open from its match's end until its next match's first half (the other match feeding it, then
+  the round break): `buy`/`unbuy` from any of its people, refused (`shopNo`) when closed, capped or short; each
+  purchase goes to the squad's people as `bought` (who, what, the price). As a match of round 2 or the final is set,
+  catch-up (`coins`, why "catch_up", to everyone). As its first half starts, each squad's cart comes in as its kit
+  (`bringKits`: `takeCart`, `applyKits`; the match again to everyone). A Stockfish token: `assist` from a person with
+  a duty (`useStockfish`; refused `assistNo`), then to everyone `assist` with the use (who, where, `shownTo`) and
+  both squads' tokens left: the lines are worked out on `shownTo`'s own devices; nothing about them crosses the
+  server. A brilliant move is asked of the judge like a token (`requestBrilliant`: the half's own bot work on that
+  board, else a remembered answer, else devices for a person's move; bots' moves only from work already done); its
+  verdict after the show, `coins` (why "brilliant", the move and who found it) to everyone. Bots: a squad nobody is
+  playing (`botRun`) shops `mercenary.bots.shopSeconds` into its window (`botShop`) and now and then uses a token
+  (`botUsesStockfish`: then the best move); never a squad with people playing.
+- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 3, typed): a lobby socket gets
+  `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock and wallet), `vote`/`voteCast`, `match` (a
+  match in full, as you may see it: tokens, block banks, blocks in effect and placed, the token log; its mode, each
+  side's free seconds, kits, Stockfish tokens and shields left, the tokens used and being used, coins this match),
+  `turn`, `clocks`, `choices`, `half`, `choiceNo`, `block`, `blockNo`, `token`, `assist`, `assistNo`, `wallets`,
+  `bought`, `shopNo`, `coins`, `placed`, `results`, `botWork`, `left`, `error`, `closed`, and sends `hello`, `vote`,
+  `choose`, `lock`, `block`, `assist`, `buy`, `unbuy`, `armageddon`, `speed`, `botTop` (each line with its reply),
+  `reclaim`, `leave`, `sync`, `nextRound`. A party socket
   gets `welcome`, `party`, `error`, `closed` and sends `hello`, `queue`, `cancel`, `leave`.
 - **Not yet:** the live line doesn't count Squads lobbies or their players (nor does the matchmaker's overload limit);
   no quick chat in Squads lobbies.
@@ -247,10 +304,15 @@ to its results, halves, deadlines, takeover and reclaiming, leaving, team clocks
 visibility, Armageddon, the test controls, rewards, bot work on devices), `squads-v2-lobby.test.ts` (tokens through
 the server and the judge on devices: refunded, kept, no judge; blocks placed, seen, paid, refused, lifted, in effect;
 the final's vote with a block; test lobbies' position, strong bots and White seat; what each side sees),
-`squads-queue.test.ts` (the queue, parties, D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match,
+`squads-mercenary-lobby.test.ts` (the Mode vote; every wallet to everyone; one shared wallet, purchases live to the
+squad, caps, putting back, closed once the match starts; the kit; catch-up; the Stockfish token and a shield through
+the server; bots' shopping; a whole Mercenary bot lobby's coins adding up), `squads-queue.test.ts` (the queue,
+parties, D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match,
 restart, closing); e2e `e2e/squads.spec.ts` (a party through the real server; a test lobby at the final);
 `e2e/squads-test-tools.spec.ts` (the start link and Cheat lines, and a player without them); `e2e/squads-v2.spec.ts`
-(a token burned and refunded, a block and its arrow until they've moved, Cheat lines while blocking). The full-lobby run: `npx tsx scripts/squads-headless.ts
+(a token burned and refunded, a block and its arrow until they've moved, Cheat lines while blocking);
+`e2e/squads-mercenary.spec.ts` (choosing Mercenary in the Mode vote, earning coins, the shop between rounds, a
+Stockfish token and a shield). The full-lobby run: `npx tsx scripts/squads-headless.ts
 --url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
 
 ## The screens (phase 3)
@@ -317,6 +379,22 @@ door's look; every class is `sq-`.
   pick, or a teammate's; with none yet, the move handed over: `blockCheatFen`), the ones worth blocking. It stays on (`SquadsClient.cheatLines`, this device only) until switched off, searching
   each new position on an engine of its own (`ownEngine()`, never queued behind bot work). Nothing is sent; scoring,
   bots and the server never see it. A page whose `welcome` says no `test` never shows it, and the switch can't turn on.
+- **The Mode vote** is Crowd's vote board with three cards: Classic, Mercenary, and "Coming soon" (dashed and hatched,
+  its card disabled; a pawn dropped on it walks back).
+- **Mercenary on screen** (`components/MercenaryShop.tsx`; classes `mc-`):
+  - **The shop** (`MercenaryShop`): a sheet at the foot of the screen while your squad's shop is open (nothing behind it
+    dimmed), until your next match starts: the one line "Spend your coins on items for the next round or save them for
+    later.", your squad's coins and the other squad's (with its cart), any catch-up, every item (its icon, what it does,
+    the price now, how many of the round's cap are in the cart, − and Buy), and the last few purchases by name. "Hide"
+    folds it into a pill ("Shop" and the coins) that opens it again. The first time an account sees it (on this device:
+    `brc.mercenary.seen.<user id>`), a short explainer with "Got it".
+  - **In a match:** a line in the panel with both squads' coins and what's left of their kits (Stockfish tokens,
+    shields, a breather); under the clocks each squad's block points (none in Classic) and tokens; the free seconds
+    count a breather's. On your decision: "Stockfish token · N left"; used, your top moves as arrows coloured by rank
+    with their evaluations and listed under it ("Your Stockfish lines"; in the final, a teammate's token shows the
+    squad's). Blocking against a squad with a shield: the line under Block says so. The line above the board: a block
+    a shield cancelled (both squads) and a brilliant move ("Brilliant! Nf5 by Pam: +75 coins for Rooks").
+  - **The standings** show every squad's coins (the side panel; the phone's sheet).
 - **Bot work on this device:** after `welcome` the page runs its engine speed check once (`engineSpeed()`, shared with
   Crowd's judges) and sends `speed`; each `botWork` job is searched on the engine pool (`topMovesAt(fen, n, nodes)`,
   every engine at once) and answered with `botTop`. A knocked-out player's page keeps answering while it's open.

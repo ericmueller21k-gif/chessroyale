@@ -33,6 +33,12 @@ describe("which positions count", () => {
     expect(skipReason(mv({ powerUp: true }))).toBe("powerUp");
   });
 
+  it("never counts a move played with a Stockfish token (Squads' Mercenary: sanctioned engine help), however good", () => {
+    expect(skipReason(mv({ engineToken: true }))).toBe("engineToken");
+    // Even a hard find the crowd missed: it was the game's own engine on their screen.
+    expect(skipReason(mv({ engineToken: true, gap: S.onlyGap, crowdFound: 0 }))).toBe("engineToken");
+  });
+
   it("skips only moves and recaptures most of the crowd found, but counts the ones the crowd missed", () => {
     expect(skipReason(mv({ gap: S.onlyGap, crowdFound: 30 }))).toBe("only");
     expect(skipReason(mv({ gap: S.onlyGap, crowdFound: 2 }))).toBeNull();

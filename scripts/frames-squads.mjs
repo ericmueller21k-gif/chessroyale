@@ -1,12 +1,16 @@
 // Frame-by-frame check of Squads' screens, played the way a player plays them (real taps), against a running server
 // with the test switch on (npx wrangler dev --var SQUADS_TEST:1 ...):
-//   npm run frames:squads -- <out-dir> <relay|pairs|final|block|token|menu|standings> [url=http://localhost:8787] [width=390] [scheme=dark]
+//   npm run frames:squads -- <out-dir> <relay|pairs|final|block|token|menu|standings|modevote|shop|stockfish|shield> [url=http://localhost:8787] [width=390] [scheme=dark]
 // relay: your move (it must show at once and never snap back), then scouting a tiny board and back.
 // pairs: your pick, lock in, the coin-flip reveal. final: your vote, lock in, the vote's reveal.
 // block: from the Scotch recapture, Block, their queen, f6: the arrow draws, keeps redrawing with its lock pulsing,
 // through your move and theirs, until they've moved (each frame's arrows are logged too). token: the same move as your
 // bot partner there (Qxd4): the same-move reveal and, a few seconds later, the refund.
 // menu: the home screen's Squads card and a party with a friend in it. standings: every squad's clock (and sudden death).
+// Mercenary: modevote: the Mode vote (Mercenary tapped, Coming soon disabled), its result and the next vote. shop: a
+// Mercenary test lobby at Pairs: the shop sliding in, the explainer, two purchases, Hide and the pill, then the match
+// starting (the shop going); PNGs of the sheet, also with a wide wallet (12,345). stockfish: a token used on your pick
+// (its arrows and lines). shield: a shield bought, the bots blocking whenever they can, the line saying it was cancelled.
 // Every painted frame is recorded (Chrome's screencast); the big board's pieces are logged on every animation frame,
 // and the timeline printed: a piece that moves twice, jumps back or flickers shows as an extra change. A GIF of the
 // moment goes to <out-dir>/<mode>-<width>.gif (and PNGs for menu and standings). See .claude/LESSONS.md.
@@ -242,6 +246,103 @@ if (mode === "relay") {
   await timeline(since);
   console.log("flashes at frames", await flashes(frames));
   gif(frames, `token-${W}`);
+} else if (mode === "modevote") {
+  await p.goto(`${url}/squads/test?nolanding&debug&clock=120,0,3,0`);
+  await p.locator(".vote-title h1", { hasText: "Which mode?" }).waitFor({ timeout: 40_000 });
+  await p.waitForTimeout(600);
+  await p.screenshot({ path: `${out}/modevote-${W}.png` });
+  const since = Date.now();
+  const { frames } = await record(async () => {
+    await p.locator(".vote-card").nth(1).click();
+    await p.locator(".vote-title h1", { hasText: "How do the boards start?" }).waitFor({ timeout: 30_000 });
+    await p.waitForTimeout(1500);
+  });
+  await timeline(since);
+  console.log("flashes at frames", await flashes(frames));
+  gif(frames, `modevote-${W}`);
+} else if (mode === "shop" || mode === "stockfish" || mode === "shield") {
+  await testLobby("pairs", "120,0,3,0", `&mode=mercenary&bots=strong${mode === "shield" ? ",blocks" : ""}`);
+  const shop = p.locator(".mc-shop");
+  if (mode === "shop") {
+    const since = Date.now();
+    const { frames } = await record(async () => {
+      await shop.waitFor({ timeout: 20_000 });
+      await p.waitForTimeout(1200);
+      await p.screenshot({ path: `${out}/shop-explainer-${W}.png` });
+      await p.getByRole("button", { name: "Got it" }).click();
+      await p.waitForTimeout(500);
+      await p.getByRole("button", { name: /^Buy a Stockfish token/ }).click();
+      await p.waitForTimeout(700);
+      await p.getByRole("button", { name: /^Buy a Shield/ }).click();
+      await p.waitForTimeout(900);
+      await p.screenshot({ path: `${out}/shop-${W}.png` });
+      // The widest realistic wallet (and the other squad's): measured, not only looked at.
+      await p.evaluate(() => {
+        const s = window.squads;
+        s.wallets = s.wallets.map((w) => ({ ...w, coins: 12345 }));
+        s.emit();
+      });
+      await p.waitForTimeout(300);
+      const over = await p.evaluate(() => {
+        const sheet = document.querySelector(".mc-shop");
+        const cut = [...document.querySelectorAll(".mc-shop *")].filter((e) => e.getBoundingClientRect().right > sheet.getBoundingClientRect().right + 0.5 || (e.scrollWidth > e.clientWidth + 0.5 && getComputedStyle(e).overflow !== "visible" && !e.matches(".mc-shop-when")));
+        return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, cut: cut.map((e) => e.className) };
+      });
+      console.log("wide wallet: sideways scroll", over.page, "cut", JSON.stringify(over.cut));
+      await p.screenshot({ path: `${out}/shop-wide-${W}.png` });
+      await p.getByRole("button", { name: "Hide" }).click();
+      await p.waitForTimeout(600);
+      await p.locator(".mc-shop-pill").click();
+      await p.waitForTimeout(600);
+      await shop.waitFor({ state: "detached", timeout: 60_000 });
+      await p.waitForTimeout(1500);
+    });
+    await timeline(since);
+    console.log("flashes at frames", await flashes(frames));
+    gif(frames, `shop-${W}`);
+  } else {
+    await shop.waitFor({ timeout: 20_000 });
+    await p.getByRole("button", { name: "Got it" }).click().catch(() => undefined);
+    await p.getByRole("button", { name: mode === "stockfish" ? /^Buy a Stockfish token/ : /^Buy a Shield/ }).click();
+    await shop.waitFor({ state: "detached", timeout: 60_000 });
+    if (mode === "stockfish") {
+      const s = await waitFor((x) => x.duty?.role === "pick", 120_000);
+      await p.waitForTimeout(800);
+      const since = Date.now();
+      const { frames } = await record(async () => {
+        await p.getByRole("button", { name: /^Stockfish token/ }).click();
+        await p.locator(".mc-stockfish .sq-cheat-lines li").nth(2).waitFor({ timeout: 30_000 });
+        await p.waitForTimeout(2000);
+        await p.screenshot({ path: `${out}/stockfish-${W}.png` });
+        await pick(s);
+        await p.waitForTimeout(1500);
+      });
+      await timeline(since);
+      console.log("flashes at frames", await flashes(frames));
+      gif(frames, `stockfish-${W}`);
+    } else {
+      const since = Date.now();
+      const { frames } = await record(async () => {
+        // (Playing your picks meanwhile, so no bot takes your seat; the news shows in the panel whichever board it was on.)
+        let last = null;
+        const end = Date.now() + 120_000;
+        while (Date.now() < end && !(await p.locator(".sq-status-block.mc-shield, .sq-note.news", { hasText: /shield/ }).count())) {
+          const s = await seen();
+          if (s?.duty && `${s.key}/${s.seq}` !== last && !s.locked) {
+            last = `${s.key}/${s.seq}`;
+            await pick(s).catch(() => undefined);
+            await p.getByRole("button", { name: /^Lock in my/ }).click({ timeout: 3000 }).catch(() => undefined);
+          }
+          await p.waitForTimeout(200);
+        }
+        await p.waitForTimeout(3200);
+      });
+      await timeline(since);
+      console.log("flashes at frames", await flashes(frames));
+      gif(frames, `shield-${W}`);
+      await p.screenshot({ path: `${out}/shield-after-${W}.png` });
+    }
+  }
 } else if (mode === "standings") {
   await testLobby("relay", "8,0,3,0");
   await waitFor((x) => x.state === "half");

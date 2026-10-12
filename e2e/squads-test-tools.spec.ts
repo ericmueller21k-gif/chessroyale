@@ -44,7 +44,8 @@ test("the start link seats you with bots at once at the first vote; Skip votes; 
   await named(page, "Eric");
   await page.goto("/squads/test?nolanding&debug&clock=90,0,3,0");
   // No waiting for the fill: the first vote is up at once, every other seat a bot.
-  await expect(page.locator(".vote-title h1")).toHaveText("How do the boards start?", { timeout: 15_000 });
+  // (The Mode vote first: Classic, Mercenary, Coming soon.)
+  await expect(page.locator(".vote-title h1")).toHaveText("Which mode?", { timeout: 15_000 });
   const lobby = await page.evaluate(() => {
     const s = (window as any).squads;
     return { people: s.lobby.players.filter((p: any) => !p.isBot).length, bots: s.lobby.players.filter((p: any) => p.isBot).length, vote: s.vote?.index };
@@ -95,7 +96,7 @@ test("a player (not a test player) never gets Cheat lines: no button, and switch
     });
   });
   await page.goto("/squads/test?nolanding&debug&clock=90,0,3,0");
-  await expect(page.locator(".vote-title h1")).toHaveText("How do the boards start?", { timeout: 15_000 });
+  await expect(page.locator(".vote-title h1")).toHaveText("Which mode?", { timeout: 15_000 });
   await expect(page.getByRole("button", { name: "Skip votes" })).toHaveCount(0);
   // (The server here lets anyone skip; the page has no button for it, so the test asks directly.)
   await page.evaluate(() => (window as any).squads.nextRound());

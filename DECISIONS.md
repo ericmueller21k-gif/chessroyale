@@ -1838,6 +1838,8 @@ blocks to move blocks: "It's not a full piece block ever. You tap their piece an
   `liftInCheck`):** the brief's "if they're in check, a piece that can answer the check can't be blocked", carried to
   move blocks: in check every legal move answers it, so every block is lifted. Eric's move-block message listed only
   the two mercy rules; this one is kept as a setting he can turn off. You pay only for blocks that take effect.
+  **Confirmed by Eric (Oct 12, ~22:00):** `liftInCheck` stays on: "That's fine, no blocks while putting enemy in check,
+  good idea."
 - **The look (Eric):** each blocked move is an arrow from the piece to the square, both squads, from the moment it's
   placed until the other squad has played its move: it draws like a move arrow, then keeps redrawing itself slowly
   and softly (a 2.6 s loop at about 55% strength), the lock fading in and out on it (35-90%). Its beat is kept from when
@@ -1880,3 +1882,153 @@ token log; the final's one duty; bot-work answers carry each line's reply.
 **A test bound:** the full bot lobby unit test (no devices: the server's quick look, far weaker bots) ran 43-103 minutes
 over 8 seeds before v2 and 41-96 after (means 65 and 64). Its upper bound of 60 held only for its own seed, by luck;
 it's now what must hold, the lobby's safety close for a lobby nobody is in (`LOBBY_LIFE.lobbyAbandonedMinutes`, 180).
+
+### Squads modes: Classic and Mercenary (Eric, Oct 12, 2026)
+
+Eric designed a mode vote with a coin economy for Squads, and asked for it calibrated to play out "smooth and
+balanced". He named it Pillage, then renamed it the same evening: "Can we change pillage to Mercenary... just make
+front facing called Mercenary mode". Nothing had shipped under the old name, so it's `mercenary` in the code and
+settings too. Every number below is one line in `SQUADS.mercenary` or `SQUADS.modeVote`; the calibration is
+`reports/squads-mercenary.md` (the Squads sim playing Mercenary: `SQUADS_SIM_MODE=mercenary npm run sim:squads`).
+
+**The Mode vote** is the first pre-game vote, before Start and Clock, on the same machinery.
+- The options are **Classic** (just chess: same-move tokens stay, since they fix a fairness hole; no blocks, block
+  bank 0; no coins, no shop) and **Mercenary**. A third card says **Coming soon**: shown, never votable. The server
+  refuses it, the cards and zones show it dashed, and a pawn dropped on it walks back. My suggestions for the third
+  mode (Hand & Brain, Bughouse, Fog of War) are in ROADMAP.md; nothing is built.
+- Nobody voting means Classic, the base game.
+- **Bots vote, leaning Classic.** Each lobby draws a lean, a Classic share between 0.35 and 0.75, and each bot votes
+  Classic with that chance. In about 65% of lobbies the bots' majority is Classic, in the rest Mercenary, and a few
+  people can swing a close one.
+- Start and Clock keep their bots' random draws, so adding the vote moved nothing else.
+- **Test lobbies:** the bots sit the Mode vote out, so the opener's vote decides it. `mode=mercenary` or
+  `mode=classic` on the link skips the vote (`/squads/test?mode=mercenary`, `/squads/test/pairs?mode=mercenary`).
+- **Mercenary's base block bank stays 5,** Eric's number from Squads v2; Block points add to it.
+
+**Earning: the numbers.** Eric's scale was hundreds of coins, with a good team having about 700 saved by the later
+rounds.
+- **Captures pay 3 coins a point of the piece taken:** pawn 3, knight or bishop 9, rook 15, queen 27. They're the
+  frequent, small rewards.
+- **Board results:** a board won pays 50, and a checkmate 50 more (100, "around a hundred"). A drawn board pays 15 to
+  each side. Winning the match pays 75, so every squad that goes through has something to shop with.
+- The final's coins buy nothing (no round follows), but they're counted all the same.
+- **The result** (72 lobbies, three skill mixes):
+  - A squad that wins Relay earns about 600 (median 609; Relay pays most, with 4 boards).
+  - It shops before Pairs with a median wallet of 621 (10th to 90th percentile: 509 to 693). Bots shopping as people
+    might buy 2.4 items there, and save everything 26% of the time.
+  - It reaches the final's shop with a median of 690 (518 to 1,048) and caps 1.4 items on average: a strong squad can
+    max out a few items, never all of them (every cap at first prices costs about 1,500).
+  - Eric's "~700 saved by the later rounds" is about the final's median.
+
+**Brilliant moves.** Squads had no detection to reuse. Crowd's `brilliance` needs a field of six or more people
+picking in one position, and Squads has one to four. So Mercenary uses the judge the same-move tokens already use (the
+bot engine's top moves, from players' devices).
+- **A brilliant move** is a quiet move (not a capture, not out of check), from ply 16, in a position still in the
+  balance (the best scores between 0.1 and 0.9). It must be the judge's best by 0.5 of expected score over every other
+  line, about 2.7 pawns.
+- **Captures and answers to a check are left out** because they're often the only move without being brilliant
+  (taking a loose piece, which pays anyway).
+- **Never with a Stockfish token's lines on screen.**
+- **Bots' moves** are judged only from work already done; a person's move gets a device job.
+- **75 coins.** It's rare: 0.7 a lobby in the sim.
+
+**Catch-up** (Eric: so the rich don't just get richer).
+- **Who gets it:** the squad that has earned less by play than its next opponent gets half the difference (to the
+  nearest 10, at most 300). It's paid as the match is set (both squads known), during the shop's window.
+- **Between rounds, not during a match:** coins only buy items for the next match, so a comeback bonus during a match
+  would come too late to help.
+- **It compares coins earned, not wallets,** so spending first can't farm it.
+- **The sim:** the median gap was 72 before Pairs and 138 before the final, and catch-up paid 40 and 70. The squad that
+  had earned less won 48% and 46% of those matches: no snowball. The squad that spent more won 62% in Pairs and 48% in
+  the final: items matter, without deciding.
+
+**The shop.**
+- **When:** open from a squad's match's end until its next match's first half. That's the wait for the other match
+  plus the 20 s break, which is there anyway: it adds no time. Squads still in only; none before Relay (no coins yet).
+- **One wallet:** anyone on the squad buys from it, and each purchase goes live to the squad by name. Every squad's
+  coins and cart are public, for counterplay.
+- **"−" puts the last one back** at what it cost, while the shop is open. With four people on one wallet, a mis-tap
+  needs undoing.
+- **Escalation: +100 for every one of that item the squad has already bought this tournament,** one rule for every
+  item. Eric's anchors fit it exactly: Stockfish tokens at 200, 300, 400 (the third about 400), and shields at 100,
+  then 200. The Buy button shows the price now. Cheap items climb steeply, which pushes squads towards variety.
+- **Caps per round:** Stockfish token 2, breather 1 (a second doubling means nothing), block points 2, shield 2, time
+  coin 2.
+- **Test lobbies starting at Pairs or the final:** the squads still in get 600 coins (about the median wallet before
+  Pairs) and a 30 s intro to shop in.
+
+**The items, ranked by what they're worth, then priced.**
+1. **Stockfish token, 200.** An engine-perfect decision at the moment you choose is worth more than any amount of free
+   time: far ahead.
+   - It shows your own top 3 moves for one decision, with evaluations, in your position, your side to move. Blocked
+     moves are left out, and it never shows a reply or the other squad's moves (`tokenLines` keeps first moves only).
+   - **It's worked out on the user's own device** (Cheat lines' code: its own engine, 300,000 nodes), not through the
+     bot-work path. The lines appear at once, nothing about them crosses the server (the position is public anyway),
+     no other device is loaded, and Eric's computing priorities say a device that can do the job does it. The engine
+     is deterministic at fixed nodes, so in the final every teammate's device shows the same lines.
+   - **Pairs: the partner who used it only sees it.** Their partner sees their pick live anyway; the evaluations and
+     alternatives stay theirs. **The final: the whole squad sees it,** and one a half is enough there. Elsewhere it's
+     one a player a half.
+2. **Breather, 150.** Double free seconds a move for the whole match (3 s become 6). In Pairs that saves up to 3 s on
+   each of a squad's ~80 moves, worth several time coins, and out of time it doubles the time for every move. It's
+   the second-strongest item, so it costs more than block points or a shield.
+3. **Block points, 100:** +3 points, a queen block or a minor and a pawn (offence).
+3. **Shield, 100:** cancels one block that would bite, and the blocker still pays (defence). It's level with block
+   points.
+5. **Time coin, 75:** +30 s on the team bank as the match starts, about ten moves' drain. It goes into the bank (so
+   it's "used" then), and what's left of a bank carries on as always.
+
+No sixth item. Extra same-move tokens only matter in Pairs, a takeback isn't chess, and a hidden move needs fog; none
+was clean.
+
+**Item rules.**
+- **The shield acts as the half is played,** on blocks that would take effect, the first placed first; their points
+  stay spent. A block lifted anyway (impossible after the blocker's move, a check under `liftInCheck`, a mercy rule)
+  never uses a shield, and stays refunded.
+- **Shield and mercy together:** of blocks that together would trip a mercy rule, the later ones are lifted
+  (refunded), and the earlier one, still standing, is the one shielded.
+- **Shields are public.** A cheap decoy block pops one before the real block: counterplay.
+- **Armageddon after a drawn final carries the final's tokens, shields and breather on:** it's the same round, as
+  block banks are.
+
+**Bots.**
+- A squad shops by bots only while nobody is playing on it; a bot never spends people's coins.
+- They shop 3-9 s into the window. Before the final they save everything a quarter of the time, or else spend 50-90%
+  of the wallet; in the final they spend it all.
+- They choose by weight: block points 3, time and shields 2, breather 1, Stockfish token 0.5.
+- They use a Stockfish token on 4% of decisions, or 35% when the engine's best beats the next by 0.2 or more, and then
+  play the best move. That's about 0.2 tokens a squad a match in the sim.
+
+**Fair play: token moves are left out.**
+- **Squads moves aren't recorded for fair play today:** there are no judged numbers per person's move to record. So
+  the exclusion is built where it will hold.
+- **Core:** `FairMove.engineToken` gives the skip reason "engineToken": never counted, never part of anyone's crowd.
+- **Squads:** each match's `assists` log and the events' `assisted` say exactly whose choices had the lines on screen
+  (`isAssisted`).
+- When Squads feeds fair play, those moves go in with `engineToken`. They already never earn brilliant coins.
+
+**The look.**
+- The shop is a sheet at the foot of the screen with nothing dimmed behind it, so the boards stay in view. "Hide"
+  folds it into a pill. It shows Eric's line, both squads' wallets, any catch-up, the items and the purchases.
+- **The explainer shows once per account,** remembered on the device under the account's id. A server-side flag
+  would need a new stored field for a few lines of text; a second device shows it once more.
+- In a match, a line in the panel shows both squads' coins and what's left of their kits. Under each clock: the block
+  points (none in Classic) and same-move tokens. The line above the board announces a shield or a brilliant move.
+  The standings show every squad's coins.
+
+**Length** (Eric: about 30 minutes; the shop must add none).
+- The shop adds none. Items that buy time do lengthen games.
+- In the sim, on the same seeds and the Normal clock, Mercenary's median lobby was 33.1 minutes against Classic's
+  31.3. The 90th percentiles were 39.1 and 40.3.
+- **Without time coins and breathers bought** (a tuning run), Mercenary matched Classic exactly.
+- Making breathers pricier and the bots buy time less often brought the gap from 4 minutes down to about 1.5-2.
+- Squads in Mercenary reach sudden death less often (39% against 51%).
+
+**Protocol 3** (`SQUADS_PROTOCOL`): the Mode vote; `wallets`, `buy`/`unbuy`, `bought`, `shopNo` and `coins`; the
+match's mode, free seconds, kit, tokens, shields, assists and coins; `assist` both ways and `assistNo`; "coins"
+events; shielded blocks.
+
+**Test tools.**
+- `/squads/test?mode=mercenary`.
+- `bots=blocks` (or `bots=strong,blocks`) has a test lobby's bots block whenever they can, so a test, or Eric, can
+  see a shield fire.

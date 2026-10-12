@@ -18,6 +18,8 @@ export interface VoteOption {
   detail?: string;
   /** Settings this option sets if it wins. */
   patch: Partial<Settings>;
+  /** Shown but can't be voted for (Squads' third mode, "Coming soon"): the server refuses it; nobody's vote lands there. */
+  disabled?: boolean;
 }
 
 export interface PregameVote {

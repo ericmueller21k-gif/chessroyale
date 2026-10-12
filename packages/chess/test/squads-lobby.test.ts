@@ -139,14 +139,17 @@ describe("Squads: the bracket", () => {
 describe("Squads: pre-game votes", () => {
   const votes = squadsVotes();
 
-  it("two votes: Start (3 options) and Clock (Fast, Normal, Long from settings)", () => {
-    expect(votes.map((v) => v.id)).toEqual(["start", "clock"]);
-    expect(votes[0]!.options.map((o) => o.rule.start)).toEqual(["standard", "same", "random"]);
-    expect(votes[1]!.options.map((o) => o.rule.clock)).toEqual([...SQUADS.clocks]);
-    expect(votes[1]!.options.map((o) => o.id)).toEqual(["fast", "normal", "long"]);
+  it("three votes: Mode first (Classic, Mercenary, Coming soon), then Start (3 options) and Clock (Fast, Normal, Long from settings)", () => {
+    expect(votes.map((v) => v.id)).toEqual(["mode", "start", "clock"]);
+    expect(votes[0]!.options.map((o) => o.rule.mode ?? null)).toEqual(["classic", "mercenary", null]);
+    expect(votes[0]!.options.map((o) => o.label)).toEqual(["Classic", "Mercenary", "Coming soon"]);
+    expect(votes[0]!.options.map((o) => !!o.disabled)).toEqual([false, false, true]);
+    expect(votes[1]!.options.map((o) => o.rule.start)).toEqual(["standard", "same", "random"]);
+    expect(votes[2]!.options.map((o) => o.rule.clock)).toEqual([...SQUADS.clocks]);
+    expect(votes[2]!.options.map((o) => o.id)).toEqual(["fast", "normal", "long"]);
     const c = SQUADS.clocks[1]!;
-    expect(votes[1]!.options[1]!.label).toBe(`Normal ${minutesName(c.bankSeconds)} min`);
-    expect(votes[1]!.options[1]!.blurb).toBe(teamClockLine(c));
+    expect(votes[2]!.options[1]!.label).toBe(`Normal ${minutesName(c.bankSeconds)} min`);
+    expect(votes[2]!.options[1]!.blurb).toBe(teamClockLine(c));
     expect(teamClockLine({ id: "x", label: "X", bankSeconds: 360, topUpSeconds: 60, delaySeconds: 5, incrementSeconds: 0 })).toBe(
       "Team clock 6 min · +1 min a round · 5 s free a move",
     );
@@ -160,14 +163,15 @@ describe("Squads: pre-game votes", () => {
     expect(clockName({ bankSeconds: 90, incrementSeconds: 1 })).toBe("1:30+1");
   });
 
-  it("nobody voting gives the normal start and the Normal clock", () => {
-    expect(rulesFromVotes({})).toEqual({ start: "standard", clock: SQUADS.clocks[SQUADS.clockDefault] });
+  it("nobody voting gives Classic, the normal start and the Normal clock", () => {
+    expect(rulesFromVotes({})).toEqual({ mode: "classic", start: "standard", clock: SQUADS.clocks[SQUADS.clockDefault] });
     expect(SQUADS.clocks[SQUADS.clockDefault]!.id).toBe("normal");
-    expect(rulesFromVotes({ start: 2, clock: 0 })).toEqual({ start: "random", clock: SQUADS.clocks[0] });
+    expect(rulesFromVotes({ start: 2, clock: 0 })).toEqual({ mode: "classic", start: "random", clock: SQUADS.clocks[0] });
+    expect(rulesFromVotes({ mode: 1 }).mode).toBe("mercenary");
   });
 
   it("runs on Crowd's vote machinery: one vote each, bots vote, non-voters join the winner", () => {
-    const clock = votes[1]!;
+    const clock = votes[2]!;
     const everyone = Array.from({ length: 32 }, (_, i) => `p${i}`);
     let cast: { playerId: string; option: number }[] = [];
     for (const v of botVotes(mulberry32(4), everyone.slice(0, 30), clock.options.length, SQUADS.voteSeconds * 1000, SQUADS.voteBotSkip)) {

@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
 import { applyMove, inCheck, legalMoves, toSan, type MoveScore } from "@chessroyale/chess";
-import { minutesName, type Colour, type Side, type SquadsEvent } from "@chessroyale/chess/squads";
+import { minutesName, tokenLines, type Colour, type Side, type SquadsEvent } from "@chessroyale/chess/squads";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
@@ -10,6 +10,7 @@ import { MuteButton } from "../components/MuteButton.tsx";
 import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { ClockText, Member, SquadTag, SquadsBoards, StandingsStrip, shownTurn, useNow } from "../components/SquadsParts.tsx";
 import { BlockArrows, BlockPicker, LockIcon, PickTags, SquadResources, TokenBreakdown, squareAt } from "../components/SquadsBlocks.tsx";
+import { Coins, ItemIcon, KitIcons } from "../components/MercenaryShop.tsx";
 import { ownEngine } from "../engine.ts";
 import type { SquadsClient } from "../squads.ts";
 import {
@@ -21,19 +22,24 @@ import {
   blockCheatFen,
   blockName,
   blocksShown,
+  canUseStockfish,
   cheatArrows,
   cheatEval,
   cheatLinesAt,
   colourOf,
   dutyOf,
+  freeMs,
   liveBank,
   drainRate,
+  myAssist,
   myBoards,
   points,
   scouting,
   shownMatches,
   sideIn,
   squadName,
+  stockfishLeft,
+  walletOf,
   type LocalMatch,
 } from "../squads-view.ts";
 
@@ -215,7 +221,9 @@ function ClockLine({ client, m }: { client: SquadsClient; m: LocalMatch }) {
   const mine = sideIn(m, client.myId);
   const order: Side[] = mine === 1 ? [1, 0] : [0, 1];
   const live = m.state === "half" && m.current;
-  const free = live ? Math.max(0, m.current!.startedAt + m.delayMs - now) : 0;
+  // (Your squad's free seconds, or the side to move on the board: a breather gives a squad more.)
+  const freeSide: Side = mine ?? (m.current?.duties[0]?.side ?? 0);
+  const free = live ? Math.max(0, m.current!.startedAt + freeMs(m, freeSide) - now) : 0;
   const clockOf = (side: Side) => {
     const bankMs = liveBank(m, side, now);
     return { squadId: m.sides[side].squadId, bankMs, suddenDeath: bankMs <= 0, rate: drainRate(m, side, now), key: m.key };
@@ -234,7 +242,7 @@ function ClockLine({ client, m }: { client: SquadsClient; m: LocalMatch }) {
               <SquadTag id={m.sides[side].squadId} you={side === mine} />
               <ClockText clock={clockOf(side)} delayMs={m.delayMs} short />
             </span>
-            <SquadResources bank={blockBankNow(m, side)} tokens={m.tokens ? m.tokens[side] : null} you={side === mine} />
+            <SquadResources bank={m.mode === "classic" ? null : blockBankNow(m, side)} tokens={m.tokens ? m.tokens[side] : null} you={side === mine} />
           </span>
         </>
       ))}
@@ -258,7 +266,7 @@ function Banner({ title, sub, until, children }: { title: string; sub?: Componen
 
 /** One line of plain-language rules for each format. */
 function rulesLine(m: LocalMatch): string {
-  if (m.format === "relay") return "Each turn you make one move, one board along. Before it, you can block some of their moves.";
+  if (m.format === "relay") return m.mode === "classic" ? "Each turn you make one move, one board along." : "Each turn you make one move, one board along. Before it, you can block some of their moves.";
   if (m.format === "pairs") return "You and your partner each pick; a coin plays one. Pick the same move and it plays for sure: a token.";
   return "Your whole squad votes: the most picked move plays (a tie: a coin). Copy a teammate with a tap.";
 }
@@ -380,7 +388,8 @@ function MatchView({
   // Blocking: before your squad's move here is settled, with points in the bank.
   const bank = mySide === null ? 0 : blockBankNow(m, mySide);
   const settled = !!d && (d.duty.role === "move" ? !!mineChoice : d.duty.players.every((p) => m.locked.includes(p)));
-  const canBlock = !!d && m.state === "half" && !history.browsing && d.duty.board === boardId && !settled && !client.me?.botPlays;
+  // (Classic has no blocks.)
+  const canBlock = m.mode !== "classic" && !!d && m.state === "half" && !history.browsing && d.duty.board === boardId && !settled && !client.me?.botPlays;
   const [blockMode, setBlockMode] = useState(false);
   const blocking = blockMode && canBlock && bank > 0;
   useLayoutEffect(() => {
@@ -418,7 +427,16 @@ function MatchView({
   const cheatFen = cheatBase === null ? null : cheatLinesAt(client.test, { choosing: choosing || blocking, colourChoice: !!armChoice && mySide === armChoice.chooser && !client.me?.botPlays, fen: cheatBase });
   const cheatOn = cheatFen !== null && client.cheatLines;
   const cheat = useCheatLines(cheatOn ? cheatFen : null);
-  const boardArrows = useMemo(() => (cheatOn && cheat?.length ? [...liveArrows, ...cheatArrows(cheat)] : liveArrows), [liveArrows, cheatOn, cheat]);
+  // Mercenary: a Stockfish token's lines, on your screen only (the final: your squad's), for your own decision on this
+  // board this half: your side to move, your own top moves, never theirs (and never while blocking: that's their moves).
+  const assist = m.state === "half" && !history.browsing ? myAssist(m, boardId, me) : null;
+  const tokenOn = !!assist && !blocking && assist.fen === b.fen;
+  const tokenTop = useEngineLines(tokenOn ? b.fen : null, SQUADS.mercenary.stockfish.lines + inEffect.length, SQUADS.mercenary.stockfish.nodes);
+  const token = tokenOn && tokenTop ? tokenLines(tokenTop, inEffect) : null;
+  const boardArrows = useMemo(
+    () => (token?.length ? [...liveArrows, ...cheatArrows(token)] : cheatOn && cheat?.length ? [...liveArrows, ...cheatArrows(cheat)] : liveArrows),
+    [liveArrows, cheatOn, cheat, token],
+  );
   // Every blocked move on this board, for everyone, from when it's placed until the other squad has moved.
   const shownBlocks = history.browsing ? [] : blocksShown(m, boardId);
   const banner = client.banner && client.banner.key === m.key && client.banner.board === boardId && now - client.banner.at < BANNER_MS ? client.banner : null;
@@ -455,8 +473,8 @@ function MatchView({
         <div class="opening-name sq-status" aria-live="polite">
           {/* (A block placed or lifted: said here for a few seconds, both squads; the reveal's words come first.) */}
           {banner && !revealing ? (
-            <span class="sq-status-block" key={banner.at}>
-              <LockIcon size={13} />
+            <span class={`sq-status-block${banner.kind ? ` mc-${banner.kind}` : ""}`} key={banner.at}>
+              {banner.kind === "shield" ? <ItemIcon item="shield" size={13} /> : banner.kind === "brilliant" ? <span class="mc-bang" aria-hidden="true">!!</span> : <LockIcon size={13} />}
               {banner.text}
             </span>
           ) : (
@@ -532,6 +550,18 @@ function MatchView({
           </button>
         )}
         {cheatFen !== null && <CheatLines on={client.cheatLines} top={cheat} fen={cheatFen} onToggle={() => client.toggleCheatLines()} />}
+        {m.mode === "mercenary" && d && m.state === "half" && d.duty.board === boardId && (
+          <StockfishToken
+            left={mySide === null ? 0 : stockfishLeft(m, mySide)}
+            can={canUseStockfish(m, me)}
+            shown={assist}
+            byMe={assist?.by === me}
+            byName={assist ? client.nameOf(assist.by) : ""}
+            lines={token}
+            fen={b.fen}
+            onUse={() => client.useStockfish(m.key)}
+          />
+        )}
         {d && m.state === "half" && (
           <DutyPanel
             client={client}
@@ -543,11 +573,12 @@ function MatchView({
             partnerChoice={partnerChoice}
             locked={myLocked}
             fen={b.fen}
-            block={canBlock ? { on: blocking, bank, toggle: () => setBlockMode(!blocking) } : null}
+            block={canBlock ? { on: blocking, bank, toggle: () => setBlockMode(!blocking), shields: mySide === null ? 0 : (m.shields?.[mySide === 0 ? 1 : 0] ?? 0) } : null}
             noTokens={noTokens}
           />
         )}
         {m.format === "pairs" && m.tokenLog.length > 0 && (m.state === "over" || !!m.result) && <TokenBreakdown log={m.tokenLog} sides={m.sides} mine={mySide} />}
+        {m.mode === "mercenary" && <KitLine client={client} m={m} mine={mySide} />}
         {!d && <p class="sq-explain">{rulesLine(m)}</p>}
         {client.me?.botPlays && !client.me.isBot && !client.me.left && mySide !== null && (
           <div class="sq-card">
@@ -569,29 +600,117 @@ function MatchView({
   );
 }
 
-/** Cheat lines already worked out, by position (a screen change doesn't search again). */
-const cheatSeen = new Map<string, MoveScore[]>();
+/** Engine lines already worked out, by position and how many (a screen change doesn't search again). */
+const linesSeen = new Map<string, MoveScore[]>();
 
-/** The engine's top moves in `fen` (null: none asked, or still searching), on this device's own engine. */
-function useCheatLines(fen: string | null): MoveScore[] | null {
-  const [found, setFound] = useState<{ fen: string; top: MoveScore[] } | null>(null);
+/**
+ * The engine's top `n` moves in `fen` at `nodes` (null: none asked, or still searching), on this device's own engine
+ * (never queued behind the lobby's bot work): Cheat lines, and a Stockfish token's lines.
+ */
+function useEngineLines(fen: string | null, n: number, nodes: number): MoveScore[] | null {
+  const [found, setFound] = useState<{ key: string; top: MoveScore[] } | null>(null);
+  const key = fen ? `${fen}|${n}|${nodes}` : null;
   useEffect(() => {
-    if (!fen || cheatSeen.has(fen)) return;
+    if (!fen || !key || linesSeen.has(key)) return;
     let live = true;
     void ownEngine()
-      .then((engine) => engine.topMovesAt(fen, SQUADS_LOBBY.cheatLines.moves, SQUADS_LOBBY.cheatLines.nodes))
+      .then((engine) => engine.topMovesAt(fen, n, nodes))
       .then((top) => {
-        if (cheatSeen.size > 200) cheatSeen.clear();
-        cheatSeen.set(fen, top);
-        if (live) setFound({ fen, top });
+        if (linesSeen.size > 200) linesSeen.clear();
+        linesSeen.set(key, top);
+        if (live) setFound({ key, top });
       })
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [fen]);
-  if (!fen) return null;
-  return cheatSeen.get(fen) ?? (found?.fen === fen ? found.top : null);
+  }, [key]);
+  if (!key) return null;
+  return linesSeen.get(key) ?? (found?.key === key ? found.top : null);
+}
+
+/** Cheat lines (test controls only): the engine's top moves in the position, at the test controls' search. */
+const useCheatLines = (fen: string | null) => useEngineLines(fen, SQUADS_LOBBY.cheatLines.moves, SQUADS_LOBBY.cheatLines.nodes);
+
+/**
+ * Mercenary's Stockfish token on your decision: the button (with your squad's tokens left), and once it's used your top
+ * moves listed under it as on the board (rank, move, evaluation). Yours only: in the final your whole squad's.
+ */
+function StockfishToken({
+  left,
+  can,
+  shown,
+  byMe,
+  byName,
+  lines,
+  fen,
+  onUse,
+}: {
+  left: number;
+  can: boolean;
+  shown: { by: string } | null;
+  byMe: boolean;
+  byName: string;
+  lines: readonly MoveScore[] | null;
+  fen: string;
+  onUse: () => void;
+}) {
+  if (!shown && left <= 0) return null;
+  return (
+    <div class="sq-cheat mc-stockfish">
+      {!shown ? (
+        <button type="button" class="fd-btn mc-stockfish-btn" disabled={!can} onClick={onUse}>
+          <ItemIcon item="stockfish" size={16} />
+          Stockfish token · {left} left
+        </button>
+      ) : (
+        <span class="mc-stockfish-on">
+          <ItemIcon item="stockfish" size={14} />
+          {byMe ? "Your Stockfish lines" : `${byName}'s Stockfish token: your squad's lines`}
+        </span>
+      )}
+      {shown &&
+        (lines === null ? (
+          <span class="muted small">Asking the engine…</span>
+        ) : lines.length ? (
+          <ol class="hints sq-cheat-lines">
+            {lines.slice(0, CHEAT_BRUSHES.length).map((t, i) => (
+              <li key={t.move} class={`hint-${CHEAT_BRUSHES[i]}`}>
+                <strong>
+                  {i + 1} · {safeSan(fen, t.move)}
+                </strong>
+                <span>{cheatEval(t)}</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <span class="muted small">No moves here.</span>
+        ))}
+    </div>
+  );
+}
+
+/**
+ * Mercenary: both squads' coins and what they brought to this match that's still to use (Stockfish tokens and shields
+ * left, a breather), always on screen for both (counterplay).
+ */
+function KitLine({ client, m, mine }: { client: SquadsClient; m: LocalMatch; mine: Side | null }) {
+  const order: Side[] = mine === 1 ? [1, 0] : [0, 1];
+  return (
+    <div class="mc-kitline" aria-label="Coins and items">
+      {order.map((side) => {
+        const w = walletOf(client.wallets, m.sides[side].squadId);
+        const left = { stockfish: Math.max(0, stockfishLeft(m, side)), breather: m.kit?.[side]?.breather ? 1 : 0, blocks: 0, shield: m.shields?.[side] ?? 0, time: 0 };
+        return (
+          <span key={side} class={`mc-kitline-side${side === mine ? " you" : ""}`}>
+            <SquadTag id={m.sides[side].squadId} you={side === mine} />
+            {w && <Coins n={w.coins} />}
+            <KitIcons counts={left} />
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 /** "Cheat lines" (test controls only): the switch, and while it's on the engine's top moves listed (rank, move, eval). */
@@ -714,7 +833,7 @@ function DutyPanel({
   partnerChoice: string | null;
   locked: boolean;
   fen: string;
-  block: { on: boolean; bank: number; toggle: () => void } | null;
+  block: { on: boolean; bank: number; toggle: () => void; shields: number } | null;
   noTokens: boolean;
 }) {
   const san = (mv: string) => safeSan(fen, mv);
@@ -723,6 +842,13 @@ function DutyPanel({
       <LockIcon size={16} />
       {block.on ? "Done blocking" : block.bank > 0 ? `Block · ${block.bank} ${block.bank === 1 ? "point" : "points"}` : "No block points left"}
     </button>
+  );
+  // (Mercenary: their shield cancels your next block that would take effect; you still pay for it.)
+  const shieldLine = block && block.shields > 0 && (
+    <span class="mc-shield-note">
+      <ItemIcon item="shield" size={12} />
+      They have {block.shields === 1 ? "a shield" : `${block.shields} shields`}: your next block {block.shields === 1 ? "is" : "blocks are"} cancelled, still paid
+    </span>
   );
   const placed = m.placed.filter((b) => b.board === m.current?.duties.find((d) => d.players.includes(client.myId ?? ""))?.board);
   const placedLine = placed.length > 0 && (
@@ -735,9 +861,10 @@ function DutyPanel({
     return (
       <div class="sq-duty move">
         <strong>{mine ? `You played ${san(mine)}` : "Your move"}</strong>
-        <span class="muted small">{mine ? "Tap a tiny board to watch it." : `${Math.round(m.delayMs / 1000)} s free, then your squad's clock runs.`}</span>
+        <span class="muted small">{mine ? "Tap a tiny board to watch it." : `${Math.round(freeMs(m, sideIn(m, client.myId) ?? 0) / 1000)} s free, then your squad's clock runs.`}</span>
         {placedLine}
         {blockButton}
+        {shieldLine}
       </div>
     );
   }
@@ -772,6 +899,7 @@ function DutyPanel({
         </button>
         {placedLine}
         {blockButton}
+        {shieldLine}
         <span class="muted small">The most picked move plays; a tie, a coin. You can change until you lock in.</span>
       </div>
     );
@@ -801,6 +929,7 @@ function DutyPanel({
       {noTokens && <span class="sq-same none">No same-move tokens left: pick a different move.</span>}
       {placedLine}
       {blockButton}
+      {shieldLine}
       <span class="muted small">{noTokens ? "You can change until you lock in." : "Pick your partner's move too and it plays for sure (a token). You can change until you lock in."}</span>
     </div>
   );

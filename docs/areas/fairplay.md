@@ -9,7 +9,10 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   never numbers a browser makes up: strength, hard finds measured against the crowd, timing. The one exception is the
   look-away count (only the browser can see the page hidden), weak evidence that can add a few points, never ban.
 - **Recording.** During a match the lobby records each human pick's signals (`noteFair`, the `fair` record). Turns a
-  boss power touches (`powerTurn`) don't count.
+  boss power touches (`powerTurn`) don't count, nor picks made with the engine's moves on screen that the game showed:
+  a power-up (`powerUp`), or Squads Mercenary's Stockfish token (`engineToken`: sanctioned help, skip reason
+  "engineToken"). Squads isn't recorded yet; its matches log which choices had a token's lines on screen
+  (`assists`, `isAssisted`), so when it is, they go in with `engineToken`.
 - **The suspicion score** turns a player's evidence into a level; every threshold is in `FAIRPLAY`.
 - **A case** is one player's file. Its status: **watch** (recorded only), **review** (a person or the automated
   reviewer decides; meanwhile their online results are held off ranking and `eligibleForRanked` says no), **banned**

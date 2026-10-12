@@ -201,7 +201,8 @@ export function VoteScreen({
   }, [vote.result]);
 
   const cast = (option: number, spot: BoardSpot) => {
-    if (!canAct || mine?.option === option) return;
+    // ("Coming soon": shown, but nobody's vote lands there; a pawn dropped on it walks back.)
+    if (!canAct || mine?.option === option || def.options[option]?.disabled) return;
     setMyDrop({ key: vote.key, option, spot });
     setSelected(false);
     match.castVote(option);
@@ -312,7 +313,7 @@ export function VoteScreen({
                   return (
                     <div
                       key={o.id}
-                      class={`vote-zone${state}${mine?.option === i ? " mine" : ""}${overZone === i ? " over" : ""}`}
+                      class={`vote-zone${state}${mine?.option === i ? " mine" : ""}${overZone === i && !o.disabled ? " over" : ""}${o.disabled ? " disabled" : ""}`}
                       style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height}%` }}
                     />
                   );
@@ -337,9 +338,9 @@ export function VoteScreen({
                   const box = zoneOnScreen(i, orientation);
                   const state = vote.result === null ? "" : vote.result === i ? " win" : " lose";
                   return (
-                    <div key={o.id} class={`vote-label${state}`} style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height / 2}%` }}>
+                    <div key={o.id} class={`vote-label${state}${o.disabled ? " disabled" : ""}`} style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height / 2}%` }}>
                       <span class="vote-zone-icon">{o.icon}</span>
-                      <PopCount n={counts[i]!} class="vote-zone-count" />
+                      {o.disabled ? <span class="vote-zone-soon">Soon</span> : <PopCount n={counts[i]!} class="vote-zone-count" />}
                     </div>
                   );
                 })}
@@ -347,6 +348,7 @@ export function VoteScreen({
               {selected &&
                 def.options.map((o, i) => {
                   const box = zoneOnScreen(i, orientation);
+                  if (o.disabled) return null;
                   return (
                     <button
                       type="button"
@@ -398,8 +400,9 @@ export function VoteScreen({
               role="radio"
               aria-checked={mine?.option === i}
               key={o.id}
-              class={`vote-card${mine?.option === i ? " on" : ""}${state}`}
-              disabled={!canAct}
+              class={`vote-card${mine?.option === i ? " on" : ""}${state}${o.disabled ? " disabled" : ""}`}
+              disabled={!canAct || !!o.disabled}
+              aria-disabled={o.disabled ? true : undefined}
               onClick={() => cast(i, voteZoneCentre(i, side))}
             >
               <span class="vote-card-icon" aria-hidden="true">
@@ -407,10 +410,12 @@ export function VoteScreen({
               </span>
               <strong>{o.label}</strong>
               <span class="vote-card-blurb">{o.blurb}</span>
-              <span class="vote-card-bar">
-                <i style={{ width: `${(100 * counts[i]!) / total}%` }} />
-              </span>
-              <PopCount n={counts[i]!} class="vote-card-count" />
+              {!o.disabled && (
+                <span class="vote-card-bar">
+                  <i style={{ width: `${(100 * counts[i]!) / total}%` }} />
+                </span>
+              )}
+              {!o.disabled && <PopCount n={counts[i]!} class="vote-card-count" />}
             </button>
           );
         })}

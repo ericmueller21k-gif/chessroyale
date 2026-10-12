@@ -221,12 +221,34 @@ describe("the FAQ on Squads (v2: tokens, blocks, the team vote)", () => {
   });
 });
 
+describe("the FAQ on Squads' modes and Mercenary", () => {
+  it("says what the modes are, and Mercenary's numbers come from the settings", () => {
+    const Q = FAQ_DEFAULTS.squads;
+    const M = Q.mercenary;
+    const t = section("modes");
+    expect(t).toContain("Classic is just chess");
+    expect(t).toContain("Mercenary adds coins");
+    expect(t).toContain("coming soon");
+    expect(t).toContain(`a knight or bishop ${M.capture.n}`);
+    expect(t).toContain(`winning the match ${M.matchWin}`);
+    expect(t).toContain(`Stockfish token (${M.items.stockfish.price} coins, up to ${M.items.stockfish.cap} a round)`);
+    expect(t).toContain(`Shield (${M.items.shield.price} coins`);
+    expect(t).toContain(`${M.priceStep} coins more for every one`);
+    expect(t).toContain("Never the other squad's moves");
+    expect(t).toContain("use them or lose them");
+    const changed = section("modes", { ...FAQ_DEFAULTS, squads: { ...Q, mercenary: { ...M, priceStep: 70, timeSeconds: 45, items: { ...M.items, time: { price: 55, cap: 3 } } } } });
+    expect(changed).toContain("70 coins more for every one");
+    expect(changed).toContain("Time coin (55 coins, up to 3 a round): 45 seconds more");
+  });
+});
+
 describe("the FAQ keeps to how the game works", () => {
   it("says nothing about how the app talks to the server, admin or test controls", () => {
-    // ("Token" alone is a login's; Squads' same-move tokens are a rule of the game, so a line about them may say it.)
+    // ("Token" alone is a login's; Squads' same-move tokens and Mercenary's Stockfish tokens are rules of the game, so a
+    // line about them may say it.)
     const t = text()
       .split("\n")
-      .map((l) => (/same-move/i.test(l) ? l.replace(/\btokens?\b/gi, "") : l))
+      .map((l) => (/same-move|stockfish token/i.test(l) ? l.replace(/\btokens?\b/gi, "") : l))
       .join("\n");
     expect(t).not.toMatch(/\/api\b|websocket|endpoint|protocol|durable|\bhost\b|admin|secret|token|rate limit|\?[a-z]+=|test switch|trigger ultimate/i);
   });

@@ -189,19 +189,42 @@ function modes(src: FaqSources): FaqSection {
 ### Squads {#mode-squads}
 
 - **${Q.squadCount} squads of ${Q.squadSize}** play a knockout bracket. Come alone or with a party of up to ${Q.partyMax}; bots fill any empty seats.
+- **Two modes, voted first:** **Classic** is just chess: same-move tokens in Pairs, no blocks, no coins. **Mercenary** adds coins, a team shop between rounds and items, with blocks on (see [Squads: Mercenary](#mode-mercenary)). A third mode is coming soon. Nobody voting means Classic.
 - **Round 1, Relay:** ${n(Q.boards.relay, "board")}; your squad's players move from board to board, a different one each turn.
 - **Round 2, Pairs:** ${n(Q.boards.pairs, "board")}, played in pairs that change partners: both partners pick a move, and a coin decides which is played.
 - **Same-move tokens (Pairs):** pick the same move as your partner and it's played for sure, using one of your squad's ${n(Q.tokens.perMatch, "token")} for the match (both squads' tokens show under the board). If the engine then finds it was the only good move, every other move about ${n(Math.round(Q.tokens.refundGap / Q.tokens.pawnWorth), "pawn")} worse, the token comes back a few seconds later. The engine runs on players' devices; if none can judge it, there's no refund. With no tokens left, partners must pick different moves. After the match, a breakdown lists every token used, refunded or not, and why.
 - **The final, the team vote:** one board. On your squad's move all of you pick, you see your teammates' picks as they come (the other squad doesn't), and you can copy one. The most picked move is played; a tie is settled by a coin between the tied moves.
-- **Blocks (every round):** each squad has ${n(Q.blocks.bankPerMatch, "block point")} a match. On your turn, before your squad's move is settled, tap Block, one of their pieces and a square it could go to: that move can't be played on their next turn on that board (the piece's other moves can). It costs ${num(Q.blocks.cost.p)} for a pawn's move, ${num(Q.blocks.cost.n)} for a knight's, bishop's or rook's, ${num(Q.blocks.cost.q)} for a queen's${Q.blocks.castlingCost === null ? "" : ` and ${num(Q.blocks.castlingCost)} for castling`}; the king's other moves can't be blocked. ${Q.blocks.maxPerTurn === null ? "Block as many moves in one turn as your points allow." : `Up to ${n(Q.blocks.maxPerTurn, "block")} a turn on a board.`} Both squads see every blocked move as an arrow with a lock until it's their move and they've played. A block that wouldn't do anything (your own move already took the piece or shut its way) is lifted and the points come back, and so is one that would leave them no move${Q.blocks.liftBeforeMate ? ", or only moves that allow mate in one (the most recent first)" : ""}${Q.blocks.liftInCheck ? ", or that lands while they're in check" : ""}.
-- Every game is played to the end on the board (a win is ${n(Q.winPoints, "point")}, a draw ${num(Q.drawPoints)}). No engine scores Squads; it only judges whether a same-move token comes back.
+- **Blocks (Mercenary, every round):** each squad has ${n(Q.blocks.bankPerMatch, "block point")} a match. On your turn, before your squad's move is settled, tap Block, one of their pieces and a square it could go to: that move can't be played on their next turn on that board (the piece's other moves can). It costs ${num(Q.blocks.cost.p)} for a pawn's move, ${num(Q.blocks.cost.n)} for a knight's, bishop's or rook's, ${num(Q.blocks.cost.q)} for a queen's${Q.blocks.castlingCost === null ? "" : ` and ${num(Q.blocks.castlingCost)} for castling`}; the king's other moves can't be blocked. ${Q.blocks.maxPerTurn === null ? "Block as many moves in one turn as your points allow." : `Up to ${n(Q.blocks.maxPerTurn, "block")} a turn on a board.`} Both squads see every blocked move as an arrow with a lock until it's their move and they've played. A block that wouldn't do anything (your own move already took the piece or shut its way) is lifted and the points come back, and so is one that would leave them no move${Q.blocks.liftBeforeMate ? ", or only moves that allow mate in one (the most recent first)" : ""}${Q.blocks.liftInCheck ? ", or that lands while they're in check" : ""}.
+- Every game is played to the end on the board (a win is ${n(Q.winPoints, "point")}, a draw ${num(Q.drawPoints)}). No engine scores Squads; it only judges whether a same-move token comes back (and, in Mercenary, whether a move was brilliant).
 - Each squad has **one clock for the whole tournament** (${clocks}, topped up each round). When it runs out, every move must be made within ${n(Q.clocks[Q.clockDefault]?.delaySeconds ?? 3, "second")}. A drawn final is settled by one Armageddon game.
+
+${mercenary(Q)}
 
 ### Classic {#mode-classic}
 
 The original mode (${S.lobbySize} players on ${n(S.lobbySize / S.groupSize, "board")}, rotating) is off the menu while it's being redesigned.
 `,
   };
+}
+
+/** Squads' Mercenary mode: earning, the shop, the items, every number from settings. */
+function mercenary(Q: SquadsSettings): string {
+  const M = Q.mercenary;
+  const free = Q.clocks[Q.clockDefault]?.delaySeconds ?? 3;
+  const item = (name: string, it: keyof typeof M.items, what: string) => `- **${name}** (${n(M.items[it].price, "coin")}, up to ${num(M.items[it].cap)} a round): ${what}`;
+  return `### Squads: Mercenary {#mode-mercenary}
+
+- **One wallet per squad**, shared by its players, for the whole tournament: coins you don't spend carry on to the next round.
+- **Earning:** a capture pays by the piece taken (a pawn ${num(M.capture.p)}, a knight or bishop ${num(M.capture.n)}, a rook ${num(M.capture.r)}, a queen ${num(M.capture.q)}); a board won ${num(M.boardWin)}, ${num(M.mate)} more for a checkmate; a drawn board ${num(M.boardDraw)} to each squad; winning the match ${num(M.matchWin)}; a **brilliant move** ${num(M.brilliant.coins)} (a quiet move the engine rates the only good one, every other move about ${n(Math.round(M.brilliant.gap / Q.tokens.pawnWorth), "pawn")} worse, in a game still in the balance).
+- **Catch-up:** when your next match is set, if your squad has earned fewer coins in the tournament than its opponent, it gets ${Math.round(M.catchUp.share * 100)}% of the difference (at most ${num(M.catchUp.max)}), so the rich don't just get richer.
+- **The shop** opens after each round for the squads still in, while you wait for the next match (the other match finishing, then the break before it), so it adds no time. Anyone on your squad can buy from the wallet, and the whole squad sees each purchase. Both squads can see each other's coins and what they've bought.
+- **Items last for your next match only:** use them or lose them. Each costs ${n(M.priceStep, "coin")} more for every one of it your squad has already bought in the tournament, and there's a limit to how many of each you can bring to one match.
+${item("Stockfish token", "stockfish", `for one of your own decisions, your top ${num(M.stockfish.lines)} moves as arrows with their evaluations. Never the other squad's moves or replies. In Pairs only you see it; in the final your whole squad does. A move made with it is allowed help: it never counts against you.`)}
+${item("Breather", "breather", `double free seconds a move for the match (${free} s become ${num(free * M.breatherFactor)}), so your clock runs less; out of time, double the time for each move.`)}
+${item("Block points", "blocks", `${n(M.blockPoints, "more block point")} for the match.`)}
+${item("Shield", "shield", "cancels the next block against your squad that would take effect; they still pay for it. A block lifted anyway (by the rules above) doesn't use it.")}
+${item("Time coin", "time", `${n(M.timeSeconds, "second")} more on your team clock as the match starts.`)}
+`;
 }
 
 function scoring(src: FaqSources): FaqSection {

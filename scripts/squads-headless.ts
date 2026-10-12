@@ -9,6 +9,7 @@
  *   --people N                people (default 1; a party's size with --mode party, at most 4)
  *   --start relay|pairs|final a test lobby's first round
  *   --clock B,T,F,I            a test lobby's team clock: bank, top-up, free seconds, increment (seconds)
+ *   --game classic|mercenary   a test lobby's mode (no Mode vote); the report then has every squad's coins and kits
  *   --play                    the people play their own duties (the engine's best, or a random legal move); else they
  *                             sit idle and a bot takes each seat after its third miss (a full bot lobby)
  *   --device                  each person's client answers bot work with Node's Stockfish, as a phone or computer would
@@ -53,7 +54,7 @@ const clients = Array.from({ length: people }, (_, i) => new SquadsClient({ base
 
 let code: string;
 if (mode === "test") {
-  const q = new URLSearchParams({ start: arg("start", "relay")!, ...(arg("clock") ? { clock: arg("clock")! } : {}), keep: "60" });
+  const q = new URLSearchParams({ start: arg("start", "relay")!, ...(arg("clock") ? { clock: arg("clock")! } : {}), ...(arg("game") ? { mode: arg("game")! } : {}), keep: "60" });
   const res = await fetch(`${base}/api/squads/lobby?${q}`, { method: "POST", headers: { cookie: cookies[0] ?? "" } });
   if (!res.ok) throw new Error(`test lobby: ${res.status} ${await res.text()}`);
   code = ((await res.json()) as { code: string }).code;
@@ -129,6 +130,22 @@ const lines = [
   `- Wall time, filled to results: **${((ended - filled) / 60_000).toFixed(1)} minutes** (${Math.round((ended - filled) / 1000)} s); from the first PLAY: ${((ended - t0) / 60_000).toFixed(1)} minutes.`,
   ...Object.entries(marks).map(([k, t]) => `  - ${((t - filled) / 1000).toFixed(0).padStart(5)} s: ${k}`),
   `- Placements (squad: place): ${JSON.stringify(watch.results)}`,
+  ...(watch.wallets.length
+    ? [
+        "",
+        `Mercenary (${watch.lobby?.rules?.mode ?? "?"}): every squad's coins by play per round (round 1, round 2, the final), catch-up, what it bought (each shop as it closed), coins left. Placements: 1, 2, 3 = 3rd-4th, 5 = 5th-8th.`,
+        "",
+        "| Squad | Placed | Earned R1 | R2 | Final | Catch-up | Kits | Coins left |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        ...watch.wallets.map((w) => {
+          const kits = watch.kits.filter((k) => k.squadId === w.squadId).map((k) => `R${k.round + 1}: ${Object.entries(k.cart).filter(([, n]) => n > 0).map(([it, n]) => `${it}${n > 1 ? `×${n}` : ""}`).join(" ") || "saved"} (of ${k.coins})`);
+          return `| ${w.squadId} | ${watch.results?.[w.squadId] ?? "-"} | ${w.byRound[0]} | ${w.byRound[1]} | ${w.byRound[2]} | ${w.catchUp} | ${kits.join("; ") || "-"} | ${w.coins} |`;
+        }),
+        "",
+        `Brilliant moves: ${watch.coinNews.filter((c) => c.why === "brilliant").map((c) => `${c.move} (squad ${c.squadId})`).join(", ") || "none"}. Catch-up: ${watch.coinNews.filter((c) => c.why === "catch_up").map((c) => `squad ${c.squadId} +${c.coins} (v ${c.against})`).join(", ") || "none"}.`,
+        "",
+      ]
+    : []),
   ...clients.map((c, i) => `- ${c.playerId}: placed ${c.placed?.placement ?? "-"}, reward ${c.placed ? `${c.placed.coins} coins, ${c.placed.crates} crates, recorded ${c.placed.recorded}` : "-"}; wallet now ${rewards[i]?.shop?.coins ?? "-"}; bot work answered ${c.stats.botWork}; moves chosen ${c.stats.chosen}, refused ${c.stats.refused}; ${c.stats.messages} messages, ${(c.stats.bytes / 1024).toFixed(0)} KB; errors: ${c.errors.join("; ") || "none"}`),
 ];
 console.log(`\n${lines.join("\n")}`);
