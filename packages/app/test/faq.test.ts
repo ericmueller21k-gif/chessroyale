@@ -236,6 +236,34 @@ describe("the FAQ on Squads (v2: tokens, blocks, the team vote)", () => {
   });
 });
 
+describe("the FAQ on Squads' team clock (Oct 13: three chess time controls)", () => {
+  it("names each time control in chess form with its bank, increment and cap, the default, the free seconds and sudden death, all from the settings", () => {
+    const Q = FAQ_DEFAULTS.squads;
+    const t = section("modes");
+    const mins = (sec: number) => (sec === 60 ? "1 minute" : `${sec / 60} minutes`);
+    for (const c of Q.clocks) {
+      expect(t).toContain(`${c.label} ${c.bankSeconds / 60}+${c.incrementSeconds} (${mins(c.bankSeconds)}, +${c.incrementSeconds} s a move, at most ${c.capSeconds} s on a move)`);
+    }
+    expect(t).toContain(`The first ${Q.clocks[0]!.delaySeconds} s of every move are free`);
+    const def = Q.clocks[Q.clockDefault]!;
+    expect(t).toContain(`Nobody voting means ${def.label} ${def.bankSeconds / 60}+${def.incrementSeconds}.`);
+    expect(t).toContain("Every move made in time adds its seconds back");
+    expect(t).toContain("sudden death: every move within the free seconds, until moves made in time earn some back");
+    expect(t).not.toMatch(/\b(Fast|Normal|Long) \d/);
+    // Changed settings: the words follow (an odd bank in m:ss, free seconds and top-ups that differ between options).
+    const clocks = [
+      { ...Q.clocks[0]!, bankSeconds: 90, incrementSeconds: 1, capSeconds: 8, delaySeconds: 2, topUpSeconds: 20 },
+      { ...Q.clocks[1]!, bankSeconds: 240, incrementSeconds: 2, capSeconds: 12, delaySeconds: 3, topUpSeconds: 60 },
+      { ...Q.clocks[2]!, bankSeconds: 600, incrementSeconds: 5, capSeconds: 25, delaySeconds: 3, topUpSeconds: 120 },
+    ];
+    const changed = section("modes", { ...FAQ_DEFAULTS, squads: { ...Q, clocks, clockDefault: 2 } });
+    expect(changed).toContain("Bullet 1:30+1 (1:30 minutes, +1 s a move, at most 8 s on a move), Blitz 4+2 (4 minutes, +2 s a move, at most 12 s on a move) or Rapid 10+5 (10 minutes, +5 s a move, at most 25 s on a move)");
+    expect(changed).toContain("Nobody voting means Rapid 10+5.");
+    expect(changed).toContain("The first few seconds of every move are free (Bullet 2 s, Blitz 3 s, Rapid 3 s); then your squad's clock runs");
+    expect(changed).toContain("plus a top-up (Bullet 20 s, Blitz 1 minute, Rapid 2 minutes) as you go through");
+  });
+});
+
 describe("the FAQ on Squads' modes and Mercenary", () => {
   it("says what the modes are, and Mercenary's numbers come from the settings", () => {
     const Q = FAQ_DEFAULTS.squads;

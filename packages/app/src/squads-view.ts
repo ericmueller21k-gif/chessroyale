@@ -77,6 +77,12 @@ export function points(x: number): string {
   return half ? (whole ? `${whole}½` : "½") : String(whole);
 }
 
+/**
+ * A team clock under this is low (red on screen); and the sudden-death sting, once heard, plays again only after its
+ * squad's bank has been back up to it (a squad living on its increment near zero would otherwise hear it every half).
+ */
+export const LOW_BANK_MS = 30_000;
+
 /** "3:05" (m:ss); under ten seconds "9.4". */
 export function bankText(ms: number): string {
   const v = Math.max(0, ms);

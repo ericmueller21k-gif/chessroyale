@@ -63,6 +63,7 @@ function match(format: "relay" | "pairs" | "final", starts: string[], o: Partial
       banksMs: [BANK, BANK],
       delayMs: DELAY,
       incrementMs: 0,
+      capMs: 20_000,
       ...o,
     },
     s,

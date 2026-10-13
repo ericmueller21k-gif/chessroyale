@@ -82,6 +82,8 @@ const sides: [Lineup, Lineup] = [
 ];
 const BANK = 240_000;
 const DELAY = 3_000;
+/** The tests' own cap on a move (each Clock option has its own). */
+const CAP = 20_000;
 /** 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6: White mates with Qxf7. */
 const SCHOLAR = "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4";
 /** After 1.d4 Nf6 2.Bg5: White's bishop can take the knight. */
@@ -104,6 +106,7 @@ function match(format: "relay" | "pairs" | "final", starts: string[], o: Partial
       banksMs: [BANK, BANK],
       delayMs: DELAY,
       incrementMs: 0,
+      capMs: CAP,
       mode: "mercenary",
       ...o,
     },
@@ -573,7 +576,7 @@ describe("Mercenary: the items", () => {
 
 describe("Mercenary: the Time chip (Eric, Oct 13)", () => {
   const CHIP = M.chipSeconds * 1000;
-  const CEILING = SQUADS.moveCeilingSeconds * 1000;
+  const CEILING = CAP;
   const bankEvent = (events: SquadsEvent[], side: Side) => ofKind(events, "bank").find((e) => e.side === side)!;
   const ok = <T extends object>(r: T): Exclude<T, { error: unknown }> => {
     if ("error" in r) throw new Error(String((r as { error: unknown }).error));
@@ -699,6 +702,44 @@ describe("Mercenary: the Time chip (Eric, Oct 13)", () => {
     const out = resolveHalf(m, inputs(m, all, t.inputs), think);
     expect(out.acted).toContain(mover);
     expect(resolveHalf(m, inputs(m, all), think).missed).toContain(mover);
+  });
+
+  it("works with every time control (Oct 13): 30 s past the option's cap, the bank held still from the free seconds, the increment still earned; in sudden death the free seconds and 30 s", () => {
+    for (const c of SQUADS.clocks) {
+      const o = { delayMs: c.delaySeconds * 1000, incrementMs: c.incrementSeconds * 1000, capMs: c.capSeconds * 1000 };
+      const m = applyKits(relay(undefined, o), [kit({ chip: 2 }), NO_ITEMS]);
+      const mover = moverOn(m, 0);
+      const d = dutyOf(m, mover)!.duty;
+      expect(d.deadlineMs).toBe(o.capMs);
+      const t = ok(useChip(m, NO_INPUTS, mover, 1_000, 0));
+      expect(dutyDeadline(t.inputs, d)).toBe(o.capMs + CHIP);
+      // Its 30 s run from after the free seconds (tapped within them).
+      expect(chipWindowsOn(m, t.inputs, 0)).toEqual([[o.delayMs, o.delayMs + CHIP]]);
+      const all = rest(m, { [mover]: movesAllowed(m, 0)[0]! });
+      // Everyone else moves within the free seconds; the mover 2 s past the chip's 30 s (and past the option's cap).
+      const think = Object.fromEntries(Object.keys(all).map((x) => [x, 1_000]));
+      think[mover] = o.delayMs + CHIP + 2_000;
+      expect(think[mover]).toBeGreaterThan(o.capMs);
+      const out = resolveHalf(m, inputs(m, all, t.inputs), think);
+      expect(out.acted).toContain(mover);
+      expect(bankEvent(out.events, 0).drainedMs).toBe(2_000);
+      // Both of the squad's moves were made in time: both earn the increment.
+      expect(out.match.banks[0]).toBe(BANK - 2_000 + 2 * o.incrementMs);
+      // Without the chip, the same move is past the cap: missed, no increment for it.
+      const without = resolveHalf(m, inputs(m, all), think);
+      expect(without.missed).toContain(mover);
+      expect(without.match.banks[0]).toBe(BANK - (o.capMs - o.delayMs) + o.incrementMs);
+      // Sudden death: the free seconds and 30 s; made in time, the increment lifts the squad out.
+      const sd = applyKits(relay(undefined, { ...o, banksMs: [0, BANK] }), [kit({ chip: 1 }), NO_ITEMS]);
+      const sdDuty = dutyOf(sd, mover)!.duty;
+      expect(sdDuty.deadlineMs).toBe(o.delayMs);
+      const tapped = ok(useChip(sd, NO_INPUTS, mover, 500, 0));
+      expect(dutyDeadline(tapped.inputs, sdDuty)).toBe(o.delayMs + CHIP);
+      think[mover] = o.delayMs + 20_000;
+      const sdOut = resolveHalf(sd, inputs(sd, rest(sd, { [mover]: movesAllowed(sd, 0)[0]! }), tapped.inputs), think);
+      expect(sdOut.acted).toContain(mover);
+      expect(sdOut.match.banks[0]).toBe(2 * o.incrementMs);
+    }
   });
 
   it("the bank running out while a chip holds it: that move runs to the chip's end; after it, the bank runs on", () => {

@@ -1,6 +1,6 @@
 // Frame-by-frame check of Squads' screens, played the way a player plays them (real taps), against a running server
 // with the test switch on (npx wrangler dev --var SQUADS_TEST:1 ...):
-//   npm run frames:squads -- <out-dir> <relay|pairs|final|block|token|menu|standings|modevote|shop|stockfish|shield|chip> [url=http://localhost:8787] [width=390] [scheme=dark]
+//   npm run frames:squads -- <out-dir> <relay|pairs|final|block|token|menu|standings|modevote|shop|stockfish|shield|chip|clockvote|clockline> [url=http://localhost:8787] [width=390] [scheme=dark] [clock=rapid]
 // relay: your move (it must show at once and never snap back), then scouting a tiny board and back.
 // pairs: your pick, lock in, the coin-flip reveal. final: your vote, lock in, the vote's reveal.
 // block: from the Scotch recapture, Block, their queen, f6: the arrow draws, keeps redrawing with its lock pulsing,
@@ -13,6 +13,11 @@
 // (its arrows and lines). shield: a shield bought, the bots blocking whenever they can, the line saying it was cancelled.
 // chip: a Time chip bought, then tapped on your pick: the "+30 s", the clock jumping and standing still (each frame's
 // clock text is logged).
+// The time controls (Oct 13): clockvote: the Clock vote's three cards (Bullet, Blitz, Rapid), a tap, the result's banner
+// with the winner in full, then the first match's card with its time control. clockline: a Relay test lobby on the
+// clock given (an option's id, or "bank,top-up,free,increment,cap"; a small bank shows sudden death and living on the
+// increment): the clock line under the board through a few halves. Both log, on every animation frame, the vote cards'
+// or the clock line's text and anything sticking out of its box or the screen.
 // Every painted frame is recorded (Chrome's screencast); the big board's pieces are logged on every animation frame,
 // and the timeline printed: a piece that moves twice, jumps back or flickers shows as an extra change. A GIF of the
 // moment goes to <out-dir>/<mode>-<width>.gif (and PNGs for menu and standings). See .claude/LESSONS.md.
@@ -21,7 +26,7 @@ import { execFileSync } from "node:child_process";
 import { chromium, devices } from "@playwright/test";
 import { Chess } from "chess.js";
 
-const [out = ".", mode = "relay", url = "http://localhost:8787", widthArg = "390", scheme = "dark"] = process.argv.slice(2);
+const [out = ".", mode = "relay", url = "http://localhost:8787", widthArg = "390", scheme = "dark", clockArg = "rapid"] = process.argv.slice(2);
 const W = Number(widthArg);
 const phone = W < 900;
 mkdirSync(out, { recursive: true });
@@ -369,6 +374,87 @@ if (mode === "relay") {
       gif(frames, `shield-${W}`);
       await p.screenshot({ path: `${out}/shield-after-${W}.png` });
     }
+  }
+} else if (mode === "clockvote" || mode === "clockline") {
+  // On every animation frame: the vote cards' or the clock line's text, and any part of it outside its box or the screen.
+  const watchFit = () =>
+    p.evaluate((sel) => {
+      const log = (window.__fit = []);
+      let last = "";
+      const tick = () => {
+        const vw = document.documentElement.clientWidth;
+        const els = [...document.querySelectorAll(sel)];
+        const text = els.map((e) => e.textContent.replace(/\s+/g, " ").trim()).join(" | ");
+        const out = els.flatMap((e) => {
+          const r = e.getBoundingClientRect();
+          // (Something placed over the board, the vote's result banner: inside the board, not over what's under it.)
+          const over = getComputedStyle(e).position === "absolute" && e.offsetParent ? e.offsetParent.getBoundingClientRect() : null;
+          const outside = over && (r.bottom > over.bottom + 0.5 || r.top < over.top - 0.5);
+          return r.width && (e.scrollWidth > e.clientWidth + 0.5 || r.left < -0.5 || r.right > vw + 0.5 || outside) ? [`${e.className}(${Math.round(r.left)}-${Math.round(r.right)} of ${vw}, ${Math.round(r.top)}-${Math.round(r.bottom)}${over ? ` in ${Math.round(over.top)}-${Math.round(over.bottom)}` : ""}, scroll ${e.scrollWidth}/${e.clientWidth})`] : [];
+        });
+        const side = document.documentElement.scrollWidth - vw;
+        const key = `${text}#${out.join(",")}#${side}`;
+        if (key !== last) {
+          last = key;
+          log.push({ t: performance.now() + performance.timeOrigin, text, out, side });
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }, mode === "clockvote" ? ".vote-card strong, .vote-card-blurb, .vote-banner, .vote-banner-detail, .sq-banner-clock" : ".sq-clockline, .sq-clockline-side, .sq-clockline .sq-clock, .sq-free");
+  const printFit = async (since) => {
+    const log = await p.evaluate(() => window.__fit);
+    let bad = 0;
+    for (const r of log.filter((x) => x.t >= since)) {
+      bad += r.out.length + (r.side > 0 ? 1 : 0);
+      console.log(`${String(Math.round(r.t - since)).padStart(6)} ms  ${r.side > 0 ? `SIDE SCROLL ${r.side}  ` : ""}${r.out.length ? `OUT: ${r.out.join(" ")}  ` : ""}${r.text.slice(0, 160)}`);
+    }
+    console.log(bad ? `${bad} frames with something out of its box` : "every frame: everything inside its box and the screen");
+  };
+  if (mode === "clockvote") {
+    await p.goto(`${url}/squads/test?nolanding&debug`);
+    await p.locator(".vote-title h1", { hasText: "Which mode?" }).waitFor({ timeout: 40_000 });
+    await p.locator(".vote-card").nth(0).click();
+    await p.locator(".vote-title h1", { hasText: "How fast?" }).waitFor({ timeout: 60_000 });
+    await p.waitForTimeout(600);
+    await watchFit();
+    await p.screenshot({ path: `${out}/clockvote-${W}.png` });
+    const since = Date.now();
+    const { frames } = await record(async () => {
+      await p.locator(".vote-card").nth(0).click();
+      await p.locator(".sq-banner-clock").waitFor({ timeout: 40_000 });
+      await p.waitForTimeout(800);
+      await p.screenshot({ path: `${out}/clockvote-card-${W}.png` });
+      await p.waitForTimeout(1500);
+    });
+    await printFit(since);
+    console.log("flashes at frames", await flashes(frames));
+    gif(frames, `clockvote-${W}`);
+  } else {
+    await testLobby("relay", clockArg);
+    await waitFor((x) => x.state === "half", 60_000);
+    await watchFit();
+    const since = Date.now();
+    const { frames } = await record(async () => {
+      // A few halves: your move when it comes (at once), the clocks running, the free seconds, sudden death if it comes.
+      const end = Date.now() + 25_000;
+      let shot = false;
+      while (Date.now() < end) {
+        const s = await seen();
+        if (s?.duty && !s.locked && s.state === "half") {
+          await p.waitForTimeout(2500);
+          if (!shot) {
+            await p.screenshot({ path: `${out}/clockline-${W}.png` });
+            shot = true;
+          }
+          await pick(s).catch(() => undefined);
+        }
+        await p.waitForTimeout(200);
+      }
+    });
+    await printFit(since);
+    console.log("flashes at frames", await flashes(frames));
+    gif(frames, `clockline-${W}`);
   }
 } else if (mode === "standings") {
   await testLobby("relay", "8,0,3,0");

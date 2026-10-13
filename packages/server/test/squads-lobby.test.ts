@@ -272,8 +272,9 @@ describe("squads lobby: playing a half", () => {
     expect(turn.banks[side]).toBe(4_000);
     const mine = turn.current.duties.filter((d) => d.side === side);
     expect(mine).toHaveLength(2);
-    // The ceiling bounds a move while the bank lasts.
-    expect(mine.every((d) => d.deadline - turn.current.startedAt === SQUADS.moveCeilingSeconds * 1000)).toBe(true);
+    // The cap bounds a move while the bank lasts (a test clock of four numbers: the ceiling every clock had before the
+    // time controls, so older test links keep their meaning).
+    expect(mine.every((d) => d.deadline - turn.current.startedAt === SQUADS.legacyCapSeconds * 1000)).toBe(true);
     // One mover chooses at 5 s, after the bank ran out (at 4 s): too late, a miss, but not a no-show. The other is gone
     // (disconnected) and never moves: a no-show.
     const [late, absent] = [mine[0]!.players[0]!, mine[1]!.players[0]!];

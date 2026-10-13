@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { SQUADS, type SquadsSettings } from "@chessroyale/core";
+import { SQUADS, mulberry32, type SquadsSettings } from "@chessroyale/core";
 import { START_FEN, gameEnd, legalMoves, type Opening } from "../src/index.ts";
 import {
   NO_INPUTS,
@@ -15,6 +15,7 @@ import {
   formSquads,
   halfDuties,
   halfReady,
+  liveCutoff,
   lockIn,
   materialCount,
   matchClocks,
@@ -26,10 +27,12 @@ import {
   playOnBoard,
   resolveHalf,
   settleTeamClocks,
+  squadBotThinkMs,
   squadsLegalMoves,
   squadsRng,
   startTeamClocks,
   teamClocks,
+  upgradeMatch,
   winnerSquad,
   type HalfInputs,
   type Lineup,
@@ -46,7 +49,8 @@ const sides: [Lineup, Lineup] = [
 ];
 const BANK = 240_000;
 const DELAY = 3_000;
-const CEILING = SQUADS.moveCeilingSeconds * 1000;
+/** The tests' own cap on a move (each Clock option has its own: tested below). */
+const CEILING = 20_000;
 /** White mates in one: Ra8#. */
 const WHITE_MATES = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
 /** White stalemates in one: Qf7. */
@@ -73,6 +77,7 @@ function match(format: "relay" | "pairs", starts: string[], o: Partial<MatchSetu
       banksMs: [BANK, BANK],
       delayMs: DELAY,
       incrementMs: 0,
+      capMs: CEILING,
       ...o,
     },
     s,
@@ -210,11 +215,13 @@ describe("Squads team clocks across the tournament", () => {
     // Squad 0's movers take 10 s each (past the free seconds), squad 1's no time at all.
     const slow = Object.fromEntries(halfDuties(m).duties.map((d) => [d.players[0]!, d.side === 0 ? 10_000 : 0]));
     m = resolveHalf(m, inputs(m, firstMoves(m)), slow).match;
-    const drained = 2 * (10_000 - NORMAL.delaySeconds * 1000);
-    expect(m.banks).toEqual([NORMAL.bankSeconds * 1000 - drained, NORMAL.bankSeconds * 1000]);
+    // (Both squads' two moves were made in time: each earns the increment.)
+    const drained = 2 * (10_000 - NORMAL.delaySeconds * 1000) - 2 * NORMAL.incrementSeconds * 1000;
+    const earned = 2 * NORMAL.incrementSeconds * 1000;
+    expect(m.banks).toEqual([NORMAL.bankSeconds * 1000 - drained, NORMAL.bankSeconds * 1000 + earned]);
     squads = settleTeamClocks(squads, m);
     expect(squads[0]!.bankMs).toBe(NORMAL.bankSeconds * 1000 - drained);
-    expect(squads[1]!.bankMs).toBe(NORMAL.bankSeconds * 1000);
+    expect(squads[1]!.bankMs).toBe(NORMAL.bankSeconds * 1000 + earned);
     expect(squads[2]!.bankMs).toBe(NORMAL.bankSeconds * 1000);
     expect(planMatch(plan, 1, 0, [squads[0]!, squads[1]!], library).banks[0]).toBe(NORMAL.bankSeconds * 1000 - drained + NORMAL.topUpSeconds * 1000);
   });
@@ -310,7 +317,7 @@ describe("Squads team clock: draining", () => {
     // Absent, not out of time: not a timeout.
     expect(a.timeouts).toEqual([]);
     expect(a.match.banks[0]).toBe(BANK - (CEILING - DELAY));
-    expect(halfDuties(m, { ...SQUADS, moveCeilingSeconds: 60 }).duties[0]!.deadlineMs).toBe(60_000);
+    expect(halfDuties({ ...m, capMs: 60_000 }).duties[0]!.deadlineMs).toBe(60_000);
   });
 
   it("an increment (a setting) is credited for each move made in time, not for a miss", () => {
@@ -322,6 +329,167 @@ describe("Squads team clock: draining", () => {
     // An increment can lift a squad out of sudden death.
     const zero = relay(undefined, { banksMs: [0, BANK], incrementMs: 1_000 });
     expect(resolveHalf(zero, inputs(zero, firstMoves(zero)), { a0: 1_000, a2: 1_000 }).match.banks[0]).toBe(2_000);
+  });
+});
+
+describe("Squads: three chess time controls (Eric, Oct 13)", () => {
+  const ms = (x: number) => x * 1000;
+
+  it("each option: its bank, top-up, free seconds, increment and cap come into every match; the cap is each move's deadline while the bank lasts, the free seconds in sudden death", () => {
+    for (const clock of SQUADS.clocks) {
+      const squads = startTeamClocks(bots32(), clock);
+      const plan = planLobby(4, { start: "standard", clock }, library);
+      for (const round of [0, 1, 2] as const) {
+        const m = planMatch(plan, round, 0, [squads[0]!, squads[1]!], library);
+        expect(m).toMatchObject({ delayMs: ms(clock.delaySeconds), incrementMs: ms(clock.incrementSeconds), capMs: ms(clock.capSeconds) });
+        expect(m.banks).toEqual([0, 1].map(() => ms(clock.bankSeconds) + (round > 0 ? ms(clock.topUpSeconds) : 0)));
+        expect(halfDuties(m).duties.every((d) => d.deadlineMs === ms(clock.capSeconds))).toBe(true);
+        expect(halfDuties({ ...m, banks: [0, m.banks[1]] }).duties.map((d) => d.deadlineMs)).toEqual(
+          halfDuties(m).duties.map((d) => (d.side === 0 ? ms(clock.delaySeconds) : ms(clock.capSeconds))),
+        );
+      }
+    }
+  });
+
+  it("the increment banks: a move quicker than the free seconds and the increment earns time back; a slower one costs what's past them", () => {
+    const m = relay(undefined, { incrementMs: 2_000, capMs: 15_000 });
+    // Squad 0's movers 1 s each (inside the free seconds): +2 s each. Squad 1's 8 s each: 5 s past them each, +2 each.
+    const out = resolveHalf(m, inputs(m, firstMoves(m)), { a0: 1_000, a2: 1_000, b1: 8_000, b3: 8_000 });
+    expect(out.match.banks).toEqual([BANK + 4_000, BANK - 10_000 + 4_000]);
+    expect(ofKind(out.events, "bank")).toEqual([
+      { kind: "bank", turn: 0, half: "w", side: 0, drainedMs: 0, leftMs: BANK + 4_000, suddenDeath: false },
+      { kind: "bank", turn: 0, half: "w", side: 1, drainedMs: 10_000, leftMs: BANK - 6_000, suddenDeath: false },
+    ]);
+    // Exactly the free seconds plus the increment: even.
+    const even = resolveHalf(m, inputs(m, firstMoves(m)), { a0: DELAY + 2_000, a2: DELAY + 2_000, b1: 0, b3: 0 });
+    expect(even.match.banks[0]).toBe(BANK);
+    // The bank isn't capped at its start: quick moves take it past it, as on a chess clock (each half, each squad's two
+    // moves earn 2 s each).
+    let q = relay(undefined, { incrementMs: 2_000, capMs: 15_000 });
+    for (let i = 0; i < 6; i++) q = resolveHalf(q, inputs(q, firstMoves(q)), Object.fromEntries(halfDuties(q).duties.map((d) => [d.players[0]!, 500]))).match;
+    expect(q.banks).toEqual([BANK + 24_000, BANK + 24_000]);
+  });
+
+  it("the cap: a move not made by it is missed (a random move) and earns nothing; the bank drains up to the cap", () => {
+    const m = relay(undefined, { incrementMs: 1_000, capMs: 10_000 });
+    const d = halfDuties(m).duties;
+    expect(d.every((x) => x.deadlineMs === 10_000)).toBe(true);
+    const moves = firstMoves(m);
+    const absent = d[2]!.players[0]!;
+    delete moves[absent];
+    const out = resolveHalf(m, inputs(m, moves), { a0: 2_000, b1: 0, b3: 0 });
+    expect(out.missed).toEqual([absent]);
+    expect(ofKind(out.events, "relay").find((e) => e.player === absent)!.missed).toBe(true);
+    // a0 in time (+1 s); the absent mover drained to the cap (7 s past the free seconds) and earned nothing.
+    expect(out.match.banks[0]).toBe(BANK - (10_000 - DELAY) + 1_000);
+    // A move chosen after the cap doesn't count (out of time).
+    const late = resolveHalf(m, inputs(m, firstMoves(m)), { a0: 2_000, a2: 10_001, b1: 0, b3: 0 });
+    expect(late.timeouts).toEqual(["a2"]);
+  });
+
+  it("sudden death with an increment: at zero the free seconds; a move made in time earns it and lifts the squad out; one missed leaves it at zero", () => {
+    const zero = relay(undefined, { banksMs: [0, BANK], incrementMs: 1_000, capMs: 10_000 });
+    expect(halfDuties(zero).duties.filter((d) => d.side === 0).every((d) => d.deadlineMs === DELAY)).toBe(true);
+    const lifted = resolveHalf(zero, inputs(zero, firstMoves(zero)), { a0: 1_000, a2: DELAY, b1: 0, b3: 0 });
+    expect(lifted.match.banks[0]).toBe(2_000);
+    expect(ofKind(lifted.events, "bank")[0]).toMatchObject({ side: 0, drainedMs: 0, leftMs: 2_000, suddenDeath: false });
+    expect(ofKind(lifted.events, "sudden_death")).toEqual([]);
+    expect(matchClocks(lifted.match)[0].suddenDeath).toBe(false);
+    // Lifted out, the next move has the cap again, and is cut off when the bank runs out (the free seconds and 1 s each).
+    const next = { ...lifted.match, turn: 1, half: "w" as const };
+    expect(halfDuties(next).duties.filter((d) => d.side === 0).every((d) => d.deadlineMs === 10_000)).toBe(true);
+    // One past the free seconds in sudden death: missed (a random move), no increment for it; the bank stays at zero.
+    const one = resolveHalf(zero, inputs(zero, firstMoves(zero)), { a0: 1_000, a2: DELAY + 1, b1: 0, b3: 0 });
+    expect(one.timeouts).toEqual(["a2"]);
+    expect(one.match.banks[0]).toBe(1_000);
+    const both = resolveHalf(zero, inputs(zero, firstMoves(zero)), { a0: DELAY + 1, a2: DELAY + 1, b1: 0, b3: 0 });
+    expect(both.match.banks[0]).toBe(0);
+    expect(ofKind(both.events, "bank")[0]).toMatchObject({ side: 0, leftMs: 0, suddenDeath: true });
+    // (Already in sudden death: no new "sudden_death".)
+    expect(ofKind(both.events, "sudden_death")).toEqual([]);
+  });
+
+  it("a bank that runs out mid-half is sudden death only if the half's increments don't lift it again", () => {
+    // 1 s left, 3 s free, two movers: out at 3.5 s. a0 moves at 3.2 s (in time), a2 thinks on (cut off).
+    const m = relay(undefined, { banksMs: [1_000, BANK], incrementMs: 1_000, capMs: 10_000 });
+    const think = { a0: 3_200, a2: 9_000, b1: 0, b3: 0 };
+    const lifted = resolveHalf(m, inputs(m, firstMoves(m)), think);
+    expect(lifted.timeouts).toEqual(["a2"]);
+    expect(lifted.match.banks[0]).toBe(1_000);
+    expect(ofKind(lifted.events, "sudden_death")).toEqual([]);
+    // Without an increment it stays empty: sudden death.
+    const plain = resolveHalf({ ...m, incrementMs: 0 }, inputs(m, firstMoves(m)), think);
+    expect(plain.match.banks[0]).toBe(0);
+    expect(ofKind(plain.events, "sudden_death")).toEqual([{ kind: "sudden_death", turn: 0, half: "w", side: 0 }]);
+  });
+
+  it("living on the increment: a squad near zero that moves before its bank runs out never reaches sudden death", () => {
+    for (const clock of SQUADS.clocks) {
+      let m = relay(undefined, { banksMs: [500, 500], delayMs: ms(clock.delaySeconds), incrementMs: ms(clock.incrementSeconds), capMs: ms(clock.capSeconds) });
+      for (let i = 0; i < 24 && !m.result; i++) {
+        // Each of a squad's two movers takes the free seconds and its share of the bank, at most the increment.
+        const think = Object.fromEntries(halfDuties(m).duties.map((d) => [d.players[0]!, ms(clock.delaySeconds) + Math.min(ms(clock.incrementSeconds), m.banks[d.side] / 2) - 100]));
+        const out = resolveHalf(m, inputs(m, firstMoves(m)), think);
+        expect(out.missed).toEqual([]);
+        expect(ofKind(out.events, "sudden_death")).toEqual([]);
+        m = out.match;
+        expect(Math.min(...m.banks)).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("bots on Bullet (every option): living near zero they move before their squad's bank runs out, so they don't time out", () => {
+    // Every seat a bot, thinking by `squadBotThinkMs` with when its squad's bank would run out (as the server asks).
+    const run = (clock: (typeof SQUADS.clocks)[number], format: "relay" | "pairs", withCutoff: boolean) => {
+      const o = { banksMs: [1_000, 1_000] as [number, number], delayMs: ms(clock.delaySeconds), incrementMs: ms(clock.incrementSeconds), capMs: ms(clock.capSeconds) };
+      let m = format === "relay" ? relay(undefined, o) : pairs(undefined, o);
+      const rng = mulberry32(9);
+      let timeouts = 0;
+      let halves = 0;
+      for (; halves < 60 && !m.result; halves++) {
+        const think: Record<string, number> = {};
+        const moves: Record<string, string> = {};
+        for (const d of halfDuties(m).duties) {
+          const cutoffMs = liveCutoff(m, NO_INPUTS, d);
+          const legal = legalMoves(m.boards[d.board]!.fen);
+          d.players.forEach((p, i) => {
+            think[p] = squadBotThinkMs(rng, { bankMs: m.banks[d.side], incrementMs: m.incrementMs, delayMs: m.delayMs, deadlineMs: d.deadlineMs, ...(withCutoff ? { cutoffMs } : {}) });
+            moves[p] = legal[i % legal.length]!;
+          });
+        }
+        const out = resolveHalf(m, inputs(m, moves), think);
+        timeouts += out.timeouts.length;
+        m = out.match;
+      }
+      return { timeouts, halves, banks: m.banks };
+    };
+    for (const clock of SQUADS.clocks) {
+      for (const format of ["relay", "pairs"] as const) {
+        const r = run(clock, format, true);
+        expect(r.halves).toBeGreaterThan(10);
+        expect(r.timeouts, `${clock.id} ${format}`).toBe(0);
+      }
+    }
+    // Without knowing when the bank runs out (only the cap), bots near zero are cut off now and then.
+    const without = SQUADS.clocks.flatMap((c) => (["relay", "pairs"] as const).map((f) => run(c, f, false).timeouts));
+    expect(without.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+  });
+
+  it("a match stored before the time controls keeps playing on its old ceiling (20 s); one planned from an old clock keeps that clock's numbers", () => {
+    const { capMs: _gone, ...old } = relay();
+    const up = upgradeMatch(old as never);
+    expect(up.capMs).toBe(SQUADS.legacyCapSeconds * 1000);
+    expect(halfDuties(up).duties.every((d) => d.deadlineMs === 20_000)).toBe(true);
+    expect(upgradeMatch(up)).toBe(up);
+    // Its half plays as it would have: a mover absent all half drains the bank to the old ceiling.
+    const moves = firstMoves(up);
+    delete moves.a2;
+    expect(resolveHalf(up, inputs(up, moves)).match.banks[0]).toBe(BANK - (20_000 - DELAY));
+    const normal = { id: "normal", label: "Normal", bankSeconds: 240, topUpSeconds: 60, delaySeconds: 3, incrementSeconds: 0 } as never;
+    const squads = startTeamClocks(bots32(), normal);
+    const plan = planLobby(4, { start: "standard", clock: normal }, library);
+    const r2 = planMatch(plan, 1, 0, [squads[0]!, squads[1]!], library);
+    expect(r2).toMatchObject({ banks: [300_000, 300_000], delayMs: 3_000, incrementMs: 0, capMs: 20_000 });
   });
 });
 

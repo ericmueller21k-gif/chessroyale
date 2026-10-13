@@ -31,8 +31,10 @@ import type { SquadsMode, SquadsRules, SquadsVoteId } from "./votes.ts";
  * 0 coins and `capped`; the base for playing a match is a "coins" event (why "played").
  * Version 5 (Oct 13, 2026): the Time chip. The time coin becomes the item "chip", kept from round to round (the
  * wallet's and the match's `chips`); `chip` both ways and "chipNo"; a half's `chips`.
+ * Version 6 (Oct 13, 2026): chess time controls. The Clock vote's options are Bullet, Blitz and Rapid; a clock (the
+ * rules') has its cap on a move (`capSeconds`) and a match its own (`capMs`); every option has an increment that banks.
  */
-export const SQUADS_PROTOCOL = 5;
+export const SQUADS_PROTOCOL = 6;
 
 /** A squad's placement: 1st, 2nd, 3rd-4th (out in round 2), 5th-8th (out in round 1). */
 export type SquadsPlacement = 1 | 2 | 3 | 5;
@@ -174,7 +176,7 @@ export interface NetDuty {
   side: Side;
   role: Role;
   players: string[];
-  /** When their time is up (server time): the per-move ceiling, or (moves and picks) their side's bank if shorter. */
+  /** When their time is up (server time): the time control's cap on a move, or in sudden death the free seconds (Time chips count). */
   deadline: number;
 }
 
@@ -215,8 +217,10 @@ export interface NetSquadsMatch {
    */
   banks: [number, number];
   delayMs: number;
-  /** Credited to a squad's bank after each move it made in time. */
+  /** Credited to a squad's bank after each move it made in time (it can lift a squad out of sudden death). */
   incrementMs: number;
+  /** The time control's cap on one move while a squad's bank lasts (a duty's `deadline` already counts it). */
+  capMs: number;
   /** Each side's same-move tokens left (Pairs; null elsewhere). */
   tokens: [number, number] | null;
   /** Each side's block bank as the current half began (blocks placed this half, `placed`, are paid from it at once). */

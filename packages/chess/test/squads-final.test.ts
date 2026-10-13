@@ -39,10 +39,10 @@ const WHITE_STALEMATES = "7k/8/6Q1/8/8/8/8/K7 w - - 0 1";
 
 const BANK = 240_000;
 const DELAY = 4_000;
-const CEILING = SQUADS.moveCeilingSeconds * 1000;
+const CEILING = 20_000;
 function final(fen = START_FEN, seed = 1, white: Side = 0, s?: SquadsSettings, banksMs: [number, number] = [BANK, BANK]): SquadsMatch {
   return createSquadsMatch(
-    { key: "r2m0", seed, round: 2, format: "final", sides, starts: [{ fen, openingId: null }], whites: [white], banksMs, delayMs: DELAY, incrementMs: 0 },
+    { key: "r2m0", seed, round: 2, format: "final", sides, starts: [{ fen, openingId: null }], whites: [white], banksMs, delayMs: DELAY, incrementMs: 0, capMs: CEILING },
     s,
   );
 }

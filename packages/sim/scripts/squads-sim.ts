@@ -5,10 +5,10 @@
  * how often they miss (below). The rules never ask the engine, but for a same-move token's refund (the judge's top
  * moves, given as data: here this engine's); the engine also judges which of two picks was better, for this report.
  *
- * Run: npm run sim:squads -- [lobbies per setting = 12] [nodes = 10000] [clocks: "bank|top-up|free|increment,..." with
- * the bank and top-up as m:ss, e.g. "6:00|1:00|5|0"] (about 35 minutes on 4 cores). Writes reports/squads-sim.md, or the
- * file in SQUADS_SIM_OUT (tuning runs). SQUADS_SIM_MIXES limits the mixes (e.g. "mixed"); SQUADS_SIM_SET overrides
- * settings for a tuning run (JSON merged into SQUADS, e.g. '{"moveCeilingSeconds":20}'). SQUADS_SIM_MODE=mercenary plays
+ * Run: npm run sim:squads -- [lobbies per setting = 12] [nodes = 10000] [clocks: "bank|top-up|free|increment|cap,..."
+ * with the bank and top-up as m:ss, e.g. "2:00|0:30|3|1|10"] (about 35 minutes on 4 cores). Writes reports/squads-sim.md,
+ * or the file in SQUADS_SIM_OUT (tuning runs). SQUADS_SIM_MIXES limits the mixes (e.g. "mixed"); SQUADS_SIM_SET overrides
+ * settings for a tuning run (JSON merged into SQUADS, e.g. '{"roundBreakSeconds":20}'). SQUADS_SIM_MODE=mercenary plays
  * Mercenary (coins, catch-up, the shop as bots shop, kits, Stockfish tokens; DECISIONS.md, "Squads modes: Mercenary")
  * and adds the economy's tables; its report goes to reports/squads-mercenary.md unless SQUADS_SIM_OUT says otherwise.
  */
@@ -54,6 +54,7 @@ import {
   isOnlyMove,
   judgeTokenUse,
   lockIn,
+  liveCutoff,
   minutesName,
   movesAllowed,
   noteActions,
@@ -70,6 +71,7 @@ import {
   startArmageddon,
   startTeamClocks,
   teamClockLine,
+  clockLabel,
   tokensLeft,
   topAllowed,
   winnerSquad,
@@ -92,14 +94,14 @@ const NODES = Number(process.argv[3] ?? 10_000);
 const WORKERS = 4;
 const library = JSON.parse(readFileSync(new URL("../../chess/data/openings.json", import.meta.url), "utf8")) as Opening[];
 
-/** A tuning run's option: "6:00|1:00|5|0" (the bank and top-up as m:ss, then free seconds and increment). */
+/** A tuning run's option: "2:00|0:30|3|1|10" (the bank and top-up as m:ss, then free seconds, increment and cap). */
 function parseClock(text: string, i: number): SquadsClock {
   const secs = (t: string) => {
     const [m, sec] = t.split(":");
     return Number(m) * 60 + Number(sec ?? 0);
   };
-  const [bank, topUp, delay, inc] = text.split("|");
-  return { id: `try${i}`, label: `#${i + 1}`, bankSeconds: secs(bank!), topUpSeconds: secs(topUp!), delaySeconds: Number(delay), incrementSeconds: Number(inc ?? 0) };
+  const [bank, topUp, delay, inc, cap] = text.split("|");
+  return { id: `try${i}`, label: `#${i + 1}`, bankSeconds: secs(bank!), topUpSeconds: secs(topUp!), delaySeconds: Number(delay), incrementSeconds: Number(inc ?? 0), capSeconds: Number(cap ?? 20) };
 }
 const S: SquadsSettings = { ...SQUADS, ...(process.env.SQUADS_SIM_SET ? (JSON.parse(process.env.SQUADS_SIM_SET) as Partial<SquadsSettings>) : {}) };
 const CLOCKS: readonly SquadsClock[] = process.argv[4] ? process.argv[4].split(",").map(parseClock) : S.clocks;
@@ -124,13 +126,17 @@ type MixId = (typeof ALL_MIXES)[number]["id"];
  *   increment, times a random factor in THINK_RANGE (mean 1), never less than MIN_THINK_S.
  * - In sudden death they try to beat the free seconds: a share of them in SD_RANGE (at least 1 s); past them, it's
  *   missed.
- * - Past the ceiling it's missed. They also miss outright with MISS_CHANCE (a distraction).
+ * - They watch the clock (Oct 13, with the time controls' increments and caps): when they'd think past HURRY_AT of the
+ *   time they can see they have (the cap, or their squad's bank running out with all its moves going, a Time chip
+ *   counted), they hurry to beat it as in sudden death: a share of it in SD_RANGE; past it, it's missed.
+ * - Past the cap it's missed. They also miss outright with MISS_CHANCE (a distraction): the half waits to their deadline.
  */
 const BANK_MOVES = 40;
 const INC_SHARE = 0.8;
 const THINK_RANGE = [0.5, 1.5] as const;
 const MIN_THINK_S = 2;
 const SD_RANGE = [0.4, 1.05] as const;
+const HURRY_AT = 0.85;
 const MISS_CHANCE = 0.02;
 /** Mercenary: a person who taps a Time chip thinks on into its time, this share of it (a range). */
 const CHIP_USE = [0.15, 0.7] as const;
@@ -346,6 +352,10 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
           planned[d.side]++;
         }
       }
+      // What each move's clock shows as the half begins: when it would be cut off (its cap, or its squad's bank running
+      // out with all its moves still going), the chips planned counted.
+      const chipInputs = { ...NO_INPUTS, chips: [...chipPlan].map(([board, at]) => ({ board, by: duties.duties.find((d) => d.board === board)!.players[0]!, at })) };
+      const horizon = new Map(duties.duties.map((d) => [d.board, liveCutoff(m, chipInputs, d, {}, s)]));
       const acts = duties.duties.flatMap((d) =>
         d.players.map((p, slot) => {
           const bank = m.banks[d.side];
@@ -359,6 +369,12 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
           if (tap !== undefined) {
             const r = squadsRng(seed, m.key, m.turn, m.half, d.board, "sim-chip-think", p)();
             think = Math.max(think, tap + 500) + chipMs * (CHIP_USE[0] + r * (CHIP_USE[1] - CHIP_USE[0]));
+          }
+          // Watching the clock: about to run past the time they can see, they hurry to beat it.
+          const seen = horizon.get(d.board)!;
+          if (!sudden && think > HURRY_AT * seen) {
+            const r = squadsRng(seed, m.key, m.turn, m.half, d.board, "sim-hurry", p)();
+            think = Math.max(1_000, seen * (SD_RANGE[0] + r * (SD_RANGE[1] - SD_RANGE[0])));
           }
           const deadline = d.deadlineMs + chipMs;
           const late = think > deadline;
@@ -605,7 +621,8 @@ engines.forEach((e) => e.close());
 const min = (sec: number) => (sec / 60).toFixed(1);
 const f1 = (x: number) => x.toFixed(1);
 const sel = (p: (r: LobbyStat) => boolean) => results.filter(p);
-const clockLabel = (c: SquadsClock) => `${c.label} (${minutesName(c.bankSeconds)}, +${minutesName(c.topUpSeconds)}, ${c.delaySeconds} s free${c.incrementSeconds ? `, +${c.incrementSeconds} s` : ""})`;
+/** A clock's row name: "Bullet 2+1 (+0:30 a round, 3 s free, max 10 s)". */
+const optionName = (c: SquadsClock) => `${clockLabel(c)} (+${minutesName(c.topUpSeconds)} a round, ${c.delaySeconds} s free, max ${c.capSeconds} s)`;
 const byClock = (c: SquadsClock) => sel((r) => r.cfg.clock === c);
 const roundNames = ["Round 1 (Relay)", "Round 2 (Pairs)", "Final"];
 const matchesIn = (rs: LobbyStat[], r: number) => rs.flatMap((x) => x.rounds[r]!);
@@ -625,9 +642,10 @@ push(
   "",
   "**The team clock.** Each squad has one bank for the whole tournament, carried from round to round and topped up",
   "when it advances. Each of its moves being thought about drains it past the free seconds (a Relay mover, a pair, the",
-  "final's voting squad; two at once drain it twice as fast). At zero it's sudden death: every move within the free seconds,",
-  "or it's a random move. No flag falls. The options:",
-  ...CLOCKS.map((c) => `- ${c.label}: ${teamClockLine(c)}.`),
+  "final's voting squad; two at once drain it twice as fast), and each move made in time earns the increment back. No move",
+  "goes past its cap. At zero it's sudden death: every move within the free seconds, or it's a random move, until the",
+  "increment for moves made in time lifts it out again. No flag falls. The options:",
+  ...CLOCKS.map((c) => `- ${clockLabel(c)}: ${teamClockLine(c)}, +${minutesName(c.topUpSeconds)} a round, ${c.delaySeconds} s free a move.`),
   "",
   "**How the seats are played.** Every seat is a person played by a bot: the bot engine (Stockfish 19 lite at",
   `${NODES.toLocaleString("en")} nodes, its top ${SQUADS.bots.candidates} moves) then \`botPick\` at the person's skill, a temperature over each move's loss:`,
@@ -641,7 +659,9 @@ push(
   `- With bank left, a person thinks for their squad's bank / ${BANK_MOVES} + ${INC_SHARE} × (the free seconds + any increment), times a`,
   `  random factor of ${THINK_RANGE[0]}–${THINK_RANGE[1]}, at least ${MIN_THINK_S} s.`,
   `- In sudden death they try to beat the free seconds: ${SD_RANGE[0]}–${SD_RANGE[1]} of them, at least 1 s; past them it's missed.`,
-  `- Past the per-move ceiling (${S.moveCeilingSeconds} s) it's missed. They also miss outright (a distraction) ${pct(MISS_CHANCE)} of the time.`,
+  `- They watch the clock: about to think past ${pct(HURRY_AT)} of the time they can see they have (the cap on a move, or their squad's`,
+  `  bank running out with all its moves going, a Time chip counted), they hurry to beat it, as in sudden death (${SD_RANGE[0]}–${SD_RANGE[1]} of it).`,
+  `- Past the cap on a move it's missed. They also miss outright (a distraction) ${pct(MISS_CHANCE)} of the time: the half waits to their deadline.`,
   "",
   `A half lasts as long as its slowest player, plus the show: ${S.moveShowSeconds} s for a Relay half's moves, ${S.pairRevealSeconds} s for the pair's reveal,`,
   `${S.finalRevealSeconds} s for the final's reveal. A match starts as soon as its two feeder matches are done, after ${S.roundBreakSeconds} s of bracket; ${f1(squadsVotes(S).length * (S.voteSeconds + S.voteResultSeconds))} s of votes come first.`,
@@ -653,7 +673,7 @@ table(
   ["Clock", "Median", "90th percentile", "Longest", "Shortest", "Median if rounds ran in lockstep"],
   CLOCKS.map((c) => {
     const tot = byClock(c).map((r) => r.totalSeconds);
-    return [clockLabel(c), min(quantile(tot, 0.5)), min(quantile(tot, 0.9)), min(Math.max(...tot)), min(Math.min(...tot)), min(quantile(byClock(c).map((r) => r.lockstepSeconds), 0.5))];
+    return [optionName(c), min(quantile(tot, 0.5)), min(quantile(tot, 0.9)), min(Math.max(...tot)), min(Math.min(...tot)), min(quantile(byClock(c).map((r) => r.lockstepSeconds), 0.5))];
   }),
 );
 push("By skill mix (median minutes):", "");
@@ -674,7 +694,7 @@ const sdShare = (rs: LobbyStat[], rounds: number[]) => {
   const sum = (f: (r: LobbyStat) => number[]) => rs.reduce((t, r) => t + rounds.reduce((u, i) => u + f(r)[i]!, 0), 0);
   return pct(sum((r) => r.sdMoves) / Math.max(1, sum((r) => r.drainMoves)));
 };
-push("## Sudden death", "", "A squad whose bank reaches zero plays every move within the free seconds from then on (or it's a random move).", "");
+push("## Sudden death", "", "A squad whose bank reaches zero plays every move within the free seconds (or it's a random move) until the increment for moves made in time lifts it out again. \"Moves made in sudden death\": moves whose half began with the squad's bank at zero.", "");
 table(
   ["Clock", "Squads that reach it", "…first in round 1", "…in round 2", "…in the final", "Moves made in sudden death", "…round 1", "…round 2", "…final", "Moves out of time (random)"],
   CLOCKS.map((c) => {

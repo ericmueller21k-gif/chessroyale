@@ -3624,6 +3624,14 @@ button.history-label {
 .vote-banner.leaving {
   opacity: 0;
 }
+/*
+ * A banner with a detail line (Squads' Mode, Start and Clock votes) is too tall to start 28% down a 320 px phone's board
+ * (it ran over the cards under it): centred in the board instead. `translate`, not `transform`: banner-in scales it.
+ */
+.vote-banner.with-detail {
+  top: 50%;
+  translate: 0 -50%;
+}
 .vote-banner strong {
   font-size: 22px;
 }

@@ -122,14 +122,16 @@ export function botBlock(rng: Rng, o: { fen: string; ownMove: string; reply: str
 
 /**
  * A bot's thinking time (ms): its squad's bank over `movesToGo`, plus `incrementShare` of the increment and the free
- * seconds, times a random factor in `thinkRange`; at least `minThinkSeconds`, and never past its deadline (in sudden
- * death, the free seconds: it always moves in time).
+ * seconds, times a random factor in `thinkRange`; at least `minThinkSeconds`, and always in time: within `inTime` of
+ * its deadline (the cap; in sudden death, the free seconds) and of `cutoffMs`, when its squad's bank would run out
+ * with every move it's thinking about still going (`liveCutoff` as the half begins). So a squad living on its increment
+ * near zero moves before its bank runs out instead of being cut off.
  */
-export function squadBotThinkMs(rng: Rng, clock: { bankMs: number; incrementMs: number; delayMs: number; deadlineMs: number }, s: SquadsSettings = SQUADS): number {
+export function squadBotThinkMs(rng: Rng, clock: { bankMs: number; incrementMs: number; delayMs: number; deadlineMs: number; cutoffMs?: number }, s: SquadsSettings = SQUADS): number {
   const [lo, hi] = s.bots.thinkRange;
   const target = (clock.bankMs / s.bots.movesToGo + s.bots.incrementShare * (clock.incrementMs + clock.delayMs)) * (lo + rng() * (hi - lo));
   const ms = Math.max(Math.min(s.bots.minThinkSeconds * 1000, clock.delayMs * 0.5), target);
-  return Math.round(Math.min(ms, clock.deadlineMs * 0.9));
+  return Math.round(Math.min(ms, clock.deadlineMs * s.bots.inTime, (clock.cutoffMs ?? Infinity) * s.bots.inTime));
 }
 
 /** The colour a bot squad takes when it picks Armageddon's colours. */

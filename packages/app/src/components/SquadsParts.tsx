@@ -8,6 +8,7 @@ import { PlayerName } from "./PlayerName.tsx";
 import type { SquadsClient } from "../squads.ts";
 import {
   FORMAT_NAME,
+  LOW_BANK_MS,
   ROUND_NAME,
   bankText,
   myBoards,
@@ -72,7 +73,7 @@ export function ClockText({ clock, delayMs, short }: { clock: SquadClock | undef
       </span>
     );
   return (
-    <span class={`sq-clock${clock.rate ? " running" : ""}${clock.bankMs < 30_000 ? " low" : ""}`}>
+    <span class={`sq-clock${clock.rate ? " running" : ""}${clock.bankMs < LOW_BANK_MS ? " low" : ""}`}>
       {bankText(clock.bankMs)}
       {clock.rate > 0 && <b aria-hidden="true">{clock.rate > 1 ? "▼▼" : "▼"}</b>}
     </span>

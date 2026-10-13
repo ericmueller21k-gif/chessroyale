@@ -8,7 +8,8 @@
  *   --mode queue|party|test   how the people get in: PLAY alone (default), a party, or a test lobby (needs SQUADS_TEST=1)
  *   --people N                people (default 1; a party's size with --mode party, at most 4)
  *   --start relay|pairs|final a test lobby's first round
- *   --clock B,T,F,I            a test lobby's team clock: bank, top-up, free seconds, increment (seconds)
+ *   --clock bullet|blitz|rapid a test lobby's time control (the old fast, normal, long map to them), or its own numbers:
+ *                             B,T,F,I[,C] bank, top-up, free seconds, increment and the cap on a move (seconds)
  *   --game classic|mercenary   a test lobby's mode (no Mode vote); the report then has every squad's coins and kits
  *   --play                    the people play their own duties (the engine's best, or a random legal move); else they
  *                             sit idle and a bot takes each seat after its third miss (a full bot lobby)
@@ -21,6 +22,7 @@
 import { writeFileSync } from "node:fs";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { DEFAULT_SETTINGS } from "@chessroyale/core";
+import { clockLabel } from "@chessroyale/chess/squads";
 import { PartyClient, SquadsClient, guestCookie, me, type TopEngine } from "../e2e/squads-client.ts";
 
 const args = process.argv.slice(2);
@@ -130,6 +132,7 @@ const lines = [
   `- Wall time, filled to results: **${((ended - filled) / 60_000).toFixed(1)} minutes** (${Math.round((ended - filled) / 1000)} s); from the first PLAY: ${((ended - t0) / 60_000).toFixed(1)} minutes.`,
   ...Object.entries(marks).map(([k, t]) => `  - ${((t - filled) / 1000).toFixed(0).padStart(5)} s: ${k}`),
   `- Placements (squad: place): ${JSON.stringify(watch.results)}`,
+  `- Clock: ${watch.lobby?.rules ? `${clockLabel(watch.lobby.rules.clock)} (${watch.lobby.rules.clock.delaySeconds} s free, max ${watch.lobby.rules.clock.capSeconds} s a move, +${watch.lobby.rules.clock.topUpSeconds} s a round)` : "-"}. Missed actions on every seat: ${(watch.lobby?.players ?? []).reduce((t, p) => t + p.misses, 0)}; moves played: ${[...watch.matches.values()].reduce((t, m) => t + m.boards.reduce((u, b) => u + b.ply, 0), 0)}.`,
   ...(watch.wallets.length
     ? [
         "",
