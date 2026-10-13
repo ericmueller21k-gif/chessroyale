@@ -10,6 +10,7 @@ import {
   applyKits,
   assistShownTo,
   botModeVotes,
+  botChipTap,
   botShop,
   botUsesStockfish,
   boardCoins,
@@ -19,8 +20,12 @@ import {
   captureCoins,
   capturedPiece,
   catchUpCoins,
+  chipWindowsOn,
+  chipsNow,
+  chipsOn,
   choose,
   createSquadsMatch,
+  dutyDeadline,
   dutyOf,
   earn,
   formSquads,
@@ -31,6 +36,7 @@ import {
   itemCounts,
   itemPrice,
   lockIn,
+  moveCutoffs,
   movesAllowed,
   newWallet,
   nextPrice,
@@ -38,6 +44,7 @@ import {
   planLobby,
   planMatch,
   resolveHalf,
+  returnChips,
   rulesFromVotes,
   squadsVotes,
   startArmageddon,
@@ -48,6 +55,7 @@ import {
   unbuyItem,
   upgradeMatch,
   upgradeWallet,
+  useChip,
   useStockfish,
   votable,
   type HalfInputs,
@@ -302,12 +310,12 @@ describe("Mercenary: earning coins", () => {
     w = earn(w, 600, "test", 1);
     expect(w).toMatchObject({ coins: 835, earned: 195, byRound: [195, 0, 0], catchUp: 40 });
     // Spending and the shop closing never take what's left: it carries on into the next round.
-    const bought = buyItem(w, "time");
+    const bought = buyItem(w, "shield");
     if ("error" in bought) throw new Error(bought.error);
     const closed = takeCart(bought.wallet);
-    expect(closed.wallet.coins).toBe(835 - M.items.time.price);
+    expect(closed.wallet.coins).toBe(835 - M.items.shield.price);
     expect(closed.wallet.cart).toEqual(NO_ITEMS);
-    expect(earn(closed.wallet, 30, "capture", 1)).toMatchObject({ coins: 835 - M.items.time.price + 30, byRound: [195, 30, 0] });
+    expect(earn(closed.wallet, 30, "capture", 1)).toMatchObject({ coins: 835 - M.items.shield.price + 30, byRound: [195, 30, 0] });
   });
 
   it("catch-up: the squad that has earned less gets a share of the gap (to the nearest 10, at most the max), the other none", () => {
@@ -372,8 +380,8 @@ describe("Mercenary: brilliant moves", () => {
 describe("Mercenary: the shop", () => {
   const rich = (coins = 5000) => earn(newWallet(0), coins, "capture", 0);
 
-  it("each item's price rises by the step for every one the squad has bought this tournament", () => {
-    for (const it of MERC_ITEMS) {
+  it("each item's price rises by the step for every one the squad has bought this tournament (the Time chip: its own list)", () => {
+    for (const it of MERC_ITEMS.filter((x) => !M.items[x].prices)) {
       expect(itemPrice(it, 0)).toBe(M.items[it].price);
       expect(itemPrice(it, 2)).toBe(M.items[it].price + 2 * M.priceStep);
     }
@@ -410,8 +418,8 @@ describe("Mercenary: the shop", () => {
   });
 
   it("not enough coins: refused; putting one back refunds what it cost and lowers the price again", () => {
-    expect(buyItem(newWallet(0), "time")).toEqual({ error: "coins" });
-    expect(unbuyItem(newWallet(0), "time")).toEqual({ error: "none" });
+    expect(buyItem(newWallet(0), "chip")).toEqual({ error: "coins" });
+    expect(unbuyItem(newWallet(0), "chip")).toEqual({ error: "none" });
     const w0 = rich(1000);
     const a = buyItem(w0, "blocks");
     if ("error" in a) throw new Error(a.error);
@@ -427,27 +435,28 @@ describe("Mercenary: the shop", () => {
   it("one shared wallet: whoever on the squad buys, it all comes from (and goes into) the same cart", () => {
     // (The lobby keeps one wallet per squad: two teammates' purchases one after the other.)
     let w = rich(500);
-    for (const it of ["time", "shield"] as const) {
+    for (const it of ["chip", "shield"] as const) {
       const r = buyItem(w, it);
       if ("error" in r) throw new Error(r.error);
       w = r.wallet;
     }
-    expect(w.coins).toBe(500 - M.items.time.price - M.items.shield.price);
-    expect(w.cart).toEqual(kit({ time: 1, shield: 1 }));
+    expect(w.coins).toBe(500 - M.items.chip.price - M.items.shield.price);
+    expect(w.cart).toEqual(kit({ chip: 1, shield: 1 }));
   });
 });
 
 describe("Mercenary: the kit is for the next match only", () => {
   it("comes in once as the match starts; a later match (or Armageddon's) without one has none", () => {
-    const m = applyKits(pairs(), [kit({ time: 2, blocks: 1, stockfish: 2, shield: 1 }), NO_ITEMS]);
-    expect(m.banks).toEqual([BANK + 2 * M.timeSeconds * 1000, BANK]);
+    const m = applyKits(pairs(), [kit({ chip: 2, blocks: 1, stockfish: 2, shield: 1 }), NO_ITEMS]);
+    expect(m.banks).toEqual([BANK, BANK]);
+    expect(m.chips).toEqual([2, 0]);
     expect(m.blockBanks).toEqual([SQUADS.blocks.bankPerMatch + M.blockPoints, SQUADS.blocks.bankPerMatch]);
     expect(m.stockfish).toEqual([2, 0]);
     expect(m.shields).toEqual([1, 0]);
     // Once only, and never into Classic.
-    expect(applyKits(m, [kit({ time: 2 }), kit({ time: 2 })])).toBe(m);
+    expect(applyKits(m, [kit({ chip: 2 }), kit({ chip: 2 })])).toBe(m);
     const classic = pairs(undefined, { mode: "classic" });
-    expect(applyKits(classic, [kit({ time: 2 }), NO_ITEMS])).toBe(classic);
+    expect(applyKits(classic, [kit({ chip: 2 }), NO_ITEMS])).toBe(classic);
     // The next match: nothing carried (its own kit, from the next shop).
     const next = final();
     expect([next.stockfish, next.shields, next.kit]).toEqual([[0, 0], [0, 0], null]);
@@ -462,10 +471,6 @@ describe("Mercenary: the kit is for the next match only", () => {
 });
 
 describe("Mercenary: the items", () => {
-  it("a time coin: more team bank as the match starts", () => {
-    const m = applyKits(relay(), [kit({ time: 1 }), NO_ITEMS]);
-    expect(m.banks[0] - m.banks[1]).toBe(M.timeSeconds * 1000);
-  });
 
   it("block points: more block bank for the match", () => {
     const m = applyKits(relay(), [NO_ITEMS, kit({ blocks: 2 })]);
@@ -473,9 +478,9 @@ describe("Mercenary: the items", () => {
   });
 
   it("four items: the Breather is gone (Eric, Oct 13), and a kit stored with one is read without it", () => {
-    expect([...MERC_ITEMS]).toEqual(["stockfish", "blocks", "shield", "time"]);
-    expect(Object.keys(M.items).sort()).toEqual(["blocks", "shield", "stockfish", "time"]);
-    expect(itemCounts({ stockfish: 1, breather: 1, time: 2 })).toEqual(kit({ stockfish: 1, time: 2 }));
+    expect([...MERC_ITEMS]).toEqual(["stockfish", "blocks", "shield", "chip"]);
+    expect(Object.keys(M.items).sort()).toEqual(["blocks", "chip", "shield", "stockfish"]);
+    expect(itemCounts({ stockfish: 1, breather: 1, time: 2, chip: 1 })).toEqual(kit({ stockfish: 1, chip: 1 }));
     expect(itemCounts(null)).toEqual(NO_ITEMS);
     // A kit stored with a breather (a match in play across the deploy): the kit comes in without it, the free seconds
     // are the match's for both squads.
@@ -563,6 +568,201 @@ describe("Mercenary: the items", () => {
     expect(b.match.shields[1]).toBe(0);
     expect(b.match.blockBanks[0]).toBe(SQUADS.blocks.bankPerMatch - SQUADS.blocks.cost.p);
     expect(b.match.blocks).toEqual([]);
+  });
+});
+
+describe("Mercenary: the Time chip (Eric, Oct 13)", () => {
+  const CHIP = M.chipSeconds * 1000;
+  const CEILING = SQUADS.moveCeilingSeconds * 1000;
+  const bankEvent = (events: SquadsEvent[], side: Side) => ofKind(events, "bank").find((e) => e.side === side)!;
+  const ok = <T extends object>(r: T): Exclude<T, { error: unknown }> => {
+    if ("error" in r) throw new Error(String((r as { error: unknown }).error));
+    return r as Exclude<T, { error: unknown }>;
+  };
+
+  it("is bought at Eric's prices (25, 25, 50, 50, then 50), counted by chips bought; a squad holds at most 3", () => {
+    expect([0, 1, 2, 3, 4, 9].map((n) => itemPrice("chip", n))).toEqual([25, 25, 50, 50, 50, 50]);
+    expect(M.items.chip.cap).toBe(3);
+    let w = earn(newWallet(0), 1000, "capture", 0);
+    const paid: number[] = [];
+    for (let i = 0; i < M.items.chip.cap; i++) {
+      const r = ok(buyItem(w, "chip"));
+      paid.push(r.price);
+      w = r.wallet;
+    }
+    expect(paid).toEqual([25, 25, 50]);
+    expect(buyItem(w, "chip")).toEqual({ error: "cap" });
+    // Into the match: all of them; the wallet holds none meanwhile.
+    const t = takeCart(w);
+    expect(t.kit.chip).toBe(3);
+    expect(t.wallet.chips).toBe(0);
+    // One left after the match: kept for the next round, where the shop sells up to the cap again, the price list going
+    // on from the chips bought (three so far: 50).
+    let back = returnChips(t.wallet, 1);
+    expect(back.chips).toBe(1);
+    expect(nextPrice(back, "chip")).toBe(50);
+    for (let i = 0; i < 2; i++) back = ok(buyItem(back, "chip")).wallet;
+    expect(buyItem(back, "chip")).toEqual({ error: "cap" });
+    // "−" puts back one from the cart, never a chip held.
+    const u = ok(unbuyItem(back, "chip"));
+    expect([u.wallet.chips, u.wallet.cart.chip, u.refund]).toEqual([1, 1, 50]);
+    // The held chip goes into the next match with the ones bought.
+    expect(takeCart(back).kit.chip).toBe(3);
+  });
+
+  it("comes into the match as the squad's (both squads' counts on the match); what's left goes back after; never in Classic", () => {
+    const m = applyKits(relay(), [kit({ chip: 2 }), kit({ chip: 1 })]);
+    expect(m.chips).toEqual([2, 1]);
+    const classic = relay(undefined, { mode: "classic" });
+    expect(applyKits(classic, [kit({ chip: 2 }), NO_ITEMS]).chips).toEqual([0, 0]);
+    const mover = moverOn(m, 0);
+    expect(useChip({ ...classic, chips: [1, 0] }, NO_INPUTS, mover, 1000, 0)).toEqual({ error: "no_chips" });
+    // A chip tapped this half is spent with the half: the rest stay the squad's.
+    const t = ok(useChip(m, NO_INPUTS, mover, 1000, 0));
+    expect(chipsNow(m, t.inputs, 0)).toBe(1);
+    const out = resolveHalf(m, inputs(m, rest(m, {}), t.inputs));
+    expect(out.match.chips).toEqual([1, 1]);
+  });
+
+  it("is tapped only by a player on the move being thought about, during their squad's move", () => {
+    const m = applyKits(relay(), [kit({ chip: 1 }), NO_ITEMS]);
+    const duties = halfDuties(m).duties;
+    const mover = moverOn(m, 0);
+    const theirs = duties.find((d) => d.side === 1)!.players[0]!;
+    const idle = m.sides[0].seats.find((p) => !duties.some((d) => d.players.includes(p)))!;
+    expect(useChip(m, NO_INPUTS, idle, 1000, 0)).toEqual({ error: "no_duty" });
+    expect(useChip(m, NO_INPUTS, theirs, 1000, 0)).toEqual({ error: "no_chips" });
+    // Moved already: too late for that move.
+    const moved = inputs(m, { [mover]: movesAllowed(m, 0)[0]! });
+    expect(useChip(m, moved, mover, 1000, 0)).toEqual({ error: "done" });
+    const t = ok(useChip(m, NO_INPUTS, mover, 1000, 0));
+    expect(t.chip).toEqual({ board: 0, side: 0, by: mover, at: 1000 });
+    // None left now.
+    expect(useChip(m, t.inputs, moverOn(m, 2), 1000, 0)).toEqual({ error: "no_chips" });
+  });
+
+  it("in Pairs counts for both partners; two at once spend one (the first tap wins); several stack on one move", () => {
+    const m = applyKits(pairs(), [kit({ chip: 3 }), NO_ITEMS]);
+    const d = halfDuties(m).duties.find((x) => x.side === 0)!;
+    const [p, q] = d.players as [string, string];
+    const a = ok(useChip(m, NO_INPUTS, p, 1000, 0));
+    // Q saw no chip on it: P's went first, so Q's tap spends nothing.
+    expect(useChip(m, a.inputs, q, 1100, 0)).toEqual({ error: "stale" });
+    // Seeing one, a second stacks.
+    const b = ok(useChip(m, a.inputs, q, 1200, 1));
+    expect(chipsOn(b.inputs, d.board)).toBe(2);
+    expect(dutyDeadline(b.inputs, d)).toBe(CEILING + 2 * CHIP);
+    expect(chipWindowsOn(m, b.inputs, d.board)).toEqual([[DELAY, DELAY + 2 * CHIP]]);
+    // Both partners' picks at 45 s count (the ceiling is 20 s), and the bank never moved.
+    const all = rest(m, {});
+    const think = Object.fromEntries(Object.keys(all).map((x) => [x, 4_000]));
+    think[p] = 45_000;
+    think[q] = 45_000;
+    const out = resolveHalf(m, inputs(m, all, b.inputs), think);
+    expect(out.acted).toEqual(expect.arrayContaining([p, q]));
+    expect(bankEvent(out.events, 0).drainedMs).toBe(0);
+    expect(out.match.chips).toEqual([1, 0]);
+  });
+
+  it("pushes the move's deadline 30 s later and holds the bank still for those 30 s; time it doesn't use is lost", () => {
+    const m = applyKits(relay(), [kit({ chip: 2 }), NO_ITEMS]);
+    const mover = moverOn(m, 0);
+    const d = dutyOf(m, mover)!.duty;
+    const t = ok(useChip(m, NO_INPUTS, mover, 5_000, 0));
+    expect(dutyDeadline(t.inputs, d)).toBe(CEILING + CHIP);
+    const all = rest(m, { [mover]: movesAllowed(m, 0)[0]! });
+    const think = Object.fromEntries(Object.keys(all).map((x) => [x, 4_000]));
+    // 40 s on it (past the ceiling, in time with the chip): it drains 3-5 s and 35-40 s; the other mover 1 s.
+    think[mover] = 40_000;
+    const out = resolveHalf(m, inputs(m, all, t.inputs), think);
+    expect(out.acted).toContain(mover);
+    expect(bankEvent(out.events, 0).drainedMs).toBe(2_000 + 5_000 + 1_000);
+    // Without the chip, the same 40 s is out of time.
+    expect(resolveHalf(m, inputs(m, all), think).missed).toContain(mover);
+    // The move made at 10 s: the bank drained 2 s on it, and the chip's other 25 s are gone (never banked).
+    think[mover] = 10_000;
+    const quick = resolveHalf(m, inputs(m, all, t.inputs), think);
+    expect(bankEvent(quick.events, 0).drainedMs).toBe(2_000 + 1_000);
+    expect(quick.match.banks[0]).toBe(BANK - 3_000);
+  });
+
+  it("works in sudden death: the free seconds and 30 s more for that move, tapped while there's time", () => {
+    const m = applyKits(relay(undefined, { banksMs: [0, BANK] }), [kit({ chip: 1 }), NO_ITEMS]);
+    const mover = moverOn(m, 0);
+    const d = dutyOf(m, mover)!.duty;
+    expect(useChip(m, NO_INPUTS, mover, DELAY + 1, 0)).toEqual({ error: "late" });
+    const t = ok(useChip(m, NO_INPUTS, mover, 1_500, 0));
+    expect(dutyDeadline(t.inputs, d)).toBe(DELAY + CHIP);
+    const all = rest(m, { [mover]: movesAllowed(m, 0)[0]! });
+    const think = Object.fromEntries(Object.keys(all).map((x) => [x, 2_000]));
+    think[mover] = 20_000;
+    const out = resolveHalf(m, inputs(m, all, t.inputs), think);
+    expect(out.acted).toContain(mover);
+    expect(resolveHalf(m, inputs(m, all), think).missed).toContain(mover);
+  });
+
+  it("the bank running out while a chip holds it: that move runs to the chip's end; after it, the bank runs on", () => {
+    const m = applyKits(relay(undefined, { banksMs: [5_000, BANK] }), [kit({ chip: 1 }), NO_ITEMS]);
+    const mover = moverOn(m, 0);
+    const other = moverOn(m, 2);
+    const duties = halfDuties(m).duties.filter((d) => d.side === 0);
+    const t = ok(useChip(m, NO_INPUTS, mover, 4_000, 0));
+    const at = (ends: Record<string, number>) => duties.map((d) => ends[d.players[0]!]!);
+    // The other mover thinks 20 s: two moves drain 3-4 s (2 s), then it alone until 7 s: out. The chip holds the mover
+    // to 34 s.
+    let r = moveCutoffs(m, t.inputs, 0, duties, at({ [mover]: CEILING + CHIP, [other]: 20_000 }));
+    expect(r.out).toBe(7_000);
+    expect(r.cutoffs.get(0)).toBe(34_000);
+    expect(r.cutoffs.get(2)).toBe(7_000);
+    // The other mover quick (3 s): 1 s drained before the chip, and after it (34 s) the last 4 s: out at 38 s.
+    r = moveCutoffs(m, t.inputs, 0, duties, at({ [mover]: CEILING + CHIP, [other]: 3_000 }));
+    expect(r.out).toBe(38_000);
+    expect(r.cutoffs.get(0)).toBe(38_000);
+    const all = rest(m, { [mover]: movesAllowed(m, 0)[0]! });
+    const think = Object.fromEntries(Object.keys(all).map((x) => [x, 3_000]));
+    think[mover] = 37_000;
+    const made = resolveHalf(m, inputs(m, all, t.inputs), think);
+    expect(made.acted).toContain(mover);
+    expect(made.match.banks[0]).toBe(1_000);
+    think[mover] = 39_000;
+    const late = resolveHalf(m, inputs(m, all, t.inputs), think);
+    expect(late.missed).toContain(mover);
+    expect(late.match.banks[0]).toBe(0);
+  });
+
+  it("a drawn final's Armageddon keeps the final's chips", () => {
+    let m = applyKits(final("8/8/8/4k3/8/8/4K3/8 w - - 0 1"), [kit({ chip: 2 }), kit({ chip: 1 })]);
+    m = { ...m, result: { winner: null, points: [0.5, 0.5], how: "boards" }, boards: m.boards.map((b) => ({ ...b, result: { winner: null, reason: "insufficient_material" } })) };
+    expect(startArmageddon(m, 0, { fen: START_FEN, openingId: null }).chips).toEqual([2, 1]);
+  });
+
+  it("a wallet from before the Time chip: a time coin in an open shop's cart refunded at what it cost; no chips held", () => {
+    const w = { squadId: 2, coins: 10, earned: 0, byRound: [0, 0, 0], catchUp: 0, bought: { stockfish: 0, blocks: 0, shield: 0, time: 2 }, cart: { stockfish: 0, blocks: 0, shield: 0, time: 1 } } as unknown as ReturnType<typeof newWallet>;
+    const up = upgradeWallet(w);
+    expect(up.coins).toBe(10 + 75 + M.priceStep);
+    expect(up.bought).toEqual(NO_ITEMS);
+    expect(up.cart).toEqual(NO_ITEMS);
+    expect(up.chips).toBe(0);
+  });
+
+  it("bots: tap one when a move needs time (sudden death more than a low bank), never with plenty; shop chips up to the cap", () => {
+    const rate = (bankMs: number) => Array.from({ length: 2000 }, (_, i) => botChipTap(mulberry32(i + 1), bankMs)).filter((x) => x !== null).length / 2000;
+    expect(rate(0)).toBeGreaterThan(M.bots.chip.suddenDeath - 0.05);
+    expect(rate(0)).toBeLessThan(M.bots.chip.suddenDeath + 0.05);
+    expect(rate(M.bots.chip.lowBankSeconds * 1000 - 1)).toBeGreaterThan(M.bots.chip.lowBank - 0.05);
+    expect(rate(M.bots.chip.lowBankSeconds * 1000 - 1)).toBeLessThan(M.bots.chip.lowBank + 0.05);
+    expect(rate(BANK)).toBe(0);
+    for (let i = 1; i < 200; i++) {
+      const at = botChipTap(mulberry32(i), 0);
+      if (at !== null) expect(at).toBeGreaterThanOrEqual(M.bots.chip.tapMs[0]);
+      if (at !== null) expect(at).toBeLessThanOrEqual(M.bots.chip.tapMs[1]);
+    }
+    // Shopping in the final with a chip held: never past the cap.
+    for (let seed = 1; seed <= 100; seed++) {
+      const w = { ...earn(newWallet(0), 900, "capture", 0), chips: 1 };
+      const items = botShop(mulberry32(seed), w, true);
+      expect(items.filter((it) => it === "chip").length).toBeLessThanOrEqual(M.items.chip.cap - 1);
+    }
   });
 });
 
@@ -717,9 +917,9 @@ describe("Mercenary: bots", () => {
     }
     expect(saved / 300).toBeGreaterThan(M.bots.saveChance - 0.08);
     expect(saved / 300).toBeLessThan(M.bots.saveChance + 0.08);
-    // Blocks and time most; a Stockfish token now and then.
+    // Blocks and chips most; a Stockfish token now and then.
     expect(counts.blocks!).toBeGreaterThan(counts.stockfish!);
-    expect(counts.time!).toBeGreaterThan(counts.stockfish!);
+    expect(counts.chip!).toBeGreaterThan(counts.stockfish!);
     expect(counts.stockfish!).toBeGreaterThan(0);
     // The final: never saving; spending until nothing more fits.
     for (let seed = 1; seed <= 50; seed++) {
@@ -744,12 +944,12 @@ describe("Mercenary: bots", () => {
     expect(rate(sharp)).toBeLessThan(M.bots.stockfishSharp + 0.05);
   });
 
-  it("the shop's ranking: the Stockfish token dearest (Eric: 200), then block points and shields, the time coin cheapest", () => {
+  it("the shop's ranking: the Stockfish token dearest (Eric: 200), then block points and shields, the Time chip cheapest", () => {
     const p = M.items;
     expect(p.stockfish.price).toBe(200);
     expect(p.stockfish.price).toBeGreaterThan(p.blocks.price);
     expect(p.blocks.price).toBe(p.shield.price);
-    expect(p.shield.price).toBeGreaterThan(p.time.price);
+    expect(p.shield.price).toBeGreaterThan(p.chip.price);
     expect(p.stockfish.cap).toBeLessThanOrEqual(2);
   });
 

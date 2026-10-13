@@ -63,6 +63,8 @@ export class SquadsClient {
   kits: { squadId: number; round: number; cart: Record<string, number>; coins: number }[] = [];
   /** Mercenary: catch-up and brilliant coins as they were announced. */
   coinNews: Extract<SquadsServerMessage, { t: "coins" }>[] = [];
+  /** Mercenary: every Time chip tapped (where, by which squad's side), as announced. */
+  chipNews: { key: string; side: 0 | 1; squadId: number | null }[] = [];
   errors: string[] = [];
   closed = false;
   test = false;
@@ -149,6 +151,9 @@ export class SquadsClient {
         break;
       case "coins":
         this.coinNews.push(msg);
+        break;
+      case "chip":
+        this.chipNews.push({ key: msg.key, side: msg.chip.side, squadId: this.matches.get(msg.key)?.sides[msg.chip.side].squadId ?? null });
         break;
       case "clocks":
         this.clocks = msg.clocks;

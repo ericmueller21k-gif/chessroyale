@@ -29,6 +29,9 @@ import {
   myAssist,
   shopRows,
   stockfishLeft,
+  canTapChip,
+  chipLeftMs,
+  chipsLeft,
   type LocalMatch,
 } from "../src/squads-view.ts";
 import { SQUADS } from "@chessroyale/core";
@@ -60,6 +63,7 @@ function match(over: Partial<LocalMatch> = {}, boards = 4): LocalMatch {
     kit: null,
     stockfish: [0, 0],
     shields: [0, 0],
+    chips: [0, 0],
     assists: [],
     coins: [0, 0],
     assisting: [],
@@ -79,7 +83,7 @@ function match(over: Partial<LocalMatch> = {}, boards = 4): LocalMatch {
 }
 
 const duty = (board: number, side: 0 | 1, players: string[], role: NetDuty["role"] = "move", deadline = 20_000): NetDuty => ({ board, side, role, players, deadline });
-const half = (duties: NetDuty[]): NetSquadsHalf => ({ seq: 0, turn: 0, half: "w", startedAt: 0, duties, scouts: [], forced: [] });
+const half = (duties: NetDuty[], chips: NetSquadsHalf["chips"] = []): NetSquadsHalf => ({ seq: 0, turn: 0, half: "w", startedAt: 0, duties, scouts: [], forced: [], chips });
 
 describe("Squads screens: the team clock as the screen runs it", () => {
   it("drains past the free seconds, once for each move being thought about (twice as fast with two)", () => {
@@ -291,20 +295,23 @@ describe("cheat lines (test controls only)", () => {
 
 describe("Mercenary on screen", () => {
   const M = SQUADS.mercenary;
-  const none = { stockfish: 0, blocks: 0, shield: 0, time: 0 };
+  const none = { stockfish: 0, blocks: 0, shield: 0, chip: 0 };
 
   it("the shop's rows: strongest first, the price now (risen for each bought), the cart against the round's cap, why not", () => {
-    const rows = shopRows({ coins: 260, bought: { ...none, shield: 1 }, cart: { ...none, shield: 1, time: M.items.time.cap } });
-    expect(rows.map((r) => r.item)).toEqual(["stockfish", "blocks", "shield", "time"]);
+    const rows = shopRows({ coins: 260, bought: { ...none, shield: 1 }, cart: { ...none, shield: 1, chip: 1 }, chips: M.items.chip.cap - 1 });
+    expect(rows.map((r) => r.item)).toEqual(["stockfish", "blocks", "shield", "chip"]);
     const by = Object.fromEntries(rows.map((r) => [r.item, r]));
     expect(by.shield).toMatchObject({ price: M.items.shield.price + M.priceStep, count: 1, cap: M.items.shield.cap, bought: 1 });
-    expect(by.time).toMatchObject({ can: false, why: "cap" });
+    // Time chips: those held and in the cart against what a squad may hold; "−" only for the cart's.
+    expect(by.chip).toMatchObject({ count: M.items.chip.cap, inCart: 1, can: false, why: "cap" });
     expect(by.stockfish).toMatchObject({ can: M.items.stockfish.price <= 260, why: M.items.stockfish.price <= 260 ? null : "coins" });
     expect(by.blocks!.can).toBe(true);
   });
 
   it("every item's words carry its numbers from settings", () => {
-    expect(itemText("time").line).toContain(`+${M.timeSeconds}\u00a0s`);
+    expect(itemText("chip").name).toBe("Time chip");
+    expect(itemText("chip").line).toContain(`+${M.chipSeconds}\u00a0s for that move`);
+    expect(itemText("chip").line).toContain(`hold ${M.items.chip.cap}`);
     expect(itemText("blocks").line).toContain(`+${M.blockPoints} block points`);
     expect(itemText("stockfish").line).toContain(`top ${M.stockfish.lines} moves`);
     expect(itemText("stockfish").line).toContain("Never theirs");
@@ -334,6 +341,38 @@ describe("Mercenary on screen", () => {
     expect(liveBank(live, 0, 5000)).toBe(58_000);
     expect(liveBank(live, 1, 5000)).toBe(58_000);
     expect(itemText("stockfish").name).toBe("Stockfish token");
-    expect(shopRows({ coins: 0, bought: none, cart: none }).map((r) => itemText(r.item).name)).toEqual(["Stockfish token", "Block points", "Shield", "Time coin"]);
+    expect(shopRows({ coins: 0, bought: none, cart: none }).map((r) => itemText(r.item).name)).toEqual(["Stockfish token", "Block points", "Shield", "Time chip"]);
+  });
+
+  it("a Time chip on screen: its squad's clock jumps (20 s becomes 50) and stands still while the chip's time runs; both squads' counts", () => {
+    const chip = M.chipSeconds * 1000;
+    const m = match({ mode: "mercenary", banks: [20_000, 60_000], chips: [2, 1], current: half([duty(0, 0, ["a0"], "move", 20_000 + chip), duty(1, 1, ["b1"], "move", 20_000)], [{ board: 0, by: "a0", at: 5_000 }]) });
+    // (The chip's move: its deadline 30 s later, as the server's "chip" says.)
+    // At 5 s (just tapped): 20 s less the 2 s drained, and the chip's 30 s on top.
+    expect(liveBank(m, 0, 5_000)).toBe(18_000);
+    expect(chipLeftMs(m, 0, 5_000)).toBe(chip);
+    // At 20 s: the bank hasn't moved since the tap, the chip has 15 s left; the other squad's bank ran on.
+    expect(liveBank(m, 0, 20_000)).toBe(18_000);
+    expect(chipLeftMs(m, 0, 20_000)).toBe(15_000);
+    expect(drainRate(m, 0, 20_000)).toBe(0);
+    expect(liveBank(m, 1, 20_000)).toBe(60_000 - 17_000);
+    // After the chip (35 s): the bank drains again.
+    expect(liveBank(m, 0, 40_000)).toBe(13_000);
+    expect(chipLeftMs(m, 0, 40_000)).toBe(0);
+    // Both squads' counts: what each has left this half.
+    expect([chipsLeft(m, 0), chipsLeft(m, 1)]).toEqual([1, 1]);
+    // The move made: the chip's time left is lost (the clock shows the bank).
+    expect(chipLeftMs({ ...m, locked: ["a0"] }, 0, 20_000)).toBe(0);
+  });
+
+  it("who may tap a Time chip: the player on the move being thought about, with one left, before its time is up", () => {
+    const m = match({ mode: "mercenary", chips: [1, 0], current: half([duty(0, 0, ["a0"]), duty(1, 1, ["b1"])]) });
+    expect(canTapChip(m, "a0", 1_000)).toBe(true);
+    expect(canTapChip(m, "b1", 1_000)).toBe(false);
+    expect(canTapChip(m, "a1", 1_000)).toBe(false);
+    expect(canTapChip(m, "a0", 20_000)).toBe(false);
+    expect(canTapChip({ ...m, visible: { a0: "e2e4" } }, "a0", 1_000)).toBe(false);
+    expect(canTapChip({ ...m, mode: "classic" }, "a0", 1_000)).toBe(false);
+    expect(canTapChip({ ...m, current: half(m.current!.duties, [{ board: 0, by: "a0", at: 500 }]) }, "a0", 1_000)).toBe(false);
   });
 });

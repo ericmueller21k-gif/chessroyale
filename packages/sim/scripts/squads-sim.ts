@@ -37,6 +37,11 @@ import {
   choose,
   earn,
   isBrilliant,
+  itemPrice,
+  botChipTap,
+  chipsOn,
+  returnChips,
+  useChip,
   brilliantPay,
   newWallet,
   squadsVotes,
@@ -127,6 +132,8 @@ const THINK_RANGE = [0.5, 1.5] as const;
 const MIN_THINK_S = 2;
 const SD_RANGE = [0.4, 1.05] as const;
 const MISS_CHANCE = 0.02;
+/** Mercenary: a person who taps a Time chip thinks on into its time, this share of it (a range). */
+const CHIP_USE = [0.15, 0.7] as const;
 
 interface Config {
   mix: MixId;
@@ -243,6 +250,8 @@ interface EconStat {
   /** Brilliant moves past their squad's cap for the match (announced, no coins). */
   brilliantCapped: number;
   shielded: number;
+  /** Time chips tapped. */
+  chipsTapped: number;
 }
 
 interface LobbyStat {
@@ -304,7 +313,7 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
     tokens: [],
     blocks: [],
     squadMatches: [0, 0, 0],
-    econ: { earned: [], shops: [], matches: [], assists: 0, brilliant: 0, brilliantCapped: 0, shielded: 0 },
+    econ: { earned: [], shops: [], matches: [], assists: 0, brilliant: 0, brilliantCapped: 0, shielded: 0, chipsTapped: 0 },
   };
   const player = (id: string) => squads.flatMap((x) => x.players).find((p) => p.id === id)!;
   /** Coins each side of the match being played has earned so far, by source. */
@@ -323,16 +332,37 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
     while (!m.result) {
       const duties = halfDuties(m, s);
       const fens = m.boards.map((b) => b.fen);
+      // Mercenary: a squad taps one of its Time chips on a move that needs time (in sudden death, or low on bank), as
+      // the bots' policy plays it (`botChipTap`; its own random stream, so nothing else moves); then its players think
+      // on into the chip's time.
+      const chipPlan = new Map<number, number>();
+      if (MERC) {
+        const planned: [number, number] = [0, 0];
+        for (const d of duties.duties) {
+          if (m.chips[d.side] <= planned[d.side]) continue;
+          const tap = botChipTap(squadsRng(seed, m.key, m.turn, m.half, d.board, "sim-chip"), m.banks[d.side], s);
+          if (tap === null) continue;
+          chipPlan.set(d.board, tap);
+          planned[d.side]++;
+        }
+      }
       const acts = duties.duties.flatMap((d) =>
         d.players.map((p, slot) => {
           const bank = m.banks[d.side];
           const sudden = bank <= 0;
-          const think = sudden
+          let think = sudden
             ? Math.max(1_000, m.delayMs * (SD_RANGE[0] + rng() * (SD_RANGE[1] - SD_RANGE[0])))
             : Math.max(MIN_THINK_S * 1000, (bank / BANK_MOVES + INC_SHARE * (m.delayMs + m.incrementMs)) * (THINK_RANGE[0] + rng() * (THINK_RANGE[1] - THINK_RANGE[0])));
           const distracted = !player(p).replacedByBot && rng() < MISS_CHANCE;
-          const late = think > d.deadlineMs;
-          return { d, p, slot, miss: distracted || late, t: distracted || late ? d.deadlineMs : think };
+          const tap = chipPlan.get(d.board);
+          const chipMs = tap !== undefined ? s.mercenary.chipSeconds * 1000 : 0;
+          if (tap !== undefined) {
+            const r = squadsRng(seed, m.key, m.turn, m.half, d.board, "sim-chip-think", p)();
+            think = Math.max(think, tap + 500) + chipMs * (CHIP_USE[0] + r * (CHIP_USE[1] - CHIP_USE[0]));
+          }
+          const deadline = d.deadlineMs + chipMs;
+          const late = think > deadline;
+          return { d, p, slot, miss: distracted || late, t: distracted || late ? deadline : think, tap };
         }),
       );
       for (const d of duties.duties) {
@@ -342,6 +372,15 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
       acts.sort((a, b) => a.t - b.t);
       let inputs = NO_INPUTS;
       const think: Record<string, number> = {};
+      // (The chips planned this half, tapped first: they're in before anyone's move.)
+      for (const [board, tap] of [...chipPlan].sort((x, y) => x[1] - y[1])) {
+        const by = duties.duties.find((d) => d.board === board)!.players[0]!;
+        const c = useChip(m, inputs, by, tap, chipsOn(inputs, board), {}, s);
+        if ("inputs" in c) {
+          inputs = c.inputs;
+          out.econ.chipsTapped++;
+        }
+      }
       for (const a of acts) {
         if (a.miss) continue;
         const fen = fens[a.d.board]!;
@@ -486,6 +525,8 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
       matchBrilliant = [0, 0];
       const played = await play(planned);
       let m = played.match;
+      // Mercenary: the Time chips each squad didn't use go back to its wallet.
+      if (MERC) for (const side of [0, 1] as const) wallets[m.sides[side].squadId] = returnChips(wallets[m.sides[side].squadId]!, m.chips[side]);
       squads = settleTeamClocks(squads, m);
       const left = m.banks;
       const w = (m.result!.winner ?? 0) as 0 | 1;
@@ -785,8 +826,8 @@ if (MERC) {
       (["p", "n", "b", "r", "q"] as const).map((k) => `${k.toUpperCase()} ${M.capture[k]}`).join(", ") +
       `), a board won ${M.boardWin} (a mate ${M.mate} more), drawn ${M.boardDraw} each, those times ${M.roundScale.join(", ")} in Relay, Pairs and the final; a match won ${M.matchWin}, a brilliant move ${M.brilliant.coins} (at most ${M.brilliant.capPerMatch} a squad a match).`,
     `Catch-up: ${pct(M.catchUp.share)} of the earned gap to the next opponent, at most ${M.catchUp.max}. Prices: ` +
-      MERC_ITEMS.map((it) => `${it} ${M.items[it].price} (cap ${M.items[it].cap})`).join(", ") +
-      `, each +${M.priceStep} for every one already bought. The people's shopping is played by the bots' policy (\`botShop\`): before the final it saves everything ${pct(M.bots.saveChance)} of the time, else spends ${pct(M.bots.spend[0])}–${pct(M.bots.spend[1])} of its wallet; in the final all of it.`,
+      MERC_ITEMS.map((it) => (M.items[it].prices ? `${it} ${M.items[it].prices!.join(", ")} then ${M.items[it].prices!.at(-1)} (hold ${M.items[it].cap})` : `${it} ${M.items[it].price} (cap ${M.items[it].cap})`)).join(", ") +
+      `; the others each +${M.priceStep} for every one already bought. The people's shopping is played by the bots' policy (\`botShop\`): before the final it saves everything ${pct(M.bots.saveChance)} of the time, else spends ${pct(M.bots.spend[0])}–${pct(M.bots.spend[1])} of its wallet; in the final all of it.`,
     "",
   );
   push("### Coins earned per squad per round", "", "Coins by play (catch-up apart), each squad in each match it played (Armageddon with its final).", "");
@@ -802,15 +843,15 @@ if (MERC) {
     }),
   );
   {
-    // What a round's coins buy (Eric, Oct 13): a Stockfish token, a time reload and a block or shield; a very good round
-    // a second token too. (The reload at Eric's Time chip prices, 25 + 25 + 50, in the next change.)
-    const RELOAD = 100;
+    // What a round's coins buy (Eric, Oct 13): a Stockfish token, a chip reload (a squad's first Time chips up to what
+    // it may hold: 25 + 25 + 50) and a block or shield; a very good round a second token too.
+    const RELOAD = Array.from({ length: M.items.chip.cap }, (_, i) => itemPrice("chip", i, S)).reduce((a, b) => a + b, 0);
     const basket = M.items.stockfish.price + RELOAD + Math.min(M.items.shield.price, M.items.blocks.price);
     const more = basket + M.items.stockfish.price + M.priceStep;
     const won = all.flatMap((x) => x.econ.earned.filter((e) => e.won && e.round < 2)).map((e) => e.total);
     push(
       "",
-      `Winners' rounds before a shop (Relay and Pairs): ${pct(won.filter((t) => t >= basket).length / Math.max(1, won.length))} earned at least ${coins(basket)} (a Stockfish token, a time reload of ${RELOAD} and a shield or block points), ${pct(won.filter((t) => t >= more).length / Math.max(1, won.length))} at least ${coins(more)} (a second token too).`,
+      `Winners' rounds before a shop (Relay and Pairs): ${pct(won.filter((t) => t >= basket).length / Math.max(1, won.length))} earned at least ${coins(basket)} (a Stockfish token, a Time chip reload of ${RELOAD} and a shield or block points), ${pct(won.filter((t) => t >= more).length / Math.max(1, won.length))} at least ${coins(more)} (a second token too).`,
       "",
     );
   }
@@ -843,7 +884,7 @@ if (MERC) {
   );
   const sm = Math.max(1, all.reduce((t, x) => t + x.squadMatches[1] + x.squadMatches[2], 0));
   push(
-    `Per squad per match of round 2 and the final: ${f1(all.reduce((t, x) => t + x.econ.assists, 0) / sm)} Stockfish tokens used, ${f1(all.reduce((t, x) => t + x.econ.shielded, 0) / sm)} blocks shielded. Brilliant moves: ${f1(all.reduce((t, x) => t + x.econ.brilliant, 0) / all.length)} a lobby (past the cap, unpaid: ${all.reduce((t, x) => t + x.econ.brilliantCapped, 0)} in all).`,
+    `Per squad per match of round 2 and the final: ${f1(all.reduce((t, x) => t + x.econ.assists, 0) / sm)} Stockfish tokens used, ${f1(all.reduce((t, x) => t + x.econ.shielded, 0) / sm)} blocks shielded, ${f1(all.reduce((t, x) => t + x.econ.chipsTapped, 0) / sm)} Time chips tapped. Brilliant moves: ${f1(all.reduce((t, x) => t + x.econ.brilliant, 0) / all.length)} a lobby (past the cap, unpaid: ${all.reduce((t, x) => t + x.econ.brilliantCapped, 0)} in all).`,
     "",
   );
 }

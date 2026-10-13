@@ -16,28 +16,30 @@ import type { BoardResult, Colour } from "./board.ts";
  *   bonus's job: keeping the squads still in close).
  * - **The shop.** One wallet per squad, shared by its players, carried from round to round. After each round, a squad
  *   still in may buy items for its next match: each item's price rises by `priceStep` for every one of it the squad has
- *   already bought this tournament, and at most `cap` of an item go into one round. What's bought (the cart) is that
- *   match's kit, used there or lost.
+ *   already bought this tournament (the Time chip: its own price list), and at most `cap` of an item go into one round.
+ *   What's bought (the cart) is that match's kit, used there or lost; Time chips are kept (at most `cap` held).
  * - **The items.** A Stockfish token (your own top moves for one decision, on your own device; never theirs), block
  *   points (more block bank), a shield (the next block against you that would take effect is cancelled, its points
- *   still spent) and a time coin (more team bank). (A fifth, the Breather, was taken out on Oct 13: see
- *   `itemCounts` and `upgradeWallet` for lobbies stored with one.)
+ *   still spent) and Time chips (Eric, Oct 13: tapped on a move for more time on it, kept until used). Items since
+ *   taken out (the Breather; the time coin, which became the Time chip) are read away from stored lobbies by
+ *   `itemCounts` and `upgradeWallet`.
  */
 
 /** The items in the shop's order: strongest first. */
-export const MERC_ITEMS: readonly MercItem[] = ["stockfish", "blocks", "shield", "time"];
+export const MERC_ITEMS: readonly MercItem[] = ["stockfish", "blocks", "shield", "chip"];
 export type ItemCounts = Readonly<Record<MercItem, number>>;
-export const NO_ITEMS: ItemCounts = { stockfish: 0, blocks: 0, shield: 0, time: 0 };
+export const NO_ITEMS: ItemCounts = { stockfish: 0, blocks: 0, shield: 0, chip: 0 };
 export const isMercItem = (x: unknown): x is MercItem => typeof x === "string" && (MERC_ITEMS as readonly string[]).includes(x);
 
 /**
- * Counts of today's items only, from a stored record that may hold an item since taken out (the Breather, Oct 13) or
- * miss one: unknown items dropped, missing ones 0. A kit or cart stored before a deploy never crashes the rules.
+ * Counts of today's items only, from a stored record that may hold an item since taken out (the Breather and the time
+ * coin, Oct 13) or miss one: unknown items dropped, missing ones 0. A kit or cart stored before a deploy never crashes
+ * the rules.
  */
 export function itemCounts(x: unknown): ItemCounts {
   const r = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
   const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
-  return { stockfish: n(r.stockfish), blocks: n(r.blocks), shield: n(r.shield), time: n(r.time) };
+  return { stockfish: n(r.stockfish), blocks: n(r.blocks), shield: n(r.shield), chip: n(r.chip) };
 }
 
 // ---------------- Earning ----------------
@@ -165,14 +167,27 @@ export interface Wallet {
   bought: ItemCounts;
   /** Bought for the next match (the shop's cart): that match's kit. */
   cart: ItemCounts;
+  /** Time chips the squad holds between matches (in a match they're the match's, `SquadsMatch.chips`, until it ends). */
+  chips: number;
 }
 
 export function newWallet(squadId: number): Wallet {
-  return { squadId, coins: 0, earned: 0, byRound: [0, 0, 0], catchUp: 0, bought: NO_ITEMS, cart: NO_ITEMS };
+  return { squadId, coins: 0, earned: 0, byRound: [0, 0, 0], catchUp: 0, bought: NO_ITEMS, cart: NO_ITEMS, chips: 0 };
 }
 
-/** An item's price when the squad has already bought `before` of it this tournament. */
-export const itemPrice = (item: MercItem, before: number, s: SquadsSettings = SQUADS): number => s.mercenary.items[item].price + s.mercenary.priceStep * Math.max(0, before);
+/**
+ * An item's price when the squad has already bought `before` of it this tournament: its first price plus `priceStep`
+ * for each, or its own price list (the Time chip: 25, 25, 50, 50, then 50 each; the last repeats).
+ */
+export function itemPrice(item: MercItem, before: number, s: SquadsSettings = SQUADS): number {
+  const it = s.mercenary.items[item];
+  const n = Math.max(0, before);
+  if (it.prices?.length) return it.prices[Math.min(n, it.prices.length - 1)]!;
+  return it.price + s.mercenary.priceStep * n;
+}
+
+/** How many of an item one more would make, against its cap: in the cart (the Time chip: held and in the cart). */
+export const capCount = (w: Pick<Wallet, "cart" | "chips">, item: MercItem): number => w.cart[item] + (item === "chip" ? (w.chips ?? 0) : 0);
 
 /** What the next one of an item costs this squad. */
 export const nextPrice = (w: Pick<Wallet, "bought">, item: MercItem, s: SquadsSettings = SQUADS): number => itemPrice(item, w.bought[item], s);
@@ -192,7 +207,7 @@ export type ShopError = "closed" | "unknown_item" | "cap" | "coins" | "none";
 /** Buys one of an item for the next match, from the wallet: at its price now, within the round's cap. */
 export function buyItem(w: Wallet, item: MercItem, s: SquadsSettings = SQUADS): { wallet: Wallet; price: number } | { error: ShopError } {
   if (!isMercItem(item)) return { error: "unknown_item" };
-  if (w.cart[item] >= s.mercenary.items[item].cap) return { error: "cap" };
+  if (capCount(w, item) >= s.mercenary.items[item].cap) return { error: "cap" };
   const price = nextPrice(w, item, s);
   if (w.coins < price) return { error: "coins" };
   return { wallet: { ...w, coins: w.coins - price, bought: { ...w.bought, [item]: w.bought[item] + 1 }, cart: { ...w.cart, [item]: w.cart[item] + 1 } }, price };
@@ -206,27 +221,37 @@ export function unbuyItem(w: Wallet, item: MercItem, s: SquadsSettings = SQUADS)
   return { wallet: { ...w, coins: w.coins + refund, bought: { ...w.bought, [item]: w.bought[item] - 1 }, cart: { ...w.cart, [item]: w.cart[item] - 1 } }, refund };
 }
 
-/** The shop closes as the next match starts: the cart becomes that match's kit, and the wallet's cart empties. */
+/**
+ * The shop closes as the next match starts: the cart becomes that match's kit, and the wallet's cart empties. The Time
+ * chips the squad holds go into the match with the ones just bought (the kit's `chip`: all it brings).
+ */
 export function takeCart(w: Wallet): { wallet: Wallet; kit: ItemCounts } {
-  return { wallet: { ...w, cart: NO_ITEMS }, kit: w.cart };
+  return { wallet: { ...w, cart: NO_ITEMS, chips: 0 }, kit: { ...w.cart, chip: w.cart.chip + (w.chips ?? 0) } };
 }
 
-/** The Breather's prices before it was taken out (Oct 13): 150, then up by the price step for each one bought. */
-const BREATHER_PRICE = 150;
+/** A match ends: the Time chips its squad didn't use come back to the wallet, kept for the next round. */
+export const returnChips = (w: Wallet, chips: number): Wallet => ({ ...w, chips: (w.chips ?? 0) + Math.max(0, chips) });
+
+/** The first prices of items since taken out (Oct 13), each then up by the price step for every one bought. */
+const GONE_ITEMS: Readonly<Record<string, number>> = { breather: 150, time: 75 };
 
 /**
- * A wallet stored before the Breather was taken out (a lobby in play across the deploy): a breather still in the cart
- * (the shop open) is refunded at what it cost, and the item is dropped from the counts. Others come back as they were.
+ * A wallet stored by an earlier version (a lobby in play across a deploy): an item since taken out (the Breather; the
+ * time coin, now the Time chip) still in the cart (the shop open) is refunded at what it cost, and dropped from the
+ * counts; a wallet from before the Time chip holds none. Others come back as they were.
  */
 export function upgradeWallet(w: Wallet, s: SquadsSettings = SQUADS): Wallet {
   const bought = w.bought as Partial<Record<string, number>>;
   const cart = w.cart as Partial<Record<string, number>>;
-  if (!("breather" in bought) && !("breather" in cart)) return w;
-  const inCart = Math.max(0, cart.breather ?? 0);
-  const before = Math.max(0, (bought.breather ?? 0) - inCart);
+  const gone = Object.keys(GONE_ITEMS).filter((k) => k in bought || k in cart);
+  if (!gone.length && typeof w.chips === "number" && "chip" in bought && "chip" in cart) return w;
   let refund = 0;
-  for (let i = 0; i < inCart; i++) refund += BREATHER_PRICE + s.mercenary.priceStep * (before + i);
-  return { ...w, coins: w.coins + refund, bought: itemCounts(w.bought), cart: itemCounts(w.cart) };
+  for (const k of gone) {
+    const inCart = Math.max(0, cart[k] ?? 0);
+    const before = Math.max(0, (bought[k] ?? 0) - inCart);
+    for (let i = 0; i < inCart; i++) refund += GONE_ITEMS[k]! + s.mercenary.priceStep * (before + i);
+  }
+  return { ...w, coins: w.coins + refund, bought: itemCounts(w.bought), cart: itemCounts(w.cart), chips: typeof w.chips === "number" ? w.chips : 0 };
 }
 
 /**
@@ -247,8 +272,8 @@ export function catchUpCoins(earned: readonly [number, number], s: SquadsSetting
 /**
  * A bot squad's shopping (nobody playing on it): before the final it saves everything with `saveChance`; otherwise it
  * spends up to a share of its wallet in `spend` (the final, the last chance: all of it), one item at a time, each drawn
- * by `weights` among those it can still afford and hasn't capped. Sensible, not perfect: blocks and time most, a
- * Stockfish token now and then. Returns the items in the order to buy them.
+ * by `weights` among those it can still afford and hasn't capped. Sensible, not perfect: blocks and chips most, a
+ * Stockfish token now and then; Time chips up to what it may hold. Returns the items in the order to buy them.
  */
 export function botShop(rng: Rng, w: Wallet, final: boolean, s: SquadsSettings = SQUADS): MercItem[] {
   const b = s.mercenary.bots;
@@ -258,7 +283,7 @@ export function botShop(rng: Rng, w: Wallet, final: boolean, s: SquadsSettings =
   let wallet = w;
   let spent = 0;
   for (let guard = 0; guard < 20; guard++) {
-    const open = MERC_ITEMS.filter((it) => wallet.cart[it] < s.mercenary.items[it].cap && nextPrice(wallet, it, s) <= Math.min(wallet.coins, budget - spent));
+    const open = MERC_ITEMS.filter((it) => capCount(wallet, it) < s.mercenary.items[it].cap && nextPrice(wallet, it, s) <= Math.min(wallet.coins, budget - spent));
     const total = open.reduce((t, it) => t + b.weights[it], 0);
     if (!open.length || total <= 0) break;
     let r = rng() * total;
@@ -304,4 +329,16 @@ export function tokenLines(top: readonly MoveScore[], blocked: readonly string[]
     .sort((a, b) => b.expected - a.expected)
     .slice(0, s.mercenary.stockfish.lines)
     .map((t) => ({ move: t.move, expected: t.expected, ...(t.mate !== undefined ? { mate: t.mate } : {}) }));
+}
+
+/**
+ * Whether a bot squad taps one of its Time chips on a move (one a move), and when (ms into the move): in sudden death
+ * with `chip.suddenDeath`, with its bank under `chip.lowBankSeconds` with `chip.lowBank`, else never. Not perfect: a
+ * chip now and then where a person might, never all of them at once.
+ */
+export function botChipTap(rng: Rng, bankMs: number, s: SquadsSettings = SQUADS): number | null {
+  const c = s.mercenary.bots.chip;
+  const p = bankMs <= 0 ? c.suddenDeath : bankMs < c.lowBankSeconds * 1000 ? c.lowBank : 0;
+  if (!p || rng() >= p) return null;
+  return Math.round(c.tapMs[0] + rng() * (c.tapMs[1] - c.tapMs[0]));
 }

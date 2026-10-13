@@ -4,7 +4,7 @@ import type { MoveScore } from "../uci.ts";
 import type { BlockError, SquadsBlock } from "./blocks.ts";
 import type { BoardResult, Colour, Side } from "./board.ts";
 import type { SquadsFormat, SquadsRound } from "./lobby.ts";
-import type { AssistError, AssistUse, ChoiceError, MatchResult, Role, SquadsEvent } from "./match.ts";
+import type { AssistError, AssistUse, ChipError, ChoiceError, MatchResult, PlacedChip, Role, SquadsEvent } from "./match.ts";
 import type { CoinWhy, ShopError } from "./mercenary.ts";
 import type { TokenUse } from "./tokens.ts";
 import type { SquadsMode, SquadsRules, SquadsVoteId } from "./votes.ts";
@@ -29,8 +29,10 @@ import type { SquadsMode, SquadsRules, SquadsVoteId } from "./votes.ts";
  * Version 4 (Oct 13, 2026): Eric's first Mercenary changes. The Breather is gone from the items (and with it the
  * match's per-side free seconds, `delays`); a brilliant move past its squad's cap for the match comes as "coins" with
  * 0 coins and `capped`; the base for playing a match is a "coins" event (why "played").
+ * Version 5 (Oct 13, 2026): the Time chip. The time coin becomes the item "chip", kept from round to round (the
+ * wallet's and the match's `chips`); `chip` both ways and "chipNo"; a half's `chips`.
  */
-export const SQUADS_PROTOCOL = 4;
+export const SQUADS_PROTOCOL = 5;
 
 /** A squad's placement: 1st, 2nd, 3rd-4th (out in round 2), 5th-8th (out in round 1). */
 export type SquadsPlacement = 1 | 2 | 3 | 5;
@@ -124,6 +126,8 @@ export interface NetWallet {
   catchUp: number;
   bought: Record<MercItem, number>;
   cart: Record<MercItem, number>;
+  /** Time chips held between matches (in a match: the match's `chips`). */
+  chips: number;
   shop: { round: SquadsRound; until: number | null } | null;
 }
 
@@ -186,6 +190,8 @@ export interface NetSquadsHalf {
   scouts: NetDuty[];
   /** Boards whose side to move has one move it may play (a block counted): it plays itself. */
   forced: number[];
+  /** Mercenary: the Time chips tapped this half (each duty's `deadline` already counts its own). */
+  chips: PlacedChip[];
 }
 
 export interface NetSquadsMatch {
@@ -226,6 +232,8 @@ export interface NetSquadsMatch {
   /** Mercenary: each side's Stockfish tokens and shields left (tokens used this half are paid at once: "assist"). */
   stockfish: [number, number];
   shields: [number, number];
+  /** Mercenary: each side's Time chips in this match (as the current half began: taps this half come as "chip"). */
+  chips: [number, number];
   /** Every Stockfish token used this match (the lines show only on `shownTo`'s screens, worked out there). */
   assists: AssistUse[];
   /** Mercenary: coins each side has earned in this match. */
@@ -287,6 +295,11 @@ export type SquadsClientMessage =
    * worked out on your device. Refused: "assistNo".
    */
   | { t: "assist"; key: string; seq: number }
+  /**
+   * Mercenary: tap one of your squad's Time chips on your board's move while it's being thought about (more time for
+   * that move). `seen`: how many chips you saw on it already (a teammate's tap at the same moment wins). Refused: "chipNo".
+   */
+  | { t: "chip"; key: string; seq: number; seen: number }
   /** Mercenary: buy one of an item for your squad's next match, from its wallet, while its shop is open. Refused: "shopNo". */
   | { t: "buy"; item: MercItem }
   /** Mercenary: put one back while the shop is open (the last one bought, refunded at what it cost). */
@@ -359,6 +372,13 @@ export type SquadsServerMessage = { now: number } & (
   | { t: "assist"; key: string; seq: number; use: AssistUse; stockfish: [number, number] }
   /** Your Stockfish token wasn't used (nothing spent): the rules' reason, `late` or `stale`. */
   | { t: "assistNo"; key: string; seq: number; reason: AssistError | "late" | "stale" }
+  /**
+   * Mercenary: a Time chip tapped (to everyone, at once): where, by whom, when (ms into the half), both squads' chips
+   * left now, and that move's new deadline (server time).
+   */
+  | { t: "chip"; key: string; seq: number; chip: PlacedChip & { side: Side }; chips: [number, number]; deadline: number }
+  /** Your Time chip wasn't tapped (nothing spent): the rules' reason (stale: a teammate's went on first). */
+  | { t: "chipNo"; key: string; seq: number; reason: ChipError }
   /** Mercenary: every squad's wallet and shop, whenever one changes (coins earned, a purchase, a shop opening or closing). */
   | { t: "wallets"; wallets: NetWallet[] }
   /** Mercenary: a purchase (or one put back) in a squad's shop, by whom: to that squad's people, live. */

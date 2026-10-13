@@ -1,6 +1,7 @@
 import { SQUADS, type MercItem, type SquadsSettings } from "@chessroyale/core";
 import {
   MERC_ITEMS,
+  chipWindows,
   modeOf,
   nextPrice,
   pairSchedule,
@@ -154,9 +155,52 @@ export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "de
     if (d.side !== side) continue;
     const done = d.players.every((p) => m.locked.includes(p));
     const end = done ? Math.max(...d.players.map((p) => (m.lockedAt[p] ?? now) - t0)) : Math.min(t, d.deadline - t0);
-    drained += Math.max(0, Math.min(end, t) - delay);
+    // (A Time chip on the move holds the bank still for its seconds.)
+    drained += spanLess(delay, Math.min(end, t), chipWindowsNow(m, d.board));
   }
   return Math.max(0, start - drained);
+}
+
+/** How long `[from, to]` lasts outside `windows` (ms). */
+function spanLess(from: number, to: number, windows: readonly (readonly [number, number])[]): number {
+  if (to <= from) return 0;
+  let out = to - from;
+  for (const [a, b] of windows) out -= Math.max(0, Math.min(b, to) - Math.max(a, from));
+  return Math.max(0, out);
+}
+
+/** Mercenary: the Time chips tapped on a board's move this half, and when they hold its squad's bank still (ms into the half). */
+export const chipsTapped = (m: Pick<LocalMatch, "current">, board: number) => (m.current?.chips ?? []).filter((c) => c.board === board);
+export const chipWindowsNow = (m: Pick<LocalMatch, "current" | "delayMs">, board: number, s: SquadsSettings = SQUADS): [number, number][] =>
+  chipWindows(chipsTapped(m, board).map((c) => c.at), m.delayMs, s.mercenary.chipSeconds * 1000);
+
+/**
+ * The chip time still to come on a board's move (ms): what its clock shows on top of the bank (20 s left with a chip:
+ * 50). Once the move is made (everyone on it locked in), what's left of it is lost: none.
+ */
+export function chipLeftMs(m: Pick<LocalMatch, "current" | "delayMs" | "state"> & { locked?: readonly string[] }, board: number, now: number, s: SquadsSettings = SQUADS): number {
+  if (m.state !== "half" || !m.current) return 0;
+  const d = m.current.duties.find((x) => x.board === board);
+  if (d && m.locked && d.players.every((p) => m.locked!.includes(p))) return 0;
+  const t = now - m.current.startedAt;
+  return chipWindowsNow(m, board, s).reduce((sum, [a, b]) => sum + Math.max(0, b - Math.max(a, t)), 0);
+}
+
+/** A side's Time chips now: the match's, less those tapped on its moves this half. */
+export function chipsLeft(m: Pick<LocalMatch, "chips" | "current">, side: Side): number {
+  const mine = new Set((m.current?.duties ?? []).filter((d) => d.side === side).map((d) => d.board));
+  return Math.max(0, (m.chips?.[side] ?? 0) - (m.current?.chips ?? []).filter((c) => mine.has(c.board)).length);
+}
+
+/**
+ * Whether you may tap a Time chip now (Mercenary): your board's move is being thought about (your Relay move not
+ * made; in Pairs and the final not everyone on it locked in), its time isn't up, and your squad has one.
+ */
+export function canTapChip(m: Pick<LocalMatch, "mode" | "chips" | "state" | "current" | "locked" | "visible">, playerId: string | null, now: number): boolean {
+  if (m.mode !== "mercenary" || m.state !== "half" || !m.current || !playerId) return false;
+  const d = m.current.duties.find((x) => x.players.includes(playerId));
+  if (!d || now >= d.deadline || d.players.every((p) => m.locked.includes(p)) || (d.role === "move" && m.visible[playerId])) return false;
+  return chipsLeft(m, d.side) > 0;
 }
 
 /** The free time a move (ms), before a squad's bank starts to drain. */
@@ -165,8 +209,10 @@ export const freeMs = (m: Pick<LocalMatch, "delayMs">): number => m.delayMs;
 /** How many of a side's moves are draining its bank right now (2: Relay's two movers, twice as fast). */
 export function drainRate(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked">, side: Side, now: number): number {
   if (m.state !== "half" || !m.current || m.banks[side] <= 0) return 0;
-  if (now - m.current.startedAt <= freeMs(m)) return 0;
-  return m.current.duties.filter((d) => d.side === side && !d.players.every((p) => m.locked.includes(p)) && now < d.deadline).length;
+  const t = now - m.current.startedAt;
+  if (t <= freeMs(m)) return 0;
+  const held = (board: number) => chipWindowsNow(m, board).some(([a, b]) => t >= a && t < b);
+  return m.current.duties.filter((d) => d.side === side && !d.players.every((p) => m.locked.includes(p)) && now < d.deadline && !held(d.board)).length;
 }
 
 /** A squad's team clock for the screen: its bank now, sudden death, and whether it's running (draining). */
@@ -374,8 +420,8 @@ export function itemText(item: MercItem, s: SquadsSettings = SQUADS): { name: st
       return { name: "Block points", one: `${c.blockPoints} block points`, line: `+${c.blockPoints} block points.` };
     case "shield":
       return { name: "Shield", one: "a shield", line: "Cancels the next block against you. They still pay for it." };
-    case "time":
-      return { name: "Time coin", one: "a time coin", line: `+${c.timeSeconds}\u00a0s on your team clock.` };
+    case "chip":
+      return { name: "Time chip", one: "a Time chip", line: `Tap it on your move: +${c.chipSeconds}\u00a0s for that move. Kept until used; hold ${c.items.chip.cap}.` };
   }
 }
 
@@ -387,18 +433,21 @@ export interface ShopRow {
   cap: number;
   /** Bought this tournament (each raised the price). */
   bought: number;
+  /** In the cart now (what "−" can put back; `count` adds the Time chips held). */
+  inCart: number;
   can: boolean;
   why: "cap" | "coins" | null;
 }
 
 /** The shop's rows for a wallet, strongest item first. */
-export function shopRows(w: Pick<NetWallet, "coins" | "bought" | "cart">, s: SquadsSettings = SQUADS): ShopRow[] {
+export function shopRows(w: Pick<NetWallet, "coins" | "bought" | "cart"> & { chips?: number }, s: SquadsSettings = SQUADS): ShopRow[] {
   return MERC_ITEMS.map((item) => {
     const price = nextPrice(w, item, s);
     const cap = s.mercenary.items[item].cap;
-    const count = w.cart[item] ?? 0;
+    // (Time chips: those held count against the cap, kept from round to round.)
+    const count = (w.cart[item] ?? 0) + (item === "chip" ? (w.chips ?? 0) : 0);
     const why = count >= cap ? "cap" : w.coins < price ? "coins" : null;
-    return { item, price, count, cap, bought: w.bought[item] ?? 0, can: !why, why };
+    return { item, price, count, cap, bought: w.bought[item] ?? 0, inCart: w.cart[item] ?? 0, can: !why, why };
   });
 }
 

@@ -14,6 +14,7 @@ import {
   type SquadsClientMessage,
   type SquadsPlacement,
   type AssistError,
+  type ChipError,
   type BlockError,
   type BlockLift,
   type NetWallet,
@@ -162,6 +163,15 @@ const ASSIST_REFUSED: Record<AssistError | "late" | "stale", string> = {
   stale: "That half is over.",
 };
 
+const CHIP_REFUSED: Record<ChipError, string> = {
+  no_chips: "Your squad has no Time chips left.",
+  done: "Your move is already made.",
+  late: "Too late: your time was up.",
+  no_duty: "It's not your move.",
+  match_over: "The match is over.",
+  stale: "A teammate's chip went on first.",
+};
+
 const SHOP_REFUSED: Record<ShopError, string> = {
   closed: "The shop is closed: your next match has started.",
   cap: "That's as many as one round allows.",
@@ -219,6 +229,8 @@ export class SquadsClient {
   note: SquadsNote | null = null;
   /** A short banner over a board: a block placed or lifted, a shield, a brilliant move (both squads see it). */
   banner: { key: string; board: number; text: string; at: number; kind?: "brilliant" | "shield" } | null = null;
+  /** Mercenary: a Time chip just tapped (both squads see "+30 s" on that squad's clock for a moment). */
+  chipFlash: { key: string; board: number; side: 0 | 1; by: string; at: number } | null = null;
   /** Mercenary: every squad's wallet and shop (empty in Classic). */
   wallets: NetWallet[] = [];
   /** Mercenary: purchases in your squad's shop as they happen (by whom), newest last. */
@@ -384,6 +396,14 @@ export class SquadsClient {
     const m = this.matches.get(key);
     if (!m?.current) return;
     this.send({ t: "assist", key, seq: m.current.seq });
+  }
+
+  /** Mercenary: tap one of your squad's Time chips on your board's move (the server says yes: "chip", to everyone). */
+  tapChip(key: string) {
+    const m = this.matches.get(key);
+    const d = m?.current?.duties.find((x) => x.players.includes(this.myId ?? ""));
+    if (!m?.current || !d) return;
+    this.send({ t: "chip", key, seq: m.current.seq, seen: (m.current.chips ?? []).filter((c) => c.board === d.board).length });
   }
 
   /** Mercenary: buy one of an item for your squad's next match (or put one back), from your squad's wallet. */
@@ -590,6 +610,24 @@ export class SquadsClient {
       }
       case "assistNo":
         if (msg.reason !== "stale") this.note = { text: ASSIST_REFUSED[msg.reason] ?? "That token wasn't used.", at: Date.now(), kind: "no" };
+        break;
+      case "chip": {
+        const had = this.matches.get(msg.key);
+        if (!had?.current || had.current.seq !== msg.seq) break;
+        const chip = { board: msg.chip.board, by: msg.chip.by, at: msg.chip.at };
+        const chips = [...(had.current.chips ?? []).filter((c) => !(c.board === chip.board && c.by === chip.by && c.at === chip.at)), chip];
+        const deadline = this.local(msg.deadline);
+        const current = { ...had.current, chips, duties: had.current.duties.map((d) => (d.board === chip.board ? { ...d, deadline } : d)) };
+        this.matches.set(had.key, { ...had, current });
+        this.chipFlash = { key: had.key, board: chip.board, side: msg.chip.side, by: chip.by, at: Date.now() };
+        if (this.myId && chip.by !== this.myId && current.duties.some((d) => d.board === chip.board && d.players.includes(this.myId!))) {
+          this.note = { text: `${this.nameOf(chip.by)} tapped a Time chip: +${SQUADS.mercenary.chipSeconds} s on your move`, at: Date.now(), kind: "news" };
+        }
+        play("select");
+        break;
+      }
+      case "chipNo":
+        this.note = { text: CHIP_REFUSED[msg.reason] ?? "That chip wasn't tapped.", at: Date.now(), kind: "no" };
         break;
       case "wallets":
         this.wallets = this.localWallets(msg.wallets);

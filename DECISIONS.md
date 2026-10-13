@@ -2106,6 +2106,68 @@ Time chip, with its own prices, in the next change.
 **Protocol 4** (`SQUADS_PROTOCOL`): the item list without the Breather and the match without `delays`; "coins" with
 `capped`; the "played" coins.
 
+### Mercenary: the Time chip (Eric, Oct 13, 2026)
+
+The time coin (+30 s on the team bank as the next match started) becomes the **Time chip**. Eric: "you can use one on
+any turn and it just actually adds time to that current turn... you can store up to a few of them... always want to
+go into the next round with a few extra... they don't add to your total... you tap it, it pushes your clock, so even if
+you have 20 seconds left it'll go to 50... it opens up the cap for the turn and you can use more than one on a turn."
+The rules below are the director's reading of that, recorded as the defaults; every number is in `SQUADS.mercenary`.
+
+- **Name and effect:** "Time chip", +30 s (`chipSeconds`) on one move: the one being thought about on the tapper's
+  board. The move's deadline moves 30 s later, so a chip opens the per-move cap too, and those 30 s don't drain the
+  bank: the clock jumps (20 s left shows 50) and the bank stands still while the chip's seconds run down. Time from
+  a chip that isn't used is lost; it never goes into the bank (Eric's "they don't add to your total"). Several can go
+  on one move.
+- **When its 30 s run:** from the tap, but not before the free seconds end, so a chip tapped in the free seconds
+  still gives its full 30 s. A second chip on the same move while the first is running adds 30 s to its end.
+- **Sudden death:** a move has the free seconds and 30 s more for each chip. The chip has to be tapped within the free
+  seconds, so the button is there from the move's first moment.
+- **The bank running out while a chip holds it:** that move runs to the chip's end; the squad's other moves are cut
+  off as before.
+- **Owned and stored:** chips belong to the squad's shared pool and are the only item kept from round to round. A
+  squad holds at most 3 (`items.chip.cap`), and the shop won't sell past that (held plus cart). In a match the squad's
+  chips are the match's (the wallet shows none meanwhile); the ones left go back to the wallet when the match ends.
+  A drawn final's Armageddon keeps the final's chips.
+- **Tapped, never automatic.** Eric considered a chip that fires by itself when time runs out and rejected it as
+  confusing.
+  - Any squad player on the move being thought about taps the chip button by their squad's clock, during their
+    squad's move. In Pairs, both partners share it.
+  - **The first tap wins,** like blocks: a tap carries how many chips the tapper saw on the move, so two teammates
+    tapping at the same moment spend one, and the second gets "A teammate's chip went on first". Stacking is a second,
+    deliberate tap.
+- **Both squads see** each squad's chip count under its clock (with the block points and tokens) and in the panel's
+  kit line, and "+30 s" floating up from that squad's clock when one is tapped.
+- **Prices** (Eric, Oct 13): "everyone should be able to basically reload on time chips... you spend your extra
+  money, if you have it, to reload your time bank." **25, 25, 50, 50, then 50 for every one after**, counted by chips
+  bought in the tournament, not chips held (`items.chip.prices`, the last repeating). This replaces the +100 per
+  repeat for chips; the other items keep it.
+- **Bots** (a squad nobody is playing): they buy chips like other items, up to what a squad may hold, and tap one on a
+  move in sudden death with 60% chance, or with under 20 s of bank with 30%, 0.7 to 1.8 s in, then think on into it.
+  Not every time, and never a squad with people playing (its chips are theirs).
+- **Classic:** no chips.
+- **A lobby in play across the deploy:** a time coin still in an open shop's cart is refunded at what it cost (75,
+  plus the price step for each one bought before); a time coin bought earlier is already in its squad's bank.
+- **The sim** (72 lobbies, the Normal clock, people's chips played by the bots' policy, a chip's time partly used):
+  - Squads buy 1.8 chips before Pairs and 2.5 before the final (each round's shop, mean), and tap 1.7 a match in
+    Pairs and the final.
+  - A round's coins still buy a token, a chip reload (25 + 25 + 50 = 100) and a shield or block points in every
+    winner's round, and a second token in 14%.
+  - 48% of squads reach sudden death (the time coin's lobbies: 44%, Classic's 51%): a chip doesn't add to the bank, it
+    gives one move time. 1.4% of moves are random for want of time (Classic 1.5%).
+  - **Length:** a median 33.2 minutes against Classic's 31.3 on the same seeds (90th percentiles 39.3 and 40.3), about
+    a minute more than with the time coin (32.0): the chips' time is spent on hard moves.
+- **Through the real server** (`scripts/squads-headless.ts --device`, three bot lobbies at once on a busy machine):
+  Mercenary 39.9 and 40.1 minutes, Classic 31.9. Relay, before any shop, took 3-4 minutes longer in both Mercenary
+  lobbies, so most of that gap comes before chips exist; the pair before Eric's changes went the other way (Mercenary
+  35.1, Classic 38.1). Single lobbies swing by minutes, so the sim's same-seed comparison is the length measure. Seven
+  of the eight squads that went on reloaded 3 chips before Pairs (the eighth saved); every finalist reloaded before
+  the final.
+- **The price rule:** the director's brief said to keep +100 a repeat unless chips went unbought. Eric then set chips'
+  own list, so that rule never applied: at 25-50 a chip nearly every squad that wins reloads.
+- **Protocol 5** (`SQUADS_PROTOCOL`): the item "chip" in place of "time"; the wallet's and the match's `chips`;
+  `chip` both ways and "chipNo"; a half's `chips`.
+
 ### Crowd 50 v 50: three chess time controls (Eric, Oct 13, 2026)
 
 Eric, Oct 12-13: "10+5s is fine for the long mode, needs to be 3 time options, the games should follow normal chess

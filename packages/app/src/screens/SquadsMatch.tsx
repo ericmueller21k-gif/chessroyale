@@ -9,7 +9,7 @@ import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
 import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { ClockText, Member, SquadTag, SquadsBoards, StandingsStrip, shownTurn, useNow } from "../components/SquadsParts.tsx";
-import { BlockArrows, BlockPicker, LockIcon, PickTags, SquadResources, TokenBreakdown, squareAt } from "../components/SquadsBlocks.tsx";
+import { BlockArrows, BlockPicker, ChipIcon, LockIcon, PickTags, SquadResources, TokenBreakdown, squareAt } from "../components/SquadsBlocks.tsx";
 import { Coins, ItemIcon, KitIcons } from "../components/MercenaryShop.tsx";
 import { ownEngine } from "../engine.ts";
 import type { SquadsClient } from "../squads.ts";
@@ -30,6 +30,9 @@ import {
   dutyOf,
   freeMs,
   liveBank,
+  chipLeftMs,
+  chipsLeft,
+  canTapChip,
   drainRate,
   myAssist,
   myBoards,
@@ -216,16 +219,24 @@ function BoardArrows({ arrows, orientation }: { arrows: Arrow[]; orientation: "w
  * down while a move is being thought about (then the bank drains; ▼▼ when two of a squad's moves drain it at once).
  * Under each clock, that squad's block bank and (Pairs) its same-move tokens: both squads see both, always.
  */
-function ClockLine({ client, m }: { client: SquadsClient; m: LocalMatch }) {
+function ClockLine({ client, m, board }: { client: SquadsClient; m: LocalMatch; board: number }) {
   const now = useNow(100);
   const mine = sideIn(m, client.myId);
   const order: Side[] = mine === 1 ? [1, 0] : [0, 1];
   const live = m.state === "half" && m.current;
   const free = live ? Math.max(0, m.current!.startedAt + freeMs(m) - now) : 0;
+  // Mercenary: a Time chip on this board's move shows on its squad's clock (20 s left with a chip: 50), counting down
+  // while the bank stands still.
+  const duty = live ? m.current!.duties.find((d) => d.board === board) : undefined;
+  const merc = m.mode === "mercenary";
   const clockOf = (side: Side) => {
     const bankMs = liveBank(m, side, now);
-    return { squadId: m.sides[side].squadId, bankMs, suddenDeath: bankMs <= 0, rate: drainRate(m, side, now), key: m.key };
+    const chip = merc && duty?.side === side ? chipLeftMs(m, board, now) : 0;
+    return { squadId: m.sides[side].squadId, bankMs: bankMs + chip, suddenDeath: bankMs + chip <= 0, rate: drainRate(m, side, now), key: m.key, chip: chip > 0 };
   };
+  const flash = merc && client.chipFlash && client.chipFlash.key === m.key && now - client.chipFlash.at < CHIP_FLASH_MS ? client.chipFlash : null;
+  const myDuty = live && client.myId ? m.current!.duties.find((d) => d.players.includes(client.myId!)) : undefined;
+  const canChip = merc && !!myDuty && myDuty.board === board && canTapChip(m, client.myId, now);
   return (
     <span class="sq-clockline">
       {order.map((side, i) => (
@@ -238,9 +249,22 @@ function ClockLine({ client, m }: { client: SquadsClient; m: LocalMatch }) {
           <span key={side} class={`sq-clockline-side${side === mine ? " you" : ""}`}>
             <span class="sq-clockline-top">
               <SquadTag id={m.sides[side].squadId} you={side === mine} />
-              <ClockText clock={clockOf(side)} delayMs={m.delayMs} short />
+              <span class={`mc-chip-clock${clockOf(side).chip ? " on" : ""}`}>
+                <ClockText clock={clockOf(side)} delayMs={m.delayMs} short />
+                {flash && flash.side === side && (
+                  <span class="mc-chip-plus" key={flash.at} aria-hidden="true">
+                    +{SQUADS.mercenary.chipSeconds} s
+                  </span>
+                )}
+              </span>
+              {side === mine && canChip && (
+                <button type="button" class="mc-chip-btn" onClick={() => client.tapChip(m.key)} aria-label={`Tap a Time chip: ${SQUADS.mercenary.chipSeconds} more seconds for this move (${chipsLeft(m, side)} left)`}>
+                  <ChipIcon size={14} />
+                  <span class="mc-chip-btn-text">+{SQUADS.mercenary.chipSeconds}s</span>
+                </button>
+              )}
             </span>
-            <SquadResources bank={m.mode === "classic" ? null : blockBankNow(m, side)} tokens={m.tokens ? m.tokens[side] : null} you={side === mine} />
+            <SquadResources bank={m.mode === "classic" ? null : blockBankNow(m, side)} tokens={m.tokens ? m.tokens[side] : null} chips={merc ? chipsLeft(m, side) : null} you={side === mine} />
           </span>
         </>
       ))}
@@ -539,7 +563,7 @@ function MatchView({
             )}
           </Board>
         </div>
-        <HistoryNav view={history} total={b.moves.length} clock={<ClockLine client={client} m={m} />} />
+        <HistoryNav view={history} total={b.moves.length} clock={<ClockLine client={client} m={m} board={boardId} />} />
       </div>
       <div class="sq-panel">
         {watching && (
@@ -698,7 +722,7 @@ function KitLine({ client, m, mine }: { client: SquadsClient; m: LocalMatch; min
     <div class="mc-kitline" aria-label="Coins and items">
       {order.map((side) => {
         const w = walletOf(client.wallets, m.sides[side].squadId);
-        const left = { stockfish: Math.max(0, stockfishLeft(m, side)), blocks: 0, shield: m.shields?.[side] ?? 0, time: 0 };
+        const left = { stockfish: Math.max(0, stockfishLeft(m, side)), blocks: 0, shield: m.shields?.[side] ?? 0, chip: chipsLeft(m, side) };
         return (
           <span key={side} class={`mc-kitline-side${side === mine ? " you" : ""}`}>
             <SquadTag id={m.sides[side].squadId} you={side === mine} />
@@ -935,5 +959,7 @@ function DutyPanel({
 
 /** A block banner shows this long over the board (ms). */
 const BANNER_MS = 2600;
+/** How long "+30 s" shows on a squad's clock after a Time chip (both squads). */
+const CHIP_FLASH_MS = 1800;
 
 export { bankText };

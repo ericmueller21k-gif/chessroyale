@@ -6,8 +6,9 @@ import { BOARD_SEL, named, test } from "./helpers.ts";
 /**
  * Squads' Mercenary mode (Eric, Oct 12) played through its screens on the real server (wrangler dev, SQUADS_TEST on):
  * choosing it in the Mode vote (Coming soon can't be), earning coins with a capture, the team shop between rounds (the
- * one-time explainer, buying, putting one back, closed as the match starts), and in the match a Stockfish token (your
- * own top moves, on your screen) and a shield (the bots' block against your squad cancelled). Test lobbies start from
+ * one-time explainer, buying, putting one back, closed as the match starts), and in the match a Time chip (the clock
+ * jumping 30 s, the move's deadline later), a Stockfish token (your own top moves, on your screen) and a shield (the
+ * bots' block against your squad cancelled). Test lobbies start from
  * a known position (`fen`) with strong bots, and `bots=blocks` has their bots block whenever they can.
  */
 
@@ -130,7 +131,7 @@ test("earning coins: your capture pays your squad's wallet (a knight's worth), s
   await noSideScroll(page);
 });
 
-test("the shop between rounds, a Stockfish token and a shield: bought with the squad's wallet, used in the next match", async ({ page }) => {
+test("the shop between rounds, a Stockfish token, a Time chip and a shield: bought with the squad's wallet, used in the next match", async ({ page }) => {
   test.setTimeout(300_000);
   await named(page, "Tess");
   // Straight at Pairs: every squad still in has a test wallet, and the shop is open until the match starts.
@@ -150,21 +151,24 @@ test("the shop between rounds, a Stockfish token and a shield: bought with the s
   const start = (await wallet(page)).coins as number;
   expect(start).toBeGreaterThan(300);
   await expect(page.locator(".mc-wallet.you .mc-coins")).toHaveText(start.toLocaleString("en"));
-  // Buy a Stockfish token and a shield; a time coin, then put it back.
+  // A Time chip, then put it back; then a Stockfish token, a shield and a Time chip.
+  await page.getByRole("button", { name: /^Buy a Time chip for/ }).click();
+  await expect.poll(async () => (await wallet(page)).cart.chip).toBe(1);
+  await page.getByRole("button", { name: "Put back a Time chip" }).click();
+  await expect.poll(async () => (await wallet(page)).cart.chip).toBe(0);
   await page.getByRole("button", { name: /^Buy a Stockfish token for/ }).click();
   await expect.poll(async () => (await wallet(page)).cart.stockfish).toBe(1);
   await page.getByRole("button", { name: /^Buy a Shield for/ }).click();
   await expect.poll(async () => (await wallet(page)).cart.shield).toBe(1);
-  await page.getByRole("button", { name: /^Buy a Time coin for/ }).click();
-  await expect.poll(async () => (await wallet(page)).cart.time).toBe(1);
-  await page.getByRole("button", { name: "Put back a Time coin" }).click();
-  await expect.poll(async () => (await wallet(page)).cart.time).toBe(0);
+  await page.getByRole("button", { name: /^Buy a Time chip for/ }).click();
+  await expect.poll(async () => (await wallet(page)).cart.chip).toBe(1);
   const after = await wallet(page);
-  expect(start - after.coins).toBe(SQUADS.mercenary.items.stockfish.price + SQUADS.mercenary.items.shield.price);
+  // (The chip put back was refunded: the one bought costs the first price again.)
+  expect(start - after.coins).toBe(SQUADS.mercenary.items.stockfish.price + SQUADS.mercenary.items.shield.price + SQUADS.mercenary.items.chip.price);
   // Each purchase live to the squad (the last few).
   await expect(page.locator(".mc-feed")).toContainText("You bought a shield");
-  await expect(page.locator(".mc-feed")).toContainText("You put back a time coin");
-  await expect(page.locator(".mc-item.in")).toHaveCount(2);
+  await expect(page.locator(".mc-feed")).toContainText("You bought a Time chip");
+  await expect(page.locator(".mc-item.in")).toHaveCount(3);
   // (From before the match starts: every half's shielded blocks and the banners shown, kept as they come: a later
   // half's replace the last.)
   await page.evaluate(() => {
@@ -185,9 +189,32 @@ test("the shop between rounds, a Stockfish token and a shield: bought with the s
   await expect(shop).toHaveCount(0, { timeout: 60_000 });
   await expect(page.locator(".mc-kitline-side.you .mc-kit-stockfish")).toBeVisible();
   await expect(page.locator(".mc-kitline-side.you .mc-kit-shield")).toBeVisible();
-  // The Stockfish token on your pick: your own top moves, listed and drawn, on your screen.
+  await expect(page.locator(".mc-kitline-side.you .mc-kit-chip")).toBeVisible();
   const s = await nextDuty(page);
   expect(s.duty!.role).toBe("pick");
+  // A Time chip on this move: the clock jumps 30 s (both squads see "+30 s"), the move's deadline 30 s later.
+  const secs = (t: string) => (t.includes(":") ? Number(t.split(":")[0]) * 60 + Number(t.split(":")[1]) : Number(t));
+  const myClock = page.locator(".sq-clockline-side.you .sq-clock");
+  const chipButton = page.locator(".sq-clockline-side.you .mc-chip-btn");
+  await expect(chipButton).toBeVisible();
+  await expect(page.locator(".sq-clockline-side.you .sq-res-chips")).toContainText("×1");
+  const before = secs((await myClock.textContent())!.replace(/[▼\s]/g, ""));
+  const deadline0 = await page.evaluate(([key, me]) => (window as any).squads.matches.get(key).current.duties.find((x: any) => x.players.includes(me)).deadline, [s.key, await page.evaluate(() => (window as any).squads.myId)] as const);
+  await chipButton.click();
+  await expect(page.locator(".sq-clockline-side.you .mc-chip-plus")).toHaveText(`+${SQUADS.mercenary.chipSeconds} s`);
+  await expect(page.locator(".sq-clockline-side.you .mc-chip-clock.on")).toBeVisible();
+  const jumped = secs((await myClock.textContent())!.replace(/[▼\s]/g, ""));
+  expect(jumped).toBeGreaterThanOrEqual(before + SQUADS.mercenary.chipSeconds - 3);
+  expect(jumped).toBeLessThanOrEqual(before + SQUADS.mercenary.chipSeconds + 1);
+  await expect(page.locator(".sq-clockline-side.you .sq-res-chips")).toContainText("×0");
+  await expect(chipButton).toHaveCount(0);
+  const chipped = await page.evaluate(([key, me]) => {
+    const m = (window as any).squads.matches.get(key);
+    return { chips: m.current.chips, deadline: m.current.duties.find((x: any) => x.players.includes(me)).deadline };
+  }, [s.key, await page.evaluate(() => (window as any).squads.myId)] as const);
+  expect(chipped.chips).toHaveLength(1);
+  expect(Math.round((chipped.deadline - deadline0) / 1000)).toBe(SQUADS.mercenary.chipSeconds);
+  // The Stockfish token on your pick: your own top moves, listed and drawn, on your screen.
   const tokenButton = page.getByRole("button", { name: /^Stockfish token · 1 left/ });
   await expect(tokenButton).toBeVisible();
   await tokenButton.click();

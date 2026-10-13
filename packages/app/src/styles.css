@@ -12260,6 +12260,16 @@ button.sq-tiny {
     min-width: 44px;
     padding: 2px 4px;
   }
+  /* (Mercenary: the Time chip button is its icon alone; a squad's counts sit closer.) */
+  .sq-clockline .sq-res {
+    gap: 4px;
+  }
+  .mc-chip-btn {
+    padding: 3px;
+  }
+  .mc-chip-btn-text {
+    display: none;
+  }
 }
 .sq-res {
   display: inline-flex;
@@ -13124,21 +13134,24 @@ button.sq-tiny {
   --mc-gold: #b7791f;
   --mc-stockfish: #0f8f80;
   --mc-shield: #7c3aed;
-  --mc-time: #15803d;
+  --mc-chip: #15803d;
+  --mc-chip-ink: #fff;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --mc-gold: #f2c14e;
     --mc-stockfish: #2dd4bf;
     --mc-shield: #a78bfa;
-    --mc-time: #4ade80;
+    --mc-chip: #4ade80;
+    --mc-chip-ink: #052e16;
   }
 }
 :root[data-theme="dark"] {
   --mc-gold: #f2c14e;
   --mc-stockfish: #2dd4bf;
   --mc-shield: #a78bfa;
-  --mc-time: #4ade80;
+  --mc-chip: #4ade80;
+  --mc-chip-ink: #052e16;
 }
 .mc-coins {
   display: inline-flex;
@@ -13177,8 +13190,8 @@ button.sq-tiny {
 .mc-icon-shield {
   color: var(--mc-shield);
 }
-.mc-icon-time {
-  color: var(--mc-time);
+.mc-icon-chip {
+  color: var(--mc-chip);
 }
 .mc-kit {
   display: inline-flex;
@@ -13506,4 +13519,93 @@ button.sq-tiny {
   font-size: 11px;
   font-weight: 900;
   letter-spacing: -1px;
+}
+
+/* ---- Mercenary: the Time chip in a match (a squad's count, the tap button, its clock jump) ---- */
+.sq-res-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--mc-chip);
+}
+.sq-res-chips .mc-icon {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+.sq-res-chips.none {
+  opacity: 0.5;
+}
+.mc-chip-clock {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.mc-chip-clock.on .sq-clock {
+  color: var(--mc-chip);
+}
+/* "+30 s" floats up from the clock and fades (both squads see it). */
+.mc-chip-plus {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translate(-50%, 0);
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--mc-chip);
+  color: var(--mc-chip-ink);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: mc-chip-plus 1.8s ease-out forwards;
+}
+@keyframes mc-chip-plus {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.85);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.08);
+  }
+  25% {
+    transform: translate(-50%, -2px) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(1);
+  }
+}
+.mc-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px 3px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mc-chip);
+  color: var(--mc-chip-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  --mc-icon-eye: var(--mc-chip);
+}
+.mc-chip-btn .mc-icon {
+  color: var(--mc-chip-ink);
+}
+.mc-chip-btn:active {
+  transform: scale(0.94);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mc-chip-plus {
+    animation-duration: 0.01s;
+    animation-delay: 1.6s;
+  }
 }

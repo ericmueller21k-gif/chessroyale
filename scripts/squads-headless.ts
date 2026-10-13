@@ -133,13 +133,13 @@ const lines = [
   ...(watch.wallets.length
     ? [
         "",
-        `Mercenary (${watch.lobby?.rules?.mode ?? "?"}): every squad's coins by play per round (round 1, round 2, the final), catch-up, what it bought (each shop as it closed), coins left. Placements: 1, 2, 3 = 3rd-4th, 5 = 5th-8th.`,
+        `Mercenary (${watch.lobby?.rules?.mode ?? "?"}): every squad's coins by play per round (round 1, round 2, the final), catch-up, what it bought (each shop as it closed), Time chips tapped and held at the end, coins left. Placements: 1, 2, 3 = 3rd-4th, 5 = 5th-8th.`,
         "",
-        "| Squad | Placed | Earned R1 | R2 | Final | Catch-up | Kits | Coins left |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Squad | Placed | Earned R1 | R2 | Final | Catch-up | Kits | Chips tapped | Chips held | Coins left |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ...watch.wallets.map((w) => {
           const kits = watch.kits.filter((k) => k.squadId === w.squadId).map((k) => `R${k.round + 1}: ${Object.entries(k.cart).filter(([, n]) => n > 0).map(([it, n]) => `${it}${n > 1 ? `×${n}` : ""}`).join(" ") || "saved"} (of ${k.coins})`);
-          return `| ${w.squadId} | ${watch.results?.[w.squadId] ?? "-"} | ${w.byRound[0]} | ${w.byRound[1]} | ${w.byRound[2]} | ${w.catchUp} | ${kits.join("; ") || "-"} | ${w.coins} |`;
+          return `| ${w.squadId} | ${watch.results?.[w.squadId] ?? "-"} | ${w.byRound[0]} | ${w.byRound[1]} | ${w.byRound[2]} | ${w.catchUp} | ${kits.join("; ") || "-"} | ${watch.chipNews.filter((c) => c.squadId === w.squadId).length} | ${w.chips ?? 0} | ${w.coins} |`;
         }),
         "",
         `Brilliant moves: ${watch.coinNews.filter((c) => c.why === "brilliant").map((c) => `${c.move} (squad ${c.squadId})`).join(", ") || "none"}. Catch-up: ${watch.coinNews.filter((c) => c.why === "catch_up").map((c) => `squad ${c.squadId} +${c.coins} (v ${c.against})`).join(", ") || "none"}.`,
