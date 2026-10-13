@@ -1000,6 +1000,20 @@ export class MatchRunner {
       retiredThisRound: snapshot.retired,
       botThink: new Map(snapshot.botThink ?? []),
       botPowerUps: new Set(),
+      // (Not made from the snapshot, but fields every runner has: Object.create skips the class's own initializers. A
+      // restored runner without the bosses' store crashed Big Boy's Big Bounce online: every event of a lobby restores.)
+      kingCallers: new Set(),
+      kingStrikers: new Set(),
+      strikeBots: null,
+      planned: new Map(),
+      planning: null,
+      forceLastStand: false,
+      showdownScout: null,
+      humanBrain: null,
+      brainNote: null,
+      bossLast: null,
+      bossMemo: new Map(),
+      bossViewMemo: null,
     });
     // The boss battle's board isn't in the opening library.
     for (const [id, b] of runner.boards) if (!b.opening) runner.boards.set(id, { ...b, opening: BOSS_OPENING });
@@ -1552,6 +1566,56 @@ export class MatchRunner {
 
   alive(): PlayerState[] {
     return alivePlayers(this.state);
+  }
+
+  // ---- Leaving the match (settings.ts, LEAVING) ----
+
+  /**
+   * Someone leaves for good and `bot` takes their seat from now on, under a new id: the seat's score, bank, power-ups,
+   * team, losses and turns in a final carry on as the bot's (the person's own result is taken before this). In the
+   * middle of a round the seat simply has no pick of its own this time.
+   */
+  handOver(id: string, bot: { id: string; name: string; skill: number }): void {
+    const rename = (x: string) => (x === id ? bot.id : x);
+    const s = this.state;
+    const f = s.final;
+    this.state = {
+      ...s,
+      players: s.players.map((p) =>
+        p.id === id
+          ? { ...p, id: bot.id, name: bot.name, isBot: true, skill: bot.skill, practice: false, lastGroupmates: p.lastGroupmates.map(rename) }
+          : p.lastGroupmates.includes(id)
+            ? { ...p, lastGroupmates: p.lastGroupmates.map(rename) }
+            : p,
+      ),
+      ...(f ? { final: { ...f, order: f.order.map(rename), teams: [f.teams[0].map(rename), f.teams[1].map(rename)] as [string[], string[]] } } : {}),
+    };
+    this.groups = new Map([...this.groups].map(([b, ids]) => [b, ids.map(rename)]));
+    // (A runner the lobby server restored has these only once a move has been dealt.)
+    this.kingCallers?.delete(id);
+    this.kingStrikers?.delete(id);
+  }
+
+  /**
+   * Someone leaves for good and nobody takes their seat: they're out now, in the last place still open (where a cut
+   * would put them; the later cuts place below it). Returns their placement (already out: the one they had).
+   */
+  retire(id: string): number {
+    const p = this.state.players.find((x) => x.id === id);
+    if (!p) return this.state.players.length;
+    if (!p.alive) return p.placement ?? this.alive().length + 1;
+    const place = this.alive().length;
+    this.state = { ...this.state, players: this.state.players.map((x) => (x.id === id ? { ...x, alive: false, outInStage: this.state.stage, placement: place } : x)) };
+    this.groups = new Map([...this.groups].map(([b, ids]) => [b, ids.filter((x) => x !== id)]));
+    this.kingCallers?.delete(id);
+    this.kingStrikers?.delete(id);
+    return place;
+  }
+
+  /** Before move 1: someone who leaves and whose seat nobody takes is simply gone (no place, no result). */
+  withdraw(id: string): void {
+    this.state = { ...this.state, players: this.state.players.filter((p) => p.id !== id) };
+    this.groups = new Map([...this.groups].map(([b, ids]) => [b, ids.filter((x) => x !== id)]));
   }
 }
 

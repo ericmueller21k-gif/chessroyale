@@ -15,6 +15,7 @@ import { TokenBreakdown } from "../components/SquadsBlocks.tsx";
 import { MercenaryShop } from "../components/MercenaryShop.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { SIDE_PANEL } from "../components/SquadsParts.tsx";
+import { FlagIcon, MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
 
 /**
  * Squads' screens (docs/areas/squads.md, "The screens"), by the lobby's phase: the waiting room (the queue's seats, 32 of
@@ -26,10 +27,53 @@ import { SIDE_PANEL } from "../components/SquadsParts.tsx";
 export interface SquadsActions {
   /** Leave this lobby and go home. */
   onHome: () => void;
+  /** Resign (mid-bracket, your squad still in): a loss, a bot in your seat, then the resign screen. */
+  onResign: () => void;
   /** Leave and queue again (solo), or back to your party. */
   onAgain: () => void;
   /** You came with a party: "Back to your party" instead of the solo queue. */
   party: boolean;
+}
+
+/**
+ * What leaving means in a Squads lobby right now (MatchMenu, the standings' Leave): before the bracket, Leave (a bot
+ * takes your seat, nothing recorded); with your squad still in it, Resign (a loss at the worst place it can still
+ * finish, a bot in your seat for good); your squad out, Leave (its result stands). Null: nothing to leave.
+ */
+export function squadsExit(client: SquadsClient, actions: SquadsActions): MatchExit | null {
+  const lobby = client.lobby;
+  if (!lobby || client.left || client.resigning || client.resigned || lobby.phase === "results" || lobby.phase === "waiting") return null;
+  const sq = client.mySquad;
+  if (lobby.phase !== "bracket") return { kind: "leave", note: "You'll go home, and a bot takes your seat.", go: actions.onHome };
+  if (!sq || client.placed) return { kind: "leave", note: "Your squad's result stands. You'll go home.", go: actions.onHome };
+  return { kind: "resign", note: `You'll leave the lobby and it counts as a loss. A bot plays your seat for the ${squadName(sq.id)}.`, go: actions.onResign };
+}
+
+/** You resigned: what went on your record, and where to go next (the lobby goes on without you). */
+function SquadsResigned({ client, actions }: { client: SquadsClient; actions: SquadsActions }) {
+  const r = client.resigned;
+  const sq = client.mySquad;
+  return (
+    <div class="screen results sq-results sq-resigned">
+      <div class="trophy resigned" aria-hidden="true">
+        <FlagIcon size={56} />
+      </div>
+      <h1>You resigned</h1>
+      <p class="muted">
+        {!r ? "Leaving the lobby…" : client.lobby?.test ? "Test lobby: nothing goes on your record." : `On your record: ${placementText(r.placement)} of ${r.players} squads.`}
+        {sq ? ` A bot plays your seat for the ${squadName(sq.id)}.` : ""}
+      </p>
+      {r && !client.lobby?.test && <p class="team-result bad">It counts as a loss.</p>}
+      <div class="sq-card-actions">
+        <button type="button" class="fd-btn primary" onClick={actions.onAgain}>
+          {actions.party ? "Back to your party" : "Queue again"}
+        </button>
+        <button type="button" class="fd-btn" onClick={actions.onHome}>
+          Home
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** The waiting room: "12 / 32", the seconds until bots fill, and the 32 seats (your party's together), then the squads. */
@@ -116,7 +160,7 @@ export function SquadsQueue({ client, onCancel }: { client: SquadsClient; onCanc
 }
 
 /** The pre-game votes on Crowd's vote board: everyone's pawn on your side of an empty board, three zones, three cards. */
-function SquadsVote({ client, vote, onLeave }: { client: SquadsClient; vote: NonNullable<SquadsClient["vote"]>; onLeave: () => void }) {
+function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vote: NonNullable<SquadsClient["vote"]>; onLeave: () => void; exit: MatchExit | null }) {
   const lobby = client.lobby!;
   const defs = squadsVotes();
   const def = defs[vote.index]!;
@@ -146,7 +190,8 @@ function SquadsVote({ client, vote, onLeave }: { client: SquadsClient; vote: Non
           </button>
         ) : undefined
       }
-      below={<StandingsStrip client={client} onLeave={onLeave} />}
+      below={<StandingsStrip client={client} onLeave={onLeave} exit={exit} />}
+      menu={<MatchMenu exit={exit} />}
     />
   );
 }
@@ -224,7 +269,7 @@ function SquadsBracketPhase({ client, actions }: { client: SquadsClient; actions
   );
   return (
     <>
-      <SquadsMatchScreen client={client} panel={panel} onNextRound={() => client.nextRound()} onLeave={actions.onHome} />
+      <SquadsMatchScreen client={client} panel={panel} onNextRound={() => client.nextRound()} onLeave={actions.onHome} exit={squadsExit(client, actions)} />
       {/* Mercenary: your squad's shop, while it waits for its next match. */}
       <MercenaryShop client={client} />
     </>
@@ -287,9 +332,12 @@ export function SquadsScreen({ client, actions }: { client: SquadsClient; action
   const side = useMedia(SIDE_PANEL);
   const lobby = client.lobby;
   if (!lobby) return <div class="screen center"><p class="muted">Connecting…</p></div>;
+  // You resigned (or are resigning): your record and what next, whatever the lobby does meanwhile.
+  if (client.resigning || client.resigned) return <SquadsResigned client={client} actions={actions} />;
+  const exit = squadsExit(client, actions);
   const body =
     lobby.phase === "vote" && client.vote ? (
-      <SquadsVote client={client} vote={client.vote} onLeave={actions.onHome} />
+      <SquadsVote client={client} vote={client.vote} onLeave={actions.onHome} exit={exit} />
     ) : lobby.phase === "results" ? (
       <SquadsResults client={client} actions={actions} />
     ) : lobby.phase === "bracket" ? (
@@ -304,7 +352,7 @@ export function SquadsScreen({ client, actions }: { client: SquadsClient; action
       {/* (Only where it shows: its clocks are drawn ten times a second.) */}
       {side && (
         <aside class="tower-side sq-side">
-          <StandingsPanel client={client} onLeave={actions.onHome} />
+          <StandingsPanel client={client} onLeave={actions.onHome} exit={exit} />
         </aside>
       )}
       {body}

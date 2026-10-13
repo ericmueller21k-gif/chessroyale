@@ -179,6 +179,19 @@ export function reportWinner(bracket: Bracket, round: SquadsRound, index: number
 export const roundDecided = (bracket: Bracket, round: SquadsRound) => bracket[round]!.every((m) => m.winner !== null);
 
 /**
+ * The worst place a squad still in the bracket can finish: where it would place losing the match it's in or waiting
+ * for (round 1: 5th-8th, round 2: 3rd-4th, the final: 2nd). What someone who leaves mid-bracket has on their record.
+ */
+export function worstPlacement(bracket: Bracket, squadId: number): 2 | 3 | 5 {
+  const lostIn: readonly (2 | 3 | 5)[] = [5, 3, 2];
+  let round = 0;
+  bracket.forEach((matches, r) => {
+    if (matches.some((m) => m.squads.includes(squadId))) round = r;
+  });
+  return lostIn[Math.min(round, lostIn.length - 1)]!;
+}
+
+/**
  * Placements so far, for rewards: 1 (won the final), 2 (lost it), 3 (out in round 2: 3rd-4th), 5 (out in round 1:
  * 5th-8th). Squads still playing aren't listed.
  */

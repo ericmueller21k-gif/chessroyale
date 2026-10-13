@@ -26,6 +26,7 @@ import { pawnLook } from "../looks.ts";
 import { seenKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
+import { exitMatch } from "../match-exit.ts";
 import { ordinal } from "./StageBreak.tsx";
 
 const sideName = (s: "w" | "b") => (s === "w" ? "White" : "Black");
@@ -640,6 +641,19 @@ export function CrowdCut({
           <CutNames knockedOut={knockedOut} />
           {/* Out, you stay here until the results: quick chat with your team (online). */}
           {(youOut || me?.out) && <ChatSection match={match} />}
+          {/* Or go: your place stands (online, home; solo, your result now). */}
+          {(youOut || me?.out) && match.exit === "leave" && (
+            <button
+              type="button"
+              class="btn btn-secondary leave-match"
+              onClick={(e) => {
+                e.stopPropagation();
+                exitMatch();
+              }}
+            >
+              Leave the match
+            </button>
+          )}
         </>
       )}
       {why && (

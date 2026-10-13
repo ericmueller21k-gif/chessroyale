@@ -670,9 +670,12 @@ describe("lobby: Crowd mode", () => {
     // Cy waited 50 s when the bots filled the rest.
     L.advance(50_000);
     expect(L.core.record.auto).toMatchObject({ waiters: 1, waitMs: 50_000 });
-    // After the start nobody can leave: the seat stays (they're just disconnected).
+    // Once the seats have filled, Cancel is leaving the match before move 1 (Resign: LEAVING): a bot sits in, nothing
+    // is recorded, and with nobody left the lobby ends at once.
     L.core.message("p3", { t: "leave" });
-    expect(L.core.record.humans.map((h) => h.name)).toEqual(["Cy"]);
+    expect(L.core.record.humans).toEqual([]);
+    expect(L.core.record.left).toMatchObject([{ name: "Cy", how: "early", result: null }]);
+    expect(L.core.record.phase).toBe("results");
   });
 
   it("standings carry a person's account id (a tap on their name opens their profile); bots have none", () => {

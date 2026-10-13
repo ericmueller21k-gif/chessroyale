@@ -111,6 +111,7 @@ export function VoteScreen({
   extra,
   below,
   chime = true,
+  menu,
 }: {
   match: VoteHost;
   vote: VoteView;
@@ -126,6 +127,8 @@ export function VoteScreen({
   below?: ComponentChildren;
   /** The result's three tones and the timer's ticks (Crowd's); Squads has neither. */
   chime?: boolean;
+  /** At the top line's end: the match's control (Sound, and Leave: MatchMenu); without one, the sound button. */
+  menu?: ComponentChildren;
 }) {
   const now = useFrameNow();
   const animate = useCrowdAnimations();
@@ -290,7 +293,7 @@ export function VoteScreen({
           <h1>{def.title}</h1>
         </div>
         {extra}
-        <MuteButton />
+        {menu ?? <MuteButton />}
       </div>
       <div class="board-area">
         <div class="opening-name vote-hint" aria-live="polite">

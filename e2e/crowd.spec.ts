@@ -4,7 +4,7 @@ import { createLobbyFromHome, expectCoordsInSquares, named, soloFromHome, submit
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
-test("narrow phones: the top bar's numbers stay clear of the sound button, and the cut lists whole rows of names", async ({ browser }) => {
+test("narrow phones: the top bar's numbers stay clear of the options button, and the cut lists whole rows of names", async ({ browser }) => {
   test.setTimeout(5 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // 360 px and 375 px wide (the layout is the same in both schemes; one of each).
@@ -31,7 +31,8 @@ test("narrow phones: the top bar's numbers stay clear of the sound button, and t
     const bar = await page.evaluate(() => {
       const hud = document.querySelector(".hud-row .hud")!;
       const cut = document.querySelector(".hud-row .hud-cut")!.getBoundingClientRect();
-      const mute = document.querySelector(".hud-row .mute-btn")!.getBoundingClientRect();
+      // (On a phone the top line ends in "⋯", the match's options: Sound and Resign.)
+      const mute = document.querySelector(".hud-row .mm-more")!.getBoundingClientRect();
       const label = [...document.querySelectorAll(".hud-row .hud-stage-text > span")];
       return {
         text: (hud as HTMLElement).innerText,
@@ -41,7 +42,7 @@ test("narrow phones: the top bar's numbers stay clear of the sound button, and t
       };
     });
     expect(bar.spill, `${device}: ${bar.text}`).toBeLessThanOrEqual(0);
-    expect(bar.clear, `${device}: the cut pill runs under the sound button`).toBeGreaterThanOrEqual(0);
+    expect(bar.clear, `${device}: the cut pill runs under the options button`).toBeGreaterThanOrEqual(0);
     expect(bar.labelCut, `${device}: "Move 34 · cut in 2" is cut short`).toBe(false);
     // Play to the first cut (16 go out) and hold it there.
     await expect

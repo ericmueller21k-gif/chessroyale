@@ -1,7 +1,8 @@
 import { useEffect, useState } from "preact/hooks";
 import { LeaderboardSheet } from "../components/LeaderboardSheet.tsx";
 import { LiveNumber } from "../components/LiveNumber.tsx";
-import { MuteButton } from "../components/MuteButton.tsx";
+import { MatchMenu } from "../components/MatchMenu.tsx";
+import { exitFor } from "../match-exit.ts";
 import { clockText } from "../components/RaceTower.tsx";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
 import { isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
@@ -124,7 +125,8 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
           )}
           {crowd ? <span class="hud-spacer" /> : <BankTime match={match} />}
         </button>
-        <MuteButton />
+        {/* Sound, and Resign (a phone: "⋯" and its sheet; a computer: the flag). */}
+        <MatchMenu exit={exitFor(match)} />
       </div>
       {boss ? <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
       {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}

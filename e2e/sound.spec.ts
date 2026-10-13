@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { Chess } from "chess.js";
-import { soloFromHome } from "./helpers.ts";
+import { soloFromHome, soundOff } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -42,7 +42,7 @@ test("only piece sounds, clock ticks and the reveal reel play, and muting silenc
   // The audio context was running (unlocked by the tap), so they were actually heard.
   expect(log.filter((l) => l.startsWith("tick")).every((l) => l.includes(":running"))).toBe(true);
   // Muting silences them.
-  await page.getByRole("button", { name: "Turn sound off" }).first().click();
+  await soundOff(page);
   await page.evaluate(() => ((window as any).__soundLog = []));
   await page.evaluate(() => (window as any).match.skipReveal());
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");

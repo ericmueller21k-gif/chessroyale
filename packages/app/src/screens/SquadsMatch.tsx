@@ -6,7 +6,7 @@ import { matchClockLine, minutesName, tokenLines, type Colour, type Side, type S
 import { Board, type Arrow } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
-import { MuteButton } from "../components/MuteButton.tsx";
+import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
 import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { ClockText, Member, SquadTag, SquadsBoards, StandingsStrip, shownTurn, useNow } from "../components/SquadsParts.tsx";
 import { BlockArrows, BlockPicker, ChipIcon, LockIcon, PickTags, SquadResources, TokenBreakdown, squareAt } from "../components/SquadsBlocks.tsx";
@@ -297,7 +297,20 @@ function rulesLine(m: LocalMatch): string {
  * The match screen. `focus` is the board on the big board when you aren't asked to choose: your own (null) or one you
  * tapped. `extra` goes in the panel (the knocked-out and "through" cards, the bracket while you watch).
  */
-export function SquadsMatchScreen({ client, panel, onNextRound, onLeave }: { client: SquadsClient; panel?: ComponentChildren; onNextRound?: () => void; onLeave?: () => void }) {
+export function SquadsMatchScreen({
+  client,
+  panel,
+  onNextRound,
+  onLeave,
+  exit = null,
+}: {
+  client: SquadsClient;
+  panel?: ComponentChildren;
+  onNextRound?: () => void;
+  onLeave?: () => void;
+  /** Resign or leave, from the top line (MatchMenu) and the standings' foot. */
+  exit?: MatchExit | null;
+}) {
   const me = client.myId;
   const mySquad = client.mySquad;
   const matches = [...client.matches.values()];
@@ -339,6 +352,7 @@ export function SquadsMatchScreen({ client, panel, onNextRound, onLeave }: { cli
       panel={panel}
       onNextRound={onNextRound}
       onLeave={onLeave}
+      exit={exit}
     />
   );
 }
@@ -356,6 +370,7 @@ function MatchView({
   panel,
   onNextRound,
   onLeave,
+  exit,
 }: {
   client: SquadsClient;
   m: LocalMatch;
@@ -369,6 +384,7 @@ function MatchView({
   panel?: ComponentChildren;
   onNextRound?: () => void;
   onLeave?: () => void;
+  exit: MatchExit | null;
 }) {
   const me = client.myId;
   const b = m.boards[boardId]!;
@@ -487,9 +503,10 @@ function MatchView({
             Next round
           </button>
         )}
-        <MuteButton />
+        {/* Sound, and Resign (a phone: "⋯" and its sheet; a computer: the flag). */}
+        <MatchMenu exit={exit} />
       </div>
-      <StandingsStrip client={client} onLeave={onLeave} />
+      <StandingsStrip client={client} onLeave={onLeave} exit={exit} />
       <SquadsBoards client={client} watching={`${m.key}/${boardId}`} onWatch={canWatch ? onWatch : null} />
       <div class="board-area">
         <div class="opening-name sq-status" aria-live="polite">

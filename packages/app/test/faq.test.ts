@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, DEFAULT_SETTINGS, isPlayable, maiaRatingFor } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, DEFAULT_SETTINGS, LEAVING, isPlayable, maiaRatingFor } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -288,6 +288,17 @@ describe("the FAQ on Squads' modes and Mercenary", () => {
     const changed = section("modes", { ...FAQ_DEFAULTS, squads: { ...Q, mercenary: { ...M, priceStep: 70, chipSeconds: 45, items: { ...M.items, chip: { price: 10, cap: 4, prices: [10, 20] } } } } });
     expect(changed).toContain("70 coins more for every one");
     expect(changed).toContain("Time chip (10, 20, then 20 coins each; your squad holds up to 4): tap it during your squad's move, on the board you're playing: 45 seconds more");
+  });
+});
+
+describe("the FAQ: leaving or resigning", () => {
+  it("says how to resign on a phone and a computer, what it does, and how long a seat waits (LEAVING)", () => {
+    const t = text();
+    expect(t).toContain("Leaving or resigning");
+    expect(t).toContain("on a phone, tap ⋯ at the top right of the match, then Resign; on a computer, click the flag");
+    expect(t).toContain(`Back within ${LEAVING.awayMs / 60_000} minutes, you're still in your seat`);
+    expect(text({ ...FAQ_DEFAULTS, leaving: { awayMs: 90_000 } })).toContain("Back within 90 seconds, you're still in your seat");
+    expect(faqAnchors(faqPage())).toContain("leaving");
   });
 });
 

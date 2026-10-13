@@ -25,6 +25,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     every 2 s, each Worker caches `/api/live` for 3 s, and D1 gets `users.last_seen` once a minute per account.
   - **Rate limits:** per address, per account and (PLAY, new lobbies) per account again (`CAPACITY.rateLimits`,
     `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
+- **Nothing runs for no one:** a match everyone has left (resigned, or gone longer than `LEAVING.awayMs`) ends at once
+  and its lobby closes, Squads too (DECISIONS.md, "Resign: leaving a match in every mode"); before Oct 13 such a match
+  played itself out for up to an hour or more, counted on the live line all along.
 - **Costs and guards:** engine server re-checks capped by `ENGINE_DAILY_SEARCHES` (3000 a day, D1 `engine_usage`);
   fair play's deep re-checks by `FAIRPLAY.deep.dailySearches` (D1 `fairplay_budget`) on their own instance; the
   deep re-check's cron runs every 15 minutes (`triggers.crons`). Suggested budget alert: $20/month.

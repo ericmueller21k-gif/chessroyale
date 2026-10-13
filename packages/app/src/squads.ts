@@ -1,4 +1,4 @@
-import { SQUADS, type ItemLook, type MercItem } from "@chessroyale/core";
+import { LEAVING, SQUADS, type ItemLook, type MercItem } from "@chessroyale/core";
 import { toSan, type MoveScore } from "@chessroyale/chess";
 import {
   SQUADS_PROTOCOL,
@@ -219,6 +219,11 @@ export class SquadsClient {
   gone: string | null = null;
   /** You left (Leave, queue again): the socket is closed. */
   left = false;
+  /** A resign sent (mid-bracket, your squad still in), the server's word not yet back. */
+  resigning = false;
+  /** You resigned: what went on your record (a loss at the worst place your squad could still finish). */
+  resigned: { placement: SquadsPlacement; players: number } | null = null;
+  private resignTimer: ReturnType<typeof setTimeout> | null = null;
   /**
    * Your choice and lock as sent, shown at once until the server's "choices" carry them (or "choiceNo" takes them back):
    * a Relay move stays on your board, a pick never blinks out when someone else's choice arrives first.
@@ -325,6 +330,7 @@ export class SquadsClient {
   dispose() {
     this.closed = true;
     if (this.retryTimer) clearTimeout(this.retryTimer);
+    if (this.resignTimer && !this.resigning) clearTimeout(this.resignTimer);
     if (this.ticker) clearInterval(this.ticker);
     this.ticker = null;
     document.removeEventListener("visibilitychange", this.onVisible);
@@ -439,6 +445,26 @@ export class SquadsClient {
     this.closed = true;
     setTimeout(() => this.dispose(), 150);
     this.emit();
+  }
+
+  /**
+   * Resign (LEAVING in settings.ts): mid-bracket, with your squad still in, you leave the lobby for good: a loss on
+   * your record (the worst place your squad can still finish) and a bot plays your seat. The server says what it
+   * recorded ("left"), then closes the socket; with no word in LEAVING.confirmWaitMs, you're simply gone.
+   */
+  resign() {
+    this.send({ t: "leave" });
+    forgetSquads(this.code);
+    this.closed = true;
+    this.resigning = true;
+    this.emit();
+    this.resignTimer = setTimeout(() => {
+      if (!this.resigning) return;
+      this.resigning = false;
+      this.left = true;
+      this.dispose();
+      this.emit();
+    }, LEAVING.confirmWaitMs);
   }
 
   sync() {
@@ -713,12 +739,19 @@ export class SquadsClient {
         break;
       case "left":
         this.left = true;
+        if (this.resigning) {
+          this.resigning = false;
+          if (this.resignTimer) clearTimeout(this.resignTimer);
+          this.resigned = msg.how === "resigned" && msg.result ? msg.result : null;
+          this.dispose();
+        }
         break;
       case "error":
         if (msg.banned) {
           showBanNotice();
           this.goneNow("Banned");
-        } else if (msg.ended) this.goneNow(msg.message);
+        } else if (msg.left) this.goneNow(msg.left.how === "resigned" ? "You resigned that match." : "You left that match.");
+        else if (msg.ended) this.goneNow(msg.message);
         else if (!this.myId) {
           // Can't join (full, already started, an old app): no more reconnecting.
           this.error = msg.message;

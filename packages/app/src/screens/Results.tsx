@@ -9,6 +9,7 @@ import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection } from "../components/QuickChat.tsx";
 import { rankedMinHumans } from "@chessroyale/core";
 import { BossCharacter, hasCharacter } from "../components/BossCharacter.tsx";
+import { FlagIcon } from "../components/MatchMenu.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
   const played = match.moves.filter((m) => m.move !== null);
@@ -32,17 +33,22 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
   // A boss battle is won or lost against the boss: your place is only your rank in the crowd. (Alone, you're always
   // "1st of 1", which used to read "You won the match!" right above "The Iron Bishop won.")
   const alone = !!bossResult && match.totalPlayers === 1;
+  // You left before the end: you resigned (a loss), or you were already out (your place stood; no winner yet).
+  const left = match.phase.kind === "results" ? match.phase.left : undefined;
+  const resigned = left?.how === "resigned";
   const topName = (() => {
     const w = standings.find((s) => s.placement === 1);
     return w ? <PlayerName name={winner} uid={w.uid} bot={w.isBot} /> : winner;
   })();
   return (
     <div class="screen results">
-      <div class="trophy" aria-hidden="true">
-        {bossResult ? (bossResult === "crowd" ? "🏆" : bossResult === "boss" ? "💀" : "🤝") : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
+      <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
+        {resigned ? <FlagIcon size={56} /> : bossResult ? (bossResult === "crowd" ? "🏆" : bossResult === "boss" ? "💀" : "🤝") : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
       </div>
       <h1>
-        {alone ? (
+        {resigned ? (
+          "You resigned"
+        ) : alone ? (
           bossResult === "crowd" ? "Victory!" : bossResult === "boss" ? "Defeated" : "A draw"
         ) : (
           <>
@@ -51,7 +57,19 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           </>
         )}
       </h1>
-      {!alone && (
+      {left ? (
+        // (Your place when you left; the match went on without you, or, solo, stopped there. Boss alone: the boss's line
+        // below says who won.)
+        !alone && (
+          <p class="muted left-line">
+            {resigned
+              ? `Out in ${placement}${ordinal(placement)} place of ${match.totalPlayers}.${
+                  !match.serverPaced ? "" : left.bot ? " A bot plays your seat." : " The match goes on without you."
+                }`
+              : "You left before the end. Your place stands."}
+          </p>
+        )
+      ) : !alone && (
         <p class="muted">
           {bossResult ? (
             placement === 1 ? (
@@ -82,7 +100,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
       {bossResult && match.boss?.lastStand && <GodKingEpilogue side={match.boss.crowdSide} rises={bossResult === "crowd"} />}
       {/* What he saved you from: the blunder, the boss's reply, the best move, your chances (tap to open). */}
       {bossResult && match.boss?.lastStand?.fen && <LastStandCard stand={match.boss.lastStand} side={match.boss.crowdSide} />}
-      {team && !bossResult && (
+      {/* You resigned: a loss on your record. */}
+      {resigned && <p class="team-result bad">It counts as a loss.</p>}
+      {team && !bossResult && !left && (
         <p class={`team-result ${gameWinner === team ? "good" : gameWinner ? "bad" : ""}`}>
           {gameWinner === team
             ? `Your team (${team === "w" ? "White" : "Black"}) won the game: a win on your record.`

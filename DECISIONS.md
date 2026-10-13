@@ -2552,3 +2552,125 @@ playable; online, the host's line-up through the server. `npm run perf:boss -- <
 `showdown`): 16.7-16.8 ms frames at the 95th percentile through his searches on the computer and on the phone at 4x
 CPU slowdown, the scout's turns included; nothing grows with the match. In the perf runs the God King's Last Stand
 (once a battle) twice undid the crowd's wrong duel: the trap works, and the King can still save the crowd from it.
+
+### Resign: leaving a match in every mode (Eric, Oct 13, 2026)
+
+Eric: "we need a surrender button basically, or a forfeit button, for every game mode... right now when I play test I
+basically just refresh the screen or back out of it. Against the bosses, if you know you're losing, there's really no
+exit unless you just leave. And that just seems to hang a session. And then surrendering can also close lobby codes and
+stuff... take a look at how chess.com and lichess put it on their screen... do something similar so it's familiar to
+players... I know they have undo move; we're not building anything like that at the moment."
+
+**What hung.** No match screen had a way out (only Squads' standings had "Leave the lobby"). So:
+- **Online**, someone who closed the tab kept their seat for the rest of the match: every move of theirs was a miss,
+  and every move waited out the whole clock for a pick that never came. With nobody left, the match still played on
+  by itself for up to an hour or more (each move its full clock; the boss's moves, with no device to play them,
+  random after a 15 s wait), counted on the live line all along, and only the 180-minute safety cap would have
+  closed one that stuck. And opening the app again put you straight back into it (the device remembers the match it's
+  seated in, to rejoin it): the losing session you'd walked away from, every time.
+- **Solo**, the only exit was a reload. Knocked out, the rest of the match was played out with the engine on "Playing
+  out the match…" (minutes in a 50 v 50 or a raid), with no way to skip it; and a solo match's steps after an engine
+  search didn't check whether it had been left meanwhile (a search finishing late could set its timers going again).
+
+**Where the button is** (lichess and chess.com: a small flag by the moves and clocks on a computer, a bottom bar or a
+"⋯" menu on phones, with a second step):
+- **Phone:** "⋯" at the right end of every match screen's top line, where the sound button was, opens a small sheet at
+  the foot of the screen: one row, **Sound** (on/off) and **Resign** with a flag (**Leave the match** before move 1, or
+  once you're out) side by side. A tap anywhere else, "⋯" again or Escape closes it. A home for later options. The
+  sound button moved into it because the top line has no room for both at 360 px with its widest numbers (the cut pill
+  already runs close: `e2e/crowd.spec.ts`). One row, and the confirm one short paragraph, because on the shortest
+  phones (an iPhone SE, 375 x 667) a taller sheet reached Squads' clocks under the board.
+- **Open through the next move:** a match screen is drawn afresh when the phase changes (a reveal, the next move, the
+  boss's reply), so the sheet or confirm someone just opened stays open through that instead of vanishing under their
+  thumb (it was found vanishing by `e2e/sound.spec.ts`).
+- **Computer** (the game's two-column layout, 900 px wide and up): the **flag** beside the sound button at the top
+  line's right end, above the panel beside the board. My call against putting it under the board: the row under the
+  board is different on every screen (« » and power-ups, the boss's dock, the reveal, the vote's cards), while the top
+  line is the same everywhere, Squads included.
+- **Both:** a second step that says what will happen: "Resign? You'll leave this match and it counts as a loss. A bot
+  takes your seat." with Cancel (focused, so Enter or a stray tap never resigns) and Resign. Nothing dims or covers the
+  board, its moves or the clock meanwhile: the phone's sheet sits at the foot of the screen, the computer's confirm
+  under the flag (checked by `e2e/resign.spec.ts` and frame by frame).
+- **Someone already out** (the cut screen, watching in Classic, Classic's stage break, solo's play-out) also gets a
+  plain "Leave the match" button there; solo's play-out says "Skip to your result".
+- No undo, no draw offers (Eric: not now).
+
+**What resigning means** (`LEAVING` in settings.ts):
+- **Solo** (Boss alone, a Solo raid, a Solo 50 v 50, Classic): the match stops at once, a loss: you're out in the last
+  place still open; "You resigned" on the results (Boss alone: the boss won). Every timer stops, every step after an
+  engine search checks first, Maia's worker and the showdown scout close (the engine pool's workers stay up, idle,
+  for the next match). Recorded on your profile as any solo result (team or boss result a loss).
+- **Online** (Crowd 50 v 50, everyone moves, boss raids, Classic): you can't end the game for everyone; you leave it.
+  - **Out in the last place still open**, where a cut would put you now (the familiar battle-royale rule; never your
+    current rank, or resigning while ahead would beat playing on). A bot then playing your seat may finish anywhere;
+    that's the bot's place, never yours.
+  - **A loss, recorded as you go:** your team's (or the crowd's against a boss) result a loss, and in a boss battle you
+    didn't see it through. Your rating estimate is your moves so far, as for anyone. In a match that counts for
+    ranking it counts for yours; and the match's ranked status counts everyone who played, so nobody's leaving makes
+    it unranked for those who stay (or for the one who left).
+  - **A bot takes your seat** (a new id and a bot's name nobody in the match has, at `LEAVING.botSkill`, the same as
+    Squads' replacement bots) where the lobby fills seats with bots: Default and private Crowd lobbies. The seat keeps
+    its team, score, bank, power-ups and turns in a final. With Bots off, and in a private raid (people only), the seat
+    goes out instead; except in a final (a game needs both sides) and for the last one on a side (a team, or the
+    crowd against a boss), so no side is ever left with nobody to move.
+  - The resign is answered ("resigned", with what was recorded) and the socket closed; the device forgets its seat, so
+    the app opened again never puts you back. A resign sent while the connection is between tries goes again, as the
+    same seat, the moment it's back; with no answer in `LEAVING.confirmWaitMs` (4 s) the app goes home anyway and the
+    away rule does the rest. Coming back with the seat's token later: told you left ("You resigned
+    that match.", or for the away rule, "You were away from that match too long...") with "See your result".
+  - If you were the host (your device played the boss or scored), the next device takes over at once.
+- **Squads:** "Leave" was already there (a bot plays your seat for good). Now with your squad still in the bracket
+  it's resigning: a loss on your record at once, at the worst place your squad can still finish (5th-8th in Relay,
+  3rd-4th in Pairs, 2nd in the final), never the squad's later place (before, a leaver was recorded at the squad's
+  final place, so a bot squad's win went on the leaver's profile); no reward, as before. The "You resigned" screen,
+  then Queue again or Home. Before the bracket (the votes): Leave, nothing recorded (before, the squad's place was).
+  Its squad already out: Leave, its result stands.
+- **Before move 1** (the votes, the full grid's moment, a boss's entrance) it's **Leave**: home, a bot in your seat (Bots
+  off: the seat is simply gone), nothing recorded; a vote you'd cast goes with you.
+- **Already out** (cut, struck down): Leave: home; your place stands and is recorded with everyone's when the match
+  ends (your team may yet win the game).
+
+**Leaving without resigning** (a refresh, a closed tab, the back button, the app in the background):
+- **Today's grace stays:** within `LEAVING.awayMs` (120 s, the same as Bots off's waiting seats) a reload or a return
+  puts you back in your seat. Past it, you've left the match, exactly as if you'd resigned (seat to a bot, a loss).
+  This is also how an app from before this change, which never sends "resign", is handled.
+- **Nobody is held up meanwhile:** a move locks as soon as everyone still here has moved; someone away no longer makes
+  everyone wait out the clock. With nobody here at all it waits for the clock as before, so a reload doesn't cost you
+  the move.
+- **The last person out ends it:** when nobody is left in a match (everyone resigned, or gone past the grace), it ends
+  at once rather than playing on for no one: everyone's result recorded as they left it, and the lobby closes straight
+  away. The 180-minute cap is now only a safety net. Squads keeps its own rule for someone away (a bot after three
+  misses, theirs again with "Take my seat back"); its lobby ends at once, the same way, when nobody is left.
+
+**Also found and fixed: Big Boy's Big Bounce crashed online.** The lobby server rebuilds its match from storage on
+every message, and the rebuilt match was missing the boss's memo (and a few other fields a new match starts with). Big
+Boy's Big Bounce reads that memo, so in an online raid against him the bounce threw and the raid stalled, another
+"hung session". The rebuilt match now starts with every one of them (`MatchRunner.restore`; tested in
+`packages/chess/test/bigboy.test.ts`, which fails without the fix).
+
+**Lobby codes** (following "Closing finished lobbies"). What changed:
+- A match everyone has left closes at once (it was up to 180 minutes, or until it played itself out): its code stops
+  working and is free again.
+- A private lobby nobody started closes when its last person presses Leave (it waited an hour), so its invite link
+  says "That lobby has closed."
+- A finished match's results still stay up 15 minutes for the people on them, as before.
+
+**Protocol.** Crowd's lobby: a new message each way, "resign" from the app and "resigned" back; an "error" can say
+`left` (how you left). The main lobby has no version constant, and an old app never sends "resign" (the away rule
+covers it). Squads: `SQUADS_PROTOCOL` 7 ("left" says how and what was recorded; "error" can say `left`); an older app
+is asked to reload, as for every Squads bump.
+
+**Testing.** The full lane. Unit: `packages/server/test/resign.test.ts` (resigning mid-match: the seat to a bot, the
+others play on, told how and let go, back with the token; a rated loss and the match staying ranked; Leave in the
+votes; Bots off: out, and the last of the crowd to a bot; leaving once cut; the last person out ending it and closing
+it; a reload within the grace and the away rule after it; nobody held up by someone away; resigning on the boss's turn
+as its host; resigning during Lights out; a private lobby closing when emptied; Squads: resigning mid-bracket, leaving
+in the votes, the last one out and the away case), `lobby-life.test.ts` (each ending wrapped up after the last went),
+`packages/chess/test/crowd.test.ts` (handing a seat over and retiring keep every place given once),
+`packages/app/test/faq.test.ts`. e2e `e2e/resign.spec.ts` (phone and computer): Boss alone through the "⋯" sheet and
+the flag (the confirm staying up through a move and the boss's reply, Cancel, Resign, nothing after it), a Solo 50 v
+50 (Leave in the votes, Resign mid-match), Squads (Resign, the lobby closing), and an online raid (one resigns, a bot
+takes the seat, the other plays on and hosts); every confirm checked clear of the board, the line above it, the timer
+bars and the clocks. Frame by frame (`npm run frames:resign`, phone 390 and computer 1280, light and dark, Boss alone
+and a Crowd match): the sheet and confirm never cover the board or the line above it, the board never moves, no frame
+blinks.

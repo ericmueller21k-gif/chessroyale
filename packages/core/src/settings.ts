@@ -1171,11 +1171,32 @@ export const LOBBY_LIFE = {
   lobbyIdleMinutes: 60,
   /**
    * Safety cap for a match in progress that nobody is connected to: it closes after this long without hearing from
-   * anyone. A match left to itself still plays out (no move waits for long), and the longest, a team final to its
-   * 160-turn cap, takes about an hour and a half; so a running match always reaches its results first, and this only
-   * clears one that's stuck. Never while anyone is connected.
+   * anyone. Since Oct 13 a match everyone has left wraps up as the last of them goes (LEAVING.awayMs after the last
+   * one dropped), so this only clears one that's stuck. Never while anyone is connected.
    */
   lobbyAbandonedMinutes: 180,
+} as const;
+
+/**
+ * Resigning and leaving a match (Eric, Oct 13: "we need a surrender button... for every game mode"; DECISIONS.md,
+ * "Resign: leaving a match in every mode"). Resigning in a solo game ends it at once, a loss. Online you can't end the
+ * game for everyone: you leave it, out in the last place still open (a loss on your record), and a bot plays your seat
+ * so your team isn't short (with Bots off, only where a side would be left empty, or in a final). Before move 1 it's
+ * just Leave: nothing recorded. Once the last person has gone, the lobby wraps up at once and closes, freeing its code.
+ */
+export const LEAVING = {
+  /**
+   * Someone gone from a match in progress this long (a closed tab, the back button, the app in the background, a
+   * dropped connection) has left it: as if they'd resigned (before move 1, as if they'd pressed Leave). Back within it
+   * (a reload, a quick look at another app), the seat is still theirs. The same hold as Bots off's waiting seats
+   * (MATCHMAKING.botsOffSeatHoldMs). In Squads it only decides when nobody is left at all: someone away there keeps
+   * Squads' own rule (a bot after noShowsBeforeBot misses, theirs again when they're back).
+   */
+  awayMs: 120_000,
+  /** How strong the bot that takes a seat someone left plays (a temperature, as botSkillRange; Squads' replacementBotSkill is the same). */
+  botSkill: 4,
+  /** The app waits this long for the server to confirm a resign, then goes on anyway (the away rule covers the rest). */
+  confirmWaitMs: 4_000,
 } as const;
 
 /**

@@ -22,5 +22,7 @@ export interface BossLobby {
   pick(playerId: string, key: string, move: string, away?: unknown): void;
   sendTally(): void;
   roundHumans(): Human[];
+  /** Everyone the round waits for has moved (the people here: someone away doesn't hold it up). */
+  roundDone(): boolean;
   lock(): void;
 }

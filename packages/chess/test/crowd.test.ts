@@ -103,6 +103,54 @@ describe("Crowd mode", () => {
     expect(runner.leaderboard()[0]!.team).toMatch(/^[wb]$/);
   });
 
+  it("leaving (LEAVING): a seat handed to a bot keeps its team, score and turns in the final under a new id; one that goes out takes the last place still open, and every place is still given once", async () => {
+    const settings: Settings = { ...base, crowdTeams: true, finalMaxTurns: 30 };
+    const runner = new MatchRunner({
+      settings,
+      rng: mulberry32(3),
+      engines: [fake],
+      library,
+      entrants: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: i > 1, skill: 1 + (i % 20) })),
+    });
+    // Two moves in, b0 (a person) leaves: a bot takes the seat.
+    for (let i = 0; i < 2; i++) {
+      runner.deal();
+      await runner.score(new Map());
+    }
+    const seat = runner.player("b0");
+    runner.deal();
+    runner.handOver("b0", { id: "rb1", name: "Relief Rita", skill: 4 });
+    expect(runner.state.players.some((p) => p.id === "b0")).toBe(false);
+    expect(runner.player("rb1")).toMatchObject({ isBot: true, skill: 4, name: "Relief Rita", colour: seat.colour, stageScore: seat.stageScore, alive: true });
+    // (In this move's group, under its new id, if its team is moving.)
+    const group = [...runner.groups.values()][0]!;
+    expect(group.includes("b0")).toBe(false);
+    if (seat.colour === runner.boards.get(runner.state.boards[0]!)!.fen.split(" ")[1]) expect(group).toContain("rb1");
+    await runner.score(new Map());
+    // b1 (a person) leaves with nobody to take the seat: out now, last of the 100 still in.
+    expect(runner.retire("b1")).toBe(100);
+    expect(runner.player("b1")).toMatchObject({ alive: false, placement: 100 });
+    expect(runner.alive()).toHaveLength(99);
+    // The match plays on to the end: every place from 1 to 100 given exactly once.
+    while (!runner.isFinal()) {
+      runner.deal();
+      await runner.score(new Map());
+      if (runner.stageComplete()) runner.endStage();
+    }
+    while (!runner.stageComplete()) {
+      runner.deal();
+      await runner.score(new Map());
+      runner.afterFinalTurn();
+    }
+    runner.finishFinal();
+    expect(runner.isOver()).toBe(true);
+    expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+    // Before move 1, a seat nobody takes is simply gone.
+    const early = new MatchRunner({ settings, rng: mulberry32(4), engines: [fake], library, entrants: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: i > 0 })) });
+    early.withdraw("b0");
+    expect(early.state.players).toHaveLength(99);
+  });
+
   it("50 v 50 duel: the best of each side play 1v1; the game's winner places first", async () => {
     const settings: Settings = { ...base, crowdTeams: true, finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel, finalMaxTurns: 40 };
     const { runner, sizes } = await playKnockouts(settings, 3);

@@ -158,8 +158,25 @@ export type Phase =
    * Hollow's Lights out, at the start of his turn (the clocks stopped), before his move.
    */
   | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView }
-  /** `gameWinner`: Crowd, who won the game on the board (null for a draw). `bossResult`: who won a boss battle. */
-  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw" };
+  /**
+   * `gameWinner`: Crowd, who won the game on the board (null for a draw). `bossResult`: who won a boss battle. `left`:
+   * you left before the end (see GameView.resign): you resigned (a loss; `bot`: online, a bot plays your seat), or you
+   * left once you were already out (your place as it stood; the winner isn't known).
+   */
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult };
+
+/** How you left a match before its end (the results screen says so). */
+export interface LeftResult {
+  how: "resigned" | "out";
+  /** Online: a bot took your seat (else the match went on without it). */
+  bot?: boolean;
+}
+
+/**
+ * Leaving the match (settings.ts, LEAVING): "resign" while the match is on and you're in it (a loss); "leave" before
+ * move 1, or once you're out (nothing changes on your record).
+ */
+export type ExitKind = "resign" | "leave";
 
 export interface GameView {
   readonly settings: Settings;
@@ -244,6 +261,18 @@ export interface GameView {
   readonly chat?: MatchChat;
   /** It counts for your ranking (at least 30% real players; never solo). Null or missing: not known (yet). */
   readonly ranked?: boolean | null;
+  /** What leaving means now (null: nothing to leave: the results, or still connecting). */
+  readonly exit: ExitKind | null;
+  /** Leaving goes straight home, with no results screen (before move 1; online, once you're out). */
+  readonly exitHome: boolean;
+  /** Online: a bot takes the seat you leave (the lobby fills seats with bots); else the match goes on without it. */
+  readonly seatToBot?: boolean;
+  /**
+   * Resign (or leave: see `exit`). Solo: the match stops here (every timer, engine search and worker with it) and the
+   * results show at once. Online: the server takes you out of the match (a bot in your seat) and its answer brings the
+   * results; the others play on.
+   */
+  resign(): void;
 }
 
 /** Crowd 50 v 50: your team (the side you play all match), if you have one. */
