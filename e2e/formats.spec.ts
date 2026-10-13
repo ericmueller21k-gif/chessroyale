@@ -66,16 +66,22 @@ test("pre-game votes: the cards vote too; the winners set the ending and the clo
   // Vote 2: tap the Bullet card.
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("radio", { name: /Bullet/ }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(2);
+  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(0);
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.vote?.result ?? null), { timeout: 15_000 }).not.toBeNull();
   const result: number = await page.evaluate(() => (window as any).match.phase.vote.result);
   await expect.poll(() => phase(page), { timeout: 20_000 }).toMatch(/play|watching/);
-  // The game's clock is the winning speed's: Normal 20 s, Variable 10 s on move 1 (then rising), Bullet 10 s.
+  // The game's clock is the winning time control's: Bullet 3+2 (10 s a move at most), Blitz 5+3 (15 s), Rapid 10+5
+  // (20 s). Everyone's bank starts at its minutes (yours too, until your first move).
   const clock = await page.evaluate(() => {
     const r = (window as any).match.runner;
-    return { now: r.moveClock(), steps: r.settings.moveClockSteps.length };
+    const me = r.player("you");
+    return { cap: r.moveClock(), bank: r.settings.timeBankSeconds, increment: r.settings.timeIncrementSeconds, mine: me.movesTimed ? null : me.bankMs };
   });
-  expect(clock).toEqual([{ now: 20, steps: 0 }, { now: 10, steps: 5 }, { now: 10, steps: 0 }][result]);
+  expect(clock).toEqual([
+    { cap: 10, bank: 180, increment: 2, mine: 180_000 },
+    { cap: 15, bank: 300, increment: 3, mine: 300_000 },
+    { cap: 20, bank: 600, increment: 5, mine: 600_000 },
+  ][result]);
 });
 
 test("team final: the top 8 play 4v4, the weakest on each side go out, everyone is placed", async ({ page }) => {

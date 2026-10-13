@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, BOSS_TIERS, VARIABLE_CLOCK, clockStepRanges, speedOption } from "@chessroyale/core";
+import { CROWD_SETTINGS as C, DEFAULT_SETTINGS as S, MAX_OPENING_MOVES, RAID_SETTINGS as R, BOSS_TIERS, PREGAME_VOTES } from "@chessroyale/core";
 import { InstallCard } from "../components/InstallCard.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
@@ -41,34 +41,12 @@ function store(key: string, value: string) {
   }
 }
 
-/** The Variable speed's clock, move by move: one row per step of VARIABLE_CLOCK. */
-export function ClockBreakdown() {
-  return (
-    <table class="fd-clock-steps" aria-label="The Variable speed's clock">
-      <thead>
-        <tr>
-          <th scope="col">Moves</th>
-          <th scope="col">Time a move</th>
-        </tr>
-      </thead>
-      <tbody>
-        {clockStepRanges(VARIABLE_CLOCK).map((r) => (
-          <tr key={r.from}>
-            <td>{r.to === null ? `${r.from} on` : r.to === r.from ? `${r.from}` : `${r.from}–${r.to}`}</td>
-            <td>{r.seconds} s</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
 /** How each mode works, in plain words (moved here from the old home screen). */
 export function HowToPlay() {
   const LOW = BOSS_TIERS[0]!;
   const HIGH = BOSS_TIERS[BOSS_TIERS.length - 1]!;
-  const normal = speedOption("normal")!.patch.moveClockSeconds;
-  const bullet = speedOption("bullet")!.patch.moveClockSeconds;
+  // The clock vote's time controls, from the vote's own data.
+  const speed = PREGAME_VOTES.find((v) => v.id === "speed")!;
   return (
     <div class="fd-rules">
       <h3>Crowd · 50 v 50</h3>
@@ -95,11 +73,10 @@ export function HowToPlay() {
           your record; your own move quality places you.
         </li>
         <li>
-          <strong>Then the speed.</strong> Normal: {normal} s a move. Bullet: {bullet} s a move. Variable: the clock starts short and grows as
-          the game goes on, so the quick opening moves are quick and the hard ones later get more time. A move is the number at the top of the
-          screen (White's move and Black's reply are the same move):
-          <ClockBreakdown />
-          Nobody votes? Variable.
+          <strong>Then the clock: a chess time control.</strong> {speed.options.map((o) => `${o.label} (${o.blurb})`).join(", ")}. Your
+          minutes last the whole game and every move adds its seconds as it starts; what a quick move doesn't use stays in your bank, as on a
+          chess clock. No move can go past its cap, because your whole team picks together. Nobody votes?{" "}
+          {speed.options[speed.defaultOption]!.label}.
         </li>
       </ol>
       <h3>Boss raid</h3>

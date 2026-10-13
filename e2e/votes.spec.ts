@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
-import { BOARD_SEL, soloFromHome, test } from "./helpers.ts";
+import { Chess } from "chess.js";
+import { BOARD_SEL, createLobbyFromHome, soloFromHome, test } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const centre = async (p: Page, sel: string, nth = 0) => {
@@ -113,11 +114,11 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
   await expect(page.getByRole("radio", { name: /Duel/ })).toBeDisabled();
   await expect(page.locator(".vote-banner")).toBeVisible({ timeout: 15_000 });
 
-  // The second vote: everyone back on their spot (yours too), and the speeds left to right.
+  // The second vote: everyone back on their spot (yours too), and the time controls left to right.
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 10_000 });
   // (In the page's order; from Black's side they show mirrored, like the zones.)
-  await expect(page.locator(".vote-card strong")).toHaveText(["Normal", "Variable", "Bullet"]);
-  await expect(page.locator(".vote-card-blurb").nth(1)).toHaveText("10 s, rising to 30 s");
+  await expect(page.locator(".vote-card strong")).toHaveText(["Bullet 3+2", "Blitz 5+3", "Rapid 10+5"]);
+  await expect(page.locator(".vote-card-blurb")).toHaveText(["3 min + 2 s a move · max 10 s", "5 min + 3 s a move · max 15 s", "10 min + 5 s a move · max 20 s"]);
   await expect.poll(async () => {
     const c = await centre(page, ".vote-me");
     return Math.hypot(c.x - start.x, c.y - start.y);
@@ -156,9 +157,9 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
   await expect(page.locator(BOARD_SEL.piece)).toHaveCount(32);
   await expect(page.locator(".vote-pawn")).toHaveCount(0);
   expect(await boardBox(page)).toEqual(voteBoard);
-  // The clock is the voted speed's: Normal 20 s, Variable 10 s on move 1, Bullet 10 s.
+  // The clock is the voted time control's cap: Bullet 10 s, Blitz 15 s, Rapid 20 s.
   const clock = await page.evaluate(() => (window as any).match.runner.moveClock());
-  expect([10, 20]).toContain(clock);
+  expect([10, 15, 20]).toContain(clock);
 });
 
 test("time's up: whoever didn't vote (you, and a few bots) walks to the winner, then the banner names it", async ({ page }) => {
@@ -216,41 +217,84 @@ test("time's up: whoever didn't vote (you, and a few bots) walks to the winner, 
   expect(await page.evaluate(() => (window as any).match.myVote)).toBe(atEnd.result);
 });
 
-test("the Variable speed: 10 s a move for moves 1-5, then 15 s from move 6, shown above the board", async ({ page }) => {
-  test.setTimeout(4 * 60_000);
+/** The bank as the board's clock writes it (RaceTower's clockText). */
+const clockText = (ms: number) => {
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+};
+
+/** Your move's clock is running: what the screen and the rules say, read at one moment. */
+const yourMove = (page: Page) =>
+  page.evaluate(() => {
+    const m = (window as any).match;
+    const me = m.standings().find((x: any) => x.isYou);
+    return {
+      fen: m.phase.board.fen as string,
+      allowed: m.phase.allowedMs as number,
+      increment: m.settings.timeIncrementSeconds as number,
+      bank: me.bankMs as number,
+      inMove: Date.now() - m.phase.startsAt,
+      shown: document.querySelector(".board-area .bc-bank")?.textContent ?? "",
+    };
+  });
+
+/** A legal move in this position (worked out by the test, not on your clock). */
+const anyMove = (fen: string) => {
+  const m = new Chess(fen).moves({ verbose: true })[0]!;
+  return m.from + m.to + (m.promotion ?? "");
+};
+
+/** Waits for your own move with its clock running (the other team's turn comes first when you play Black). */
+const waitForYourMove = (page: Page, timeout = 60_000) =>
+  expect
+    .poll(() => page.evaluate(() => (window as any).match?.phase.kind === "play" && Date.now() > (window as any).match.phase.startsAt + 200).catch(() => false), { timeout })
+    .toBe(true);
+
+test("a time control (Bullet 3+2): a 3:00 bank, +2 s each move kept when the move is quicker, at most 10 s a move", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  // (No votes: the ending and the speed from the address.)
-  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&speed=variable");
+  // (No votes: the ending and the time control from the address.)
+  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&speed=bullet");
   await soloFromHome(page);
-  const seen = new Map<number, { note: string; up: boolean; allowed: number }>();
-  const stopAt = Date.now() + 3.5 * 60_000;
-  while (Date.now() < stopAt && !seen.has(6)) {
-    if ((await phase(page)) === "play") {
-      const now = await page
-        .evaluate(() => {
-          const m = (window as any).match;
-          if (m.phase.kind !== "play") return null;
-          const note = document.querySelector(".clock-note");
-          return { move: Number(m.phase.board.fen.split(" ")[5]), note: note?.textContent ?? "", up: !!note?.classList.contains("up"), allowed: m.phase.allowedMs, fen: m.phase.board.fen };
-        })
-        .catch(() => null);
-      if (now && now.note && !seen.has(now.move)) {
-        seen.set(now.move, { note: now.note, up: now.up, allowed: now.allowed });
-        // (Move 6 stays on screen, to look at.)
-        if (now.move === 6) break;
-        // Any legal move: the clock is what's tested.
-        await page.evaluate((fen) => {
-          const m = (window as any).match;
-          const move = [...(m.runner.planned?.values() ?? [])][0];
-          if (m.phase.kind === "play" && m.phase.board.fen === fen) m.submit(move ?? null);
-        }, now.fen);
-      }
-    }
-    await page.waitForTimeout(150);
-  }
-  expect(seen.get(1)).toEqual({ note: "⏱ 10 s", up: false, allowed: 10_000 });
-  expect(seen.get(5)?.allowed).toBe(10_000);
-  // Move 6: more time, and it says so (lit, with a ▲) for that move.
-  expect(seen.get(6)).toEqual({ note: "⏱ 15 s ▲", up: true, allowed: 15_000 });
-  await expect(page.locator(".clock-note.up")).toBeVisible();
+  await waitForYourMove(page);
+  const first = await yourMove(page);
+  const note = await page.locator(".clock-note").textContent();
+  await page.evaluate((uci) => (window as any).match.submit(uci), anyMove(first.fen));
+  // A fresh 3:00 bank leaves the whole 10 s cap, and the board's clock runs the bank down from 3:02 (the bank and this
+  // move's 2 s) as you think.
+  expect([first.bank, first.allowed, first.increment, note]).toEqual([180_000, 10_000, 2, "⏱ 10 s"]);
+  expect([clockText(182_000 - first.inMove), clockText(182_000 - first.inMove + 200)]).toContain(first.shown);
+  // The move took well under 2 s: what it didn't use of the 2 s is in the bank now.
+  await expect.poll(() => page.evaluate(() => (window as any).match.runner.player("you").movesTimed), { timeout: 30_000 }).toBe(1);
+  const after = await page.evaluate(() => {
+    const p = (window as any).match.runner.player("you");
+    return { bank: p.bankMs as number, think: p.thinkMsTotal as number };
+  });
+  expect(after.think).toBeLessThan(2_000);
+  expect(after.bank).toBe(182_000 - after.think);
+  // The next move starts from that bank (the scoreboard's), with 2 s more, still at most 10 s.
+  await expect.poll(() => page.evaluate(() => (window as any).match.phase.kind).catch(() => ""), { timeout: 30_000 }).not.toBe("play");
+  await waitForYourMove(page);
+  const second = await yourMove(page);
+  expect([second.bank, second.allowed]).toEqual([after.bank, 10_000]);
+  expect([clockText(after.bank + 2_000 - second.inMove), clockText(after.bank + 2_000 - second.inMove + 200)]).toContain(second.shown);
+});
+
+test("online, the time control's increment comes with each move (an app that started with another's has it too)", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  // A lobby of one and 99 bots, on Bullet 3+2 (no votes: from the address).
+  await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&speed=bullet");
+  await createLobbyFromHome(page);
+  await expect.poll(() => page.evaluate(() => !!(window as any).match?.code), { timeout: 30_000 }).toBe(true);
+  // Joined from PLAY, the app only knows the Crowd's usual clock (Rapid's +5 s) until the server says otherwise.
+  await page.evaluate(() => {
+    const m = (window as any).match;
+    m.settings = { ...m.settings, timeIncrementSeconds: 5, timeBankSeconds: 600, moveClockSeconds: 20 };
+  });
+  await page.getByRole("button", { name: /Start with 1 player/ }).click();
+  await waitForYourMove(page, 90_000);
+  const now = await yourMove(page);
+  expect([now.bank, now.allowed, now.increment]).toEqual([180_000, 10_000, 2]);
+  expect([clockText(182_000 - now.inMove), clockText(182_000 - now.inMove + 200)]).toContain(now.shown);
 });

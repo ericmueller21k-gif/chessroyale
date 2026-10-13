@@ -4,6 +4,7 @@ import {
   openingPlies,
   allowedMs,
   applyRound,
+  startBanks,
   assignColours,
   assignGroups,
   botChoose,
@@ -483,9 +484,13 @@ export class MatchRunner {
     return { ...this.settings, moveClockSeconds: this.moveClock(), moveClockSteps: [] };
   }
 
-  /** Pre-game votes: settings from the winning options (how it ends, the clock) for the rest of the match. */
+  /**
+   * Pre-game votes: settings from the winning options (how it ends, the clock) for the rest of the match. A time
+   * control (the clock vote) also sets the bank everyone starts with, as long as no move has been played.
+   */
   patchSettings(patch: Partial<Settings>): void {
     this.opts.settings = { ...this.opts.settings, ...patch };
+    if (patch.timeBankSeconds !== undefined) this.state = startBanks(this.state, this.settings);
   }
 
   private replaceBoard(id: number): void {

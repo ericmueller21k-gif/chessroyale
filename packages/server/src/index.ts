@@ -207,7 +207,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
           const f = url.searchParams.get("format") as FinalFormat | null;
           return mode === "crowd" && f && f in CROWD_KNOCKOUTS ? { finalFormat: f, knockoutsPerStage: CROWD_KNOCKOUTS[f], augments: false } : {};
         })(),
-        // ?speed=normal|variable|bullet: that speed (for testing, with ?format=; a stale "slow" is Normal).
+        // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
         ...(mode === "crowd" ? (speedOption(url.searchParams.get("speed"))?.patch ?? {}) : {}),
       };
       // ?keep=SECONDS: its results stay up this long (5 s up to the usual 15 minutes), for tests.

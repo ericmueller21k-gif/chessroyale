@@ -427,8 +427,11 @@ export class NetMatch implements GameView {
         this.roundsPlayed = m.round;
         this.standingsList = m.standings;
         this.cutoff = m.cutoff;
-        // This move's clock (the server works it out move by move: the Variable speed's rises as the game goes on).
+        // This move's clock (the server works it out move by move) and the time control's increment, which the bank
+        // on screen adds as your move starts (the clock vote sets both: they're sent with every round, so a reload
+        // mid-match has them too).
         if (m.moveClock) this.settings = { ...this.settings, moveClockSeconds: m.moveClock, moveClockSteps: [] };
+        if (m.increment !== undefined) this.settings = { ...this.settings, timeIncrementSeconds: m.increment };
         if (m.board && m.watching) {
           // Crowd 50 v 50: the other team is choosing.
           this.currentBoard = m.board;

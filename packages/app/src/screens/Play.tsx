@@ -37,9 +37,9 @@ function useNow(ms = 200) {
 const clockSeen = new WeakMap<object, number>();
 
 /**
- * This move's clock, above the board ("⏱ 15 s"). When it has gone up since your last move (the Variable speed: 10 s
- * for moves 1-5, then 5 s more every 5 moves), it's lit for that move, with a ▲, so the change is noticed without
- * anything over the board.
+ * This move's clock, above the board ("⏱ 15 s"). When it has gone up since your last move (a rising schedule,
+ * moveClockSteps, or the cut's clock vote; neither is on today), it's lit for that move, with a ▲, so the change is
+ * noticed without anything over the board.
  */
 export function ClockNote({ match, seconds }: { match: GameView; seconds: number }) {
   const [up] = useState(() => {

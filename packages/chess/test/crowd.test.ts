@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_TIERS, bossDef, isPlayable, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, VARIABLE_CLOCK, type Settings } from "@chessroyale/core";
+import { BOSS_TIERS, bossDef, isPlayable, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
 import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, withoutPiece, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
@@ -331,8 +331,57 @@ describe("Crowd mode", () => {
     }
   });
 
-  it("the Variable speed: each move's clock follows the move number, bots think within it, and the boss battle counts on", async () => {
-    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4, moveClockSteps: VARIABLE_CLOCK };
+  it("the clock vote's time control: every bank starts at its bank (only before move 1), every move's cap is its own, bots think within it", async () => {
+    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4 };
+    const runner = new MatchRunner({
+      settings,
+      rng: mulberry32(11),
+      engines: [fake],
+      library,
+      entrants: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 1 + (i % 20) })),
+    });
+    const [bullet, , rapid] = PREGAME_VOTES.find((v) => v.id === "speed")!.options;
+    // Made with the default bank (Rapid's 10:00); Bullet wins the vote before move 1: everyone's bank is 3:00.
+    expect(new Set(runner.state.players.map((p) => p.bankMs))).toEqual(new Set([600_000]));
+    runner.patchSettings(bullet!.patch);
+    expect(new Set(runner.state.players.map((p) => p.bankMs))).toEqual(new Set([180_000]));
+    // Patches without a bank (how it ends) leave the banks alone.
+    runner.patchSettings({ finalFormat: "boss" });
+    expect(new Set(runner.state.players.map((p) => p.bankMs))).toEqual(new Set([180_000]));
+    let rounds = 0;
+    while (!runner.isFinal()) {
+      runner.deal();
+      expect(runner.moveClock()).toBe(10);
+      const ids = [...runner.groups.values()][0]!;
+      for (const id of ids) expect(runner.allowedMsFor(id)).toBe(Math.min(10_000, runner.player(id).bankMs + 2_000));
+      // Bots spread out within 85% of the 10 s cap, never on the buzzer.
+      expect(Math.max(...Object.values(runner.botThinkTimes()))).toBeLessThanOrEqual(8_500);
+      await runner.score(new Map());
+      if (runner.stageComplete()) runner.endStage();
+      rounds++;
+    }
+    expect(rounds).toBe(40);
+    // Each bot paid what it thought beyond the 2 s increment, never more than 8 s a move, from its 3:00.
+    for (const p of runner.state.players.filter((x) => x.movesTimed > 0)) {
+      expect(p.bankMs).toBe(Math.max(0, 180_000 + p.movesTimed * 2_000 - p.thinkMsTotal));
+    }
+    // The boss battle keeps the cap. And once moves are played, another time control never resets a bank.
+    runner.deal();
+    expect(runner.moveClock()).toBe(10);
+    const before = runner.state.players.map((p) => p.bankMs);
+    runner.patchSettings(rapid!.patch);
+    expect(runner.state.players.map((p) => p.bankMs)).toEqual(before);
+  });
+
+  it("a rising move clock (moveClockSteps; no option has one today) follows the move number, and the boss battle counts on", async () => {
+    const rising = [
+      { fromMove: 1, seconds: 10 },
+      { fromMove: 6, seconds: 15 },
+      { fromMove: 11, seconds: 20 },
+      { fromMove: 16, seconds: 25 },
+      { fromMove: 21, seconds: 30 },
+    ];
+    const settings: Settings = { ...base, crowdTeams: true, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4, moveClockSteps: rising };
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(11),

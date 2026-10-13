@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, PREGAME_VOTES, RAID_SETTINGS, VARIABLE_CLOCK, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, FRONT_DOOR, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { LAST_STAND_MS, applyMove, bossIntroTimeline, legalMoves, sanLineToUci, toSan, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -414,17 +414,20 @@ describe("lobby: Crowd mode", () => {
     L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
     const speed = PREGAME_VOTES[1]!.options[L.last("p1", "vote")!.vote.result!]!;
     L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
-    // The game starts with the voted clock: Normal 20 s, Variable's first step (10 s) or Bullet 10 s.
-    expect(L.last("p1", "round")!.moveClock).toBe({ normal: 20, variable: 10, bullet: 10 }[speed.id]);
-    expect(L.core.record.overrides?.moveClockSteps ?? []).toEqual(speed.patch.moveClockSteps);
+    // The game starts with the voted time control: its cap and increment on the round, its bank for everyone.
+    const round = L.last("p1", "round")!;
+    expect(round.moveClock).toBe({ bullet: 10, blitz: 15, rapid: 20 }[speed.id]);
+    expect(round.increment).toBe({ bullet: 2, blitz: 3, rapid: 5 }[speed.id]);
+    expect(new Set(round.standings.map((x) => x.bankMs))).toEqual(new Set([speed.patch.timeBankSeconds! * 1000]));
+    expect(L.core.record.overrides).toMatchObject(speed.patch);
   });
 
-  it("pre-game votes: nobody votes, so the default wins (Team final, then Variable) and everyone joins it", () => {
+  it("pre-game votes: nobody votes, so the default wins (Team final, then Blitz 5+3) and everyone joins it", () => {
     const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }), boardIntroSeconds: 0, voteBotSkip: 1 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
-    for (const [index, want] of [[0, "team"], [1, "variable"]] as const) {
+    for (const [index, want] of [[0, "team"], [1, "blitz"]] as const) {
       const v = L.last("p1", "vote")!.vote;
       expect(v.index).toBe(index);
       expect(v.votes).toEqual([]);
@@ -435,8 +438,60 @@ describe("lobby: Crowd mode", () => {
       expect(done.votes.every((x) => x.joined && x.option === done.result)).toBe(true);
       L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
     }
-    expect(L.core.record.overrides?.finalFormat).toBe("team");
-    expect(L.core.record.overrides?.moveClockSteps).toEqual(VARIABLE_CLOCK);
+    expect(L.core.record.overrides).toMatchObject({ finalFormat: "team", timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 });
+    const round = L.last("p1", "round")!;
+    expect([round.moveClock, round.increment, round.deadline - round.startsAt!]).toEqual([15, 3, 15_000]);
+  });
+
+  it("the clock vote online: the winner's time control sets every bank, each move's increment and cap, and survives the lobby sleeping", () => {
+    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: true }), firstStageRounds: 20, roundsPerStage: 2, boardIntroSeconds: 0, voteBotSkip: 1 });
+    L.core.connect(undefined, "Ann", "computer");
+    L.core.connect(undefined, "Bo", "phone");
+    L.core.message("p1", { t: "start" });
+    // The ending (nobody votes: Team final), then the clock: both people vote Bullet; the bots don't vote.
+    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    const v = L.last("p1", "vote")!.vote;
+    expect(v.index).toBe(1);
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "vote", key: v.key, option: 0 });
+    L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
+    const result = L.last("p1", "vote")!;
+    expect(PREGAME_VOTES[1]!.options[result.vote.result!]!.id).toBe("bullet");
+    // Everyone's bank is now Bullet's 3:00 (people and bots; the match was made with the default 10:00).
+    expect(new Set(result.standings.map((x) => x.bankMs))).toEqual(new Set([180_000]));
+    expect(L.core.record.overrides).toMatchObject({ timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10, moveClockSteps: [] });
+
+    // The Durable Object sleeps here and wakes from its record: the first move is still Bullet's.
+    const sent = new Map<string, Msg[]>();
+    let wokenNow = L.now;
+    const io = { now: () => wokenNow, send: (id: string, msg: Msg) => sent.set(id, [...(sent.get(id) ?? []), msg]) };
+    const settings = { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0 };
+    const woken = new LobbyCore(JSON.parse(JSON.stringify(L.core.save())), io, library, mulberry32(7), settings);
+    expect(woken.nextAlarm).toBe(result.vote.nextAt);
+    wokenNow = woken.nextAlarm!;
+    woken.alarm();
+    const first = (id: string) => sent.get(id)?.find((m) => m.t === "round") as Extract<Msg, { t: "round" }> | undefined;
+    expect([first("p1")?.moveClock, first("p1")?.increment]).toEqual([10, 2]);
+    expect(new Set(first("p1")!.standings.map((x) => x.bankMs))).toEqual(new Set([180_000]));
+
+    // The lobby that didn't sleep: each move's cap and increment, and a fresh bank leaves the whole cap.
+    L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
+    const movers = ["p1", "p2"].filter((id) => !L.last(id, "round")!.watching);
+    expect(movers.length).toBeGreaterThan(0);
+    for (const id of movers) {
+      const r = L.last(id, "round")!;
+      expect([r.moveClock, r.increment, r.deadline - r.startsAt!]).toEqual([10, 2, 10_000]);
+    }
+    // A quick move (1 s) banks the rest of the increment: 3:00 + 2 s - 1 s.
+    L.advance(1000);
+    for (const id of movers) {
+      const r = L.last(id, "round")!;
+      L.core.message(id, { t: "pick", key: r.key, move: legalMoves(r.board!.fen)[0]! });
+    }
+    expect(L.hostScores("p1") || L.hostScores("p2")).toBe(true);
+    const bank = (id: string) => L.last("p1", "reveal")!.standings.find((x) => x.id === id)!.bankMs;
+    for (const id of movers) expect(bank(id)).toBe(181_000);
+    for (const id of ["p1", "p2"].filter((x) => !movers.includes(x))) expect(bank(id)).toBe(180_000);
   });
 
   it("pre-game votes: one vote each (a second is ignored); with voteChangeAllowed it replaces the first", () => {
@@ -457,8 +512,12 @@ describe("lobby: Crowd mode", () => {
     }
   });
 
-  it("the Variable speed online: each move's deadline follows the schedule (10 s on move 1, 15 s on move 6)", () => {
-    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), firstStageRounds: 20, roundsPerStage: 2, boardIntroSeconds: 0, moveClockSteps: VARIABLE_CLOCK });
+  it("a rising move clock online (moveClockSteps; no option has one today): each move's deadline follows it", () => {
+    const rising = [
+      { fromMove: 1, seconds: 10 },
+      { fromMove: 6, seconds: 15 },
+    ];
+    const L = setup({ ...modeSettings("crowd", { crowdTeams: true, augments: false }), firstStageRounds: 20, roundsPerStage: 2, boardIntroSeconds: 0, moveClockSteps: rising });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
