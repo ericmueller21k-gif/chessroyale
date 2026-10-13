@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { FRONT_DOOR, SQUADS, SQUADS_LOBBY, type MercItem } from "@chessroyale/core";
-import { MERC_ITEMS, blockTargets, catchUpCoins, checkBlock, halfDuties, itemPrice, piecesOf, squadsLegalMoves, squadsVotes, type NetWallet, type SquadsEvent } from "@chessroyale/chess/squads";
+import { MERC_ITEMS, NO_ITEMS, blockTargets, catchUpCoins, checkBlock, halfDuties, itemPrice, piecesOf, squadsLegalMoves, squadsVotes, type BrilliantCandidate, type NetWallet, type SquadsEvent } from "@chessroyale/chess/squads";
 import { SquadsCore, clearTopCache, testLobbyOptions, type LiveMatch } from "../src/squads-lobby.ts";
 import { library } from "./squads-fixture.ts";
 import { squadsLobby } from "./squads-fixture.ts";
@@ -137,7 +137,7 @@ describe("Mercenary on the server: the shop", () => {
     expect(lm.m.shields[side]).toBe(1);
     expect(lm.m.blockBanks[side]).toBe(SQUADS.blocks.bankPerMatch + M.blockPoints);
     const w = L.last(solo, "wallets")!.wallets.find((x) => x.squadId === squad)!;
-    expect(w.cart).toEqual({ stockfish: 0, breather: 0, blocks: 0, shield: 0, time: 0 });
+    expect(w.cart).toEqual({ stockfish: 0, blocks: 0, shield: 0, time: 0 });
     expect(w.shop).toBeNull();
     // Everyone's match view carries both kits (counterplay).
     const view = L.all(solo, "match").filter((x) => x.match.key === lm.key).at(-1)!.match;
@@ -307,6 +307,55 @@ describe("Mercenary on the server: earning and catch-up", () => {
   }, 120_000);
 });
 
+describe("Mercenary on the server: brilliant moves", () => {
+  /** A quiet move in a middlegame the judge (here: an answer already in) rates the only good one: brilliant. */
+  const MIDDLE = "r1bq1rk1/pp2bppp/2n1pn2/2pp4/3P4/2PBPN2/PP1N1PPP/R1BQ1RK1 w - - 0 12";
+  function judged(lm: LiveMatch, side: 0 | 1, finder: string, now: number) {
+    const n = (lm.brilliantSeq = (lm.brilliantSeq ?? 0) + 1);
+    const cand: BrilliantCandidate = { board: 0, side, fen: MIDDLE, move: "a2a3", ply: 22, finders: [finder], blocked: [] };
+    const top = [
+      { move: "a2a3", expected: 0.7 },
+      { move: "h2h3", expected: 0.7 - M.brilliant.gap },
+    ];
+    (lm.brilliant ??= {})[n] = { id: `${lm.key}:b:${n}`, fen: MIDDLE, devices: [], sentAt: now, answers: {}, index: n, notBefore: now, brilliant: cand, top, how: "agreed" };
+  }
+
+  it("pays its squad 25, at most twice a match: the third still announced, with no coins; a fresh cap the next match", () => {
+    const L = squadsLobby({ seed: 5, test: { start: 0, mode: "mercenary" }, fillInMs: 0 });
+    const eric = L.join("Eric", { test: true });
+    L.advance(FRONT_DOOR.fillShowMs + 2 * VOTE_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000 + 1);
+    const lm = L.core.allMatches().find((x) => x.round === 0)!;
+    const [a, b] = lm.m.sides.map((x) => x.squadId) as [number, number];
+    const earned = (id: number) => L.core.walletsView().find((w) => w.squadId === id)!.earned;
+    const [a0, b0] = [earned(a), earned(b)];
+    L.clear();
+    // Squad a finds three brilliant moves in this match, squad b one.
+    for (const side of [0, 0, 0, 1] as const) judged(lm, side, lm.m.sides[side].seats[0]!, L.now);
+    L.core.alarm();
+    const news = L.all(eric, "coins").filter((c) => c.why === "brilliant" && c.key === lm.key);
+    expect(news.map((c) => [c.squadId, c.coins, !!c.capped])).toEqual([
+      [a, 25, false],
+      [a, 25, false],
+      [a, 0, true],
+      [b, 25, false],
+    ]);
+    expect(earned(a) - a0).toBe(2 * M.brilliant.coins);
+    expect(earned(b) - b0).toBe(M.brilliant.coins);
+    expect(lm.brilliantPaid).toEqual([2, 1]);
+    // Its next match: the cap starts again.
+    L.core.message(eric, { t: "nextRound" });
+    const next = L.core.allMatches().find((x) => x.round === 1 && x.m.sides.some((sd) => sd.squadId === a || sd.squadId === b))!;
+    const side = next.m.sides.findIndex((sd) => sd.squadId === a || sd.squadId === b) as 0 | 1;
+    const id = next.m.sides[side].squadId;
+    const before = earned(id);
+    L.clear();
+    for (let i = 0; i < 3; i++) judged(next, side, next.m.sides[side].seats[0]!, L.now);
+    L.core.alarm();
+    expect(L.all(eric, "coins").filter((c) => c.why === "brilliant" && c.key === next.key).map((c) => c.coins)).toEqual([25, 25, 0]);
+    expect(earned(id) - before).toBe(2 * M.brilliant.coins);
+  });
+});
+
 describe("squads modes on the server: a lobby in play across the deploy", () => {
   it("a match stored before the modes (no mode, free seconds, kits, coins) is read as Classic and plays on", () => {
     const L = squadsLobby({ seed: 3, test: { start: 1 }, fillInMs: 5_000 });
@@ -317,8 +366,8 @@ describe("squads modes on the server: a lobby in play across the deploy", () => 
     // What the Durable Object would have stored before: no Mercenary fields at all.
     const stored = Object.fromEntries(
       live.map((lm) => {
-        const { mode, delays, kit, stockfish, shields, assists, coins, ...m } = lm.m;
-        void [mode, delays, kit, stockfish, shields, assists, coins];
+        const { mode, kit, stockfish, shields, assists, coins, ...m } = lm.m;
+        void [mode, kit, stockfish, shields, assists, coins];
         return [lm.key, { ...lm, m: m as LiveMatch["m"] }];
       }),
     );
@@ -336,5 +385,32 @@ describe("squads modes on the server: a lobby in play across the deploy", () => 
     restarted.message(tess, { t: "sync" });
     expect(restarted.lobbyView("all").wallets).toEqual([]);
   });
-});
 
+  it("a lobby stored with the Breather (before Oct 13): a breather in an open shop's cart refunded, nothing crashes", () => {
+    const L = squadsLobby({ seed: 3, test: { start: 1, mode: "mercenary" }, fillInMs: 0 });
+    const tess = L.join("Tess", { test: true });
+    L.advance(FRONT_DOOR.fillShowMs + 2 * VOTE_MS + 1);
+    expect(L.core.walletsView().some((w) => w.shop)).toBe(true);
+    // What the Durable Object would have stored: Tess's squad with a breather in its cart (150, before the step), a
+    // match carrying the old per-side free seconds.
+    const sq = L.core.record.squads.find((x) => x.players.some((p) => p.id === tess))!.id;
+    const record = structuredClone(L.core.record);
+    const w = record.wallets![sq]!;
+    record.wallets![sq] = { ...w, coins: w.coins - 150, bought: { ...w.bought, breather: 1 }, cart: { ...w.cart, breather: 1 } } as typeof w;
+    const stored = Object.fromEntries(L.core.allMatches().map((lm) => [lm.key, { ...structuredClone(lm), m: { ...structuredClone(lm.m), delays: [lm.m.delayMs, lm.m.delayMs] } as LiveMatch["m"] }]));
+    const restarted = new SquadsCore(record, stored, L.io, library);
+    const mine = restarted.walletsView().find((x) => x.squadId === sq)!;
+    expect(mine.coins).toBe(w.coins);
+    expect(mine.cart).toEqual(NO_ITEMS);
+    expect(Object.keys(mine.bought).sort()).toEqual([...MERC_ITEMS].sort());
+    for (const lm of restarted.allMatches()) expect("delays" in lm.m).toBe(false);
+    // It plays on to the next match's kit: halves resolve, the views build.
+    for (let i = 0; i < 200 && !restarted.allMatches().some((lm) => lm.m.kit); i++) {
+      L.now = (restarted.nextAlarm ?? L.now + 1000) + 1;
+      restarted.alarm();
+    }
+    expect(restarted.allMatches().some((lm) => lm.m.kit)).toBe(true);
+    restarted.message(tess, { t: "sync" });
+    expect(restarted.lobbyView("all").wallets.length).toBeGreaterThan(0);
+  });
+});

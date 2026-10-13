@@ -209,17 +209,16 @@ The original mode (${S.lobbySize} players on ${n(S.lobbySize / S.groupSize, "boa
 /** Squads' Mercenary mode: earning, the shop, the items, every number from settings. */
 function mercenary(Q: SquadsSettings): string {
   const M = Q.mercenary;
-  const free = Q.clocks[Q.clockDefault]?.delaySeconds ?? 3;
+  const times = (k: number) => (k === 2 ? "double" : `${num(k)} times as much`);
   const item = (name: string, it: keyof typeof M.items, what: string) => `- **${name}** (${n(M.items[it].price, "coin")}, up to ${num(M.items[it].cap)} a round): ${what}`;
   return `### Squads: Mercenary {#mode-mercenary}
 
 - **One wallet per squad**, shared by its players, for the whole tournament: coins you don't spend carry on to the next round.
-- **Earning:** a capture pays by the piece taken (a pawn ${num(M.capture.p)}, a knight or bishop ${num(M.capture.n)}, a rook ${num(M.capture.r)}, a queen ${num(M.capture.q)}); a board won ${num(M.boardWin)}, ${num(M.mate)} more for a checkmate; a drawn board ${num(M.boardDraw)} to each squad; winning the match ${num(M.matchWin)}; a **brilliant move** ${num(M.brilliant.coins)} (a quiet move the engine rates the only good one, every other move about ${n(Math.round(M.brilliant.gap / Q.tokens.pawnWorth), "pawn")} worse, in a game still in the balance).
+- **Earning:** every match your squad plays pays ${n(M.played, "coin")} when it ends, win or lose, and winning it pays ${num(M.matchWin)} more: that's most of your coins. Playing well adds to it: a capture pays by the piece taken (a pawn ${num(M.capture.p)}, a knight or bishop ${num(M.capture.n)}, a rook ${num(M.capture.r)}, a queen ${num(M.capture.q)}); a board won ${num(M.boardWin)}, ${num(M.mate)} more for a checkmate; a drawn board ${num(M.boardDraw)} to each squad. Those are Relay's: with fewer boards, a board pays ${times(M.roundScale[1])} in Pairs and ${times(M.roundScale[2])} in the final, so every round is worth about the same. A **brilliant move** pays ${num(M.brilliant.coins)}, at most ${n(M.brilliant.capPerMatch, "time")} per squad per match (a quiet move the engine rates the only good one, every other move about ${n(Math.round(M.brilliant.gap / Q.tokens.pawnWorth), "pawn")} worse, in a game still in the balance).
 - **Catch-up:** when your next match is set, if your squad has earned fewer coins in the tournament than its opponent, it gets ${Math.round(M.catchUp.share * 100)}% of the difference (at most ${num(M.catchUp.max)}), so the rich don't just get richer.
 - **The shop** opens after each round for the squads still in, while you wait for the next match (the other match finishing, then the break before it), so it adds no time. Anyone on your squad can buy from the wallet, and the whole squad sees each purchase. Both squads can see each other's coins and what they've bought.
 - **Items last for your next match only:** use them or lose them. Each costs ${n(M.priceStep, "coin")} more for every one of it your squad has already bought in the tournament, and there's a limit to how many of each you can bring to one match.
 ${item("Stockfish token", "stockfish", `for one of your own decisions, your top ${num(M.stockfish.lines)} moves as arrows with their evaluations. Never the other squad's moves or replies. In Pairs only you see it; in the final your whole squad does. A move made with it is allowed help: it never counts against you.`)}
-${item("Breather", "breather", `double free seconds a move for the match (${free} s become ${num(free * M.breatherFactor)}), so your clock runs less; out of time, double the time for each move.`)}
 ${item("Block points", "blocks", `${n(M.blockPoints, "more block point")} for the match.`)}
 ${item("Shield", "shield", "cancels the next block against your squad that would take effect; they still pay for it. A block lifted anyway (by the rules above) doesn't use it.")}
 ${item("Time coin", "time", `${n(M.timeSeconds, "second")} more on your team clock as the match starts.`)}

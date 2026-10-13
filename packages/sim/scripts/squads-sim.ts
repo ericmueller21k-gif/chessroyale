@@ -37,6 +37,7 @@ import {
   choose,
   earn,
   isBrilliant,
+  brilliantPay,
   newWallet,
   squadsVotes,
   stockfishNow,
@@ -226,6 +227,9 @@ interface EconMatch {
   round: number;
   earnedGap: number;
   catchUp: number;
+  /** The poorer squad's coins over the richer's going into the match (catch-up in, before shopping); and earned before catch-up. */
+  walletRatio: number;
+  earnedRatio: number;
   poorerWon: boolean | null;
   spent: readonly [number, number];
   moreSpentWon: boolean | null;
@@ -236,6 +240,8 @@ interface EconStat {
   matches: EconMatch[];
   assists: number;
   brilliant: number;
+  /** Brilliant moves past their squad's cap for the match (announced, no coins). */
+  brilliantCapped: number;
   shielded: number;
 }
 
@@ -298,11 +304,13 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
     tokens: [],
     blocks: [],
     squadMatches: [0, 0, 0],
-    econ: { earned: [], shops: [], matches: [], assists: 0, brilliant: 0, shielded: 0 },
+    econ: { earned: [], shops: [], matches: [], assists: 0, brilliant: 0, brilliantCapped: 0, shielded: 0 },
   };
   const player = (id: string) => squads.flatMap((x) => x.players).find((p) => p.id === id)!;
   /** Coins each side of the match being played has earned so far, by source. */
   let matchEarn: [Partial<Record<CoinWhy, number>>, Partial<Record<CoinWhy, number>>] = [{}, {}];
+  /** Brilliant moves paid to each side of the match being played (at most the cap a match). */
+  let matchBrilliant: [number, number] = [0, 0];
   const addEarn = (m: SquadsMatch, side: 0 | 1, why: CoinWhy, coins: number) => {
     const id = m.sides[side].squadId;
     wallets[id] = earn(wallets[id]!, coins, why, m.round);
@@ -398,8 +406,14 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
       // Mercenary: brilliant moves, judged by this engine's top moves (the judge's job on players' devices).
       for (const cand of res.brilliant) {
         if (!isBrilliant(cand, await lab.topMoves(cand.fen), s)) continue;
-        addEarn(m, cand.side, "brilliant", s.mercenary.brilliant.coins);
         out.econ.brilliant++;
+        const pay = brilliantPay(matchBrilliant[cand.side], s);
+        if (pay.capped) {
+          out.econ.brilliantCapped++;
+          continue;
+        }
+        matchBrilliant[cand.side]++;
+        addEarn(m, cand.side, "brilliant", pay.coins);
       }
       m = res.match;
       // Same-move tokens: the judge (this engine's top moves; on players' devices in a real lobby), at once.
@@ -442,14 +456,16 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
       out.squadMatches[round] += 2;
       let planned = planMatch(plan, round, bm.index, pair, library, s);
       // Mercenary: catch-up as the match is set, then each squad's shopping (as bots shop), its kit in as it starts.
-      let econMatch: Omit<EconMatch, "poorerWon" | "moreSpentWon"> & { poorer: 0 | 1 | null } = { round, earnedGap: 0, catchUp: 0, spent: [0, 0], poorer: null };
+      let econMatch: Omit<EconMatch, "poorerWon" | "moreSpentWon"> & { poorer: 0 | 1 | null } = { round, earnedGap: 0, catchUp: 0, walletRatio: 1, earnedRatio: 1, spent: [0, 0], poorer: null };
       if (MERC && round > 0) {
         const ids = [pair[0].id, pair[1].id] as const;
         const before = [wallets[ids[0]]!.earned, wallets[ids[1]]!.earned] as const;
         const cu = catchUpCoins(before, s);
         const spent: [number, number] = [0, 0];
+        for (const i of [0, 1] as const) if (cu[i]) wallets[ids[i]] = earn(wallets[ids[i]]!, cu[i], "catch_up", round);
+        const coinsIn = [wallets[ids[0]]!.coins, wallets[ids[1]]!.coins];
+        const ratio = (x: readonly number[]) => (Math.max(...x) > 0 ? Math.min(...x) / Math.max(...x) : 1);
         const kits = ([0, 1] as const).map((i) => {
-          if (cu[i]) wallets[ids[i]] = earn(wallets[ids[i]]!, cu[i], "catch_up", round);
           const w0 = wallets[ids[i]]!;
           let w = w0;
           const bought = botShop(squadsRng(seed, "shop", ids[i], round), w0, round === 2, s);
@@ -464,9 +480,10 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
           return t.kit;
         }) as [ItemCounts, ItemCounts];
         planned = applyKits(planned, kits, s);
-        econMatch = { round, earnedGap: Math.abs(before[0] - before[1]), catchUp: Math.max(cu[0], cu[1]), spent, poorer: before[0] === before[1] ? null : before[0] < before[1] ? 0 : 1 };
+        econMatch = { round, earnedGap: Math.abs(before[0] - before[1]), catchUp: Math.max(cu[0], cu[1]), walletRatio: ratio(coinsIn), earnedRatio: ratio(before), spent, poorer: before[0] === before[1] ? null : before[0] < before[1] ? 0 : 1 };
       }
       matchEarn = [{}, {}];
+      matchBrilliant = [0, 0];
       const played = await play(planned);
       let m = played.match;
       squads = settleTeamClocks(squads, m);
@@ -759,12 +776,14 @@ if (MERC) {
   const all = results;
   const coins = (x: number) => Math.round(x).toLocaleString("en");
   const q = (xs: number[], p: number) => (xs.length ? coins(quantile(xs, p)) : "–");
+  const share = (x: number) => `${Math.round(x * 100)}%`;
+  const sumWhy = (es: readonly EconEarned[], whys: readonly CoinWhy[]) => es.reduce((t, e) => t + whys.reduce((u, w) => u + (e.byWhy[w] ?? 0), 0), 0);
   push(
     "## Mercenary: the economy",
     "",
     "Every lobby here is Mercenary. Earning: a capture by the piece taken (" +
       (["p", "n", "b", "r", "q"] as const).map((k) => `${k.toUpperCase()} ${M.capture[k]}`).join(", ") +
-      `), a board won ${M.boardWin} (a mate ${M.mate} more), drawn ${M.boardDraw} each, a match won ${M.matchWin}, a brilliant move ${M.brilliant.coins}.`,
+      `), a board won ${M.boardWin} (a mate ${M.mate} more), drawn ${M.boardDraw} each, those times ${M.roundScale.join(", ")} in Relay, Pairs and the final; a match won ${M.matchWin}, a brilliant move ${M.brilliant.coins} (at most ${M.brilliant.capPerMatch} a squad a match).`,
     `Catch-up: ${pct(M.catchUp.share)} of the earned gap to the next opponent, at most ${M.catchUp.max}. Prices: ` +
       MERC_ITEMS.map((it) => `${it} ${M.items[it].price} (cap ${M.items[it].cap})`).join(", ") +
       `, each +${M.priceStep} for every one already bought. The people's shopping is played by the bots' policy (\`botShop\`): before the final it saves everything ${pct(M.bots.saveChance)} of the time, else spends ${pct(M.bots.spend[0])}–${pct(M.bots.spend[1])} of its wallet; in the final all of it.`,
@@ -772,15 +791,29 @@ if (MERC) {
   );
   push("### Coins earned per squad per round", "", "Coins by play (catch-up apart), each squad in each match it played (Armageddon with its final).", "");
   table(
-    ["Round", "All: median", "10th–90th", "Winners: median", "Losers: median", "Captures (mean)", "Board wins", "Mates", "Draws", "Match win", "Brilliant"],
+    ["Round", "All: median", "10th–90th", "Mean", "Winners: median", "10th–90th", "Losers: median", "10th–90th", "Base: played (mean)", "Captures", "Board wins", "Mates", "Draws", "Match win", "Brilliant", "Base share"],
     [0, 1, 2].map((r) => {
       const es = all.flatMap((x) => x.econ.earned.filter((e) => e.round === r));
       const w = es.filter((e) => e.won).map((e) => e.total);
       const l = es.filter((e) => !e.won).map((e) => e.total);
       const avg = (why: CoinWhy) => coins(mean(es.map((e) => e.byWhy[why] ?? 0)));
-      return [roundNames[r]!, q(es.map((e) => e.total), 0.5), `${q(es.map((e) => e.total), 0.1)}–${q(es.map((e) => e.total), 0.9)}`, q(w, 0.5), q(l, 0.5), avg("capture"), avg("board_win"), avg("mate"), avg("board_draw"), avg("match_win"), avg("brilliant")];
+      const spread = (xs: number[]) => `${q(xs, 0.1)}–${q(xs, 0.9)}`;
+      return [roundNames[r]!, q(es.map((e) => e.total), 0.5), spread(es.map((e) => e.total)), coins(mean(es.map((e) => e.total))), q(w, 0.5), spread(w), q(l, 0.5), spread(l), avg("played"), avg("capture"), avg("board_win"), avg("mate"), avg("board_draw"), avg("match_win"), avg("brilliant"), share(sumWhy(es, ["played", "match_win"]) / Math.max(1, es.reduce((t, e) => t + e.total, 0)))];
     }),
   );
+  {
+    // What a round's coins buy (Eric, Oct 13): a Stockfish token, a time reload and a block or shield; a very good round
+    // a second token too. (The reload at Eric's Time chip prices, 25 + 25 + 50, in the next change.)
+    const RELOAD = 100;
+    const basket = M.items.stockfish.price + RELOAD + Math.min(M.items.shield.price, M.items.blocks.price);
+    const more = basket + M.items.stockfish.price + M.priceStep;
+    const won = all.flatMap((x) => x.econ.earned.filter((e) => e.won && e.round < 2)).map((e) => e.total);
+    push(
+      "",
+      `Winners' rounds before a shop (Relay and Pairs): ${pct(won.filter((t) => t >= basket).length / Math.max(1, won.length))} earned at least ${coins(basket)} (a Stockfish token, a time reload of ${RELOAD} and a shield or block points), ${pct(won.filter((t) => t >= more).length / Math.max(1, won.length))} at least ${coins(more)} (a second token too).`,
+      "",
+    );
+  }
   push("### The shop", "", "Each squad still in, as it shops for its next match: its wallet (catch-up included), what it spent, how many items it bought, saved everything, and items at their cap.", "");
   table(
     ["Shopping for", "Wallet: median", "10th–90th", "Spent: median", "Items bought (mean)", "Saved everything", "Items at their cap (mean)"],
@@ -797,19 +830,20 @@ if (MERC) {
       return [roundNames[r]!, ...MERC_ITEMS.map((it) => f1(mean(ss.map((e) => e.bought.filter((b) => b === it).length))))];
     }),
   );
-  push("### Catch-up and snowballing", "", "Matches of round 2 and the final: the squads' earned gap before catch-up, the catch-up paid, how often the squad that had earned less won, and how often the squad that spent more won.", "");
+  push("### Catch-up and snowballing", "", "Matches of round 2 and the final: the squads' earned gap before catch-up, the catch-up paid, the poorer squad's coins as a share of the richer's going into the match (earned before catch-up; wallets with it, before shopping), how often the squad that had earned less won, and how often the squad that spent more won.", "");
   table(
-    ["Round", "Matches", "Earned gap: median", "Catch-up: median", "The poorer squad won", "The squad that spent more won"],
+    ["Round", "Matches", "Earned gap: median", "Catch-up: median", "Earned, poorer ÷ richer: median", "Wallets, poorer ÷ richer: median", "10th percentile", "Under 2/3", "The poorer squad won", "The squad that spent more won"],
     [1, 2].map((r) => {
       const ms = all.flatMap((x) => x.econ.matches.filter((e) => e.round === r));
       const poorer = ms.filter((m) => m.poorerWon !== null);
       const spent = ms.filter((m) => m.moreSpentWon !== null);
-      return [roundNames[r]!, String(ms.length), q(ms.map((m) => m.earnedGap), 0.5), q(ms.map((m) => m.catchUp), 0.5), `${pct(poorer.filter((m) => m.poorerWon).length / Math.max(1, poorer.length))} of ${poorer.length}`, `${pct(spent.filter((m) => m.moreSpentWon).length / Math.max(1, spent.length))} of ${spent.length}`];
+      const wr = ms.map((m) => m.walletRatio);
+      return [roundNames[r]!, String(ms.length), q(ms.map((m) => m.earnedGap), 0.5), q(ms.map((m) => m.catchUp), 0.5), ms.length ? share(quantile(ms.map((m) => m.earnedRatio), 0.5)) : "–", wr.length ? share(quantile(wr, 0.5)) : "–", wr.length ? share(quantile(wr, 0.1)) : "–", pct(wr.filter((x) => x < 2 / 3).length / Math.max(1, wr.length)), `${pct(poorer.filter((m) => m.poorerWon).length / Math.max(1, poorer.length))} of ${poorer.length}`, `${pct(spent.filter((m) => m.moreSpentWon).length / Math.max(1, spent.length))} of ${spent.length}`];
     }),
   );
   const sm = Math.max(1, all.reduce((t, x) => t + x.squadMatches[1] + x.squadMatches[2], 0));
   push(
-    `Per squad per match of round 2 and the final: ${f1(all.reduce((t, x) => t + x.econ.assists, 0) / sm)} Stockfish tokens used, ${f1(all.reduce((t, x) => t + x.econ.shielded, 0) / sm)} blocks shielded. Brilliant moves: ${f1(all.reduce((t, x) => t + x.econ.brilliant, 0) / all.length)} a lobby.`,
+    `Per squad per match of round 2 and the final: ${f1(all.reduce((t, x) => t + x.econ.assists, 0) / sm)} Stockfish tokens used, ${f1(all.reduce((t, x) => t + x.econ.shielded, 0) / sm)} blocks shielded. Brilliant moves: ${f1(all.reduce((t, x) => t + x.econ.brilliant, 0) / all.length)} a lobby (past the cap, unpaid: ${all.reduce((t, x) => t + x.econ.brilliantCapped, 0)} in all).`,
     "",
   );
 }

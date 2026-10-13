@@ -1,4 +1,4 @@
-import type { ItemLook, MercItem } from "@chessroyale/core";
+import { SQUADS, type ItemLook, type MercItem } from "@chessroyale/core";
 import { toSan, type MoveScore } from "@chessroyale/chess";
 import {
   SQUADS_PROTOCOL,
@@ -606,7 +606,9 @@ export class SquadsClient {
           const m = this.matches.get(msg.key);
           const who = (msg.by ?? []).map((id) => (id === this.myId ? "you" : this.nameOf(id))).join(" and ");
           const san = m && msg.move ? sanBefore(m, msg.board, msg.move) : (msg.move ?? "");
-          this.banner = { key: msg.key, board: msg.board, at: Date.now(), kind: "brilliant", text: `Brilliant! ${san}${who ? ` by ${who}` : ""}: +${coinText(msg.coins)} coins for ${squadName(msg.squadId)}` };
+          // (Past the squad's cap for the match: still a brilliant move, but no coins.)
+          const pay = msg.capped ? `no coins (cap of ${SQUADS.mercenary.brilliant.capPerMatch} a match reached)` : `+${coinText(msg.coins)} coins for ${squadName(msg.squadId)}`;
+          this.banner = { key: msg.key, board: msg.board, at: Date.now(), kind: "brilliant", text: `Brilliant! ${san}${who ? ` by ${who}` : ""}: ${pay}` };
         }
         break;
       }
@@ -783,7 +785,7 @@ export class SquadsClient {
     }
     const d = this.myId ? dutyOf(m, this.myId) : null;
     if (!d || m.locked.includes(this.myId!)) return;
-    const free = freeMs(m, d.duty.side);
+    const free = freeMs(m);
     const left = m.current.startedAt + free - now;
     const secs = Math.ceil(left / 1000);
     if (left <= 0 || secs > TICK_FREE_FROM || secs >= Math.ceil(free / 1000)) return;

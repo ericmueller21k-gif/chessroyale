@@ -87,18 +87,25 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
 - **Mercenary** (`mercenary.ts`; numbers `SQUADS.mercenary`; the calibration `reports/squads-mercenary.md`):
   - **The wallet.** One per squad for the tournament, shared by its players (`Wallet`: coins, `earned` by play and by
     round, catch-up, what it has `bought` this tournament, its `cart` for the next match). Coins left carry on.
-  - **Earning.** The match's rules emit "coins" events (a Mercenary match only): a capture by the piece taken (en
-    passant a pawn), a board won and more for a mate, a drawn board to each side, the match won. A **brilliant move**
+  - **Earning** (Eric, Oct 13: shaped like CS's or Valorant's economy, a steady base with play on top). The match's
+    rules emit "coins" events (a Mercenary match only): the base, `played`, to both squads as a match ends (most of the
+    coins; a drawn final's Armageddon doesn't pay it again) and the match won; on top, a capture by the piece taken (en
+    passant a pawn), a board won and more for a mate, a drawn board to each side. A board's coins are
+    multiplied by `roundScale` (Relay ×1, Pairs ×2, the final ×4: fewer boards, more each), so every round pays a
+    squad about the same (Eric, Oct 13: 500-800 a round on average). A **brilliant move**
     (`brilliantCandidate`, then `isBrilliant` over the judge's top moves): a quiet move (no capture, not out of check),
     from ply `brilliant.fromPly`, the best by `brilliant.gap` of expected score over every other move in a position
-    still in the balance, found without a Stockfish token. **Catch-up** (`catchUpCoins`) as a match of round 2 or the
+    still in the balance, found without a Stockfish token. It pays `brilliant.coins` (25) at most
+    `brilliant.capPerMatch` (2) times per squad per match (`brilliantPay`; the lobby counts them in the match's
+    `brilliantPaid`, Armageddon with its final); past that it's announced with no coins. **Catch-up** (`catchUpCoins`) as a match of round 2 or the
     final is set: the squad that has earned less by play gets a share of the gap (spending never counts).
   - **The shop.** Open from a squad's match's end until its next match's first half (the wait that's there anyway),
     for squads still in, never before round 1. `buyItem`/`unbuyItem`: each item's price rises by `priceStep` for every
     one bought before this tournament (`itemPrice`); at most `items[x].cap` in one cart. `takeCart` as the match starts:
-    the cart becomes the match's kit (`applyKits`): time coins into the team bank, block points into the block bank, a
-    breather multiplying the side's free seconds (`delays`, `delayOf`: the drain, and sudden death's time a move),
-    Stockfish tokens and shields. A drawn final's Armageddon carries the final's on.
+    the cart becomes the match's kit (`applyKits`): time coins into the team bank, block points into the block bank,
+    Stockfish tokens and shields. A drawn final's Armageddon carries the final's on. Four items: a fifth, the
+    Breather (double free seconds), was taken out on Oct 13 (Eric); a match or wallet stored with one is read without
+    it (`upgradeMatch`, `upgradeWallet`: a breather still in an open shop's cart is refunded, `itemCounts`).
   - **The Stockfish token** (`useStockfish`): on your own decision this half (your move before it's made, your pick or
     vote before you lock in), paid at once; one a player a half (the final: one for the squad). Its lines are your top
     moves in your position, your side to move (`tokenLines`: blocked moves out, never a reply), shown to you (the
@@ -269,10 +276,11 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   both squads' tokens left: the lines are worked out on `shownTo`'s own devices; nothing about them crosses the
   server. A brilliant move is asked of the judge like a token (`requestBrilliant`: the half's own bot work on that
   board, else a remembered answer, else devices for a person's move; bots' moves only from work already done); its
-  verdict after the show, `coins` (why "brilliant", the move and who found it) to everyone. Bots: a squad nobody is
+  verdict after the show, `coins` (why "brilliant", the move and who found it; `capped` with 0 coins past the squad's
+  cap for the match) to everyone. Bots: a squad nobody is
   playing (`botRun`) shops `mercenary.bots.shopSeconds` into its window (`botShop`) and now and then uses a token
   (`botUsesStockfish`: then the best move); never a squad with people playing.
-- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 3, typed): a lobby socket gets
+- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 4, typed): a lobby socket gets
   `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock and wallet), `vote`/`voteCast`, `match` (a
   match in full, as you may see it: tokens, block banks, blocks in effect and placed, the token log; its mode, each
   side's free seconds, kits, Stockfish tokens and shields left, the tokens used and being used, coins this match),
@@ -389,11 +397,11 @@ door's look; every class is `sq-`.
     folds it into a pill ("Shop" and the coins) that opens it again. The first time an account sees it (on this device:
     `brc.mercenary.seen.<user id>`), a short explainer with "Got it".
   - **In a match:** a line in the panel with both squads' coins and what's left of their kits (Stockfish tokens,
-    shields, a breather); under the clocks each squad's block points (none in Classic) and tokens; the free seconds
-    count a breather's. On your decision: "Stockfish token · N left"; used, your top moves as arrows coloured by rank
+    shields); under the clocks each squad's block points (none in Classic) and tokens. On your decision: "Stockfish token · N left"; used, your top moves as arrows coloured by rank
     with their evaluations and listed under it ("Your Stockfish lines"; in the final, a teammate's token shows the
     squad's). Blocking against a squad with a shield: the line under Block says so. The line above the board: a block
-    a shield cancelled (both squads) and a brilliant move ("Brilliant! Nf5 by Pam: +75 coins for Rooks").
+    a shield cancelled (both squads) and a brilliant move ("Brilliant! Nf5 by Pam: +25 coins for Rooks"; past the cap,
+    "Brilliant! Nf5 by Pam: no coins (cap of 2 a match reached)").
   - **The standings** show every squad's coins (the side panel; the phone's sheet).
 - **Bot work on this device:** after `welcome` the page runs its engine speed check once (`engineSpeed()`, shared with
   Crowd's judges) and sends `speed`; each `botWork` job is searched on the engine pool (`topMovesAt(fen, n, nodes)`,

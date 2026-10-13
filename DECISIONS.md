@@ -1903,15 +1903,15 @@ settings too. Every number below is one line in `SQUADS.mercenary` or `SQUADS.mo
   mode (Hand & Brain, Bughouse, Fog of War) are in ROADMAP.md; nothing is built.
 - Nobody voting means Classic, the base game.
 - **Bots vote, leaning Classic.** Each lobby draws a lean, a Classic share between 0.35 and 0.75, and each bot votes
-  Classic with that chance. In about 65% of lobbies the bots' majority is Classic, in the rest Mercenary, and a few
-  people can swing a close one.
+  Classic with that chance. With bots alone, 62% of lobbies come out Classic and 38% Mercenary (5,000 draws), and a
+  few people can swing a close one.
 - Start and Clock keep their bots' random draws, so adding the vote moved nothing else.
 - **Test lobbies:** the bots sit the Mode vote out, so the opener's vote decides it. `mode=mercenary` or
   `mode=classic` on the link skips the vote (`/squads/test?mode=mercenary`, `/squads/test/pairs?mode=mercenary`).
 - **Mercenary's base block bank stays 5,** Eric's number from Squads v2; Block points add to it.
 
-**Earning: the numbers.** Eric's scale was hundreds of coins, with a good team having about 700 saved by the later
-rounds.
+**Earning: the numbers** (Oct 12; reshaped on Oct 13, see "Mercenary: Eric's first changes" below). Eric's scale
+was hundreds of coins, with a good team having about 700 saved by the later rounds.
 - **Captures pay 3 coins a point of the piece taken:** pawn 3, knight or bishop 9, rook 15, queen 27. They're the
   frequent, small rewards.
 - **Board results:** a board won pays 50, and a checkmate 50 more (100, "around a hundred"). A drawn board pays 15 to
@@ -1935,7 +1935,7 @@ bot engine's top moves, from players' devices).
   (taking a loose piece, which pays anyway).
 - **Never with a Stockfish token's lines on screen.**
 - **Bots' moves** are judged only from work already done; a person's move gets a device job.
-- **75 coins.** It's rare: 0.7 a lobby in the sim.
+- **75 coins** (Oct 13: 25, at most twice per squad per match; below). It's rare: 0.7 a lobby in the sim.
 
 **Catch-up** (Eric: so the rich don't just get richer).
 - **Who gets it:** the squad that has earned less by play than its next opponent gets half the difference (to the
@@ -1957,8 +1957,7 @@ bot engine's top moves, from players' devices).
 - **Escalation: +100 for every one of that item the squad has already bought this tournament,** one rule for every
   item. Eric's anchors fit it exactly: Stockfish tokens at 200, 300, 400 (the third about 400), and shields at 100,
   then 200. The Buy button shows the price now. Cheap items climb steeply, which pushes squads towards variety.
-- **Caps per round:** Stockfish token 2, breather 1 (a second doubling means nothing), block points 2, shield 2, time
-  coin 2.
+- **Caps per round:** Stockfish token 2, block points 2, shield 2, time coin 2.
 - **Test lobbies starting at Pairs or the final:** the squads still in get 600 coins (about the median wallet before
   Pairs) and a 30 s intro to shop in.
 
@@ -1974,9 +1973,7 @@ bot engine's top moves, from players' devices).
    - **Pairs: the partner who used it only sees it.** Their partner sees their pick live anyway; the evaluations and
      alternatives stay theirs. **The final: the whole squad sees it,** and one a half is enough there. Elsewhere it's
      one a player a half.
-2. **Breather, 150.** Double free seconds a move for the whole match (3 s become 6). In Pairs that saves up to 3 s on
-   each of a squad's ~80 moves, worth several time coins, and out of time it doubles the time for every move. It's
-   the second-strongest item, so it costs more than block points or a shield.
+2. **Breather, 150: taken out on Oct 13** (below). It doubled the free seconds a move for the whole match.
 3. **Block points, 100:** +3 points, a queen block or a minor and a pawn (offence).
 3. **Shield, 100:** cancels one block that would bite, and the blocker still pays (defence). It's level with block
    points.
@@ -1993,14 +1990,14 @@ was clean.
 - **Shield and mercy together:** of blocks that together would trip a mercy rule, the later ones are lifted
   (refunded), and the earlier one, still standing, is the one shielded.
 - **Shields are public.** A cheap decoy block pops one before the real block: counterplay.
-- **Armageddon after a drawn final carries the final's tokens, shields and breather on:** it's the same round, as
-  block banks are.
+- **Armageddon after a drawn final carries the final's tokens and shields on:** it's the same round, as block banks
+  are.
 
 **Bots.**
 - A squad shops by bots only while nobody is playing on it; a bot never spends people's coins.
 - They shop 3-9 s into the window. Before the final they save everything a quarter of the time, or else spend 50-90%
   of the wallet; in the final they spend it all.
-- They choose by weight: block points 3, time and shields 2, breather 1, Stockfish token 0.5.
+- They choose by weight: block points 3, time and shields 2, Stockfish token 0.5.
 - They use a Stockfish token on 4% of decisions, or 35% when the engine's best beats the next by 0.2 or more, and then
   play the best move. That's about 0.2 tokens a squad a match in the sim.
 
@@ -2021,7 +2018,7 @@ was clean.
   points (none in Classic) and same-move tokens. The line above the board announces a shield or a brilliant move.
   The standings show every squad's coins.
 
-**Length** (Eric: about 30 minutes; the shop must add none).
+**Length** (Eric: about 30 minutes; the shop must add none). Oct 12's numbers, with the Breather:
 - The shop adds none. Items that buy time do lengthen games.
 - In the sim, on the same seeds and the Normal clock, Mercenary's median lobby was 33.1 minutes against Classic's
   31.3. The 90th percentiles were 39.1 and 40.3.
@@ -2037,6 +2034,77 @@ events; shielded blocks.
 - `/squads/test?mode=mercenary`.
 - `bots=blocks` (or `bots=strong,blocks`) has a test lobby's bots block whenever they can, so a test, or Eric, can
   see a shield fire.
+
+### Mercenary: Eric's first changes (Oct 13, 2026)
+
+Eric's changes after Mercenary went live, and the calls made with them. Every number is one line in
+`SQUADS.mercenary`; the calibration is `reports/squads-mercenary.md`.
+
+**Brilliant moves pay 25, at most twice per squad per match.** Eric: "a brilliant move pays seventy-five. There
+should probably be a cap on how many of those you can get a game... How could one move be more than winning an entire
+game?"
+- **25** is below a board won in every round (40 in Relay, more later), and a fraction of the base a match pays.
+- **The cap, 2 per squad per match** (`brilliant.capPerMatch`), counted by the lobby in each match (`brilliantPaid`;
+  Armageddon counts with the final it settles). Each match starts the count again.
+- **Why 2:** brilliant moves are rare (0.8 a lobby in the sim), so the cap only stops a freak run. Two still reward a
+  squad that keeps finding them.
+- **Past the cap** it's still a brilliant move: the banner says "Brilliant! Nf5 by Pam: no coins (cap of 2 a match
+  reached)", and the coins message comes with 0 coins and `capped`.
+
+**The Breather is gone.** Eric: "I never said anything about putting in a breather item... seems absolutely
+pointless... How would doubling free seconds per move be better than a shield?" The director added it to the brief,
+and it overlapped the time coin, so it's taken out entirely: the item, its price and cap, its effect (with it the
+match's per-side free seconds, `delays`), the bots' weight for it, its icon, the FAQ line and its tests. Four items
+stay, nothing replaces it.
+- **A lobby in play across the deploy:** a match stored with a breather in its kit plays on without it, both squads on
+  the match's free seconds (`upgradeMatch`). A wallet with a breather still in an open shop's cart gets it refunded at
+  what it cost (150, plus the price step for each one bought before), and the counts drop it (`upgradeWallet`). A
+  breather already used for an earlier round gives nothing back: it was played.
+
+**The economy's shape.** Eric first set a target: "let's like aim for that being the distribution on average per
+round" (500-800 coins a squad a round). Then he made it about the shape, not the number: "more like thinking about
+what the average spread should be for any sort of game style like that, a squad game... like Valorant or CSGO, where
+doing well should get you rewarded to be able to get a few more things. But even the bottom team... it shouldn't be
+that crazy of a distribution... so it can just do its own calculations."
+- **Like CS or Valorant:** there, the round payout is most of the money and kills add a little; a team that keeps
+  losing gets a loss bonus so it can still buy. Mercenary now works the same way.
+  - **The base:** every match a squad plays pays 200 at its end, win or lose (`played`; a drawn final's Armageddon
+    doesn't pay it again), and winning it pays 150 more.
+  - **Play on top, smaller:** a coin a point of material taken (pawn 1, knight or bishop 3, rook 5, queen 9), a board
+    won 40 and a mate 25 more, a drawn board 15 to each side, the capped brilliant moves.
+  - **Fewer boards, more each:** a board's coins are doubled in Pairs and multiplied by 4 in the final
+    (`roundScale`). Relay has 4 boards, Pairs 2 and the final 1, so without this a squad's play would earn half as much
+    each round.
+  - **Catch-up is the loss bonus.** In Squads a squad that loses a match is out, so the gap that matters is between the
+    two squads meeting. The squad that has earned less gets half the gap, now at most 150 (it was 300, when play was
+    most of the coins).
+- **The targets, from Eric and the director's notes:** two squads meeting should usually be within about two-thirds of
+  each other's coins; a round should buy about a Stockfish token, a time reload and a block or shield, and a very good
+  round a second token; 500-800 a round is where Eric pictured it.
+- **The result** (the sim, 72 lobbies, the Normal clock; only squads that win reach a shop, so the winners' numbers
+  matter):
+  - A winner's round: median 622 in Relay (10th to 90th percentile 540 to 650), 686 in Pairs (542 to 742), 730 in
+    the final. Losers: 322, 276 and 240.
+  - The base and the win are 57-59% of all coins earned.
+  - Every winner's round before a shop paid for a token, a reload (100, Eric's Time chip prices) and a shield or block
+    points (400). 14% paid for a second token too (700).
+  - Two squads meeting: the poorer had earned a median 94% of the richer's coins before Pairs and 93% before the final.
+    Their wallets were 97% and 85% (10th percentile 92% and 67%). The wider wallet gap before the final comes from a
+    choice: one squad saved everything before Pairs and the other spent.
+  - The squad that had earned more won 57-58% of the next matches: some edge for playing better, no runaway.
+- **Rejected:** first, the play numbers scaled up to hit 500-800 (the sim's first try: board wins 100). Play was then
+  most of the money, and the spread came out wide. Then a base of 250 with smaller play: the spread was so tight that a
+  good round bought almost nothing extra (Relay winners within 95 coins of each other).
+
+**Prices.** Eric: "you would always want to try to grab one Stockfish token; if you did really well, you could grab
+your second one." The Stockfish token stays 200, +100 a repeat (200, 300, 400). Block points and the shield stay
+100, +100: affordable with a token in a typical round, not trivial. The time coin is unchanged here; it becomes the
+Time chip, with its own prices, in the next change.
+
+**Length:** a median 32.0 minutes against Classic's 31.3 on the same seeds (90th percentiles 36.4 and 40.3).
+
+**Protocol 4** (`SQUADS_PROTOCOL`): the item list without the Breather and the match without `delays`; "coins" with
+`capped`; the "played" coins.
 
 ### Crowd 50 v 50: three chess time controls (Eric, Oct 13, 2026)
 

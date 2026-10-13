@@ -57,7 +57,6 @@ function match(over: Partial<LocalMatch> = {}, boards = 4): LocalMatch {
     blocks: [],
     tokenLog: [],
     mode: "classic",
-    delays: [3000, 3000],
     kit: null,
     stockfish: [0, 0],
     shields: [0, 0],
@@ -292,11 +291,11 @@ describe("cheat lines (test controls only)", () => {
 
 describe("Mercenary on screen", () => {
   const M = SQUADS.mercenary;
-  const none = { stockfish: 0, breather: 0, blocks: 0, shield: 0, time: 0 };
+  const none = { stockfish: 0, blocks: 0, shield: 0, time: 0 };
 
   it("the shop's rows: strongest first, the price now (risen for each bought), the cart against the round's cap, why not", () => {
     const rows = shopRows({ coins: 260, bought: { ...none, shield: 1 }, cart: { ...none, shield: 1, time: M.items.time.cap } });
-    expect(rows.map((r) => r.item)).toEqual(["stockfish", "breather", "blocks", "shield", "time"]);
+    expect(rows.map((r) => r.item)).toEqual(["stockfish", "blocks", "shield", "time"]);
     const by = Object.fromEntries(rows.map((r) => [r.item, r]));
     expect(by.shield).toMatchObject({ price: M.items.shield.price + M.priceStep, count: 1, cap: M.items.shield.cap, bought: 1 });
     expect(by.time).toMatchObject({ can: false, why: "cap" });
@@ -306,7 +305,6 @@ describe("Mercenary on screen", () => {
 
   it("every item's words carry its numbers from settings", () => {
     expect(itemText("time").line).toContain(`+${M.timeSeconds}\u00a0s`);
-    expect(itemText("breather", SQUADS, 5).line).toContain(`5\u00a0s\u00a0→\u00a0${5 * M.breatherFactor}\u00a0s`);
     expect(itemText("blocks").line).toContain(`+${M.blockPoints} block points`);
     expect(itemText("stockfish").line).toContain(`top ${M.stockfish.lines} moves`);
     expect(itemText("stockfish").line).toContain("Never theirs");
@@ -328,13 +326,14 @@ describe("Mercenary on screen", () => {
     expect(canUseStockfish(used, "a0")).toBe(false);
   });
 
-  it("a breather's free seconds: the side's own", () => {
-    const m = match({ mode: "mercenary", delays: [6000, 3000] });
-    expect(freeMs(m, 0)).toBe(6000);
-    expect(freeMs(m, 1)).toBe(3000);
-    // The bank drains past the side's own free seconds: 5 s thinking drains nothing with a breather.
+  it("the free seconds are the match's, the same for both squads (no Breather since Oct 13)", () => {
+    const m = match({ mode: "mercenary" });
+    expect(freeMs(m)).toBe(3000);
+    // The bank drains past the free seconds: 5 s thinking drains 2 s on each side.
     const live = { ...m, current: half([duty(0, 0, ["a0"]), duty(1, 1, ["b1"])]) };
-    expect(liveBank(live, 0, 5000)).toBe(60_000);
+    expect(liveBank(live, 0, 5000)).toBe(58_000);
     expect(liveBank(live, 1, 5000)).toBe(58_000);
+    expect(itemText("stockfish").name).toBe("Stockfish token");
+    expect(shopRows({ coins: 0, bought: none, cart: none }).map((r) => itemText(r.item).name)).toEqual(["Stockfish token", "Block points", "Shield", "Time coin"]);
   });
 });
