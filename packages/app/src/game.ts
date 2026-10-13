@@ -136,7 +136,7 @@ export type Phase =
   | { kind: "opening"; boards: BoardView[] }
   /**
    * `startsAt`: when the move clock starts (after the new board's settling-in countdown). `clock`: this move's clock
-   * in seconds (the Variable speed's rises as the game goes on; `allowedMs` is less when a time bank runs low).
+   * in seconds, the time control's cap (`allowedMs` is less when a time bank runs low).
    */
   | { kind: "play"; board: BoardView; startsAt: number; deadline: number; allowedMs: number; clock?: number; strike?: StrikeState }
   /** `watched`: Crowd 50 v 50, the other team's vote is being counted. */

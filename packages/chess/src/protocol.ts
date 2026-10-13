@@ -485,6 +485,11 @@ export type ServerMessage = { now: number } & (
       watching?: boolean;
       /** The move clock this round (seconds), which augment votes can change. */
       moveClock?: number;
+      /**
+       * The seconds added to every bank at the start of this move: the time control's increment (Crowd 50 v 50's clock
+       * vote sets it), for the bank the screen runs down. Optional: an older server doesn't send it.
+       */
+      increment?: number;
       /** Boss battle: the battle as it stands (the God King's charges, a Last Stand's barred move). */
       boss?: NetBoss;
     }

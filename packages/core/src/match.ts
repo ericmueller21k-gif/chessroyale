@@ -318,10 +318,21 @@ export interface RoundPlayerOutcome {
 
 /**
  * How long this player may think about the next move: the bank plus the increment, capped by the move clock on that
- * move number (see moveClockAt: the Variable speed's clock rises as the game goes on).
+ * move number (see moveClockAt). An empty bank still leaves the increment.
  */
 export function allowedMs(p: Pick<PlayerState, "bankMs">, settings: Settings = DEFAULT_SETTINGS, move = 1): number {
   return Math.min(moveClockAt(settings, move) * 1000, p.bankMs + settings.timeIncrementSeconds * 1000);
+}
+
+/**
+ * A time control chosen before the first move (Crowd 50 v 50's clock vote): every player's bank starts at its
+ * timeBankSeconds (the match was made with the default bank). Once a move has been played, banks are never reset: the
+ * state comes back as it was.
+ */
+export function startBanks(state: MatchState, settings: Pick<Settings, "timeBankSeconds">): MatchState {
+  // (The round count starts again at 0 each stage: before move 1 is stage 0, round 0.)
+  if (state.stage > 0 || state.round > 0) return state;
+  return { ...state, players: state.players.map((p) => ({ ...p, bankMs: settings.timeBankSeconds * 1000 })) };
 }
 
 /** What the standings rank by: the stage score (move quality only; time and power-ups don't count). */
@@ -712,7 +723,7 @@ export function botChoose(
 
 /**
  * A bot's thinking time: somewhere in botThinkSeconds, but within 85% of the move clock on that move, so on a short
- * clock (Bullet, the Variable speed's first moves) bots spread out over it instead of piling up on the buzzer.
+ * clock (Bullet's 10 s) bots spread out over it instead of piling up on the buzzer.
  */
 export function botThinkMs(rng: Rng, settings: Settings = DEFAULT_SETTINGS, move = 1): number {
   const [lo, top] = settings.botThinkSeconds;

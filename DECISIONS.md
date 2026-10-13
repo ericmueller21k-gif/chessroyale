@@ -1194,7 +1194,12 @@ From Eric's screenshot of Ginger's blizzard on a computer, and his word on the q
   each banner in `screens/Boss.tsx`). It's still fetched with the other samples (8 KB); left so to keep `sound.ts`
   untouched while its settings are being worked on.
 
-### The Crowd's 10:00 that "goes back to 10 minutes after every move" (Oct 11, 2026): working as designed, not changed
+### The Crowd's 10:00 that "goes back to 10 minutes after every move" (Oct 11, 2026): working as designed, not changed; settled Oct 13
+
+**Settled (Oct 13, 2026):** the increment banks as in real chess, and that's how it stays. Eric asked for real chess
+time controls ("the games should follow normal chess timer variations"), and on a chess clock a quick move keeps the
+seconds it didn't use. So the "free seconds" change below is off the table, and the 10-minute bank is now Rapid 10+5,
+one of three time controls (see "Crowd 50 v 50: three chess time controls (Eric, Oct 13, 2026)").
 
 Eric, in a 50 v 50 against bots: a 10-minute timer that seemed to go back to 10:00 after every move. It's your time
 bank (the board's clock at the top right, after this move's seconds, and the scoreboard's BANK), and it works as Eric
@@ -2032,3 +2037,90 @@ events; shielded blocks.
 - `/squads/test?mode=mercenary`.
 - `bots=blocks` (or `bots=strong,blocks`) has a test lobby's bots block whenever they can, so a test, or Eric, can
   see a shield fire.
+
+### Crowd 50 v 50: three chess time controls (Eric, Oct 13, 2026)
+
+Eric, Oct 12-13: "10+5s is fine for the long mode, needs to be 3 time options, the games should follow normal chess
+timer variations", and "we got to do the time control change first". The pre-game vote "How fast?" (Normal 20 s a move,
+Variable 10 s rising to 30 s, Bullet 10 s, all on one 10-minute bank with +5 s a move) is now three real chess time
+controls. Each is a bank for the game, an increment added at the start of every move and kept in the bank when a move
+is quicker (as on a chess clock), and a cap on any one move, because 50 people pick together and every turn has to end.
+
+| Option | Bank | Increment | Cap on a move |
+| --- | --- | --- | --- |
+| Bullet 3+2 | 3:00 | +2 s | 10 s |
+| Blitz 5+3 (nobody votes) | 5:00 | +3 s | 15 s |
+| Rapid 10+5 (today's clock) | 10:00 | +5 s | 20 s |
+
+**The calibration, by arithmetic** (Eric, Oct 13: keep testing proportionate; no sim). A player makes 20 moves before
+the team final or the boss battle (10 before the first cut, then one a cut for 10 cuts) and 23 before the duel. A move
+of t seconds costs the bank t minus the increment (nothing if t is less: it banks the rest), so a bank lasts
+bank ÷ (t − increment) moves. Moves each bank lasts, and what's left after the 20 moves before the final:
+
+| Time control | 6 s a move | 7 s a move | 8 s a move | The cap every move |
+| --- | --- | --- | --- | --- |
+| Bullet 2+1 (asked for) | 24 moves (0:20 left) | 20 (0:00) | 17 (dry at move 18) | 13 (dry at move 14) |
+| **Bullet 3+2 (built)** | 45 (1:40) | 36 (1:20) | 30 (1:00) | 22 (0:20; dry at move 23) |
+| Blitz 5+3 | 100 (4:00) | 75 (3:40) | 60 (3:20) | 25 (1:00) |
+| Rapid 10+5 | 600 (9:40) | 300 (9:20) | 200 (9:00) | 40 (5:00) |
+
+- **Bullet is 3+2, not 2+1.** The brief's rule: if 2+1 runs a normal-pace player dry before the final, make it 3+2
+  and keep the 10 s cap. At 7 s a move 2+1 is empty at exactly move 20, and at 8 s at move 18, so a normal-pace player
+  would play the last cuts on 1 s a move. 3+2 keeps a 7-8 s player in time through the knockouts with a minute or more
+  to spare, and someone at the cap every move lasts about the whole knockout phase. It's still clearly the fastest
+  option: 3 minutes and at most 10 s a move, against Blitz's 5 minutes and 15 s.
+- **The finals use the same clock.** The team final and the duel go on on the same board; the boss battle's crowd turns
+  too. In a long final on Bullet a normal-pace player will be on the increment alone (2 s a move) after about 16 more
+  moves (80 s left at 7 s a move), as in real bullet. Not changed: it's what Bullet means. If playtests find a 2 s
+  move too short on a phone, Bullet 3+3 is a one-line change in `votes.ts`.
+- The bots think 2 s up to 85% of the cap (`botThinkMs`): on Bullet 5.25 s a move on average, so about 55 moves on 3:00.
+
+**The calls made:**
+- **Nobody votes: Blitz**, the middle option. The director's call, keeping the rule that nobody voting gives the middle
+  option (it was Variable).
+- **Left to right, fastest first** (Bullet, Blitz, Rapid), as the brief lists them and as chess sites order them.
+  Icons: ⚡ Bullet (the old Bullet's), 🔥 Blitz, ⏱️ Rapid (the old Normal's).
+- **Each option is one data entry** in `PREGAME_VOTES` (`votes.ts`): `timeControl(id, icon, name, { timeBankSeconds,
+  timeIncrementSeconds, moveClockSeconds })`. The patch sets those three (and clears any rising schedule); the card's
+  label ("Bullet 3+2") and blurb ("3 min + 2 s a move · max 10 s") are made from the same numbers, so they can't drift
+  apart. The title stays "How fast?" and the vote's id `speed` (so `?speed=` keeps working).
+- **Everyone's bank is set when the vote ends.** The match is made (with the default 10:00 bank) before the vote, so a
+  patch with a bank resets every player's bank, people and bots, as long as no move has been played (`startBanks` in
+  `match.ts`, called by `MatchRunner.patchSettings`; solo and the lobby server both go through it). It never touches a
+  bank once a move is played.
+- **The bank isn't capped at its start:** quick moves can take it past 3:00, as in chess.
+- **Old `?speed=` ids** map to the new ones: normal → rapid, variable → blitz, bullet → bullet (and the older slow and
+  standard → rapid). An id we don't know gets the default (Blitz); no id means the vote decides.
+- **Gone:** Normal, Variable and the old Bullet, `VARIABLE_CLOCK` (nothing else used it), its table in How to play and
+  `clockStepRanges`/`clockScheduleLine`. Kept: `moveClockSteps` and `moveClockAt`, the one place every clock is read
+  (solo, the server, the finals, the bots); no option has a rising schedule now, but removing it would touch the runner,
+  the server and the app for nothing a player sees. Its tests keep an inline schedule.
+- **Without the vote** (Pre-game votes off, Everyone moves, raids and Boss alone) the clock is Rapid 10+5 with a 20 s
+  cap, as before. Raids and Boss alone never read the vote (`pregameVotes` needs 50 v 50 with votes on). Squads' team
+  clocks and Mercenary's time chips are untouched.
+
+**Everywhere the vote's clock reaches (checked):**
+- **Solo:** the runner's settings carry the patch, so the deadline (`allowedMsFor`), the board's clock and the bots'
+  timing follow it.
+- **The lobby server:** the patch goes into the record's overrides (it survives the Durable Object sleeping; tested by
+  waking a lobby from its record) and into the runner; each person's deadline comes from their own bank. A miss costs
+  the whole allowed time, as before.
+- **Online apps:** the board's clock adds the increment to the bank as your move starts, so the app must know it. An app
+  joined from PLAY only knows the Crowd's usual clock, and a reload mid-match never sees the vote, so each `round`
+  message now carries `increment` beside `moveClock`. Crowd's lobby protocol has no version number (only Squads has
+  one, `SQUADS_PROTOCOL`), and the field is optional both ways: an older app ignores it, and a new app on an older
+  server keeps its own increment. Nothing to bump.
+- **Replays:** the home page's live window plays recorded bot matches on its own ply timing (`LIVE_WINDOW`), and a new
+  board's settling-in replay runs before the clock starts. Neither reads the vote; unchanged.
+- **The finals:** team final, duel and boss battle all take each move's deadline from the same bank, increment and cap
+  (the boss battle's clock counts on from the game's move number, which with a flat cap changes nothing). Found and kept,
+  as pacing of their own: in a final, a bot's turn waits its recorded think time clamped to 1.5-4 s (solo) or 1.5-6 s
+  (online), and solo squeezes the other team's whole turn into at most 5 s. Neither is a person's clock, and the time
+  charged to a bot's bank is still its drawn think time, capped by its bank and the cap.
+- **The scoreboard's BANK** comes from the server's (or solo runner's) banks, so it starts at the voted bank and moves
+  after each move. `LOW_BANK_MS` (red under a minute) works for all three.
+
+**Testing.** The full lane, not the light one: this changes the runner (`patchSettings`) and the protocol, which the
+lanes rule (CLAUDE.md, Eric, Oct 13) puts in the full lane. Unit tests: each option's patch, the bank and increment
+maths (banking on quick moves, the cap, an empty bank), the calibration above, the old ids, the default, the runner
+resetting banks only before move 1, and the lobby applying the winner (round, increment, banks, and after waking).

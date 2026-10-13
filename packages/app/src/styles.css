@@ -7861,32 +7861,6 @@ button.fd-logo {
 .fd-rules strong {
   color: var(--fd-text);
 }
-/* The Variable speed's clock, move by move. */
-.fd-clock-steps {
-  margin: 6px 0;
-  border-collapse: collapse;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-.fd-clock-steps th,
-.fd-clock-steps td {
-  padding: 2px 14px 2px 0;
-  text-align: left;
-}
-.fd-clock-steps th {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--fd-sub);
-}
-.fd-clock-steps td {
-  color: var(--fd-text);
-  font-weight: 700;
-}
-.fd-clock-steps tbody tr + tr td {
-  border-top: 1px solid color-mix(in srgb, var(--fd-sub) 25%, transparent);
-}
 
 /* -- The FAQ, "How HunChess works" (screens/Faq.tsx): a readable column in the app's type and colours -- */
 .fd-faq {
