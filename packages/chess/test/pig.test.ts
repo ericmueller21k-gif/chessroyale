@@ -273,7 +273,8 @@ describe("Wrangler's lasso drag: the rules", () => {
     expect(a).toEqual(dragCandidates(RUY, 11));
     expect(a.length).toBeLessThanOrEqual(BOSS_POWERS.dragCandidates);
     expect(a.length).toBeGreaterThan(0);
-    const seeds = new Set(Array.from({ length: 12 }, (_, s) => dragCandidates(RUY, s).map((d) => d.from + d.to).join()));
+    // (Here every drag fits in the sample: a smaller one shows the seed choosing.)
+    const seeds = new Set(Array.from({ length: 12 }, (_, s) => dragCandidates(RUY, s, { dragCandidates: 6 }).map((d) => d.from + d.to).join()));
     expect(seeds.size).toBeGreaterThan(1);
   });
 
@@ -605,7 +606,7 @@ describe("Wrangler's showdown in the match", () => {
     if (p.drag?.turn === 5) {
       expect(p.drag.ult).toBe(true);
       expect(p.events).toContainEqual({ kind: "drag", turn: 5, square: p.drag.to, squares: [p.drag.from, p.drag.to], ult: true });
-    } else expect(p.events.map((x) => x.kind)).toContain("hold");
+    } else expect(p.events).toContainEqual({ kind: "hold", turn: 5, ult: true });
     expect(powerMomentMs([{ kind: "hold" }])).toBe(HOLD.total);
   }, 60_000);
 
@@ -620,6 +621,8 @@ describe("Wrangler's showdown in the match", () => {
     b = prepareTurn({ ...b, crowdMoves: 6 }, fen);
     expect(b.powers!.ultAt).toBe(7);
     expect(b.powers!.holds).toBe(0);
+    // (Spent with nothing to show: a hold marked as the ultimate's, so his line says so rather than "Not yet...".)
+    expect(b.powers!.events).toContainEqual({ kind: "hold", turn: 7, ult: true });
     // The trigger: due at his next turn.
     const t = triggerUltimate(bossWith(fen, {}, 4));
     expect(t.ok).toBe(true);
@@ -650,7 +653,7 @@ describe("Wrangler's moments", () => {
   it("each holds the screen for its beats", () => {
     expect(powerMomentMs([{ kind: "pull" }])).toBe(PULL.total);
     expect(powerMomentMs([{ kind: "showdown" }])).toBe(SHOWDOWN.total);
-    expect(SHOWDOWN.pairs.every((t) => t > SHOWDOWN.landAt && t + SHOWDOWN.yankMs <= SHOWDOWN.backAt)).toBe(true);
+    expect(SHOWDOWN.pairs.every((t) => t >= SHOWDOWN.cornerAt && t + SHOWDOWN.yankMs <= SHOWDOWN.drawAt)).toBe(true);
     expect(SHOWDOWN.drawAt).toBeLessThan(SHOWDOWN.total);
   });
 

@@ -22,8 +22,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   at a Maia rating for its level (its strength, plus a crowd's margin), clearly favoured in plain chess (Eric, Oct 12:
   "boss = a challenge"), then the bridge band (light guard, strict guard by the level; a growing share of Stockfish's
   moves by the strength), then Stockfish from 2800 (`BOSS_BRAIN`). Maia picks only among the moves its
-  powers leave it. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra move and Big Boy's bounce
-  keep their own Stockfish picks; Maia's own mistakes replace the slips. Players meet Stockfish until
+  powers leave it. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra move, Big Boy's bounce and
+  Wrangler's long pull keep their own Stockfish picks (his drag and showdown aren't moves); Maia's own mistakes replace
+  the slips. Players meet Stockfish until
   `BOSS_BRAIN.forPlayers` is on (needs Eric's OK: the Maia box's source published); admins meet Maia on every boss,
   in every mode (online: in a lobby of admins only). The Brain picker in Boss alone's menu and a debug line are
   admins' test tools. Details in [engine.md](engine.md), "The boss's brain".
@@ -73,8 +74,28 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 | Jefferson (`grex`; G-REX until Oct 10) | the game so far | **Sparkler:** a tile on the crowd's half catches fire and burns in `fireStages` stages, one a crowd turn; a crowd piece left on it after the crowd's move on the last stage burns (never the king, never one whose loss leaves a king in check: it fizzles) | **Roman candle:** `candleShots` fireballs in waves (`candleWaves`) from `candleDelay` turns later, each wave's squares shown as growing shadows `candleAhead` turns ahead; `candleOwnShare` (0.4) of each wave, rounded, falls on his own half (Eric, Oct 11: too strong; 10 of the 24 there, 14 on the crowd's), where his pieces never burn (a crowd piece there still would). The first time one of his pieces stands in the candle's fire (`fireproof`, once a match) he laughs it off: a `fireproof` moment, his smug look and one of four lines picked from the seed (`FIREPROOF_LINES`; he has no laugh sound of his own, so none) |
 | Hollow (`hollow`) | always Black, from the starting position (he claims the dark side in the intro if the crowd would have been Black) | **The dark:** after his first move he covers the square of the piece he moved, then another every `darkEvery`-th move (a random occupied square, never a king's) for `darkTurns`; pieces there are hidden; a move touching the dark goes unchecked, an illegal one costs `darkTryCost` and the `darkTries`-th ends the turn as a miss | **Lights out:** at the start of his turn, a memory test in rounds (`lightsOutRounds`: find 1, 2, then 3 of his pieces); each piece missed costs `lightsOutMiss`; below `lightsOutHold` found, he plays an extra quiet move (`lightsOutExtraGain`) |
 | Big Boy (`bigboy`) | from the starting position less the crowd's d- or e-pawn, which he eats (his snack) | **Toy blocks:** every `blockEvery` turns from turn 2, a block on an empty square in the crowd's half that a crowd piece could move to, for `blockTurns`; nothing (either side) may move onto it or slide through it; a knight jumps it; it never stops an attack | **Big Bounce:** at the start of his turn (after the warning), `bouncePieces` crowd pieces thrown to empty squares within `bounceReach` (pawns sideways), into a position `bounceLoss` pawns worse for the crowd (nearest `bounceTarget`) |
+| Wrangler (`pig`; the code id stays `pig`: "wrangler" is Cloudflare's CLI here) | from the starting position, Black as every raid boss (`?side=b` turns it round); his first move is the **long pull** (`pullOptions`, `pullFrom`): a centre pawn's double step, then lassoed one square further, three squares in one move (e2-e5 or d2-d5 as White; d7-d4 or e7-e4 as Black after the crowd's first move), the engine's pick of the d- or e-pawn; none sound (it would hang the pawn: a crowd pawn on it, more attackers than defenders, or more than `pullMaxLoss` pawns against his best ordinary move; its path or square taken): an ordinary first move. The board's history keeps the legal double step and a base with the pawn one square on; the screens name it as the pull (`d4`) | **Lasso drag** (`dragOptions`, `dragFrom`): after his move, from turn `dragFirst`, every `dragEvery` turns, a crowd piece (never the king, never a bishop: it would change colour) dragged one square up, down, left or right onto an empty square (a pawn never onto the first or last rank; never leaving the crowd in check or without a move, nor his king attacked), the one costing the crowd nearest the middle of `dragLoss` (0.1 to 0.9 pawns, log-odds as Big Boy's bounce), seeded among ties; none in the band (or a game already decided): none, and he tries again after his next move. A base on the board; `?power=drag`: from turn 2, every 2 | **SHOWDOWN!** (an engine-shaped power, below): the warning, then after his move three matched pairs (queens, rooks, a bishop or knight pair) line up facing each other in the middle (files b-g, ranks 3-6, 0 or 1 empty squares between, knights a jump apart, bishops on their colour), his pieces protected (`checkLineup`); the crowd's next move must be one of the three duels (its piece taking his; none legal: a normal move). The best duel gains him `showdownEdge` pawns over the position before (nearest `showdownTarget`), a wrong one costs the crowd `showdownTrap` more. None found: "Not yet..." (`hold`) for up to `showdownHolds` turns (none when the board lacks three pairs), then two pairs, then a drag; the meter is spent either way. On screen he drops into the middle winding up both loops, leaps to his corner and his ropes yank each pair in; "DRAW!"; the duels glow and the dock says "Showdown! Take one of his three." (the God King quiet about threats he can't heed, his own word at "DRAW!") |
 | Sawyer (`sawyer`) | the game so far; his first move is a pawn's, then the **split pawn**: that pawn sawn in two, a second pawn of his on an empty square beside it (a seeded side; never where it attacks a crowd piece or gives check), both tracked. On screen (`SAWYER_LOOKS`, Oct 11) the sawn pawn morphs into two smaller whole pawns that hop to their squares and grow back to a pawn's size as they land (my call: they're ordinary pawns); `split: "halves"` brings back the old look (cut in two halves, drawn as halves wherever they go), `settle: "small"` keeps them small. If that pawn has no such square, another of his that has one (the most central, from the seed: `chooseSplit`); none, or a first move that wasn't a pawn's (a check left him none): it waits for his next pawn move. With no room for another pawn of his (8 already, or 32 pieces: the engine's limit) it waits for his first pawn move once there is | **Saw cuts:** every `sawEvery` turns from `sawFirst` (turn 3), an edge between two squares of the crowd's half that one of its moves crosses, for `sawTurns`: no straight move across it (a slide, a pawn's step, the king's, castling's way), either side; knights and diagonal moves pass; taped over as it heals | **Board saw:** the meter full, turn `boardSawFrom` or later, and a half of the board (a-d or e-h) his on material: the warning, then for `boardSawTurns` no move crosses between the d and e files (knights included), either side; then the halves rejoin |
 
+- **An engine-shaped power** (Wrangler's showdown, Oct 13; Eric wants every ultimate this way later: ROADMAP.md): the
+  power searches its possible outcomes with the engine and plays one that moves the game by a set amount, with
+  fallbacks so it never fizzles. The pattern, in `bosses/pig.ts`:
+  - **A pure, seeded generator** of plausible candidates (`lineups`: the director's cluster method, his pieces
+    protected, those with at most one of his pieces ganged up on first) and **a pure checker** the server uses on the
+    answer (`checkLineup`): the host's word stands only within the rules.
+  - **Scored by the engine where the boss's moves are worked out** (the host's device; solo this one), never the server:
+    a quick scan of each candidate (`searchShowdowns`, `showdownNodes`, read with some slack), the promising ones looked
+    at closely (`confirmShowdown`, `showdownConfirmNodes`), the pick nearest the target, seeded among ties. Its numbers
+    are pawns in log-odds of the engine's expected score (as Big Boy's bounce), measured from the position before.
+  - **Its search time comes from the crowd's thinking:** a scout (`ShowdownScout`, an engine of its own: `ownEngine`)
+    searches the position while the crowd thinks on the turns it may follow (the meter at `showdownScoutFrom`, the
+    warning, a hold); his move changes the position, so at his turn the scout's promising candidates are scanned again
+    on the new one first (most still stand), then fresh ones, within `showdownTurnMs`. The generator yields to the page
+    every few milliseconds (`SLICE_MS`): nothing freezes the board.
+  - **The server asks for it with his move** (`BossRules.asks`: the bossRequest's `pull`, `drag`, `showdown`, and a
+    `seed` drawn from the battle's and the turn, never the battle's own) and gets it back with the move (`bossMove`'s
+    `drag`, `showdown`); `afterBossMove` checks it and puts it on the board as a base; the next turn's events show it.
+    The host has longer to answer when it's asked for one (`bossTimeoutMs`).
 - **Test switches:** `?boss=<id>` picks the boss (`?boss=jefferson` too: `BOSS_ALIASES`, read by `bossIdFromLink`);
   `?power=<id>` brings its ultimate early (warned as turn 2 begins, unleashed on turn 3; its passive as usual); admins
   see "Trigger ultimate (testing)" in any boss battle (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next
@@ -141,20 +162,21 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 
 Each boss lives in its own files, one per layer, on a shared base. The shared files only put them together.
 
-| Layer | Shared | Each boss (Ginger, Boingo, Jefferson, Hollow, Big Boy, Sawyer) |
+| Layer | Shared | Each boss (Ginger, Boingo, Jefferson, Hollow, Big Boy, Sawyer, Wrangler) |
 | --- | --- | --- |
 | The roster, the playable rule, choosing a boss, strength | `packages/core/src/boss.ts` (`BOSS_ROSTER`; power ids, event kinds and every boss's state fields in `BossPowerState`) | its line in `BOSS_ROSTER` |
-| Rules: each turn's powers, allowed moves, what the judge sees, after-move effects, fair-play turns, its opening, its screen fields | `packages/chess/src/bosses/base.ts` (the base boss, `BossRules`, and shared helpers), `bosses/index.ts` (the registry), `boss-powers.ts` (the dispatcher: `prepareTurn`, `crowdAllowed`, `bossAllowed`, `powerTurn`, `icedSquares`, the judge's hooks) | `packages/chess/src/bosses/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts`, `sawyer.ts` |
+| Rules: each turn's powers, allowed moves, what the judge sees, after-move effects, fair-play turns, its opening, its screen fields | `packages/chess/src/bosses/base.ts` (the base boss, `BossRules`, and shared helpers), `bosses/index.ts` (the registry), `boss-powers.ts` (the dispatcher: `prepareTurn`, `crowdAllowed`, `bossAllowed`, `powerTurn`, `icedSquares`, the judge's hooks) | `packages/chess/src/bosses/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts`, `sawyer.ts`, `pig.ts` (`bosses/grid.ts`: the grid helpers Big Boy's and Wrangler's generators share) |
 | Timings the server and the screens share | `packages/chess/src/boss-timing.ts` (`POWER_FX` spreads each boss's `<BOSS>_FX`; `powerFxMs`, `bossIntroTimeline`) | in its rules file (`GINGER_FX`, `FIRE_BURN_MS`, `LIGHTS_OUT`, `CLAIM_MS`, `SNACK`, `BOUNCE`, `BLOCK`, `SPLIT`, `SAW_CUT`, `BOARD_SAW`…) |
 | Its moments in the match runner (Lights out, the extra move, the bounce) | `packages/chess/src/runner.ts` hands each a `Battle` (base.ts) and keeps one-line methods (`startLightsOut`, `playBounce`…) | `<boss>Battle` in its rules file, with its engine pick (`extraMoveFrom`, `bounceFrom`) |
-| The lobby server | `packages/server/src/lobby.ts` (the boss's turn; the host-engine requests for the extra move and the bounce), `packages/server/src/bosses/base.ts` (`BossLobby`) | `packages/server/src/bosses/hollow.ts` (dark tries, Lights out) |
-| Solo | `packages/app/src/solo.ts` (drives the same runner; its own timing of Lights out) | |
-| Art and sounds | `characters/index.ts` (`CHARACTERS`), `characters/kits.ts` (`BOSS_KITS`: animations per moment, lines, portrait), `characters/power-art.ts` (each power's moments and effects) | `characters/<boss>.ts`, `<boss>-sounds.ts` (`gingerbread`, `clown`, `grex`, `hollow`, `bigboy`, `sawyer`) |
+| The lobby server | `packages/server/src/lobby.ts` (the boss's turn; the host-engine requests for the extra move and the bounce, and what his turn `asks` besides his move: Wrangler's pull, drag and showdown), `packages/server/src/bosses/base.ts` (`BossLobby`) | `packages/server/src/bosses/hollow.ts` (dark tries, Lights out) |
+| Solo | `packages/app/src/solo.ts` (drives the same runner; its own timing of Lights out; Wrangler's scout on your turn) | |
+| The host's engine work | `packages/app/src/net.ts` (`hostBoss` and its kin; Wrangler's `pigTurn` and scout) | |
+| Art and sounds | `characters/index.ts` (`CHARACTERS`), `characters/kits.ts` (`BOSS_KITS`: animations per moment, lines, portrait), `characters/power-art.ts` (each power's moments and effects) | `characters/<boss>.ts`, `<boss>-sounds.ts` (`gingerbread`, `clown`, `grex`, `hollow`, `bigboy`, `sawyer`, `pig`) |
 | Board effect sprites | `characters/effects.ts` (`EFFECT_SPRITES`), `characters/effects/common.ts` | `characters/effects/<boss>.ts`: `ginger.ts`, `boingo.ts`, `grex.ts`, `hollow.ts`, `bigboy.ts`, `sawyer.ts` |
 | Speech: every line's time and turn, the text box | `packages/app/src/speech.tsx` (`Voice`, `bossVoice`, `SpeechBox`, `holdMs`); power moments' lines said in `BossPowers.tsx` (`useMomentSpeech`), reactions in `BossCharacter.tsx` | a moment's `line`, `lineAt` and `priority` in its `BossUi` (only when the kit's lines aren't the whole story) |
-| Powers on screen: moments, banners, the board layer, the rage meter | `components/BossPowers.tsx` (`momentsOf`, `PowerMoment`, `PowerBoard`, `BossBarExtra`, `dockLine`, the warning), `components/PowerParts.tsx` (`BossUi`, `Moment`, `Flight`, `PowerBanner`), `components/BossEffect.tsx` | `components/Ginger.tsx`, `Boingo.tsx`, `Grex.tsx`, `Hollow.tsx` (+ `LightsOut.tsx`), `BigBoy.tsx`, `Sawyer.tsx` |
+| Powers on screen: moments, banners, the board layer, the rage meter | `components/BossPowers.tsx` (`momentsOf`, `PowerMoment`, `PowerBoard`, `BossBarExtra`, `dockLine`, the warning), `components/PowerParts.tsx` (`BossUi`, `Moment`, `Flight`, `PowerBanner`), `components/BossEffect.tsx` | `components/Ginger.tsx`, `Boingo.tsx`, `Grex.tsx`, `Hollow.tsx` (+ `LightsOut.tsx`), `BigBoy.tsx`, `Sawyer.tsx`, `Pig.tsx` |
 | The boss's brain (Maia-3 or Stockfish) | `bossBrainFor` (core `boss.ts`), `packages/chess/src/boss-brain.ts`, `human-uci.ts`, `bossMoveFrom` and `bossBrainPlan` (`runner.ts`); online the lobby's `bossBrainNow` and the host's `hostBoss` (`net.ts`); solo `startBrain` (`solo.ts`); `packages/app/src/maia.ts`, `boss-brain.ts`, `components/BossBrain.tsx` (the picker), `BrainDebug` (`BossDock.tsx`); the Maia box `packages/maia-worker/` | none (every boss: `BOSS_BRAIN.brain`; an exception would go in `BOSS_BRAIN.byBoss`) |
-| The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below; Sawyer's split hides the new half until the crack, and his board saw jolts the board) | |
+| The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below; Sawyer's split hides the new half until the crack, and his board saw jolts the board; Wrangler's lasso and showdown keep pieces where they were until they're hauled: `pigBoard`); `screens/Play.tsx` (Wrangler's duel prompt in the dock) | |
 | The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
 | A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`) |
 
@@ -175,7 +197,9 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `iced` | The squares that show ice | Ginger |
 | `judge` | What the judge must score too, how it ranks and reads moves | Jefferson (fire) |
 | `afterCrowdMove(b, move)` | After any crowd move, in the match | Jefferson (the burn), Sawyer (the halves follow) |
-| `afterBossMove(b, move)` | After the boss's own move, in the match, before the crowd's turn is set up | Sawyer (the split: a base on the board; the halves follow) |
+| `afterBossMove(b, move, extras)` | After the boss's own move, in the match, before the crowd's turn is set up; `extras`: what his turn worked out besides the move (the host's answer online) | Sawyer (the split: a base on the board; the halves follow), Wrangler (the pull, a drag or the showdown's line-up, each checked) |
+| `specialMove(boss, fen, move)` | A boss move its rules play as something else, with its name on screen | Wrangler (the long pull: the double step, then the base) |
+| `asks(boss, fen)` | What the boss's turn must work out with the engine besides its move (the server asks the host with the move) | Wrangler (his pulls, a drag, the showdown) |
 | `scoreRound(b, players)` | Its own costs on a round's scores | Hollow (dark tries) |
 | `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack), Sawyer (his cuts from turn 3) |
 | `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy, Sawyer |
@@ -191,7 +215,7 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 5. **Character and art**: `characters/<boss>.ts` (+ sounds), in `characters/index.ts` and `BOSS_KITS` (`kits.ts`); its effects in `characters/effects/<boss>.ts`, in `effects.ts` and `power-art.ts`'s `EFFECTS`; its moments in `power-art.ts`.
 6. **Screen**: `components/<Boss>.tsx` with its `BossUi`; add it to `BOSS_UI` and `MOMENT_UI` in `BossPowers.tsx` (the compiler names any moment kind without a view). Its power words in `power-words.ts` (the compiler names a missing one). Its lines need nothing more: its kit's lines for each moment are said into its voice and held by the speech rule (`speech.tsx`); give a moment `lineAt` if the boss speaks partway through it, and say any other line with `bossVoice.say` (or `<Say>`), never in a box of its own.
 7. **Only if it has a moment of its own beyond these** (and these still mean shared edits, because they're protocol):
-   - one the host's engine plays (like the extra move, the bounce): a `<boss>Battle` with one-line runner methods, the lobby's request, answer and timeout (`lobby.ts`, `bossKind`), the host's handler (`net.ts`) and solo's (`solo.ts`), and the request's flag in `protocol.ts`;
+   - one the host's engine plays (like the extra move, the bounce): a `<boss>Battle` with one-line runner methods, the lobby's request, answer and timeout (`lobby.ts`, `bossKind`), the host's handler (`net.ts`) and solo's (`solo.ts`), and the request's flag in `protocol.ts`; one worked out alongside the boss's own move (Wrangler's): `asks` and `afterBossMove`'s extras (see "An engine-shaped power");
    - one the server times (like Lights out): `packages/server/src/bosses/<boss>.ts` on `BossLobby`, routed from `lobby.ts`, its messages in `protocol.ts`, and solo's timing in `solo.ts`;
    - anything that changes the board the boss screen shows, or the intro (like the funhouse's turns, the bounce, the burn, Hollow's claim, Big Boy's snack, Sawyer's split): `screens/Boss.tsx`.
    - anything that changes the position outside a move leaves a base (`afterCrowdMove`, `afterBossMove`, or the boss's own moment), and never a ninth pawn of one side or a 33rd piece (the engine refuses those positions).
@@ -224,13 +248,16 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   unscored, its loss band and cap, among them), `rage.test.ts`
   (every boss's ultimate again and again, never two at once), `packages/app/test/board-view.test.ts` (the turned
   board's squares, moves and coordinates), `grex.test.ts` (the meter), `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
-  `long-match.test.ts`, `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`,
+  `long-match.test.ts`, `pig.test.ts` (Wrangler: the pull, the drag's rules and band, the line-up's shape and checks,
+  Eric's goal, the search and the scout, the forced duel, the fallbacks, host and solo agreeing),
+  `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts` ("Wrangler online"),
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,
-  `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
+  `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`, `pig.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
 - Unit, a boss's attack on a king: `packages/chess/test/king-attack.test.ts` (the beats, the Last Stand's fit, the
   mate's hold, the mate switch), `packages/app/test/king-attack.test.ts` (the kit, Hollow's frames on the beats, the God
   King's blows, the hits).
-- e2e: `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
+- e2e: `e2e/pig.spec.ts` (Wrangler: the long pull, a drag, a showdown and its forced duel, phone and computer),
+  `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
   0°, 180°, 90° and 270°; the coordinates and pies on their squares at each), `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
   `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
   gone on time),
@@ -239,11 +266,11 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   (the page's clock paused and stepped 40 ms at a time: every frame of the attack),
   `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both] [light|dark] [moves] [desktop
   width]` (Ginger: the blizzard, both thaws and the boss's turns between them, six moves by default), `frames:hollow`,
-  `frames:bigboy`, `frames:sawyer`, `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`,
+  `frames:bigboy`, `frames:sawyer`, `frames:pig -- <dir> [phone|desktop|both] [light|dark] [side=b] [power=drag]` (his
+  long pull, the warning, SHOWDOWN! and the duels, then a drag), `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`,
   `frames:rage -- <dir> [boss] [phone|desktop] [moves] [strikes]` (the rage meter: strikes, the warning, the
   ultimate, its slide down and refill, every frame, with the meter's own numbers sampled each frame).
-- Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect). Art not yet in the game
-  (Wrangler, `characters/pig.ts`): add `extra=packages/app/src/characters/pig.ts only=pig`.
+- Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect; `only=pig` for Wrangler).
 - Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] 25`.
 - Sims: `packages/sim/scripts/boss-sim.ts` (modes `snack`, Big Boy's; `split`, Sawyer's; `raid <boss,ids|all> <games>
   <seed> <strikes> <tag>`: Solo raids of 50 bots with every power through the match runner, ultimates per game and the

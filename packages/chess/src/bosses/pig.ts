@@ -31,19 +31,21 @@ import { gridAttackers, gridHanging, gridKingAttacked, gridOf, isLight, placemen
 
 /**
  * The long pull, beat by beat (ms into its moment, after his first move (the double step) shows): his banner; he hops
- * from his corner to beside the pawn (`landAt`); his lasso's loop drops over it (`catchAt`: the art's CATCH point on
- * the pawn) and he hauls it one square further (`tugAt`, sliding for `slideMs`); he hops back (`backAt`).
+ * from his corner (`hopAt`, landing beside the pawn at `landAt`); his lasso's loop drops over it (`catchAt`: the art's
+ * CATCH point on the pawn) and he hauls it one square further (`tugAt`, the art's `tug` cue: it slides for `slideMs`,
+ * him stepping with it); he hops back (`backAt`).
  */
-export const PULL = { hopAt: 900, landAt: 1350, catchAt: 2150, tugAt: 2450, slideMs: 420, backAt: 3150, total: 3700 } as const;
+export const PULL = { hopAt: 500, landAt: 1000, catchAt: 1775, tugAt: 2035, slideMs: 420, backAt: 2950, total: 3500 } as const;
 /** The lasso drag: the same beats as the pull, on the piece he drags one square. */
-export const DRAG = { hopAt: 900, landAt: 1350, catchAt: 2150, tugAt: 2450, slideMs: 420, backAt: 3150, total: 3700 } as const;
+export const DRAG = PULL;
 /**
  * SHOWDOWN!, beat by beat (ms into its moment, as the crowd's turn begins after his move): "SHOWDOWN!" (his banner);
- * he drops into the middle of the board (`dropAt`, landing at `landAt`) and spins both loops (`spinAt`: his wind-up);
- * the ropes yank the pairs into the line-up one at a time (`pairs`, each sliding for `yankMs`); he hops back to his
- * corner (`backAt`); "DRAW!" with a quick-draw sting (`drawAt`); then the crowd picks its duel.
+ * he drops into the middle of the board (`dropAt`, landing at `landAt`), both loops spinning (his wind-up, to its
+ * throw at `throwAt`), and leaps back to his corner (there at `cornerAt`); from there his ropes yank the pairs into the
+ * line-up one at a time (`pairs`, each sliding for `yankMs`); "DRAW!" with a quick-draw sting (`drawAt`); then the
+ * crowd picks its duel.
  */
-export const SHOWDOWN = { dropAt: 1250, landAt: 1650, spinAt: 1700, pairs: [3000, 3650, 4300] as readonly number[], yankMs: 480, backAt: 5000, drawAt: 5550, total: 6900 } as const;
+export const SHOWDOWN = { dropAt: 900, landAt: 1400, throwAt: 2400, cornerAt: 2900, pairs: [3000, 3500, 4000] as readonly number[], yankMs: 420, drawAt: 4600, total: 6000 } as const;
 /** "Not yet...": no line-up this time; his taunt and the line, then the crowd's turn. */
 export const HOLD = { total: 1900 } as const;
 
@@ -214,8 +216,8 @@ export interface DragOption {
 const ORTHO = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
 /**
- * Every lasso drag the rules allow now (`fen`: his move just played, the crowd to move): a crowd piece, never the king,
- * one square up, down, left or right onto an empty square (no slide past anything), a pawn never onto the first or last
+ * Every lasso drag the rules allow now (`fen`: his move just played, the crowd to move): a crowd piece, never the king
+ * nor a bishop (it would change colour), one square up, down, left or right onto an empty square, a pawn never onto the first or last
  * rank (so never onto its own back rank), never onto the en passant square; never leaving the crowd in check (a piece
  * dragged out of a pin's line) or his king attacked, and never leaving the crowd without a move. Castling rights go
  * with a rook dragged off its corner. Pure: the server checks the host's drag against it.
@@ -226,7 +228,9 @@ export function dragOptions(fen: string, opts: { legal?: boolean } = {}): DragOp
   const ep = fen.split(" ")[3];
   const out: DragOption[] = [];
   for (const [sq, c] of [...g0].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
-    if (!mineOf(c, crowd) || c.toLowerCase() === "k") continue;
+    // (Never the king; never a bishop either, my call: a square up, down or sideways is a square of the other colour,
+    // and two bishops on one colour is a position no game could reach, as Big Boy's bounce keeps them on theirs.)
+    if (!mineOf(c, crowd) || c.toLowerCase() === "k" || c.toLowerCase() === "b") continue;
     for (const [df, dr] of ORTHO) {
       const f = file(sq) + df;
       const r = rank(sq) + dr;
@@ -290,6 +294,9 @@ export function dragCandidates(fen: string, seed: number, s: Pick<BossPowerSetti
   return kept.sort((a, b) => (a.from + a.to < b.from + b.to ? -1 : 1));
 }
 
+/** Past this many pawns either way the game counts as decided for a drag (its loss can't be read): none. */
+const DRAG_DECIDED = 4;
+
 /** A drag as the engine scored it: the crowd's expected score after it (the crowd to move), and whether its line has a forced mate. */
 export interface DragScore {
   drag: string;
@@ -331,7 +338,8 @@ export async function dragFrom(
   if (!list.length || !engines.length) return null;
   const glance = await topEach(engines, [fen, ...list.map((d) => d.fen)], s.dragScreenNodes);
   const b0 = moverScore(fen, glance[0]);
-  if (!b0) return null;
+  // (A game already decided: the engine's numbers there are pinned near 0 or 1 and a loss can't be read. No drag.)
+  if (!b0 || Math.abs(edgeInPawns(b0.expected, s)) > DRAG_DECIDED) return null;
   const mid = (s.dragLoss[0] + s.dragLoss[1]) / 2;
   const near = list
     .map((d, i) => ({ d, m: moverScore(d.fen, glance[i + 1]) }))
@@ -998,7 +1006,7 @@ export const PIG: BossRules = {
     next.ultAt = t.turn;
     next.holds = 0;
     const d = next.drag?.turn === t.turn && next.drag.ult ? next.drag : null;
-    t.events.push(d ? { kind: "drag", turn: t.turn, square: d.to, squares: [d.from, d.to], ult: true } : { kind: "hold", turn: t.turn });
+    t.events.push(d ? { kind: "drag", turn: t.turn, square: d.to, squares: [d.from, d.to], ult: true } : { kind: "hold", turn: t.turn, ult: true });
     return true;
   },
   // The long pull's moment, as the turn after his first move begins.

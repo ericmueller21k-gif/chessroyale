@@ -13,6 +13,7 @@ import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gin
 import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT, bulbsLook } from "./hollow.ts";
 import { SAWYER, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
+import { PIG, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
 import { lashItem, type SquareItem } from "./power-art.ts";
@@ -196,6 +197,48 @@ export const BOSS_KITS: Record<string, BossKit> = {
     lines: SAWYER_LINES,
     chance: SAWYER_CHANCE,
     portrait: { ...SAWYER_PORTRAIT, anim: "idle", frame: 0 },
+    wide: true,
+  },
+  "Wrangler": {
+    ch: PIG,
+    anims: {
+      entrance: "taunt",
+      thinking: "idle",
+      move: "idle",
+      capture: "lasso",
+      hurt: "idle",
+      check: "taunt",
+      smug: "taunt",
+      rattled: "idle",
+      defeat: "idle",
+      victory: "taunt",
+      strike: "lasso",
+      power: "lasso",
+      ultimateWarn: "taunt",
+      ultimate: "windup",
+      pull: "lasso",
+      tug: "lasso",
+      hold: "taunt",
+    },
+    sounds: {
+      whirl: "pigWhirl",
+      throw: "pigThrow",
+      catch: "pigCatch",
+      tug: "pigTug",
+      tip: "pigTip",
+      laugh: "pigLaugh",
+      snort: "pigSnort",
+      stomp: "pigStomp",
+      windup: "pigWindup",
+      hop: "pigHop",
+      // (Played by his showdown on the board: the quick-draw sting and each pair yanked in.)
+      draw: "pigDraw",
+      yank: "pigYank",
+    },
+    lines: PIG_LINES,
+    chance: PIG_CHANCE,
+    portrait: { ...PIG_PORTRAIT, anim: "idle", frame: 0 },
+    // His throw's room out to one side (the frame is 115 wide): a wider box on a phone, as Sawyer's.
     wide: true,
   },
 };

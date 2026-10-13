@@ -6,8 +6,10 @@
  * gold spurs; one lasso spinning overhead in a big loop (his right hand, on our left) and a coil of rope in the other.
  * Drawn facing front, turned a little to our left as in the reference, light from the top left.
  *
- * ART ONLY (Oct 13, 2026): he is in no roster, kit or list, so nothing in the game shows him. His previews are drawn
- * from this module directly (`npm run preview:characters -- <dir> extra=packages/app/src/characters/pig.ts`).
+ * A playable boss since Oct 13, 2026 (his kit "Wrangler" in kits.ts; his powers on screen in components/Pig.tsx; his
+ * rules in packages/chess/src/bosses/pig.ts): his lasso throw's `CATCH` point lands on the piece he drags, he hops on
+ * and off the board (`leap`), winds up both loops for his showdown (`windup`) and hauls its pairs in (`haul`, the board
+ * drawing the ropes from his fists). His lines: PIG_LINES; his sounds: characters/pig-sounds.ts.
  *
  * Rigging: the head (one per face), the body and the boots are painted once; the legs and arms from their points (a
  * hip, a knee and an ankle; a shoulder, an elbow and a fist); the hat from its tilt (so he can tip it); every rope (the
@@ -833,6 +835,43 @@ const windup: Anim = (() => {
   return { loop: false, frames };
 })();
 
+/**
+ * A hop on or off the board (the board moves him along his arc): a crouch, off the ground at PIG_LEAP.upAt with his
+ * boots tucked up and the loop spinning, down at PIG_LEAP.landAt (cue `hop`, dust off his boots), then he steadies.
+ */
+export const PIG_LEAP = { upAt: 100, landAt: 600 } as const;
+const leap: Anim = (() => {
+  const frames: Frame[] = [f(100, { mood: "fierce", bob: 2, spin: 0 })];
+  for (let i = 0; i < 4; i++) frames.push(f(125, { mood: i < 2 ? "wild" : "fierce", feet: { l: [1, -4], r: [-1, -4] }, spin: (i * 2 + 1) % 8, coil: i % 2 ? 1 : -1 }));
+  frames.push(f(90, { mood: "grit", bob: 2, spin: 1 }, { cue: "hop", shake: [0, 1], specks: stompDust(0) }));
+  frames.push(f(110, { mood: "smug", bob: 1, spin: 2 }, { specks: stompDust(1) }));
+  return { loop: false, frames };
+})();
+
+/**
+ * Hauling his showdown's pairs in (the board draws the ropes, from his fists to the pieces): both fists low and pulling,
+ * leaning back, a heave every half second (cue `tug` on each, a little dust), no loop in his hands (they're out on the
+ * board). Loops: the board plays it for as long as the pairs come in.
+ */
+export const HAUL_FISTS: readonly Pt[] = [
+  [18 + OX, 48 + OY],
+  [52 + OX, 50 + OY],
+];
+const haul: Anim = (() => {
+  const frames: Frame[] = [];
+  const pose = (lean: number, bob: number, mood: Mood): PigPose => ({ mood, lean, bob, ...HAUL_ARM, fistR: [52, 50], elbowR: [55, 47], loop: null, loop2: null, coil: null });
+  for (let i = 0; i < 2; i++) {
+    frames.push(f(110, pose(-2, 1, "grit"), { cue: "tug", shake: [-1, 0], specks: dust([30, 70], 0, 6) }));
+    frames.push(f(110, pose(-2, 1, "grit"), { specks: dust([30, 70], 1, 6) }));
+    frames.push(f(140, pose(-1, 0, i ? "smug" : "fierce")));
+    frames.push(f(140, pose(-1, 0, "fierce")));
+  }
+  return { loop: true, frames };
+})();
+
+/** Where his lasso's loop lands (CATCH) in his frame (frame pixels, as `foot` is): the board puts it on the piece he drags. */
+export const CATCH_AT: Pt = [CATCH[0] + OX, CATCH[1] + OY];
+
 export const PIG: Character = {
   id: "pig",
   name: "Wrangler",
@@ -842,7 +881,50 @@ export const PIG: Character = {
   palette: PIG_PALETTE,
   halo: "#2c2624",
   parts: PARTS,
-  anims: { idle, lasso, taunt, windup },
+  anims: { idle, lasso, taunt, windup, leap, haul },
+};
+
+/**
+ * Wrangler's lines in his text box (a cowboy pig: short, drawled, a snort now and then), by moment; how often each
+ * moment gets one is PIG_CHANCE (a power's moment always has its line). The same line for everyone (picked by the
+ * moment). `pull`: his long pull; `tug`: the drag that stands in for a showdown he couldn't line up; `hold`: "Not yet...",
+ * the showdown held a turn; `spent`: his showdown's turn gone with neither a line-up nor a drag.
+ */
+export const PIG_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
+  entrance: ["Howdy, varmints.", "Saddle up!", "Yee-haw!"],
+  pull: ["The long pull!", "Giddy-up, pawn!", "Yank!"],
+  move: ["Giddy-up.", "Easy now.", "Mosey on."],
+  capture: ["Roped!", "Hog-tied!", "Got 'im!"],
+  check: ["Reach for the sky!", "Hands up!", "Corralled!"],
+  hurt: ["Oink!", "Dang varmints!", "My hat!"],
+  thinking: ["Hmm, reckon…", "Lemme think…", "Snort…"],
+  smug: ["Heh heh. Snort.", "Easy pickin's.", "Like roping fence posts."],
+  rattled: ["Uh oh…", "Rustlers!", "This ain't good…"],
+  defeat: ["I'll be danged…", "Back to the barn…", "Outdrawn…"],
+  victory: ["Yee-haw!", "Rodeo's over!", "Snort snort!"],
+  strike: ["Git along!", "Yer outta here!", "Yee-haw!"],
+  power: ["Git over here!", "C'mere, little doggie.", "Yoink!"],
+  tug: ["Fine. Just a tug, then.", "Yoink, anyhow.", "A tug'll do."],
+  hold: ["Not yet...", "Not yet... snort.", "Not yet, partner..."],
+  spent: ["Next time, varmints.", "Dang. No showdown.", "Snort. Not today."],
+  ultimateWarn: ["High noon's comin'.", "Reach for yer pieces…", "Snort. Get ready."],
+  ultimate: ["This board ain't big enough for the six of us.", "It's high noon!", "Pick yer duel, varmints."],
+};
+export const PIG_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
+  entrance: 1,
+  move: 0.12,
+  capture: 0.6,
+  check: 0.75,
+  hurt: 0.6,
+  thinking: 0.08,
+  smug: 0.8,
+  rattled: 0.8,
+  defeat: 1,
+  victory: 1,
+  strike: 0.8,
+  power: 1,
+  ultimateWarn: 1,
+  ultimate: 1,
 };
 
 /** The part of him a portrait shows (his hat and face), in frame pixels. */

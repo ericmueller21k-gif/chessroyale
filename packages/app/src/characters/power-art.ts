@@ -113,6 +113,19 @@
  *                               apart, the board's pieces clipped to halves), a `leap` back. Lines: `kit.lines.split`.
  *       leap       "leap"       A hop on or off the board: off the ground at LEAP.upAt, down at LEAP.landAt (`hop`).
  *
+ *   "Wrangler"
+ *     power        "lasso"      His lasso drag, played ON THE BOARD (components/Pig.tsx, DRAG in his rules): a `leap` from
+ *                               his corner to beside the piece, the loop thrown so its `catch` lands on it (the art's
+ *                               CATCH point on the piece's square), the `tug` dragging it one square (he steps with it,
+ *                               the rope taut), a `leap` back. The long pull after his first move is the same on his
+ *                               pawn (`more.pull`).
+ *     ultimateWarn "taunt"      His hat tip and snorting laugh, for the warning.
+ *     ultimate     "windup"     SHOWDOWN!, ON THE BOARD (SHOWDOWN): a `leap` into the middle, both loops spinning (the
+ *                               windup to its `throw`), a leap back to his corner, then `haul` while the board's ropes
+ *                               yank each pair into the line-up (a `yank` each), and "DRAW!" (the `draw` sting).
+ *     more:
+ *       hold       "taunt"      "Not yet...": the showdown held a turn (his snort).
+ *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
  *   keyed by the moment so every player gets the same line), and its sounds fire from its frames' cues.
@@ -193,6 +206,10 @@ export const POWER_ANIMS = [
   "sawDown",
   "leap",
   "boardSaw",
+  "lasso",
+  "taunt",
+  "windup",
+  "haul",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -267,6 +284,17 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     more: {
       split: { anim: "sawDown", hit: "cut", onBoard: true, effects: ["sawCrack"] },
       leap: { anim: "leap", hit: "hop", onBoard: true },
+    },
+  },
+  "Wrangler": {
+    power: { anim: "lasso", hit: "tug", onBoard: true },
+    ultimateWarn: { anim: "taunt" },
+    ultimate: { anim: "windup", hit: "throw", onBoard: true },
+    more: {
+      pull: { anim: "lasso", hit: "tug", onBoard: true },
+      haul: { anim: "haul", hit: "tug", onBoard: true },
+      leap: { anim: "leap", hit: "hop", onBoard: true },
+      hold: { anim: "taunt", hit: "snort" },
     },
   },
 };

@@ -13,13 +13,14 @@ import { GINGER_UI } from "./Ginger.tsx";
 import { GREX_UI } from "./Grex.tsx";
 import { HOLLOW_UI } from "./Hollow.tsx";
 import { SAWYER_UI } from "./Sawyer.tsx";
+import { PIG_UI } from "./Pig.tsx";
 import { PowerBanner, kitLine, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 
 /**
  * Boss powers on screen: what every player sees, from the battle's shared state (NetBoss.powers), so online everyone
  * sees the same ice, the same pie and the same moment at the same time. Each boss's own beats, moments and board layer
- * are in its file (Ginger.tsx, Boingo.tsx, Grex.tsx, Hollow.tsx, BigBoy.tsx, Sawyer.tsx, on the shapes in PowerParts.tsx); this
+ * are in its file (Ginger.tsx, Boingo.tsx, Grex.tsx, Hollow.tsx, BigBoy.tsx, Sawyer.tsx, Pig.tsx, on the shapes in PowerParts.tsx); this
  * puts them together:
  *
  * - The board layer (PowerBoard): the boss's own layer (ice, the pie, fire, the dark, a toy block), drawn over the
@@ -39,7 +40,7 @@ export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";
 export { PowerBanner, type Moment } from "./PowerParts.tsx";
 
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
-const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI] as BossUi[]).map((u) => [u.id, u]));
+const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI] as BossUi[]).map((u) => [u.id, u]));
 const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
@@ -68,6 +69,7 @@ const MOMENT_UI: Record<PowerEventKind, MomentUi> = {
   ...HOLLOW_UI.moments,
   ...BIGBOY_UI.moments,
   ...SAWYER_UI.moments,
+  ...PIG_UI.moments,
 };
 
 /** The moments that play on a screen of their own, in the order they're looked for. */
@@ -85,7 +87,7 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   const list = p.events.filter((e) => (only ? e.kind === only : !MOMENT_UI[e.kind].own)).sort((a, b) => MOMENT_UI[a.kind].order - MOMENT_UI[b.kind].order);
   let t = until - powerMomentMs(list);
   return list.map((e) => {
-    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}) };
+    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t, ms: powerFxMs(e), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}) };
     t += m.ms;
     return m;
   });
@@ -140,7 +142,7 @@ export function BossBarExtra({ boss, until = 0 }: { boss: BossView; until?: numb
 // ---------------- The moments ----------------
 
 /** The boss's line for a power's moment (its kit's), the same on every screen; null without one. */
-export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick">): string | null {
+export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult">): string | null {
   const ui = MOMENT_UI[m.kind];
   return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
 }
@@ -199,7 +201,7 @@ export function PowerMoment({ boss, moment, now, orientation, side }: { boss: Bo
     const since = moment.at + hitAt - (cueAt(a, hit) ?? 0);
     if (now < since) return null;
     return (
-      <span class="pm-caster">
+      <span class={`pm-caster pm-by-${kit!.ch.id}`}>
         <BossMoment boss={boss.name} anim={anim} since={since} then="idle" />
       </span>
     );

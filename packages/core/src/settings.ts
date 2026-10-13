@@ -653,11 +653,12 @@ export const BOSS_POWERS = {
   /**
    * Wrangler's lasso drag (his passive): after his move, from crowd turn dragFirst, every dragEvery turns, he ropes one
    * crowd piece (never the king) and drags it one square up, down, left or right onto an empty square (a pawn never onto
-   * the first or last rank), never leaving the crowd in check or without a move. Of the legal drags (at most
-   * dragCandidates, a seeded sample, none leaving more of the crowd's material hanging), each glanced at by the engine
-   * (dragScreenNodes), the dragConfirm nearest the band's middle are looked at properly (dragNodes, as is the position
-   * before), and the one costing the crowd nearest the middle of dragLoss (in pawns: bouncePawnLogit) is played (seeded
-   * among ties). None in the band: no drag that turn, and it doesn't count (he tries again after his next move). About
+   * the first or last rank; never a bishop: it would change colour), never leaving the crowd in check or without a move.
+   * In a game already decided (past 4 pawns either way) there's none: the engine can't read a loss there. Of the legal
+   * drags (at most dragCandidates, a seeded sample, none leaving more of the crowd's material hanging), each glanced at
+   * by the engine (dragScreenNodes), the dragConfirm nearest the band's middle are looked at properly (dragNodes, as is
+   * the position before), and the one costing the crowd nearest the middle of dragLoss (in pawns: bouncePawnLogit) is
+   * played (seeded among ties). None in the band: no drag that turn, and it doesn't count (he tries again after his next move). About
    * 3 to 4 a battle of 30 to 40 crowd moves (turns 3, 13, 23, 33), by estimate (Eric's rule on power rates): not yet
    * tested with the bot sim.
    */
@@ -665,22 +666,27 @@ export const BOSS_POWERS = {
   dragEvery: 10,
   dragLoss: [0.1, 0.9] as readonly [number, number],
   dragCandidates: 16,
-  dragScreenNodes: 15_000,
+  dragScreenNodes: 8_000,
   dragConfirm: 3,
-  dragNodes: 100_000,
+  dragNodes: 50_000,
   /**
    * Wrangler's showdown (his ultimate, as the crowd turn after the warning begins): three pairs (a crowd piece and one of
    * his of the same kind: queens, rooks, then bishops or knights, the most valuable pairs there are) lined up facing
    * each other in the middle of the board (files b-g, ranks 3-6), his pieces always protected; the crowd's next move
    * must be one of the duels (its piece taking his). The host's engine (solo: this device's) searches line-ups: the
-   * crowd's best duel leaves him showdownEdge pawns up (nearest showdownTarget, seeded among ties), and another duel
-   * costs the crowd at least showdownTrap pawns more; never a check, never a mate in 1 for him after the best duel.
+   * crowd's best duel gains him showdownEdge pawns over the position before the line-up (nearest showdownTarget, seeded
+   * among ties: DECISIONS.md, "Wrangler, built", on why it's measured from the position before), and another duel costs
+   * the crowd at least showdownTrap pawns more; never a check, never a mate for him after the best duel.
    * - The search: while the crowd thinks (from showdownScoutFrom of the meter, and through the warning), up to
-   *   showdownSearchMs a turn on the position then; at his turn, after his move, the line-ups it found are checked on
-   *   the new position first, then a fresh search for up to showdownTurnMs (at most showdownSetups line-ups a search).
-   *   Each line-up costs one search per duel at showdownNodes; the pick is looked at again at showdownConfirmNodes.
-   * - Nothing found: he holds ("Not yet...") and tries again after his next move, up to showdownHolds times; then a
-   *   showdown of two pairs under the same rule; then a lasso drag (the passive's band).
+   *   showdownSearchMs a turn on the position then (an engine of its own); at his turn, after his move, the promising
+   *   line-ups it found are scanned again on the new position first, then fresh ones, for up to showdownTurnMs (at most
+   *   showdownSetups line-ups a search; on his last try half each for three pairs and two). Each line-up costs one
+   *   search per duel at showdownNodes (a quick scan, read with some slack); the promising ones are looked at closely at
+   *   showdownConfirmNodes. Measured (8 middlegames, one engine on a computer): about 1 line-up in 9 meets the goal;
+   *   found in 1 to 3 s where one exists. A phone is 3 to 5 times slower: the scout's time is what it leans on.
+   * - Nothing found: he holds ("Not yet...") and tries again after his next move, up to showdownHolds times (none when
+   *   the board no longer holds three matched pairs); then a showdown of two pairs under the same rule; then a lasso drag
+   *   (the passive's band).
    */
   showdownEdge: [0.1, 1.2] as readonly [number, number],
   showdownTarget: 0.5,
@@ -689,8 +695,8 @@ export const BOSS_POWERS = {
   showdownSearchMs: 8000,
   showdownTurnMs: 3000,
   showdownSetups: 60,
-  showdownNodes: 20_000,
-  showdownConfirmNodes: 60_000,
+  showdownNodes: 8_000,
+  showdownConfirmNodes: 40_000,
   showdownHolds: 2,
 } as const;
 

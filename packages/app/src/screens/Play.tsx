@@ -15,6 +15,7 @@ import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
+import { duelCount, duelTurn } from "../components/Pig.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
@@ -176,7 +177,9 @@ export function PlayScreen({
     kingTurn(board.fen);
     const w = knownEval(board.fen);
     const prevFen = board.history.length >= 2 ? fenAtPly(board.history, board.history.length - 2, board.bases) : undefined;
-    return turnCues({ fen: board.fen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen });
+    const cues = turnCues({ fen: board.fen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen });
+    // (Wrangler's forced duel: the move must be a duel, so "move your queen" or "shield the king" can't be heeded.)
+    return duelTurn(match.boss) ? cues.filter((c) => c.cue !== "queenDanger" && c.cue !== "mateThreat") : cues;
   }, [board.fen, strike?.at, waiting]);
 
   return (
@@ -276,6 +279,11 @@ export function PlayScreen({
                 <span class="muted">
                   {strike.calls}/{strike.needed} needed. Pick your move.
                 </span>
+              </span>
+            ) : duelTurn(match.boss) ? (
+              // Wrangler's showdown: the rule the player must play by, whole, for the whole turn.
+              <span class="duel-note">
+                <strong>Showdown!</strong> <span class="muted">Take one of his {duelCount(match.boss) === 2 ? "two" : "three"}.</span>
               </span>
             ) : (
               <span>

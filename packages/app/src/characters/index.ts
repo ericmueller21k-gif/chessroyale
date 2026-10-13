@@ -7,12 +7,13 @@ import { GREX } from "./grex.ts";
 import { HOLLOW } from "./hollow.ts";
 import { PAWN_GOLEM } from "./pawn-golem.ts";
 import { SAWYER } from "./sawyer.ts";
+import { PIG } from "./pig.ts";
 import type { Character } from "./sprite.ts";
 
 export type { Character } from "./sprite.ts";
 
 /** Every character drawn so far: the bosses, and the God King (the crowd's champion). */
-export const CHARACTERS: readonly Character[] = [BLACK_KNIGHT, PAWN_GOLEM, CLOWN, GINGERBREAD, GREX, HOLLOW, BIGBOY, SAWYER, GOD_KING];
+export const CHARACTERS: readonly Character[] = [BLACK_KNIGHT, PAWN_GOLEM, CLOWN, GINGERBREAD, GREX, HOLLOW, BIGBOY, SAWYER, PIG, GOD_KING];
 
 // The bosses' powers: the moments their characters play and the effect sprites for the board (see power-art.ts).
 export { EFFECT_NAMES, EFFECTS, POWER_ANIMS, POWER_MOMENTS, animLength, cueAt, type BossPowerMoments, type Effect, type EffectName, type PowerAnim, type PowerMoment } from "./power-art.ts";
