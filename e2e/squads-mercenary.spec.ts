@@ -122,7 +122,7 @@ test("earning coins: your capture pays your squad's wallet (a knight's worth), s
         ),
       { timeout: 60_000 },
     )
-    .toMatchObject({ piece: "n", board: s.duty!.board, coins: SQUADS.mercenary.capture.n });
+    .toMatchObject({ piece: "n", board: s.duty!.board, coins: SQUADS.mercenary.capture.n * SQUADS.mercenary.roundScale[0] });
   const w = await wallet(page);
   expect(w.coins).toBeGreaterThanOrEqual(SQUADS.mercenary.capture.n);
   expect(w.earned).toBe(w.coins);

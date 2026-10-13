@@ -143,9 +143,9 @@ export function scouting(m: Pick<NetSquadsMatch, "state" | "current">, playerId:
  * side's moves still being thought about (a duty whose players haven't all locked in) drains it past the free seconds;
  * a move locked in stopped draining when it was. The exact bank comes with the half's result.
  */
-export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked" | "lockedAt"> & { delays?: readonly number[] }, side: Side, now: number): number {
+export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked" | "lockedAt">, side: Side, now: number): number {
   const start = m.banks[side];
-  const delay = freeMs(m, side);
+  const delay = freeMs(m);
   if (m.state !== "half" || !m.current || start <= 0) return Math.max(0, start);
   const t0 = m.current.startedAt;
   const t = now - t0;
@@ -159,13 +159,13 @@ export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "de
   return Math.max(0, start - drained);
 }
 
-/** A side's free time a move (ms): the match's, more with a breather (Mercenary). */
-export const freeMs = (m: Pick<LocalMatch, "delayMs"> & { delays?: readonly number[] }, side: Side): number => m.delays?.[side] ?? m.delayMs;
+/** The free time a move (ms), before a squad's bank starts to drain. */
+export const freeMs = (m: Pick<LocalMatch, "delayMs">): number => m.delayMs;
 
 /** How many of a side's moves are draining its bank right now (2: Relay's two movers, twice as fast). */
-export function drainRate(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked"> & { delays?: readonly number[] }, side: Side, now: number): number {
+export function drainRate(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked">, side: Side, now: number): number {
   if (m.state !== "half" || !m.current || m.banks[side] <= 0) return 0;
-  if (now - m.current.startedAt <= freeMs(m, side)) return 0;
+  if (now - m.current.startedAt <= freeMs(m)) return 0;
   return m.current.duties.filter((d) => d.side === side && !d.players.every((p) => m.locked.includes(p)) && now < d.deadline).length;
 }
 
@@ -364,15 +364,12 @@ export const lobbyMode = (lobby: Pick<NetSquadsLobby, "rules"> | null): SquadsMo
 export const walletOf = (wallets: readonly NetWallet[], squadId: number | null | undefined): NetWallet | null => wallets.find((w) => w.squadId === squadId) ?? null;
 
 /** Each item's name and what it does, in one line, with its numbers from settings. */
-export function itemText(item: MercItem, s: SquadsSettings = SQUADS, freeSeconds?: number): { name: string; line: string; one: string } {
+export function itemText(item: MercItem, s: SquadsSettings = SQUADS): { name: string; line: string; one: string } {
   const c = s.mercenary;
-  // (The lobby's own free seconds when known; else the default clock's. Numbers and units never split across lines.)
-  const free = freeSeconds ?? (s.clocks[s.clockDefault] ?? s.clocks[0]!).delaySeconds;
+  // (Numbers and units never split across lines.)
   switch (item) {
     case "stockfish":
       return { name: "Stockfish token", one: "a Stockfish token", line: `Your top ${c.stockfish.lines} moves for one decision, with their evaluations. Never theirs.` };
-    case "breather":
-      return { name: "Breather", one: "a breather", line: `${c.breatherFactor === 2 ? "Double" : `${c.breatherFactor}×`} free seconds a move (${free}\u00a0s\u00a0→\u00a0${Math.round(free * c.breatherFactor)}\u00a0s).` };
     case "blocks":
       return { name: "Block points", one: `${c.blockPoints} block points`, line: `+${c.blockPoints} block points.` };
     case "shield":

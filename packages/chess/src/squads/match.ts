@@ -17,7 +17,7 @@ import {
 } from "./board.ts";
 import { allowedMoves, checkBlock, isBlocked, liftBlocks, type BlockError, type BlockLift, type BlockPiece, type SquadsBlock } from "./blocks.ts";
 import { ROUND_FORMAT, coin, squadsRng, type Squad, type SquadsFormat, type SquadsRound } from "./lobby.ts";
-import { boardCoins, brilliantCandidate, captureCoins, capturedPiece, type BrilliantCandidate, type CapturePiece, type CoinWhy, type ItemCounts } from "./mercenary.ts";
+import { boardCoins, brilliantCandidate, captureCoins, capturedPiece, itemCounts, type BrilliantCandidate, type CapturePiece, type CoinWhy, type ItemCounts } from "./mercenary.ts";
 import { pairSchedule, relaySeat } from "./schedule.ts";
 import type { TokenUse, TokenVerdict } from "./tokens.ts";
 import { modeOf, type SquadsMode, type SquadsRules } from "./votes.ts";
@@ -99,8 +99,6 @@ export interface SquadsMatch {
   tokenLog: readonly TokenUse[];
   /** Classic (no blocks, no coins) or Mercenary (coins earned as "coins" events; items from the shop). */
   mode: SquadsMode;
-  /** Each side's free time a move (ms): `delayMs`, multiplied for a side with a breather (Mercenary). */
-  delays: readonly [number, number];
   /** Mercenary: what each side brought from the shop (null in Classic, or before the kit is in). */
   kit: readonly [ItemCounts, ItemCounts] | null;
   /** Mercenary: each side's Stockfish tokens and shields left in this match (from its kit). */
@@ -129,26 +127,27 @@ export interface AssistUse {
 }
 
 /**
- * A match stored before the modes came (a lobby in play across the deploy): Classic, with none of Mercenary's fields
- * yet, so the rules and the views never read a missing one.
+ * A match stored by an earlier version (a lobby in play across a deploy) in today's shape, so the rules and the views
+ * never read a missing field or a gone item:
+ * - from before the modes: Classic, with none of Mercenary's fields;
+ * - from before the Breather was taken out (Oct 13): its kit without the breather, and no per-side free seconds
+ *   (`delays`): a squad that brought one plays on with the match's own free seconds.
  */
 export function upgradeMatch(m: SquadsMatch): SquadsMatch {
-  const old = m as Partial<SquadsMatch> & SquadsMatch;
-  if (old.mode && old.delays && old.stockfish && old.shields && old.assists && old.coins && old.kit !== undefined) return m;
+  const old = m as Partial<SquadsMatch> & SquadsMatch & { delays?: unknown };
+  const kitOk = !old.kit || old.kit.every((k) => !("breather" in k));
+  if (old.mode && old.stockfish && old.shields && old.assists && old.coins && old.kit !== undefined && kitOk && !("delays" in old)) return m;
+  const { delays: _gone, ...rest } = old;
   return {
-    ...m,
+    ...rest,
     mode: old.mode ?? "classic",
-    delays: old.delays ?? [m.delayMs, m.delayMs],
-    kit: old.kit ?? null,
+    kit: old.kit ? [itemCounts(old.kit[0]), itemCounts(old.kit[1])] : null,
     stockfish: old.stockfish ?? [0, 0],
     shields: old.shields ?? [0, 0],
     assists: old.assists ?? [],
     coins: old.coins ?? [0, 0],
   };
 }
-
-/** A side's free time a move (ms). */
-export const delayOf = (m: Pick<SquadsMatch, "delays" | "delayMs">, side: Side): number => m.delays?.[side] ?? m.delayMs;
 
 // ---- Starting positions ----
 
@@ -210,8 +209,7 @@ export interface MatchSetup {
   blockBanks?: readonly [number, number];
   /** Classic (the default) or Mercenary. */
   mode?: SquadsMode;
-  /** Armageddon after a drawn final carries the final's items on: its free seconds, tokens, shields and kit. */
-  delaysMs?: readonly [number, number];
+  /** Armageddon after a drawn final carries the final's items on: its tokens, shields and kit. */
   stockfish?: readonly [number, number];
   shields?: readonly [number, number];
   kit?: readonly [ItemCounts, ItemCounts] | null;
@@ -222,7 +220,6 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
   for (const st of o.starts) if (colourToMove(st) !== "w") throw new Error("Every board starts with White to move");
   return {
     mode: o.mode ?? "classic",
-    delays: o.delaysMs ? [o.delaysMs[0], o.delaysMs[1]] : [o.delayMs, o.delayMs],
     kit: o.kit ?? null,
     stockfish: o.stockfish ? [o.stockfish[0], o.stockfish[1]] : [0, 0],
     shields: o.shields ? [o.shields[0], o.shields[1]] : [0, 0],
@@ -320,8 +317,8 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
 
 /**
  * Mercenary: each side's kit (what its squad bought for this match) comes in as the match starts: time coins into its
- * team bank, block points into its block bank, a breather multiplying its free seconds a move, its Stockfish tokens
- * and shields. Once, before the first half (a match whose kit is in keeps it); used here or lost.
+ * team bank, block points into its block bank, its Stockfish tokens and shields. Once, before the first half (a
+ * match whose kit is in keeps it); used here or lost.
  */
 export function applyKits(m: SquadsMatch, kits: readonly [ItemCounts, ItemCounts], s: SquadsSettings = SQUADS): SquadsMatch {
   if (m.mode !== "mercenary" || m.kit !== null || m.turn !== 0 || m.half !== "w" || m.result) return m;
@@ -329,10 +326,9 @@ export function applyKits(m: SquadsMatch, kits: readonly [ItemCounts, ItemCounts
   const per = <T>(f: (k: ItemCounts, side: Side) => T): [T, T] => [f(kits[0], 0), f(kits[1], 1)];
   return {
     ...m,
-    kit: [{ ...kits[0] }, { ...kits[1] }],
+    kit: [itemCounts(kits[0]), itemCounts(kits[1])],
     banks: per((k, side) => m.banks[side] + k.time * c.timeSeconds * 1000),
     blockBanks: per((k, side) => m.blockBanks[side] + k.blocks * c.blockPoints),
-    delays: per((k, side) => (k.breather > 0 ? Math.round(m.delayMs * c.breatherFactor) : m.delays[side])),
     stockfish: per((k) => k.stockfish),
     shields: per((k) => k.shield),
   };
@@ -377,7 +373,7 @@ export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuti
   if (m.result) return out;
   const n = m.boards.length;
   const ceiling = s.moveCeilingSeconds * 1000;
-  const deadline = (side: Side) => (m.banks[side] > 0 ? ceiling : delayOf(m, side));
+  const deadline = (side: Side) => (m.banks[side] > 0 ? ceiling : m.delayMs);
   for (const b of m.boards) {
     const side = sideOf(b, m.half);
     const deadlineMs = deadline(side);
@@ -826,15 +822,14 @@ export function bankRunsOut(ends: readonly number[], delayMs: number, bankMs: nu
  * A squad's bank this half. Each of its moves (a Relay mover, a pair, the final's squad) drains it from the free
  * seconds until the move is made (its slowest player, or a block placed later, which is thinking time too), or to the
  * ceiling if one of them never chose; several at once drain it together. If it runs out, moves not yet made are cut
- * off; at zero (sudden death) each move has only the free seconds. (The free seconds are the side's own: a breather
- * multiplies them.)
+ * off; at zero (sudden death) each move has only the free seconds.
  */
 function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
   const { m, s } = c;
   if (!duties.length) return;
   const bank = c.banks[side];
   const ceiling = s.moveCeilingSeconds * 1000;
-  const delay = delayOf(m, side);
+  const delay = m.delayMs;
   if (bank <= 0) {
     c.cutoff[side] = delay;
     c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: 0, leftMs: 0, suddenDeath: true });
@@ -891,10 +886,19 @@ function pay(c: Ctx, side: Side, coins: number, why: CoinWhy, board: number | nu
   c.events.push({ kind: "coins", turn: c.m.turn, half: c.m.half, side, coins, why, board, ...extra });
 }
 
+/**
+ * Mercenary: a finished match's coins. Both squads get the base for playing it (`played`, the steady part of the
+ * economy; a drawn final's Armageddon doesn't pay it again), the winner `matchWin` more.
+ */
+function payMatch(c: Ctx, result: MatchResult) {
+  if (!c.m.armageddon) for (const side of [0, 1] as const) pay(c, side, c.s.mercenary.played, "played", null);
+  if (result.winner != null) pay(c, result.winner, c.s.mercenary.matchWin, "match_win", null);
+}
+
 /** Mercenary: a finished board's coins (a win and any mate bonus, or a draw for each side). */
 function payBoard(c: Ctx, b: SquadsBoard) {
   if (c.m.mode !== "mercenary" || !b.result) return;
-  for (const x of boardCoins(b.result, c.s)) pay(c, sideOf(b, x.colour), x.coins, x.why, b.id);
+  for (const x of boardCoins(b.result, c.m.round, c.s)) pay(c, sideOf(b, x.colour), x.coins, x.why, b.id);
 }
 
 function play(c: Ctx, board: number, move: string) {
@@ -903,7 +907,7 @@ function play(c: Ctx, board: number, move: string) {
   const taken = c.m.mode === "mercenary" ? capturedPiece(b.fen, move) : null;
   const next = playOnBoard(b, move);
   c.boards[board] = next;
-  if (taken) pay(c, sideOf(b, c.m.half), captureCoins(taken, c.s), "capture", board, { move, piece: taken });
+  if (taken) pay(c, sideOf(b, c.m.half), captureCoins(taken, c.m.round, c.s), "capture", board, { move, piece: taken });
   if (next.result) {
     c.events.push({ kind: "board_end", board, result: next.result });
     payBoard(c, next);
@@ -1014,7 +1018,7 @@ function afterHalf(c: Ctx, stockfish: [number, number]): HalfOutcome {
   });
   const banks: [number, number] = [Math.max(0, c.banks[0]), Math.max(0, c.banks[1])];
   const result = matchResultOf({ ...m, boards: c.boards, banks }, s);
-  if (result?.winner != null) pay(c, result.winner, s.mercenary.matchWin, "match_win", null);
+  if (result) payMatch(c, result);
   if (result) c.events.push({ kind: "match_end", result });
   const match: SquadsMatch = {
     ...m,
@@ -1127,7 +1131,6 @@ export function startArmageddon(final: SquadsMatch, white: Side, start: BoardSta
       blockBanks: final.blockBanks,
       // (The same round: Mercenary's items carry on from the final, as its block banks do.)
       mode: final.mode,
-      delaysMs: final.delays,
       stockfish: final.stockfish,
       shields: final.shields,
       kit: final.kit,
@@ -1155,11 +1158,12 @@ export function endByMaterial(m: SquadsMatch, s: SquadsSettings = SQUADS): { mat
     if (b.result) return b;
     const done = decideByMaterial(b, "admin", s);
     events.push({ kind: "board_end", board: b.id, result: done.result! });
-    for (const x of boardCoins(done.result!, s)) pay(sideOf(b, x.colour), x.coins, x.why, b.id);
+    for (const x of boardCoins(done.result!, m.round, s)) pay(sideOf(b, x.colour), x.coins, x.why, b.id);
     return done;
   });
   const decided = matchResultOf({ ...m, boards }, s)!;
   const result: MatchResult = decided.winner !== null ? { ...decided, how: "admin" } : tiebreak(m, decided.points, true);
+  if (!m.armageddon) for (const side of [0, 1] as const) pay(side, s.mercenary.played, "played", null);
   if (result.winner !== null) pay(result.winner, s.mercenary.matchWin, "match_win", null);
   events.push({ kind: "match_end", result });
   return { match: { ...m, boards, blocks: [], coins, result }, events };

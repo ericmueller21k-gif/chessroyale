@@ -35,21 +35,21 @@ Minutes from the votes to the final's last move (Armageddon included).
 
 | Clock | Median | 90th percentile | Longest | Shortest | Median if rounds ran in lockstep |
 | --- | --- | --- | --- | --- | --- |
-| #1 (4, +1, 3 s free) | 33.1 | 39.1 | 50.2 | 27.2 | 33.6 |
+| #1 (4, +1, 3 s free) | 32.0 | 36.4 | 45.5 | 22.1 | 32.2 |
 
 By skill mix (median minutes):
 
 | Mix | #1 |
 | --- | --- |
-| Strong | 35.9 |
-| Mixed | 32.4 |
-| Casual | 32.6 |
+| Strong | 34.4 |
+| Mixed | 31.9 |
+| Casual | 30.9 |
 
 A match's length (mean minutes, Armageddon included) and its moves per side (its longest board):
 
 | Clock | Round 1 (Relay): min | Round 2 (Pairs): min | Final: min | Round 1 (Relay): moves | Round 2 (Pairs): moves | Final: moves |
 | --- | --- | --- | --- | --- | --- | --- |
-| #1 | 8.4 | 10.8 | 11.3 | 35.5 | 39.8 | 30.7 |
+| #1 | 8.4 | 10.1 | 10.5 | 35.5 | 38.4 | 30.3 |
 
 ## Sudden death
 
@@ -57,7 +57,7 @@ A squad whose bank reaches zero plays every move within the free seconds from th
 
 | Clock | Squads that reach it | …first in round 1 | …in round 2 | …in the final | Moves made in sudden death | …round 1 | …round 2 | …final | Moves out of time (random) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| #1 | 39.1% | 17.5% | 36.8% | 12.5% | 5.2% | 3.0% | 12.5% | 5.6% | 0.9% |
+| #1 | 43.6% | 17.5% | 45.8% | 12.5% | 6.2% | 3.0% | 16.6% | 7.5% | 1.0% |
 
 ## Bank carried forward
 
@@ -65,7 +65,7 @@ Round 1 winners, split at the median length of their round 1 match: the bank the
 
 | Clock | Bank left, faster R1 wins | Bank left, slower R1 wins | Faster R1 matches (min) | Slower R1 matches (min) | R2: more bank wins | Final: more bank wins |
 | --- | --- | --- | --- | --- | --- | --- |
-| #1 | 30.7 s | 12.9 s | 7.3 | 9.4 | 52.1% of 142 | 48.6% of 70 |
+| #1 | 30.7 s | 12.9 s | 7.3 | 9.4 | 59.7% of 144 | 50.0% of 64 |
 
 ## How boards end
 
@@ -74,8 +74,8 @@ All mixes.
 | Clock | Round | Mate | Draw by the rules | Safety cap | Left unfinished (clinched) |
 | --- | --- | --- | --- | --- | --- |
 | #1 | Round 1 (Relay) | 92.5% | 0.3% | 0.0% | 7.1% |
-| #1 | Round 2 (Pairs) | 98.6% | 1.4% | 0.0% | 0.0% |
-| #1 | Final | 100.0% | 0.0% | 0.0% | 0.0% |
+| #1 | Round 2 (Pairs) | 99.7% | 0.3% | 0.0% | 0.0% |
+| #1 | Final | 98.6% | 1.4% | 0.0% | 0.0% |
 
 ## Ties
 
@@ -83,13 +83,13 @@ Rounds 1 and 2: a level match goes to the squad with more team bank left (a coin
 
 | Clock | R1 clinched early | R1 level → bank | R2 level → bank | Level → coin | Median bank gap deciding a tie (s) | Final drawn → Armageddon | Armageddon won by Black |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| #1 | 28.5% | 31.6% | 36.1% | 24 of 167 | 11.3 | 0.0% | – |
+| #1 | 28.5% | 31.6% | 30.6% | 34 of 169 | 10.2 | 1.4% | 0.0% of 1 |
 
 ## Missed actions
 
 | Clock | Actions per lobby | Missed (absent or out of time) | Seats handed to a bot, per lobby |
 | --- | --- | --- | --- |
-| #1 | 1634.6 | 2.6% | 0.0 |
+| #1 | 1627.0 | 2.7% | 0.0 |
 
 ## Round 2: how often the coin plays the weaker pick
 
@@ -97,9 +97,9 @@ Per pair move (forced moves left out). "Weaker" is by the engine's expected scor
 
 | Mix | Pair moves | Picks 1+ point apart | Coin played the weaker pick (1+ point) | …weaker by 5+ points | …weaker by 20+ points | Moves with a missed slot |
 | --- | --- | --- | --- | --- | --- | --- |
-| Strong | 6276 | 26.7% | 13.4% | 5.9% | 2.0% | 5.9% |
-| Mixed | 6005 | 29.0% | 14.7% | 7.5% | 2.6% | 5.8% |
-| Casual | 6078 | 23.4% | 12.3% | 6.1% | 2.3% | 6.3% |
+| Strong | 6379 | 28.4% | 14.1% | 6.5% | 2.2% | 6.9% |
+| Mixed | 5795 | 27.2% | 13.9% | 7.1% | 2.7% | 6.5% |
+| Casual | 5981 | 24.9% | 12.6% | 6.2% | 2.4% | 6.9% |
 
 ## Round 2: same-move tokens
 
@@ -107,9 +107,9 @@ Per pair move (forced moves left out). "Weaker" is by the engine's expected scor
 
 | Mix | Tokens burned per squad per match | Refunded | Not refunded: another move close | …another move better | …unranked or no judge |
 | --- | --- | --- | --- | --- | --- |
-| Strong | 2.1 | 74.3% | 25.7% | 0.0% | 0.0% |
-| Mixed | 1.8 | 75.7% | 24.3% | 0.0% | 0.0% |
-| Casual | 1.4 | 75.8% | 24.2% | 0.0% | 0.0% |
+| Strong | 2.1 | 75.5% | 24.5% | 0.0% | 0.0% |
+| Mixed | 1.5 | 77.4% | 22.6% | 0.0% | 0.0% |
+| Casual | 1.4 | 75.6% | 24.4% | 0.0% | 0.0% |
 
 ## Blocks (every round)
 
@@ -118,14 +118,14 @@ A 5-point bank per squad per match. Bots block sparingly: the other squad's like
 | Mix | Round | Blocks per squad per match | Points spent per squad per match | In effect | Lifted: impossible after the move | …in check | …no move left | …mate in one |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Strong | Round 1 (Relay) | 2.9 | 4.7 | 100.0% | 0.0% | 0.0% | 0.0% | 0.0% |
-| Strong | Round 2 (Pairs) | 3.3 | 4.2 | 70.0% | 14.1% | 0.0% | 0.0% | 0.0% |
-| Strong | Final | 2.0 | 2.3 | 64.2% | 5.3% | 0.0% | 0.0% | 0.0% |
+| Strong | Round 2 (Pairs) | 3.4 | 4.2 | 66.4% | 17.1% | 0.0% | 0.0% | 0.0% |
+| Strong | Final | 2.4 | 2.4 | 50.4% | 6.2% | 0.0% | 0.0% | 0.0% |
 | Mixed | Round 1 (Relay) | 3.0 | 4.6 | 100.0% | 0.0% | 0.0% | 0.0% | 0.0% |
-| Mixed | Round 2 (Pairs) | 3.5 | 4.5 | 72.2% | 13.4% | 0.0% | 0.0% | 0.0% |
-| Mixed | Final | 1.5 | 1.7 | 56.8% | 0.0% | 0.0% | 0.0% | 0.0% |
+| Mixed | Round 2 (Pairs) | 3.3 | 4.3 | 72.4% | 10.6% | 0.3% | 0.0% | 0.0% |
+| Mixed | Final | 2.2 | 1.8 | 46.7% | 5.7% | 0.0% | 0.0% | 0.0% |
 | Casual | Round 1 (Relay) | 3.0 | 4.6 | 100.0% | 0.0% | 0.0% | 0.0% | 0.0% |
-| Casual | Round 2 (Pairs) | 3.2 | 3.9 | 70.5% | 12.5% | 0.0% | 0.0% | 0.0% |
-| Casual | Final | 1.6 | 1.7 | 57.0% | 5.1% | 0.0% | 0.0% | 0.0% |
+| Casual | Round 2 (Pairs) | 3.4 | 4.1 | 66.4% | 14.4% | 0.0% | 0.0% | 0.0% |
+| Casual | Final | 1.7 | 1.5 | 47.5% | 8.8% | 0.0% | 0.0% | 0.0% |
 
 ## The final: the vote
 
@@ -133,24 +133,27 @@ Per move of the final (and its Armageddon), forced moves left out.
 
 | Mix | Moves | Picks counted (mean) | A clear majority (3+ of 4) | 2 of 4 on the top move | A tie (the coin) | Nobody picked | The move played worse than the best pick (1+ point) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Strong | 1640 | 3.9 | 70.4% | 17.4% | 12.2% | 0.0% | 4.2% |
-| Mixed | 1449 | 3.9 | 64.5% | 21.6% | 13.9% | 0.0% | 7.9% |
-| Casual | 1230 | 3.9 | 55.1% | 28.3% | 16.6% | 0.0% | 12.4% |
+| Strong | 1653 | 3.9 | 74.0% | 15.7% | 10.1% | 0.1% | 3.5% |
+| Mixed | 1410 | 3.9 | 65.2% | 19.2% | 15.5% | 0.0% | 7.4% |
+| Casual | 1232 | 3.9 | 55.5% | 26.2% | 18.3% | 0.0% | 9.8% |
 
 ## Mercenary: the economy
 
-Every lobby here is Mercenary. Earning: a capture by the piece taken (P 3, N 9, B 9, R 15, Q 27), a board won 50 (a mate 50 more), drawn 15 each, a match won 75, a brilliant move 75.
-Catch-up: 50.0% of the earned gap to the next opponent, at most 300. Prices: stockfish 200 (cap 2), breather 150 (cap 1), blocks 100 (cap 2), shield 100 (cap 2), time 75 (cap 2), each +100 for every one already bought. The people's shopping is played by the bots' policy (`botShop`): before the final it saves everything 25.0% of the time, else spends 50.0%–90.0% of its wallet; in the final all of it.
+Every lobby here is Mercenary. Earning: a capture by the piece taken (P 1, N 3, B 3, R 5, Q 9), a board won 40 (a mate 25 more), drawn 15 each, those times 1, 2, 4 in Relay, Pairs and the final; a match won 150, a brilliant move 25 (at most 2 a squad a match).
+Catch-up: 50.0% of the earned gap to the next opponent, at most 150. Prices: stockfish 200 (cap 2), blocks 100 (cap 2), shield 100 (cap 2), time 75 (cap 2), each +100 for every one already bought. The people's shopping is played by the bots' policy (`botShop`): before the final it saves everything 25.0% of the time, else spends 50.0%–90.0% of its wallet; in the final all of it.
 
 ### Coins earned per squad per round
 
 Coins by play (catch-up apart), each squad in each match it played (Armageddon with its final).
 
-| Round | All: median | 10th–90th | Winners: median | Losers: median | Captures (mean) | Board wins | Mates | Draws | Match win | Brilliant |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Round 1 (Relay) | 446 | 153–663 | 609 | 271 | 207 | 93 | 93 | 0 | 38 | 5 |
-| Round 2 (Pairs) | 259 | 51–461 | 394 | 105 | 119 | 49 | 49 | 0 | 38 | 3 |
-| Final | 196 | 12–277 | 256 | 24 | 55 | 25 | 25 | 0 | 38 | 0 |
+| Round | All: median | 10th–90th | Mean | Winners: median | 10th–90th | Losers: median | 10th–90th | Base: played (mean) | Captures | Board wins | Mates | Draws | Match win | Brilliant | Base share |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Round 1 (Relay) | 512 | 251–641 | 466 | 622 | 540–650 | 322 | 235–411 | 200 | 69 | 74 | 46 | 0 | 75 | 2 | 59% |
+| Round 2 (Pairs) | 512 | 234–732 | 484 | 686 | 542–742 | 276 | 224–432 | 200 | 78 | 80 | 50 | 0 | 75 | 1 | 57% |
+| Final | 630 | 220–746 | 484 | 730 | 678–758 | 240 | 212–292 | 200 | 77 | 80 | 50 | 1 | 75 | 1 | 57% |
+
+
+Winners' rounds before a shop (Relay and Pairs): 100.0% earned at least 400 (a Stockfish token, a time reload of 100 and a shield or block points), 14.4% at least 700 (a second token too).
 
 ### The shop
 
@@ -158,26 +161,26 @@ Each squad still in, as it shops for its next match: its wallet (catch-up includ
 
 | Shopping for | Wallet: median | 10th–90th | Spent: median | Items bought (mean) | Saved everything | Items at their cap (mean) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Round 2 (Pairs) | 621 | 509–693 | 350 | 2.4 | 26.4% | 0.6 |
-| Final | 690 | 518–1,048 | 625 | 3.9 | 0.0% | 1.4 |
+| Round 2 (Pairs) | 627 | 561–651 | 300 | 2.4 | 26.4% | 0.5 |
+| Final | 957 | 769–1,321 | 875 | 4.6 | 0.0% | 1.6 |
 
 What was bought (per squad shopping, mean):
 
-| Shopping for | stockfish | breather | blocks | shield | time |
-| --- | --- | --- | --- | --- | --- |
-| Round 2 (Pairs) | 0.1 | 0.2 | 0.8 | 0.5 | 0.6 |
-| Final | 0.3 | 0.5 | 1.1 | 0.9 | 1.0 |
+| Shopping for | stockfish | blocks | shield | time |
+| --- | --- | --- | --- | --- |
+| Round 2 (Pairs) | 0.1 | 0.9 | 0.6 | 0.7 |
+| Final | 0.6 | 1.5 | 1.2 | 1.4 |
 
 ### Catch-up and snowballing
 
-Matches of round 2 and the final: the squads' earned gap before catch-up, the catch-up paid, how often the squad that had earned less won, and how often the squad that spent more won.
+Matches of round 2 and the final: the squads' earned gap before catch-up, the catch-up paid, the poorer squad's coins as a share of the richer's going into the match (earned before catch-up; wallets with it, before shopping), how often the squad that had earned less won, and how often the squad that spent more won.
 
-| Round | Matches | Earned gap: median | Catch-up: median | The poorer squad won | The squad that spent more won |
-| --- | --- | --- | --- | --- | --- |
-| Round 2 (Pairs) | 144 | 72 | 40 | 48.3% of 143 | 62.4% of 125 |
-| Final | 72 | 138 | 70 | 45.8% of 72 | 47.7% of 65 |
+| Round | Matches | Earned gap: median | Catch-up: median | Earned, poorer ÷ richer: median | Wallets, poorer ÷ richer: median | 10th percentile | Under 2/3 | The poorer squad won | The squad that spent more won |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Round 2 (Pairs) | 144 | 41 | 20 | 94% | 97% | 92% | 0.0% | 42.7% of 143 | 57.1% of 119 |
+| Final | 72 | 90 | 50 | 93% | 85% | 67% | 11.1% | 41.7% of 72 | 54.7% of 64 |
 
-Per squad per match of round 2 and the final: 0.2 Stockfish tokens used, 0.6 blocks shielded. Brilliant moves: 0.7 a lobby.
+Per squad per match of round 2 and the final: 0.3 Stockfish tokens used, 0.7 blocks shielded. Brilliant moves: 0.8 a lobby (past the cap, unpaid: 2 in all).
 
 The "what this means for fun" section is written by hand below this line.
 
@@ -185,18 +188,35 @@ The "what this means for fun" section is written by hand below this line.
 
 ## Notes (by hand)
 
-**What the tables say for the calibration** (DECISIONS.md, "Squads modes: Classic and Mercenary"):
+**The economy's shape** (Eric, Oct 13; DECISIONS.md, "Mercenary: Eric's first changes"). Like Counter-Strike's or
+Valorant's: most coins are a steady base, every match a squad plays (200, and 150 more for winning it); play adds a
+smaller layer (captures, board wins and mates, the capped brilliant moves), multiplied in the later rounds because
+they have fewer boards (Relay ×1, Pairs ×2, the final ×4). Only squads that win go on to a shop, so the numbers that
+matter are the winners'.
 
-- **Earning.** A squad that wins Relay earns about 600 coins. With Pairs' winnings it reaches the final's shop with
-  about 700 (median 690), Eric's "~700 saved by the later rounds".
-- **The shop.** Before Pairs a squad has about 620 to spend: a Stockfish token and a shield and a time coin, or block
-  points and a breather, about 2-3 items. Before the final, more; a strong squad caps a few items, never all of them.
-- **Brilliant moves** are rare (well under one a lobby), as they should be.
-- **No snowball.** Catch-up is small, because the earned gaps between squads that both won are small. The squad that
-  had earned less won about half of its matches (48% in Pairs, 46% in the final). Spending more helps (62% in Pairs),
-  without deciding (48% in the final).
-- **Length.** On the same seeds Classic took a median 31.3 minutes (90th percentile 40.3), so Mercenary adds about 2
-  minutes. That's the time coins and breathers bought (more time to think): a tuning run without them matched Classic.
-  The shop itself adds nothing. Squads reach sudden death less often in Mercenary (39% against Classic's 51%).
+- **A winner's round:** median 622 in Relay (10th to 90th percentile 540 to 650), 686 in Pairs (542 to 742), 730 in
+  the final. The base and the win are 57-59% of all coins earned, and about 350 of a winner's ~650.
+- **What a round buys:** every winner's round before a shop paid for a Stockfish token, a time reload (100 at Eric's
+  Time chip prices) and a shield or block points (400). 14% paid for a second token too (700): the very good rounds.
+- **A tight spread.** Two squads meeting had earned within a few percent of each other: the poorer had a median 94% of
+  the richer's coins earned before Pairs and 93% before the final. Their wallets, catch-up in and before shopping,
+  were 97% and 85% (10th percentile 92% and 67%). The wider wallet gap before the final is a choice, not luck: a squad
+  that saved everything before Pairs (about a quarter of them, as the bots play it) meets one that spent.
+- **Playing well buys an extra item or two:** the 90th-percentile winner earns about 100 more than the 10th in Relay
+  and 200 more in Pairs.
+- **No snowball:** the squad that had earned more won 57-58% of the next matches (it played better, so some edge is
+  fair); catch-up, half the earned gap up to 150, is the loss bonus's job here.
+- **Brilliant moves** pay 25, at most twice per squad per match: 0.8 a lobby, and the cap held back 2 in 72 lobbies.
+- **Length:** a median 32.0 minutes, against Classic's 31.3 on the same seeds (90th percentiles 36.4 and 40.3). The
+  shop adds no time; the time coins bought make squads reach sudden death less often (44% against 51%).
+
+**Through the real server** (`scripts/squads-headless.ts --game mercenary|classic --device` against `wrangler dev`, the
+Normal clock, one idle person whose device did the bots' engine work and the judge's), run on Oct 13 before these
+changes (the Oct 12 economy, with the Breather): two full bot lobbies at the same time on one server, Mercenary 35.1
+minutes and Classic 38.1, each with a long final (17 and 15 minutes). The Mercenary squads earned 69 to 660 in Relay.
+Of the four that went on, two saved everything before Pairs and two spent most of their wallets (shields, time coins,
+block points); no errors, 994 bot-work jobs answered. The economy above replaces those numbers; the Time chip's change
+reruns these lobbies.
+
 - **The bots' shopping stands in for people** here (`botShop`); real players may buy differently. The prices and caps
   are each one line in `SQUADS.mercenary`.

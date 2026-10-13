@@ -8,29 +8,42 @@ import type { BoardResult, Colour } from "./board.ts";
  * Mercenary mode's economy (Eric, Oct 12; DECISIONS.md, "Squads modes: Mercenary"), pure: what a squad earns, its
  * wallet, the team shop, and the items it brings to its next match. Every number is `SQUADS.mercenary`.
  *
- * - **Earning.** A squad earns coins by play: a capture by the piece taken, a board won (more for a checkmate) or
- *   drawn, a match won, and a brilliant move (judged later from the judge's top moves). The match's rules emit each as a
- *   "coins" event (match.ts); the lobby adds them to the squad's wallet. Between rounds the squad that has earned less
- *   than its next opponent gets catch-up coins.
+ * - **Earning** (Eric, Oct 13: shaped like Counter-Strike's or Valorant's economy). Most of it is a steady base: every
+ *   match a squad plays pays it, win or lose, and winning pays more. Play adds a smaller layer: a capture by the piece
+ *   taken, a board won (more for a checkmate) or drawn, and a brilliant move (judged later from the judge's top moves;
+ *   at most a few a match). The match's rules emit each as a "coins" event (match.ts); the lobby adds them to the
+ *   squad's wallet. Between rounds the squad that has earned less than its next opponent gets catch-up coins (the loss
+ *   bonus's job: keeping the squads still in close).
  * - **The shop.** One wallet per squad, shared by its players, carried from round to round. After each round, a squad
  *   still in may buy items for its next match: each item's price rises by `priceStep` for every one of it the squad has
  *   already bought this tournament, and at most `cap` of an item go into one round. What's bought (the cart) is that
  *   match's kit, used there or lost.
- * - **The items.** A Stockfish token (your own top moves for one decision, on your own device; never theirs), a
- *   breather (the free seconds a move multiplied), block points (more block bank), a shield (the next block against you
- *   that would take effect is cancelled, its points still spent) and a time coin (more team bank).
+ * - **The items.** A Stockfish token (your own top moves for one decision, on your own device; never theirs), block
+ *   points (more block bank), a shield (the next block against you that would take effect is cancelled, its points
+ *   still spent) and a time coin (more team bank). (A fifth, the Breather, was taken out on Oct 13: see
+ *   `itemCounts` and `upgradeWallet` for lobbies stored with one.)
  */
 
 /** The items in the shop's order: strongest first. */
-export const MERC_ITEMS: readonly MercItem[] = ["stockfish", "breather", "blocks", "shield", "time"];
+export const MERC_ITEMS: readonly MercItem[] = ["stockfish", "blocks", "shield", "time"];
 export type ItemCounts = Readonly<Record<MercItem, number>>;
-export const NO_ITEMS: ItemCounts = { stockfish: 0, breather: 0, blocks: 0, shield: 0, time: 0 };
+export const NO_ITEMS: ItemCounts = { stockfish: 0, blocks: 0, shield: 0, time: 0 };
 export const isMercItem = (x: unknown): x is MercItem => typeof x === "string" && (MERC_ITEMS as readonly string[]).includes(x);
+
+/**
+ * Counts of today's items only, from a stored record that may hold an item since taken out (the Breather, Oct 13) or
+ * miss one: unknown items dropped, missing ones 0. A kit or cart stored before a deploy never crashes the rules.
+ */
+export function itemCounts(x: unknown): ItemCounts {
+  const r = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+  return { stockfish: n(r.stockfish), blocks: n(r.blocks), shield: n(r.shield), time: n(r.time) };
+}
 
 // ---------------- Earning ----------------
 
 /** Why coins came in: play (counted in a squad's `earned`), or catch-up and a test lobby's wallet (not counted). */
-export type CoinWhy = "capture" | "board_win" | "mate" | "board_draw" | "match_win" | "brilliant" | "catch_up" | "test";
+export type CoinWhy = "played" | "capture" | "board_win" | "mate" | "board_draw" | "match_win" | "brilliant" | "catch_up" | "test";
 /** Coins from play: what catch-up compares. */
 export const fromPlay = (why: CoinWhy): boolean => why !== "catch_up" && why !== "test";
 
@@ -53,17 +66,26 @@ export function capturedPiece(fen: string, move: string): CapturePiece | null {
   return null;
 }
 
-/** The coins a capture earns. */
-export const captureCoins = (piece: CapturePiece, s: SquadsSettings = SQUADS): number => s.mercenary.capture[piece];
+/**
+ * A board's coins in a round (captures, its win, mate and draw) are the base times `roundScale[round]`: fewer boards
+ * a round, more each (Relay 4 boards, Pairs 2, the final 1), so every round pays about the same (Eric, Oct 13: about
+ * 500-800 coins a squad a round). Armageddon is the final's round.
+ */
+export const roundScale = (round: number, s: SquadsSettings = SQUADS): number => s.mercenary.roundScale[round] ?? 1;
 
-/** What a finished board earns: the winning colour its win (and the mate bonus), or each colour the draw. */
-export function boardCoins(result: BoardResult, s: SquadsSettings = SQUADS): { colour: Colour; coins: number; why: CoinWhy }[] {
+/** The coins a capture earns in a round. */
+export const captureCoins = (piece: CapturePiece, round: number, s: SquadsSettings = SQUADS): number => Math.round(s.mercenary.capture[piece] * roundScale(round, s));
+
+/** What a finished board earns in a round: the winning colour its win (and the mate bonus), or each colour the draw. */
+export function boardCoins(result: BoardResult, round: number, s: SquadsSettings = SQUADS): { colour: Colour; coins: number; why: CoinWhy }[] {
   const c = s.mercenary;
+  const k = roundScale(round, s);
+  const draw = Math.round(c.boardDraw * k);
   if (result.winner === null) {
-    return c.boardDraw ? [{ colour: "w", coins: c.boardDraw, why: "board_draw" }, { colour: "b", coins: c.boardDraw, why: "board_draw" }] : [];
+    return draw ? [{ colour: "w", coins: draw, why: "board_draw" }, { colour: "b", coins: draw, why: "board_draw" }] : [];
   }
-  const out = [{ colour: result.winner, coins: c.boardWin, why: "board_win" as CoinWhy }];
-  if (result.reason === "checkmate" && c.mate) out.push({ colour: result.winner, coins: c.mate, why: "mate" });
+  const out = [{ colour: result.winner, coins: Math.round(c.boardWin * k), why: "board_win" as CoinWhy }];
+  if (result.reason === "checkmate" && c.mate) out.push({ colour: result.winner, coins: Math.round(c.mate * k), why: "mate" });
   return out;
 }
 
@@ -115,6 +137,16 @@ export function isBrilliant(c: Pick<BrilliantCandidate, "fen" | "move" | "blocke
   if (!best || best.move !== c.move || lines.length < 2) return false;
   if (best.expected >= 1 - b.decided || best.expected <= b.decided) return false;
   return best.expected - lines[1]!.expected >= b.gap - 1e-9;
+}
+
+/**
+ * What a brilliant move pays its squad when the squad has already been paid for `paid` of them in this match (a
+ * bracket match: Armageddon counts with the final it settles): `brilliant.coins` until `capPerMatch`, then nothing
+ * (`capped`: still announced, "no coins").
+ */
+export function brilliantPay(paid: number, s: SquadsSettings = SQUADS): { coins: number; capped: boolean } {
+  const b = s.mercenary.brilliant;
+  return paid < b.capPerMatch ? { coins: b.coins, capped: false } : { coins: 0, capped: true };
 }
 
 // ---------------- Wallets and the shop ----------------
@@ -177,6 +209,24 @@ export function unbuyItem(w: Wallet, item: MercItem, s: SquadsSettings = SQUADS)
 /** The shop closes as the next match starts: the cart becomes that match's kit, and the wallet's cart empties. */
 export function takeCart(w: Wallet): { wallet: Wallet; kit: ItemCounts } {
   return { wallet: { ...w, cart: NO_ITEMS }, kit: w.cart };
+}
+
+/** The Breather's prices before it was taken out (Oct 13): 150, then up by the price step for each one bought. */
+const BREATHER_PRICE = 150;
+
+/**
+ * A wallet stored before the Breather was taken out (a lobby in play across the deploy): a breather still in the cart
+ * (the shop open) is refunded at what it cost, and the item is dropped from the counts. Others come back as they were.
+ */
+export function upgradeWallet(w: Wallet, s: SquadsSettings = SQUADS): Wallet {
+  const bought = w.bought as Partial<Record<string, number>>;
+  const cart = w.cart as Partial<Record<string, number>>;
+  if (!("breather" in bought) && !("breather" in cart)) return w;
+  const inCart = Math.max(0, cart.breather ?? 0);
+  const before = Math.max(0, (bought.breather ?? 0) - inCart);
+  let refund = 0;
+  for (let i = 0; i < inCart; i++) refund += BREATHER_PRICE + s.mercenary.priceStep * (before + i);
+  return { ...w, coins: w.coins + refund, bought: itemCounts(w.bought), cart: itemCounts(w.cart) };
 }
 
 /**

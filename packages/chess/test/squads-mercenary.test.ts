@@ -14,12 +14,13 @@ import {
   botUsesStockfish,
   boardCoins,
   brilliantCandidate,
+  brilliantPay,
   buyItem,
+  captureCoins,
   capturedPiece,
   catchUpCoins,
   choose,
   createSquadsMatch,
-  delayOf,
   dutyOf,
   earn,
   formSquads,
@@ -27,6 +28,7 @@ import {
   heldVotes,
   isAssisted,
   isBrilliant,
+  itemCounts,
   itemPrice,
   lockIn,
   movesAllowed,
@@ -44,6 +46,8 @@ import {
   takeCart,
   tokenLines,
   unbuyItem,
+  upgradeMatch,
+  upgradeWallet,
   useStockfish,
   votable,
   type HalfInputs,
@@ -209,17 +213,34 @@ describe("Mercenary: earning coins", () => {
     expect(capturedPiece(START_FEN, "e2e4")).toBeNull();
     const m = relay([BG5, START_FEN, START_FEN, START_FEN]);
     const out = resolveHalf(m, inputs(m, rest(m, { [moverOn(m, 0)]: "g5f6" })));
-    expect(ofKind(out.events, "coins")).toEqual([{ kind: "coins", turn: 0, half: "w", side: 0, coins: M.capture.n, why: "capture", board: 0, move: "g5f6", piece: "n" }]);
-    expect(out.match.coins).toEqual([M.capture.n, 0]);
+    expect(ofKind(out.events, "coins")).toEqual([{ kind: "coins", turn: 0, half: "w", side: 0, coins: M.capture.n * M.roundScale[0], why: "capture", board: 0, move: "g5f6", piece: "n" }]);
+    expect(out.match.coins).toEqual([M.capture.n * M.roundScale[0], 0]);
+  });
+
+  it("fewer boards, more a board: Pairs and the final multiply a board's coins, so every round pays about the same", () => {
+    // Relay plays 4 boards, Pairs 2, the final 1: the scale makes up for it (Eric, Oct 13: 500-800 a squad a round).
+    expect(M.roundScale[0]).toBe(1);
+    expect(M.roundScale[1]).toBeGreaterThan(M.roundScale[0]);
+    expect(M.roundScale[2]).toBeGreaterThan(M.roundScale[1]);
+    for (const r of [0, 1, 2] as const) {
+      expect(captureCoins("q", r)).toBe(Math.round(M.capture.q * M.roundScale[r]));
+      expect(boardCoins({ winner: "w", reason: "checkmate" }, r).map((x) => x.coins)).toEqual([Math.round(M.boardWin * M.roundScale[r]), Math.round(M.mate * M.roundScale[r])]);
+    }
+    // In a Pairs match, the knight taken pays the Pairs rate.
+    const m = pairs([BG5, START_FEN]);
+    const all: Record<string, string> = {};
+    for (const d of halfDuties(m).duties) for (const p of d.players) all[p] = d.board === 0 ? "g5f6" : movesAllowed(m, d.board)[0]!;
+    const out = resolveHalf(m, inputs(m, all));
+    expect(ofKind(out.events, "coins").filter((e) => e.why === "capture").map((e) => e.coins)).toEqual([M.capture.n * M.roundScale[1]]);
   });
 
   it("a board won pays its winner (more for a checkmate); a drawn board pays both", () => {
-    expect(boardCoins({ winner: "w", reason: "checkmate" })).toEqual([
+    expect(boardCoins({ winner: "w", reason: "checkmate" }, 0)).toEqual([
       { colour: "w", coins: M.boardWin, why: "board_win" },
       { colour: "w", coins: M.mate, why: "mate" },
     ]);
-    expect(boardCoins({ winner: "b", reason: "safety_cap" })).toEqual([{ colour: "b", coins: M.boardWin, why: "board_win" }]);
-    expect(boardCoins({ winner: null, reason: "stalemate" }).map((x) => [x.colour, x.coins])).toEqual([
+    expect(boardCoins({ winner: "b", reason: "safety_cap" }, 0)).toEqual([{ colour: "b", coins: M.boardWin, why: "board_win" }]);
+    expect(boardCoins({ winner: null, reason: "stalemate" }, 0).map((x) => [x.colour, x.coins])).toEqual([
       ["w", M.boardDraw],
       ["b", M.boardDraw],
     ]);
@@ -233,13 +254,37 @@ describe("Mercenary: earning coins", () => {
     ]);
   });
 
-  it("winning the match pays its winner (the final's mate: the capture, the board, the mate and the match)", () => {
+  it("a finished match pays both squads the base for playing it, and its winner more (the final's mate: all of it)", () => {
     const m = final(SCHOLAR);
     const out = resolveHalf(m, inputs(m, { a0: "h5f7", a1: "h5f7", a2: "h5f7", a3: "h5f7" }));
     expect(out.match.result?.winner).toBe(0);
-    expect(ofKind(out.events, "coins").map((e) => e.why)).toEqual(["capture", "board_win", "mate", "match_win"]);
-    expect(out.match.coins[0]).toBe(M.capture.p + M.boardWin + M.mate + M.matchWin);
+    const coins = ofKind(out.events, "coins");
+    expect(coins.map((e) => [e.side, e.why])).toEqual([
+      [0, "capture"],
+      [0, "board_win"],
+      [0, "mate"],
+      [0, "played"],
+      [1, "played"],
+      [0, "match_win"],
+    ]);
+    expect(out.match.coins).toEqual([(M.capture.p + M.boardWin + M.mate) * M.roundScale[2] + M.played + M.matchWin, M.played]);
     expect(out.events.at(-1)!.kind).toBe("match_end");
+  });
+
+  it("the base is most of a squad's coins (Eric, Oct 13: like CS or Valorant); play adds a smaller layer", () => {
+    // A squad that wins its match has the base, the win and some play: the base and the win outweigh a typical
+    // match's play (a few captures, its boards), and a brilliant move never pays more than a board won.
+    expect(M.played + M.matchWin).toBeGreaterThan(2 * (M.boardWin + M.mate) * M.roundScale[0]);
+    expect(M.played).toBeGreaterThan(M.matchWin);
+    expect(M.brilliant.coins).toBeLessThanOrEqual(M.boardWin);
+  });
+
+  it("a drawn final's Armageddon doesn't pay the base again: only its winner's match win", () => {
+    const drawn = final("8/8/8/4k3/8/8/4K3/8 w - - 0 1");
+    const arm = startArmageddon({ ...drawn, result: { winner: null, points: [0.5, 0.5], how: "boards" }, boards: drawn.boards.map((b) => ({ ...b, result: { winner: null, reason: "insufficient_material" } })) }, 0, { fen: SCHOLAR, openingId: null });
+    const out = resolveHalf(arm, inputs(arm, Object.fromEntries(halfDuties(arm).duties.flatMap((d) => d.players.map((p) => [p, "h5f7"])))));
+    expect(out.match.result).not.toBeNull();
+    expect(ofKind(out.events, "coins").filter((e) => e.board === null).map((e) => e.why)).toEqual(["match_win"]);
   });
 
   it("Classic pays nothing for the same mate", () => {
@@ -275,6 +320,20 @@ describe("Mercenary: earning coins", () => {
 });
 
 describe("Mercenary: brilliant moves", () => {
+  it("pays 25 (about a queen taken in Relay, well under a board won), at most twice per squad per match", () => {
+    // Eric, Oct 13: "How could one move be more than winning an entire game?"
+    expect(M.brilliant.coins).toBe(25);
+    expect(M.brilliant.coins).toBeLessThan(M.boardWin);
+    expect(M.brilliant.capPerMatch).toBe(2);
+    expect(brilliantPay(0)).toEqual({ coins: 25, capped: false });
+    expect(brilliantPay(1)).toEqual({ coins: 25, capped: false });
+    expect(brilliantPay(2)).toEqual({ coins: 0, capped: true });
+    expect(brilliantPay(5)).toEqual({ coins: 0, capped: true });
+    // The cap is a setting.
+    const s3 = { ...SQUADS, mercenary: { ...M, brilliant: { ...M.brilliant, capPerMatch: 3 } } };
+    expect(brilliantPay(2, s3)).toEqual({ coins: 25, capped: false });
+  });
+
   const top = (lines: [string, number][]): MoveScore[] => lines.map(([move, expected]) => ({ move, expected }));
 
   it("a quiet move the judge rates best by the gap, in a position still in the balance, is brilliant", () => {
@@ -380,10 +439,9 @@ describe("Mercenary: the shop", () => {
 
 describe("Mercenary: the kit is for the next match only", () => {
   it("comes in once as the match starts; a later match (or Armageddon's) without one has none", () => {
-    const m = applyKits(pairs(), [kit({ time: 2, blocks: 1, breather: 1, stockfish: 2, shield: 1 }), NO_ITEMS]);
+    const m = applyKits(pairs(), [kit({ time: 2, blocks: 1, stockfish: 2, shield: 1 }), NO_ITEMS]);
     expect(m.banks).toEqual([BANK + 2 * M.timeSeconds * 1000, BANK]);
     expect(m.blockBanks).toEqual([SQUADS.blocks.bankPerMatch + M.blockPoints, SQUADS.blocks.bankPerMatch]);
-    expect(m.delays).toEqual([DELAY * M.breatherFactor, DELAY]);
     expect(m.stockfish).toEqual([2, 0]);
     expect(m.shields).toEqual([1, 0]);
     // Once only, and never into Classic.
@@ -392,14 +450,14 @@ describe("Mercenary: the kit is for the next match only", () => {
     expect(applyKits(classic, [kit({ time: 2 }), NO_ITEMS])).toBe(classic);
     // The next match: nothing carried (its own kit, from the next shop).
     const next = final();
-    expect([next.stockfish, next.shields, next.delays, next.kit]).toEqual([[0, 0], [0, 0], [DELAY, DELAY], null]);
+    expect([next.stockfish, next.shields, next.kit]).toEqual([[0, 0], [0, 0], null]);
   });
 
-  it("a drawn final's Armageddon is the same round: the final's tokens, shields and breather carry on", () => {
-    let m = applyKits(final("8/8/8/4k3/8/8/4K3/8 w - - 0 1"), [kit({ stockfish: 1, shield: 2, breather: 1 }), NO_ITEMS]);
+  it("a drawn final's Armageddon is the same round: the final's tokens and shields carry on", () => {
+    let m = applyKits(final("8/8/8/4k3/8/8/4K3/8 w - - 0 1"), [kit({ stockfish: 1, shield: 2 }), NO_ITEMS]);
     m = { ...m, result: { winner: null, points: [0.5, 0.5], how: "boards" }, boards: m.boards.map((b) => ({ ...b, result: { winner: null, reason: "insufficient_material" } })) };
     const arm = startArmageddon(m, 0, { fen: START_FEN, openingId: null });
-    expect(arm).toMatchObject({ mode: "mercenary", stockfish: [1, 0], shields: [2, 0], delays: [DELAY * M.breatherFactor, DELAY] });
+    expect(arm).toMatchObject({ mode: "mercenary", stockfish: [1, 0], shields: [2, 0], delayMs: DELAY });
   });
 });
 
@@ -414,22 +472,45 @@ describe("Mercenary: the items", () => {
     expect(m.blockBanks[1] - m.blockBanks[0]).toBe(2 * M.blockPoints);
   });
 
-  it("a breather: double free seconds a move, so the bank drains less; in sudden death, double the time a move", () => {
-    const m = applyKits(relay(), [kit({ breather: 1 }), NO_ITEMS]);
-    expect(delayOf(m, 0)).toBe(DELAY * 2);
-    expect(delayOf(m, 1)).toBe(DELAY);
-    // Both squads' movers think 5 s: the side with the breather drains nothing, the other 2 s each.
+  it("four items: the Breather is gone (Eric, Oct 13), and a kit stored with one is read without it", () => {
+    expect([...MERC_ITEMS]).toEqual(["stockfish", "blocks", "shield", "time"]);
+    expect(Object.keys(M.items).sort()).toEqual(["blocks", "shield", "stockfish", "time"]);
+    expect(itemCounts({ stockfish: 1, breather: 1, time: 2 })).toEqual(kit({ stockfish: 1, time: 2 }));
+    expect(itemCounts(null)).toEqual(NO_ITEMS);
+    // A kit stored with a breather (a match in play across the deploy): the kit comes in without it, the free seconds
+    // are the match's for both squads.
+    const m = applyKits(relay(), [{ ...kit({ shield: 1 }), breather: 1 } as ItemCounts, NO_ITEMS]);
+    expect(m.kit![0]).toEqual(kit({ shield: 1 }));
     const all = rest(m, {});
     const think = Object.fromEntries(Object.keys(all).map((p) => [p, 5_000]));
-    const out = resolveHalf(m, inputs(m, all), think);
-    const bank = ofKind(out.events, "bank");
-    expect(bank.find((e) => e.side === 0)!.drainedMs).toBe(0);
-    expect(bank.find((e) => e.side === 1)!.drainedMs).toBe(2 * (5_000 - DELAY));
-    // In sudden death the free seconds are the time to move: the breather doubles it.
-    const sd = applyKits(relay(undefined, { banksMs: [0, 0] }), [kit({ breather: 1 }), NO_ITEMS]);
-    const deadlines = halfDuties(sd).duties.map((d) => [d.side, d.deadlineMs]);
-    expect(deadlines.filter(([s]) => s === 0).every(([, ms]) => ms === DELAY * 2)).toBe(true);
-    expect(deadlines.filter(([s]) => s === 1).every(([, ms]) => ms === DELAY)).toBe(true);
+    const bank = ofKind(resolveHalf(m, inputs(m, all), think).events, "bank");
+    expect(bank.map((e) => e.drainedMs)).toEqual([2 * (5_000 - DELAY), 2 * (5_000 - DELAY)]);
+  });
+
+  it("a match stored with a breather's free seconds plays on with the match's own; nothing else changes", () => {
+    const fresh = applyKits(relay(), [kit({ stockfish: 1 }), NO_ITEMS]);
+    const old = { ...fresh, delays: [DELAY * 2, DELAY], kit: [{ ...kit({ stockfish: 1 }), breather: 1 }, NO_ITEMS] } as unknown as SquadsMatch;
+    const up = upgradeMatch(old);
+    expect("delays" in up).toBe(false);
+    expect(up.kit).toEqual([kit({ stockfish: 1 }), NO_ITEMS]);
+    expect({ ...up, kit: null }).toEqual({ ...fresh, kit: null });
+    expect(halfDuties({ ...up, banks: [0, 0] }).duties.every((d) => d.deadlineMs === DELAY)).toBe(true);
+    // Today's match comes back as it was.
+    expect(upgradeMatch(fresh)).toBe(fresh);
+  });
+
+  it("a wallet stored with a breather: one still in an open shop's cart refunded at what it cost; the counts without it", () => {
+    const w = { ...newWallet(3), coins: 40, bought: { ...NO_ITEMS, shield: 1, breather: 2 }, cart: { ...NO_ITEMS, shield: 1, breather: 1 } } as unknown as ReturnType<typeof newWallet>;
+    const up = upgradeWallet(w);
+    // Its second breather (one bought in an earlier round, this one in the cart): 150 + one step.
+    expect(up.coins).toBe(40 + 150 + M.priceStep);
+    expect(up.bought).toEqual(kit({ shield: 1 }));
+    expect(up.cart).toEqual(kit({ shield: 1 }));
+    // A breather bought for an earlier round and used: nothing back.
+    const used = { ...newWallet(3), coins: 40, bought: { ...NO_ITEMS, breather: 1 }, cart: { ...NO_ITEMS, breather: 0 } } as unknown as ReturnType<typeof newWallet>;
+    expect(upgradeWallet(used)).toMatchObject({ coins: 40, bought: NO_ITEMS, cart: NO_ITEMS });
+    const today = newWallet(1);
+    expect(upgradeWallet(today)).toBe(today);
   });
 
   it("a shield cancels the next block against its squad that would take effect: the blocker's points stay spent", () => {
@@ -663,10 +744,10 @@ describe("Mercenary: bots", () => {
     expect(rate(sharp)).toBeLessThan(M.bots.stockfishSharp + 0.05);
   });
 
-  it("the shop's ranking: the Stockfish token dearest, then the breather, block points and shields, the time coin cheapest", () => {
+  it("the shop's ranking: the Stockfish token dearest (Eric: 200), then block points and shields, the time coin cheapest", () => {
     const p = M.items;
-    expect(p.stockfish.price).toBeGreaterThan(p.breather.price);
-    expect(p.breather.price).toBeGreaterThan(p.blocks.price);
+    expect(p.stockfish.price).toBe(200);
+    expect(p.stockfish.price).toBeGreaterThan(p.blocks.price);
     expect(p.blocks.price).toBe(p.shield.price);
     expect(p.shield.price).toBeGreaterThan(p.time.price);
     expect(p.stockfish.cap).toBeLessThanOrEqual(2);

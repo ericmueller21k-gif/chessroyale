@@ -26,7 +26,6 @@ import {
   choose,
   createSquadsMatch,
   coin,
-  delayOf,
   drawBracket,
   dutyOf,
   earn,
@@ -36,6 +35,7 @@ import {
   halfReady,
   heldVotes,
   isBrilliant,
+  brilliantPay,
   isMercItem,
   isOnlyMove,
   judgeTokenUse,
@@ -71,6 +71,7 @@ import {
   topAllowed,
   unbuyItem,
   upgradeMatch,
+  upgradeWallet,
   useStockfish,
   visibleChoices,
   votable,
@@ -244,6 +245,8 @@ export interface LiveMatch {
   /** Mercenary: moves waiting for the judge to say if they were brilliant, by number (`brilliantSeq` counts them). */
   brilliant?: Record<number, JudgeJob>;
   brilliantSeq?: number;
+  /** Mercenary: brilliant moves paid to each side in this match (Armageddon's with its final), up to the cap. */
+  brilliantPaid?: [number, number];
 }
 
 /** A reward to write: a results row (when `recorded`) and coins and crates, for one person. */
@@ -459,8 +462,10 @@ export class SquadsCore {
     private readonly library: readonly Opening[],
     private readonly s: SquadsSettings = SQUADS,
   ) {
-    // (Matches stored before the modes came: Classic, with Mercenary's fields filled in.)
+    // (Matches stored by an earlier version in today's shape: before the modes, Classic with Mercenary's fields filled
+    // in; before the Breather was taken out, without it. Wallets likewise: a breather in an open shop's cart refunded.)
     for (const [k, v] of Object.entries(matches)) this.matches.set(k, { ...v, m: upgradeMatch(v.m), ...(v.drawn ? { drawn: upgradeMatch(v.drawn) } : {}) });
+    if (record.wallets) record.wallets = record.wallets.map((w) => upgradeWallet(w, s));
   }
 
   private get r() {
@@ -1040,7 +1045,7 @@ export class SquadsCore {
       for (const p of d.players) {
         if (!this.botPlays(p)) continue;
         const bankMs = m.banks[d.side];
-        half.bots[p] = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: delayOf(m, d.side), deadlineMs: d.deadlineMs }, this.s);
+        half.bots[p] = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: m.delayMs, deadlineMs: d.deadlineMs }, this.s);
         boards.add(d.board);
       }
     }
@@ -1296,7 +1301,7 @@ export class SquadsCore {
     this.sendWallets();
   }
 
-  /** The shop closes as a match starts: each squad's cart comes in as its kit (time, block points, breather, tokens, shields). */
+  /** The shop closes as a match starts: each squad's cart comes in as its kit (time, block points, tokens, shields). */
   private bringKits(lm: LiveMatch) {
     if (lm.m.kit !== null || lm.m.mode !== "mercenary") return;
     const kits = lm.m.sides.map((side) => {
@@ -1543,10 +1548,15 @@ export class SquadsCore {
       const cand = job.brilliant;
       if (!cand || !isBrilliant(cand, job.how === "fallback" ? null : (job.top ?? null), this.s)) continue;
       const squadId = lm.m.sides[cand.side].squadId;
-      const coins = this.s.mercenary.brilliant.coins;
-      this.earnCoins(squadId, coins, "brilliant", lm.round);
-      this.sendAll({ t: "coins", squadId, coins, why: "brilliant", key: lm.key, board: cand.board, move: cand.move, by: [...cand.finders] });
-      this.sendWallets();
+      // At most `capPerMatch` paid a squad a match: past it, still announced, with no coins.
+      const paid = (lm.brilliantPaid ??= [0, 0]);
+      const pay = brilliantPay(paid[cand.side], this.s);
+      if (!pay.capped) {
+        paid[cand.side]++;
+        this.earnCoins(squadId, pay.coins, "brilliant", lm.round);
+      }
+      this.sendAll({ t: "coins", squadId, coins: pay.coins, why: "brilliant", key: lm.key, board: cand.board, move: cand.move, by: [...cand.finders], ...(pay.capped ? { capped: true } : {}) });
+      if (!pay.capped) this.sendWallets();
     }
     if (lm.brilliant && !Object.keys(lm.brilliant).length) delete lm.brilliant;
     if (changed) this.touch(lm);
@@ -2085,7 +2095,6 @@ export class SquadsCore {
       blocks: m.blocks.map((b) => ({ ...b })),
       tokenLog: m.tokenLog.map((u) => ({ ...u, players: [...u.players], blocked: [...u.blocked] })),
       mode: m.mode,
-      delays: [m.delays[0], m.delays[1]],
       kit: m.kit ? [{ ...m.kit[0] }, { ...m.kit[1] }] : null,
       stockfish: [m.stockfish[0], m.stockfish[1]],
       shields: [m.shields[0], m.shields[1]],
