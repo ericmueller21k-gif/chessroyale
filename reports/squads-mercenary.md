@@ -188,6 +188,11 @@ The "what this means for fun" section is written by hand below this line.
 
 ## Notes (by hand)
 
+**These tables are from before the time controls** (Oct 13: Bullet, Blitz and Rapid replaced Fast, Normal and Long;
+DECISIONS.md, "Squads: three chess time controls"): one clock, the old Normal (4 minutes, 3 free seconds, no
+increment, a 20 s ceiling). The economy doesn't depend on the clock; the lengths and sudden death in Mercenary on the
+new time controls are in `reports/squads-sim.md`'s notes.
+
 **The economy's shape** (Eric, Oct 13; DECISIONS.md, "Mercenary: Eric's first changes"). Like Counter-Strike's or
 Valorant's: most coins are a steady base, every match a squad plays (200, and 150 more for winning it); play adds a
 smaller layer (captures, board wins and mates, the capped brilliant moves), multiplied in the later rounds because

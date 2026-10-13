@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
 import { applyMove, inCheck, legalMoves, toSan, type MoveScore } from "@chessroyale/chess";
-import { minutesName, tokenLines, type Colour, type Side, type SquadsEvent } from "@chessroyale/chess/squads";
+import { matchClockLine, minutesName, tokenLines, type Colour, type Side, type SquadsEvent } from "@chessroyale/chess/squads";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
@@ -542,6 +542,7 @@ function MatchView({
                   </div>
                 )}
                 <div class="sq-banner-rules">{rulesLine(m)}</div>
+                {client.lobby?.rules && <div class="sq-banner-rules sq-banner-clock">{matchClockLine(client.lobby.rules.clock)}</div>}
               </Banner>
             )}
             {armChoice && (

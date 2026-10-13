@@ -10,7 +10,9 @@ screen, the app's side of bot work, the sounds; see "The screens" below). **Squa
 the final a majority vote of the whole squad; the old Pick and Block is gone. **Modes** (Eric, Oct 12; DECISIONS.md,
 "Squads modes: Classic and Mercenary"): the first vote picks **Classic** (just chess: same-move tokens, no blocks, no
 coins) or **Mercenary** (coins, a team shop between rounds, items for the next match; blocks on), and shows a third
-mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `mercenary` everywhere.
+mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `mercenary` everywhere. **Time controls**
+(Eric, Oct 13; DECISIONS.md, "Squads: three chess time controls"): the Clock vote picks **Bullet 1+1**, **Blitz 3+2** or
+**Rapid 5+3** (nobody voting: Blitz), each a team bank with a chess increment that banks and its own cap on a move.
 
 ## How it works today
 
@@ -27,22 +29,43 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
   what's drawn), so the server can replay any decision from the lobby's seed, and adding a draw never moves others.
 - **Votes** (`votes.ts`): Mode, Start and Clock as `PregameVote`s, run by Crowd's machinery (`castPregameVote`,
   `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: Classic, the normal start, the
-  Normal clock. The Mode vote's third option is `disabled` ("Coming soon": shown, never votable: `votable`). Bots vote
+  Blitz clock (the middle option). The Mode vote's third option is `disabled` ("Coming soon": shown, never votable: `votable`). Bots vote
   on the mode by a lean drawn per lobby (`botModeVotes`, `modeVote.classicLean`: most lobbies' bots lean Classic). A test
   lobby's bots sit the Mode vote out (its opener decides), and its link's `mode=` skips it (`heldVotes`).
 - **The team clock** (Eric, Oct 10): one bank per squad for the whole tournament (`Squad.bankMs`), carried from
   match to match (`startTeamClocks`, then `planMatch` brings it in, `settleTeamClocks` takes it out), with a top-up
-  when a squad starts a new round. The Clock option sets the starting bank, the top-up, the free seconds a move (a
-  delay) and any increment.
+  when a squad starts a new round. The Clock option (Eric, Oct 13: three chess time controls) sets the starting bank,
+  the top-up, the free seconds a move (a delay), the increment and the cap on a move; each match carries its own
+  (`delayMs`, `incrementMs`, `capMs`), so a match never changes clock under its players.
+  - **The options** (`SQUADS.clocks`), on the cards in chess form (`clockLabel`: "Bullet 1+1"; `teamClockLine`;
+    `teamClockDetail` for the result's banner; `matchClockLine` on each match's opening card):
+
+    | Option | Bank | Increment | Free seconds | Cap on a move | Top-up a round |
+    | --- | --- | --- | --- | --- | --- |
+    | Bullet 1+1 | 1:00 | +1 s | 2 s | 10 s | +15 s |
+    | Blitz 3+2 (nobody votes) | 3:00 | +2 s | 2 s | 15 s | +30 s |
+    | Rapid 5+3 | 5:00 | +3 s | 2 s | 20 s | +1:00 |
+  - **Old ids** (`clockById`): fast → bullet, normal → blitz, long → rapid; one we don't know gets Blitz, never an
+    error. A stored vote's result is the option's place, so an old Fast, Normal or Long vote reads as Bullet, Blitz or
+    Rapid. A clock stored before the time controls (`upgradeClock`, `upgradeRules`; a match: `upgradeMatch`) keeps its
+    own numbers and the one ceiling every option had then (`legacyCapSeconds`, 20 s): a lobby in play across that
+    deploy finishes on the clock it voted.
   - **Draining.** Each of a squad's moves being thought about drains its bank past the free seconds: a Relay mover,
     a pair (the slower picker), the final's voting squad (its slowest picker). Placing a block is thinking time too: a
     move's time runs to the block if that came later. Two of a squad's moves being thought about at once (Relay's two
     movers each half) drain it twice as fast (`bankRunsOut`).
-  - **The per-move ceiling** (`moveCeilingSeconds`) bounds every move while the bank lasts. A mover or picker who
-    hasn't chosen by then misses (a random move it may play), the bank draining meanwhile.
+  - **The cap on a move** (the option's `capSeconds`, the match's `capMs`) bounds every move while the bank lasts. A
+    mover or picker who hasn't chosen by then misses (a random move it may play), the bank draining meanwhile.
+  - **The increment** banks, as on a chess clock: each move made in time earns it, credited after the half (`earned`;
+    a missed move earns none, `incrementOnMiss`). A move quicker than the free seconds and the increment together
+    adds to the bank (not capped at its start); a slower one costs only what's past them. So a squad's bank settles
+    where its drain and its increments meet (in the sim about 20 s on Bullet, 35 on Blitz, 45 on Rapid), and the
+    increment, more than the bank, sets an option's pace.
   - **Sudden death.** If the bank runs out during a half, the squad's moves still being thought about are cut off
     (random moves). At zero, each move must be made within the free seconds, or it's missed. There are no flag
-    falls; an increment, if set, can lift a squad back out.
+    falls. Each move made in time earns the increment, which lifts the squad out again: near zero a squad lives on
+    it (each move the free seconds and the increment). The "sudden_death" event comes only when a bank is still
+    empty once the half's increments are in.
   - **What every player sees:** each squad's bank and whether it's in sudden death (`teamClocks` for the lobby,
     `matchClocks` live in a match, and the half's `bank` and `sudden_death` events).
   - **Records:** `resolveHalf` returns `timeouts` among the missed (out of time, not absent). The sim leaves them out
@@ -129,13 +152,16 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
     Stockfish token now and then. A bot uses one of its squad's tokens rarely (more when the engine's best stands out)
     and then plays the best move. It taps a Time chip on a move in sudden death (60%) or with under 20 s of bank (30%),
     0.7-1.8 s in, and thinks on into it. Never for a squad with people playing.
-- **What the sim says** (`reports/squads-sim.md`, Squads v2):
-  - Median lobbies take 29-31 minutes on every option (Fast 3 min, Normal 4, Long 5; 3 free seconds); every 90th
-    percentile is at most 40.
-  - 46-64% of squads reach sudden death, mostly in Pairs, and 7-13% of moves are made in it.
-  - Bots use 1-2 same-move tokens a Pairs match, 75-80% refunded; they spend 2.6-4.7 of their 5 block points a match.
-  - The final's vote: a clear majority on 54-72% of moves, the coin on 12-16%.
-  - Ties go to the bank, a quarter to a third of them to the coin.
+- **What the sim says** (`reports/squads-sim.md`, the time controls, Classic):
+  - Median lobbies take 26.9 (Bullet), 33.5 (Blitz) and 43.9 (Rapid) minutes; 90th percentiles 34.7, 40.9 and 54.5.
+    Mercenary: 29.9, 37.8 and 43.9. Bullet can't reach 20: about 11 minutes of every lobby is reveals, votes and the
+    bracket (shorter reveals in Bullet: 24.0, Eric's call). Through the real server a Bullet bot lobby took 32.9
+    minutes (one 13-minute Relay match), its bots never out of time.
+  - 17-31% of squads reach sudden death, mostly in Pairs, but only 0.2-0.5% of moves are made in it (the increment lifts
+    a squad out); 0.3-0.7% of actions become random moves for want of time.
+  - Bots use 1-2 same-move tokens a Pairs match, 76-80% refunded (Mercenary's blocks: `reports/squads-mercenary.md`).
+  - The final's vote: a clear majority on 54-72% of moves, the coin on 11-18%.
+  - Ties go to the bank, and no longer to the coin (0 of 258: banks are rarely both at zero).
 - **Bots** (`bots.ts`): the existing bot engine (Stockfish's top moves, then `botPick` at a skill; blocked moves left
   out, `topAllowed`) for Relay moves, pair picks (never the partner's, unless it's the bot's own best move and an only
   move, `isOnlyMove` at `bots.sameMoveGap`, with a token left: then the same), and the final's votes (`botVotePick`:
@@ -144,7 +170,9 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
   capture or a check (shared among the players choosing that move), keeping `blockReserve` unless sharp, never one a
   mercy rule would lift. Winning, a bot plays with purpose (`squadBotSkill` caps its temperature; `candidatesFrom`
   breaks ties by the engine's order and plays a mate it sees). `squadBotThinkMs` paces a bot by its clock. Bots take
-  Black when they choose Armageddon's colours.
+  Black when they choose Armageddon's colours. Since the time controls (Oct 13) a bot's think also stays within 90% of when
+  its squad's bank would run out with all its moves going (`cutoffMs`, `liveCutoff` as the half begins; `bots.inTime`),
+  so bots living on Bullet's increment near zero move in time instead of being cut off.
 
 ## Where the code is
 
@@ -163,8 +191,9 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
 
 ## Settings
 
-`SQUADS` in `packages/core/src/settings.ts`: sizes and boards, the votes (`clocks`: each option's starting bank,
-top-up, free seconds and increment; `clockDefault`; vote timing), `moveCeilingSeconds`, `incrementOnMiss`,
+`SQUADS` in `packages/core/src/settings.ts`: sizes and boards, the votes (`clocks`: each time control's starting bank,
+top-up, free seconds, increment and cap on a move; `clockDefault`; vote timing), `legacyCapSeconds` (a clock stored
+before the time controls), `incrementOnMiss`,
 `safetyCap`, `material`, `materialLead`, points, openings, `tokens` (per match, `refundGap`, `pawnWorth`), `blocks`
 (`bankPerMatch`, `cost`, `castlingCost`, `maxPerTurn`, `liftBeforeMate`, `liftInCheck`), `final` (`tie`),
 `armageddon` (the drawn final's fixed clocks), `noShowsBeforeBot`, `replacementBotSkill`, `bots` (choosing, same
@@ -176,8 +205,9 @@ gives a match its own block banks (`MatchSetup.blockBanks`: 0 in Classic) withou
 
 - Unit: `packages/chess/test/squads-lobby.test.ts` (squads, records, bracket, votes, schedules),
   `squads-match.test.ts` (boards, starts, the team clock: top-up, carry-over, the views, free seconds, the double
-  drain, a bank running out mid-half, sudden death, the ceiling, the increment; Relay, Pairs, the safety cap, clinch,
-  the bank tiebreak), `squads-final.test.ts` (the final's vote: majorities, ties, missed picks, nobody picking,
+  drain, a bank running out mid-half, sudden death, the cap, the increment; the time controls: each option into every
+  match, the increment banking, the cap, sudden death and the increment lifting a squad out, living on the increment,
+  bots on Bullet in time, a match stored before them; Relay, Pairs, the safety cap, clinch, the bank tiebreak), `squads-final.test.ts` (the final's vote: majorities, ties, missed picks, nobody picking,
   visibility, copying, the clock, castling and promotion, the drawn-final Armageddon, replay, bots),
   `squads-v2.test.ts` (tokens: burn, the 0-token rule, refunds and their threshold, the breakdown's data; blocks:
   costs, the king, castling, several a turn, the mercy rules together with refunds, visibility, thinking time; bots'
@@ -252,7 +282,8 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   deterministic). Two that disagree go to the engine server (one budgeted restricted search of their moves) or, without
   it, to a third device; the wrong device gets a strike (`strikes`: no more work). One answer stands after `graceMs`;
   none after `answerMs`, or no device at all: the server's own quick look (`fallbackTop`: material two plies deep and
-  mate in one, no engine). A bot waits for its answer at most until `fallbackMarginMs` before its deadline. Settled
+  mate in one, no engine). A bot waits for its answer at most until `fallbackMarginMs` before its deadline, and (Oct 13) until 90% of when its
+  squad's bank would run out (`liveCutoff`, `bots.inTime`): near zero a quick look in time beats a random move. Settled
   positions are remembered.
 - **Missed actions and takeover.** The rules' `noteActions`: three misses in a row and a bot plays the seat. The person
   can `reclaim` it (from the next half). Leaving while their squad still plays hands the seat to a bot at once.
@@ -267,8 +298,9 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
   e2e, never production), while `SQUADS_LOBBY.testControls` is on (`squadsTestAllowed`): `nextRound` in a lobby (the
   rules' `endByMaterial` on the earliest round's matches, the next round 3 s later; in the votes: they close), and a
-  test lobby, `POST /api/squads/lobby?start=votes|relay|pairs|final&clock=BANK,TOPUP,FREE,INC` (a team clock in
-  seconds; `testLobbyOptions`), that fills 5 s after it opens, skipping the rounds before (squads with more people go
+  test lobby, `POST /api/squads/lobby?start=votes|relay|pairs|final&clock=bullet|blitz|rapid` (a time control; the old
+  fast, normal and long map to them, an unknown id gives Blitz) or `clock=BANK,TOPUP,FREE,INC[,CAP]` (a team clock in
+  seconds; without CAP the old 20 s ceiling, so older links keep their meaning; `testLobbyOptions`), that fills 5 s after it opens, skipping the rounds before (squads with more people go
   through). For tests also `fen=` (the first round's boards start there: a legal position, White to move),
   `bots=strong` (every bot at the strongest skill), `bots=blocks` (bots block whenever they can; `bots=strong,blocks`
   for both) and `seat=white` (the opener plays White on their first board). `mode=mercenary|classic` sets the mode
@@ -296,7 +328,8 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   playing (`botRun`) shops `mercenary.bots.shopSeconds` into its window (`botShop`), now and then uses a token
   (`botUsesStockfish`: then the best move), and plans a Time chip tap as a half starts (`botChipTap`, `botChips`),
   thinking with its time; never a squad with people playing.
-- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 5, typed): a lobby socket gets
+- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 6, typed; 6: the time controls, a
+  clock's `capSeconds` and a match's `capMs`): a lobby socket gets
   `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock and wallet), `vote`/`voteCast`, `match` (a
   match in full, as you may see it: tokens, block banks, blocks in effect and placed, the token log; its mode, each
   side's free seconds, kits, Stockfish tokens and shields left, the tokens used and being used, coins this match),
@@ -328,14 +361,17 @@ to its results, halves, deadlines, takeover and reclaiming, leaving, team clocks
 visibility, Armageddon, the test controls, rewards, bot work on devices), `squads-v2-lobby.test.ts` (tokens through
 the server and the judge on devices: refunded, kept, no judge; blocks placed, seen, paid, refused, lifted, in effect;
 the final's vote with a block; test lobbies' position, strong bots and White seat; what each side sees),
-`squads-mercenary-lobby.test.ts` (the Mode vote; every wallet to everyone; one shared wallet, purchases live to the
+`squads-clocks-lobby.test.ts` (the time controls: whichever option the Clock vote picks, the lobby plays it; a whole
+bot lobby on Bullet in time; a test link's clock by name, old ids and numbers; a lobby stored on the old Normal clock
+playing on to its results), `squads-mercenary-lobby.test.ts` (the Mode vote; every wallet to everyone; one shared wallet, purchases live to the
 squad, caps, putting back, closed once the match starts; the kit; catch-up; the Stockfish token and a shield through
 the server; bots' shopping; a whole Mercenary bot lobby's coins adding up), `squads-queue.test.ts` (the queue,
 parties, D1 rewards), `squads-do.test.ts` (the Durable Object: storage per match,
 restart, closing); e2e `e2e/squads.spec.ts` (a party through the real server; a test lobby at the final);
 `e2e/squads-test-tools.spec.ts` (the start link and Cheat lines, and a player without them); `e2e/squads-v2.spec.ts`
 (a token burned and refunded, a block and its arrow until they've moved, Cheat lines while blocking);
-`e2e/squads-mercenary.spec.ts` (choosing Mercenary in the Mode vote, earning coins, the shop between rounds, a
+`e2e/squads-clocks.spec.ts` (the Clock vote's cards in chess form, whole at 320 px; the winner on the match's card,
+in its deadlines, and the clock line whole at 320 px); `e2e/squads-mercenary.spec.ts` (choosing Mercenary in the Mode vote, earning coins, the shop between rounds, a
 Stockfish token and a shield). The full-lobby run: `npx tsx scripts/squads-headless.ts
 --url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies).
 
@@ -384,7 +420,8 @@ door's look; every class is `sq-`.
   - **Each squad's block points and tokens** under its clock, both squads, always (`SquadResources`).
   - **The token breakdown** after a Pairs match (`TokenBreakdown`; between matches, and on the results): every use,
     refunded or not, why, with numbers ("Qxd4: refunded, every other move lost at least 3.1 pawns").
-  - **Staging:** each match opens with a card over the board (its round, its squads, one line of rules, the count);
+  - **Staging:** each match opens with a card over the board (its round, its squads, one line of rules, the lobby's
+    time control, `matchClockLine`: "Blitz 3+2 · +2 s a move · max 15 s", the count);
     the final's is "SQUAD FINAL" with both squads' members. Knocked-out squads watch the final on the same screen.
     Armageddon: the choosing squad's people pick White or Black on the card (the times from settings).
   - A bot playing your seat (three misses): "Take my seat back" (`reclaim`).
@@ -393,7 +430,7 @@ door's look; every class is `sq-`.
   squad's placement and members, yours ringed, your reward, the bracket; Play again or Home.
 - **Test controls on screen** (only when the server's `welcome` says `test`): "Next round" beside the title in a
   match, "Skip votes" in the votes. A test lobby: an admin's Party sheet has Start · Relay · Pairs · Final, and the link
-  `/squads/test[/start|relay|pairs|final][?clock=BANK,TOPUP,FREE,INC]` opens one (admins on hunchess.com; anyone
+  `/squads/test[/start|relay|pairs|final][?clock=bullet|blitz|rapid or BANK,TOPUP,FREE,INC[,CAP]]` opens one (admins on hunchess.com; anyone
   locally with `SQUADS_TEST`); `/squads/test` alone (or `/start`) is the whole tournament from the first vote.
 - **Cheat lines** (test controls only, Eric Oct 12): a switch in the panel wherever you choose (`cheatLinesAt`: your
   Relay move, a Pairs or final pick, a block, Armageddon's colours). On, it draws the engine's top 3 in the position
@@ -427,7 +464,9 @@ door's look; every class is `sq-`.
   every engine at once) and answered with `botTop`. A knocked-out player's page keeps answering while it's open.
 - **Sounds:** the normal knocks for moves (the big board's own); `sqTick` in the last two seconds of your free time
   while you still have a choice to make (not blockers); `sqSting` when a squad on the big board enters sudden death
-  (the moment its clock hits zero on screen, or the half's `sudden_death`). Both quieter than a move
+  (the moment its clock hits zero on screen, or the half's `sudden_death`), and again only once its bank has been back
+  up to the low line (`LOW_BANK_MS`, 30 s): a squad living on its increment near zero runs out and is lifted again
+  half after half, and hears it once. Both quieter than a move
   (`measureSound`, checked in e2e), both through mute, no chimes anywhere in Squads.
 - **Rejoining:** the seat's token is kept per lobby (`brc.squads.CODE`); a reload or the app reopened at `/` goes back
   in while the lobby is on (`/squads/CODE` is its address).
@@ -446,7 +485,7 @@ door's look; every class is `sq-`.
 Tests: `packages/app/test/squads-view.test.ts`; e2e `e2e/squads-play.spec.ts` (through the real server with its bots, on
 a phone and a computer: Pairs, the final, a Relay half with the board's coordinates in their squares both ways up, Next
 round, the party, the sounds). Frames:
-`npm run frames:squads -- <dir> relay|pairs|final|block|token|menu|standings http://localhost:8787` against `wrangler
+`npm run frames:squads -- <dir> relay|pairs|final|block|token|menu|standings|clockvote|clockline http://localhost:8787` against `wrangler
 dev --var SQUADS_TEST:1` (every painted frame, the big board's pieces and blocked moves' arrows logged per frame, a
 GIF). Never beside an e2e run from the
 same checkout without `--persist-to` a folder of its own: two local servers on one `.wrangler/state` lock each other's
@@ -455,6 +494,10 @@ storage (SQLITE_BUSY), and the e2e's lobbies fail.
 ## The design (Eric, Oct 10, 2026)
 
 The brief, as given (calls marked "director's call"). Phase 1's own calls are in `DECISIONS.md`, "Squads".
+
+**Changed since (Eric, Oct 13, time controls):** the Clock vote's Fast, Normal and Long became three chess time
+controls, Bullet, Blitz and Rapid, each a team bank with an increment that banks and its own cap on a move
+(DECISIONS.md, "Squads: three chess time controls").
 
 **Changed since (Eric, Oct 12, Squads v2):** same-move tokens in Pairs, move blocks in every round, and the final a
 majority vote of the whole squad, replacing Pick and Block below (DECISIONS.md, "Squads v2").

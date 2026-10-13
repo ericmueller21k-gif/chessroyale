@@ -79,6 +79,9 @@ import {
   unbuyItem,
   upgradeMatch,
   upgradeWallet,
+  upgradeClock,
+  upgradeRules,
+  clockById,
   useStockfish,
   visibleChoices,
   votable,
@@ -382,15 +385,20 @@ export function partiesFit(sizes: readonly number[], s: SquadsSettings = SQUADS)
 }
 
 /**
- * A test lobby's team clock (?clock=): "bank,top-up,free,increment" in seconds (each squad's starting bank, its top-up
- * a round, the free seconds a move, the increment), e.g. "120,30,3,0". Null if it isn't one.
+ * A test lobby's team clock (?clock=). A Clock option by its id: bullet, blitz or rapid (the old fast, normal and long
+ * map to them; an id we don't know gets the default, Blitz). Or its own numbers in seconds, "bank,top-up,free,increment"
+ * and optionally the cap on a move, e.g. "120,30,3,1,10"; without a cap, the one ceiling every clock had before the
+ * time controls (`legacyCapSeconds`), so an older test link keeps its meaning. Null if it's neither.
  */
-export function parseTestClock(text: string | null): SquadsClock | null {
-  const m = text?.trim().match(/^(\d{1,4}),(\d{1,4}),(\d{1,3}),(\d{1,3})$/);
+export function parseTestClock(text: string | null, s: SquadsSettings = SQUADS): SquadsClock | null {
+  const t = text?.trim() ?? "";
+  if (/^[a-z]{1,16}$/i.test(t)) return clockById(t, s);
+  const m = t.match(/^(\d{1,4}),(\d{1,4}),(\d{1,3}),(\d{1,3})(?:,(\d{1,3}))?$/);
   if (!m) return null;
-  const [bank, topUp, delay, inc] = m.slice(1).map(Number) as [number, number, number, number];
-  if (bank < 1 || delay < 1) return null;
-  return { id: "test", label: "Test", bankSeconds: bank, topUpSeconds: topUp, delaySeconds: delay, incrementSeconds: inc };
+  const [bank, topUp, delay, inc] = m.slice(1, 5).map(Number) as [number, number, number, number];
+  const cap = m[5] === undefined ? s.legacyCapSeconds : Number(m[5]);
+  if (bank < 1 || delay < 1 || cap < 1) return null;
+  return { id: "test", label: "Test", bankSeconds: bank, topUpSeconds: topUp, delaySeconds: delay, incrementSeconds: inc, capSeconds: cap };
 }
 
 /** May this person open a test lobby: the test controls' switch is on, and an admin (or SQUADS_TEST is "1" here). */
@@ -473,9 +481,14 @@ export class SquadsCore {
     private readonly s: SquadsSettings = SQUADS,
   ) {
     // (Matches stored by an earlier version in today's shape: before the modes, Classic with Mercenary's fields filled
-    // in; before the Breather was taken out, without it. Wallets likewise: a breather in an open shop's cart refunded.)
-    for (const [k, v] of Object.entries(matches)) this.matches.set(k, { ...v, m: upgradeMatch(v.m), ...(v.drawn ? { drawn: upgradeMatch(v.drawn) } : {}) });
+    // in; before the Breather was taken out, without it; before the time controls, with the one ceiling every clock had
+    // then. Wallets likewise: a breather in an open shop's cart refunded. A clock voted before the time controls keeps
+    // its numbers and that ceiling: the lobby finishes on the clock it voted.)
+    for (const [k, v] of Object.entries(matches)) this.matches.set(k, { ...v, m: upgradeMatch(v.m, s), ...(v.drawn ? { drawn: upgradeMatch(v.drawn, s) } : {}) });
     if (record.wallets) record.wallets = record.wallets.map((w) => upgradeWallet(w, s));
+    if (record.rules) record.rules = upgradeRules(record.rules, s);
+    if (record.plan) record.plan = { ...record.plan, rules: upgradeRules(record.plan.rules, s) };
+    if (record.test?.clock) record.test = { ...record.test, clock: upgradeClock(record.test.clock, s) };
   }
 
   private get r() {
@@ -1074,10 +1087,13 @@ export class SquadsCore {
         planned[d.side]++;
       }
       const chipMs = tap !== null ? this.s.mercenary.chipSeconds * 1000 : 0;
+      // (When its squad's bank would run out with all its moves still going, the chip counted: a bot moves before it.)
+      const chipIn: HalfInputs = tap !== null && chipBot ? { ...NO_INPUTS, chips: [{ board: d.board, by: chipBot, at: tap }] } : NO_INPUTS;
+      const cutoffMs = liveCutoff(m, chipIn, d, {}, this.s);
       for (const p of d.players) {
         if (!this.botPlays(p)) continue;
         const bankMs = m.banks[d.side] + 3 * chipMs;
-        const think = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: m.delayMs, deadlineMs: d.deadlineMs + chipMs }, this.s);
+        const think = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: m.delayMs, deadlineMs: d.deadlineMs + chipMs, cutoffMs }, this.s);
         // (With a chip coming, never before it's tapped.)
         half.bots[p] = tap !== null ? Math.max(think, tap + 200) : think;
         boards.add(d.board);
@@ -1426,7 +1442,10 @@ export class SquadsCore {
     if (!d) return planned;
     const job = half.work[d.duty.board];
     if (!job || job.how || (!job.devices.length && !job.queued && !job.follows)) return planned;
-    return Math.max(planned, half.startedAt + Math.max(0, dutyDeadline(half.inputs, d.duty, this.s) - SQUADS_LOBBY.botWork.fallbackMarginMs));
+    // Waiting for its devices, a bot plays from the quick look by its fallback moment: before its deadline, and before
+    // its squad's bank would run out (Bullet near zero: a random move for want of time is worse than the quick look).
+    const fallback = Math.min(dutyDeadline(half.inputs, d.duty, this.s) - SQUADS_LOBBY.botWork.fallbackMarginMs, liveCutoff(lm.m, half.inputs, d.duty, half.at, this.s) * this.s.bots.inTime);
+    return Math.max(planned, half.startedAt + Math.max(0, fallback));
   }
 
   /** A bot plays its seat's duty: the rules' squad bots (bots.ts) over the top moves (the devices', or the quick look). */
@@ -2178,6 +2197,7 @@ export class SquadsCore {
       turn: m.turn,
       half: m.half,
       incrementMs: m.incrementMs,
+      capMs: m.capMs,
       state: lm.state,
       startsAt: lm.startsAt,
       current: lm.state === "half" ? this.netHalf(lm) : null,

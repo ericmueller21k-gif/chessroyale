@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { FRONT_DOOR, SQUADS, SQUADS_LOBBY, type MercItem } from "@chessroyale/core";
-import { MERC_ITEMS, NO_ITEMS, blockTargets, catchUpCoins, checkBlock, halfDuties, itemPrice, piecesOf, squadsLegalMoves, squadsVotes, type BrilliantCandidate, type NetWallet, type SquadsEvent } from "@chessroyale/chess/squads";
+import { MERC_ITEMS, NO_ITEMS, blockTargets, catchUpCoins, checkBlock, dutyDeadline, halfDuties, itemPrice, piecesOf, squadsLegalMoves, squadsVotes, type BrilliantCandidate, type NetWallet, type SquadsEvent } from "@chessroyale/chess/squads";
 import { SquadsCore, clearTopCache, testLobbyOptions, type LiveMatch } from "../src/squads-lobby.ts";
 import { library } from "./squads-fixture.ts";
 import { squadsLobby } from "./squads-fixture.ts";
@@ -298,7 +298,9 @@ describe("Mercenary on the server: the Time chip", () => {
     const bank = lm.m.banks[side];
     L.advance(5_000);
     L.core.message(p, { t: "chip", key: lm.key, seq: half.seq, seen: 0 });
-    // 40 s into the half (past the 20 s ceiling): the half is still on, and both picks count.
+    // 40 s into the half (past the time control's cap, at most 20 s): the half is still on, and both picks count.
+    expect(lm.m.capMs).toBeLessThanOrEqual(20_000);
+    expect(dutyDeadline(lm.half!.inputs, d)).toBeGreaterThanOrEqual(40_000);
     L.advanceTo(half.startedAt + 40_000);
     expect(lm.half?.seq).toBe(half.seq);
     const moves = squadsLegalMoves(lm.m.boards[d.board]!.fen);
@@ -309,9 +311,10 @@ describe("Mercenary on the server: the Time chip", () => {
     const played = L.all(p, "half").find((h) => h.key === lm.key && h.seq === half.seq)!;
     expect(played.missed).not.toContain(p);
     expect(played.missed).not.toContain(q);
-    // 3-5 s and 35-40 s: 7 s off the bank.
-    expect(ofKind(played.events, "bank").find((e) => e.side === side)!.drainedMs).toBe(7_000);
-    expect(lm.m.banks[side]).toBe(bank - 7_000);
+    // From the free seconds to the tap (5 s), and 35-40 s: off the bank; both picks in time, the increment back.
+    const drained = 5_000 - lm.m.delayMs + 5_000;
+    expect(ofKind(played.events, "bank").find((e) => e.side === side)!.drainedMs).toBe(drained);
+    expect(lm.m.banks[side]).toBe(bank - drained + lm.m.incrementMs);
     expect(played.match.chips[side]).toBe(1);
     // The match over: the chip left goes back to the squad's wallet, kept for the final.
     L.core.message(party[0]!, { t: "nextRound" });

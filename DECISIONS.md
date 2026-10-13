@@ -2254,3 +2254,109 @@ bank ÷ (t − increment) moves. Moves each bank lasts, and what's left after th
 lanes rule (CLAUDE.md, Eric, Oct 13) puts in the full lane. Unit tests: each option's patch, the bank and increment
 maths (banking on quick moves, the cap, an empty bank), the calibration above, the old ids, the default, the runner
 resetting banks only before move 1, and the lobby applying the winner (round, increment, banks, and after waking).
+
+### Squads: three chess time controls (Eric, Oct 13, 2026)
+
+Eric, Oct 13, of the 50 v 50's three chess time controls (above): "I wanted that for squad"; he expects the bullet
+modes to be popular. He approved the director's plan before going to sleep ("go ahead"): three options named like chess
+time controls; the shared team bank stays (it's what makes Squads work across Relay's simultaneous boards), and the
+top-ups unless the increment makes them pointless; a real chess increment that banks; a cap on a move for each option;
+medians of about 20, 30 and 40 minutes with sensible 90th percentiles; nobody voting gives the middle one; old ids
+mapped. The calls, all made without Eric:
+
+| Option | Bank | Increment | Free seconds | Cap on a move | Top-up a round |
+| --- | --- | --- | --- | --- | --- |
+| Bullet 1+1 | 1:00 | +1 s | 2 s | 10 s | +15 s |
+| Blitz 3+2 (nobody votes) | 3:00 | +2 s | 2 s | 15 s | +30 s |
+| Rapid 5+3 | 5:00 | +3 s | 2 s | 20 s | +1:00 |
+
+- **The increment banks** as on a chess clock, by the rule the team clock already had (`incrementSeconds`, 0 until
+  now): each move made in time earns it, credited after the half; a missed move earns none (`incrementOnMiss`). A
+  move quicker than the free seconds and the increment together adds to the bank, which isn't capped at its start; a
+  slower one costs only what's past them. Credited after the half, not at the move's start (the 50 v 50's way):
+  with several moves draining one bank at once, the rule that existed keeps every other part of the team clock (the
+  double drain, the bank running out mid-half, the Time chip's windows, the screens' clock) as it was.
+- **Sudden death with an increment.** At zero each move still has only the free seconds; one made in time earns the
+  increment, which lifts the squad out again, so near zero a squad lives on it (each move the free seconds plus the
+  increment: 3 s on Bullet, as sudden death gave before). "sudden_death" now comes only when a bank is still empty once
+  the half's increments are in. The screen's sting plays when a squad's clock hits zero and again only after its bank
+  has been back above the low line (30 s): living on the increment would otherwise sting every half.
+- **The increment sets the pace, not the bank** (the tuning runs' finding). In the sim's model people spend their
+  bank over 40 moves plus most of the free seconds and the increment, so a squad's bank settles where its drain and
+  its increments meet (a round 1 winner carried about 20 s on Bullet, 35 on Blitz, 50 on Rapid). A bigger bank only
+  slows each round's start. In the tuning runs (12 lobbies each, the usual bot spread) 1+1 and 1:30+1 ran 26.9 and
+  26.1 minutes, 2+2 and 3+2 30.9 and 32.7, 4+3 and 5+3 39.8 and 40.3: the bank moved a lobby by a minute or two, the
+  increment by 5-8. So the options' increments step 1, 2, 3 s (and 1, 3, 5 minutes reads as a chess ladder too).
+- **The free seconds stay, at 2 s for every option (were 3).** With an increment on top, 3 s made each option about 4-5
+  minutes longer (people spend most of the free seconds every move: Blitz 3+1 with 3 s ran 37.6 minutes, 3+2 with 2 s
+  34.8, 8 lobbies each). Gone, sudden death would have no time for a move. One number for every option keeps it clear ("A move's first 2 s are free"), and the Time chip's
+  "30 s from after the free seconds" reads as before. 2 s in sudden death is tight for a pair on a phone, but sudden
+  death is now 0.2-0.5% of moves, and a move made in it lifts the squad out.
+- **Caps 10, 15, 20 s,** as the 50 v 50's; each match carries its own (`capMs`), Armageddon the final's. The single
+  `moveCeilingSeconds` is gone.
+- **Top-ups stay, scaled (+15 s, +30 s, +1 minute).** The increment makes them less needed (a squad is never stuck in
+  sudden death), but not pointless: Pairs is where squads reach sudden death (the slower of two pickers drains the
+  bank), and a round's top-up is its buffer there. They cost under a minute a round.
+- **Names and cards:** "Bullet 1+1" (`clockLabel`, minutes and increment as chess players write them), the blurb
+  "1 min + 1 s a move · max 10 s" as the 50 v 50's cards, and the rest in the result's banner (`teamClockDetail`: one
+  clock per squad for the tournament, the top-up, the free seconds, the increment, sudden death; short enough for a
+  320 px phone). Icons as the 50 v 50's: ⚡ 🔥 ⏱️. Each match's opening card says the time control in one line
+  (`matchClockLine`: "Blitz 3+2 · +2 s a move · max 15 s"), for anyone who missed the vote.
+- **Nobody votes: Blitz,** the middle option, as Normal was.
+- **Old ids** (`clockById`): fast → bullet, normal → blitz, long → rapid; an id we don't know gets Blitz, never an
+  error. A stored vote's result is the option's place, so an old Fast, Normal or Long vote reads as Bullet, Blitz or
+  Rapid. **A lobby stored mid-tournament keeps its numbers** (`upgradeClock`, `upgradeRules`, `upgradeMatch`): its
+  clock and matches, stored without a cap, get the one ceiling every option had then (20 s, `legacyCapSeconds`), and
+  it finishes on the clock it voted. Upgrading it to the new option would change the increment and the cap under
+  players mid-tournament.
+- **Test links:** `?clock=bullet|blitz|rapid` (old ids mapped) or the numbers with an optional fifth, the cap
+  (`120,30,3,1,10`); four numbers keep the old 20 s ceiling, so every older link means what it did.
+- **Bots** pace themselves as before (their bank over 40 moves plus 80% of the free seconds and the increment), but
+  never past 90% of when their squad's bank would run out with all its moves going (`cutoffMs`, `liveCutoff` as the
+  half begins; `bots.inTime`), not just of their deadline: near zero on Bullet the deadline is the cap, 10 s, and the
+  bank runs out at about 3 s. And a bot waiting for its devices' answer plays from the quick look by then too: a
+  weaker move in time beats a random one. No per-option tuning was needed.
+- **The Time chip** works as it did: 30 s on top of the option's cap, the bank held still from after the free seconds,
+  the increment still earned by a move made in it; in sudden death the free seconds and 30 s.
+- **The sim's people watch the clock** (the one change to its model): about to think past 85% of the time they can see
+  (the cap, or their squad's bank running out), they hurry as in sudden death. Without it, squads living on their
+  increment near zero would have people blindly thinking past their bank.
+- **The calibration** (`reports/squads-sim.md`; Classic 36 lobbies an option, 12 per skill mix; Mercenary 12):
+
+  | Option | Classic median | 90th pct | Mercenary median | 90th pct | Squads reaching sudden death | Moves in it | Random for want of time |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Bullet 1+1 | 26.9 | 34.7 | 29.9 | 39.9 | 31% (Merc 28%) | 0.5% (0.5%) | 0.7% |
+  | Blitz 3+2 | 33.5 | 40.9 | 37.8 | 41.6 | 22% (23%) | 0.4% (0.3%) | 0.6% |
+  | Rapid 5+3 | 43.9 | 54.5 | 43.9 | 52.7 | 22% (17%) | 0.4% (0.2%) | 0.4% |
+  | (old Fast, Normal, Long) | 28.6-31.1 | 33.3-39.6 | | | 46-64% | 7-13% | 1.3-2.1% |
+
+  The usual bot spread alone (Mixed): 26.9, 32.7 and 40.3. Level matches no longer go to the coin (0 of 258; a
+  quarter to a third did, both squads at zero).
+- **Bullet doesn't reach 20 minutes, and can't on its clock alone.** About 11 minutes of every lobby is shown, not
+  played (each Relay half's moves, 1 s; the pair's reveal, 3 s; the final's, 4.5 s; over about 220 halves, plus the
+  votes and the bracket), and the slowest of four people choosing in a half takes about 3-4 s even at a person's
+  fastest. Shorter reveals in Bullet (Pairs 2 s, the final 3 s) bring it to 24.0 on the same seeds (Mixed): left to
+  Eric, as it's how the reveals look. Blitz and Rapid are 3-4 minutes over their 30 and 40; Rapid's 90th percentile
+  (55, strong squads' long games) is the long one. Rapid 5+2 or a 15 s cap would trim it.
+- **Through the real server** (`scripts/squads-headless.ts --clock bullet --device`, one idle person whose device did
+  the bots' engine work): a full Bullet lobby took **32.9 minutes** from the fill to its results, within the sim's
+  spread (median 26.9, 90th percentile 34.7) and long for the usual reason: one Relay match ran 13 minutes (boards of
+  159 and 183 plies) and held up its side of the bracket; Pairs took 8 and the final 10. The bots were never out of
+  time: 0 missed actions in 1,949 moves (the 3 on the record were the idle person's, before a bot took the seat), and
+  squads that tied in rounds 1 and 2 had 2-7 s of bank left, living on the increment. A first try ended at 24 minutes
+  into the lobby (in the final) when the local server stopped; Relay then took 8.4 minutes and Pairs 13.3 (a 129-ply
+  game).
+- **Screens:** the vote's result banner with a detail line (Squads' Mode, Start and Clock votes) is centred in the
+  board rather than 28% down: at 320 px it ran over the cards under it (every Squads option with a detail did,
+  before this too). Checked frame by frame at 320, 390 and 1280 px (the Clock vote, its banner, the match's card, the
+  clock line on Rapid and near zero), and measured in `e2e/squads-clocks.spec.ts`.
+- **Protocol 6** (`SQUADS_PROTOCOL`): a clock's `capSeconds` in the rules, a match's `capMs`.
+- **Untouched:** the 50 v 50's time controls, raids and Boss alone, and Armageddon's own clocks (90 and 60 s, +1 s;
+  now with the lobby's 2 free seconds and the final's cap).
+
+**Testing.** The full lane: this changes the rules, the server, the protocol and stored data. Unit tests: each option
+into every match, the increment banking, the cap, sudden death and the increment lifting a squad out, living on the
+increment, the old ids and the default, a stored match and lobby upgraded (and a lobby on the old Normal clock played
+to its results), the Time chip on every option, bots on every option (and a whole bot lobby on Bullet) in time, the
+server applying whichever option the vote picks, the test link's clock, the FAQ's words from the settings. e2e: the
+Clock vote's cards, its banner and the clock line whole at 320 px, and the winner's cap in the deadlines.

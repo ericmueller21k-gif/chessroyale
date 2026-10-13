@@ -50,11 +50,77 @@ export function clockName(c: { bankSeconds: number; incrementSeconds: number }):
   return `${minutesName(c.bankSeconds)}+${c.incrementSeconds}`;
 }
 
-/** A Clock option in one line: "Team clock 6 min · +1 min a round · 5 s free a move". */
+/** A time control as chess players name it: "Bullet 2+1". */
+export const clockLabel = (c: Pick<SquadsClock, "label" | "bankSeconds" | "incrementSeconds">): string => `${c.label} ${clockName(c)}`;
+
+/** A Clock option in one line, as the 50 v 50's cards say theirs: "2 min + 1 s a move · max 10 s". */
 export function teamClockLine(c: SquadsClock): string {
-  const parts = [`Team clock ${minutesName(c.bankSeconds)} min`, `+${minutesName(c.topUpSeconds)} min a round`, `${c.delaySeconds} s free a move`];
-  if (c.incrementSeconds) parts.push(`+${c.incrementSeconds} s a move`);
-  return parts.join(" · ");
+  return `${minutesName(c.bankSeconds)} min + ${c.incrementSeconds} s a move · max ${c.capSeconds} s`;
+}
+
+/** The lobby's time control on a match's opening card: "Blitz 3+2 · +2 s a move · max 15 s". */
+export function matchClockLine(c: SquadsClock): string {
+  return [clockLabel(c), ...(c.incrementSeconds ? [`+${c.incrementSeconds} s a move`] : []), `max ${c.capSeconds} s`].join(" · ");
+}
+
+/**
+ * The rest of a Clock option, in words, short enough for the vote's banner on a 320 px phone (the cap is in its
+ * `teamClockLine` just above): one clock per squad for the tournament, its top-up, the free seconds, the increment and
+ * sudden death.
+ */
+export function teamClockDetail(c: SquadsClock): string {
+  const t = c.topUpSeconds;
+  const topUp = t ? ` (+${t % 60 ? `${t} s` : `${t / 60} min`} a round)` : "";
+  const inc = c.incrementSeconds ? ` each move made in time adds ${c.incrementSeconds} s.` : "";
+  return `One clock per squad for the tournament${topUp}. A move's first ${c.delaySeconds} s are free;${inc || " then it runs."} At zero, sudden death: every move within ${c.delaySeconds} s.`;
+}
+
+/** Clock options that are gone, by their old ids (Oct 13, 2026: chess time controls): Fast, Normal, Long. */
+const OLD_CLOCKS: ReadonlyMap<string, string> = new Map([
+  ["fast", "bullet"],
+  ["normal", "blitz"],
+  ["long", "rapid"],
+]);
+
+/** The Clock option if nobody votes (Blitz). */
+export const defaultClock = (s: SquadsSettings = SQUADS): SquadsClock => s.clocks[s.clockDefault] ?? s.clocks[0]!;
+
+/**
+ * A Clock option by its id (a test link's ?clock=bullet|blitz|rapid). Old ids map to the new ones (fast → bullet,
+ * normal → blitz, long → rapid); an id we don't know gets the default (Blitz), never an error.
+ */
+export function clockById(id: string | null | undefined, s: SquadsSettings = SQUADS): SquadsClock {
+  const key = (id ?? "").trim().toLowerCase();
+  return s.clocks.find((c) => c.id === (OLD_CLOCKS.get(key) ?? key)) ?? defaultClock(s);
+}
+
+/**
+ * A team clock stored by an earlier version in today's shape. One from before the time controls (Fast, Normal, Long,
+ * or a test lobby's own) has no cap: it keeps its own numbers, and the one ceiling every option had then
+ * (`legacyCapSeconds`), so a lobby in play across the deploy finishes on the clock it voted. Missing numbers (never
+ * expected) come from the option its id names.
+ */
+export function upgradeClock(c: Partial<SquadsClock> | null | undefined, s: SquadsSettings = SQUADS): SquadsClock {
+  if (c && typeof c.capSeconds === "number" && typeof c.bankSeconds === "number" && typeof c.topUpSeconds === "number" && typeof c.delaySeconds === "number" && typeof c.incrementSeconds === "number") return c as SquadsClock;
+  const base = clockById(c?.id, s);
+  const num = (x: unknown, d: number) => (typeof x === "number" && Number.isFinite(x) ? x : d);
+  const legacy = !!c && typeof c.capSeconds !== "number";
+  return {
+    id: c?.id ?? base.id,
+    label: c?.label ?? base.label,
+    bankSeconds: num(c?.bankSeconds, base.bankSeconds),
+    topUpSeconds: num(c?.topUpSeconds, base.topUpSeconds),
+    delaySeconds: num(c?.delaySeconds, base.delaySeconds),
+    incrementSeconds: num(c?.incrementSeconds, base.incrementSeconds),
+    capSeconds: legacy ? s.legacyCapSeconds : num(c?.capSeconds, base.capSeconds),
+  };
+}
+
+/** Rules stored by an earlier version: their clock in today's shape (`upgradeClock`). */
+export function upgradeRules<R extends SquadsRules | null>(r: R, s: SquadsSettings = SQUADS): R {
+  if (!r) return r;
+  const clock = upgradeClock(r.clock, s);
+  return clock === r.clock ? r : { ...r, clock };
 }
 
 /** The mode vote's options: Classic, Mercenary, and a third mode shown as "Coming soon" (it can't be voted for). */
@@ -106,13 +172,13 @@ export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
       id: "clock",
       title: "How fast?",
       defaultOption: s.clockDefault,
+      // (Icons as the 50 v 50's: ⚡ Bullet, 🔥 Blitz, ⏱️ Rapid.)
       options: s.clocks.map((c, i) => ({
         id: c.id,
-        icon: ["⚡", "⏱️", "🧘"][i] ?? "⏱️",
-        label: `${c.label} ${minutesName(c.bankSeconds)} min`,
+        icon: ["⚡", "🔥", "⏱️"][i] ?? "⏱️",
+        label: clockLabel(c),
         blurb: teamClockLine(c),
-        detail:
-          "One clock per squad for the whole tournament: what's left carries into the next round. It runs past the free seconds while your squad thinks, faster when two of you move at once. At zero it's sudden death: every move within the free seconds.",
+        detail: teamClockDetail(c),
         patch: {},
         rule: { clock: c },
       })),
@@ -151,7 +217,7 @@ export function botModeVotes(rng: Rng, ids: readonly string[], windowMs: number,
  * its link, whatever the vote (it doesn't hold one then).
  */
 export function rulesFromVotes(results: Partial<Record<SquadsVoteId, number>>, s: SquadsSettings = SQUADS, mode?: SquadsMode | null): SquadsRules {
-  const rules: SquadsRules = { mode: "classic", start: "standard", clock: s.clocks[s.clockDefault] ?? s.clocks[0]! };
+  const rules: SquadsRules = { mode: "classic", start: "standard", clock: defaultClock(s) };
   for (const vote of squadsVotes(s)) {
     let option = vote.options[results[vote.id] ?? vote.defaultOption] ?? vote.options[vote.defaultOption]!;
     if (option.disabled) option = vote.options[vote.defaultOption]!;

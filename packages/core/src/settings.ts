@@ -1506,15 +1506,18 @@ export const FAIRPLAY = {
  * (2 boards, two players pick and a coin chooses, unless both pick the same move: a same-move token), the final a
  * majority vote (one board, the whole squad picks, the most popular pick plays). In every round a squad may block one
  * of the other squad's moves before its own move (a block bank per match). Each squad has one team clock for the
- * whole tournament: a bank that carries from round to round (topped up when it advances), drained past a few free
- * seconds a move, once for each of its moves being thought about at the same time. At zero it's sudden death: every
- * move within the free seconds, or it's missed. No flag falls, and every game is played to the end. No engine in the
+ * whole tournament, a chess time control voted before round 1 (Bullet, Blitz, Rapid): a bank that carries from round to
+ * round (topped up when it advances), drained past a few free seconds a move, once for each of its moves being thought
+ * about at the same time; each move made in time earns the increment back, and no move goes past the option's cap. At
+ * zero it's sudden death: every move within the free seconds, or it's missed, until the increment lifts the squad out
+ * again. No flag falls, and every game is played to the end. No engine in the
  * rules but one: a same-move token's refund takes the judge's top moves (from players' devices) as data; legal moves
  * and mate in one come from the chess library; only the silent safety cap and the test-only "Next round" fall back on
  * material. The rules are in `packages/chess/src/squads/`; every number for the mode is here.
  */
 export interface SquadsClock {
   id: string;
+  /** The time control's name ("Bullet"); on screen with its numbers in chess form: "Bullet 2+1" (`clockLabel`). */
   label: string;
   /** Each squad's team bank at the start of the tournament (seconds). */
   bankSeconds: number;
@@ -1522,8 +1525,16 @@ export interface SquadsClock {
   topUpSeconds: number;
   /** Free seconds every move before the bank drains; at zero (sudden death), the time to make each move. */
   delaySeconds: number;
-  /** Credited to the bank after each move made in time (0: none). */
+  /**
+   * Credited to the bank after each move made in time (0: none), as on a chess clock: a move quicker than the free
+   * seconds and the increment together earns time back. It can lift a squad out of sudden death.
+   */
   incrementSeconds: number;
+  /**
+   * The per-move cap while the squad's bank lasts: nobody can hold up a half longer than this (Time chips apart). A
+   * mover or picker who hasn't chosen by then misses (a random legal move), the bank draining meanwhile.
+   */
+  capSeconds: number;
 }
 /** Mercenary's items, in the shop's order (strongest first: DECISIONS.md, "Squads modes: Mercenary"). */
 export type MercItem = "stockfish" | "blocks" | "shield" | "chip";
@@ -1621,16 +1632,17 @@ export interface SquadsSettings {
   voteResultSeconds: number;
   voteBotSkip: number;
   /**
-   * The Clock vote's options (Eric, Oct 10: Fast, Normal, Long; tuned by the sim), each setting the team clock: the
-   * starting bank, the top-up a round, the free seconds a move and any increment. And the one if nobody votes.
+   * The Clock vote's options (Eric, Oct 13: Bullet, Blitz and Rapid, chess time controls like the 50 v 50's; tuned by
+   * the sim), each a team clock: the starting bank, the top-up a round, the free seconds a move, the increment and the
+   * cap on one move. And the one if nobody votes.
    */
   clocks: readonly SquadsClock[];
   clockDefault: number;
   /**
-   * The per-move ceiling while a squad's bank is above zero: nobody can hold up a half longer than this. A mover or
-   * picker who hasn't chosen by then misses (a random legal move), the bank draining meanwhile.
+   * A team clock stored before the time controls (Oct 13, 2026: Fast, Normal, Long, or a test lobby's four numbers) had
+   * one per-move ceiling for every option, this long: a lobby in play across that deploy keeps its numbers and this cap.
    */
-  moveCeilingSeconds: number;
+  legacyCapSeconds: number;
   /** A missed move earns no increment. */
   incrementOnMiss: boolean;
   /** The silent safety cap on every board, in moves per side: then material decides (as does "Next round"). */
@@ -1741,12 +1753,14 @@ export interface SquadsSettings {
     /**
      * A bot's thinking time: its squad's bank over `movesToGo`, plus `incrementShare` of the increment and the free
      * seconds, times a random factor in `thinkRange`, at least `minThinkSeconds` (but within the free seconds in
-     * sudden death), and never past its deadline.
+     * sudden death), and always in time: at most `inTime` of its deadline (the cap, or the free seconds in sudden
+     * death) and of when its squad's bank would run out (Oct 13: with an increment a squad lives near zero).
      */
     movesToGo: number;
     incrementShare: number;
     thinkRange: readonly [number, number];
     minThinkSeconds: number;
+    inTime: number;
   };
   /**
    * The mode vote (Eric, Oct 12), the first pre-game vote: Classic (just chess: same-move tokens, no blocks, no coins)
@@ -1778,16 +1792,18 @@ export const SQUADS: SquadsSettings = {
   voteSeconds: 8,
   voteResultSeconds: 3.2,
   voteBotSkip: 0.1,
-  // Eric, Oct 10: one team clock per squad for the whole tournament. Tuned by reports/squads-sim.md: every option's
-  // median lobby about 30-36 minutes, its 90th percentile at most 40.
+  // Eric, Oct 10: one team clock per squad for the whole tournament; Oct 13: three chess time controls, Bullet, Blitz
+  // and Rapid, each with an increment that banks and its own cap on a move. Tuned by reports/squads-sim.md
+  // (DECISIONS.md, "Squads: three chess time controls").
   clocks: [
-    { id: "fast", label: "Fast", bankSeconds: 180, topUpSeconds: 45, delaySeconds: 3, incrementSeconds: 0 },
-    { id: "normal", label: "Normal", bankSeconds: 240, topUpSeconds: 60, delaySeconds: 3, incrementSeconds: 0 },
-    { id: "long", label: "Long", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 3, incrementSeconds: 0 },
+    { id: "bullet", label: "Bullet", bankSeconds: 60, topUpSeconds: 15, delaySeconds: 2, incrementSeconds: 1, capSeconds: 10 },
+    { id: "blitz", label: "Blitz", bankSeconds: 180, topUpSeconds: 30, delaySeconds: 2, incrementSeconds: 2, capSeconds: 15 },
+    { id: "rapid", label: "Rapid", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 2, incrementSeconds: 3, capSeconds: 20 },
   ],
+  // Nobody votes: Blitz, the middle option (as Normal was).
   clockDefault: 1,
-  // 20 s, not the brief's starting 40, so nobody stalls a half (and a miss doesn't empty a team bank).
-  moveCeilingSeconds: 20,
+  // The one ceiling every option had before the time controls (20 s, not the brief's starting 40).
+  legacyCapSeconds: 20,
   incrementOnMiss: false,
   safetyCap: 120,
   material: { p: 1, n: 3, b: 3, r: 5, q: 9 },
@@ -1828,6 +1844,7 @@ export const SQUADS: SquadsSettings = {
     incrementShare: 0.8,
     thinkRange: [0.5, 1.5],
     minThinkSeconds: 1.5,
+    inTime: 0.9,
   },
   modeVote: { classicLean: [0.35, 0.75] },
   // Calibrated by reports/squads-mercenary.md (DECISIONS.md, "Mercenary: Eric's first changes"): a squad that wins a

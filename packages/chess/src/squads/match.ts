@@ -20,7 +20,7 @@ import { ROUND_FORMAT, coin, squadsRng, type Squad, type SquadsFormat, type Squa
 import { boardCoins, brilliantCandidate, captureCoins, capturedPiece, itemCounts, type BrilliantCandidate, type CapturePiece, type CoinWhy, type ItemCounts } from "./mercenary.ts";
 import { pairSchedule, relaySeat } from "./schedule.ts";
 import type { TokenUse, TokenVerdict } from "./tokens.ts";
-import { modeOf, type SquadsMode, type SquadsRules } from "./votes.ts";
+import { defaultClock, modeOf, upgradeClock, type SquadsMode, type SquadsRules } from "./votes.ts";
 
 /**
  * One Squads match between two squads, in its round's format: Relay (round 1), Pairs (round 2) or the majority vote
@@ -43,9 +43,11 @@ import { modeOf, type SquadsMode, type SquadsRules } from "./votes.ts";
  *   (the slower picker), the final's squad (its slowest picker). Placing a block is thinking time too: the move's
  *   time runs to the block if that came later. Two of a squad's moves being thought about at once drain it twice as
  *   fast.
- * - While the bank is above zero, the per-move ceiling bounds a move; if the bank runs out during the half, every
- *   move of that squad still being thought about is cut off. At zero it's sudden death: each move within the free
- *   seconds. A move not made in time is a missed action: a random legal move. No flag falls.
+ * - While the bank is above zero, the time control's cap on a move (`capMs`) bounds it; if the bank runs out during
+ *   the half, every move of that squad still being thought about is cut off. At zero it's sudden death: each move
+ *   within the free seconds. A move not made in time is a missed action: a random legal move. No flag falls.
+ * - Each move made in time earns the increment (`incrementMs`), credited to the bank after the half, as on a chess
+ *   clock: a quick move earns time back, and a squad in sudden death that keeps making its moves in time lives on it.
  */
 
 /** A squad in a match: its id and its players' ids in seat order. */
@@ -87,6 +89,8 @@ export interface SquadsMatch {
   delayMs: number;
   /** Credited to a squad's bank after each move it made in time (ms). */
   incrementMs: number;
+  /** The time control's cap on one move while a squad's bank lasts (ms; Time chips push a move's later). */
+  capMs: number;
   /** The silent safety cap, in moves per side. */
   safetyMoves: number;
   /** Each side's same-move tokens left (Pairs only; null in other formats). */
@@ -134,15 +138,18 @@ export interface AssistUse {
  * - from before the modes: Classic, with none of Mercenary's fields;
  * - from before the Breather was taken out (Oct 13): its kit without the breather, and no per-side free seconds
  *   (`delays`): a squad that brought one plays on with the match's own free seconds;
- * - from before the Time chip (Oct 13): no chips (a time coin bought then is already in its bank).
+ * - from before the Time chip (Oct 13): no chips (a time coin bought then is already in its bank);
+ * - from before the time controls (Oct 13): no cap of its own: the one ceiling every option had then
+ *   (`legacyCapSeconds`), so a match in play keeps its clock's numbers.
  */
-export function upgradeMatch(m: SquadsMatch): SquadsMatch {
+export function upgradeMatch(m: SquadsMatch, s: SquadsSettings = SQUADS): SquadsMatch {
   const old = m as Partial<SquadsMatch> & SquadsMatch & { delays?: unknown };
   const kitOk = !old.kit || old.kit.every((k) => !("breather" in k) && !("time" in k));
-  if (old.mode && old.stockfish && old.shields && old.chips && old.assists && old.coins && old.kit !== undefined && kitOk && !("delays" in old)) return m;
+  if (old.mode && old.stockfish && old.shields && old.chips && old.assists && old.coins && old.kit !== undefined && kitOk && !("delays" in old) && typeof old.capMs === "number") return m;
   const { delays: _gone, ...rest } = old;
   return {
     ...rest,
+    capMs: typeof old.capMs === "number" ? old.capMs : s.legacyCapSeconds * 1000,
     mode: old.mode ?? "classic",
     kit: old.kit ? [itemCounts(old.kit[0]), itemCounts(old.kit[1])] : null,
     stockfish: old.stockfish ?? [0, 0],
@@ -208,6 +215,8 @@ export interface MatchSetup {
   banksMs: readonly [number, number];
   delayMs: number;
   incrementMs: number;
+  /** The cap on one move while a bank lasts (ms); default the default Clock option's. */
+  capMs?: number;
   armageddon?: boolean;
   /** Each side's block bank coming in (Armageddon: what the final left); default the bank for a match. */
   blockBanks?: readonly [number, number];
@@ -243,6 +252,7 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
     banks: [Math.max(0, o.banksMs[0]), Math.max(0, o.banksMs[1])],
     delayMs: o.delayMs,
     incrementMs: o.incrementMs,
+    capMs: o.capMs ?? defaultClock(s).capSeconds * 1000,
     safetyMoves: s.safetyCap,
     tokens: o.format === "pairs" && !o.armageddon ? [s.tokens.perMatch, s.tokens.perMatch] : null,
     blockBanks: o.blockBanks ? [o.blockBanks[0], o.blockBanks[1]] : [s.blocks.bankPerMatch, s.blocks.bankPerMatch],
@@ -258,7 +268,7 @@ export const lineupOf = (sq: Squad): Lineup => ({ squadId: sq.id, seats: sq.play
 // ---- Team clocks across the tournament ----
 
 /** Every squad's team bank at the start of the tournament, from the voted Clock option. */
-export function startTeamClocks(squads: readonly Squad[], clock: SquadsClock): Squad[] {
+export function startTeamClocks(squads: readonly Squad[], clock: Pick<SquadsClock, "bankSeconds">): Squad[] {
   return squads.map((sq) => ({ ...sq, bankMs: clock.bankSeconds * 1000 }));
 }
 
@@ -298,7 +308,8 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
   const format = ROUND_FORMAT[round];
   const key = `r${round}m${index}`;
   const { starts, whites } = matchStarts(plan, key, s.boards[format], library, s);
-  const c = plan.rules.clock;
+  // (A lobby stored before the time controls: its clock's own numbers and the ceiling it had then.)
+  const c = upgradeClock(plan.rules.clock, s);
   const topUp = round > 0 ? c.topUpSeconds * 1000 : 0;
   const mode = modeOf(plan.rules);
   const bank = mode === "classic" ? 0 : s.blocks.bankPerMatch;
@@ -314,6 +325,7 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
       banksMs: [squads[0].bankMs + topUp, squads[1].bankMs + topUp],
       delayMs: c.delaySeconds * 1000,
       incrementMs: c.incrementSeconds * 1000,
+      capMs: c.capSeconds * 1000,
       blockBanks: [bank, bank],
       mode,
     },
@@ -351,8 +363,8 @@ export interface Duty {
   /** One player (a Relay move), two (a pair's picks) or the whole squad (the final's vote). */
   players: readonly string[];
   /**
-   * How long they have (ms): the per-move ceiling; for moves and picks in sudden death (the squad's bank at zero), the
-   * free seconds. (A bank running out during the half cuts its moves off sooner: see `resolveHalf`.)
+   * How long they have (ms): the time control's cap on a move; in sudden death (the squad's bank at zero), the free
+   * seconds. (A bank running out during the half cuts its moves off sooner: see `resolveHalf`. Time chips: later.)
    */
   deadlineMs: number;
 }
@@ -378,8 +390,7 @@ export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuti
   const out: HalfDuties = { duties: [], scouts: [], forced: [] };
   if (m.result) return out;
   const n = m.boards.length;
-  const ceiling = s.moveCeilingSeconds * 1000;
-  const deadline = (side: Side) => (m.banks[side] > 0 ? ceiling : m.delayMs);
+  const deadline = (side: Side) => (m.banks[side] > 0 ? m.capMs : m.delayMs);
   for (const b of m.boards) {
     const side = sideOf(b, m.half);
     const deadlineMs = deadline(side);
@@ -647,7 +658,7 @@ export function bankTimeline(moves: readonly { end: number; windows?: readonly (
 }
 
 /**
- * When each of a side's moves this half is cut off (ms after the half began, by board): its deadline (the ceiling, or
+ * When each of a side's moves this half is cut off (ms after the half began, by board): its deadline (the cap, or
  * the free seconds in sudden death, each Time chip on it later), or its squad's bank running out, unless a chip is
  * holding the bank still for that move then (it runs to that chip's end). `ends`: when each move ended (made), or
  * its deadline if it's still being thought about. Also the bank's run-out time and what it drained.
@@ -797,7 +808,7 @@ export type SquadsEvent =
   | { kind: "scout"; turn: number; half: Colour; board: number; side: Side; players: readonly string[] }
   /** A squad's team bank this half: how much its moves drained, what's left (after any increment), sudden death. */
   | { kind: "bank"; turn: number; half: Colour; side: Side; drainedMs: number; leftMs: number; suddenDeath: boolean }
-  /** A squad's bank ran out: from now on each of its moves must be made within the free seconds. */
+  /** A squad's bank ran out and its increment didn't lift it: each of its moves must be made within the free seconds (until one does). */
   | { kind: "sudden_death"; turn: number; half: Colour; side: Side }
   | { kind: "board_end"; board: number; result: BoardResult }
   | { kind: "match_end"; result: MatchResult };
@@ -898,6 +909,8 @@ export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonl
     ctx.events.push({ kind: "block", turn: m.turn, half: m.half, board: b.board, side: b.side, by: b.by, move: b.move, piece: b.piece, cost: b.cost, outcome });
   }
   ctx.nextBlocks = next;
+  // The increment: each move made in time earns it, credited after the half (a squad in sudden death that made its
+  // moves in time is out of it again, living on its increment). A bank that ran out and stays empty: sudden death.
   for (const side of [0, 1] as const) {
     if (!ctx.earned[side] || !m.incrementMs) continue;
     ctx.banks[side] += ctx.earned[side] * m.incrementMs;
@@ -906,6 +919,9 @@ export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonl
     if (e.kind !== "bank") continue;
     e.leftMs = ctx.banks[e.side];
     e.suddenDeath = ctx.banks[e.side] <= 0;
+  }
+  for (const side of [0, 1] as const) {
+    if (m.banks[side] > 0 && ctx.banks[side] <= 0) ctx.events.push({ kind: "sudden_death", turn: m.turn, half: m.half, side });
   }
   return afterHalf(ctx, stockfish);
 }
@@ -922,7 +938,7 @@ interface Ctx {
   missed: string[];
   timeouts: string[];
   /**
-   * Each move this half (by board) counts only if made by this time (ms): its deadline (the ceiling, or the free seconds
+   * Each move this half (by board) counts only if made by this time (ms): its deadline (the cap, or the free seconds
    * in sudden death; Time chips push it later) or its squad's bank running out.
    */
   cutoffs: Map<number, number>;
@@ -979,8 +995,8 @@ function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
     return;
   }
   c.banks[side] = r.out === Infinity ? bank - r.drained : 0;
+  // (Sudden death, if the bank is still empty once the half's increments are in: `resolveHalf`.)
   c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: Math.min(bank, r.drained), leftMs: c.banks[side], suddenDeath: c.banks[side] <= 0 });
-  if (c.banks[side] <= 0) c.events.push({ kind: "sudden_death", turn: m.turn, half: m.half, side });
 }
 
 /**
@@ -996,7 +1012,7 @@ function take(c: Ctx, player: string, board: number, side: Side): string | null 
   else {
     c.missed.push(player);
     if (chose) c.timeouts.push(player);
-    else if (c.m.banks[side] <= 0 || limit < c.s.moveCeilingSeconds * 1000 + chipsOn(c.inputs, board) * c.s.mercenary.chipSeconds * 1000) c.timeouts.push(player);
+    else if (c.m.banks[side] <= 0 || limit < c.m.capMs + chipsOn(c.inputs, board) * c.s.mercenary.chipSeconds * 1000) c.timeouts.push(player);
   }
   return inTime ? move! : null;
 }
@@ -1260,6 +1276,8 @@ export function startArmageddon(final: SquadsMatch, white: Side, start: BoardSta
       banksMs: banks,
       delayMs: final.delayMs,
       incrementMs: s.armageddon.incrementSeconds * 1000,
+      // (The final's cap on a move: its time control's.)
+      capMs: final.capMs,
       armageddon: true,
       blockBanks: final.blockBanks,
       // (The same round: Mercenary's items carry on from the final, as its block banks do.)

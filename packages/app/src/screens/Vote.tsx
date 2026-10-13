@@ -380,7 +380,7 @@ export function VoteScreen({
               )}
             </div>
             {winner && now >= walkedAt && (
-              <div class={`vote-banner${resetting || leaving ? " leaving" : ""}`} role="status">
+              <div class={`vote-banner${winner.detail ? " with-detail" : ""}${resetting || leaving ? " leaving" : ""}`} role="status">
                 <span class="vote-banner-icon">{winner.icon}</span>
                 <strong>{winner.label}</strong>
                 <span>{winner.blurb}</span>

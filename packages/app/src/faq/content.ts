@@ -55,6 +55,7 @@ import {
   type Settings,
   type SquadsSettings,
 } from "@chessroyale/core";
+import { clockLabel, minutesName } from "@chessroyale/chess/squads";
 import { anchorsOf, parse, plainText, type Block } from "./markdown.ts";
 
 /** Everything the FAQ quotes. The defaults are the game's; tests pass changed ones. */
@@ -160,7 +161,7 @@ function modes(src: FaqSources): FaqSection {
   const timeControl = (p: Partial<Settings>) => `${n(Number(p.timeBankSeconds) / 60, "minute")}, +${num(Number(p.timeIncrementSeconds))} s a move, at most ${num(Number(p.moveClockSeconds))} s on a move`;
   const timeControls = V.options.map((o) => `**${o.label}** (${timeControl(o.patch)})`);
   const teamSizes = S.teamFinalSizes.map((x) => `${x}v${x}`);
-  const clocks = Q.clocks.map((c) => `${c.label} ${num(c.bankSeconds / 60)} min`).join(", ");
+  const clocks = squadsClocks(Q);
   return {
     id: "modes",
     title: "The modes",
@@ -195,7 +196,7 @@ function modes(src: FaqSources): FaqSection {
 - **The final, the team vote:** one board. On your squad's move all of you pick, you see your teammates' picks as they come (the other squad doesn't), and you can copy one. The most picked move is played; a tie is settled by a coin between the tied moves.
 - **Blocks (Mercenary, every round):** each squad has ${n(Q.blocks.bankPerMatch, "block point")} a match. On your turn, before your squad's move is settled, tap Block, one of their pieces and a square it could go to: that move can't be played on their next turn on that board (the piece's other moves can). It costs ${num(Q.blocks.cost.p)} for a pawn's move, ${num(Q.blocks.cost.n)} for a knight's, bishop's or rook's, ${num(Q.blocks.cost.q)} for a queen's${Q.blocks.castlingCost === null ? "" : ` and ${num(Q.blocks.castlingCost)} for castling`}; the king's other moves can't be blocked. ${Q.blocks.maxPerTurn === null ? "Block as many moves in one turn as your points allow." : `Up to ${n(Q.blocks.maxPerTurn, "block")} a turn on a board.`} Both squads see every blocked move as an arrow with a lock until it's their move and they've played. A block that wouldn't do anything (your own move already took the piece or shut its way) is lifted and the points come back, and so is one that would leave them no move${Q.blocks.liftBeforeMate ? ", or only moves that allow mate in one (the most recent first)" : ""}${Q.blocks.liftInCheck ? ", or that lands while they're in check" : ""}.
 - Every game is played to the end on the board (a win is ${n(Q.winPoints, "point")}, a draw ${num(Q.drawPoints)}). No engine scores Squads; it only judges whether a same-move token comes back (and, in Mercenary, whether a move was brilliant).
-- Each squad has **one clock for the whole tournament** (${clocks}, topped up each round). When it runs out, every move must be made within ${n(Q.clocks[Q.clockDefault]?.delaySeconds ?? 3, "second")}. A drawn final is settled by one Armageddon game.
+- ${clocks} A drawn final is settled by one Armageddon game.
 
 ${mercenary(Q)}
 
@@ -204,6 +205,25 @@ ${mercenary(Q)}
 The original mode (${S.lobbySize} players on ${n(S.lobbySize / S.groupSize, "board")}, rotating) is off the menu while it's being redesigned.
 `,
   };
+}
+
+/**
+ * Squads' team clock, every number from settings: the three time controls (chess form, the bank, the increment, the
+ * cap), the default, the free seconds, the increment banking, the top-up and sudden death.
+ */
+function squadsClocks(Q: SquadsSettings): string {
+  const cs = Q.clocks;
+  const one = <T>(f: (c: (typeof cs)[number]) => T) => cs.every((c) => f(c) === f(cs[0]!));
+  const mins = (sec: number) => (sec % 60 ? `${minutesName(sec)} minutes` : n(sec / 60, "minute"));
+  const option = (c: (typeof cs)[number]) => `**${clockLabel(c)}** (${mins(c.bankSeconds)}, +${num(c.incrementSeconds)} s a move, at most ${num(c.capSeconds)} s on a move)`;
+  const options = cs.map(option);
+  const list = `${options.slice(0, -1).join(", ")} or ${options.at(-1)}`;
+  const perOption = (f: (c: (typeof cs)[number]) => string) => cs.map((c) => `${c.label} ${f(c)}`).join(", ");
+  const free = one((c) => c.delaySeconds) ? `The first ${num(cs[0]!.delaySeconds)} s of every move are free` : `The first few seconds of every move are free (${perOption((c) => `${num(c.delaySeconds)} s`)})`;
+  const topUp = (c: (typeof cs)[number]) => (c.topUpSeconds % 60 ? `${num(c.topUpSeconds)} s` : n(c.topUpSeconds / 60, "minute"));
+  const topUps = one((c) => c.topUpSeconds) ? `plus ${topUp(cs[0]!)}` : `plus a top-up (${perOption(topUp)})`;
+  const def = cs[Q.clockDefault] ?? cs[0]!;
+  return `Each squad has **one clock for the whole tournament**, a chess time control voted before round 1: ${list}. Nobody voting means ${clockLabel(def)}. ${free}; then your squad's clock runs, twice as fast while two of you are moving. Every move made in time adds its seconds back, so a quick move saves time for later, as on a chess clock. What's left carries into the next round, ${topUps} as you go through. When it runs out, it's **sudden death**: every move within the free seconds, until moves made in time earn some back.`;
 }
 
 /** Squads' Mercenary mode: earning, the shop, the items, every number from settings. */

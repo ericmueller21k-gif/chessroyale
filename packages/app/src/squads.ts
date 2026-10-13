@@ -26,7 +26,7 @@ import { account, playerName } from "./account.ts";
 import { enginePool, engineSpeed } from "./engine.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { play } from "./sound.ts";
-import { blockName, coinText, dutyOf, freeMs, itemText, liveBank, movesOfHalf, sideIn, squadName, squadOf, type LocalBoard, type LocalMatch } from "./squads-view.ts";
+import { LOW_BANK_MS, blockName, coinText, dutyOf, freeMs, itemText, liveBank, movesOfHalf, sideIn, squadName, squadOf, type LocalBoard, type LocalMatch } from "./squads-view.ts";
 
 /**
  * Squads on this device (docs/areas/squads.md, "The screens"): the lobby's socket and everything the screens draw from
@@ -784,7 +784,10 @@ export class SquadsClient {
 
   // ---------------- Sounds: the free seconds' ticks and the sudden-death sting ----------------
 
-  /** Squads whose sudden death has been heard (and their bank was 0 when last looked at). */
+  /**
+   * Squads whose sudden death has been heard: until their bank is back up to LOW_BANK_MS (a squad living on its
+   * increment near zero runs out and is lifted out again half after half; it hears the sting once).
+   */
   private heard = new Map<number, boolean>();
   private lastTick: string | null = null;
 
@@ -819,7 +822,7 @@ export class SquadsClient {
       const id = m.sides[side].squadId;
       const out = liveBank(m, side, now) <= 0;
       if (out && !this.heard.get(id) && m.banks[side] > 0) this.stingFor(id, m.key);
-      else if (!out && m.banks[side] > 0) this.heard.set(id, false);
+      else if (!out && m.banks[side] >= LOW_BANK_MS) this.heard.set(id, false);
     }
     const d = this.myId ? dutyOf(m, this.myId) : null;
     if (!d || m.locked.includes(this.myId!)) return;
