@@ -2470,8 +2470,8 @@ the design decision"), then the calls made while building him.
   - **A decided game has none** (past 4 pawns either way): the engine's expected score is flat there, so it can't read
     a 0.1-0.9 loss (I saw drags never land in the band in won or lost games; it now skips without the engine time).
   - The engine: at most `dragCandidates` (16, a seeded sample) glanced at (`dragScreenNodes`, 8k), the `dragConfirm`
-    (3) nearest the band's middle looked at properly (`dragNodes`, 50k), the one nearest 0.5 played. 0.5 to 0.9 s on
-    one engine on a computer.
+    (3) nearest the band's middle looked at properly (`dragNodes`, 50k), the one nearest 0.5 played. About half a
+    second on one engine on a computer.
   - Shown with the lasso throw: the art's `CATCH` point lands on the piece, he hauls it a square ("LASSO!").
 - **SHOWDOWN!, my calls:**
   - **The band is measured from the position before the line-up**, not from level (my reading; recorded for Eric).
@@ -2487,8 +2487,9 @@ the design decision"), then the calls made while building him.
   - **The generator** (`lineups`): pairs by value (queens, rooks, then bishops or knights; the most valuable available),
     each crowd piece and his of the kind moved to two facing squares in the middle, never through another of the
     line-up's squares, never onto a square another line-up piece left; his piece protected after the line-up; no
-    check; for the first 1000 tries it prefers line-ups where at most one of the crowd's pieces is attacked by more
-    than one of his (they're the ones that meet the goal; measured). Bishops stay on their colour, rooks leaving a
+    check. It prefers line-ups where at most one of his three is attacked by two or more of the crowd's pieces (over
+    1,200 line-ups in 8 middlegames, 11% of those met the goal against 3% of the rest), until 1000 tries in a row find
+    none. Bishops stay on their colour, rooks leaving a
     corner take their castling right. Seeded by the turn (`lassoSeed`, never the battle seed: the host would learn
     every power's rolls).
   - **The search** (scan, then confirm): each line-up costs one search per duel at `showdownNodes` (8k, a quick scan
@@ -2524,12 +2525,30 @@ the design decision"), then the calls made while building him.
   into the middle with the wind-up (both loops), leaps back to his corner, and his ropes yank the six pieces into the
   line-up one pair at a time (each rope from his fists), then "DRAW!" with a quick-draw sting; the three duels glow as
   the only choices and the dock says "Showdown! Take one of his three." The duel then plays as a normal move.
-  "Not yet..." is his snort and a line. Checked frame by frame on a 390 px phone and a 1280 px computer, light and dark.
+  "Not yet..." is his snort and a line; a showdown spent with nothing to show (no line-up, no drag) gets its own line
+  ("Next time, varmints."), since there's no next try. The God King has his word at "DRAW!" ("Three duels, and one's a
+  trap. Choose well!") and that turn keeps quiet about a queen in danger or a mate threat: only a duel can be played.
+  Checked frame by frame on a 390 px phone and a 1280 px computer, light and dark (`npm run frames:pig`).
 - **Sounds** (`characters/pig-sounds.ts`, synthesised): rope whirl, throw, catch, tug, the hop's thump, his snort and
   snorting laugh, a spur stomp, the double wind-up, a pair's yank, and "DRAW!"'s sting (a low damped twang and a knock).
   All under a move's loudness, nothing bright.
 - **Lines** (his text box): "This board ain't big enough for the six of us.", "It's high noon!", "Pick yer duel,
   varmints.", "Not yet...", "Yee-haw!", and so on.
-- **Test links:** `?boss=pig` (Boss alone against him), `?boss=pig&power=showdown` (the showdown searched at his next
-  turn, no warning), `?boss=pig&power=drag` (drags from turn 2, every 2 turns). `?side=b` for the crowd as Black (his
-  pull as White).
+- **Test links:** `?boss=pig` (Boss alone against him), `?boss=pig&power=showdown` (the warning as turn 2 begins, the
+  line-up searched after his next move, the showdown as turn 3 begins, or "Not yet..." first), `?boss=pig&power=drag`
+  (drags from turn 2, every 2 turns), and the admins' "Trigger ultimate (testing)" (searched after his next move, no
+  warning). `?side=b` for the crowd as Black (his pull as White). A raid link takes `&boss=pig` too.
+
+**Testing.** The full lane: new rules, the server, the protocol and the screens. Unit tests
+(`packages/chess/test/pig.test.ts`): the long pull (centre pawns only, skipped when blocked, hanging or too costly, the
+board's record), the drag (its band and pick, never the king or a bishop, never into check or no move, a pawn never
+to the 1st or 8th rank, castling rights, the server's check, seeded and deterministic), the showdown (the line-up's
+shape and middle, his pieces protected, bishops on their colour, the band and the trap, mates refused, the forced duel
+and the no-legal-duel case, the scan and confirm, the scout's carried line-ups, holds, two pairs, the drag and the spent
+turn as fallbacks, the same line-up from the same seed and position, the host's answer and solo's agreeing); the lobby
+("Wrangler online": the host asked and answered, a bad answer refused); the app (his art, kit, moments, lines, sounds,
+the duel turn). e2e (`e2e/pig.spec.ts`, phone and computer): the long pull and a drag; SHOWDOWN! with only the duels
+playable; online, the host's line-up through the server. `npm run perf:boss -- <dir> pig both 25` (and with
+`showdown`): 16.7-16.8 ms frames at the 95th percentile through his searches on the computer and on the phone at 4x
+CPU slowdown, the scout's turns included; nothing grows with the match. In the perf runs the God King's Last Stand
+(once a battle) twice undid the crowd's wrong duel: the trap works, and the King can still save the crowd from it.

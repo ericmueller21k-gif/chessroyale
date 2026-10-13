@@ -124,7 +124,7 @@ describe("Wrangler: who he is", () => {
     expect(BOSS_ROSTER.some((b) => b.id === "wrangler")).toBe(false);
   });
 
-  it("plays from the starting position, sides as usual", () => {
+  it("plays from the starting position, Black as every raid boss (the crowd White)", () => {
     const r = raid();
     expect(r.boards.get(0)!.history).toEqual([]);
     expect(fenOf(r)).toBe(START_FEN);

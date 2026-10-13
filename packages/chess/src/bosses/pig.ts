@@ -1099,8 +1099,8 @@ export const PIG: BossRules = {
     if (dragDue(boss)) return { drag: true, seed };
     return null;
   },
-  // From the starting position (his long pull needs his centre pawns home), sides as usual; his first drag on turn
-  // dragFirst (the test switch ?power=drag: from turn 2, every 2 turns).
+  // From the starting position (his long pull needs his centre pawns home), sides as usual (a raid's crowd is White:
+  // he plays Black); his first drag on turn dragFirst (the test switch ?power=drag: from turn 2, every 2 turns).
   opening: {
     fromStart: true,
     setUp: (b) => ({ nextPassive: b.settings.bossPowerTest === "drag" ? 2 : BOSS_POWERS.dragFirst }),
