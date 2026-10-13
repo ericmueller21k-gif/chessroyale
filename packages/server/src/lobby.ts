@@ -2,9 +2,10 @@ import { hollowLobby } from "./bosses/hollow.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LOBBY_LIFE, MATCHMAKING, isRankedMatch, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
+  BOT_NAMES,
   botRoster,
   bossIntroTimeline,
   bossTurnShowMs,
@@ -31,6 +32,8 @@ import {
   type ScoreJob,
   type ServerMessage,
   type LobbyCloseReason,
+  type LeftHow,
+  type NetLeft,
   applyRecheck,
   blameJudge,
   deepTargets,
@@ -77,6 +80,8 @@ export interface LobbyIO {
   serverScore?(req: ServerScoreRequest): void;
   /** Many judges: how each of the round's jobs was settled, as the round's scores go in (the harness measures with it). */
   settled?(jobs: { id: string; boardId: number; how: JudgeHow; judges: string[]; board: JudgedBoard }[]): void;
+  /** Someone has left the match (resigned): close their sockets. */
+  close?(playerId: string): void;
 }
 
 /** A deep search the lobby asks of the engine server (a verdict, a re-check of close calls, a spot check). */
@@ -136,6 +141,47 @@ export interface Human {
   /** An admin (ADMIN_EMAILS, as the Durable Object found on connecting): a lobby of admins only meets the Maia boss. */
   admin?: boolean;
 }
+
+/** A person's result in a match, for their profile (humanResults; a resign's is taken as they leave). */
+export type HumanResult = {
+  playerId: string;
+  placement: number;
+  players: number;
+  team: "w" | "b" | null;
+  teamWon: boolean | null;
+  avgScore: number | null;
+  rating: number | null;
+  brilliant: number;
+  bestMove: string | null;
+  /** It counts for their ranking: enough real players (isRankedMatch), and they weren't practicing (unlimited hints). */
+  ranked: boolean;
+  /** They had the eval bar on, as their app said (null: an app from before the setting). */
+  evalBar: boolean | null;
+} & MatchFeats;
+
+/**
+ * Someone who left the match (LEAVING in settings.ts): resigned, gone longer than LEAVING.awayMs, left before move 1
+ * or after they were out. Their seat is a bot's now, or out (or, before move 1, gone).
+ */
+export interface LeftHuman {
+  id: string;
+  name: string;
+  /** Their seat's token: coming back with it, they're told they left (and how). */
+  token: string;
+  how: LeftHow;
+  at: number;
+  /** Their result as recorded when they left (a loss). Null: nothing to record (before move 1), or not yet (`deferred`). */
+  result: HumanResult | null;
+  /** Already out when they left: their result is recorded with everyone's when the match ends (their team may yet win). */
+  deferred?: true;
+  /** On their profile already (the Durable Object wrote it). */
+  saved?: true;
+  practice?: boolean;
+  evalBar?: boolean;
+}
+
+/** What someone coming back to a seat they left is told (their app goes home with a note of its own). */
+export const LEFT_MATCH = "You left that match.";
 
 export type Timer =
   | "bossPlay"
@@ -304,6 +350,12 @@ export interface LobbyRecord {
    */
   fair?: Record<string, FairMove[]>;
   fairV?: number;
+  /** People who left the match (resigned, gone too long, before move 1 or once out): see LeftHuman and LEAVING. */
+  left?: LeftHuman[];
+  /** A private lobby nobody had started: when the last person in it pressed Leave (it closes then; LOBBY_LIFE). */
+  emptiedAt?: number;
+  /** The match ended early because everyone had left it (it closes at once). */
+  wrapped?: true;
 }
 
 export interface JudgesRecord {
@@ -330,7 +382,9 @@ export const MATCH_ENDED = "That match has ended.";
 /**
  * When a lobby closes and why (null: not while a match is on with someone connected). Then its Durable Object
  * deletes everything it stored, and its code is free again.
- *   - The match is over: `lobbyResultsKeepMinutes` after it ended (a lobby that ended before this rule existed: now).
+ *   - The match is over: `lobbyResultsKeepMinutes` after it ended (a lobby that ended before this rule existed: now;
+ *     one everyone had left, wrapped up early: now, `keepMs` 0).
+ *   - A private lobby nobody started whose last person pressed Leave: now.
  *   - It never started (a private lobby nobody started, a queue everyone left): `lobbyIdleMinutes` after anyone last
  *     did anything in it.
  *   - A match in progress: never while anyone is connected; with nobody connected, `lobbyAbandonedMinutes` after anyone
@@ -340,6 +394,8 @@ export const MATCH_ENDED = "That match has ended.";
 export function lobbyClosing(r: LobbyRecord, connected: boolean, life = LOBBY_LIFE): { at: number; reason: LobbyCloseReason } | null {
   const min = 60_000;
   if (r.phase === "results") return { at: (r.endedAt ?? 0) + (r.keepMs ?? life.lobbyResultsKeepMinutes * min), reason: "ended" };
+  // (A private lobby whose last person pressed Leave: empty, so it closes now and its code stops working.)
+  if (r.phase === "lobby" && !r.auto && r.emptiedAt !== undefined && !r.humans.length) return { at: r.emptiedAt, reason: "idle" };
   if (r.phase === "lobby" && !r.auto?.filledAt) return { at: (r.activeAt ?? r.createdAt) + life.lobbyIdleMinutes * min, reason: "idle" };
   if (connected) return null;
   return { at: (r.activeAt ?? r.startedAt ?? r.createdAt) + life.lobbyAbandonedMinutes * min, reason: "abandoned" };
@@ -402,7 +458,8 @@ export class LobbyCore {
   }
 
   get nextAlarm(): number | null {
-    return this.record.timer?.at ?? null;
+    const times = [this.record.timer?.at, this.awayAt()].filter((t): t is number => typeof t === "number");
+    return times.length ? Math.min(...times) : null;
   }
 
   // ---------------- Helpers ----------------
@@ -452,6 +509,7 @@ export class LobbyCore {
       pick: (playerId, key, move, away) => lobby.pick(playerId, key, move, away),
       sendTally: () => lobby.sendTally(),
       roundHumans: () => lobby.roundHumans(),
+      roundDone: () => lobby.roundDone(),
       lock: () => lobby.lock(),
     };
   }
@@ -626,6 +684,9 @@ export class LobbyCore {
       if (!this.r.timer && this.dueToStart()) this.startMatch();
       return { ok: true as const, playerId: existing.id };
     }
+    // Someone who left this match (resigned, or gone too long): they're told so, and how (their app goes home).
+    const gone = token ? this.r.left?.find((l) => l.token === token) : undefined;
+    if (gone) return { ok: false as const, message: LEFT_MATCH, ended: true as const, left: this.netLeft(gone) };
     // Bots off: someone whose seat was freed while they were gone, back while it still waits: a new seat, same token.
     const reseat = !!token && !!this.r.freed?.includes(token) && this.joinable();
     if (reseat) this.r.freed = this.r.freed!.filter((t) => t !== token);
@@ -653,6 +714,7 @@ export class LobbyCore {
     });
     if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [id]: userId };
     if (!this.r.hostId) this.r.hostId = id;
+    delete this.r.emptiedAt;
     this.send(id, { t: "welcome", playerId: id, token: newToken, code: this.r.code }, false);
     this.broadcast(this.lobbyMessage(id), false);
     // Matchmade and full (or, Bots off, ready): start now.
@@ -685,6 +747,8 @@ export class LobbyCore {
     }
     this.judgeGone(playerId);
     this.broadcast(this.lobbyMessage(), false);
+    // (A person away doesn't hold the round up: if everyone here has moved, it locks now.)
+    if (this.r.phase === "play" && this.r.round && this.roundDone()) this.lock();
   }
 
   /** Leaving before the match starts (Cancel in the queue, Leave in a lobby): the seat is free again. */
@@ -699,7 +763,250 @@ export class LobbyCore {
       this.r.accounts = rest;
     }
     if (this.r.hostId === playerId) this.r.hostId = this.pickHost(playerId);
+    // A private lobby's last person has gone: it closes now (lobbyClosing), and its code stops working.
+    if (!this.r.auto && !this.r.humans.length) this.r.emptiedAt = this.io.now();
     this.broadcast(this.lobbyMessage(), false);
+  }
+
+  // ---------------- Leaving the match (LEAVING in settings.ts) ----------------
+
+  /** A match is on (its seats filled, not over): someone who goes now leaves the match, not a lobby. */
+  private inMatch(): boolean {
+    return !!this.runner && this.r.phase !== "results" && (this.r.phase !== "lobby" || !!this.r.auto?.filledAt);
+  }
+
+  /** Move 1 has come (a round has been dealt, or the boss has moved): from here, leaving is resigning. */
+  private begun(): boolean {
+    if (!this.runner || this.r.phase === "lobby") return false;
+    if (this.r.round) return true;
+    const b = this.runner.state.boss;
+    const board = this.runner.boards.get(this.runner.state.boards[0]!);
+    return !!b && !!board && board.history.length > (b.startPly ?? 0);
+  }
+
+  /** Still here: connected, or gone less than LEAVING.awayMs (a reload, a quick look at another app). */
+  private present(h: Human, now = this.io.now()): boolean {
+    return h.connected || h.goneAt === undefined || now - h.goneAt < LEAVING.awayMs;
+  }
+
+  /**
+   * When the next person gone from the match runs out of LEAVING.awayMs (null: nobody to wait for). Someone still in
+   * the match whose time is up is due now (they leave it at the next alarm); someone already out only matters while
+   * their time is still to come (then the lobby checks whether anyone is left).
+   */
+  private awayAt(): number | null {
+    if (!this.inMatch()) return null;
+    const now = this.io.now();
+    const at = this.r.humans.flatMap((h) => {
+      if (h.connected || h.goneAt === undefined) return [];
+      const t = h.goneAt + LEAVING.awayMs;
+      const inPlay = this.runner!.state.players.find((p) => p.id === h.id)?.alive !== false;
+      return t > now || inPlay ? [t] : [];
+    });
+    return at.length ? Math.min(...at) : null;
+  }
+
+  /** Bots take empty seats here: Default and private Crowd lobbies (not Bots off, not a private raid: people only). */
+  private botsFill(): boolean {
+    return !(this.r.auto?.botsOff || (this.settings.raid && !this.r.auto));
+  }
+
+  /**
+   * Whether a bot takes the seat someone leaves: where bots fill seats; and, even with none, a seat in a final (a game
+   * needs both sides) or the last one on its side (a team, or the crowd against a boss: never a side with nobody).
+   */
+  private botTakes(id: string): boolean {
+    const runner = this.runner!;
+    if (this.botsFill() || runner.final?.order.includes(id)) return true;
+    const p = runner.player(id);
+    const teams = isTeamMatch(this.settings) && !runner.boss;
+    return !runner.alive().some((q) => q.id !== id && (!teams || q.colour === p.colour));
+  }
+
+  /** A bot takes this seat from now on (a new id, and a bot's name nobody in the match has). */
+  private giveSeat(id: string) {
+    const runner = this.runner!;
+    const taken = new Set(runner.state.players.map((p) => p.name));
+    const n = BOT_NAMES.length;
+    let name = "";
+    for (let i = 0; i < n * 4 && !name; i++) {
+      const base = BOT_NAMES[(this.r.counter * 7 + i) % n]!;
+      const lap = Math.floor(i / n);
+      const candidate = lap ? `${base} ${lap + 1}` : base;
+      if (!taken.has(candidate)) name = candidate;
+    }
+    const bot = { id: `rb${++this.r.counter}`, name: name || `Bot ${this.r.counter}`, skill: LEAVING.botSkill };
+    runner.handOver(id, bot);
+    this.r.bots.push(bot);
+  }
+
+  /** A person's result as they leave mid-match: out in `placement`, a loss (their team, or the crowd against a boss). */
+  private resultOf(h: Human, p: PlayerState, placement: number): HumanResult {
+    const runner = this.runner!;
+    const row = this.standings().find((s) => s.id === h.id);
+    const stages = this.settings.knockoutsPerStage.length;
+    const boss = runner.boss;
+    const feats = matchFeats({ id: p.id, outInStage: runner.state.stage }, stages, boss, !!this.settings.raid);
+    const f = this.r.feats?.[h.id];
+    const team = row?.team ?? null;
+    return {
+      playerId: h.id,
+      placement,
+      players: runner.state.players.length,
+      team,
+      teamWon: team || boss ? false : null,
+      avgScore: row?.avg ?? null,
+      rating: row?.rating ?? null,
+      brilliant: f?.brilliant ?? 0,
+      bestMove: f?.best?.san ?? null,
+      ranked: this.ranked() && !h.practice,
+      evalBar: h.evalBar ?? null,
+      ...feats,
+      // (In a boss battle they didn't see it through.)
+      ...(feats.strikes !== null ? { survived: false } : {}),
+    };
+  }
+
+  private netLeft(l: LeftHuman): NetLeft {
+    return { how: l.how, result: l.result ? { placement: l.result.placement, players: l.result.players, ranked: l.result.ranked } : null };
+  }
+
+  /**
+   * Someone leaves the match for good: they resigned, or (`away`) they've been gone longer than LEAVING.awayMs. Before
+   * move 1 it's just Leave (nothing recorded); mid-match it's a loss, out in the last place still open; already out,
+   * they go with their result as it stands (recorded with everyone's at the end). A bot takes the seat (botTakes), or
+   * it goes out (before move 1: it's gone). They're told how ("resigned") and let go; the match goes on without them,
+   * and wraps up at once if nobody is left.
+   */
+  resign(playerId: string, why: "resigned" | "away" = "resigned") {
+    const h = this.human(playerId);
+    if (!h) return;
+    if (!this.inMatch()) {
+      // Still waiting (the queue, a private lobby): the seat is simply free again. (The results: nothing to leave.)
+      if (this.r.phase !== "lobby") return;
+      this.leave(playerId);
+      this.io.send(playerId, { t: "resigned", how: "early", result: null });
+      this.io.close?.(playerId);
+      return;
+    }
+    this.leaveMatch(h, why);
+    if (this.wrapUpIfEmpty()) return;
+    this.nobodyToWaitFor();
+  }
+
+  /** The work of leaving (see resign), without wrapping the match up. */
+  private leaveMatch(h: Human, why: "resigned" | "away") {
+    const runner = this.runner!;
+    const id = h.id;
+    const now = this.io.now();
+    const p = runner.state.players.find((x) => x.id === id);
+    this.r.activeAt = now;
+    let how: LeftHow;
+    let result: HumanResult | null = null;
+    if (!p || !this.begun()) {
+      how = "early";
+      if (p) {
+        if (this.botTakes(id)) this.giveSeat(id);
+        else runner.withdraw(id);
+      }
+      // (Their pre-game vote goes with them; the seat's new bot joins the winner, as anyone who didn't vote does.)
+      const v = this.r.vote;
+      if (v?.votes[id] && v.result === null) {
+        delete v.votes[id];
+        this.r.humans = this.r.humans.filter((x) => x.id !== id);
+        for (const o of this.r.humans) this.send(o.id, { t: "vote", vote: this.voteView(), standings: this.standings() });
+      }
+    } else if (p.alive) {
+      how = why;
+      const placement = runner.alive().length;
+      result = this.resultOf(h, p, placement);
+      if (this.botTakes(id)) this.giveSeat(id);
+      else this.r.placements[id] = runner.retire(id);
+    } else how = "out";
+    this.r.humans = this.r.humans.filter((x) => x.id !== id);
+    delete this.r.last[id];
+    this.r.left = [
+      ...(this.r.left ?? []),
+      { id, name: h.name, token: h.token, how, at: now, result, ...(how === "out" ? { deferred: true as const } : {}), ...(h.practice ? { practice: true } : {}), ...(h.evalBar !== undefined ? { evalBar: h.evalBar } : {}) },
+    ];
+    this.chatGone(id);
+    // Hollow's Lights out: they're no longer in the test (a round may now be over sooner).
+    const l = this.r.lights;
+    if (l) {
+      delete l.taps[id];
+      delete l.tapAt?.[id];
+    }
+    if (this.r.hostId === id) {
+      this.r.hostId = this.pickHost(id);
+      this.resendHostWork();
+    }
+    this.judgeGone(id);
+    console.log(`lobby ${this.r.code}: ${id} left the match (${how}${result ? `, ${result.placement} of ${result.players}` : ""})`);
+    // Them: how they left and what was recorded, then their sockets close. (Gone already, they hear it if they come back.)
+    this.io.send(id, { t: "resigned", ...this.netLeft(this.r.left.at(-1)!) });
+    this.io.close?.(id);
+    // Everyone else: the seat's new name (a bot), or the player gone.
+    this.broadcast(this.lobbyMessage(), false);
+  }
+
+  /** Someone left mid-round: if everyone the round still waits for has moved, it locks now; Lights out may end sooner. */
+  private nobodyToWaitFor() {
+    if (this.r.phase === "play" && this.r.round && this.roundDone()) return this.lock();
+    if (this.r.phase === "boss" && this.r.lights) hollowLobby.lightsStep(this.bossLobby);
+  }
+
+  /**
+   * Everyone this round waits for has moved: the people here (someone away doesn't hold the others up). With nobody
+   * here, everyone in the round (so a reload doesn't cost the move).
+   */
+  private roundDone(): boolean {
+    const playing = this.roundHumans();
+    const here = playing.filter((h) => h.connected);
+    return (here.length ? here : playing).every((h) => this.doneThisRound(h.id));
+  }
+
+  /** People gone from the match longer than LEAVING.awayMs have left it, as if they'd resigned (those already out just wait). */
+  private sweepAway() {
+    if (!this.inMatch()) return;
+    const now = this.io.now();
+    for (const h of [...this.r.humans]) {
+      if (this.present(h, now)) continue;
+      const p = this.runner!.state.players.find((x) => x.id === h.id);
+      if (!p || p.alive) this.leaveMatch(h, "away");
+    }
+  }
+
+  /**
+   * Nobody is left in the match (everyone resigned, or has been gone longer than LEAVING.awayMs): it ends now rather
+   * than playing on for no one, and the lobby closes at once (its code free). Everyone's result is recorded first: as
+   * they left it, or as they were placed when they went out.
+   */
+  private wrapUpIfEmpty(): boolean {
+    if (!this.inMatch()) return false;
+    const now = this.io.now();
+    if (this.r.humans.some((h) => this.present(h, now))) return false;
+    // (Anyone still in the match has been gone too long: they leave it first.)
+    for (const h of [...this.r.humans]) if (this.runner!.player(h.id)?.alive) this.leaveMatch(h, "away");
+    const runner = this.runner!;
+    for (const p of runner.state.players) if (p.placement !== null) this.r.placements[p.id] = p.placement;
+    this.r.phase = "results";
+    this.r.timer = null;
+    this.r.endedAt = now;
+    this.r.keepMs = 0;
+    this.r.wrapped = true;
+    console.log(`lobby ${this.r.code}: everyone has left the match: it ends now`);
+    return true;
+  }
+
+  /** Results of people who left mid-match (a loss), not yet on their profiles: the Durable Object writes them now. */
+  takeLeftResults(): HumanResult[] {
+    const out: HumanResult[] = [];
+    for (const l of this.r.left ?? []) {
+      if (l.saved || !l.result) continue;
+      l.saved = true;
+      out.push(l.result);
+    }
+    return out;
   }
 
   /** If the host owes the server work (scores, a bot's duel move), (re)send it to the current host. */
@@ -768,7 +1075,7 @@ export class LobbyCore {
         (round.kingCalls ??= {})[playerId] = true;
         for (const h of this.r.humans) this.send(h.id, { t: "moved", key: round.key, playerId }, false);
         this.sendTally();
-        if (this.roundHumans().every((h) => this.doneThisRound(h.id))) this.lock();
+        if (this.roundDone()) this.lock();
         return;
       }
       case "bossMove":
@@ -776,7 +1083,10 @@ export class LobbyCore {
           this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}) });
         return;
       case "leave":
-        return this.leave(playerId);
+        // (Cancel on the queue screen once its seats have filled is leaving the match: before move 1, a bot sits in.)
+        return this.inMatch() ? this.resign(playerId) : this.leave(playerId);
+      case "resign":
+        return this.resign(playerId);
       case "chat":
         return this.chatSay(playerId, msg.say, msg.to);
       case "chatPrefs":
@@ -884,6 +1194,11 @@ export class LobbyCore {
 
   alarm() {
     this.freeGoneSeats();
+    // Someone gone from the match too long has left it; nobody left at all: it ends now.
+    const before = this.r.left?.length ?? 0;
+    this.sweepAway();
+    if (this.wrapUpIfEmpty()) return;
+    if ((this.r.left?.length ?? 0) > before) this.nobodyToWaitFor();
     const timer = this.r.timer;
     if (!timer || timer.at > this.io.now() + 50) return;
     this.r.timer = null;
@@ -1397,7 +1712,7 @@ export class LobbyCore {
     };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     this.sendTally();
-    if (this.roundHumans().every((h) => this.doneThisRound(h.id))) this.lock();
+    if (this.roundDone()) this.lock();
   }
 
   private sendTally() {
@@ -2427,28 +2742,16 @@ export class LobbyCore {
   }
 
   /** Each human's result once the match is over (for their profiles). */
-  humanResults(): ({
-    playerId: string;
-    placement: number;
-    players: number;
-    team: "w" | "b" | null;
-    teamWon: boolean | null;
-    avgScore: number | null;
-    rating: number | null;
-    brilliant: number;
-    bestMove: string | null;
-    /** It counts for their ranking: enough real players (isRankedMatch), and they weren't practicing (unlimited hints). */
-    ranked: boolean;
-    /** They had the eval bar on, as their app said (null: an app from before the setting). */
-    evalBar: boolean | null;
-  } & MatchFeats)[] {
+  humanResults(): HumanResult[] {
     const runner = this.runner;
     if (!runner || this.r.phase !== "results") return [];
     const st = this.standings();
     const winner = this.settings.mode === "crowd" ? runner.gameWinner() : null;
     const boss = runner.boss;
     const stages = this.settings.knockoutsPerStage.length;
-    return this.r.humans.flatMap((h) => {
+    // Everyone still here, and anyone who left once they were out (their place stood; recorded now, with everyone's).
+    const people: { id: string; practice?: boolean; evalBar?: boolean }[] = [...this.r.humans, ...(this.r.left ?? []).filter((l) => l.deferred)];
+    return people.flatMap((h) => {
       const row = st.find((s) => s.id === h.id);
       const placement = this.r.placements[h.id];
       if (!row || !placement) return [];
@@ -2481,10 +2784,13 @@ export class LobbyCore {
   /**
    * The match counts for ranking: real players fill at least RANKING.rankedMinHumanShare of the mode's seats (30 of a
    * 50 v 50's 100, 15 of a raid's 50). A match that started short (a raid with Bots off) counts its empty seats too.
+   * Everyone who played counts, whoever left since (a bot playing their seat now): leaving never makes a match
+   * unranked for those who stay, nor for the one who left. Only someone who left before move 1 doesn't count.
    */
   ranked(): boolean {
     const players = this.runner?.state.players ?? [];
-    return isRankedMatch(players.filter((p) => !p.isBot).length, Math.max(this.settings.lobbySize, players.length));
+    const played = this.r.humans.length + (this.r.left ?? []).filter((l) => l.how !== "early").length;
+    return isRankedMatch(played, Math.max(this.settings.lobbySize, players.length));
   }
 
   /** The home page's live window: the crowd's top votes on the move just played (Crowd and boss raids; no names). */

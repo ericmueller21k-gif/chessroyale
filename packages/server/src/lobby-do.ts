@@ -96,6 +96,16 @@ export class Lobby extends DurableObject<Env> {
           }
         }
       },
+      // They've left the match (resigned): their sockets close (their app doesn't reconnect).
+      close: (playerId) => {
+        for (const ws of this.socketsOf(playerId)) {
+          try {
+            ws.close(4001, "Left the match");
+          } catch {
+            // Already gone.
+          }
+        }
+      },
     }, library);
   }
 
@@ -122,14 +132,20 @@ export class Lobby extends DurableObject<Env> {
     return this.ctx.getWebSockets().filter((ws) => (ws.deserializeAttachment() as { playerId?: string } | null)?.playerId === playerId);
   }
 
-  /** Match over: results go on signed-in players' profiles (once), with the lobby's code for "See your result". */
+  /**
+   * Results go on signed-in players' profiles (once), with the lobby's code for "See your result": everyone's when the
+   * match is over, and anyone who left mid-match (resigned, or gone too long) as they leave, a loss.
+   */
   private async saveResults(core: LobbyCore, rec: LobbyRecord) {
-    if (rec.phase !== "results" || rec.resultsSaved || !this.env.DB) return;
-    rec.resultsSaved = true;
+    if (!this.env.DB) return;
+    const left = core.takeLeftResults();
+    const over = rec.phase === "results" && !rec.resultsSaved;
+    if (!left.length && !over) return;
+    if (over) rec.resultsSaved = true;
     const sql = d1Sql(this.env.DB);
     const mode = this.mode();
     const mail = caseMailer(await withSecrets(this.env));
-    for (const r of core.humanResults()) {
+    for (const r of [...left, ...(over ? core.humanResults() : [])]) {
       const userId = rec.accounts?.[r.playerId];
       if (!userId) continue;
       // Fair play: the match's signals and the player's level first (it may put them in review)…
@@ -425,7 +441,7 @@ export class Lobby extends DurableObject<Env> {
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {
-        ws.send(JSON.stringify({ t: "error", message: result.message, ...("ended" in result ? { ended: true } : {}), now: Date.now() }));
+        ws.send(JSON.stringify({ t: "error", message: result.message, ...("ended" in result ? { ended: true } : {}), ...("left" in result ? { left: result.left } : {}), now: Date.now() }));
         ws.close(1008, result.message);
         return;
       }

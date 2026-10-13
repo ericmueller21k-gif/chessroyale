@@ -287,6 +287,13 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   positions are remembered.
 - **Missed actions and takeover.** The rules' `noteActions`: three misses in a row and a bot plays the seat. The person
   can `reclaim` it (from the next half). Leaving while their squad still plays hands the seat to a bot at once.
+- **Resigning** (Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"). `leave` once the lobby has filled is
+  for good (`leaveForGood`): with the squad still in the bracket, a loss on the record at once at the worst place it
+  can still finish (`worstPlacement`: 5, 3 or 2; no reward; never the squad's later place), "left" saying `how` and
+  `result`; before the bracket (the votes), nothing recorded; the squad already out, it just goes. Someone who comes
+  back with the seat's token gets `error` with `left`. **When nobody is left** (everyone left, or gone longer than
+  `LEAVING.awayMs`; someone away otherwise keeps the three-misses rule) the lobby ends at once (`wrapUpIfEmpty`:
+  anyone still seated recorded as leaving, `wrapped`, `keepMs` 0) and closes.
 - **Armageddon.** A drawn final: the rules' `armageddonChooser`; that squad's people pick a color during
   `armageddonIntroSeconds` (the last pick stands; nobody: the bots' Black), then `startArmageddon`.
 - **Spectating and leaving.** Everyone gets every match (the tiny boards). A knocked-out squad's people watch on, or
@@ -328,8 +335,8 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   playing (`botRun`) shops `mercenary.bots.shopSeconds` into its window (`botShop`), now and then uses a token
   (`botUsesStockfish`: then the best move), and plans a Time chip tap as a half starts (`botChipTap`, `botChips`),
   thinking with its time; never a squad with people playing.
-- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 6, typed; 6: the time controls, a
-  clock's `capSeconds` and a match's `capMs`): a lobby socket gets
+- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 7, typed; 6: the time controls, a
+  clock's `capSeconds` and a match's `capMs`; 7: "left" with `how` and `result`, "error" with `left`): a lobby socket gets
   `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock and wallet), `vote`/`voteCast`, `match` (a
   match in full, as you may see it: tokens, block banks, blocks in effect and placed, the token log; its mode, each
   side's free seconds, kits, Stockfish tokens and shields left, the tokens used and being used, coins this match),
@@ -356,7 +363,8 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
 Settings: `SQUADS_LOBBY` in settings.ts (the bracket's intro, rewards, bot work, the test controls' switch and test
 fill, parties); Worker variables `MATCH_FILL_SECONDS` and `SQUADS_TEST`.
 
-Tests: `packages/server/test/squads-lobby.test.ts` (seats and parties, the fill, votes, the bracket, a full bot lobby
+Tests: `packages/server/test/resign.test.ts` ("resigning in Squads": mid-bracket, in the votes, the last one out and
+everyone away), `packages/server/test/squads-lobby.test.ts` (seats and parties, the fill, votes, the bracket, a full bot lobby
 to its results, halves, deadlines, takeover and reclaiming, leaving, team clocks and sudden death, ties, the final's
 visibility, Armageddon, the test controls, rewards, bot work on devices), `squads-v2-lobby.test.ts` (tokens through
 the server and the judge on devices: refunded, kept, no judge; blocks placed, seen, paid, refused, lifted, in effect;
@@ -394,8 +402,10 @@ door's look; every class is `sq-`.
   (`squads-view.ts`: `liveBank` runs a bank down during a half from the match's banks, its duties and who has locked
   in; ▼▼ when two moves drain it at once; the exact bank comes with each half). Sudden death turns red and pulses. A
   computer: a side panel (from 1100 px). A phone: a strip of eight chips (name and clock), tapped for the whole table
-  and the bracket. The standings' foot has "Leave the lobby" (it asks again while your squad still plays: a bot takes
-  your seat for good).
+  and the bracket. The standings' foot has "Leave the lobby" (it asks again while your squad still plays: "Resign: a
+  loss, and a bot takes your seat"). The match's top line ends in the match's control as in every mode
+  (`MatchMenu`: a phone's "⋯" with Sound and Resign, a computer's flag; `squadsExit` says what it offers), and the
+  votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home.
 - **A match** (`screens/SquadsMatch.tsx`): the score and round on top, the strip, every board in the lobby as tiny
   boards (`TinyBoard`, match by match, your squad's ringed, YOU on your board and NEXT on next turn's; tappable only once
   you've moved or locked in: one opens full size with "Back to my board"; a new half that asks something of you brings

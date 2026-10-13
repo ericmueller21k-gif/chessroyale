@@ -102,6 +102,11 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   crowd turn begins, no warning). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
   calls the God King's Last Stand, and Hollow lashes him) and `?boss=hollow&mate=1` (Boss alone from 1.f3 e5 2.g4, the
   boss to move: he mates at once, lashes your king, then the result; `settings.bossMateTest`, solo only).
+- **Resigning never waits for a moment** (Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the top
+  line's "⋯" or flag works through every moment (the God King's Last Stand, Lights out, a power's banner, the boss's
+  turn). Solo, the battle stops there (Boss alone: "You resigned", the boss won) and the moment's timers, its engine
+  work, Maia and both voices are cleared. Online, the others' battle goes on: a host who resigns hands the boss's move
+  to the next device at once, and someone resigning in Lights out leaves the test (a round no longer waits for them).
 - **What a boss says** (`packages/app/src/speech.tsx`, numbers in `SPEECH`; Eric, Oct 10: Ginger's line came and went
   at once): every line (its powers' moments, its ultimate, its warning, its reactions, Hollow's claim and Lights out
   words, Big Boy's snack) goes into the boss's voice and shows in its text box beside it (in the boss bar on a phone,

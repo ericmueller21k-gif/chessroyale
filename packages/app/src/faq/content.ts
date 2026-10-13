@@ -27,6 +27,7 @@ import {
   DEFAULT_SETTINGS,
   ENGINE_MIN_ELO,
   ITEM_COLORS,
+  LEAVING,
   PREGAME_VOTES,
   PRIOR_RATING,
   PURITY_BANDS,
@@ -84,6 +85,8 @@ export interface FaqSources {
   squads: SquadsSettings;
   /** Crowd 50 v 50's clock vote: its time controls (each option's patch has the bank, increment and cap) and default. */
   clockVote: Pick<PregameVote, "options" | "defaultOption">;
+  /** Resigning and leaving: how long someone may be gone from a match and still have their seat. */
+  leaving: { awayMs: number };
 }
 
 export const FAQ_DEFAULTS: FaqSources = {
@@ -110,6 +113,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   shopFree: SHOP_FREE,
   squads: SQUADS,
   clockVote: PREGAME_VOTES.find((v) => v.id === "speed")!,
+  leaving: LEAVING,
 };
 
 // ---------------- Numbers as words ----------------
@@ -200,6 +204,8 @@ function modes(src: FaqSources): FaqSection {
 
 ${mercenary(Q)}
 
+${leaving(src)}
+
 ### Classic {#mode-classic}
 
 The original mode (${S.lobbySize} players on ${n(S.lobbySize / S.groupSize, "board")}, rotating) is off the menu while it's being redesigned.
@@ -224,6 +230,20 @@ function squadsClocks(Q: SquadsSettings): string {
   const topUps = one((c) => c.topUpSeconds) ? `plus ${topUp(cs[0]!)}` : `plus a top-up (${perOption(topUp)})`;
   const def = cs[Q.clockDefault] ?? cs[0]!;
   return `Each squad has **one clock for the whole tournament**, a chess time control voted before round 1: ${list}. Nobody voting means ${clockLabel(def)}. ${free}; then your squad's clock runs, twice as fast while two of you are moving. Every move made in time adds its seconds back, so a quick move saves time for later, as on a chess clock. What's left carries into the next round, ${topUps} as you go through. When it runs out, it's **sudden death**: every move within the free seconds, until moves made in time earn some back.`;
+}
+
+/** Leaving or resigning a match, in every mode (LEAVING in settings.ts; Eric, Oct 13). */
+function leaving(src: FaqSources): string {
+  const away = src.leaving.awayMs / 1000;
+  const gone = away % 60 ? n(away, "second") : n(away / 60, "minute");
+  return `### Leaving or resigning {#leaving}
+
+- **To resign:** on a phone, tap **⋯** at the top right of the match, then **Resign**; on a computer, click the **flag** beside the sound button. It asks once more, so a stray tap never resigns. (There's no undo and no draw offer.)
+- **Solo games and Boss alone:** the game ends there, and it counts as a loss.
+- **Online (Crowd, boss raids, Squads):** you can't end the game for everyone else, so resigning means you leave it. You're out in the last place still open, it counts as a loss (in a match that counts for ranking, for your ranking too), and a bot plays your seat so your team isn't a player short (with Bots off, only when your side would otherwise have nobody left). In Squads your squad plays on with a bot in your seat, and your record has the worst place your squad could still finish.
+- **Before the first move** (the votes, a boss's entrance), it's just **Leave**: you go home, a bot takes your seat, and nothing goes on your record.
+- **Already out** (cut, or struck down by the boss)? **Leave the match** takes you home, and your place stands.
+- **Closed the app or lost your connection?** Back within ${gone}, you're still in your seat (a reload is fine). Gone longer, it counts as resigning. When everyone has left a match, it ends there, and its lobby code stops working.`;
 }
 
 /** Squads' Mercenary mode: earning, the shop, the items, every number from settings. */

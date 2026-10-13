@@ -33,8 +33,12 @@ import type { SquadsMode, SquadsRules, SquadsVoteId } from "./votes.ts";
  * wallet's and the match's `chips`); `chip` both ways and "chipNo"; a half's `chips`.
  * Version 6 (Oct 13, 2026): chess time controls. The Clock vote's options are Bullet, Blitz and Rapid; a clock (the
  * rules') has its cap on a move (`capSeconds`) and a match its own (`capMs`); every option has an increment that banks.
+ * Version 7 (Oct 13, 2026): resigning. "left" says how you left and what went on your record (`how`, `result`: a
+ * loss, at the worst place your squad could still finish); someone who comes back to a seat they left gets an
+ * "error" with `left`. (Leaving is still "leave": an app that never sends it is covered by the lobby wrapping up once
+ * nobody is left.)
  */
-export const SQUADS_PROTOCOL = 6;
+export const SQUADS_PROTOCOL = 7;
 
 /** A squad's placement: 1st, 2nd, 3rd-4th (out in round 2), 5th-8th (out in round 1). */
 export type SquadsPlacement = 1 | 2 | 3 | 5;
@@ -408,9 +412,18 @@ export type SquadsServerMessage = { now: number } & (
    */
   | { t: "botWork"; jobs: { id: string; fen: string; n: number; nodes: number }[] }
   /** You left (the socket closes next). */
-  | { t: "left" }
+  | {
+      t: "left";
+      /**
+       * How you left: before the bracket ("early": nothing recorded), with your squad still in ("resigned": a loss on
+       * your record, `result`; a bot plays your seat), or with your squad already out or the bracket over ("out").
+       */
+      how?: "early" | "resigned" | "out";
+      /** What went on your record: your squad's worst possible place from where it stood, of `players` squads. */
+      result?: { placement: SquadsPlacement; players: number } | null;
+    }
   /** Can't join or play on. `ended`: the lobby is over or gone. `banned`: banned for fair play. */
-  | { t: "error"; message: string; ended?: true; banned?: true }
+  | { t: "error"; message: string; ended?: true; banned?: true; left?: { how: "early" | "resigned" | "out"; result: { placement: SquadsPlacement; players: number } | null } }
   /** The lobby is closing (see LOBBY_LIFE); the socket closes next. */
   | { t: "closed"; reason: LobbyCloseReason }
 );

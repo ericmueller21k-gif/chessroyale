@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, FRONT_DOOR, LOBBY_LIFE, RAID_SETTINGS, modeSettings, type Settings } from "@chessroyale/core";
-import { MATCH_ENDED, lobbyClosing } from "../src/lobby.ts";
+import { CROWD_KNOCKOUTS, FRONT_DOOR, LEAVING, LOBBY_LIFE, RAID_SETTINGS, modeSettings, type Settings } from "@chessroyale/core";
+import { LEFT_MATCH, MATCH_ENDED, lobbyClosing } from "../src/lobby.ts";
 import { setup } from "./lobby-fixture.ts";
 
 /**
@@ -72,10 +72,9 @@ describe("lobby: closing (LOBBY_LIFE)", () => {
     expect(lobbyClosing(L.core.record, true)).toBeNull();
   });
 
-  it("a match in progress never closes while anyone is connected; left to itself it reaches its results well inside the safety cap", () => {
+  it("a match in progress never closes while anyone is connected; one everyone has left ends LEAVING.awayMs after the last went, and closes at once", () => {
     expect(LOBBY_LIFE.lobbyAbandonedMinutes).toBe(180);
-    const cap = LOBBY_LIFE.lobbyAbandonedMinutes * MIN;
-    const took: Record<string, number> = {};
+    expect(LEAVING.awayMs).toBe(120_000);
     for (const [name, settings] of [
       ["team final", crowd("team")],
       ["boss battle", crowd("boss")],
@@ -83,45 +82,46 @@ describe("lobby: closing (LOBBY_LIFE)", () => {
       ["boss raid", { ...RAID_SETTINGS }],
     ] as const) {
       const L = setup(settings as Partial<Settings>);
-      L.core.connect(undefined, "Ann", "phone");
+      L.core.connect(undefined, "Ann", "phone", false, null, undefined, "user-ann");
       L.core.message("p1", { t: "start" });
-      L.advance(1000);
+      // Into the match (past the votes and any intro): move 1 has come.
+      for (let i = 0; i < 400 && L.core.record.phase !== "play"; i++) L.advance(Math.max(1, (L.core.nextAlarm ?? L.now + 1000) - L.now));
+      expect(L.core.record.phase, name).toBe("play");
       expect(lobbyClosing(L.core.record, true)).toBeNull();
-      // Everyone leaves (closes the app): the safety cap counts from then.
+      // She closes the app: within LEAVING.awayMs nothing changes (a reload would put her back in her seat).
       const left = L.now;
       L.core.disconnect("p1");
-      expect(lobbyClosing(L.core.record, false)).toEqual({ at: left + cap, reason: "abandoned" });
-      // The match plays itself out (nobody scores, nobody picks), and is never due to close on the way.
-      playOut(L, () => {
-        const c = lobbyClosing(L.core.record, false)!;
-        expect(c.at).toBeGreaterThan(L.now);
-      });
-      took[name] = L.now - left;
-      expect(L.now - left).toBeLessThan(cap * 0.75);
-      expect(lobbyClosing(L.core.record, false)!.reason).toBe("ended");
+      L.advance(LEAVING.awayMs - 1000);
+      expect(L.core.record.humans.map((h) => h.id), name).toEqual(["p1"]);
+      expect(L.core.record.phase).not.toBe("results");
+      // Then she has left it: a loss, in the last place still open (a private raid is people only: 1st of 1, the boss
+      // won), and with nobody left the match ends now.
+      L.advance(2000);
+      expect(L.core.nextAlarm).toBeNull();
+      expect(L.core.record.phase, name).toBe("results");
+      expect(L.core.record.wrapped).toBe(true);
+      expect(L.now - left).toBeLessThanOrEqual(LEAVING.awayMs + 1000);
+      expect(L.core.record.left).toMatchObject([{ id: "p1", how: "away", result: { placement: settings.raid ? 1 : 100, teamWon: false } }]);
+      // It closes at once (its code free), and her result is on her profile then (the Durable Object writes it).
+      expect(lobbyClosing(L.core.record, false)).toEqual({ at: L.core.record.endedAt, reason: "ended" });
+      expect(L.core.takeLeftResults()).toMatchObject([{ playerId: "p1", players: settings.raid ? 1 : 100 }]);
+      expect(L.core.takeLeftResults()).toEqual([]);
     }
-    // (How long each took, to keep the cap's reasoning honest: see LOBBY_LIFE.)
-    console.log("abandoned matches played out in", Object.fromEntries(Object.entries(took).map(([k, v]) => [k, `${Math.round(v / MIN)} min`])));
-  }, 120_000);
+  });
 
-  it("a returning player sees their true place: one who closed the app as the match began and missed every move came 100th of 100", () => {
+  it("someone who closed the app as the match began and never came back: a loss, last of 100; back with the old seat, she's told she left", () => {
     // (A short final: a place at the first cut doesn't depend on it.)
     const L = setup({ ...crowd("team"), finalMaxTurns: 6 });
     L.core.connect(undefined, "Ann", "phone", false, null, undefined, "user-ann");
     const token = L.core.record.humans[0]!.token;
     L.core.message("p1", { t: "start" });
-    L.advance(1000);
+    for (let i = 0; i < 400 && L.core.record.phase !== "play"; i++) L.advance(Math.max(1, (L.core.nextAlarm ?? L.now + 1000) - L.now));
     L.core.disconnect("p1");
-    playOut(L);
-    L.take("p1");
-    // Back hours later (within the keep time): her seat, and the results as they were.
-    const back = L.core.connect(token, "Ann", "phone");
-    expect(back).toMatchObject({ ok: true, playerId: "p1" });
-    const res = L.last("p1", "results")!;
-    expect(res.placements.p1).toBe(100);
-    expect(res.placements.p1).toBe(L.core.record.placements.p1);
-    // The same place goes on her profile.
-    expect(L.core.humanResults()).toMatchObject([{ playerId: "p1", placement: 100, players: 100 }]);
+    L.advance(LEAVING.awayMs + 1000);
+    expect(L.core.record.phase).toBe("results");
+    expect(L.core.takeLeftResults()).toMatchObject([{ playerId: "p1", placement: 100, players: 100, teamWon: false, ranked: false }]);
+    // Back with her seat's token (the Durable Object has closed by then; a closed lobby says it has ended): told she left.
+    expect(L.core.connect(token, "Ann", "phone")).toEqual({ ok: false, message: LEFT_MATCH, ended: true, left: { how: "away", result: { placement: 100, players: 100, ranked: false } } });
   });
 
   it("someone who wasn't in the match is told it has ended; so is a seat from an older lobby that had this code", () => {

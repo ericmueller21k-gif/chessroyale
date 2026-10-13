@@ -2,7 +2,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, PREGAME_VOTES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -17,6 +17,8 @@ import {
   type ServerMessage,
   type UciEngine,
   type LobbyCloseReason,
+  type LeftHow,
+  type NetLeft,
   TopMovesCache,
   bossGuardFrom,
   recheckCloseCalls,
@@ -48,7 +50,7 @@ import {
   pigTurn,
   ShowdownScout,
 } from "@chessroyale/chess";
-import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
+import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
 import { evalBarOn } from "./prefs.ts";
@@ -56,6 +58,8 @@ import { RoundProgress } from "./progress.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { MatchChat } from "./chat.ts";
 import { isAdmin, maiaAllowed } from "./boss-brain.ts";
+import { resetKingSpeech } from "./godKing.ts";
+import { bossVoice } from "./speech.tsx";
 import { prefetchMaia, startMaia } from "./maia.ts";
 
 /** Your result in a lobby's match (once it's over), from the server: for "See your result". */
@@ -106,9 +110,10 @@ export function forgetSeat(code: string) {
 
 /**
  * Why a lobby is gone: it closed (its results had been up long enough, it never started, or it was abandoned), or
- * the server has no lobby under that code (closed a while ago, or never was).
+ * the server has no lobby under that code (closed a while ago, or never was), or you left its match ("left": you
+ * resigned, or were gone longer than LEAVING.awayMs; `leftHow` says which).
  */
-export type LobbyGone = LobbyCloseReason | "unknown";
+export type LobbyGone = LobbyCloseReason | "unknown" | "left";
 
 /**
  * A multiplayer match: the lobby server runs the clock and the draw; this
@@ -212,7 +217,88 @@ export class NetMatch implements GameView {
   ) {}
 
   get totalPlayers() {
-    return this.players.length || this.settings.lobbySize;
+    return this.leftPlayers ?? (this.players.length || this.settings.lobbySize);
+  }
+
+  // ---------------- Resigning (LEAVING in settings.ts) ----------------
+
+  /** Move 1 has come (a move's clock, a reveal, a cut, the boss's move): leaving from here is resigning. */
+  private begun = false;
+  /** A resign sent, its answer not yet back. */
+  resigning = false;
+  /** Leaving went home (before move 1, once out, or no answer): the app goes home. */
+  exited = false;
+  /** How you left a match, when the server said so on your coming back (the note on the home screen). */
+  leftHow: LeftHow | null = null;
+  private leftPlayers: number | null = null;
+  private resignTimer: ReturnType<typeof setTimeout> | null = null;
+
+  get exit(): ExitKind | null {
+    const k = this.phase.kind;
+    if (this.closed || this.resigning || k === "results" || k === "loading" || (k === "lobby" && !this.started)) return null;
+    if (!this.begun) return "leave";
+    const me = this.standingsList.find((s) => s.id === this.myId);
+    return me && !me.out ? "resign" : "leave";
+  }
+
+  /** Online, leaving before move 1 or once you're out goes straight home (the match goes on without you). */
+  get exitHome(): boolean {
+    return this.exit === "leave";
+  }
+
+  /** The lobby fills seats with bots (Default, and private Crowd lobbies; not Bots off, nor a private raid), or it's a final. */
+  get seatToBot(): boolean {
+    return (!this.botsOff && !(this.settings.raid && !this.auto)) || (!!this.final && this.final.order.includes(this.myId ?? ""));
+  }
+
+  /**
+   * Resign (or leave). The server takes you out of the match and answers "resigned" (then closes the socket): mid-match,
+   * the results screen with your place; before move 1 or once out, home. This device forgets its seat (with the answer),
+   * so opening the app again never puts you back. With no answer in LEAVING.confirmWaitMs (a dead connection), home
+   * anyway: the server's away rule does the rest.
+   */
+  resign() {
+    const exit = this.exit;
+    if (!exit) return;
+    this.send({ t: "resign" });
+    if (this.exitHome) {
+      forgetSeat(this.code);
+      return void (this.exited = true);
+    }
+    // (The seat's token stays until the answer: if the connection is between tries, the resign goes again, as this
+    // seat, the moment it's back; see "welcome".)
+    this.resigning = true;
+    this.lookAways.stop();
+    this.emit();
+    this.resignTimer = setTimeout(() => {
+      if (!this.resigning) return;
+      this.resigning = false;
+      forgetSeat(this.code);
+      this.exited = true;
+      this.emit();
+    }, LEAVING.confirmWaitMs);
+  }
+
+  /** The server's answer: how you left, and your result if one went on your record. */
+  private onResigned(m: NetLeft) {
+    this.resigning = false;
+    if (this.resignTimer) clearTimeout(this.resignTimer);
+    this.closed = true;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    forgetSeat(this.code);
+    this.freeBrain();
+    this.scout?.reset();
+    this.progress.reset();
+    resetKingSpeech();
+    bossVoice.reset();
+    if (!m.result) {
+      this.exited = true;
+      return this.emit();
+    }
+    this.ranked = m.result.ranked;
+    this.placement = m.result.placement;
+    this.leftPlayers = m.result.players;
+    this.setPhase({ kind: "results", placement: m.result.placement, winner: "", youWon: false, left: { how: "resigned", bot: this.seatToBot } });
   }
   get isHost() {
     return this.myId !== null && this.myId === this.hostId;
@@ -356,6 +442,7 @@ export class NetMatch implements GameView {
 
   dispose() {
     this.closed = true;
+    if (this.resignTimer) clearTimeout(this.resignTimer);
     this.freeBrain();
     if (this.retryTimer) clearTimeout(this.retryTimer);
     document.removeEventListener("visibilitychange", this.onVisible);
@@ -385,11 +472,19 @@ export class NetMatch implements GameView {
           // Reconnecting from this device won't keep the seat.
         }
         if (this.phase.kind === "loading") this.setPhase({ kind: "lobby" });
+        // (A resign sent while the connection was down: again, now it's back.)
+        if (this.resigning) this.send({ t: "resign" });
         this.chat.onWelcome();
         // This device's engine speed, so the lobby can share out the judging (once per page; sent again on reconnect).
         void this.reportSpeed();
         return;
       case "error":
+        // (You left this match: resigned, or gone too long. Home, with a note of its own.)
+        if (m.left) {
+          this.leftHow = m.left.how;
+          forgetSeat(this.code);
+          return this.goneNow("left");
+        }
         // (The match is over: results gone, or a seat from an older lobby that had this code.)
         if (m.ended) return this.goneNow("ended");
         // Banned for fair play: the ban notice, with its appeal.
@@ -399,6 +494,8 @@ export class NetMatch implements GameView {
         return this.emit();
       case "closed":
         return this.goneNow(m.reason);
+      case "resigned":
+        return this.onResigned(m);
       case "lobby":
         this.players = m.players;
         for (const p of m.players) {
@@ -418,6 +515,7 @@ export class NetMatch implements GameView {
       case "opening":
         return this.setPhase({ kind: "opening", boards: m.boards.map((b) => this.toView(b)) });
       case "round":
+        this.begun = true;
         this.key = m.key;
         this.kingCalled = false;
         this.darkNote = null;
@@ -488,6 +586,7 @@ export class NetMatch implements GameView {
       case "reveal":
         return this.onReveal(m);
       case "stageBreak": {
+        this.begun = true;
         this.standingsList = m.standings;
         this.augmentVote = null;
         const youOut = !!this.myId && m.knockedOut.includes(this.myId);
@@ -506,11 +605,13 @@ export class NetMatch implements GameView {
         });
       }
       case "spectate":
+        this.begun = true;
         this.standingsList = m.standings;
         this.stage = m.stage;
         if (this.phase.kind !== "stageBreak") this.setPhase({ kind: "spectating", boards: m.boards.map((b) => this.toView(b)) });
         return;
       case "final":
+        this.begun = true;
         this.final = { ...m.final, board: this.toView(m.final.board) };
         this.standingsList = m.standings;
         // During your own turn the play screen stays up; otherwise watch the final.
@@ -538,6 +639,8 @@ export class NetMatch implements GameView {
         return this.setPhase({ kind: "vote", vote: this.voteState });
       }
       case "boss":
+        // (The boss's first move, when it moves first, is move 1 too; its intro isn't.)
+        if (!m.intro && m.boss.lastMove) this.begun = true;
         this.boss = { ...m.boss, board: this.toView(m.boss.board) };
         this.standingsList = m.standings;
         this.currentBoard = m.boss.board;
@@ -614,6 +717,7 @@ export class NetMatch implements GameView {
   }
 
   private onReveal(m: Extract<ServerMessage, { t: "reveal" }>) {
+    this.begun = true;
     this.stage = m.stage;
     this.roundsPlayed = m.roundsPlayed;
     this.standingsList = m.standings;

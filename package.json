@@ -36,6 +36,7 @@
     "frames:home": "node scripts/frames-home-queue.mjs",
     "frames:lobbychat": "node scripts/frames-lobby-chat.mjs",
     "frames:squads": "node scripts/frames-squads.mjs",
+    "frames:resign": "node scripts/frames-resign.mjs",
     "perf:boss": "node scripts/perf-boss.mjs"
   },
   "devDependencies": {

@@ -417,6 +417,13 @@ export type ClientMessage =
   | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
+  /**
+   * Resign: this player leaves the match for good (settings.ts, LEAVING). Mid-match it's a loss, out in the last place
+   * still open, and a bot plays the seat; before move 1, just Leave; already out, they go with their result as it
+   * stands. The server answers "resigned" and closes the socket. (An app from before Oct 13 never sends it: it just
+   * goes, and the away rule, LEAVING.awayMs, does the same for it.)
+   */
+  | { t: "resign" }
   /** Quick chat: say a line (a phrase or emoji id) to your team or, for Hello and Sporting lines and emoji, to everyone. */
   | { t: "chat"; say: string; to?: "team" | "all" }
   /**
@@ -442,6 +449,22 @@ export type ClientMessage =
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
+
+/**
+ * How someone left a match (LEAVING in settings.ts): they resigned; they were gone longer than LEAVING.awayMs ("away",
+ * counted as resigning); they left before move 1 ("early": nothing recorded); or they left after they were already
+ * out ("out": their result as it stands, recorded when the match ends).
+ */
+export type LeftHow = "resigned" | "away" | "early" | "out";
+
+/**
+ * Someone who left: how, and their result as it was recorded then (`placement` of `players`; a loss unless they were
+ * already out). Null result: nothing recorded (before move 1), or not yet (already out: it's recorded with everyone's).
+ */
+export interface NetLeft {
+  how: LeftHow;
+  result: { placement: number; players: number; ranked: boolean } | null;
+}
 
 /** A battle on the Maia brain, as the lobby tells the host's device (bossBrainFor's plan). */
 export interface NetBossBrain {
@@ -469,15 +492,18 @@ export type ServerMessage = { now: number } & (
     }
   /**
    * Can't join (or play on). `ended`: the match is over (or long gone), so the app goes home with a note. `banned`:
-   * the account is banned for fair play (the app shows the ban notice and its appeal).
+   * the account is banned for fair play (the app shows the ban notice and its appeal). `left`: this seat left the
+   * match (resigned, or gone longer than LEAVING.awayMs), and how: the app goes home with its own note.
    */
-  | { t: "error"; message: string; ended?: true; banned?: true }
+  | { t: "error"; message: string; ended?: true; banned?: true; left?: NetLeft }
   /**
    * The lobby is closing: its results have been up long enough (`ended`), it never started and nothing happened in it
    * for a long time (`idle`), or nobody had been in its match for hours (`abandoned`). The socket closes next, and
    * the lobby's code is free again. The app goes home with a note.
    */
   | { t: "closed"; reason: LobbyCloseReason }
+  /** The answer to "resign": you've left the match (how, and your result as recorded). The socket closes next. */
+  | ({ t: "resigned" } & NetLeft)
   | { t: "opening"; boards: NetBoard[]; until: number }
   | {
       t: "round";

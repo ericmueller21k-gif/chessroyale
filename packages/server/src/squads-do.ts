@@ -254,7 +254,7 @@ export class SquadsLobby extends DurableObject<Env> {
       });
       if (!result.ok) {
         await this.persist(core);
-        return refuse(result.message, result.ended ? { ended: true } : {});
+        return refuse(result.message, { ...(result.ended ? { ended: true } : {}), ...(result.left ? { left: result.left } : {}) });
       }
       if (!known) {
         ws.serializeAttachment({ ...attached, playerId: result.playerId });

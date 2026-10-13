@@ -13,6 +13,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   a power-up (`powerUp`), or Squads Mercenary's Stockfish token (`engineToken`: sanctioned help, skip reason
   "engineToken"). Squads isn't recorded yet; its matches log which choices had a token's lines on screen
   (`assists`, `isAssisted`), so when it is, they go in with `engineToken`.
+- **Someone who resigns mid-match** (or is gone too long) has their match's signals recorded with their result as
+  they leave (`takeLeftResults`, the Durable Object's `saveResults`), as everyone's are at the end.
 - **The suspicion score** turns a player's evidence into a level; every threshold is in `FAIRPLAY`.
 - **A case** is one player's file. Its status: **watch** (recorded only), **review** (a person or the automated
   reviewer decides; meanwhile their online results are held off ranking and `eligibleForRanked` says no), **banned**

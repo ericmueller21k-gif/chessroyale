@@ -1657,6 +1657,218 @@ p {
   font-size: 16px;
 }
 
+/* ---- Resign and leave (components/MatchMenu.tsx; Eric, Oct 13) ----
+   At the right end of a match's top line: a phone's "⋯" (its sheet at the foot of the screen: Sound, Resign), a
+   computer's flag beside the sound button (its confirm under the flag). Nothing dims or covers the board. */
+.mm {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.mm-more,
+.mm-flag {
+  flex: none;
+  width: 44px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.mm-more > span {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-2px);
+}
+.mm-flag {
+  color: var(--muted);
+}
+.mm-flag:hover,
+.mm-flag.on {
+  color: var(--text);
+}
+.mm-more.on,
+.mm-flag.on {
+  background: var(--surface-2);
+}
+.mm-flag-icon {
+  display: block;
+}
+/* An invisible layer over the page while the sheet or the confirm is open: a tap outside closes it, nothing dims. */
+.mm-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.mm-sheet,
+.mm-confirm.mm-sheet {
+  width: min(100vw, 480px);
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px calc(env(safe-area-inset-bottom) + 8px);
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  background: var(--surface);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.35);
+  animation: mm-up 160ms ease-out;
+}
+/* The phone's options: Sound and Resign side by side, one row. */
+.mm-sheet {
+  grid-template-columns: 1fr 1fr;
+}
+.mm-sheet.one {
+  grid-template-columns: 1fr;
+}
+@keyframes mm-up {
+  from {
+    transform: translateY(24px);
+  }
+  to {
+    transform: none;
+  }
+}
+.mm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.mm-row-icon {
+  flex: none;
+  width: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  line-height: 1;
+}
+.mm-row-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.mm-exit {
+  color: var(--danger);
+}
+.mm-switch {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+.mm-switch.on {
+  background: var(--good);
+  color: #fff;
+}
+/* The confirm: what happens, Cancel and Resign. On a phone, the sheet's place; on a computer, under the flag. */
+.mm-confirm {
+  color: var(--text);
+}
+.mm-confirm-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.3;
+}
+.mm-confirm-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 900;
+}
+.mm-confirm-title .mm-flag-icon {
+  color: var(--danger);
+}
+.mm-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mm-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mm-btn.mm-go {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+.mm-confirm.mm-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 66;
+  width: 300px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow), 0 8px 28px rgba(0, 0, 0, 0.3);
+  text-align: left;
+  white-space: normal;
+}
+/* A computer's: the question on its own line, bigger. */
+.mm-pop .mm-confirm-title {
+  display: flex;
+  margin-bottom: 4px;
+  font-size: 18px;
+}
+.mm-pop .mm-btn {
+  min-height: 40px;
+  font-size: 15px;
+}
+/* A plain "Leave the match" for someone already out (the cut screen, watching, the solo play-out). */
+.leave-match {
+  margin-top: 10px;
+}
+.results .trophy.resigned {
+  display: grid;
+  place-items: center;
+  color: var(--danger);
+}
+
 
 
 /* ---- Step through a board's game ---- */
@@ -2234,7 +2446,9 @@ button.history-label {
     flex: none;
   }
   .screen.game .hud,
-  .screen.game .mute-btn {
+  .screen.game .mute-btn,
+  .screen.game .mm-more,
+  .screen.game .mm-flag {
     min-height: 36px;
   }
   .screen.game .opening-name {
@@ -2295,9 +2509,11 @@ button.history-label {
   }
 }
 
-/* The strip above the boards: one clean line, no box (sound toggle too). */
+/* The strip above the boards: one clean line, no box (sound toggle, "⋯" and the flag too). */
 .screen.game .hud,
-.screen.game .mute-btn {
+.screen.game .mute-btn,
+.screen.game .mm-more,
+.screen.game .mm-flag {
   border: none;
   background: transparent;
   box-shadow: none;
@@ -2305,8 +2521,14 @@ button.history-label {
 .screen.game .hud {
   padding: 0 2px;
 }
-.screen.game .mute-btn {
+.screen.game .mute-btn,
+.screen.game .mm-more,
+.screen.game .mm-flag {
   width: 36px;
+}
+.screen.game .mm-more.on,
+.screen.game .mm-flag.on {
+  background: var(--surface-2);
 }
 
 /* The evaluation bar sits left of the board; a matching gap on the right keeps the board centered. */

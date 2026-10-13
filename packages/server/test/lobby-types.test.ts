@@ -181,14 +181,15 @@ describe("ranking: a match needs at least 30% real players", () => {
     L.core.connect(undefined, "Practice", "phone", true);
     L.core.message("p1", { t: "start" });
     expect(L.core.record.bots).toHaveLength(44);
-    // (Nobody here scores: with everyone gone, rounds time out and the match plays itself out.)
-    for (const h of L.core.record.humans) L.core.disconnect(h.id);
+    // (Nobody here scores: rounds time out and the match plays itself out. Everyone but p1 goes, and once they've been
+    // gone LEAVING.awayMs they've left it: their results are taken then, a loss, and still count for ranking.)
+    for (const h of L.core.record.humans) if (h.id !== "p1") L.core.disconnect(h.id);
     playOut(L);
     expect(L.core.ranked()).toBe(true);
-    const mine = L.core.humanResults();
+    const mine = [...L.core.takeLeftResults(), ...L.core.humanResults()];
+    expect(mine).toHaveLength(20);
     expect(mine.filter((r) => r.ranked)).toHaveLength(19);
     expect(mine.find((r) => r.playerId === "p20")!.ranked).toBe(false);
-    L.core.connect(L.core.record.humans[0]!.token, "P0", "phone");
     expect(L.last("p1", "results")!.ranked).toBe(true);
 
     // 19 people and 45 bots: one short, unranked.
@@ -201,9 +202,7 @@ describe("ranking: a match needs at least 30% real players", () => {
     const B = setup();
     B.core.connect(undefined, "Ann", "computer");
     B.core.message("p1", { t: "start" });
-    B.core.disconnect("p1");
     playOut(B);
-    B.core.connect(B.core.record.humans[0]!.token, "Ann", "computer");
     expect(B.last("p1", "results")!.ranked).toBe(false);
     expect(B.core.humanResults()[0]!.ranked).toBe(false);
   });

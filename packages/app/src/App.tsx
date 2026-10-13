@@ -9,6 +9,9 @@ import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool } from "./engine.ts";
 import { cutLabel, elimination, isCrowd, roundLive, towerView, type GameView } from "./game.ts";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
+import { exitFor, exitMatch, onExitMatch } from "./match-exit.ts";
+import { MatchMenu } from "./components/MatchMenu.tsx";
+import type { LeftHow } from "@chessroyale/chess";
 import { SoloMatch } from "./solo.ts";
 import { FinalScreen } from "./screens/Final.tsx";
 import { HomeScreen } from "./screens/Home.tsx";
@@ -166,6 +169,16 @@ interface EndedNote {
   why: LobbyGone;
   /** Your result in it, if you played it (the server keeps it on your profile). */
   result: LobbyResult | null;
+  /** You left its match (`why` "left"): how. */
+  how?: LeftHow | null;
+}
+
+/** The home screen's note after coming back to a match you'd left (resigned, or gone too long). */
+function leftNote(how: LeftHow | null | undefined): string {
+  if (how === "away") return "You were away from that match too long: a bot took your seat, and it counted as a loss.";
+  if (how === "early") return "You left that match before it began.";
+  if (how === "out") return "You left that match after you were out.";
+  return "You resigned that match.";
 }
 
 /** Back from Google: ?signin=google (or failed). Read once, then tidied out of the address bar. */
@@ -224,12 +237,12 @@ export function App() {
    * The lobby has closed: home (the address too, so reopening the app lands there) with a note, and your result if
    * you played (from the server, asked before this so the note shows whole, never growing a button a moment later).
    */
-  const showEnded = (code: string, why: LobbyGone, result: LobbyResult | null) => {
+  const showEnded = (code: string, why: LobbyGone, result: LobbyResult | null, how: LeftHow | null = null) => {
     forgetSeat(code);
     if (currentMatch() === code) setCurrentMatch(null);
     setInvite(null);
     if (location.pathname !== "/") history.replaceState(null, "", "/");
-    setEnded({ code, why, result });
+    setEnded({ code, why, result, how });
   };
   const chooseGuest = (on: boolean) => {
     setGuest(on);
@@ -270,12 +283,18 @@ export function App() {
     // A boss battle shares its result among those still standing (as online); otherwise the team's game.
     const feats = me ? matchFeats(runner.player(me.id), match.settings.knockoutsPerStage.length, runner.boss, raid) : null;
     const bossResult = match.phase.bossResult;
+    // You resigned: a loss (on your team's record, or against the boss), and you didn't see a boss battle through.
+    const resigned = match.phase.left?.how === "resigned";
     void recordSoloResult({
       mode: raid ? "boss" : match.settings.mode,
       placement: match.phase.placement,
       players: match.totalPlayers,
       team: me?.team ?? null,
-      teamWon: bossResult
+      teamWon: resigned
+        ? me?.team || runner.boss
+          ? false
+          : null
+        : bossResult
         ? feats?.survived && bossResult !== "draw"
           ? bossResult === "crowd"
           : null
@@ -287,6 +306,7 @@ export function App() {
       brilliant: match.moves.filter((m) => m.brilliant).length,
       bestMove: bestMoveOf(match.moves),
       ...feats,
+      ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
     });
   });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
@@ -303,6 +323,10 @@ export function App() {
 
   useEffect(() => squads?.subscribe(() => rerender(undefined)), [squads]);
   useEffect(() => party?.subscribe(() => rerender(undefined)), [party]);
+  // A resign in Squads that recorded nothing (or got no answer): home.
+  useEffect(() => {
+    if (squads?.left && !squads.resigned && !squads.resigning && !squads.gone) leaveSquads();
+  });
   // A Squads lobby that has ended or closed: home, with the note.
   useEffect(() => {
     if (!squads?.gone) return;
@@ -389,7 +413,7 @@ export function App() {
       if (onScreen.current !== m) return;
       m.dispose();
       setMatch(null);
-      showEnded(m.code, m.gone!, result);
+      showEnded(m.code, m.gone!, result, m.leftHow);
     };
     if (m.goneResult !== undefined) go(m.goneResult);
     else void lobbyStatus(m.code, 3000).then((s) => go(s?.result ?? null));
@@ -709,6 +733,28 @@ export function App() {
     }
   };
 
+  /**
+   * Resign or Leave, from any match screen's top line (MatchMenu, match-exit.ts). Solo: the results at once. Online: the
+   * server's answer brings them (the screen stays meanwhile). Before move 1, and online once you're out: home.
+   */
+  useEffect(
+    () =>
+      onExitMatch(() => {
+        const m = onScreen.current;
+        if (!m?.exit) return;
+        const home = m.exitHome;
+        // (Gone on purpose: opening the app again doesn't bring you back.)
+        setCurrentMatch(null);
+        m.resign();
+        if (home) leave();
+      }),
+    [match],
+  );
+  // Online, a resign that went home (before move 1, once out, or no answer from the server): home now.
+  useEffect(() => {
+    if (match instanceof NetMatch && match.exited) leave();
+  });
+
   const leave = () => {
     // On purpose: opening the app again doesn't bring you back to this match.
     setCurrentMatch(null);
@@ -782,7 +828,7 @@ export function App() {
   // (Before any page below, the home screen's frame needs these.)
   const noLanding = new URLSearchParams(location.search).has("nolanding");
   const inviteCode = invite === "open" ? linkCode : undefined;
-  const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : "That match has ended.") : (squadsNote ?? undefined);
+  const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : ended.why === "left" ? leftNote(ended.how) : "That match has ended.") : (squadsNote ?? undefined);
   // Squads: the lobby you're in (the waiting room is the home screen's queue, as for Crowd).
   if (squads && !match) {
     const overlayS = profileOpen && (
@@ -811,7 +857,7 @@ export function App() {
       );
     return (
       <>
-        <SquadsScreen client={squads} actions={{ onHome: leaveSquads, onAgain: squadsAgain, party: !!squads.party }} />
+        <SquadsScreen client={squads} actions={{ onHome: leaveSquads, onResign: () => squads.resign(), onAgain: squadsAgain, party: !!squads.party }} />
         {overlayS}
       </>
     );
@@ -1130,12 +1176,18 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
           <p class="muted">
             Stage {p.stage + 1}, round {p.round + 1}
           </p>
+          {/* You're out: your place stands. See it now rather than wait for the rest. */}
+          {match.exit && (
+            <button type="button" class="btn btn-secondary leave-match" onClick={exitMatch}>
+              Skip to your result
+            </button>
+          )}
         </div>
       );
     case "final":
       return <FinalScreen match={match} final={p.final} />;
     case "vote":
-      return <VoteScreen match={match} vote={p.vote} />;
+      return <VoteScreen match={match} vote={p.vote} menu={<MatchMenu exit={exitFor(match)} />} />;
     case "boss":
       return <BossScreen match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} lights={p.lights} />;
     case "results":

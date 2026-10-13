@@ -418,6 +418,24 @@ describe("Big Boy's Big Bounce: the new position", () => {
   });
 });
 
+describe("Big Boy's Big Bounce on the lobby server", () => {
+  it("a runner restored from its snapshot (as every lobby event restores it) works out the bounce: it has the bosses' store", async () => {
+    const r = raid({ patch: { bossPowerTest: "bounce" } });
+    await turn(r);
+    r.deal();
+    await r.score(new Map([["h0", { move: [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort()[0]!, thinkMs: 1000 }]]));
+    expect(r.bounceDue()).toBe(true);
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "bigboy", lastStandFrom: 999, bossPowerTest: "bounce" } as Settings;
+    const restored = MatchRunner.restore(structuredClone(r.snapshot()), { settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(LINE)] });
+    expect(restored.bounceDue()).toBe(true);
+    expect(restored.bounceCandidates()).toEqual(r.bounceCandidates());
+    expect(restored.kingCallers).toBeInstanceOf(Set);
+    // (Leaving a match hands a seat over on a restored runner too.)
+    restored.handOver("h0", { id: "rb1", name: "Relief", skill: 4 });
+    expect(restored.state.players[0]).toMatchObject({ id: "rb1", isBot: true });
+  });
+});
+
 describe("Big Boy's Big Bounce in a battle", () => {
   it("the meter full: RAGE! as a turn begins; after the crowd's move, the bounce at the start of his turn, then his move", async () => {
     const r = raid({ patch: { bossPowerTest: "bounce" } });

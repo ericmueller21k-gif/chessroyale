@@ -28,7 +28,7 @@ function darkTry(lobby: BossLobby, playerId: string, key: string, move: unknown,
   (round.darkOut ??= {})[playerId] = Math.min(lobby.thinkTime(round, now), lobby.thinkTime(round, deadline));
   for (const h of lobby.r.humans) lobby.send(h.id, { t: "moved", key, playerId }, false);
   lobby.sendTally();
-  if (lobby.roundHumans().every((h) => lobby.doneThisRound(h.id))) lobby.lock();
+  if (lobby.roundDone()) lobby.lock();
 }
 
 // ---------------- Lights out ----------------

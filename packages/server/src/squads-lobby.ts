@@ -1,9 +1,10 @@
-import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, botVotes, castPregameVote, cleanLook, closePregameVote, shuffle, type ItemLook, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FRONT_DOOR, LEAVING, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, botVotes, castPregameVote, cleanLook, closePregameVote, shuffle, type ItemLook, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
 import { botRoster, type LobbyCloseReason, type MoveScore, type Opening } from "@chessroyale/chess";
 import { Chess } from "chess.js";
 import {
   NO_INPUTS,
   NO_ITEMS,
+  worstPlacement,
   ROUND_FORMAT,
   SQUADS_PROTOCOL,
   applyKits,
@@ -170,6 +171,8 @@ export interface SquadsHuman {
   goneAt?: number;
   /** They left (see "leave"). */
   left?: true;
+  /** How they left and what went on their record (told again if they come back with their seat's token). */
+  leftAs?: SquadsLeft;
   look?: ItemLook;
   /** May use the test controls (an admin, or SQUADS_TEST where it's on). */
   test?: true;
@@ -263,6 +266,12 @@ export interface LiveMatch {
 }
 
 /** A reward to write: a results row (when `recorded`) and coins and crates, for one person. */
+/** How someone left a Squads lobby (protocol: "left"), and the loss recorded for them, if any. */
+export interface SquadsLeft {
+  how: "early" | "resigned" | "out";
+  result: { placement: SquadsPlacement; players: number } | null;
+}
+
 export interface SquadsReward {
   playerId: string;
   userId: string | null;
@@ -327,6 +336,8 @@ export interface SquadsRecord {
   endedAt?: number;
   /** How long its results stay up, if not LOBBY_LIFE's (tests). */
   keepMs?: number;
+  /** It ended early because everyone had left (nothing more is played; it closes at once). */
+  wrapped?: true;
 }
 
 export function newSquadsRecord(code: string, now: number, seed: number, opts: { auto?: boolean; fillAt?: number | null; test?: SquadsRecord["test"]; keepMs?: number } = {}): SquadsRecord {
@@ -589,13 +600,13 @@ export class SquadsCore {
   connect(
     token: string | undefined,
     opts: { name?: string; device?: "phone" | "computer"; party?: string; look?: unknown; userId?: string; test?: boolean; v?: number },
-  ): { ok: true; playerId: string } | { ok: false; message: string; ended?: true } {
+  ): { ok: true; playerId: string } | { ok: false; message: string; ended?: true; left?: SquadsLeft } {
     const now = this.io.now();
     this.r.activeAt = now;
     if (opts.v !== SQUADS_PROTOCOL) return { ok: false, message: SQUADS_UPDATE };
     const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
     if (existing) {
-      if (existing.left) return { ok: false, message: SQUADS_ENDED, ended: true };
+      if (existing.left) return { ok: false, message: SQUADS_ENDED, ended: true, left: existing.leftAs ?? { how: "out", result: null } };
       existing.connected = true;
       delete existing.goneAt;
       if (opts.look !== undefined) existing.look = cleanLook(opts.look);
@@ -743,12 +754,15 @@ export class SquadsCore {
   alarm() {
     // (Promised solo seats that ran out are let go here too.)
     this.groupSizes(this.io.now());
+    // Nobody left at all (everyone gone longer than LEAVING.awayMs): it ends now.
+    if (this.wrapUpIfEmpty()) return;
     this.pump();
   }
 
   /** The next time something is due (a timer, a half's deadline, a bot's move, a device's answer). */
   get nextAlarm(): number | null {
     const times: number[] = [];
+    if (this.r.wrapped) return null;
     if (this.r.timer) times.push(this.r.timer.at);
     for (const lm of this.liveMatches()) {
       if ((lm.state === "break" || lm.state === "show") && lm.startsAt !== null) times.push(lm.startsAt);
@@ -757,6 +771,9 @@ export class SquadsCore {
     }
     for (const lm of this.allMatches()) times.push(...this.judgeWakes(lm));
     times.push(...Object.values(this.r.botShop ?? {}));
+    // (Someone gone from the lobby: when they run out of LEAVING.awayMs, it checks whether anyone is left.)
+    const away = this.awayAt();
+    if (away !== null) times.push(away);
     // (Everything due has just been done: a time already past would only wake the object to do nothing, over and over.)
     return times.length ? Math.max(Math.min(...times), this.io.now() + 20) : null;
   }
@@ -765,6 +782,8 @@ export class SquadsCore {
 
   /** Advances everything that's due, until nothing more is. */
   private pump() {
+    // (Everyone left and it ended: nothing more is played while it closes.)
+    if (this.r.wrapped) return;
     for (let guard = 0; guard < 200; guard++) {
       const now = this.io.now();
       let changed = false;
@@ -1743,7 +1762,8 @@ export class SquadsCore {
       if (this.r.placed[sq]) continue;
       this.r.placed[sq] = placement;
       for (const p of this.r.squads[sq]!.players) {
-        if (p.isBot) continue;
+        // (Someone who left before their squad's place was decided has their own row already: a loss as they left.)
+        if (p.isBot || this.human(p.id)?.left) continue;
         const reward = this.rewardFor(p.id, placement);
         this.r.rewardQueue.push({ playerId: p.id, userId: this.r.accounts[p.id] ?? null, squadId: sq, placement, ...reward });
         this.send(p.id, { t: "placed", squadId: sq, placement, ...reward });
@@ -1806,12 +1826,74 @@ export class SquadsCore {
       this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
       return;
     }
-    h.left = true;
-    h.connected = false;
-    this.r.squads = this.r.squads.map((sq) => ({ ...sq, players: sq.players.map((p) => (p.id === id && !this.r.placed[sq.id] ? { ...p, replacedByBot: true } : p)) }));
-    this.io.send(id, { t: "left" });
+    this.leaveForGood(h);
+    this.io.send(id, { t: "left", ...h.leftAs! });
     this.io.close?.(id);
     this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
+    this.wrapUpIfEmpty();
+  }
+
+  /**
+   * Someone leaves the lobby for good once it has filled (resigning: LEAVING in settings.ts). With their squad still in
+   * the bracket it's a loss on their record now, at the worst place the squad could still finish (losing the match
+   * it's in or waiting for), and a bot plays their seat from here; never the squad's later place, win or lose. Before
+   * the bracket (the votes): nothing recorded. Their squad already out, or the bracket over: they just go.
+   */
+  private leaveForGood(h: SquadsHuman) {
+    const id = h.id;
+    const sq = this.squadOf(id);
+    const placed = sq ? this.r.placed[sq.id] : undefined;
+    let leftAs: SquadsLeft = { how: "out", result: null };
+    if (this.r.phase !== "bracket" && this.r.phase !== "results") leftAs = { how: "early", result: null };
+    else if (sq && placed === undefined && this.r.bracket) {
+      const placement = worstPlacement(this.r.bracket, sq.id);
+      leftAs = { how: "resigned", result: { placement, players: this.s.squadCount } };
+      const testing = !!this.r.test || !!this.r.testUsed;
+      if (!testing && this.r.accounts[id]) this.r.rewardQueue.push({ playerId: id, userId: this.r.accounts[id]!, squadId: sq.id, placement, coins: 0, crates: 0, recorded: true });
+    }
+    h.left = true;
+    h.leftAs = leftAs;
+    h.connected = false;
+    this.r.squads = this.r.squads.map((s) => ({ ...s, players: s.players.map((p) => (p.id === id && !this.r.placed[s.id] ? { ...p, replacedByBot: true } : p)) }));
+    // Bot work it owed goes elsewhere (or another answer stands).
+    for (const { lm, job } of this.liveJobs()) this.settle(lm, job);
+  }
+
+  /** Still here: connected, or gone less than LEAVING.awayMs (a reload, a quick look at another app). */
+  private present(h: SquadsHuman, now = this.io.now()): boolean {
+    return !h.left && (h.connected || h.goneAt === undefined || now - h.goneAt < LEAVING.awayMs);
+  }
+
+  /** The lobby has filled and its bracket isn't over: someone who goes now leaves it, not a waiting room. */
+  private inPlay(): boolean {
+    return this.r.phase === "filled" || this.r.phase === "vote" || this.r.phase === "bracket";
+  }
+
+  /** When the next person gone from the lobby runs out of LEAVING.awayMs (null: nobody to wait for). */
+  private awayAt(): number | null {
+    if (!this.inPlay()) return null;
+    const now = this.io.now();
+    const at = this.r.humans.flatMap((h) => (!h.left && !h.connected && h.goneAt !== undefined && h.goneAt + LEAVING.awayMs > now ? [h.goneAt + LEAVING.awayMs] : []));
+    return at.length ? Math.min(...at) : null;
+  }
+
+  /**
+   * Nobody is left (everyone left, or has been gone longer than LEAVING.awayMs): the bracket isn't played out for no
+   * one. The lobby ends now and closes at once (its code free): anyone still seated is recorded as if they'd left (a
+   * loss if their squad was still in), and squads already placed keep their places and rewards.
+   */
+  private wrapUpIfEmpty(): boolean {
+    if (!this.inPlay()) return false;
+    const now = this.io.now();
+    if (this.r.humans.some((h) => this.present(h, now))) return false;
+    for (const h of this.r.humans) if (!h.left) this.leaveForGood(h);
+    this.r.phase = "results";
+    this.r.timer = null;
+    this.r.endedAt = now;
+    this.r.keepMs = 0;
+    this.r.wrapped = true;
+    console.log(`squads ${this.r.code}: everyone has left: it ends now`);
+    return true;
   }
 
   // ---------------- Test controls ----------------

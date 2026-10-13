@@ -25,9 +25,18 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   stays people-only. Seats survive reloads (a seat token on the device). The host (a connected computer before a
   phone) or the many judges score each round (see [engine.md](engine.md)).
 - **A lobby's life** (`LOBBY_LIFE`): results stay up `lobbyResultsKeepMinutes` (15), then it closes; a lobby that
-  never starts closes after `lobbyIdleMinutes`, an abandoned one after `lobbyAbandonedMinutes`. Closing tells anyone
-  still connected, records results on profiles, drops it from the live line and deletes its storage (freeing the code).
-  An old link or a reopened tab asks `/api/lobby/CODE` before retrying the socket.
+  never starts closes after `lobbyIdleMinutes`, an abandoned one after `lobbyAbandonedMinutes` (now only a safety net).
+  Closing tells anyone still connected, records results on profiles, drops it from the live line and deletes its
+  storage (freeing the code). An old link or a reopened tab asks `/api/lobby/CODE` before retrying the socket.
+- **Leaving a match** (Oct 13; `LEAVING`; DECISIONS.md, "Resign: leaving a match in every mode"; the screens:
+  [crowd.md](crowd.md)). "resign" from the app, or gone longer than `LEAVING.awayMs` (120 s; an older app is handled
+  this way), takes someone out of the match: mid-match a loss in the last place still open, recorded at once; before
+  move 1 nothing recorded; a bot in the seat where the lobby fills seats with bots (`botsFill`; with Bots off and in a
+  private raid only a final's seat or the last of a side, `botTakes`). The device forgets the seat; coming back with
+  its token is told how they left (`error` with `left`). **When nobody is left** the match ends at once and the lobby
+  closes (`wrapUpIfEmpty`, results `keepMs` 0), so its code stops working; a **private lobby nobody started** closes
+  when its last person presses Leave (`emptiedAt`). The match's ranked status counts everyone who played
+  (`ranked()`), so leaving never makes it unranked.
 - **Squads** (`docs/areas/squads.md`, "The server"; no menu entry until its screens): its own queue (`squads-default`,
   the same matchmaker object) whose tickets are parties (up to 4, under a code and invite link, the leader queuing) or
   single players, each seated whole in a Squads lobby that still fits it; the lobby fills with bots after
@@ -54,14 +63,16 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
 
 ## Settings
 
-`MATCHMAKING`, `MATCHMAKING_TYPES`, `RANKING`, `LOBBY_LIFE`, `FRONT_DOOR.fillShowMs`, `CAPACITY.queue` and
+`MATCHMAKING`, `MATCHMAKING_TYPES`, `RANKING`, `LOBBY_LIFE`, `LEAVING`, `FRONT_DOOR.fillShowMs`, `CAPACITY.queue` and
 `CAPACITY.overload`; the Worker variable `MATCH_FILL_SECONDS` (`wrangler.jsonc`).
 
 ## Tests and tools
 
 - Unit: `packages/server/test/matchmaker.test.ts`, `lobby-types.test.ts`, `lobby-life.test.ts`, `lobby.test.ts`,
+  `resign.test.ts` (leaving: seats to bots, the loss, the last one out closing the lobby and its code, the away rule),
   `packages/core/test/rating.test.ts`, `profile.test.ts`.
-- e2e: `e2e/matchmaking.spec.ts`, `lobby-close.spec.ts`, `multiplayer.spec.ts`, `busy.spec.ts`, `front-door.spec.ts`.
+- e2e: `e2e/matchmaking.spec.ts`, `lobby-close.spec.ts`, `multiplayer.spec.ts`, `busy.spec.ts`, `front-door.spec.ts`,
+  `resign.spec.ts`.
 - Frames: `npm run frames:matchmaking`, `frames:queue`, `frames:close`.
 - Rating curve: `npx tsx packages/sim/scripts/calibrate-rating.ts` (`reports/rating-calibration.md`).
 

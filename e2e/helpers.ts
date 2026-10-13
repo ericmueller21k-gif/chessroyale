@@ -70,6 +70,21 @@ export async function named(page: Page, name: string) {
   }, name);
 }
 
+/**
+ * Sound off in a match: the sound button in the top line on a computer; on a phone, the "⋯" sheet's Sound switch
+ * (MatchMenu.tsx: the phone's top line has "⋯" where the sound button was).
+ */
+export async function soundOff(page: Page) {
+  const btn = page.getByRole("button", { name: "Turn sound off" }).first();
+  if (await btn.isVisible().catch(() => false)) return btn.click();
+  await page.getByRole("button", { name: "Match options" }).click();
+  const sheet = page.getByRole("dialog", { name: "Match options" });
+  await sheet.getByRole("switch", { name: /Sound/ }).click();
+  // (A tap anywhere else, or Escape, closes the sheet.)
+  await page.keyboard.press("Escape");
+  await sheet.waitFor({ state: "detached" });
+}
+
 /** Home → Matchmaking: Solo → PLAY (in the mode the URL or the picker chose): you and bots, after the seats fill. */
 export async function soloFromHome(page: Page) {
   await page.getByRole("radio", { name: /^Solo/ }).click();

@@ -2,12 +2,13 @@ import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, 
 import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
-import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
+import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
 import { ownEngine, warmEngineServer, withServerRecheck } from "./engine.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
-import { crowdMoveCues, kingSay } from "./godKing.ts";
+import { crowdMoveCues, kingSay, resetKingSpeech } from "./godKing.ts";
+import { bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
 import { isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
@@ -181,6 +182,8 @@ export class SoloMatch implements GameView {
   }
 
   private set(phase: Phase) {
+    // (Stopped: an engine answer or a timer on its way changes nothing.)
+    if (this.stopped) return;
     this.phase = phase;
     this.listeners.forEach((l) => l());
   }
@@ -190,11 +193,71 @@ export class SoloMatch implements GameView {
   }
 
   dispose() {
-    this.freeBrain();
-    if (this.timer) clearTimeout(this.timer);
-    this.progress.reset();
+    this.halt();
     this.listeners.clear();
+  }
+
+  // ---------------- Resigning (LEAVING in settings.ts) ----------------
+
+  /**
+   * Stopped (resigned, left, or done with): no timer runs, no engine answer still on its way changes anything (every
+   * step after an engine search checks this), Maia's worker and the showdown scout are closed. The engine pool's
+   * workers stay up for the next match, idle.
+   */
+  private stopped = false;
+  /** Move 1 has come (your first move's clock, or the boss's first move): leaving from here is resigning. */
+  private begun = false;
+
+  private halt() {
+    this.stopped = true;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.freeBrain();
+    this.runner?.showdownScout?.stop();
+    this.progress.reset();
+    this.live = null;
+    this.lights = null;
     this.lobbyChat.close();
+  }
+
+  get exit(): ExitKind | null {
+    const k = this.phase.kind;
+    if (this.stopped || k === "results" || k === "loading") return null;
+    if (!this.begun) return "leave";
+    return this.you.alive ? "resign" : "leave";
+  }
+
+  get exitHome(): boolean {
+    return !this.begun;
+  }
+
+  /**
+   * Resign: the match stops here, at once, a loss: you're out in the last place still open (Boss alone: the boss won).
+   * Already out (a cut, the boss's strike): the rest isn't played out; your place stands. Before move 1: nothing to
+   * record (the app goes home).
+   */
+  resign() {
+    const exit = this.exit;
+    if (!exit) return;
+    const home = this.exitHome;
+    const alive = this.you.alive;
+    const alone = this.alone;
+    const boss = !!this.runner.boss;
+    this.halt();
+    // (Nothing more for him or the boss to say.)
+    resetKingSpeech();
+    bossVoice.reset();
+    if (home) return this.emit();
+    const placement = alive ? this.runner.retire(HUMAN) : (this.you.placement ?? this.runner.alive().length + 1);
+    this.phase = {
+      kind: "results",
+      placement,
+      winner: "",
+      youWon: false,
+      left: { how: alive ? "resigned" : "out" },
+      ...(boss && alive && alone ? { bossResult: "boss" as const } : {}),
+    };
+    this.emit();
   }
 
   get you(): PlayerState {
@@ -545,6 +608,7 @@ export class SoloMatch implements GameView {
 
   /** The boss's turn: it thinks (for a moment at least), then its move shows before the crowd picks again. */
   private async bossTurn() {
+    this.begun = true;
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     // (Alone, it has been "thinking" since your move went in: scoring your move counts toward it.)
@@ -552,6 +616,7 @@ export class SoloMatch implements GameView {
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
     const minThink = bossThinkMs(snap.board.history, snap.board.bases, burnt) - (this.alone && !burnt ? Date.now() - this.movedAt : 0);
     await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
+    if (this.stopped) return;
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
     // before your clock starts.
     // (At a mate, the boss's attack on your king, if it has one: the result waits for it.)
@@ -572,6 +637,7 @@ export class SoloMatch implements GameView {
     // (No engine answer: he skips it, as online.)
     const pick = this.runner.playExtraMove(this.engines[0]).catch(() => this.runner.applyExtraMove(null));
     const [played] = await Promise.all([pick, new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history, snap.board.bases)))]);
+    if (this.stopped) return;
     if (!played) return this.nextRound();
     const showMs = powerMomentMs([{ kind: "extra" }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
@@ -584,6 +650,7 @@ export class SoloMatch implements GameView {
    */
   private async funhouseTurn() {
     await this.runner.playFunhouse(this.engines[0]).catch(() => this.runner.applyFunhouse(""));
+    if (this.stopped) return;
     const showMs = powerMomentMs([{ kind: "funhouse" }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
     this.timer = setTimeout(() => this.nextRound(), showMs);
@@ -599,6 +666,7 @@ export class SoloMatch implements GameView {
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     const bounce = this.runner.playBounce(this.engines).catch(() => this.runner.applyBounce(null));
     await Promise.all([bounce, new Promise((r) => setTimeout(r, bossThinkMs(snap.board.history, snap.board.bases)))]);
+    if (this.stopped) return;
     const showMs = powerMomentMs([{ kind: "bounce" }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
     this.timer = setTimeout(() => this.nextRound(), showMs);
@@ -654,6 +722,7 @@ export class SoloMatch implements GameView {
       // (Boingo's funhouse: his move for you, as your turn begins.)
       if (this.runner.funhouseDue()) return void this.funhouseTurn();
     } else if (this.runner.isFinal()) return void this.finalTurn();
+    this.begun = true;
     this.runner.deal();
     this.kingCalled = false;
     this.frozen = null;
@@ -711,6 +780,7 @@ export class SoloMatch implements GameView {
       }),
       inFinal ? Promise.resolve() : this.progress.finishAll(this.runner.alive().map((p) => p.id)),
     ]);
+    if (this.stopped) return;
     const report = this.runner.finishRound(scored.results, scored.thinkMs, scored.powerUps);
     const mine = report.boards.find((b) => b.playerIds.includes(HUMAN))!;
     const record = moveRecordFrom(report.stage, report.round, mine, (id) => id === HUMAN);
@@ -754,6 +824,7 @@ export class SoloMatch implements GameView {
     const { board } = this.phase;
     this.set({ kind: "scoring", board, move: null, watched: true });
     const [scored] = await Promise.all([this.runner.evaluate(new Map()), this.progress.finishAll(this.runner.alive().map((p) => p.id), 600)]);
+    if (this.stopped) return;
     const report = this.runner.finishRound(scored.results, scored.thinkMs, scored.powerUps);
     const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
     this.set({ kind: "reveal", mine: report.boards[0]!, board, until: Date.now() + revealMs });
@@ -836,7 +907,7 @@ export class SoloMatch implements GameView {
     this.set({ kind: "final", final: this.finalState! });
     const think = Math.min(4000, Math.max(1500, this.runner.botThinkTimes()[mover] ?? 2500));
     const [report] = await Promise.all([this.runner.score(new Map()), new Promise((r) => setTimeout(r, think))]);
-    if (this.phase.kind !== "final") return;
+    if (this.stopped || this.phase.kind !== "final") return;
     this.showFinalMove(report);
   }
 
@@ -862,6 +933,8 @@ export class SoloMatch implements GameView {
   /** After a knockout, the rest of the match (the final too) is played quickly with no UI. */
   private async simulateRest() {
     while (!this.runner.isOver()) {
+      // (You left: the rest isn't played out.)
+      if (this.stopped) return;
       this.set({ kind: "simulating", stage: this.runner.state.stage, round: this.runner.state.round });
       if (this.runner.boss) {
         if (this.runner.stageComplete()) {
@@ -888,17 +961,20 @@ export class SoloMatch implements GameView {
         }
         this.runner.deal();
         await this.runner.score(new Map());
+        if (this.stopped) return;
         if (this.runner.bossKillDue()) this.runner.bossKill();
         continue;
       }
       this.runner.deal();
       await this.runner.score(new Map());
+      if (this.stopped) return;
       if (this.runner.final) this.runner.afterFinalTurn();
       if (this.runner.stageComplete()) {
         if (this.runner.isFinal() && this.runner.final) this.runner.finishFinal();
         else if (!this.runner.isFinal()) this.runner.endStage();
       }
     }
+    if (this.stopped) return;
     this.finish();
   }
 

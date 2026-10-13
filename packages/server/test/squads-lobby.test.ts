@@ -135,10 +135,13 @@ describe("squads lobby: votes and the bracket", () => {
   it("a full lobby of bots plays the whole bracket to its results: every placement, the final, and the lobby's end", () => {
     const L = squadsLobby({ seed: 11 });
     const a = L.join("Ann");
+    // Wes stays to watch (connected, never playing his seat: after noShowsBeforeBot misses a bot plays it), so the
+    // lobby has someone in it and plays on. (With nobody left at all it would end at once: "leaving" below.)
+    const w = L.join("Wes");
     L.advance(60_000);
-    // Ann goes at once: her seat is a bot's, so every seat is played by a bot.
+    // Ann goes at once: her seat is a bot's, so every seat is played by a bot (Wes's after his misses).
     L.core.message(a, { t: "leave" });
-    expect(L.core.record.squads.flatMap((sq) => sq.players).every((p) => p.isBot || p.replacedByBot)).toBe(true);
+    expect(L.core.record.squads.flatMap((sq) => sq.players).filter((p) => !p.isBot && !p.replacedByBot).map((p) => p.id)).toEqual([w]);
     const start = L.now;
     L.runUntil(() => L.core.record.phase === "results", 3 * 3_600_000, "the results");
     const minutes = (L.now - start) / 60_000;
@@ -158,8 +161,8 @@ describe("squads lobby: votes and the bracket", () => {
     expect(matches.map((m) => m.key).sort()).toEqual(["r0m0", "r0m1", "r0m2", "r0m3", "r1m0", "r1m1", "r2m0"]);
     expect(matches.every((m) => m.state === "over" && m.m.result && m.m.result.winner !== null)).toBe(true);
     // Each round's match began only after its two feeders were over.
-    // (Ann left before anything was decided: her placement is recorded only on a profile; no reward.)
-    expect(L.core.takeRewards().map((r) => [r.playerId, r.coins, r.crates])).toEqual([[a, 0, 0]]);
+    // (Ann left before the bracket: nothing recorded for her. Wes's seat was a bot's: his squad's place, no reward.)
+    expect(L.core.takeRewards().map((r) => [r.playerId, r.coins, r.crates])).toEqual([[w, 0, 0]]);
     // Its end: results kept LOBBY_LIFE's 15 minutes, then it closes.
     const close = squadsClosing(L.core.record, false)!;
     expect(close.reason).toBe("ended");
@@ -516,17 +519,22 @@ describe("squads lobby: rewards", () => {
     const a = L.join("Ann", { userId: "ua" });
     const b = L.join("Bo", { userId: "ub" });
     const c = L.join("Cy");
-    // Ann plays every duty; Bo leaves once it fills; Cy (no account) plays too.
+    // Ann plays every duty; Bo leaves once the bracket is drawn (resigns: a loss at his squad's worst place, then);
+    // Cy (no account) plays too.
     L.players.add(a);
     L.players.add(c);
-    L.advance(60_000);
+    L.runUntil(() => L.core.record.phase === "bracket", 10 * 60_000, "the bracket");
     L.core.message(b, { t: "leave" });
+    expect(L.last(b, "left")).toMatchObject({ how: "resigned", result: { placement: 5, players: 8 } });
+    const bo = L.core.takeRewards();
+    expect(bo).toEqual([{ playerId: b, userId: "ub", squadId: expect.any(Number), placement: 5, coins: 0, crates: 0, recorded: true }]);
     L.runUntil(() => L.core.record.phase === "results", 3 * 3_600_000, "the results");
     const rewards = L.core.takeRewards();
     const ann = rewards.find((r) => r.playerId === a)!;
     expect(ann).toMatchObject({ userId: "ua", recorded: true, coins: SQUADS_LOBBY.rewards[ann.placement].coins, crates: SQUADS_LOBBY.rewards[ann.placement].crates });
     expect(ann.coins).toBeGreaterThan(0);
-    expect(rewards.find((r) => r.playerId === b)).toMatchObject({ userId: "ub", recorded: true, coins: 0, crates: 0 });
+    // (Bo's row was written as he left: never his squad's later place, whatever it is.)
+    expect(rewards.find((r) => r.playerId === b)).toBeUndefined();
     const cy = rewards.find((r) => r.playerId === c)!;
     expect(cy).toMatchObject({ userId: null, recorded: false });
     expect(L.last(a, "placed")).toMatchObject({ placement: ann.placement, coins: ann.coins, recorded: true });

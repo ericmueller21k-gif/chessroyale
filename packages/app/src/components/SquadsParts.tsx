@@ -1,3 +1,4 @@
+import type { MatchExit } from "./MatchMenu.tsx";
 import { memo } from "preact/compat";
 import { useEffect, useState } from "preact/hooks";
 import { useMedia } from "./QuickChat.tsx";
@@ -84,7 +85,7 @@ export function ClockText({ clock, delayMs, short }: { clock: SquadClock | undef
  * The standings as a side panel (a computer): every squad, best placed first, with its name, members, where it stands
  * in the bracket, and its team clock counting down.
  */
-export function StandingsPanel({ client, onLeave }: { client: SquadsClient; onLeave?: () => void }) {
+export function StandingsPanel({ client, onLeave, exit = null }: { client: SquadsClient; onLeave?: () => void; exit?: MatchExit | null }) {
   const lobby = client.lobby;
   const clocks = useClocks(client);
   if (!lobby || !lobby.squads.length) return null;
@@ -116,20 +117,22 @@ export function StandingsPanel({ client, onLeave }: { client: SquadsClient; onLe
           </div>
         );
       })}
-      {onLeave && <LeaveButton client={client} onLeave={onLeave} />}
+      {onLeave && <LeaveButton client={client} onLeave={onLeave} exit={exit} />}
     </section>
   );
 }
 
 /**
- * Leaving the lobby: before your squad is out a bot takes your seat for good (the server's rule), so it asks once more.
+ * Leaving the lobby. With your squad still in the bracket it's resigning (a loss, and a bot takes your seat for good:
+ * the server's rule), so it asks once more and goes as a resign does (`exit`); otherwise you just go home.
  */
-function LeaveButton({ client, onLeave }: { client: SquadsClient; onLeave: () => void }) {
+function LeaveButton({ client, onLeave, exit }: { client: SquadsClient; onLeave: () => void; exit: MatchExit | null }) {
   const [sure, setSure] = useState(false);
-  const playing = !!client.mySquad && !client.placed && client.lobby?.phase !== "results";
+  const resign = exit?.kind === "resign";
+  const playing = resign || (!!client.mySquad && !client.placed && client.lobby?.phase !== "results");
   return (
-    <button type="button" class={`sq-leave${sure ? " sure" : ""}`} onClick={() => (playing && !sure ? setSure(true) : onLeave())}>
-      {playing ? (sure ? "Leave now: a bot takes your seat" : "Leave the lobby") : "Leave the lobby"}
+    <button type="button" class={`sq-leave${sure ? " sure" : ""}`} onClick={() => (playing && !sure ? setSure(true) : resign ? exit!.go() : onLeave())}>
+      {playing ? (sure ? (resign ? "Resign: a loss, and a bot takes your seat" : "Leave now: a bot takes your seat") : "Leave the lobby") : "Leave the lobby"}
     </button>
   );
 }
@@ -153,7 +156,7 @@ export function Member({ client, id }: { client: SquadsClient; id: string }) {
  * The standings as a phone's compact strip: every squad's short name and clock in one row (yours ringed, sudden
  * death red and pulsing). A tap opens the whole table.
  */
-export function StandingsStrip({ client, onLeave }: { client: SquadsClient; onLeave?: () => void }) {
+export function StandingsStrip({ client, onLeave, exit = null }: { client: SquadsClient; onLeave?: () => void; exit?: MatchExit | null }) {
   const [open, setOpen] = useState(false);
   const lobby = client.lobby;
   // (Not where the side panel shows them: every Squads screen is in the arena, which has it there.)
@@ -186,7 +189,7 @@ export function StandingsStrip({ client, onLeave }: { client: SquadsClient; onLe
             </div>
             <StandingsPanel client={client} />
             {lobby.bracket.length > 0 && <Bracket lobby={lobby} mine={mine} />}
-            {onLeave && <LeaveButton client={client} onLeave={onLeave} />}
+            {onLeave && <LeaveButton client={client} onLeave={onLeave} exit={exit} />}
           </div>
         </div>
       )}

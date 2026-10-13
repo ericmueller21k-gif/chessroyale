@@ -1,6 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, expectCoordsInSquares, named, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, expectCoordsInSquares, named, soundOff, test, watchFor } from "./helpers.ts";
 
 /**
  * Squads played through its screens, on the real server (wrangler dev, SQUADS_TEST on) with its bots: test lobbies
@@ -278,7 +278,7 @@ test("sounds: ticks in the last free seconds, a sting at sudden death, quieter t
     expect(s.rms).toBeLessThan(move.rms);
   }
   // Muted: still logged, never heard.
-  await page.getByRole("button", { name: "Turn sound off" }).first().click();
+  await soundOff(page);
   await page.evaluate(() => ((window as any).__soundLog = []));
   await expect.poll(() => page.evaluate(() => (window as any).__soundLog.length), { timeout: 30_000 }).toBeGreaterThan(0);
   expect(await page.evaluate(() => (window as any).__soundLog.every((l: string) => l.endsWith(":muted")))).toBe(true);

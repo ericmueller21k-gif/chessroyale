@@ -48,6 +48,19 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   tallies, an optional motion trail, the eval bar (unless switched off in Settings: [hub.md](hub.md)), the scoreboard
   and chat under the board. A crowd of one keeps its
   move on the board (no ghost, no snap-back). The board never moves between screens.
+- **Resigning and leaving** (Eric, Oct 13; `LEAVING`; DECISIONS.md, "Resign: leaving a match in every mode"). The
+  top line of every match screen ends in the match's control (`components/MatchMenu.tsx`): a phone's "⋯" (a sheet at
+  the foot of the screen: Sound, Resign) where the sound button was, a computer's flag beside the sound button; a
+  second step says what happens (Cancel focused). Before move 1 it's **Leave**; once out, **Leave the match** (also a
+  plain button on the cut screen, Classic's watching and stage break, and solo's play-out: "Skip to your result").
+  - **Solo:** the match stops at once (`SoloMatch.resign`: every timer, every step after an engine search, Maia and the
+    scout), out in the last place still open (`runner.retire`), "You resigned" on the results.
+  - **Online** (`LobbyCore.resign`): out in the last place still open, a loss recorded at once (`takeLeftResults`), the
+    seat to a bot under a new id (`runner.handOver`; Default and private Crowd lobbies, and with Bots off only a final's
+    seat or the last of a side; otherwise `runner.retire`). Before move 1 nothing is recorded (`runner.withdraw` if no
+    bot sits in). Already out: their place is recorded with everyone's at the end. The match stays ranked as it was.
+  - **Away:** gone longer than `LEAVING.awayMs` (120 s) is resigning (`sweepAway`); a move locks once everyone still
+    here has moved (`roundDone`). Nobody left: the match ends at once and the lobby closes (`wrapUpIfEmpty`).
 - **Classic** (64 players, 8 boards, rotating) still runs but is frozen: Eric will rework it; don't invest in it.
 
 ## Where the code is
@@ -64,10 +77,11 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 | Screens | `packages/app/src/screens/` (`Play`, `Crowd`, `Reveal`, `StageBreak`, `Final`, `Results`, `Hud`, `Spectate`) |
 | The board and its overlays | `components/Board.tsx` (the board itself: [board.md](board.md)), `CrowdGhosts.tsx`, `EvalBar.tsx`, `Breakdown.tsx`, `Gavel.tsx`, `ShadeMoves.tsx` |
 | Online lobby flow | `packages/server/src/lobby.ts` (pure), `lobby-do.ts` (the Durable Object) |
+| Resigning and leaving | `components/MatchMenu.tsx` (the "⋯", the flag, the confirm), `match-exit.ts` (what it offers, its words), `SoloMatch.resign`, `NetMatch.resign`, `LobbyCore.resign` (`lobby.ts`), `runner.handOver` / `retire` / `withdraw` |
 
 ## Settings
 
-`DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS`, `CROWD_EVERYONE_KNOCKOUTS`, `PACE_SETTINGS`
+`LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS`, `CROWD_EVERYONE_KNOCKOUTS`, `PACE_SETTINGS`
 (relaxed/quick; tests use quick), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
 time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
@@ -79,6 +93,8 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   `votes.test.ts` (each time control, the bank math, the calibration), `crowd.test.ts` (the runner) and
   `packages/server/test/lobby.test.ts` ("the clock vote online"); e2e `votes.spec.ts` (Bullet's clock, solo and online)
   and `formats.spec.ts` (the cards set the clock).
+- Resigning: `packages/server/test/resign.test.ts`, `lobby-life.test.ts`, `packages/chess/test/crowd.test.ts` ("leaving");
+  e2e `e2e/resign.spec.ts` (Boss alone, a Solo 50 v 50, Squads, an online raid; phone and computer).
 - e2e: `e2e/crowd.spec.ts`, `formats.spec.ts`, `votes.spec.ts`, `match-screen.spec.ts`, `panel.spec.ts`,
   `solo.spec.ts`, `multiplayer.spec.ts`, `castling.spec.ts`, `perf.spec.ts`.
 - Frames: `npm run frames:boss` (one move, real taps), `frames:flash` (white flashes), `frames:vote`, `frames:chat`.
