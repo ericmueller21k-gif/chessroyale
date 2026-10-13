@@ -125,7 +125,7 @@ function setup(opts: { judges?: Partial<JudgeConfig>; server?: boolean; settings
 }
 
 describe("many judges: the lobby", () => {
-  it("helpers: draws favour fast devices, never repeat, spread the load; the cut bubble; stable seeds", () => {
+  it("helpers: draws favor fast devices, never repeat, spread the load; the cut bubble; stable seeds", () => {
     const rng = mulberry32(1);
     const devices = [{ id: "pc", nps: 1_500_000 }, { id: "phone", nps: 250_000 }, { id: "old", nps: 120_000 }];
     const counts: Record<string, number> = { pc: 0, phone: 0, old: 0 };

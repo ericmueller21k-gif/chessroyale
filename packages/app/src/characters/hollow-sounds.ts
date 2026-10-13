@@ -1,5 +1,5 @@
 /**
- * Hollow's sounds, synthesised (no files, no licences, no voice), all low and dark (Eric, Oct 9, 2026: no chimes, ever;
+ * Hollow's sounds, synthesized (no files, no licenses, no voice), all low and dark (Eric, Oct 9, 2026: no chimes, ever;
  * nothing bright, nothing major-key): the low hum of the void, the darkness pouring out of it, the hush of smoke
  * settling on a square (and lifting off it), a bulb going out (a dull fizzle), a bulb smashed in his claw (kept: Eric
  * loves it), the void's pulse in the dark (a low heartbeat, the test's countdown), a piece found (a low swell) or missed

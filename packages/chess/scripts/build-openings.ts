@@ -78,7 +78,7 @@ for (let m = 0; m <= MAX_OPENING_MOVES; m++) {
     const k = l.moves.slice(0, n).join(" ");
     counts.set(k, (counts.get(k) ?? 0) + 1);
   }
-  // One per named variation (the part of the name before any comma), the most travelled first.
+  // One per named variation (the part of the name before any comma), the most traveled first.
   const best = new Map<string, Pick>();
   for (const [k, popularity] of counts) {
     const moves = k.split(" ");

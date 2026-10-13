@@ -49,7 +49,7 @@ export const resetBoardsStrip = () => {
 
 /**
  * Every board in the match as a strip of tiny boards numbered 1–8, live after
- * each round. Yours this turn is ringed; boards that have closed stay greyed.
+ * each round. Yours this turn is ringed; boards that have closed stay grayed.
  * While `frozen` (the reveal, before the chosen move plays) it keeps showing
  * the positions from before; when they change, the boards light up one after
  * another with a ripple of soft knocks.

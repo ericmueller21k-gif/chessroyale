@@ -145,7 +145,7 @@ describe("Squads boards", () => {
 });
 
 describe("Squads starts and setup", () => {
-  it("random openings: each opening on two boards of a match, colours swapped", () => {
+  it("random openings: each opening on two boards of a match, colors swapped", () => {
     const plan = planLobby(5, rules("random"), library);
     const squads = startTeamClocks(bots32(), NORMAL);
     const m = planMatch(plan, 0, 0, [squads[0]!, squads[1]!], library);
@@ -508,7 +508,7 @@ describe("Squads round 1: Relay", () => {
     }
   });
 
-  it("everyone shifts one board along each turn, and so alternates colours", () => {
+  it("everyone shifts one board along each turn, and so alternates colors", () => {
     let m = relay();
     const boardOf = (mm: SquadsMatch, id: string) => {
       for (const half of ["w", "b"] as const) for (const d of halfDuties({ ...mm, half }).duties) if (d.players.includes(id)) return d.board;

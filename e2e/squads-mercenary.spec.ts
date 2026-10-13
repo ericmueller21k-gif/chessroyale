@@ -8,7 +8,7 @@ import { BOARD_SEL, named, test } from "./helpers.ts";
  * choosing it in the Mode vote (Coming soon can't be), earning coins with a capture, the team shop between rounds (the
  * one-time explainer, buying, putting one back, closed as the match starts), and in the match a Time chip (the clock
  * jumping 30 s, the move's deadline later), a Stockfish token (your own top moves, on your screen) and a shield (the
- * bots' block against your squad cancelled). Test lobbies start from
+ * bots' block against your squad canceled). Test lobbies start from
  * a known position (`fen`) with strong bots, and `bots=blocks` has their bots block whenever they can.
  */
 
@@ -238,11 +238,11 @@ test("the shop between rounds, a Stockfish token, a Time chip and a shield: boug
   await tapSquare(page, mine.slice(2, 4));
   // (If the half's time ran out meanwhile, there's nothing to lock in.)
   await page.getByRole("button", { name: "Lock in my pick" }).click({ timeout: 5_000 }).catch(() => undefined);
-  // The shield: the other squad's bots block whenever they can; the first that would take effect is cancelled.
+  // The shield: the other squad's bots block whenever they can; the first that would take effect is canceled.
   // (In your match, a block by the other squad: other matches' squads buy shields too, and so may your opponent.)
   const ours = () => page.evaluate(([key, side]) => (window as any).__shielded.filter((x: any) => x.key === key && x.side !== side), [s.key, s.side!] as const);
   await expect.poll(async () => (await ours()).length, { timeout: 120_000, intervals: [250] }).toBe(1);
   expect(await page.evaluate(([key, side]) => (window as any).squads.matches.get(key).shields[side], [s.key, s.side!] as const)).toBe(0);
-  // Both squads are told (the line above the board: your shield cancelled their block).
+  // Both squads are told (the line above the board: your shield canceled their block).
   expect(await page.evaluate(() => (window as any).__banners)).toContain("shield");
 });

@@ -297,7 +297,7 @@ export function cleanName(name: unknown): string | null {
   return n.length ? n : null;
 }
 
-/** A normalised email address, or null if it doesn't look like one. */
+/** A normalized email address, or null if it doesn't look like one. */
 export function cleanEmail(email: unknown): string | null {
   if (typeof email !== "string") return null;
   const e = email.trim().toLowerCase();
@@ -661,7 +661,7 @@ export interface PublicProfile {
   lastSeen: number | null;
   online: boolean;
   rating: number | null;
-  /** The rank ("Weighty"), its place on the ladder (0 = Novice), its colour and a top rank's pill effect. */
+  /** The rank ("Weighty"), its place on the ladder (0 = Novice), its color and a top rank's pill effect. */
   tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   /** "Top 18%" among rated players (null until enough players have a rating). */
   topPercent: number | null;

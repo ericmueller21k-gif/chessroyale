@@ -167,7 +167,7 @@ export function chooseLightsOut(fen: string, side: Side, seed: number, s: Pick<B
     .filter((r) => r.pieces.length > 0);
 }
 
-/** A round's targets (a round from before they were spelt out: one type target per piece letter). */
+/** A round's targets (a round from before they were spelled out: one type target per piece letter). */
 const targetsOf = (round: Pick<LightsOutRound, "pieces" | "targets">): LightsOutTarget[] => round.targets ?? round.pieces.map((type) => ({ type }));
 
 /**
@@ -307,7 +307,7 @@ export const HOLLOW: BossRules = {
     ...(p.claimed ? { claimed: true } : {}),
     lightsAt: p.lightsOut ? p.lightsOut.at : null,
     ...(p.lightsOut?.extra ? { lightsExtra: p.lightsOut.extra } : {}),
-    // His lights' colours this battle (looks only): from the seed, 12 bits of it.
+    // His lights' colors this battle (looks only): from the seed, 12 bits of it.
     lights: Math.floor(powerRoll(p.seed, "lights") * 4096),
   }),
 };

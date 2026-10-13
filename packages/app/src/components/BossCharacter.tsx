@@ -39,7 +39,7 @@ const startOf = (key: string, now = Date.now()) => {
 const played = new Set<string>();
 
 /**
- * Each frame's pixels, made once per look ("" its own colours; Hollow's `bulbs2` puts a bulb out) and per recolour
+ * Each frame's pixels, made once per look ("" its own colors; Hollow's `bulbs2` puts a bulb out) and per recolor
  * from the battle (Hollow's lights: `ch.swap`).
  */
 const images = new WeakMap<Frame, Map<string, ImageData>>();
@@ -136,7 +136,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     // (Its attack on a king too: the God King's Last Stand, or its mate.)
     prewarmKingAttack(kit.ch.name);
   }, [kit]);
-  // A recolour from the battle's state (Hollow's bulbs still lit), read as it's drawn.
+  // A recolor from the battle's state (Hollow's bulbs still lit), read as it's drawn.
   const lookRef = useRef<() => string>(() => "");
   lookRef.current = () => (wipLook.now?.() ?? (kit?.lookOf ? kit.lookOf(boss) : undefined)) ?? "";
   const box = useRef<HTMLDivElement>(null);

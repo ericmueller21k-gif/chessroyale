@@ -5,9 +5,9 @@ import type { Rng } from "./rng.ts";
  *   1. its tier, which decides the item: the strip lands on a tier's box (Common to Epic: a present in Winter, a
  *      supply box in Beta), which opens to one of that tier's items evenly, or on Fischer Random (Legendary and
  *      Mythic items only),
- *   2. its colour (red and yellow common, Pearl the rarest), and
- *   3. its purity: 100% minus a blemish of 0-100% (blotches over that share of its colour). At 90%+ purity it's
- *      shiny; at 0% it's blotched all over, a darker shade of its colour.
+ *   2. its color (red and yellow common, Pearl the rarest), and
+ *   3. its purity: 100% minus a blemish of 0-100% (blotches over that share of its color). At 90%+ purity it's
+ *      shiny; at 0% it's blotched all over, a darker shade of its color.
  * Nothing here changes how a match is played or scored. The tiers run Common to Mythic, the ladder players know (the
  * Puzzle Pirates names went to player ranks, Oct 6, 2026).
  */
@@ -31,7 +31,7 @@ export type ItemSlot = "head" | "face" | "skin" | "weapon";
 export const SLOT_NAMES: Record<ItemSlot, string> = { head: "Head", face: "Face", skin: "Skin", weapon: "Weapon" };
 
 /**
- * Colours, commonest first: `weight` is the chance out of 100. `hex` paints the item; Opal, Oceanic and Pearl
+ * Colors, commonest first: `weight` is the chance out of 100. `hex` paints the item; Opal, Oceanic and Pearl
  * also have a second tone for a sheen (`hex2`).
  */
 export const ITEM_COLORS: readonly { id: string; name: string; hex: string; hex2?: string; weight: number }[] = [
@@ -59,7 +59,7 @@ export interface ItemDef {
    * e.g. a cape or wings, seen around the piece).
    */
   layer?: "front" | "back";
-  /** Rolls a second colour too (both with the usual colour odds), e.g. a present's box and its ribbon. */
+  /** Rolls a second color too (both with the usual color odds), e.g. a present's box and its ribbon. */
   colors?: 2;
 }
 
@@ -72,16 +72,16 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "beanie", name: "Beanie", tier: "common", slot: "head", description: "A plain knit beanie. Keeps the thinking warm." },
   { id: "tree-tee", name: "Christmas Tree Tee", tier: "common", slot: "skin", description: "Your pawn in a festive T-shirt. The bulbs are the only part that's lit." },
   { id: "antlers", name: "Antlers", tier: "uncommon", slot: "head", description: "Guides the sleigh through the endgame." },
-  { id: "scarf", name: "Scarf", tier: "uncommon", slot: "face", description: "A long knit scarf. Your pawn's mum insisted." },
+  { id: "scarf", name: "Scarf", tier: "uncommon", slot: "face", description: "A long knit scarf. Your pawn's mom insisted." },
   { id: "santa-hat", name: "Santa Hat", tier: "rare", slot: "head", description: "Knows who's been naughty in the opening." },
-  { id: "ski-goggles", name: "Ski Goggles", tier: "rare", slot: "face", colors: 2, description: "Frame in one colour, see-through lenses in another. For black-diamond lines." },
+  { id: "ski-goggles", name: "Ski Goggles", tier: "rare", slot: "face", colors: 2, description: "Frame in one color, see-through lenses in another. For black-diamond lines." },
   { id: "snowman", name: "Snowman", tier: "epic", slot: "skin", description: "Your pawn, built of snow, with a scarf." },
-  { id: "present", name: "Present", tier: "epic", slot: "head", colors: 2, description: "Worn as a helmet. Box in one colour, ribbon in another. Now with a visor, for peeking." },
+  { id: "present", name: "Present", tier: "epic", slot: "head", colors: 2, description: "Worn as a helmet. Box in one color, ribbon in another. Now with a visor, for peeking." },
   { id: "gingerbread", name: "Gingerbread Man", tier: "epic", slot: "skin", description: "Run, run, as fast as you can. Iced, with gumdrop buttons." },
-  { id: "chimney", name: "Chimney", tier: "epic", slot: "skin", description: "Your pawn, sitting in a brick chimney, bricks and all in its colour. Came down the wrong one." },
+  { id: "chimney", name: "Chimney", tier: "epic", slot: "skin", description: "Your pawn, sitting in a brick chimney, bricks and all in its color. Came down the wrong one." },
   { id: "gift-tube", name: "Gift-Wrap Tube", tier: "legendary", slot: "weapon", description: "Wrapping-paper tube, tri-blend stripes. Swing responsibly." },
-  { id: "candy-cane", name: "Candy Cane", tier: "legendary", slot: "weapon", description: "White, striped in its colour. Sharpened at one end (allegedly)." },
-  { id: "fire-ice-crown", name: "Fire & Ice Crown", tier: "mythic", slot: "head", description: "A crown of winter ice, burning in its own colour." },
+  { id: "candy-cane", name: "Candy Cane", tier: "legendary", slot: "weapon", description: "White, striped in its color. Sharpened at one end (allegedly)." },
+  { id: "fire-ice-crown", name: "Fire & Ice Crown", tier: "mythic", slot: "head", description: "A crown of winter ice, burning in its own color." },
   // Beta Crate · Series 001 (Eric, Oct 11): the old shop's pawn hats, then themes split across the tiers (secret agent,
   // pirate, ninja) and a one-off Smiley Face. The full plan is in DECISIONS.md; it ships in batches.
   { id: "party-hat", name: "Party Hat", tier: "common", slot: "head", description: "Every move is a celebration. Even the blunders." },
@@ -91,9 +91,9 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "little-crown", name: "Little Crown", tier: "uncommon", slot: "head", description: "Dreaming of promotion." },
   { id: "eyepatch", name: "Eyepatch", tier: "uncommon", slot: "face", description: "Half the vision, twice the swagger." },
   { id: "dark-shades", name: "Dark Shades", tier: "rare", slot: "face", description: "Can't see the board. Looks great, though." },
-  { id: "suit-and-tie", name: "Suit and Tie", tier: "epic", slot: "skin", colors: 2, description: "A sharp suit in one colour, the tie in another. Licence to promote." },
+  { id: "suit-and-tie", name: "Suit and Tie", tier: "epic", slot: "skin", colors: 2, description: "A sharp suit in one color, the tie in another. License to promote." },
   { id: "smiley-face", name: "Smiley Face", tier: "legendary", slot: "face", description: "Have a nice game." },
-  { id: "tommy-gun", name: "Tommy Gun", tier: "mythic", slot: "weapon", colors: 2, description: "A classic drum-fed Tommy gun, metal in one colour, wood in another. For settling the endgame." },
+  { id: "tommy-gun", name: "Tommy Gun", tier: "mythic", slot: "weapon", colors: 2, description: "A classic drum-fed Tommy gun, metal in one color, wood in another. For settling the endgame." },
 ];
 
 export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);
@@ -115,7 +115,7 @@ export interface CrateDef {
   blurb: string;
   look: CrateLook;
   /**
-   * The strip's odds out of 100: a box for each tier, in its colour, and Fischer Random. Each tier's box is rarer
+   * The strip's odds out of 100: a box for each tier, in its color, and Fischer Random. Each tier's box is rarer
    * than the one below. A box opens to one of its tier's items, evenly.
    */
   strip: readonly { tier: PresentTier | typeof FISCHER; weight: number }[];
@@ -212,7 +212,7 @@ export const crateDef = (id: string) => CRATES.find((c) => c.id === id);
 export const CRATES_FREE = true;
 
 /**
- * One item a player owns: which item, its colour (and a second colour for two-colour items), its blemish (0-100,
+ * One item a player owns: which item, its color (and a second color for two-color items), its blemish (0-100,
  * to one decimal place; items rolled before Oct 5, 2026 are all 0-49) and the seed that shapes its blotches.
  */
 export interface ItemInstance {
@@ -225,7 +225,7 @@ export interface ItemInstance {
 }
 
 /**
- * The locker's stacks: copies of the same item in the same colour (both colours, for two-colour items) shown as one,
+ * The locker's stacks: copies of the same item in the same color (both colors, for two-color items) shown as one,
  * the purest on top (Eric, Oct 8). `items` are purest first, so `items[0]` is the top.
  */
 export interface ItemStack {
@@ -288,7 +288,7 @@ export interface CrateRoll {
   fischer: boolean;
   def: string;
   color: string;
-  /** Two-colour items only. */
+  /** Two-color items only. */
   color2?: string;
   blemish: number;
   seed: number;

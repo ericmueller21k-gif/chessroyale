@@ -208,7 +208,7 @@ test("Relay (a test lobby): your move on your board shows at once, then the tiny
   const others = page.locator("button.sq-tiny:not(.is-you)");
   await expect(others.first()).toBeVisible();
   // The big board's coordinates sit in their own squares, either way up (the letters were a column off): on your board,
-  // then on next turn's, where your squad has the other colour, so it opens the other way up.
+  // then on next turn's, where your squad has the other color, so it opens the other way up.
   const up = await expectCoordsInSquares(page);
   await page.locator("button.sq-tiny:has(.sq-mark.next)").click();
   await expectCoordsInSquares(page, up === "white" ? "black" : "white");

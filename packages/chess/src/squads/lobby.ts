@@ -14,7 +14,7 @@ import { SQUADS, mulberry32, shuffle, type Rng, type SquadsSettings } from "@che
 export function squadsRng(seed: number, ...parts: readonly (string | number)[]): Rng {
   let h = 2166136261;
   for (const c of `${seed >>> 0}|${parts.join("|")}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
-  // (A finaliser, so names one character apart give unrelated streams.)
+  // (A finalizer, so names one character apart give unrelated streams.)
   h ^= h >>> 16;
   h = Math.imul(h, 0x85ebca6b);
   h ^= h >>> 13;

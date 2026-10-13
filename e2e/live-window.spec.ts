@@ -21,7 +21,7 @@ const noRealMatch = (p: Page) =>
 /** Move, capture and castling sounds played so far (window.__soundLog, from sound.ts). */
 const knocks = (p: Page) => p.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => /^(move|capture|castle):/.test(l)));
 
-test("computer: a bot match plays in the live window above the buttons, labelled as one, silent; light on the page; none below 1280 px or on a phone", async ({ page }) => {
+test("computer: a bot match plays in the live window above the buttons, labeled as one, silent; light on the page; none below 1280 px or on a phone", async ({ page }) => {
   await named(page, "Watcher");
   await page.addInitScript(() => ((window as any).__soundLog = []));
   if (!desktop()) {

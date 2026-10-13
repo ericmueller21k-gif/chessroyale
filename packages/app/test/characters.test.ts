@@ -5,7 +5,7 @@ import { frameKeys, renderFrame } from "../src/characters/sprite.ts";
 describe("boss characters (code-drawn pixel art)", () => {
   for (const ch of CHARACTERS) {
     describe(ch.name, () => {
-      it("draws every part only with colours in its palette", () => {
+      it("draws every part only with colors in its palette", () => {
         for (const [name, part] of Object.entries(ch.parts))
           for (const row of part.grid) for (const k of row) if (k !== "." && k !== " ") expect(ch.palette, `${name}: "${k}"`).toHaveProperty(k);
       });

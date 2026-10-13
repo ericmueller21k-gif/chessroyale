@@ -9,8 +9,8 @@ export const UNDO_STEPS = 40;
 export type Pixels = Uint32Array;
 
 /**
- * A "#rrggbb" colour as a pixel value. Unsigned (`>>> 0`), like the values a Uint32Array hands back: a signed value
- * never compares equal to what's stored, which is what made a fill over its own colour run until out of memory.
+ * A "#rrggbb" color as a pixel value. Unsigned (`>>> 0`), like the values a Uint32Array hands back: a signed value
+ * never compares equal to what's stored, which is what made a fill over its own color run until out of memory.
  */
 export const toRgba = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
@@ -19,9 +19,9 @@ export const toRgba = (hex: string) => {
 export const toHex = (v: number) => "#" + [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff].map((c) => c.toString(16).padStart(2, "0")).join("");
 
 /**
- * The paint bucket: gives the area of (x, y)'s colour (joined edge to edge) the colour `value`. Iterative, and each
+ * The paint bucket: gives the area of (x, y)'s color (joined edge to edge) the color `value`. Iterative, and each
  * pixel is queued at most once, so it ends within 48 × 48 steps whatever the drawing. Returns how many pixels
- * changed: 0 when (x, y) is off the canvas or already that colour.
+ * changed: 0 when (x, y) is off the canvas or already that color.
  */
 export function floodFill(p: Pixels, x: number, y: number, value: number): number {
   const v = value >>> 0;

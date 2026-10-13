@@ -18,7 +18,7 @@ export function PauseMenu({
   items: { label: string; sub?: string; disabled?: boolean; back?: boolean; onPick: () => void }[];
   onClose: () => void;
 }) {
-  // Centred on the board, wherever it sits on the screen.
+  // Centered on the board, wherever it sits on the screen.
   const [top] = useState(() => {
     const r = document.querySelector(".board-wrap")?.getBoundingClientRect();
     return r ? r.top + r.height / 2 : window.innerHeight / 2;

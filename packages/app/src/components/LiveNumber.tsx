@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 /**
  * A number that counts to its new value (about 0.7 s) and flashes green when
  * it goes up or red when it goes down, so the scores feel live.
- * `goodWhenDown` flips the colours (e.g. a position number: lower is better).
+ * `goodWhenDown` flips the colors (e.g. a position number: lower is better).
  */
 export function LiveNumber({
   value,

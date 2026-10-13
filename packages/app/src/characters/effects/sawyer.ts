@@ -208,7 +208,7 @@ export const SAW_CRACK: Character = {
 
 // ---------------- The board saw's gap down the middle ----------------
 
-/** The gap's strip: GAP_W columns, the board's height (8 squares), centred on the line between the d and e files. */
+/** The gap's strip: GAP_W columns, the board's height (8 squares), centered on the line between the d and e files. */
 export const GAP_W = 14;
 export const GAP_STEPS = 16;
 const BOARD_H = 8 * SQUARE;

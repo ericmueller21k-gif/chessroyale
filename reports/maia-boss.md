@@ -3,7 +3,7 @@
 Written by `npx tsx packages/sim/scripts/maia-sim.ts summary` from `reports/maia-sim/*.jsonl`. Boss alone as plain chess
 (Ginger's powers and the God King left out): a bot player (boss-sim.ts's kind: a skill temperature and some random
 moves) against Ginger at a tier (her offset, Normal), the boss on each brain (BOSS_BRAIN: Maia's draw at temperature
-0.8, top-p 0.9). The same openings and colours for every brain; 60 player moves at most, then the
+0.8, top-p 0.9). The same openings and colors for every brain; 60 player moves at most, then the
 engine's verdict (75% or more: a win). Every boss move is scored as the judge scores a pick (its loss against the best,
 in points, at engineNodes); the loss columns count only moves in a game still to be played (the boss's chances 15–85%
 before it). (Stockfish judging Stockfish's own moves reads them kindly: compare the brains with each other.)

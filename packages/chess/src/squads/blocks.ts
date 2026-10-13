@@ -73,7 +73,7 @@ const colourOfPiece = (p: string): Colour => (p === p.toUpperCase() ? "w" : "b")
 
 /**
  * The squares a piece of the other squad could move to on their next turn, as far as this position shows: by how the
- * piece moves (a slider up to and onto the first piece in its way, either colour: your move may take it; a pawn's
+ * piece moves (a slider up to and onto the first piece in its way, either color: your move may take it; a pawn's
  * pushes and both diagonals; a knight's jumps), and castling while they still have the right (if castling can be
  * blocked). Never the king's ordinary moves. Empty if no piece of `colour` stands on `from`.
  */

@@ -175,14 +175,14 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await expect(phone.locator(".qchat-split .qline", { hasText: "For the crown!" }).filter({ hasText: "Desky" })).toBeVisible();
   await desk.locator(".qto button", { hasText: "Team" }).click();
 
-  // A plan goes to your team only. Right after sending, the buttons grey out (one message every 3 s).
+  // A plan goes to your team only. Right after sending, the buttons gray out (one message every 3 s).
   await phone.locator(".qchat-split .qchip", { hasText: "Push the pawns!" }).click();
   await expect(phone.locator(".qchat-split .qline.you", { hasText: "Push the pawns!" })).toBeVisible();
   await expect(phone.locator(".qchat-split .qchip", { hasText: "Wow!" })).toBeDisabled();
   await desk.waitForTimeout(1000);
   expect(await desk.locator(".qchat-side .qline", { hasText: "Push the pawns!" }).count()).toBe(same ? 1 : 0);
   await expect(phone.locator(".qchat-split .qchip", { hasText: "Wow!" })).toBeEnabled({ timeout: 4000 });
-  // The same line again stays greyed for a while.
+  // The same line again stays grayed for a while.
   await expect(phone.locator(".qchat-split .qchip", { hasText: "Push the pawns!" })).toBeDisabled();
 
   // The server drops free text and lines from packs you don't own (the phone hasn't got the God King pack).

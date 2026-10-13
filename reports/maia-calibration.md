@@ -13,7 +13,7 @@ and "Maia bosses harder".
   Stand), up to 60 crowd moves, then the engine's verdict (60% or more: a win). The boss's strength is the crowd's
   weighted rating less 100 (as the Crowd's boss battle sets it); the boss is today's Stockfish boss, or Maia at a fixed
   rating. "One player alone" is the crowd's middle member on its own, against a boss at its own rating (Boss alone at
-  Normal). The same openings for every boss, colours alternating. "Their played moves rate": the rating (the game's
+  Normal). The same openings for every boss, colors alternating. "Their played moves rate": the rating (the game's
   own, from points lost a move) of the moves the crowd actually played.
 - **Per move**: on the positions the game's rating curve was fitted on (calibrate-rating.ts's), Maia's likeliest moves
   at a ladder of ratings, scored as the judge scores a pick. Maia's expected loss is worked out from its
@@ -114,7 +114,7 @@ Where each is even with Maia (no guard), from the table above:
   crowd scored 0.38, the club crowd 0.50, the club player alone 0.50, the expert crowd (in the bridge, 90% Stockfish)
   0.38: about even everywhere, within error bars of about ±0.3 to ±0.4.
 
-## Harder: the boss clearly favoured (Eric, Oct 12)
+## Harder: the boss clearly favored (Eric, Oct 12)
 
 Eric, after #157: "We should be upping the Maia rating. The numbers don't need to be accurate; people read 'boss' and
 assume it's a challenge, so that's the key." The new target: each crowd, and a lone player at its own difficulty,

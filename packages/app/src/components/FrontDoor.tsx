@@ -172,12 +172,12 @@ export function LiveLine({ live, stacked }: { live: LiveCounts | null; stacked?:
   );
 }
 
-/** What a rank needs to be drawn: its name, colour and (the top ranks) effect. */
+/** What a rank needs to be drawn: its name, color and (the top ranks) effect. */
 export type RankLook = { label: string; color: string; effect: RankEffect | null };
 
 const rankClass = (t: RankLook) => `tier${t.effect ? ` rank-${t.effect}` : ""}`;
 
-/** The rank pill on a profile: "Weighty · 1612" in the rank's colour (the top three dressed up), or "No rating yet". */
+/** The rank pill on a profile: "Weighty · 1612" in the rank's color (the top three dressed up), or "No rating yet". */
 export function RankPill({ tier, rating }: { tier: RankLook | null; rating: number | null }) {
   if (!tier || rating === null) return <span class="fd-pill">No rating yet</span>;
   return (
@@ -187,7 +187,7 @@ export function RankPill({ tier, rating }: { tier: RankLook | null; rating: numb
   );
 }
 
-/** The rank line under your name on home: the rank's name in its colour, then the rating ("Weighty · 1612"). */
+/** The rank line under your name on home: the rank's name in its color, then the rating ("Weighty · 1612"). */
 export function RankLine({ rating }: { rating: number | null }) {
   const t = ratingTier(rating);
   if (!t || rating === null) return <>No rating yet</>;

@@ -7,11 +7,11 @@ option is wood (Eric, Oct 12: "slightly different wooden sounds, not chips or cl
 - "Classic light", "Classic deep", "Classic soft" (and the captures' "... double"): close variations of the classic
   knocks, made here from PyChess's original WAVs by a small pitch shift (resampling), a gentle high-shelf EQ and a
   slightly shorter or longer decay (VARIATIONS, below). Modified PyChess files, so GPL-3.0 too.
-- The rest: Kenney's CC0 *Impact Sounds*, or made here (ours, no licence needed).
+- The rest: Kenney's CC0 *Impact Sounds*, or made here (ours, no license needed).
 
-Every file is trimmed to start on its hit (so it lands with the piece), faded out, and levelled to the classic knock of
+Every file is trimmed to start on its hit (so it lands with the piece), faded out, and leveled to the classic knock of
 its kind: the loudest 30 ms, heard through a phone speaker (high-passed at 200 Hz) and the game's own 6 kHz low-pass,
-matches sounds/move.mp3 (moves) or sounds/capture.mp3 (captures). Sources and licences: sounds/SOURCES.md.
+matches sounds/move.mp3 (moves) or sounds/capture.mp3 (captures). Sources and licenses: sounds/SOURCES.md.
 
     # put the sources in one folder first:
     #   Kenney's CC0 pack, unzipped: https://kenney.nl/assets/impact-sounds  -> <dir>/kenney-impact/
@@ -200,7 +200,7 @@ def classic_variation(name):
 # --- Ours -------------------------------------------------------------------------------------------------------
 
 def wood_tap():
-    """A short, bright wooden knock (as the game's first knock was: about 13 ms to fall 20 dB, centred near 1.2 kHz)."""
+    """A short, bright wooden knock (as the game's first knock was: about 13 ms to fall 20 dB, centered near 1.2 kHz)."""
     return strike([(1180, 1.0, 0.0075), (2650, 0.42, 0.0042), (610, 0.55, 0.011), (4100, 0.12, 0.0025)], 0.09, noise=(0.45, 0.0005, "bandpass", 2600), seed=6)
 
 
@@ -245,7 +245,7 @@ def wood_block():
     return trim(pitch(pack("impactWood_medium_004.ogg"), 2))
 
 
-# name: (make, kind it's levelled against, length seconds, fade seconds, ours). The classic variations first.
+# name: (make, kind it's leveled against, length seconds, fade seconds, ours). The classic variations first.
 FILES = {
     "move-classic-light": (classic_variation("move-classic-light"), "move", 0.045, 0.012, False),
     "move-classic-deep": (classic_variation("move-classic-deep"), "move", 0.055, 0.015, False),
@@ -288,7 +288,7 @@ def main():
         x *= 10 ** ((target[kind] - loudness(x)) / 20)
         peak = 20 * math.log10(np.abs(x).max())
         if peak > -1:
-            sys.exit(f"{name}: peak {peak:.1f} dBFS after levelling (would clip)")
+            sys.exit(f"{name}: peak {peak:.1f} dBFS after leveling (would clip)")
         path = os.path.join(OUT, f"{name}.mp3")
         encode(x, path)
         got = load(path)
@@ -298,7 +298,7 @@ def main():
             x *= 10 ** (miss / 20)
             peak = 20 * math.log10(np.abs(x).max())
             if peak > -1:
-                sys.exit(f"{name}: peak {peak:.1f} dBFS after levelling (would clip)")
+                sys.exit(f"{name}: peak {peak:.1f} dBFS after leveling (would clip)")
             encode(x, path)
             got = load(path)
         print(f"{name:20s} {len(x) / SR * 1000:4.0f} ms  peak {peak:5.1f} dBFS  loudness {loudness(got):5.1f} dB  {os.path.getsize(path):5d} bytes")

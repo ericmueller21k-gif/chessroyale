@@ -3,7 +3,7 @@ import { BOSS_BRAIN, type BossBrain, type BossBrainSettings, type Settings } fro
 
 /**
  * Boss battle: the last 10 team up against Stockfish. The boss's strength comes
- * from the crowd's own ratings, weighted towards the best players (it should
+ * from the crowd's own ratings, weighted toward the best players (it should
  * feel like a real fight to them, and like a wall to the weakest), plus an
  * offset because a crowd voting together plays better than its average member.
  */
@@ -38,7 +38,7 @@ export function bossStumbleChance(elo: number, s: Pick<Settings, "bossStumbleBel
  * Where the boss battle starts: a position from the game just played, with
  * White (the crowd) to move, between moves 5 and 12. It should be roughly even
  * and never better for the boss: White's expected score 0.50-0.60 if possible
- * (the one nearest move 8), else the closest to even that still favours White,
+ * (the one nearest move 8), else the closest to even that still favors White,
  * else the starting position. `evals[k]` is the side to move's expected score
  * after k plies.
  */
@@ -106,7 +106,7 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
   { id: "grex", name: "Jefferson", icon: "🦖", kit: "Jefferson", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
   { id: "hollow", name: "Hollow", icon: "🌑", kit: "Hollow", offset: -100, powers: { passive: "dark", ultimate: "lightsout" } },
-  // Big Boy eats one of the crowd's centre pawns before move 1 (his snack), so he plays further under the lobby's
+  // Big Boy eats one of the crowd's center pawns before move 1 (his snack), so he plays further under the lobby's
   // strength than the others (DECISIONS.md: "Big Boy, built": the boss sim's numbers).
   { id: "bigboy", name: "Big Boy", icon: "🍭", kit: "Big Boy", offset: -250, powers: { passive: "blocks", ultimate: "bounce" } },
   // Sawyer saws his first pawn in two after his first move (the split pawn): a pawn's head start, so he plays further
@@ -300,7 +300,7 @@ export interface BossPowerState {
   pies?: { square: string; until: number }[];
   /**
    * Boingo's funhouse: the crowd turn it came (the board upside down), and the side its quarter turn goes to after
-   * (90: a quarter turn clockwise, 270: anticlockwise); then the other side, then back (boardAngle). `move`/`san`: the
+   * (90: a quarter turn clockwise, 270: counterclockwise); then the other side, then back (boardAngle). `move`/`san`: the
    * crowd's move he played for it on that first turn (Eric, Oct 12: "the forced move is the joke"), once played.
    */
   funhouse?: { turn: number; side: 90 | 270; move?: string; san?: string } | null;
@@ -351,7 +351,7 @@ export interface BossPowerState {
   tries?: { round: number; by: Record<string, number> };
   /** Hollow's Lights out (his ultimate, at the start of his turn): the test once it has begun. Never sent to screens. */
   lightsOut?: LightsOutTest | null;
-  /** Big Boy's snack: the crowd's centre pawn he ate before move 1 (its square). */
+  /** Big Boy's snack: the crowd's center pawn he ate before move 1 (its square). */
   snack?: { square: string };
   /** Big Boy's toy block: its square (empty; nothing may move onto it or slide through it), the crowd turn it landed, its last. */
   block?: { square: string; at: number; until: number } | null;
@@ -359,12 +359,12 @@ export interface BossPowerState {
   bounce?: BounceResult | null;
   /** Sawyer's split pawn, once his first move is played (unset until then: his first move must be a pawn move). */
   split?: SplitPawn;
-  /** Sawyer's saw cut: the edge between two neighbouring squares nothing may move straight across, its first and last crowd turn. */
+  /** Sawyer's saw cut: the edge between two neighboring squares nothing may move straight across, its first and last crowd turn. */
   cut?: SawCut | null;
   /** Sawyer's board saw (his ultimate): no move may cross between the d and e files from crowd turn `at` through `until`. */
   boardSaw?: { at: number; until: number } | null;
   /**
-   * Wrangler's long pull (his first move): the centre pawn's double step (`from` to `via`), then lassoed one square
+   * Wrangler's long pull (his first move): the center pawn's double step (`from` to `via`), then lassoed one square
    * further (to `to`), as crowd turn `turn` begins. Null: his first move was an ordinary one (no sound pull). Unset until
    * his first move.
    */
@@ -415,7 +415,7 @@ export interface SplitPawn {
 }
 
 /**
- * A saw cut on the edge between two orthogonally neighbouring squares (`a` before `b`: the lower file, or the lower rank
+ * A saw cut on the edge between two orthogonally neighboring squares (`a` before `b`: the lower file, or the lower rank
  * on one file), from crowd turn `at` through `until` (sawTurns in all).
  */
 export interface SawCut {
@@ -425,7 +425,7 @@ export interface SawCut {
   until: number;
 }
 
-/** Wrangler's long pull: his centre pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
+/** Wrangler's long pull: his center pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
 export interface LongPull {
   turn: number;
   from: string;
@@ -554,7 +554,7 @@ export interface BurnEvent {
  * `extra`: Hollow's extra move after a failed Lights out (played after his own, before the crowd's turn). `block`: Big
  * Boy's toy block landing; `bounce`: his Big Bounce (at the start of his turn, after the crowd's move). `split`:
  * Sawyer saws the pawn of his first move in two; `cut`: a saw cut on an edge; `boardsaw`: his board saw. `pull`:
- * Wrangler's long pull (his first move, a centre pawn three squares); `drag`: his lasso drag (a crowd piece dragged a
+ * Wrangler's long pull (his first move, a center pawn three squares); `drag`: his lasso drag (a crowd piece dragged a
  * square after his move; `ult`: the showdown's last fallback); `showdown`: his showdown (three pairs lined up, a forced
  * duel); `hold`: "Not yet..." (no line-up found this time: he searches again next turn).
  */
@@ -626,7 +626,7 @@ export function lastStandBar(best: number, crowdMoves: number, charges: number, 
 /**
  * Whether the crowd's played move calls for the Last Stand: it gave away at least the bar (`loss`, in points; see
  * lastStandBar), and the position wasn't already lost (the best move was worth at least lastStandFrom, `best`
- * being the mover's expected score after it, 0-1). The engine's judgement decides, not the material: a sacrifice it
+ * being the mover's expected score after it, 0-1). The engine's judgment decides, not the material: a sacrifice it
  * likes gives nothing away. Once per game: the caller checks he hasn't fallen already.
  */
 export function lastStandDue(loss: number, best: number, crowdMoves: number, charges: number, s: LastStandSettings): boolean {

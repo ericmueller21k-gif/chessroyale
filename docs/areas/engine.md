@@ -26,20 +26,20 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - **Deep checks on players' computers** (`JUDGES.deepOnDevices`) are built and ship **off**: the browsers' lite network
   is less accurate than the server's (`reports/deep-accuracy.md`), and fairness comes first.
 - **Bosses' strength.** `bossMoveFrom` in `runner.ts` plays at a UCI_Elo set from the lobby's ratings (`bossElo`:
-  weighted towards the best players, `bossEloOffset`, `bossEloRange`; the raid's tiers `BOSS_TIERS`, `bossFixedElo`;
+  weighted toward the best players, `bossEloOffset`, `bossEloRange`; the raid's tiers `BOSS_TIERS`, `bossFixedElo`;
   each boss's `offset` in `BOSS_ROSTER`; solo's difficulty `BOSS_DIFFICULTY`). Below `bossStumbleBelow` it may slip
   slightly (`bossSlipLoss`). The **blunder guard** (`bossMaxLoss`, `bossMaxLogitLoss`) forbids any move that throws
   material: "It's boss mode, not idiot mode." A power can limit the boss's moves too (it plays the best allowed one).
 - **The boss's brain (DECISIONS.md: "A human-like boss: Maia-3 for Ginger", Oct 11; "Every boss on Maia", Oct 12).**
   Every boss plays its normal moves with **Maia-3** (CSSLab, University of Toronto: human moves at a rating), not
   Stockfish, up to the strength where Stockfish must take over (`BOSS_BRAIN`, `bossBrainFor`, `maiaRatingFor`).
-  - **The Maia box:** a separate AGPL program (`packages/maia-worker/`, its own README and licence): a module worker at
+  - **The Maia box:** a separate AGPL program (`packages/maia-worker/`, its own README and license): a module worker at
     `/engine/maia/` (the official 23M checkpoint converted to int8 ONNX, 24 MiB, run by onnxruntime-web on one thread,
     about 80 ms a move here). The game only exchanges UCI-style text with it (`HumanUciEngine`).
   - **The rule** (`BOSS_BRAIN`): the boss's **level** is its strength, plus `crowdMargin` (400) when more than one picks
     the crowd's moves. Maia plays at `maiaRatingFor(level)`: 600 (its floor) up to a level of 1800, 850 at 2000, 1100
     at 2250, 2000 at 2400, held at 2500 from 2650 (`reports/maia-calibration.md`; Eric, Oct 12: the boss clearly
-    favoured, a crowd or a lone player scoring about 0.30 in plain chess). Below a level of `bridgeFrom` (2400) Maia's
+    favored, a crowd or a lone player scoring about 0.30 in plain chess). Below a level of `bridgeFrom` (2400) Maia's
     own draw (`maia-raw`, no guard: Eric) at temperature 0.8, top-p 0.9; from 2400 the light guard (25 points / 2
     logits), from `bridgeStrictFrom` (2800) the strict one (4 / 0.5): the guard follows the level, so a crowd meets it
     sooner (one player never meets the strict guard: Stockfish takes over at a strength of 2800).
@@ -114,4 +114,4 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - The FAQ explains the judge, the re-check and the boss's brain and strength to players (`packages/app/src/faq/content.ts`):
   a change to how they work changes its words in the same PR.
 - The Maia box stays a separate program: nothing in the game imports it, and nothing in it imports the game; only
-  text goes between them (Eric's licence decision). Its source is published only with Eric's OK.
+  text goes between them (Eric's license decision). Its source is published only with Eric's OK.

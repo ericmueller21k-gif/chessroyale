@@ -1,5 +1,5 @@
 /**
- * Boingo the Clown (BOSS_ROSTER "clown"): his rules. His passive, the pie, splats an empty square near the centre for a
+ * Boingo the Clown (BOSS_ROSTER "clown"): his rules. His passive, the pie, splats an empty square near the center for a
  * few turns (nobody, either side, may move onto it), up to two at once; his ultimate, the funhouse, turns the board
  * round in steps (Eric, Oct 11): upside down, a quarter turn to one side, a half turn to the other side, then back where
  * it started. As it comes he plays the crowd's first move for it, a weak but recoverable one, unscored (Eric, Oct 12:
@@ -35,7 +35,7 @@ const CENTRE = ["d4", "e4", "d5", "e5", "c3", "d3", "e3", "f3", "c4", "f4", "c5"
 const centreDistance = (sq: string) => Math.abs(sq.charCodeAt(0) - 100.5) + Math.abs(Number(sq[1]) - 4.5);
 
 /**
- * Pie: the square to pie, an empty one near the centre chosen so the position barely changes: the fewest moves of
+ * Pie: the square to pie, an empty one near the center chosen so the position barely changes: the fewest moves of
  * either side can land there right now (none, if possible), nearest the middle first, a pick from the best few. Never a
  * square already pied (`taken`).
  */
@@ -108,7 +108,7 @@ export function funhousePlayed(boss: BossState, move: string, san: string): Boss
 export const shownAngle = (f: BossPowerState["funhouse"], turn: number, step: number = BOSS_POWERS.funhouseStepTurns): BoardAngle =>
   f && turn === f.turn && !f.move ? 0 : funhouseAngle(f, turn, step);
 
-/** Boingo: pies on squares near the centre (nobody moves onto them), and the funhouse turning the board round. */
+/** Boingo: pies on squares near the center (nobody moves onto them), and the funhouse turning the board round. */
 export const BOINGO: BossRules = {
   id: "clown",
   wearOff(next, t) {

@@ -67,7 +67,7 @@ function BlockArrow({ move, since, orientation }: { move: string; since: number 
   const len = Math.hypot(to.x - from.x, to.y - from.y) || 1;
   const ux = (to.x - from.x) / len;
   const uy = (to.y - from.y) / len;
-  // (The shaft stops short of the target's centre, so the head sits on the square, as the board's arrows do.)
+  // (The shaft stops short of the target's center, so the head sits on the square, as the board's arrows do.)
   const x2 = to.x + 0.5 - ux * 0.32;
   const y2 = to.y + 0.5 - uy * 0.32;
   const head = `${x2 + ux * 0.3},${y2 + uy * 0.3} ${x2 - uy * 0.22},${y2 + ux * 0.22} ${x2 + uy * 0.22},${y2 - ux * 0.22}`;

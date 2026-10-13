@@ -1,16 +1,16 @@
 HunChess: third-party software, fonts and sounds in the app
 
-The app's own code is HunChess's. It includes the following third-party software and fonts, each under its licence,
+The app's own code is HunChess's. It includes the following third-party software and fonts, each under its license,
 whose text follows. (The chess pieces have their own notice: /licenses/pieces.txt. The chess engines, Stockfish and
 Maia-3, are separate programs with their own notices: /engine/COPYING.txt, /engine/maia/NOTICE.txt and
 /engine/maia/LICENSE.txt. The classic piece sounds and their variations are PyChess's, under the GPL-3.0: see "Piece
 sounds" below. The other sounds are CC0 or the game's own: no notice is needed.)
 
-- Preact (https://preactjs.com): MIT licence.
-- chess.js (https://github.com/jhlywa/chess.js): BSD 2-Clause licence.
-- Vite's small runtime helper (https://vite.dev), compiled into the app: MIT licence.
+- Preact (https://preactjs.com): MIT license.
+- chess.js (https://github.com/jhlywa/chess.js): BSD 2-Clause license.
+- Vite's small runtime helper (https://vite.dev), compiled into the app: MIT license.
 - Fonts: Archivo, Archivo Black (Omnibus-Type) and Press Start 2P (CodeMan38), from Google Fonts: SIL Open Font
-  Licence 1.1.
+  License 1.1.
 - Piece sounds: the classic knocks and their variations, from PyChess: GNU General Public License, version 3.
 
 ================================================================================================================
@@ -202,7 +202,7 @@ General Public License, version 3. They are separate data files the game plays, 
 - /sounds/pieces/move-classic-light.mp3, move-classic-deep.mp3, move-classic-soft.mp3 and
   /sounds/pieces/capture-classic-light.mp3, capture-classic-deep.mp3, capture-classic-soft.mp3: variations of
   PyChess's sounds, made by our script. Modified by HunChess on October 12, 2026, from mov2.wav and capture2.wav:
-  a small pitch shift, a gentle EQ, a slightly shorter or longer decay, and levelled to the classic's loudness.
+  a small pitch shift, a gentle EQ, a slightly shorter or longer decay, and leveled to the classic's loudness.
   Exactly how each was made: /sounds/SOURCES.md.
 
 The source of each sound (the original WAV files) is at the PyChess link above. The full text of the GNU General

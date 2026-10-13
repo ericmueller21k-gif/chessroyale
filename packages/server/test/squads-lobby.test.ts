@@ -379,7 +379,7 @@ describe("squads lobby: the final, Armageddon and visibility", () => {
     expect(L.last(otherSide[0]!, "choiceNo")).toMatchObject({ reason: "no_duty" });
   });
 
-  it("a drawn final goes to Armageddon: the squad with more time left picks its colour, then one board decides", () => {
+  it("a drawn final goes to Armageddon: the squad with more time left picks its color, then one board decides", () => {
     let found: ReturnType<typeof finalStart> | null = null;
     for (let seed = 1; seed < 60 && !found; seed++) {
       const f = finalStart(seed);

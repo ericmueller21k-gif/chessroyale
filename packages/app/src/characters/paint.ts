@@ -21,7 +21,7 @@ const set = (cv: Canvas, x: number, y: number, k: string) => {
   if (y >= 0 && y < cv.length && x >= 0 && x < cv[0]!.length) cv[y]![x] = k;
 };
 
-/** Fills a polygon (pixel centres inside it). */
+/** Fills a polygon (pixel centers inside it). */
 export function poly(cv: Canvas, pts: readonly (readonly [number, number])[], k: string): void {
   for (let y = 0; y < cv.length; y++) {
     const yc = y + 0.5;
@@ -69,7 +69,7 @@ export function ellipse(cv: Canvas, cx: number, cy: number, rx: number, ry: numb
 }
 
 /**
- * Recolours the pixels of `from` (any key if "*") that sit on an edge facing (dx, dy): their neighbour that way is
+ * Recolors the pixels of `from` (any key if "*") that sit on an edge facing (dx, dy): their neighbor that way is
  * empty. Light from the top left: `edge(cv, 0, -1, "*", "p")` puts a highlight along every top edge.
  */
 export function edge(cv: Canvas, dx: number, dy: number, from: string, to: string, depth = 1): void {
@@ -83,7 +83,7 @@ export function edge(cv: Canvas, dx: number, dy: number, from: string, to: strin
     }
 }
 
-/** Recolours every `from` pixel inside a polygon to `to` (a fold, a shadow band). */
+/** Recolors every `from` pixel inside a polygon to `to` (a fold, a shadow band). */
 export function tint(cv: Canvas, pts: readonly (readonly [number, number])[], from: string, to: string): void {
   const mask = canvas(cv[0]!.length, cv.length);
   poly(mask, pts, "#");
@@ -119,7 +119,7 @@ export function shade(cv: Canvas, inside: (x: number, y: number) => boolean, ram
     }
 }
 
-/** Light from the top left on a round surface centred at (cx, cy) with radii (rx, ry). */
+/** Light from the top left on a round surface centered at (cx, cy) with radii (rx, ry). */
 export const roundLight = (cx: number, cy: number, rx: number, ry: number, bias = 0) => (x: number, y: number) => {
   const nx = (x + 0.5 - cx) / rx;
   const ny = (y + 0.5 - cy) / ry;

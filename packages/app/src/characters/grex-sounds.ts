@@ -1,5 +1,5 @@
 /**
- * G-REX's sounds, synthesised (no files, no licences, no voice): a fire crackle, a whoosh, a sparkler's fizz, the poof
+ * G-REX's sounds, synthesized (no files, no licenses, no voice): a fire crackle, a whoosh, a sparkler's fizz, the poof
  * of a piece burning up, the pop of a Roman candle shot, a comically big roar (a growl that ends in a squeak), the
  * wood-smack of the candle slammed down on the board, and the candle's shots: a firework's shrill sliding whistle in
  * three variants, now and then ending in a crackle high up. Each is a pure function of the sample rate (its noise is seeded),

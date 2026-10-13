@@ -160,7 +160,7 @@ test("boss raid (solo): you against a boss from a named opening; the King can st
   // Alone you're the whole crowd, so he strikes at once, during your move, from his spot by the board.
   await expect(page.getByLabel("The God King strikes the boss")).toBeVisible({ timeout: 5_000 });
   expect(await phase(page)).toBe("play");
-  // One strike a move: Strike is greyed out now.
+  // One strike a move: Strike is grayed out now.
   await expect(page.locator(".king-summon, .king-command")).toHaveCount(0, { timeout: 8_000 });
   await king.click();
   await expect(page.getByRole("menuitem", { name: /Strike/ })).toBeDisabled();
@@ -266,7 +266,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   await page.evaluate((mv) => (window as any).match.submit(mv), move);
   expect(await phase(page)).toBe("play");
   // He fell with his 3 charges: they're your power-ups, a ⚡ button beside his fallen figure. One shows the engine's
-  // top 3 moves as arrows (and the barred move keeps its grey ✕ arrow).
+  // top 3 moves as arrows (and the barred move keeps its gray ✕ arrow).
   const power = page.getByRole("button", { name: /Use a power-up: the engine's top 3 moves \(3 left\)/ });
   await expect(power).toBeVisible();
   await power.click();

@@ -3,7 +3,7 @@
  * frames, cues), each frame exactly the area it covers, so placing one is sizing its canvas to a square (or the whole
  * board) with `image-rendering: pixelated`. See power-art.ts for the list and how each is meant to play.
  *
- * Colours may be see-through (`#rrggbbaa`): the ice over a frozen piece lets the piece show, the blizzard's haze
+ * Colors may be see-through (`#rrggbbaa`): the ice over a frozen piece lets the piece show, the blizzard's haze
  * lets the board show.
  */
 import type { Character } from "./sprite.ts";

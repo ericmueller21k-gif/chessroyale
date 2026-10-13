@@ -289,7 +289,7 @@ describe("Crowd mode", () => {
     expect(bossStartPly(set({ 12: 0.55 }), 11)).toBe(0);
   });
 
-  it("the boss's strength leans towards the best of the crowd, plus the offset, within limits", () => {
+  it("the boss's strength leans toward the best of the crowd, plus the offset, within limits", () => {
     const s = { bossEloOffset: 150, bossEloRange: [1320, 3000] as const };
     // Weights 3, 2, 1: (3*2000 + 2*1600 + 1*1200) / 6 = 1733, + 150.
     expect(bossElo([1600, 2000, 1200], s)).toBe(1883);

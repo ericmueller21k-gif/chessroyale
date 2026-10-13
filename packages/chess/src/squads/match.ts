@@ -190,8 +190,8 @@ export function planLobby(seed: number, rules: SquadsRules, library: readonly Op
 
 /**
  * Each board's start and White side for a match of `boards` boards. Side 0 is White on boards 1 and 3, side 1 on
- * boards 2 and 4 (so every Relay player alternates colours turn by turn; in Pairs each squad is White on one board).
- * Random openings: each opening is played on two boards, colours swapped (boards 1-2, 3-4). One board (the final):
+ * boards 2 and 4 (so every Relay player alternates colors turn by turn; in Pairs each squad is White on one board).
+ * Random openings: each opening is played on two boards, colors swapped (boards 1-2, 3-4). One board (the final):
  * a coin gives White.
  */
 export function matchStarts(plan: SquadsPlan, key: string, boards: number, library: readonly Opening[], s: SquadsSettings = SQUADS): { starts: BoardStart[]; whites: Side[] } {
@@ -796,7 +796,7 @@ export type SquadsEvent =
     }
   /**
    * A block placed this half, after the blocking side's move: in effect on the other side's next turn there ("on"),
-   * cancelled by the other squad's shield ("shielded": its points still spent), or lifted and refunded (why).
+   * canceled by the other squad's shield ("shielded": its points still spent), or lifted and refunded (why).
    */
   | { kind: "block"; turn: number; half: Colour; board: number; side: Side; by: string; move: string; piece: BlockPiece; cost: number; outcome: "on" | "shielded" | BlockLift }
   /**
@@ -1241,7 +1241,7 @@ export function matchResultOf(m: Pick<SquadsMatch, "seed" | "key" | "format" | "
 
 // ---- A drawn final: Armageddon ----
 
-/** The side that picks Armageddon's colours: the one with more team bank left after the final (a coin if level). */
+/** The side that picks Armageddon's colors: the one with more team bank left after the final (a coin if level). */
 export function armageddonChooser(final: SquadsMatch): Side {
   if (final.banks[0] !== final.banks[1]) return final.banks[0] > final.banks[1] ? 0 : 1;
   return coin(squadsRng(final.seed, final.key, "armageddon-chooser"));

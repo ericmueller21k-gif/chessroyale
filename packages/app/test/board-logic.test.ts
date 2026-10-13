@@ -69,7 +69,7 @@ describe("the board's squares: where each is drawn, either way up and turned", (
       for (const t of TURNS)
         for (const s of ALL_SQUARES) {
           const { col, row } = cellOf(s, o, t);
-          // The centre, and just inside each corner.
+          // The center, and just inside each corner.
           for (const [dx, dy] of [
             [25, 25],
             [0.01, 0.01],
@@ -277,7 +277,7 @@ describe("which piece went where", () => {
   it("a touch near a piece means the board, not a scroll", () => {
     const box = { left: 0, top: 0, width: 400, height: 400 };
     const p = readPieces("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-    // e1's centre is (225, 375).
+    // e1's center is (225, 375).
     expect(pieceCloseTo(p, 225, 375, box, "white")).toBe(true);
     expect(pieceCloseTo(p, 225 + 49, 375, box, "white")).toBe(true);
     expect(pieceCloseTo(p, 225 + 60, 375, box, "white")).toBe(false);
@@ -286,7 +286,7 @@ describe("which piece went where", () => {
 });
 
 describe("arrows", () => {
-  it("run between the squares' centres, stopping short for the head; shorter still with another arrow into the square", () => {
+  it("run between the squares' centers, stopping short for the head; shorter still with another arrow into the square", () => {
     const [a] = drawArrows([{ move: "e2e4", brush: "green" }], "white");
     expect(a).toMatchObject({ x1: 0.5, y1: 2.5, x2: 0.5 });
     expect(a!.y2).toBeCloseTo(0.5 + 10 / 64, 6);

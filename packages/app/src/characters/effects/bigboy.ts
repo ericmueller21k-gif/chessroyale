@@ -24,7 +24,7 @@ const TOY_PALETTE = {
   S: "#f3ecdccc",
 } as const;
 
-/** The block's letters, 7 x 9 (and 3 x 5 for the little one in flight), with their panel's colour key. */
+/** The block's letters, 7 x 9 (and 3 x 5 for the little one in flight), with their panel's color key. */
 const TOY_LETTERS = {
   A: { panel: "r", side: "U", big: ["..###..", ".##.##.", "##...##", "##...##", "##...##", "#######", "##...##", "##...##", "##...##"], small: [".#.", "#.#", "###", "#.#", "#.#"] },
   B: { panel: "u", side: "G", big: ["######.", "##...##", "##...##", "##...##", "######.", "##...##", "##...##", "##...##", "######."], small: ["##.", "#.#", "##.", "#.#", "##."] },
@@ -35,7 +35,7 @@ export const TOY_LETTER_NAMES = Object.keys(TOY_LETTERS) as ToyLetter[];
 
 /**
  * A toy block seen from the front and a little above (light from the top left): a wooden cube, its front `w` x `h`
- * with a coloured panel and its letter, its top and right side `d` deep, the side's panel another colour.
+ * with a colored panel and its letter, its top and right side `d` deep, the side's panel another color.
  */
 function toyCube(letter: ToyLetter, w: number, h: number, d: number): Part {
   const L = TOY_LETTERS[letter];

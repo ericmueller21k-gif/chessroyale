@@ -159,7 +159,7 @@ test("players meet Stockfish: no Brain picker, no Maia download, no debug line",
   expect(maiaFiles).toEqual([]);
 });
 
-test("the credits name Maia-3 and Stockfish, with the Maia box's licence beside it", async ({ page }) => {
+test("the credits name Maia-3 and Stockfish, with the Maia box's license beside it", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   await page.goto("/settings");
   const credit = page.locator(".maia-credit");

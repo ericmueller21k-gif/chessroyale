@@ -18,7 +18,7 @@ export interface PieceEl {
   el: HTMLElement;
   /** The real square it stands on. */
   square: string;
-  /** Its colour and kind as its classes name it: "white pawn". */
+  /** Its color and kind as its classes name it: "white pawn". */
   name: string;
 }
 

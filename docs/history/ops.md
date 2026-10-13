@@ -70,7 +70,7 @@ never catches us out. Reports in `reports/load/`; how to run them, staging and m
 - `scripts/load/burst.ts`: N PLAY presses at the same moment, no sockets: the matchmaker alone.
   `scripts/load/record-size.ts`: how big a 100-player lobby's stored record gets.
 - **Local limits:** wrangler runs every Worker and Durable Object in one process, which saturates one core at about
-  1,000 players. So locally we find code-level choke points (calls, writes, serialisation) and compare before with
+  1,000 players. So locally we find code-level choke points (calls, writes, serialization) and compare before with
   after; absolute capacity needs staging (below). Its dev proxy also drops requests when that process is saturated
   (the "play 500" rows in the local reports, before and after alike; not a server error).
 
@@ -79,7 +79,7 @@ never catches us out. Reports in `reports/load/`; how to run them, staging and m
   but players connect a second or two after PLAY answers, so in a surge it promised the same lobby to far more than
   100. 124 of 500 and 365 of 1,000 players got "This match has already started". In the burst test all 1,000 PLAY
   presses were given one 100-seat lobby.
-- **It serialised:** one PLAY at a time, each waiting on a call to the lobby object inside `blockConcurrencyWhile`
+- **It serialized:** one PLAY at a time, each waiting on a call to the lobby object inside `blockConcurrencyWhile`
   (1,000 presses = 1,000 locked cross-object calls; server time p50 655 ms at 500 players, 1.1 s at 1,000).
 - **D1 writes:** 1.8 per player per minute in steady play (the conditional `UPDATE users SET last_seen` on every
   request and heartbeat, 1.46, and `live_lobbies` reports, 0.31), plus a guest account's two inserts once. That's
@@ -94,7 +94,7 @@ never catches us out. Reports in `reports/load/`; how to run them, staging and m
    by themselves), and again every second (`CAPACITY.queue.formEveryMs`) while anyone waits in line. Each batch makes
    one seat-reservation call per lobby (`Lobby.reserve`), and a new lobby takes its reservation in its `create`
    call. A lobby counts promised seats (held 20 s for the player to connect) as taken, so it's never overfilled; a
-   cancelled seat goes to the next player as before. Nothing waits on another object while holding the queue.
+   canceled seat goes to the next player as before. Nothing waits on another object while holding the queue.
    - Kept: 60 s fill then bots, Boss raid's own queue, `?pool=` test queues, private code lobbies untouched.
    - Why not "form lobbies only on a 1 s timer", as the assessment said: it would add up to a second to every PLAY at
      quiet times. Batching as soon as the last batch is done gives the same grouping under load and none of the wait.
@@ -132,7 +132,7 @@ never catches us out. Reports in `reports/load/`; how to run them, staging and m
    took about 1 s (`/api/profile/x` 1,012-1,061 ms, `/api/live` 1,056-1,464 ms) while one without D1 took 0-42 ms
    (`/api/auth/config`).
 5. **A lobby's stored record:** each person's last message (re-sent on reconnect) is stored under its own key, and
-   only when it changes. Measured with V8's serialiser (what Durable Object storage writes), a 100-player record is
+   only when it changes. Measured with V8's serializer (what Durable Object storage writes), a 100-player record is
    about 150 KB (the 2.4 MB JSON size is misleading: JSON repeats the standings every message shares); a pick now
    writes about 80 KB instead of about 150 KB.
 6. **Rate limits** (`limits.ts`, `CAPACITY.rateLimits`): per address 10,000 a minute (a school or a mobile network
@@ -190,7 +190,7 @@ container (4 cores) can drive about 5,000-6,000 simulated players; 10,000 needs 
   $0.0000025/GiB-s, CPU $0.00002/vCPU-s), about $0.0001 a re-check. 64,000 re-checks a day (four busy hours) is
   **about $200 a month**; around the clock at that load, about $1,200.
 - Recommendation, when real traffic gets near it: `max_instances` 16 and `ENGINE_DAILY_SEARCHES` 60,000 (≈ $200 a
-  month at the cap), plus the cheaper wins first: cache analysed positions (Crowd games share openings) and re-check
+  month at the cap), plus the cheaper wins first: cache analyzed positions (Crowd games share openings) and re-check
   only cuts that matter (the bottom few places). Until then, today's 2 and 3,000 keep the worst case near $25 a month.
 
 **Rough running cost at 10,000 players at once** (estimate; staging will give a real number): Durable Object time

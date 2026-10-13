@@ -8,7 +8,7 @@
  *     (results.held: the rating, its chart, "Top N%", later leaderboards and ranked) and eligibleForRanked says no;
  *   - banned: no online play (solo stays open), with an appeal a person decides; their sign-in identities are kept
  *     (hashed) so a new account made with them is banned too, and a device it played from puts new accounts in review;
- *   - cleared: decided in their favour; held results count again;
+ *   - cleared: decided in their favor; held results count again;
  *   - closed: a watch that saw nothing new for FAIRPLAY.evidenceDays.
  * Every change goes in fairplay_log with who made it and why.
  *
@@ -141,7 +141,7 @@ async function identityHashes(u: Pick<User, "email" | "google_sub">): Promise<[s
 
 /**
  * Whether an account may play online, checked when it asks to (PLAY, a new lobby, joining one). Banned: no. Also
- * catches evasion: an account signed in with a banned account's identity (the same normalised email or Google
+ * catches evasion: an account signed in with a banned account's identity (the same normalized email or Google
  * account) is banned too; one seen on a device a banned account played from goes to review (families share devices).
  * `device`: the device marker cookie, recorded against the account.
  */
@@ -302,7 +302,7 @@ export type ReportOutcome = { ok: true; already?: boolean } | { ok: false; messa
  *
  * Reports never ban anyone. Every report opens a watch case (the player's matches are then kept as evidence), and
  * cheating reports from enough different signed-in accounts within a week put the player in review (fewer for a new
- * account). A guest's report is stored and read, but doesn't count towards a review.
+ * account). A guest's report is stored and read, but doesn't count toward a review.
  */
 export async function reportPlayer(sql: Sql, reporter: User, target: unknown, reason: unknown, match: unknown, now: number): Promise<ReportOutcome> {
   if (typeof target !== "string" || target === reporter.id || !(await sql.first("SELECT id FROM users WHERE id = ?", target))) return { ok: false, message: "No such player." };

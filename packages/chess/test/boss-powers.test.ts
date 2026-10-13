@@ -141,7 +141,7 @@ describe("boss powers: the ground rules", () => {
     const fen = "6kr/8/8/8/8/8/6PP/7K w - - 0 1";
     const legal = legalMoves(fen);
     const b = battle("clown", fen);
-    // (The pie is near the centre in play; here it sits on the escape square to test the rule.)
+    // (The pie is near the center in play; here it sits on the escape square to test the rule.)
     for (const sq of new Set(legal.map((m) => m.slice(2, 4)))) {
       const pied = { ...b, powers: { ...b.powers!, pie: { square: sq, until: 3 } } };
       const allowed = crowdAllowed(pied, fen) ?? legal;
@@ -239,7 +239,7 @@ describe("boss powers: as each turn begins", () => {
     expect(picks.size).toBeGreaterThan(1);
   });
 
-  it("puts the pie on an empty square near the centre that the fewest moves can reach", () => {
+  it("puts the pie on an empty square near the center that the fewest moves can reach", () => {
     for (const fen of positions(30, 3)) {
       const sq = choosePie(fen, 1, 2);
       if (!sq) continue;

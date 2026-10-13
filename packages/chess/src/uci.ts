@@ -35,7 +35,7 @@ export interface MoveScore {
 export interface Analysis {
   /** Engine's best move and the mover's expected score after it. */
   best: MoveScore;
-  /** Scores for every move analysed (top N plus any requested), best first. */
+  /** Scores for every move analyzed (top N plus any requested), best first. */
   moves: MoveScore[];
 }
 

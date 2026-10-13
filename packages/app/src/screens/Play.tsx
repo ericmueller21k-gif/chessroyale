@@ -118,7 +118,7 @@ export function PlayScreen({
   const alone = !!match.boss && alive.length === 1;
   const moved = waiting && picked && !crowd ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
   const doneCount = alive.filter((s) => match.done.has(s.id)).length;
-  // Boss battle, the re-pick after the God King's Last Stand: the move he took back is greyed out and can't be played.
+  // Boss battle, the re-pick after the God King's Last Stand: the move he took back is grayed out and can't be played.
   const barred = match.boss?.barred && legalMoves(board.fen).includes(match.boss.barred) ? match.boss.barred : null;
   // A boss power limits the moves this turn (a frozen piece, a pie, the blizzard): only those can be played.
   const powerAllowed = match.boss?.powers?.allowed ?? null;

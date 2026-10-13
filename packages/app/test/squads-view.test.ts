@@ -253,7 +253,7 @@ describe("Squads v2 on screen: blocks and tokens", () => {
 
 describe("cheat lines (test controls only)", () => {
   const fen = START_FEN;
-  it("only a test player gets them, and only while choosing (a move, a pick, a block, Armageddon's colours)", () => {
+  it("only a test player gets them, and only while choosing (a move, a pick, a block, Armageddon's colors)", () => {
     for (const choosing of [true, false]) for (const colourChoice of [true, false]) expect(cheatLinesAt(false, { choosing, colourChoice, fen })).toBeNull();
     expect(cheatLinesAt(true, { choosing: true, colourChoice: false, fen })).toBe(fen);
     expect(cheatLinesAt(true, { choosing: false, colourChoice: true, fen })).toBe(fen);
@@ -272,7 +272,7 @@ describe("cheat lines (test controls only)", () => {
     expect(eric.cheatLines).toBe(false);
   });
 
-  it("draws the top 3 as arrows coloured by rank, each labelled with its evaluation for the side to move", () => {
+  it("draws the top 3 as arrows colored by rank, each labeled with its evaluation for the side to move", () => {
     expect(cheatEval({ expected: 0.5 })).toBe("0.0");
     expect(cheatEval({ expected: 0.75 })).toBe("+1.0");
     expect(cheatEval({ expected: 0.25 })).toBe("−1.0");

@@ -42,7 +42,7 @@ export const TIMER_BAR_BELOW = true;
 
 /**
  * The move clock as a bar snug to the top edge of the board (and mirrored along the bottom edge): full when
- * the clock starts, shrinking from both ends towards the middle until it's
+ * the clock starts, shrinking from both ends toward the middle until it's
  * gone at the deadline, and fading from dark green through yellow to red as time
  * runs out. It ticks every second for the last 10 seconds.
  */

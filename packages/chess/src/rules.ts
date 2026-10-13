@@ -18,7 +18,7 @@ export function toSan(fen: string, uci: string): string {
 }
 
 /**
- * The piece on a square: colour and type (p, n, b, r, q, k), or null. The screens ask about many squares of the same
+ * The piece on a square: color and type (p, n, b, r, q, k), or null. The screens ask about many squares of the same
  * position, some on every redraw (the ice over every frozen piece in the blizzard), so a position is read once.
  */
 export function pieceAt(fen: string, square: string): { color: "w" | "b"; type: "p" | "n" | "b" | "r" | "q" | "k" } | null {

@@ -13,7 +13,7 @@
  *
  * Rigging: the head (one per face), the body and the boots are painted once; the legs and arms from their points (a
  * hip, a knee and an ankle; a shoulder, an elbow and a fist); the hat from its tilt (so he can tip it); every rope (the
- * spinning loop, the line to it, the coil, the slack) from its path: a loop is an ellipse (its centre, radii and
+ * spinning loop, the line to it, the coil, the slack) from its path: a loop is an ellipse (its center, radii and
  * tilt), and the line runs from his fist to the loop's nearest point. So a lasso pose is a few numbers. Every part is
  * painted the first time a frame that uses it shows (sprite.ts lazyParts).
  */
@@ -220,7 +220,7 @@ function head(mood: Mood): Part {
 
 // ---- The hat: painted from its tilt, so he can tip it.
 
-/** A piece of a part in its own space (u across, v down from its anchor), coloured by (u, v). Later pieces cover earlier. */
+/** A piece of a part in its own space (u across, v down from its anchor), colored by (u, v). Later pieces cover earlier. */
 type Piece = { pts: readonly Pt[]; key: (u: number, v: number, inside: (u: number, v: number) => boolean) => string };
 
 /** The hat in its own space: (0, 0) the middle of the crown's base. The brim sweeps up to our right, as in the reference. */
@@ -419,7 +419,7 @@ function densify(pts: readonly Pt[], closed = false): Pt[] {
   return out;
 }
 
-/** A loop of rope: an ellipse, its centre, radii and tilt (degrees, positive turns its right end down). */
+/** A loop of rope: an ellipse, its center, radii and tilt (degrees, positive turns its right end down). */
 export interface Loop {
   c: Pt;
   rx: number;
@@ -489,7 +489,7 @@ function loopLayer(l0: Loop, phase: number, knot: number | null = null): Placed 
     return rope(path, ph, (i) => pts[Math.floor(i / per) % pts.length]!.far, kn === null ? undefined : (i) => Math.abs(i - at) < per * 0.6);
   });
 }
-/** The line from a fist to a loop: it leaves the fist upward (or towards the loop) and bows a little. */
+/** The line from a fist to a loop: it leaves the fist upward (or toward the loop) and bows a little. */
 function lineLayer(from: Pt, to: Pt, bow: Pt): Placed {
   const a: Pt = [r2(from[0]), r2(from[1])];
   const c: Pt = [r2(to[0]), r2(to[1])];

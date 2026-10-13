@@ -55,7 +55,7 @@ export interface LocalMatch extends Omit<NetSquadsMatch, "boards"> {
 }
 
 /**
- * The eight squads' names and colours, by squad id (display only: the rules number them). One short word each, so a
+ * The eight squads' names and colors, by squad id (display only: the rules number them). One short word each, so a
  * name fits beside its clock in the phone's strip at 360 px.
  */
 export const SQUAD_NAMES = ["Rooks", "Knights", "Bishops", "Queens", "Kings", "Pawns", "Towers", "Crowns"] as const;
@@ -109,7 +109,7 @@ export function seatIn(m: Pick<NetSquadsMatch, "sides">, playerId: string | null
   return side === null ? -1 : m.sides[side].seats.indexOf(playerId!);
 }
 
-/** The board's colour a side plays. */
+/** The board's color a side plays. */
 export const colourOf = (b: Pick<NetSquadsBoard, "white">, side: Side): Colour => (b.white === side ? "w" : "b");
 
 /**
@@ -280,7 +280,7 @@ export function standingsOrder(lobby: NetSquadsLobby): number[] {
 }
 
 /**
- * The matches whose boards show as tiny boards: every match still going, and the latest round's finished ones (greyed).
+ * The matches whose boards show as tiny boards: every match still going, and the latest round's finished ones (grayed).
  */
 export function shownMatches(matches: readonly LocalMatch[]): LocalMatch[] {
   const latest = Math.max(-1, ...matches.map((m) => m.round));
@@ -380,13 +380,13 @@ export function matchFor(matches: readonly LocalMatch[], squadId: number | null)
  * "Cheat lines" (test controls only, Eric Oct 12): the position whose engine lines to show, or null for no button. Only
  * for a test player (the server's `welcome` says `test`: an admin, or SQUADS_TEST), and only while they choose
  * something: their Relay move, a Pairs or final pick, a block (the position is the picking side's, so its top moves
- * are the ones worth blocking), or Armageddon's colours.
+ * are the ones worth blocking), or Armageddon's colors.
  */
 export function cheatLinesAt(test: boolean, s: { choosing: boolean; colourChoice: boolean; fen: string }): string | null {
   return test && (s.choosing || s.colourChoice) ? s.fen : null;
 }
 
-/** The colours of the cheat lines, best first (the power-up hints' own). */
+/** The colors of the cheat lines, best first (the power-up hints' own). */
 export const CHEAT_BRUSHES = ["green", "blue", "yellow"] as const;
 
 /**
@@ -402,7 +402,7 @@ export function cheatEval(t: Pick<MoveScore, "expected" | "mate">): string {
   return r === 0 ? "0.0" : `${r > 0 ? "+" : "−"}${Math.abs(r).toFixed(1)}`;
 }
 
-/** The cheat lines as the board's arrows: best first, coloured by rank, each labelled with its evaluation. */
+/** The cheat lines as the board's arrows: best first, colored by rank, each labeled with its evaluation. */
 export function cheatArrows(top: readonly Pick<MoveScore, "move" | "expected" | "mate">[]): Arrow[] {
   return top.slice(0, CHEAT_BRUSHES.length).map((t, i) => ({ move: t.move, brush: CHEAT_BRUSHES[i]!, label: cheatEval(t) }));
 }

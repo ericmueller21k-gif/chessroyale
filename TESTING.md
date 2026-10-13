@@ -23,7 +23,7 @@ turns, and the best average move quality wins. A solo match is about 25 minutes 
 - Tick **Practice mode** on the first screen if you want unlimited power-ups (the engine's top 3 moves with arrows).
 - The strip above the board shows your position and how far you are above or below the elimination line; tap it
   for the full leaderboard. On a computer the leaderboard sits on the left all the time.
-- You keep one colour per stage. When you land on a board, the last few moves you missed replay before you move.
+- You keep one color per stage. When you land on a board, the last few moves you missed replay before you move.
 - Your time bank is under the countdown: 10 minutes, +5 s a move, 30 s at most per move. Time never costs points.
 - The **Elo** column is an engine-based rating estimate from your moves (it settles after a few rounds). Tell me if
   it feels way off for you or your friends; it's easy to recalibrate.
@@ -42,7 +42,7 @@ Signed in with your admin account (players never see any of this):
    drawn). **Next round** (top right) ends the current round whenever you like. Add `?clock=90,0,3,0` for a quick
    team clock (bank, top-up, free seconds, increment, in seconds).
 2. **Cheat lines**: a dashed button above your move panel, whenever you're choosing (your Relay move, your Pairs pick,
-   your pick or block in the final, Armageddon's colours). Tap it: the engine's top 3 moves show as arrows (green
+   your pick or block in the final, Armageddon's colors). Tap it: the engine's top 3 moves show as arrows (green
    best, then blue, then yellow), each with its evaluation for the side to move ("+0.8"; "#3" is mate in 3), and
    listed under the button as "1 · Nf3 +0.8". When you're **blocking**, they're the picking side's best moves, i.e.
    the ones worth blocking. It stays on (every new position is worked out again) until you tap it off. Your phone's
@@ -55,7 +55,7 @@ Signed in with your admin account (players never see any of this):
 Signed in with your admin account, on your phone (players still meet Stockfish; only admins meet Maia for now):
 
 1. Tap **Boss alone**. Under the difficulty there's **BRAIN · TEST**. Leave it on **Default (Maia, no guard)**: every
-   boss now plays with Maia, set to be clearly favoured (your call, Oct 12: a boss is a challenge), then the bridge
+   boss now plays with Maia, set to be clearly favored (your call, Oct 12: a boss is a challenge), then the bridge
    (light guard, strict guard, a growing share of Stockfish moves), then Stockfish from 2800. Or pick Stockfish / Maia with no, light, full or strict guard to compare. Pick any boss.
 2. The first time, Maia downloads (about 29 MB, kept afterwards) while the boss's intro plays. Under the God King's
    dock a small line shows what the brain did with each move: "🧠 Maia 1640 · no guard · Maia's #1 · 210 ms".

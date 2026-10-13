@@ -413,7 +413,7 @@ ${note ? `<div class="card">${esc(note)}</div>` : ""}
 ${appealForm}
 <h2>Decide</h2>${decision}
 <form class="row" method="post"><button name="action" value="deep">Check the counted moves with the engine server now</button></form>
-<p class="muted">Hard positions (fewer than ${Math.round(FAIRPLAY.signals.hardShare * 100)}% of the crowd found the best move) are in bold; greyed rows don't count (opening, forced, obvious, decided, power-up).</p>
+<p class="muted">Hard positions (fewer than ${Math.round(FAIRPLAY.signals.hardShare * 100)}% of the crowd found the best move) are in bold; grayed rows don't count (opening, forced, obvious, decided, power-up).</p>
 ${d.sameDevice.length ? `<h2>Same device</h2><p>${d.sameDevice.map((u) => `<a href="/admin/fairplay/case/${esc(u.id)}">${esc(u.name)}</a> (${esc(u.status ?? "no case")})`).join(", ")}</p>` : ""}
 <h2>Reports (${d.reports.length})</h2>${d.reports.length ? `<div class="card scroll"><table><tr><th>When</th><th>Reason</th><th>Match</th><th>By</th></tr>${d.reports
     .map((r) => `<tr><td>${when(r.at)}</td><td>${esc(r.reason)}</td><td>${esc(r.match ?? "profile")}</td><td><a href="/admin/fairplay/case/${esc(r.reporter.id)}">${esc(r.reporter.name)}</a>${r.reporter.signedIn ? "" : " (guest)"}</td></tr>`)

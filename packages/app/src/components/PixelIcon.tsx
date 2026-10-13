@@ -19,8 +19,8 @@ const PALETTE = [
 
 /**
  * The icon builder, like an old console emblem editor: a 48 × 48 grid and a few
- * deliberately simple tools (pencil, eraser, fill, colour picker, brush size,
- * undo, clear) with a palette and a custom colour.
+ * deliberately simple tools (pencil, eraser, fill, color picker, brush size,
+ * undo, clear) with a palette and a custom color.
  */
 export function IconEditor({ initial, onSave, onCancel }: { initial: string; onSave: (png: string) => Promise<void> | void; onCancel: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -85,7 +85,7 @@ export function IconEditor({ initial, onSave, onCancel }: { initial: string; onS
       return;
     }
     if (tool === "fill") {
-      // A fill that changes nothing (the same colour again) is not a step to undo.
+      // A fill that changes nothing (the same color again) is not a step to undo.
       const before = pixels.current.slice();
       if (floodFill(pixels.current, x, y, toRgba(colour))) {
         remember(history.current, before);
@@ -139,7 +139,7 @@ export function IconEditor({ initial, onSave, onCancel }: { initial: string; onS
     ["pencil", "✏️", "Pencil"],
     ["eraser", "🧽", "Eraser"],
     ["fill", "🪣", "Fill"],
-    ["picker", "💧", "Pick a colour from the drawing"],
+    ["picker", "💧", "Pick a color from the drawing"],
   ];
   return (
     <div class="icon-editor">
@@ -176,7 +176,7 @@ export function IconEditor({ initial, onSave, onCancel }: { initial: string; onS
           🗑️
         </button>
       </div>
-      <div class="icon-palette" role="radiogroup" aria-label="Colour">
+      <div class="icon-palette" role="radiogroup" aria-label="Color">
         {PALETTE.map((c) => (
           <button
             type="button"
@@ -192,8 +192,8 @@ export function IconEditor({ initial, onSave, onCancel }: { initial: string; onS
             }}
           />
         ))}
-        <label class="icon-custom" title="Any colour">
-          <input type="color" value={colour} onInput={(e) => setColour(e.currentTarget.value)} aria-label="Custom colour" />
+        <label class="icon-custom" title="Any color">
+          <input type="color" value={colour} onInput={(e) => setColour(e.currentTarget.value)} aria-label="Custom color" />
           <span style={{ background: colour }} />
         </label>
       </div>

@@ -39,7 +39,7 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
     });
   }
   await page.reload();
-  // Home names the rank under your name, in the rank's colour.
+  // Home names the rank under your name, in the rank's color.
   await expect(page.locator(".fd-hero-sub")).toContainText("Weighty · 1612");
   await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Weighty");
   await page.getByRole("button", { name: "Your profile" }).click();
@@ -49,7 +49,7 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open locker" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Report" })).toHaveCount(0);
-  // Wearing shows the item itself (its drawing, in its colour), not a colour swatch.
+  // Wearing shows the item itself (its drawing, in its color), not a color swatch.
   await expect(page.locator(".fd-item .fd-thumb .item-art svg")).toHaveCount(1);
   // Stats: Crowd and Boss raid tabs, real numbers.
   const tiles = page.locator(".fd-stat");

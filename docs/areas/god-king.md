@@ -50,9 +50,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   take the piece. Eric's two games, replayed in Solo by `scripts/repro-last-stand.ts`: losing on purpose (moves giving
   away 4 to 21 points, none a disaster for where they were played) and then the queen hung from 12% (in Eric's own game,
   19%): no Last Stand, the game being lost by then; the queen hung on move 1 (55% to 4%): Last Stand.
-- **Looks.** Pixel art in the boss characters' format, in white and black versions (a recolour of the armour only,
-  in the crowd's colour). SNES/Fire Emblem style: pixel portraits, slanted cut-in banners, retro sounds, a Press
-  Start 2P speech bubble. Drama yes, gore no (cracks, sparks and a few stylised red drops are the limit).
+- **Looks.** Pixel art in the boss characters' format, in white and black versions (a recolor of the armor only,
+  in the crowd's color). SNES/Fire Emblem style: pixel portraits, slanted cut-in banners, retro sounds, a Press
+  Start 2P speech bubble. Drama yes, gore no (cracks, sparks and a few stylized red drops are the limit).
 - **The boss battle's presentation:** the intro (the boss's card, the game so far replayed, "START!"), the fight
   banners (`FightBanner`), the boss's move and its banner when it takes your queen, the dock. The queen banners
   (QUEEN DOWN!, QUEEN SLAIN!) are silent for now (Eric, Oct 11: the gasp sounded wrong; its file is kept, unused).

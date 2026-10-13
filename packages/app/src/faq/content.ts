@@ -320,7 +320,7 @@ A move is **brilliant** when it separated the field: among at least ${B.minPicke
 
 ### Your rating {#rating}
 
-Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts towards your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count.
+Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count.
 `,
   };
 }
@@ -537,7 +537,7 @@ Plays from the game so far.
   clown: (p) => `
 Plays from the game so far.
 
-- **Pie** (passive): from turn ${p.firstPassive}, an empty square near the centre (the one the fewest moves can reach) gets a pie for ${n(p.pieTurns, "turn")}: nobody, on either side, may move onto it. A new pie every ${n(p.pieEvery, "turn")}, up to ${p.pieMax} on the board at once, never two on one square.
+- **Pie** (passive): from turn ${p.firstPassive}, an empty square near the center (the one the fewest moves can reach) gets a pie for ${n(p.pieTurns, "turn")}: nobody, on either side, may move onto it. A new pie every ${n(p.pieEvery, "turn")}, up to ${p.pieMax} on the board at once, never two on one square.
 - **Funhouse** (ultimate): as it comes, the board turns upside down and he plays your move for you: a weak but recoverable one (giving away ${range(p.funhouseLoss)} points, never more than ${num(p.funhouseMaxLogit)} in log-odds). Nobody is scored for it. Then he plays his own, and the board keeps turning, ${n(p.funhouseStepTurns, "turn")} a step (his move for you counts as the first): upside down, then a quarter turn to one side (left or right, at random), then a half turn to the other side, then back the right way up, where it stays. From then on you play your own moves (taps and drags work at every angle, and the coordinates name the real squares), scored as usual. Once the board is back, his meter fills again; each funhouse after that plays your move once more.`,
   grex: (p) => `
 Plays from the game so far.
@@ -560,7 +560,7 @@ Plays from the game so far, and his first move is a pawn's. Then the **split paw
 - **Saw cuts** (passive): from turn ${p.sawFirst}, every ${n(p.sawEvery, "turn")} he saws through the edge between two squares in your half that one of your moves would cross, for ${n(p.sawTurns, "turn")}: no straight move across it (a slide, a pawn's step, the king's step, castling), on either side. Knights and diagonal moves pass.
 - **Board saw** (ultimate): once his meter is full, from turn ${p.boardSawFrom}, and while one half of the board (files a to d, or e to h) is his on material: the warning, then for ${n(p.boardSawTurns, "turn")} no move may cross between the d- and e-files, knights included, on either side. Then the halves rejoin.`,
   pig: (p, b) => `
-Plays from the starting position. His first move, after yours, is the **long pull**: a centre pawn's double step, then he lassos it one square further, three squares in one move (d7 to d4 or e7 to e4; if you're Black, e2 to e5 or d2 to d5). The engine picks the pawn that suits the position; if neither would be safe there (it would just be taken, or its way is blocked), he plays an ordinary first move. It's worth about nothing either way: flavour. His lassos are why he plays ${Math.abs(b.offset)} under the usual strength.
+Plays from the starting position. His first move, after yours, is the **long pull**: a center pawn's double step, then he lassos it one square further, three squares in one move (d7 to d4 or e7 to e4; if you're Black, e2 to e5 or d2 to d5). The engine picks the pawn that suits the position; if neither would be safe there (it would just be taken, or its way is blocked), he plays an ordinary first move. It's worth about nothing either way: flavor. His lassos are why he plays ${Math.abs(b.offset)} under the usual strength.
 
 - **Lasso drag** (passive): from turn ${p.dragFirst}, every ${n(p.dragEvery, "turn")}, after his move he ropes one of your pieces (never your king) and drags it one square up, down, left or right onto an empty square. It never leaves you in check or without a move, and a pawn never ends on the first or last rank. The engine picks a drag that costs you only a little: between ${num(p.dragLoss[0])} and ${num(p.dragLoss[1])} of a pawn. If none fits (or the game is already decided), there's no drag that turn and he tries again after his next move.
 - **SHOWDOWN!** (ultimate): the warning, then after his move he lines up three pairs facing each other in the middle of the board: your queen against his, a rook against a rook, and a bishop or knight against its match. His three are always protected. **Your next move must be one of the three duels**: one of your three takes the piece facing it. The three glow, and nothing else can be played. The engine sets it up so that even the right duel tips the game a little his way (about ${num(p.showdownEdge[0])} to ${num(p.showdownEdge[1])} of a pawn) and a wrong one costs you ${num(p.showdownTrap)} pawns or more on top, so look before you take. If he can't find such a line-up, he says "Not yet..." and tries again after his next move (up to ${n(p.showdownHolds, "time")}), then with two pairs, and failing that he drags a piece instead.`,
@@ -641,7 +641,7 @@ function godKing(src: FaqSources): FaqSection {
     body: `
 ### Who he is {#king-who}
 
-The crowd's champion in every boss battle: raids, the Crowd's boss battle and Boss alone. He stands by the board in your side's colours, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.
+The crowd's champion in every boss battle: raids, the Crowd's boss battle and Boss alone. He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.
 
 ### Strike or play: his charges {#king-charges}
 
@@ -715,8 +715,8 @@ function crates(src: FaqSources): FaqSection {
 Every item from a crate rolls three things, each on its own:
 
 1. **Its tier, which decides the item.** The strip lands on a tier's box, which opens to one of that tier's items, each as likely as the others. Or it lands on **Fischer Random**, a second spin for the rarest items: ${fischerWords}.
-2. **Its colour.**
-3. **Its purity:** 100% less a blemish (blotches over that share of its colour). From 90% it's **shiny**.
+2. **Its color.**
+3. **Its purity:** 100% less a blemish (blotches over that share of its color). From 90% it's **shiny**.
 
 | Box | ${src.crates.map((c) => c.name).join(" | ")} |
 |${src.crates.map(() => "---|").join("")}---|
@@ -724,17 +724,17 @@ ${stripRows}
 
 ${perDropWords}
 
-| Colour | Chance |
+| Color | Chance |
 |---|---|
 ${colors}
 
-Some items take a second colour (a present's ribbon, a suit's tie), rolled the same way.
+Some items take a second color (a present's ribbon, a suit's tie), rolled the same way.
 
 | Purity | Chance |
 |---|---|
 ${purity}
 
-Shiny comes about 1 time in ${num(1 / (shiny || 1), 0)}. Crates are opened by the game's server, never by your device, so nobody can roll themselves a Pearl crown. The shop sells God King effects (the colour of his bolts, beam and halo) and quick-chat packs.${src.cratesFree || src.shopFree ? " While HunChess is being tested, crates and the shop are free." : ""}
+Shiny comes about 1 time in ${num(1 / (shiny || 1), 0)}. Crates are opened by the game's server, never by your device, so nobody can roll themselves a Pearl crown. The shop sells God King effects (the color of his bolts, beam and halo) and quick-chat packs.${src.cratesFree || src.shopFree ? " While HunChess is being tested, crates and the shop are free." : ""}
 `,
   };
 }
@@ -748,7 +748,7 @@ function fairPlay(): FaqSection {
 - **Engine help is cheating, and we look for it.** Using an engine, another device or anyone else's help to pick your moves is against the rules. We watch for engine assistance and act on it. We don't explain how, so it stays hard to dodge.
 - **What happens:** while an account is under review, its online results are held off the rankings. A confirmed cheater is banned from online play (solo stays open). Borderline cases go to a person, never straight to a ban, and a ban can be appealed.
 - **Reporting:** tap a player's name to report them. A report never bans anyone by itself: it puts their games in front of a reviewer sooner.
-- **Practice mode** (Settings) gives you unlimited power-ups in the open: you're marked on the leaderboard, and practice never counts towards your ranking.
+- **Practice mode** (Settings) gives you unlimited power-ups in the open: you're marked on the leaderboard, and practice never counts toward your ranking.
 `,
   };
 }
@@ -756,13 +756,13 @@ function fairPlay(): FaqSection {
 function credits(src: FaqSources): FaqSection {
   return {
     id: "credits",
-    title: "Credits and licences",
+    title: "Credits and licenses",
     body: `
-- **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish), [this build's source](https://github.com/nmrugg/stockfish.js): stockfish.js 19, [licence](/engine/COPYING.txt)). It runs as a separate program in your browser.
-- **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [the bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; the source of our Maia box is available on request ([notice](/engine/maia/NOTICE.txt), [licence](/engine/maia/LICENSE.txt)).
-- **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD licence ([licence](/licenses/pieces.txt)).
-- **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([licence](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md)). Like the engines, they're separate files the game plays, not part of its code.
-- **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font Licence) ([licences](/licenses/third-party.txt)). Its other sounds are free of rights (CC0) or the game's own.
+- **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish), [this build's source](https://github.com/nmrugg/stockfish.js): stockfish.js 19, [license](/engine/COPYING.txt)). It runs as a separate program in your browser.
+- **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [the bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; the source of our Maia box is available on request ([notice](/engine/maia/NOTICE.txt), [license](/engine/maia/LICENSE.txt)).
+- **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD license ([license](/licenses/pieces.txt)).
+- **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([license](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md)). Like the engines, they're separate files the game plays, not part of its code.
+- **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font License) ([licenses](/licenses/third-party.txt)). Its other sounds are free of rights (CC0) or the game's own.
 - The same credits are at the foot of Settings.
 `,
   };

@@ -47,7 +47,7 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **Purity that didn't match the item** (Oct 6, [story](../docs/history/lessons.md#purity-that-didnt-match-the-item-oct-6-2026)):
   when a number on screen describes a drawing (a purity, a meter, a share), measure the drawing against the number
   over many cases, not one preview. Then add a test that does the same.
-- **Coloured squares instead of the item** (Oct 6, [story](../docs/history/lessons.md#coloured-squares-instead-of-the-item-oct-6-2026)):
+- **Colored squares instead of the item** (Oct 6, [story](../docs/history/lessons.md#colored-squares-instead-of-the-item-oct-6-2026)):
   wherever an item is named on screen, show the item, drawn by `ItemArt` or `Avatar`, never a stand-in (a swatch, an
   emoji, an icon). When a mockup uses a placeholder for real art, build it with the real art.
 - **Cut names that lost their chips, and a top bar too wide for phones** (Oct 7, [story](../docs/history/lessons.md#cut-names-that-lost-their-chips-and-a-top-bar-too-wide-for-phones-oct-7-2026)):
@@ -65,7 +65,7 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **A vote board that jumped, and zones that pulsed green** (Oct 7, [story](../docs/history/lessons.md#a-vote-board-that-jumped-and-zones-that-pulsed-green-oct-7-2026)):
   - When one screen hands a board to the next, give both the same frame (top line, the line above the board, the eval
     bar's slot, the sidebar) and measure the board's box on both, on a phone and a computer. Don't trust a screenshot.
-  - Don't transition or animate between colours made with `color-mix(…, transparent)`. Switch them, or fade a layer's
+  - Don't transition or animate between colors made with `color-mix(…, transparent)`. Switch them, or fade a layer's
     opacity, or animate a shadow.
   - An emoji or symbol in a line above the board gets `line-height: 1` (its font is taller than the text's).
 - **A top bar that only fit a new player** (Oct 8, [story](../docs/history/lessons.md#a-top-bar-that-only-fit-a-new-player-oct-8-2026)):
@@ -83,10 +83,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     marks, with our CSS, either way up: a library's defaults are made for its own page.
   - Board coordinates sit inside their edge squares. A test measures each label's text against the square it names,
     both ways up, on a phone and a computer (`expectCoordsInSquares` in `e2e/helpers.ts`).
-- **A rage meter drawn at a fifth of its colour** (Oct 11, [story](../docs/history/lessons.md#a-rage-meter-drawn-at-a-fifth-of-its-colour-oct-11-2026)):
+- **A rage meter drawn at a fifth of its color** (Oct 11, [story](../docs/history/lessons.md#a-rage-meter-drawn-at-a-fifth-of-its-color-oct-11-2026)):
   - A rule on a bare element under a box (`.box i`) styles every component nested in that box too: use a child
     selector or a class of its own, and check the computed style of what sits inside.
-  - Look at a drawn number (a meter, a bar) in true colour, alone and enlarged, not only in a frame of the whole screen.
+  - Look at a drawn number (a meter, a bar) in true color, alone and enlarged, not only in a frame of the whole screen.
 - **Names that looked short** (Oct 7, [story](../docs/history/lessons.md#tests-that-leaned-on-a-lucky-seed-and-names-that-looked-short-oct-7-2026)):
   check text that must fit by measuring it in the real font and box, with some room for other fonts (an iPhone's runs
   wider than headless Chrome's), not by counting characters. (The same lesson's rule about seeds is under "Tests".)

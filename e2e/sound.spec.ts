@@ -14,7 +14,7 @@ test("only piece sounds, clock ticks and the reveal reel play, and muting silenc
   await expect(page.locator(".center-count")).toHaveCount(0, { timeout: 10_000 });
   // (The bar above the board; its mirror under the board is .timer-bar.below.)
   await expect(page.locator(".timer-bar:not(.below)")).toBeVisible();
-  // Five power-up slots, three lit at the start. A grey one just shakes; a lit one uses a power-up.
+  // Five power-up slots, three lit at the start. A gray one just shakes; a lit one uses a power-up.
   await expect(page.locator(".pu-dot")).toHaveCount(5);
   await expect(page.locator(".pu-dot.on")).toHaveCount(3);
   await page.locator(".pu-dot:not(.on)").first().click();

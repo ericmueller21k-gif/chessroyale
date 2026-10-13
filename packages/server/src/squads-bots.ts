@@ -86,7 +86,7 @@ const square = (i: number) => "abcdefgh"[i & 15]! + String(8 - (i >> 4));
 const uciOf = (m: InternalMove) => square(m.from) + square(m.to) + (m.promotion ?? "");
 const gainOf = (m: InternalMove) => (m.captured ? VALUE[m.captured]! : 0) + (m.promotion ? VALUE[m.promotion]! - 1 : 0);
 /**
- * A small nudge between moves of equal material (a fraction of a pawn): towards the centre, castling, knights and
+ * A small nudge between moves of equal material (a fraction of a pawn): toward the center, castling, knights and
  * bishops off the back rank, not the king for a walk.
  */
 function nudge(m: InternalMove): number {

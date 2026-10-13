@@ -12,7 +12,7 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
   await expect(chip).toBeVisible();
   await expect(page.locator(".fd-hero")).toContainText("No rating yet");
   await chip.click();
-  // Your profile: Edit name & icon. Draw an icon: fill the canvas with a colour, add a stroke, save.
+  // Your profile: Edit name & icon. Draw an icon: fill the canvas with a color, add a stroke, save.
   await expect(page.locator(".fd-card")).toContainText("No rating yet");
   await page.getByRole("button", { name: "Edit name & icon" }).click();
   await page.getByRole("button", { name: "Edit your icon" }).click();

@@ -18,7 +18,7 @@ function Name({ match, id }: { match: GameView; id: string }) {
   );
 }
 
-/** Which colour each team has: teams[0] had the move when the final started. */
+/** Which color each team has: teams[0] had the move when the final started. */
 export function teamSides(f: FinalView): ["w" | "b", "w" | "b"] {
   const now = sideToMove(f.board.fen);
   const first = f.turn % 2 === 0 ? now : now === "w" ? "b" : "w";

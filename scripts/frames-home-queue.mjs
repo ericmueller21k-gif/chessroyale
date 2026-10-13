@@ -10,7 +10,7 @@
 // --var MATCH_FILL_SECONDS:8 --var ENGINE_OFF:1). Saves every painted frame (frames/<step>/f<ms>.jpg), a timeline per
 // step (timeline.txt), and screenshots. Flags: the side menu or the live panel missing on a frame of home or the
 // queue (computer), the seat grid moving or vanishing, the count going down, a frame much brighter or darker than both
-// neighbours (a blink), more than one jump in brightness for one theme pick, and a frame of the wrong theme while
+// neighbors (a blink), more than one jump in brightness for one theme pick, and a frame of the wrong theme while
 // a page loads.
 import { chromium, devices } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";

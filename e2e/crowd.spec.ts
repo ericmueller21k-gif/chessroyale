@@ -96,7 +96,7 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
   // The cut you went out at.
   await expect(page.locator(".crowd-cut .out-msg")).toContainText("You're out");
   await expect(page.getByRole("button", { name: "Why was I cut?" })).toBeVisible();
-  // The next cut, watched from the sidelines: a new judgement (the doomed pawns glow before the gavel lands).
+  // The next cut, watched from the sidelines: a new judgment (the doomed pawns glow before the gavel lands).
   await expect.poll(async () => (await cut())?.stage ?? -1, { timeout: 90_000, intervals: [100] }).toBeGreaterThan(outAt!);
   await expect(page.locator(".crowd-cut .grid-pawn.doomed").first()).toBeVisible({ timeout: 1000 });
   await expect(page.locator(".crowd-cut .grid-pawn.cut-now").first()).toBeVisible({ timeout: 5000 });

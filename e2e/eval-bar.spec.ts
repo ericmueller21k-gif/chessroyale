@@ -3,7 +3,7 @@ import { BOARD_SEL, test } from "./helpers.ts";
 
 /**
  * The eval bar's switch (Eric, Oct 10): on by default, in Settings only (never on a board screen); off, no bar on any
- * board and the board takes its room, centred, on a phone and a computer; remembered on the device.
+ * board and the board takes its room, centered, on a phone and a computer; remembered on the device.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 
@@ -36,7 +36,7 @@ test("the eval bar: on by default, switched off in Settings, and the board takes
 
   const off = await boardNow(page);
   expect(off.bars).toBe(0);
-  // The board takes the bar's room: wider on a phone (the width was the limit), never smaller; still centred, no
+  // The board takes the bar's room: wider on a phone (the width was the limit), never smaller; still centered, no
   // sideways scroll.
   if (info.project.name === "phone") expect(off.width).toBeGreaterThan(on.width + 15);
   else expect(off.width).toBeGreaterThanOrEqual(on.width - 1);

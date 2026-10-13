@@ -14,7 +14,7 @@ The app uses the smoothed column: a straight line through log(loss) against rati
 | 2800 | 2.87 | 3.10 |
 | 3190 | 2.12 | 2.17 |
 
-What a player's average loss per move maps to (before the early-match pull towards 1500):
+What a player's average loss per move maps to (before the early-match pull toward 1500):
 
 | Average loss | Rating |
 | --- | --- |

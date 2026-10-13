@@ -522,7 +522,7 @@ describe("Mercenary: the items", () => {
   });
 
   it("a shield cancels the next block against its squad that would take effect: the blocker's points stay spent", () => {
-    // Side 0 (White on board 0) blocks two of Black's replies; side 1 has one shield: the first block placed is cancelled.
+    // Side 0 (White on board 0) blocks two of Black's replies; side 1 has one shield: the first block placed is canceled.
     const m = applyKits(relay(), [NO_ITEMS, kit({ shield: 1 })]);
     const mover = moverOn(m, 0);
     let inp = block(m, NO_INPUTS, mover, 0, "g8f6", 100);
@@ -831,7 +831,7 @@ describe("Mercenary: the Stockfish token", () => {
         if ("error" in r) throw new Error(r.error);
         const colour = r.use.fen.split(" ")[1];
         const board = m.boards[d.board]!;
-        // The position the lines are for has the user's own colour to move.
+        // The position the lines are for has the user's own color to move.
         expect(colour).toBe(board.white === d.side ? "w" : "b");
         expect(r.use.fen).toBe(board.fen);
       }

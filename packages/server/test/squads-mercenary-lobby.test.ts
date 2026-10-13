@@ -205,7 +205,7 @@ describe("Mercenary on the server: items in a match", () => {
     expect(ofKind(half.events, "pair").find((e) => e.board === duty.board)!.assisted).toEqual([p]);
   });
 
-  it("a shield bought against another squad of people: their block is cancelled, its points spent, both told", () => {
+  it("a shield bought against another squad of people: their block is canceled, its points spent, both told", () => {
     for (let seed = 1; seed < 40; seed++) {
       const L = squadsLobby({ seed, test: { start: 1, mode: "mercenary" }, fillInMs: 5_000 });
       L.core.reserve([{ size: 4, pass: "red" }, { size: 4, pass: "blue" }], 60_000);
@@ -287,7 +287,7 @@ describe("Mercenary on the server: the Time chip", () => {
     expect(view.current!.duties.find((x) => x.board === d.board)!.deadline).toBe(half.startedAt + d.deadlineMs + CHIP);
   });
 
-  it("the clock maths: picks at 40 s count, the bank drained only outside the chip's 30 s; unused chips go back to the wallet", () => {
+  it("the clock math: picks at 40 s count, the bank drained only outside the chip's 30 s; unused chips go back to the wallet", () => {
     const { L, party, lm, squad } = pairsLobby();
     for (let i = 0; i < 2; i++) L.core.message(party[0]!, { t: "buy", item: "chip" });
     L.advanceTo(lm.startsAt! + 1);

@@ -11,13 +11,13 @@ import { play, type SoundName } from "../sound.ts";
 import { equippedLook } from "@chessroyale/core";
 import { account } from "../account.ts";
 
-/** Your equipped God King effect (from the shop) as CSS colours for his bolts, beam and glow. */
+/** Your equipped God King effect (from the shop) as CSS colors for his bolts, beam and glow. */
 export function kingEffectStyle(): Record<string, string> {
   const look = equippedLook(account().profile?.shop, "king");
   return { "--ks-bolt": look.bolt!, "--ks-glow": look.glow!, "--ks-beam": look.beam! };
 }
 
-/** Each frame of his drawn once per look (white or black armour). */
+/** Each frame of his drawn once per look (white or black armor). */
 const images = { w: new WeakMap<Frame, ImageData>(), b: new WeakMap<Frame, ImageData>() };
 function frameImage(side: "w" | "b", frame: Frame): ImageData {
   let img = images[side].get(frame);
@@ -29,7 +29,7 @@ function frameImage(side: "w" | "b", frame: Frame): ImageData {
   return img;
 }
 
-/** Placing his frame: his drawing space (one board square) fills the box's height, his feet at its bottom centre. */
+/** Placing his frame: his drawing space (one board square) fills the box's height, his feet at its bottom center. */
 const BOX_STYLE = {
   "--gk-w": GOD_KING.w,
   "--gk-h": GOD_KING.h,
@@ -74,15 +74,15 @@ export function GodKingSprite({ side, anim = "idle", since = 0, then, class: cls
 }
 
 /**
- * The God King fallen (after his Last Stand): on his side, his armour cracked, his eyes dark, his crown rolled off
- * and his sword's flame down to embers. Greyed in the dock for the rest of the battle.
+ * The God King fallen (after his Last Stand): on his side, his armor cracked, his eyes dark, his crown rolled off
+ * and his sword's flame down to embers. Grayed in the dock for the rest of the battle.
  */
 export function GodKingFallen({ side, class: cls = "" }: { side: "w" | "b"; class?: string }) {
   return <GodKingSprite side={side} anim="fallen" class={`fallen ${cls}`} />;
 }
 
 /**
- * Centre of a square on the board in a 0-800 coordinate space, from the given side; on a board turned a quarter of the
+ * Center of a square on the board in a 0-800 coordinate space, from the given side; on a board turned a quarter of the
  * way round (`turn`, Boingo's funhouse: BoardTurn), where the turned board shows it.
  */
 export function squareXY(real: string, orientation: "white" | "black", turn: QuarterTurn = 0) {
@@ -445,7 +445,7 @@ export function kingCommandAct(mode: "move" | "strike", startAt: number, now: nu
 /**
  * The God King's portrait for his banners, from his drawing: crown and helm, eyes blazing and the
  * flaming sword raised beside him; `hurt`, battle-worn for his Last Stand (cracked, eyes dimmed, the flame low).
- * Scaled up with crisp pixels; his armour in the crowd's colour.
+ * Scaled up with crisp pixels; his armor in the crowd's color.
  */
 export function GodKingPortrait({ side, hurt = false }: { side: "w" | "b"; hurt?: boolean }) {
   const cv = useRef<HTMLCanvasElement>(null);

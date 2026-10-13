@@ -19,7 +19,7 @@ decisions about accounts, profiles, matchmaking and the landing page (indexed in
 | What | Where |
 | --- | --- |
 | Home, landing, profile, lobby screens | `packages/app/src/screens/Home.tsx`, `Landing.tsx`, `Profile.tsx`, `Lobby.tsx`, and new screens you add |
-| The approved mockups (the look to match) | `docs/mockups/front-door/*.dc.html` (design-component HTML: read it for layout, sizes, colours and copy) |
+| The approved mockups (the look to match) | `docs/mockups/front-door/*.dc.html` (design-component HTML: read it for layout, sizes, colors and copy) |
 | Accounts, profiles, results, the API | `packages/server/src/accounts.ts`, `api.ts` |
 | Matchmaking ("Play now" = the queue) | `packages/server/src/matchmaker.ts`, the lobby's joining and filling in `lobby.ts` / `lobby-do.ts` |
 | App-side account calls | `packages/app/src/account.ts`, `net.ts` (connecting only) |
@@ -36,7 +36,7 @@ If you need one of those changed, say what and why, and stop.
 ## Rules for this lane
 
 - **Phone first, desktop as good.** Every screen works at 320–430 px wide with big tap targets (44 px+) and no sideways
-  scrolling. On desktop (1024 px+) it uses the room, like the big chess sites (a side menu, a centre, a side panel),
+  scrolling. On desktop (1024 px+) it uses the room, like the big chess sites (a side menu, a center, a side panel),
   in HunChess's own look. Check both in Playwright screenshots before you call anything done.
 - **One look.** Dark ground `#14161b`, panels `#1b1e25` / `#232731`, gold `#f2c14e`, green `#4ade80` for online.
   Archivo for text and Archivo Black for the logo and big numbers (self-host them like Press Start 2P). The

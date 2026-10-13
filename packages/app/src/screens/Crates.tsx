@@ -43,7 +43,7 @@ const colorIndex = (c: string) => ITEM_COLORS.findIndex((x) => x.id === c);
 const pct = (x: number) => (x >= 0.01 ? `${(x * 100).toFixed(x >= 0.1 ? 0 : 1)}%` : `${(x * 100).toFixed(2)}%`);
 
 /** An item's one-line finish: "Emerald · Purity 91.5%". */
-/** Its colour name (both, for a two-colour item). */
+/** Its color name (both, for a two-color item). */
 export const colorName = (it: { color: string; color2?: string | null }) => itemColor(it.color).name + (it.color2 ? ` & ${itemColor(it.color2).name}` : "");
 export const finishLine = (it: { color: string; color2?: string | null; blemish: number }) => `${colorName(it)} · Purity ${purity(it.blemish).toFixed(1)}%`;
 
@@ -156,7 +156,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
       </div>
       <h3 class="ff-title">{look.boxes}</h3>
       <p class="small muted">
-        The crate holds a {look.box} for each tier, in its colour. A {look.box} opens to one of its tier's items, each as likely as the others.
+        The crate holds a {look.box} for each tier, in its color. A {look.box} opens to one of its tier's items, each as likely as the others.
       </p>
       <div class="odds-list">
         {liveStrip(crate).map(({ tier }) => {
@@ -215,8 +215,8 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         })}
       </div>
       <details class="odds-more">
-        <summary>Colours and purity</summary>
-        <p class="small">Every item also rolls a colour and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250).</p>
+        <summary>Colors and purity</summary>
+        <p class="small">Every item also rolls a color and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250).</p>
         <div class="color-odds">
           {ITEM_COLORS.map((c) => (
             <span key={c.id} class="color-chip">
@@ -273,7 +273,7 @@ function pickWeighted<T extends { weight: number }>(list: readonly T[]): T {
   return list[list.length - 1]!;
 }
 
-/** A decoy's look, by the real colour and purity odds (so the strip doesn't make a shiny look common). */
+/** A decoy's look, by the real color and purity odds (so the strip doesn't make a shiny look common). */
 const decoyFinish = () => ({ color: pickWeighted(ITEM_COLORS).id, color2: pickWeighted(ITEM_COLORS).id, blemish: rollBlemish(Math.random), seed: Math.floor(Math.random() * 2 ** 31) });
 
 /** A strip of tiles: decoys drawn by `pick`, the result at `land`. */
@@ -318,7 +318,7 @@ function TileView({ tile, look }: { tile: Tile; look: CrateLook }) {
 }
 
 /**
- * The strip: it races past a centre marker, slows (ease-out) and lands on the result, with a click for every
+ * The strip: it races past a center marker, slows (ease-out) and lands on the result, with a click for every
  * tile that passes (fast, then slower and slower).
  */
 function Spin({ tiles, land, ms, look, onDone }: { tiles: Tile[]; land: number; ms: number; look: CrateLook; onDone: () => void }) {
@@ -329,7 +329,7 @@ function Spin({ tiles, land, ms, look, onDone }: { tiles: Tile[]; land: number; 
     const first = el.children[0] as HTMLElement;
     const step = first.offsetWidth + 6;
     const width = box.current!.offsetWidth;
-    // Land somewhere inside the tile (not dead centre), like a real wheel.
+    // Land somewhere inside the tile (not dead center), like a real wheel.
     const target = land * step + step / 2 - width / 2 + (Math.random() - 0.5) * step * 0.6;
     const start = performance.now();
     let last = -1;
@@ -464,7 +464,7 @@ function Unwrap({ tier, look }: { tier: PresentTier; look: CrateLook }) {
   );
 }
 
-/** The reveal: an FF-style window with the item, its tier, colour, purity and (if so) its shine. */
+/** The reveal: an FF-style window with the item, its tier, color, purity and (if so) its shine. */
 function Reveal({ item, onAgain, onClose }: { item: ItemInstance; onAgain: () => void; onClose: () => void }) {
   const d = itemDef(item.def)!;
   const t = tierInfo(d.tier);
@@ -518,7 +518,7 @@ const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapo
 const tabName = (t: LockerTab) => (t === "all" ? "All" : t === "king" ? "God King" : SLOT_NAMES[t]);
 
 /**
- * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same colour
+ * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same color
  * stacked (×3, the purest on top: that's the one you wear). Then what you got in the shop: God King effects. Tap to
  * wear (tap again to take off); hold a crate item (or right-click it) to delete it. Your avatar shows the result.
  * (The pawn hats are crate items now, from the Beta crate.)

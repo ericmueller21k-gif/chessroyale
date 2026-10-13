@@ -3,11 +3,11 @@
  *
  * A character is a palette, a set of parts (small pixel grids, one character per pixel, each character a palette
  * key) and animations. A frame stacks parts back to front at whole-pixel positions; a part can be rotated by quarter
- * turns, mirrored, or rippled (a cape or a plume: each row or column slides by whole pixels, more towards its free
+ * turns, mirrored, or rippled (a cape or a plume: each row or column slides by whole pixels, more toward its free
  * end). Every part gets a 1-pixel dark outline of its own, so a part in front of another is always cut out from it,
- * however the parts move. Nothing is ever smoothed: frames are drawn on the grid and scaled up with nearest-neighbour.
+ * however the parts move. Nothing is ever smoothed: frames are drawn on the grid and scaled up with nearest-neighbor.
  *
- * Frames carry `cue`s (sound and game hooks: "thrust", "impact") that fire when the frame shows, and recolours are
+ * Frames carry `cue`s (sound and game hooks: "thrust", "impact") that fire when the frame shows, and recolors are
  * palette swaps (a whole look, or one frame's flash).
  */
 
@@ -72,14 +72,14 @@ export interface Character {
   h: number;
   /** Where the character stands (the ground between its feet), in frame pixels: for placing it on screen. */
   foot: readonly [number, number];
-  /** Palette: key -> #rrggbb (or #rrggbbaa, see-through). `k` is the outline colour and must be present. */
+  /** Palette: key -> #rrggbb (or #rrggbbaa, see-through). `k` is the outline color and must be present. */
   palette: Readonly<Record<string, string>>;
   /** A faint 1-pixel backlight around the whole silhouette, so a dark boss still reads on the dark ground. */
   halo?: string;
-  /** Named recolours (palette changes) for whole looks: "frozen", "enraged". */
+  /** Named recolors (palette changes) for whole looks: "frozen", "enraged". */
   looks?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   /**
-   * A recolour that changes from battle to battle (Hollow's lights), read as frames are drawn: whatever draws and
+   * A recolor that changes from battle to battle (Hollow's lights), read as frames are drawn: whatever draws and
    * caches frames passes it to renderFrame (`swap`) and keys its cache by its id. Null: the palette as it is.
    */
   swap?: () => Swap | null;
@@ -88,10 +88,10 @@ export interface Character {
 }
 
 /**
- * A recolour by colour, key by key: for each palette key, a map from a colour (`#rrggbb`, lower case) to the one it
- * becomes. It applies to the key's final colour (after the palette, the look and the frame's own changes), keeping its
+ * A recolor by color, key by key: for each palette key, a map from a color (`#rrggbb`, lower case) to the one it
+ * becomes. It applies to the key's final color (after the palette, the look and the frame's own changes), keeping its
  * alpha, so a frame that puts a key out, dims it or flashes it still does. `id` names it for the caches of drawn frames.
- * Hollow's lights use it: each bulb has keys of its own, drawn in a default colour and swapped to the battle's
+ * Hollow's lights use it: each bulb has keys of its own, drawn in a default color and swapped to the battle's
  * (lights.ts).
  */
 export interface Swap {
@@ -149,7 +149,7 @@ function ripple(cells: Cells, wave: Wave): { cells: Cells; pad: number } {
 
 const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
-/** Rings the filled cells with `key` (4-neighbour), growing the part by one pixel each side. */
+/** Rings the filled cells with `key` (4-neighbor), growing the part by one pixel each side. */
 function ring(cells: Cells, key: string): Cells {
   const h = cells.length;
   const w = cells[0]?.length ?? 0;
@@ -195,7 +195,7 @@ function placed(part: Part, layer: Layer): { cells: Cells; dx: number; dy: numbe
   return done;
 }
 
-/** A frame as palette keys (null = transparent), before colours. */
+/** A frame as palette keys (null = transparent), before colors. */
 export function frameKeys(ch: Character, frame: Frame): Cells {
   const canvas: Cells = Array.from({ length: ch.h }, () => Array<string | null>(ch.w).fill(null));
   // Pixels of outlined parts: the halo rings these only, not a ground shadow or a glow.
@@ -237,7 +237,7 @@ export function frameKeys(ch: Character, frame: Frame): Cells {
   return out;
 }
 
-/** `#rrggbb`, or `#rrggbbaa` for a see-through colour (ice over a piece, a cloud): [r, g, b, a]. */
+/** `#rrggbb`, or `#rrggbbaa` for a see-through color (ice over a piece, a cloud): [r, g, b, a]. */
 function hex(c: string): [number, number, number, number] {
   const s = c.replace("#", "");
   const n = parseInt(s.slice(0, 6), 16);
@@ -246,7 +246,7 @@ function hex(c: string): [number, number, number, number] {
 
 /**
  * Draws one frame as RGBA pixels (ImageData-shaped): `bg` fills the empty pixels (transparent if left out);
- * `look` picks a recolour; `swap` swaps colours key by key after everything else (Hollow's lights: see Swap).
+ * `look` picks a recolor; `swap` swaps colors key by key after everything else (Hollow's lights: see Swap).
  */
 export function renderFrame(ch: Character, frame: Frame, opts: { bg?: string; look?: string; swap?: Swap | null } = {}): { w: number; h: number; data: Uint8ClampedArray } {
   const pal: Record<string, string> = { ...ch.palette, ...(opts.look ? ch.looks?.[opts.look] : {}), ...frame.pal };
@@ -265,10 +265,10 @@ export function renderFrame(ch: Character, frame: Frame, opts: { bg?: string; lo
     let px = pixels.get(k);
     if (px !== undefined) return px;
     const colour = k ? pal[k] : undefined;
-    if (k && !colour) throw new Error(`${ch.id}: no colour for "${k}"`);
+    if (k && !colour) throw new Error(`${ch.id}: no color for "${k}"`);
     const c = colour ? hex(colour) : null;
     const rgb = c && bg && c[3] < 255 ? ([0, 1, 2].map((j) => Math.round(c[j]! * (c[3] / 255) + bg[j]! * (1 - c[3] / 255))) as number[]) : (c ?? bg);
-    // A see-through colour keeps its alpha, unless it was laid over `bg`.
+    // A see-through color keeps its alpha, unless it was laid over `bg`.
     px = rgb ? [rgb[0]!, rgb[1]!, rgb[2]!, c && !bg ? c[3] : 255] : null;
     pixels.set(k, px);
     return px;

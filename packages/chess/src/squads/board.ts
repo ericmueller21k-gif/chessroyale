@@ -16,7 +16,7 @@ export type Side = 0 | 1;
 export type BoardEnd = Exclude<GameEnd, null> | "safety_cap" | "admin";
 
 export interface BoardResult {
-  /** The colour that won; null for a draw. */
+  /** The color that won; null for a draw. */
   winner: Colour | null;
   reason: BoardEnd;
   /** The material count, when the safety cap (or the admin button) decided it. */
@@ -57,7 +57,7 @@ export function newSquadsBoard(id: number, start: BoardStart, white: Side): Squa
   return { id, start, fen: start.fen, moves: [], keys: [positionKey(start.fen)], white, result: null };
 }
 
-/** The colour to move on a board. */
+/** The color to move on a board. */
 export function colourToMove(board: Pick<SquadsBoard, "fen">): Colour {
   return board.fen.split(" ")[1] === "b" ? "b" : "w";
 }
@@ -138,7 +138,7 @@ export function playOnBoard(board: SquadsBoard, move: string): SquadsBoard {
   return { ...board, fen, moves: [...board.moves, move], keys, result: endOf(chess, keys) };
 }
 
-/** Each colour's material (pawn 1, knight and bishop 3, rook 5, queen 9; kings don't count). */
+/** Each color's material (pawn 1, knight and bishop 3, rook 5, queen 9; kings don't count). */
 export function materialCount(fen: string, s: SquadsSettings = SQUADS): { w: number; b: number } {
   const out = { w: 0, b: 0 };
   for (const ch of fen.split(" ")[0]!) {

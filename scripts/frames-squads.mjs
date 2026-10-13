@@ -10,7 +10,7 @@
 // Mercenary: modevote: the Mode vote (Mercenary tapped, Coming soon disabled), its result and the next vote. shop: a
 // Mercenary test lobby at Pairs: the shop sliding in, the explainer, two purchases, Hide and the pill, then the match
 // starting (the shop going); PNGs of the sheet, also with a wide wallet (12,345). stockfish: a token used on your pick
-// (its arrows and lines). shield: a shield bought, the bots blocking whenever they can, the line saying it was cancelled.
+// (its arrows and lines). shield: a shield bought, the bots blocking whenever they can, the line saying it was canceled.
 // chip: a Time chip bought, then tapped on your pick: the "+30 s", the clock jumping and standing still (each frame's
 // clock text is logged).
 // The time controls (Oct 13): clockvote: the Clock vote's three cards (Bullet, Blitz, Rapid), a tap, the result's banner

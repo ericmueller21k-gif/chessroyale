@@ -19,7 +19,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   **brilliant** move is one that separated the field (among enough pickers); a pick made after a power-up's hints
   can't be brilliant.
 - **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out
-  (`knockoutsPerStage`; in 50 v 50 the same number from each team). The cut is a judgement: every player's pawn in a
+  (`knockoutsPerStage`; in 50 v 50 the same number from each team). The cut is a judgment: every player's pawn in a
   10 × 10 grid, the gavel, the verdict, "Why was I cut?" (the elimination breakdown). `stageBreakSeconds` 10.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
   on an empty board (or tapping a card): how it ends (**team final**, **boss battle**, **duel**), then "How fast?", a
@@ -76,7 +76,7 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
 
 - Unit: `packages/core/test/match.test.ts`, `scoring.test.ts`, `votes.test.ts`, `brilliance.test.ts`,
   `packages/chess/test/crowd.test.ts`, `runner.test.ts`, `replay-cache.test.ts`, `long-match.test.ts`. The clock vote:
-  `votes.test.ts` (each time control, the bank maths, the calibration), `crowd.test.ts` (the runner) and
+  `votes.test.ts` (each time control, the bank math, the calibration), `crowd.test.ts` (the runner) and
   `packages/server/test/lobby.test.ts` ("the clock vote online"); e2e `votes.spec.ts` (Bullet's clock, solo and online)
   and `formats.spec.ts` (the cards set the clock).
 - e2e: `e2e/crowd.spec.ts`, `formats.spec.ts`, `votes.spec.ts`, `match-screen.spec.ts`, `panel.spec.ts`,

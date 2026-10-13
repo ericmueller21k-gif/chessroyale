@@ -2437,7 +2437,7 @@ export class LobbyCore {
     rating: number | null;
     brilliant: number;
     bestMove: string | null;
-    /** It counts for their ranking: enough real players (isRankedMatch), and they weren't practising (unlimited hints). */
+    /** It counts for their ranking: enough real players (isRankedMatch), and they weren't practicing (unlimited hints). */
     ranked: boolean;
     /** They had the eval bar on, as their app said (null: an app from before the setting). */
     evalBar: boolean | null;

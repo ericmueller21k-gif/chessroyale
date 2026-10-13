@@ -34,7 +34,7 @@ function when(at: number, now = Date.now()): string {
   return new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/** What they wear, one row per item: the item itself (as it looks on them), slot, colour, purity and tier. */
+/** What they wear, one row per item: the item itself (as it looks on them), slot, color, purity and tier. */
 function Wearing({ look, own }: { look: ItemLook; own: boolean }) {
   const rows = WORN_ORDER.flatMap((slot) => {
     const it = look[slot];

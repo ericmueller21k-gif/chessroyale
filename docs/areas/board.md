@@ -19,7 +19,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 - **How it behaves** (`board/OwnBoard.tsx`, its pure logic in `board/logic.ts`):
   - **Feel:** a move slides 220 ms on a cubic ease in and out (`SLIDE_MS`); a captured piece fades as the taker slides
     on; a press becomes a drag at 3 px (`DRAG_DISTANCE_PX`), and after a dragged move the next drag starts at once;
-    a dragged piece's centre follows the finger; a drop lands at once; a drop where it can't go goes straight back.
+    a dragged piece's center follows the finger; a drop lands at once; a drop where it can't go goes straight back.
     A tap-tap move is made as the second press goes down. A touch on a piece, near one or with one selected doesn't
     scroll the page; one on an empty stretch with nothing selected still can.
   - **A move you make** stays on the board until the game next tells the board anything (as the old board's did): a
@@ -37,11 +37,11 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     (see-through, z-index 2) and their labels (`svg.hb-labels`, 9), the coordinates (`.hb-coords`) under the pieces.
     The board's own boxes: `.board.hb` (with `orientation-white`/`-black`), `.hb-container` (exactly the board),
     `.hb-board` (the squares). Nothing in it makes a stacking layer of its own.
-- **The pieces** are the cburnett set (Colin M.L. Burnett) from Wikimedia Commons under the BSD licence
+- **The pieces** are the cburnett set (Colin M.L. Burnett) from Wikimedia Commons under the BSD license
   (`board/pieces/`: the files, `LICENSE.txt`, `SOURCES.md`), drawn by `board/pieces.css` on the board, on anything
   else drawn with them (a layer marked `.hb-pieces`: ghosts, the bounce, the split, the Last Stand's piece, the God
   King's targets, avatars; it also gives their pieces the board's base: a square each, z-index 2, never taking a tap)
-  and in the promotion picker. The black pieces' details are toned to the light grey the game always showed.
+  and in the promotion picker. The black pieces' details are toned to the light gray the game always showed.
 - **What overlays may rely on** (`board/dom.ts`): `BOARD_SQUARES` / `boardSquares(el)` for the squares' box (the God
   King's strike, Lights out's taps), `boardPieces(wrap)` for the piece elements and their real squares (Sawyer's split
   pawns).
@@ -52,7 +52,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 | --- | --- |
 | The board, and the knock for each move | `packages/app/src/components/Board.tsx`, `board/OwnBoard.tsx` |
 | Its logic (squares, the size, taps and drags, which piece slides where, the dots, arrows) | `packages/app/src/board/logic.ts`; props `board/types.ts` |
-| The pieces, and the base for anything drawn with them | `packages/app/src/board/pieces/` (files, licence, sources), `board/pieces.css` |
+| The pieces, and the base for anything drawn with them | `packages/app/src/board/pieces/` (files, license, sources), `board/pieces.css` |
 | Its styles | `styles.css`, "The board" (after `.board-wrap`) |
 | A turned board's squares and coordinates | `packages/app/src/board-view.ts` |
 | What overlays look up | `packages/app/src/board/dom.ts` |
@@ -66,7 +66,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 - Unit: `packages/app/test/board-logic.test.ts` (every square's place at every orientation and turn, against
   `squareXY`; the square under a point; the board's size; the 3 px drag threshold; taps, tap-tap, drags, drops and
   what each lets go of; the move dots, a power's moves and Hollow's dark; which piece slides where, a capture's fade,
-  castling, a promotion; arrows), `board-view.test.ts`, `pieces.test.ts` (the pieces' files, sources and licence).
+  castling, a promotion; arrows), `board-view.test.ts`, `pieces.test.ts` (the pieces' files, sources and license).
 - e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`.
 - Frames: every `npm run frames:*` script.
 

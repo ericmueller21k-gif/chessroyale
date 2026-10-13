@@ -7,7 +7,7 @@
  * sleeve) and legs are painted from their pose's points (a shoulder, an elbow, a hand; a hip and a foot), and the
  * lollipop from where his fist holds it and where the candy is. So a new pose is a few numbers.
  *
- * His powers' moments (characters/power-art.ts): `snack` (he waddles over to one of the crowd's centre pawns, grabs it
+ * His powers' moments (characters/power-art.ts): `snack` (he waddles over to one of the crowd's center pawns, grabs it
  * and eats it: nom, nom), `toss` (a toy block thrown at the board), `bigBounce` (on the board: three bounces with squash
  * and stretch, a giant fall, dazed, a giggle, and off again; timed to boss-timing's BOUNCE), and his reactions `lick`
  * (a slurp of the lollipop), `giggle` and `wail` (the tantrum with its wail). Idle, swing and tantrum are as approved.
@@ -64,7 +64,7 @@ export const BIGBOY_PALETTE: Record<string, string> = {
   y: "#ffd84a", // dazed stars
 };
 
-/** Recolours: the crowd's pawn in his hand is black when the crowd plays Black. */
+/** Recolors: the crowd's pawn in his hand is black when the crowd plays Black. */
 const LOOKS: Record<string, Record<string, string>> = { blackPawn: { x: "#55555f", X: "#26262e" } };
 
 type Pt = readonly [number, number];
@@ -316,7 +316,7 @@ function paintLimb(pts: readonly Pt[], r: number, endR: number, sleeve: number):
 // ---- The lollipop: a swirl of rainbow on a stick.
 
 const CANDY_R = 8.5;
-/** The candy, its swirl turned by `spin` sixths of a turn (the colours wind round it, outward). */
+/** The candy, its swirl turned by `spin` sixths of a turn (the colors wind round it, outward). */
 function candy(spin: number): Part {
   const S = 18;
   const c = S / 2;
@@ -430,7 +430,7 @@ const FREE: Record<Free, Pt[]> = {
   hold: [SHOULDER_R, [51, 27.5], [51.5, 19.5]],
   /** Wound back over his shoulder (the throw's wind-up): the arm drawn behind him, what it holds up over his head. */
   back: [SHOULDER_R, [52.5, 25], [50, 13]],
-  /** Thrown out towards the board (on our right). */
+  /** Thrown out toward the board (on our right). */
   throw: [SHOULDER_R, [51.5, 31], [55.5, 33.5]],
 };
 /** What his free hand holds, drawn at it: the pawn (whole or bitten), or a toy block. */
@@ -532,7 +532,7 @@ export function bigBoyLayers(p: BigBoyPose): Layer[] {
 
 const f = (ms: number, p: BigBoyPose, extra: Partial<Frame> = {}): Frame => ({ ms, layers: bigBoyLayers(p), ...extra });
 
-/** A four-point star (an impact, a sparkle): a white core and coloured rays. */
+/** A four-point star (an impact, a sparkle): a white core and colored rays. */
 const star = (x: number, y: number, k = "3", big = false): Speck[] => [
   [x, y, "F"],
   [x - 1, y, k],
@@ -554,7 +554,7 @@ const tears = (t: number, hx = 0, hy = 0): Speck[] =>
   });
 /**
  * The swing's rainbow trail: an arc round his shoulder (drawing space) between two angles (degrees, 0 to our right,
- * negative up), six one-pixel bands red on the outside to purple inside, thinning to dots towards its start.
+ * negative up), six one-pixel bands red on the outside to purple inside, thinning to dots toward its start.
  */
 function rainbowArc(c: Pt, r: number, from: number, to: number): Speck[] {
   const out: Speck[] = [];

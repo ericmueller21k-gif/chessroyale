@@ -79,7 +79,7 @@ describe("the kit's kingAttack", () => {
     expect(bossKit("Hollow")!.chance.kingAttack).toBe(1);
   });
 
-  it("hits the king's square back and forth: a forehand then a backhand, from his side, in the bulbs' colours", () => {
+  it("hits the king's square back and forth: a forehand then a backhand, from his side, in the bulbs' colors", () => {
     expect(lashItem("e1", 0, "L", 5)).toEqual({ square: "e1", name: "lashHit", anim: "hitFL0", since: 5 });
     expect(lashItem("a3", 1, "R", 5).anim).toBe("hitBR1");
     expect(lashItem("a3", 5, "R", 5).anim).toBe("hitBR2");

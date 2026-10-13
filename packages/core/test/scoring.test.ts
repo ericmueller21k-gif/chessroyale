@@ -150,7 +150,7 @@ describe("draw rules", () => {
     expect(scoreGroup(picks, evaluation, mulberry32(1), DEFAULT_SETTINGS, "best").drawRule).toBe("best");
   });
 
-  it("weighted favours better moves but still plays weaker ones sometimes", () => {
+  it("weighted favors better moves but still plays weaker ones sometimes", () => {
     const s = share("weighted");
     // Losses 0, 4, 4, 32 with 4-point weights: e2e4 1, d2d4 2 × e^-1, h2h4 e^-8.
     expect(s.e2e4!).toBeCloseTo(1 / (1 + 2 * Math.exp(-1)), 1);

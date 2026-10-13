@@ -268,8 +268,8 @@ describe("time bank and power-ups", () => {
   });
 });
 
-describe("colours per stage", () => {
-  it("splits players evenly and swaps last stage's colours where it can", () => {
+describe("colors per stage", () => {
+  it("splits players evenly and swaps last stage's colors where it can", () => {
     let state = assignColours(createMatch(entrants, boards), mulberry32(1), 32);
     expect(state.players.filter((p) => p.colour === "w")).toHaveLength(32);
     const before = new Map(state.players.map((p) => [p.id, p.colour]));
@@ -278,7 +278,7 @@ describe("colours per stage", () => {
     expect(assignColours(state, mulberry32(3), null).players.every((p) => p.colour === null)).toBe(true);
   });
 
-  it("groups players only onto boards where their colour is to move", () => {
+  it("groups players only onto boards where their color is to move", () => {
     const state = assignColours(createMatch(entrants, boards), mulberry32(1), 32);
     const sides = new Map(boards.map((b) => [b, b < 4 ? ("w" as const) : ("b" as const)]));
     const groups = assignGroups(mulberry32(4), state, DEFAULT_SETTINGS, 4000, sides);
@@ -290,7 +290,7 @@ describe("colours per stage", () => {
 });
 
 describe("odd board counts", () => {
-  it("keeps colours fixed with an odd number of boards: group sizes follow the numbers", () => {
+  it("keeps colors fixed with an odd number of boards: group sizes follow the numbers", () => {
     const players = entrants.slice(0, 56);
     let state = assignColours(createMatch(players, [0, 1, 2, 3, 4, 5, 6]), mulberry32(1), 28);
     // 4 boards White to move, 3 Black; next round it flips.

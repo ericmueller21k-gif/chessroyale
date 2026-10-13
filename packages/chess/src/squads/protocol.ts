@@ -245,15 +245,15 @@ export interface NetSquadsMatch {
   /**
    * break: about to start (the first half at `startsAt`); half: a half is being played (`current`); show: the half's
    * moves landing, the reveal and the coin (the next half at `startsAt`); armageddon: a drawn final, its Armageddon's
-   * colours being chosen (`armageddonChoice`); over.
+   * colors being chosen (`armageddonChoice`); over.
    */
   state: "break" | "half" | "show" | "armageddon" | "over";
   startsAt: number | null;
   current: NetSquadsHalf | null;
   result: MatchResult | null;
-  /** After a drawn final: its points and each side's team bank left (which decided who picks Armageddon's colours). */
+  /** After a drawn final: its points and each side's team bank left (which decided who picks Armageddon's colors). */
   drawnFinal?: { points: [number, number]; timeLeft: [number, number] };
-  /** A drawn final: the side that picks Armageddon's colours (its squad's people; bots take Black), until when, and the pick so far. */
+  /** A drawn final: the side that picks Armageddon's colors (its squad's people; bots take Black), until when, and the pick so far. */
   armageddonChoice?: { chooser: Side; until: number; colour: Colour | null };
 }
 
@@ -308,7 +308,7 @@ export type SquadsClientMessage =
   | { t: "buy"; item: MercItem }
   /** Mercenary: put one back while the shop is open (the last one bought, refunded at what it cost). */
   | { t: "unbuy"; item: MercItem }
-  /** A drawn final: your squad picks Armageddon's colour (the side that picks: see `armageddonChoice`; the last pick stands). */
+  /** A drawn final: your squad picks Armageddon's color (the side that picks: see `armageddonChoice`; the last pick stands). */
   | { t: "armageddon"; key: string; colour: Colour }
   /** This device's engine speed (nodes per second), from its speed check on joining: it can take bot work. */
   | { t: "speed"; nps: number }

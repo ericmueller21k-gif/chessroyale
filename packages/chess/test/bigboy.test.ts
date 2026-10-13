@@ -345,7 +345,7 @@ describe("Big Boy's Big Bounce: the new position", () => {
 
   it("measures the loss in pawns (log-odds of the expected score), so a pawn is a pawn however lopsided the game", () => {
     expect(pawnsLost(0.5, 0.5)).toBe(0);
-    // About the snack's own pawn: the starting position against one without a centre pawn.
+    // About the snack's own pawn: the starting position against one without a center pawn.
     expect(pawnsLost(0.536, 0.305)).toBeCloseTo(1, 1);
     // The same pawn from a crowd already well behind is a few points of expected score, still a pawn.
     const behind = 1 / (1 + Math.exp(2.5));
@@ -397,7 +397,7 @@ describe("Big Boy's Big Bounce: the new position", () => {
     expect(await bounceFrom([engine()], fen, [])).toBeNull();
   });
 
-  it("lands three bounces on 2x2 blocks over the pieces it moves (never the centre's), the same everywhere", () => {
+  it("lands three bounces on 2x2 blocks over the pieces it moves (never the center's), the same everywhere", () => {
     for (const fen of POSITIONS)
       for (let seed = 0; seed < 10; seed++) {
         const crowd = sideToMove(fen) === "w" ? "b" : "w";
@@ -527,7 +527,7 @@ describe("Big Boy's Big Bounce in a battle", () => {
   });
 
   it("over many positions, the pick is inside the band whenever a candidate is, nearest the target; never past the cap", async () => {
-    // An engine whose verdict follows material and how far the crowd's pieces were thrown from the centre.
+    // An engine whose verdict follows material and how far the crowd's pieces were thrown from the center.
     const material = (f: string, side: "w" | "b") => [...squares(f).values()].filter((p) => p[0] === side).reduce((t, p) => t + ({ p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 } as Record<string, number>)[p[1]!]!, 0);
     const centre = (f: string, side: "w" | "b") => [...squares(f)].filter(([, p]) => p[0] === side && p[1] !== "k").reduce((t, [sq]) => t - Math.abs(sq.charCodeAt(0) - 100.5) - Math.abs(Number(sq[1]) - 4.5), 0);
     const his = (f: string) => {

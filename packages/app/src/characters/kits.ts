@@ -51,7 +51,7 @@ export interface BossKit extends BeatLines {
   /** Wider than the boss bar's usual box (Sawyer's saw and tail): on a phone his box is wider, so neither the screen's
    * edge nor the boss's name cuts into him. */
   wide?: boolean;
-  /** A recolour (one of the character's `looks`) from the battle's state: Hollow's bulbs still lit. */
+  /** A recolor (one of the character's `looks`) from the battle's state: Hollow's bulbs still lit. */
   lookOf?: (boss: BossView) => string | undefined;
   /** Its attack on a king (the God King's Last Stand, its mate), if it has one: see KingAttackKit. */
   kingAttack?: KingAttackKit;
@@ -127,7 +127,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
       const n = (boss.powers as { bulbs?: number } | undefined)?.bulbs;
       return n === undefined ? undefined : bulbsLook(n);
     },
-    // He drops in beside the king and whips his strand at it (hollow.ts: kingAttack), a lash of colour on its square each hit.
+    // He drops in beside the king and whips his strand at it (hollow.ts: kingAttack), a lash of color on its square each hit.
     kingAttack: { ch: HOLLOW_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: lashItem },
   },
   "Big Boy": {

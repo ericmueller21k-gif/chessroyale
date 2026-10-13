@@ -20,7 +20,7 @@ beforeAll(async () => {
 }, 60_000);
 
 describe("the int8 model in the browser's runtime", () => {
-  it("gives the same top moves as native onnxruntime on every fixture (both colours, promotions)", async () => {
+  it("gives the same top moves as native onnxruntime on every fixture (both colors, promotions)", async () => {
     let worst = 0;
     for (const p of fixtures.positions) {
       const out = await model.predict(p.fen, p.elo, p.elo);

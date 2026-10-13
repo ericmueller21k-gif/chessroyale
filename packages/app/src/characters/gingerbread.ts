@@ -221,7 +221,7 @@ function paintLimb(pts: readonly Pt[], r: number, cuff: number, endR = r): Paint
 type CaneLook = { part: Part; glow: Part; at: Pt; tip: Pt; hookTop: Pt };
 
 /**
- * The cane held at `grip`: `dir` points from the grip towards the hook end, `up` pixels to where the hook starts,
+ * The cane held at `grip`: `dir` points from the grip toward the hook end, `up` pixels to where the hook starts,
  * `down` pixels the other way to the tip. The hook curls round to the left of `dir` (`curl` -1 for the right).
  */
 function paintCane(grip: Pt, dir: Pt, up: number, down: number, curl: 1 | -1 = 1): CaneLook {
@@ -242,7 +242,7 @@ function paintCane(grip: Pt, dir: Pt, up: number, down: number, curl: 1 | -1 = 1
   for (let t = -down; t <= up; t += 0.25) push([grip[0] + ux * t, grip[1] + uy * t]);
   const top: Pt = [grip[0] + ux * up, grip[1] + uy * up];
   const centre: Pt = [top[0] + lx * R, top[1] + ly * R];
-  // Half a turn round the centre, from the shaft's top over to the other side, then a short tail down.
+  // Half a turn round the center, from the shaft's top over to the other side, then a short tail down.
   for (let a = 0; a <= Math.PI; a += 0.06) {
     const c = Math.cos(a);
     const sn = Math.sin(a);

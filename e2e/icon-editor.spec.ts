@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-/** The colour of one icon pixel, read from the editor's canvas (r, g, b, a). */
+/** The color of one icon pixel, read from the editor's canvas (r, g, b, a). */
 const pixel = (page: Page, x: number, y: number) =>
   page.evaluate(([x, y]) => Array.from((document.querySelector(".icon-canvas") as HTMLCanvasElement).getContext("2d")!.getImageData(x!, y!, 1, 1).data), [x, y]);
 
@@ -26,7 +26,7 @@ test("the icon builder's tools survive being spammed", async ({ page }) => {
   const fillButton = page.getByRole("button", { name: "Fill", exact: true });
   const quick = { timeout: 5_000 };
 
-  // 50 fills in a row with one colour: the first fills the blank canvas, the rest change nothing.
+  // 50 fills in a row with one color: the first fills the blank canvas, the rest change nothing.
   await page.getByRole("radio", { name: "#ed1c24" }).click();
   for (let i = 0; i < 50; i++) {
     await fillButton.click(quick);
@@ -39,7 +39,7 @@ test("the icon builder's tools survive being spammed", async ({ page }) => {
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   expect(await pixel(page, 47, 47)).toEqual([0, 0, 0, 0]);
 
-  // Alternating colours: every fill repaints the whole canvas.
+  // Alternating colors: every fill repaints the whole canvas.
   for (let i = 0; i < 20; i++) {
     await page.getByRole("radio", { name: i % 2 ? "#00a2e8" : "#22b14c" }).click(quick);
     await canvas.click({ ...quick, position: { x: 30, y: 30 } });

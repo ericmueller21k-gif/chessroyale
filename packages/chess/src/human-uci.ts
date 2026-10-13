@@ -1,5 +1,5 @@
 /**
- * A human-like engine (the Maia box: its own worker, its own licence) spoken to only in UCI-style text, through the
+ * A human-like engine (the Maia box: its own worker, its own license) spoken to only in UCI-style text, through the
  * same transport as Stockfish (uci.ts). Its replies: `info … multipv k … p <probability> … pv <move>` lines for its
  * likeliest moves, then `bestmove <move>` (its own draw). Nothing of it is imported here: only text goes back and forth.
  */

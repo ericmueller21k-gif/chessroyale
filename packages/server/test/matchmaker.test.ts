@@ -99,7 +99,7 @@ describe("matchmaker", () => {
     expect(L.calls()).toBeLessThan(15);
   });
 
-  it("a seat freed in the filling lobby (someone cancelled) goes to the next player", async () => {
+  it("a seat freed in the filling lobby (someone canceled) goes to the next player", async () => {
     const L = lobbies(0, 3);
     const mm = matchmaker(L.ns);
     const first = await Promise.all([mm.next({}, 60_000), mm.next({}, 60_000), mm.next({}, 60_000)]);

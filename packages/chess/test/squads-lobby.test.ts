@@ -41,7 +41,7 @@ describe("Squads: seeded randomness", () => {
     expect(squadsRng(43, "r0m1", 3, "w", 2, "coin")()).not.toBe(draws[0]);
   });
 
-  it("coins from neighbouring names come out fair (no bias between similar names)", () => {
+  it("coins from neighboring names come out fair (no bias between similar names)", () => {
     let heads = 0;
     for (let t = 0; t < 2000; t++) heads += squadsRng(7, "r1m0", t, "w", 0, "coin")() < 0.5 ? 1 : 0;
     expect(heads / 2000).toBeGreaterThan(0.45);

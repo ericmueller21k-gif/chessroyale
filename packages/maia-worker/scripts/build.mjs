@@ -3,7 +3,7 @@
 //   ort-wasm-simd-threaded.wasm  onnxruntime's WebAssembly (run on one thread)
 //   <model>.onnx                 the converted model (model/, made by scripts/convert.py)
 //   LICENSE.txt                  the GNU AGPL 3.0 (this box and Maia-3)
-//   NOTICE.txt                   what this is, where its source is, and the bundled libraries' licences
+//   NOTICE.txt                   what this is, where its source is, and the bundled libraries' licenses
 // Usage: node scripts/build.mjs [outDir]
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -53,11 +53,11 @@ writeFileSync(
     `Model: ${MODEL} (${MODEL_NAME}), converted from the official checkpoint UofTCSSLab/Maia3-23M.`,
     "Its source (the worker, the conversion scripts and how the model was made) is available on request.",
     "",
-    `Bundled: onnxruntime-web ${ortVersion} (MIT licence, (c) Microsoft Corporation), chess.js ${chessVersion}`,
-    "(BSD 2-Clause licence, (c) Jeff Hlywa). Their licence texts follow.",
+    `Bundled: onnxruntime-web ${ortVersion} (MIT license, (c) Microsoft Corporation), chess.js ${chessVersion}`,
+    "(BSD 2-Clause license, (c) Jeff Hlywa). Their license texts follow.",
     "",
     "---- onnxruntime-web ----",
-    // (Its npm package ships no licence file: the MIT text from its repository.)
+    // (Its npm package ships no license file: the MIT text from its repository.)
     readFileSync(join(BOX, "licenses/onnxruntime-MIT.txt"), "utf8").trim(),
     "",
     "---- chess.js ----",

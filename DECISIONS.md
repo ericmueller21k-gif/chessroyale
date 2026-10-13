@@ -1,6 +1,6 @@
 # Decisions
 
-Judgement calls made while building, with the reason for each. Eric asked to be involved as little as possible, so
+Judgment calls made while building, with the reason for each. Eric asked to be involved as little as possible, so
 these weren't reviewed first. Most are a single line in `packages/core/src/settings.ts`.
 
 ## How this file works (Oct 10, 2026)
@@ -32,7 +32,7 @@ In [`docs/history/bosses.md`](docs/history/bosses.md). How it works today: [`doc
 - [Boss characters: style test (Oct 8, 2026)](docs/history/bosses.md#boss-characters-style-test-oct-8-2026)
 - [Boss powers and the boss raid rework (design, Oct 8, 2026; the template, Freeze, Boingo and G-REX (Fire) built: see below)](docs/history/bosses.md#boss-powers-and-the-boss-raid-rework-design-oct-8-2026-the-template-freeze-boingo-and-g-rex-fire-built-see-below)
 - [Lag that grew with the match (Oct 9, 2026)](docs/history/bosses.md#lag-that-grew-with-the-match-oct-9-2026)
-- [Two tweaks (Eric, Oct 9, 2026)](docs/history/bosses.md#two-tweaks-eric-oct-9-2026): Ginger freezes more often; the God King keeps his colours in the dock
+- [Two tweaks (Eric, Oct 9, 2026)](docs/history/bosses.md#two-tweaks-eric-oct-9-2026): Ginger freezes more often; the God King keeps his colors in the dock
 - [Hollow, the Darkness boss (design, Eric, Oct 9, 2026; calls marked "director's call")](docs/history/bosses.md#hollow-the-darkness-boss-design-eric-oct-9-2026-calls-marked-directors-call)
 - [Big Boy, the baby boss (design, Eric, Oct 10, 2026; calls marked "director's call")](docs/history/bosses.md#big-boy-the-baby-boss-design-eric-oct-10-2026-calls-marked-directors-call)
 
@@ -71,7 +71,7 @@ In [`docs/history/match-and-crowd.md`](docs/history/match-and-crowd.md). How it 
 - [One locked phone screen, every board on top, one countdown style, ticks only (Oct 3, 2026)](docs/history/match-and-crowd.md#one-locked-phone-screen-every-board-on-top-one-countdown-style-ticks-only-oct-3-2026)
 - [Cleaner play screen (Oct 3, 2026)](docs/history/match-and-crowd.md#cleaner-play-screen-oct-3-2026)
 - [One line of controls, a power-up button, live numbers, a smarter small scoreboard (Oct 3, 2026)](docs/history/match-and-crowd.md#one-line-of-controls-a-power-up-button-live-numbers-a-smarter-small-scoreboard-oct-3-2026)
-- [Power-up slots, a centre-closing timer, shorter openings, replay from move 0 (Oct 3, 2026)](docs/history/match-and-crowd.md#power-up-slots-a-centre-closing-timer-shorter-openings-replay-from-move-0-oct-3-2026)
+- [Power-up slots, a center-closing timer, shorter openings, replay from move 0 (Oct 3, 2026)](docs/history/match-and-crowd.md#power-up-slots-a-center-closing-timer-shorter-openings-replay-from-move-0-oct-3-2026)
 - [Timer bar flush with the board; the reveal reel's sound is back (Oct 3, 2026)](docs/history/match-and-crowd.md#timer-bar-flush-with-the-board-the-reveal-reels-sound-is-back-oct-3-2026)
 - ["15 opening moves", a sound lab, and a sound for every board moving (Oct 3, 2026)](docs/history/match-and-crowd.md#15-opening-moves-a-sound-lab-and-a-sound-for-every-board-moving-oct-3-2026)
 - [Crowd mode: 100 players, one board (Oct 3, 2026)](docs/history/match-and-crowd.md#crowd-mode-100-players-one-board-oct-3-2026)
@@ -83,7 +83,7 @@ In [`docs/history/match-and-crowd.md`](docs/history/match-and-crowd.md). How it 
 - [Motion trail, an option (Oct 5, 2026)](docs/history/match-and-crowd.md#motion-trail-an-option-oct-5-2026)
 - [One name per square (Oct 5, 2026)](docs/history/match-and-crowd.md#one-name-per-square-oct-5-2026)
 - [Elimination breakdown (Oct 5, 2026)](docs/history/match-and-crowd.md#elimination-breakdown-oct-5-2026)
-- [The cut as a judgement (Oct 5, 2026)](docs/history/match-and-crowd.md#the-cut-as-a-judgement-oct-5-2026)
+- [The cut as a judgment (Oct 5, 2026)](docs/history/match-and-crowd.md#the-cut-as-a-judgment-oct-5-2026)
 - [A crowd of one keeps its move on the board (Oct 6, 2026)](docs/history/match-and-crowd.md#a-crowd-of-one-keeps-its-move-on-the-board-oct-6-2026)
 - [No flash between a match's screens (Oct 6, 2026)](docs/history/match-and-crowd.md#no-flash-between-a-matchs-screens-oct-6-2026)
 - [e2e: two flaky solo tests (Oct 6, 2026)](docs/history/match-and-crowd.md#e2e-two-flaky-solo-tests-oct-6-2026)
@@ -208,9 +208,9 @@ design). Phase 1 is pure code: the rules (`packages/chess/src/squads/`), squad b
   Length has two options; the vote board's third zone is for phase 3 to settle.
 - **Openings:** 4 moves per side, classic lines inside the balance window Classic uses (0.40-0.60). "One opening" is
   one opening for the whole lobby, final and Armageddon included. "Random openings": Relay draws two (boards 1-2 and
-  3-4, colours swapped on each pair), Pairs one (both boards, swapped), the final one, an Armageddon a fresh one.
-- **Relay colours and rotation:** side 0 is White on boards 1 and 3, so with everyone moving one board along, each
-  player alternates colours turn by turn, and each half two of a squad move. Both squads rotate the same way, so a
+  3-4, colors swapped on each pair), Pairs one (both boards, swapped), the final one, an Armageddon a fresh one.
+- **Relay colors and rotation:** side 0 is White on boards 1 and 3, so with everyone moving one board along, each
+  player alternates colors turn by turn, and each half two of a squad move. Both squads rotate the same way, so a
   player meets the same seat of the other squad on every board: a rival for the round.
 - **"Your board alternates" (Pairs) and "each player alternates picking and blocking" (the final) can't hold for
   everyone while partners change:** two consecutive turns' pairs always share exactly one player, so each turn two
@@ -230,9 +230,9 @@ design). Phase 1 is pure code: the rules (`packages/chess/src/squads/`), squad b
 - **Castling is the king's move (e1g1), and each promotion piece is its own move:** blocking the queen promotion
   leaves the rook, bishop and knight promotions open, as the chess library counts moves.
 - **The mate-in-one mercy rule** is read literally (every legal move but the block allows mate in one) and checked
-  for the active block when the move is resolved; `blockCancelledByMate` is exported so the screens can grey such a
+  for the active block when the move is resolved; `blockCancelledByMate` is exported so the screens can gray such a
   block out live.
-- **Missed actions:** a missed pick and a forfeited block both count towards the no-show streak; 3 in a row hands
+- **Missed actions:** a missed pick and a forfeited block both count toward the no-show streak; 3 in a row hands
   the seat to a bot (at skill 4). A forced move or a block the mercy rule took away isn't a miss.
 - **Armageddon** (now only for a drawn final: see "Squads: chess clocks" below)**:** the same format and length as the
   tied round (the final's is to the end), at 10 s. In Relay its one board takes each squad's seats in order; in Pairs
@@ -250,7 +250,7 @@ design). Phase 1 is pure code: the rules (`packages/chess/src/squads/`), squad b
   decides 82-84% of round 1 and 2 boards at the cap, and capped matches never clinch early. - A third of Relay matches
   and half of Pairs matches tie. Black wins about half of Armageddons. - The coin plays a clearly weaker pick on about
   7% of Pairs moves. - A block forces the worse pick on about 1 final move in 16. The mercy rules fire on 5% (no
-  blocks) and 0.5% (cancelled) of moves.
+  blocks) and 0.5% (canceled) of moves.
 - **Settings stay as the brief set them in this PR.** The report recommends:
   - a 25-move cap (the check: 29 minutes saved at 15 s);
   - a shorter Armageddon (about 20 moves);
@@ -392,7 +392,7 @@ three seconds, four, not that long." `SPEECH` in settings.ts: `readMs` 2500 → 
 ### The Last Stand: Eric's option 3 (Oct 10, 2026)
 
 Eric chose option 3 of "The Last Stand: working as designed; three proposals for Eric". He keeps the engine's
-judgement rather than "piece lost", because players sometimes sacrifice on purpose and a sacrifice the engine likes
+judgment rather than "piece lost", because players sometimes sacrifice on purpose and a sacrifice the engine likes
 gives nothing away. The "already lost" line drops, and in a weak position the bar is a share of the chances left. The
 numbers (settings.ts): `lastStandFrom` 40 → 20, and two new keys, `lastStandShareBelow` 40 and `lastStandShare` 0.5.
 The calls made:
@@ -447,7 +447,7 @@ the test link `?wip=1&kit=Sawyer`.
   our left as in the reference, light from the top left. A wide, low stance; a yellow hard hat with three ridges and a
   brim lower at the front; a bold black bandit mask across his eyes, a toothy grin rising to his near cheek; a white
   near-cheek tuft; a cream chest; white gloves; a big ringed tail curling up behind him; the saw held
-  across him at about 14°, blade up to our left, as in the reference. The fur is the reference's warm grey-brown.
+  across him at about 14°, blade up to our left, as in the reference. The fur is the reference's warm gray-brown.
   - **Rigging:** the saw is painted from its angle, where its front grip is and how far the blade has slid out, and the
     gloves ride on its grips, so every saw pose is three numbers and the hands follow. The legs, arms and tail are
     painted from their points; every part is painted the first time it shows (`lazyParts`).
@@ -507,7 +507,7 @@ A raccoon in a yellow hard hat with a black bandit mask and a red-and-black reci
 
 ##### Passive: saw cuts
 - Every few turns (director's call: every 4, like Big Boy's blocks) he saws one edge of a square: a wall between two
-  neighbouring squares. Nothing may move straight across that edge (a rook, queen, king or pawn moving through it);
+  neighboring squares. Nothing may move straight across that edge (a rook, queen, king or pawn moving through it);
   diagonal moves pass corners, not edges, so they aren't blocked; knights jump it; a piece can still land on the
   square from another side.
 - Each cut lasts 3 turns and is visibly repaired over them (tape or stitches closing up); a new cut comes after a
@@ -515,7 +515,7 @@ A raccoon in a yellow hard hat with a black bandit mask and a red-and-black reci
 - Placed on an edge in the crowd's half that one of the crowd's legal moves would cross, so it matters a little.
 
 ##### Ultimate: sawing the board in half
-- Needs the shared rage meter full, and move 10 or later, and one half of the board (files a-d or e-h) favouring
+- Needs the shared rage meter full, and move 10 or later, and one half of the board (files a-d or e-h) favoring
   him on material. He jumps on, revs, and a saw runs up the middle (between the d and e files) from bottom to top
   with a sawing sound; the board splits visibly in two.
 - For 5 turns each, no piece may cross between the halves (any move whose path crosses the line, knights included).
@@ -559,7 +559,7 @@ A raccoon in a yellow hard hat with a black bandit mask and a red-and-black reci
     (the rule lifts, like every power's limit). Then too the split waits and comes on his first pawn move with room
     and a pawn to split, so he always gets it (the e2e found a crowd's Bxf7+ on move 1 losing it for good).
   - **The halves are tracked** (`split.halves`, `trackHalves`) through every move, his and the crowd's: a half that's
-    taken (en passant too) or promotes (a whole piece now) is gone; each keeps its side of the cut (`a`: the one towards
+    taken (en passant too) or promotes (a whole piece now) is gone; each keeps its side of the cut (`a`: the one toward
     the a-file).
   - **His first move:** only pawn moves (`bossStops`); none: any move (the dispatcher lifts it).
   - **The split is a base** on the board at its ply (the position changes outside a move): every replay plays from it.
@@ -612,7 +612,7 @@ A raccoon in a yellow hard hat with a black bandit mask and a red-and-black reci
     (14 of the board's 256 px, under the pieces, a shadow round it) for its 5 turns; then the halves close up and knock
     back together (`close`, a clunk).
   - All drawn ahead in slices from when his battle shows (`prewarmSawyer`); the gap and cuts are single canvases.
-- **Sounds** (`characters/sawyer-sounds.ts`, synthesised): the rev, a swing, the cut's rasp, the wood crack, tape, the
+- **Sounds** (`characters/sawyer-sounds.ts`, synthesized): the rev, a swing, the cut's rasp, the wood crack, tape, the
   big board saw, a hop's thump, the halves' clunk. Each 3 to 5 dB under a move's mean, peaks under half a move's, low and
   soft (no chimes), through the mute switch; the big saw is made ahead (31 ms to make on a computer). His moves still
   knock as every move does (a test hears the move's knock first).
@@ -703,7 +703,7 @@ default and players get a switch to turn it off. Calls:
   today, and adding a preferences store for one switch isn't worth it yet.
 - **Every mode:** the one `EvalBar` component (play, reveal, vote, final, boss screens) draws nothing when it's off. All
   the layout rules that narrow the board are written for `.eval-bar ~ .board-wrap`, so the board takes the room back
-  by itself, centred, on a phone and a computer (on an iPhone 13 it grows from 312 to 333 px, where the height becomes
+  by itself, centered, on a phone and a computer (on an iPhone 13 it grows from 312 to 333 px, where the height becomes
   the limit; on a 1440 x 900 computer from 552 to 584 px). The vote board and the game board still match.
 - **The value is still worked out when it's off:** the God King's word on how it's going reads it (`knownEval`), and
   he shouldn't talk differently because the bar is hidden; the cost is what it was with the bar on.
@@ -723,7 +723,7 @@ saves the crowd); doing it again at checkmate was left to us. Calls:
   gold "−N" off the king each, the God King's strike style), cackles and leaps off: 2.78 s. Shared beats keep the God
   King's frames, the numbers, the sounds and the server's clock in step, whichever boss attacks.
 - **In the Last Stand it is the blow meant for the piece** (beat 5): instead of the 25 anonymous red slashes, Hollow
-  drops in as the piece slides back and lashes the God King, whose blows (a flash and a jolt each, his armour cracking
+  drops in as the piece slides back and lashes the God King, whose blows (a flash and a jolt each, his armor cracking
   at the 2nd, 6th and 9th) land on the lashes; Hollow leaps off as he staggers; then the Last Stand carries on as
   before (the collapse, the fade, the re-pick). It fits between the slide and the stagger, so the Last Stand is no
   longer and the server needed no change for it. His numbers are the God King's gold strike style, as Eric asked,
@@ -734,18 +734,18 @@ saves the crowd); doing it again at checkmate was left to us. Calls:
   3.9 s (was 1.8 s; 0.45 s in Boss alone) for a boss with an attack, solo and online alike (`bossTurnShowMs`, used by
   both; `KING_ATTACKERS` lists those bosses for the server, and a unit test keeps it equal to the kits). Other bosses
   and every other move keep today's timing. No power's moment plays with a mate.
-- **Where he stands:** beside the king on the side towards the board's middle (mirrored when the king is on the left
+- **Where he stands:** beside the king on the side toward the board's middle (mirrored when the king is on the left
   half), a square and a half to two squares off, so the whole strand reads as a whip and its tip lands in the king's
   square. A side-on lash reads better than one from "in front" on a top-down board, and the king's side always has
   room. He is about 1.8 squares tall (36 frame pixels a square: at least one screen pixel per art pixel on a phone, so
   his pixels stay crisp), over the squares beside the king for under 3 s while nobody can move.
 - **His art:** his own parts and palette (`HOLLOW_ATTACK`, a frame 38 px wider so the strand fits; his usual frame
   stays as it was), four new strand poses (cracked out straight, flicked up, cracked out low, dropped), sparks off the
-  bulbs at its tip, and `lashHit` (the crack of a bulb's colour across the king's square, forehand or backhand) on
+  bulbs at its tip, and `lashHit` (the crack of a bulb's color across the king's square, forehand or backhand) on
   the shared `BoardEffects` canvas. Drawn ahead as his battle starts: his first drop-in frame took about 80 ms to draw
   cold on a computer.
 - **His sound:** `hollowLash`, a low whoosh sinking as it swings, a dull snap and the wire's rattle; about 6 dB under
-  a move, centred near 240 Hz, no chimes (the loudness and "low and dark" tests cover it).
+  a move, centered near 240 Hz, no chimes (the loudness and "low and dark" tests cover it).
 - **His line:** as he lands, into his voice by the speech rule, critical (the battle's end, or the Last Stand's big
   moment): "Shh. Sleep now, little king.", "Into the dark with you." or "Lights out, little king." His usual reaction
   line to the mating move (a check line) stays quiet then.
@@ -790,7 +790,7 @@ decide (duties, deadlines, clocks, what a miss plays, ties). Nothing links to it
 - **The quick look has no engine.** The engine server can't serve routine bot moves: a lobby asks thousands of
   positions and its budget is 3,000 searches a day. Stockfish in the Worker would be a big change to the engine lane's
   code and costs CPU on every bot move. So the Worker scores moves by material two plies deep (a capture it can take
-  back costs the taker its piece) and mate in one, with a small nudge to the centre and castling (about 6 ms a position).
+  back costs the taker its piece) and mate in one, with a small nudge to the center and castling (about 6 ms a position).
   It's only for when no device can answer: nobody connected, or devices too slow. A bot waits for its devices until
   1.5 s before its deadline, never longer.
 - **Halves.** A half ends when everyone with a duty has locked in, or when the last deadline of anyone still choosing
@@ -803,7 +803,7 @@ decide (duties, deadlines, clocks, what a miss plays, ties). Nothing links to it
   half (`reclaim`): the rules' takeover is permanent, but a dropped connection shouldn't cost the rest of the lobby.
   Leaving while your squad still plays hands the seat to a bot at once (no point in three random moves first).
   Leaving once your squad is out just goes: you can queue again.
-- **Armageddon's colour** is picked by any person on the choosing squad during the intro, the last pick standing;
+- **Armageddon's color** is picked by any person on the choosing squad during the intro, the last pick standing;
   nobody picks, the bots' Black (draw odds).
 - **Rewards** (unranked; numbers in `SQUADS_LOBBY.rewards`, for Eric to tune): 1st 100 coins and a crate, 2nd 60 and a
   crate, 3rd-4th 40, 5th-8th 20. Paid when the bracket decides the squad's placement (a squad out in round 1 is paid
@@ -862,20 +862,20 @@ of bot work and the sounds (docs/areas/squads.md, "The screens"). The calls:
   goes straight back in. When the party is placed its socket closes (members stay members), so a member still in a
   lobby can't be pulled into the next one; "Back to your party" after the lobby reconnects. A placing is acted on once
   (remembered per party), so reopening the party never rejoins an old lobby.
-- **Squad names and colours are the app's**, by squad id (Rooks, Knights, Bishops, Queens, Kings, Pawns, Towers,
-  Crowns): the rules number squads, a name and a colour make eight of them tellable apart in a strip at 360 px. One
+- **Squad names and colors are the app's**, by squad id (Rooks, Knights, Bishops, Queens, Kings, Pawns, Towers,
+  Crowns): the rules number squads, a name and a color make eight of them tellable apart in a strip at 360 px. One
   short word each (checked at 360 px in e2e).
 - **Standings:** a side panel on a computer (from 1100 px, where the arena has room, as Crowd's tower), a strip of
   eight chips on a phone (name and clock; a tap opens the table with members, plus the bracket). Ordered by how far each
   squad got, a squad still playing above one knocked out at the same stage. Sudden death is a red, pulsing "SD" (the
-  panel says "Sudden death"); the pulse is a shadow and a scale, never a colour transition (LESSONS).
+  panel says "Sudden death"); the pulse is a shadow and a scale, never a color transition (LESSONS).
 - **The clock on screen runs from what the client already has** (the server sends nothing per second): each move still
   being thought about drains past the free seconds; a duty stops draining when its players have all locked in (when
   this device saw it). The exact bank arrives with each half. ▼, or ▼▼ when two moves drain a bank at once.
 - **No eval bar in Squads**, on the votes or the boards: "no engine in the game". The vote board is Crowd's, given
   Squads' own votes, every pawn on one side (squads aren't sides).
-- **Tiny boards:** every match's boards in a group with its two squads' colours along the top, your squad's ringed;
-  the latest round's finished matches stay greyed until the next round's start. YOU and NEXT follow the board you're on
+- **Tiny boards:** every match's boards in a group with its two squads' colors along the top, your squad's ringed;
+  the latest round's finished matches stay grayed until the next round's start. YOU and NEXT follow the board you're on
   (during the moment after a turn's second half, still last turn's). Tappable once you've moved or locked in, and
   whenever you have nothing to choose; a new half that asks something of you brings you back to your board.
 - **What shows at once:** your Relay move is on your board as soon as you make it and stays (the half resolving later
@@ -884,7 +884,7 @@ of bot work and the sounds (docs/areas/squads.md, "The screens"). The calls:
 - **The reveals** reuse Crowd's ghost-move reveal (`ShadeMoves`): ghost pieces with their pickers' names (a bot's last
   word, so two tags side by side fit), a reel stepping between the two picks and landing on the coin's, then the move
   plays with its knock. The final adds ghost arrows for the picks, both blocks, then the active one slamming down as a
-  red lock on its square (or no lock: the mercy rule, a missed block, a cancelled one, said in words). The reveal's
+  red lock on its square (or no lock: the mercy rule, a missed block, a canceled one, said in words). The reveal's
   words go in the line above the board, not over the squares. Each reveal fits the show the server gives it (3 s
   Pairs, 4.5 s the final). The reveal draws on its own frames; the rest of the screen is drawn again only at its
   moments (perf).
@@ -922,8 +922,8 @@ CSS puts them off the squares (files 24 px to the right across the board's full 
 - **Under the pieces,** as on a printed board, tucked into the corners, where a piece's base only just reaches a
   letter's edge. Drawn over the pieces they read badly where they cross one (dark on a black piece, white on a white
   one).
-- **Colour by the square under each label:** white on the dark squares, dark brown on the light ones (the brown theme's
-  own colouring assumed ranks on the right edge, so it was wrong for the left column). Bold, 9 px on a phone's board,
+- **Color by the square under each label:** white on the dark squares, dark brown on the light ones (the brown theme's
+  own coloring assumed ranks on the right edge, so it was wrong for the left column). Bold, 9 px on a phone's board,
   growing with the board to 14 px on a computer.
 - **Tests:** `boardCoords` / `expectCoordsInSquares` in `e2e/helpers.ts` measure each label's text against the square
   it names; Squads' Relay test checks your board and next turn's (the other way up), and a Crowd "everyone moves" test
@@ -954,11 +954,11 @@ batches, so he can check the look after each. The full plan, the odds and the ba
   packs belong there, separate from crates. Bots that wore a shop hat now wear the same hat as a crate item.
 - **Same odds as Winter:** boxes 40/26/18/14, Fischer Random 2%. Every tier holds something from batch 1, so the strip
   stays whole at the same odds all along. If a tier is ever empty, the strip leaves it out (no crash), and a test fails.
-- **The container is a supply box:** a wooden crate with steel corners, a band in the tier's colour and a stencilled
-  star. The crate itself is olive drab, stencilled BETA 001. Beta is listed first, with a one-line blurb and an item
+- **The container is a supply box:** a wooden crate with steel corners, a band in the tier's color and a stenciled
+  star. The crate itself is olive drab, stenciled BETA 001. Beta is listed first, with a one-line blurb and an item
   count on each crate.
 - **The third theme is Ninja:** it reads at pawn size and makes the playground trio with pirates and agents.
-- **Suit and Tie rolls two colours** (the suit, the tie). **The Wire Earpiece is a head item**, so it can be worn with
+- **Suit and Tie rolls two colors** (the suit, the tie). **The Wire Earpiece is a head item**, so it can be worn with
   Dark Shades (face). **The Smiley Face's features turn white on Midnight**, where dark ones vanish.
 - **28 items when complete,** 8/7/5/4 in the boxes, so each tier's items end up rarer than the one below's (5.0, 3.71,
   3.6, 3.5, 0.8 and 0.2%). In batch 1, the lone Rare and Epic items are 18% and 14%, as Winter's lone Antlers were.
@@ -976,7 +976,7 @@ Eric wants to try a boss that plays like a person, not like Stockfish held back,
 playing it on his phone. The prototype: Ginger in Boss alone, her moves picked by **Maia-3**, the human-like chess
 model from CSSLab at the University of Toronto (Chessformer, ICLR 2026). No calibration across all bosses yet.
 
-- **The licence (Eric's decision, followed exactly):** Maia-3's code and weights are AGPL-3.0; Eric won't publish the
+- **The license (Eric's decision, followed exactly):** Maia-3's code and weights are AGPL-3.0; Eric won't publish the
   game's source, and accepts the "separate program" approach. So Maia lives in its own box, `packages/maia-worker/`:
   its own `LICENSE` (the AGPL text), a `README.md` with the provenance and every conversion step, the conversion
   script, the worker's source and its tests. It's built to a standalone worker plus the model, served from
@@ -987,7 +987,7 @@ model from CSSLab at the University of Toronto (Chessformer, ICLR 2026). No cali
   `HumanUciEngine` (`packages/chess/src/human-uci.ts`), the same kind of transport as Stockfish's. My call: `p` comes
   before `pv` (UCI ends an info line with its pv; the game's parser takes either order).
 - **The model:** the official `UofTCSSLab/Maia3-23M` checkpoint, converted by our own script (ONNX, opset 17) and
-  quantised to int8 (onnxruntime's dynamic quantisation). Checked against the official PyTorch model: fp32 matches to
+  quantized to int8 (onnxruntime's dynamic quantization). Checked against the official PyTorch model: fp32 matches to
   5e-5; int8 has the same top move in 106 of 108 positions × ratings (the 2 others near-ties). No third-party export.
 - **Hosting:** the int8 file is 25,191,199 bytes (24.02 MiB), under Cloudflare's 25 MiB per static asset, so it's an
   ordinary asset: no R2, nothing paid. **Committed to git** (`packages/maia-worker/model/`): Workers Builds deploys
@@ -1029,7 +1029,7 @@ model from CSSLab at the University of Toronto (Chessformer, ICLR 2026). No cali
   #2", "guard → Stockfish", "Stockfish (Maia loading)".
 - **Credits (Settings):** "Bosses and bots use Stockfish (GPL-3.0, source) and Maia-3 by CSSLab, University of Toronto
   (AGPL-3.0), each a separate program running in your browser. The source of our Maia box is available on request
-  (notice, licence)." Eric asked for both names in one line (bots will use Maia too, later).
+  (notice, license)." Eric asked for both names in one line (bots will use Maia too, later).
 - **What the sanity runs show (`reports/maia-boss.md`; small samples, plain chess, no powers):** raw Maia makes Ginger
   much easier at these ratings. Against the same strong bot player at tier 1600 (Ginger 1500, Maia 1190), the player
   scored 1.5 of 8 against today's Stockfish Ginger, 5 of 8 against Maia with no guard, 5 of 8 with the light guard and
@@ -1066,7 +1066,7 @@ Three visual fixes Eric asked for from a screenshot of a Hollow battle on a comp
 - **Computer only, the God King mirrors the boss** (Eric: no room on a phone, so the phone is unchanged). Same
   breakpoint as every desktop layout (`min-width: 900px` and `min-height: 600px`). His feet on the board's bottom edge
   like the boss's, his middle as far right of the board as the boss's is left of it (86 px with the eval bar, 62 px
-  without), measured within 2 px at 12 desktop sizes. The status box is the board's width, centred under it. The board
+  without), measured within 2 px at 12 desktop sizes. The status box is the board's width, centered under it. The board
   keeps its size (the room his old spot in the dock took stays free under the status box); growing it would change
   every boss screen's layout, so it's left for Eric to ask for.
 - **His words and his menu open outwards** (to the right, away from the board) on a computer, as the boss's do: over
@@ -1075,26 +1075,26 @@ Three visual fixes Eric asked for from a screenshot of a Hollow battle on a comp
   scoreboard) would otherwise sit under him: it starts where he ends (`--gk-clear`, from the same sums as the board's
   size), up to about 100 px narrower when the board fills its column. Boss alone has nothing there.
 - **The Last Stand's leap:** he no longer shows again in his spot for a moment as his leap ends (a 200 ms fade did
-  that), and his shadow no longer stays behind as a grey dome while he leaps. Both were there before the move too.
-- **Hollow's lights: 8 colours** in `HOLLOW_LIGHTS` (settings.ts): red, yellow, blue, green, orange, purple, pink and
-  cyan, each a glass colour and a shade; the glint and glow are made from the glass. Purple and pink are kept bright
+  that), and his shadow no longer stays behind as a gray dome while he leaps. Both were there before the move too.
+- **Hollow's lights: 8 colors** in `HOLLOW_LIGHTS` (settings.ts): red, yellow, blue, green, orange, purple, pink and
+  cyan, each a glass color and a shade; the glint and glow are made from the glass. Purple and pink are kept bright
   and clear of his own violet.
-- **"Never repeat" means neighbours** (with ten bulbs and eight colours, no order can avoid repeats): a bulb's colour
-  differs from the next three bulbs' along the wire either way. The next one is its neighbour, but his countdown to
+- **"Never repeat" means neighbors** (with ten bulbs and eight colors, no order can avoid repeats): a bulb's color
+  differs from the next three bulbs' along the wire either way. The next one is its neighbor, but his countdown to
   the next cover puts every third bulb out at a time (with a third lit, bulbs 0, 3, 6 and 9 show side by side), and
-  the first screenshots had two reds three apart looking like neighbours. Within three, no two bulbs that ever show
-  next to each other match. Bulbs 4 and 5 (either side of his hand) count as neighbours; the two ends don't.
+  the first screenshots had two reds three apart looking like neighbors. Within three, no two bulbs that ever show
+  next to each other match. Bulbs 4 and 5 (either side of his hand) count as neighbors; the two ends don't.
 - **The same lights for everyone in a battle:** Hollow's view sends `lights`, a number from 0 to 4095 drawn from the
   battle's seed (`powerRoll(seed, "lights")`). Only 12 bits, so it can't be used to work out the seed and foresee his
   powers. It's a new optional field, not a new message; an older server without it gets a random order per battle on
   each device.
-- **Recoloured as drawn, not redrawn:** the art is code-drawn, so each of the ten bulbs got palette keys of its own,
-  drawn in default colours (red, yellow, blue in turn, as before), and a per-key colour swap (`Swap` in sprite.ts)
-  turns them into the battle's colours wherever his frames are drawn: his sprite and every moment, his attack and its
+- **Recolored as drawn, not redrawn:** the art is code-drawn, so each of the ten bulbs got palette keys of its own,
+  drawn in default colors (red, yellow, blue in turn, as before), and a per-key color swap (`Swap` in sprite.ts)
+  turns them into the battle's colors wherever his frames are drawn: his sprite and every moment, his attack and its
   lashes, Lights out, the strip by the boss bar. The swap keeps whatever a frame does to a bulb (out, flickering,
-  flashing), so a bulb keeps its colour through every frame. The strip's three bulbs and the lashes take the first
-  three bulbs' colours, always three different ones. Lights out still puts a third of the strand out at a time (bulbs
-  2, 5, 8 first), now by position rather than colour.
+  flashing), so a bulb keeps its color through every frame. The strip's three bulbs and the lashes take the first
+  three bulbs' colors, always three different ones. Lights out still puts a third of the strand out at a time (bulbs
+  2, 5, 8 first), now by position rather than color.
 
 ### Piece sounds you pick: a Move sound and a Capture sound (Eric, Oct 11, 2026)
 
@@ -1106,13 +1106,13 @@ capture sound and whatever move sound you want", in Settings with a play button.
   first option and the default, so nothing changes for anyone who doesn't pick. Kept on the device (`brc.moveSound`,
   `brc.captureSound`, like the mute switch; accounts keep no preferences); an unknown or old id reads as the default.
   The list and the storage: `packages/app/src/piece-sounds.ts`.
-- **Where the sounds come from (licences first):** two picks of each from Kenney's CC0 packs (*Impact Sounds*, *Casino
+- **Where the sounds come from (licenses first):** two picks of each from Kenney's CC0 packs (*Impact Sounds*, *Casino
   Audio*), and two of each made for the game by `scripts/piece-sounds.py` (a few decaying partials and a short burst of
   noise: ours outright). Nothing CC BY, so no credit line is owed in Settings (Kenney's welcome but not required: left
-  out, like the God King's CC0 packs). Every file's source, author and licence: `public/sounds/SOURCES.md`. Lichess's
+  out, like the God King's CC0 packs). Every file's source, author and license: `public/sounds/SOURCES.md`. Lichess's
   sets are out (AGPL, CC BY-NC-SA or non-free, per its own `COPYING.md`); Freesound's CC0 "Piece Placement" (el_boss)
   would do but Freesound refused the download from here.
-- **Levelled to today's sounds** (my call): each file starts on its hit and its loudest 30 ms, heard through a phone
+- **Leveled to today's sounds** (my call): each file starts on its hit and its loudest 30 ms, heard through a phone
   speaker (high-passed at 200 Hz) and the game's 6 kHz low-pass, matches today's move or capture. Kenney's chips were
   pitched down a fifth: as recorded, most of them was above the low-pass and they'd have had to clip to be as loud.
   mp3 like the rest (Safari), 2–4 KB each.
@@ -1126,7 +1126,7 @@ capture sound and whatever move sound you want", in Settings with a play button.
   a pick. (The service worker still precaches every file for offline play: the new ones are 23 KB in all.)
 - **Previews play with the sound switched off** (my call): ▶ is a tap asking to hear it. Picking an option plays it
   too, like a phone's ringtone list. Mute still silences every sound in a game.
-- **Flagged for Eric: the defaults are GPL-3.0** (PyChess, chosen Oct 2 "the same licence as the app"). Since the
+- **Flagged for Eric: the defaults are GPL-3.0** (PyChess, chosen Oct 2 "the same license as the app"). Since the
   Maia decision (Oct 11) the game's source isn't published, which GPL assets in the bundle don't fit. Eric asked to keep
   today's sound as the default, so it stays; switching the defaults to a CC0 or our own option (Light wood and Heavy
   wood are the closest) is a one-line change in `piece-sounds.ts` (and castling's knock would need a new file too).
@@ -1137,7 +1137,7 @@ capture sound and whatever move sound you want", in Settings with a play button.
 ### The FAQ: "How HunChess works", in Settings (Oct 11, 2026)
 
 Eric: "I want to put in the app a full explanation of how things work… call it the FAQ… maybe have a table of
-contents. Put it in the settings." With the maths of how a strong boss switches from Maia to Stockfish first, and how
+contents. Put it in the settings." With the math of how a strong boss switches from Maia to Stockfish first, and how
 the God King's save comes into play. The calls:
 
 - **Where:** Settings → HOW TO PLAY, a row "📖 FAQ · How it works" above the short rules, opening its own page at
@@ -1157,7 +1157,7 @@ the God King's save comes into play. The calls:
   itself when it's on); the bridge band between Maia and Stockfish (2600–2800) is "Planned" (today Maia holds at 3000
   to 2800, then Stockfish). Classic gets one line: off the menu while it's redesigned.
 - **True to the code, where the brief's shorthand differs:** a raid's boss is matched to the people in it (bots never
-  count); the Crowd's boss battle is set from the last ten's ratings in that match, weighted towards the best, minus
+  count); the Crowd's boss battle is set from the last ten's ratings in that match, weighted toward the best, minus
   100, whoever they are (bots among them count, as `startBoss` does). The rating-gap formula is the usual one, shown
   as a guide to the boss menu's "+N vs you", not something the game computes.
 - **Security:** only how the game works for a player. Nothing on how the app talks to the server (messages, routes,
@@ -1173,13 +1173,13 @@ From Eric's screenshot of Ginger's blizzard on a computer, and his word on the q
 - **Why the ice didn't line up:** each block was already one square-shaped sprite, the same for every piece, but it
   was placed and sized in % of the board's wrap, which is up to 8 device pixels wider than chessground's own board
   (the lesson "A ring a few pixels off its square" again). At a board of 552 px in a 555 px wrap, the blocks drifted
-  up to 2.6 px right and down towards the h-file and rank 1, so the king's block on g1 sat flush right and 6 px in on
+  up to 2.6 px right and down toward the h-file and rank 1, so the king's block on g1 sat flush right and 6 px in on
   the left, and rank 1's blocks ran into the bar under the board. Now the ice and the cold burst as it forms are
   placed in eighths of `--cg-size` (`onSquare`), like every other boss's squares: 0 px off on every square, both ways
   up, on a phone (312 px board in a 314 px wrap) and on computers (456 and 552 px boards). `e2e/boss-powers.spec.ts`
   checks every block within 1 px of its square, all one size.
 - **The block keeps its one-pixel inset** (1/32 of the square: about 1.2 px on a phone, 2 px on a computer). Flush to
-  the edge, neighbouring blocks would merge into one sheet with doubled outlines; with it, each piece reads as its own
+  the edge, neighboring blocks would merge into one sheet with doubled outlines; with it, each piece reads as its own
   block of ice. It's static while frozen (only the glint sweeps across it).
 - **Every timer bar is at the back** (`.timer-bar`, `z-index: -1`), as the eval bar is: the board's wrap isn't a layer
   of its own, so the bars go to the back of the board's row (a layer, `isolation`), behind the squares' overlays, a
@@ -1305,7 +1305,7 @@ upside down, like he normally does. A few turns later he turns it 90 degrees to 
 a 180, so now it's on the side we haven't done yet. A few more turns after that, it goes back to the start, and we
 leave it there. And he doesn't play any extra moves during this time." The calls:
 
-- **Two pies.** Each pie keeps its rules (an empty square near the centre that the fewest moves reach, `pieTurns` 3
+- **Two pies.** Each pie keeps its rules (an empty square near the center that the fewest moves reach, `pieTurns` 3
   turns, nobody on either side moves onto it). The cadence was "3 on, 2 clear" (one pie at a time); now a new pie
   every `pieEvery` = 2 turns while fewer than `pieMax` = 2 are down, never on a square already pied, so there are two
   on the board every other turn. The state is `pies` (a list); screens get `pies`, and `pie` (the newest) for older
@@ -1378,7 +1378,7 @@ chessground. The calls:
   in Settings → "Testing (admins)"; `?board=own` / `?board=cg` switches any device and is kept on it (`brc.board`), so
   a link survives every screen (the other test switches only last one load, but this one has to outlive a whole visit
   to be useful). `VITE_BOARD=own` at build time makes ours the default: the e2e suite's second run.
-- **The same props and the same behaviour where the game relies on it:** a tap-tap move goes as the second press goes
+- **The same props and the same behavior where the game relies on it:** a tap-tap move goes as the second press goes
   down; a move you make stays shown until the game next tells the board anything (as chessground's did; so the Crowd's
   pick still goes back while a solo move stays); the selection survives a new position; after a dragged move the next
   drag starts at once; a dropped piece lands at once and a drop where it can't go goes straight back; a touch on a
@@ -1386,7 +1386,7 @@ chessground. The calls:
   slides on a cubic ease in and out, a 3 px drag threshold, a fade on the captured piece.
 - **The same elements and stacking,** so nothing drawn over the board needed to change: pieces are `<piece class="white
   pawn">` at z-index 2 (8 sliding, 11 dragged, 1 fading), highlights are `<square>` with the same classes (and each
-  `marks` class), arrows are drawn with chessground's measured widths, colours and see-through-ness, and the board
+  `marks` class), arrows are drawn with chessground's measured widths, colors and see-through-ness, and the board
   writes its size as `---cg-width` (`--cg-size` stays the name everything reads, until Phase 2 renames it everywhere at
   once). Only four places looked inside chessground's own elements (the God King's strike and Lights out measuring
   `cg-board`, the chat bubble, Sawyer's split pawns); they now ask `board/dom.ts`, which finds either board.
@@ -1398,11 +1398,11 @@ chessground. The calls:
 - **The check glow** (`BOARD.checkHighlight`): the game's board never showed it (the wrapper cleared it on every
   update), so it stays off on both boards for parity; it's one setting if Eric wants it.
 - **The pieces:** the cburnett set came in through chessground's CSS (GPL). The same drawings now come from their own
-  source, Wikimedia Commons, where Colin M.L. Burnett offers them under a choice of licences; we use the BSD one
+  source, Wikimedia Commons, where Colin M.L. Burnett offers them under a choice of licenses; we use the BSD one
   (`board/pieces/`: the twelve files, `LICENSE.txt`, `SOURCES.md` with every URL and checksum). Chessground's copies
-  had one change, the black pieces' white details toned to `#ececec`; we made the same one-colour change so nothing
+  had one change, the black pieces' white details toned to `#ececec`; we made the same one-color change so nothing
   looks different (measured: the only remaining differences are a pixel of anti-aliasing at the outlines). Credited in
-  Settings and the FAQ, the licence served at `/licenses/pieces.txt`. Both boards draw them (chessground's own piece
+  Settings and the FAQ, the license served at `/licenses/pieces.txt`. Both boards draw them (chessground's own piece
   CSS is gone already).
 - **A bug found on the way: the promotion picker showed four empty buttons** on the game's board (its pieces' art only
   applied inside chessground's own element). The picker now draws its pieces on both boards.
@@ -1422,7 +1422,7 @@ PyChess's knocks (GPL-3), which a closed-source game can't ship. The calls:
 - **The defaults: Light wood and Heavy wood** (the brief's suggestion, real recorded wood). Measured against the old
   knocks, Wooden tap and Double knock are closer in brightness and length; they're one tap away in Settings if Eric
   prefers them, and a one-line change to make them the defaults.
-- **Levelled to the old loudness:** the script now holds the old move and capture's measured loudness (TARGET), since
+- **Leveled to the old loudness:** the script now holds the old move and capture's measured loudness (TARGET), since
   their files are gone.
 - **Castling** with the default is its own file (`castle-wood.mp3`: the Light wood twice, king then rook, 110 ms apart,
   the second softer), the same pattern castling already had with any other pick.
@@ -1513,7 +1513,7 @@ OKs publishing the Maia box's source (AGPL), and admins get Maia on every boss n
   host's on its device online; Maia isn't asked for a move Stockfish plays. An admin's pick plays that brain, no share.
 - **Strength from the people** (Eric's "people only"): the Crowd's boss battle now takes the weighted rating of the
   people among the last ten (bots only if no person is left among them). It used to count the bots too. This moves
-  today's Stockfish bosses in the Crowd's boss battle as well, towards the people's own strength, which is the point.
+  today's Stockfish bosses in the Crowd's boss battle as well, toward the people's own strength, which is the point.
   A raid already counted people only.
 - **The crowd's margin** (`crowdMargin`, set by the calibration): Maia plays at `maiaRatingFor(strength + margin)` when
   more than one picks the crowd's moves (a raid, solo or online, and the Crowd's boss battle); in Boss alone (and a raid
@@ -1619,7 +1619,7 @@ GPL") for these files only. The calls:
   soft** (1 down, −5 dB, a slightly shorter decay); the captures' are "Classic light double", "Classic deep double",
   "Classic soft double" (the pickers' labels must differ: each ▶ is named by its label). Made by
   `scripts/piece-sounds.py` from PyChess's original WAVs (not the mp3s, to avoid a second lossy pass), reproducible
-  byte for byte. Measured against the classic (the power-weighted spectral centre): the moves' light +14%, deep −12%,
+  byte for byte. Measured against the classic (the power-weighted spectral center): the moves' light +14%, deep −12%,
   soft −5%; the captures', which have more high end for the EQ to work on, +28%, −28%, −12%. The captures keep their
   two knocks, up to 12% closer together or further apart; every one is as loud as its classic. They're GPL-3.0
   (modified PyChess files), credited as "variations of PyChess's sounds, made by our script", with each one's exact
@@ -1627,17 +1627,17 @@ GPL") for these files only. The calls:
   remake them).
 - **The decay of a capture is changed more gently** (a tau of 120–150 ms, not the move's 50–80 ms): the classic
   capture's low ring is quiet and long, and the move's settings cut it enough to make it a different sound.
-- **Levelled to the classic of its kind,** and once more from the encoded mp3 (the mp3 moved the loudness about half
+- **Leveled to the classic of its kind,** and once more from the encoded mp3 (the mp3 moved the loudness about half
   a decibel); the script now measures the classics' files for its target instead of holding their numbers. Kenney's
   and our files are left as they were (within half a decibel of the classic; the e2e allows two).
 - **The e2e loudness check now measures what the script levels:** Web Audio reads a low- or high-pass's Q in dB, so
   its default (1 dB) put a bump at 200 Hz the script's filters (Q 0.707) don't have, and read Kenney's low wood about
   2 dB louder than the classics. With Q set to −3.01 dB the browser's numbers match the script's to 0.01 dB: every
   option is within half a decibel of its classic, so the check is now 1 dB (0.5 for the variations), not 2.
-- **The licence text is Stockfish's copy** (`/engine/COPYING.txt`, copied from the stockfish package at every build;
+- **The license text is Stockfish's copy** (`/engine/COPYING.txt`, copied from the stockfish package at every build;
   the same GPL-3.0 text as PyChess's `LICENSE`, only its line endings differ), not a second copy. The notice is in
   `/licenses/third-party.txt`; Settings and the FAQ credit "Classic piece sounds and their variations: PyChess
-  (GPL-3.0)", linking PyChess's `sounds/` folder, the licence and `sounds/SOURCES.md`.
+  (GPL-3.0)", linking PyChess's `sounds/` folder, the license and `sounds/SOURCES.md`.
 - **`castle-wood.mp3` is gone:** it was castling for Light wood as the default, and castling with any non-default
   pick plays that pick twice, which for Light wood is the same thing.
 - **The gavel** is the classic capture and move sounds pitched down to about half (0.55 and 0.45), as it was before
@@ -1646,7 +1646,7 @@ GPL") for these files only. The calls:
 ### Maia bosses harder: a boss is a challenge (Eric, Oct 12, 2026)
 
 Eric, after #157 aimed for an even game: "We should be upping the Maia rating. The numbers don't need to be accurate;
-people read 'boss' and assume it's a challenge, so that's the key." The new target (his): the boss clearly favoured in
+people read 'boss' and assume it's a challenge, so that's the key." The new target (his): the boss clearly favored in
 plain chess, each crowd and a lone player at its own difficulty scoring about 0.30, before the powers and the God King;
 where Maia alone can't get there, the bridge starts earlier rather than the challenge being lost; Maia with no guard
 wherever it can reach the target on its own. The calls (`reports/maia-calibration.md`, "Harder"):
@@ -1770,9 +1770,9 @@ engine's best moves on demand ("I'm bad at chess and need infinite cheat moves")
   is the moment it's made, so the opener's connection fills it (bots in every other seat) and the votes follow after
   the usual full-grid moment (1.8 s, kept: it's the same screen players see). The other test links keep their 5 s wait
   for others to join. Admin-only, like every test control (`squadsTestAllowed`).
-- **Cheat lines show the evaluation on the arrow and the rank by colour,** not "1 · +0.8" on the arrow: the board's
+- **Cheat lines show the evaluation on the arrow and the rank by color,** not "1 · +0.8" on the arrow: the board's
   arrow labels sit in a small disc sized for 3-4 characters (the power-up hints' "52.1"), and 7 characters there would
-  be unreadable on a phone. The full "1 · Nf3 +0.8" is listed under the button, in the same colours.
+  be unreadable on a phone. The full "1 · Nf3 +0.8" is listed under the button, in the same colors.
 - **Evaluations in pawns, approximately,** for the side to move: the engine gives an expected score (win + half the
   draws), turned back into pawns on Stockfish's scale (+1.00 is about a 50% win, an expected score of about 0.75).
   Good enough to compare moves; the chess package's engine interface stays as it is.
@@ -1780,7 +1780,7 @@ engine's best moves on demand ("I'm bad at chess and need infinite cheat moves")
   exactly when Eric would want his lines. 300,000 nodes (`SQUADS_LOBBY.cheatLines`).
 - **For a block,** the position is the picking side's to move, so its top moves are the ones worth blocking: the same
   search, no special case.
-- **A fix found on the way:** the block line above the board named the blockers' own colour as the one picking ("Block
+- **A fix found on the way:** the block line above the board named the blockers' own color as the one picking ("Block
   with Pam · White is picking" while Black picked): a block's duty carries the blockers' side. It now names the other
   side, the one whose move it is.
 
@@ -1832,7 +1832,7 @@ blocks to move blocks: "It's not a full piece block ever. You tap their piece an
   wins (nothing is taken back), paid at once, and everyone sees it at once.
 - **What a block can name (DEFAULT):** it's placed before your own move, so it names a move they might have after it:
   any square the piece could reach by how it moves (a slider up to and onto the first piece in its way, either
-  colour, since your move may take it; a pawn's pushes and both diagonals; a knight's jumps), or castling while they
+  color, since your move may take it; a pawn's pushes and both diagonals; a knight's jumps), or castling while they
   still have the right. A promotion block covers every piece. The cost is the piece's.
 - **It takes effect** on the other squad's next turn on that board, and is gone after it: that piece to that square
   can't be played (the piece's other moves can). A miss, a forced move or a bot never plays it.
@@ -1956,7 +1956,7 @@ bot engine's top moves, from players' devices).
   needs undoing.
 - **Escalation: +100 for every one of that item the squad has already bought this tournament,** one rule for every
   item. Eric's anchors fit it exactly: Stockfish tokens at 200, 300, 400 (the third about 400), and shields at 100,
-  then 200. The Buy button shows the price now. Cheap items climb steeply, which pushes squads towards variety.
+  then 200. The Buy button shows the price now. Cheap items climb steeply, which pushes squads toward variety.
 - **Caps per round:** Stockfish token 2, block points 2, shield 2, time coin 2.
 - **Test lobbies starting at Pairs or the final:** the squads still in get 600 coins (about the median wallet before
   Pairs) and a 30 s intro to shop in.
@@ -1974,8 +1974,8 @@ bot engine's top moves, from players' devices).
      alternatives stay theirs. **The final: the whole squad sees it,** and one a half is enough there. Elsewhere it's
      one a player a half.
 2. **Breather, 150: taken out on Oct 13** (below). It doubled the free seconds a move for the whole match.
-3. **Block points, 100:** +3 points, a queen block or a minor and a pawn (offence).
-3. **Shield, 100:** cancels one block that would bite, and the blocker still pays (defence). It's level with block
+3. **Block points, 100:** +3 points, a queen block or a minor and a pawn (offense).
+3. **Shield, 100:** cancels one block that would bite, and the blocker still pays (defense). It's level with block
    points.
 5. **Time coin, 75:** +30 s on the team bank as the match starts, about ten moves' drain. It goes into the bank (so
    it's "used" then), and what's left of a bank carries on as always.
@@ -2252,7 +2252,7 @@ bank ÷ (t − increment) moves. Moves each bank lasts, and what's left after th
 
 **Testing.** The full lane, not the light one: this changes the runner (`patchSettings`) and the protocol, which the
 lanes rule (CLAUDE.md, Eric, Oct 13) puts in the full lane. Unit tests: each option's patch, the bank and increment
-maths (banking on quick moves, the cap, an empty bank), the calibration above, the old ids, the default, the runner
+math (banking on quick moves, the cap, an empty bank), the calibration above, the old ids, the default, the runner
 resetting banks only before move 1, and the lobby applying the winner (round, increment, banks, and after waking).
 
 ### Squads: three chess time controls (Eric, Oct 13, 2026)
@@ -2346,7 +2346,7 @@ mapped. The calls, all made without Eric:
   squads that tied in rounds 1 and 2 had 2-7 s of bank left, living on the increment. A first try ended at 24 minutes
   into the lobby (in the final) when the local server stopped; Relay then took 8.4 minutes and Pairs 13.3 (a 129-ply
   game).
-- **Screens:** the vote's result banner with a detail line (Squads' Mode, Start and Clock votes) is centred in the
+- **Screens:** the vote's result banner with a detail line (Squads' Mode, Start and Clock votes) is centered in the
   board rather than 28% down: at 320 px it ran over the cards under it (every Squads option with a detail did,
   before this too). Checked frame by frame at 320, 390 and 1280 px (the Clock vote, its banner, the match's card, the
   clock line on Rapid and near zero), and measured in `e2e/squads-clocks.spec.ts`.
@@ -2387,7 +2387,7 @@ powers, rules, lines, sounds, kit or roster entry, and he is not in `CHARACTERS`
   - **Fitting the phone's boss bar:** the loop sits a little lower than in the reference (behind his far ear and the
     hat's brim) and the coil arm is shorter, so nothing rises above Sawyer's height under the heading and the coil
     stays off the boss's name. Like Sawyer he needs the `wide` box (58 px) when he gets a kit.
-  - **Rigging:** a loop is an ellipse (centre, radii, tilt) painted as rope, and the line runs from his fist to the
+  - **Rigging:** a loop is an ellipse (center, radii, tilt) painted as rope, and the line runs from his fist to the
     loop's nearest point, so a lasso pose is a few numbers; arms and legs are painted from their points, the hat from
     its tilt (for the nod), every part made the first time it shows (`lazyParts`).
 - **Animations** (a turn of the spin is 8 frames; one-shots end on the idle's first spin position):
@@ -2418,10 +2418,10 @@ the design decision"), then the calls made while building him.
 #### The design (Eric's idea; the director's calls, settled)
 
 - **A cowboy pig with two lassos.** Three lasso powers, each checked by the engine so it bends the game, never breaks it.
-- **The long pull** (his opening flourish): his first move is a centre pawn's double step, then he lassos it one square
+- **The long pull** (his opening flourish): his first move is a center pawn's double step, then he lassos it one square
   further (three squares in one move). The engine picks the d- or e-pawn; neither sound (it hangs the pawn, or its path
   or square is blocked): an ordinary first move. Measured by the director (Stockfish, depth 18): −0.2 to +0.3 pawns for
-  him against a normal first move, pure flavour; side pawns are bad for him (c-pawn −0.7 to −1.8), so centre only.
+  him against a normal first move, pure flavor; side pawns are bad for him (c-pawn −0.7 to −1.8), so center only.
 - **The lasso drag** (passive; Eric: "he drags your piece one direction, up down left or right... only when it's
   calculated that it drops you less than a pawn... a slight disadvantage according to Stockfish... not a ton"): every
   `dragEvery` turns from about turn 3, one crowd piece dragged one square orthogonally onto an empty square. Never the
@@ -2429,12 +2429,12 @@ the design decision"), then the calls made while building him.
   one costing the crowd 0.1 to 0.9 pawns, nearest the middle, seeded among ties; none: no drag, and it doesn't count.
   About 3 to 4 a battle, estimated (Eric's rule on power rates).
 - **SHOWDOWN!** (ultimate; Eric: "he takes three of your pieces and three of his... facing each other in a line, not
-  much space between, near the centre... an opportunity for the players to make a big devastating mistake, but even if
+  much space between, near the center... an opportunity for the players to make a big devastating mistake, but even if
   they make the correct play it's still slightly advantageous for the boss"). **The director's finding:** with free
   play after the line-up the crowd wins (whoever moves first grabs material), so **the crowd's next move must be one of
   the duels** (its piece taking his facing one). Three matched pairs (queen, rook, then bishop or knight), each facing
   along a file, rank or diagonal (knights a jump apart) with 0 or 1 empty squares between, all six on files b-g, ranks
-  3-6, his three always protected, bishops on their own colour. The host's engine searches line-ups (the warning turn,
+  3-6, his three always protected, bishops on their own color. The host's engine searches line-ups (the warning turn,
   and from about 85% of the meter); the best duel leaves him +0.1 to +1.2, another costs the crowd 2 or more pawns more;
   no check, never a mate in 1 for him after the best duel; nearest +0.5, seeded among ties; about 8 s a turn. Nothing
   found: "Not yet..." up to 2 more turns, then a 2-pair showdown, then a lasso drag. No legal duel: a normal move.
@@ -2449,7 +2449,7 @@ the design decision"), then the calls made while building him.
   `showdown*`): pure checkers (`pullOptions`, `dragOptions`/`checkDrag`, `checkLineup`) the server, the host and solo
   share, and the engine work (`pullFrom`, `dragFrom`, `showdownFrom`, `pigTurn`) that runs where the boss's moves are
   worked out. The grid helpers Big Boy's bounce used moved to `bosses/grid.ts` and are shared.
-- **His colour: Black, as every raid boss** (my call). He starts from the starting position (his centre pawns must be
+- **His color: Black, as every raid boss** (my call). He starts from the starting position (his center pawns must be
   home), and a raid's crowd plays White (Boss alone too), so his pull answers the crowd's first move: d7-d4 or e7-e4,
   whichever is sound (after 1.e4, e7-e4 is blocked, so d7-d4 if it doesn't hang). Playing Black like the others keeps
   the crowd's first move its own and the pull a reply to it. `?side=b` turns it round for testing (the crowd Black,
@@ -2463,8 +2463,8 @@ the design decision"), then the calls made while building him.
   own logic, decided before the brain is asked.
 - **The lasso drag:** first on crowd turn `dragFirst` (3), then every `dragEvery` (10): turns 3, 13, 23, 33, so 3 to 4
   in a battle of 30 to 40 crowd moves (estimated, not sim-tested). Calls on top of Eric's rule:
-  - **Never a bishop** (my call): any orthogonal step changes a bishop's square colour, giving two bishops on one
-    colour, a position no game could reach (Big Boy's bounce keeps bishops on theirs for the same reason).
+  - **Never a bishop** (my call): any orthogonal step changes a bishop's square color, giving two bishops on one
+    color, a position no game could reach (Big Boy's bounce keeps bishops on theirs for the same reason).
   - Never onto the en passant square, never leaving more of the crowd's material hanging than before (a cheap filter
     before the engine), never a drag that gives check either way.
   - **A decided game has none** (past 4 pawns either way): the engine's expected score is flat there, so it can't read
@@ -2489,7 +2489,7 @@ the design decision"), then the calls made while building him.
     line-up's squares, never onto a square another line-up piece left; his piece protected after the line-up; no
     check. It prefers line-ups where at most one of his three is attacked by two or more of the crowd's pieces (over
     1,200 line-ups in 8 middlegames, 11% of those met the goal against 3% of the rest), until 1000 tries in a row find
-    none. Bishops stay on their colour, rooks leaving a
+    none. Bishops stay on their color, rooks leaving a
     corner take their castling right. Seeded by the turn (`lassoSeed`, never the battle seed: the host would learn
     every power's rolls).
   - **The search** (scan, then confirm): each line-up costs one search per duel at `showdownNodes` (8k, a quick scan
@@ -2516,7 +2516,7 @@ the design decision"), then the calls made while building him.
     The main lobby protocol has no version constant (only Squads has one), so none to bump; the new fields are optional.
   - **Rage speed** 1.1 (his showdown pauses the meter for one turn after its warning, more if he holds): about two a
     battle, estimated, not yet sim-tested.
-- **Strength: offset −250** (my judgement), as Big Boy and Sawyer: his drag costs the crowd about half a pawn three or
+- **Strength: offset −250** (my judgment), as Big Boy and Sawyer: his drag costs the crowd about half a pawn three or
   four times a battle, and a showdown swings about half a pawn his way with a trap on top, nastier than the −100
   bosses' powers.
 - **Screens** (`components/Pig.tsx`, his kit "Wrangler" with the `wide` box): the long pull and each drag are a
@@ -2529,7 +2529,7 @@ the design decision"), then the calls made while building him.
   ("Next time, varmints."), since there's no next try. The God King has his word at "DRAW!" ("Three duels, and one's a
   trap. Choose well!") and that turn keeps quiet about a queen in danger or a mate threat: only a duel can be played.
   Checked frame by frame on a 390 px phone and a 1280 px computer, light and dark (`npm run frames:pig`).
-- **Sounds** (`characters/pig-sounds.ts`, synthesised): rope whirl, throw, catch, tug, the hop's thump, his snort and
+- **Sounds** (`characters/pig-sounds.ts`, synthesized): rope whirl, throw, catch, tug, the hop's thump, his snort and
   snorting laugh, a spur stomp, the double wind-up, a pair's yank, and "DRAW!"'s sting (a low damped twang and a knock).
   All under a move's loudness, nothing bright.
 - **Lines** (his text box): "This board ain't big enough for the six of us.", "It's high noon!", "Pick yer duel,
@@ -2540,10 +2540,10 @@ the design decision"), then the calls made while building him.
   warning). `?side=b` for the crowd as Black (his pull as White). A raid link takes `&boss=pig` too.
 
 **Testing.** The full lane: new rules, the server, the protocol and the screens. Unit tests
-(`packages/chess/test/pig.test.ts`): the long pull (centre pawns only, skipped when blocked, hanging or too costly, the
+(`packages/chess/test/pig.test.ts`): the long pull (center pawns only, skipped when blocked, hanging or too costly, the
 board's record), the drag (its band and pick, never the king or a bishop, never into check or no move, a pawn never
 to the 1st or 8th rank, castling rights, the server's check, seeded and deterministic), the showdown (the line-up's
-shape and middle, his pieces protected, bishops on their colour, the band and the trap, mates refused, the forced duel
+shape and middle, his pieces protected, bishops on their color, the band and the trap, mates refused, the forced duel
 and the no-legal-duel case, the scan and confirm, the scout's carried line-ups, holds, two pairs, the drag and the spent
 turn as fallbacks, the same line-up from the same seed and position, the host's answer and solo's agreeing); the lobby
 ("Wrangler online": the host asked and answered, a bad answer refused); the app (his art, kit, moments, lines, sounds,

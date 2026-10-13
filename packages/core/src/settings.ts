@@ -189,7 +189,7 @@ export interface Settings {
   powerUpsMax: number;
   /** Bots use a power-up when the second-best candidate loses at least this many points. */
   botPowerUpLoss: number;
-  /** Each player keeps one colour for a whole stage, swapping at stage breaks (needs 2+ boards). */
+  /** Each player keeps one color for a whole stage, swapping at stage breaks (needs 2+ boards). */
   colourPerStage: boolean;
   /** A pick arriving this long after the deadline still counts. */
   lateGraceMs: number;
@@ -414,7 +414,7 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   // Most of the show happens live (picks appear as they're made), so the reveal itself is short.
   revealSeconds: 2.5,
   drawnMoveSeconds: 1.5,
-  // The cut is a judgement (the gavel and every player's pawn): 10 s, as Eric asked.
+  // The cut is a judgment (the gavel and every player's pawn): 10 s, as Eric asked.
   stageBreakSeconds: 10,
   botThinkSeconds: [2, 14],
 };
@@ -460,7 +460,7 @@ export const BOSS_POWERS = {
     [4, 5],
   ] as readonly (readonly [number, number])[],
   /**
-   * Pie: a square near the centre is pied for pieTurns crowd turns (nobody may move onto it). Up to pieMax pies on the
+   * Pie: a square near the center is pied for pieTurns crowd turns (nobody may move onto it). Up to pieMax pies on the
    * board at once (Eric, Oct 11: two), never two on one square; a new one every pieEvery turns while there's room.
    */
   pieTurns: 3,
@@ -624,7 +624,7 @@ export const BOSS_POWERS = {
   bouncePawnLogit: 0.95,
   /**
    * Sawyer's saw cuts: from crowd turn sawFirst (his split pawn has turn 2 to itself), every sawEvery crowd turns he
-   * saws one edge between two neighbouring squares in the crowd's half that one of its moves would cross, for sawTurns
+   * saws one edge between two neighboring squares in the crowd's half that one of its moves would cross, for sawTurns
    * crowd turns (and his replies in between; then a turn's gap). Nothing, either side, may move straight across it (a
    * rook, queen, king or pawn moving through it); diagonal moves and knights pass. It blocks moves, never attacks;
    * never leaves anyone without a move, never blocks the only way out of check (it lifts for that turn).
@@ -641,19 +641,19 @@ export const BOSS_POWERS = {
   boardSawFrom: 10,
   boardSawTurns: 5,
   /**
-   * Wrangler's long pull (his first move): a centre pawn's double step, lassoed one square further (three squares in one
+   * Wrangler's long pull (his first move): a center pawn's double step, lassoed one square further (three squares in one
    * move: e2-e5 or d2-d5 as White; d7-d4 or e7-e4 as Black after the crowd's first move). The engine picks the d- or
    * e-pawn (the position after each, and after his best ordinary move, searched at pullNodes); a pull losing more than
    * pullMaxLoss pawns against that ordinary move is unsound (it hangs the pawn), and so is one whose path or square is
    * taken or that leaves the pawn simply taken: then it's an ordinary first move. Measured (Stockfish, depth 18): -0.2
-   * to +0.3 pawns for him against a normal first move, pure flavour.
+   * to +0.3 pawns for him against a normal first move, pure flavor.
    */
   pullMaxLoss: 0.5,
   pullNodes: 100_000,
   /**
    * Wrangler's lasso drag (his passive): after his move, from crowd turn dragFirst, every dragEvery turns, he ropes one
    * crowd piece (never the king) and drags it one square up, down, left or right onto an empty square (a pawn never onto
-   * the first or last rank; never a bishop: it would change colour), never leaving the crowd in check or without a move.
+   * the first or last rank; never a bishop: it would change color), never leaving the crowd in check or without a move.
    * In a game already decided (past 4 pawns either way) there's none: the engine can't read a loss there. Of the legal
    * drags (at most dragCandidates, a seeded sample, none leaving more of the crowd's material hanging), each glanced at
    * by the engine (dragScreenNodes), the dragConfirm nearest the band's middle are looked at properly (dragNodes, as is
@@ -712,14 +712,14 @@ export const BOSS_POWERS = {
 export const SAWYER_LOOKS: { readonly split: "morph" | "halves"; readonly settle: "grow" | "small" } = { split: "morph", settle: "grow" };
 
 /**
- * Hollow's string of Christmas lights (packages/app/src/characters/lights.ts; Eric, Oct 11: random colours each game).
- * Looks only. Each battle his ten bulbs take a fresh order of these colours, the same on every screen of the battle
- * (from the battle's seed), never one colour on two bulbs within three of each other along the wire (so no two bulbs
+ * Hollow's string of Christmas lights (packages/app/src/characters/lights.ts; Eric, Oct 11: random colors each game).
+ * Looks only. Each battle his ten bulbs take a fresh order of these colors, the same on every screen of the battle
+ * (from the battle's seed), never one color on two bulbs within three of each other along the wire (so no two bulbs
  * ever lit side by side match, as the countdown puts every third one out). Every place a bulb is drawn takes it: his
  * sprite and its moments, his whip at a king and its lashes, Lights out, the strip of bulbs by the boss bar.
- * Each colour: `glass` (lit) and `shade` (the glass's shaded side, darker); a glint (near white) and the glow round a
+ * Each color: `glass` (lit) and `shade` (the glass's shaded side, darker); a glint (near white) and the glow round a
  * lit bulb (the glass, see-through) are made from `glass`. Bright enough to read on his charcoal fur and on the
- * board's squares; purple and pink kept clear of his own violet. At least 3 colours.
+ * board's squares; purple and pink kept clear of his own violet. At least 3 colors.
  */
 export const HOLLOW_LIGHTS: { readonly colours: readonly { readonly name: string; readonly glass: string; readonly shade: string }[] } = {
   colours: [
@@ -834,7 +834,7 @@ export const BOSS_BRAIN = {
    * Maia's rating for a boss's level (its strength, plus crowdMargin for a crowd), on straight lines between these
    * points: below the first along the first line, down to maiaRatingMin; above the last held there (Maia's ceiling).
    * Calibrated against bot crowds and lone bots in plain chess (reports/maia-calibration.md; DECISIONS.md, "Maia bosses
-   * harder"): the boss clearly favoured, the crowd or the lone player scoring about 0.30 before the powers and the God
+   * harder"): the boss clearly favored, the crowd or the lone player scoring about 0.30 before the powers and the God
    * King (Eric, Oct 12: "people read 'boss' and assume it's a challenge").
    */
   maiaRating: [
@@ -928,17 +928,17 @@ export interface RankDef {
   name: string;
   /** The lowest rating in this rank (on the engine rating's scale). */
   from: number;
-  /** Its pill colour (a prism pill paints a rainbow instead; this is its colour elsewhere). */
+  /** Its pill color (a prism pill paints a rainbow instead; this is its color elsewhere). */
   color: string;
   effect?: RankEffect;
 }
 
 /**
- * The player ranks, lowest first. The names honour Puzzle Pirates, whose skill ladder they are (Eric, Oct 6, 2026).
- * Cutoffs are fixed and rounded to 50, set so a chess-like spread of ratings (centre 1500, SD 350) lands about
+ * The player ranks, lowest first. The names honor Puzzle Pirates, whose skill ladder they are (Eric, Oct 6, 2026).
+ * Cutoffs are fixed and rounded to 50, set so a chess-like spread of ratings (center 1500, SD 350) lands about
  * 5 / 7 / 9 / 10 / 11 / 12 / 11 / 10 / 9 / 7 / 5 / 2.5 / 1.2 / 0.3 % in each, lowest first; the shares these cutoffs
- * actually give are in DECISIONS.md ("The rank ladder"). Colours climb from dull grey through earth, green and sky to
- * violet, and the top three are special. Each colour keeps its pill readable on both themes (4.5:1 or better).
+ * actually give are in DECISIONS.md ("The rank ladder"). Colors climb from dull gray through earth, green and sky to
+ * violet, and the top three are special. Each color keeps its pill readable on both themes (4.5:1 or better).
  */
 export const RATING_RANKS: readonly RankDef[] = [
   { name: "Novice", from: 0, color: "#a2a6ad" },
@@ -1047,7 +1047,7 @@ export function isRankedMatch(humans: number, seats: number, share: number = RAN
 /**
  * What bots wear on the vote board and the cut screen (core/bot-looks.ts), seeded by the bot's name so a bot always
  * looks the same. Mostly one thing, rarely two, plenty plain (Eric: nothing "crazy decked out"). Only items that
- * already exist: the crates' head, face and weapon pieces (no skins: they hide the team's colour; nothing Mythic: that
+ * already exist: the crates' head, face and weapon pieces (no skins: they hide the team's color; nothing Mythic: that
  * stays the players'). See DECISIONS.md, "Vote board follow-ups". The old shop hats are crate head pieces now (Beta
  * Crate, Oct 11, 2026), so they're in `head`, and the old "shop hat" share joined the head share.
  */
@@ -1247,7 +1247,7 @@ export const SQUADS_LOBBY = {
 
 /**
  * Quick chat in matches and in the lobby before them (preset phrases and emoji only; see DECISIONS.md, "Quick chat
- * in matches" and "Lobby chat"). The server enforces the limits; the app mirrors them to grey out its buttons.
+ * in matches" and "Lobby chat"). The server enforces the limits; the app mirrors them to gray out its buttons.
  */
 export const QUICK_CHAT = {
   /** One message every this long… */
@@ -1414,7 +1414,7 @@ export const FAIRPLAY = {
    */
   enforcement: "ban" as "watch" | "review" | "ban",
   reports: {
-    /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts towards an automatic review. */
+    /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts toward an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
     /** Reports one account can make a day (one per player per match; outside a match one per player a day). */
     perDay: 20,
@@ -1465,7 +1465,7 @@ export const FAIRPLAY = {
     obviousShare: 0.5,
     /** Already won or lost: the best move's expected score is below this or above 1 minus it. */
     decided: 0.03,
-    /** The crowd's rates need at least this many other people picking (not practising, no power-up). */
+    /** The crowd's rates need at least this many other people picking (not practicing, no power-up). */
     minCrowd: 8,
     /** A hard position: fewer than this share of the crowd found the best move. */
     hardShare: 0.1,
@@ -1546,7 +1546,7 @@ export const FAIRPLAY = {
      * every `banOne*` bar.
      */
     banMatches: 2,
-    /** (A match counts towards a ban only with this many of its moves deep-checked.) */
+    /** (A match counts toward a ban only with this many of its moves deep-checked.) */
     banMatchChecked: 8,
     banEvidence: 9,
     banDeepChecked: 16,
@@ -1771,7 +1771,7 @@ export interface SquadsSettings {
   /**
    * A drawn final goes to one Armageddon board in the final's format, on its own fixed clocks (a bank for each side,
    * team-clock rules, the lobby's free seconds): Black has draw odds, White more time. The squad with more team bank
-   * left after the final picks its colour.
+   * left after the final picks its color.
    */
   armageddon: { whiteSeconds: number; blackSeconds: number; incrementSeconds: number };
   /** Missed actions in a row before a player's seat goes to a bot (every miss is logged on their record). */
@@ -1797,7 +1797,7 @@ export interface SquadsSettings {
     blockReserve: number;
     /** The final: a bot copies a human teammate's pick (one already made) with this chance, so it feels like a teammate. */
     copyHumanChance: number;
-    /** The colour a bot squad takes when it picks Armageddon's colours. */
+    /** The color a bot squad takes when it picks Armageddon's colors. */
     armageddonColour: "w" | "b";
     /**
      * Winning, a bot plays with purpose: once the best move's expected score is at least `wonAt`, its temperature is

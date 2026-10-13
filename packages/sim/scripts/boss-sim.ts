@@ -3,7 +3,7 @@
  * played) as White against Stockfish at UCI_Elo = the crowd's weighted rating +
  * an offset, with the boss striking down the worst recent mover every 3 crowd
  * moves (down to 3). Crowds of three strengths (expert, club and casual players,
- * modelled as bots that sometimes play a random move). The goal is a boss that's hard but beatable.
+ * modeled as bots that sometimes play a random move). The goal is a boss that's hard but beatable.
  *
  *   npx tsx packages/sim/scripts/boss-sim.ts run <expert|club|casual|beginner> <offsets,comma> <games> <seed> [stumble][,snack][,split]
  *
@@ -182,7 +182,7 @@ function summary() {
     const n = rs.length;
     const pct = (k: string) => `${Math.round((100 * rs.filter((r) => r.result === k).length) / n)}%`;
     const avg = Math.round(rs.reduce((s, r) => s + r.moves, 0) / n);
-    lines.push(`| ${kind} | ${rs[0]!.rating} | ${Number(offset) >= 0 ? "+" : ""}${offset} | ${st?.startsWith("s") ? "stumbles" : "plain"}${st?.includes("+snack") ? ", snack (a centre pawn eaten)" : ""}${st?.includes("+split") ? ", split (his first pawn sawn in two)" : ""} | ${Math.round(rs.reduce((s, r) => s + r.elo, 0) / n)} | ${n} | ${pct("crowd")} | ${pct("draw")} | ${pct("boss")} | ${avg} |`);
+    lines.push(`| ${kind} | ${rs[0]!.rating} | ${Number(offset) >= 0 ? "+" : ""}${offset} | ${st?.startsWith("s") ? "stumbles" : "plain"}${st?.includes("+snack") ? ", snack (a center pawn eaten)" : ""}${st?.includes("+split") ? ", split (his first pawn sawn in two)" : ""} | ${Math.round(rs.reduce((s, r) => s + r.elo, 0) / n)} | ${n} | ${pct("crowd")} | ${pct("draw")} | ${pct("boss")} | ${avg} |`);
   }
   writeFileSync(root + "reports/boss-calibration.md", lines.join("\n") + "\n");
   console.log(lines.join("\n"));

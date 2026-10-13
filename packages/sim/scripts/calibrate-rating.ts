@@ -120,7 +120,7 @@ const md = [
   "| --- | --- | --- |",
   ...measured.map((m, i) => `| ${m.elo} | ${m.meanLoss.toFixed(2)} | ${curve[i]!.meanLoss.toFixed(2)} |`),
   "",
-  "What a player's average loss per move maps to (before the early-match pull towards 1500):",
+  "What a player's average loss per move maps to (before the early-match pull toward 1500):",
   "",
   "| Average loss | Rating |",
   "| --- | --- |",

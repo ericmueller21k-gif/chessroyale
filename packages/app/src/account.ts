@@ -109,7 +109,7 @@ export interface Locker {
   keys: number | null;
 }
 
-/** Opens a crate on the server. `force`: the test switches (?fischer=1, ?shiny=1), honoured only while testing. */
+/** Opens a crate on the server. `force`: the test switches (?fischer=1, ?shiny=1), honored only while testing. */
 export async function openCrate(crate: string, force: { fischer?: boolean; shiny?: boolean } = {}): Promise<{ roll: CrateRoll; item: ItemInstance }> {
   const r = await api<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/locker/open", { method: "POST", body: JSON.stringify({ crate, ...force }) });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });

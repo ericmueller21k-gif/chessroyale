@@ -140,7 +140,7 @@ function ChatFeed({ people, chat, scroll, teams, onName, hint, empty }: { people
   );
 }
 
-/** One phrase or emoji button. Greyed while the limits (or the Team / All switch) don't allow it. */
+/** One phrase or emoji button. Grayed while the limits (or the Team / All switch) don't allow it. */
 function SayButton({ chat, say, now }: { chat: MatchChat; say: ChatSay; now: number }) {
   const ok = chat.canSay(say.id, now);
   return (
@@ -230,14 +230,14 @@ function SplitButton({ full, what, onClick }: { full: boolean; what: string; onC
   );
 }
 
-/** Minimise the space under the board (both panels to their headers), or open it again. */
+/** Minimize the space under the board (both panels to their headers), or open it again. */
 function FoldButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
       class="qhead-btn fold"
       aria-expanded={open}
-      aria-label={open ? "Minimise the leaderboard and chat" : "Show the leaderboard and chat"}
+      aria-label={open ? "Minimize the leaderboard and chat" : "Show the leaderboard and chat"}
       onClick={(e) => {
         e.stopPropagation();
         onToggle();
@@ -290,7 +290,7 @@ export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatP
   useEffect(() => onAccountChange(() => redraw((n) => n + 1)), []);
   const teams = chat.hasTeams();
   const now = Date.now();
-  // On screen while its feed has room to show something (a minimised panel is only its header).
+  // On screen while its feed has room to show something (a minimized panel is only its header).
   useLayoutEffect(() => {
     const el = feed.current;
     if (!el || chat.off) {

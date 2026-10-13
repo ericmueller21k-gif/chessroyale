@@ -547,7 +547,7 @@ export class SoloMatch implements GameView {
   private async bossTurn() {
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
-    // (Alone, it has been "thinking" since your move went in: scoring your move counts towards it.)
+    // (Alone, it has been "thinking" since your move went in: scoring your move counts toward it.)
     // (G-REX's fire has just burnt something: it plays out before the boss's move.)
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
     const minThink = bossThinkMs(snap.board.history, snap.board.bases, burnt) - (this.alone && !burnt ? Date.now() - this.movedAt : 0);

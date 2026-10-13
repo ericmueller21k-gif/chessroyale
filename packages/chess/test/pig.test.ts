@@ -45,7 +45,7 @@ import {
 } from "../src/index.ts";
 
 /**
- * Wrangler, the cowboy pig (code id `pig`): his long pull (his first move, a centre pawn three squares), his lasso drag
+ * Wrangler, the cowboy pig (code id `pig`): his long pull (his first move, a center pawn three squares), his lasso drag
  * (a crowd piece dragged a square after his move, costing the crowd a little by the engine's measure) and SHOWDOWN! (three
  * pairs lined up facing each other, the crowd's next move one of the duels). See DECISIONS.md, "Wrangler, built".
  */
@@ -134,7 +134,7 @@ describe("Wrangler: who he is", () => {
 });
 
 describe("Wrangler's long pull", () => {
-  it("only a centre pawn (d or e) from its starting square, three squares; never a side pawn", () => {
+  it("only a center pawn (d or e) from its starting square, three squares; never a side pawn", () => {
     expect(pullOptions(START_FEN)).toEqual(["d2d5", "e2e5"]);
     // As Black after the crowd's first move: the pawn the crowd's move blocks is out.
     expect(pullOptions(applyMove(START_FEN, "e2e4"))).toEqual(["d7d4"]);
@@ -409,7 +409,7 @@ describe("Wrangler's showdown: the line-up", () => {
         const dr = Math.abs(Number(p.crowd[1]) - Number(p.boss[1]));
         if (p.piece === "n") expect(df * dr).toBe(2);
         else expect(Math.max(df, dr)).toBeLessThanOrEqual(2);
-        // Bishops keep their colour.
+        // Bishops keep their color.
         if (p.piece === "b") {
           const light = (s: string) => (s.charCodeAt(0) - 97 + Number(s[1])) % 2 === 0;
           expect(light(p.crowd)).toBe(light(p.crowdFrom));

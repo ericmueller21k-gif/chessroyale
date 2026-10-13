@@ -3,14 +3,14 @@
 The game's pieces (the board's, and every piece drawn over it or elsewhere) are the "cburnett" set by Colin M.L. Burnett,
 the same drawings the game has always shown (they used to come in through chessground's CSS, which is GPL-3; Oct 12,
 2026 they come from their own source instead). Each file is taken from Wikimedia Commons, where the author
-offers it under a choice of the GFDL, the **BSD licence** or the GPL (`{{self|GFDL|migration=relicense|BSD|GPL}}` on
-each file's page). HunChess uses them under the BSD licence (Commons' `{{BSD}}`: the 3-clause BSD licence), whose text is
-in `LICENSE.txt` beside this file. The credit is in the app (Settings, and the FAQ's "Credits and licences").
+offers it under a choice of the GFDL, the **BSD license** or the GPL (`{{self|GFDL|migration=relicense|BSD|GPL}}` on
+each file's page). HunChess uses them under the BSD license (Commons' `{{BSD}}`: the 3-clause BSD license), whose text is
+in `LICENSE.txt` beside this file. The credit is in the app (Settings, and the FAQ's "Credits and licenses").
 
-Drawn by `pieces.css` (`piece.<colour>.<kind>`), inlined into the stylesheet by the build.
+Drawn by `pieces.css` (`piece.<color>.<kind>`), inlined into the stylesheet by the build.
 
-**Changed for the game (one colour):** in the five black pieces with light details (bishop, knight, rook, queen,
-king), the details' white (`#ffffff`) is toned to a light grey (`#ececec`), as the game has always drawn them (measured
+**Changed for the game (one color):** in the five black pieces with light details (bishop, knight, rook, queen,
+king), the details' white (`#ffffff`) is toned to a light gray (`#ececec`), as the game has always drawn them (measured
 against the old board, Oct 12, 2026: otherwise the same). Nothing else is changed; the white pieces and the black pawn
 are byte for byte as downloaded. The SHA-1 below is of the file as downloaded.
 

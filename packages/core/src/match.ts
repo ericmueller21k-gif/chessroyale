@@ -49,7 +49,7 @@ export interface PlayerState {
   movesTimed: number;
   /** Practice mode: unlimited power-ups (shown on the leaderboard). */
   practice: boolean;
-  /** Colour played this stage (null when colours aren't fixed, e.g. the last stages on one board). */
+  /** Color played this stage (null when colors aren't fixed, e.g. the last stages on one board). */
   colour: Side | null;
   /** The final: loss of each move (a miss counts as finalMissLoss). */
   finalLosses: number[];
@@ -203,9 +203,9 @@ export const alivePlayers = (state: MatchState) => state.players.filter((p) => p
 /**
  * Splits the alive players into groups, one per board. While there are 4 or
  * more boards nobody gets the same board twice in a row; repeat groupmates are
- * avoided where possible. When players have a colour for the stage and
+ * avoided where possible. When players have a color for the stage and
  * `boardSide` says which side is to move on each board, players only go to
- * boards where their colour is to move.
+ * boards where their color is to move.
  */
 export function assignGroups(
   rng: Rng,
@@ -221,7 +221,7 @@ export function assignGroups(
   const sides: Side[] = ["w", "b"];
   const byColour = (side: Side) => players.filter((p) => p.colour === side);
   const boardsOf = (side: Side) => state.boards.filter((b) => boardSide?.get(b) === side);
-  // Colours fit when every player has one and each colour has a board where it's to move. Group sizes then
+  // Colors fit when every player has one and each color has a board where it's to move. Group sizes then
   // follow the numbers (an odd number of boards makes them 7-10 instead of 8).
   const colourFits =
     boardSide !== undefined &&
@@ -288,14 +288,14 @@ function groupSubset(
 }
 
 /**
- * Colours for a new stage: `whites` players play White and the rest Black.
- * Players swap colour from the last stage where the numbers allow; the rest
- * are chosen at random. Pass whites = null to clear colours (one board left).
+ * Colors for a new stage: `whites` players play White and the rest Black.
+ * Players swap color from the last stage where the numbers allow; the rest
+ * are chosen at random. Pass whites = null to clear colors (one board left).
  */
 export function assignColours(state: MatchState, rng: Rng, whites: number | null): MatchState {
   const alive = alivePlayers(state);
   if (whites === null) return { ...state, players: state.players.map((p) => (p.alive ? { ...p, colour: null } : p)) };
-  // Preference order for White: last stage's Black players first, then no colour, then last stage's White.
+  // Preference order for White: last stage's Black players first, then no color, then last stage's White.
   const rank = (p: PlayerState) => (p.colour === "b" ? 0 : p.colour === null ? 1 : 2);
   const order = shuffle(rng, alive).sort((a, b) => rank(a) - rank(b));
   const white = new Set(order.slice(0, whites).map((p) => p.id));
@@ -498,7 +498,7 @@ export function endStage(
   };
 }
 
-/** Crowd 50 v 50: players keep one colour (their team) all match. */
+/** Crowd 50 v 50: players keep one color (their team) all match. */
 export const isTeamMatch = (settings: Pick<Settings, "mode" | "crowdTeams">) => settings.mode === "crowd" && settings.crowdTeams;
 
 /** True once the knockout stages are over and the 2v2 final is on. */

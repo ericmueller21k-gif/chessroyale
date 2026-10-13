@@ -446,7 +446,7 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
       out.missed += res.missed.length;
       out.timeouts += res.timeouts.length;
       const before = squads.flatMap((x) => x.players).filter((p) => p.replacedByBot).length;
-      // (A slow move in sudden death isn't a no-show: only true misses count towards a bot taking the seat.)
+      // (A slow move in sudden death isn't a no-show: only true misses count toward a bot taking the seat.)
       squads = noteActions(squads, res.acted, res.missed.filter((p) => !res.timeouts.includes(p)), s);
       out.replaced += squads.flatMap((x) => x.players).filter((p) => p.replacedByBot).length - before;
       for (const e of res.events) {

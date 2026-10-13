@@ -142,7 +142,7 @@ describe("piece sounds: the files", () => {
     ["move", MOVE_SOUNDS],
     ["capture", CAPTURE_SOUNDS],
   ] as const) {
-    it(`${kind}: all wood, unique ids and labels, each file small and credited in SOURCES.md with its source, author and licence`, () => {
+    it(`${kind}: all wood, unique ids and labels, each file small and credited in SOURCES.md with its source, author and license`, () => {
       expect(list.length).toBe(9);
       // (Eric, Oct 12: wooden sounds, not chips or clicks; the classics are PyChess's wooden knocks.)
       for (const o of list) expect(`${o.id} ${o.label}`).toMatch(/wood|knock|classic/i);
@@ -221,7 +221,7 @@ describe("piece sounds: the classics are PyChess's (GPL-3.0), credited", () => {
     for (const o of variations) expect(script, o.file).toContain(`"${o.file.replace("/sounds/pieces/", "").replace(".mp3", "")}": (`);
   });
 
-  it("the GPL-3.0's text ships with them (Stockfish's copy, the same licence) and the notice names every file", () => {
+  it("the GPL-3.0's text ships with them (Stockfish's copy, the same license) and the notice names every file", () => {
     // (vite.config.ts copies Stockfish's Copying.txt to /engine/COPYING.txt at every build.)
     const gpl = readFileSync(join(dirname(createRequire(import.meta.url).resolve("stockfish/package.json")), "Copying.txt"), "utf8");
     expect(gpl).toContain("GNU GENERAL PUBLIC LICENSE");
@@ -235,13 +235,13 @@ describe("piece sounds: the classics are PyChess's (GPL-3.0), credited", () => {
     expect(notice).toContain("variations of\n  PyChess's sounds, made by our script");
   });
 
-  it("credited in Settings and the FAQ, with a link to PyChess's sounds and the licence", () => {
+  it("credited in Settings and the FAQ, with a link to PyChess's sounds and the license", () => {
     const settings = read("../src/screens/Settings.tsx");
     expect(settings).toContain(`Classic piece sounds and their variations: <a href="${PYCHESS}">PyChess</a> (GPL-3.0)`);
-    expect(settings).toContain('<a href="/engine/COPYING.txt">licence</a>');
+    expect(settings).toContain('<a href="/engine/COPYING.txt">license</a>');
     const faq = read("../src/faq/content.ts");
     expect(faq).toContain(`- **Classic piece sounds** and their variations: [PyChess](${PYCHESS}) (GPL-3.0).`);
-    expect(faq).toContain("[licence](/engine/COPYING.txt)");
+    expect(faq).toContain("[license](/engine/COPYING.txt)");
     expect(read("../../../LICENSES.md")).toContain("GPL-3.0 data files");
     expect(read("../../../DECISIONS.md")).toContain("Eric, Oct 12: classic PyChess knocks back as the default, GPL-3.0, credited");
   });

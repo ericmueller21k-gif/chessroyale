@@ -68,7 +68,7 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
     "Ready the pawns. Glory starts small.",
     "Fear is a pinned piece. Don't let it move you.",
     "Let's give the bards something to sing about.",
-    "Hold the centre, and hold your nerve.",
+    "Hold the center, and hold your nerve.",
     "My sword remembers every boss it has met.",
     "Courage. I fight beside you.",
     "Every crowd needs a champion. Today, I'm yours.",

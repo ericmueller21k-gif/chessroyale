@@ -56,7 +56,7 @@ Answer to its question 8, the settings changed or kept because of it:
 ## Milestone 3: solo build
 
 - **Board component: chessground** (Lichess's board, GPL-3). Tap-tap and drag, legal-square dots, last-move highlight
-  and arrows for the reveal all come built in. GPL matches Stockfish's licence, so the app as a whole is GPL anyway.
+  and arrows for the reveal all come built in. GPL matches Stockfish's license, so the app as a whole is GPL anyway.
 - **Engines in the browser: up to 4 Web Workers** (cores − 1). The 8 boards of a round are scored in parallel, so
   scoring takes well under a second on a laptop. The results screen prints the time per round on that device.
 - **Pacing.** The opening grid plays for 6 s; the reveal shows for 4 s plus 1.5 s for the drawn move, and a tap skips
@@ -93,7 +93,7 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
   kept as a stat (results screen, and in the data for future player profiles). An interim version counted time (±2 points a
   minute) and charged 4 points per power-up; that was dropped.
 - **Power-ups are free.** One at the start, plus one more for everyone who survives a cut, and unused ones carry over, so the
-  choice is when to spend them. Using one shows the engine's top 3 moves as labelled arrows with each move's expected
+  choice is when to spend them. Using one shows the engine's top 3 moves as labeled arrows with each move's expected
   score. The hint comes from the search the device already runs for the eval bar, so it appears almost at once. Bots use
   one when a position is sharp (the second-best move loses 15+ points), then play the best move.
 - **Practice mode** (checkbox on the first screen): unlimited power-ups, and a 💡 on the
@@ -101,10 +101,10 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
   suggestions; the power-up view does the same job.
 - **Evaluation bar always shown**, on the play screen and for both duel players. The spec said players never see it;
   Eric decided otherwise. On the play screen it reuses the top-moves search already running for scoring.
-- **One colour per stage.** Half the boards now have White to move and half Black (openings are cut at 20 or 21
-  plies). Each player is White or Black for a whole stage, so the board never flips under you, and colours swap at
-  each cut, as evenly as the numbers allow. Shrinking keeps half of each colour's boards. The final four share one
-  board, so colours alternate there. Grouping only seats players on boards where their colour is to move, which also
+- **One color per stage.** Half the boards now have White to move and half Black (openings are cut at 20 or 21
+  plies). Each player is White or Black for a whole stage, so the board never flips under you, and colors swap at
+  each cut, as evenly as the numbers allow. Shrinking keeps half of each color's boards. The final four share one
+  board, so colors alternate there. Grouping only seats players on boards where their color is to move, which also
   means you never get the same board twice in a row.
 - **Catching up on a board.** When you land on a board, the moves played since you last saw it are replayed (or the
   last 2 if it's new to you), up to 4 at about half a second each, before you can move. The move you watch drawn in
@@ -138,7 +138,7 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
   leaderboard and round counter don't move behind the waiting banner.
 - **The reveal says which pick continues the board.** One pick per group is drawn at random to carry the game on,
   and the reveal used to say so only in small print, so a different move appearing looked like a bug. Now a 🎲
-  callout names the move and whose pick it was, the picks list marks it, your arrow is labelled "You" and the best
+  callout names the move and whose pick it was, the picks list marks it, your arrow is labeled "You" and the best
   move "★". Castling was checked with real taps and drags on phone and desktop (`e2e/castling.spec.ts`).
 - **The cut line reads "Cut after round 8"**, and the danger zone is amber ("at risk") instead of dark red, which
   read as "already eliminated". The first cut is after 8 rounds; `?rounds=2` in a link makes it 2 for quick tests.
@@ -154,7 +154,7 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
 - **The reveal shows everyone's move at once.** See-through copies of each moved piece slide to their squares with
   the players' names stacked above (yours in blue). Then "All moves in · choosing the move", then the chosen move plays
   with the reason ("the most popular move in your group", "the best move in your group", …).
-- **Sounds, synthesised in the browser** (Web Audio, so nothing to license or download): a wooden "thock" for every
+- **Sounds, synthesized in the browser** (Web Audio, so nothing to license or download): a wooden "thock" for every
   move on the main board (your move, the catch-up replay, the chosen move, the duel), a sharper double knock for
   captures, a soft chime when a round starts, a sparkle for a power-up, a ding when all moves are in, a rising chord
   when you survive a cut, a falling one when you're out, and a fanfare for winning. The countdown beeps moved into the
@@ -163,9 +163,9 @@ Eric asked for these. Where they reverse the spec, the request wins; the details
 
 ## Pace, the reveal, history and real piece sounds (Oct 2, 2026)
 
-- **Piece sounds are recorded wooden knocks** from PyChess (GPL-3, the same licence as the app): one for a move, a
+- **Piece sounds are recorded wooden knocks** from PyChess (GPL-3, the same license as the app): one for a move, a
   double knock for a capture, king-and-rook for castling. Lichess's classic set is listed as non-free in its own
-  licence file, and its alternative sets are AGPL, so PyChess was the clean choice. Other cues (round start, the
+  license file, and its alternative sets are AGPL, so PyChess was the clean choice. Other cues (round start, the
   reveal's reel ticks and landing, the 3-2-1, cuts, the win) are a soft marimba-style voice in a lower, warmer
   range than before, and the move clock's last-seconds beeps use it too.
 - **Relaxed pace by default**, with a toggle on the first screen (unticked = quick; `?pace=quick` in a link). Relaxed:
@@ -186,13 +186,13 @@ Eric's design; the details were my call.
   players, not 3), and the reveal shows up to 8 moves sliding in at once.
 - **Each cut removes the bottom 8 and one board**: 64/8 → 56/7 → 48/6 → 40/5 → 32/4 → 24/3 → 16/2 → 8/1, then the last 4
   play the final. The board that closes is the most lopsided (furthest from 50/50), keeping both sides to move
-  represented so each colour still has boards. 5 rounds per stage (40 knockout rounds, about 25 minutes relaxed).
+  represented so each color still has boards. 5 rounds per stage (40 knockout rounds, about 25 minutes relaxed).
 - **Boards are never swapped.** The same games develop all match. If a game actually ends mid-stage, that board leaves
   play and its players spread over the other boards until the cut; only if the very last board's game ends does it
   get a fresh opening. In the bot check this happened 0.16 times per match.
-- **Colours stay fixed per stage with any number of boards.** Players split half White, half Black. With an odd number
+- **Colors stay fixed per stage with any number of boards.** Players split half White, half Black. With an odd number
   of boards the boards' sides alternate 4/3 then 3/4, so group sizes become 7-10 instead of exactly 8. With one board
-  left, colours alternate as before.
+  left, colors alternate as before.
 - **The 2v2 final replaces the duel.** It's on the last board, the game everyone has watched. Seeds (from the last
   stage's standings) 1 & 4 play the side to move, 2 & 3 the other, and the turns go seed 1, 2, 4, 3. Each finalist
   makes 5 moves (fewer if the game ends). Every move is scored as usual and placement 1st-4th is by average loss per
@@ -211,16 +211,16 @@ Eric's requests; the details were my call.
 - **Phones get one locked screen** (anything under 900 px wide): nothing scrolls or moves around. From top to
   bottom: the 8 tiny boards, the stage/position strip, the board (a little smaller, about 300 px on a short phone
   screen), ◀ ▶, the move controls, and a small scoreboard. The scoreboard is the only part that scrolls, inside its
-  own box, kept centred on you. Its rows show just position, name and points. Its header ("Leaderboard P12/64 · +3.1")
-  minimises it to one line, and with it minimised the board grows into the space. The choice is remembered on the
+  own box, kept centered on you. Its rows show just position, name and points. Its header ("Leaderboard P12/64 · +3.1")
+  minimizes it to one line, and with it minimized the board grows into the space. The choice is remembered on the
   device. The full leaderboard is still one tap on the strip, and the stage breaks and results show it in full.
   Landscape phones (under 520 px tall) keep the scrolling layout, since a locked screen would leave no room for the board.
 - **Computers keep the full scoreboard on the left** (at 1100 px and wider). Between 900 and 1100 px the small
   scoreboard sits under the move controls instead.
-- **All 8 boards along the top, on every game screen** (phone and computer): tiny pixel boards (grey squares, white
+- **All 8 boards along the top, on every game screen** (phone and computer): tiny pixel boards (gray squares, white
   and black blocks for pieces, pawns small and kings largest, last move tinted) numbered 1-8. They're live: each one
   shows its position after every round. Yours this turn has an orange ring. A board that has closed (at a cut, or
-  because its game ended) stays in its place, greyed out, so the numbers never shift. They're always drawn with White
+  because its game ended) stays in its place, grayed out, so the numbers never shift. They're always drawn with White
   at the bottom. The server sends every board slot with each round, reveal, stage break, final and spectate message.
 - **The move clock is a thin bar on the board's top edge.** It's full when the clock starts and shrinks right to left
   to nothing at your deadline (30 s, or less when your bank is short). It turns red for the last 10 s, with a tick
@@ -242,7 +242,7 @@ Eric's requests; the details were my call.
 - **The stage/position strip moved above the tiny boards** and lost its white box and border, as did the sound
   toggle: one clean line, left to right ("S1 · R1/5  P12/64  +3.1 safe … ⚡1 ☰ 🔊"). Tapping it still opens the full
   leaderboard.
-- **The board is centred on the screen.** The evaluation bar stays on the left, and an equal empty gap on the right
+- **The board is centered on the screen.** The evaluation bar stays on the left, and an equal empty gap on the right
   balances it.
 - **History is just ◀ on the left and ▶ on the right**, with no boxes. ⏮ and ⏭ are gone. While you're looking back,
   the middle says "Move 14 · 27/40 · back to live"; tap it to return.
@@ -259,7 +259,7 @@ Eric's requests; the details were my call.
   rounded box; between them your move clock and the power-up button. Going straight to the first move was dropped:
   there's no time for it mid-round.
 - **The power-up is one round button with a lightning bolt and "x1" above it** (how many you hold). It's lit when you
-  can use one and greyed out at x0. While it's in use this move it shows as an outlined ring and the count drops. When
+  can use one and grayed out at x0. While it's in use this move it shows as an outlined ring and the count drops. When
   you earn one (and when the match starts) it flashes yellow a few times and the count ticks over. The engine's top
   3 show as arrows on the board and as one line of small chips under the controls.
 - **The strip: your points are big** (green above the cut, red in the knockout zone), **then the cut line's score in
@@ -272,20 +272,20 @@ Eric's requests; the details were my call.
   up or down to their new values (about 0.7 s) and flash green when they improve, red when they drop. Rows still slide
   to their new places.
 - **The phone's small scoreboard never scrolls; it shows as many players as fit**, in this order: you, the leader,
-  the last place through and the first place out (with the cut line between them), your neighbours, the rest of the
+  the last place through and the first place out (with the cut line between them), your neighbors, the rest of the
   top five, then outwards from you. "⋯" marks the gaps. On a 700 px-tall phone that's about 4-5 rows; on a typical
   phone it's 8-10. Each row shows position, name, points, average, rating and power-ups, with small column labels.
-  Tapping it opens the full leaderboard; the arrow in its header still minimises it. Computers keep the full
+  Tapping it opens the full leaderboard; the arrow in its header still minimizes it. Computers keep the full
   leaderboard on the left.
 
-## Power-up slots, a centre-closing timer, shorter openings, replay from move 0 (Oct 3, 2026)
+## Power-up slots, a center-closing timer, shorter openings, replay from move 0 (Oct 3, 2026)
 
 Eric's requests; the details were my call.
 
 - **Power-ups: start with 3, hold at most 5** (one more each stage you survive; one earned on a full hand is lost).
-  Under the board they're a row of 5 small round slots with a lightning bolt: lit for each one you hold, grey for
+  Under the board they're a row of 5 small round slots with a lightning bolt: lit for each one you hold, gray for
   missing or used. Tap a lit one to see the engine's top 3 on this move; the slot turns into a breathing outlined
-  ring while it's in use. Tapping a grey one gives a little shake and does nothing. Newly earned ones light up with
+  ring while it's in use. Tapping a gray one gives a little shake and does nothing. Newly earned ones light up with
   a few yellow flashes, one after another (and your first 3 do at the start of the match).
 - **The move clock moved off the controls line.** The line under the board is now ‹‹, the power-up slots, ››, all
   smaller, so the board area is tighter and the scoreboard gets more room. **Your total time left (the bank) is in
@@ -298,7 +298,7 @@ Eric's requests; the details were my call.
   lobbies you create (`?moves=N` in a link). Boards where Black starts get one ply more. At 0 every White-to-move board
   starts from the initial position.
 - **The opening library was rebuilt for every length from 0 to 10 moves**, from named Lichess lines only (no engine
-  filler moves): for each length, the distinct positions named lines reach, one per named variation, most travelled
+  filler moves): for each length, the distinct positions named lines reach, one per named variation, most traveled
   first (up to 100 classic and 30 unusual per length). Each is scored at both lengths it can be shown at and kept if
   balanced (40-60%), and each board is named after the longest named line its moves actually match (so a 4-move
   board says "Italian Game", not the name of a 12-move line it was cut from). Short lengths have few families, so
@@ -317,7 +317,7 @@ Eric's requests; the details were my call.
   yellow to red.
 - **The "selecting move" reel has a sound again**, aiming at a kart racer's item roulette: each reel step is a quick,
   bright two-note flick climbing a major arpeggio (C-E-G-C), so it rolls faster then slower with the reel. When it
-  lands, the winning move blinks three times with three identical tones. Both are synthesised placeholders until Eric
+  lands, the winning move blinks three times with three identical tones. Both are synthesized placeholders until Eric
   finds a sample.
 
 ## "15 opening moves", a sound lab, and a sound for every board moving (Oct 3, 2026)
@@ -375,7 +375,7 @@ Eric's design; the details were my call. The 8-board version stays as **Classic*
 Eric's requests; the details were my call.
 
 - **Every pick is a ghost piece with names.** Each picked move gets a tag over its square with the top three names (by
-  leaderboard, you first) and "+N" for the rest; names are cut to about a square and a half so neighbouring tags stay
+  leaderboard, you first) and "+N" for the rest; names are cut to about a square and a half so neighboring tags stay
   readable. Cluttered on purpose.
 - **Animations on (default):** every single pick is its own see-through piece sliding onto its square, in quick
   succession and in a mixed order (20 knight picks are 20 knights; all 50 in about two seconds), silently. Then the
@@ -435,7 +435,7 @@ Eric's brief (voice, late at night, "make the calls"): the 50 v 50 becomes the m
 - **Boss battle (top 10).** The third option has two parts:
   - **The board.** At first I had the ten start a fresh game from the starting position. Eric then asked for a position from **the game they just played**, around moves 5–12, roughly even, and never better for the boss. So the battle starts from a position in that game with White (the crowd) to move, between moves 5 and 12:
     - If possible, one where White's expected score is 0.50–0.60, taking the one nearest move 8.
-    - Otherwise, the position closest to even that still favours White.
+    - Otherwise, the position closest to even that still favors White.
     - Otherwise, the starting position, which is even by definition.
   - **Choosing it costs nothing.** Every position's evaluation was recorded when that move was scored (`BoardState.evals`), so no extra engine search is needed and it works the same solo and online.
   - **The intro.** A 5.5 s screen shows the boss appearing and says which move of their game it takes over from.
@@ -443,13 +443,13 @@ Eric's brief (voice, late at night, "make the calls"): the 50 v 50 becomes the m
   - **Strikes.** Every 3 crowd moves the boss strikes down the player who lost the most points over those 3 moves; a tie goes against the weaker player over the match. Strikes continue down to 3 survivors.
   - **The strike animation.** A white-red flash, a skull, the victim's name shaken and crossed out, and a slight screen shake. No new sound, keeping to Eric's earlier "piece sounds, ticks and the reveal only".
   - **The end.** The battle ends on mate, a draw, or 60 crowd moves; at the cap, the engine's verdict decides. Those still standing share the result on their records.
-  - **The boss's strength.** It's set from the ten's own engine ratings, weighted towards the best: the top player counts 10 times, the 10th once. Then an offset is added, clamped to 800–3000, and Stockfish plays at UCI_Elo. The number stays secret. Instead the boss has a name and look that scale with its strength (The Pawn Golem 🗿, The Iron Bishop 🤖, The Black Knight 🐴, The Tower Tyrant 🏰, The Grandmaster Wraith 👻, The Engine Eternal 👹) and a 1–5 skull threat rating.
+  - **The boss's strength.** It's set from the ten's own engine ratings, weighted toward the best: the top player counts 10 times, the 10th once. Then an offset is added, clamped to 800–3000, and Stockfish plays at UCI_Elo. The number stays secret. Instead the boss has a name and look that scale with its strength (The Pawn Golem 🗿, The Iron Bishop 🤖, The Black Knight 🐴, The Tower Tyrant 🏰, The Grandmaster Wraith 👻, The Engine Eternal 👹) and a 1–5 skull threat rating.
   - **Calibration.** See below.
 - **Duel (top 2).** This is the third option Eric left to me. The best player on each side plays 1v1 to the end, and the winner of the game places first. It's cheap to build (it's the team final with one player a side) and it's a real contrast to the other two: a showdown instead of a team effort.
 
 **Boss calibration (`packages/sim/scripts/boss-sim.ts`, `reports/boss-calibration.md`).**
 - **The setup.** Crowds of 10 bots (the most popular pick played, the weakest struck down every 3 moves) played White against Stockfish at the crowd's weighted rating plus an offset.
-- **Crowd types.** I modelled human-like crowds (expert, club, casual, beginner) as bots that also play a random move now and then.
+- **Crowd types.** I modeled human-like crowds (expert, club, casual, beginner) as bots that also play a random move now and then.
 - **Findings** (6–8 games a row, so noisy, in `reports/boss-calibration.md`):
   - **Strong crowds.** A boss at the crowd's own weighted rating gave the expert crowd 33% wins and 50% draws. About 150 points weaker made it easy (83% wins).
   - **Club crowds.** At about 100 points weaker, they won 38%, drew 25% and lost 38%. That's the target: very hard but beatable. So **the offset is −100.**
@@ -459,7 +459,7 @@ Eric's brief (voice, late at night, "make the calls"): the 50 v 50 becomes the m
   - **This is a starting point for real players.** Real human crowds probably agree on natural moves better than random bots do. With actual games, the offset and the stumble are the two numbers to tune (`bossEloOffset`, `bossStumbleBelow`, `bossStumbleMax` in settings.ts).
 
 **Play now (matchmaking).**
-- **The flow.** One button, no lobby: you join the 50 v 50 lobby that's filling up and watch the count climb towards 100. The match starts when it's full, or 60 s after the lobby opened, with bots in the empty seats. Unranked only for now, since nobody has a rating yet.
+- **The flow.** One button, no lobby: you join the 50 v 50 lobby that's filling up and watch the count climb toward 100. The match starts when it's full, or 60 s after the lobby opened, with bots in the empty seats. Unranked only for now, since nobody has a rating yet.
 - **How it's built.** A `Matchmaker` Durable Object hands out the current lobby, one request at a time, so two players arriving together never open two lobbies. A matchmade lobby has no host button and starts itself on an alarm.
 - **Settings.** Local tests use an 8 s fill (`MATCH_FILL_SECONDS`).
 - **Later.** Filling with bots "around players' ratings" waits for ranked: bot strength is a temperature, not a rating, and mapping between the two needs its own calibration. It's in the roadmap.
@@ -475,7 +475,7 @@ Eric's brief (voice, late at night, "make the calls"): the 50 v 50 becomes the m
 - **Calling him.** On a crowd move, anyone can tap **Call the King** as well as picking their move. If more than half the crowd calls and a charge is left, the King plays instead of the popular move. Picks are still scored as usual, so calling never protects you from the boss's strikes.
   - Bots call him when the crowd's popular move would lose 6 points or more, and back a human's call 60% of the time. That way a lone human in a solo game can still bring him in.
 - **His strength.** The King plays the engine's best move at full strength: the same search that scores the picks, so it costs nothing extra. It's always stronger than the boss, which plays limited to its UCI_Elo. On screen this reads as "plays at full strength".
-- **How he looks.** A king piece in the crowd's colour with a sword at his side, beside the board in place of the power-ups during the battle. Charges show as crowns. He sways gently, and the sword wiggles.
+- **How he looks.** A king piece in the crowd's color with a sword at his side, beside the board in place of the power-ups during the battle. Charges show as crowns. He sways gently, and the sword wiggles.
   - When he plays, a gold card appears over the board ("The King steps in", with his move) as he rises and raises his sword. The poll shows a 👑 King row with the number who called.
   - No confirmation step, as Eric said.
 
@@ -502,7 +502,7 @@ Eric liked the cleaner fixed ghosts but missed seeing everyone "move their piece
   - Each new pick launches a short-lived flyer from its piece's square. It's placed on the landing square and starts offset by whole squares (a GPU transform), so it ends exactly where the fixed ghost stands. It has two fading echoes behind it (the trail), lasts 0.42 s, and fades out as it lands.
   - The fixed ghost then appears (a new square) or pops (one more pick), so pieces only ever stop on one spot.
 - **Limits that keep it clean.** At most one flyer per move is in the air at a time (a popular move otherwise stacked into a streak, as a first try showed), and at most 14 overall; any extra pick just pops. In a 50-player round, at most 7 were in the air at once.
-- Measured in a phone browser during a full round with the trail on: every fixed ghost's centre was within 0.02 px of its square at every sample.
+- Measured in a phone browser during a full round with the trail on: every fixed ghost's center was within 0.02 px of its square at every sample.
 - **Settings.** "Motion trail" sits under Animations on the home screen (needs Animations on), and `?trail=1` turns it on. It was off by default at first. Eric tried it on his phone and made it the default (Oct 5): on unless switched off on this device. Reduced-motion devices never show the flyers.
 
 ## One name per square (Oct 5, 2026)
@@ -511,7 +511,7 @@ Eric suggested one name over each picked square, "You" when it's your move, plus
 
 - Each square shows one name pill: "You" if you picked it, otherwise the best-placed player who did. The pill is never wider than the square.
 - "+N" (everyone else) is now an orange badge on the piece's top-right corner, inside the square.
-- Before, up to three names plus "+N" stacked above each square, and neighbouring columns overlapped. Now nothing on one square can cover another's.
+- Before, up to three names plus "+N" stacked above each square, and neighboring columns overlapped. Now nothing on one square can cover another's.
 
 ## Elimination breakdown (Oct 5, 2026)
 
@@ -526,12 +526,12 @@ Eric wants eliminated players to see why, so they can learn rather than argue.
 - Tap a move to see the position with your move (red arrow) and the best (green).
 - It's built from each reveal on your own device (solo and online alike), so no new server messages were needed.
 
-## The cut as a judgement (Oct 5, 2026)
+## The cut as a judgment (Oct 5, 2026)
 
 Eric's design:
 - **The pawns:** every player is a pawn in a 10 × 10 grid, White's team on the left five columns and Black's on the right, in fixed seats so you can find yourself (gold ring). You wear your equipped hat; bots wear random ones (a hint of the shop); other online players have none for now.
 - **The judge:** a gavel piece in the board's own piece style, on a wooden sound block.
-- **The sequence:** the doomed pawns glow red, the gavel raises and slams at 1.5 s (two heavy wooden knocks, the piece sounds pitched down, and a small shake), and the cut pawns fade to grey. Pawns cut earlier stay faint.
+- **The sequence:** the doomed pawns glow red, the gavel raises and slams at 1.5 s (two heavy wooden knocks, the piece sounds pitched down, and a small shake), and the cut pawns fade to gray. Pawns cut earlier stay faint.
 - **Then:** the verdict, "Why was I cut?" if you're out, and the names.
 - **Length:** 10 s (Crowd's `stageBreakSeconds`, was 4); quick pace (tests) keeps 4.
 - **Eric asked whether a whole side could be wiped out:** not in 50 v 50, since every cut takes the same number from each team.
@@ -591,8 +591,8 @@ Five things the quick-chat build noticed, and one found on the way. My calls:
   they see every later cut, and those said "You're through."
   - Now they say "You went out earlier, in 37th place." There's no "Why was I cut?" there (the results have "Why you
     went out"), and no clock vote (the server ignores the vote of a player who's out).
-  - Each later cut is now its own judgement. The screen used to be reused, so the gavel never fell again and the
-    newly cut pawns went straight to grey, with no sound.
+  - Each later cut is now its own judgment. The screen used to be reused, so the gavel never fell again and the
+    newly cut pawns went straight to gray, with no sound.
   - Classic has the same bug online ("You're through to stage 3" for players already out). Not fixed: Classic is
     being reworked.
 - **The cut screen's names.**
@@ -663,7 +663,7 @@ change it later: "we will consider it"), and Variable when nobody votes. Mine:
 **The vote board.**
 - **Everyone is their own pawn**, the cut screen's drawing (`Avatar`): you in your shop hat and crate items, others in
   the crate items they sent, bots in a hat seeded by their id (the cut screen's rule, now shared: `pawnLook` in
-  looks.ts). Nothing on: a plain pawn in your team's colour. No chess pieces while the votes run.
+  looks.ts). Nothing on: a plain pawn in your team's color. No chess pieces while the votes run.
 - **Starting spots** (`voteHomeSpots`): White's team spread over ranks 1–2, Black's over 7–8. Even, with no clumps or
   holes at 50 a side (a low-discrepancy sequence plus a little jitter), not on squares, overlapping a little. Who
   stands where is seeded by the player's id, so a pawn keeps its spot between renders and between the two votes.
@@ -694,7 +694,7 @@ change it later: "we will consider it"), and Variable when nobody votes. Mine:
   on a computer the vote had no leaderboard beside it. The vote now uses the game screens' frame: the title in the
   top line ("Vote 1 of 2" over "How does it end?", the sound button beside it), the hint in the line above the board,
   and the eval bar's slot (hidden until the pieces come). On a computer the leaderboard sits beside it as in the
-  game (from 1100 px), and the cards take the panel's place. With the scoreboard minimised (its own setting), a
+  game (from 1100 px), and the cards take the panel's place. With the scoreboard minimized (its own setting), a
   phone's game board is bigger, and so is the vote's. Checked at 360 and 390 px and at 1000 and 1280 px.
 - **Board orientation** as before: from Black's side the board, the zones and the cards are mirrored, and Black's
   pawns are at the bottom.
@@ -759,8 +759,8 @@ fallback ("Queenie 2") stays. Same style: chess terms, openings, mates and puns,
   so seeding by id would give the same seats the same clothes each match and a name a new outfit every time. By name,
   "Gambit Gus" always looks like Gambit Gus.
 - Only items that already exist, drawn by the usual `Avatar`. No skins (they replace the pawn, and with it the team's
-  colour, which the vote board and the cut screen read by). Not the Mythic Fire & Ice Crown (the rarest item stays
-  the players'). Colours by the crates' odds. Purity evenly 55-88%: clean enough to read on a 22 px pawn, and never
+  color, which the vote board and the cut screen read by). Not the Mythic Fire & Ice Crown (the rarest item stays
+  the players'). Colors by the crates' odds. Purity evenly 55-88%: clean enough to read on a 22 px pawn, and never
   shiny (90%+), which stays the players'.
 - Checked on a 360 px phone on the vote board, the cut screen and the scoreboard (the scoreboard shows names only).
 
@@ -786,10 +786,10 @@ From Eric's marked-up screenshot of a Crowd match. My calls:
 - **The board's clock** sits in the line above the board, level with the board's right edge: this move's seconds
   ("12s") and your bank ("9:50", the leaderboard's BANK). No labels: they made it too wide for a phone's line, and
   the formats tell them apart; the full words are its tooltip. The seconds go red under 5 s on your own move; the
-  bank red under a minute. Once you've moved, your bank stops and the seconds go grey. Watching the other team, the
+  bank red under a minute. Once you've moved, your bank stops and the seconds go gray. Watching the other team, the
   seconds are theirs (never red). In the reveal only the bank shows, in the same place.
   - Beside it, the line's own "⏱ 20 s" shows only when it's lit (the clock went up, "▲"); otherwise it repeated the
-    clock. On a phone the line's text is centred in the room left of the clock; it drops "Your pick for" only while
+    clock. On a phone the line's text is centered in the room left of the clock; it drops "Your pick for" only while
     the lit note is in it below 430 px, and "you're on White" below 375 px.
   - Crowd only (not the boss raid, which has the dock, or Classic, which shows the bank in its top bar).
 - **Chat on a computer** was already in the right column, under the vote results, in online matches (solo has no

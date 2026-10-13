@@ -19,7 +19,7 @@ export const blackToMove = (fen: string): boolean => fen.split(" ")[1] === "b";
 
 /**
  * One board as the model sees it: 64 squares × 12 planes (index square × 12 + plane), a1 = 0 … h8 = 63, from the
- * mover's side: when Black is to move the board is mirrored top to bottom and the colours swapped, so the mover is
+ * mover's side: when Black is to move the board is mirrored top to bottom and the colors swapped, so the mover is
  * always "White" moving up the board.
  */
 export function encodeBoard(fen: string): Float32Array {

@@ -34,7 +34,7 @@ describe("the pieces (cburnett, BSD: board/pieces/)", () => {
     }
   });
 
-  it("their licence ships with the app, word for word (the credit in Settings and the FAQ links it)", () => {
+  it("their license ships with the app, word for word (the credit in Settings and the FAQ links it)", () => {
     expect(readFileSync(new URL("../public/licenses/pieces.txt", import.meta.url), "utf8")).toBe(readFileSync(new URL("LICENSE.txt", DIR), "utf8"));
     expect(readFileSync(new URL("../src/screens/Settings.tsx", import.meta.url), "utf8")).toContain("/licenses/pieces.txt");
     expect(readFileSync(new URL("../src/faq/content.ts", import.meta.url), "utf8")).toContain("/licenses/pieces.txt");

@@ -49,7 +49,7 @@ export interface ChatHost {
 
 /**
  * Quick chat in one online match: the lines this player can see, the icons that came with them, their packs, who
- * they muted, and the limits mirrored from the server (so the buttons grey out instead of failing). The server
+ * they muted, and the limits mirrored from the server (so the buttons gray out instead of failing). The server
  * decides everything; this only shows it.
  */
 export class MatchChat {
@@ -114,7 +114,7 @@ export class MatchChat {
     else this.arrived(l);
   }
 
-  /** The server dropped a line: grey the buttons until it says. */
+  /** The server dropped a line: gray the buttons until it says. */
   onRefused(say: string, reason: ChatRefusal, retryAt: number) {
     if (reason === "gap" || reason === "burst") this.blockedUntil = Math.max(this.blockedUntil, this.host.local(retryAt));
     if (reason === "repeat") this.sent = { ...this.sent, last: { say, at: this.host.local(retryAt) - QUICK_CHAT.repeatMs } };

@@ -23,8 +23,8 @@ export function StageBreakScreen(props: {
             ? "You made the final four! A 2v2 on one board: teammates take turns, and the best average move quality wins."
             : `You're through to stage ${stage + 2}. ${
                 stage + 1 === match.settings.knockoutsPerStage.length - 1
-                  ? "The final four share one board, so colours alternate."
-                  : "Colours swap for the next stage."
+                  ? "The final four share one board, so colors alternate."
+                  : "Colors swap for the next stage."
               } You get ${match.settings.powerUpsPerStage} more power-up (you can hold up to ${match.settings.powerUpsMax}).`}
       </p>
       <RaceTower standings={standings} cutoff={cutoff} cutLabel="Cut" />

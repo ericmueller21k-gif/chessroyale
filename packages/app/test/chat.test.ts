@@ -78,7 +78,7 @@ describe("quick chat in the app", () => {
     expect(chat.lines().map((l) => l.from)).toEqual(["bot4"]);
   });
 
-  it("mirrors the limits: the buttons grey out after a send, the same line for longer; All allows only Hello and Sporting lines and emoji", () => {
+  it("mirrors the limits: the buttons gray out after a send, the same line for longer; All allows only Hello and Sporting lines and emoji", () => {
     const { chat, sent } = setup();
     chat.onLog([], ["basics", "emoji-basics"]);
     expect(chat.canSay("gk-crown")).toBe(false); // a pack you don't own
@@ -211,7 +211,7 @@ describe("lobby chat in the app (before the match)", () => {
     expect(chat.hasTeams()).toBe(false);
     chat.say("good-luck");
     expect(chat.lines()).toEqual([expect.objectContaining({ from: "you", say: "good-luck", to: "all", team: null, lobby: true })]);
-    // The buttons grey out as online; and the stand-in refuses what a server would (it's sent past the buttons here).
+    // The buttons gray out as online; and the stand-in refuses what a server would (it's sent past the buttons here).
     expect(chat.canSay("wow")).toBe(false);
     const send = (say: unknown) => (s as unknown as { receive(m: ClientMessage): void })["receive"]({ t: "chat", say } as ClientMessage);
     send("wow");

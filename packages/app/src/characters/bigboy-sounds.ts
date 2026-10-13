@@ -1,5 +1,5 @@
 /**
- * Big Boy's sounds, synthesised (no files, no licences, no real voice): baby noises made from a little buzzing voice
+ * Big Boy's sounds, synthesized (no files, no licenses, no real voice): baby noises made from a little buzzing voice
  * shaped into vowels (a giggle, a wail, a "nom"), a lollipop slurp, the bounce's boing and the big crash, and his toys
  * (a toy block thrown and clacking down, puffing away; the lollipop's swish and bonk; a stomp). Nothing bright: no
  * chimes, no dings (the toy block's clack is a light wooden tok, the bonk's squeak a soft rubber one: baby toys). Each

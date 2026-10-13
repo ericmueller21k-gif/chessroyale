@@ -31,7 +31,7 @@ export interface FairMove {
   near: number;
   /** Points the second-best scored move loses (null when only one move was scored). */
   gap: number | null;
-  /** Other people picking in this position (not practising, no power-up), and how many of them found the best. */
+  /** Other people picking in this position (not practicing, no power-up), and how many of them found the best. */
   crowd: number;
   crowdFound: number;
   /**
@@ -103,7 +103,7 @@ export function skipReason(m: FairMove, s: Signals = FAIRPLAY.signals): SkipReas
   return null;
 }
 
-/** Engine rating over counted moves' losses, pulled towards 1500 by `perfPriorMoves` (null with no moves). */
+/** Engine rating over counted moves' losses, pulled toward 1500 by `perfPriorMoves` (null with no moves). */
 export function matchPerf(losses: readonly number[], s: Pick<Signals, "perfPriorMoves"> = FAIRPLAY.signals): number | null {
   if (!losses.length) return null;
   const prior = lossForRating(1500);

@@ -52,7 +52,7 @@ test("light or dark lives in Settings (Match device / Light / Dark), not on home
   expect(await page.evaluate(() => (window as any).__themes)).toEqual(["light"]);
   expect(await bg(page, ".fd-root")).toBe(LIGHT_GROUND);
 
-  // Every front-door page honours it, and the game's colours too.
+  // Every front-door page honors it, and the game's colors too.
   for (const path of ["/settings", "/profile", "/shop"]) {
     await page.goto(path);
     await expect(page.locator(".fd-root").first()).toBeVisible();

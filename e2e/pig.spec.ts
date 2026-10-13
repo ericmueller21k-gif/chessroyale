@@ -4,7 +4,7 @@ import { BOARD_SEL, createLobbyFromHome, engineTop, test, watchFor } from "./hel
 
 /**
  * Wrangler, the cowboy pig, played alone on a phone and a computer with real taps: his long pull as his first move
- * (a centre pawn three squares, LONG PULL!), a lasso drag (?power=drag: from turn 2; LASSO!, one of your pieces one
+ * (a center pawn three squares, LONG PULL!), a lasso drag (?power=drag: from turn 2; LASSO!, one of your pieces one
  * square, never the king), and SHOWDOWN! (?power=showdown: searched by this device's engine at his next turn; perhaps
  * "Not yet..." first), the line-up yanked into the middle, "DRAW!", and the forced duel: only the duels can be played.
  * Then online (one run): the host's engine lines the showdown up, the server checks it and sends it to everyone.

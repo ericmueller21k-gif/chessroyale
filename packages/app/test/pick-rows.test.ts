@@ -8,7 +8,7 @@ describe("pickRows (the phone's small scoreboard)", () => {
   it("shows you, the leader and both sides of the cut line first", () => {
     expect(sorted(pickRows(64, 20, 56, upTo(4)))).toEqual([0, 20, 55, 56]);
   });
-  it("then your neighbours and the rest of the top five", () => {
+  it("then your neighbors and the rest of the top five", () => {
     expect(sorted(pickRows(64, 20, 56, upTo(10)))).toEqual([0, 1, 2, 3, 4, 19, 20, 21, 55, 56]);
   });
   it("never repeats a row when you're at the top or on the cut line", () => {

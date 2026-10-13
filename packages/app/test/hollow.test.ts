@@ -33,7 +33,7 @@ describe("Hollow, the Darkness boss", () => {
       const [r, g, b] = rgb(c);
       expect(g > r + 30 && g > b + 30, `${k} ${c} is green`).toBe(false);
     }
-    // The fur is near-grey and dark.
+    // The fur is near-gray and dark.
     for (const k of ["d", "c", "C", "h"]) {
       const [r, g, b] = rgb(ch.palette[k]!);
       expect(Math.max(r, g, b) - Math.min(r, g, b), k).toBeLessThan(20);
@@ -59,7 +59,7 @@ describe("Hollow, the Darkness boss", () => {
 
   it("counts down on his strand: each look puts about a third of the bulbs out", () => {
     const f = anim("idle").frames[0]!;
-    // The pixels in a lit bulb's own colours (main, shade, glint).
+    // The pixels in a lit bulb's own colors (main, shade, glint).
     const litColours = new Set(BULB_KEYS.flatMap((b) => b.slice(0, 3).map((k) => ch.palette[k]!.toLowerCase())));
     const lit = (look: string) => {
       const img = renderFrame(ch, f, { look });
@@ -89,7 +89,7 @@ describe("Hollow, the Darkness boss", () => {
     expect(bulbsLook(-1)).toBe("bulbs0");
   });
 
-  it("casts the dark: a wind-up, then at the cast cue the darkness pours out of his chest towards the board", () => {
+  it("casts the dark: a wind-up, then at the cast cue the darkness pours out of his chest toward the board", () => {
     const cast = anim("darkCast");
     expect(cueAt(cast, "cast")).toBeGreaterThan(200);
     const i = cast.frames.findIndex((f) => f.cue === "cast");

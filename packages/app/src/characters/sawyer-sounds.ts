@@ -1,5 +1,5 @@
 /**
- * Sawyer's sounds, synthesised (no files, no licences): his reciprocating saw (a motor's buzz pulsing with the blade's
+ * Sawyer's sounds, synthesized (no files, no licenses): his reciprocating saw (a motor's buzz pulsing with the blade's
  * strokes, the rasp of its teeth in wood), its rev, a swing, the wood cracking as his pawn splits, duct tape pulled
  * over a cut, the big board saw running up the board, a landing thump and the halves knocking back together. Nothing
  * bright: no chimes, no dings (the saw's whine is filtered down to a buzz). Each is a pure function of the sample rate

@@ -129,14 +129,14 @@ export function bossThinkMs(history: readonly string[], bases?: readonly Base[] 
  * 0. The warning (`warnMs` long): a red "??" badge pops on the piece's square (`badgeAt`), the square pulses red,
  *    a danger sting plays, the eval bar plunges to the crowd's chances after the move, and the dock says in plain
  *    words what it loses ("?? Blunder: Nb5 / Loses your knight").
- * 1. Everything freezes (`freezeAt`): the board goes cold and grey, under a dark red pulse.
+ * 1. Everything freezes (`freezeAt`): the board goes cold and gray, under a dark red pulse.
  * 2. He leaps up out of the dock (`leapAt`), out of view, and crashes down onto the piece's square (`fallAt`,
  *    landing at `crashAt`): a dark red shockwave, dust, the board shakes.
  * 3. The "LAST STAND" cut-in with his battle-worn portrait and one of his lines (`bannerAt`, for `bannerMs`).
  * 4. The piece slides back to the square it came from (`slideAt`); he stands alone where it was. The eval bar
  *    goes back to what it was before the move.
  * 5. The blow meant for it: `slashes` rapid slashes, one every `slashEveryMs` from `slashAt`, each with a red
- *    damage number; his armour cracks (`crackAt`), grunts of agony, a few stylised red drops.
+ *    damage number; his armor cracks (`crackAt`), grunts of agony, a few stylized red drops.
  * 6. He staggers (`staggerAt`), collapses (`collapseAt`) and fades from the board (`fadeAt`, for `fadeMs`);
  *    his fallen figure lies in the dock from then on, with his last words (and his leftover charges, as power-ups).
  * 7. At `endMs` the reveal ends: the crowd picks again with a fresh clock.

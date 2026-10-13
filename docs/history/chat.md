@@ -25,10 +25,10 @@ Roomy on desktop, closed but expandable on a phone. The `social` delegate builds
     few lines.
 - **Who hears it.** In 50 v 50, **your team** by default. The Hello and Sporting phrases can also go to **everyone**
   (one switch: Team / All), so plans stay inside the team. In a raid, everyone is one team.
-- **Each message shows:** the sender's pixel icon, their name (in the leaderboard's colour for their team) and the
+- **Each message shows:** the sender's pixel icon, their name (in the leaderboard's color for their team) and the
   phrase. Tapping the name opens their profile once the hub's profiles exist.
 - **Limits** (server-enforced, in settings.ts): one message every 3 s, at most 5 in 30 s; repeats of the same phrase
-  are dropped. Over the limit, the buttons grey out briefly.
+  are dropped. Over the limit, the buttons gray out briefly.
 - **Muting.**
   - Tap a name to mute that player for the match.
   - A "Chat off" switch hides it all, remembered on the device.
@@ -94,13 +94,13 @@ The `social` delegate built it as designed. The lines and packs are in `core/cha
     by Eric the same day: emoji can go to All. See "Emoji to All, and your picks in the profile" below.)
   - Each pack phrase joins one of the four groups, so the rule stays one sentence: "Hello and Sporting lines go to
     both teams".
-  - With All on, the team-only buttons grey out and the feed says why.
+  - With All on, the team-only buttons gray out and the feed says why.
   - There's no switch where everyone is one team: a raid, "everyone moves", and a 50 v 50's boss battle.
-- **Team colours.** A white or black chip before the name, only on lines sent to everyone. A team line is always
+- **Team colors.** A white or black chip before the name, only on lines sent to everyone. A team line is always
   your team's, and a black name can't be read on the dark panel.
 - **Limits.**
   - "Repeats are dropped" means the same line as your last one, within 30 s; other lines still go.
-  - Over the limit the buttons grey out until they work again. At the 5-in-30-s limit, the feed says when.
+  - Over the limit the buttons gray out until they work again. At the 5-in-30-s limit, the feed says when.
   - The server checks everything and tells the sender why it dropped a line. Free text, unknown ids and pack lines
     you don't own never reach anyone.
 - **Muting.**
@@ -175,7 +175,7 @@ profile under quick chat and emoji selection." My calls:
     pack's own name. Every pack's name ends in "pack" or "emoji", so those words are left out, or "pa" would match
     them all. Emoji got names for this (and for screen readers).
   - A new pick goes at the end. There's no drag to reorder: take one out and add it again. At the cap, the
-    unpicked rows grey out and the menu says "10/10 picked. Take one out to add another."
+    unpicked rows gray out and the menu says "10/10 picked. Take one out to add another."
   - Lines from packs you don't own show locked, with a 🔒 and the pack's name ("God King pack ›"). A tap opens the
     shop on its Chat packs tab. In a match (your profile opened over the game) the shop isn't one tap away, so they
     show locked without the link.
@@ -199,7 +199,7 @@ profile under quick chat and emoji selection." My calls:
 - **Lines and emoji are chosen apart.** Picking lines leaves your emoji on the defaults, and the other way round.
 - **In the match** the buttons are your picks in your order. They replace the four fixed groups: a phone's sideways
   row of lines and a row of emoji, and the computer's lines wrapping with the emoji under them. There are no group
-  headings any more. With All on, the lines that can't go to everyone grey out, as before.
+  headings any more. With All on, the lines that can't go to everyone gray out, as before.
 - **Getting a pack:** its lines go into any empty slots, in the pack's order, up to the cap. This happens on the
   server, as part of the purchase. Most players are full (the defaults are 10/10 and 8/8), so the shop then shows
   "Your quick chat lines are full (10/10), so nothing changed in your games yet." with **Pick these in your
@@ -300,7 +300,7 @@ could see the lobby chat." The `social` delegate's calls:
     the match", with ⋯ for chat off and the mutes.
   - Computer: for now in the right column under Cancel (the queue grid's free cell). The hub's new layout moves it.
   - Private lobby: a 210 px box under the players.
-  - It follows the page's theme (the queue's own colours).
+  - It follows the page's theme (the queue's own colors).
   - On an iPhone 13 in Safari (390 × 664), the count, the grid and the whole chat are in view while the queue fills.
     "You're in" and Cancel are below. The queue already ran 72 px past that screen before the chat (Cancel was half
     off it); the back arrow also leaves the queue.
@@ -324,7 +324,7 @@ only for now, desktop only, signed-in players post, guests read, bots behind one
 
 - **Where:** the computer's home page only (the right column from 1024 px, under Playing now), filling the rest of
   the column's height: the feed scrolls inside it, the buttons stay at its foot. Not the queue (the lobby has its own
-  chat in the centre), the shop, the profile or Settings, and not on a phone yet. The hub owns the column; the panel
+  chat in the center), the shop, the profile or Settings, and not on a phone yet. The hub owns the column; the panel
   is one self-contained component (`components/GlobalChat.tsx`) placed after Playing now.
 - **Preset lines only, as in quick chat.** No text box anywhere, and the server takes only a line's id
   (`canSayHome`, `core/chat.ts`):
@@ -348,7 +348,7 @@ only for now, desktop only, signed-in players post, guests read, bots behind one
   a player who posts in a public room can be looked up, like anyone in a shared lobby).
 - **The limit: one message per account every 30 s** (`GLOBAL_CHAT.gapMs`), enforced by the live hub. It's checked
   against the last line kept too, so a restart doesn't reset it. The app mirrors it: after a line, every button
-  greys out with "Next message in 28 s", also after a reload (your own last line says when). The server's 429
+  grays out with "Next message in 28 s", also after a reload (your own last line says when). The server's 429
   carries how long to wait, and the app takes that too.
 - **Who can post:** signed-in players, wherever a way to sign in is set up (production), the same rule as online
   play. Guests read, with "Sign in to chat. Guests can read." and a Sign in button. Banned players can't post (fair

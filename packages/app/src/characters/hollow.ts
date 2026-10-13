@@ -4,7 +4,7 @@
  * middle, so where his belly was there is a band of violet-black darkness with a void at its heart, slowly swirling.
  * Torn seams across his shoulder, his cheek and his thigh are bound the same way. He carries a long strand of
  * Christmas lights held in the middle, its two halves hanging with five bulbs each (Eric's reference: red, gold,
- * blue in turn; since Oct 11 the battle's own colours, lights.ts), which count down to his next cover of the dark.
+ * blue in turn; since Oct 11 the battle's own colors, lights.ts), which count down to his next cover of the dark.
  * Glowing gold eyes, a thin violet edge glow (his halo) so he never vanishes on the dark ground. Drawn facing front,
  * light from the top left.
  *
@@ -12,7 +12,7 @@
  * swirl phase and size; the arms and legs are painted from their pose's points (a shoulder, an elbow, a hand; a hip, a
  * knee, an ankle) as shaggy strokes; the strand is painted from the hand that holds it. So a new pose is a few numbers.
  *
- * Each bulb has palette keys of its own (main, shade, glint, glow), drawn in its default colour (lights.ts,
+ * Each bulb has palette keys of its own (main, shade, glint, glow), drawn in its default color (lights.ts,
  * DEFAULT_LIGHTS: red, yellow, blue in turn): the battle's lights swap them (HOLLOW.swap), and a look (`bulbs2`,
  * `bulbs1`, `bulbs0`) puts a third of the strand out (bulbs 2, 5, 8 first, then 1, 4, 7, then the rest) without
  * redrawing anything. Their glints are specks in the same keys (an unlit bulb never glints).
@@ -32,7 +32,7 @@ export const BULB_KEYS: readonly (readonly [string, string, string, string])[] =
   const k = (j: number) => String.fromCharCode(0xc0 + 4 * i + j);
   return [k(0), k(1), k(2), k(3)] as const;
 });
-/** Each bulb lit, in its default colour: [main, shade, glint, glow]. */
+/** Each bulb lit, in its default color: [main, shade, glint, glow]. */
 const BULB_LIT: readonly (readonly [string, string, string, string])[] = DEFAULT_LIGHTS.map((c) => {
   const b = bulbColour(c);
   return [b.glass, b.shade, b.glint, b.glow] as const;
@@ -418,7 +418,7 @@ function foot(dir: 1 | -1): Part {
 // ---- The strand of lights: a long wire held in the middle, its two halves hanging, five bulbs on each.
 
 /** Bulbs on the strand, numbered along the wire: the inner half from its end up to his hand (0-4), then the outer half
- * from his hand down to its end (5-9). Each has its own keys (BULB_KEYS), so each takes its own colour. */
+ * from his hand down to its end (5-9). Each has its own keys (BULB_KEYS), so each takes its own color. */
 export const BULBS = LIGHT_BULBS;
 const PER_HALF = BULBS / 2;
 /** Where the bulbs sit along each half, from the hand (0) to the end (1). */
@@ -509,7 +509,7 @@ function strand(s: StrandSpec): { wire: { name: string; at: Pt }; glow: { name: 
       // The stem from the wire to the socket.
       line(cv, wx - x0, wy - y0, bx + (i % 2 === 0 ? 2 : 1), by, "w");
       const rows = lit ? bulbRows(i) : brokenRows(i);
-      // A little light round a lit bulb: its glass's colour, see-through, either side of it.
+      // A little light round a lit bulb: its glass's color, see-through, either side of it.
       if (lit) for (const [gx, gy] of [[-1, 3], [4, 3], [-1, 4], [4, 4], [1, 6], [2, 6]] as const) glow[by + gy] && (glow[by + gy]![bx + gx] = keysOf(i)[3]);
       rows.forEach((row, y) => [...row].forEach((k, x) => k !== "." && cv[by + y] && (cv[by + y]![bx + x] = k)));
     }
@@ -723,14 +723,14 @@ const sparkle = (x: number, y: number, big = false): Speck[] => [
   [x, y + 1, "U"],
   ...(big ? ([[x - 2, y, "u"], [x + 2, y, "u"], [x, y - 2, "u"], [x, y + 2, "u"]] as Speck[]) : []),
 ];
-/** Darkness gathering into the void: specks spiralling in (`t` 0 to 1). */
+/** Darkness gathering into the void: specks spiraling in (`t` 0 to 1). */
 const gather = ([x, y]: Pt, t: number, n = 10): Speck[] =>
   Array.from({ length: n }, (_, i): Speck => {
     const a = (i / n) * Math.PI * 2 + t * 3;
     const r = 18 * (1 - t) + 4;
     return [Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r * 0.7), i % 3 === 0 ? "U" : i % 2 ? "u" : "V"];
   });
-/** A gush of darkness pouring out of the void to our right (towards the board), `t` frames in. */
+/** A gush of darkness pouring out of the void to our right (toward the board), `t` frames in. */
 const pour = ([x, y]: Pt, t: number): Speck[] => {
   const out: Speck[] = [];
   for (let i = 0; i < 26; i++) {
@@ -775,7 +775,7 @@ const DUSK_PAL: Record<string, string> = { d: "#121118", c: "#1a1822", C: "#2421
 const FLASH: Record<string, string> = { d: "#5e5868", c: "#8a8494", C: "#b3adbd", h: "#ffffff" };
 /** His bulbs flickering (hurt, a hit): all of them dim for a frame. */
 const FLICKER: Record<string, string> = Object.fromEntries(BULB_KEYS.flatMap((keys) => keys.map((k, i) => [k, i === 3 ? "#00000000" : BULB_OFF[i]!])));
-/** His bulbs flashing bright (victory): white glints, a stronger glow (in each bulb's colour: the lights swap it). */
+/** His bulbs flashing bright (victory): white glints, a stronger glow (in each bulb's color: the lights swap it). */
 const BULBS_BRIGHT: Record<string, string> = Object.fromEntries(BULB_KEYS.flatMap(([, , glint, glow], b) => [[glint, "#ffffff"], [glow, `${BULB_LIT[b]![0]}99`]]));
 
 // ---- His animations.
@@ -800,7 +800,7 @@ const idle: Anim = {
   }),
 };
 
-/** Entrance: darkness gathers into a whirl, he rises out of it, eyes snapping open; his bulbs light a colour at a time. */
+/** Entrance: darkness gathers into a whirl, he rises out of it, eyes snapping open; his bulbs light a color at a time. */
 const entrance: Anim = {
   loop: false,
   frames: [
@@ -845,7 +845,7 @@ const rattled: Anim = {
   frames: Array.from({ length: 8 }, (_, i) => f(80, { mood: "rattled", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, phase: i, size: i % 3 === 0 ? 1 : 0, free: "out", sway: i % 2 ? 1 : -1 }, { specks: [...sweat(i), ...wisps([AT_HEART[0], AT_HEART[1] - 1], i, 3, 12)] })),
 };
 
-/** His move: a step and a flourish of the strand towards the board, bulbs clinking. */
+/** His move: a step and a flourish of the strand toward the board, bulbs clinking. */
 const move: Anim = {
   loop: false,
   frames: [
@@ -900,7 +900,7 @@ const check: Anim = {
   ],
 };
 
-/** Defeat: the darkness lets go. The void sputters and shrinks to nothing, his bulbs go out a colour at a time, and he slumps into a heap of fur. */
+/** Defeat: the darkness lets go. The void sputters and shrinks to nothing, his bulbs go out a color at a time, and he slumps into a heap of fur. */
 function heap(mood: Mood, extra: Speck[] = []): Partial<Frame> & { layers: Layer[] } {
   const standing = build({ mood, free: "out", strand: false }).layers.filter((l) => l.part !== "shadow" && !l.part.startsWith("void:"));
   const lying = lieDown(PARTS, { layers: standing }, 0, 0, "right").layers;
@@ -943,7 +943,7 @@ const victory: Anim = {
 
 /**
  * His passive, casting the dark: he draws his free arm back as darkness spirals into the void, then flicks it at the
- * board; at the "cast" cue the darkness pours out of his chest towards the board (the board's darkPour takes over
+ * board; at the "cast" cue the darkness pours out of his chest toward the board (the board's darkPour takes over
  * there), and he sneers.
  */
 const CAST_P: HollowPose = { crouch: 1, feet: "wide", free: "flick", mood: "roar", size: 2 };
@@ -1071,7 +1071,7 @@ const testMiss: Anim = {
 };
 
 /**
- * Lights back, after the test: the void flares and a fresh strand spills out of it, its bulbs lighting a colour at a time
+ * Lights back, after the test: the void flares and a fresh strand spills out of it, its bulbs lighting a color at a time
  * ("relight"), the light comes back into him, he takes the strand in hand and leaps back to his corner (the last
  * frame is empty: he's gone from this spot).
  */
@@ -1156,7 +1156,7 @@ export const HOLLOW: Character = {
   palette: HOLLOW_PALETTE,
   halo: "#6a46c4",
   looks: HOLLOW_LOOKS,
-  // The battle's lights: each bulb in its colour (lights.ts). His attack (HOLLOW_ATTACK) shares it.
+  // The battle's lights: each bulb in its color (lights.ts). His attack (HOLLOW_ATTACK) shares it.
   swap: lightsSwap(BULB_KEYS),
   parts: PARTS,
   anims: {

@@ -2,7 +2,7 @@ import { CRATES_FREE, crateDef, itemDef, mulberry32, rollCrate, type CrateRoll, 
 import type { Sql } from "./accounts.ts";
 
 /**
- * The locker: crate items a player owns (each with its own colour, blemish and seed) and what's equipped in each
+ * The locker: crate items a player owns (each with its own color, blemish and seed) and what's equipped in each
  * slot. Crates are opened here, on the server, so nobody can make themselves a Pearl crown.
  */
 export const LOCKER_SCHEMA = [

@@ -1,5 +1,5 @@
 /*
- * The pieces: the cburnett set by Colin M.L. Burnett, under the BSD licence (board/pieces/LICENSE.txt; where each file
+ * The pieces: the cburnett set by Colin M.L. Burnett, under the BSD license (board/pieces/LICENSE.txt; where each file
  * comes from: board/pieces/SOURCES.md). Every <piece class="white pawn"> in the game: on the board (.hb), on everything
  * drawn over it or elsewhere with pieces (marked .hb-pieces) and in the promotion picker. The build inlines each file,
  * so the pieces show on the board's first frame.

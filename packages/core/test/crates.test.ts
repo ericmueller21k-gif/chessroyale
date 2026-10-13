@@ -100,7 +100,7 @@ describe("crates", () => {
     expect(rollCrate(mulberry32(1), noFischer, { fischer: true })).toMatchObject({ fischer: false, def: "party-hat" });
   });
 
-  it("the tiers: Common to Mythic, commonest first, each in its colour", () => {
+  it("the tiers: Common to Mythic, commonest first, each in its color", () => {
     // The order sorts the locker (rarest first). The Puzzle Pirates names are player ranks now (Oct 6, 2026).
     expect(TIERS.map((t) => `${t.name} ${t.color}`)).toEqual([
       "Common #9ca3af",
@@ -204,7 +204,7 @@ describe("crates", () => {
     }
   });
 
-  it("two-colour items (a present, goggles) roll a second colour; one-colour items don't", () => {
+  it("two-color items (a present, goggles) roll a second color; one-color items don't", () => {
     const rng = mulberry32(3);
     const twos: Record<string, number> = {};
     for (let i = 0; i < 5000; i++) {
@@ -263,7 +263,7 @@ describe("crates", () => {
     }
   });
 
-  it("the locker stacks copies of an item in the same colour (both colours, for two-colour ones), the purest on top", () => {
+  it("the locker stacks copies of an item in the same color (both colors, for two-color ones), the purest on top", () => {
     const it = (id: string, def: string, color: string, blemish: number, color2?: string) => ({ id, def, color, blemish, seed: 1, ...(color2 ? { color2 } : {}) });
     const stacks = stackItems([
       it("a", "santa-beard", "red", 40),

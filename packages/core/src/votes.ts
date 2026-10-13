@@ -149,7 +149,7 @@ export function voteZoneAt(p: BoardSpot): number | null {
   return i < 0 ? null : i;
 }
 
-/** How far a pawn's centre stays from the edges of its band or zone (squares): it stands inside, not on the line. */
+/** How far a pawn's center stays from the edges of its band or zone (squares): it stands inside, not on the line. */
 export const VOTE_SPOT_MARGIN = 0.32;
 
 /** A player id's 32-bit hash (FNV-1a): the seed for where their pawn stands. */

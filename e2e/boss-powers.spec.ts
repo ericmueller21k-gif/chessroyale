@@ -92,7 +92,7 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Ginger");
   await expect(page.locator(".rage-meter")).toBeVisible();
-  // Its bar in full colour (the threat skulls' dimming once caught it too: it sat at 22%).
+  // Its bar in full color (the threat skulls' dimming once caught it too: it sat at 22%).
   expect(await page.locator(".rage-meter i").first().evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
 
   await playBest(page);
@@ -217,7 +217,7 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
 });
 
 /**
- * Where a real square is on screen (its centre), on the big board as it's drawn now: either way up, and turned a
+ * Where a real square is on screen (its center), on the big board as it's drawn now: either way up, and turned a
  * quarter of the way round in Boingo's funhouse (the board's data-turn: 90 or 270), as Board draws it (board-view.ts).
  */
 const squareOnScreen = (p: Page, square: string) =>

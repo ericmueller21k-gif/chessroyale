@@ -331,7 +331,7 @@ export class MatchRunner {
     const plan = stagePlan(opts.settings);
     const boardCount = plan[0]?.boards ?? 1;
     const plies = openingPlies(opts.settings);
-    // With colours per stage, half the boards have White to move and half Black (the opening one ply longer).
+    // With colors per stage, half the boards have White to move and half Black (the opening one ply longer).
     const raidBlack = !!opts.settings.raid && opts.raidSide === "b";
     const blackBoards = raidBlack ? boardCount : opts.settings.colourPerStage && boardCount >= 2 ? Math.floor(boardCount / 2) : 0;
     const unusual = boardCount - blackBoards > 2 ? 1 : 0;
@@ -373,7 +373,7 @@ export class MatchRunner {
     const claimed = !!opening?.crowdWhite && crowdSide === "b" && !this.settings.bossMateTest;
     if (opening?.fromStart) this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
     if (opening?.crowdWhite) crowdSide = "w";
-    // Anything else the boss does to the board before move 1 (Big Boy eats one of the crowd's centre pawns).
+    // Anything else the boss does to the board before move 1 (Big Boy eats one of the crowd's center pawns).
     let setUp = opening?.setUp?.(this.battle, { boardId: id, seed, crowdSide, generation: board.generation }) ?? null;
     // (Test switch: the crowd White, mated in one, the boss to move. Instead of any other set-up.)
     if (this.settings.bossMateTest) {
@@ -446,7 +446,7 @@ export class MatchRunner {
     return new Map(this.state.boards.map((id) => [id, sideToMove(this.boards.get(id)!.fen)]));
   }
 
-  /** How many players play White this stage: half (null when colours aren't fixed: one board left, or the final). */
+  /** How many players play White this stage: half (null when colors aren't fixed: one board left, or the final). */
   private whiteSeats(): number | null {
     if (!this.settings.colourPerStage || this.state.boards.length < 2 || this.state.final) return null;
     return Math.floor(this.alive().length / 2);
@@ -1471,7 +1471,7 @@ export class MatchRunner {
     const plan = stagePlan(this.settings);
     const nextBoards = plan[this.state.stage + 1]?.boards ?? 1;
     // One board fewer each cut (finished games first, then the most lopsided); boards are never swapped.
-    // Keep both sides to move as even as possible, so each colour still has boards to play on.
+    // Keep both sides to move as even as possible, so each color still has boards to play on.
     const status = this.state.boards.map((id) => boardStatus(this.boards.get(id)!));
     const count = Math.min(nextBoards, this.state.boards.length);
     const sides = this.boardSides();

@@ -114,7 +114,7 @@ describe("accounts", () => {
   it("a Google account's email is kept however the account was made, and added on the next sign-in if missing", async () => {
     const sql = memorySql();
     await ensureSchema(sql);
-    // No guest on this device: a new account made by Google keeps the email (normalised).
+    // No guest on this device: a new account made by Google keeps the email (normalized).
     const fresh = await signInWithIdentity(sql, null, "google", "sub-2", { email: "Admin@Example.com", name: "A" }, 1000);
     expect(fresh.email).toBe("admin@example.com");
     // An older Google account saved without its email gets it when it signs in again.
@@ -439,7 +439,7 @@ describe("account API", () => {
     expect(emptied.ok && emptied.locker.equipped[slot]).toBeUndefined();
   });
 
-  it("the locker keeps a present's second colour, and adding that column again is harmless", async () => {
+  it("the locker keeps a present's second color, and adding that column again is harmless", async () => {
     const sql = memorySql();
     await ensureSchema(sql);
     await ensureSchema(sql, {}); // a second connection runs the column migration again
@@ -454,7 +454,7 @@ describe("account API", () => {
     const eq = await equipLocker(sql, user.id, "head", present.id);
     expect(eq.ok && eq.locker.look.head?.color2).toBe(present.color2);
     const st = await lockerState(sql, user.id);
-    // One-colour items have none (goggles, like the present, have two).
+    // One-color items have none (goggles, like the present, have two).
     for (const i of st.items) if (itemDef(i.def)?.colors !== 2) expect(i.color2).toBeUndefined();
   });
 

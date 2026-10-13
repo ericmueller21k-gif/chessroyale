@@ -52,16 +52,16 @@ Eric: the Iron Bishop (the 1600 boss) just blundered its queen. "It's boss mode,
 
 Eric wants to choose which boss to fight.
 
-- Boss raid shows a row of boss cards (name, skulls, strength), weakest first, plus "Match me" (the old behaviour: a step above your rating, the default).
+- Boss raid shows a row of boss cards (name, skulls, strength), weakest first, plus "Match me" (the old behavior: a step above your rating, the default).
 - The choice is saved on the device and used for solo ("Take on the boss alone") and for raids you create. The server takes `?boss=<tier>` and keeps the pick for rematches; an unpicked raid still matches the group.
 
 ## The boss menu comes first (Oct 5, 2026)
 
 Eric: when you take on the boss alone, the first thing should be choosing which boss to fight, with each one's strength alongside.
 
-- **A menu, not a row.** "Take on the boss alone" now opens "Choose your boss": all ten bosses in one list, weakest first. Each row has the icon, the name, its skulls, its strength (1400 to 3190), and a coloured "vs you" (−100 green, ≈ your level gold, +300 orange, +500 and up red). A bar for each boss puts them all on one scale, with a line at your rating. A tap picks the boss and starts. The old scrolling row of cards on the home screen is gone.
+- **A menu, not a row.** "Take on the boss alone" now opens "Choose your boss": all ten bosses in one list, weakest first. Each row has the icon, the name, its skulls, its strength (1400 to 3190), and a colored "vs you" (−100 green, ≈ your level gold, +300 orange, +500 and up red). A bar for each boss puts them all on one scale, with a line at your rating. A tap picks the boss and starts. The old scrolling row of cards on the home screen is gone.
 - **Solo always fights a named boss.** "Match me" is gone from the solo menu. The boss it would have picked (the weakest above your rating) is tagged "your match", and it's highlighted the first time. After that, your last pick is highlighted. Your rating is your profile's engine rating, or 1500 if you're unrated, and the header shows which.
-- **"Create a raid" opens the same menu,** plus "Match the group" at the top (the old behaviour: the weakest boss above the group's average, decided when the raid starts). I did raids too so there's one way to pick a boss, not a menu for solo and a row of cards for raids. Joining a raid by code skips it: the host picked.
+- **"Create a raid" opens the same menu,** plus "Match the group" at the top (the old behavior: the weakest boss above the group's average, decided when the raid starts). I did raids too so there's one way to pick a boss, not a menu for solo and a row of cards for raids. Joining a raid by code skips it: the host picked.
 - **`?boss=N` skips the menu** (for tests and links). The pick is kept on the device as before, and in memory too, for browsers without storage.
 - Checked on a 390 px and a 320 px phone, light and dark. Ten rows fit without scrolling on an iPhone 13; on a 320 px phone the list scrolls inside the sheet.
 
@@ -102,7 +102,7 @@ chess.com, for any solo mode (the solo boss raid is the only one where you're th
 Phase 1, before building any boss into the game: two bosses drawn as code-defined pixel art, to check the look with
 Eric. Nothing in the game changes yet; the bosses still show as emoji icons.
 
-- **What's drawn:** the Black Knight, after Eric's reference picture (a dark armoured knight, plumed helm, winged
+- **What's drawn:** the Black Knight, after Eric's reference picture (a dark armored knight, plumed helm, winged
   spear, ragged cape), and the Pawn Golem (a white stone pawn come to life, gold runes, floating boulder fists). Each
   has an idle loop (8 frames) and an attack: the knight's spear thrust (wind-up, lunge, a spark at the tip), the
   golem's two-fisted ground slam (fists over its head, a blur, dust and stone chips). Preview:
@@ -111,7 +111,7 @@ Eric. Nothing in the game changes yet; the bosses still show as emoji icons.
   (typed by hand for hard surfaces, painted with shapes for cloth and stone), and frames that stack the parts at
   whole-pixel offsets, with quarter turns, mirroring and ripples for cloth. Why: an animation is a list of numbers
   (a lunge is `dx: -4`), so a boss's whole pack (idle, attack, hurt, death, taunt) costs a pose function, not dozens of
-  redrawn frames; a recolour is a palette swap; and each part has its own outline, so the outlines stay right however
+  redrawn frames; a recolor is a palette swap; and each part has its own outline, so the outlines stay right however
   the parts move.
 - **Cues live on frames** (`cue: "thrust"`, `"hit"`, `"slam"`, `"impact"`): the sprite component will fire the sound
   and screen effect when that frame shows, so a sound pack lines up with the picture by construction.
@@ -162,7 +162,7 @@ end to end: sprite, portrait, animations, sounds, lines, and where he stands.
   - **The same everywhere:** the line, and whether there is one, comes from a hash of the moment's key, so every
     player gets the same line at the same time.
   - **Mood lines** only when the mood changes.
-- **Sounds:** synthesised in code (`characters/clown-sounds.ts`), so there are no files or licences: a pogo boing, a
+- **Sounds:** synthesized in code (`characters/clown-sounds.ts`), so there are no files or licenses: a pogo boing, a
   bulb-horn honk, a rubber squeak, a slide whistle up and down, and a kazoo laugh (no voice).
   - **Quieter than a move:** a unit test measures each one against the move sample's peak and mean level; each sits
     about 3 dB under it.
@@ -189,7 +189,7 @@ the power rules' job (he becomes playable once he has powers too). `packages/cor
   and a foot; the cane's grip and direction), so a new pose is a few numbers. The cane is in his right hand (our
   left), as in the reference.
   - **The frosty edge:** his icing's shadow is a cold blue, a frost glint runs round his icing while he idles, and when
-    he casts his cane glows ice-blue (stripes recoloured, a pale rim round it) and his red eyes go icy.
+    he casts his cane glows ice-blue (stripes recolored, a pale rim round it) and his red eyes go icy.
   - **The cast points low:** he thrusts the cane forward and down across his legs, to his right, where the board is
     on both layouts (pointing it across his chest hid it behind his arms).
   - **Defeat:** cracked, he topples over on his side, the cane on the ground; no crumbling to pieces (drama, no gore).
@@ -202,7 +202,7 @@ the power rules' job (he becomes playable once he has powers too). `packages/cor
   boss: `power` (a piece frozen: "Freeze!", "Chill out!"), `ultimateWarn` ("A storm is brewing…") and `ultimate`
   ("BLIZZARD!", "Let it snow!"). Boingo got lines for them too (the pie, the funhouse). They're in the `Beat` type
   now; `bossBeat` doesn't produce them: the power rules say when they happen.
-- **Sounds** (`characters/gingerbread-sounds.ts`, synthesised, no voice): a cookie crunch (hurt, defeat), a
+- **Sounds** (`characters/gingerbread-sounds.ts`, synthesized, no voice): a cookie crunch (hurt, defeat), a
   sleigh-bell jingle (entrance, his move, capture, victory), an ice crackle (frost slams, the cast, the ice) and the
   blizzard's wind (with the sweep). Seeded noise, so each is the same every time and testable. Each sits about 3 dB
   under a move's mean level, the wind about 5 dB (it's long), with a soft ceiling keeping peaks under half a move's.
@@ -219,7 +219,7 @@ the power rules' job (he becomes playable once he has powers too). `packages/cor
     1.3 s, a haze thinning behind it; the wind starts with it.
   - `pieSplat` (a square): splat (the pie comes down, SPLAT, cream flies), pied (loop), fade.
   - `iceBolt` and `pieFly` (a square each, loops): the bolt and the pie in flight, for flying them to the square.
-- **Renderer:** a palette colour may be `#rrggbbaa` (see-through), for the ice and the haze. Old palettes are
+- **Renderer:** a palette color may be `#rrggbbaa` (see-through), for the ice and the haze. Old palettes are
   unaffected.
 - **The contract** (`characters/power-art.ts`, also exported from `characters/index.ts`): `POWER_MOMENTS` (per boss:
   each power's animation, the cue of its hit, whether it plays on the board, the effects that follow), `EFFECTS`
@@ -243,7 +243,7 @@ rules' job (`god-king`); `packages/core/src/boss.ts` is unchanged, so he never s
 - **Name:** "G-REX" (Eric's), exactly.
 - **Art** (`characters/grex.ts`): 56 x 88 px from parts, in a 100 x 122 frame (room above for his jump and the
   rockets). Three-quarters, facing right as in the reference: the flaming mane and tail on our left, the two sparklers
-  on our right, towards the board.
+  on our right, toward the board.
   - **A giraffe first (Eric, Oct 9):** a long neck, so he stands about as tall as the God King with his wings spread,
     and a giraffe face: half-lidded cocky eyes with a fiery glint, a cream muzzle, flaming ossicones. The first draft
     had dark shades and a short neck; Eric asked for the neck and the face instead. The head stays big (32 x 23 px) so
@@ -272,7 +272,7 @@ rules' job (`god-king`); `packages/core/src/boss.ts` is unchanged, so he never s
 - **Lines:** a cocky show-off, fire puns and the odd dinosaur joke ("Rawr! I mean… hi.", "Tiny arms? Not me!",
   "Extinct… again…"), as rare as Ginger's, with lines for igniting a tile, a piece burning up, the warning, the launch
   and the fireballs.
-- **Sounds** (`characters/grex-sounds.ts`, synthesised, no voice): a fire crackle, a whoosh, a sparkler's fizz, the
+- **Sounds** (`characters/grex-sounds.ts`, synthesized, no voice): a fire crackle, a whoosh, a sparkler's fizz, the
   poof of a piece burning up, a Roman candle's pop, and a comically big roar (a growl that ends in a squeak). Each
   sits about 3 dB under a move's mean level, peaks under half a move's.
 - **Effect sprites** (`characters/effects.ts`, one square each unless said):
@@ -306,9 +306,9 @@ of this file). The art, lines, sounds and a preview only: the rules (the dark sq
 test, making him playable) are the power rules' job (`god-king`). `packages/core/src/boss.ts` is unchanged, so he never
 shows in a battle; his kit is `BOSS_KITS["Hollow"]`.
 
-- **An original creature, not a recoloured Grinch** (director's call, per the design): charcoal-black shaggy fur, a
+- **An original creature, not a recolored Grinch** (director's call, per the design): charcoal-black shaggy fur, a
   round face with spiky cheek tufts and a wild tuft on top, glowing gold eyes, no green anywhere (a unit test checks
-  every colour), no suit, no hat, never "Grinch" in a line. Torn seams across his cheek, his shoulder and a thigh are
+  every color), no suit, no hat, never "Grinch" in a line. Torn seams across his cheek, his shoulder and a thigh are
   bound by violet-black darkness, and where his middle was there's a band of it with a void at its heart: a black core,
   two violet arms turning round it and a tilted ring. **A violet edge glow** (his halo, `#6a46c4`) keeps him from
   vanishing on the dark ground, and it reads on the light ground too.
@@ -337,14 +337,14 @@ shows in a battle; his kit is `BOSS_KITS["Hollow"]`.
     slits: the void is the only light. `testFound` (he recoils) and `testMiss` (he cackles in the dark).
   - `lightsBack` (on the board): a fresh strand spills out of the void and lights bulb by bulb (`relight`), the light
     comes back into him and he leaps off; the last frame is empty, so the rules show him back in his corner.
-- **His new spot for Lights out (my call):** centred above the board, his feet on its top edge (`lightsOutSpot()`).
+- **His new spot for Lights out (my call):** centered above the board, his feet on its top edge (`lightsOutSpot()`).
   The design leaves the spot open; anywhere on the board would cover squares the test asks about, and there's no room
   beside the board on a phone. On a phone he stands over the boss bar (the bar and its heading don't matter while the
   game is paused).
 - **A dark square (`darkSquare`):** billows of violet-black smoke round a dark middle, lit from the top left, turning
   slowly, violet glints twinkling: cloudy, never a flat box. Its body always covers the square but its outer 2 of 32
   pixels (corners rounded), so the piece is hidden on every frame (a test checks it) and the normal green selection
-  shows round it as a glow. Its last turn (`thin`) is paler and greyer, wisps peeling off its top, fewer glints, and
+  shows round it as a glow. Its last turn (`thin`) is paler and grayer, wisps peeling off its top, fewer glints, and
   still hides the piece (the dark lasts that turn too). `gather` as it forms, `clear` as it goes. `darkMiss` is a
   red-violet slash, for a wrong tap in the test or a wrong move into the dark.
 - **The night (`nightSquare`, on the one shared board canvas):** a tile a square, so a found piece can show through
@@ -360,7 +360,7 @@ shows in a battle; his kit is `BOSS_KITS["Hollow"]`.
   cover, always; "Can you still see it?", "How do you like the dark?" now and then; "It's time."; "Remember that."),
   everyone the same (by the moment's key). The test's prompt names the pieces: `findLine(["r", "n"])` is "Find my rook
   and my knight." New moments in `Beat` for him: `darkFirst`, `claim`, `found`, `missed`, `lightsBack`.
-- **Sounds** (`characters/hollow-sounds.ts`, synthesised, no voice): the void's low hum, the dark pouring out, a whisper
+- **Sounds** (`characters/hollow-sounds.ts`, synthesized, no voice): the void's low hum, the dark pouring out, a whisper
   of smoke settling on (or lifting off) a square, a bulb going out (a glassy tink and a dying fizz), a bulb smashed (a
   crack, glass tinkling, a thump), the void's pulse in the test (a soft double beat), a piece found (a two-note
   chime), a miss (a dull buzz), the lights coming back (a shimmer and three rising plinks) and his bulbs clinking. Each
@@ -378,7 +378,7 @@ shows in a battle; his kit is `BOSS_KITS["Hollow"]`.
     stalled the last smash (32 at once) and its first loop: `prewarm()` (`BossEffect.tsx`) draws them ahead, about 4 ms
     a frame on the shared loop, from when he drops in (`nightWarmList()`).
   - The first bulb smashed stalled 480 ms: its sound was being made (150 ms on a computer). The glass sounds are now
-    closed-form (30 ms), and `warmSounds()` (`sound.ts`) makes a boss's synthesised sounds in idle moments once his
+    closed-form (30 ms), and `warmSounds()` (`sound.ts`) makes a boss's synthesized sounds in idle moments once his
     character shows (Hollow's for now).
   - Through the whole Lights out preview: p95 16.8 ms, 2% of frames over 20 ms, the worst 50 ms; the plain board
     beside it p95 16.7 ms, 1%. `npm run perf:boss` (Ginger, phone, 25 moves) stays flat at p95 16.7-16.8 ms.
@@ -412,8 +412,8 @@ battle. His kit is `BOSS_KITS["BigBoy"]`, seen only through the test link `?wip=
 - **The shirt stays:** "BIG BOY" is two lines of 4 x 5 pixel letters. Red and teal are about as light as each other, so
   at first the letters blurred into the shirt at phone size; with a dark red drop shadow they read in the boss bar on
   an iPhone (checked in the game, `?wip=1&kit=BigBoy`). So the diaper-only version wasn't needed.
-- **The lollipop reads at phone size:** a 17 px candy whose six colours wind out from the middle in a spiral (each a
-  wide band at the rim; a test checks every colour shows), a white glint, a two-pixel stick. Its swirl turns when he
+- **The lollipop reads at phone size:** a 17 px candy whose six colors wind out from the middle in a spiral (each a
+  wide band at the rim; a test checks every color shows), a white glint, a two-pixel stick. Its swirl turns when he
   waves it.
 - **Animations:**
   - `idle` (loop, about 5.4 s): he wobbles side to side, dipping at the knees and rocking one heel up; blinks; brings
@@ -431,7 +431,7 @@ battle. His kit is `BOSS_KITS["BigBoy"]`, seen only through the test link `?wip=
 - **Portrait:** his head, tufts and the whole candy beside it.
 - **In the test link** he takes the place of every boss, but a battle is still that boss's: when Boingo's powers fire,
   the boss bar hides its character for the power's moment (as it always does) and Big Boy has no moment to play there.
-- Tests: `packages/app/test/bigboy.test.ts` (a preview kit with no boss; never above his wave; the swirl's colours; the
+- Tests: `packages/app/test/bigboy.test.ts` (a preview kit with no boss; never above his wave; the swirl's colors; the
   portrait), plus the shared character tests.
 
 ### Ideas for later, not built (Eric, Oct 8, 2026)
@@ -439,7 +439,7 @@ battle. His kit is `BOSS_KITS["BigBoy"]`, seen only through the test link `?wip=
 - **Real boss abilities, never game-breaking:** freezing most of the team for a turn, or making the crowd move a
   particular piece, but only when that piece has a move that isn't a blunder. They need the rules, the server and
   the engine (the director's call, with `engine` and `god-king`).
-- **Bosses jumping to the centre of the board to cast something** (an ability's wind-up), the way the God King leaps
+- **Bosses jumping to the center of the board to cast something** (an ability's wind-up), the way the God King leaps
   onto the board.
 - **More bosses drawn from Eric's references:** a farmer with a string trimmer, and a gingerbread man with a candy cane.
 
@@ -502,7 +502,7 @@ the kind of boss. Nothing here is built yet; when it is, each part gets its own 
   person moves alone for one turn, without power-ups; nobody else is scored that turn; if they run out of time, the God
   King makes a safe move.
 - **Boingo the Clown.** Passive, the pie: he throws a pie at one empty square, which stays pied for 3 turns (nobody can
-  move a piece onto it), then 2 clear turns, then another pie. The square is near the centre and chosen so it's roughly
+  move a piece onto it), then 2 clear turns, then another pie. The square is near the center and chosen so it's roughly
   even for both sides (the engine checks it changes the eval little). Ultimate, the funhouse: as the turn passes to
   you, he pogos down onto the board, the board flips, he says a line and plays your move for you: a weak but
   recoverable one (about 1-2.5 pawns worse than the best, never hanging mate or the queen outright). That turn isn't
@@ -529,7 +529,7 @@ system with two powers that prove it: Freeze (move limits and judging) and Boing
 engine choosing a move, and online sync).
 
 **Later ideas:** boss drops (a themed crate item for beating a boss: a clown nose, a zombie hand); bosses jumping to the
-centre of the board to cast; the farmer and the gingerbread man as bosses.
+center of the board to cast; the farmer and the gingerbread man as bosses.
 
 **Later (Eric, Oct 9, 2026; not built, design to be worked out with Eric):** every boss gets random quips and short
 exchanges with the God King: they talk to each other and about each other (a boss taunting him, his retort; a line
@@ -604,7 +604,7 @@ turn).
   more; for the king, two). The passive waits a turn on the ultimate's turn.
 
 **Boingo the Clown**
-- **Passive, the pie:** from the crowd's 2nd turn, a pie on one empty square near the centre (c3 to f6) for 3 crowd
+- **Passive, the pie:** from the crowd's 2nd turn, a pie on one empty square near the center (c3 to f6) for 3 crowd
   turns and the boss's replies in between, then 2 clear turns, again and again. Nobody may move onto it. The moment:
   "PIE!", then he throws: the pie tumbles in from his side (`pieFly`) and splats on the square (`pieSplat`).
 - **Ultimate, the funhouse:** as the turn passes to the crowd, "FUNHOUSE!", then he drops onto the middle of the board
@@ -674,7 +674,7 @@ don't replace the strike.
 - It brings the ultimate **as the next crowd turn begins, without the warning** (the normal path, skipping the meter
   and the warning). It never touches a turn or a moment in progress: pressed during your turn, your turn goes on as it
   was and the ultimate comes after the boss's reply; pressed while the boss thinks, it comes as your turn begins. Once
-  pressed it reads "Ultimate next turn (testing)" and is greyed out; spent, "Ultimate used (testing)". Already used,
+  pressed it reads "Ultimate next turn (testing)" and is grayed out; spent, "Ultimate used (testing)". Already used,
   the battle over, pressed twice: nothing. `BOSS_POWERS.ultimateTestButton: false` removes it, server included.
 
 **Fix: the God King stays silent after falling** in his Last Stand, the blizzard's line included.
@@ -778,7 +778,7 @@ Eric's eight changes, built across G-REX's lanes (his art, sounds and power rule
   right, back across to the left and right again** (tilts of up to 26 degrees, drawn once per tilt), his other hoof
   pumping his sparkler. Each shot leaves from the candle's top along its tilt (a few degrees either way), so the
   volley fans out across the board; a shot is two squares tall with its trail, so it reads on a phone. The moment is 7.1 s (was 5 s), before the crowd's clock starts, as every power's.
-- **Firework whistles** (`grex-sounds.ts`, synthesised): each shot plays a rising whistle, one of three (a quick bright
+- **Firework whistles** (`grex-sounds.ts`, synthesized): each shot plays a rising whistle, one of three (a quick bright
   one, a long low one, one with a warble), up to 7% higher or lower, and about one shot in three ends in a crackle
   high up. Each whistle sits about 10 dB under a move; the whole volley at once (24 overlapping whistles, every one
   crackling, at the slowest pitch) stays under a move's loudness, and the wood smack under half a move's peak. They
@@ -848,9 +848,9 @@ move 13-15; the blizzard glitched.
 
 - **Ginger freezes a little more often:** every 4 to 6 crowd turns instead of 5 to 7 (`BOSS_POWERS.freezeEvery`). The
   first freeze still comes on the crowd's second turn, and each lasts 2 turns, so a freeze is never on top of another.
-- **The God King keeps his colours in the dock:** his figure used to fade and desaturate when he couldn't be summoned,
-  and go grey and half see-through once his moves were used. Now he stays in full colour; the crowns under him show
-  what's left (a dash once they're spent), as before. His fallen figure after his Last Stand is still greyed: that
+- **The God King keeps his colors in the dock:** his figure used to fade and desaturate when he couldn't be summoned,
+  and go gray and half see-through once his moves were used. Now he stays in full color; the crowns under him show
+  what's left (a dash once they're spent), as before. His fallen figure after his Last Stand is still grayed: that
   shows he has fallen, which is different from having used his moves.
 
 ## Hollow, the Darkness boss (design, Eric, Oct 9, 2026; calls marked "director's call")
@@ -859,7 +859,7 @@ Eric's reference: a furry Christmas-thief creature, gone dark. Lore: the village
 him back and now holds him together through the middle, so there is a void in his chest. He carries a strand of
 Christmas lights. He is "the dark boss": a small change to the chess (a memory test), not a fog of war.
 
-**Name: Hollow** (director's call; Eric didn't pick one, names aren't final). Kept an original creature, not a recoloured
+**Name: Hollow** (director's call; Eric didn't pick one, names aren't final). Kept an original creature, not a recolored
 Grinch, because that character is someone else's trademark: no "Grinch"/"Grimch" in names or lines, no green fur, no
 Santa suit or hat. His own look is charcoal-black fur, torn edges bound by violet-black darkness, the chest void, and the
 lights.
@@ -1021,7 +1021,7 @@ solo's `lightsOutTurn`; on screen `components/LightsOut.tsx`)
 
 - **His lights: a long strand held in the middle,** like Eric's reference: ten bulbs (red, gold, blue in turn) down its
   two halves, five a side, hanging from his hand in two curves, the bulbs either side of the wire on short stems. The
-  countdown puts out a colour at a time (blue, then gold, then red: about a third of the strand per move, 10 → 7 → 4 →
+  countdown puts out a color at a time (blue, then gold, then red: about a third of the strand per move, 10 → 7 → 4 →
   0 lit), then they relight; the 3-bulb strip by the board is unchanged and goes out in the same order. Lights out
   smashes the strand in three strikes, a section at a time (the inner half's low end, the middle by his hand, the
   outer half's low end), his claw reaching for each. **My calls:** one hand holds it, as in the reference (Eric's
@@ -1162,7 +1162,7 @@ A chubby baby in a diaper and a "BIG BOY" crop shirt, armed with a swirly rainbo
 ("flawless") from the preview on branch `claude/bigboy-art`. Name not final (it is also a restaurant chain's mark).
 
 ### Opening: Snack time
-- Before move 1, he waddles over and eats one of the crowd's centre pawns (d or e, from the match seed): about a pawn's
+- Before move 1, he waddles over and eats one of the crowd's center pawns (d or e, from the match seed): about a pawn's
   head start. "Nom nom."
 - His strength offset is lowered so his raid stays as hard as the others at the same tier (director's call; set it from
   a quick sim with the existing boss sim, record the numbers).
@@ -1178,7 +1178,7 @@ A chubby baby in a diaper and a "BIG BOY" crop shirt, armed with a swirly rainbo
 ### Ultimate: the Big Bounce (Eric)
 - Fires from the shared rage meter at the start of his turn, like the other bosses' ultimates.
 - He leaps onto the board and bounces 3 times, each landing on a 2x2 block of squares (a shadow grows briefly before
-  each landing). Pieces there are knocked up and tumble. The 4th bounce is a giant fall onto the four centre squares:
+  each landing). Pieces there are knocked up and tumble. The 4th bounce is a giant fall onto the four center squares:
   a crash, a shockwave across the board, dust, the board jolts. Then every piece settles into the new position and he
   bounces back to his corner and plays his move.
 - The new position is calculated beforehand (Eric): the pieces may be thrown around a lot on screen, but the result
@@ -1196,7 +1196,7 @@ A chubby baby in a diaper and a "BIG BOY" crop shirt, armed with a swirly rainbo
 
 ### Character
 - No real voice: baby sounds (a giggle, a lollipop slurp, a wail, bounce boings, the big crash, a "nom" for the
-  snack), quieter than a move, CC0 credited or synthesised.
+  snack), quieter than a move, CC0 credited or synthesized.
 - Short baby lines in his text box: "Mine!", "Nom nom.", "Waaaah!", "Big boy BOUNCE!", and so on.
 
 ### Built: Big Boy, playable (Oct 10, 2026)
@@ -1221,7 +1221,7 @@ Every number is in `BOSS_POWERS` (`blockEvery` 4, `blockTurns` 3, `bouncePieces`
   opens as White.
 - The intro: his card, then the snack (3 s, `SNACK`): he waddles in from the board's edge nearest the pawn, grabs it
   (it leaves the board at `grabAt`), bites it twice ("nom" at `nomAt` and after), smacks his lips and waddles off; his
-  line ("Nom nom.") in his text box and the dock; then "START!". The pawn in his hand is the crowd's colour (his look
+  line ("Nom nom.") in his text box and the dock; then "START!". The pawn in his hand is the crowd's color (his look
   `blackPawn`).
 - **His strength offset: −250** (the others −100): 150 more for the pawn. From the boss sim
   (`packages/sim/scripts/boss-sim.ts`, a new `snack` mode: the crowd's d- or e-pawn gone before move 1; `stumble`, the
@@ -1271,7 +1271,7 @@ Every number is in `BOSS_POWERS` (`blockEvery` 4, `blockTurns` 3, `bouncePieces`
   warned as the 2nd turn begins, the bounce after the crowd's 2nd move. Once a match; the meter is gone after.
 - **The new position**, as the design says (only the crowd's pieces, never a king, no captures; each to an empty
   square within 2, pawns only sideways; 2 to 6 of them; the crowd's king not in check; castling rights gone with a moved
-  rook; en passant cleared). **My calls:** a bishop keeps its colour; nothing lands on the toy block; the bounce never
+  rook; en passant cleared). **My calls:** a bishop keeps its color; nothing lands on the toy block; the bounce never
   gives him check nor leaves him without a move; a try that leaves more of the crowd's material hanging (attacked by
   something cheaper, or attacked and undefended) than before is dropped before the engine sees it (he'd just take it:
   far past a pawn and a half). 2 to 6 pieces, even odds.
@@ -1315,7 +1315,7 @@ Every number is in `BOSS_POWERS` (`blockEvery` 4, `blockTurns` 3, `bouncePieces`
   block for his hand.
 - **His moments:** his move a slurp of the lollipop (12% a line), a capture, his strike and his entrance the swing (the
   BONK), check and victory a giggle, hurt, defeat and the rage warning the wail. Thinking is his idle, silent.
-- **Sounds, synthesised (no real voice, no files):** a giggle (five quick "heh"s from a little buzzing voice through
+- **Sounds, synthesized (no real voice, no files):** a giggle (five quick "heh"s from a little buzzing voice through
   vowel formants), a slurp, a wail ("waaah"), a nom (an "n", an "o", an "m"), a boing, the crash (a deep thud, a
   rumble of dust, toy blocks tumbling), a toss, the block's clack (a light wooden tok, a small bounce, a rattle), a
   poof, the lollipop's swish and bonk (a squeaky-toy hammer), a stomp. They replace the preview's borrowed sounds. Each
