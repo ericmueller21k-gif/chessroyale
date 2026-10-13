@@ -14,6 +14,7 @@ import { grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds
 import { hollowSound, type HollowSound } from "./characters/hollow-sounds.ts";
 import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
 import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
+import { pigSound, type PigSound } from "./characters/pig-sounds.ts";
 import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSoundChange, pieceSound, pieceSoundOption, type PieceSoundKind } from "./piece-sounds.ts";
 
 let ctx: AudioContext | null = null;
@@ -228,6 +229,7 @@ const grex = (name: GrexSound) => (t: number) => buffer(grexSound(name, ctx!.sam
 const hollow = (name: HollowSound) => (t: number) => buffer(hollowSound(name, ctx!.sampleRate), t);
 const bigBoy = (name: BigBoySound) => (t: number) => buffer(bigBoySound(name, ctx!.sampleRate), t);
 const sawyer = (name: SawyerSound) => (t: number) => buffer(sawyerSound(name, ctx!.sampleRate), t);
+const pig = (name: PigSound) => (t: number) => buffer(pigSound(name, ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
 function grexWhistle(t: number) {
   const w = whistlePick(Math.random(), Math.random(), Math.random());
@@ -535,6 +537,19 @@ export type SoundName =
   | "sawyerBigSaw"
   | "sawyerHop"
   | "sawyerRejoin"
+  // Wrangler (a raid boss, the cowboy pig): synthesised, see characters/pig-sounds.ts.
+  | "pigWhirl"
+  | "pigThrow"
+  | "pigCatch"
+  | "pigTug"
+  | "pigTip"
+  | "pigLaugh"
+  | "pigSnort"
+  | "pigStomp"
+  | "pigWindup"
+  | "pigHop"
+  | "pigDraw"
+  | "pigYank"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
   | "sqSting";
@@ -645,6 +660,18 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   sawyerBigSaw: sawyer("bigsaw"),
   sawyerHop: sawyer("hop"),
   sawyerRejoin: sawyer("rejoin"),
+  pigWhirl: pig("whirl"),
+  pigThrow: pig("throw"),
+  pigCatch: pig("catch"),
+  pigTug: pig("tug"),
+  pigTip: pig("tip"),
+  pigLaugh: pig("laugh"),
+  pigSnort: pig("snort"),
+  pigStomp: pig("stomp"),
+  pigWindup: pig("windup"),
+  pigHop: pig("hop"),
+  pigDraw: pig("draw"),
+  pigYank: pig("yank"),
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
   // Every board's move landing after a round: a quick ripple of soft knocks (the picked move sound), one per board.
@@ -653,7 +680,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   },
 };
 
-/** Synthesised sounds that can be made ahead (warmSounds), by name: Hollow's (his smash took 150 ms to make on a computer), Big Boy's, Sawyer's. */
+/** Synthesised sounds that can be made ahead (warmSounds), by name: Hollow's (his smash took 150 ms to make on a computer), Big Boy's, Sawyer's, Wrangler's. */
 const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
   hollowHum: (r) => hollowSound("hum", r),
   hollowCast: (r) => hollowSound("cast", r),
@@ -686,6 +713,18 @@ const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
   sawyerBigSaw: (r) => sawyerSound("bigsaw", r),
   sawyerHop: (r) => sawyerSound("hop", r),
   sawyerRejoin: (r) => sawyerSound("rejoin", r),
+  pigWhirl: (r) => pigSound("whirl", r),
+  pigThrow: (r) => pigSound("throw", r),
+  pigCatch: (r) => pigSound("catch", r),
+  pigTug: (r) => pigSound("tug", r),
+  pigTip: (r) => pigSound("tip", r),
+  pigLaugh: (r) => pigSound("laugh", r),
+  pigSnort: (r) => pigSound("snort", r),
+  pigStomp: (r) => pigSound("stomp", r),
+  pigWindup: (r) => pigSound("windup", r),
+  pigHop: (r) => pigSound("hop", r),
+  pigDraw: (r) => pigSound("draw", r),
+  pigYank: (r) => pigSound("yank", r),
 };
 /**
  * Makes a boss's synthesised sounds ahead of time, one per idle moment, so the first time one plays (a bulb smashed in

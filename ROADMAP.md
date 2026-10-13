@@ -104,6 +104,16 @@ Added Oct 12, 2026 (with Squads' modes; notes only, nothing built):
   - fallback fonts where the pixel title font lacks a script (Cyrillic, Devanagari, CJK);
   - a layout pass for right-to-left languages.
 
+Added Oct 13, 2026 (with Wrangler; notes only, nothing built):
+
+- **Multi-boss** (Eric, Oct 13): a 50 v 50's boss ending against three random bosses at once (it needs rules for how
+  three bosses share one side: whose move it is, whose powers fire when, one rage meter or three), and/or a **Boss
+  Rush** raid mode: boss after boss, all or nothing. The director suggests Boss Rush first.
+- **Engine-shaped ultimates for every boss** (Eric, Oct 13): like Wrangler's showdown, each ultimate searches its
+  possible outcomes with the engine and aims for a target swing (about +0.5 to +1.5 pawns for the boss), with fallbacks
+  so it never fizzles. Revisit Ginger's blizzard, Hollow's Lights out, Jefferson's Roman candle and the others
+  (docs/areas/bosses.md, "An engine-shaped power").
+
 ## Needs Eric
 
 - **Maia-3 bosses, before players meet them (pre-launch):** your OK to publish the Maia box's source

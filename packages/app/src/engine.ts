@@ -70,6 +70,7 @@ export function withServerRecheck(engine: UciEngine, boards: () => number = () =
     topMoves: (fen, n) => engine.topMoves(fen, n),
     scoreMoves: (fen, moves) => engine.scoreMoves(fen, moves),
     playAtElo: (fen, elo, nodes) => engine.playAtElo(fen, elo, nodes),
+    topMovesAt: (fen, n, nodes) => engine.topMovesAt(fen, n, nodes),
     scoreMovesAt: async (fen, moves, nodes) => (await serverScoreAt(fen, moves, boards())) ?? engine.scoreMovesAt(fen, moves, nodes),
   };
 }

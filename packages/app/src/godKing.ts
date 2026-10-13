@@ -49,6 +49,7 @@ export type KingCue =
   | "thaw"
   | "thawed"
   | "funhouse"
+  | "showdown"
   | "fireTile"
   | "mateThreat"
   | "queenLost"
@@ -116,6 +117,8 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   thaw: ["The ice is cracking! More of ours can move.", "A thaw! Our pieces stir again.", "Some of ours are free. The rest soon."],
   thawed: ["The ice is gone. To arms, all of you!", "Thawed out! Every piece is ours again.", "The storm has passed. Full strength!"],
   funhouse: ["Upside down? Shake it off!", "That clown played our move! We'll fix it.", "He moved for us? Fine. We'll take it from here."],
+  // Wrangler's showdown, at its "DRAW!": the crowd must take one of his three, and one is a trap.
+  showdown: ["A duel we must take. Choose the right one!", "Three duels, and one's a trap. Choose well!", "We must draw. Pick the duel that wins!"],
   // A mate threatened against us (as our move begins), and a queen taken, either way.
   mateThreat: ["Mate is near! Shield the king.", "It threatens mate. Look again!", "Danger at the gate. Guard the king!"],
   queenLost: ["Our queen has fallen. Fight on!", "The queen! She'll be avenged.", "They took the queen. Hold the line."],
@@ -162,6 +165,7 @@ const KIND: Record<KingCue, Kind> = {
   thaw: "critical",
   thawed: "critical",
   funhouse: "critical",
+  showdown: "critical",
   fireTile: "critical",
 };
 

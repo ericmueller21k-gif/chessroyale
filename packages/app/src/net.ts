@@ -1,5 +1,5 @@
 import { LookAways } from "./lookaway.ts";
-import { engineSpeed } from "./engine.ts";
+import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, PREGAME_VOTES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings } from "@chessroyale/core";
@@ -43,6 +43,10 @@ import {
   type BrainNote,
   type HumanUciEngine,
   type NetBossBrain,
+  type NetBoss,
+  type BossAsks,
+  pigTurn,
+  ShowdownScout,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
@@ -419,6 +423,8 @@ export class NetMatch implements GameView {
         this.darkNote = null;
         // Boss battle: the battle as it stands (his charges; after his Last Stand, the move he took back).
         if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+        // (Wrangler's showdown may follow this turn: the host scouts line-ups while the crowd thinks.)
+        if (m.boss) this.scoutShowdown(m.boss);
         this.tally = null;
         this.myPick = null;
         this.hint = null;
@@ -577,7 +583,7 @@ export class NetMatch implements GameView {
       case "bossRequest":
         if (m.extra) return void this.hostExtra(m.key, m.fen);
         if (m.bounce) return void this.hostBounce(m.key, m.fen, m.bounce);
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
         return void this.useBrain(m.brain);
@@ -589,6 +595,7 @@ export class NetMatch implements GameView {
         return this.chat.onRefused(m.say, m.reason, m.retryAt);
       case "results":
         this.freeBrain();
+        this.scout?.reset();
         if (this.myId) {
           this.placement = m.placements[this.myId] ?? this.placement;
           this.lossesByStage = m.lossesByStage[this.myId] ?? [];
@@ -653,21 +660,43 @@ export class NetMatch implements GameView {
    * Boss battle, host only: play the boss's move with this device's engine at the boss's strength, or on the Maia
    * brain (`brain`, the lobby's plan for the battle) with Maia, never waiting for it (Stockfish's move meanwhile).
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger", allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger", allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null) {
     try {
-      const [engine] = await this.engines();
+      const engines = await this.engines();
+      const [engine] = engines;
       if (brain) this.useBrain(brain);
       const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), engine: this.maia, onNote: (n: BrainNote) => (this.brainNote = n) } : undefined;
+      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia);
+      if (asks && !funhouse) {
+        // Wrangler's turn: his long pull (his first move) or his move, then his drag or his showdown's line-up after it,
+        // on this device's engines (the scout's line-ups first). The server checks them against his rules.
+        const answer = await pigTurn(engines, fen, asks, ordinary, this.scout);
+        this.send({ t: "bossMove", key, move: answer.move, ...(answer.drag !== undefined ? { drag: answer.drag } : {}), ...(answer.showdown !== undefined ? { showdown: answer.showdown } : {}) });
+        return this.emit();
+      }
       // Boingo's funhouse: the crowd's move, played for it (a weak but recoverable one); else the boss's own (a pie
       // stops it too). The server sends the one move to everyone.
-      const move = funhouse
-        ? await funhouseMoveFrom(engine!, fen, allowed)
-        : await bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia);
+      const move = funhouse ? await funhouseMoveFrom(engine!, fen, allowed) : await ordinary();
       this.send({ t: "bossMove", key, move });
       this.emit();
     } catch {
       // No engine here: the server asks someone else, or plays a random move.
     }
+  }
+
+  /** Wrangler's showdown scout, on the host's device: line-ups searched while the crowd thinks (its own engine). */
+  private scout: ShowdownScout | null = null;
+
+  /**
+   * As a crowd turn begins: if this device is the host and Wrangler's showdown may follow it (the meter nearly full,
+   * his warning, a hold, the test trigger), its scout searches line-ups on this position until his turn; else it stops.
+   */
+  private scoutShowdown(boss: NetBoss) {
+    const p = boss.powers;
+    const soon = !!p && (p.warned || !!p.ultNext || (p.holds ?? 0) > 0 || (p.rage ?? 0) >= BOSS_POWERS.showdownScoutFrom);
+    if (!this.isHost || boss.id !== "pig" || !p || boss.result || p.ultAt !== null || !soon) return void this.scout?.stop();
+    this.scout ??= new ShowdownScout(() => ownEngine());
+    this.scout.scout(boss.board.fen, (p.holds ?? 0) >= BOSS_POWERS.showdownHolds ? [3, 2] : [3]);
   }
 
   // ---------------- The boss's brain (host only) ----------------

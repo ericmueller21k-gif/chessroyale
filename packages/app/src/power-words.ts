@@ -18,6 +18,8 @@ export const POWER_WORDS: Record<PowerId, string> = {
   bounce: "big bounce",
   cuts: "splits a pawn, saw cuts",
   boardsaw: "board saw",
+  drag: "lassos your pieces",
+  showdown: "showdown",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

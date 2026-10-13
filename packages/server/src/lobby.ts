@@ -238,6 +238,8 @@ export interface LobbyRecord {
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
+  /** What came with that move (Wrangler's drag or showdown line-up), held with it. */
+  bossPendingExtras?: { drag?: string; showdown?: string };
   bossMinAt?: number;
   bossIntroDone?: boolean;
   /**
@@ -370,6 +372,11 @@ const FINAL_CUT_MS = 1800;
 /** Boss battle: how long the boss's move shows, how long a strike shows, and how long the host has to play the boss. */
 const BOSS_KILL_MS = 3800;
 const BOSS_TIMEOUT_MS = 15_000;
+/**
+ * Longer when the host also works out Wrangler's showdown (a few seconds of line-ups on its engines, more on a phone;
+ * on his last try two sizes and a drag) or his drag (about one of his moves' searching), so a slow phone isn't cut off.
+ */
+const bossTimeoutMs = (asks: { showdown?: string; drag?: true } | null): number => BOSS_TIMEOUT_MS + (asks?.showdown ? 15_000 : asks?.drag ? 8_000 : 0);
 
 export class LobbyCore {
   private runner: MatchRunner | null = null;
@@ -765,7 +772,8 @@ export class LobbyCore {
         return;
       }
       case "bossMove":
-        if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key) this.playBoss(msg.move);
+        if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key)
+          this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}) });
         return;
       case "leave":
         return this.leave(playerId);
@@ -897,7 +905,7 @@ export class LobbyCore {
         return this.bossTimeout();
       case "bossPlay":
         this.r.bossMinAt = undefined;
-        return this.r.bossPending ? this.playBoss(this.r.bossPending) : undefined;
+        return this.r.bossPending ? this.playBoss(this.r.bossPending, this.r.bossPendingExtras ?? {}) : undefined;
       case "autoStart":
         // Matchmade: time's up, bots fill the rest (if anyone is still here). Bots off: a raid with enough people begins.
         if (this.r.humans.some((h) => h.connected) && this.dueToStart()) this.startMatch();
@@ -1019,7 +1027,13 @@ export class LobbyCore {
     const host = this.hostNow();
     this.r.hostId = host;
     if (host) this.sendBossRequest(host);
-    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+    this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()));
+  }
+
+  /** What the boss's own turn asks the host for besides its move (Wrangler's long pull, drag or showdown), or null. */
+  private bossAsks() {
+    const kind = this.r.bossKind;
+    return kind === "elo" || kind === "stumble" || kind === "stagger" ? (this.runner?.bossAsks() ?? null) : null;
   }
 
   private sendBossRequest(host: string) {
@@ -1028,6 +1042,8 @@ export class LobbyCore {
     const funhouse = this.r.bossKind === "funhouse";
     // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for it.
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
+    // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
+    const asks = this.bossAsks();
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
@@ -1042,6 +1058,7 @@ export class LobbyCore {
       // (Only the boss's own moves are Maia's: the funhouse's move for the crowd, Hollow's extra move and Big Boy's
       // bounce keep their own engine picks.)
       ...(this.r.bossBrain && !funhouse && this.r.bossKind !== "extra" && this.r.bossKind !== "bounce" ? { brain: this.r.bossBrain } : {}),
+      ...(asks ? { ...(asks.pull ? { pull: asks.pull } : {}), ...(asks.drag ? { drag: true as const } : {}), ...(asks.showdown ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
     });
   }
 
@@ -1109,7 +1126,7 @@ export class LobbyCore {
     this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
-  private playBoss(move: string) {
+  private playBoss(move: string, extras: { drag?: string; showdown?: string } = {}) {
     this.r.bossKey = undefined;
     if (this.r.bossKind === "bounce") {
       // The Big Bounce: the position the host picked (one of the candidates, else nothing moves); it plays out, then
@@ -1141,10 +1158,13 @@ export class LobbyCore {
     // Too soon (your queen banner is still up): hold the move until then.
     if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
       this.r.bossPending = move;
+      this.r.bossPendingExtras = extras;
       return this.setTimer("bossPlay", this.r.bossMinAt);
     }
     this.r.bossPending = undefined;
-    this.runner!.applyBossMove(move);
+    this.r.bossPendingExtras = undefined;
+    // (Wrangler's drag or showdown line-up: the runner checks each against his rules before it's used.)
+    this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null });
     // As the turn passes to the crowd, any power that comes with it (a freeze, a pie, the warning, the blizzard)
     // plays out before the crowd's clock starts.
     // (At a mate, the boss's attack on the crowd's king, if it has one: the result waits for it.)
@@ -1160,7 +1180,7 @@ export class LobbyCore {
     if (next && next !== this.r.hostId) {
       this.r.hostId = next;
       this.sendBossRequest(next);
-      this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+      this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()));
       return;
     }
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the

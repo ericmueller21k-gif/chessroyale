@@ -2360,3 +2360,195 @@ increment, the old ids and the default, a stored match and lobby upgraded (and a
 to its results), the Time chip on every option, bots on every option (and a whole bot lobby on Bullet) in time, the
 server applying whichever option the vote picks, the test link's clock, the FAQ's words from the settings. e2e: the
 Clock vote's cards, its banner and the clock line whole at 320 px, and the winner's cap in the deadlines.
+
+### Wrangler, a sprite preview (art only, Oct 13, 2026)
+
+A pink cowboy pig with two lassos, from Eric's reference, drawn so Eric can review him before his powers are designed
+(as with Sawyer's and Big Boy's previews). Eric named him **Wrangler**, a cowboy who rounds up livestock. Art only: no
+powers, rules, lines, sounds, kit or roster entry, and he is not in `CHARACTERS`, so nothing in the game shows him
+(`packages/app/test/pig.test.ts` checks that, and makes the checks `characters.test.ts` makes of every character).
+
+- **Names:** the display name is "Wrangler"; the code id and file stay `pig` (`characters/pig.ts`, `PIG`), because
+  "wrangler" already means Cloudflare's CLI in this repo (`wrangler.jsonc`, `npx wrangler`).
+- **Previews without registering him:** `npm run preview:characters -- <dir> extra=packages/app/src/characters/pig.ts
+  only=pig` (the preview script already loads draft modules). He was also checked in the real game on a 390 px phone
+  and a 1280 px computer by swapping his kit into a boss's place from a scratch script, not from the app's code.
+- **Art** (`characters/pig.ts`): a 115 x 77 frame (the extra width on our right is room for the throw); at rest he is
+  75 x 70 px, 68 px above his feet (Sawyer 67, Big Boy 69, Hollow 75), 37 px each side of his foot point. Facing front,
+  turned a little to our left as in the reference, light from the top left, the same 1-pixel dark outline and halo as
+  the cast. Kept from the reference: the brown hat with its dark band and gold star, pointy pink ears, angry brows, the
+  big snout (light, dark-rimmed, two nostrils), the toothy grin rising to one cheek, the fringed vest with its star,
+  the belt and big gold buckle, the boots with gold spurs, the loop spinning overhead and the coil in the other fist.
+  - **Simplified for size:** the fringe is a row of dark ticks along the vest's hems; each spur is a gold strap and a
+    3 x 3 rowel; the hat's badge and the vest's star are 5 x 5 stars (the badge's ring was dropped); the slack under
+    his spinning fist is one small hanging loop (the reference has several); the coil is three rings, not a tangle;
+    the rope's twist is a darker tick every 3 px. The snout, ears, hat and loop were kept big, so at 1x on a phone he
+    reads as a pig in a cowboy hat with a lasso.
+  - **Fitting the phone's boss bar:** the loop sits a little lower than in the reference (behind his far ear and the
+    hat's brim) and the coil arm is shorter, so nothing rises above Sawyer's height under the heading and the coil
+    stays off the boss's name. Like Sawyer he needs the `wide` box (58 px) when he gets a kit.
+  - **Rigging:** a loop is an ellipse (centre, radii, tilt) painted as rope, and the line runs from his fist to the
+    loop's nearest point, so a lasso pose is a few numbers; arms and legs are painted from their points, the hat from
+    its tilt (for the nod), every part made the first time it shows (`lazyParts`).
+- **Animations** (a turn of the spin is 8 frames; one-shots end on the idle's first spin position):
+  - `idle` (loop, 4.1 s, silent): the loop spins overhead the whole time (it swings round and foreshortens, its knot
+    running round it, his fist circling), a dip at the knees now and then, two blinks, a sneer (one brow cocked, the
+    lip curled) and a snort (head jerk, flared nostrils, two puffs).
+  - `lasso` (1.9 s): a quick wider spin and a lean back (cue `whirl`), he hurls the loop out to our right (cue
+    `throw`), it drops over its mark on the ground (cue `catch`, at `CATCH`), he hauls it tight (cue `tug`) and drags
+    it a little way, then flicks it home over his head. Made for his future passive (he ropes a piece and drags it a
+    square); the board will aim at `CATCH` later.
+  - `taunt` (2.2 s): a slow nod tipping his hat down over his eyes (cue `tip`), then a laugh with his head back and the
+    hat hopping (cue `laugh`), snorts (cue `snort`), and a spur stomp with dust and a glint off the spur (cue `stomp`).
+    A hand-to-brim hat tip didn't work: his arms are short (cartoon proportions), so the nod tips it instead.
+  - `windup` (3.1 s, a generic ultimate wind-up, since his ultimate isn't designed): he shakes the coil out into a
+    second loop (cue `windup`), spins both over his head faster and wider, hurls both out (cue `throw`), they drop (cue
+    `catch`), a double yank (cue `tug`), then he gathers up. It doesn't copy Big Boy's Big Bounce.
+- **For later (not built):** his passive (Eric: now and then he lassos one crowd piece and drags it one square, only
+  when Stockfish says it costs the crowd less than a pawn) and his ultimate (Eric's to design; a big rope catch was
+  mentioned). When he becomes a boss: a kit (`wide`, his portrait `PIG_PORTRAIT`), sounds for his cues, his lines.
+
+### Wrangler, built (Oct 13, 2026)
+
+Wrangler becomes a playable boss (`pig`, 🤠, display name "Wrangler"; the code id stays `pig` because "wrangler" is
+Cloudflare's CLI here): his rules, the host's engine search for his powers, the server's checks, his moments, sounds and
+lines, on the approved sprite (only added to). **Eric's idea, with the director's calls** (Eric, Oct 13: "you can make
+the design decision"), then the calls made while building him.
+
+#### The design (Eric's idea; the director's calls, settled)
+
+- **A cowboy pig with two lassos.** Three lasso powers, each checked by the engine so it bends the game, never breaks it.
+- **The long pull** (his opening flourish): his first move is a centre pawn's double step, then he lassos it one square
+  further (three squares in one move). The engine picks the d- or e-pawn; neither sound (it hangs the pawn, or its path
+  or square is blocked): an ordinary first move. Measured by the director (Stockfish, depth 18): −0.2 to +0.3 pawns for
+  him against a normal first move, pure flavour; side pawns are bad for him (c-pawn −0.7 to −1.8), so centre only.
+- **The lasso drag** (passive; Eric: "he drags your piece one direction, up down left or right... only when it's
+  calculated that it drops you less than a pawn... a slight disadvantage according to Stockfish... not a ton"): every
+  `dragEvery` turns from about turn 3, one crowd piece dragged one square orthogonally onto an empty square. Never the
+  king, never a pawn onto the 1st or 8th rank, never leaving the crowd in check or without a move. Of the legal drags,
+  one costing the crowd 0.1 to 0.9 pawns, nearest the middle, seeded among ties; none: no drag, and it doesn't count.
+  About 3 to 4 a battle, estimated (Eric's rule on power rates).
+- **SHOWDOWN!** (ultimate; Eric: "he takes three of your pieces and three of his... facing each other in a line, not
+  much space between, near the centre... an opportunity for the players to make a big devastating mistake, but even if
+  they make the correct play it's still slightly advantageous for the boss"). **The director's finding:** with free
+  play after the line-up the crowd wins (whoever moves first grabs material), so **the crowd's next move must be one of
+  the duels** (its piece taking his facing one). Three matched pairs (queen, rook, then bishop or knight), each facing
+  along a file, rank or diagonal (knights a jump apart) with 0 or 1 empty squares between, all six on files b-g, ranks
+  3-6, his three always protected, bishops on their own colour. The host's engine searches line-ups (the warning turn,
+  and from about 85% of the meter); the best duel leaves him +0.1 to +1.2, another costs the crowd 2 or more pawns more;
+  no check, never a mate in 1 for him after the best duel; nearest +0.5, seeded among ties; about 8 s a turn. Nothing
+  found: "Not yet..." up to 2 more turns, then a 2-pair showdown, then a lasso drag. No legal duel: a normal move.
+  Online the host computes and everyone gets the same line-up through the shared state (as Big Boy's bounce). About two
+  a battle on the meter, estimated, not yet sim-tested.
+- **Also:** an Elo offset like the others; the Maia brain as for every boss, the special moves keeping their own logic;
+  the FAQ; test links.
+
+#### What was built, and my calls
+
+- **Rules** (`packages/chess/src/bosses/pig.ts`, on the base boss; every number in `BOSS_POWERS.pull*`, `drag*`,
+  `showdown*`): pure checkers (`pullOptions`, `dragOptions`/`checkDrag`, `checkLineup`) the server, the host and solo
+  share, and the engine work (`pullFrom`, `dragFrom`, `showdownFrom`, `pigTurn`) that runs where the boss's moves are
+  worked out. The grid helpers Big Boy's bounce used moved to `bosses/grid.ts` and are shared.
+- **His colour: Black, as every raid boss** (my call). He starts from the starting position (his centre pawns must be
+  home), and a raid's crowd plays White (Boss alone too), so his pull answers the crowd's first move: d7-d4 or e7-e4,
+  whichever is sound (after 1.e4, e7-e4 is blocked, so d7-d4 if it doesn't hang). Playing Black like the others keeps
+  the crowd's first move its own and the pull a reply to it. `?side=b` turns it round for testing (the crowd Black,
+  his pull White's e2-e5 or d2-d5 as move 1), and the rules handle either side.
+- **The long pull:** "unsound" is (a) the double step not legal or the third square taken; (b) the pawn left simply
+  taken on its square (attacked by a crowd pawn, or by more crowd pieces than defend it), or giving check; (c) the
+  engine's best pull costing him more than `pullMaxLoss` (0.5) pawns against his best ordinary move (`pullNodes`). He
+  plays the pull that's best for him. It goes on the board as the double step (his real move, so the move list, the
+  clocks and the judges see a legal move) and then the pawn is lassoed on as a base (the same way Big Boy's bounce
+  changes a position outside a move); no en passant after it. The Maia brain plays his ordinary moves; the pull is his
+  own logic, decided before the brain is asked.
+- **The lasso drag:** first on crowd turn `dragFirst` (3), then every `dragEvery` (10): turns 3, 13, 23, 33, so 3 to 4
+  in a battle of 30 to 40 crowd moves (estimated, not sim-tested). Calls on top of Eric's rule:
+  - **Never a bishop** (my call): any orthogonal step changes a bishop's square colour, giving two bishops on one
+    colour, a position no game could reach (Big Boy's bounce keeps bishops on theirs for the same reason).
+  - Never onto the en passant square, never leaving more of the crowd's material hanging than before (a cheap filter
+    before the engine), never a drag that gives check either way.
+  - **A decided game has none** (past 4 pawns either way): the engine's expected score is flat there, so it can't read
+    a 0.1-0.9 loss (I saw drags never land in the band in won or lost games; it now skips without the engine time).
+  - The engine: at most `dragCandidates` (16, a seeded sample) glanced at (`dragScreenNodes`, 8k), the `dragConfirm`
+    (3) nearest the band's middle looked at properly (`dragNodes`, 50k), the one nearest 0.5 played. About half a
+    second on one engine on a computer.
+  - Shown with the lasso throw: the art's `CATCH` point lands on the piece, he hauls it a square ("LASSO!").
+- **SHOWDOWN!, my calls:**
+  - **The band is measured from the position before the line-up**, not from level (my reading; recorded for Eric).
+    In checking the director's experiment I found its sign was flipped: Stockfish scores the side to move, which after
+    the crowd's forced capture is the boss, but `showdown_forced.py` read it as White's (the crowd's), so its "best duel"
+    was his best, and its 3-15% wasn't Eric's goal. Measured properly over 8 middlegames: about 1.7% of random line-ups
+    meet the goal with the band from level, about 5% with the band from the position before, and about 1 in 9 with the
+    generator below. From level the goal also can't be met at all once the game is lopsided (a crowd 3 pawns up would
+    need a 3.1-pawn swing). From the position before, it means what Eric said: even the right duel swings the game a
+    little his way (+0.1 to +1.2), a wrong one 2 or more pawns further. In a level game the two readings agree.
+  - **Mates:** no line-up where the engine sees any forced mate for him after the best duel (stricter than mate in 1),
+    and a mate-in-1 check on top.
+  - **The generator** (`lineups`): pairs by value (queens, rooks, then bishops or knights; the most valuable available),
+    each crowd piece and his of the kind moved to two facing squares in the middle, never through another of the
+    line-up's squares, never onto a square another line-up piece left; his piece protected after the line-up; no
+    check. It prefers line-ups where at most one of his three is attacked by two or more of the crowd's pieces (over
+    1,200 line-ups in 8 middlegames, 11% of those met the goal against 3% of the rest), until 1000 tries in a row find
+    none. Bishops stay on their colour, rooks leaving a
+    corner take their castling right. Seeded by the turn (`lassoSeed`, never the battle seed: the host would learn
+    every power's rolls).
+  - **The search** (scan, then confirm): each line-up costs one search per duel at `showdownNodes` (8k, a quick scan
+    read with slack); the promising ones are scored again at `showdownConfirmNodes` (40k), checked for the mate, and
+    the first that qualifies, nearest +0.5, is his. It runs during the crowd's turn as a **scout** on the device's own
+    engine (from `showdownScoutFrom`, 85% of the meter, through the warning and holds), up to `showdownSearchMs` (8 s)
+    a turn; at his turn the scout's finds are re-checked on the new position first, then fresh ones for up to
+    `showdownTurnMs` (3 s; at most `showdownSetups`, 60, line-ups). The line-up tries run in 6 ms slices between
+    frames, the engine in its own worker, so the board never freezes. Measured on one engine on a computer: a showdown
+    found in 1 to 3 s in the positions that have one (4-5 of 8 middlegames at the turn's budget; the others at a later
+    try or decided). A phone is 3-5 times slower: the scout's time is what makes that work.
+  - **Holds only help with three pairs left:** if the board no longer has three matched pairs, waiting can't help
+    (material only goes), so the try is his last at once: two pairs, then a drag.
+  - **Fizzle-proof:** "Not yet..." (`showdownHolds`, 2) uses his taunt and a line; the 2-pair showdown follows the same
+    rule; the last resort is a drag in the passive's band, shown as his ultimate (and if not even that, the meter is
+    spent and he says so, so the meter never sticks). No engine anywhere (online, nobody can run one): no showdown.
+  - **The forced duel:** the crowd's allowed moves are only the duels (`crowdFilter`); none legal: the dispatcher lifts
+    the filter (a normal move). The move clock is the usual one. The duel is a turn the crowd didn't set up
+    (`powerTurn`), as after a drag.
+  - **Online:** the server asks the host for his move plus what his turn needs (`bossRequest.pull`, `drag`,
+    `showdown: "try" | "last"`, and the turn's seed); the host answers with the move and the drag or line-up
+    (`bossMove.drag`, `showdown`); the server checks each answer with the same pure checkers and puts it on the board
+    as a base, so everyone sees the same line-up. The host's reply has 15 s more for a showdown, 8 s more for a drag.
+    The main lobby protocol has no version constant (only Squads has one), so none to bump; the new fields are optional.
+  - **Rage speed** 1.1 (his showdown pauses the meter for one turn after its warning, more if he holds): about two a
+    battle, estimated, not yet sim-tested.
+- **Strength: offset −250** (my judgement), as Big Boy and Sawyer: his drag costs the crowd about half a pawn three or
+  four times a battle, and a showdown swings about half a pawn his way with a trap on top, nastier than the −100
+  bosses' powers.
+- **Screens** (`components/Pig.tsx`, his kit "Wrangler" with the `wide` box): the long pull and each drag are a
+  moment ("LONG PULL!", "LASSO!"): he hops out of his corner beside the piece, the throw's loop drops on it at the
+  art's `CATCH`, the `tug` cue hauls it a square (he steps with it), and he hops back. SHOWDOWN!: the banner, he leaps
+  into the middle with the wind-up (both loops), leaps back to his corner, and his ropes yank the six pieces into the
+  line-up one pair at a time (each rope from his fists), then "DRAW!" with a quick-draw sting; the three duels glow as
+  the only choices and the dock says "Showdown! Take one of his three." The duel then plays as a normal move.
+  "Not yet..." is his snort and a line; a showdown spent with nothing to show (no line-up, no drag) gets its own line
+  ("Next time, varmints."), since there's no next try. The God King has his word at "DRAW!" ("Three duels, and one's a
+  trap. Choose well!") and that turn keeps quiet about a queen in danger or a mate threat: only a duel can be played.
+  Checked frame by frame on a 390 px phone and a 1280 px computer, light and dark (`npm run frames:pig`).
+- **Sounds** (`characters/pig-sounds.ts`, synthesised): rope whirl, throw, catch, tug, the hop's thump, his snort and
+  snorting laugh, a spur stomp, the double wind-up, a pair's yank, and "DRAW!"'s sting (a low damped twang and a knock).
+  All under a move's loudness, nothing bright.
+- **Lines** (his text box): "This board ain't big enough for the six of us.", "It's high noon!", "Pick yer duel,
+  varmints.", "Not yet...", "Yee-haw!", and so on.
+- **Test links:** `?boss=pig` (Boss alone against him), `?boss=pig&power=showdown` (the warning as turn 2 begins, the
+  line-up searched after his next move, the showdown as turn 3 begins, or "Not yet..." first), `?boss=pig&power=drag`
+  (drags from turn 2, every 2 turns), and the admins' "Trigger ultimate (testing)" (searched after his next move, no
+  warning). `?side=b` for the crowd as Black (his pull as White). A raid link takes `&boss=pig` too.
+
+**Testing.** The full lane: new rules, the server, the protocol and the screens. Unit tests
+(`packages/chess/test/pig.test.ts`): the long pull (centre pawns only, skipped when blocked, hanging or too costly, the
+board's record), the drag (its band and pick, never the king or a bishop, never into check or no move, a pawn never
+to the 1st or 8th rank, castling rights, the server's check, seeded and deterministic), the showdown (the line-up's
+shape and middle, his pieces protected, bishops on their colour, the band and the trap, mates refused, the forced duel
+and the no-legal-duel case, the scan and confirm, the scout's carried line-ups, holds, two pairs, the drag and the spent
+turn as fallbacks, the same line-up from the same seed and position, the host's answer and solo's agreeing); the lobby
+("Wrangler online": the host asked and answered, a bad answer refused); the app (his art, kit, moments, lines, sounds,
+the duel turn). e2e (`e2e/pig.spec.ts`, phone and computer): the long pull and a drag; SHOWDOWN! with only the duels
+playable; online, the host's line-up through the server. `npm run perf:boss -- <dir> pig both 25` (and with
+`showdown`): 16.7-16.8 ms frames at the 95th percentile through his searches on the computer and on the phone at 4x
+CPU slowdown, the scout's turns included; nothing grows with the match. In the perf runs the God King's Last Stand
+(once a battle) twice undid the crowd's wrong duel: the trap works, and the King can still save the crowd from it.

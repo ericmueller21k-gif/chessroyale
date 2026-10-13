@@ -45,6 +45,12 @@ export type Beat =
   | "snack"
   // Sawyer's split pawn after his first move (that pawn sawn in two).
   | "split"
+  // Wrangler's long pull (his first move), the drag standing in for his showdown, "Not yet..." (it held a turn), and
+  // his showdown spent with nothing to show (no line-up, no drag).
+  | "pull"
+  | "tug"
+  | "hold"
+  | "spent"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments. */

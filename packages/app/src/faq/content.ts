@@ -559,6 +559,11 @@ Plays from the game so far, and his first move is a pawn's. Then the **split paw
 
 - **Saw cuts** (passive): from turn ${p.sawFirst}, every ${n(p.sawEvery, "turn")} he saws through the edge between two squares in your half that one of your moves would cross, for ${n(p.sawTurns, "turn")}: no straight move across it (a slide, a pawn's step, the king's step, castling), on either side. Knights and diagonal moves pass.
 - **Board saw** (ultimate): once his meter is full, from turn ${p.boardSawFrom}, and while one half of the board (files a to d, or e to h) is his on material: the warning, then for ${n(p.boardSawTurns, "turn")} no move may cross between the d- and e-files, knights included, on either side. Then the halves rejoin.`,
+  pig: (p, b) => `
+Plays from the starting position. His first move, after yours, is the **long pull**: a centre pawn's double step, then he lassos it one square further, three squares in one move (d7 to d4 or e7 to e4; if you're Black, e2 to e5 or d2 to d5). The engine picks the pawn that suits the position; if neither would be safe there (it would just be taken, or its way is blocked), he plays an ordinary first move. It's worth about nothing either way: flavour. His lassos are why he plays ${Math.abs(b.offset)} under the usual strength.
+
+- **Lasso drag** (passive): from turn ${p.dragFirst}, every ${n(p.dragEvery, "turn")}, after his move he ropes one of your pieces (never your king) and drags it one square up, down, left or right onto an empty square. It never leaves you in check or without a move, and a pawn never ends on the first or last rank. The engine picks a drag that costs you only a little: between ${num(p.dragLoss[0])} and ${num(p.dragLoss[1])} of a pawn. If none fits (or the game is already decided), there's no drag that turn and he tries again after his next move.
+- **SHOWDOWN!** (ultimate): the warning, then after his move he lines up three pairs facing each other in the middle of the board: your queen against his, a rook against a rook, and a bishop or knight against its match. His three are always protected. **Your next move must be one of the three duels**: one of your three takes the piece facing it. The three glow, and nothing else can be played. The engine sets it up so that even the right duel tips the game a little his way (about ${num(p.showdownEdge[0])} to ${num(p.showdownEdge[1])} of a pawn) and a wrong one costs you ${num(p.showdownTrap)} pawns or more on top, so look before you take. If he can't find such a line-up, he says "Not yet..." and tries again after his next move (up to ${n(p.showdownHolds, "time")}), then with two pairs, and failing that he drags a piece instead.`,
 };
 
 function bossPowers(src: FaqSources): FaqSection {
@@ -605,7 +610,7 @@ In a level game (at ×1) it's full after about ${n(level, "crowd move")}; with t
 `
     : ""
 }
-When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's and Big Boy's ultimates come at the start of their own turn instead (Lights out's only warning is the full meter), and Sawyer's needs more than a full meter (below).
+When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's and Big Boy's ultimates come at the start of their own turn instead (Lights out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler's can wait a turn or two for a line-up (below).
 
 Then the meter empties and fills again for the next one. While an ultimate is still under way (the blizzard's ${n(Math.max(2, Math.round(p.blizzardTurns)), "turn")}, the Roman candle's fireballs still falling or burning, the board flipped or sawn in two, Lights out and the extra move after it) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap.
 

@@ -4,6 +4,7 @@ import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackLine, snackPawnShown } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
+import { SHOWDOWN_KING_AT, pigBoard } from "../components/Pig.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
@@ -239,6 +240,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   useEffect(() => {
     if (funLine) kingSay("funhouse", `funhouse-${funhouse!.key}`);
   }, [funLine]);
+  // Wrangler's showdown: the God King's word as "DRAW!" comes.
+  const showdown = moments.find((m) => m.kind === "showdown");
+  const showdownLine = !!showdown && now >= showdown.at + SHOWDOWN_KING_AT;
+  useEffect(() => {
+    if (showdownLine) kingSay("showdown", `showdown-${showdown!.key}`);
+  }, [showdownLine]);
   // The board: the crowd's view (in Boingo's funhouse turned upside down, then a quarter turn either way, then back:
   // each step turns it as its moment reaches its spin).
   const view = intro ? angleView(0, boss.crowdSide) : angleView(fun.angle, boss.crowdSide);
@@ -262,8 +269,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // (the moment draws them) until they've landed; the board doesn't animate those changes.
   const split = moments.find((m) => m.kind === "split") ?? null;
   const splitShown = bounceShown ? null : splitFen(boss.powers?.split, split, now, fenShown);
-  const boardFen = bounceShown ?? splitShown ?? fenShown;
-  const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : fenShown;
+  // Wrangler's long pull, lasso drag and showdown: the piece where it was until his tug, the line-up's pieces where they
+  // stood until each pair is yanked in (the moment draws them on their way); the eval bar keeps the position before.
+  const pig = bounceShown || splitShown ? null : pigBoard(boss, moments, now, fenShown);
+  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? fenShown;
+  const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)
   const burnNames = burning.length > 2 ? `${burning.length} pieces` : burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
@@ -281,11 +291,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           <BossSide match={match} />
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={lastShown} animate={!bounceShown && !splitStill(split, now)}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
-            {!thinking && !victim && !alone && !funhouse && !bounce && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
+            {!thinking && !victim && !alone && !funhouse && !bounce && !pig && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}
             <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
             {mateKing && <KingAttack boss={boss} square={mateKing} orientation={orientation} startAt={attackAt} now={now} seed={`mate:${boss.board.fen}`} king={boss.crowdSide} />}
             <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />

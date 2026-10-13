@@ -220,9 +220,21 @@ export interface BossRules {
   afterCrowdMove?(b: Battle, move: string | null): void;
   /**
    * In the match: what happens after the boss's own move, before the crowd's next turn is set up (Sawyer saws the pawn of
-   * his first move in two; the halves follow every move).
+   * his first move in two; the halves follow every move; Wrangler's long pull, drag and showdown line-up). `extras`:
+   * what the boss's turn worked out besides the move (the host's answer online, this device's in solo).
    */
-  afterBossMove?(b: Battle, move: string): void;
+  afterBossMove?(b: Battle, move: string, extras?: BossMoveExtras): void;
+  /**
+   * A boss move its rules play as something else (Wrangler's long pull, written as its three squares: the double step,
+   * then the pawn goes on in afterBossMove), with the move as the screens name it. Null: an ordinary move.
+   */
+  specialMove?(boss: BossState, fen: string, move: string): { play: string; san: string } | null;
+  /**
+   * What the boss's turn must work out besides its move, with the engine (Wrangler's long pull, drag and showdown), in
+   * the position before its move: the server asks the host's device for it with the move; solo works it out. Null:
+   * nothing.
+   */
+  asks?(boss: BossState, fen: string): BossAsks | null;
   /** In the match: its own costs on a round's scores (Hollow's wrong tries into the dark). */
   scoreRound?(b: Battle, players: { playerId: string; roundScore: number }[]): void;
   /**
@@ -237,6 +249,32 @@ export interface BossRules {
   };
   /** What the screens get of its own state, on top of every boss's (protocol.ts, NetBossPowers). */
   view?(p: BossPowerState): Partial<NetBossPowers>;
+}
+
+/**
+ * What a boss's turn must work out besides its move (BossRules.asks; Wrangler's): his long pulls to choose from (his
+ * first move), a lasso drag after it, or his showdown's line-up after it ("last": his last try, two pairs and then a
+ * drag allowed). `seed`: what the engine work is ordered by (drawn from the battle's seed and the turn: the battle's own
+ * seed never leaves the server).
+ */
+export interface BossAsks {
+  pull?: string[];
+  drag?: true;
+  showdown?: "try" | "last";
+  seed: number;
+}
+
+/**
+ * What a boss's turn worked out besides its move, for afterBossMove: the move as sent when its rules played it as
+ * something else (`special`: Wrangler's long pull), his drag ("c3c4") and his showdown's line-up (checkLineup's
+ * spec), each checked against the rules before it's used ("" or null: none), and his edge after the best duel when
+ * this device's engine worked it out (solo).
+ */
+export interface BossMoveExtras {
+  special?: string;
+  drag?: string | null;
+  showdown?: string | null;
+  edge?: number | null;
 }
 
 /** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */

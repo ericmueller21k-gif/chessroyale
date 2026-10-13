@@ -27,6 +27,8 @@ function fakeEngine(): EngineLike {
         .sort((a, b) => b.expected - a.expected)
         .slice(0, n),
     scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((move) => ({ move, expected: score(fen, move) })),
+    // (A position's worth at a budget, as the bounce and Wrangler's searches ask: quick, a hash of the position.)
+    topMovesAt: async (fen) => [{ move: "0000", expected: 0.3 + 0.4 * hash(fen) }],
     playAtElo: async (fen) => {
       const all = legalMoves(fen).sort();
       return all.find((m) => isKnight(fen, m) && empty(fen, m)) ?? all[0]!;
@@ -37,12 +39,13 @@ const RUY = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "
 const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test", family: "Test", unusual: false, moves, namedPlies: moves.length, expected: { [moves.length]: 0.52 } });
 
 /** Each boss's ultimate and the moment that shows it has come. */
-const ULTIMATES = { gingerbread: "blizzard", clown: "funhouse", grex: "candle", hollow: "lightsout", bigboy: "bounce", sawyer: "boardsaw" } as const;
+const ULTIMATES = { gingerbread: "blizzard", clown: "funhouse", grex: "candle", hollow: "lightsout", bigboy: "bounce", sawyer: "boardsaw", pig: "showdown" } as const;
 
 describe("every boss's ultimate, again and again", () => {
   for (const [id, ult] of Object.entries(ULTIMATES)) {
     it(`${id}: its ${ult} comes again and again, never two at once, never leaving the crowd without a move`, async () => {
-      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: id, lastStandFrom: 999, bossMaxMoves: 90 } as Settings;
+      // (Wrangler's showdown searches its line-ups for real, under a second a try: a shorter battle keeps the test quick.)
+      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: id, lastStandFrom: 999, bossMaxMoves: id === "pig" ? 45 : 90 } as Settings;
       const r = new MatchRunner({ settings, rng: mulberry32(9), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
       // (turn, ultAt) as each crowd turn begins: an ultimate's ultAt only ever follows a turn with none under way.
       const seen: { turn: number; ultAt: number | undefined }[] = [];

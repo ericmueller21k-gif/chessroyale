@@ -1,14 +1,15 @@
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
 import { BOSS_BRAIN, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type Settings } from "@chessroyale/core";
-import { MatchRunner, legalMoves, sanLineToUci, type BrainNote, type EngineLike, type HumanAnswer, type HumanEngineLike, type Opening } from "../src/index.ts";
+import { MatchRunner, legalMoves, pullOptions, sanLineToUci, type BrainNote, type EngineLike, type HumanAnswer, type HumanEngineLike, type Opening } from "../src/index.ts";
 
 /**
  * Every boss on the Maia path (DECISIONS.md, "Every boss on Maia", Oct 12): each playable boss is played through a long
  * Boss alone battle with every power (an admin pulling the test trigger whenever it may be pulled) with Maia as its
  * brain. Maia here is a stand-in that names a move a power forbids first whenever there is one (the real box is asked
  * for the allowed moves only): the boss never plays it. Its normal moves are Maia's; the King's strike, Boingo's
- * funhouse move for the crowd, Hollow's extra move and Big Boy's bounce keep their own engine picks (Maia isn't asked).
+ * funhouse move for the crowd, Hollow's extra move, Big Boy's bounce and Wrangler's long pull (his drag and showdown
+ * aren't moves) keep their own engine picks (Maia isn't asked).
  */
 
 const hash = (s: string) => {
@@ -65,7 +66,7 @@ const PLAYABLE = BOSS_ROSTER.filter(isPlayable).map((b) => b.id);
 
 describe("every boss on the Maia path", () => {
   it("the roster's playable bosses are the six this test was written for (a new one is covered by the loop)", () => {
-    expect(PLAYABLE).toEqual(expect.arrayContaining(["gingerbread", "clown", "grex", "hollow", "bigboy", "sawyer"]));
+    expect(PLAYABLE).toEqual(expect.arrayContaining(["gingerbread", "clown", "grex", "hollow", "bigboy", "sawyer", "pig"]));
   });
 
   for (const id of PLAYABLE) {
@@ -88,7 +89,8 @@ describe("every boss on the Maia path", () => {
       };
       let struck = false;
       for (let i = 0; i < 400 && !r.stageComplete(); i++) {
-        r.triggerUltimate();
+        // (Wrangler's showdown searches its line-ups for real, a second or so each try: his trigger once, mid-battle.)
+        if (id !== "pig" || r.boss!.crowdMoves === 6) r.triggerUltimate();
         if (r.bossToMove()) {
           if (r.lightsOutDue()) {
             r.startLightsOut();
@@ -101,7 +103,14 @@ describe("every boss on the Maia path", () => {
           const fen = r.boards.get(0)!.fen;
           const allowed = r.bossAllowed();
           const staggered = !!r.boss!.staggerNext;
+          const asked = maia.asks.length;
           const move = await r.playBoss();
+          // Wrangler's long pull: his engine's own pick (three squares: not a chess move), Maia not asked.
+          if (id === "pig" && pullOptions(fen).includes(move)) {
+            expect(maia.asks.length).toBe(asked);
+            played.special++;
+            continue;
+          }
           const note = r.brainNote!;
           notes.push(note);
           // Never a move a power forbids, though Maia named one first.

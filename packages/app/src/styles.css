@@ -11805,6 +11805,123 @@ img.qicon {
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.55));
 }
 
+/* ---- Wrangler: his long pull, his lasso drag and his showdown (components/Pig.tsx) ---- */
+
+/* His banners: saddle leather with a stripe of rope. */
+.fight-banner.power-cut.western .fb-band {
+  background: repeating-linear-gradient(115deg, #6c3d1c 0 7cqw, #b5733a 7cqw 8.5cqw, #6c3d1c 8.5cqw 15cqw);
+  border-color: #ffd451;
+}
+.fight-banner.power-cut.western.draw .fb-text {
+  letter-spacing: 0.12em;
+}
+/* His moments on the board: on the board's own squares (eighths of --board-size), over the pieces, never taking a tap. */
+.pg-layer {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 8;
+  pointer-events: none;
+}
+.pg-layer > * {
+  position: absolute;
+  pointer-events: none;
+}
+.pg-shadow {
+  z-index: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(8, 8, 14, 0.85) 0 45%, rgba(8, 8, 14, 0) 72%);
+}
+.pg-pig {
+  z-index: 4;
+  filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3));
+}
+/* A piece on its way (dragged a square, yanked into the line-up): the board's own drawing (cburnett), a square in size. */
+.pg-layer piece.pg-piece {
+  z-index: 3;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+  filter: drop-shadow(0 0.6cqw 0 rgba(0, 0, 0, 0.35));
+}
+/* His ropes in the showdown, from his fists to the pieces they yank (% of the board: the SVG's units). */
+.pg-ropes {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  overflow: visible;
+}
+.pg-rope {
+  stroke: #c58f4b;
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0.25px 0 #4a2611);
+}
+.pg-loop {
+  fill: none;
+  stroke: #c58f4b;
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0.25px 0 #4a2611);
+}
+/* The three duels on the crowd's turn: a rope of light from each of its pieces to the one it must take, gently pulsing
+   (its opacity: no colour transitions), a dark edge under it so it reads on light and dark squares alike. */
+.pg-duels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  pointer-events: none;
+  overflow: visible;
+}
+.pg-duel {
+  animation: pg-glow 1.4s ease-in-out infinite;
+}
+.pg-duel-line {
+  stroke: #ffd451;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 0.6px #4a2611) drop-shadow(0 0 1.4px #ffb000);
+}
+.pg-duel-ring {
+  fill: none;
+  stroke: #ffd451;
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 0.5px #4a2611);
+}
+.pg-duel-target {
+  fill: none;
+  stroke: #ff6b57;
+  stroke-width: 0.7;
+  stroke-dasharray: 1.6 1.2;
+  filter: drop-shadow(0 0 0.5px #4a2611);
+}
+@keyframes pg-glow {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pg-duel {
+    animation: none;
+  }
+}
+/* Casting at the board's corner (the warning, "Not yet..."): his frame's own shape (wide: the room for his throw). */
+.pm-caster.pm-by-pig {
+  aspect-ratio: 115 / 77;
+  width: 40%;
+  left: -12%;
+  top: -12%;
+}
+
 /* ---- A boss's attack on a king (KingAttack.tsx): the God King in his Last Stand, the crowd's king at the boss's mate ---- */
 
 /* Over the board's pieces (and, in the Last Stand, over the God King on his square), never taking a tap. */

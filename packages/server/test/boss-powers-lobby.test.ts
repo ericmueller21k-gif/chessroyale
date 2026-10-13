@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, POWER_FX, bossShowMs, extraMoveCandidates, initPowers, legalMoves, lightsOutTimeline, passTurn, pieceAt, sanLineToUci, sideToMove, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, POWER_FX, applyMove, bossShowMs, dragOptions, extraMoveCandidates, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, sanLineToUci, sideToMove, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 const hash = (s: string) => {
@@ -286,13 +286,13 @@ describe("boss powers online", () => {
       expect(L.core.save().runner!.state.boss!.id).not.toBe("clown");
     }
     const ids = new Set<string>();
-    for (let seed = 1; seed <= 60 && ids.size < 6; seed++) {
+    for (let seed = 1; seed <= 80 && ids.size < 7; seed++) {
       const L = setup({ ...RAID_SETTINGS }, {}, seed);
       L.core.connect(undefined, "A", "computer", false, 1500);
       L.core.message("p1", { t: "start" });
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
-    expect([...ids].sort()).toEqual(["bigboy", "clown", "gingerbread", "grex", "hollow", "sawyer"]);
+    expect([...ids].sort()).toEqual(["bigboy", "clown", "gingerbread", "grex", "hollow", "pig", "sawyer"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {
@@ -842,5 +842,139 @@ describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players o
     expect(sf.core.save().runner!.state.boss!.elo).toBe(2900);
     expect(sf.last("p1", "bossBrain")).toBeUndefined();
     expect(sf.core.record.bossBrain).toBeNull();
+  });
+});
+
+describe("Wrangler online", () => {
+  const toRound = (L: ReturnType<typeof setup>) => {
+    for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+    return L.last("p1", "round")!;
+  };
+  /** The host answers the boss request: `move` (else the first legal), with `extras` (Wrangler's drag or showdown). */
+  const answer = (L: ReturnType<typeof setup>, move?: string, extras: { drag?: string; showdown?: string } = {}) => {
+    const req = L.last("p1", "bossRequest")!;
+    L.inbox.set("p1", (L.inbox.get("p1") ?? []).filter((m) => m.t !== "bossRequest"));
+    L.core.message("p1", { t: "bossMove", key: req.key, move: move ?? legalMoves(req.fen).sort()[0]!, ...extras });
+    return req;
+  };
+
+  it("his long pull: the host is sent his pulls (and a seed of the turn's, never the battle's); the pull everyone sees, a base on the board", () => {
+    const L = raid({ bossId: "pig" });
+    const r1 = L.last("p1", "round")!;
+    expect(r1.boss!.id).toBe("pig");
+    expect(r1.board!.history).toEqual([]);
+    crowdMove(L);
+    const req = L.last("p1", "bossRequest")!;
+    expect(req.pull!.length).toBeGreaterThan(0);
+    for (const p of req.pull!) expect(["d", "e"]).toContain(p[0]);
+    expect(req.seed).toBeTypeOf("number");
+    expect(req.seed).not.toBe(L.core.save().runner!.state.boss!.powers!.seed);
+    expect(req.drag).toBeUndefined();
+    expect(req.showdown).toBeUndefined();
+    const pull = req.pull![0]!;
+    answer(L, pull);
+    const b = L.last("p2", "boss")!;
+    expect(b.boss.lastMove).toMatchObject({ move: pull, san: pull.slice(2, 4) });
+    expect(pieceAt(b.boss.board.fen, pull.slice(2, 4))).toEqual({ color: "b", type: "p" });
+    expect(b.boss.board.bases).toContainEqual({ ply: b.boss.board.history.length, fen: b.boss.board.fen });
+    expect(b.boss.powers!.pull).toMatchObject({ turn: 2, from: pull.slice(0, 2), to: pull.slice(2, 4) });
+    expect(b.boss.powers!.events.map((e) => e.kind)).toContain("pull");
+    expect(b.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
+    expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + POWER_FX.pull);
+  });
+
+  it("an ordinary first move when the host answers one; a later three-square move is never a pull", () => {
+    const L = raid({ bossId: "pig" });
+    crowdMove(L);
+    answer(L);
+    const b = L.last("p1", "boss")!;
+    expect(b.boss.powers!.pull).toBeNull();
+    expect(b.boss.powers!.events.map((e) => e.kind)).not.toContain("pull");
+  });
+
+  it("his drag: asked for after his move as turn 3 begins; the host's drag everyone sees; one outside his rules is ignored", () => {
+    for (const good of [true, false]) {
+      const L = raid({ bossId: "pig", bossKillEvery: 99 });
+      crowdMove(L);
+      expect(L.last("p1", "bossRequest")!.drag).toBeUndefined();
+      answer(L);
+      toRound(L);
+      crowdMove(L);
+      const req = L.last("p1", "bossRequest")!;
+      expect(req.drag).toBe(true);
+      const move = legalMoves(req.fen).sort()[0]!;
+      const after = applyMove(req.fen, move);
+      const drag = good ? dragOptions(after)[0]! : null;
+      answer(L, move, { drag: drag ? drag.from + drag.to : "e1e2" });
+      const b = L.last("p2", "boss")!;
+      if (drag) {
+        expect(b.boss.powers!.drag).toEqual({ turn: 3, from: drag.from, to: drag.to, piece: drag.piece });
+        expect(b.boss.board.fen).toBe(drag.fen);
+        expect(b.boss.powers!.events).toContainEqual({ kind: "drag", turn: 3, square: drag.to, squares: [drag.from, drag.to] });
+        expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + POWER_FX.drag);
+      } else {
+        expect(b.boss.powers!.drag ?? null).toBeNull();
+        expect(b.boss.board.fen).toBe(after);
+      }
+      expect(b.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
+    }
+  });
+
+  it("SHOWDOWN! (the test switch): warned on turn 2; at his turn the host is asked for the line-up; everyone gets it, and the crowd's picks and jobs are the duels", () => {
+    const L = raid({ bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99 });
+    crowdMove(L);
+    answer(L);
+    const r2 = toRound(L);
+    expect(r2.boss!.powers!.warned).toBe(true);
+    crowdMove(L);
+    const req = L.last("p1", "bossRequest")!;
+    expect(req.showdown).toBe("try");
+    // (Longer for the host: line-ups to search.)
+    const move = legalMoves(req.fen).sort()[0]!;
+    const after = applyMove(req.fen, move);
+    const lineup = [...lineups(after, 1, 3, 3000)].find(Boolean)!;
+    answer(L, move, { showdown: lineup.spec });
+    const b = L.last("p2", "boss")!;
+    expect(b.boss.powers!.showdown).toMatchObject({ turn: 3, pairs: lineup.pairs, before: after });
+    expect(b.boss.board.fen).toBe(lineup.fen);
+    expect(b.boss.powers!.events).toContainEqual({ kind: "showdown", turn: 3, squares: lineup.pairs.flatMap((p) => [p.crowd, p.boss]) });
+    expect(b.boss.powers).toEqual(L.last("p1", "boss")!.boss.powers);
+    expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + POWER_FX.showdown);
+    const r3 = toRound(L);
+    expect([...r3.boss!.powers!.allowed!].sort()).toEqual([...lineup.duels].sort());
+    // A pick that isn't a duel is refused; the job carries the duels.
+    const notDuel = legalMoves(r3.board!.fen).find((m) => !lineup.duels.includes(m))!;
+    L.core.message("p1", { t: "pick", key: r3.key, move: notDuel });
+    const job = crowdMove(L);
+    expect([...job.jobs[0]!.allowed!].sort()).toEqual([...lineup.duels].sort());
+  });
+
+  it("no line-up (\"\", junk, or no host): \"Not yet...\", the host asked again next turn; after his holds, his last try", () => {
+    const L = raid({ bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99 });
+    crowdMove(L);
+    answer(L);
+    toRound(L);
+    const asks: string[] = [];
+    for (const reply of ["", "d1d4d8d5 a1c3a8c5 c1e3c8f5"]) {
+      crowdMove(L);
+      for (let i = 0; i < 10 && !L.last("p1", "bossRequest"); i++) L.advance(5_000);
+      const req = L.last("p1", "bossRequest")!;
+      asks.push(req.showdown!);
+      answer(L, undefined, { showdown: reply });
+      const b = L.last("p2", "boss")!;
+      expect(b.boss.powers!.events.map((e) => e.kind)).toContain("hold");
+      expect(b.boss.powers!.showdown ?? null).toBeNull();
+      expect(b.until - b.now).toBe(bossShowMs(b.boss.lastMove) + POWER_FX.hold);
+      toRound(L);
+    }
+    crowdMove(L);
+    for (let i = 0; i < 10 && !L.last("p1", "bossRequest"); i++) L.advance(5_000);
+    asks.push(L.last("p1", "bossRequest")!.showdown!);
+    expect(asks).toEqual(["try", "try", "last"]);
+    // His last try: no line-up and no drag either: the ultimate is spent all the same.
+    answer(L, undefined, { showdown: "", drag: "" });
+    const b = L.last("p2", "boss")!;
+    expect(b.boss.powers!.ultAt).toBe(b.boss.powers!.turn);
+    expect(b.boss.powers!.holds).toBe(0);
   });
 });
