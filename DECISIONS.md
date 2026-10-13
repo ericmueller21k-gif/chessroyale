@@ -2254,3 +2254,50 @@ bank ÷ (t − increment) moves. Moves each bank lasts, and what's left after th
 lanes rule (CLAUDE.md, Eric, Oct 13) puts in the full lane. Unit tests: each option's patch, the bank and increment
 maths (banking on quick moves, the cap, an empty bank), the calibration above, the old ids, the default, the runner
 resetting banks only before move 1, and the lobby applying the winner (round, increment, banks, and after waking).
+
+### Wrangler, a sprite preview (art only, Oct 13, 2026)
+
+A pink cowboy pig with two lassos, from Eric's reference, drawn so Eric can review him before his powers are designed
+(as with Sawyer's and Big Boy's previews). Eric named him **Wrangler**, a cowboy who rounds up livestock. Art only: no
+powers, rules, lines, sounds, kit or roster entry, and he is not in `CHARACTERS`, so nothing in the game shows him
+(`packages/app/test/pig.test.ts` checks that, and makes the checks `characters.test.ts` makes of every character).
+
+- **Names:** the display name is "Wrangler"; the code id and file stay `pig` (`characters/pig.ts`, `PIG`), because
+  "wrangler" already means Cloudflare's CLI in this repo (`wrangler.jsonc`, `npx wrangler`).
+- **Previews without registering him:** `npm run preview:characters -- <dir> extra=packages/app/src/characters/pig.ts
+  only=pig` (the preview script already loads draft modules). He was also checked in the real game on a 390 px phone
+  and a 1280 px computer by swapping his kit into a boss's place from a scratch script, not from the app's code.
+- **Art** (`characters/pig.ts`): a 115 x 77 frame (the extra width on our right is room for the throw); at rest he is
+  75 x 70 px, 68 px above his feet (Sawyer 67, Big Boy 69, Hollow 75), 37 px each side of his foot point. Facing front,
+  turned a little to our left as in the reference, light from the top left, the same 1-pixel dark outline and halo as
+  the cast. Kept from the reference: the brown hat with its dark band and gold star, pointy pink ears, angry brows, the
+  big snout (light, dark-rimmed, two nostrils), the toothy grin rising to one cheek, the fringed vest with its star,
+  the belt and big gold buckle, the boots with gold spurs, the loop spinning overhead and the coil in the other fist.
+  - **Simplified for size:** the fringe is a row of dark ticks along the vest's hems; each spur is a gold strap and a
+    3 x 3 rowel; the hat's badge and the vest's star are 5 x 5 stars (the badge's ring was dropped); the slack under
+    his spinning fist is one small hanging loop (the reference has several); the coil is three rings, not a tangle;
+    the rope's twist is a darker tick every 3 px. The snout, ears, hat and loop were kept big, so at 1x on a phone he
+    reads as a pig in a cowboy hat with a lasso.
+  - **Fitting the phone's boss bar:** the loop sits a little lower than in the reference (behind his far ear and the
+    hat's brim) and the coil arm is shorter, so nothing rises above Sawyer's height under the heading and the coil
+    stays off the boss's name. Like Sawyer he needs the `wide` box (58 px) when he gets a kit.
+  - **Rigging:** a loop is an ellipse (centre, radii, tilt) painted as rope, and the line runs from his fist to the
+    loop's nearest point, so a lasso pose is a few numbers; arms and legs are painted from their points, the hat from
+    its tilt (for the nod), every part made the first time it shows (`lazyParts`).
+- **Animations** (a turn of the spin is 8 frames; one-shots end on the idle's first spin position):
+  - `idle` (loop, 4.1 s, silent): the loop spins overhead the whole time (it swings round and foreshortens, its knot
+    running round it, his fist circling), a dip at the knees now and then, two blinks, a sneer (one brow cocked, the
+    lip curled) and a snort (head jerk, flared nostrils, two puffs).
+  - `lasso` (1.9 s): a quick wider spin and a lean back (cue `whirl`), he hurls the loop out to our right (cue
+    `throw`), it drops over its mark on the ground (cue `catch`, at `CATCH`), he hauls it tight (cue `tug`) and drags
+    it a little way, then flicks it home over his head. Made for his future passive (he ropes a piece and drags it a
+    square); the board will aim at `CATCH` later.
+  - `taunt` (2.2 s): a slow nod tipping his hat down over his eyes (cue `tip`), then a laugh with his head back and the
+    hat hopping (cue `laugh`), snorts (cue `snort`), and a spur stomp with dust and a glint off the spur (cue `stomp`).
+    A hand-to-brim hat tip didn't work: his arms are short (cartoon proportions), so the nod tips it instead.
+  - `windup` (3.1 s, a generic ultimate wind-up, since his ultimate isn't designed): he shakes the coil out into a
+    second loop (cue `windup`), spins both over his head faster and wider, hurls both out (cue `throw`), they drop (cue
+    `catch`), a double yank (cue `tug`), then he gathers up. It doesn't copy Big Boy's Big Bounce.
+- **For later (not built):** his passive (Eric: now and then he lassos one crowd piece and drags it one square, only
+  when Stockfish says it costs the crowd less than a pawn) and his ultimate (Eric's to design; a big rope catch was
+  mentioned). When he becomes a boss: a kit (`wide`, his portrait `PIG_PORTRAIT`), sounds for his cues, his lines.
