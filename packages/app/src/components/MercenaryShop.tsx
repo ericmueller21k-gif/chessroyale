@@ -4,7 +4,7 @@ import { MERC_ITEMS, type NetWallet } from "@chessroyale/chess/squads";
 import { account } from "../account.ts";
 import { possessive, type SquadsClient } from "../squads.ts";
 import { coinText, itemText, shopRows, squadName, walletOf } from "../squads-view.ts";
-import { CoinIcon, Coins, LockIcon } from "./SquadsBlocks.tsx";
+import { ChipIcon, CoinIcon, Coins, LockIcon } from "./SquadsBlocks.tsx";
 
 export { CoinIcon, Coins };
 import { SquadTag, useNow } from "./SquadsParts.tsx";
@@ -36,13 +36,8 @@ export function ItemIcon({ item, size = 22 }: { item: MercItem; size?: number })
           <path d="M12 5.2v13.4c2.9-1.3 5-4 5-7.2V7.4z" fill="var(--mc-icon-eye, #fff)" opacity="0.35" />
         </svg>
       );
-    case "time":
-      return (
-        <svg {...common} fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-          <circle cx="12" cy="13.5" r="7.5" />
-          <path d="M12 9.5v4.2l2.6 1.6M9.5 2.8h5M12 2.8v3.2" />
-        </svg>
-      );
+    case "chip":
+      return <ChipIcon size={size} class={common.class} />;
   }
 }
 
@@ -203,15 +198,15 @@ function ShopSheet({ client, w, round, explain, onExplained, onHide }: { client:
                 <span class="mc-item-line">{t.line}</span>
               </span>
               <span class="mc-item-buy">
-                <span class="mc-item-count" aria-label={`${r.count} of ${r.cap} for this round`}>
+                <span class="mc-item-count" aria-label={r.item === "chip" ? `${r.count} held of ${r.cap}` : `${r.count} of ${r.cap} for this round`}>
                   {r.count}/{r.cap}
                 </span>
-                {r.count > 0 && (
+                {r.inCart > 0 && (
                   <button type="button" class="mc-minus" aria-label={`Put back a ${t.name}`} disabled={!!busy} onClick={() => act(r.item, true)}>
                     −
                   </button>
                 )}
-                <button type="button" class="mc-plus" disabled={!r.can || !!busy} onClick={() => act(r.item, false)} aria-label={r.why === "cap" ? `${t.name}: as many as one round allows` : `Buy a ${t.name} for ${r.price} coins`}>
+                <button type="button" class="mc-plus" disabled={!r.can || !!busy} onClick={() => act(r.item, false)} aria-label={r.why === "cap" ? (r.item === "chip" ? `${t.name}: as many as a squad may hold` : `${t.name}: as many as one round allows`) : `Buy a ${t.name} for ${r.price} coins`}>
                   {r.why === "cap" ? (
                     "Max"
                   ) : (

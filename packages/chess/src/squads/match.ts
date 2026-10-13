@@ -104,6 +104,8 @@ export interface SquadsMatch {
   /** Mercenary: each side's Stockfish tokens and shields left in this match (from its kit). */
   stockfish: readonly [number, number];
   shields: readonly [number, number];
+  /** Mercenary: each side's Time chips in this match (all its squad holds); what's left goes back to its wallet after. */
+  chips: readonly [number, number];
   /** Every Stockfish token used this match: whose lines, where (fair play leaves those moves out). */
   assists: readonly AssistUse[];
   /** Mercenary: coins each side has earned in this match so far (its wallet holds the tournament's). */
@@ -131,12 +133,13 @@ export interface AssistUse {
  * never read a missing field or a gone item:
  * - from before the modes: Classic, with none of Mercenary's fields;
  * - from before the Breather was taken out (Oct 13): its kit without the breather, and no per-side free seconds
- *   (`delays`): a squad that brought one plays on with the match's own free seconds.
+ *   (`delays`): a squad that brought one plays on with the match's own free seconds;
+ * - from before the Time chip (Oct 13): no chips (a time coin bought then is already in its bank).
  */
 export function upgradeMatch(m: SquadsMatch): SquadsMatch {
   const old = m as Partial<SquadsMatch> & SquadsMatch & { delays?: unknown };
-  const kitOk = !old.kit || old.kit.every((k) => !("breather" in k));
-  if (old.mode && old.stockfish && old.shields && old.assists && old.coins && old.kit !== undefined && kitOk && !("delays" in old)) return m;
+  const kitOk = !old.kit || old.kit.every((k) => !("breather" in k) && !("time" in k));
+  if (old.mode && old.stockfish && old.shields && old.chips && old.assists && old.coins && old.kit !== undefined && kitOk && !("delays" in old)) return m;
   const { delays: _gone, ...rest } = old;
   return {
     ...rest,
@@ -144,6 +147,7 @@ export function upgradeMatch(m: SquadsMatch): SquadsMatch {
     kit: old.kit ? [itemCounts(old.kit[0]), itemCounts(old.kit[1])] : null,
     stockfish: old.stockfish ?? [0, 0],
     shields: old.shields ?? [0, 0],
+    chips: old.chips ?? [0, 0],
     assists: old.assists ?? [],
     coins: old.coins ?? [0, 0],
   };
@@ -209,9 +213,10 @@ export interface MatchSetup {
   blockBanks?: readonly [number, number];
   /** Classic (the default) or Mercenary. */
   mode?: SquadsMode;
-  /** Armageddon after a drawn final carries the final's items on: its tokens, shields and kit. */
+  /** Armageddon after a drawn final carries the final's items on: its tokens, shields, chips and kit. */
   stockfish?: readonly [number, number];
   shields?: readonly [number, number];
+  chips?: readonly [number, number];
   kit?: readonly [ItemCounts, ItemCounts] | null;
 }
 
@@ -223,6 +228,7 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
     kit: o.kit ?? null,
     stockfish: o.stockfish ? [o.stockfish[0], o.stockfish[1]] : [0, 0],
     shields: o.shields ? [o.shields[0], o.shields[1]] : [0, 0],
+    chips: o.chips ? [o.chips[0], o.chips[1]] : [0, 0],
     assists: [],
     coins: [0, 0],
     key: o.key,
@@ -316,9 +322,9 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
 }
 
 /**
- * Mercenary: each side's kit (what its squad bought for this match) comes in as the match starts: time coins into its
- * team bank, block points into its block bank, its Stockfish tokens and shields. Once, before the first half (a
- * match whose kit is in keeps it); used here or lost.
+ * Mercenary: each side's kit (what its squad bought for this match) comes in as the match starts: block points into
+ * its block bank, its Stockfish tokens and shields (used here or lost), and its Time chips (all it holds, `kit.chip`;
+ * what's left goes back after). Once, before the first half (a match whose kit is in keeps it).
  */
 export function applyKits(m: SquadsMatch, kits: readonly [ItemCounts, ItemCounts], s: SquadsSettings = SQUADS): SquadsMatch {
   if (m.mode !== "mercenary" || m.kit !== null || m.turn !== 0 || m.half !== "w" || m.result) return m;
@@ -327,10 +333,10 @@ export function applyKits(m: SquadsMatch, kits: readonly [ItemCounts, ItemCounts
   return {
     ...m,
     kit: [itemCounts(kits[0]), itemCounts(kits[1])],
-    banks: per((k, side) => m.banks[side] + k.time * c.timeSeconds * 1000),
     blockBanks: per((k, side) => m.blockBanks[side] + k.blocks * c.blockPoints),
     stockfish: per((k) => k.stockfish),
     shields: per((k) => k.shield),
+    chips: per((k) => k.chip),
   };
 }
 
@@ -429,6 +435,13 @@ export interface PlacedAssist {
   at: number;
 }
 
+/** A Time chip tapped this half (Mercenary): by whom, on which board (their move there), when (ms after the half began). */
+export interface PlacedChip {
+  board: number;
+  by: string;
+  at: number;
+}
+
 /** What players have chosen so far this half (a move or a pick), who has locked in, the blocks placed, tokens used. */
 export interface HalfInputs {
   choices: Readonly<Record<string, string>>;
@@ -436,6 +449,8 @@ export interface HalfInputs {
   blocks: readonly PlacedBlock[];
   /** Stockfish tokens used this half (Mercenary; missing: none). */
   assists?: readonly PlacedAssist[];
+  /** Time chips tapped this half (Mercenary; missing: none). */
+  chips?: readonly PlacedChip[];
 }
 
 export const NO_INPUTS: HalfInputs = { choices: {}, locked: {}, blocks: [] };
@@ -562,6 +577,132 @@ export function placedAssists(m: SquadsMatch, inputs: Pick<HalfInputs, "assists"
  */
 export const isAssisted = (m: Pick<SquadsMatch, "assists">, playerId: string, turn: number, half: Colour, board: number): boolean =>
   m.assists.some((a) => a.turn === turn && a.half === half && a.board === board && a.shownTo.includes(playerId));
+
+// ---- Time chips (Mercenary) ----
+
+/** The Time chips tapped on a board's move this half. */
+export const chipsOn = (inputs: Pick<HalfInputs, "chips">, board: number): number => (inputs.chips ?? []).filter((c) => c.board === board).length;
+
+/** A side's Time chips now: the match's, less those its players have tapped this half. */
+export function chipsNow(m: Pick<SquadsMatch, "chips" | "boards" | "half">, inputs: Pick<HalfInputs, "chips">, side: Side): number {
+  const used = (inputs.chips ?? []).filter((c) => {
+    const board = m.boards[c.board];
+    return !!board && sideOf(board, m.half) === side;
+  }).length;
+  return (m.chips?.[side] ?? 0) - used;
+}
+
+/** A move's deadline this half (ms after the half began): the duty's, `chipSeconds` later for each Time chip on it. */
+export const dutyDeadline = (inputs: Pick<HalfInputs, "chips">, duty: Pick<Duty, "board" | "deadlineMs">, s: SquadsSettings = SQUADS): number =>
+  duty.deadlineMs + chipsOn(inputs, duty.board) * s.mercenary.chipSeconds * 1000;
+
+/**
+ * When a move's Time chips hold its squad's bank still (ms after the half began): each chip `chipMs`, from when it was
+ * tapped (not before the free seconds are over), or straight after the one before it if that one's still running.
+ * Sorted, never overlapping.
+ */
+export function chipWindows(taps: readonly number[], delayMs: number, chipMs: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (const at of [...taps].sort((a, b) => a - b)) {
+    const start = Math.max(at, delayMs);
+    const last = out[out.length - 1];
+    if (last && start <= last[1]) last[1] += chipMs;
+    else out.push([start, start + chipMs]);
+  }
+  return out;
+}
+
+/** A board's chip windows this half. */
+export const chipWindowsOn = (m: Pick<SquadsMatch, "delayMs">, inputs: Pick<HalfInputs, "chips">, board: number, s: SquadsSettings = SQUADS): [number, number][] =>
+  chipWindows((inputs.chips ?? []).filter((c) => c.board === board).map((c) => c.at), m.delayMs, s.mercenary.chipSeconds * 1000);
+
+/**
+ * A squad's bank over a half: its moves, each ending at `end` (ms after the half began) and holding the bank still in
+ * its chip `windows`, drain it together past `delayMs`. When it runs out (Infinity: it lasts) and what they drained.
+ */
+export function bankTimeline(moves: readonly { end: number; windows?: readonly (readonly [number, number])[] }[], delayMs: number, bankMs: number): { out: number; drained: number } {
+  const points = new Set<number>([delayMs]);
+  for (const mv of moves) {
+    if (Number.isFinite(mv.end)) points.add(mv.end);
+    for (const [a, b] of mv.windows ?? []) {
+      points.add(a);
+      points.add(b);
+    }
+  }
+  const ts = [...points].filter((t) => t >= delayMs).sort((a, b) => a - b);
+  let left = bankMs;
+  let drained = 0;
+  for (let i = 0; i + 1 < ts.length; i++) {
+    const t0 = ts[i]!;
+    const t1 = ts[i + 1]!;
+    const mid = (t0 + t1) / 2;
+    const rate = moves.filter((mv) => mid < mv.end && !(mv.windows ?? []).some(([a, b]) => mid > a && mid < b)).length;
+    if (!rate) continue;
+    const span = (t1 - t0) * rate;
+    if (span >= left) return { out: t0 + left / rate, drained: drained + left };
+    left -= span;
+    drained += span;
+  }
+  return { out: Infinity, drained };
+}
+
+/**
+ * When each of a side's moves this half is cut off (ms after the half began, by board): its deadline (the ceiling, or
+ * the free seconds in sudden death, each Time chip on it later), or its squad's bank running out, unless a chip is
+ * holding the bank still for that move then (it runs to that chip's end). `ends`: when each move ended (made), or
+ * its deadline if it's still being thought about. Also the bank's run-out time and what it drained.
+ */
+export function moveCutoffs(m: SquadsMatch, inputs: HalfInputs, side: Side, duties: readonly Duty[], ends: readonly number[], s: SquadsSettings = SQUADS): { cutoffs: Map<number, number>; out: number; drained: number } {
+  const cutoffs = new Map<number, number>();
+  const bank = m.banks[side];
+  if (bank <= 0) {
+    for (const d of duties) cutoffs.set(d.board, dutyDeadline(inputs, d, s));
+    return { cutoffs, out: 0, drained: 0 };
+  }
+  const windows = duties.map((d) => chipWindowsOn(m, inputs, d.board, s));
+  const t = bankTimeline(duties.map((d, i) => ({ end: ends[i]!, windows: windows[i] })), m.delayMs, bank);
+  duties.forEach((d, i) => {
+    const holding = windows[i]!.find(([a, b]) => t.out >= a && t.out < b);
+    const cut = t.out === Infinity ? Infinity : holding ? holding[1] : t.out;
+    cutoffs.set(d.board, Math.min(dutyDeadline(inputs, d, s), cut));
+  });
+  return { cutoffs, ...t };
+}
+
+/**
+ * When a move still being thought about is cut off, as things stand `nowMs` into the half (`thinkMs`: when each
+ * player who's done chose): the other moves still going run to their deadlines (the soonest it could be).
+ */
+export function liveCutoff(m: SquadsMatch, inputs: HalfInputs, duty: Duty, thinkMs: Readonly<Record<string, number>> = {}, s: SquadsSettings = SQUADS): number {
+  const mine = halfDuties(m, s).duties.filter((d) => d.side === duty.side);
+  const ends = mine.map((d) => (d.players.every((p) => inputs.locked[p]) ? Math.max(0, ...d.players.map((p) => thinkMs[p] ?? 0)) : dutyDeadline(inputs, d, s)));
+  return moveCutoffs(m, inputs, duty.side, mine, ends, s).cutoffs.get(duty.board) ?? dutyDeadline(inputs, duty, s);
+}
+
+/** no_chips: none left (or Classic); done: the move is made (everyone on it locked in); late: its time is up; stale: someone tapped first. */
+export type ChipError = "match_over" | "no_duty" | "done" | "no_chips" | "late" | "stale";
+
+/**
+ * A player taps one of their squad's Time chips (Mercenary) on their own board's move this half, while it's being
+ * thought about: `chipSeconds` more for that move only (its deadline later, the bank held still meanwhile; any of it
+ * unused is lost). Any player with a duty on that board may (in Pairs both partners share it), and several chips can
+ * go on one move. `seen`: how many the tapper saw on it already, so two teammates tapping at once spend one (the first
+ * tap wins). `at`: ms after the half began; `thinkMs` as for `liveCutoff`.
+ */
+export function useChip(m: SquadsMatch, inputs: HalfInputs, playerId: string, at: number, seen: number, thinkMs: Readonly<Record<string, number>> = {}, s: SquadsSettings = SQUADS): { inputs: HalfInputs; chip: PlacedChip & { side: Side } } | { error: ChipError } {
+  if (m.result) return { error: "match_over" };
+  if (m.mode !== "mercenary") return { error: "no_chips" };
+  const d = dutyOf(m, playerId, s);
+  if (!d) return { error: "no_duty" };
+  if (d.duty.role === "move" && inputs.choices[playerId]) return { error: "done" };
+  if (d.duty.players.every((p) => inputs.locked[p])) return { error: "done" };
+  if (seen !== chipsOn(inputs, d.duty.board)) return { error: "stale" };
+  if (chipsNow(m, inputs, d.duty.side) <= 0) return { error: "no_chips" };
+  const when = Math.max(0, at);
+  if (when > liveCutoff(m, inputs, d.duty, thinkMs, s)) return { error: "late" };
+  const placed: PlacedChip = { board: d.duty.board, by: playerId, at: when };
+  return { inputs: { ...inputs, chips: [...(inputs.chips ?? []), placed] }, chip: { ...placed, side: d.duty.side } };
+}
 
 /** A player locks in their current choice (nothing to lock without one). */
 export function lockIn(inputs: HalfInputs, playerId: string): HalfInputs {
@@ -707,7 +848,7 @@ export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonl
     acted: [],
     missed: [],
     timeouts: [],
-    cutoff: [Infinity, Infinity],
+    cutoffs: new Map(),
     earned: [0, 0],
     tokens: m.tokens ? [m.tokens[0], m.tokens[1]] : null,
     tokenLog: [...m.tokenLog],
@@ -780,8 +921,11 @@ interface Ctx {
   acted: string[];
   missed: string[];
   timeouts: string[];
-  /** Each side's moves this half count only if made by this time (ms): the ceiling, its bank running out, or the free seconds. */
-  cutoff: [number, number];
+  /**
+   * Each move this half (by board) counts only if made by this time (ms): its deadline (the ceiling, or the free seconds
+   * in sudden death; Time chips push it later) or its squad's bank running out.
+   */
+  cutoffs: Map<number, number>;
   /** Moves each side made in time this half (each earns the increment). */
   earned: [number, number];
   tokens: [number, number] | null;
@@ -804,51 +948,38 @@ const rngFor = (c: Ctx, board: number, what: string) => squadsRng(c.m.seed, c.m.
  * at the same time: the moment, or Infinity if it lasts.
  */
 export function bankRunsOut(ends: readonly number[], delayMs: number, bankMs: number): number {
-  let t = delayMs;
-  let left = bankMs;
-  const sorted = ends.filter((e) => e > delayMs).sort((a, b) => a - b);
-  let draining = sorted.length;
-  for (const end of sorted) {
-    const span = (end - t) * draining;
-    if (span >= left) return t + left / draining;
-    left -= span;
-    t = end;
-    draining--;
-  }
-  return Infinity;
+  return bankTimeline(ends.map((end) => ({ end })), delayMs, bankMs).out;
 }
 
 /**
  * A squad's bank this half. Each of its moves (a Relay mover, a pair, the final's squad) drains it from the free
- * seconds until the move is made (its slowest player, or a block placed later, which is thinking time too), or to the
- * ceiling if one of them never chose; several at once drain it together. If it runs out, moves not yet made are cut
- * off; at zero (sudden death) each move has only the free seconds.
+ * seconds until the move is made (its slowest player, or a block placed later, which is thinking time too), or to its
+ * deadline if one of them never chose; several at once drain it together. A Time chip on a move holds the bank still
+ * for its seconds and pushes that move's deadline later. If the bank runs out, moves not yet made are cut off (one a
+ * chip is holding: when the chip's time ends); at zero (sudden death) each move has only the free seconds (and its chips').
  */
 function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
   const { m, s } = c;
   if (!duties.length) return;
   const bank = c.banks[side];
-  const ceiling = s.moveCeilingSeconds * 1000;
-  const delay = m.delayMs;
-  if (bank <= 0) {
-    c.cutoff[side] = delay;
-    c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: 0, leftMs: 0, suddenDeath: true });
-    return;
-  }
   const ends = duties.map((d) => {
+    const deadline = dutyDeadline(c.inputs, d, s);
     const allowed = movesAllowed(m, d.board);
     const all = d.players.every((p) => {
       const mv = c.inputs.choices[p];
-      return !!mv && allowed.includes(mv) && (c.thinkMs[p] ?? 0) <= ceiling;
+      return !!mv && allowed.includes(mv) && (c.thinkMs[p] ?? 0) <= deadline;
     });
     const blockAt = Math.max(0, ...c.inputs.blocks.filter((b) => b.board === d.board && d.players.includes(b.by)).map((b) => b.at));
-    return all ? Math.min(ceiling, Math.max(blockAt, ...d.players.map((p) => c.thinkMs[p] ?? 0))) : ceiling;
+    return all ? Math.min(deadline, Math.max(blockAt, ...d.players.map((p) => c.thinkMs[p] ?? 0))) : deadline;
   });
-  const out = bankRunsOut(ends, delay, bank);
-  const drained = ends.reduce((t, e) => t + Math.max(0, Math.min(e, out) - delay), 0);
-  c.banks[side] = out === Infinity ? bank - drained : 0;
-  c.cutoff[side] = Math.min(ceiling, out);
-  c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: Math.min(bank, drained), leftMs: c.banks[side], suddenDeath: c.banks[side] <= 0 });
+  const r = moveCutoffs(m, c.inputs, side, duties, ends, s);
+  for (const [board, cut] of r.cutoffs) c.cutoffs.set(board, cut);
+  if (bank <= 0) {
+    c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: 0, leftMs: 0, suddenDeath: true });
+    return;
+  }
+  c.banks[side] = r.out === Infinity ? bank - r.drained : 0;
+  c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: Math.min(bank, r.drained), leftMs: c.banks[side], suddenDeath: c.banks[side] <= 0 });
   if (c.banks[side] <= 0) c.events.push({ kind: "sudden_death", turn: m.turn, half: m.half, side });
 }
 
@@ -859,13 +990,13 @@ function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
 function take(c: Ctx, player: string, board: number, side: Side): string | null {
   const move = c.inputs.choices[player];
   const chose = !!move && movesAllowed(c.m, board).includes(move);
-  const limit = c.cutoff[side];
+  const limit = c.cutoffs.get(board) ?? Infinity;
   const inTime = chose && (c.thinkMs[player] ?? 0) <= limit;
   if (inTime) c.acted.push(player);
   else {
     c.missed.push(player);
     if (chose) c.timeouts.push(player);
-    else if (c.m.banks[side] <= 0 || c.cutoff[side] < c.s.moveCeilingSeconds * 1000) c.timeouts.push(player);
+    else if (c.m.banks[side] <= 0 || limit < c.s.moveCeilingSeconds * 1000 + chipsOn(c.inputs, board) * c.s.mercenary.chipSeconds * 1000) c.timeouts.push(player);
   }
   return inTime ? move! : null;
 }
@@ -1033,6 +1164,8 @@ function afterHalf(c: Ctx, stockfish: [number, number]): HalfOutcome {
     coins: [c.coins[0], c.coins[1]],
     shields: [c.shields[0], c.shields[1]],
     stockfish,
+    // (Time chips tapped this half are spent; the rest stay the squad's.)
+    chips: [Math.max(0, chipsNow(m, c.inputs, 0)), Math.max(0, chipsNow(m, c.inputs, 1))],
     assists: c.assistsNow.length ? [...m.assists, ...c.assistsNow] : m.assists,
     result,
   };
@@ -1133,6 +1266,7 @@ export function startArmageddon(final: SquadsMatch, white: Side, start: BoardSta
       mode: final.mode,
       stockfish: final.stockfish,
       shields: final.shields,
+      chips: final.chips,
       kit: final.kit,
     },
     s,

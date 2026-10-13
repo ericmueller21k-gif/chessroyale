@@ -1537,7 +1537,7 @@ export interface SquadsClock {
   incrementSeconds: number;
 }
 /** Mercenary's items, in the shop's order (strongest first: DECISIONS.md, "Squads modes: Mercenary"). */
-export type MercItem = "stockfish" | "blocks" | "shield" | "time";
+export type MercItem = "stockfish" | "blocks" | "shield" | "chip";
 /**
  * Mercenary (Eric, Oct 12; renamed from Pillage the same night): each squad has one shared coin wallet for the
  * tournament, earned by play and carried from round to round. After each round, squads still in may spend it in a
@@ -1577,12 +1577,21 @@ export interface MercenarySettings {
    * (by play) gets `share` of the difference, to the nearest `round`, at most `max`.
    */
   catchUp: { share: number; max: number; round: number };
-  /** Every item's price rises by this for each one of it the squad has already bought this tournament. */
+  /** Every item's price rises by this for each one of it the squad has already bought this tournament (unless it has `prices`). */
   priceStep: number;
-  /** Each item's first price and the most a squad may buy for one round. */
-  items: Readonly<Record<MercItem, { price: number; cap: number }>>;
-  /** A time coin: seconds added to the squad's team bank as its next match starts. */
-  timeSeconds: number;
+  /**
+   * Each item's first price and the most a squad may buy for one round. `prices`: the item's own price list instead,
+   * by how many of it the squad has bought this tournament (the last repeats). For the Time chip `cap` is the most a
+   * squad may hold.
+   */
+  items: Readonly<Record<MercItem, { price: number; cap: number; prices?: readonly number[] }>>;
+  /**
+   * A Time chip (Eric, Oct 13: "like a poker chip"): seconds added to one move, the one being thought about on the
+   * tapper's board, when a player on it taps it during their squad's move. The move's deadline moves that much later
+   * and those seconds don't drain the bank (unused, they're lost); several can go on one move. Chips are the squad's,
+   * kept from round to round.
+   */
+  chipSeconds: number;
   /** Block points: added to the squad's block bank for its next match. */
   blockPoints: number;
   /** A Stockfish token: your own top `lines` moves for one decision, searched on your device at `nodes`. */
@@ -1603,6 +1612,11 @@ export interface MercenarySettings {
     stockfishChance: number;
     stockfishSharp: number;
     sharpGap: number;
+    /**
+     * A bot squad's Time chips: on a move in sudden death it taps one with `suddenDeath`, with its bank under
+     * `lowBankSeconds` with `lowBank` (one a move), `tapMs` (a range) into the move.
+     */
+    chip: { suddenDeath: number; lowBank: number; lowBankSeconds: number; tapMs: readonly [number, number] };
   };
 }
 export interface SquadsSettings {
@@ -1848,9 +1862,11 @@ export const SQUADS: SquadsSettings = {
       stockfish: { price: 200, cap: 2 },
       blocks: { price: 100, cap: 2 },
       shield: { price: 100, cap: 2 },
-      time: { price: 75, cap: 2 },
+      // Eric, Oct 13: chips 25, 25, 50, 50, then 50 each ("everyone should be able to basically reload on time
+      // chips"); hold at most 3.
+      chip: { price: 25, cap: 3, prices: [25, 25, 50, 50] },
     },
-    timeSeconds: 30,
+    chipSeconds: 30,
     blockPoints: 3,
     stockfish: { lines: 3, nodes: 300_000 },
     testWallet: 600,
@@ -1858,10 +1874,11 @@ export const SQUADS: SquadsSettings = {
       shopSeconds: [3, 9],
       saveChance: 0.25,
       spend: [0.5, 0.9],
-      weights: { stockfish: 0.5, blocks: 3, shield: 2, time: 2 },
+      weights: { stockfish: 0.5, blocks: 3, shield: 2, chip: 3 },
       stockfishChance: 0.04,
       stockfishSharp: 0.35,
       sharpGap: 0.2,
+      chip: { suddenDeath: 0.6, lowBank: 0.3, lowBankSeconds: 20, tapMs: [700, 1800] },
     },
   },
   moveShowSeconds: 1,

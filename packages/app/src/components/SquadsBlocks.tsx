@@ -182,6 +182,18 @@ export function CoinIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+/** A Time chip (Mercenary): a poker chip with a clock face (Eric: "like a poker chip"). */
+export function ChipIcon({ size = 14, class: cls = "mc-icon mc-icon-chip" }: { size?: number; class?: string }) {
+  return (
+    <svg class={cls} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" fill="currentColor" />
+      <path d="M10.6 2.1h2.8v3h-2.8zM10.6 18.9h2.8v3h-2.8zM2.1 10.6v2.8h3v-2.8zM18.9 10.6v2.8h3v-2.8z" fill="var(--mc-icon-eye, #fff)" opacity="0.85" />
+      <circle cx="12" cy="12" r="5.4" fill="none" stroke="var(--mc-icon-eye, #fff)" stroke-width="1.6" />
+      <path d="M12 9.3v2.9l1.9 1.2" fill="none" stroke="var(--mc-icon-eye, #fff)" stroke-width="1.6" stroke-linecap="round" />
+    </svg>
+  );
+}
+
 /** "1,240" with a coin (Mercenary). */
 export function Coins({ n, class: cls = "" }: { n: number; class?: string }) {
   return (
@@ -196,8 +208,8 @@ export function Coins({ n, class: cls = "" }: { n: number; class?: string }) {
  * Each squad's block bank (a lock and the points left; none in Classic) and, in Pairs, its same-move tokens (×N), shown
  * under the board beside the clocks for both squads at all times.
  */
-export function SquadResources({ bank, tokens, you }: { bank: number | null; tokens: number | null; you?: boolean }) {
-  if (bank === null && tokens === null) return null;
+export function SquadResources({ bank, tokens, chips = null, you }: { bank: number | null; tokens: number | null; chips?: number | null; you?: boolean }) {
+  if (bank === null && tokens === null && chips === null) return null;
   return (
     <span class={`sq-res${you ? " you" : ""}`}>
       {bank !== null && (
@@ -209,6 +221,11 @@ export function SquadResources({ bank, tokens, you }: { bank: number | null; tok
       {tokens !== null && (
         <span class={`sq-res-tokens${tokens ? "" : " none"}`} title={`Same-move tokens left: ${tokens}`} aria-label={`${tokens} same-move tokens`}>
           <TokenIcon />×{tokens}
+        </span>
+      )}
+      {chips !== null && (
+        <span class={`sq-res-chips${chips ? "" : " none"}`} title={`Time chips: ${chips}`} aria-label={`${chips} Time chips`}>
+          <ChipIcon size={12} />×{chips}
         </span>
       )}
     </span>

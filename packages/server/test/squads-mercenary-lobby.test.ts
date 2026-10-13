@@ -93,14 +93,14 @@ describe("Mercenary on the server: the shop", () => {
     const { L, party, solo, squad } = pairsLobby();
     L.clear();
     L.core.message(party[0]!, { t: "buy", item: "shield" });
-    L.core.message(party[1]!, { t: "buy", item: "time" });
+    L.core.message(party[1]!, { t: "buy", item: "chip" });
     const w = L.last(solo, "wallets")!.wallets.find((x) => x.squadId === squad)!;
-    expect(w.coins).toBe(M.testWallet - M.items.shield.price - M.items.time.price);
-    expect(w.cart).toMatchObject({ shield: 1, time: 1 });
+    expect(w.coins).toBe(M.testWallet - M.items.shield.price - M.items.chip.price);
+    expect(w.cart).toMatchObject({ shield: 1, chip: 1 });
     // Who bought what, live to the squad (all four), not to the other squads.
     for (const p of party) expect(L.all(p, "bought").map((b) => [b.by, b.item, b.price])).toEqual([
       [party[0], "shield", M.items.shield.price],
-      [party[1], "time", M.items.time.price],
+      [party[1], "chip", M.items.chip.price],
     ]);
     expect(L.all(solo, "bought")).toEqual([]);
     // The second shield costs more; the third is over the round's cap.
@@ -124,26 +124,29 @@ describe("Mercenary on the server: the shop", () => {
     expect(L.last(party[0]!, "shopNo")).toMatchObject({ reason: "unknown_item" });
   });
 
-  it("closes as the match starts: the cart comes in as the squad's kit (its bank, its tokens), the wallet's cart empties", () => {
+  it("closes as the match starts: the cart comes in as the squad's kit (its chips, its tokens), the wallet's cart empties", () => {
     const { L, party, solo, lm, squad } = pairsLobby();
-    for (const it of ["time", "stockfish", "shield", "blocks"] as const) L.core.message(party[0]!, { t: "buy", item: it });
+    for (const it of ["chip", "stockfish", "shield", "blocks"] as const) L.core.message(party[0]!, { t: "buy", item: it });
     const side = lm.m.sides.findIndex((x) => x.squadId === squad);
     const bankBefore = lm.m.banks[side]!;
     L.advanceTo(lm.startsAt! + 1);
     expect(lm.state).toBe("half");
-    expect(lm.m.kit![side]).toMatchObject({ time: 1, stockfish: 1, shield: 1, blocks: 1 });
-    expect(lm.m.banks[side]).toBe(bankBefore + M.timeSeconds * 1000);
+    expect(lm.m.kit![side]).toMatchObject({ chip: 1, stockfish: 1, shield: 1, blocks: 1 });
+    expect(lm.m.banks[side]).toBe(bankBefore);
+    expect(lm.m.chips[side]).toBe(1);
     expect(lm.m.stockfish[side]).toBe(1);
     expect(lm.m.shields[side]).toBe(1);
     expect(lm.m.blockBanks[side]).toBe(SQUADS.blocks.bankPerMatch + M.blockPoints);
     const w = L.last(solo, "wallets")!.wallets.find((x) => x.squadId === squad)!;
-    expect(w.cart).toEqual({ stockfish: 0, blocks: 0, shield: 0, time: 0 });
+    expect(w.cart).toEqual({ stockfish: 0, blocks: 0, shield: 0, chip: 0 });
+    expect(w.chips).toBe(0);
     expect(w.shop).toBeNull();
     // Everyone's match view carries both kits (counterplay).
     const view = L.all(solo, "match").filter((x) => x.match.key === lm.key).at(-1)!.match;
-    expect(view.kit![side]).toMatchObject({ time: 1, stockfish: 1, shield: 1, blocks: 1 });
+    expect(view.kit![side]).toMatchObject({ chip: 1, stockfish: 1, shield: 1, blocks: 1 });
+    expect(view.chips[side]).toBe(1);
     // Closed now.
-    L.core.message(party[1]!, { t: "buy", item: "time" });
+    L.core.message(party[1]!, { t: "buy", item: "chip" });
     expect(L.last(party[1]!, "shopNo")).toMatchObject({ reason: "closed" });
   });
 
@@ -248,6 +251,89 @@ describe("Mercenary on the server: items in a match", () => {
   }, 120_000);
 });
 
+describe("Mercenary on the server: the Time chip", () => {
+  const CHIP = M.chipSeconds * 1000;
+
+  it("a tap on your move: everyone hears at once, with both squads' counts and the move's deadline 30 s later; the first tap wins", () => {
+    const { L, party, solo, lm, squad } = pairsLobby();
+    for (let i = 0; i < 2; i++) L.core.message(party[0]!, { t: "buy", item: "chip" });
+    L.advanceTo(lm.startsAt! + 1);
+    const side = lm.m.sides.findIndex((x) => x.squadId === squad) as 0 | 1;
+    expect(lm.m.chips[side]).toBe(2);
+    expect(L.core.walletsView().find((w) => w.squadId === squad)!.chips).toBe(0);
+    const half = lm.half!;
+    const d = halfDuties(lm.m).duties.find((x) => x.side === side)!;
+    const [p, q] = d.players as [string, string];
+    expect(party).toEqual(expect.arrayContaining([p, q]));
+    L.clear();
+    L.advance(5_000);
+    const at = L.now - half.startedAt;
+    L.core.message(p, { t: "chip", key: lm.key, seq: half.seq, seen: 0 });
+    for (const who of [solo, q]) {
+      expect(L.last(who, "chip")).toMatchObject({ key: lm.key, seq: half.seq, chip: { board: d.board, side, by: p }, deadline: half.startedAt + d.deadlineMs + CHIP });
+      expect(L.last(who, "chip")!.chips[side]).toBe(1);
+    }
+    // The partner tapping at the same moment (they saw none): refused, nothing spent.
+    L.core.message(q, { t: "chip", key: lm.key, seq: half.seq, seen: 0 });
+    expect(L.last(q, "chipNo")).toMatchObject({ reason: "stale" });
+    expect(L.all(solo, "chip")).toHaveLength(1);
+    // Someone not on that move: refused.
+    L.core.message(solo, { t: "chip", key: lm.key, seq: half.seq, seen: 1 });
+    expect(L.last(solo, "chipNo")!.reason).toMatch(/no_duty|no_chips/);
+    // The half's view carries it, and the duty's new deadline, for anyone (re)joining.
+    L.core.message(solo, { t: "sync" });
+    const view = L.all(solo, "match").filter((x) => x.match.key === lm.key).at(-1)!.match;
+    expect(view.current!.chips).toEqual([{ board: d.board, by: p, at }]);
+    expect(view.current!.duties.find((x) => x.board === d.board)!.deadline).toBe(half.startedAt + d.deadlineMs + CHIP);
+  });
+
+  it("the clock maths: picks at 40 s count, the bank drained only outside the chip's 30 s; unused chips go back to the wallet", () => {
+    const { L, party, lm, squad } = pairsLobby();
+    for (let i = 0; i < 2; i++) L.core.message(party[0]!, { t: "buy", item: "chip" });
+    L.advanceTo(lm.startsAt! + 1);
+    const side = lm.m.sides.findIndex((x) => x.squadId === squad) as 0 | 1;
+    const half = lm.half!;
+    const d = halfDuties(lm.m).duties.find((x) => x.side === side)!;
+    const [p, q] = d.players as [string, string];
+    const bank = lm.m.banks[side];
+    L.advance(5_000);
+    L.core.message(p, { t: "chip", key: lm.key, seq: half.seq, seen: 0 });
+    // 40 s into the half (past the 20 s ceiling): the half is still on, and both picks count.
+    L.advanceTo(half.startedAt + 40_000);
+    expect(lm.half?.seq).toBe(half.seq);
+    const moves = squadsLegalMoves(lm.m.boards[d.board]!.fen);
+    L.core.message(p, { t: "choose", key: lm.key, seq: half.seq, move: moves[0]! });
+    L.core.message(q, { t: "choose", key: lm.key, seq: half.seq, move: moves[1]! });
+    for (const x of [p, q]) L.core.message(x, { t: "lock", key: lm.key, seq: half.seq });
+    L.advance(1);
+    const played = L.all(p, "half").find((h) => h.key === lm.key && h.seq === half.seq)!;
+    expect(played.missed).not.toContain(p);
+    expect(played.missed).not.toContain(q);
+    // 3-5 s and 35-40 s: 7 s off the bank.
+    expect(ofKind(played.events, "bank").find((e) => e.side === side)!.drainedMs).toBe(7_000);
+    expect(lm.m.banks[side]).toBe(bank - 7_000);
+    expect(played.match.chips[side]).toBe(1);
+    // The match over: the chip left goes back to the squad's wallet, kept for the final.
+    L.core.message(party[0]!, { t: "nextRound" });
+    const w = L.core.walletsView().find((x) => x.squadId === squad)!;
+    if (L.core.allMatches().some((x) => x.round === 2 && x.m.sides.some((sd) => sd.squadId === squad))) expect(w.chips).toBe(1);
+  });
+
+  it("too late: a tap after the move's time is up is refused", () => {
+    const { L, party, lm, squad } = pairsLobby();
+    L.core.message(party[0]!, { t: "buy", item: "chip" });
+    L.advanceTo(lm.startsAt! + 1);
+    const side = lm.m.sides.findIndex((x) => x.squadId === squad) as 0 | 1;
+    const half = lm.half!;
+    const d = halfDuties(lm.m).duties.find((x) => x.side === side)!;
+    const now0 = half.startedAt;
+    // (Straight past the deadline and the network's grace, the half still open for the message: it's refused.)
+    L.now = now0 + d.deadlineMs + 5_000;
+    L.core.message(d.players[0]!, { t: "chip", key: lm.key, seq: half.seq, seen: 0 });
+    expect(L.last(d.players[0]!, "chipNo")!.reason).toMatch(/late|stale/);
+  });
+});
+
 describe("Mercenary on the server: earning and catch-up", () => {
   it("every coin a half pays goes into its squad's wallet (catch-up as the next match is set: a share of the gap)", () => {
     const L = squadsLobby({ seed: 5, test: { start: 0, mode: "mercenary" }, fillInMs: 0 });
@@ -290,7 +376,13 @@ describe("Mercenary on the server: earning and catch-up", () => {
       expect(w.coins).toBeGreaterThanOrEqual(0);
       expect(w.earned).toBe(w.byRound[0] + w.byRound[1] + w.byRound[2]);
       expect(w.shop).toBeNull();
+      // Time chips: bought, less those tapped, are what it holds now (kept from round to round), never over the cap.
+      const tapped = L.all(ann, "chip").filter((c) => L.core.allMatches().find((x) => x.key === c.key)!.m.sides[c.chip.side].squadId === w.squadId).length;
+      expect(w.chips).toBe(w.bought.chip - tapped);
+      expect(w.chips).toBeLessThanOrEqual(M.items.chip.cap);
     }
+    // The bots tapped some of their chips (in sudden death, or low on time).
+    expect(L.all(ann, "chip").length).toBeGreaterThan(0);
     // Every match from round 2 on brought a kit; tokens used only by bot squads, never more than bought.
     const later = L.core.allMatches().filter((m) => m.round > 0);
     for (const lm of later) {

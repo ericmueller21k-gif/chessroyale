@@ -239,9 +239,12 @@ describe("the FAQ on Squads' modes and Mercenary", () => {
     expect(t).toContain(`${M.priceStep} coins more for every one`);
     expect(t).toContain("Never the other squad's moves");
     expect(t).toContain("use them or lose them");
-    const changed = section("modes", { ...FAQ_DEFAULTS, squads: { ...Q, mercenary: { ...M, priceStep: 70, timeSeconds: 45, items: { ...M.items, time: { price: 55, cap: 3 } } } } });
+    expect(t).toContain(`Time chip (25, 25, 50, 50, then 50 coins each; your squad holds up to ${M.items.chip.cap})`);
+    expect(t).toContain(`${M.chipSeconds} seconds more for that move`);
+    expect(t).toContain("kept for the next round");
+    const changed = section("modes", { ...FAQ_DEFAULTS, squads: { ...Q, mercenary: { ...M, priceStep: 70, chipSeconds: 45, items: { ...M.items, chip: { price: 10, cap: 4, prices: [10, 20] } } } } });
     expect(changed).toContain("70 coins more for every one");
-    expect(changed).toContain("Time coin (55 coins, up to 3 a round): 45 seconds more");
+    expect(changed).toContain("Time chip (10, 20, then 20 coins each; your squad holds up to 4): tap it during your squad's move, on the board you're playing: 45 seconds more");
   });
 });
 

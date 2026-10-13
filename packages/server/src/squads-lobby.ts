@@ -62,6 +62,13 @@ import {
   squadsRng,
   startArmageddon,
   stockfishNow,
+  chipsNow,
+  chipsOn,
+  dutyDeadline,
+  liveCutoff,
+  useChip,
+  botChipTap,
+  returnChips,
   takeCart,
   matchClocks,
   settleTeamClocks,
@@ -82,6 +89,7 @@ import {
   type Colour,
   type Duty,
   type HalfInputs,
+  type PlacedChip,
   type ItemCounts,
   type NetBracketMatch,
   type NetDuty,
@@ -222,6 +230,8 @@ export interface HalfRecord {
   at: Record<string, number>;
   /** Bots still to act, and when (ms after the half began). */
   bots: Record<string, number>;
+  /** Mercenary: a squad of bots' Time chip taps still to come, by bot, and when (ms after the half began). */
+  botChips?: Record<string, number>;
   /** Bot work, by board. */
   work: Record<number, WorkJob>;
 }
@@ -681,6 +691,9 @@ export class SquadsCore {
       case "assist":
         this.humanAssist(id, msg.key, msg.seq);
         break;
+      case "chip":
+        this.humanChip(id, msg.key, msg.seq, msg.seen);
+        break;
       case "buy":
         this.shopAction(id, msg.item, false);
         break;
@@ -1014,6 +1027,12 @@ export class SquadsCore {
     const half = lm.half;
     let changed = false;
     for (const job of Object.values(half.work)) if (!job.how && this.settle(lm, job)) changed = true;
+    for (const [bot, at] of Object.entries(half.botChips ?? {})) {
+      if (half.startedAt + at <= now) {
+        this.botChip(lm, bot);
+        changed = true;
+      }
+    }
     for (const bot of Object.keys(half.bots)) {
       if (this.botActAt(lm, bot) <= now) {
         this.botAct(lm, bot);
@@ -1041,11 +1060,26 @@ export class SquadsCore {
     lm.startsAt = null;
     lm.half = half;
     const boards = new Set<number>();
+    const planned: [number, number] = [0, 0];
     for (const d of duties.duties) {
+      // Mercenary: a squad of bots now and then taps a Time chip on a move that needs time (in sudden death, or low on
+      // bank): one bot a move, and it thinks with the chip's time. Never a squad with people playing: their chips.
+      const chipBot = d.players.find((p) => this.botPlays(p));
+      const tap =
+        chipBot && this.mercenary() && m.chips[d.side] > planned[d.side] && this.botRun(m.sides[d.side].squadId)
+          ? botChipTap(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "bot-chip"), m.banks[d.side], this.s)
+          : null;
+      if (chipBot && tap !== null) {
+        (half.botChips ??= {})[chipBot] = tap;
+        planned[d.side]++;
+      }
+      const chipMs = tap !== null ? this.s.mercenary.chipSeconds * 1000 : 0;
       for (const p of d.players) {
         if (!this.botPlays(p)) continue;
-        const bankMs = m.banks[d.side];
-        half.bots[p] = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: m.delayMs, deadlineMs: d.deadlineMs }, this.s);
+        const bankMs = m.banks[d.side] + 3 * chipMs;
+        const think = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: m.delayMs, deadlineMs: d.deadlineMs + chipMs }, this.s);
+        // (With a chip coming, never before it's tapped.)
+        half.bots[p] = tap !== null ? Math.max(think, tap + 200) : think;
         boards.add(d.board);
       }
     }
@@ -1079,7 +1113,7 @@ export class SquadsCore {
     const half = lm.half!;
     if (halfReady(lm.m, half.inputs, this.s)) return half.startedAt;
     let last = 0;
-    for (const d of halfDuties(lm.m, this.s).duties) if (d.players.some((p) => !half.inputs.locked[p])) last = Math.max(last, d.deadlineMs);
+    for (const d of halfDuties(lm.m, this.s).duties) if (d.players.some((p) => !half.inputs.locked[p])) last = Math.max(last, dutyDeadline(half.inputs, d, this.s));
     return half.startedAt + last + DEFAULT_SETTINGS.lateGraceMs;
   }
 
@@ -1087,6 +1121,7 @@ export class SquadsCore {
     const half = lm.half!;
     const out = [this.halfDue(lm)];
     for (const bot of Object.keys(half.bots)) out.push(this.botActAt(lm, bot));
+    for (const at of Object.values(half.botChips ?? {})) out.push(half.startedAt + at);
     for (const job of Object.values(half.work)) {
       // (A queued job waits for a device to answer something; one following a twin, for the twin.)
       if (job.how || job.queued || job.follows) continue;
@@ -1105,11 +1140,12 @@ export class SquadsCore {
     const d = dutyOf(lm.m, id, this.s);
     if (!d || this.botPlays(id)) return no("no_duty");
     const elapsed = this.io.now() - lm.half.startedAt;
-    if (elapsed > d.duty.deadlineMs + DEFAULT_SETTINGS.lateGraceMs) return no("late");
+    const deadline = dutyDeadline(lm.half.inputs, d.duty, this.s);
+    if (elapsed > deadline + DEFAULT_SETTINGS.lateGraceMs) return no("late");
     const r = choose(lm.m, lm.half.inputs, id, move, this.s);
     if ("error" in r) return no(r.error);
     lm.half.inputs = r.inputs;
-    lm.half.at[id] = Math.min(elapsed, d.duty.deadlineMs);
+    lm.half.at[id] = Math.min(elapsed, deadline);
     this.touch(lm);
     this.sendChoices(lm, d.duty);
   }
@@ -1119,7 +1155,7 @@ export class SquadsCore {
     if (!lm || lm.state !== "half" || !lm.half || lm.half.seq !== seq) return;
     const d = dutyOf(lm.m, id, this.s);
     if (!d || this.botPlays(id)) return;
-    if (this.io.now() - lm.half.startedAt > d.duty.deadlineMs + DEFAULT_SETTINGS.lateGraceMs) return;
+    if (this.io.now() - lm.half.startedAt > dutyDeadline(lm.half.inputs, d.duty, this.s) + DEFAULT_SETTINGS.lateGraceMs) return;
     const next = lockIn(lm.half.inputs, id);
     if (next === lm.half.inputs) return;
     lm.half.inputs = next;
@@ -1139,8 +1175,9 @@ export class SquadsCore {
     const d = dutyOf(lm.m, id, this.s);
     if (!d || this.botPlays(id)) return no("no_duty");
     const elapsed = this.io.now() - lm.half.startedAt;
-    if (elapsed > d.duty.deadlineMs + DEFAULT_SETTINGS.lateGraceMs) return no("late");
-    const r = placeBlock(lm.m, lm.half.inputs, id, board, move, Math.min(elapsed, d.duty.deadlineMs), this.s);
+    const deadline = dutyDeadline(lm.half.inputs, d.duty, this.s);
+    if (elapsed > deadline + DEFAULT_SETTINGS.lateGraceMs) return no("late");
+    const r = placeBlock(lm.m, lm.half.inputs, id, board, move, Math.min(elapsed, deadline), this.s);
     if ("error" in r) return no(r.error);
     lm.half.inputs = r.inputs;
     this.touch(lm);
@@ -1159,12 +1196,60 @@ export class SquadsCore {
     const d = dutyOf(lm.m, id, this.s);
     if (!d || this.botPlays(id)) return no("no_duty");
     const elapsed = this.io.now() - lm.half.startedAt;
-    if (elapsed > d.duty.deadlineMs + DEFAULT_SETTINGS.lateGraceMs) return no("late");
-    const r = useStockfish(lm.m, lm.half.inputs, id, Math.min(elapsed, d.duty.deadlineMs), this.s);
+    const deadline = dutyDeadline(lm.half.inputs, d.duty, this.s);
+    if (elapsed > deadline + DEFAULT_SETTINGS.lateGraceMs) return no("late");
+    const r = useStockfish(lm.m, lm.half.inputs, id, Math.min(elapsed, deadline), this.s);
     if ("error" in r) return no(r.error);
     lm.half.inputs = r.inputs;
     this.touch(lm);
     this.sendAll({ t: "assist", key, seq, use: r.use, stockfish: [stockfishNow(lm.m, lm.half.inputs, 0), stockfishNow(lm.m, lm.half.inputs, 1)] });
+  }
+
+  /**
+   * Mercenary: a person taps one of their squad's Time chips on their board's move (the rules' `useChip`: more time
+   * for that move, the bank held still meanwhile). `seen`: the chips they saw on it, so a teammate's tap at the same
+   * moment doesn't spend a second. Everyone hears at once (both squads see the counts), with the move's new deadline.
+   */
+  private humanChip(id: string, key: string, seq: number, seen: number) {
+    const lm = this.matches.get(key);
+    const no = (reason: Extract<SquadsOutgoing, { t: "chipNo" }>["reason"]) => this.send(id, { t: "chipNo", key, seq, reason });
+    if (!lm || lm.state !== "half" || !lm.half || lm.half.seq !== seq) return no("stale");
+    const d = dutyOf(lm.m, id, this.s);
+    if (!d || this.botPlays(id)) return no("no_duty");
+    // (The network's grace: a tap sent in time counts at the last moment it could have been made.)
+    const elapsed = this.io.now() - lm.half.startedAt;
+    const live = liveCutoff(lm.m, lm.half.inputs, d.duty, lm.half.at, this.s);
+    if (elapsed > live + DEFAULT_SETTINGS.lateGraceMs) return no("late");
+    const r = useChip(lm.m, lm.half.inputs, id, Math.min(elapsed, live), Number.isInteger(seen) ? seen : -1, lm.half.at, this.s);
+    if ("error" in r) return no(r.error);
+    this.chipPlaced(lm, r);
+  }
+
+  /** A Time chip tapped (a person's, or a squad of bots'): into the half, and to everyone with the move's new deadline. */
+  private chipPlaced(lm: LiveMatch, r: { inputs: HalfInputs; chip: PlacedChip & { side: Side } }) {
+    const half = lm.half!;
+    half.inputs = r.inputs;
+    this.touch(lm);
+    const d = halfDuties(lm.m, this.s).duties.find((x) => x.board === r.chip.board)!;
+    this.sendAll({
+      t: "chip",
+      key: lm.key,
+      seq: half.seq,
+      chip: { board: r.chip.board, side: r.chip.side, by: r.chip.by, at: r.chip.at },
+      chips: [chipsNow(lm.m, half.inputs, 0), chipsNow(lm.m, half.inputs, 1)],
+      deadline: half.startedAt + dutyDeadline(half.inputs, d, this.s),
+    });
+  }
+
+  /** A squad of bots taps the Time chip it planned for this move (if the move is still being thought about). */
+  private botChip(lm: LiveMatch, bot: string) {
+    const half = lm.half!;
+    const at = half.botChips?.[bot] ?? 0;
+    if (half.botChips) delete half.botChips[bot];
+    const d = dutyOf(lm.m, bot, this.s);
+    if (!d) return;
+    const r = useChip(lm.m, half.inputs, bot, at, chipsOn(half.inputs, d.duty.board), half.at, this.s);
+    if ("inputs" in r) this.chipPlaced(lm, r);
   }
 
   // ---------------- Mercenary: wallets and the shop ----------------
@@ -1218,6 +1303,7 @@ export class SquadsCore {
       catchUp: w.catchUp,
       bought: { ...w.bought },
       cart: { ...w.cart },
+      chips: w.chips ?? 0,
       shop: this.shopOf(w.squadId),
     }));
   }
@@ -1340,7 +1426,7 @@ export class SquadsCore {
     if (!d) return planned;
     const job = half.work[d.duty.board];
     if (!job || job.how || (!job.devices.length && !job.queued && !job.follows)) return planned;
-    return Math.max(planned, half.startedAt + Math.max(0, d.duty.deadlineMs - SQUADS_LOBBY.botWork.fallbackMarginMs));
+    return Math.max(planned, half.startedAt + Math.max(0, dutyDeadline(half.inputs, d.duty, this.s) - SQUADS_LOBBY.botWork.fallbackMarginMs));
   }
 
   /** A bot plays its seat's duty: the rules' squad bots (bots.ts) over the top moves (the devices', or the quick look). */
@@ -1359,7 +1445,7 @@ export class SquadsCore {
     let top = topAllowed(job?.top ?? fallbackTop(fen, this.s.bots.candidates, this.s), blocked);
     if (!top.length) top = topAllowed(fallbackTop(fen, squadsLegalMoves(fen).length, this.s), blocked).slice(0, this.s.bots.candidates);
     const p = this.player(bot);
-    const elapsedNow = Math.min(this.io.now() - half.startedAt, d.duty.deadlineMs);
+    const elapsedNow = Math.min(this.io.now() - half.startedAt, dutyDeadline(half.inputs, d.duty, this.s));
     // Mercenary: a squad of bots now and then uses one of its Stockfish tokens (the engine's best, whatever its skill).
     // Never a squad with people playing: their tokens are theirs to use.
     let strong = false;
@@ -1584,6 +1670,13 @@ export class SquadsCore {
     lm.state = "over";
     lm.startsAt = null;
     this.touch(lm);
+    // Mercenary: the Time chips each squad didn't use go back to its wallet, kept for its next round.
+    if (this.mercenary()) {
+      for (const side of [0, 1] as const) {
+        const w = this.wallet(m.sides[side].squadId);
+        if (w) this.r.wallets![w.squadId] = returnChips(w, m.chips[side]);
+      }
+    }
     this.r.bracket = reportWinner(this.r.bracket!, lm.round, lm.index, winnerSquad(m)!);
     this.placeNew();
     if (lm.round < 2) {
@@ -2040,7 +2133,7 @@ export class SquadsCore {
   }
 
   private netDuty(lm: LiveMatch, d: Duty): NetDuty {
-    return { board: d.board, side: d.side, role: d.role, players: [...d.players], deadline: lm.half!.startedAt + d.deadlineMs };
+    return { board: d.board, side: d.side, role: d.role, players: [...d.players], deadline: lm.half!.startedAt + dutyDeadline(lm.half!.inputs, d, this.s) };
   }
 
   private netHalf(lm: LiveMatch): NetSquadsHalf | null {
@@ -2055,6 +2148,7 @@ export class SquadsCore {
       duties: duties.duties.map((d) => this.netDuty(lm, d)),
       scouts: duties.scouts.map((d) => this.netDuty(lm, d)),
       forced: duties.forced,
+      chips: (half.inputs.chips ?? []).map((c) => ({ ...c })),
     };
   }
 
@@ -2098,6 +2192,7 @@ export class SquadsCore {
       kit: m.kit ? [{ ...m.kit[0] }, { ...m.kit[1] }] : null,
       stockfish: [m.stockfish[0], m.stockfish[1]],
       shields: [m.shields[0], m.shields[1]],
+      chips: [m.chips[0], m.chips[1]],
       assists: m.assists.map((a) => ({ ...a, shownTo: [...a.shownTo] })),
       coins: [m.coins[0], m.coins[1]],
       ...(lm.drawn ? { drawnFinal: { points: [lm.drawn.result!.points[0], lm.drawn.result!.points[1]] as [number, number], timeLeft: [lm.drawn.banks[0], lm.drawn.banks[1]] as [number, number] } } : {}),

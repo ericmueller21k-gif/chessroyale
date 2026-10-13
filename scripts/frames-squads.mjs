@@ -1,6 +1,6 @@
 // Frame-by-frame check of Squads' screens, played the way a player plays them (real taps), against a running server
 // with the test switch on (npx wrangler dev --var SQUADS_TEST:1 ...):
-//   npm run frames:squads -- <out-dir> <relay|pairs|final|block|token|menu|standings|modevote|shop|stockfish|shield> [url=http://localhost:8787] [width=390] [scheme=dark]
+//   npm run frames:squads -- <out-dir> <relay|pairs|final|block|token|menu|standings|modevote|shop|stockfish|shield|chip> [url=http://localhost:8787] [width=390] [scheme=dark]
 // relay: your move (it must show at once and never snap back), then scouting a tiny board and back.
 // pairs: your pick, lock in, the coin-flip reveal. final: your vote, lock in, the vote's reveal.
 // block: from the Scotch recapture, Block, their queen, f6: the arrow draws, keeps redrawing with its lock pulsing,
@@ -11,6 +11,8 @@
 // Mercenary test lobby at Pairs: the shop sliding in, the explainer, two purchases, Hide and the pill, then the match
 // starting (the shop going); PNGs of the sheet, also with a wide wallet (12,345). stockfish: a token used on your pick
 // (its arrows and lines). shield: a shield bought, the bots blocking whenever they can, the line saying it was cancelled.
+// chip: a Time chip bought, then tapped on your pick: the "+30 s", the clock jumping and standing still (each frame's
+// clock text is logged).
 // Every painted frame is recorded (Chrome's screencast); the big board's pieces are logged on every animation frame,
 // and the timeline printed: a piece that moves twice, jumps back or flickers shows as an extra change. A GIF of the
 // moment goes to <out-dir>/<mode>-<width>.gif (and PNGs for menu and standings). See .claude/LESSONS.md.
@@ -260,7 +262,7 @@ if (mode === "relay") {
   await timeline(since);
   console.log("flashes at frames", await flashes(frames));
   gif(frames, `modevote-${W}`);
-} else if (mode === "shop" || mode === "stockfish" || mode === "shield") {
+} else if (mode === "shop" || mode === "stockfish" || mode === "shield" || mode === "chip") {
   await testLobby("pairs", "120,0,3,0", `&mode=mercenary&bots=strong${mode === "shield" ? ",blocks" : ""}`);
   const shop = p.locator(".mc-shop");
   if (mode === "shop") {
@@ -303,9 +305,34 @@ if (mode === "relay") {
   } else {
     await shop.waitFor({ timeout: 20_000 });
     await p.getByRole("button", { name: "Got it" }).click().catch(() => undefined);
-    await p.getByRole("button", { name: mode === "stockfish" ? /^Buy a Stockfish token/ : /^Buy a Shield/ }).click();
+    await p.getByRole("button", { name: mode === "stockfish" ? /^Buy a Stockfish token/ : mode === "chip" ? /^Buy a Time chip/ : /^Buy a Shield/ }).click();
     await shop.waitFor({ state: "detached", timeout: 60_000 });
-    if (mode === "stockfish") {
+    if (mode === "chip") {
+      const s = await waitFor((x) => x.duty?.role === "pick", 120_000);
+      await p.waitForTimeout(600);
+      const since = Date.now();
+      // Every 100 ms: your squad's clock as shown, and whether "+30 s" is up.
+      const clocks = [];
+      const watch = setInterval(async () => {
+        const t = await p.evaluate(() => ({ clock: document.querySelector(".sq-clockline-side.you .sq-clock")?.textContent ?? "", plus: !!document.querySelector(".sq-clockline-side.you .mc-chip-plus"), on: !!document.querySelector(".sq-clockline-side.you .mc-chip-clock.on") })).catch(() => null);
+        if (t) clocks.push({ ms: Date.now() - since, ...t });
+      }, 100);
+      const { frames } = await record(async () => {
+        await p.waitForTimeout(700);
+        await p.screenshot({ path: `${out}/chip-before-${W}.png` });
+        await p.locator(".sq-clockline-side.you .mc-chip-btn").click();
+        await p.waitForTimeout(400);
+        await p.screenshot({ path: `${out}/chip-${W}.png` });
+        await p.waitForTimeout(2600);
+        await pick(s);
+        await p.waitForTimeout(1200);
+      });
+      clearInterval(watch);
+      console.log("clock:", clocks.map((c) => `${c.ms}:${c.clock}${c.plus ? "+" : ""}${c.on ? "*" : ""}`).join(" "));
+      await timeline(since);
+      console.log("flashes at frames", await flashes(frames));
+      gif(frames, `chip-${W}`);
+    } else if (mode === "stockfish") {
       const s = await waitFor((x) => x.duty?.role === "pick", 120_000);
       await p.waitForTimeout(800);
       const since = Date.now();

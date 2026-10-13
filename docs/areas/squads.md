@@ -101,11 +101,22 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
     final is set: the squad that has earned less by play gets a share of the gap (spending never counts).
   - **The shop.** Open from a squad's match's end until its next match's first half (the wait that's there anyway),
     for squads still in, never before round 1. `buyItem`/`unbuyItem`: each item's price rises by `priceStep` for every
-    one bought before this tournament (`itemPrice`); at most `items[x].cap` in one cart. `takeCart` as the match starts:
-    the cart becomes the match's kit (`applyKits`): time coins into the team bank, block points into the block bank,
-    Stockfish tokens and shields. A drawn final's Armageddon carries the final's on. Four items: a fifth, the
-    Breather (double free seconds), was taken out on Oct 13 (Eric); a match or wallet stored with one is read without
-    it (`upgradeMatch`, `upgradeWallet`: a breather still in an open shop's cart is refunded, `itemCounts`).
+    one bought before this tournament (`itemPrice`; the Time chip has its own list, `items.chip.prices`: 25, 25, 50,
+    50, then 50); at most `items[x].cap` in one cart (the Time chip: held and in the cart, `capCount`). `takeCart` as
+    the match starts: the cart becomes the match's kit (`applyKits`): block points into the block bank, Stockfish
+    tokens and shields, and the squad's Time chips (all it holds, `kit.chip`, into the match's `chips`; the wallet's
+    `chips` go back up as the match ends, `returnChips`). A drawn final's Armageddon carries the final's on. Four
+    items. Taken out on Oct 13 (Eric): the Breather (double free seconds), and the time coin (+30 s on the bank), which
+    became the Time chip; a match or wallet stored with one is read without it (`upgradeMatch`, `upgradeWallet`: one
+    still in an open shop's cart is refunded, `itemCounts`).
+  - **The Time chip** (Eric, Oct 13: "like a poker chip"; `useChip`): the squad's, kept from round to round, at most
+    `items.chip.cap` (3) held. A player on a move being thought about taps it during their squad's move (in Pairs
+    both partners share the board's), `seen` saying how many they saw on it so two at once spend one. It gives that
+    move `chipSeconds` (30): the move's deadline that much later (`dutyDeadline`), and the bank held still for those
+    seconds from the tap, not before the free seconds end (`chipWindows`); any of them unused is lost, never banked.
+    Several stack. In sudden death it's the free seconds and 30 s more. The bank's run-out with chips:
+    `bankTimeline`, `moveCutoffs` (a move a chip is holding when the bank runs out runs to the chip's end), and
+    `liveCutoff` for a tap during the half. Never automatic (Eric rejected an automatic trigger as confusing).
   - **The Stockfish token** (`useStockfish`): on your own decision this half (your move before it's made, your pick or
     vote before you lock in), paid at once; one a player a half (the final: one for the squad). Its lines are your top
     moves in your position, your side to move (`tokenLines`: blocked moves out, never a reply), shown to you (the
@@ -113,10 +124,11 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
     events' `assisted` say whose choice had them on screen (`isAssisted`): never brilliant, never fair-play evidence.
   - **The shield** acts as the half is played: the first block placed against its squad that would take effect (the
     mercy rules and lifts weighed first) is "shielded": not in effect, its points still spent.
-  - **Bots** (`botShop`, `botUsesStockfish`): a squad of bots shops a few seconds into its window, saving some rounds,
-    spending most of its wallet in the final; blocks and time most, a Stockfish token now and then. A bot uses one of
-    its squad's tokens rarely (more when the engine's best stands out) and then plays the best move. Never for a squad
-    with people playing.
+  - **Bots** (`botShop`, `botUsesStockfish`, `botChipTap`): a squad of bots shops a few seconds into its window, saving
+    some rounds, spending most of its wallet in the final; blocks and Time chips most (chips up to what it may hold), a
+    Stockfish token now and then. A bot uses one of its squad's tokens rarely (more when the engine's best stands out)
+    and then plays the best move. It taps a Time chip on a move in sudden death (60%) or with under 20 s of bank (30%),
+    0.7-1.8 s in, and thinks on into it. Never for a squad with people playing.
 - **What the sim says** (`reports/squads-sim.md`, Squads v2):
   - Median lobbies take 29-31 minutes on every option (Fast 3 min, Normal 4, Long 5; 3 free seconds); every 90th
     percentile is at most 40.
@@ -274,13 +286,17 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   (`bringKits`: `takeCart`, `applyKits`; the match again to everyone). A Stockfish token: `assist` from a person with
   a duty (`useStockfish`; refused `assistNo`), then to everyone `assist` with the use (who, where, `shownTo`) and
   both squads' tokens left: the lines are worked out on `shownTo`'s own devices; nothing about them crosses the
-  server. A brilliant move is asked of the judge like a token (`requestBrilliant`: the half's own bot work on that
+  server. A Time chip: `chip` from a person with a duty (`humanChip`: `useChip` against the move's live cutoff,
+  `liveCutoff` with the half's `at`; refused `chipNo`), then to everyone `chip` (where, who, when, both squads' chips
+  left, the move's new deadline); the half's view carries its `chips`, every deadline and the half's end count them
+  (`dutyDeadline`), and the chips a squad didn't use go back to its wallet as the match ends. A brilliant move is asked of the judge like a token (`requestBrilliant`: the half's own bot work on that
   board, else a remembered answer, else devices for a person's move; bots' moves only from work already done); its
   verdict after the show, `coins` (why "brilliant", the move and who found it; `capped` with 0 coins past the squad's
   cap for the match) to everyone. Bots: a squad nobody is
-  playing (`botRun`) shops `mercenary.bots.shopSeconds` into its window (`botShop`) and now and then uses a token
-  (`botUsesStockfish`: then the best move); never a squad with people playing.
-- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 4, typed): a lobby socket gets
+  playing (`botRun`) shops `mercenary.bots.shopSeconds` into its window (`botShop`), now and then uses a token
+  (`botUsesStockfish`: then the best move), and plans a Time chip tap as a half starts (`botChipTap`, `botChips`),
+  thinking with its time; never a squad with people playing.
+- **The protocol** (`packages/chess/src/squads/protocol.ts`, `SQUADS_PROTOCOL` 5, typed): a lobby socket gets
   `welcome`, `lobby` (seats, squads, bracket, rules, every squad's clock and wallet), `vote`/`voteCast`, `match` (a
   match in full, as you may see it: tokens, block banks, blocks in effect and placed, the token log; its mode, each
   side's free seconds, kits, Stockfish tokens and shields left, the tokens used and being used, coins this match),
@@ -397,7 +413,10 @@ door's look; every class is `sq-`.
     folds it into a pill ("Shop" and the coins) that opens it again. The first time an account sees it (on this device:
     `brc.mercenary.seen.<user id>`), a short explainer with "Got it".
   - **In a match:** a line in the panel with both squads' coins and what's left of their kits (Stockfish tokens,
-    shields); under the clocks each squad's block points (none in Classic) and tokens. On your decision: "Stockfish token · N left"; used, your top moves as arrows coloured by rank
+    shields, Time chips); under the clocks each squad's block points (none in Classic), tokens and Time chips. On your
+    move, a "+30s" chip button by your squad's clock; tapped (yours or a teammate's), that squad's clock jumps by the
+    chip's time and counts it down while the bank stands still, and "+30 s" floats up from it for both squads (the
+    timer bar takes the move's later deadline). On your decision: "Stockfish token · N left"; used, your top moves as arrows coloured by rank
     with their evaluations and listed under it ("Your Stockfish lines"; in the final, a teammate's token shows the
     squad's). Blocking against a squad with a shield: the line under Block says so. The line above the board: a block
     a shield cancelled (both squads) and a brilliant move ("Brilliant! Nf5 by Pam: +25 coins for Rooks"; past the cap,
