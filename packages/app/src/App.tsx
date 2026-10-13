@@ -59,7 +59,7 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
   // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
   const format = q.get("format") as FinalFormat | null;
   const forced = crowd && format && format in CROWD_KNOCKOUTS ? { finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format], augments: false } : {};
-  // ?speed=normal|variable|bullet: that speed (for testing, with ?format=; a stale "slow" is Normal).
+  // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
   const speed = crowd ? (speedOption(q.get("speed"))?.patch ?? {}) : {};
   return {
     // The mode's own rules and pace first, then pace and playtest overrides on top (only the ones that are set).
