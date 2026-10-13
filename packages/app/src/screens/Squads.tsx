@@ -162,8 +162,11 @@ export function SquadsQueue({ client, onCancel }: { client: SquadsClient; onCanc
 /** The pre-game votes on Crowd's vote board: everyone's pawn on your side of an empty board, three zones, three cards. */
 function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vote: NonNullable<SquadsClient["vote"]>; onLeave: () => void; exit: MatchExit | null }) {
   const lobby = client.lobby!;
-  const defs = squadsVotes();
-  const def = defs[vote.index]!;
+  // The votes this lobby holds (a test lobby whose mode is set has no Mode vote), each found by its id, never by its
+  // place: so a vote always shows its own options, in their one fixed order.
+  const all = squadsVotes();
+  const defs = vote.count < all.length ? all.filter((d) => d.id !== "mode") : all;
+  const def = all.find((d) => d.id === vote.id) ?? defs[vote.index]!;
   const host: VoteHost = useMemo(
     () => ({
       // (Every pawn on one side: there are no teams here, only squads.)

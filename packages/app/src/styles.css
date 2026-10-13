@@ -4143,13 +4143,6 @@ button.history-label {
   gap: 4px 8px;
   align-items: center;
 }
-/* From Black's side the zones run the other way, so the cards do too. */
-.vote-cards.flipped {
-  direction: rtl;
-}
-.vote-cards.flipped .vote-card {
-  direction: ltr;
-}
 
 /* ---- Play now ---- */
 .play-now {

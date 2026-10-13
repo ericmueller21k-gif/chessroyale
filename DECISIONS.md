@@ -2674,3 +2674,7 @@ takes the seat, the other plays on and hosts); every confirm checked clear of th
 bars and the clocks. Frame by frame (`npm run frames:resign`, phone 390 and computer 1280, light and dark, Boss alone
 and a Crowd match): the sheet and confirm never cover the board or the line above it, the board never moves, no frame
 blinks.
+
+## Vote options never move (Oct 13, 2026)
+
+Eric: "The voting rounds in all modes should never change position. They should always be slowest on the left, fastest on the right; for the mode type, just pick one order." Every vote now keeps its data order on every screen (Black's turned board no longer mirrors the zones and cards), speeds run Rapid, Blitz, Bullet in the 50 v 50 and Squads, Mode stays Classic, Mercenary, Coming soon, and each default is named by id (Blitz, Classic, Team final, Normal start).

@@ -22,6 +22,7 @@ import {
   voteZoneAt,
   voteZoneBox,
   voteZoneCentre,
+  voteZoneFor,
   voteZoneSpot,
   type MatchState,
   type Settings,
@@ -29,35 +30,54 @@ import {
 
 const crowd: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: true }) };
 const speed = PREGAME_VOTES.find((v) => v.id === "speed")!;
-/** Crowd 50 v 50's settings once each time control has won the vote. */
-const won = (option: number): Settings => ({ ...crowd, ...speed.options[option]!.patch });
-const bullet = won(0);
-const blitz = won(1);
-const rapid = won(2);
+/** Crowd 50 v 50's settings once each time control has won the vote (by its id: the order is the vote's business). */
+const won = (id: string): Settings => ({ ...crowd, ...speed.options.find((o) => o.id === id)!.patch });
+const bullet = won("bullet");
+const blitz = won("blitz");
+const rapid = won("rapid");
+
+describe("every vote's options keep one fixed order (Eric, Oct 13: \"should never change position\")", () => {
+  it("each vote's options, left to right, and its default by id", () => {
+    expect(PREGAME_VOTES.map((v) => [v.id, v.options.map((o) => o.id), v.options[v.defaultOption]!.id])).toEqual([
+      ["format", ["team", "boss", "duel"], "team"],
+      ["speed", ["rapid", "blitz", "bullet"], "blitz"],
+    ]);
+  });
+
+  it("from either side the options run left to right on screen: Black's turned board takes the zones the other way round", () => {
+    // A zone's left edge on screen, in squares: from White's side its x; from Black's (the board turned) 8 minus its right edge.
+    const left = (zone: number, viewer: "w" | "b") => (viewer === "w" ? voteZoneBox(zone).x0 : 8 - voteZoneBox(zone).x1);
+    for (const viewer of ["w", "b"] as const) {
+      const xs = [0, 1, 2].map((option) => left(voteZoneFor(option, viewer), viewer));
+      expect(xs).toEqual([1, 3, 5]);
+      // Its own inverse: a zone gives back the option it holds.
+      for (const option of [0, 1, 2]) expect(voteZoneFor(voteZoneFor(option, viewer), viewer)).toBe(option);
+    }
+  });
+});
 
 describe("the clock vote: three chess time controls", () => {
-  it("Bullet 3+2, Blitz 5+3, Rapid 10+5 from left to right; each patch sets the bank, the increment and the cap", () => {
+  it("Rapid 10+5, Blitz 5+3, Bullet 3+2 from left to right (slowest to fastest); each patch sets the bank, the increment and the cap", () => {
     expect(speed.title).toBe("How fast?");
-    expect(speed.options.map((o) => o.id)).toEqual(["bullet", "blitz", "rapid"]);
-    expect(speed.options.map((o) => o.label)).toEqual(["Bullet 3+2", "Blitz 5+3", "Rapid 10+5"]);
+    expect(speed.options.map((o) => o.id)).toEqual(["rapid", "blitz", "bullet"]);
+    expect(speed.options.map((o) => o.label)).toEqual(["Rapid 10+5", "Blitz 5+3", "Bullet 3+2"]);
     expect(speed.options.map((o) => o.blurb)).toEqual([
-      "3 min + 2 s a move · max 10 s",
-      "5 min + 3 s a move · max 15 s",
       "10 min + 5 s a move · max 20 s",
+      "5 min + 3 s a move · max 15 s",
+      "3 min + 2 s a move · max 10 s",
     ]);
     expect(speed.options.map((o) => o.patch)).toEqual([
-      { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10, moveClockSteps: [] },
-      { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15, moveClockSteps: [] },
       { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20, moveClockSteps: [] },
+      { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15, moveClockSteps: [] },
+      { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10, moveClockSteps: [] },
     ]);
     // Nothing old is left in the vote.
     expect(speed.options.some((o) => /normal|variable|slow|rising/i.test(o.id + o.label + o.blurb))).toBe(false);
   });
 
-  it("nobody votes: the middle option, Blitz", () => {
-    expect(speed.defaultOption).toBe(1);
+  it("nobody votes: Blitz, named by its id", () => {
     expect(speed.options[speed.defaultOption]!.id).toBe("blitz");
-    expect(tallyVotes([], 3, speed.defaultOption, mulberry32(1))).toBe(1);
+    expect(speed.options[tallyVotes([], 3, speed.defaultOption, mulberry32(1))]!.id).toBe("blitz");
   });
 
   it("Rapid is today's clock: the same as Crowd without the vote (votes off, everyone moves, raids)", () => {
@@ -74,7 +94,7 @@ describe("the clock vote: three chess time controls", () => {
     const rising = { ...crowd, moveClockSteps: [{ fromMove: 6, seconds: 15 }, { fromMove: 1, seconds: 10 }] };
     expect([0, 1, 5, 6, 40].map((m) => moveClockAt(rising, m))).toEqual([10, 10, 10, 15, 15]);
     // A time control's patch clears a schedule.
-    expect(moveClockAt({ ...rising, ...speed.options[0]!.patch }, 6)).toBe(10);
+    expect(moveClockAt({ ...rising, ...bullet }, 6)).toBe(10);
   });
 
   it("old ?speed= ids map to the new ones; an unknown id gets the default; no id is nothing", () => {

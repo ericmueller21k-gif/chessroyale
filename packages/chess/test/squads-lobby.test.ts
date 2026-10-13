@@ -145,19 +145,19 @@ describe("Squads: the bracket", () => {
 describe("Squads: pre-game votes", () => {
   const votes = squadsVotes();
 
-  it("three votes: Mode first (Classic, Mercenary, Coming soon), then Start (3 options) and Clock (Bullet, Blitz, Rapid from settings)", () => {
+  it("three votes: Mode first (Classic, Mercenary, Coming soon), then Start (3 options) and Clock (Rapid, Blitz, Bullet from settings)", () => {
     expect(votes.map((v) => v.id)).toEqual(["mode", "start", "clock"]);
     expect(votes[0]!.options.map((o) => o.rule.mode ?? null)).toEqual(["classic", "mercenary", null]);
     expect(votes[0]!.options.map((o) => o.label)).toEqual(["Classic", "Mercenary", "Coming soon"]);
     expect(votes[0]!.options.map((o) => !!o.disabled)).toEqual([false, false, true]);
     expect(votes[1]!.options.map((o) => o.rule.start)).toEqual(["standard", "same", "random"]);
     expect(votes[2]!.options.map((o) => o.rule.clock)).toEqual([...SQUADS.clocks]);
-    expect(votes[2]!.options.map((o) => o.id)).toEqual(["bullet", "blitz", "rapid"]);
-    expect(votes[2]!.options.map((o) => o.icon)).toEqual(["⚡", "🔥", "⏱️"]);
+    expect(votes[2]!.options.map((o) => o.id)).toEqual(["rapid", "blitz", "bullet"]);
+    expect(votes[2]!.options.map((o) => o.icon)).toEqual(["⏱️", "🔥", "⚡"]);
     // Each card in chess form, its numbers from settings: "Bullet 2+1", "2 min + 1 s a move · max 10 s".
     SQUADS.clocks.forEach((c, i) => {
       const o = votes[2]!.options[i]!;
-      expect(o.label).toBe(`${["Bullet", "Blitz", "Rapid"][i]} ${clockName(c)}`);
+      expect(o.label).toBe(`${["Rapid", "Blitz", "Bullet"][i]} ${clockName(c)}`);
       expect(o.label).toBe(clockLabel(c));
       expect(o.blurb).toBe(`${minutesName(c.bankSeconds)} min + ${c.incrementSeconds} s a move · max ${c.capSeconds} s`);
       expect(o.detail).toBe(teamClockDetail(c));
@@ -176,8 +176,9 @@ describe("Squads: pre-game votes", () => {
     );
   });
 
-  it("the three options go from fastest to slowest: every one with an increment that banks and its own cap on a move", () => {
-    const [bullet, blitz, rapid] = SQUADS.clocks as [SquadsClock, SquadsClock, SquadsClock];
+  it("the three options go from slowest to fastest, left to right: every one with an increment that banks and its own cap on a move", () => {
+    const [rapid, blitz, bullet] = SQUADS.clocks as [SquadsClock, SquadsClock, SquadsClock];
+    expect([rapid.id, blitz.id, bullet.id]).toEqual(["rapid", "blitz", "bullet"]);
     for (const c of SQUADS.clocks) {
       expect(c.incrementSeconds).toBeGreaterThan(0);
       expect(c.delaySeconds).toBeGreaterThan(0);
@@ -197,17 +198,18 @@ describe("Squads: pre-game votes", () => {
     expect(clockLabel({ label: "Bullet", bankSeconds: 120, incrementSeconds: 1 })).toBe("Bullet 2+1");
   });
 
-  it("nobody voting gives Classic, the normal start and the Blitz clock (the middle option)", () => {
-    expect(rulesFromVotes({})).toEqual({ mode: "classic", start: "standard", clock: SQUADS.clocks[SQUADS.clockDefault] });
-    expect(SQUADS.clockDefault).toBe(1);
-    expect(SQUADS.clocks[SQUADS.clockDefault]!.id).toBe("blitz");
-    expect(defaultClock()).toBe(SQUADS.clocks[1]);
+  it("nobody voting gives Classic, the normal start and the Blitz clock, each named by its id", () => {
+    expect(SQUADS.clockDefault).toBe("blitz");
+    expect(rulesFromVotes({})).toEqual({ mode: "classic", start: "standard", clock: SQUADS.clocks.find((c) => c.id === "blitz") });
+    expect(defaultClock().id).toBe("blitz");
+    for (const v of votes) expect(v.options[v.defaultOption]!.id).toBe({ mode: "classic", start: "standard", clock: "blitz" }[v.id]);
     expect(rulesFromVotes({ start: 2, clock: 0 })).toEqual({ mode: "classic", start: "random", clock: SQUADS.clocks[0] });
+    expect(rulesFromVotes({ clock: 0 }).clock.id).toBe("rapid");
     expect(rulesFromVotes({ mode: 1 }).mode).toBe("mercenary");
   });
 
   it("old Clock ids map to the new options (fast → bullet, normal → blitz, long → rapid); an unknown id gets the default, never a crash", () => {
-    const [bullet, blitz, rapid] = SQUADS.clocks as [SquadsClock, SquadsClock, SquadsClock];
+    const [rapid, blitz, bullet] = SQUADS.clocks as [SquadsClock, SquadsClock, SquadsClock];
     expect(clockById("bullet")).toBe(bullet);
     expect(clockById("Blitz")).toBe(blitz);
     expect(clockById(" rapid ")).toBe(rapid);
@@ -215,8 +217,8 @@ describe("Squads: pre-game votes", () => {
     expect(clockById("normal")).toBe(blitz);
     expect(clockById("LONG")).toBe(rapid);
     for (const odd of ["", "slow", "variable", "classic", "constructor", "__proto__", null, undefined]) expect(clockById(odd)).toBe(blitz);
-    // (A stored vote's result is the option's place: an old lobby's Fast, Normal or Long vote reads as Bullet, Blitz or Rapid.)
-    expect([0, 1, 2].map((i) => rulesFromVotes({ clock: i }).clock.id)).toEqual(["bullet", "blitz", "rapid"]);
+    // (A vote's result is the option's place, left to right: Rapid, Blitz, Bullet.)
+    expect([0, 1, 2].map((i) => rulesFromVotes({ clock: i }).clock.id)).toEqual(["rapid", "blitz", "bullet"]);
     expect(rulesFromVotes({ clock: 7 }).clock).toBe(blitz);
   });
 

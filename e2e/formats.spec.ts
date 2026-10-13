@@ -66,7 +66,8 @@ test("pre-game votes: the cards vote too; the winners set the ending and the clo
   // Vote 2: tap the Bullet card.
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("radio", { name: /Bullet/ }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(0);
+  // (Bullet is the right-hand card: slowest on the left, fastest on the right.)
+  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(2);
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.vote?.result ?? null), { timeout: 15_000 }).not.toBeNull();
   const result: number = await page.evaluate(() => (window as any).match.phase.vote.result);
   await expect.poll(() => phase(page), { timeout: 20_000 }).toMatch(/play|watching/);
