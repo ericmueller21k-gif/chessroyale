@@ -21,7 +21,7 @@ engine server's sections (indexed in `DECISIONS.md`, in `docs/history/ops.md` an
 | Deploy config, monitoring, alerts | `wrangler.jsonc`, `DEPLOY.md` |
 
 Not yours:
-- game rules, screens and rating maths
+- game rules, screens and rating math
 - the engine's judging (`engine`), although the engine server's capacity is shared ground: agree changes with it
 
 ## Rules

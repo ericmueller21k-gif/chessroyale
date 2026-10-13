@@ -183,7 +183,7 @@ export function CrowdGhosts({
       {tags && [...byMove].map(([move, ps]) => {
         const to = at(move.slice(2, 4), orientation, turn);
         // One name (yours if you picked it, else the best-placed) over the square, and "+N" for everyone else on the
-        // piece's corner: both inside the square, so neighbouring squares never overlap.
+        // piece's corner: both inside the square, so neighboring squares never overlap.
         const top = [...ps].sort((a, b) => Number(b.you) - Number(a.you) || a.rank - b.rank)[0]!;
         const more = ps.length - 1;
         const you = ps.some((p) => p.you);

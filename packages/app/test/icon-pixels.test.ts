@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ICON_SIZE, UNDO_STEPS, floodFill, remember, toHex, toRgba, type Pixels } from "../src/icon-pixels.ts";
 
 /**
- * The icon builder's paint bucket (Eric, Oct 10): filling an area with the colour it already had never ended, and the
- * tab ran out of memory. The colour was a signed number, the pixels unsigned, so "already that colour" was never true.
+ * The icon builder's paint bucket (Eric, Oct 10): filling an area with the color it already had never ended, and the
+ * tab ran out of memory. The color was a signed number, the pixels unsigned, so "already that color" was never true.
  */
 
 const N = ICON_SIZE * ICON_SIZE;
@@ -13,7 +13,7 @@ const RED = toRgba("#ed1c24");
 const BLUE = toRgba("#00a2e8");
 
 describe("icon pixels", () => {
-  it("colours are unsigned, like the pixels that hold them, and round-trip", () => {
+  it("colors are unsigned, like the pixels that hold them, and round-trip", () => {
     for (const hex of ["#000000", "#ffffff", "#ed1c24", "#c3c3c3", "#0b0b14"]) {
       const v = toRgba(hex);
       expect(v).toBeGreaterThanOrEqual(0);
@@ -30,16 +30,16 @@ describe("icon pixels", () => {
     expect(p.every((v) => v === RED)).toBe(true);
   });
 
-  it("filling with the colour already there changes nothing, at once, however often", () => {
+  it("filling with the color already there changes nothing, at once, however often", () => {
     const p = blank();
     floodFill(p, 10, 10, RED);
     for (let i = 0; i < 50; i++) expect(floodFill(p, i % ICON_SIZE, (i * 7) % ICON_SIZE, RED)).toBe(0);
     expect(p.every((v) => v === RED)).toBe(true);
-    // (And the colour given as the signed number the old code used.)
+    // (And the color given as the signed number the old code used.)
     expect(floodFill(p, 3, 3, RED | 0)).toBe(0);
   });
 
-  it("a full canvas refilled in another colour, back and forth", () => {
+  it("a full canvas refilled in another color, back and forth", () => {
     const p = blank();
     for (let i = 0; i < 20; i++) {
       const c = i % 2 ? BLUE : RED;
@@ -55,7 +55,7 @@ describe("icon pixels", () => {
     expect(at(p, 19, 47)).toBe(RED);
     expect(at(p, 20, 0)).toBe(BLUE);
     expect(at(p, 21, 0)).toBe(0);
-    // Diagonal neighbours aren't joined.
+    // Diagonal neighbors aren't joined.
     const q = blank();
     q[0] = RED;
     q[ICON_SIZE + 1] = RED;
@@ -66,7 +66,7 @@ describe("icon pixels", () => {
   it("the edges and corners: rows and columns don't wrap round", () => {
     const p = blank();
     p[ICON_SIZE - 1] = RED; // top-right corner
-    p[ICON_SIZE] = RED; // the next row's first pixel, its neighbour in memory but not on screen
+    p[ICON_SIZE] = RED; // the next row's first pixel, its neighbor in memory but not on screen
     expect(floodFill(p, ICON_SIZE - 1, 0, BLUE)).toBe(1);
     expect(at(p, 0, 1)).toBe(RED);
     expect(floodFill(p, ICON_SIZE - 1, ICON_SIZE - 1, BLUE)).toBe(N - 2);

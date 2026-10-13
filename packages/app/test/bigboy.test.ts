@@ -37,7 +37,7 @@ describe("Big Boy, the baby boss", () => {
     expect(BIGBOY.anims.wail!.frames.filter((f) => f.cue === "wail")).toHaveLength(1);
   });
 
-  it("shows every colour of the lollipop's swirl at rest, enough of each to read at phone size", () => {
+  it("shows every color of the lollipop's swirl at rest, enough of each to read at phone size", () => {
     const keys = frameKeys(BIGBOY, BIGBOY.anims.idle!.frames[0]!).flat();
     for (const k of RAINBOW) expect(keys.filter((c) => c === k).length, k).toBeGreaterThanOrEqual(20);
   });

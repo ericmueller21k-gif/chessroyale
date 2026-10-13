@@ -5,7 +5,7 @@
  * before keeps them. Next, three close variations of each classic (pitch, EQ and decay changed a little; GPL-3.0 too),
  * then the other wooden options (Kenney's CC0, or ours). An old or unknown id reads as the default. Files: the classics
  * in public/sounds/, the rest in public/sounds/pieces/, made by scripts/piece-sounds.py; where each comes from and its
- * licence: public/sounds/SOURCES.md.
+ * license: public/sounds/SOURCES.md.
  *
  * Pure (storage only): sound.ts plays them, Settings shows them.
  */

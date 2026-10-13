@@ -136,7 +136,7 @@ await cdp.send("Page.stopScreencast");
 polling = false;
 await poll;
 
-// Every frame, its brightness, and anything that flashes against its neighbours.
+// Every frame, its brightness, and anything that flashes against its neighbors.
 const t0 = frames[0]?.t ?? Date.now();
 const rows = [];
 for (const f of frames) {

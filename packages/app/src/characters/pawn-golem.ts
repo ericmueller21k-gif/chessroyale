@@ -257,7 +257,7 @@ export const PAWN_GOLEM: Character = {
   palette: PALETTE,
   halo: "#262a33",
   looks: {
-    // Phase 2 idea, to show a recolour is only a palette: the same golem in black stone.
+    // Phase 2 idea, to show a recolor is only a palette: the same golem in black stone.
     obsidian: { a: "#121216", b: "#1e1e24", c: "#2c2c34", d: "#3e3e48", e: "#55555f", f: "#7a7a86" },
   },
   parts: PARTS,

@@ -125,7 +125,7 @@ test("the queue: your pawn first and ringed, others pop in, Cancel frees the sea
   expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
 
-test("computer: a side menu, the centre and a live panel; the phone keeps one column", async ({ page, browser }) => {
+test("computer: a side menu, the center and a live panel; the phone keeps one column", async ({ page, browser }) => {
   test.setTimeout(2 * 60_000);
   await page.goto("/");
   const menu = page.getByRole("navigation", { name: "Menu" });

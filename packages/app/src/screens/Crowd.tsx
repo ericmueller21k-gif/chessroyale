@@ -525,7 +525,7 @@ function CutNames({ knockedOut }: { knockedOut: Standing[] }) {
 }
 
 /**
- * Crowd's cut, as a judgement: every player is a pawn in a grid (White's team on the left, Black's on the
+ * Crowd's cut, as a judgment: every player is a pawn in a grid (White's team on the left, Black's on the
  * right, everyone in a fixed seat; bots in random hats, you in yours), the judge, a gavel piece, swings down,
  * and the players cut fade out. Then: who went out, whether you're through, and if not, why (the breakdown).
  */

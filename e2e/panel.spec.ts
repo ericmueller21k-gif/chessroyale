@@ -91,7 +91,7 @@ test("the panel under the board is never empty: every tap, every remembered layo
 
   // Every button from every state, by real taps. Making a panel bigger always opens it (Eric: "it should reset the
   // other toggle"); folding leaves just the header. After each tap, a reload keeps the same view.
-  const FOLD = "Minimise the leaderboard and chat";
+  const FOLD = "Minimize the leaderboard and chat";
   const OPEN = "Show the leaderboard and chat";
   const walk: [string, { layout: "split" | "board" | "chat"; open: boolean }][] = [
     [FOLD, { layout: "split", open: false }],
@@ -149,7 +149,7 @@ test("the panel under the board is never empty: every tap, every remembered layo
     expect(v.width, JSON.stringify(v)).toBeGreaterThan(v.vw * 0.8);
   }
   // (No chat: the fold is the scoreboard's alone.)
-  await tap(p, "Minimise the leaderboard");
+  await tap(p, "Minimize the leaderboard");
   await expectShowing(p, { layout: "board", open: false }, "chat off, folded");
   await reload();
   await expectShowing(p, { layout: "board", open: false }, "chat off, folded, reloaded");
@@ -180,7 +180,7 @@ test("solo Crowd (no chat): the scoreboard alone, full width, folds to its heade
   const v = await look(page);
   expect(v.labels.filter((l) => /full width|Side by side/.test(l)), JSON.stringify(v)).toEqual([]);
   expect(v.width, JSON.stringify(v)).toBeGreaterThan(v.vw * 0.8);
-  await tap(page, "Minimise the leaderboard");
+  await tap(page, "Minimize the leaderboard");
   await expectShowing(page, { layout: "board", open: false }, "solo, folded");
   await tap(page, "Show the leaderboard");
   await expectShowing(page, { layout: "board", open: true }, "solo, opened");

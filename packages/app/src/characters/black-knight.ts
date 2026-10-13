@@ -1,5 +1,5 @@
 /**
- * The Black Knight (boss tier 4, from 1900): a dark armoured knight with a plumed helm, a winged spear and a ragged
+ * The Black Knight (boss tier 4, from 1900): a dark armored knight with a plumed helm, a winged spear and a ragged
  * cape, after Eric's reference picture. Drawn facing left, light from the top left.
  */
 import { canvas, edge, ellipse, line, poly, tint, toGrid } from "./paint.ts";
@@ -7,7 +7,7 @@ import type { Anim, Character, Frame, Layer, Part, Speck } from "./sprite.ts";
 
 const PALETTE = {
   k: "#0b0b0f", // outline, seams
-  a: "#141316", // armour: deepest shadow
+  a: "#141316", // armor: deepest shadow
   b: "#1f1d20", // dark
   c: "#2f2b2c", // mid (warm, like the reference)
   d: "#4a413c", // light
@@ -351,7 +351,7 @@ function streaks(dx: number, bob: number, reach: number): Speck[] {
   return out;
 }
 
-/** A burst of sparks at the spear's tip: a white-hot centre, gold rays, a few loose flecks. */
+/** A burst of sparks at the spear's tip: a white-hot center, gold rays, a few loose flecks. */
 function spark(dx: number, bob: number, reach: number): Speck[] {
   const [tx, ty] = levelSpear(dx, bob, reach).tip;
   const cx = tx - 3;

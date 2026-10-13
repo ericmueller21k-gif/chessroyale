@@ -91,7 +91,7 @@ describe("the God King's Last Stand: the rule", () => {
     expect(lastStandDue(10, 0.2, 0, 3, s)).toBe(true);
     // Eric's game 2: the queen hung on move 1, from 72% to 0: far over the plain bar, as before.
     expect(lastStandDue(72, 0.72, 0, 3, s)).toBe(true);
-    // The engine's judgement, not the material: a sacrifice it likes gives nothing away, in any position.
+    // The engine's judgment, not the material: a sacrifice it likes gives nothing away, in any position.
     expect(lastStandDue(0, 0.6, 0, 3, s)).toBe(false);
     expect(lastStandDue(6, 0.6, 30, 0, s)).toBe(false);
     expect(lastStandDue(0, 0.3, 0, 3, s)).toBe(false);
@@ -265,7 +265,7 @@ describe("the God King's Last Stand: the rule", () => {
 
   it("the move he took back doesn't bring the boss's strike closer, and the strike still weighs that round's picks", async () => {
     // Found in a 50 v 50 boss final: a Last Stand on the move after a strike, and the next strike came two crowd
-    // moves later, because the taken-back round counted towards it as a move. Five players: three blunder.
+    // moves later, because the taken-back round counted toward it as a move. Five players: three blunder.
     const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000 } as Settings;
     const engine = judge({ bestExpected: 0.55, blunder: "d2d4", blunderExpected: 0.08 });
     const ids = ["h0", "h1", "h2", "h3", "h4"];

@@ -1,5 +1,5 @@
 /**
- * Boingo's sounds, synthesised (no files, no licences): a pogo boing, a bulb-horn honk, a rubber squeak, a slide
+ * Boingo's sounds, synthesized (no files, no licenses): a pogo boing, a bulb-horn honk, a rubber squeak, a slide
  * whistle up and down, a kazoo laugh (a clown's laugh with no voice), and for his powers a pie's splat and the
  * funhouse's boing-flip. Each is a pure function of the sample rate,
  * so a test can measure it: every one stays quieter than a piece's move sound (peak and loudness; see

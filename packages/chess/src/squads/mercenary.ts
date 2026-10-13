@@ -19,7 +19,7 @@ import type { BoardResult, Colour } from "./board.ts";
  *   already bought this tournament (the Time chip: its own price list), and at most `cap` of an item go into one round.
  *   What's bought (the cart) is that match's kit, used there or lost; Time chips are kept (at most `cap` held).
  * - **The items.** A Stockfish token (your own top moves for one decision, on your own device; never theirs), block
- *   points (more block bank), a shield (the next block against you that would take effect is cancelled, its points
+ *   points (more block bank), a shield (the next block against you that would take effect is canceled, its points
  *   still spent) and Time chips (Eric, Oct 13: tapped on a move for more time on it, kept until used). Items since
  *   taken out (the Breather; the time coin, which became the Time chip) are read away from stored lobbies by
  *   `itemCounts` and `upgradeWallet`.
@@ -78,7 +78,7 @@ export const roundScale = (round: number, s: SquadsSettings = SQUADS): number =>
 /** The coins a capture earns in a round. */
 export const captureCoins = (piece: CapturePiece, round: number, s: SquadsSettings = SQUADS): number => Math.round(s.mercenary.capture[piece] * roundScale(round, s));
 
-/** What a finished board earns in a round: the winning colour its win (and the mate bonus), or each colour the draw. */
+/** What a finished board earns in a round: the winning color its win (and the mate bonus), or each color the draw. */
 export function boardCoins(result: BoardResult, round: number, s: SquadsSettings = SQUADS): { colour: Colour; coins: number; why: CoinWhy }[] {
   const c = s.mercenary;
   const k = roundScale(round, s);

@@ -2024,7 +2024,7 @@ button.history-label {
 }
 /* The line above the board beside the clock. The clock counts this move's seconds down from its allowance, so the
    line's own "⏱ 20 s" shows only when it's lit (the clock went up: "⏱ 15 s ▲"). On a phone the line is barely wider
-   than the board, so its text is centred in the room left of the clock, and gives up words where it must. */
+   than the board, so its text is centered in the room left of the clock, and gives up words where it must. */
 .board-area:has(.board-clock) .clock-part:not(:has(.clock-note.up)) {
   display: none;
 }
@@ -2218,7 +2218,7 @@ button.history-label {
   .screen.game .board-row .eval-bar ~ .board-wrap {
     width: min(calc(100% - 48px), calc(100dvh - 330px));
   }
-  /* With the scoreboard minimised, the board takes the room. */
+  /* With the scoreboard minimized, the board takes the room. */
   .screen.game:has(.mini-tower.closed) .board-area .board-wrap {
     width: min(100%, calc(100dvh - 255px));
   }
@@ -2309,7 +2309,7 @@ button.history-label {
   width: 36px;
 }
 
-/* The evaluation bar sits left of the board; a matching gap on the right keeps the board centred. */
+/* The evaluation bar sits left of the board; a matching gap on the right keeps the board centered. */
 .board-row:has(.eval-bar)::after {
   content: "";
   flex: 0 0 18px;
@@ -2387,7 +2387,7 @@ button.history-label {
   font-weight: 800;
 }
 
-/* ---- Power-ups: a row of small round slots (lit = held, grey = missing or used) ---- */
+/* ---- Power-ups: a row of small round slots (lit = held, gray = missing or used) ---- */
 
 .pu-row {
   display: flex;
@@ -2960,7 +2960,7 @@ button.history-label {
   color: var(--good);
   font-weight: 800;
   /* A flash as it appears (not a bump: the line above the board clips anything taller than itself). The solid
-     layer fades rather than the colours mixing (Chrome mixes color-mix() colours into odd ones on the way). */
+     layer fades rather than the colors mixing (Chrome mixes color-mix() colors into odd ones on the way). */
   animation: clock-up-text 900ms ease-out;
 }
 .clock-note.up::before {
@@ -3450,7 +3450,7 @@ button.history-label {
   border: 3px solid color-mix(in srgb, var(--accent) 80%, transparent);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   border-radius: 6px;
-  /* (No colour transitions: Chrome mixes these color-mix() colours into a vivid green on the way.) */
+  /* (No color transitions: Chrome mixes these color-mix() colors into a vivid green on the way.) */
   transition:
     opacity 300ms,
     transform 200ms;
@@ -3526,7 +3526,7 @@ button.history-label {
   }
 }
 
-/* Everyone's pawn: a faint ghost of them, dressed as they are, centred on its spot. */
+/* Everyone's pawn: a faint ghost of them, dressed as they are, centered on its spot. */
 .vote-pawn {
   position: absolute;
   width: var(--vp);
@@ -3626,7 +3626,7 @@ button.history-label {
 }
 /*
  * A banner with a detail line (Squads' Mode, Start and Clock votes) is too tall to start 28% down a 320 px phone's board
- * (it ran over the cards under it): centred in the board instead. `translate`, not `transform`: banner-in scales it.
+ * (it ran over the cards under it): centered in the board instead. `translate`, not `transform`: banner-in scales it.
  */
 .vote-banner.with-detail {
   top: 50%;
@@ -3756,7 +3756,7 @@ button.history-label {
     animation: none;
   }
 }
-/* Phones: the scoreboard minimised makes the game's board bigger; the vote's board matches it. */
+/* Phones: the scoreboard minimized makes the game's board bigger; the vote's board matches it. */
 @media (max-width: 899px) and (min-height: 520px) {
   .screen.game.vote-screen.tower-closed .board-row .eval-bar ~ .board-wrap {
     width: min(calc(100% - 48px), calc(100dvh - 255px));
@@ -4092,7 +4092,7 @@ button.history-label {
 
 /* ---- The God King (GodKing.tsx; his pixel art in characters/god-king.ts) ---- */
 /* The box is his drawing space, one board square: his frame (with room for wings, sword and cape) is placed so the
-   drawing space fills the box's height, his feet at its bottom centre. Nothing outside the box takes a tap. */
+   drawing space fills the box's height, his feet at its bottom center. Nothing outside the box takes a tap. */
 .god-king {
   position: relative;
   display: block;
@@ -4164,7 +4164,7 @@ button.history-label {
 }
 .ks-bolt {
   fill: none;
-  /* His colours: the equipped King effect from the shop (Holy Light by default). */
+  /* His colors: the equipped King effect from the shop (Holy Light by default). */
   stroke: var(--ks-bolt, #fffdf0);
   stroke-width: 3.5;
   stroke-linecap: round;
@@ -4318,7 +4318,7 @@ button.history-label {
   color: var(--bad);
 }
 /* Computers: the dock stays under the board at every width (Eric, Oct 9: it had been in the column beside the board,
-   at its top): the status line with « », centred under the board at its width. The God King stands by the board's
+   at its top): the status line with « », centered under the board at its width. The God King stands by the board's
    bottom-right corner instead, mirroring the boss by its bottom-left (Eric, Oct 11: they face each other across the
    board): his feet on the board's bottom edge like the boss's, his middle as far from the board as the boss's (see
    .boss-side: `--gk-off`, his box 26 px from the board's edge with the eval bar, 2 px without), his crowns under his
@@ -4402,7 +4402,7 @@ button.history-label {
 .gk-unit-btn:disabled {
   opacity: 1;
 }
-/* He stays in full colour whether or not he can be summoned, and once his moves are used (Eric, Oct 9): the crowns
+/* He stays in full color whether or not he can be summoned, and once his moves are used (Eric, Oct 9): the crowns
    under him say what's left. */
 .gk-unit:not(.ready) .god-king {
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
@@ -4838,7 +4838,7 @@ button.history-label {
   box-shadow: 0 0 0 2px #f2c14e, 0 0 14px rgba(242, 193, 78, 0.6);
 }
 
-/* The God King's cut-in: the START banner's motion in his colours, his portrait, the move, the piece. */
+/* The God King's cut-in: the START banner's motion in his colors, his portrait, the move, the piece. */
 .fight-banner.king-cut .fb-band {
   height: 36%;
   gap: 2.5cqw;
@@ -5604,7 +5604,7 @@ button.history-label {
   }
 }
 
-/* ---- The cut as a judgement: the gavel, and every player's pawn ---- */
+/* ---- The cut as a judgment: the gavel, and every player's pawn ---- */
 .crowd-cut.judge {
   gap: 10px;
   /* From the top, so nothing moves when the verdict appears under the grid. */
@@ -6231,7 +6231,7 @@ button.history-label {
   font-size: 10px;
   font-weight: 800;
 }
-/* A stack's count (copies of the same item in the same colour), top right. */
+/* A stack's count (copies of the same item in the same color), top right. */
 .locker-count {
   position: absolute;
   top: 4px;
@@ -6378,7 +6378,7 @@ button.history-label {
     transform: scale(1);
   }
 }
-/* 1. Everything freezes: the board goes cold and grey, under a dark red pulse (never a white flash). */
+/* 1. Everything freezes: the board goes cold and gray, under a dark red pulse (never a white flash). */
 .ls-freeze {
   position: absolute;
   inset: 0;
@@ -6467,7 +6467,7 @@ button.history-label {
   height: 100%;
   background-size: cover;
 }
-/* 5. The slashes he takes, their damage numbers and a few stylised drops. */
+/* 5. The slashes he takes, their damage numbers and a few stylized drops. */
 .ls-slash {
   stroke: #fff4f4;
   stroke-width: 6;
@@ -6577,7 +6577,7 @@ button.history-label {
     opacity: 0;
   }
 }
-/* Fallen: on his side, cracked and greyed, for the rest of the battle. No menu, no crowns. */
+/* Fallen: on his side, cracked and grayed, for the rest of the battle. No menu, no crowns. */
 .gk-unit.fallen .gk-unit-btn {
   cursor: default;
   background: none;
@@ -7341,7 +7341,7 @@ button.fd-logo {
   border-radius: 22px;
   padding: 18px;
 }
-/* Your icon to the left of your name and rating: the pair centred under your pawn, the words ranged left. */
+/* Your icon to the left of your name and rating: the pair centered under your pawn, the words ranged left. */
 .fd-hero-id {
   display: flex;
   align-items: center;
@@ -7870,7 +7870,7 @@ button.fd-logo {
   color: var(--fd-text);
 }
 
-/* -- The FAQ, "How HunChess works" (screens/Faq.tsx): a readable column in the app's type and colours -- */
+/* -- The FAQ, "How HunChess works" (screens/Faq.tsx): a readable column in the app's type and colors -- */
 .fd-faq {
   gap: 14px;
   width: 100%;
@@ -8324,8 +8324,8 @@ button.fd-logo {
   font-weight: 600;
   font-size: 14px;
 }
-/* A rank: its colour on a tint of it (dark), or darkened on a tint of white (light). core's profile test checks each
-   rank's colour stays 4.5:1 through these mixes, so change them together. */
+/* A rank: its color on a tint of it (dark), or darkened on a tint of white (light). core's profile test checks each
+   rank's color stays 4.5:1 through these mixes, so change them together. */
 .fd-pill.tier,
 .fd-rank {
   --fd-tier-ink: var(--tier);
@@ -8626,7 +8626,7 @@ button.fd-seat {
   color: inherit;
 }
 
-/* -- The computer's frame (1024 px and wider): a side menu, the centre, a side panel (live line, playing now) -- */
+/* -- The computer's frame (1024 px and wider): a side menu, the center, a side panel (live line, playing now) -- */
 .fd-side,
 .fd-right {
   display: none;
@@ -8643,7 +8643,7 @@ button.fd-seat {
     width: 100%;
     max-width: 920px;
     justify-self: center;
-    /* Other screens in the frame (the shop) take the centre's width, not the window's. */
+    /* Other screens in the frame (the shop) take the center's width, not the window's. */
     --col: 100%;
   }
   .fd-side {
@@ -8763,7 +8763,7 @@ button.fd-seat {
     background: var(--fd-panel-2);
     font-size: 18px;
   }
-  /* Pages (profile, settings) and the private lobby: a readable column in the centre. */
+  /* Pages (profile, settings) and the private lobby: a readable column in the center. */
   .fd-root.framed .fd-page {
     padding: 28px 32px 40px;
   }
@@ -9711,7 +9711,7 @@ img.qicon {
   padding-right: 2px;
 }
 
-/* A page's chat (results, watching, the cut once you're out): a box in the page's own colours. */
+/* A page's chat (results, watching, the cut once you're out): a box in the page's own colors. */
 .qchat-page {
   flex: none;
   align-self: center;
@@ -10359,7 +10359,7 @@ img.qicon {
   flex: none;
   pointer-events: none;
 }
-/* The frame (with room above for jumps) is placed so the character's feet sit on the box's bottom centre. */
+/* The frame (with room above for jumps) is placed so the character's feet sit on the box's bottom center. */
 .boss-char-sprite {
   position: absolute;
   left: calc(50% - var(--bc-fx) * var(--bc-scale) * 1px);
@@ -10674,7 +10674,7 @@ img.qicon {
   }
 }
 
-/* The funhouse's later steps: a quarter turn of the board in its own plane, clockwise or anticlockwise (the pieces go
+/* The funhouse's later steps: a quarter turn of the board in its own plane, clockwise or counterclockwise (the pieces go
    round with it for a moment), then it's drawn at its new angle, untransformed (Board's turn: the board places its
    squares then). Shrunk at the halfway point so its corners stay in its box. */
 .pw-turning-cw .board-wrap {
@@ -10706,7 +10706,7 @@ img.qicon {
   }
 }
 
-/* The power's banner: the God King's cut-in, the boss on the left, him on the right; its colours by the power. */
+/* The power's banner: the God King's cut-in, the boss on the left, him on the right; its colors by the power. */
 .pc-boss .boss-portrait {
   display: block;
   width: 82%;
@@ -11592,7 +11592,7 @@ img.qicon {
 .pm-block .pm-caster {
   aspect-ratio: 78 / 92;
 }
-/* The toy block's banner: toy-box colours. */
+/* The toy block's banner: toy-box colors. */
 .fight-banner.power-cut.toy .fb-band {
   background: repeating-linear-gradient(115deg, #c2410c 0 6cqw, #1d4ed8 6cqw 12cqw, #15803d 12cqw 18cqw);
   border-color: #fde68a;
@@ -11792,7 +11792,7 @@ img.qicon {
   z-index: 1;
   pointer-events: none;
 }
-/* The gap: GAP_W (14) of the board's 256 frame pixels, centred on the line between the d and e files; a shadow round
+/* The gap: GAP_W (14) of the board's 256 frame pixels, centered on the line between the d and e files; a shadow round
    it so the halves read as apart. */
 .board-wrap > .sw-gap {
   position: absolute;
@@ -11868,7 +11868,7 @@ img.qicon {
   filter: drop-shadow(0 0.25px 0 #4a2611);
 }
 /* The three duels on the crowd's turn: a rope of light from each of its pieces to the one it must take, gently pulsing
-   (its opacity: no colour transitions), a dark edge under it so it reads on light and dark squares alike. */
+   (its opacity: no color transitions), a dark edge under it so it reads on light and dark squares alike. */
 .pg-duels {
   position: absolute;
   top: 0;
@@ -11976,7 +11976,7 @@ img.qicon {
 
 /* ==== Squads (docs/areas/squads.md, "The screens"): every class is sq-, so none falls into another screen's rules ==== */
 
-/* A squad's name with its colour. */
+/* A squad's name with its color. */
 .sq-tag {
   display: inline-flex;
   align-items: center;
@@ -11995,7 +11995,7 @@ img.qicon {
 .sq-tag.you {
   color: var(--accent);
 }
-/* A team clock. Sudden death: red, pulsing (a shadow, never a colour transition). */
+/* A team clock. Sudden death: red, pulsing (a shadow, never a color transition). */
 .sq-clock {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -12372,7 +12372,7 @@ button.sq-tiny {
   gap: 5px;
   line-height: 1.15;
 }
-/* (A narrow phone: under the board each squad is its colour; its name is in the score line above.) */
+/* (A narrow phone: under the board each squad is its color; its name is in the score line above.) */
 @media (max-width: 374px) {
   .sq-clockline {
     gap: 5px;

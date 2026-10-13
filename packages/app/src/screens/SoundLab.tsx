@@ -84,7 +84,7 @@ export function SoundLab({ onBack }: { onBack: () => void }) {
       </ul>
       <p class="muted small">
         Found a sound you like? Send the file (or a link) and it can replace any of these. Good free sources: freesound.org
-        (filter by the CC0 licence; try “steel drum hit”, “kalimba”, “roulette”), or make one in BeepBox (beepbox.co) and
+        (filter by the CC0 license; try “steel drum hit”, “kalimba”, “roulette”), or make one in BeepBox (beepbox.co) and
         export a WAV.
       </p>
       <button type="button" class="btn btn-secondary" onClick={onBack}>

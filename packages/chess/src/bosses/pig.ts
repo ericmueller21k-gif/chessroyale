@@ -3,7 +3,7 @@
  * since "wrangler" is Cloudflare's CLI in this repo): his rules. Eric's design with the director's calls (DECISIONS.md,
  * "Wrangler, built"). Every power is checked by the engine, so it bends the game and never breaks it.
  *
- * - **The long pull** (his opening): his first move is a centre pawn's double step, lassoed one square further: three
+ * - **The long pull** (his opening): his first move is a center pawn's double step, lassoed one square further: three
  *   squares in one move (e2-e5 or d2-d5 as White; d7-d4 or e7-e4 as Black, after the crowd's first move). The engine
  *   picks the d- or e-pawn; none sound (it would hang the pawn, or its path or square is taken): an ordinary first move.
  * - **The lasso drag** (his passive): every few turns, after his move, he ropes one crowd piece (never the king) and
@@ -183,7 +183,7 @@ export function pullFen(fen: string, pull: string): string | null {
 }
 
 /**
- * Which long pull he plays (Eric: the engine picks the best centre pawn for the position): of the pulls (pullOptions),
+ * Which long pull he plays (Eric: the engine picks the best center pawn for the position): of the pulls (pullOptions),
  * the one whose position is best for him, as long as it costs him no more than pullMaxLoss pawns against his best
  * ordinary move (else it hangs the pawn: no pull). Each position searched at pullNodes. Null: an ordinary first move.
  */
@@ -217,7 +217,7 @@ const ORTHO = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
 /**
  * Every lasso drag the rules allow now (`fen`: his move just played, the crowd to move): a crowd piece, never the king
- * nor a bishop (it would change colour), one square up, down, left or right onto an empty square, a pawn never onto the first or last
+ * nor a bishop (it would change color), one square up, down, left or right onto an empty square, a pawn never onto the first or last
  * rank (so never onto its own back rank), never onto the en passant square; never leaving the crowd in check (a piece
  * dragged out of a pin's line) or his king attacked, and never leaving the crowd without a move. Castling rights go
  * with a rook dragged off its corner. Pure: the server checks the host's drag against it.
@@ -228,8 +228,8 @@ export function dragOptions(fen: string, opts: { legal?: boolean } = {}): DragOp
   const ep = fen.split(" ")[3];
   const out: DragOption[] = [];
   for (const [sq, c] of [...g0].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
-    // (Never the king; never a bishop either, my call: a square up, down or sideways is a square of the other colour,
-    // and two bishops on one colour is a position no game could reach, as Big Boy's bounce keeps them on theirs.)
+    // (Never the king; never a bishop either, my call: a square up, down or sideways is a square of the other color,
+    // and two bishops on one color is a position no game could reach, as Big Boy's bounce keeps them on theirs.)
     if (!mineOf(c, crowd) || c.toLowerCase() === "k" || c.toLowerCase() === "b") continue;
     for (const [df, dr] of ORTHO) {
       const f = file(sq) + df;
@@ -374,7 +374,7 @@ const inMiddle = (sq: string) => file(sq) >= 1 && file(sq) <= 6 && rank(sq) >= 3
 /** The six squares stand close together: within this many files of each other (the middle is six wide). */
 const SPAN_FILES = 4;
 
-/** The squares strictly between two squares on a line (none for a knight's jump or neighbours). */
+/** The squares strictly between two squares on a line (none for a knight's jump or neighbors). */
 function between(a: string, b: string): string[] {
   const df = file(b) - file(a);
   const dr = rank(b) - rank(a);
@@ -426,7 +426,7 @@ function lineupFault(g: Grid, pairs: readonly ShowdownPair[], crowd: Side): stri
  * A line-up as written (lineupSpec) checked against the rules in this position (`fen`: his move just played, the crowd
  * to move): 2 or 3 pairs (`duels`), each a crowd piece and one of his of the same kind (a queen, rook, bishop or knight:
  * never a king or pawn), every square moved to in the middle (files b-g, ranks 3-6), the six within five files, each
- * moved piece's from-square its own and no square used twice, bishops on their own colour, each pair facing off with
+ * moved piece's from-square its own and no square used twice, bishops on their own color, each pair facing off with
  * nothing or one empty square between (knights a jump apart), his pieces protected, no check either way, and every duel
  * legal. Returns the checked line-up, or null. Pure: the server checks the host's answer with it.
  */
@@ -478,7 +478,7 @@ export function checkLineup(fen: string, spec: string | null | undefined, duels:
 
 /**
  * The kinds of pair a showdown of `n` duels lines up (Eric: the most valuable pairs): queens, rooks, then bishops (both
- * on one colour) or knights (`minor` first), each kind once while there are enough kinds, then a second pair of a kind
+ * on one color) or knights (`minor` first), each kind once while there are enough kinds, then a second pair of a kind
  * both sides have two of. Null when there aren't `n` pairs to be had.
  */
 function pairKinds(g: Grid, crowd: Side, n: number, minor: "b" | "n"): string[] | null {
@@ -584,7 +584,7 @@ export function* lineups(fen: string, seed: number, n: number, tries = 3000): Ge
 /** Tries without a line-up that suits before the search takes any (lineups). */
 const PICKY_TRIES = 1000;
 
-// ---------------- The showdown: the engine's judgement ----------------
+// ---------------- The showdown: the engine's judgment ----------------
 
 /**
  * A line-up as the engine scored it: his edge in pawns after each duel (him to move, against the position before the
@@ -935,7 +935,7 @@ export async function pigTurn(engines: readonly EngineLike[], fen: string, ask: 
 
 /**
  * The board holds three matched pairs for a showdown (`fen`, either side to move: the crowd's pieces and his are told
- * apart by colour, `crowd` its side). Without them, holding his showdown can't help (material only goes): his try is
+ * apart by color, `crowd` its side). Without them, holding his showdown can't help (material only goes): his try is
  * his last at once (two pairs, then a drag).
  */
 export function threePairs(fen: string, crowd: Side): boolean {
@@ -1099,7 +1099,7 @@ export const PIG: BossRules = {
     if (dragDue(boss)) return { drag: true, seed };
     return null;
   },
-  // From the starting position (his long pull needs his centre pawns home), sides as usual (a raid's crowd is White:
+  // From the starting position (his long pull needs his center pawns home), sides as usual (a raid's crowd is White:
   // he plays Black); his first drag on turn dragFirst (the test switch ?power=drag: from turn 2, every 2 turns).
   opening: {
     fromStart: true,

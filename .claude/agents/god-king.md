@@ -53,10 +53,10 @@ Adding a boss: follow the checklist in `docs/areas/bosses.md` ("Adding a boss").
 
 - **He's secondary to the chess.** Big moments are rare and short. No instruction text on screen. He speaks about 5–10
   times a game.
-- **Everything he shows comes in white and black versions:** the sprite, the portrait, any new art. It's a recolour of
-  the armour only (his `black` look); gold, eyes, cape and effects stay the same. Use the crowd's colour.
+- **Everything he shows comes in white and black versions:** the sprite, the portrait, any new art. It's a recolor of
+  the armor only (his `black` look); gold, eyes, cape and effects stay the same. Use the crowd's color.
 - **Style.** SNES/Fire Emblem/Final Fantasy: pixel portraits with crisp scaling, slanted cut-in bands, retro SFX, and a
-  Press Start 2P speech bubble. Drama is welcome; gore isn't. Cracks, sparks and a few stylised red drops are the limit.
+  Press Start 2P speech bubble. Drama is welcome; gore isn't. Cracks, sparks and a few stylized red drops are the limit.
 - **The clock stands still** while he acts on the board, for everyone, solo and online (see how `kingStrikeMs` moves
   every deadline). Nothing he does may cost anyone time.
 - **Fair.** A power never changes how a player's own pick was judged, and a power-up move never earns brilliant credit.

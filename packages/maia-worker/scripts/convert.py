@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Maia box: converts an OFFICIAL Maia-3 checkpoint (CSSLab, University of Toronto) to ONNX, quantises it to int8 and
+# Maia box: converts an OFFICIAL Maia-3 checkpoint (CSSLab, University of Toronto) to ONNX, quantizes it to int8 and
 # checks both against the official PyTorch model. Part of the Maia box (packages/maia-worker), AGPL-3.0: see LICENSE.
 #
 # Usage (any directory; Python 3.11 with the packages in requirements.txt):
@@ -13,7 +13,7 @@
 #        inputs   tokens [B, 64, 96] float32 (8 boards of 12 planes: the official history input; we repeat the
 #                 current board 8 times, as the official engine does by default), elo_self [B], elo_oppo [B] float32
 #        outputs  logits_move [B, 4352] (4096 from-to + 256 promotions), logits_value [B, 3] (loss, draw, win)
-#   5. Quantises it with onnxruntime's dynamic quantisation (int8 weights, per tensor) into model/<name>-int8.onnx.
+#   5. Quantizes it with onnxruntime's dynamic quantization (int8 weights, per tensor) into model/<name>-int8.onnx.
 #   6. Checks the fp32 and int8 files against PyTorch on fixed positions and writes the test fixtures
 #      (test/fixtures/*.json): the official tokenizer's encodings and move indices, and the int8 file's top moves.
 import argparse
@@ -49,7 +49,7 @@ CHECKPOINTS = {
 BOX = Path(__file__).resolve().parents[1]
 HISTORY = 8
 
-# Positions for the checks and the fixtures: both sides to move, castling, en passant, promotions (both colours,
+# Positions for the checks and the fixtures: both sides to move, castling, en passant, promotions (both colors,
 # captures and under-promotions), checks, endgames.
 FENS = [
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
@@ -228,7 +228,7 @@ def main():
         dynamo=False,
     )
     onnx.checker.check_model(str(fp32))
-    log("quantising", int8)
+    log("quantizing", int8)
     int8.parent.mkdir(parents=True, exist_ok=True)
     if int8.exists():
         int8.unlink()

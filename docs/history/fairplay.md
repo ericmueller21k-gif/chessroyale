@@ -19,9 +19,9 @@ should be banned; and a report system. Built by the `fairplay` delegate (`.claud
 - **Reports never ban anyone.** Every report opens a *watch* case (the player's matches are kept as evidence, once
   signals are recorded: step 2). Cheating reports from 3 different signed-in accounts within 7 days put the player in
   **review** (Eric, Oct 8); 2 for a new account (fewer than 10 online matches). My calls:
-  - Only "Cheating" counts towards a review: review holds a player's results, which is a fair-play measure. Name and
+  - Only "Cheating" counts toward a review: review holds a player's results, which is a fair-play measure. Name and
     other reports put the player on watch, in the queue for a person.
-  - Guests' reports are stored and read, but don't count towards a review (anyone can make guest accounts; online
+  - Guests' reports are stored and read, but don't count toward a review (anyone can make guest accounts; online
     players are signed in anyway).
   - After a decision on a case (a clearing, say), only reports made since count again.
 - **Review holds results off ranking** until cleared: entering review marks the player's online results from the last
@@ -57,7 +57,7 @@ should be banned; and a report system. Built by the `fairplay` delegate (`.claud
   A watch with nothing new for 30 days closes, and its evidence then goes. The summary rows stay as the player's
   history. The privacy page says so in plain words.
 - **The match's signals** (`matchSignals`), over counted moves:
-  - **strength:** an engine rating over counted moves (the same curve as the "Elo" column), with a small pull towards
+  - **strength:** an engine rating over counted moves (the same curve as the "Elo" column), with a small pull toward
     1500 so a handful of lucky moves isn't super-GM strength; and a **jump** far above the player's own history (the
     median of their last matches, 3 or more) or rating;
   - **hard finds:** finding the best move where few of the crowd did, measured as evidence (a log-likelihood) against
@@ -82,7 +82,7 @@ should be banned; and a report system. Built by the `fairplay` delegate (`.claud
 - **Every online result of a banned account is held** and its rating removed (out of ranking, percentiles and later
   leaderboards). A clearing (an appeal overturned) gives everything back.
 - **Ban evasion, made harder without fingerprinting:**
-  - A ban keeps the account's sign-in identities, hashed: a normalised email (lower case, no "+tag", Gmail without
+  - A ban keeps the account's sign-in identities, hashed: a normalized email (lower case, no "+tag", Gmail without
     dots) and the Google account. A new account signed in with one of them is banned too ("evasion" in the log).
   - A coarse device marker: a random id in its own cookie (`hc_device`, 400 days), recorded against the accounts that
     play online from it. A new account on a device a banned account played from goes to **review**, not a ban
@@ -128,7 +128,7 @@ should be banned; and a report system. Built by the `fairplay` delegate (`.claud
     container instance (`fairplay-1`, so a match's re-checks never wait behind it; inside `max_instances` 2) and its
     own budget (`FAIRPLAY.deep.dailySearches`, 500 a day: about 25 minutes of one instance, under $0.10).
   - Queued (an indexed flag): every match still kept of a player with a match scoring 2+, or with an open case. Earlier
-    matches are checked too: an honest-looking one counts in their favour.
+    matches are checked too: an honest-looking one counts in their favor.
   - The review page has a button to run it on one player at once.
 - **The evidence model** (`moveEvidence`): for each counted pick, the log-likelihood that an engine user made it
   rather than an honest player of the player's own strength (the higher of their history and this match, capped at

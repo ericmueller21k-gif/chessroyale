@@ -1,7 +1,7 @@
 /**
  * Which players the small scoreboard shows when only `rows` fit, most
  * important first: you, the leader, the two either side of the cut line, your
- * neighbours, the rest of the top five, then outwards from you (as many as fit).
+ * neighbors, the rest of the top five, then outwards from you (as many as fit).
  */
 export function pickRows(n: number, me: number, cutoff: number, fits: (keep: Set<number>) => boolean): Set<number> {
   const knockouts = cutoff > 0 && cutoff < n;

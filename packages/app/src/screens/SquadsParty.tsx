@@ -52,7 +52,7 @@ export function PartySheet({
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
-      // Cancelled, or no clipboard: the link is on screen to copy by hand.
+      // Canceled, or no clipboard: the link is on screen to copy by hand.
     }
   };
   const leader = p?.members.find((m) => m.id === p.leaderId);

@@ -427,7 +427,7 @@ export function parseTestFen(text: string | null): string | null {
  * opener plays White on their board in the first round's first half (their match's squads swapped if need be).
  * `mode=classic|mercenary`: that mode, with no Mode vote (without it the Mode vote is held, and the bots don't vote in
  * it: the opener's vote decides, nobody's gives Classic). `bots=blocks` (with or without strong: `bots=strong,blocks`):
- * the bots block whenever they can (so a test can count on a block, and on a shield cancelling one).
+ * the bots block whenever they can (so a test can count on a block, and on a shield canceling one).
  */
 export function testLobbyOptions(q: URLSearchParams, now: number): { fillAt: number; test: NonNullable<SquadsRecord["test"]>; keepMs?: number } {
   const which = q.get("start");
@@ -1676,7 +1676,7 @@ export class SquadsCore {
     // What's left of each squad's team bank carries into its next match (Armageddon's own clocks aside).
     this.r.squads = settleTeamClocks(this.r.squads, m);
     if (m.result!.winner === null) {
-      // A drawn final: Armageddon. The squad with more team bank left picks its colour (bots take Black).
+      // A drawn final: Armageddon. The squad with more team bank left picks its color (bots take Black).
       lm.drawn = m;
       lm.state = "armageddon";
       lm.startsAt = null;

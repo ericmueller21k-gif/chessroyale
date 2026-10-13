@@ -7,7 +7,7 @@
 //   npm run frames:matchmaking -- <out-dir> [scheme=dark|light] [base url, default http://localhost:8788]
 // Needs the Worker running with a short fill (npx wrangler dev --port 8788 --enable-containers=false
 // --var MATCH_FILL_SECONDS:8 --var ENGINE_OFF:1). Saves every painted frame (frames/<step>/f<ms>.jpg), a timeline per
-// step (timeline.txt), and screenshots of each screen. Flags: a frame much brighter or darker than both neighbours
+// step (timeline.txt), and screenshots of each screen. Flags: a frame much brighter or darker than both neighbors
 // (a blink), the seat grid vanishing or its count going down while on the queue screen, and any frame with neither
 // the queue nor a match on screen once PLAY was tapped.
 import { chromium, devices } from "@playwright/test";

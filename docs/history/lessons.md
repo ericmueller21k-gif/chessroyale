@@ -14,7 +14,7 @@ later it moves again. It feels like the app froze.
   The reveal then counts the votes and moves the winning piece.
 - A solo boss raid is Crowd mode with a crowd of one. Your pick *is* the move, so the snap-back, the ghost and the
   second move were all noise.
-- It was old behaviour (since the crowd ghosts), not the Last Stand work, which only made it more noticeable.
+- It was old behavior (since the crowd ghosts), not the Last Stand work, which only made it more noticeable.
 - Every test passed throughout: tests check *what* ends up on the board, not *how it gets there*.
 
 **How it was found:**
@@ -22,7 +22,7 @@ later it moves again. It feels like the app froze.
   saves a frame every time the pieces or the phase change.
 - The timeline showed the piece on its new square, then back on the old one with a ghost, then on the new one again.
 - Running the same script on the commit before the suspected change (`git checkout <sha>`, run, check out the branch
-  again) showed the same frames. So the bug was older, and the fix belonged wherever the behaviour came from.
+  again) showed the same frames. So the bug was older, and the fix belonged wherever the behavior came from.
 
 **The fix:**
 - A crowd of one keeps your move on the board (`Play.tsx`: crowd mode only when more than one is picking).
@@ -52,11 +52,11 @@ pixels inside the item. That turned "looks off" into numbers, before and after t
 **The rule:** when a number on screen describes a drawing (a purity, a meter, a share), measure the drawing against
 the number over many cases, not one preview. Then add a test that does the same.
 
-## Coloured squares instead of the item (Oct 6, 2026)
+## Colored squares instead of the item (Oct 6, 2026)
 
-**Eric saw:** the profile's Wearing list showed a plain coloured square beside each item, "not the item itself".
+**Eric saw:** the profile's Wearing list showed a plain colored square beside each item, "not the item itself".
 
-**The cause:** the mockup drew a colour swatch there, and it was built exactly as drawn. On a real profile, a swatch
+**The cause:** the mockup drew a color swatch there, and it was built exactly as drawn. On a real profile, a swatch
 next to an item's name reads as a missing picture. Every test passed: none looked at what stood in for the item.
 
 **The fix:** each row draws the item with the crates' `ItemArt` (the same drawing as the locker and the reveal), and
@@ -208,7 +208,7 @@ the panel (height, rows, chat). Then it listed every CSS rule matching the empty
 
 **The cause:**
 - Each screen built its own frame around the board, so the board's box depended on what was above and beside it.
-- Chrome animates between a `color-mix(in srgb, X 80%, transparent)` colour and a plain one through values far out
+- Chrome animates between a `color-mix(in srgb, X 80%, transparent)` color and a plain one through values far out
   of range (its computed border read `oklab(1 129 245 / 1)`), drawn as bright green.
 
 **How it was found:** a script measured the board's box (and the rows above it) on the vote and on the game's first
@@ -218,7 +218,7 @@ the frame of the tap showed the green.
 **The rule:**
 - When one screen hands a board to the next, give both the same frame (top line, the line above the board, the eval
   bar's slot, the sidebar) and measure the board's box on both, on a phone and a computer. Don't trust a screenshot.
-- Don't transition or animate between colours made with `color-mix(…, transparent)`. Switch them, or fade a layer's
+- Don't transition or animate between colors made with `color-mix(…, transparent)`. Switch them, or fade a layer's
   opacity, or animate a shadow.
 - Also caught (by `e2e/crowd.spec.ts`, "the board never moves", on the computer only): the move's clock added to the
   line above the board ("⏱ 10 s") made that line 1 px taller on your move, so the board moved. The emoji's font is
@@ -350,7 +350,7 @@ timers and the heap all stayed flat; only frame times climbed.
 - The boss's turn had the same thing: the boss screen replayed the whole game on every frame (`lastMoveTookQueen`), and
   the match flow did it again in `gameEnd` several times a round.
 - The blizzard added its own cost: its pixel frames are drawn the first time they show (each part's outline redone
-  for every frame, each pixel's colour parsed from text), and the ice over every piece built a chess.js game per
+  for every frame, each pixel's color parsed from text), and the ice over every piece built a chess.js game per
   square on every redraw (`pieceAt`).
 - Checking the other modes found the same kind of cost in Crowd. From move 4 (once ratings show), the standings
   re-sorted the rating curve 51 times per player, for 100 players, on every redraw: drag p95 went from 17 ms to 150-180
@@ -382,7 +382,7 @@ The boss's turn at move 25 went from every frame dropped (p95 200 ms on the comp
   build would give.
 - `fenAfter` and `gameEnd` remember their answers; a line a move or two on from a known one carries on from it.
   `pieceAt` reads a position once.
-- Sprite frames work out each part's outline once per way it's drawn and each colour once per frame. Every frame of
+- Sprite frames work out each part's outline once per way it's drawn and each color once per frame. Every frame of
   every character and effect is byte for byte the same.
 - The rating curve's sorted points and the prior's loss are worked out once per curve.
 
@@ -502,7 +502,7 @@ bulb smashed, and dropped 7-11% of frames for the next few seconds. Every frame 
 passed: tests and previews see an effect's frames, not the first time they're made.
 
 **The cause:** everything is made the first time it's needed, in the frame that needs it.
-- The smash's synthesised sound took 150 ms to make on a computer (16 little glass bells, each running its oscillators
+- The smash's synthesized sound took 150 ms to make on a computer (16 little glass bells, each running its oscillators
   for the whole sound), so about 500 ms on the slowed phone, at the cue.
 - At the last smash the night's 32 tile variants all showed for the first time in one frame, and each new frame of the
   night's loop made 32 more.
@@ -558,13 +558,13 @@ screen and the boss bar.
 **Eric saw** (on his computer): in the profile's icon builder, a few clicks of the fill froze the page, then Chrome's
 "Aw, Snap! Out of Memory".
 
-**The cause:** a colour built with bitwise operators (`0xff << 24 | …`) is a *signed* number; the same value read
-back from a `Uint32Array` is unsigned. So the fill's "already that colour, stop" check never matched, and filling an
-area with the colour it already had (any second click on it) re-queued every pixel forever. Every test passed: the one
+**The cause:** a color built with bitwise operators (`0xff << 24 | …`) is a *signed* number; the same value read
+back from a `Uint32Array` is unsigned. So the fill's "already that color, stop" check never matched, and filling an
+area with the color it already had (any second click on it) re-queued every pixel forever. Every test passed: the one
 test of the fill clicked once, on a blank canvas.
 
 **How it was found:** `e2e/icon-editor.spec.ts` (50 fills in a row on a computer) hung on the second fill on `main`;
-then two lines of Node showed `new Uint32Array([v])[0] !== v` for an opaque colour.
+then two lines of Node showed `new Uint32Array([v])[0] !== v` for an opaque color.
 
 **The rule:**
 - A pixel or packed value compared with what a typed array holds is made unsigned (`>>> 0`) first.
@@ -618,21 +618,21 @@ board (White's way up) and the Squads board (Black's): every file one column alo
 - Board coordinates sit inside their edge squares; a test measures each label against the square it names, both ways
   up, on a phone and a computer (`expectCoordsInSquares` in `e2e/helpers.ts`).
 
-## A rage meter drawn at a fifth of its colour (Oct 11, 2026)
+## A rage meter drawn at a fifth of its color (Oct 11, 2026)
 
 **Found while** watching the rage meter frame by frame for repeat ultimates (PR "rage meters"): its bar was a dull
-brown at every fill, and as it emptied the change was hard to see. True-colour screenshots of the meter alone showed
+brown at every fill, and as it emptied the change was hard to see. True-color screenshots of the meter alone showed
 the same, so it wasn't the screencast's compression.
 
 **The cause:** the boss bar's threat skulls are `<i>` elements, dimmed by `.boss-threat i { opacity: 0.22 }` (the
 skulls not lit). The rage meter sits inside the same `.boss-threat` box, and its bar is an `<i>` too: the rule caught
-it, so the meter has been drawn at 22% opacity since it was built. No test looked at its colour, only at its width and
+it, so the meter has been drawn at 22% opacity since it was built. No test looked at its color, only at its width and
 classes.
 
 **The rule:**
 - A rule on a bare element under a box (`.box i`) also styles every component nested in that box. Style children by a
   child selector or a class of their own (`.boss-threat > i`), and check the computed style of what sits inside.
-- When a number on screen is drawn (a meter, a bar), look at it in true colour, alone and enlarged, not only in a
+- When a number on screen is drawn (a meter, a bar), look at it in true color, alone and enlarged, not only in a
   frame of the whole screen.
 
 ## A melt the test blinked through (Oct 12, 2026)

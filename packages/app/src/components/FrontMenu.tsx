@@ -126,8 +126,8 @@ export function RightPanel({ onProfile, chat, onSignIn }: { onProfile: () => voi
 }
 
 /**
- * The front door's frame: the page's background and its centre column. On a computer (1024 px and wider) with `nav`,
- * the side menu on the left and the live panel on the right; on a phone, just the centre. (The queue is a state of
+ * The front door's frame: the page's background and its center column. On a computer (1024 px and wider) with `nav`,
+ * the side menu on the left and the live panel on the right; on a phone, just the center. (The queue is a state of
  * the home screen, in the same frame: see HomeScreen.)
  */
 export function FrontFrame({ children, page, nav }: { children: ComponentChildren; page?: FrontPage; nav?: FrontNav }) {

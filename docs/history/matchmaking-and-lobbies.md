@@ -17,7 +17,7 @@ in the order they were made. This is the record of why. For how it works today, 
   and logged 2 mismatches in a test match; with identical searches the next full match logged none.
 - **Rounds lock early** once every live human has picked, so nobody waits out the clock for bots.
 - **Duel in multiplayer:** the server runs both clocks. If a finalist is a bot, the host's browser chooses its moves.
-  The higher final-four scorer has 15 s to choose a colour, then gets White.
+  The higher final-four scorer has 15 s to choose a color, then gets White.
 
 ## Closing finished lobbies (Oct 7, 2026)
 
@@ -190,9 +190,9 @@ ranking can't change" (since replaced: see Ranking below). The `hub` delegate's 
 - **Bots off shows a warning** under the row while it's picked: no bots can mean a much longer wait, and you can
   switch to Default from the queue.
 - **Remembered per device** (`brc.matchmaking`). Not per account yet: the profile has no place for preferences.
-- **Guests** (where online needs signing in): Default and Bots off are greyed out, Solo is picked, and the line under
+- **Guests** (where online needs signing in): Default and Bots off are grayed out, Solo is picked, and the line under
   PLAY says "Sign in to play online".
-- **Classic:** online Classic is still "coming" (Default and Bots off keep PLAY greyed, as before). Solo plays Classic
+- **Classic:** online Classic is still "coming" (Default and Bots off keep PLAY grayed, as before). Solo plays Classic
   against 63 bots, as "Solo vs 63 bots" did.
 - **Play with friends** is lobbies only: its "Solo vs 99 bots" is gone (Solo replaces it).
 - **Boss alone stays where it was** (the home's buttons and the computer's side menu). It's a different thing from a
@@ -219,7 +219,7 @@ ranking can't change" (since replaced: see Ranking below). The `hub` delegate's 
   (`MATCHMAKING.raidBotsOffMinPlayers`). Raids already started with whoever was there, and 10 is the size of the
   Crowd's boss battle: a real crowd.
 - **Default raids now fill the crowd with bots** after the minute (before, they started with just the people there).
-  Private raids stay people-only. **The boss is matched to the people only:** bots don't count towards its strength.
+  Private raids stay people-only. **The boss is matched to the people only:** bots don't count toward its strength.
 - **Bots off → Default** ("Switch to Default", under the waiting line): the seat is handed back to the server, which
   puts you in Default's queue with your wait counting. Bots fill a minute after you first joined at the latest, but
   never sooner than 5 s (`switchMinWaitMs`) so you see it happen. If the lobby filled meanwhile, you stay in it.
@@ -240,7 +240,7 @@ ranking can't change" (since replaced: see Ranking below). The `hub` delegate's 
     unranked.
   - **Solo never counts** (all bots, and its result comes from the browser).
   - **Practice never counts** either (unlimited hints, online too).
-  - Leaving bot seats out of the rating maths is the `ranked` lane's job, later. This only stores the flag and shows it.
+  - Leaving bot seats out of the rating math is the `ranked` lane's job, later. This only stores the flag and shows it.
 - **Stored with each result** (`results.ranked`: 1, 0, or NULL for results from before the rule). Only ranked results
   move your rating, its chart and Top N%. Every result still counts in your stats.
 - **From now on, not backwards:** older results count as before, so nobody's rank disappears overnight (ratings that

@@ -71,7 +71,7 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   await expect.poll(async () => (await level("castle")).peak, { timeout: 10_000 }).toBeGreaterThan(0.05);
   const castle = await level("castle");
   await moves.getByRole("radio", { name: /^Wooden tap/ }).click();
-  // (Every option is levelled to the same loudness, so their peaks are close, but not the same: the Wooden tap's
+  // (Every option is leveled to the same loudness, so their peaks are close, but not the same: the Wooden tap's
   // differs from the classic's, rendered the same way each time.)
   await expect.poll(async () => Math.abs((await level("move")).peak - classic.peak), { timeout: 10_000 }).toBeGreaterThan(0.02);
   // Castling follows the pick too: two Wooden taps (the first's peak), no longer the classic castle.
@@ -83,12 +83,12 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   await expect.poll(async () => Math.abs((await level("move")).peak - tap.peak), { timeout: 10_000 }).toBeGreaterThan(0.01);
 });
 
-test("piece sounds: the classics and their variations are credited to PyChess (GPL-3.0), with the licence served", async ({ page }) => {
+test("piece sounds: the classics and their variations are credited to PyChess (GPL-3.0), with the license served", async ({ page }) => {
   await page.goto("/settings");
   const credit = page.locator(".sounds-credit");
   await expect(credit).toContainText("Classic piece sounds and their variations: PyChess (GPL-3.0)");
   await expect(credit.getByRole("link", { name: "PyChess" })).toHaveAttribute("href", "https://github.com/pychess/pychess/tree/master/sounds");
-  await expect(credit.getByRole("link", { name: "licence" })).toHaveAttribute("href", "/engine/COPYING.txt");
+  await expect(credit.getByRole("link", { name: "license" })).toHaveAttribute("href", "/engine/COPYING.txt");
   for (const [path, text] of [
     ["/engine/COPYING.txt", "GNU GENERAL PUBLIC LICENSE"],
     ["/licenses/third-party.txt", "variations of\n  PyChess's sounds, made by our script"],
@@ -103,7 +103,7 @@ test("piece sounds: the classics and their variations are credited to PyChess (G
   const faq = page.locator("li", { hasText: "Classic piece sounds and their variations: PyChess (GPL-3.0)." });
   await expect(faq).toHaveCount(1);
   await expect(faq.getByRole("link", { name: "PyChess" })).toHaveAttribute("href", "https://github.com/pychess/pychess/tree/master/sounds");
-  await expect(faq.getByRole("link", { name: "licence" })).toHaveAttribute("href", "/engine/COPYING.txt");
+  await expect(faq.getByRole("link", { name: "license" })).toHaveAttribute("href", "/engine/COPYING.txt");
 });
 
 test("piece sounds: every option decodes, starts on its hit and is as loud as the classic", async ({ page }) => {

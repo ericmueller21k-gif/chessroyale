@@ -189,7 +189,7 @@ export function WipPreview({ fen, orientation, crowd }: { fen: string; orientati
     const [rook] = squaresOf(fen, him, "r");
     const [knight] = squaresOf(fen, him, "n");
     const wrong = emptySquares(fen)[20] ?? "e4";
-    // His new spot: centred above the board, his feet on its top edge.
+    // His new spot: centered above the board, his feet on its top edge.
     const spot = lightsOutSpot(kit.ch, 36);
     const spotSquare = orientation === "white" ? "d8" : "e1";
     let anim: { name: string; since: number; then?: string } | null = null;

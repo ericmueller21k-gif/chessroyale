@@ -12,7 +12,7 @@ import { Flight, onSquare, type BossUi, type Moment, type MomentProps } from "./
 import { NORMAL, bossVoice } from "../speech.tsx";
 
 /**
- * Big Boy on the board: his snack before move 1 (he waddles over to one of the crowd's centre pawns, grabs it, eats it)
+ * Big Boy on the board: his snack before move 1 (he waddles over to one of the crowd's center pawns, grabs it, eats it)
  * and his Big Bounce (three bounces on 2x2 spots, the pieces there knocked up and tumbling; a giant fall onto the four
  * middle squares, a shockwave, dust and a jolt; every piece settling into the new position; and off he bounces). All
  * from the shared state (`powers.snack`, `powers.bounce`) and the moment's start, so everyone online sees the same

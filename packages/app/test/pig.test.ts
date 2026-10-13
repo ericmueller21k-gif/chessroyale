@@ -34,7 +34,7 @@ describe("Wrangler, the cowboy pig", () => {
     expect(BOSS_ROSTER.some((b) => b.id === "wrangler")).toBe(false);
   });
 
-  it("draws every part only with colours in his palette", () => {
+  it("draws every part only with colors in his palette", () => {
     for (const [name, part] of Object.entries(PIG.parts))
       for (const row of part.grid) for (const k of row) if (k !== "." && k !== " ") expect(PIG.palette, `${name}: "${k}"`).toHaveProperty(k);
   });
@@ -163,7 +163,7 @@ describe("on the board", () => {
           }
   });
 
-  it("he stands on the side the piece is hauled towards (it comes to him), room allowing", () => {
+  it("he stands on the side the piece is hauled toward (it comes to him), room allowing", () => {
     const o = "white";
     expect(lassoStand(centre("e4", o), centre("d4", o)).flip).toBe(false);
     expect(lassoStand(centre("d4", o), centre("e4", o)).flip).toBe(true);

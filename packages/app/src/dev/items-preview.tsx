@@ -7,11 +7,11 @@ import { Avatar, ItemArt } from "../components/Items.tsx";
 /**
  * Dev only: the item fitting sheet (`npm run preview:items`, or /items-preview.html on `npm run dev`). Every item
  * (or `?items=a,b`) is worn on a plain pawn and on every skin, white and black, then shown as cards: plain,
- * at a spread of purities (shiny to 0%). `?color=red&color2=emerald` sets the colours, `?purities=100,50,0` the cards,
+ * at a spread of purities (shiny to 0%). `?color=red&color2=emerald` sets the colors, `?purities=100,50,0` the cards,
  * and `?with=beanie` wears other items too (to see two together, e.g. goggles over a hat).
  *
  * `?sheet=1` is the short sheet for showing a batch (Eric): each item as a card and worn on a white and a black pawn,
- * with its tier, the colours taken in turn from `?colors=` (and `?purity=`), then any whole outfits in
+ * with its tier, the colors taken in turn from `?colors=` (and `?purity=`), then any whole outfits in
  * `?outfits=dark-shades+suit-and-tie+tommy-gun;eyepatch`, each on both pawns.
  */
 const q = new URLSearchParams(location.search);

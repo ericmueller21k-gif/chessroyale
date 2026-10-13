@@ -129,7 +129,7 @@ export function bossTierFromUrl(): number {
   return BOSS_TIERS.includes(n) ? n : 0;
 }
 
-/** A boss's strength against yours, in words and a colour. */
+/** A boss's strength against yours, in words and a color. */
 function versus(elo: number, you: number): { text: string; tone: "easy" | "even" | "hard" | "brutal" } {
   const d = Math.round((elo - you) / 10) * 10;
   if (Math.abs(d) < 100) return { text: "≈ your level", tone: "even" };
@@ -349,7 +349,7 @@ function FriendsSheet({
             </div>
           </>
         )}
-        {/* (Practising against bots is Solo now, on the home screen.) */}
+        {/* (Practicing against bots is Solo now, on the home screen.) */}
       </div>
     </div>
   );

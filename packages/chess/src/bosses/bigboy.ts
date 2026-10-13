@@ -1,6 +1,6 @@
 /**
  * Big Boy, the baby boss (BOSS_ROSTER "bigboy"): his rules. He opens with his snack: the battle starts from the starting
- * position less one of the crowd's centre pawns, which he eats before move 1. His passive, toy blocks: every few turns
+ * position less one of the crowd's center pawns, which he eats before move 1. His passive, toy blocks: every few turns
  * a block lands on an empty square in the crowd's half, and nothing (either side) may move onto it or slide through it
  * while it's there (a knight jumps it; it never stops an attack). His ultimate, the Big Bounce, comes at the start of his
  * turn after its warning: a few of the crowd's pieces are thrown to new squares nearby, into a position a little worse
@@ -16,7 +16,7 @@ import { bossPowers, crowdHalf, logit, meterFull, moveSquares, other, powerRoll,
 import { gridHanging, gridKingAttacked, gridOf, isLight, placementOf, type Grid } from "./grid.ts";
 
 /**
- * Big Boy's snack in the intro (before move 1): he waddles over to the crowd's centre pawn, grabs it and eats it
+ * Big Boy's snack in the intro (before move 1): he waddles over to the crowd's center pawn, grabs it and eats it
  * ("Nom nom."), beat by beat in ms from its start (the app's SnackTime): he's at the pawn at `grabAt` (it leaves the
  * board), eats it at `nomAt`, and is back in his corner by the end.
  */
@@ -29,8 +29,8 @@ export const SNACK_MS = SNACK.ms;
  *   leapAt    he leaps from his corner; a shadow grows on the first of his three spots (each a 2x2 block of squares).
  *   lands     he lands on each spot in turn, squashing, then stretches up again: the pieces there are knocked up and
  *             tumble in the air.
- *   jumpAt    the last spring, high up and out of sight, his shadow growing over the four centre squares.
- *   crashAt   the giant fall on the centre: a crash, a shockwave across the board, dust, the board jolts (`jolt` ms).
+ *   jumpAt    the last spring, high up and out of sight, his shadow growing over the four center squares.
+ *   crashAt   the giant fall on the center: a crash, a shockwave across the board, dust, the board jolts (`jolt` ms).
  *   settleAt  every piece comes down into the new position, settled by `settledAt`.
  *   backAt    he bounces back to his corner (gone from the board by `total`); then he plays his move.
  */
@@ -52,7 +52,7 @@ export const BLOCK = { flyAt: 1450, landAt: 1850 } as const;
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
 export const BIGBOY_FX = { block: 2300, bounce: BOUNCE.total } as const;
 
-/** Big Boy opens with his snack: the battle starts from the starting position less one of the crowd's centre pawns. */
+/** Big Boy opens with his snack: the battle starts from the starting position less one of the crowd's center pawns. */
 export const startsWithSnack = (def: { powers: { passive: string } | null } | null | undefined): boolean => def?.powers?.passive === "blocks";
 
 /** The crowd's pawn Big Boy eats before move 1: its d- or e-pawn (from the seed), on its starting square. */
@@ -104,7 +104,7 @@ export interface BounceCandidate {
 /**
  * Where a crowd piece may land in the Big Bounce: an empty square within `reach` (in both directions) of where it
  * stood, never the toy block; a pawn only sideways along its rank (so it never reaches the first or last rank, and
- * the pawns stay plausible); a bishop on its own colour (my call: a position that could come up in a game).
+ * the pawns stay plausible); a bishop on its own color (my call: a position that could come up in a game).
  */
 function landings(sq: string, type: string, g: Grid, block: string | null, reach: number): string[] {
   const f0 = sq.charCodeAt(0) - 97;
@@ -235,7 +235,7 @@ export function pickBounce(
 /**
  * Where his three bounces land before the crash (each a 2x2 block of squares, by its lower-left square from White's
  * side): over the pieces the bounce moves, in order, so they're the ones knocked up; then (fewer than three needed) on
- * the crowd's half, from the seed. Never the centre block (d4-e5): that's the crash's.
+ * the crowd's half, from the seed. Never the center block (d4-e5): that's the crash's.
  */
 export function bounceSpots(moves: readonly { from: string }[], crowd: Side, seed: number, at: number): string[] {
   const out: string[] = [];
@@ -251,7 +251,7 @@ export function bounceSpots(moves: readonly { from: string }[], crowd: Side, see
     if (out.some((sp) => covers(sp, m.from))) continue;
     const f = m.from.charCodeAt(0) - 97;
     const r = Number(m.from[1]);
-    // (The four blocks holding the square, in a seeded order: the first on the board that isn't the centre's.)
+    // (The four blocks holding the square, in a seeded order: the first on the board that isn't the center's.)
     const options = [0, 1, 2, 3]
       .map((k) => ({ k, roll: powerRoll(seed, "spot", at, m.from, k) }))
       .sort((a, b) => a.roll - b.roll)
@@ -315,7 +315,7 @@ export const BIGBOY: BossRules = {
     return block ? (m, fen) => blockedBy(m, block, fen) : null;
   },
   powerTurn: (boss) => !!boss.powers!.block,
-  // From the starting position (sides as usual), less the crowd's centre pawn he eats before move 1: a base at ply 0
+  // From the starting position (sides as usual), less the crowd's center pawn he eats before move 1: a base at ply 0
   // (the position changed outside a move: every replay plays from it).
   opening: {
     fromStart: true,

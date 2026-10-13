@@ -32,7 +32,7 @@ const FIRE_PALETTE = {
   v: "#3f74d6",
 } as const;
 
-/** Lays a flame tongue onto a canvas, its base's middle at (cx, base); where flames overlap, the hotter colour wins. */
+/** Lays a flame tongue onto a canvas, its base's middle at (cx, base); where flames overlap, the hotter color wins. */
 function putFlame(cv: Canvas, cx: number, base: number, w: number, h: number, seed: number, lean = 0): void {
   const g = flame(w, h, seed, lean);
   const HEAT = "RFfYy";
@@ -101,7 +101,7 @@ function tileFlames(stage: Stage, i: number, boost = 0): Part {
     putFlame(cv, t % 2 ? 1 : SQUARE - 2, y + 3, 3, h - 1, i + t * 1.3 + 2, t % 2 ? 1 : -1);
   }
   if (stage === 1) {
-    // A singe: flickers in two corners and a smoulder along the top edge.
+    // A singe: flickers in two corners and a smolder along the top edge.
     putFlame(cv, 2, 4 + (i % 2), 3, 3 + (i % 2), i + 5);
     putFlame(cv, SQUARE - 3, 3 + ((i + 1) % 2), 3, 3 + ((i + 1) % 2), i + 9);
   }
@@ -499,7 +499,7 @@ export const CANDLE_SHOTS: Character = {
           ms: 140,
           // (Pip n from the top; the bottom `left` are lit.)
           layers: Array.from({ length: SHOTS }, (_, n): Layer => ({ part: n >= SHOTS - left ? "lit" : "spent", x: 2, y: 2 + n * PIP_H })),
-          // Each lit one's little flame flickers above it, out of step with its neighbours.
+          // Each lit one's little flame flickers above it, out of step with its neighbors.
           specks: Array.from({ length: left }, (_, j): Speck => {
             const n = SHOTS - 1 - j;
             return [3, 1 + n * PIP_H - ((n + i) % 2), (n + i) % 3 ? "f" : "Y"];

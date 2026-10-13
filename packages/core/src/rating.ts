@@ -4,7 +4,7 @@ import { RATING_CURVE } from "./rating-curve.ts";
  * An engine-based rating estimate from a player's move losses. It isn't a real
  * Elo (games aren't played out): it asks which Stockfish UCI_Elo setting loses
  * the same points per move on positions like these (see RATING_CURVE), so it
- * sits on Stockfish's CCRL-anchored scale. With few moves it's pulled towards
+ * sits on Stockfish's CCRL-anchored scale. With few moves it's pulled toward
  * PRIOR_RATING and firms up as moves come in.
  */
 

@@ -17,7 +17,7 @@ const clamp01 = (p: number) => Math.max(0, Math.min(1, p));
 
 /**
  * The slash that hit him on the i-th blow: its angle (degrees) and where its damage number floats off (in board
- * units, from his square `at`): spread around him, towards the middle of the board so none spills off its edge.
+ * units, from his square `at`): spread around him, toward the middle of the board so none spills off its edge.
  */
 function blow(i: number, at: { x: number; y: number }) {
   const angle = (i * 137.5 + 20) % 180;
@@ -33,7 +33,7 @@ function blow(i: number, at: { x: number; y: number }) {
 
 /** How long the piece takes to slide back to its square. */
 export const SLIDE_MS = 450;
-/** Slashes that send a stylised red drop flying (a few, no more). */
+/** Slashes that send a stylized red drop flying (a few, no more). */
 const DROPS = [5, 11, 17, 22];
 
 /**
@@ -63,7 +63,7 @@ export function lastStandBoard(t: number): "after" | "pushed" | "back" | "before
  * bar and the dock say the rest); then everything freezes under a dark red pulse; he leaps out of the dock (the
  * dock plays that part) and crashes down onto the piece's square (a dark shockwave, dust; the screen shakes); his
  * cut-in banner with a line; the piece slides back to where it came from; the blow meant for it lands on him
- * instead, 25 rapid slashes with red damage numbers while his armour cracks; he staggers, collapses and fades.
+ * instead, 25 rapid slashes with red damage numbers while his armor cracks; he staggers, collapses and fades.
  * Nothing in it flashes white. Timings: LAST_STAND (boss-timing.ts). `fen` is the position before the move. The
  * board itself (what it shows when) follows lastStandBoard.
  *
@@ -147,7 +147,7 @@ export function LastStand({ side, orientation, fen, move, startAt, boss }: { sid
           ??
         </span>
       )}
-      {/* 1. Everything freezes: a dark red pulse, and the board goes cold and grey until he lands. */}
+      {/* 1. Everything freezes: a dark red pulse, and the board goes cold and gray until he lands. */}
       {t >= L.freezeAt && t < L.crashAt + 200 && <div class="ls-freeze" style={{ opacity: Math.min(1, (t - L.freezeAt) / 120) * (t > L.crashAt ? 1 - (t - L.crashAt) / 200 : 1) }} />}
       {t >= L.freezeAt && t < L.freezeAt + 320 && <div class="ls-flash" style={{ opacity: 0.75 * (1 - (t - L.freezeAt) / 320) }} />}
       <svg class="ls-fx" viewBox="0 0 800 800" preserveAspectRatio="none" aria-hidden="true">
@@ -245,7 +245,7 @@ export function LastStandCutIn({ side, line }: { side: "w" | "b"; line: string }
 
 /**
  * The result screen after his Last Stand. The crowd won: his fallen figure rises again in holy light ("A god
- * does not stay down."). Otherwise he stays down, greyed, without a word.
+ * does not stay down."). Otherwise he stays down, grayed, without a word.
  */
 export function GodKingEpilogue({ side, rises }: { side: "w" | "b"; rises: boolean }) {
   const now = useFrameNow();

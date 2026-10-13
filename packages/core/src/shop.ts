@@ -23,7 +23,7 @@ export interface ShopCategory {
 }
 
 export const SHOP_CATEGORIES: readonly ShopCategory[] = [
-  { slot: "king", name: "God King effects", blurb: "The colour of his lightning, beam and halo when he answers your call." },
+  { slot: "king", name: "God King effects", blurb: "The color of his lightning, beam and halo when he answers your call." },
   {
     slot: "chat",
     name: "Chat packs",
@@ -41,7 +41,7 @@ export interface ShopItem {
   price: number;
   /** Everyone owns it from the start (one per slot, equipped until you choose another). */
   starter?: boolean;
-  /** How it looks, for the app: colours for King effects, a chat pack's id. */
+  /** How it looks, for the app: colors for King effects, a chat pack's id. */
   look: Record<string, string>;
 }
 

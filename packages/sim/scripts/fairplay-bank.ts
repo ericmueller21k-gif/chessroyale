@@ -1,5 +1,5 @@
 /**
- * The fair-play simulation's position bank: Crowd games as a crowd plays them, every position analysed once.
+ * The fair-play simulation's position bank: Crowd games as a crowd plays them, every position analyzed once.
  *
  * Each game starts from the starting position (as Crowd does). At every ply:
  *   - the judge's numbers: the top 8 moves at the game's engine budget (250k nodes, the browser build), exactly what
@@ -27,7 +27,7 @@ const MAX_PLY = 48;
 const SHALLOW_DEPTH = 11;
 const CHEAT_NODES = 1_000_000;
 
-/** One analysed position. Expected scores are the mover's (0-1); `sh[d]` are depth d's lines, internal units. */
+/** One analyzed position. Expected scores are the mover's (0-1); `sh[d]` are depth d's lines, internal units. */
 export interface BankPosition {
   ply: number;
   fen: string;

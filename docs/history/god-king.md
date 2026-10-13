@@ -6,7 +6,7 @@ in the order they were made. This is the record of why. For how it works today, 
 ## The God King (Oct 4, 2026)
 
 Eric asked for the King to become a real character: a custom piece, summoned with lightning, striking with his sword, and leaving in holy light, with SNES-style sounds.
-- **The sprite** (`components/GodKing.tsx`) is my own SVG, inspired by Eric's reference image. It's a crowned, visored knight-king on a three-tier chess base, holding a sword point down, drawn in the crowd's colour with the board's outline style and gold for the crown and hilt, so it still reads as a chess piece.
+- **The sprite** (`components/GodKing.tsx`) is my own SVG, inspired by Eric's reference image. It's a crowned, visored knight-king on a three-tier chess base, holding a sword point down, drawn in the crowd's color with the board's outline style and gold for the crown and hilt, so it still reads as a chess piece.
   - It's drawn in parts so it can move: a gentle bob and sway, and the sword swings up to his side when he commands.
   - In the move picker, the ordinary king stands by with his small sword; the God King only appears when summoned.
 - **The summoning** (about 3.6 s over the board, CSS timings):
@@ -31,7 +31,7 @@ Eric asked for the King to become a real character: a custom piece, summoned wit
   - He raises his sword, and a thin bolt hits the piece he moves, or the boss's king with "−N HP" (the middle of `kingStrikeLoss`).
   - If his move is a king move, he walks with it.
   - As the round ends, holy light takes him away from whatever square he's on, and the ordinary king drops back there.
-- **Leave sound.** The laser-like exit sound is replaced with a synthesised falling shimmer that fades out (`leave.mp3`), so he vanishes rather than fires.
+- **Leave sound.** The laser-like exit sound is replaced with a synthesized falling shimmer that fades out (`leave.mp3`), so he vanishes rather than fires.
 
 ## The God King's strike happens during the move; the eval bar holds steady (Oct 4, 2026)
 
@@ -40,12 +40,12 @@ Eric's second look: the God King animation is right, but the eval bar jumped aro
 - **Eval bar.** Every screen change (your move → reveal → the boss's turn → your next move) mounted a fresh bar that started at 50% and slid back to the real value, so it moved several times per move.
   - The bar now remembers what it last showed and each position's value, so it only moves when a move lands on the board: once when the God King's move plays, once for the boss's reply.
 - **The strike is no longer your turn.**
-  - "Strike the boss" (confirmed: "The clock stops while he strikes, then you pick your move") counts towards a strike during the move. When more than half the crowd has called (bots back a human's call as before), he strikes at once, on everyone's screen.
+  - "Strike the boss" (confirmed: "The clock stops while he strikes, then you pick your move") counts toward a strike during the move. When more than half the crowd has called (bots back a human's call as before), he strikes at once, on everyone's screen.
   - The move clock stands still for the strike (`kingStrikeMs`, 4.4 s). Every deadline moves back by that long, and so do bots still thinking. Time on the move leaves it out.
   - Then the move goes on and everyone picks as usual. One strike per move. The button shows "Strike called 2/4" while calls come in, and "Boss struck" after.
   - Calling him to *play* the move is still your whole turn (callers abstain, as before).
 - **Three slashes.** The strike shows as three quick slashes on the boss's king. Each has a slash sound (the last also the hit) and a yellow number, adding up to the middle of `kingStrikeLoss`: −3, −3, −4. The effect is unchanged: the boss's next move loses 5–15 points.
-- **Slash sound.** `slash.mp3` is a short noise swish with a metallic ring, synthesised with ffmpeg.
+- **Slash sound.** `slash.mp3` is a short noise swish with a metallic ring, synthesized with ffmpeg.
 
 ## Boss battle: one fixed dock under the board (Oct 4, 2026)
 
@@ -56,7 +56,7 @@ Eric: during a God King move, the text and the leaderboard below the board kept 
   - the reveal: a "👑 King" vote bar (the green bar with a 1: how many called him) and a score line
   - the boss's turn: a status line and a four-line God King explanation
 - **The dock.** In boss battles, every screen now has the same dock under the board, with two rows of fixed height:
-  1. The King's buttons and crowns, always there and greyed out when they can't be used. On the boss's turn they show their plain labels, so nothing from the last move carries over. "Are you sure?" swaps them for "Yes, summon him" and "No", with the question in the status line.
+  1. The King's buttons and crowns, always there and grayed out when they can't be used. On the boss's turn they show their plain labels, so nothing from the last move carries over. "Are you sure?" swaps them for "Yes, summon him" and "No", with the question in the status line.
   2. A fixed two-line status, for example:
      - "Your move. Or summon the God King."
      - "👑 The God King plays Ng3 · 1 of 1 called him" / "You called the King: no score for you this move."
@@ -97,12 +97,12 @@ Eric asked for this.
 Eric asked for this.
 
 - **He's the button.**
-  - The two King buttons are gone. The God King stands at the right of the dock under the board, in your colour, with his charges as crowns at his feet.
+  - The two King buttons are gone. The God King stands at the right of the dock under the board, in your color, with his charges as crowns at his feet.
   - He idles like an RPG unit: he breathes, his crown bobs and his sword sways.
-  - He glows gold when he can be called, is dimmed when he can't, and turns grey when his charges are spent. He steps away while he's on the board.
+  - He glows gold when he can be called, is dimmed when he can't, and turns gray when his charges are spent. He steps away while he's on the board.
 - **His commands.**
   - Tap him and a little blue window opens above his head, like an old Final Fantasy battle menu, with a ▶ cursor and retro menu blips: "Play move" (his move at full strength; you won't pick) and "Strike" (the boss's next move is weaker; the clock stops, then you pick).
-  - Strike is greyed out once struck, or while your call waits for the others.
+  - Strike is grayed out once struck, or while your call waits for the others.
   - Tap him again to close the menu. Choosing a command is the confirmation (two deliberate taps), so there's no separate "Are you sure?".
   - The pause-menu version (dimmed screen, window over the board) was built first; Eric preferred this. It's kept as a generic `PauseMenu` component for later menus.
 - **His lines** (`godKing.ts`). 49 lines across 17 moments, shown in a pixel speech bubble (Press Start 2P, OFL, hosted with the app) that types itself out over the board's corner.
@@ -134,16 +134,16 @@ Eric saw the bubble flash a couple of times as it ended. Each screen of a turn (
 
 Eric asked for a Fire Emblem style banner the moment the God King raises his sword, before he moves the piece.
 
-- **What it shows.** It uses the START banner's motion (flash, slanted band over speed lines, slam), in his colours instead of red: navy and indigo with gold borders. Left to right:
+- **What it shows.** It uses the START banner's motion (flash, slanted band over speed lines, slam), in his colors instead of red: navy and indigo with gold borders. Left to right:
   - his pixel portrait: crowned, helmed, eyes burning white with a blue glow, a red cape behind;
   - "GOD KING" over what he's doing: the move in SAN (e.g. "Bxe7") or "STRIKE!";
   - the target: the piece he moves (the board's own piece art), or the boss's face for a strike.
-- **The portrait.** After two simpler tries that didn't read as godlike, it's a detailed 64 × 60 pixel image in the style of Eric's reference (an ornate armoured lord), as a holy version:
+- **The portrait.** After two simpler tries that didn't read as godlike, it's a detailed 64 × 60 pixel image in the style of Eric's reference (an ornate armored lord), as a holy version:
   - a steel helm under a five-spiked gold crown with a cross and jewels, and burning gold eyes in an angled visor;
   - one big gold-rimmed pauldron per shoulder, its layered plates shown as seams inside it (two stacked plates read as four shoulders), with gold spikes; a gold gorget, the king's cross on his chest, and a crimson cape (it was royal blue at first, but blended into the navy banner);
   - golden sparks around him.
   - It's drawn from shapes with light from the top left and outlined, by `scripts/god-king-portrait.py`. It's shown scaled up with crisp pixels and a pulsing golden glow.
-  - **Two versions, always** (Eric: everything the God King shows comes in both colours). `god-king-portrait-w.png` and `-b.png` (about 1 KB each) are the same picture with the armour recoloured: white steel for White, blackened steel for Black; gold, eyes, cape and sparks unchanged. The cut-in picks the crowd's colour, like his figure on the board, beside it and in the summon.
+  - **Two versions, always** (Eric: everything the God King shows comes in both colors). `god-king-portrait-w.png` and `-b.png` (about 1 KB each) are the same picture with the armor recolored: white steel for White, blackened steel for Black; gold, eyes, cape and sparks unchanged. The cut-in picks the crowd's color, like his figure on the board, beside it and in the summon.
 - **Timing.** The banner plays for 1.5 s right after his "hyuah!" sword raise. His bolt, the move and the strike's three slashes all come 1.5 s later than before.
   - The reveal where he plays the move gets 5.4 s extra (was 3.9 s), in solo and online.
   - A strike stops the clock for 5.9 s (`kingStrikeMs`, was 4.4 s).
@@ -188,11 +188,11 @@ goes on, and an early hung queen or piece in a solo raid must set it off.
 - The move isn't played. The board, the crowd's move count and the boss's turn are as before it: it's still the same
   crowd move. The boss's strike waits until the re-pick has been played (then it weighs both rounds' picks), so
   nothing comes between his fall and the re-pick.
-- The crowd picks again from the same position with a fresh clock. The move he took back is barred: a grey arrow
+- The crowd picks again from the same position with a fresh clock. The move he took back is barred: a gray arrow
   with ✕ on the board and "✕ Nxe5" in the status; the board won't play it, the server rejects it, no bot picks it,
   and it isn't the best move on offer in the re-pick either.
 - He has fallen: his figure lies in the dock for the rest of the battle, toppled on his side like a beaten chess piece,
-  armour cracked, crown and sword on the ground, greyed. No menu, no crowns, no more lines. Above him, a ⚡ button
+  armor cracked, crown and sword on the ground, grayed. No menu, no crowns, no more lines. Above him, a ⚡ button
   with the power-ups he left (Oct 7).
 - On the result screen he rises again in holy light ("A god does not stay down.") if the crowd won. If it lost or
   drew, he stays down, without a word.
@@ -207,11 +207,11 @@ any time). Updated Oct 7: a 1,300 ms warning comes first, everything after it 1,
 | Beat | From (ms) | What |
 | --- | --- | --- |
 | 0. Warning | 0, for 1,300 | A red "??" badge pops on the piece's square (80 ms), the square pulses red three times under the piece, a danger sting plays, the eval bar plunges to the crowd's chances after the move, and the dock says what it loses in plain words. |
-| 1. Freeze | 1,550 | A dark red pulse; the board goes cold and grey. |
+| 1. Freeze | 1,550 | A dark red pulse; the board goes cold and gray. |
 | 2. Leap and crash | 1,950 / 2,450 / 2,700 | He leaps up out of the dock (450 ms), falls onto the piece's square in a gold streak (250 ms), and lands at 2,700: a dark red shockwave with an orange ring, dust, the board shakes (450 ms). The piece is knocked aside; the badge goes. |
 | 3. Banner | 3,250, for 2,100 | "LAST STAND", his battle-worn portrait and one of his lines (the same on every screen for the move). His usual cut-in is 1,500 ms; this one is held longer so the line can be read. Its flash is dark red. |
 | 4. Slide back | 5,450, for 450 | The piece slides back to its square; he stands alone where it was. The eval bar goes back to what it was. |
-| 5. The blow | 5,950 to 7,950 | 25 slashes, one every 80 ms, each a red-white cut with a red damage number (6 to 14, seeded by the move) spiralling off around him; his armour cracks at 6,350, 6,950 and 7,550; grunts of agony at the 2nd, 11th and 20th slash; four stylised red drops. |
+| 5. The blow | 5,950 to 7,950 | 25 slashes, one every 80 ms, each a red-white cut with a red damage number (6 to 14, seeded by the move) spiraling off around him; his armor cracks at 6,350, 6,950 and 7,550; grunts of agony at the 2nd, 11th and 20th slash; four stylized red drops. |
 | 6. Fall | 8,100 / 8,550 / 9,100 | He staggers, collapses onto his side with a death groan, and fades from the board (500 ms). His fallen figure appears in the dock with his last words: "Finish… it… for me.", and the ⚡ power-ups he left beside him. |
 | 7. Re-pick | 9,900 | The reveal ends; the crowd picks again. |
 
@@ -253,11 +253,11 @@ the 50 v 50 final is ten bots with two charges, which the bots spend whenever th
 **Art, sounds and lines:**
 - **Sprite:** his figure is now drawn from parts (body, crown, sword), so there is a cracked variant (three levels,
   dark jagged splits with a bright chipped edge) and a fallen pose (the same figure toppled on its side, crown knocked
-  off, sword on the ground). White and black, armour only, like the rest of him. A dev sheet shows them all:
+  off, sword on the ground). White and black, armor only, like the rest of him. A dev sheet shows them all:
   `node scripts/preview-god-king.mjs out.png banner=1 epilogue=rise`.
 - **Portrait:** `god-king-portrait-hurt-w.png` and `-b.png` (from `scripts/god-king-portrait.py`; the usual portraits
   are unchanged byte for byte): cracks across the helm, a cheek plate, both pauldrons and the chest, a crown spike
-  broken off, the cape's hem torn, embers among the sparks, and three small stylised red drops.
+  broken off, the cape's hem torn, embers among the sparks, and three small stylized red drops.
 - **Sounds** (`public/sounds/god-king/last-*.mp3`, CC0, credited there; cut by `scripts/god-king-last-stand-sounds.py`):
   the leap (a heavy jump into a falling whistle), the crash, the 25 slashes (one 2 s flurry of sword swishes landing
   with hits), two grunts of agony and the death groan, from the same two packs as his other sounds.
@@ -318,7 +318,7 @@ the best move as a green one. Stacked on phones, the board beside the facts from
 power-ups for each charge he had left: the same as Crowd's, the engine's top 3 moves at full strength with the usual
 hint arrows. It's done in the runner, so the solo raid (just you), online raids and the 50 v 50 boss final (bots too,
 who use them as bots do in Crowd) share it. The ⚡ button, with the count left, sits in the dock above his fallen
-figure, where his menu was (the whole column is the button; gold and glowing on your move, grey otherwise, ringed
+figure, where his menu was (the whole column is the button; gold and glowing on your move, gray otherwise, ringed
 while one is in use). A power-up move is an ordinary pick, marked as a power-up move (⚡ in the move list) and never
 brilliant.
 
@@ -345,7 +345,7 @@ golden sword, a blue tabard with gold crosses and a long torn white-and-gold cap
 overhaul in the boss characters' format, so the crowd's champion looks as grand as the bosses.
 
 - **The sprite** (`packages/app/src/characters/god-king.ts`, listed with the bosses so their tests and preview cover
-  him): his drawing space is one board square, 60 x 60 px with his feet at the bottom centre, in a 108 x 104 frame
+  him): his drawing space is one board square, 60 x 60 px with his feet at the bottom center, in a 108 x 104 frame
   that leaves room for his wings, raised sword and cape. It's made of parts: a helm with a T-visor and glowing eyes, a
   five-spiked crown, gold helmet wings, spiked pauldrons with a gold cross, a breastplate with a gold sun-cross and blue
   banners, faulds, the tabard, legs with gold knee cops, sabatons, the cape, and white back wings (folded, half open
@@ -355,7 +355,7 @@ overhaul in the boss characters' format, so the crowd's champion looks as grand 
     when he raises it, and burns down to embers when he falls.
   - Parts that move: the sword arm, the flame, the cape and tabard (ripples), the back wings, the helmet wings (a
     flap), and the eyes (glowing, blazing, dim, dark).
-- **Both sides:** a `black` look swaps the four armour colours for dark steel, a step lighter than black so he reads
+- **Both sides:** a `black` look swaps the four armor colors for dark steel, a step lighter than black so he reads
   on the dark ground. Gold, eyes, cape, cloth, wings and flame stay the same (his standing rule, so the cape stays
   white on Black). A unit test checks that no other pixel changes.
 - **Renderer additions** (backwards-compatible; the clown and his tests are unchanged): `lieDown` turns a whole frame
@@ -409,7 +409,7 @@ overhaul in the boss characters' format, so the crowd's champion looks as grand 
 
 Eric's notes after playing, built in one batch with Hollow's and G-REX's polish (PR "Polish batch").
 
-- **No wings.** The small white back wings are gone from every pose, both colours, the portraits and cut-ins (the QUEEN
+- **No wings.** The small white back wings are gone from every pose, both colors, the portraits and cut-ins (the QUEEN
   SLAIN! face is his portrait). The cape, the helmet's gold wings (part of his crown-helmet) and everything else stay.
   **My call:** "the small upward-pointing wings on either side of him" read as the back wings (folded or half open in
   the dock, they point up beside him), since Eric said to keep the cape on his back; the helmet's gold wings stay.
@@ -445,12 +445,12 @@ Eric's notes after playing, built in one batch with Hollow's and G-REX's polish 
     22.7 → 13.4 (checks were said twice and every move a check held).
 - **The queen-capture sound** (one try, kept): a woman's short gasp for a queen taken either way, on both banners
   (QUEEN SLAIN! played the START whoosh, QUEEN DOWN! a pitched-down male yell; the yell's file is removed). A CC0
-  voice-acted gasp (wintuh, Freesound 471875, licence checked), trimmed, filtered, a light hall echo, levelled under a
+  voice-acted gasp (wintuh, Freesound 471875, license checked), trimmed, filtered, a light hall echo, leveled under a
   move (peak −7.7, mean −22.8 dBFS). **My call:** kept because it's what Eric asked for (a woman's voice, a gasp, nothing
   sexual: a sharp intake of breath) where the old ones were a man's yell and a generic whoosh; it's one file to swap
   (`public/sounds/banner/queen-gasp.mp3`) if it doesn't land.
 - **Fixed (a rules bug): the boss's strike after a Last Stand.** In a 50 v 50 final, G-REX struck twice two crowd moves
   apart. The cause: the move the God King takes back isn't a crowd move (the move count goes back), but its round still
-  counted towards the boss's next strike (`sinceKill`), so a Last Stand right after a strike brought the next one a
+  counted toward the boss's next strike (`sinceKill`), so a Last Stand right after a strike brought the next one a
   move early. Now the count goes back with the move; the strike still weighs that round's picks (whoever blundered
   there can still be struck). `last-stand.test.ts` checks both; the crowd test's old seed now strikes every 3 moves.

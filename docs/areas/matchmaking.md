@@ -1,6 +1,6 @@
 # Matchmaking, lobbies and ranked
 
-Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matching rules and the rating maths),
+Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matching rules and the rating math),
 `ops` (the matchmaker's plumbing under load: [ops.md](ops.md)).
 
 ## How it works today
@@ -32,7 +32,7 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   the same matchmaker object) whose tickets are parties (up to 4, under a code and invite link, the leader queuing) or
   single players, each seated whole in a Squads lobby that still fits it; the lobby fills with bots after
   `MATCH_FILL_SECONDS`, like Crowd's Default. Routes under `/api/squads/`.
-- **The boss of a raid** is matched to the people only (bots don't count towards its strength), avoiding the boss most
+- **The boss of a raid** is matched to the people only (bots don't count toward its strength), avoiding the boss most
   of its players met last (each sends theirs on joining).
 - **Ranking today** is the rating on your profile (its rank, chart and "Top N%"); there is no ranked mode yet. A match
   counts for ranking only if at least `RANKING.rankedMinHumanShare` (30%) of its seats are real players

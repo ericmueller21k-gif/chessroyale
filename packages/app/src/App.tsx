@@ -635,7 +635,7 @@ export function App() {
       for (;;) {
         const res = await fetch(`/api/play${q.size ? `?${q}` : ""}`, { method: "POST" });
         const body = (await res.json()) as { code?: string; message?: string; busy?: boolean; ticket?: string; waitSeconds?: number; retryMs?: number; banned?: boolean };
-        if (run !== lineRun.current) return; // Cancelled while asking.
+        if (run !== lineRun.current) return; // Canceled while asking.
         // Banned for fair play: the ban notice, with its appeal (solo stays open).
         if (body.banned) {
           setInLine(null);
@@ -1120,7 +1120,7 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
       if (isCrowd(match)) return <CrowdReveal key={`${p.board.id}:${p.board.ply}`} match={match} mine={p.mine} board={p.board} until={p.until} />;
       return <RevealScreen key={`${p.board.id}:${p.board.ply}`} match={match} mine={p.mine} board={p.board} until={p.until} />;
     case "stageBreak":
-      // (Keyed by the cut: once out, online, you stay on this screen, and each later cut is a judgement of its own.)
+      // (Keyed by the cut: once out, online, you stay on this screen, and each later cut is a judgment of its own.)
       if (isCrowd(match)) return <CrowdCut key={p.stage} match={match} {...p} />;
       return <StageBreakScreen match={match} {...p} />;
     case "simulating":

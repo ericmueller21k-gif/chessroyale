@@ -26,7 +26,7 @@ bosses work today, the code map and the "adding a boss" checklist). For the why,
 | Moments from the shared match state, and line picking (pure) | `packages/app/src/characters/boss-beats.ts` |
 | The character on screen, its text box, its portrait (`BossFace`) | `packages/app/src/components/BossCharacter.tsx`; placed in the boss bar (`BossBar` in `Boss.tsx`), each boss screen's `.board-row` (`BossSide`), and the results |
 | Power art: each power's moment, the board's effect sprites (ice, pies, the blizzard), and playing them | `characters/power-art.ts` (the contract the power rules import), one file of effect sprites per boss in `characters/effects/<boss>.ts` (registered in `characters/effects.ts`), `components/BossEffect.tsx` |
-| Sound packs | synthesised in `characters/<boss>-sounds.ts`, or CC0 files in `public/sounds/bosses/<boss>/` credited in a `CREDITS.md`; names in `src/sound.ts` |
+| Sound packs | synthesized in `characters/<boss>-sounds.ts`, or CC0 files in `public/sounds/bosses/<boss>/` credited in a `CREDITS.md`; names in `src/sound.ts` |
 | Frame-by-frame check in the game | `scripts/frames-boss-character.mjs` (`npm run frames:character -- <dir> [boss] [phone|desktop|both]`) |
 | Tests | `packages/app/test/characters.test.ts`, `packages/app/test/boss-character.test.ts`, `e2e/boss-character.spec.ts` |
 
@@ -39,13 +39,13 @@ If you need one of those changed, say what and why, and stop.
 
 ## How the art works
 
-- **True pixel art only.** Every pixel on the grid, no smoothing, scaled by whole numbers with nearest-neighbour
+- **True pixel art only.** Every pixel on the grid, no smoothing, scaled by whole numbers with nearest-neighbor
   (`image-rendering: pixelated` on screen). A part is a grid of palette keys, typed by hand (hard surfaces: visors,
   plates) or painted with `paint.ts` shapes (capes, plumes, stone). Every part gets its own 1-pixel dark outline, and a
   faint halo rings the silhouette so dark bosses read on the dark ground (`#14161b`).
 - **Frames stack parts** at whole-pixel offsets, with quarter turns, mirroring and ripples (cloth, plumes). Write a
   `pose()` per boss and build frames from it, so moving a part is a number, not a redraw.
-- **Recolours are palettes:** a `look` swaps keys for a whole boss (an enraged or frozen variant); a frame's `pal`
+- **Recolors are palettes:** a `look` swaps keys for a whole boss (an enraged or frozen variant); a frame's `pal`
   flashes eyes or pulses runes.
 - **Cues are on frames:** `cue: "boing"`, `"honk"`. The component plays the kit's sound for a cue when that frame
   shows (once, however many placements or screens), so sound and picture can't drift apart. Never louder than a

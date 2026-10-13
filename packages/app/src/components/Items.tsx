@@ -3,16 +3,16 @@ import { useRef } from "preact/hooks";
 import { behindPiece, isShiny, itemColor, mulberry32, type ItemLook, type ItemSlot } from "@chessroyale/core";
 
 /**
- * Crate items, drawn. Every item is drawn once, on a pawn's 100 × 100 square (head centred at 50, 20), with its
- * *paint regions* marked: those get the item's colour automatically, then its blemish (dark blotches over exactly
- * that share of the colour, shaped by the item's seed; at 0% purity, all of it, a darker shade) and, at 90%+
+ * Crate items, drawn. Every item is drawn once, on a pawn's 100 × 100 square (head centered at 50, 20), with its
+ * *paint regions* marked: those get the item's color automatically, then its blemish (dark blotches over exactly
+ * that share of the color, shaped by the item's seed; at 0% purity, all of it, a darker shade) and, at 90%+
  * purity, a sweeping shine. Outlines and fixed parts (white fur, coal, ice) stay as drawn. A new item is one
- * drawing; every colour comes free.
+ * drawing; every color comes free.
  */
 
 export interface Finish {
   color: string;
-  /** Two-colour items (a present's ribbon). */
+  /** Two-color items (a present's ribbon). */
   color2?: string | null;
   blemish: number;
   seed: number;
@@ -25,7 +25,7 @@ const useUid = () => {
   return r.current;
 };
 
-/** A colour mixed towards black (amount 0-1). */
+/** A color mixed toward black (amount 0-1). */
 function darken(hex: string, amount: number): string {
   const n = parseInt(hex.slice(1), 16);
   const ch = (s: number) => Math.round(((n >> s) & 255) * (1 - amount));
@@ -141,7 +141,7 @@ export function blotchPath(seed: number, blemish: number, d: string[] = [], box:
     else if (k > 0) {
       cut = sorted[k]!;
       const rest = k - sorted.indexOf(cut);
-      // The part grows as a spot from the cell's centre, or, when blotches already ring the cell (a clean spot
+      // The part grows as a spot from the cell's center, or, when blotches already ring the cell (a clean spot
       // left in a blotched item), closes in from its edge, so the clean spot shrinks instead of leaving a ring.
       const c0 = cells[vals.indexOf(cut)]!;
       const hole = [-65, -64, -63, -1, 1, 63, 64, 65].filter((o) => value(c0 + o) < cut).length >= 6;
@@ -179,7 +179,7 @@ export function blotchPath(seed: number, blemish: number, d: string[] = [], box:
   return path;
 }
 
-/** The paint for one item: its fill (a gradient for the sheen colours), blotch colour and the clip id. */
+/** The paint for one item: its fill (a gradient for the sheen colors), blotch color and the clip id. */
 interface Paint {
   id: string;
   fill: string;
@@ -187,7 +187,7 @@ interface Paint {
   hex: string;
   defs: ComponentChildren;
   finish: Finish;
-  /** Fills that go from the colour to a bright tip (the crown's flames). */
+  /** Fills that go from the color to a bright tip (the crown's flames). */
   flameFill: string;
   /** The item's own box (where it's drawn), so the shine rolls across the item itself. */
   box: [number, number, number, number];
@@ -239,7 +239,7 @@ const lw = (n: number) => ({ style: `stroke-width: calc(var(--sw, 1) * ${n}px)` 
 const LINE = { stroke: "#1d1d1f", "stroke-linejoin": "round" as const, "stroke-linecap": "round" as const, ...lw(3) };
 
 /**
- * A painted region: its paths filled with the item's colour, the blemish blotches (clipped to the region), an
+ * A painted region: its paths filled with the item's color, the blemish blotches (clipped to the region), an
  * optional overlay (stripes), the shine when shiny, then the outline (`line` wide: thinner for small parts).
  */
 function Region({ p, d, name, fill, over, outline = true, line = 3 }: { p: Paint; d: string[]; name: string; fill?: string; over?: ComponentChildren; outline?: boolean; line?: number }) {
@@ -363,7 +363,7 @@ function FireIceCrown({ p }: { p: Paint }) {
 const VISOR = "M41 30.5 a9 4 0 1 0 18 0 a9 4 0 1 0 -18 0 Z";
 /**
  * A present, worn as a helmet: the box over the head down to the neck, with a visor to see the face through; its
- * ribbon and bow in the second colour.
+ * ribbon and bow in the second color.
  */
 function Present({ p, p2 }: { p: Paint; p2: Paint }) {
   return (
@@ -384,7 +384,7 @@ function Present({ p, p2 }: { p: Paint; p2: Paint }) {
   );
 }
 
-/** A candy cane at the pawn's side: white, striped in its colour. */
+/** A candy cane at the pawn's side: white, striped in its color. */
 const CANE = "M86 94 L86 30 A14 14 0 0 0 58 30 L58 33 A3 3 0 0 0 64 33 L64 30 A8 8 0 0 1 80 30 L80 94 A3 3 0 0 0 86 94 Z";
 function CandyCane({ p }: { p: Paint }) {
   const stripes = [];
@@ -404,7 +404,7 @@ function CandyCane({ p }: { p: Paint }) {
   );
 }
 
-/** A gingerbread man (a skin): the whole cookie takes the colour; white icing, gumdrop buttons. */
+/** A gingerbread man (a skin): the whole cookie takes the color; white icing, gumdrop buttons. */
 const GINGER =
   "M56 34.5 Q60 38 66 39 L78 40 Q84 41 84 47 Q84 53 78 53 L64 53 L64 62 L74 82 Q77 89 70 91 Q65 92 63 87 L53 73 Q50 68 47 73 L37 87 Q35 92 30 91 Q23 89 26 82 L36 62 L36 53 L22 53 Q16 53 16 47 Q16 41 22 40 L34 39 Q40 38 44 34.5 A13 13 0 1 1 56 34.5 Z";
 function Gingerbread({ p, side }: { p: Paint; side: "w" | "b" }) {
@@ -438,15 +438,15 @@ function Gingerbread({ p, side }: { p: Paint; side: "w" | "b" }) {
 const PAWN_PATH =
   "m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z";
 
-/** Whether a colour is light (so lines on it should be darker, not lighter). */
+/** Whether a color is light (so lines on it should be darker, not lighter). */
 const isLight = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
   return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.6;
 };
 
 /**
- * A chimney (a skin): the pawn sitting in a brick chimney up to its chest. The bricks and the cap take the colour;
- * the mortar is a shade of it (lighter on a dark colour, darker on a light one), so the bricks still read.
+ * A chimney (a skin): the pawn sitting in a brick chimney up to its chest. The bricks and the cap take the color;
+ * the mortar is a shade of it (lighter on a dark color, darker on a light one), so the bricks still read.
  */
 function Chimney({ p, side }: { p: Paint; side: "w" | "b" }) {
   const bricks = [];
@@ -498,7 +498,7 @@ function Beanie({ p }: { p: Paint }) {
 }
 
 /**
- * Ski goggles: the frame (and its strap) in the colour, a see-through lens in the second colour. Thinner outlines
+ * Ski goggles: the frame (and its strap) in the color, a see-through lens in the second color. Thinner outlines
  * than usual, so the frame still shows on a pawn-sized avatar.
  */
 const LENS = "M43 25.6 Q39.8 25.6 39.8 28.4 V29.7 Q39.8 32.4 43 32.4 H46.6 Q47.5 32.4 48.2 31.2 Q50 28.9 51.8 31.2 Q52.5 32.4 53.4 32.4 H57 Q60.2 32.4 60.2 29.7 V28.4 Q60.2 25.6 57 25.6 Z";
@@ -522,7 +522,7 @@ function SkiGoggles({ p, p2 }: { p: Paint; p2: Paint }) {
 
 /**
  * A Christmas tree T-shirt (a skin): the pawn in a T-shirt, white on the white side and nearly black on the black
- * side, printed with a tree whose bulbs take the colour.
+ * side, printed with a tree whose bulbs take the color.
  */
 function TreeTee({ p, side }: { p: Paint; side: "w" | "b" }) {
   const shirt = side === "w" ? "#fbfbf8" : "#2e323b";
@@ -573,7 +573,7 @@ function Scarf({ p }: { p: Paint }) {
   );
 }
 
-/** A party hat (Beta: the old shop's): the cone in its colour, stripes a light tint of it, a white pom-pom. */
+/** A party hat (Beta: the old shop's): the cone in its color, stripes a light tint of it, a white pom-pom. */
 function PartyHat({ p }: { p: Paint }) {
   return (
     <g>
@@ -593,7 +593,7 @@ function PartyHat({ p }: { p: Paint }) {
   );
 }
 
-/** A wizard's hat (Beta: the old shop's): a wide brim and a bent cone in its colour, a gold star. */
+/** A wizard's hat (Beta: the old shop's): a wide brim and a bent cone in its color, a gold star. */
 function WizardHat({ p }: { p: Paint }) {
   return (
     <g>
@@ -604,7 +604,7 @@ function WizardHat({ p }: { p: Paint }) {
   );
 }
 
-/** A top hat (Beta: the old shop's): the hat in its colour, its band a shade of it. */
+/** A top hat (Beta: the old shop's): the hat in its color, its band a shade of it. */
 function TopHat({ p }: { p: Paint }) {
   const band = isLight(p.hex) ? darken(p.hex, 0.45) : lighten(p.hex, 0.5);
   return (
@@ -621,7 +621,7 @@ function TopHat({ p }: { p: Paint }) {
   );
 }
 
-/** A Viking helm (Beta: the old shop's): the helmet in its colour, cream horns and a brass rim. */
+/** A Viking helm (Beta: the old shop's): the helmet in its color, cream horns and a brass rim. */
 function VikingHelm({ p }: { p: Paint }) {
   return (
     <g>
@@ -639,7 +639,7 @@ function VikingHelm({ p }: { p: Paint }) {
   );
 }
 
-/** A little crown (Beta: the old shop's): the crown in its colour (Yellow is the gold one), a blue jewel. */
+/** A little crown (Beta: the old shop's): the crown in its color (Yellow is the gold one), a blue jewel. */
 function LittleCrown({ p }: { p: Paint }) {
   return (
     <g>
@@ -654,19 +654,19 @@ function LittleCrown({ p }: { p: Paint }) {
   );
 }
 
-/** An eyepatch (Beta, pirate): the patch in its colour, stitched in a light shade of it, over one eye; a dark strap. */
+/** An eyepatch (Beta, pirate): the patch in its color, stitched in a light shade of it, over one eye; a dark strap. */
 function Eyepatch({ p }: { p: Paint }) {
   return (
     <g>
       <path d="M40.6 23 L50.2 26.4" fill="none" stroke="#1d1d1f" stroke-linecap="round" {...lw(1.8)} />
       <Region p={p} name="patch" d={["M49.4 25.6 Q54.6 23.6 59.8 25.8 Q60.4 31.6 54.6 34.8 Q48.8 31.6 49.4 25.6 Z"]} line={1.8} />
-      {/* A stitched edge in a light shade, so the patch has some detail in any colour (and shows on a black pawn). */}
+      {/* A stitched edge in a light shade, so the patch has some detail in any color (and shows on a black pawn). */}
       <path d="M50.9 26.6 Q54.6 25.2 58.4 26.8 Q58.8 31 54.6 33.3 Q50.4 31 50.9 26.6 Z" fill="none" stroke={lighten(p.hex, 0.55)} stroke-dasharray="1.1 1" opacity="0.8" {...lw(0.8)} />
     </g>
   );
 }
 
-/** Dark shades (Beta, agent): chunky frames in its colour, dark lenses with a glint. Thin outlines, like the goggles. */
+/** Dark shades (Beta, agent): chunky frames in its color, dark lenses with a glint. Thin outlines, like the goggles. */
 const SHADES_LENS = "M41 27.4 L41.7 30.8 Q42 32 43.4 32 H46 Q47.4 32 47.8 30.8 L48.6 28.3 Q48.8 27.4 47.8 27.4 Z M52.2 27.4 Q51.2 27.4 51.4 28.3 L52.2 30.8 Q52.6 32 54 32 H56.6 Q58 32 58.3 30.8 L59 27.4 Z";
 const SHADES = "M39.2 25.6 H60.8 Q61.8 25.6 61.6 26.8 L60.5 31.4 Q59.9 33.6 57.4 33.6 H53.6 Q51.6 33.6 51 31.8 L50.6 30.4 Q50 29.2 49.4 30.4 L49 31.8 Q48.4 33.6 46.4 33.6 H42.6 Q40.1 33.6 39.5 31.4 L38.4 26.8 Q38.2 25.6 39.2 25.6 Z";
 function DarkShades({ p }: { p: Paint }) {
@@ -682,7 +682,7 @@ function DarkShades({ p }: { p: Paint }) {
   );
 }
 
-/** A smiley face (Beta, a one-off): a flat round dot smiley over the whole head, in its colour; dark dot eyes and smile. */
+/** A smiley face (Beta, a one-off): a flat round dot smiley over the whole head, in its color; dark dot eyes and smile. */
 function SmileyFace({ p }: { p: Paint }) {
   const n = parseInt(p.hex.slice(1), 16);
   const dark = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 < 0.25;
@@ -698,8 +698,8 @@ function SmileyFace({ p }: { p: Paint }) {
 }
 
 /**
- * A suit and tie (Beta, agent; a skin): the pawn in a suit jacket in its colour, a white shirt, the tie in the second
- * colour, a pocket square. The pawn's head and base show, so it reads as white or black.
+ * A suit and tie (Beta, agent; a skin): the pawn in a suit jacket in its color, a white shirt, the tie in the second
+ * color, a pocket square. The pawn's head and base show, so it reads as white or black.
  */
 const SUIT = "M44.2 36.4 Q50 39.6 55.8 36.4 L63.5 38.6 Q68.6 40.6 68.8 46.5 L70.4 74.5 Q50 79 29.6 74.5 L31.2 46.5 Q31.4 40.6 36.5 38.6 Z";
 function SuitAndTie({ p, p2, side }: { p: Paint; p2: Paint; side: "w" | "b" }) {
@@ -727,7 +727,7 @@ function SuitAndTie({ p, p2, side }: { p: Paint; p2: Paint; side: "w" | "b" }) {
 
 /**
  * A Tommy gun (Beta, agent; Mythic): held upright at the pawn's side. The metal (receiver, drum, finned barrel) in
- * its colour, the wood (stock and grips) in the second. Drawn along its own x axis (stock at 0, muzzle at 82), then
+ * its color, the wood (stock and grips) in the second. Drawn along its own x axis (stock at 0, muzzle at 82), then
  * tilted. Thinner outlines, so the barrel shows on a small pawn.
  */
 function TommyGun({ p, p2 }: { p: Paint; p2: Paint }) {
@@ -817,7 +817,7 @@ const FRAMES: Record<string, [number, number, number, number]> = {
  * middle of its head) and its eye line. Each item names the line in its own drawing that meets its anchor (a hat's
  * brim, a beard's top edge, goggles' lens line, a scarf's middle at the neck), and the avatar lines them up. A head or face item meets its slot's
  * anchor, unless `ATTACH_TO` names another (goggles are a face item worn at the eyes). A new item needs only that
- * number; a new skin, its anchors. (The cburnett pawn's head: top at y 20, centre 29, radius 9.)
+ * number; a new skin, its anchors. (The cburnett pawn's head: top at y 20, center 29, radius 9.)
  */
 type Anchors = { head: number; face: number; eyes: number; neck: number };
 /** (The pawn's neck: where its head meets its collar, y 34.2.) */
@@ -859,7 +859,7 @@ const anchorsFor = (skin?: string) => (skin && SKIN_ANCHORS[skin]) || PAWN_ANCHO
 /** One item, drawn into an existing svg on the pawn's square. */
 export function ItemLayer({ def, finish, side = "w" }: { def: string; finish: Finish; side?: "w" | "b" }) {
   const p = usePaint(finish, def);
-  // The second colour (two-colour items): the same blemish, its own blotches.
+  // The second color (two-color items): the same blemish, its own blotches.
   const p2 = usePaint({ color: finish.color2 ?? finish.color, blemish: finish.blemish, seed: finish.seed + 101 }, def);
   const Art = ITEM_ART[def];
   if (!Art) return null;
@@ -964,7 +964,7 @@ export function FischerArt() {
   );
 }
 
-/** A tier's present (the crate's strip): a gift box in the tier's colour, the lid a shade darker, a white ribbon. */
+/** A tier's present (the crate's strip): a gift box in the tier's color, the lid a shade darker, a white ribbon. */
 export function PresentArt({ color }: { color: string }) {
   return (
     <span class="item-art present-art">
@@ -980,7 +980,7 @@ export function PresentArt({ color }: { color: string }) {
 }
 
 /**
- * A tier's supply box (Beta's strip): a wooden crate with metal corners, a band in the tier's colour and a stencilled
+ * A tier's supply box (Beta's strip): a wooden crate with metal corners, a band in the tier's color and a stenciled
  * star. Same size and place as a present, so the strip, the odds and the unwrap use either.
  */
 export function SupplyBoxArt({ color }: { color: string }) {
@@ -1014,7 +1014,7 @@ export function SupplyBoxArt({ color }: { color: string }) {
   );
 }
 
-/** A Beta Crate: an olive-drab supply crate, stencilled BETA 001, with rope handles and steel corners. */
+/** A Beta Crate: an olive-drab supply crate, stenciled BETA 001, with rope handles and steel corners. */
 export function BetaCrateArt() {
   return (
     <span class="item-art crate-art beta-crate-art">

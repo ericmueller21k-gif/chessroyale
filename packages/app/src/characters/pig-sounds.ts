@@ -1,5 +1,5 @@
 /**
- * Wrangler's sounds, synthesised (no files, no licences): the rope whirling over his head, a throw, the loop slapping
+ * Wrangler's sounds, synthesized (no files, no licenses): the rope whirling over his head, a throw, the loop slapping
  * down on its catch, the rope snapping taut and dragging, a hop's thump, his snort and his snorting laugh (a pig's
  * grunt through the nose: no real voice), a spur stomp, the double lasso winding up, and the quick-draw sting for
  * "DRAW!" (a low twang, a slide and a knock, like a western's). Nothing bright: no chimes, no dings (the spur is a dull

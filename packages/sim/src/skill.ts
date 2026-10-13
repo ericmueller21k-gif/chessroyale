@@ -2,11 +2,11 @@
  * Stockfish's own "limited strength" (UCI_LimitStrength / UCI_Elo), emulated from a MultiPV-4 search: the
  * honest players of the fair-play simulation. Stockfish turns a UCI_Elo into a skill level, searches with four
  * lines, and when the search reaches depth 1 + level it picks a move with its "magic formula" (a deterministic push
- * towards weaker moves plus a random one, both larger at lower levels). One search to depth 11 gives every level up
+ * toward weaker moves plus a random one, both larger at lower levels). One search to depth 11 gives every level up
  * to about UCI_Elo 2800 its input, so any number of honest picks at any strength cost nothing more.
  *
  * From Stockfish's search.cpp (Skill, Skill::pick_best). Scores are Stockfish's internal units; the search's
- * printed centipawns are converted back with its own material-based normalisation (to_cp's `a`). That only matters
+ * printed centipawns are converted back with its own material-based normalization (to_cp's `a`). That only matters
  * where the fourth line is more than a pawn behind (the formula caps its spread at PawnValue).
  */
 
@@ -23,7 +23,7 @@ export function skillLevel(elo: number): number {
 /** The search depth at which Stockfish picks its move at this strength. */
 export const pickDepth = (elo: number) => 1 + Math.floor(skillLevel(elo));
 
-/** Stockfish's material count for its centipawn normalisation (from a FEN's board). */
+/** Stockfish's material count for its centipawn normalization (from a FEN's board). */
 export function sfMaterial(fen: string): number {
   const board = fen.split(" ")[0]!;
   let m = 0;

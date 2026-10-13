@@ -4,8 +4,8 @@ Maia-3, the human-like chess model by the Computational Social Science Lab (CSSL
 a **separate program**: a Web Worker that speaks a UCI-style text protocol. HunChess bosses can ask it for the moves a
 human of a given rating would play.
 
-**Licence: GNU AGPL 3.0** (`LICENSE`), as Maia-3's code and weights are. Everything in this folder is part of the box
-and under that licence. The game (the rest of this repository) never imports, bundles or shares memory with any of it:
+**License: GNU AGPL 3.0** (`LICENSE`), as Maia-3's code and weights are. Everything in this folder is part of the box
+and under that license. The game (the rest of this repository) never imports, bundles or shares memory with any of it:
 it starts the built worker (`/engine/maia/maia-worker.js`) and exchanges plain-text lines with it, exactly as it does
 with Stockfish. Nothing in this folder imports game code.
 
@@ -23,7 +23,7 @@ with Stockfish. Nothing in this folder imports game code.
 | `src/worker.ts` | The Web Worker |
 | `src/cli.ts` | The same engine on stdin/stdout for Node (simulations): `npx tsx packages/maia-worker/src/cli.ts` |
 | `scripts/build.mjs` | Builds `dist/`: `maia-worker.js`, `ort-wasm-simd-threaded.wasm`, the model, `LICENSE.txt`, `NOTICE.txt` |
-| `licenses/` | Licence texts of what the build bundles (onnxruntime-web's MIT; chess.js's BSD comes from its package) |
+| `licenses/` | License texts of what the build bundles (onnxruntime-web's MIT; chess.js's BSD comes from its package) |
 | `test/` | The encoder against the official tokenizer, the protocol, and the model in the browser runtime |
 
 ## Where the model comes from (provenance)
@@ -55,8 +55,8 @@ python -I packages/maia-worker/scripts/convert.py --work <scratch dir>     # abo
      official engine does by default), `elo_self` [B] and `elo_oppo` [B] float32;
    - outputs `logits_move` [B, 4352] and `logits_value` [B, 3] (loss, draw, win for the side to move). The ponder
      head is dropped.
-5. Quantise with `onnxruntime.quantization.quantize_dynamic(fp32, int8, weight_type=QInt8, per_channel=False,
-   reduce_range=False)`: int8 weights, per tensor; activations quantised on the fly.
+5. Quantize with `onnxruntime.quantization.quantize_dynamic(fp32, int8, weight_type=QInt8, per_channel=False,
+   reduce_range=False)`: int8 weights, per tensor; activations quantized on the fly.
 6. Check and write the fixtures:
    - fp32 ONNX against PyTorch, 18 positions × 6 ratings: largest logit difference 4.96e-05;
    - int8 against PyTorch, top move over the legal moves: 106 of 108 the same, 108 of 108 within int8's top 3 (the

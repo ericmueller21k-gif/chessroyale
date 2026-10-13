@@ -76,7 +76,7 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
   viewer may see, then `resolveHalf` with each player's thinking time: it drains the banks, plays the half, and returns
   the events, who acted, who missed and who ran out of time. Then the safety cap, the result, the next half.
   - **Relay** (round 1, 4 boards): seat i is on board (i + turn) mod 4 (`relaySeat`). Side 0 is White on boards 1 and
-    3, so every player alternates colours turn by turn and each half two of a squad move. A finished board: whoever's
+    3, so every player alternates colors turn by turn and each half two of a squad move. A finished board: whoever's
     turn it would be there scouts.
   - **Pairs** (round 2, 2 boards): `pairSchedule`: partners 1+2, 1+3, 1+4 (and the other two), player 1's pair
     alternating slots; slot 0 plays board 1, slot 1 board 2. Each picks; a coin plays one. A missed pick is a random
@@ -105,7 +105,7 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
     team bank left at the end of the match, a seeded coin if exactly level; no Armageddon. **A drawn final**: one
     Armageddon board, a vote too, on its own fixed clocks (`startArmageddon`: White 1:30, Black 1:00, +1 s, by
     team-clock rules with the lobby's free seconds; a draw is Black's), each squad keeping the block bank the final
-    left it. The squad with more team bank left picks its colour (`armageddonChooser`). `endByMaterial` is the
+    left it. The squad with more team bank left picks its color (`armageddonChooser`). `endByMaterial` is the
     test-only "Next round" (a level result goes to bank, then a coin).
 - **Mercenary** (`mercenary.ts`; numbers `SQUADS.mercenary`; the calibration `reports/squads-mercenary.md`):
   - **The wallet.** One per squad for the tournament, shared by its players (`Wallet`: coins, `earned` by play and by
@@ -170,7 +170,7 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
   capture or a check (shared among the players choosing that move), keeping `blockReserve` unless sharp, never one a
   mercy rule would lift. Winning, a bot plays with purpose (`squadBotSkill` caps its temperature; `candidatesFrom`
   breaks ties by the engine's order and plays a mate it sees). `squadBotThinkMs` paces a bot by its clock. Bots take
-  Black when they choose Armageddon's colours. Since the time controls (Oct 13) a bot's think also stays within 90% of when
+  Black when they choose Armageddon's colors. Since the time controls (Oct 13) a bot's think also stays within 90% of when
   its squad's bank would run out with all its moves going (`cutoffMs`, `liveCutoff` as the half begins; `bots.inTime`),
   so bots living on Bullet's increment near zero move in time instead of being cut off.
 
@@ -287,7 +287,7 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   positions are remembered.
 - **Missed actions and takeover.** The rules' `noteActions`: three misses in a row and a bot plays the seat. The person
   can `reclaim` it (from the next half). Leaving while their squad still plays hands the seat to a bot at once.
-- **Armageddon.** A drawn final: the rules' `armageddonChooser`; that squad's people pick a colour during
+- **Armageddon.** A drawn final: the rules' `armageddonChooser`; that squad's people pick a color during
   `armageddonIntroSeconds` (the last pick stands; nobody: the bots' Black), then `startArmageddon`.
 - **Spectating and leaving.** Everyone gets every match (the tiny boards). A knocked-out squad's people watch on, or
   `leave` (their socket closes) and queue again.
@@ -390,7 +390,7 @@ door's look; every class is `sq-`.
   then the eight squads of four once bots fill. **The votes** use Crowd's vote board (`VoteScreen`, given Squads' own
   votes, no eval bar, no chimes or ticks): everyone's pawn on one side, three zones, three cards.
 - **Standings everywhere.** Every squad's name (display only, by id: Rooks, Knights, Bishops, Queens, Kings, Pawns,
-  Towers, Crowns, each with a colour), members, where it stands in the bracket, and its team clock counting down
+  Towers, Crowns, each with a color), members, where it stands in the bracket, and its team clock counting down
   (`squads-view.ts`: `liveBank` runs a bank down during a half from the match's banks, its duties and who has locked
   in; ▼▼ when two moves drain it at once; the exact bank comes with each half). Sudden death turns red and pulses. A
   computer: a side panel (from 1100 px). A phone: a strip of eight chips (name and clock), tapped for the whole table
@@ -433,9 +433,9 @@ door's look; every class is `sq-`.
   `/squads/test[/start|relay|pairs|final][?clock=bullet|blitz|rapid or BANK,TOPUP,FREE,INC[,CAP]]` opens one (admins on hunchess.com; anyone
   locally with `SQUADS_TEST`); `/squads/test` alone (or `/start`) is the whole tournament from the first vote.
 - **Cheat lines** (test controls only, Eric Oct 12): a switch in the panel wherever you choose (`cheatLinesAt`: your
-  Relay move, a Pairs or final pick, a block, Armageddon's colours). On, it draws the engine's top 3 in the position
-  (`SQUADS_LOBBY.cheatLines`: moves, nodes) as arrows coloured by rank (green, blue, yellow, as the power-up hints),
-  each labelled with its evaluation for the side to move (`cheatEval`: pawns turned back from the expected score, or
+  Relay move, a Pairs or final pick, a block, Armageddon's colors). On, it draws the engine's top 3 in the position
+  (`SQUADS_LOBBY.cheatLines`: moves, nodes) as arrows colored by rank (green, blue, yellow, as the power-up hints),
+  each labeled with its evaluation for the side to move (`cheatEval`: pawns turned back from the expected score, or
   a mate), and lists them as "1 · Nf3 +0.8". While blocking, the lines are the other squad's moves after yours (your
   pick, or a teammate's; with none yet, the move handed over: `blockCheatFen`), the ones worth blocking. It stays on (`SquadsClient.cheatLines`, this device only) until switched off, searching
   each new position on an engine of its own (`ownEngine()`, never queued behind bot work). Nothing is sent; scoring,
@@ -453,10 +453,10 @@ door's look; every class is `sq-`.
     shields, Time chips); under the clocks each squad's block points (none in Classic), tokens and Time chips. On your
     move, a "+30s" chip button by your squad's clock; tapped (yours or a teammate's), that squad's clock jumps by the
     chip's time and counts it down while the bank stands still, and "+30 s" floats up from it for both squads (the
-    timer bar takes the move's later deadline). On your decision: "Stockfish token · N left"; used, your top moves as arrows coloured by rank
+    timer bar takes the move's later deadline). On your decision: "Stockfish token · N left"; used, your top moves as arrows colored by rank
     with their evaluations and listed under it ("Your Stockfish lines"; in the final, a teammate's token shows the
     squad's). Blocking against a squad with a shield: the line under Block says so. The line above the board: a block
-    a shield cancelled (both squads) and a brilliant move ("Brilliant! Nf5 by Pam: +25 coins for Rooks"; past the cap,
+    a shield canceled (both squads) and a brilliant move ("Brilliant! Nf5 by Pam: +25 coins for Rooks"; past the cap,
     "Brilliant! Nf5 by Pam: no coins (cap of 2 a match reached)").
   - **The standings** show every squad's coins (the side panel; the phone's sheet).
 - **Bot work on this device:** after `welcome` the page runs its engine speed check once (`engineSpeed()`, shared with
@@ -522,7 +522,7 @@ No engine in the game: no move scoring, no God King, no power-ups. Playing to wi
 
 ### Pre-game votes
 1. Start: the normal starting position / every board from the same opening / each board its own random opening.
-   With random openings, each opening is played on two of a match's boards with colours swapped (director's call).
+   With random openings, each opening is played on two of a match's boards with colors swapped (director's call).
 2. Pace: about 10, 15 or 25 seconds per move.
 3. Length, for rounds 1 and 2 (Eric): play to the end / a move cap (director's call: 40 moves). At the cap, a board
    still going is decided by material count (no engine); level material is a draw. The final is always played to the
@@ -560,7 +560,7 @@ No engine in the game: no move scoring, no God King, no power-ups. Playing to wi
 - Roles rotate every full turn: each player alternates picking (on their squad's move) and blocking (on the other
   squad's), and partners cycle 1+2, 1+3, 1+4.
 - Blocks from move 1 (Eric). Mercy rules (settings): no blocks when the side to move has 3 or fewer legal moves; a
-  block is cancelled if every other legal move allows mate in one. More rules only if playtests show anti-fun.
+  block is canceled if every other legal move allows mate in one. More rules only if playtests show anti-fun.
 - Missed actions: a Picker who doesn't pick gets a random legal move in their slot; a Blocker who doesn't block
   forfeits theirs (if the coin lands on the empty slot, nothing is blocked). Both logged.
 - Staging: everyone in the lobby watches; the reveal shows both picks as ghost arrows, the active block slamming
@@ -568,7 +568,7 @@ No engine in the game: no move scoring, no God King, no power-ups. Playing to wi
 
 ### Ties
 - Round 1 at 2-2, round 2 at 1-1, or a drawn final: one Armageddon board (White must win, a draw counts for Black),
-  played in that round's format, at the fast pace. The squad with less total thinking time picks colour.
+  played in that round's format, at the fast pace. The squad with less total thinking time picks color.
 
 ### Testing (Eric)
 - An admin/test-only "Next round" button that ends the current round (boards decided by material) and moves on, and

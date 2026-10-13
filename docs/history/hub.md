@@ -53,9 +53,9 @@ The `hub` delegate builds it. Phone layouts as in the mockup; desktop as below.
 
 **Profile:** one structure for everyone, opened by tapping your pawn or any name (leaderboards, cut screen, results).
 - **Header:** dressed pawn (large), name, online now or last seen, joined month, rank tier and rating, percentile.
-- **Wearing:** each equipped item drawn as it looks (crates' `ItemArt`: its colour, blotches and shine), slot,
-  colour, purity (and "Shiny"), and a tier pill in its tier colour. (Eric, Oct 6: the mockup's plain colour swatch
-  read as "just coloured shapes, not the item itself". A shop hat shows on its pawn.)
+- **Wearing:** each equipped item drawn as it looks (crates' `ItemArt`: its color, blotches and shine), slot,
+  color, purity (and "Shiny"), and a tier pill in its tier color. (Eric, Oct 6: the mockup's plain color swatch
+  read as "just colored shapes, not the item itself". A shop hat shows on its pawn.)
 - **Stats:**
   - Mode tabs (Crowd / Boss raid).
   - Crowd: games, wins, average place, best finish, cuts survived %, brilliant moves.
@@ -65,16 +65,16 @@ The `hub` delegate builds it. Phone layouts as in the mockup; desktop as below.
 - **Bosses beaten:** the 10 tiers, lit gold once beaten.
 - **Recent matches:** place, mode, best move, when.
 - **Yours only:** Edit name & icon, Open locker (and settings and sign-in where they live now).
-- **Someone else's only:** Report, and "Add friend" greyed out until friends exist.
+- **Someone else's only:** Report, and "Add friend" grayed out until friends exist.
 - **Never shown to others:** email, sign-in method, anything private.
 
 **Desktop (Eric: "similar to the chess sites, our own style")**
 - At 1024 px and wider, a three-column frame:
   - a **left side menu**: logo, Play, Boss alone, Play with friends, Shop & crates, Profile, then settings
-  - the **centre** for the screen itself
+  - the **center** for the screen itself
   - a **right panel**: the live line, a "playing now" list of running matches (mode, players left, a watch link
     where spectating exists), and later a leaderboard
-- The home screen's centre: your pawn and PLAY, side by side.
+- The home screen's center: your pawn and PLAY, side by side.
 - The game screens keep their current desktop layout; only the front door changes.
 
 **Phone or app store?** The website is the app.
@@ -85,7 +85,7 @@ The `hub` delegate builds it. Phone layouts as in the mockup; desktop as below.
 
 ### Built, step 1: home and the live line (Oct 6, 2026)
 
-The `hub` delegate's calls while building the home screen. The layout, sizes, colours and copy are the mockup's;
+The `hub` delegate's calls while building the home screen. The layout, sizes, colors and copy are the mockup's;
 every number on it comes from the server.
 
 - **Online** means an account the server heard from in the last minute (`FRONT_DOOR.onlineWindowMs`).
@@ -103,7 +103,7 @@ every number on it comes from the server.
     (each lobby records its people's average wait when it fills). Until there's any history: "Starts within 60 s;
     bots fill any empty seats".
   - Boss raid: the mockup's "Join a raid; the boss matches the group".
-  - Classic: "Classic is being reworked", and PLAY is greyed out.
+  - Classic: "Classic is being reworked", and PLAY is grayed out.
 - **PLAY in Boss raid joins a raid queue** (new): the same matchmaker as 50 v 50, a lobby of up to 50 that fills for
   60 s, no bots, and the boss is the weakest that's stronger than the group's average rating.
 - **Guests, where online play needs signing in:** PLAY plays 99 bots (Crowd) or opens the boss menu (Boss raid), and
@@ -118,7 +118,7 @@ every number on it comes from the server.
   - The options (practice, pace, 50 v 50 or everyone moves, animations, motion trail, pre-game votes, opening moves,
     sound, the sound lab) moved to **Settings** (`/settings`), with the rules ("How to play"), the install card,
     sign-in and the Stockfish credit.
-  - Lobbies with a code, and solo practice against 99 bots, are in **Play with friends** ("or practise alone"). An
+  - Lobbies with a code, and solo practice against 99 bots, are in **Play with friends** ("or practice alone"). An
     invite link opens it with the code filled in.
 - **Fonts:** Archivo and Archivo Black are self-hosted (`public/fonts`, OFL).
 - **The profile's new stats start recording now** (more in step 3), so there's real data by the time the profile
@@ -134,7 +134,7 @@ every number on it comes from the server.
 - **The pop:** a pawn scales from small up to 124%, back to 92%, a touch over 100%, and settles, in 0.35 s.
   - Pawns arriving together start 40 ms apart; the pop sound plays at most every 70 ms however many arrive, and
     only with sound on (the mute switch sits in the header's empty corner).
-  - The sound is synthesised: a short sine that drops in pitch, like a bubble, with a little tap; its pitch varies
+  - The sound is synthesized: a short sine that drops in pitch, like a bubble, with a little tap; its pitch varies
     a little so a run of them isn't mechanical. Bots get the same at under half the volume.
   - Your own pawn pops first when you arrive, then everyone already there, 40 ms apart.
 - **When time's up,** the server fills the empty seats with bots and holds the full grid for 1.8 s
@@ -176,7 +176,7 @@ every number on it comes from the server.
   - Crowd: games, wins, average place (shown rounded, as a place), best finish: from results, as before. **New:**
     cuts survived (%) and brilliant moves.
   - Boss raid: raids. **New:** bosses beaten (different tiers won), strikes survived (the boss's strikes that took
-    someone else while you stood; I read the mockup's "strikes" this way and labelled it so), Last Stands (raids in
+    someone else while you stood; I read the mockup's "strikes" this way and labeled it so), Last Stands (raids in
     which the God King made his Last Stand), survived (% of raids you were still standing at the end) and brilliant
     moves.
   - The new ones are recorded from today on. A stat counts only results that have it, and shows "—" when none do,
@@ -192,7 +192,7 @@ every number on it comes from the server.
   settings (the gear, and a link at the bottom), and signing in for a guest.
 - **Someone else's only:** Report (Cheating, Name or Something else), stored in D1's `reports` for a person to read
   (`SELECT * FROM reports ORDER BY at DESC`); one per player per reporter a day, 20 a day per reporter. "Add friend"
-  is there, greyed out "(later)".
+  is there, grayed out "(later)".
 
 ### Built, step 4: the computer's frame (Oct 6, 2026)
 
@@ -200,7 +200,7 @@ every number on it comes from the server.
   - **Left, the side menu:** the logo, Play, Boss alone, Play with friends, Shop & crates, Profile (with your
     pawn), and Settings at the bottom. The page you're on is marked with a gold bar. Play is the home screen (PLAY
     lives there); Boss alone and Play with friends open the home screen's boss menu and sheet.
-  - **The centre:** the page. Your pawn and PLAY sit side by side from 1280 px (stacked, as on a phone, from 1024 to
+  - **The center:** the page. Your pawn and PLAY sit side by side from 1280 px (stacked, as on a phone, from 1024 to
     1279, where they don't both fit); a profile goes to two columns from 1280 px.
   - **Right, the live panel:** the live line (one number to a line) and **Playing now**: each running match's mode
     (and the raid's boss), players left and how long it's been going. No names, nothing a stranger couldn't see from
@@ -214,12 +214,12 @@ every number on it comes from the server.
 
 ### The rank ladder (Eric, Oct 6, 2026)
 
-- **Fourteen ranks, Puzzle Pirates' skill ladder** (the names honour it): Novice, Neophyte, Apprentice, Narrow,
+- **Fourteen ranks, Puzzle Pirates' skill ladder** (the names honor it): Novice, Neophyte, Apprentice, Narrow,
   Broad, Solid, Weighty, Expert, Paragon, Illustrious, Sublime, Revered, Exalted, Transcendent. No divisions: the
   label is the name ("Weighty · 1612"). They replace Bronze to Grandmaster, on home and on profiles.
 - **Fixed cutoffs, in 50s** (`RATING_RANKS` in settings.ts), aimed at the spread Eric asked for. The assumption: our
-  ratings spread like chess ratings, centred on 1500 with an SD of 350. Nothing better exists yet: the sim reports
-  model bot crowds, not people, and a new player's rating starts at 1500 and is pulled towards it for the first
+  ratings spread like chess ratings, centered on 1500 with an SD of 350. Nothing better exists yet: the sim reports
+  model bot crowds, not people, and a new player's rating starts at 1500 and is pulled toward it for the first
   moves. Once real ratings are stored in numbers, refit the cutoffs to them (change `from` in settings.ts).
 
   | Rank | From | Asked | Gets (1500 ± 350) |
@@ -242,10 +242,10 @@ every number on it comes from the server.
   A band of 50 holds about 5.7% of players near the middle, so the middle ranks can't land closer than a point or
   two; the cutoffs are the set of 50s nearest the ideal that fits best overall. A unit test holds the shares near
   these, so a change to the cutoffs or the assumption is a deliberate one.
-- **Colours climb:** dull grey and stone at the bottom, then clay and copper, olive, greens, teal, sky blue, periwinkle
+- **Colors climb:** dull gray and stone at the bottom, then clay and copper, olive, greens, teal, sky blue, periwinkle
   and violet. The top three stand out: **Revered** is gold with a gold ring and a sheen, **Exalted** fire orange with
   a ring and a glow, **Transcendent** a slowly moving rainbow with dark text (held still for anyone who asks for reduced motion). On home
-  the rank's name takes its colour. Every pill reads at 4.5:1 or better in both themes, and a unit test checks it.
+  the rank's name takes its color. Every pill reads at 4.5:1 or better in both themes, and a unit test checks it.
 - **Item tiers get their own names** (Common to Mythic, the item-builder's change alongside this one), so a rank never
   reads like an item's rarity.
 
@@ -267,7 +267,7 @@ toggle". The "sun" was Settings' icon; nothing in the app could change the theme
   inline script against `theme.ts` for every case (picked, not, junk, no storage, no media queries).
 - **One rule for light in the stylesheet:** the page always carries the theme it shows (`data-theme="light|dark"`),
   so every light rule is `:root[data-theme="light"] …`. The old `@media (prefers-color-scheme: light)` blocks (the
-  base colours, the front door's, the rank pills, quick chat's bubble and page chat) became that. Before, a light pick
+  base colors, the front door's, the rank pills, quick chat's bubble and page chat) became that. Before, a light pick
   on a dark device would have missed them; quick chat's page-chat had only half its light rules duplicated.
 - **The phone's top bar, measured:** with the sun it holds the logo, the sun, your coins and your pawn. The bar
   already ran off a 320 px phone with a 4-digit balance (and a 390 px one with 5 digits once the sun was in). Now:
@@ -295,8 +295,8 @@ scoped to 1024 px and wider.
   one box that fills the window's height, up to 720 px. Your card fills its column top to bottom (nothing above it);
   the play column sits in its middle, level with your pawn. On a tall screen the space is below everything, not
   above.
-- **Sizes:** the card up to 540 px wide, the play column 320 px (1280-1439) or 360 px (1440+), 24 px apart, centred
-  in a centre of up to 1,080 px (it was 920: a 1,860 px screen had wide empty bands). The live panel is 280 px below
+- **Sizes:** the card up to 540 px wide, the play column 320 px (1280-1439) or 360 px (1440+), 24 px apart, centered
+  in a center of up to 1,080 px (it was 920: a 1,860 px screen had wide empty bands). The live panel is 280 px below
   1440 px (320 above), so the lobby gets the room. 1024-1279: stacked, as before.
 
 **The queue in place (computer)**
@@ -308,7 +308,7 @@ scoped to 1024 px and wider.
 - **Sizes:** the left column 280 px (300 from 1440), the lobby the rest; the grid is as wide as the lobby and never
   taller than the window allows, so Cancel is always in view: about 40 px pawns at 1280 × 800, 48 at 1440 × 900,
   about 65 on a 1920 × 1080 screen. (Eric's Oct 6 "60-80 px" was for a queue with the whole window; with the frame
-  and the chat kept, it's smaller on a laptop.) At 1024-1279 the lobby takes the centre, your card is in your seat's
+  and the chat kept, it's smaller on a laptop.) At 1024-1279 the lobby takes the center, your card is in your seat's
   card, and the chat goes under the lobby.
 - **"Unranked …" sits beside the count,** so when the bots arrive it doesn't push the grid down mid-show. Your seat
   and Cancel share a row. No back arrow in the lobby (Cancel is there, and the side menu).
@@ -400,7 +400,7 @@ it honestly; no server time for the stand-in; light on the device.
   the cycle comes from the time, so everyone sees the same replay at the same moment. Ten replays make a cycle of
   about 2.5 hours. Adding more is the script run again: it appends new matches from new seeds without touching the
   old ones, and the cycle grows. A day without repeats is about 90 more.
-- **Labelled honestly:** "Bot match" (and "Bot match, a recording" to screen readers), the names are the bots'.
+- **Labeled honestly:** "Bot match" (and "Bot match, a recording" to screen readers), the names are the bots'.
   **This is a beta stand-in until real players arrive**; once matches run most of the time, the window will mostly
   show real ones, and the replays can go.
 - **Light on the device:** it plays back moves only, with no engine. Each replay's positions are worked out once when

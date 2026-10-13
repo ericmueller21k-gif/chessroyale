@@ -30,7 +30,7 @@ on Eric's account.
    automated reviewer (`docs/fairplay-reviewer.md`). Next: refit the evidence model from real cleared players; block
    disposable email domains and add Cloudflare Turnstile (free) on email sign-in against scripted sign-ups.
 7. **Coins, icons and emotes.** Coins for doing well (placement, surviving cuts, a good move streak, daily first match),
-   spent on cosmetic things only: profile icons, emotes to send during a match, board and piece themes, name colours.
+   spent on cosmetic things only: profile icons, emotes to send during a match, board and piece themes, name colors.
    Nothing that changes play: no power-ups, no hints, no extra time. Earned only, not bought, unless Eric decides
    otherwise later.
 
@@ -42,7 +42,7 @@ on Eric's account.
      middle and others drop in around it as they join (the cut screen's 10 × 10 grid, filling up). Bots fill the
      last seats in plain pawns when the 60 s runs out.
    - **The podium.** The results screen puts the top three's dressed pawns on a podium, the winner's biggest.
-   - **Tap a name** (leaderboard, cut screen, podium) for a card: their pawn, each item's tier, colour and purity.
+   - **Tap a name** (leaderboard, cut screen, podium) for a card: their pawn, each item's tier, color and purity.
    - **A small head** (pawn plus hat) beside each name on the leaderboard.
    - **The moment's star.** The brilliant-move badge, the queen-kill banner and the boss raid's victory shot feature
      the player's dressed pawn.

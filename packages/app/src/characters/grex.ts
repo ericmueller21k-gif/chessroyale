@@ -7,7 +7,7 @@
  * A giraffe first (Eric, Oct 9): a long neck, so he stands taller than the other bosses (about the God King's height
  * with his wings spread; his frame grows upward), and a typical giraffe face, no sunglasses. The head stays big for
  * a phone, so his eyes, grin and flaming ossicones read. Drawn three-quarters, facing right (our right), as in the
- * reference: the flames (mane, tail) on our left, the sparklers on our right, towards the board.
+ * reference: the flames (mane, tail) on our left, the sparklers on our right, toward the board.
  *
  * Rigging: the head, torso and hooves are painted once per look; the neck, arms, legs and tail are painted from
  * their pose's points (a shoulder, an elbow, a fist; a hip, a knee, an ankle), and the sparklers from the fist in
@@ -295,7 +295,7 @@ function paintLimb(pts: readonly Pt[], r: number, opts: { endR?: number; fist?: 
       }
       const light = 0.62 - 0.42 * (best.nx / r) - 0.5 * (best.ny / r);
       let k = "dcCh"[Math.max(0, Math.min(3, Math.floor(light * 4)))]!;
-      // A spot: centred every `every` pixels along the limb, on alternate sides of its middle.
+      // A spot: centered every `every` pixels along the limb, on alternate sides of its middle.
       const n = Math.round((best.s - from) / every);
       const sc = from + n * every;
       const across = best.d * best.side;
@@ -326,7 +326,7 @@ function flameTuft(w: number, h: number, seed: number, lean: number, tongues: nu
         const Y = h - th + y;
         const cur = cv[Y]?.[ox + x];
         if (cur === undefined) return;
-        // Hotter colours win where tongues overlap.
+        // Hotter colors win where tongues overlap.
         if (cur === "." || "RFfYy".indexOf(k) > "RFfYy".indexOf(cur)) cv[Y]![ox + x] = k;
       }),
     );
@@ -415,7 +415,7 @@ PARTS["burst:1"] = flameTuft(46, 9, 5, 0, 8);
 
 /**
  * The Roman candle, big (Eric, Oct 9: much larger and longer, about his own height to the shoulder): a cardboard tube
- * with red and cream spiral stripes, two blue bands, a grey cap round its dark muzzle and a grey foot. Drawn once at
+ * with red and cream spiral stripes, two blue bands, a gray cap round its dark muzzle and a gray foot. Drawn once at
  * each tilt he sweeps it through (degrees, + its top to our right), about the middle of its foot.
  */
 export const CANDLE_LEN = 48;
@@ -725,7 +725,7 @@ export function sparkSpray([x, y]: Pt, seed: number, size = 1): Speck[] {
   return out;
 }
 
-/** Embers drifting up (`t` frames in), seeded, around a column centred on `cx`. */
+/** Embers drifting up (`t` frames in), seeded, around a column centered on `cx`. */
 function embers(cx: number, yBase: number, t: number, n = 6, spread = 14, rise = 30): Speck[] {
   return Array.from({ length: n }, (_, i): Speck => {
     const h = ((i + 1) * 2654435761) >>> 0;
@@ -894,7 +894,7 @@ const rattled: Anim = {
   }),
 };
 
-/** His move: a step towards the board and a flourish of the sparkler at it. */
+/** His move: a step toward the board and a flourish of the sparkler at it. */
 const move: Anim = {
   loop: false,
   frames: [

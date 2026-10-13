@@ -135,7 +135,7 @@
  *
  *   iceOverlay     square  freeze, frozen (loop), crack into thinning (loop: thin, dripping ice about to thaw),
  *                           thaw (ends empty). See-through: the piece shows under it.
- *   iceBolt        square  fly (loop). Points right: rotate it towards its target as it flies.
+ *   iceBolt        square  fly (loop). Points right: rotate it toward its target as it flies.
  *   blizzardSweep  board   sweep (one-shot, about 1.3 s, ends empty). Cloud and snow cross left to right.
  *   pieSplat       square  splat, pied (loop), fade (ends empty). On an empty square.
  *   pieFly         square  fly (loop). A pie tumbling; move it from the boss to the square.
@@ -158,7 +158,7 @@
  *   darkSquare     square  gather, dark (loop), thin (loop, its last turn), clear (ends empty). Hollow's dark over a
  *                          square: cloudy smoke, never a flat box, hiding the piece (its body covers 2 to 29 of the
  *                          square's 32 px, so the selection's green shows round it). Over the pieces, no taps.
- *   darkPour       square  fly (loop). The darkness in flight, pointing right: turn it towards its target.
+ *   darkPour       square  fly (loop). The darkness in flight, pointing right: turn it toward its target.
  *   darkMiss       square  miss (ends empty): a red-violet slash, for a wrong tap or a wrong move into the dark.
  *   bulbStrand     strip   lit3 … lit0 (loops), out3, out2, out1 (a bulb going out; each ends on the next lit<n>),
  *                          relight (ends on lit3); 44 x 15. Size its box to keep its shape (height = width x 15 / 44).
@@ -167,7 +167,7 @@
  *                          where <t> is the square's tile (16 by where it is, light or dark). Use nightItems().
  *   nightLabel     square  a … h, 1 … 8: the night's coordinates, over the tiles (nightItems() places them).
  *   lashHit        square  hit<F|B><L|R><c> (ends empty, about 200 ms): a lash of Hollow's strand landing on a king,
- *                          a forehand (high) or backhand (low, rising), from the left or right edge, in bulb colour c.
+ *                          a forehand (high) or backhand (low, rising), from the left or right edge, in bulb color c.
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
  * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
@@ -497,7 +497,7 @@ export function lightsOutSmashes(a: Anim): number[] {
 }
 
 /**
- * Where he goes for Lights out (his new spot), as a box on the board in % of its size: centred above it, his feet on
+ * Where he goes for Lights out (his new spot), as a box on the board in % of its size: centered above it, his feet on
  * its top edge, so he never covers a square during the test. The box keeps his frame's shape (`width` wide).
  */
 export function lightsOutSpot(ch: Character, width = 30): { left: number; top: number; width: number; height: number } {

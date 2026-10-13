@@ -57,7 +57,7 @@ matches.
 
 **Never decide** (leave it for Eric, and move on):
 - a banned case, or one with an appeal waiting (the API refuses anyway);
-- a case open only because of "Offensive name or icon" or "Something else" reports: names and behaviour are for a
+- a case open only because of "Offensive name or icon" or "Something else" reports: names and behavior are for a
   person;
 - anything where the evidence was deleted (`moves: null` for every match) and the summaries alone don't settle it.
 

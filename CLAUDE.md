@@ -5,6 +5,11 @@
 `buildspec.md` is the brief. Read it before doing anything, and follow it. Where it's ambiguous, make the call and
 record it in `DECISIONS.md`.
 
+## Language
+
+American English everywhere: game text, lines, FAQ, docs, commits, PR text and chat (Eric, Oct 13). New code uses US
+spelling in names too; older names (e.g. `colour`) stay until touched.
+
 ## Start here: how it works now
 
 - **`docs/areas/`**: one short page per area (bosses, the God King, the match, matchmaking, the front door, accounts,
@@ -16,7 +21,7 @@ record it in `DECISIONS.md`.
 
 ## How Eric likes to work (carried over from Word Trap)
 
-- Keep Eric's involvement minimal. Make judgement calls yourself and record each one, with the reason, in
+- Keep Eric's involvement minimal. Make judgment calls yourself and record each one, with the reason, in
   `DECISIONS.md`. Stop and ask Eric only for things only Eric can do: accounts or anything that costs money, testing on
   his real phone or computer, or reversing a rule he set.
 - Don't stop for review between milestones (Eric, Oct 2, 2026, overriding the spec's "stop after each milestone"):
@@ -82,7 +87,7 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
     server, protocol, accounts, stored data and migrations, security, online sync; anything where a bug could break a
     match or lose a player's data.
   - `high`: new features or screens with logic or stored settings; animation and timing work; research that needs
-    judgement (licences, design); docs that must match the code exactly (the FAQ); crate item art Eric reviews.
+    judgment (licenses, design); docs that must match the code exactly (the FAQ); crate item art Eric reviews.
   - `medium`: CSS, layout and stacking tweaks; text and copy; docs-only updates; small investigations; one obvious bug
     with a clear fix and a test.
 - **Any other window works only in its own lane** and doesn't act as the director.
@@ -135,7 +140,7 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
 - `packages/server`: `src/lobby.ts` is pure, testable lobby logic; `src/lobby-do.ts` the Durable Object;
   `src/index.ts` routes `/api/*` and serves the app. Squads' lobby and parties: `src/squads-lobby.ts`,
   `squads-party.ts` (pure) and `squads-do.ts`. Config: `wrangler.jsonc` at the repo root.
-- `packages/maia-worker`: the Maia box (Maia-3 in its own Web Worker; AGPL-3.0, its own README and licence). A separate
+- `packages/maia-worker`: the Maia box (Maia-3 in its own Web Worker; AGPL-3.0, its own README and license). A separate
   program: the game never imports it, only exchanges UCI-style text with the built worker (`/engine/maia/`).
 - `e2e/`: Playwright tests that play full solo and two-player matches on emulated phones.
 

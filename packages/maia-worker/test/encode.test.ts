@@ -9,7 +9,7 @@ const fixtures = JSON.parse(readFileSync(new URL("./fixtures/encoding.json", imp
 };
 
 describe("the encoder (the official tokenizer's planes)", () => {
-  it("covers both colours to move, promotions both ways, castling and en passant", () => {
+  it("covers both colors to move, promotions both ways, castling and en passant", () => {
     const fens = fixtures.positions.map((p) => p.fen);
     expect(fens.some((f) => blackToMove(f))).toBe(true);
     expect(fens.some((f) => !blackToMove(f))).toBe(true);

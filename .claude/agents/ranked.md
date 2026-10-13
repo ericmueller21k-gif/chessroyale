@@ -16,7 +16,7 @@ the matchmaker's plumbing). For the why, the decisions "Ranked, ratings and matc
 
 | What | Where |
 | --- | --- |
-| The rating maths (Weng–Lin / OpenSkill), RP rules, tiers, seasons | new `packages/core/src/ranked.ts` (pure, tested); tunables in `settings.ts` |
+| The rating math (Weng–Lin / OpenSkill), RP rules, tiers, seasons | new `packages/core/src/ranked.ts` (pure, tested); tunables in `settings.ts` |
 | Storing ratings, ranks, seasons, match results | `packages/server/src/accounts.ts` (new tables, migrations), `api.ts` |
 | Ranked queues and skill-based lobby forming | `packages/server/src/matchmaker.ts` (the matching logic; the queue *screen* is `hub`'s) |
 | Leaderboard data | a cached query or table you own; `hub` displays it |
@@ -31,7 +31,7 @@ Not yours:
 
 - **Measure before you ship numbers.** Simulate thousands of matches of synthetic players with known true skill
   (`packages/sim`) and show the ratings converge, the rank distribution looks right (most players in the middle
-  tiers), and no strategy (sandbagging, leaving, farming bots) pays. Put the tables in `reports/` and summarise them
+  tiers), and no strategy (sandbagging, leaving, farming bots) pays. Put the tables in `reports/` and summarize them
   in DECISIONS. Keep `docs/areas/matchmaking.md` true.
 - **Only real players move ratings.** Bots never count. A ranked match needs its minimum of real players.
 - **Server-side only.** Ratings and RP are computed on the server from the server's record of the match, never from

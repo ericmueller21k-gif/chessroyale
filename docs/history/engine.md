@@ -14,7 +14,7 @@ Eric agreed the judge must be strong and put the account on Workers Paid. He ask
 - The lobby remembers "the server answered" in memory only; if the lobby object sleeps and wakes mid-match, the host's own re-check is used until the next player joins (safe, rare during an active match).
 - **Solo:** re-checks go to `POST /api/engine/score` first, falling back to the device's own re-check (lite at 700k nodes).
 - **Cost:** Cloudflare's published rates are $5/month plus usage. A cap of 3000 re-checks a day (`ENGINE_DAILY_SEARCHES`) keeps the worst case around $25/month; past it, devices' numbers stand. A whole-match-on-server design would have been about 3.5¢ a match (memory while awake); the hybrid is well under 1¢.
-- **Later, if traffic grows:** cache analysed positions (crowd games share their openings), spot-check devices' numbers against the server, and run more instances.
+- **Later, if traffic grows:** cache analyzed positions (crowd games share their openings), spot-check devices' numbers against the server, and run more instances.
 - **Verified locally:** with the container running under `wrangler dev`, an online Classic match made 17 server re-checks (0.6–3 s), and solo games 35 (median 1.2 s).
 
 ## The re-check of close calls (Oct 5, 2026)
@@ -29,7 +29,7 @@ The top-8 search gives each move about an eighth of 250k nodes, which is why clo
 
 - A move is brilliant when, among at least 6 picks, the moves within 1.5 points of the best were found by at most 20% of the pickers, and everyone else gave away 8+ points on average (`brilliance` in `core/scoring.ts`).
 - **Never with a power-up** (Eric): a power-up shows the engine's top moves, so those picks are flagged (`usedPowerUp` on the round's results, sent online too) and never count. The reveal still shows the move, noting that a power-up pick doesn't count.
-- The reveal shows "‼ Brilliant move: Nxf7 · only 3 of 40 found it", in brighter colours if you found it.
+- The reveal shows "‼ Brilliant move: Nxf7 · only 3 of 40 found it", in brighter colors if you found it.
 
 ## Many judges (Oct 8, 2026)
 

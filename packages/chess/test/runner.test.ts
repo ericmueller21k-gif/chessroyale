@@ -33,7 +33,7 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
 }));
 
 describe("MatchRunner", () => {
-  it("plays a whole 64-bot match: one board fewer per cut, one colour per stage, then the 2v2 final", async () => {
+  it("plays a whole 64-bot match: one board fewer per cut, one color per stage, then the 2v2 final", async () => {
     const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 2, firstStageRounds: 2 };
     const rng = mulberry32(1);
     const runner = new MatchRunner({
@@ -54,11 +54,11 @@ describe("MatchRunner", () => {
       expect(groups.size).toBeLessThanOrEqual(plan[runner.state.stage]!.boards);
       expect([...groups.values()].flat()).toHaveLength(runner.alive().length);
       if (groups.size >= 2) {
-        // Everyone sits on a board where their colour is to move; groups are 7-10 when boards are odd.
+        // Everyone sits on a board where their color is to move; groups are 7-10 when boards are odd.
         for (const [id, ids] of groups) for (const pid of ids) expect(runner.player(pid).colour).toBe(runner.boards.get(id)!.fen.split(" ")[1]);
         for (const g of groups.values()) expect(g.length).toBeGreaterThanOrEqual(5);
       }
-      // Colours stay fixed through a stage, and most players swap at the break.
+      // Colors stay fixed through a stage, and most players swap at the break.
       const now = new Map(runner.alive().map((p) => [p.id, p.colour]));
       if (runner.state.stage === lastStage) expect(now).toEqual(colours);
       else if (lastStage >= 0 && groups.size >= 2) {

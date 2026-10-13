@@ -12,7 +12,7 @@ type Kind = keyof typeof BOT_LOOKS.odds;
 const KINDS = Object.keys(BOT_LOOKS.odds) as Kind[];
 
 const pickOne = <T>(rng: Rng, list: readonly T[]): T => list[Math.min(list.length - 1, Math.floor(rng() * list.length))]!;
-/** A colour by the crates' odds (red and yellow common, Pearl rare). */
+/** A color by the crates' odds (red and yellow common, Pearl rare). */
 const colour = (rng: Rng) => ITEM_COLORS[weightedIndex(rng, ITEM_COLORS.map((c) => c.weight))]!.id;
 
 /**
@@ -24,7 +24,7 @@ export function botLook(seed: string): BotLook {
   const rng = mulberry32(idHash(`look:${seed}`));
   const kind = KINDS[weightedIndex(rng, KINDS.map((k) => BOT_LOOKS.odds[k]))]!;
   const look: ItemLook = {};
-  /** A crate item in its slot: a colour (two for two-colour items) and a purity in BOT_LOOKS.purity. */
+  /** A crate item in its slot: a color (two for two-color items) and a purity in BOT_LOOKS.purity. */
   const wear = (slot: "head" | "face" | "weapon", def: string) => {
     const [lo, hi] = BOT_LOOKS.purity;
     const blemish = Math.round((100 - (lo + rng() * (hi - lo))) * 10) / 10;

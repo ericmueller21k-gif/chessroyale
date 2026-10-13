@@ -134,5 +134,5 @@ export function squadBotThinkMs(rng: Rng, clock: { bankMs: number; incrementMs: 
   return Math.round(Math.min(ms, clock.deadlineMs * s.bots.inTime, (clock.cutoffMs ?? Infinity) * s.bots.inTime));
 }
 
-/** The colour a bot squad takes when it picks Armageddon's colours. */
+/** The color a bot squad takes when it picks Armageddon's colors. */
 export const botArmageddonColour = (s: SquadsSettings = SQUADS): Colour => s.bots.armageddonColour;

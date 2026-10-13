@@ -45,7 +45,7 @@ describe("profile helpers", () => {
     });
   });
 
-  it("ranks: every pill reads at 4.5:1 or better on both themes (the pill's colour mixes in styles.css)", () => {
+  it("ranks: every pill reads at 4.5:1 or better on both themes (the pill's color mixes in styles.css)", () => {
     const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
     const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v * t + b[i]! * (1 - t));
     const lum = (c: number[]) => {
@@ -55,7 +55,7 @@ describe("profile helpers", () => {
     const contrast = (a: number[], b: number[]) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
     for (const r of RATING_RANKS.filter((r) => r.effect !== "prism")) {
       const c = rgb(r.color);
-      // Dark: the colour on a 20% tint of the panel (#1b1e25). Light: the colour darkened (55% with black) on a 20% tint of white.
+      // Dark: the color on a 20% tint of the panel (#1b1e25). Light: the color darkened (55% with black) on a 20% tint of white.
       expect(contrast(c, mix(c, rgb("#1b1e25"), 0.2)), `${r.name} dark`).toBeGreaterThanOrEqual(4.5);
       expect(contrast(mix(c, [0, 0, 0], 0.55), mix(c, [255, 255, 255], 0.2)), `${r.name} light`).toBeGreaterThanOrEqual(4.5);
     }

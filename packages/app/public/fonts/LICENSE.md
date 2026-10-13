@@ -4,5 +4,5 @@
 - `archivo.woff2`: Archivo by Omnibus-Type, SIL Open Font License 1.1 (https://fonts.google.com/specimen/Archivo). Variable weight, latin subset, from Google Fonts. The front door's text.
 - `archivo-black.woff2`: Archivo Black by Omnibus-Type, SIL Open Font License 1.1 (https://fonts.google.com/specimen/Archivo+Black). Latin subset, from Google Fonts. The logo, PLAY and big numbers.
 
-Each font's copyright notice and the licence's full text ship with the app in `/licenses/third-party.txt`
-(`public/licenses/`), linked from Settings and the FAQ's credits, as the licence asks.
+Each font's copyright notice and the license's full text ship with the app in `/licenses/third-party.txt`
+(`public/licenses/`), linked from Settings and the FAQ's credits, as the license asks.

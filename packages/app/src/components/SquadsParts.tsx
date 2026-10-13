@@ -44,7 +44,7 @@ export function useNow(ms = 100, active = true): number {
   return now;
 }
 
-/** A squad's name with its colour. */
+/** A squad's name with its color. */
 export function SquadTag({ id, you, short }: { id: number | null; you?: boolean; short?: boolean }) {
   return (
     <span class={`sq-tag${you ? " you" : ""}`} style={{ "--sq": squadColour(id) }}>

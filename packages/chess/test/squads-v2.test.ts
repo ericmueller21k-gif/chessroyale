@@ -257,7 +257,7 @@ describe("Squads v2: move blocks", () => {
   it("the moves a block can name: as the piece moves, up to and onto the first piece in its way; castling with the right", () => {
     expect(blockTargets(START_FEN, "g8", "b").sort()).toEqual(["e7", "f6", "h6"]);
     expect(blockTargets(START_FEN, "e7", "b").sort()).toEqual(["d6", "e5", "e6", "f6"]);
-    // A rook along its rank up to the first piece, either colour (your move may take it).
+    // A rook along its rank up to the first piece, either color (your move may take it).
     expect(blockTargets("4k3/8/8/8/r2P3n/8/8/4K3 w - - 0 1", "a4", "b").sort()).toEqual(["a1", "a2", "a3", "a5", "a6", "a7", "a8", "b4", "c4", "d4"]);
     expect(blockTargets(CASTLING, "e8", "b").sort()).toEqual(["c8", "g8"]);
     expect(blockTargets("r3k2r/8/8/8/8/8/8/R3K2R w KQ - 0 1", "e8", "b")).toEqual([]);

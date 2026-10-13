@@ -175,7 +175,7 @@ describe("ranking: a match needs at least 30% real players", () => {
       }
       expect(L.core.record.phase).toBe("results");
     };
-    // 20 people and 44 bots (Classic's 64 seats): exactly 30% real players, ranked. One of them practising.
+    // 20 people and 44 bots (Classic's 64 seats): exactly 30% real players, ranked. One of them practicing.
     const L = setup();
     join(L, 19);
     L.core.connect(undefined, "Practice", "phone", true);

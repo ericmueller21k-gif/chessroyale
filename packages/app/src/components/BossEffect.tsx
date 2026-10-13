@@ -61,7 +61,7 @@ export function spriteFrameAt(ch: Character, anim: string, then: string | undefi
 }
 
 /**
- * Each frame's pixels, made once per look (Hollow's bulbs out) and per recolour from the battle (Hollow's lights:
+ * Each frame's pixels, made once per look (Hollow's bulbs out) and per recolor from the battle (Hollow's lights:
  * `ch.swap`); a new battle's lights replace the last one's.
  */
 const images = new WeakMap<Frame, Map<string, ImageData>>();

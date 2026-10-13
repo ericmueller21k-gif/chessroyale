@@ -13,7 +13,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   boss menu), the coin pill, your icon, and the live line ("214 online · 9 matches running · 31 in queue") with the
   typical wait under PLAY.
   - **Phone:** one column, big tap targets, no sideways scroll at 320–430 px.
-  - **Computer** (1024 px+): a side menu, the play column in the centre, a side panel (playing now, global chat).
+  - **Computer** (1024 px+): a side menu, the play column in the center, a side panel (playing now, global chat).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
     moment (`LIVE_WINDOW`; replays in `packages/app/public/replays/crowd-bots.json`, never fetched on phones).
@@ -31,7 +31,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **Light and dark:** follows the device until you pick (Settings); same layout and accents in both.
 - **The eval bar's switch** (Settings → Playing, "Eval bar"; Eric, Oct 10): on by default. Off, no bar on any board
   (every mode: the play, reveal, vote, final and boss screens all use `EvalBar`, which draws nothing) and the board
-  takes its room, centred, on a phone and a computer. Only in Settings, never on a board screen. Kept on the device
+  takes its room, centered, on a phone and a computer. Only in Settings, never on a board screen. Kept on the device
   (`prefs.ts`: `evalBarOn`, `brc.evalBar`; accounts keep no preferences). The value is still worked out (the God
   King's word on how it's going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older
   apps), from solo's post and the online `hello`, to see later who turns it off and how they play.
@@ -49,13 +49,13 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   gavel is the classic capture and move sounds pitched down to about half. Only the picked files and the defaults load
   (after the first tap's frame), the others when previewed; a pick not loaded yet plays the default. Previews play
   even with the sound switched off; mute silences everything in a game. The files: the classics in `public/sounds/`,
-  the rest in `public/sounds/pieces/` (made by `scripts/piece-sounds.py`, levelled to the classic of their kind),
-  every source and licence in `public/sounds/SOURCES.md`.
+  the rest in `public/sounds/pieces/` (made by `scripts/piece-sounds.py`, leveled to the classic of their kind),
+  every source and license in `public/sounds/SOURCES.md`.
 - **The first tap of a visit** doesn't wait for sound (Oct 12): the audio graph is made while the page is idle
   (`prepareAudio`), so a tap only switches it on; the samples start loading after that tap's frame.
 - **The FAQ, "How HunChess works"** (Eric, Oct 11): Settings → HOW TO PLAY → "📖 FAQ · How it works" (`/faq`; back
   goes to Settings). A long page for the curious: a table of contents with tap-to-jump links, then the modes, how
-  moves are scored (with the maths and a worked example), how a boss decides its moves (its strength, Stockfish and
+  moves are scored (with the math and a worked example), how a boss decides its moves (its strength, Stockfish and
   Maia, the handover between them, what a rating gap means), boss powers and the rage meter (one block per boss), the
   God King and his Last Stand, crates and items, fair play (high level only) and credits. Its words are in
   `packages/app/src/faq/content.ts`, one entry per section in a small Markdown-like format (`faq/markdown.ts`), drawn
@@ -105,7 +105,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 - Phone first, the computer as good: check both in Playwright screenshots, at 320–430 px and 1024 px+.
 - A new piece sound: wood, CC0 or ours (then CC BY, credited in Settings; never non-commercial). GPL only as a
-  separate data file, credited, with the licence served, as the PyChess classics and their variations are (Eric's
+  separate data file, credited, with the license served, as the PyChess classics and their variations are (Eric's
   call, Oct 12). Record its source (and, if changed, how) in `public/sounds/SOURCES.md` and level it with
   `scripts/piece-sounds.py`.
 - Real numbers only: every count, stat and rating comes from the server; never fake one.

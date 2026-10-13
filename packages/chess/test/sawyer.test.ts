@@ -531,7 +531,7 @@ describe("Sawyer's board saw", () => {
     for (const m of bossAllowed(bossWith(black, { boardSaw: { at: 4, until: 8 } }), black)!) expect(crossesMiddle(m)).toBe(false);
   });
 
-  it("knows which half favours him on material", () => {
+  it("knows which half favors him on material", () => {
     expect(favouredHalf(START_FEN, "w")).toBeNull();
     // The crowd (White) without its a1 rook: files a-d are his.
     expect(favouredHalf(START_FEN.replace("RNBQKBNR", "1NBQKBNR"), "w")).toBe("a-d");

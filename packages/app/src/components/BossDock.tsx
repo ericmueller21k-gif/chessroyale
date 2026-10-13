@@ -27,7 +27,7 @@ import { SpeechBox } from "../speech.tsx";
  *   where his menu was (the engine's top 3 moves, as in Crowd).
  *
  * On a computer (styles.css, .boss-dock) the status row is the board's width,
- * centred under it, and the God King stands by the board's bottom-right corner,
+ * centered under it, and the God King stands by the board's bottom-right corner,
  * facing the boss across the board (Eric, Oct 11); his words and menu open
  * outwards there. On a phone, as above.
  */
@@ -48,14 +48,14 @@ export function BossDock({
   powerUp,
 }: {
   match: GameView;
-  /** Your move: step back through the game (the arrows are greyed out elsewhere). */
+  /** Your move: step back through the game (the arrows are grayed out elsewhere). */
   nav?: { view: ReturnType<typeof useHistoryView>; total: number };
   canCall?: boolean;
   strike?: StrikeState;
   status: ComponentChildren;
   /** The status takes the whole row, no « » (Hollow's Lights out: his prompt and the crowd's meter need the room). */
   wide?: boolean;
-  /** The crowd's colour, for the God King's armour. */
+  /** The crowd's color, for the God King's armor. */
   side?: "w" | "b";
   /** What just happened, most important first: he may say something about the first that speaks. */
   cues?: { cue: KingCue; key: string }[];
@@ -161,7 +161,7 @@ export function BossDock({
 
 /**
  * Testing, admins only (ADMIN_EMAILS, as for the fair-play review; online the server checks too): a small plain button
- * that brings the boss's ultimate as the next crowd turn begins, without the warning. Greyed out while one is on its
+ * that brings the boss's ultimate as the next crowd turn begins, without the warning. Grayed out while one is on its
  * way or under way (its effect still running); ready again once it's over, as the meter fills again.
  * BOSS_POWERS.ultimateTestButton false removes it.
  */
@@ -235,7 +235,7 @@ function GodKingUnit({
   // His leap (his Last Stand) plays from when it starts.
   const leapAt = useMemo(() => (leaping ? Date.now() : 0), [leaping]);
   if (fallen) {
-    // After his Last Stand: his fallen figure, on his side, cracked and greyed. No menu, no crowns; the charges he
+    // After his Last Stand: his fallen figure, on his side, cracked and grayed. No menu, no crowns; the charges he
     // had left are your power-ups, in a ⚡ button above him (the whole column is the button).
     const count = power ? (power.left === Infinity ? "∞" : String(power.left)) : "";
     return (

@@ -23,7 +23,7 @@ function towerHeight(keep: Set<number>, cutoff: number, n: number): number {
 
 /**
  * The phone's scoreboard under the board. It never scrolls: it shows as many
- * players as fit (you, the leaders, your neighbours and the cut line first),
+ * players as fit (you, the leaders, your neighbors and the cut line first),
  * with position, name, points, average, rating and power-ups. Tap it for the
  * full leaderboard; the header's arrow folds it to that header (the space under the board's one remembered view,
  * prefs.ts: underBoardView).
@@ -84,7 +84,7 @@ export function MiniTower({
         </button>
         {head}
         {openProp === undefined && (
-          <button type="button" class="mini-tower-toggle" onClick={toggle} aria-expanded={open} aria-label={open ? "Minimise the leaderboard" : "Show the leaderboard"}>
+          <button type="button" class="mini-tower-toggle" onClick={toggle} aria-expanded={open} aria-label={open ? "Minimize the leaderboard" : "Show the leaderboard"}>
             {open ? "▾" : "▴"}
           </button>
         )}

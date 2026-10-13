@@ -4,7 +4,7 @@
  * two halves are tracked through the game). The engine plays no position with a ninth pawn a side or a 33rd piece, so
  * while he has all 8 (or the board 32 pieces) the split waits, and comes after his first pawn move once there's room;
  * if the pawn he moved has no square to split into, another pawn of his that has one is sawn (chooseSplit). His
- * passive, saw cuts: every few turns he saws one edge between two neighbouring squares in the crowd's half, and
+ * passive, saw cuts: every few turns he saws one edge between two neighboring squares in the crowd's half, and
  * nothing (either side) may move straight across it while it's there
  * (diagonal moves pass at the corners, knights jump it). His ultimate, the board saw: with the rage meter full, from
  * turn boardSawFrom, and one half of the board more his than the crowd's on material, the warning, then the board is
@@ -166,7 +166,7 @@ export const halfPawns = (boss: Pick<BossState, "powers"> | null | undefined): S
 
 // ---------------- The cuts ----------------
 
-/** An edge between two orthogonally neighbouring squares, in order (the lower file first, or the lower rank on one file). */
+/** An edge between two orthogonally neighboring squares, in order (the lower file first, or the lower rank on one file). */
 export function edgeOf(s1: string, s2: string): { a: string; b: string } {
   return file(s1) < file(s2) || (file(s1) === file(s2) && rank(s1) < rank(s2)) ? { a: s1, b: s2 } : { a: s2, b: s1 };
 }
@@ -229,7 +229,7 @@ export const sawCut = (boss: Pick<BossState, "powers"> | null | undefined): SawC
 export const boardSawn = (boss: Pick<BossState, "powers"> | null | undefined): boolean => !!boss?.powers?.boardSaw;
 
 /**
- * The half of the board (files a-d, or e-h) that favours Sawyer on material (his pieces there worth more than the
+ * The half of the board (files a-d, or e-h) that favors Sawyer on material (his pieces there worth more than the
  * crowd's: pawns 1, knights and bishops 3, rooks 5, queens 9), the one he leads by more; null when neither does.
  */
 export function favouredHalf(fen: string, crowd: Side): "a-d" | "e-h" | null {

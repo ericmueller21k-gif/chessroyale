@@ -16,7 +16,7 @@ const DARK_PALETTE = {
   d: "#30254f",
   e: "#140f2499", // wisps at its rim, see-through
   f: "#22193866",
-  A: "#16121f", // thinning: greyer, paler
+  A: "#16121f", // thinning: grayer, paler
   B: "#211b2e",
   C: "#2f273f",
   D: "#433956",
@@ -124,7 +124,7 @@ export const DARK_SQUARE: Character = {
       loop: true,
       frames: Array.from({ length: 8 }, (_, i): Frame => ({ ms: 160, layers: [{ part: cloudPart(`dark${i}`, () => cloud(i / 8)), x: 0, y: 0 }], specks: darkGlints(i) })),
     },
-    /** Its last turn: paler and greyer, wisps peeling off its top, fewer glints; the piece still hidden. */
+    /** Its last turn: paler and grayer, wisps peeling off its top, fewer glints; the piece still hidden. */
     thin: {
       loop: true,
       frames: Array.from({ length: 8 }, (_, i): Frame => ({ ms: 160, layers: [{ part: cloudPart(`thin${i}`, () => cloud(i / 8, 1, true)), x: 0, y: 0 }], specks: [...peel(i), ...darkGlints(i, 1)] })),
@@ -146,7 +146,7 @@ export const DARK_SQUARE: Character = {
   },
 };
 
-/** The darkness in flight from his chest to its square: a churning blob trailing smoke, pointing right (turn it towards the square). */
+/** The darkness in flight from his chest to its square: a churning blob trailing smoke, pointing right (turn it toward the square). */
 const pourBlob = (i: number): Part => {
   const cv = canvas(SQUARE, SQUARE);
   for (let y = 0; y < SQUARE; y++)
@@ -217,8 +217,8 @@ export const DARK_MISS: Character = {
 // The strand of bulbs counting down: a wire drooping between two hooks, three bulbs hanging off it.
 
 /**
- * The strip's bulbs, and a lash's colours, in the lights' default colours (lights.ts): bulb `b` is drawn in
- * DEFAULT_LIGHTS[b]'s and takes the battle's colour of the strand's bulb `b` (the first three: always three colours).
+ * The strip's bulbs, and a lash's colors, in the lights' default colors (lights.ts): bulb `b` is drawn in
+ * DEFAULT_LIGHTS[b]'s and takes the battle's color of the strand's bulb `b` (the first three: always three colors).
  */
 const STRIP_LIT = [0, 1, 2].map((b) => bulbColour(DEFAULT_LIGHTS[b]!));
 const STRAND_PALETTE = {
@@ -256,7 +256,7 @@ const strandWire: Part = (() => {
   }
   return { grid: toGrid(cv) };
 })();
-/** A bulb, 5 x 8 (a socket and a pointed glass), lit (its own colours) or out (dark glass). */
+/** A bulb, 5 x 8 (a socket and a pointed glass), lit (its own colors) or out (dark glass). */
 const stripBulb = (b: number, lit: boolean): Part => {
   const [M, S, G] = lit ? STRAND_KEYS[b]! : (["o", "O", "g"] as const);
   return { grid: [".WW..", ".ww..", `${G}${M}${M}${M}${S}`, `${M}${M}${M}${M}${S}`, `${M}${M}${M}${S}${S}`, `.${M}${S}${S}.`, `..${S}..`] };
@@ -307,7 +307,7 @@ export const BULB_STRAND: Character = {
   h: STRAND_H,
   foot: [22, 14],
   palette: STRAND_PALETTE,
-  // (Each bulb in the battle's colour: lights.ts.)
+  // (Each bulb in the battle's color: lights.ts.)
   swap: lightsSwap(STRAND_KEYS),
   parts: STRIP_PARTS,
   anims: {
@@ -539,11 +539,11 @@ export const NIGHT_LABEL: Character = {
 };
 
 // ---- A lash of his strand landing on a king (his attack: the God King in his Last Stand, the crowd's king at his
-// mate), one square: the strand's crack across it in one of its bulbs' colours, sparks bursting off its tip.
+// mate), one square: the strand's crack across it in one of its bulbs' colors, sparks bursting off its tip.
 
 const LASH_PALETTE = {
   k: "#00000000",
-  "1": STRIP_LIT[0]!.glass, // the first three bulbs' colours: the crack's colour, its edge, its spark
+  "1": STRIP_LIT[0]!.glass, // the first three bulbs' colors: the crack's color, its edge, its spark
   "4": STRIP_LIT[0]!.shade,
   "7": STRIP_LIT[0]!.glint,
   "2": STRIP_LIT[1]!.glass,
@@ -613,7 +613,7 @@ for (const kind of ["F", "B"] as const)
     }
 /**
  * A lash landing on a king's square: `hit<F|B><L|R><c>`: a forehand (straight, high) or backhand (rising, low), coming
- * in from the left or the right edge, in bulb colour c (the colour of the strand's bulb c: 0, 1 or 2, the battle's
+ * in from the left or the right edge, in bulb color c (the color of the strand's bulb c: 0, 1 or 2, the battle's
  * lights; red, yellow and blue before a battle's are known). About 200 ms; ends empty. Over the
  * piece (or the God King standing there), see-through round its line.
  */
@@ -624,7 +624,7 @@ export const LASH_HIT: Character = {
   h: SQUARE,
   foot: [16, 31],
   palette: LASH_PALETTE,
-  // (In the battle's colours: lights.ts.)
+  // (In the battle's colors: lights.ts.)
   swap: lightsSwap(LASH_COLOURS),
   parts: {},
   anims: lashAnims,

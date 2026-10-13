@@ -137,7 +137,7 @@ for (const r of rows) writeFileSync(`${out}/frames/${r.file}`, r.buf);
 const flagged = rows.filter((r, i) => {
   const prev = rows[i - 1]?.lum ?? r.lum;
   const next = rows[i + 1]?.lum ?? r.lum;
-  // A one-frame spike or dip against both neighbours (a screen change is a step, not a spike).
+  // A one-frame spike or dip against both neighbors (a screen change is a step, not a spike).
   return Math.abs(r.lum - prev) > 20 && Math.abs(r.lum - next) > 20 && Math.sign(r.lum - prev) === Math.sign(r.lum - next);
 });
 const timeline = [

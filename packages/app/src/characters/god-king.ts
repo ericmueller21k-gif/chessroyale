@@ -3,10 +3,10 @@
  * reference picture: a winged crown-helmet with glowing gold eyes, a flaming golden sword, a blue tabard with gold
  * crosses, and a long torn white-and-gold cape. Drawn facing front, light from the top left.
  *
- * He plays either side: the `black` look recolours his armour to dark steel; gold, eyes, cape, cloth and the flame
- * stay the same (Eric's rule: everything he shows comes in both colours, the armour only).
+ * He plays either side: the `black` look recolors his armor to dark steel; gold, eyes, cape, cloth and the flame
+ * stay the same (Eric's rule: everything he shows comes in both colors, the armor only).
  *
- * Rigging: his own drawing space is one board square, 60 x 60, his feet at the bottom centre. The sword arm (his
+ * Rigging: his own drawing space is one board square, 60 x 60, his feet at the bottom center. The sword arm (his
  * right, on the viewer's left) is drawn from its pose's shoulder, elbow and fist, and the sword (a gold hilt and a
  * blade of fire) hangs off the fist in the pose's direction, so a swing is a list of poses. The cape and tabard
  * ripple; the helmet's wings flap; his eyes glow, flare or go dark. (No back wings: Eric, Oct 9, 2026.)
@@ -17,7 +17,7 @@ import { lieDown, partSize, type Anim, type Character, type Frame, type Layer, t
 
 export const GOD_KING_PALETTE = {
   k: "#16121b", // outline
-  a: "#f7f4ec", // armour, light to dark (the black look swaps these four)
+  a: "#f7f4ec", // armor, light to dark (the black look swaps these four)
   b: "#d9d3c9",
   c: "#aca49e",
   d: "#766e7a",
@@ -40,7 +40,7 @@ export const GOD_KING_PALETTE = {
   o: "#ffa62b",
   O: "#e9601d",
   q: "#9c3510", // embers
-  r: "#e0342c", // the few stylised red drops
+  r: "#e0342c", // the few stylized red drops
   R: "#8f1b1b",
   s: "#2b2430", // cracks
   z: "#0d0e12", // ground shadow
@@ -325,7 +325,7 @@ type Flame = "lit" | "flare" | "dim";
 interface Blade {
   hilt: Part;
   blade: Part;
-  /** The fist's pixel in the parts (they are square, the fist at the centre). */
+  /** The fist's pixel in the parts (they are square, the fist at the center). */
   r: number;
   /** The blade's tip, from the fist. */
   tip: Pt;
@@ -372,7 +372,7 @@ function paintSword(dir: Pt, flick: number, mode: Flame, blade = BLADE): Blade {
 
 // ---- Poses.
 
-/** Where his drawing space (60 x 60, one board square, feet at the bottom centre) sits on the frame. */
+/** Where his drawing space (60 x 60, one board square, feet at the bottom center) sits on the frame. */
 const OX = 34;
 const OY = 40;
 const SIZE = 60;
@@ -418,7 +418,7 @@ export interface KingPose {
   wave?: number;
   waveAmp?: number;
   eyes?: "glow" | "hot" | "dim" | "out";
-  /** Cracks in his armour, 0 to 3. */
+  /** Cracks in his armor, 0 to 3. */
   cracks?: number;
 }
 
@@ -431,7 +431,7 @@ const EYES: Record<NonNullable<KingPose["eyes"]>, Record<string, string>> = {
   dim: { e: "#9c6d16", E: "#d6a43a" },
   out: { e: "#2a2230", E: "#3a3040" },
 };
-/** A blow landing: his armour and cape flash red-white. */
+/** A blow landing: his armor and cape flash red-white. */
 const FLASH: Record<string, string> = { a: "#ffffff", b: "#ffd9d2", c: "#ff9e8f", d: "#c8453b", m: "#ffffff", M: "#ffd9d2", n: "#ff9e8f", N: "#c8453b" };
 
 /** Cracks, worse at each level: the helm, then the chest and a shoulder, then the other shoulder and a thigh. */
@@ -674,7 +674,7 @@ const leap: Anim = {
 function fallenFrame(ms: number, i: number, extra: Partial<Frame> = {}): Frame {
   const standing = kingLayers({ arm: "low", flame: "dim", flick: i, eyes: "out", cracks: 3, waveAmp: 0 });
   // Lying on his side, head to the left: the body without its cape, sword and crown, turned a quarter, then
-  // set down on the floor line, centred on his foot point.
+  // set down on the floor line, centered on his foot point.
   const keep = (l: Layer) => !/^(hilt|blade|crown|shadow|cape)/.test(l.part);
   const turned = lieDown(PARTS, { layers: standing.layers.filter(keep), specks: standing.specks }, 0, 0);
   let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -717,7 +717,7 @@ const rise: Anim = {
 /**
  * His Last Stand, from the moment he starts to fall onto the piece's square (LAST_STAND.fallAt): the dive, the
  * crash, standing guard over the square through the banner and the piece sliding back, the 25 blows (each a flash
- * and a jolt; his armour cracks at LAST_STAND.crackAt), the stagger, the collapse, and lying fallen. Built from the
+ * and a jolt; his armor cracks at LAST_STAND.crackAt), the stagger, the collapse, and lying fallen. Built from the
  * shared timings, so the picture stays in step with the effects and sounds.
  */
 function lastStandAnim(blows: readonly number[], cracks: readonly number[]): Anim {
@@ -760,14 +760,14 @@ function lastStandAnim(blows: readonly number[], cracks: readonly number[]): Ani
   frames.push(fallenFrame(Math.max(100, L.fadeAt + L.fadeMs - t - 280), 0), fallenFrame(1000, 1));
   return { loop: false, frames };
 }
-/** The 25 blows, one every LAST_STAND.slashEveryMs from slashAt; his armour cracks at crackAt. */
+/** The 25 blows, one every LAST_STAND.slashEveryMs from slashAt; his armor cracks at crackAt. */
 const lastStand = lastStandAnim(
   Array.from({ length: LAST_STAND.slashes }, (_, b) => LAST_STAND.slashAt + b * LAST_STAND.slashEveryMs),
   LAST_STAND.crackAt,
 );
 /**
  * Against a boss that attacks him itself (its kit's `kingAttack`: Hollow lashing him with his strand), the blows are its
- * lashes (lastStandAttackHits), and his armour cracks at the 2nd, 6th and 9th.
+ * lashes (lastStandAttackHits), and his armor cracks at the 2nd, 6th and 9th.
  */
 const lastStandAttacked = (() => {
   const hits = lastStandAttackHits();

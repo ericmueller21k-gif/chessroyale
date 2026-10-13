@@ -162,7 +162,7 @@ export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
           icon: "🎲",
           label: "Random openings",
           blurb: "Each board its own opening",
-          detail: "Each opening is played on two boards of a match, colours swapped",
+          detail: "Each opening is played on two boards of a match, colors swapped",
           patch: {},
           rule: { start: "random" },
         },

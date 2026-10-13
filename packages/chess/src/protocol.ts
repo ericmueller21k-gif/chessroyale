@@ -43,7 +43,7 @@ export interface NetBoard {
   bases?: Base[];
 }
 
-/** A board at a glance, for the strip of tiny boards along the top (slots never move; closed ones stay greyed). */
+/** A board at a glance, for the strip of tiny boards along the top (slots never move; closed ones stay grayed). */
 export interface BoardSlot {
   id: number;
   fen: string;
@@ -290,14 +290,14 @@ export interface NetBossPowers {
    */
   lightsExtra?: "due" | "played" | "skipped";
   /**
-   * Hollow's Christmas lights (looks only, Oct 11): which colours his bulbs take this battle, the same on every screen
+   * Hollow's Christmas lights (looks only, Oct 11): which colors his bulbs take this battle, the same on every screen
    * (packages/app/src/characters/lights.ts). A number from 0 to 4095 drawn from the battle's seed; 12 bits of it, so it
    * gives nothing of the seed (and the powers it decides) away. Missing from older servers: each device picks its own.
    */
   lights?: number;
   /**
    * Big Boy (missing for other bosses): his toy block (its square, the crowd turn it landed and its last; nothing may
-   * move onto it or through it), the crowd's centre pawn he ate before move 1, and his Big Bounce once it has happened
+   * move onto it or through it), the crowd's center pawn he ate before move 1, and his Big Bounce once it has happened
    * (the position before it, the pieces it moved, where he bounced).
    */
   block?: { square: string; at: number; until: number } | null;

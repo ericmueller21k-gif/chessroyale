@@ -56,7 +56,7 @@ test("two players in a Default queue chat before the match starts: each sees the
   await expect(bo.locator(".qchat-lobby .qline", { hasText: "Good luck!" }).filter({ hasText: "Ann Lobby" })).toBeVisible();
   await bo.locator(".qchat-lobby .qchip", { hasText: "Defend the king!" }).click();
   await expect(ann.locator(".qchat-lobby .qline", { hasText: "Defend the king!" }).filter({ hasText: "Bo Lobby" })).toBeVisible();
-  // Right after sending, Bo's buttons grey out (one line every 3 s), as in the match.
+  // Right after sending, Bo's buttons gray out (one line every 3 s), as in the match.
   await expect(bo.locator(".qchat-lobby .qchip", { hasText: "Wow!" })).toBeDisabled();
   // The server drops free text and lines Bo doesn't own.
   await bo.evaluate(() => {

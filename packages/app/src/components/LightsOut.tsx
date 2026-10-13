@@ -205,7 +205,7 @@ export function LightsOutLayer({ boss, lights, now, orientation, graceMs, onTap 
     // (The last round's stay until the dawn lifts the night.)
     if (latest < lights.rounds.length - 1) for (const x of shown) closing.push({ square: x.square, at: ends + LIGHTS_OUT.answerMs - CLOSE_MS });
   }
-  // His spot: centred above the board, his feet on its top edge (the dawn spreads out from there).
+  // His spot: centered above the board, his feet on its top edge (the dawn spreads out from there).
   const spot = lightsOutSpot(kit.ch, 36);
   const spotSquare = orientation === "white" ? "d8" : "e1";
   const items = step && !(step === "dawn" && now > stepSince + DAWN_MS) ? nightItems({ orientation, step, since: stepSince, now, shown, closing, from: spotSquare }) : [];

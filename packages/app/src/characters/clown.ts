@@ -66,7 +66,7 @@ const EYES: Record<string, readonly string[]> = {
   look: ["kk...", "Ekkkk", "eeqqq", ".qqq."],
 };
 const MOUTHS: Record<string, readonly string[]> = {
-  // Centred under the nose, top row at y 12.
+  // Centered under the nose, top row at y 12.
   grin: ["r...........r", "rkmnnnnnnnmkr", ".rkmnnnnnmkr.", "..rrkkkkkrr.."],
   laugh: ["rkkkkkkkkkr", "kmnnnnnnnmk", "kmmmmmmmmmk", "kmmmrrrmmmk", "rkmmmmmmmkr", ".rrkkkkkrr."],
   o: [".kk.", "kmmk", "kmmk", ".kk."],

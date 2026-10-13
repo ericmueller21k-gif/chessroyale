@@ -2,7 +2,7 @@
  * HunChess's board (docs/areas/board.md): plain elements, CSS transitions and pointer events. It replaced chessground
  * (GPL-3) on Oct 12, 2026, with the same look and feel, measured side by side in the board lab: 220 ms slides on a
  * cubic ease in and out, a captured piece fading, a 3 px drag threshold, a dropped piece landing at once and an illegal
- * one going straight back, the same dots, rings, highlights, arrows and coordinates. Its behaviour, where the game
+ * one going straight back, the same dots, rings, highlights, arrows and coordinates. Its behavior, where the game
  * relies on it:
  * - Taps and drags: a tap selects a piece of the side to move (its dots show), a second tap on a dot moves it (as the
  *   press goes down); or drag it. A move you make stays on the board until the game next tells the board anything
@@ -32,7 +32,7 @@ const place = (square: string, orientation: "white" | "black", turn: QuarterTurn
   return `translate(${col * 100}%, ${row * 100}%)`;
 };
 
-/** The squares' colours: light ones as the board's ground, dark ones 20 % black over it (crisp edges, any size). */
+/** The squares' colors: light ones as the board's ground, dark ones 20 % black over it (crisp edges, any size). */
 const SQUARES_SVG = (() => {
   let d = "";
   for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) if ((row + col) % 2) d += `M${col} ${row}h1v1h-1z`;
@@ -199,7 +199,7 @@ export function OwnBoard({ fen, orientation, lastMove, interactive, moves, onMov
   /** The element of the piece a press holds. */
   const heldEl = () => (pressId.current !== null ? pieceEls.current.get(pressId.current) : undefined);
 
-  /** Puts the dragged piece's centre under the pointer. */
+  /** Puts the dragged piece's center under the pointer. */
   const dragTo = (p: Press) => {
     const el = heldEl();
     const b = pressBox.current;

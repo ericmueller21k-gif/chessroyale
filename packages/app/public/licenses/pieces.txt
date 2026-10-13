@@ -1,6 +1,6 @@
 The chess pieces in cburnett/ ("Chess_<piece><l|d>t45.svg") are by Colin M.L. Burnett (Wikimedia Commons user
-Cburnett), taken from Wikimedia Commons, where he offers them under a choice of licences (GFDL, BSD or GPL); the black
-pieces' light details are toned from white to light grey (SOURCES.md). HunChess uses them under the BSD licence
+Cburnett), taken from Wikimedia Commons, where he offers them under a choice of licenses (GFDL, BSD or GPL); the black
+pieces' light details are toned from white to light gray (SOURCES.md). HunChess uses them under the BSD license
 (3-clause), whose text follows. Where each file comes from: SOURCES.md.
 
 Copyright (c) 2006 Colin M.L. Burnett

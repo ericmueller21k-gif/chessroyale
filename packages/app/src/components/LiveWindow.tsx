@@ -7,7 +7,7 @@ import { Board } from "./Board.tsx";
 /**
  * The computer's live window, at the top of the home's play column (Eric, Oct 9; DECISIONS.md, "The live window"): a
  * real match when one is running (its board and the crowd's votes, from the live line the home already polls), else a
- * bot match played back from a recording, labelled "Bot match", on a cycle set by the clock so everyone sees the same
+ * bot match played back from a recording, labeled "Bot match", on a cycle set by the clock so everyone sees the same
  * moment. No engine, nothing per frame: it redraws when the shown move changes. Silent (Eric, Oct 12): its moves and
  * captures never make a sound, whatever the sound setting. Mounted only on a computer (LIVE_WINDOW_MEDIA).
  */

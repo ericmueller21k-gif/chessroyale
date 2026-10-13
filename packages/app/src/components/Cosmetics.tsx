@@ -1,7 +1,7 @@
 import { GodKingSprite } from "./GodKing.tsx";
 
 /**
- * Shop cosmetics, drawn: the God King in a King effect's colours, his glow and a bolt beside him. (The pawn hats that
+ * Shop cosmetics, drawn: the God King in a King effect's colors, his glow and a bolt beside him. (The pawn hats that
  * were here are crate items now, drawn in Items.tsx: Beta Crate, Oct 11, 2026.)
  */
 export function KingEffectPreview({ look, side = "w" }: { look: Record<string, string>; side?: "w" | "b" }) {

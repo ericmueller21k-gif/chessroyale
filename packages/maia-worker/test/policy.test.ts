@@ -48,7 +48,7 @@ describe("sample", () => {
     // (e2e4 0.572 + d2d4 0.347 = 0.919 ≤ 0.95: g1f3 and b1c3 are cut; at 0.9 only e2e4 is left, as officially.)
     expect(Object.keys(count(1, 0.95)).sort()).toEqual(["d2d4", "e2e4"]);
     expect(Object.keys(count(1, 0.9))).toEqual(["e2e4"]);
-    // A low temperature sharpens: the favourite more often than its probability.
+    // A low temperature sharpens: the favorite more often than its probability.
     expect((count(0.5, 1).e2e4 ?? 0) / 4000).toBeGreaterThan(moves[0]!.p + 0.05);
   });
 

@@ -115,7 +115,7 @@ function SoundAt({ id, at, now, sound }: { id: string; at: number; now: number; 
 
 // ---------------- The long pull and the lasso drag ----------------
 
-/** What a lasso moment drags: the piece (its colour and kind), from and to (one square, or the pull's from its double step's square). */
+/** What a lasso moment drags: the piece (its color and kind), from and to (one square, or the pull's from its double step's square). */
 interface Lasso {
   color: "w" | "b";
   type: string;
@@ -135,7 +135,7 @@ const slideAt = (): number => DRAG.catchAt + (LASSO.tug - LASSO.catch);
 
 /**
  * Where he stands to rope a piece and which way he faces: his loop (CATCH) drops on the piece; he stands on the side it
- * comes towards (it's hauled to him), or the roomier side when it moves up or down the board, or the other side when
+ * comes toward (it's hauled to him), or the roomier side when it moves up or down the board, or the other side when
  * that would put him off the board.
  */
 export function lassoStand(from: Pt, to: Pt): { feet: Pt; flip: boolean } {

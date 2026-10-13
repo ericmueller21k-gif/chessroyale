@@ -747,7 +747,7 @@ export class SquadsClient {
     // Blocks just placed carry on (in effect now) from when they were placed.
     m.blockAt = Object.fromEntries(m.blocks.map((b) => [blockKey(b), had?.blockAt[blockKey(b)] ?? Date.now()]));
     this.matches.set(m.key, m);
-    // A block lifted (a mercy rule, or your move made it impossible): announced, refunded. One a shield cancelled:
+    // A block lifted (a mercy rule, or your move made it impossible): announced, refunded. One a shield canceled:
     // announced to both squads (its points stay spent).
     const me = sideIn(m, this.myId);
     const blocks = msg.events.filter((e): e is Extract<typeof e, { kind: "block" }> => e.kind === "block");
@@ -756,10 +756,10 @@ export class SquadsClient {
     if (shielded) {
       const ours = me === shielded.side;
       const text = ours
-        ? `${possessive(squadName(m.sides[shielded.side === 0 ? 1 : 0].squadId))} shield cancelled your block on ${blockName(shielded)} (−${shielded.cost})`
+        ? `${possessive(squadName(m.sides[shielded.side === 0 ? 1 : 0].squadId))} shield canceled your block on ${blockName(shielded)} (−${shielded.cost})`
         : me !== null
-          ? `Your shield cancelled ${possessive(squadName(m.sides[shielded.side].squadId))} block on your ${blockName(shielded)}`
-          : `A shield cancelled ${possessive(squadName(m.sides[shielded.side].squadId))} block on ${blockName(shielded)}`;
+          ? `Your shield canceled ${possessive(squadName(m.sides[shielded.side].squadId))} block on your ${blockName(shielded)}`
+          : `A shield canceled ${possessive(squadName(m.sides[shielded.side].squadId))} block on ${blockName(shielded)}`;
       this.banner = { key: m.key, board: shielded.board, at: Date.now(), kind: "shield", text };
       // (The line above the board is that board's; the squads in the match hear of it wherever they're looking.)
       if (me !== null) this.note = { text, at: Date.now(), kind: "news" };

@@ -400,20 +400,20 @@ export function SettingsScreen({ onBack, onSoundLab, onFaq }: { onBack: () => vo
         Bosses and bots use <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0,{" "}
         <a href="https://github.com/official-stockfish/Stockfish">source</a>, <a href="https://github.com/nmrugg/stockfish.js">this build</a>) and <a href="https://github.com/CSSLab/maia3">Maia-3</a> by
         CSSLab, University of Toronto (AGPL-3.0), each a separate program running in your browser. The source of our Maia box is available
-        on request (<a href="/engine/maia/NOTICE.txt">notice</a>, <a href="/engine/maia/LICENSE.txt">licence</a>).
+        on request (<a href="/engine/maia/NOTICE.txt">notice</a>, <a href="/engine/maia/LICENSE.txt">license</a>).
       </p>
       <p class="fd-note pieces-credit">
         Chess pieces by Colin M.L. Burnett (<a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces">Wikimedia Commons</a>), used
-        under the BSD licence (<a href="/licenses/pieces.txt">licence</a>).
+        under the BSD license (<a href="/licenses/pieces.txt">license</a>).
       </p>
       <p class="fd-note sounds-credit">
         Classic piece sounds and their variations: <a href="https://github.com/pychess/pychess/tree/master/sounds">PyChess</a> (GPL-3.0). The
-        variations are made from PyChess's sounds by our own script (<a href="/engine/COPYING.txt">licence</a>,{" "}
+        variations are made from PyChess's sounds by our own script (<a href="/engine/COPYING.txt">license</a>,{" "}
         <a href="/sounds/SOURCES.md">how each was made</a>).
       </p>
       <p class="fd-note licences-credit">
-        Built with Preact (MIT) and chess.js (BSD), in the Archivo and Press Start 2P fonts (SIL Open Font Licence):{" "}
-        <a href="/licenses/third-party.txt">licences</a>.
+        Built with Preact (MIT) and chess.js (BSD), in the Archivo and Press Start 2P fonts (SIL Open Font License):{" "}
+        <a href="/licenses/third-party.txt">licenses</a>.
       </p>
     </div>
   );

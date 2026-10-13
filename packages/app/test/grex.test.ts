@@ -61,7 +61,7 @@ describe("Jefferson (id grex), the Fire boss", () => {
     expect(pickLine(grex, "ultimateWarn", "warn:28")).toBe(pickLine(grex, "ultimateWarn", "warn:28"));
   });
 
-  it("throws his sparkler at the throw cue: it leaves his hand and flies on towards the board", () => {
+  it("throws his sparkler at the throw cue: it leaves his hand and flies on toward the board", () => {
     const ig = anim("ignite");
     const i = ig.frames.findIndex((f) => f.cue === "throw");
     expect(cueAt(ig, "throw")).toBeGreaterThan(150);
@@ -72,7 +72,7 @@ describe("Jefferson (id grex), the Fire boss", () => {
     const fresh = ig.frames.findIndex((f, n) => n > i && f.cue === "fizz");
     expect(fresh).toBeGreaterThan(i);
     expect(wires(fresh)).toBe(2);
-    // The thrown one (its grey wire, loose) moves right and down over the frames after.
+    // The thrown one (its gray wire, loose) moves right and down over the frames after.
     const thrown = (n: number) => ig.frames[n]!.specks!.filter((s) => s[2] === "w" || s[2] === "W").map((s) => s[0] + s[1]);
     expect(Math.min(...thrown(i + 1))).toBeGreaterThan(Math.min(...thrown(i)));
     expect(Math.min(...thrown(i + 2))).toBeGreaterThan(Math.min(...thrown(i + 1)));

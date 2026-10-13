@@ -55,7 +55,7 @@ describe("which positions count", () => {
 });
 
 describe("signals", () => {
-  it("match strength: an engine rating over counted moves, pulled towards 1500 at first", () => {
+  it("match strength: an engine rating over counted moves, pulled toward 1500 at first", () => {
     expect(matchPerf([])).toBeNull();
     expect(matchPerf(Array(40).fill(0.5))!).toBeGreaterThan(3000);
     expect(matchPerf(Array(40).fill(10))!).toBeLessThan(1600);

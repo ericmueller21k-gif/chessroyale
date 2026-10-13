@@ -55,7 +55,7 @@ import {
  *   sure and uses one of your squad's same-move tokens (none left: picks must differ); the judge may refund it.
  * - **The final** (a majority vote): the whole squad picks, teammates' picks live with their names, copy one with a
  *   tap; the reveal: every pick as a ghost with its pickers' names, the most picked plays (a tie: the coin). A "SQUAD
- *   FINAL" intro, knocked-out squads watching, and Armageddon's colour choice if it comes to that.
+ *   FINAL" intro, knocked-out squads watching, and Armageddon's color choice if it comes to that.
  * - **Blocks** (every round): on your turn, before your move is settled, Block, tap their piece, tap where it would go:
  *   that move can't be played on their next turn there. Every blocked move shows to everyone as a soft arrow that keeps
  *   drawing itself, a lock pulsing on it, until they've moved. Each squad's block bank and tokens are under the board.
@@ -206,7 +206,7 @@ function BoardArrows({ arrows, orientation }: { arrows: Arrow[]; orientation: "w
         const from = c(a.move.slice(0, 2));
         const to = c(a.move.slice(2, 4));
         const len = Math.hypot(to.x - from.x, to.y - from.y) || 1;
-        // (Stop short of the target's centre, so the head sits on the square, as the board's do.)
+        // (Stop short of the target's center, so the head sits on the square, as the board's do.)
         const end = { x: to.x - ((to.x - from.x) / len) * 0.32, y: to.y - ((to.y - from.y) / len) * 0.32 };
         return <line key={`${a.move}${a.brush}`} x1={from.x} y1={from.y} x2={end.x} y2={end.y} stroke={ARROW_COLOUR[a.brush]} stroke-width="0.16" stroke-linecap="round" opacity="0.8" marker-end={`url(#sq-head-${a.brush})`} />;
       })}
@@ -807,7 +807,7 @@ function statusLine(
   if (b.result) return `${where} is over: ${b.result.winner === null ? "a draw" : `${sideWord(b.result.winner)} won`}`;
   if (watching) return `Watching ${where} · ${squadName(m.sides[0].squadId)} v ${squadName(m.sides[1].squadId)}`;
   if (m.state === "break") return m.boards.length > 1 ? `${where} · starting soon` : "Starting soon";
-  if (m.state === "armageddon") return "Armageddon: choosing colours";
+  if (m.state === "armageddon") return "Armageddon: choosing colors";
   if (m.state === "over") return "The match is over";
   if (revealing) return m.format === "pairs" ? "The coin decides which pick plays" : "The votes are in";
   if (m.state === "show") return "Moves landing…";
@@ -870,7 +870,7 @@ function DutyPanel({
   const shieldLine = block && block.shields > 0 && (
     <span class="mc-shield-note">
       <ItemIcon item="shield" size={12} />
-      They have {block.shields === 1 ? "a shield" : `${block.shields} shields`}: your next block {block.shields === 1 ? "is" : "blocks are"} cancelled, still paid
+      They have {block.shields === 1 ? "a shield" : `${block.shields} shields`}: your next block {block.shields === 1 ? "is" : "blocks are"} canceled, still paid
     </span>
   );
   const placed = m.placed.filter((b) => b.board === m.current?.duties.find((d) => d.players.includes(client.myId ?? ""))?.board);

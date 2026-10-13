@@ -1,5 +1,5 @@
 /**
- * Building blocks for the bosses' synthesised sounds (no files, no licences). Everything is a pure function of the
+ * Building blocks for the bosses' synthesized sounds (no files, no licenses). Everything is a pure function of the
  * sample rate (noise comes from a seeded generator), so a test can render a sound and measure it.
  */
 
@@ -59,7 +59,7 @@ export function rng(seed: number): () => number {
   return () => (n(0) + 1) / 2;
 }
 
-/** A resonant band-pass (state-variable filter) whose centre can move with time: wind, whistles, crunch. */
+/** A resonant band-pass (state-variable filter) whose center can move with time: wind, whistles, crunch. */
 export function bandpass(rate: number, centre: (t: number) => number, q: number, v: Voice): Voice {
   let low = 0;
   let band = 0;

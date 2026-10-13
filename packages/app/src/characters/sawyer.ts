@@ -18,7 +18,7 @@ import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part
 
 export const SAWYER_PALETTE: Record<string, string> = {
   k: "#1c1413", // outline
-  a: "#44322e", // fur, dark to light (a warm grey-brown, as in the reference)
+  a: "#44322e", // fur, dark to light (a warm gray-brown, as in the reference)
   b: "#5f4843",
   c: "#7e635e",
   d: "#a08883",
@@ -152,7 +152,7 @@ function head(mood: Mood): Part {
   const eyes = EYES[f.eyes]!;
   stamp(cv, HX, HY, eyes.l, EYE_L[0], EYE_L[1]);
   stamp(cv, HX, HY, eyes.r, EYE_R[0], EYE_R[1]);
-  // The nose: black, at the snout's tip, a grey glint.
+  // The nose: black, at the snout's tip, a gray glint.
   stamp(cv, HX, HY, [".xxx", "xdxx", "xxxx", ".xx."], 13, 23);
   // The mouth.
   stamp(cv, HX, HY, MOUTHS[f.mouth]!, 19, 26);
@@ -180,7 +180,7 @@ function hat(): Part {
 }
 const HAT_AT: Pt = [17, -1];
 
-/** His body: grey-brown fur, a cream chest and belly. */
+/** His body: gray-brown fur, a cream chest and belly. */
 function body(): Part {
   const X0 = 23;
   const Y0 = 27;
@@ -290,7 +290,7 @@ function tail(swish: number): { part: Part; at: Pt } {
 
 /**
  * The saw in its own space: u along it (the blade at negative u, to our left at rest), v across it (down at rest),
- * from where his front hand grips it. Each piece is a polygon and a colour by (u, v); later pieces cover earlier ones.
+ * from where his front hand grips it. Each piece is a polygon and a color by (u, v); later pieces cover earlier ones.
  */
 type Piece = { pts: readonly Pt[]; key: (u: number, v: number) => string };
 function sawPieces(stroke: number): Piece[] {
@@ -358,7 +358,7 @@ function saw(p: SawPose): Part {
   const a = angleOf(p.tilt);
   for (let y = 0; y < b.h; y++)
     for (let x = 0; x < b.w; x++) {
-      // Back into the saw's own space (inPoly tests pixel centres: undo its half-pixel).
+      // Back into the saw's own space (inPoly tests pixel centers: undo its half-pixel).
       const [u, v] = rot(-a, [b.x0 + x + 0.5 - p.at[0], b.y0 + y + 0.5 - p.at[1]]);
       for (let i = pieces.length - 1; i >= 0; i--)
         if (tests[i]!(u - 0.5, v - 0.5)) {

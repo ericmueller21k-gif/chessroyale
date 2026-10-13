@@ -12,7 +12,7 @@ import { lightsId, syncLights } from "../characters/lights.ts";
 /**
  * A boss's attack on a king (its kit's `kingAttack`; Hollow's, Eric, Oct 10), over the board, on the shared beats
  * (KING_ATTACK, boss-timing.ts) from `startAt` (a Date.now() time every screen agrees on): he drops in beside the king's
- * square (on the side towards the board's middle, mirrored when the king is to his left), lashes it, and leaps off.
+ * square (on the side toward the board's middle, mirrored when the king is to his left), lashes it, and leaps off.
  * Each hit plays the kit's `hit` on the king's square (on one shared canvas) and pops a "−N" off the king, in the God
  * King's strike style (`ks-hp`). His line goes into his voice as he lands. His usual figure hides meanwhile.
  *
@@ -37,7 +37,7 @@ export function kingAttackBeat(t: number): { hit: number; lit: boolean; dim: num
 /**
  * A boss's attack drawn ahead (its frames and its hits), a slice each animation frame, as its battle starts: its first
  * drop-in frame paints new parts (about 80 ms on a computer), which would stall a phone the first time it shows. Once
- * per battle's lights (Hollow's bulbs: a new battle's colours are new frames).
+ * per battle's lights (Hollow's bulbs: a new battle's colors are new frames).
  */
 const warmed = new Set<string>();
 export function prewarmKingAttack(name: string): void {
@@ -91,13 +91,13 @@ export function KingAttack({
   now: number;
   /** The same on every screen for the same attack (its "−N" numbers and his line come from it). */
   seed: string;
-  /** At a mate: the crowd's king (its colour), drawn here in place of the real one. */
+  /** At a mate: the crowd's king (its color), drawn here in place of the real one. */
   king?: "w" | "b";
 }) {
   const kit = bossKit(boss.name);
   const ka = kit?.kingAttack;
   const t = now - startAt;
-  // (The battle's lights: his bulbs and his lashes in its colours.)
+  // (The battle's lights: his bulbs and his lashes in its colors.)
   syncLights(boss);
   const hp = useMemo(() => lastStandHits(`attack:${seed}`, KING_ATTACK.lashes), [seed]);
   // His line, as he lands: into his voice (his text box, for its time).
@@ -114,7 +114,7 @@ export function KingAttack({
   const r = Number(square[1]) - 1;
   const col = orientation === "white" ? f : 7 - f;
   const row = orientation === "white" ? 7 - r : r;
-  // He stands on the side towards the board's middle: to the king's left (as drawn) on the right half, else to its
+  // He stands on the side toward the board's middle: to the king's left (as drawn) on the right half, else to its
   // right, mirrored.
   const left = col >= 4;
   const from = left ? "L" : "R";

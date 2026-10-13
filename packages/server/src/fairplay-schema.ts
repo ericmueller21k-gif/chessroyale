@@ -43,7 +43,7 @@ export const FAIRPLAY_SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS fairplay_matches_user ON fairplay_matches (user_id, played_at)`,
   `CREATE INDEX IF NOT EXISTS fairplay_matches_keep ON fairplay_matches (keep_until)`,
-  // A banned account's sign-in identities (hashed: a normalised email, a Google id), so a new account made with the
+  // A banned account's sign-in identities (hashed: a normalized email, a Google id), so a new account made with the
   // same one is banned too.
   `CREATE TABLE IF NOT EXISTS fairplay_identities (
     kind TEXT NOT NULL,

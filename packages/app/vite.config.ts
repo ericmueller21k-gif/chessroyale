@@ -25,7 +25,7 @@ function stockfish(): Plugin {
 
 /**
  * Copies the Maia box (packages/maia-worker, built by its own `npm run build`: a separate program under the AGPL, see
- * its README) into public/engine/maia/, as it is: the worker, onnxruntime's WebAssembly, the model and the licence.
+ * its README) into public/engine/maia/, as it is: the worker, onnxruntime's WebAssembly, the model and the license.
  * The game never imports any of it; it starts the worker and exchanges text with it (src/maia.ts).
  */
 function maiaBox(): Plugin {

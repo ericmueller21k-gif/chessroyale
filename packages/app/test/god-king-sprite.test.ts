@@ -10,7 +10,7 @@ const frameOf = (anim: keyof typeof GOD_KING.anims, now: number, since = 0, then
 };
 
 describe("the God King's pixel sprite", () => {
-  it("recolours only his armour for Black: gold, eyes, cape, cloth and flame stay the same", () => {
+  it("recolors only his armor for Black: gold, eyes, cape, cloth and flame stay the same", () => {
     expect(Object.keys(GOD_KING_BLACK).sort()).toEqual(["a", "b", "c", "d"]);
     const f = GOD_KING.anims.idle!.frames[0]!;
     const keys = frameKeys(GOD_KING, f);
@@ -155,7 +155,7 @@ describe("lying down (any character)", () => {
       const after = frameKeys(ch, { ms: 1, ...turned });
       for (let y = 0; y < 12; y++)
         for (let x = 0; x < 12; x++) {
-          // Head to the left is counter-clockwise: (x, y) lands at (y, 11 - x) about the centre of a 12 x 12 frame.
+          // Head to the left is counter-clockwise: (x, y) lands at (y, 11 - x) about the center of a 12 x 12 frame.
           const [X, Y] = head === "left" ? [y, 11 - x] : [11 - y, x];
           expect(after[Y]![X], `${x},${y}`).toBe(before[y]![x]);
         }

@@ -215,7 +215,7 @@ describe("Squads final: the majority vote", () => {
     expect(() => startArmageddon(final(), 0, { fen: START_FEN, openingId: null })).toThrow();
   });
 
-  it("the squad with more team bank left after the final picks Armageddon's colours (a coin if level)", () => {
+  it("the squad with more team bank left after the final picks Armageddon's colors (a coin if level)", () => {
     const drawn = (banks: [number, number], seed = 1): SquadsMatch => {
       const m = final(START_FEN, seed, 0, undefined, banks);
       return { ...m, boards: [{ ...m.boards[0]!, result: { winner: null, reason: "repetition" } }], result: { winner: null, points: [0.5, 0.5], how: "boards" } };

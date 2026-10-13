@@ -4,15 +4,15 @@
  * point, the board's size, which pieces slide where when the position changes, the moves a tap or a drag may make, and
  * the arrows' geometry.
  *
- * The behaviour and numbers follow the board the game used before (its 3 px drag threshold, its 220 ms slides with a
- * cubic ease in and out, its arrows' widths and colours), measured against it side by side (Oct 12, 2026), so a player
+ * The behavior and numbers follow the board the game used before (its 3 px drag threshold, its 220 ms slides with a
+ * cubic ease in and out, its arrows' widths and colors), measured against it side by side (Oct 12, 2026), so a player
  * couldn't tell the two apart.
  */
 import { legalMoves, touchesDark } from "@chessroyale/chess";
 import { realSquare, viewSquare, type QuarterTurn } from "../board-view.ts";
 
 export type Orientation = "white" | "black";
-/** A piece: its colour and kind, as "wp", "bk", ... */
+/** A piece: its color and kind, as "wp", "bk", ... */
 export type PieceCode = string;
 
 export const FILES = "abcdefgh";
@@ -80,7 +80,7 @@ export function squareAtPoint(x: number, y: number, box: Box, orientation: Orien
   return squareAt(col, row, orientation, turn);
 }
 
-/** A square's centre in page pixels. */
+/** A square's center in page pixels. */
 export function squareCentre(square: string, box: Box, orientation: Orientation, turn: QuarterTurn = 0): { x: number; y: number } {
   const { col, row } = cellOf(square, orientation, turn);
   return { x: box.left + ((col + 0.5) * box.width) / 8, y: box.top + ((row + 0.5) * box.height) / 8 };
@@ -96,7 +96,7 @@ export const boardSize = (width: number, dpr: number) => (Math.floor((width * dp
 /** Whether a press that has moved (dx, dy) px has become a drag. */
 export const dragStarted = (dx: number, dy: number) => dx * dx + dy * dy >= DRAG_DISTANCE_PX * DRAG_DISTANCE_PX;
 
-/** Whether any piece's centre is within a square's width of a point: a touch there means the board, not a scroll. */
+/** Whether any piece's center is within a square's width of a point: a touch there means the board, not a scroll. */
 export function pieceCloseTo(pieces: ReadonlyMap<string, PieceCode>, x: number, y: number, box: Box, orientation: Orientation, turn: QuarterTurn = 0): boolean {
   const r2 = (box.width / 8) ** 2;
   for (const sq of pieces.keys()) {
@@ -146,7 +146,7 @@ const dist2 = (a: string, b: string) => (a.charCodeAt(0) - b.charCodeAt(0)) ** 2
 
 /**
  * The pieces of a new position, following the old one: a piece still on its square keeps its id; a piece on a new
- * square takes the id of the nearest piece of the same colour and kind that left its square (it slides there); the
+ * square takes the id of the nearest piece of the same color and kind that left its square (it slides there); the
  * rest are new. Pieces that left and went nowhere were taken (they fade). As the old board did it: a promoted pawn
  * fades and its new piece appears.
  */
@@ -253,7 +253,7 @@ export function pressUp(b: PressBoard, selected: string | null, p: Press, to: st
 
 export type Brush = "green" | "blue" | "red" | "yellow" | "paleGrey" | "paleBlue";
 
-/** Each arrow colour: its colour, see-through-ness and line width (in 64ths of a square). */
+/** Each arrow color: its color, see-through-ness and line width (in 64ths of a square). */
 export const BRUSHES: Record<Brush, { color: string; opacity: number; width: number }> = {
   green: { color: "#15781B", opacity: 1, width: 10 },
   red: { color: "#882020", opacity: 1, width: 10 },
@@ -272,7 +272,7 @@ export interface ArrowShape {
 export interface DrawnArrow {
   key: string;
   brush: Brush;
-  /** From and to the squares' centres, in squares from the board's centre (-4 to 4); the line stops short of the head. */
+  /** From and to the squares' centers, in squares from the board's center (-4 to 4); the line stops short of the head. */
   x1: number;
   y1: number;
   x2: number;
@@ -286,7 +286,7 @@ export interface DrawnArrow {
 /** An arrow's direction as one of 16 slots (arrows into one square from directions this close shorten). */
 const slot = (dx: number, dy: number) => (Math.round(((Math.atan2(dy, dx) + Math.PI) * 8) / Math.PI) + 16) % 16;
 
-/** The arrows drawn for a list of moves, in squares from the board's centre (the old board's arrows, measured). */
+/** The arrows drawn for a list of moves, in squares from the board's center (the old board's arrows, measured). */
 export function drawArrows(arrows: readonly ArrowShape[], orientation: Orientation, turn: QuarterTurn = 0): DrawnArrow[] {
   const at = (sq: string) => {
     const { col, row } = cellOf(sq, orientation, turn);

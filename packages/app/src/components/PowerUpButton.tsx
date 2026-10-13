@@ -12,8 +12,8 @@ export const Bolt = () => (
 
 /**
  * A row of small round slots, one per power-up you could hold (5): lit ones
- * you have, grey ones missing or used. Tap a lit one to use a power-up on
- * this move; a grey one just gives a little shake. Newly earned ones flash as
+ * you have, gray ones missing or used. Tap a lit one to use a power-up on
+ * this move; a gray one just gives a little shake. Newly earned ones flash as
  * they light up. In practice mode every slot is lit and never runs out.
  */
 export function PowerUps({
