@@ -13,6 +13,7 @@ import { legalMoves, pieceAt, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
 import { bossPowers, crowdHalf, logit, meterFull, moveSquares, other, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { gridHanging, gridKingAttacked, gridOf, isLight, placementOf, type Grid } from "./grid.ts";
 
 /**
  * Big Boy's snack in the intro (before move 1): he waddles over to the crowd's centre pawn, grabs it and eats it
@@ -98,84 +99,6 @@ export const bounceDue = (boss: BossState | null | undefined): boolean => {
 export interface BounceCandidate {
   fen: string;
   moves: { from: string; to: string; piece: string }[];
-}
-
-type Grid = Map<string, string>;
-const gridOf = (fen: string): Grid => {
-  const g: Grid = new Map();
-  fen
-    .split(" ")[0]!
-    .split("/")
-    .forEach((row, r) => {
-      let f = 0;
-      for (const c of row) {
-        if (c >= "1" && c <= "8") f += Number(c);
-        else g.set(`${"abcdefgh"[f++]}${8 - r}`, c);
-      }
-    });
-  return g;
-};
-const placementOf = (g: Grid): string =>
-  [8, 7, 6, 5, 4, 3, 2, 1]
-    .map((r) => [..."abcdefgh"].map((f) => g.get(`${f}${r}`) ?? ".").join("").replace(/\.+/g, (d) => String(d.length)))
-    .join("/");
-const isLight = (sq: string) => (sq.charCodeAt(0) - 97 + Number(sq[1])) % 2 === 0;
-
-const FILES = "abcdefgh";
-const PIECE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
-const KNIGHT = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]] as const;
-const AROUND = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]] as const;
-/**
- * The squares of `by`'s pieces attacking `sq` on a grid (as chess.js's `attackers`: pawns diagonally, knights, the king,
- * sliders up to the first piece in the way), worked out on the grid itself: the bounce tries many positions, and making
- * a chess.js board for each was most of its time.
- */
-function gridAttackers(g: Grid, sq: string, by: Side): string[] {
-  const f = sq.charCodeAt(0) - 97;
-  const r = Number(sq[1]);
-  const mine = (c: string) => (c === c.toUpperCase()) === (by === "w");
-  const at = (ff: number, rr: number) => (ff >= 0 && ff < 8 && rr >= 1 && rr <= 8 ? `${FILES[ff]}${rr}` : null);
-  const out: string[] = [];
-  const is = (s2: string | null, types: string) => {
-    const c = s2 ? g.get(s2) : undefined;
-    return !!c && mine(c) && types.includes(c.toLowerCase());
-  };
-  for (const df of [-1, 1]) {
-    const s2 = at(f + df, by === "w" ? r - 1 : r + 1);
-    if (is(s2, "p")) out.push(s2!);
-  }
-  for (const [df, dr] of KNIGHT) if (is(at(f + df, r + dr), "n")) out.push(at(f + df, r + dr)!);
-  for (const [df, dr] of AROUND) {
-    if (is(at(f + df, r + dr), "k")) out.push(at(f + df, r + dr)!);
-    const slider = df && dr ? "bq" : "rq";
-    for (let k = 1; k < 8; k++) {
-      const s2 = at(f + df * k, r + dr * k);
-      if (!s2) break;
-      const c = g.get(s2);
-      if (!c) continue;
-      if (mine(c) && slider.includes(c.toLowerCase())) out.push(s2);
-      break;
-    }
-  }
-  return out;
-}
-const gridKing = (g: Grid, side: Side): string | null => [...g].find(([, c]) => c === (side === "w" ? "K" : "k"))?.[0] ?? null;
-const gridKingAttacked = (g: Grid, side: Side): boolean => {
-  const k = gridKing(g, side);
-  return !k || gridAttackers(g, k, other(side)).length > 0;
-};
-/** The material `side` has hanging on a grid (as rules.ts hangingValue: attacked by a cheaper piece, or attacked and undefended). */
-function gridHanging(g: Grid, side: Side): number {
-  let total = 0;
-  for (const [sq, c] of g) {
-    if ((c === c.toUpperCase()) !== (side === "w") || c.toLowerCase() === "k") continue;
-    const att = gridAttackers(g, sq, other(side));
-    if (!att.length) continue;
-    const v = PIECE_VALUE[c.toLowerCase()]!;
-    const cheaper = att.some((a) => PIECE_VALUE[g.get(a)!.toLowerCase()]! < v);
-    if (cheaper || !gridAttackers(g, sq, side).length) total += v;
-  }
-  return total;
 }
 
 /**

@@ -488,13 +488,14 @@ export const BOSS_POWERS = {
   /**
    * How fast each boss's meter fills (every gain times this), by BOSS_ROSTER id (1 when missing). Its ultimate's
    * effect pauses the meter for its length (the blizzard 3 turns, the funhouse 12, the Roman candle about 13, Lights
-   * out 2, the Big Bounce 1, the board saw 5), so a longer one fills faster to fit two in a typical battle. Ginger a
+   * out 2, the Big Bounce 1, the board saw 5, Wrangler's showdown 1 after its warning, more if he holds it), so a longer
+   * one fills faster to fit two in a typical battle. Ginger a
    * little faster (Eric, Oct 11: her ultimate's weak; about twice a game), and 1.2 since her blizzard lasts three turns
    * (Oct 12, by estimate: the second still comes about turn 30). Jefferson's candle burns for about a third of a
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, pig: 1.1 } as Readonly<Record<string, number>>,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**
@@ -639,6 +640,58 @@ export const BOSS_POWERS = {
    */
   boardSawFrom: 10,
   boardSawTurns: 5,
+  /**
+   * Wrangler's long pull (his first move): a centre pawn's double step, lassoed one square further (three squares in one
+   * move: e2-e5 or d2-d5 as White; d7-d4 or e7-e4 as Black after the crowd's first move). The engine picks the d- or
+   * e-pawn (the position after each, and after his best ordinary move, searched at pullNodes); a pull losing more than
+   * pullMaxLoss pawns against that ordinary move is unsound (it hangs the pawn), and so is one whose path or square is
+   * taken or that leaves the pawn simply taken: then it's an ordinary first move. Measured (Stockfish, depth 18): -0.2
+   * to +0.3 pawns for him against a normal first move, pure flavour.
+   */
+  pullMaxLoss: 0.5,
+  pullNodes: 100_000,
+  /**
+   * Wrangler's lasso drag (his passive): after his move, from crowd turn dragFirst, every dragEvery turns, he ropes one
+   * crowd piece (never the king) and drags it one square up, down, left or right onto an empty square (a pawn never onto
+   * the first or last rank), never leaving the crowd in check or without a move. Of the legal drags (at most
+   * dragCandidates, a seeded sample, none leaving more of the crowd's material hanging), each glanced at by the engine
+   * (dragScreenNodes), the dragConfirm nearest the band's middle are looked at properly (dragNodes, as is the position
+   * before), and the one costing the crowd nearest the middle of dragLoss (in pawns: bouncePawnLogit) is played (seeded
+   * among ties). None in the band: no drag that turn, and it doesn't count (he tries again after his next move). About
+   * 3 to 4 a battle of 30 to 40 crowd moves (turns 3, 13, 23, 33), by estimate (Eric's rule on power rates): not yet
+   * tested with the bot sim.
+   */
+  dragFirst: 3,
+  dragEvery: 10,
+  dragLoss: [0.1, 0.9] as readonly [number, number],
+  dragCandidates: 16,
+  dragScreenNodes: 15_000,
+  dragConfirm: 3,
+  dragNodes: 100_000,
+  /**
+   * Wrangler's showdown (his ultimate, as the crowd turn after the warning begins): three pairs (a crowd piece and one of
+   * his of the same kind: queens, rooks, then bishops or knights, the most valuable pairs there are) lined up facing
+   * each other in the middle of the board (files b-g, ranks 3-6), his pieces always protected; the crowd's next move
+   * must be one of the duels (its piece taking his). The host's engine (solo: this device's) searches line-ups: the
+   * crowd's best duel leaves him showdownEdge pawns up (nearest showdownTarget, seeded among ties), and another duel
+   * costs the crowd at least showdownTrap pawns more; never a check, never a mate in 1 for him after the best duel.
+   * - The search: while the crowd thinks (from showdownScoutFrom of the meter, and through the warning), up to
+   *   showdownSearchMs a turn on the position then; at his turn, after his move, the line-ups it found are checked on
+   *   the new position first, then a fresh search for up to showdownTurnMs (at most showdownSetups line-ups a search).
+   *   Each line-up costs one search per duel at showdownNodes; the pick is looked at again at showdownConfirmNodes.
+   * - Nothing found: he holds ("Not yet...") and tries again after his next move, up to showdownHolds times; then a
+   *   showdown of two pairs under the same rule; then a lasso drag (the passive's band).
+   */
+  showdownEdge: [0.1, 1.2] as readonly [number, number],
+  showdownTarget: 0.5,
+  showdownTrap: 2,
+  showdownScoutFrom: 0.85,
+  showdownSearchMs: 8000,
+  showdownTurnMs: 3000,
+  showdownSetups: 60,
+  showdownNodes: 20_000,
+  showdownConfirmNodes: 60_000,
+  showdownHolds: 2,
 } as const;
 
 /**

@@ -32,6 +32,7 @@ import {
   turnOf,
   unleashed,
   type Battle,
+  type BossAsks,
   type BossLastMove,
   type BossRules,
   type JudgedEvaluation,
@@ -43,13 +44,14 @@ import { bossRules } from "./bosses/index.ts";
 
 // Every boss's file, and the shared pieces of the base boss, for the whole package.
 export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, unleashed };
-export type { Battle, BossLastMove, BossRules, JudgedEvaluation, RageRates, TurnContext };
+export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, RageRates, TurnContext };
 export * from "./bosses/ginger.ts";
 export * from "./bosses/boingo.ts";
 export * from "./bosses/grex.ts";
 export * from "./bosses/hollow.ts";
 export * from "./bosses/bigboy.ts";
 export * from "./bosses/sawyer.ts";
+export * from "./bosses/pig.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */

@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, LightsOutTarget, PowerEvent, PowerId, SawCut, SplitPawn } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, LassoDrag, LightsOutTarget, LongPull, PowerEvent, PowerId, SawCut, ShowdownResult, SplitPawn } from "@chessroyale/core";
 import type { Base } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule } from "@chessroyale/core";
@@ -311,6 +311,16 @@ export interface NetBossPowers {
   split?: SplitPawn | null;
   cut?: SawCut | null;
   boardSaw?: { at: number; until: number } | null;
+  /**
+   * Wrangler (missing for other bosses): his long pull once his first move is played (null: an ordinary first move), his
+   * last lasso drag (the piece, its squares, the crowd turn it set up; `ult`: the drag that stood in for his showdown),
+   * his last showdown (the pairs and where each came from, the crowd turn whose move must be one of its duels, the
+   * position before the line-up), and how many turns he has held his showdown so far ("Not yet...").
+   */
+  pull?: LongPull | null;
+  drag?: LassoDrag | null;
+  showdown?: ShowdownResult | null;
+  holds?: number;
 }
 
 /**
@@ -399,8 +409,12 @@ export type ClientMessage =
   | { t: "king"; key: string; strike?: boolean }
   /** A pre-game vote (Crowd 50 v 50): the option this player pushed a pawn into. */
   | { t: "vote"; key: string; option: number }
-  /** Boss battle, host only: the boss's move. */
-  | { t: "bossMove"; key: string; move: string }
+  /**
+   * Boss battle, host only: the boss's move (Wrangler's long pull written as its three squares), and what its turn was
+   * asked to work out besides (Wrangler's): the lasso drag after it ("c3c4", "" none) and the showdown's line-up after it
+   * (checkLineup's spec, "" none). The server checks each against the rules.
+   */
+  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
   /** Quick chat: say a line (a phrase or emoji id) to your team or, for Hello and Sporting lines and emoji, to everyone. */
@@ -618,6 +632,15 @@ export type ServerMessage = { now: number } & (
       bounce?: string[];
       /** The boss's own move on the Maia brain (BOSS_BRAIN): with Maia, at this rating (the lobby decides, once a battle). */
       brain?: NetBossBrain;
+      /**
+       * Wrangler's turn (BossAsks): his long pulls to choose from (his first move: answer one of them as `move`, or an
+       * ordinary move), a lasso drag after his move (`drag`), or his showdown's line-up after it (`showdown`; "last": two
+       * pairs, then a drag, allowed); `seed` orders the engine's candidates (never the battle's own seed).
+       */
+      pull?: string[];
+      drag?: true;
+      showdown?: "try" | "last";
+      seed?: number;
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading

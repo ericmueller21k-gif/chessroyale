@@ -10,9 +10,10 @@ import { GREX } from "./grex.ts";
 import { HOLLOW } from "./hollow.ts";
 import { BIGBOY } from "./bigboy.ts";
 import { SAWYER } from "./sawyer.ts";
+import { PIG } from "./pig.ts";
 
 /** Every boss with powers, by its BOSS_ROSTER id. */
-const BOSS_RULES: ReadonlyMap<string, BossRules> = new Map([GINGER, BOINGO, GREX, HOLLOW, BIGBOY, SAWYER].map((r) => [r.id, r]));
+const BOSS_RULES: ReadonlyMap<string, BossRules> = new Map([GINGER, BOINGO, GREX, HOLLOW, BIGBOY, SAWYER, PIG].map((r) => [r.id, r]));
 
 /** A boss's rules (null: a boss without powers). */
 export const bossRules = (boss: Pick<BossState, "id"> | null | undefined): BossRules | null => (boss?.id ? (BOSS_RULES.get(boss.id) ?? null) : null);

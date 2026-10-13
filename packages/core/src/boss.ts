@@ -74,9 +74,9 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown";
 /** Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual). */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -112,6 +112,11 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // Sawyer saws his first pawn in two after his first move (the split pawn): a pawn's head start, so he plays further
   // under the lobby's strength too (DECISIONS.md: "Sawyer, built": the boss sim's numbers).
   { id: "sawyer", name: "Sawyer", icon: "🪚", kit: "Sawyer", offset: -250, powers: { passive: "cuts", ultimate: "boardsaw" } },
+  // Wrangler (the cowboy pig; his code id stays "pig": "wrangler" is Cloudflare's CLI here) drags a crowd piece a square
+  // every few turns and lines up a forced duel as his ultimate, each costing the crowd up to about a pawn by the
+  // engine's measure (more if it picks the wrong duel), so he plays as far under the lobby's strength as Big Boy and
+  // Sawyer (DECISIONS.md: "Wrangler, built": the estimate).
+  { id: "pig", name: "Wrangler", icon: "🤠", kit: "Wrangler", offset: -250, powers: { passive: "drag", ultimate: "showdown" } },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
   { id: "knight", name: "The Black Knight", icon: "🐴", kit: null, offset: 0, powers: null },
@@ -358,6 +363,18 @@ export interface BossPowerState {
   cut?: SawCut | null;
   /** Sawyer's board saw (his ultimate): no move may cross between the d and e files from crowd turn `at` through `until`. */
   boardSaw?: { at: number; until: number } | null;
+  /**
+   * Wrangler's long pull (his first move): the centre pawn's double step (`from` to `via`), then lassoed one square
+   * further (to `to`), as crowd turn `turn` begins. Null: his first move was an ordinary one (no sound pull). Unset until
+   * his first move.
+   */
+  pull?: LongPull | null;
+  /** Wrangler's last lasso drag: a crowd piece dragged one square after his move, as crowd turn `turn` began. */
+  drag?: LassoDrag | null;
+  /** Wrangler's last showdown: the pairs he lined up after his move, as crowd turn `turn` began (its forced duel). */
+  showdown?: ShowdownResult | null;
+  /** Wrangler's showdown not found yet: the crowd turns he has held it ("Not yet...") this time (0 once it comes). */
+  holds?: number;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -406,6 +423,50 @@ export interface SawCut {
   b: string;
   at: number;
   until: number;
+}
+
+/** Wrangler's long pull: his centre pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
+export interface LongPull {
+  turn: number;
+  from: string;
+  via: string;
+  to: string;
+}
+
+/**
+ * Wrangler's lasso drag: the crowd's piece (`piece`, its letter) dragged from `from` to the empty square `to` beside it
+ * after his move, as crowd turn `turn` begins; `ult`: the drag that stood in for his showdown (none could be found).
+ */
+export interface LassoDrag {
+  turn: number;
+  from: string;
+  to: string;
+  piece: string;
+  ult?: true;
+}
+
+/**
+ * One pair of Wrangler's showdown: a piece of the crowd's and one of his of the same kind (`piece`, its letter), facing
+ * each other: the crowd's on `crowd`, his on `boss`, each roped in from `crowdFrom` and `bossFrom`.
+ */
+export interface ShowdownPair {
+  piece: string;
+  crowd: string;
+  boss: string;
+  crowdFrom: string;
+  bossFrom: string;
+}
+
+/**
+ * Wrangler's showdown: as crowd turn `turn` begins (after his move), the pairs lined up in the middle of the board (the
+ * crowd must play one of the duels: its piece taking his), the position before the line-up, and his edge in pawns after
+ * the crowd's best duel as the engine put it (null: not known here; online the host's engine picked it).
+ */
+export interface ShowdownResult {
+  turn: number;
+  pairs: ShowdownPair[];
+  before: string;
+  edge: number | null;
 }
 
 /** One of Hollow's dark squares: the crowd turn it fell as, and the last crowd turn it covers (darkTurns in all). */
@@ -492,9 +553,34 @@ export interface BurnEvent {
  * `thaw`: Ginger's blizzard thawing as one of its later turns begins (`squares`: the pieces whose ice melts now).
  * `extra`: Hollow's extra move after a failed Lights out (played after his own, before the crowd's turn). `block`: Big
  * Boy's toy block landing; `bounce`: his Big Bounce (at the start of his turn, after the crowd's move). `split`:
- * Sawyer saws the pawn of his first move in two; `cut`: a saw cut on an edge; `boardsaw`: his board saw.
+ * Sawyer saws the pawn of his first move in two; `cut`: a saw cut on an edge; `boardsaw`: his board saw. `pull`:
+ * Wrangler's long pull (his first move, a centre pawn three squares); `drag`: his lasso drag (a crowd piece dragged a
+ * square after his move; `ult`: the showdown's last fallback); `showdown`: his showdown (three pairs lined up, a forced
+ * duel); `hold`: "Not yet..." (no line-up found this time: he searches again next turn).
  */
-export type PowerEventKind = "freeze" | "pie" | "warn" | "blizzard" | "thaw" | "funhouse" | "spin" | "spark" | "candle" | "fireball" | "fireproof" | "dark" | "extra" | "block" | "bounce" | "split" | "cut" | "boardsaw";
+export type PowerEventKind =
+  | "freeze"
+  | "pie"
+  | "warn"
+  | "blizzard"
+  | "thaw"
+  | "funhouse"
+  | "spin"
+  | "spark"
+  | "candle"
+  | "fireball"
+  | "fireproof"
+  | "dark"
+  | "extra"
+  | "block"
+  | "bounce"
+  | "split"
+  | "cut"
+  | "boardsaw"
+  | "pull"
+  | "drag"
+  | "showdown"
+  | "hold";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -511,6 +597,8 @@ export interface PowerEvent {
    * Boingo's joke as his funhouse plays the crowd's move.
    */
   pick?: number;
+  /** Wrangler's drag that stands in for his showdown (none could be found after his holds). */
+  ult?: true;
 }
 
 /** The settings behind the God King's Last Stand. */

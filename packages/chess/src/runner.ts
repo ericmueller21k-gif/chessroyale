@@ -90,8 +90,13 @@ import {
   shownAngle,
   hollowBattle,
   moveLoss,
+  pigBattle,
+  pigTurn,
   type Battle,
+  type BossAsks,
   type BossLastMove,
+  type BossMoveExtras,
+  type ShowdownScout,
 } from "./boss-powers.ts";
 import type { BounceResult, LightsOutTest } from "@chessroyale/core";
 
@@ -1032,19 +1037,41 @@ export class MatchRunner {
     return this.bossStumbles() ? "stumble" : "elo";
   }
 
-  /** The boss's move from an engine (at its strength), played on the board. */
+  /**
+   * The boss's move from an engine (at its strength), played on the board. Wrangler's turn also works out his long pull,
+   * drag or showdown on this device's engines (pigTurn), as the host does online.
+   */
   async playBoss(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const kind = this.bossMoveKind();
     // (Test switch: a mate in one whenever there is one.)
     const mate = this.settings.bossMateTest ? (this.bossAllowed() ?? legalMoves(fen)).find((m) => gameEnd(applyMove(fen, m), []) === "checkmate") : undefined;
     const brain = this.humanBrain;
-    const move =
+    const ordinary = async () =>
       mate ??
       (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined));
+    const asks = this.bossAsks();
+    if (asks) {
+      // (His long pull, drag or showdown on every engine of this device; his ordinary move on `engine`, as ever.)
+      const answer = await pigTurn(this.opts.engines.length ? this.opts.engines : [engine], fen, asks, ordinary, this.showdownScout);
+      this.applyBossMove(answer.move, kind === "stagger", { drag: answer.drag ?? null, showdown: answer.showdown ?? null, edge: answer.edge ?? null });
+      return answer.move;
+    }
+    const move = await ordinary();
     this.applyBossMove(move, kind === "stagger");
     return move;
   }
+
+  /**
+   * What the boss's turn must work out besides its move, with the engine (Wrangler's long pull, drag or showdown), or
+   * null: the server sends it to the host with the request for the move; solo works it out in playBoss.
+   */
+  bossAsks(): BossAsks | null {
+    return pigBattle.asks(this.battle);
+  }
+
+  /** Wrangler's showdown scout on this device (solo's), searching line-ups while the crowd thinks; null: none. */
+  showdownScout: ShowdownScout | null = null;
 
   /**
    * The boss's brain when it isn't plain Stockfish (solo's Boss alone sets it as the battle begins: Maia-3 at a
@@ -1073,17 +1100,21 @@ export class MatchRunner {
    * Plays the boss's move (from the host's engine online). An illegal move (or one onto a pie) is replaced by the
    * first allowed one. Then the crowd's next turn begins: its powers are set (a freeze, a pie, the ultimate).
    */
-  applyBossMove(move: string, staggered = !!this.state.boss?.staggerNext): string {
+  applyBossMove(move: string, staggered = !!this.state.boss?.staggerNext, extras: BossMoveExtras = {}): string {
     const id = this.state.boards[0]!;
     const board = this.boards.get(id)!;
     const legal = this.bossAllowed() ?? legalMoves(board.fen);
-    const m = legal.includes(move) ? move : legal[0]!;
+    // (A move its rules play as something else: Wrangler's long pull, played as its double step.)
+    const boss = this.state.boss;
+    const special = boss?.powers ? (bossRules(boss)?.specialMove?.(boss, board.fen, move) ?? null) : null;
+    const m = special && legal.includes(special.play) ? special.play : legal.includes(move) ? move : legal[0]!;
+    const shown = special && m === special.play ? move : m;
     this.boards.set(id, playOnBoard(board, m, 1 - board.expected));
     const captured = pieceAt(board.fen, m.slice(2, 4))?.type;
-    this.bossLast = { move: m, san: toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}) };
+    this.bossLast = { move: shown, san: special && m === special.play ? special.san : toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
-    // (The boss's own after-move effect: Sawyer's split pawn after his first move.)
-    if (this.state.boss?.powers) bossRules(this.state.boss)?.afterBossMove?.(this.battle, m);
+    // (The boss's own after-move effect: Sawyer's split pawn after his first move; Wrangler's pull, drag or showdown.)
+    if (this.state.boss?.powers) bossRules(this.state.boss)?.afterBossMove?.(this.battle, m, { ...extras, ...(shown !== m ? { special: shown } : {}) });
     this.preparePowers();
     return m;
   }

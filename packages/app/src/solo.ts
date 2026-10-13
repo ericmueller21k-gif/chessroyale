@@ -1,11 +1,11 @@
 import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
-import { GUARD_WORDS, MatchRunner, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
+import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
-import { warmEngineServer, withServerRecheck } from "./engine.ts";
+import { ownEngine, warmEngineServer, withServerRecheck } from "./engine.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { crowdMoveCues, kingSay } from "./godKing.ts";
 import { SoloLobbyChat } from "./chat.ts";
@@ -604,6 +604,19 @@ export class SoloMatch implements GameView {
     this.timer = setTimeout(() => this.nextRound(), showMs);
   }
 
+  /**
+   * As your turn begins: if Wrangler's showdown may follow it (the meter nearly full, his warning, a hold, the test
+   * trigger), his scout searches line-ups on this position (an engine of its own) until his turn; else it stops.
+   */
+  private scoutShowdown() {
+    const v = this.runner.bossView();
+    const p = v?.powers;
+    const soon = !!p && (p.warned || !!p.ultNext || (p.holds ?? 0) > 0 || (p.rage ?? 0) >= BOSS_POWERS.showdownScoutFrom);
+    if (!v || v.id !== "pig" || !p || v.result || p.ultAt !== null || !soon) return void this.runner.showdownScout?.stop();
+    this.runner.showdownScout ??= new ShowdownScout(() => ownEngine());
+    this.runner.showdownScout.scout(v.board.fen, (p.holds ?? 0) >= BOSS_POWERS.showdownHolds ? [3, 2] : [3]);
+  }
+
   /** After a crowd move in the boss battle: the boss strikes when it's due. */
   private afterBossRound() {
     if (this.runner.bossKillDue()) {
@@ -646,6 +659,8 @@ export class SoloMatch implements GameView {
     this.frozen = null;
     this.darkNote = null;
     this.runner.prefetch();
+    // (Wrangler's showdown may follow your move: this device scouts line-ups while you think.)
+    this.scoutShowdown();
     if (!this.runner.boardOf(HUMAN)) return this.watchTurn();
     // The move clock starts after a short settling-in countdown on the new board (alone, at once: nothing to settle).
     const intro = this.alone ? 0 : this.settings.boardIntroSeconds * 1000;
@@ -889,6 +904,7 @@ export class SoloMatch implements GameView {
 
   private finish() {
     this.freeBrain();
+    this.runner.showdownScout?.reset();
     const winner = this.runner.state.players.find((p) => p.placement === 1);
     this.set({
       kind: "results",
