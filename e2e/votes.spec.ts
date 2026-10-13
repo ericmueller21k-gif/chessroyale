@@ -286,6 +286,7 @@ test("online, the time control's increment comes with each move (an app that sta
   // A lobby of one and 99 bots, on Bullet 3+2 (no votes: from the address).
   await page.goto("/?debug&pace=quick&mode=crowd&turns=teams&format=team&speed=bullet");
   await createLobbyFromHome(page);
+  await expect.poll(() => page.evaluate(() => !!(window as any).match?.code), { timeout: 30_000 }).toBe(true);
   // Joined from PLAY, the app only knows the Crowd's usual clock (Rapid's +5 s) until the server says otherwise.
   await page.evaluate(() => {
     const m = (window as any).match;
