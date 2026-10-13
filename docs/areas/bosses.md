@@ -99,7 +99,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Test switches:** `?boss=<id>` picks the boss (`?boss=jefferson` too: `BOSS_ALIASES`, read by `bossIdFromLink`);
   `?power=<id>` brings its ultimate early (warned as turn 2 begins, unleashed on turn 3; its passive as usual); admins
   see "Trigger ultimate (testing)" in any boss battle (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next
-  crowd turn begins, no warning). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
+  crowd turn begins, no warning; on a computer in the title line with the brain's pill, before sound and the flag; on a
+  phone under the dock). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
   calls the God King's Last Stand, and Hollow lashes him) and `?boss=hollow&mate=1` (Boss alone from 1.f3 e5 2.g4, the
   boss to move: he mates at once, lashes your king, then the result; `settings.bossMateTest`, solo only).
 - **Resigning never waits for a moment** (Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the top

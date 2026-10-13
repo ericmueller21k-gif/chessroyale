@@ -2674,3 +2674,9 @@ takes the seat, the other plays on and hosts); every confirm checked clear of th
 bars and the clocks. Frame by frame (`npm run frames:resign`, phone 390 and computer 1280, light and dark, Boss alone
 and a Crowd match): the sheet and confirm never cover the board or the line above it, the board never moves, no frame
 blinks.
+
+### A computer's title line: testing items, sound, the flag (Eric, Oct 13, 2026)
+
+On a computer every match's title line spans the board's column (the boss bar's width) and ends in an admin's testing
+items, then sound, then the flag, so they sit next to the title, not at the window's corner (Eric: "utilize the space
+next to 'BOSS · move 1'"); when tight, the brain's pill ellipsizes first. Phones unchanged.
