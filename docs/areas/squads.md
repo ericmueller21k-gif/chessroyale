@@ -155,7 +155,8 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
 - **What the sim says** (`reports/squads-sim.md`, the time controls, Classic):
   - Median lobbies take 26.9 (Bullet), 33.5 (Blitz) and 43.9 (Rapid) minutes; 90th percentiles 34.7, 40.9 and 54.5.
     Mercenary: 29.9, 37.8 and 43.9. Bullet can't reach 20: about 11 minutes of every lobby is reveals, votes and the
-    bracket (shorter reveals in Bullet: 24.0, Eric's call).
+    bracket (shorter reveals in Bullet: 24.0, Eric's call). Through the real server a Bullet bot lobby took 32.9
+    minutes (one 13-minute Relay match), its bots never out of time.
   - 17-31% of squads reach sudden death, mostly in Pairs, but only 0.2-0.5% of moves are made in it (the increment lifts
     a squad out); 0.3-0.7% of actions become random moves for want of time.
   - Bots use 1-2 same-move tokens a Pairs match, 76-80% refunded (Mercenary's blocks: `reports/squads-mercenary.md`).

@@ -2339,7 +2339,13 @@ mapped. The calls, all made without Eric:
   Eric, as it's how the reveals look. Blitz and Rapid are 3-4 minutes over their 30 and 40; Rapid's 90th percentile
   (55, strong squads' long games) is the long one. Rapid 5+2 or a 15 s cap would trim it.
 - **Through the real server** (`scripts/squads-headless.ts --clock bullet --device`, one idle person whose device did
-  the bots' engine work): HEADLESS_RESULT
+  the bots' engine work): a full Bullet lobby took **32.9 minutes** from the fill to its results, within the sim's
+  spread (median 26.9, 90th percentile 34.7) and long for the usual reason: one Relay match ran 13 minutes (boards of
+  159 and 183 plies) and held up its side of the bracket; Pairs took 8 and the final 10. The bots were never out of
+  time: 0 missed actions in 1,949 moves (the 3 on the record were the idle person's, before a bot took the seat), and
+  squads that tied in rounds 1 and 2 had 2-7 s of bank left, living on the increment. A first try ended at 24 minutes
+  into the lobby (in the final) when the local server stopped; Relay then took 8.4 minutes and Pairs 13.3 (a 129-ply
+  game).
 - **Screens:** the vote's result banner with a detail line (Squads' Mode, Start and Clock votes) is centred in the
   board rather than 28% down: at 320 px it ran over the cards under it (every Squads option with a detail did,
   before this too). Checked frame by frame at 320, 390 and 1280 px (the Clock vote, its banner, the match's card, the
