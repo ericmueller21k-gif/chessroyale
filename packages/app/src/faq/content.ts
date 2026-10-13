@@ -27,6 +27,7 @@ import {
   DEFAULT_SETTINGS,
   ENGINE_MIN_ELO,
   ITEM_COLORS,
+  PREGAME_VOTES,
   PRIOR_RATING,
   PURITY_BANDS,
   RAID_SETTINGS,
@@ -35,11 +36,9 @@ import {
   SHOP_FREE,
   SQUADS,
   TIERS,
-  VARIABLE_CLOCK,
   bossBrainFor,
   bossStrength,
   bossStumbleChance,
-  clockStepRanges,
   isPlayable,
   kingCharges,
   lastStandBar,
@@ -47,13 +46,12 @@ import {
   tierItems,
   maiaRatingFor,
   scoreGroup,
-  speedOption,
   type BossBrainSettings,
   type BossDef,
   type BossPowerSettings,
-  type ClockStep,
   type CrateDef,
   type FinalFormat,
+  type PregameVote,
   type Settings,
   type SquadsSettings,
 } from "@chessroyale/core";
@@ -83,7 +81,8 @@ export interface FaqSources {
   cratesFree: boolean;
   shopFree: boolean;
   squads: SquadsSettings;
-  speeds: { normal: number; bullet: number; variable: readonly ClockStep[] };
+  /** Crowd 50 v 50's clock vote: its time controls (each option's patch has the bank, increment and cap) and default. */
+  clockVote: Pick<PregameVote, "options" | "defaultOption">;
 }
 
 export const FAQ_DEFAULTS: FaqSources = {
@@ -109,11 +108,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   cratesFree: CRATES_FREE,
   shopFree: SHOP_FREE,
   squads: SQUADS,
-  speeds: {
-    normal: Number(speedOption("normal")?.patch.moveClockSeconds),
-    bullet: Number(speedOption("bullet")?.patch.moveClockSeconds),
-    variable: VARIABLE_CLOCK,
-  },
+  clockVote: PREGAME_VOTES.find((v) => v.id === "speed")!,
 };
 
 // ---------------- Numbers as words ----------------
@@ -160,7 +155,10 @@ function modes(src: FaqSources): FaqSection {
   const Q = src.squads;
   const team = C.lobbySize / 2;
   const left = (k: readonly number[]) => C.lobbySize - sum(k);
-  const steps = clockStepRanges(src.speeds.variable);
+  // The clock vote's time controls: "Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move)".
+  const V = src.clockVote;
+  const timeControl = (p: Partial<Settings>) => `${n(Number(p.timeBankSeconds) / 60, "minute")}, +${num(Number(p.timeIncrementSeconds))} s a move, at most ${num(Number(p.moveClockSeconds))} s on a move`;
+  const timeControls = V.options.map((o) => `**${o.label}** (${timeControl(o.patch)})`);
   const teamSizes = S.teamFinalSizes.map((x) => `${x}v${x}`);
   const clocks = Q.clocks.map((c) => `${c.label} ${num(c.bankSeconds / 60)} min`).join(", ");
   return {
@@ -172,7 +170,8 @@ function modes(src: FaqSources): FaqSection {
 - **${C.lobbySize} players, one game of chess**, from the first move. Two teams of ${team}: your team plays White or Black all game.
 - Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
 - Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(C.firstStageRounds / 2, "move")}; after that, the lowest scorers are cut after every move, the same number from each team. Scores carry over all game.
-- **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss battle (the top ${left(src.crowdKnockouts.boss)} team up against a boss, with the God King) or a duel (the best of each side, 1v1). Then on the speed: Normal (${src.speeds.normal} s a move), Bullet (${src.speeds.bullet} s) or Variable (${steps[0]?.seconds} s, rising to ${steps.at(-1)?.seconds} s).
+- **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss battle (the top ${left(src.crowdKnockouts.boss)} team up against a boss, with the God King) or a duel (the best of each side, 1v1). Then on the clock.
+- **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. Without the vote (Everyone moves, or Pre-game votes off) it's ${timeControl(C)}; a boss raid is ${timeControl(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
 - **Everyone moves** (Settings, Crowd) is the other way to play: everyone picks for whichever side is to move, down to a 2v2 final of the last ${left(src.everyoneKnockouts)}. It's for solo games and lobbies you create; PLAY is always 50 v 50.
 - Matchmaking: **Default** fills empty seats with bots after a short wait, **Bots off** waits for real players, and **Solo** is you and bots, at once.

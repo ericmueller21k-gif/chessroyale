@@ -1,5 +1,5 @@
 import type { Rng } from "./rng.ts";
-import { CROWD_KNOCKOUTS, VARIABLE_CLOCK, clockStepRanges, type Settings } from "./settings.ts";
+import { CROWD_KNOCKOUTS, type Settings } from "./settings.ts";
 
 /**
  * Crowd 50 v 50's pre-game votes. Before the first move, everyone (both teams) votes by dragging their own pawn into
@@ -14,7 +14,7 @@ export interface VoteOption {
   label: string;
   /** One short line under the label. */
   blurb: string;
-  /** More detail, shown when this option wins (e.g. the Variable speed's whole schedule). */
+  /** More detail, shown under the blurb when this option wins (none of today's options has any). */
   detail?: string;
   /** Settings this option sets if it wins. */
   patch: Partial<Settings>;
@@ -31,15 +31,27 @@ export interface PregameVote {
   defaultOption: number;
 }
 
-/** "Moves 1–5: 10 s · 6–10: 15 s · … · 21+: 30 s": a rising clock in one line. */
-export function clockScheduleLine(steps = VARIABLE_CLOCK): string {
-  return clockStepRanges(steps)
-    .map((r, i) => `${i === 0 ? "Moves " : ""}${r.to === null ? `${r.from}+` : r.to === r.from ? `${r.from}` : `${r.from}–${r.to}`}: ${r.seconds} s`)
-    .join(" · ");
-}
+/** What a time control sets: the bank for the game, the increment added at the start of every move, the move's cap. */
+export type TimeControl = Pick<Settings, "timeBankSeconds" | "timeIncrementSeconds" | "moveClockSeconds">;
 
-const first = VARIABLE_CLOCK[0]!.seconds;
-const last = VARIABLE_CLOCK[VARIABLE_CLOCK.length - 1]!.seconds;
+/** Minutes as chess writes them in a time control ("3" in 3+2; "1.5" for 90 s). */
+const minutes = (seconds: number) => String(Math.round((seconds / 60) * 100) / 100);
+
+/**
+ * One option of the clock vote: a chess time control, written as chess writes it ("Blitz 5+3": 5 minutes for the
+ * game, 3 s added every move), with its cap in the blurb. The label and blurb are made from the numbers, so they can't
+ * disagree. The patch also clears any rising schedule (moveClockSteps), so the cap is the same on every move.
+ */
+function timeControl(id: string, icon: string, name: string, tc: TimeControl): VoteOption {
+  const mins = minutes(tc.timeBankSeconds);
+  return {
+    id,
+    icon,
+    label: `${name} ${mins}+${tc.timeIncrementSeconds}`,
+    blurb: `${mins} min + ${tc.timeIncrementSeconds} s a move · max ${tc.moveClockSeconds} s`,
+    patch: { ...tc, moveClockSteps: [] },
+  };
+}
 
 export const PREGAME_VOTES: readonly PregameVote[] = [
   {
@@ -73,31 +85,37 @@ export const PREGAME_VOTES: readonly PregameVote[] = [
   {
     id: "speed",
     title: "How fast?",
-    // Nobody votes: the middle option, Variable.
+    // Nobody votes: the middle option, Blitz (DECISIONS.md, "Crowd 50 v 50: three chess time controls").
     defaultOption: 1,
+    // Real chess time controls (Eric, Oct 13, 2026), fastest first. Each move adds the increment to your bank; what you
+    // think comes out of it, so a quick move banks the rest. No move takes longer than its cap: 50 people pick together,
+    // and every turn has to end. Bullet is 3+2, not 2+1: at 7-8 s a move, 2+1 runs dry before the final (DECISIONS.md).
     options: [
-      { id: "normal", icon: "⏱️", label: "Normal", blurb: "20 s a move", patch: { moveClockSeconds: 20, moveClockSteps: [] } },
-      {
-        id: "variable",
-        icon: "📈",
-        label: "Variable",
-        blurb: `${first} s, rising to ${last} s`,
-        detail: clockScheduleLine(),
-        patch: { moveClockSteps: VARIABLE_CLOCK },
-      },
-      { id: "bullet", icon: "⚡", label: "Bullet", blurb: "10 s a move", patch: { moveClockSeconds: 10, moveClockSteps: [] } },
+      timeControl("bullet", "⚡", "Bullet", { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10 }),
+      timeControl("blitz", "🔥", "Blitz", { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 }),
+      timeControl("rapid", "⏱️", "Rapid", { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20 }),
     ],
   },
 ];
 
+/** Speeds that are gone, by their old ?speed= ids: Normal (and before it Slow and Standard) is Rapid, Variable Blitz. */
+const OLD_SPEEDS: ReadonlyMap<string, string> = new Map([
+  ["normal", "rapid"],
+  ["slow", "rapid"],
+  ["standard", "rapid"],
+  ["variable", "blitz"],
+]);
+
 /**
- * A speed option by its id (a test URL's ?speed=). Speeds that no longer exist map to the nearest one: "slow" (30 s
- * a move, removed Oct 7, 2026) and "standard" (the old name) are Normal.
+ * A time control by its id (a test URL's ?speed=bullet|blitz|rapid). Old ids map to the new ones (normal → rapid,
+ * variable → blitz, bullet → bullet); an id we don't know gets the default (Blitz), never an error. No id: null (the
+ * vote decides).
  */
 export function speedOption(id: string | null | undefined): VoteOption | null {
   if (!id) return null;
-  const key = id === "slow" || id === "standard" ? "normal" : id;
-  return PREGAME_VOTES.find((v) => v.id === "speed")!.options.find((o) => o.id === key) ?? null;
+  const vote = PREGAME_VOTES.find((v) => v.id === "speed")!;
+  const key = id.toLowerCase();
+  return vote.options.find((o) => o.id === (OLD_SPEEDS.get(key) ?? key)) ?? vote.options[vote.defaultOption]!;
 }
 
 /** The files of each zone, left to right (from White's side). */

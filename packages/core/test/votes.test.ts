@@ -3,110 +3,185 @@ import {
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
   PREGAME_VOTES,
-  VARIABLE_CLOCK,
   VOTE_SPOT_MARGIN,
   allowedMs,
+  applyRound,
   botThinkMs,
   botVotes,
   castPregameVote,
   clampToZone,
   closePregameVote,
-  clockScheduleLine,
-  clockStepRanges,
+  createMatch,
   modeSettings,
   moveClockAt,
   mulberry32,
   speedOption,
+  startBanks,
   tallyVotes,
   voteHomeSpots,
   voteZoneAt,
   voteZoneBox,
   voteZoneCentre,
   voteZoneSpot,
+  type MatchState,
   type Settings,
 } from "../src/index.ts";
 
 const crowd: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { crowdTeams: true }) };
 const speed = PREGAME_VOTES.find((v) => v.id === "speed")!;
-const variable: Settings = { ...crowd, ...speed.options[1]!.patch };
+/** Crowd 50 v 50's settings once each time control has won the vote. */
+const won = (option: number): Settings => ({ ...crowd, ...speed.options[option]!.patch });
+const bullet = won(0);
+const blitz = won(1);
+const rapid = won(2);
 
-describe("the move clock", () => {
-  it("Variable: 10 s for moves 1-5, then 5 s more every 5 moves, capped at 30 s from move 21", () => {
-    const at = (move: number) => moveClockAt(variable, move);
-    // Each step's first and last move.
-    expect([1, 5].map(at)).toEqual([10, 10]);
-    expect([6, 10].map(at)).toEqual([15, 15]);
-    expect([11, 15].map(at)).toEqual([20, 20]);
-    expect([16, 20].map(at)).toEqual([25, 25]);
-    // The cap: 30 s from move 21 on, however long the game.
-    expect([21, 22, 40, 80, 500].map(at)).toEqual([30, 30, 30, 30, 30]);
-    // Before the schedule starts (never in play): the first step.
-    expect(at(0)).toBe(10);
-  });
-
-  it("the schedule is data: the steps in settings, read as ranges, in any order", () => {
-    expect(clockStepRanges(VARIABLE_CLOCK)).toEqual([
-      { from: 1, to: 5, seconds: 10 },
-      { from: 6, to: 10, seconds: 15 },
-      { from: 11, to: 15, seconds: 20 },
-      { from: 16, to: 20, seconds: 25 },
-      { from: 21, to: null, seconds: 30 },
+describe("the clock vote: three chess time controls", () => {
+  it("Bullet 3+2, Blitz 5+3, Rapid 10+5 from left to right; each patch sets the bank, the increment and the cap", () => {
+    expect(speed.title).toBe("How fast?");
+    expect(speed.options.map((o) => o.id)).toEqual(["bullet", "blitz", "rapid"]);
+    expect(speed.options.map((o) => o.label)).toEqual(["Bullet 3+2", "Blitz 5+3", "Rapid 10+5"]);
+    expect(speed.options.map((o) => o.blurb)).toEqual([
+      "3 min + 2 s a move · max 10 s",
+      "5 min + 3 s a move · max 15 s",
+      "10 min + 5 s a move · max 20 s",
     ]);
-    const shuffled = { ...crowd, moveClockSteps: [...VARIABLE_CLOCK].reverse() };
-    expect(moveClockAt(shuffled, 7)).toBe(15);
-    expect(clockScheduleLine()).toBe("Moves 1–5: 10 s · 6–10: 15 s · 11–15: 20 s · 16–20: 25 s · 21+: 30 s");
+    expect(speed.options.map((o) => o.patch)).toEqual([
+      { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10, moveClockSteps: [] },
+      { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15, moveClockSteps: [] },
+      { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20, moveClockSteps: [] },
+    ]);
+    // Nothing old is left in the vote.
+    expect(speed.options.some((o) => /normal|variable|slow|rising/i.test(o.id + o.label + o.blurb))).toBe(false);
   });
 
-  it("Normal and Bullet are static; no schedule means moveClockSeconds every move", () => {
-    const normal = { ...variable, ...speed.options[0]!.patch };
-    const bullet = { ...variable, ...speed.options[2]!.patch };
-    for (const move of [1, 6, 21, 60]) {
-      expect(moveClockAt(normal, move)).toBe(20);
-      expect(moveClockAt(bullet, move)).toBe(10);
-      expect(moveClockAt(DEFAULT_SETTINGS, move)).toBe(DEFAULT_SETTINGS.moveClockSeconds);
-    }
-    // Crowd without the votes (or with them off): Normal, 20 s.
-    expect(moveClockAt(crowd, 1)).toBe(20);
+  it("nobody votes: the middle option, Blitz", () => {
+    expect(speed.defaultOption).toBe(1);
+    expect(speed.options[speed.defaultOption]!.id).toBe("blitz");
+    expect(tallyVotes([], 3, speed.defaultOption, mulberry32(1))).toBe(1);
+  });
+
+  it("Rapid is today's clock: the same as Crowd without the vote (votes off, everyone moves, raids)", () => {
+    for (const k of ["timeBankSeconds", "timeIncrementSeconds", "moveClockSeconds"] as const) expect(rapid[k]).toBe(crowd[k]);
     expect(CROWD_SETTINGS.moveClockSeconds).toBe(20);
   });
 
-  it("the time you're allowed and the bots' thinking follow the move's clock", () => {
-    const fresh = { bankMs: variable.timeBankSeconds * 1000 };
-    expect(allowedMs(fresh, variable, 1)).toBe(10_000);
-    expect(allowedMs(fresh, variable, 6)).toBe(15_000);
-    expect(allowedMs(fresh, variable, 30)).toBe(30_000);
-    // A bank running low still caps it.
-    expect(allowedMs({ bankMs: 2_000 }, variable, 30)).toBe(2_000 + variable.timeIncrementSeconds * 1000);
-    const rng = mulberry32(4);
-    const think = (move: number) => Array.from({ length: 300 }, () => botThinkMs(rng, variable, move));
-    expect(Math.max(...think(1))).toBeLessThanOrEqual(8_500);
-    expect(Math.min(...think(1))).toBeGreaterThanOrEqual(variable.botThinkSeconds[0] * 1000);
-    // On a long clock, the bots' usual range (2-14 s in Crowd).
-    expect(Math.max(...think(25))).toBeGreaterThan(12_000);
+  it("each cap is the same on every move; a rising schedule (none today) still works through moveClockAt", () => {
+    for (const move of [1, 6, 21, 60]) {
+      expect([bullet, blitz, rapid].map((s) => moveClockAt(s, move))).toEqual([10, 15, 20]);
+      expect(moveClockAt(DEFAULT_SETTINGS, move)).toBe(DEFAULT_SETTINGS.moveClockSeconds);
+    }
+    // A schedule, in any order: the step a move falls in (the first step before it starts).
+    const rising = { ...crowd, moveClockSteps: [{ fromMove: 6, seconds: 15 }, { fromMove: 1, seconds: 10 }] };
+    expect([0, 1, 5, 6, 40].map((m) => moveClockAt(rising, m))).toEqual([10, 10, 10, 15, 15]);
+    // A time control's patch clears a schedule.
+    expect(moveClockAt({ ...rising, ...speed.options[0]!.patch }, 6)).toBe(10);
+  });
+
+  it("old ?speed= ids map to the new ones; an unknown id gets the default; no id is nothing", () => {
+    const id = (x: string | null | undefined) => speedOption(x)?.id ?? null;
+    expect(["normal", "variable", "bullet"].map(id)).toEqual(["rapid", "blitz", "bullet"]);
+    // Older still: Slow and Standard were Normal.
+    expect(["slow", "standard"].map(id)).toEqual(["rapid", "rapid"]);
+    expect(["bullet", "blitz", "rapid", "BLITZ", "Rapid"].map(id)).toEqual(["bullet", "blitz", "rapid", "blitz", "rapid"]);
+    expect(["ludicrous", "constructor", "__proto__", "toString", " "].map(id)).toEqual(["blitz", "blitz", "blitz", "blitz", "blitz"]);
+    expect([null, undefined, ""].map(id)).toEqual([null, null, null]);
   });
 });
 
-describe("the speed vote", () => {
-  it("Normal, Variable, Bullet from left to right; nobody votes: Variable", () => {
-    expect(speed.options.map((o) => o.label)).toEqual(["Normal", "Variable", "Bullet"]);
-    expect(speed.options.map((o) => o.id)).toEqual(["normal", "variable", "bullet"]);
-    expect(speed.defaultOption).toBe(1);
-    expect(tallyVotes([], 3, speed.defaultOption, mulberry32(1))).toBe(1);
-    expect(speed.options[1]!.blurb).toBe("10 s, rising to 30 s");
-    expect(speed.options[1]!.detail).toContain("21+: 30 s");
-    // No Slow left anywhere in the votes.
-    expect(PREGAME_VOTES.flatMap((v) => v.options).some((o) => /slow/i.test(o.id + o.label + o.blurb))).toBe(false);
+describe("the bank and the increment, as on a chess clock", () => {
+  const entrants = [
+    { id: "me", name: "Me", isBot: false },
+    { id: "bot", name: "Bot", isBot: true },
+  ];
+  /** A match on these settings, and one move of `thinkMs` for "me" at a time. */
+  const match = (s: Settings) => {
+    let state: MatchState = createMatch(entrants, [0], s);
+    const groups = new Map([[0, ["me"]]]);
+    return {
+      me: () => state.players[0]!,
+      play: (thinkMs: number) => (state = applyRound(state, groups, [{ playerId: "me", roundScore: 0, loss: 0, thinkMs }], s)),
+      set: (bankMs: number) => (state = { ...state, players: state.players.map((p, i) => (i === 0 ? { ...p, bankMs } : p)) }),
+    };
+  };
+
+  it("a fresh bank: each move may take its cap", () => {
+    for (const s of [bullet, blitz, rapid]) expect(allowedMs({ bankMs: s.timeBankSeconds * 1000 }, s)).toBe(s.moveClockSeconds * 1000);
   });
 
-  it("a stale ?speed=slow (or the old 'standard') is Normal; unknown speeds are nothing", () => {
-    expect(speedOption("slow")!.id).toBe("normal");
-    expect(speedOption("standard")!.id).toBe("normal");
-    expect(speedOption("variable")!.patch.moveClockSteps).toEqual(VARIABLE_CLOCK);
-    expect(speedOption("bullet")!.patch.moveClockSeconds).toBe(10);
-    expect(speedOption("ludicrous")).toBeNull();
-    expect(speedOption(null)).toBeNull();
+  it("a quick move banks what the increment didn't use; a slow one pays the rest from the bank", () => {
+    const m = match(bullet);
+    expect(m.me().bankMs).toBe(180_000);
+    m.play(500); // 180 + 2 - 0.5
+    expect(m.me().bankMs).toBe(181_500);
+    m.play(2_000); // the increment exactly: no change
+    expect(m.me().bankMs).toBe(181_500);
+    m.play(7_000); // 5 s from the bank
+    expect(m.me().bankMs).toBe(176_500);
+    // The bank isn't capped at its start: quick moves can take it past 3:00, as in chess.
+    const r = match(rapid);
+    for (let i = 0; i < 10; i++) r.play(1_000);
+    expect(r.me().bankMs).toBe(640_000);
   });
 
+  it("no move takes longer than its cap: a longer think is charged at the cap", () => {
+    for (const s of [bullet, blitz, rapid]) {
+      const m = match(s);
+      m.play(60_000);
+      expect(m.me().bankMs).toBe((s.timeBankSeconds + s.timeIncrementSeconds - s.moveClockSeconds) * 1000);
+    }
+  });
+
+  it("an empty bank still leaves the increment to move; it never goes below zero", () => {
+    const m = match(bullet);
+    m.set(3_000);
+    expect(allowedMs(m.me(), bullet)).toBe(5_000); // 3 s + 2 s, under the 10 s cap
+    m.play(9_000); // charged at the 5 s it had
+    expect(m.me().bankMs).toBe(0);
+    expect(allowedMs(m.me(), bullet)).toBe(2_000);
+    m.play(2_000);
+    expect(m.me().bankMs).toBe(0);
+    m.play(500); // a quick move on an empty bank still banks the rest
+    expect(m.me().bankMs).toBe(1_500);
+  });
+
+  it("the calibration: at a normal pace (7-8 s a move) every option lasts the 20 moves before the final; at the cap, Bullet runs dry first", () => {
+    const BEFORE_FINAL = 20;
+    const left = (s: Settings, thinkMs: number) => {
+      const m = match(s);
+      for (let i = 0; i < BEFORE_FINAL; i++) m.play(thinkMs);
+      return m.me().bankMs;
+    };
+    for (const s of [bullet, blitz, rapid]) expect(left(s, 8_000)).toBeGreaterThan(0);
+    expect([bullet, blitz, rapid].map((s) => left(s, 7_000) / 1000)).toEqual([80, 220, 560]);
+    // At the cap every move: Rapid keeps half, Blitz a minute, Bullet is out just before move 23 (180 / 8 = 22.5).
+    expect([bullet, blitz, rapid].map((s) => left(s, 60_000) / 1000)).toEqual([20, 60, 300]);
+    // Bullet 2+1 would run a 7-8 s player dry before the final: why Bullet is 3+2 (DECISIONS.md).
+    expect(left({ ...bullet, timeBankSeconds: 120, timeIncrementSeconds: 1 }, 8_000)).toBe(0);
+  });
+
+  it("a time control chosen before move 1 sets every bank; once a move is played, banks are never reset", () => {
+    const state = createMatch(entrants, [0], crowd);
+    expect(state.players.map((p) => p.bankMs)).toEqual([600_000, 600_000]);
+    const voted = startBanks(state, blitz);
+    expect(voted.players.map((p) => p.bankMs)).toEqual([300_000, 300_000]);
+    const later = { ...voted, round: 1 };
+    expect(startBanks(later, bullet)).toBe(later);
+    // (A new stage starts its round count at 0 again: still not before move 1.)
+    const nextStage = { ...voted, stage: 1, round: 0 };
+    expect(startBanks(nextStage, bullet)).toBe(nextStage);
+  });
+
+  it("the bots think within 85% of the cap", () => {
+    const rng = mulberry32(4);
+    for (const s of [bullet, blitz, rapid]) {
+      const think = Array.from({ length: 300 }, () => botThinkMs(rng, s, 1));
+      expect(Math.max(...think)).toBeLessThanOrEqual(Math.min(s.botThinkSeconds[1], 0.85 * s.moveClockSeconds) * 1000);
+      expect(Math.min(...think)).toBeGreaterThanOrEqual(s.botThinkSeconds[0] * 1000);
+    }
+  });
+});
+
+describe("pre-game votes: one vote each", () => {
   it("one vote each: the first counts; with voteChangeAllowed a later one replaces it", () => {
     expect(DEFAULT_SETTINGS.voteChangeAllowed).toBe(false);
     const first = castPregameVote([], { playerId: "me", option: 0 }, false)!;
@@ -159,7 +234,7 @@ describe("time's up: everyone who didn't vote joins the winner", () => {
     expect(votes.filter((v) => v.option === 1)).toHaveLength(99);
   });
 
-  it("nobody votes: the option's default wins (Team final, Variable) and everyone goes there", () => {
+  it("nobody votes: the option's default wins (Team final, Blitz) and everyone goes there", () => {
     const labels = PREGAME_VOTES.map((vote) => {
       const { result, votes, joined } = closePregameVote([], everyone, vote, mulberry32(3), join);
       expect(result).toBe(vote.defaultOption);
@@ -167,7 +242,7 @@ describe("time's up: everyone who didn't vote joins the winner", () => {
       expect(votes.map((v) => v.option)).toEqual(everyone.map(() => vote.defaultOption));
       return vote.options[result]!.label;
     });
-    expect(labels).toEqual(["Team final", "Variable"]);
+    expect(labels).toEqual(["Team final", "Blitz 5+3"]);
   });
 
   it("everyone voted: nobody joins", () => {

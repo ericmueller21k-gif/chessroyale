@@ -43,7 +43,13 @@ record it in `DECISIONS.md`.
      must be beyond any player's reach. Never skimp on the server when it's needed; never use it when a device would
      do.
 - Never merge red: every PR runs the typecheck and unit tests on GitHub (`.github/workflows/check.yml`); wait for it
-  to pass, and run the e2e suite (`npm run e2e`) yourself before merging anything that changes gameplay or screens.
+  to pass, and run the e2e lane below yourself before merging anything that changes gameplay or screens.
+- **Test lanes** (Eric, Oct 13: "why are we going through so many checks for changing numbers?"):
+  - **Light lane** (numbers or data in settings or vote data, copy, CSS-only, docs): `check`, plus the e2e specs for
+    the screens touched, plus the live check after the deploy. No sims: estimate instead.
+  - **Full lane** (rules logic, the server, the protocol, stored data, the board or shared components, anything
+    spanning many screens): the whole `npm run e2e`.
+  - When unsure, the full lane.
 - Classic (8 boards) will be reworked (Eric, Oct 5, 2026): don't invest in it until he decides the new design.
 - Merge PRs with a **merge commit**, not squash: the working branch then stays part of `main`'s history, so the next
   push is a plain fast-forward (squash merges left the branch diverged, needing a force-push). After merging, bring

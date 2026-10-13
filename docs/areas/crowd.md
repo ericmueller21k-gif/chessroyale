@@ -22,19 +22,27 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   (`knockoutsPerStage`; in 50 v 50 the same number from each team). The cut is a judgement: every player's pawn in a
   10 × 10 grid, the gavel, the verdict, "Why was I cut?" (the elimination breakdown). `stageBreakSeconds` 10.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
-  on an empty board (or tapping a card): how it ends (**team final**, **boss battle**, **duel**) and how fast it is
-  (normal 20 s, variable, …). The options and what they change are plain data in `packages/core/src/votes.ts`.
-  Non-voters (and `voteBotSkip` of the bots) join the winner.
+  on an empty board (or tapping a card): how it ends (**team final**, **boss battle**, **duel**), then "How fast?", a
+  chess time control (**Bullet 3+2**, **Blitz 5+3**, **Rapid 10+5**; Blitz when nobody votes). The options and what
+  they change are plain data in `packages/core/src/votes.ts` (a time control is one `timeControl(...)` entry: its bank,
+  increment and cap; the card's label and blurb are made from them). Non-voters (and `voteBotSkip` of the bots) join
+  the winner. `?speed=bullet|blitz|rapid` skips the vote for tests (old ids map over: normal → rapid, variable →
+  blitz; an unknown id gets Blitz).
 - **The endings.** Team final: `teamFinalSizes` players a side, the weakest out every `teamFinalMovesPerStep`.
   Boss battle: the last 10 against a boss (the God King joins). Duel: the last two. `finalMaxTurns` caps a final; the
   engine adjudicates.
-- **The clock:** each move has its own clock (20 s in Crowd unless the vote changes it, `moveClockAt`; the bars along
-  the board's top and bottom edges, which draw behind everything on and around the board) and each player a **time
-  bank** for the match (`timeBankSeconds`, 10 minutes) with **+5 s added at the start of every move**
-  (`timeIncrementSeconds`). A move
-  takes what you think beyond those 5 s out of the bank (at most 15 s a move); a quicker move adds the rest to it, so
-  the bank can sit near 10:00 all game (Eric asked on Oct 11; see `DECISIONS.md`). The board's clock shows this move's
-  seconds and your bank, draining live from bank + 5 s as you think; the scoreboard's BANK updates after each move.
+- **The clock is a chess time control** (Eric, Oct 13): a **time bank** for the match (`timeBankSeconds`), an
+  **increment added at the start of every move** (`timeIncrementSeconds`) and a **cap** on any one move
+  (`moveClockSeconds`, read through `moveClockAt`), because 50 people pick together and every turn has to end. A move
+  takes what you think beyond the increment out of the bank; a quicker move banks the rest, as on a chess clock (the
+  bank isn't capped at its start). An empty bank still leaves the increment. The clock vote sets all three; the match is
+  made with the default bank, so the vote's patch resets every bank before move 1 (`startBanks`, from
+  `MatchRunner.patchSettings`). Without the vote (votes off, everyone moves, raids) it's Rapid 10+5, 20 s a move. Only
+  your own team's moves run your clock. The board's clock shows this move's seconds and your bank, draining live from
+  bank + increment as you think; the scoreboard's BANK updates after each move. Online, each `round` message carries
+  the move's cap (`moveClock`) and the increment (`increment`), so a reloaded app has them. The finals (team final,
+  duel, boss battle) use the same bank, increment and cap; how many moves each bank lasts is in `DECISIONS.md`, "Crowd
+  50 v 50: three chess time controls".
 - **Power-ups:** 3 at the start in Crowd (`powerUpsAtStart`); one shows the engine's top 3 moves for that turn.
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
   tallies, an optional motion trail, the eval bar (unless switched off in Settings: [hub.md](hub.md)), the scoreboard
@@ -60,12 +68,17 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 ## Settings
 
 `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS`, `CROWD_EVERYONE_KNOCKOUTS`, `PACE_SETTINGS`
-(relaxed/quick; tests use quick), `VARIABLE_CLOCK`, the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`.
+(relaxed/quick; tests use quick), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
+`moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
+time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
 
 ## Tests and tools
 
 - Unit: `packages/core/test/match.test.ts`, `scoring.test.ts`, `votes.test.ts`, `brilliance.test.ts`,
-  `packages/chess/test/crowd.test.ts`, `runner.test.ts`, `replay-cache.test.ts`, `long-match.test.ts`.
+  `packages/chess/test/crowd.test.ts`, `runner.test.ts`, `replay-cache.test.ts`, `long-match.test.ts`. The clock vote:
+  `votes.test.ts` (each time control, the bank maths, the calibration), `crowd.test.ts` (the runner) and
+  `packages/server/test/lobby.test.ts` ("the clock vote online"); e2e `votes.spec.ts` (Bullet's clock, solo and online)
+  and `formats.spec.ts` (the cards set the clock).
 - e2e: `e2e/crowd.spec.ts`, `formats.spec.ts`, `votes.spec.ts`, `match-screen.spec.ts`, `panel.spec.ts`,
   `solo.spec.ts`, `multiplayer.spec.ts`, `castling.spec.ts`, `perf.spec.ts`.
 - Frames: `npm run frames:boss` (one move, real taps), `frames:flash` (white flashes), `frames:vote`, `frames:chat`.

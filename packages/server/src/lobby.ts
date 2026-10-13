@@ -1249,8 +1249,9 @@ export class LobbyCore {
         botsDoneIn: final ? {} : runner.botThinkTimes(),
         slots: this.slots(),
         ...(watching ? { watching: true } : {}),
-        // This move's clock (the Variable speed's rises as the game goes on).
+        // This move's clock and the time control's increment (the clock vote sets both), for the clock on screen.
         moveClock: runner.moveClock(),
+        increment: runner.settings.timeIncrementSeconds,
         ...(bossNow ? { boss: bossNow } : {}),
       });
       if (final) this.send(h.id, { t: "final", final: runner.finalView()!, standings: st, slots: this.slots() }, !inRound.has(h.id));
