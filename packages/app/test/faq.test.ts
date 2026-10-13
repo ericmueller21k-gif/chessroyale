@@ -230,7 +230,10 @@ describe("the FAQ on Squads' modes and Mercenary", () => {
     expect(t).toContain("Mercenary adds coins");
     expect(t).toContain("coming soon");
     expect(t).toContain(`a knight or bishop ${M.capture.n}`);
-    expect(t).toContain(`winning the match ${M.matchWin}`);
+    expect(t).toContain(`every match your squad plays pays ${M.played} coins when it ends, win or lose, and winning it pays ${M.matchWin} more`);
+    expect(t).toContain(`a board pays double in Pairs and ${M.roundScale[2]} times as much in the final`);
+    expect(t).toContain(`A brilliant move pays ${M.brilliant.coins}, at most ${M.brilliant.capPerMatch} times per squad per match`);
+    expect(t).not.toMatch(/breather/i);
     expect(t).toContain(`Stockfish token (${M.items.stockfish.price} coins, up to ${M.items.stockfish.cap} a round)`);
     expect(t).toContain(`Shield (${M.items.shield.price} coins`);
     expect(t).toContain(`${M.priceStep} coins more for every one`);

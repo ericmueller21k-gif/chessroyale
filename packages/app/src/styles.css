@@ -13149,7 +13149,6 @@ button.sq-tiny {
 :root {
   --mc-gold: #b7791f;
   --mc-stockfish: #0f8f80;
-  --mc-breather: #0284c7;
   --mc-shield: #7c3aed;
   --mc-time: #15803d;
 }
@@ -13157,7 +13156,6 @@ button.sq-tiny {
   :root:not([data-theme="light"]) {
     --mc-gold: #f2c14e;
     --mc-stockfish: #2dd4bf;
-    --mc-breather: #38bdf8;
     --mc-shield: #a78bfa;
     --mc-time: #4ade80;
   }
@@ -13165,7 +13163,6 @@ button.sq-tiny {
 :root[data-theme="dark"] {
   --mc-gold: #f2c14e;
   --mc-stockfish: #2dd4bf;
-  --mc-breather: #38bdf8;
   --mc-shield: #a78bfa;
   --mc-time: #4ade80;
 }
@@ -13202,9 +13199,6 @@ button.sq-tiny {
 }
 .mc-icon-stockfish {
   color: var(--mc-stockfish);
-}
-.mc-icon-breather {
-  color: var(--mc-breather);
 }
 .mc-icon-shield {
   color: var(--mc-shield);

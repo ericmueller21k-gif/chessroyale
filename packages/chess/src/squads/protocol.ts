@@ -26,8 +26,11 @@ import type { SquadsMode, SquadsRules, SquadsVoteId } from "./votes.ts";
  * wallets and shop (`wallets` in the lobby and as a message, `buy`/`unbuy`, "bought", "shopNo", "coins"), items in a
  * match (`mode`, `delays`, `kit`, `stockfish`, `shields`, `assists`, `coins`; `assist` both ways, "assistNo"), coins
  * as "coins" events in a half, shielded blocks, and brilliant moves ("coins" with why "brilliant").
+ * Version 4 (Oct 13, 2026): Eric's first Mercenary changes. The Breather is gone from the items (and with it the
+ * match's per-side free seconds, `delays`); a brilliant move past its squad's cap for the match comes as "coins" with
+ * 0 coins and `capped`; the base for playing a match is a "coins" event (why "played").
  */
-export const SQUADS_PROTOCOL = 3;
+export const SQUADS_PROTOCOL = 4;
 
 /** A squad's placement: 1st, 2nd, 3rd-4th (out in round 2), 5th-8th (out in round 1). */
 export type SquadsPlacement = 1 | 2 | 3 | 5;
@@ -218,8 +221,6 @@ export interface NetSquadsMatch {
   tokenLog: TokenUse[];
   /** Classic or Mercenary. */
   mode: SquadsMode;
-  /** Each side's free seconds a move (ms): `delayMs`, more with a breather (Mercenary). */
-  delays: [number, number];
   /** Mercenary: what each side brought from the shop (null in Classic, or until the first half). */
   kit: [Record<MercItem, number>, Record<MercItem, number>] | null;
   /** Mercenary: each side's Stockfish tokens and shields left (tokens used this half are paid at once: "assist"). */
@@ -366,9 +367,10 @@ export type SquadsServerMessage = { now: number } & (
   | { t: "shopNo"; item: string; reason: ShopError }
   /**
    * Mercenary: coins outside a half's events: catch-up as a match is set (`against`: the squad that had earned more), a
-   * brilliant move once the judge has seen it (`key`, `board`, `move`, `by`: who found it), a test lobby's wallet.
+   * brilliant move once the judge has seen it (`key`, `board`, `move`, `by`: who found it; `capped`: past the squad's
+   * cap for the match, so 0 coins), a test lobby's wallet.
    */
-  | { t: "coins"; squadId: number; coins: number; why: CoinWhy; key?: string; board?: number; move?: string; by?: string[]; against?: number }
+  | { t: "coins"; squadId: number; coins: number; why: CoinWhy; key?: string; board?: number; move?: string; by?: string[]; against?: number; capped?: boolean }
   /**
    * Your squad's placement is decided (it's out, or it won): your reward (coins, crates), `recorded` if it went on your
    * profile (signed in, still playing your seat, not a test lobby).

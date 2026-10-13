@@ -27,14 +27,6 @@ export function ItemIcon({ item, size = 22 }: { item: MercItem; size?: number })
           <circle cx="8.2" cy="11" r="1.3" fill="var(--mc-icon-eye, #fff)" />
         </svg>
       );
-    case "breather":
-      return (
-        <svg {...common} fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-          <path d="M3 8.5h11a3 3 0 1 0-3-3" />
-          <path d="M3 13h15a3 3 0 1 1-3 3" />
-          <path d="M3 17.5h7" />
-        </svg>
-      );
     case "blocks":
       return <LockIcon size={size} />;
     case "shield":
@@ -171,8 +163,8 @@ function ShopSheet({ client, w, round, explain, onExplained, onHide }: { client:
         <div class="mc-explain" role="note">
           <strong>Mercenary</strong>
           <span>
-            Your squad shares one wallet. Coins come from captures, wins, mates and brilliant moves; the squad that has
-            earned less gets catch-up coins. Anyone on your squad can buy, and items last for your next match only: use them
+            Your squad shares one wallet. Every match you play pays coins, more for a win; captures, mates and brilliant
+            moves add to it, and the squad that has earned less gets catch-up coins. Anyone on your squad can buy, and items last for your next match only: use them
             or lose them. Each item costs {SQUADS.mercenary.priceStep} more for every one your squad has already bought.
           </span>
           <button type="button" class="fd-btn small" onClick={onExplained}>
@@ -200,7 +192,7 @@ function ShopSheet({ client, w, round, explain, onExplained, onHide }: { client:
       )}
       <ul class="mc-items">
         {rows.map((r) => {
-          const t = itemText(r.item, SQUADS, client.lobby?.rules?.clock.delaySeconds);
+          const t = itemText(r.item, SQUADS);
           return (
             <li key={r.item} class={`mc-item${r.count ? " in" : ""}`}>
               <span class="mc-item-icon">

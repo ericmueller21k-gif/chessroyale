@@ -1537,7 +1537,7 @@ export interface SquadsClock {
   incrementSeconds: number;
 }
 /** Mercenary's items, in the shop's order (strongest first: DECISIONS.md, "Squads modes: Mercenary"). */
-export type MercItem = "stockfish" | "breather" | "blocks" | "shield" | "time";
+export type MercItem = "stockfish" | "blocks" | "shield" | "time";
 /**
  * Mercenary (Eric, Oct 12; renamed from Pillage the same night): each squad has one shared coin wallet for the
  * tournament, earned by play and carried from round to round. After each round, squads still in may spend it in a
@@ -1546,21 +1546,32 @@ export type MercItem = "stockfish" | "breather" | "blocks" | "shield" | "time";
  * `cap` of an item for one round. Every number here; the rules are `packages/chess/src/squads/mercenary.ts`.
  */
 export interface MercenarySettings {
+  /**
+   * The base: every match a squad plays pays this at its end, win or lose (a drawn final's Armageddon doesn't pay it
+   * again). Most of a squad's coins, like a Counter-Strike round's payout; play adds the rest.
+   */
+  played: number;
   /** Coins for a capture, by the piece taken (en passant: a pawn). */
   capture: { p: number; n: number; b: number; r: number; q: number };
   /** A board won (any way: mate, or material at the safety cap), and extra for a checkmate; a drawn board, each side. */
   boardWin: number;
   mate: number;
   boardDraw: number;
+  /**
+   * A board's coins (captures, win, mate, draw) are multiplied by this in each round (Relay, Pairs, the final): fewer
+   * boards, more each, so every round pays about the same.
+   */
+  roundScale: readonly [number, number, number];
   /** Winning a match (going through to the next round). */
   matchWin: number;
   /**
    * A brilliant move: a quiet move (no capture, not out of check) that the judge (the bot engine's top moves, from
    * players' devices, as for same-move tokens) rates the best by at least `gap` of expected score over every other
    * move, from ply `fromPly` on, in a position still in the balance (the best's expected score within `decided` of
-   * neither end). Never one played with a Stockfish token.
+   * neither end). Never one played with a Stockfish token. It pays `coins`, at most `capPerMatch` times per squad per
+   * match (Eric, Oct 13: "How could one move be more than winning an entire game?"); past that it's still announced.
    */
-  brilliant: { coins: number; gap: number; fromPly: number; decided: number };
+  brilliant: { coins: number; capPerMatch: number; gap: number; fromPly: number; decided: number };
   /**
    * Catch-up: when a match of round 2 or the final is set, the squad that has earned fewer coins in the tournament
    * (by play) gets `share` of the difference, to the nearest `round`, at most `max`.
@@ -1574,8 +1585,6 @@ export interface MercenarySettings {
   timeSeconds: number;
   /** Block points: added to the squad's block bank for its next match. */
   blockPoints: number;
-  /** A breather multiplies the squad's free seconds a move for its next match (sudden death's time a move too). */
-  breatherFactor: number;
   /** A Stockfish token: your own top `lines` moves for one decision, searched on your device at `nodes`. */
   stockfish: { lines: number; nodes: number };
   /** A test lobby that starts after round 1 (the rounds before skipped): each squad's wallet to shop with. */
@@ -1818,35 +1827,38 @@ export const SQUADS: SquadsSettings = {
     minThinkSeconds: 1.5,
   },
   modeVote: { classicLean: [0.35, 0.75] },
-  // Calibrated by reports/squads-mercenary.md (DECISIONS.md, "Squads modes: Mercenary"): a squad that wins Relay has
-  // about 600 coins to shop with before Pairs, about 700 before the final (it spends some on the way); a lobby takes
-  // about a minute longer than Classic (the time coins and breathers bought: more time to think).
+  // Calibrated by reports/squads-mercenary.md (DECISIONS.md, "Mercenary: Eric's first changes"): a squad that wins a
+  // round earns about 600-700 (most of it the base), two squads meeting are within a few percent of each other's
+  // coins earned, and a lobby takes a little longer than Classic (the time coins bought: more time to think).
   mercenary: {
-    capture: { p: 3, n: 9, b: 9, r: 15, q: 27 },
-    boardWin: 50,
-    mate: 50,
+    // Eric, Oct 13: a steady base (every match played) with play on top, like CS or Valorant; each round should buy
+    // a Stockfish token, a time reload and a block or shield, and a very good one a second token.
+    played: 200,
+    capture: { p: 1, n: 3, b: 3, r: 5, q: 9 },
+    boardWin: 40,
+    mate: 25,
     boardDraw: 15,
-    matchWin: 75,
-    brilliant: { coins: 75, gap: 0.5, fromPly: 16, decided: 0.1 },
-    catchUp: { share: 0.5, max: 300, round: 10 },
+    roundScale: [1, 2, 4],
+    matchWin: 150,
+    // A brilliant move: 25, never more than a board won (Eric, Oct 13); twice per squad per match at most.
+    brilliant: { coins: 25, capPerMatch: 2, gap: 0.5, fromPly: 16, decided: 0.1 },
+    catchUp: { share: 0.5, max: 150, round: 10 },
     priceStep: 100,
     items: {
       stockfish: { price: 200, cap: 2 },
-      breather: { price: 150, cap: 1 },
       blocks: { price: 100, cap: 2 },
       shield: { price: 100, cap: 2 },
       time: { price: 75, cap: 2 },
     },
     timeSeconds: 30,
     blockPoints: 3,
-    breatherFactor: 2,
     stockfish: { lines: 3, nodes: 300_000 },
     testWallet: 600,
     bots: {
       shopSeconds: [3, 9],
       saveChance: 0.25,
       spend: [0.5, 0.9],
-      weights: { stockfish: 0.5, breather: 1, blocks: 3, shield: 2, time: 2 },
+      weights: { stockfish: 0.5, blocks: 3, shield: 2, time: 2 },
       stockfishChance: 0.04,
       stockfishSharp: 0.35,
       sharpGap: 0.2,

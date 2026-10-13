@@ -221,9 +221,7 @@ function ClockLine({ client, m }: { client: SquadsClient; m: LocalMatch }) {
   const mine = sideIn(m, client.myId);
   const order: Side[] = mine === 1 ? [1, 0] : [0, 1];
   const live = m.state === "half" && m.current;
-  // (Your squad's free seconds, or the side to move on the board: a breather gives a squad more.)
-  const freeSide: Side = mine ?? (m.current?.duties[0]?.side ?? 0);
-  const free = live ? Math.max(0, m.current!.startedAt + freeMs(m, freeSide) - now) : 0;
+  const free = live ? Math.max(0, m.current!.startedAt + freeMs(m) - now) : 0;
   const clockOf = (side: Side) => {
     const bankMs = liveBank(m, side, now);
     return { squadId: m.sides[side].squadId, bankMs, suddenDeath: bankMs <= 0, rate: drainRate(m, side, now), key: m.key };
@@ -692,7 +690,7 @@ function StockfishToken({
 
 /**
  * Mercenary: both squads' coins and what they brought to this match that's still to use (Stockfish tokens and shields
- * left, a breather), always on screen for both (counterplay).
+ * left), always on screen for both (counterplay).
  */
 function KitLine({ client, m, mine }: { client: SquadsClient; m: LocalMatch; mine: Side | null }) {
   const order: Side[] = mine === 1 ? [1, 0] : [0, 1];
@@ -700,7 +698,7 @@ function KitLine({ client, m, mine }: { client: SquadsClient; m: LocalMatch; min
     <div class="mc-kitline" aria-label="Coins and items">
       {order.map((side) => {
         const w = walletOf(client.wallets, m.sides[side].squadId);
-        const left = { stockfish: Math.max(0, stockfishLeft(m, side)), breather: m.kit?.[side]?.breather ? 1 : 0, blocks: 0, shield: m.shields?.[side] ?? 0, time: 0 };
+        const left = { stockfish: Math.max(0, stockfishLeft(m, side)), blocks: 0, shield: m.shields?.[side] ?? 0, time: 0 };
         return (
           <span key={side} class={`mc-kitline-side${side === mine ? " you" : ""}`}>
             <SquadTag id={m.sides[side].squadId} you={side === mine} />
@@ -861,7 +859,7 @@ function DutyPanel({
     return (
       <div class="sq-duty move">
         <strong>{mine ? `You played ${san(mine)}` : "Your move"}</strong>
-        <span class="muted small">{mine ? "Tap a tiny board to watch it." : `${Math.round(freeMs(m, sideIn(m, client.myId) ?? 0) / 1000)} s free, then your squad's clock runs.`}</span>
+        <span class="muted small">{mine ? "Tap a tiny board to watch it." : `${Math.round(freeMs(m) / 1000)} s free, then your squad's clock runs.`}</span>
         {placedLine}
         {blockButton}
         {shieldLine}
