@@ -8,8 +8,9 @@ import { BOARD_SEL, createLobbyFromHome, engineTop, test, watchFor } from "./hel
  * (a center pawn three squares, LONG PULL!), a lasso drag (?power=drag: from turn 2; LASSO!, one of your pieces one
  * square, never the king), and SHOWDOWN! (?power=showdown: searched by this device's engine at his next turn; perhaps
  * "Not yet..." first), the line-up yanked into the middle, "DRAW!", and the forced duel: only the duels can be played.
- * Then his reply: he takes back, the engine's best at full strength, never his brain's (Eric, Oct 13: on Maia at 600 he
- * took another piece and lost his queen for free); on the phone you're an admin, so his brain is Maia, as Eric's was.
+ * Then his reply: the engine's best at full strength, the reply the search scored, never his brain's (Eric, Oct 13: on
+ * Maia at 600 he took another piece and the crowd won his queen for free); taking back when that's the best. On the
+ * phone you're an admin, so his brain is Maia, as Eric's was.
  * Then online (one run): the host's engine lines the showdown up, the server checks it and sends it to everyone, and
  * the host plays his reply.
  */
@@ -115,27 +116,29 @@ async function bestReply(page: Page, fen: string, duel: string): Promise<string>
   expect(line, `a reply to ${duel}`).toBeTruthy();
   return line!.move;
 }
-/** A duel whose best reply takes back on its square (his pieces in a line-up are protected), and that reply. */
-async function duelTakenBack(page: Page, fen: string, duels: readonly string[]): Promise<{ duel: string; reply: string }> {
-  const seen: string[] = [];
-  for (const duel of duels) {
-    const reply = await bestReply(page, fen, duel);
-    if (reply.slice(2, 4) === duel.slice(2, 4)) return { duel, reply };
-    seen.push(`${duel}: ${reply}`);
-  }
-  throw new Error(`no duel whose best reply takes back: ${seen.join(", ")}`);
+/** Takes back on the duel's square (the crowd's piece that just took his). */
+const takesBack = (duel: string, reply: string) => reply.slice(2, 4) === duel.slice(2, 4);
+/**
+ * A duel to play and his best reply to it. The engine's best reply isn't always taking back: in a line-up the other
+ * pairs face each other too, so it can be another capture first (his knight taking the crowd's, the queen taken back
+ * later). So a duel whose best reply takes back, when there is one; else the first.
+ */
+async function duelAndReply(page: Page, fen: string, duels: readonly string[]): Promise<{ duel: string; reply: string }> {
+  const each: { duel: string; reply: string }[] = [];
+  for (const duel of duels) each.push({ duel, reply: await bestReply(page, fen, duel) });
+  console.log(`Wrangler's best replies: ${each.map((x) => `${x.duel} ${x.reply}${takesBack(x.duel, x.reply) ? " (takes back)" : ""}`).join(", ")}`);
+  return each.find((x) => takesBack(x.duel, x.reply)) ?? each[0]!;
 }
 /**
- * After the duel: your move again, his reply on the board after it, taking back on the duel's square, and the engine's
- * best (`reply`).
+ * After the duel: your move again, and his reply on the board after it: exactly the engine's best at full strength
+ * (`reply`, the move the search scored), whatever his brain; taking back when that's the best.
  */
 async function checkReply(page: Page, ply: number, duel: string, reply: string) {
   await yourMove(page);
   const after = await bossNow(page);
   expect(after.board.history[ply]).toBe(duel);
   expect(after.board.history[ply + 1]).toBe(reply);
-  expect(reply.slice(2, 4)).toBe(duel.slice(2, 4));
-  expect(new Chess(after.board.fen).get(duel.slice(2, 4) as never)).toMatchObject({ color: after.crowdSide === "w" ? "b" : "w" });
+  if (takesBack(duel, reply)) expect(new Chess(after.board.fen).get(duel.slice(2, 4) as never)).toMatchObject({ color: after.crowdSide === "w" ? "b" : "w" });
 }
 
 /** Your profile says you're an admin (as /api/me does for an email in ADMIN_EMAILS): every boss on Maia for you. */
@@ -258,7 +261,7 @@ test("Wrangler's long pull as his first move, then a lasso drag (?power=drag)", 
   expect(errors).toEqual([]);
 });
 
-test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle, DRAW!, only the duels can be played, and he takes back", async ({ page }) => {
+test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle, DRAW!, only the duels can be played, and his reply is the engine's best", async ({ page }) => {
   test.setTimeout(7 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -297,10 +300,10 @@ test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle
   await page.waitForTimeout(800);
   expect(await phase(page)).toBe("play");
   expect((await bossNow(page)).board.history.length).toBe(b.board.history.length);
-  // A duel: played as a normal move (the crowd's piece takes his). Then his reply: he takes back, the engine's best at
-  // full strength (what the search scored), whatever his brain.
+  // A duel: played as a normal move (the crowd's piece takes his). Then his reply: the engine's best at full strength
+  // (what the search scored), whatever his brain: taking back, when that's the best.
   if (admin) expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Maia \d+ · no guard/);
-  const { duel, reply } = await duelTakenBack(page, b.board.fen, b.powers.allowed as string[]);
+  const { duel, reply } = await duelAndReply(page, b.board.fen, b.powers.allowed as string[]);
   await play(page, duel);
   await checkReply(page, b.board.history.length, duel, reply);
   if (admin) expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Maia \d+ · no guard · Stockfish's best \(power reply\)$/);
@@ -311,7 +314,7 @@ test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle
   expect(errors).toEqual([]);
 });
 
-test("Wrangler online: the host's engine lines up the showdown, the server checks it, the duel is forced, and he takes back", async ({ page }) => {
+test("Wrangler online: the host's engine lines up the showdown, the server checks it, the duel is forced, and his reply is the engine's best", async ({ page }) => {
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   const errors: string[] = [];
@@ -338,7 +341,7 @@ test("Wrangler online: the host's engine lines up the showdown, the server check
   await page.waitForTimeout(800);
   expect(await phase(page)).toBe("play");
   // (The best of them: one that loses outright would be taken back by the God King's Last Stand.) His reply, from
-  // the host (this page) through the server: he takes back, the engine's best at full strength.
+  // the host (this page) through the server: the engine's best at full strength.
   const duel = await bestDuel(page, b.board.fen, b.powers.allowed as string[]);
   const reply = await bestReply(page, b.board.fen, duel);
   await play(page, duel);

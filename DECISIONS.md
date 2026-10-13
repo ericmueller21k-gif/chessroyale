@@ -2707,6 +2707,13 @@ slip or stumble (`BossMoveKind` "best", `bestReplyFrom` in `runner.ts`). All his
   allowed move, as it does for every boss move then; that case can't be Stockfish quality, and the engine server isn't
   asked for boss moves.
 
+**Found while testing: the engine's best reply isn't always taking back.** In a line-up the other pairs face each other
+too, so after a duel his best reply can be another capture first (in one e2e game all three duels' best replies were
+his knight taking the crowd's line-up knight, the queen to be taken back a move later). The fix plays that move, as the
+search scored it; but his moves after it are his brain's again, so where the engine's line needs a second move of his
+(taking the queen back next), a weak brain can still miss it. Not changed here (the brief: one reply); the three-round
+Showdown (his replies Stockfish's on every duel turn) covers it.
+
 **Other powers checked for the same gap** (a power whose engine check assumes a boss reply that his brain might not
 play). None is as clear-cut; recorded, not changed:
 - **The long pull** and **the lasso drag:** measured against his best ordinary move or with the crowd to move, with no
@@ -2726,5 +2733,6 @@ slip on the same position would take another piece; Maia isn't asked; his next m
 duel on the showdown's turn; the King's strike still staggers; the host's path agrees with solo), and "Wrangler online"
 in `packages/server/test/boss-powers-lobby.test.ts` (a lobby of admins on Maia with slips on: the reply's request says
 `best`, without the brain or a slip, the host's answer is the recapture and everyone gets it, and the next request is
-the brain's again). Both fail without the fix. e2e: `e2e/pig.spec.ts` plays a duel and checks his reply takes back,
-the engine's best at full strength (solo on a phone as an admin, on his Maia brain; on a computer; and online).
+the brain's again). Both fail without the fix. e2e: `e2e/pig.spec.ts` plays a duel and checks his reply is exactly
+the engine's best at full strength, taking back when that's the best (solo on a phone as an admin, on his Maia brain;
+on a computer; and online).

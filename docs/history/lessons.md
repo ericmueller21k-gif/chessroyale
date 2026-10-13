@@ -676,15 +676,16 @@ Wrangler didn't take back: he took a different piece, so Eric won a queen for fr
 600 · no guard".
 
 **The cause:** two parts that were each right on their own. The showdown's search picks a line-up by reading each
-position after a duel with the engine's best reply (the recapture), so a line-up "leaves him a little ahead" only if he
-plays that reply. But his next move came from his brain, like any other: on Maia at 600 with no guard (or a slip, on
+position after a duel with the engine's best reply (usually taking back), so a line-up "leaves him a little ahead" only
+if he plays that reply. But his next move came from his brain, like any other: on Maia at 600 with no guard (or a slip, on
 Stockfish), which can miss it. The tests checked the line-up, the forced duel and the brain separately, and the e2e
 stopped at the duel; nothing played the move after it.
 
 **The fix:** a power's follow-up that its engine search scored is played by the engine at full strength
 (`BossRules.bestReply`: the runner's "best" kind, the server's `bossRequest.best`), never the brain, a slip or a
 stumble. Unit tests on Maia at 600 with every move a slip (solo and online) fail without it; the e2e plays the duel and
-checks his reply.
+checks his reply is exactly the engine's best. That e2e also showed the engine's best reply isn't always the take-back
+(another capture can come first), so a power's scored line can need more than one move of his.
 
 **The rule:**
 - When a power's engine search scores an outcome that depends on the boss's next move, that move is the engine's
