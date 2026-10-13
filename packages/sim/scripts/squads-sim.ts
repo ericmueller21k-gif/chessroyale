@@ -8,14 +8,18 @@
  * Run: npm run sim:squads -- [lobbies per setting = 12] [nodes = 10000] [clocks: "bank|top-up|free|increment,..." with
  * the bank and top-up as m:ss, e.g. "6:00|1:00|5|0"] (about 35 minutes on 4 cores). Writes reports/squads-sim.md, or the
  * file in SQUADS_SIM_OUT (tuning runs). SQUADS_SIM_MIXES limits the mixes (e.g. "mixed"); SQUADS_SIM_SET overrides
- * settings for a tuning run (JSON merged into SQUADS, e.g. '{"moveCeilingSeconds":20}').
+ * settings for a tuning run (JSON merged into SQUADS, e.g. '{"moveCeilingSeconds":20}'). SQUADS_SIM_MODE=mercenary plays
+ * Mercenary (coins, catch-up, the shop as bots shop, kits, Stockfish tokens; DECISIONS.md, "Squads modes: Mercenary")
+ * and adds the economy's tables; its report goes to reports/squads-mercenary.md unless SQUADS_SIM_OUT says otherwise.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { DEFAULT_SETTINGS, SQUADS, botSkillSpread, shuffle, type Candidate, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, SQUADS, botSkillSpread, shuffle, type Candidate, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
 import type { MoveScore, Opening, UciEngine } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import {
+  MERC_ITEMS,
   NO_INPUTS,
+  applyKits,
   armageddonChooser,
   armageddonStart,
   blockBankNow,
@@ -25,8 +29,19 @@ import {
   botPairPick,
   botRelayMove,
   botVotePick,
+  botShop,
+  botUsesStockfish,
+  buyItem,
   candidatesFrom,
+  catchUpCoins,
   choose,
+  earn,
+  isBrilliant,
+  newWallet,
+  squadsVotes,
+  stockfishNow,
+  takeCart,
+  useStockfish,
   drawBracket,
   formSquads,
   halfDuties,
@@ -59,6 +74,10 @@ import {
   type SquadsMatch,
   type SquadsPlan,
   type SquadsRound,
+  type CoinWhy,
+  type ItemCounts,
+  type SquadsMode,
+  type Wallet,
 } from "@chessroyale/chess/squads";
 import { mean, pct, quantile } from "../src/stats.ts";
 
@@ -78,7 +97,11 @@ function parseClock(text: string, i: number): SquadsClock {
 }
 const S: SquadsSettings = { ...SQUADS, ...(process.env.SQUADS_SIM_SET ? (JSON.parse(process.env.SQUADS_SIM_SET) as Partial<SquadsSettings>) : {}) };
 const CLOCKS: readonly SquadsClock[] = process.argv[4] ? process.argv[4].split(",").map(parseClock) : S.clocks;
-const OUT = process.env.SQUADS_SIM_OUT ? new URL(`file://${process.env.SQUADS_SIM_OUT}`) : new URL("../../../reports/squads-sim.md", import.meta.url);
+const MODE: SquadsMode = process.env.SQUADS_SIM_MODE === "mercenary" ? "mercenary" : "classic";
+const MERC = MODE === "mercenary";
+const OUT = process.env.SQUADS_SIM_OUT
+  ? new URL(`file://${process.env.SQUADS_SIM_OUT}`)
+  : new URL(MERC ? "../../../reports/squads-mercenary.md" : "../../../reports/squads-sim.md", import.meta.url);
 
 // ---- What's simulated ----
 
@@ -182,8 +205,43 @@ interface MatchStat {
   timeGap: number;
   armageddon: { seconds: number; turns: number; winner: "w" | "b"; reason: string } | null;
 }
+/** Mercenary: a squad's coins earned in one round (its match, and Armageddon after a drawn final), by source. */
+interface EconEarned {
+  round: number;
+  won: boolean;
+  byWhy: Partial<Record<CoinWhy, number>>;
+  total: number;
+}
+/** Mercenary: a squad's shop before a round: its wallet (after catch-up), the catch-up, what it bought and spent. */
+interface EconShop {
+  round: number;
+  wallet: number;
+  catchUp: number;
+  bought: MercItem[];
+  spent: number;
+  capped: number;
+}
+/** Mercenary: a match of round 2 or the final: the earned gap before catch-up, the catch-up, who won. */
+interface EconMatch {
+  round: number;
+  earnedGap: number;
+  catchUp: number;
+  poorerWon: boolean | null;
+  spent: readonly [number, number];
+  moreSpentWon: boolean | null;
+}
+interface EconStat {
+  earned: EconEarned[];
+  shops: EconShop[];
+  matches: EconMatch[];
+  assists: number;
+  brilliant: number;
+  shielded: number;
+}
+
 interface LobbyStat {
   cfg: Config;
+  econ: EconStat;
   rounds: MatchStat[][];
   totalSeconds: number;
   lockstepSeconds: number;
@@ -219,7 +277,9 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
   // Every seat a person (so a repeat no-show is handed to a bot), played by a bot at that person's skill.
   const parties = skills.map((skill, i) => ({ id: `p${i}`, members: [{ id: `p${i}`, name: `P${i}`, isBot: false, skill }] }));
   let squads: Squad[] = startTeamClocks(formSquads(parties, [], rng, s).squads, c);
-  const plan: SquadsPlan = planLobby(seed, { start: (["standard", "same", "random"] as const)[index % 3]!, clock: c }, library, s);
+  const plan: SquadsPlan = planLobby(seed, { mode: MODE, start: (["standard", "same", "random"] as const)[index % 3]!, clock: c }, library, s);
+  // Mercenary: every squad's wallet (its people's shopping is played by the bots' policy, `botShop`).
+  const wallets: Wallet[] = squads.map((sq) => newWallet(sq.id));
   let bracket: Bracket = drawBracket(squads.map((x) => x.id), rng);
   const out: LobbyStat = {
     cfg,
@@ -238,8 +298,16 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
     tokens: [],
     blocks: [],
     squadMatches: [0, 0, 0],
+    econ: { earned: [], shops: [], matches: [], assists: 0, brilliant: 0, shielded: 0 },
   };
   const player = (id: string) => squads.flatMap((x) => x.players).find((p) => p.id === id)!;
+  /** Coins each side of the match being played has earned so far, by source. */
+  let matchEarn: [Partial<Record<CoinWhy, number>>, Partial<Record<CoinWhy, number>>] = [{}, {}];
+  const addEarn = (m: SquadsMatch, side: 0 | 1, why: CoinWhy, coins: number) => {
+    const id = m.sides[side].squadId;
+    wallets[id] = earn(wallets[id]!, coins, why, m.round);
+    matchEarn[side][why] = (matchEarn[side][why] ?? 0) + coins;
+  };
 
   async function play(m0: SquadsMatch): Promise<{ match: SquadsMatch; seconds: number }> {
     let m = m0;
@@ -274,7 +342,17 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
         if (!top.length) top = legal.slice(0, 1).map((move) => ({ move, expected: 0.5 }));
         const cands: Candidate[] = candidatesFrom(top, s);
         const who = player(a.p);
-        const skill = squadBotSkill(top, who.replacedByBot ? s.replacementBotSkill : (who.skill ?? s.replacementBotSkill), s);
+        // Mercenary: now and then a Stockfish token (the engine's best, whatever the skill).
+        let assisted = false;
+        if (MERC && stockfishNow(m, inputs, a.d.side) > 0 && botUsesStockfish(rng, top, s)) {
+          const u = useStockfish(m, inputs, a.p, Math.round(a.t), s);
+          if ("inputs" in u) {
+            inputs = u.inputs;
+            assisted = true;
+            out.econ.assists++;
+          }
+        }
+        const skill = assisted ? DEFAULT_SETTINGS.botSkillRange[0] : squadBotSkill(top, who.replacedByBot ? s.replacementBotSkill : (who.skill ?? s.replacementBotSkill), s);
         const partner = a.d.players.length === 2 ? (a.d.players[1 - a.slot] ?? null) : null;
         const partnerChoice = partner ? (inputs.choices[partner] ?? null) : null;
         let move: string;
@@ -313,7 +391,15 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
           const sd = out.suddenDeath[m.sides[e.side].squadId]!;
           sd.round ??= m.round;
         }
+        if (e.kind === "coins") addEarn(m, e.side, e.why, e.coins);
+        if (e.kind === "block" && e.outcome === "shielded") out.econ.shielded++;
         await judge(e, fens, m.round);
+      }
+      // Mercenary: brilliant moves, judged by this engine's top moves (the judge's job on players' devices).
+      for (const cand of res.brilliant) {
+        if (!isBrilliant(cand, await lab.topMoves(cand.fen), s)) continue;
+        addEarn(m, cand.side, "brilliant", s.mercenary.brilliant.coins);
+        out.econ.brilliant++;
       }
       m = res.match;
       // Same-move tokens: the judge (this engine's top moves; on players' devices in a real lobby), at once.
@@ -346,7 +432,7 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
 
   // Each match's length, then the lobby's: a match starts as soon as its two feeder matches (and the bracket's show) are done.
   const ends: number[][] = [];
-  const votes = 2 * (s.voteSeconds + s.voteResultSeconds);
+  const votes = squadsVotes(s).length * (s.voteSeconds + s.voteResultSeconds);
   for (const round of [0, 1, 2] as SquadsRound[]) {
     const stats: MatchStat[] = [];
     ends.push([]);
@@ -354,7 +440,33 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
       const pair = [squads[bm.squads[0]!]!, squads[bm.squads[1]!]!] as const;
       for (const sq of pair) out.suddenDeath[sq.id]!.lastRound = round;
       out.squadMatches[round] += 2;
-      const planned = planMatch(plan, round, bm.index, pair, library, s);
+      let planned = planMatch(plan, round, bm.index, pair, library, s);
+      // Mercenary: catch-up as the match is set, then each squad's shopping (as bots shop), its kit in as it starts.
+      let econMatch: Omit<EconMatch, "poorerWon" | "moreSpentWon"> & { poorer: 0 | 1 | null } = { round, earnedGap: 0, catchUp: 0, spent: [0, 0], poorer: null };
+      if (MERC && round > 0) {
+        const ids = [pair[0].id, pair[1].id] as const;
+        const before = [wallets[ids[0]]!.earned, wallets[ids[1]]!.earned] as const;
+        const cu = catchUpCoins(before, s);
+        const spent: [number, number] = [0, 0];
+        const kits = ([0, 1] as const).map((i) => {
+          if (cu[i]) wallets[ids[i]] = earn(wallets[ids[i]]!, cu[i], "catch_up", round);
+          const w0 = wallets[ids[i]]!;
+          let w = w0;
+          const bought = botShop(squadsRng(seed, "shop", ids[i], round), w0, round === 2, s);
+          for (const item of bought) {
+            const r = buyItem(w, item, s);
+            if ("wallet" in r) w = r.wallet;
+          }
+          spent[i] = w0.coins - w.coins;
+          const t = takeCart(w);
+          wallets[ids[i]] = t.wallet;
+          out.econ.shops.push({ round, wallet: w0.coins, catchUp: cu[i], bought, spent: spent[i], capped: MERC_ITEMS.filter((it) => t.kit[it] >= s.mercenary.items[it].cap).length });
+          return t.kit;
+        }) as [ItemCounts, ItemCounts];
+        planned = applyKits(planned, kits, s);
+        econMatch = { round, earnedGap: Math.abs(before[0] - before[1]), catchUp: Math.max(cu[0], cu[1]), spent, poorer: before[0] === before[1] ? null : before[0] < before[1] ? 0 : 1 };
+      }
+      matchEarn = [{}, {}];
       const played = await play(planned);
       let m = played.match;
       squads = settleTeamClocks(squads, m);
@@ -385,6 +497,18 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
       }
       stat.seconds = seconds;
       stats.push(stat);
+      if (MERC) {
+        for (const side of [0, 1] as const) {
+          const byWhy = matchEarn[side];
+          const total = Object.entries(byWhy).reduce((t, [why, n]) => t + (why === "catch_up" ? 0 : (n ?? 0)), 0);
+          out.econ.earned.push({ round, won: side === stat.winner, byWhy, total });
+        }
+        if (round > 0) {
+          const { poorer, ...rest } = econMatch;
+          const more = rest.spent[0] === rest.spent[1] ? null : rest.spent[0] > rest.spent[1] ? 0 : 1;
+          out.econ.matches.push({ ...rest, poorerWon: poorer === null ? null : stat.winner === poorer, moreSpentWon: more === null ? null : stat.winner === more });
+        }
+      }
       const startAt = round === 0 ? votes : Math.max(ends[round - 1]![2 * bm.index]!, ends[round - 1]![2 * bm.index + 1]!) + s.roundBreakSeconds;
       ends[round]!.push(startAt + seconds);
       bracket = reportWinner(bracket, round, bm.index, winnerSquad(m)!);
@@ -433,7 +557,7 @@ const push = (...l: string[]) => lines.push(...l);
 const table = (head: string[], rows: string[][]) => push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`, ...rows.map((r) => `| ${r.join(" | ")} |`), "");
 
 push(
-  "# Squads: bot simulation",
+  MERC ? "# Squads, Mercenary mode: bot simulation" : "# Squads: bot simulation",
   "",
   `${results.length} full lobbies of 32 (8 squads of 4), ${LOBBIES} for every skill mix × Clock option, from`,
   "`packages/sim/scripts/squads-sim.ts` (`npm run sim:squads`), through the real rules in `packages/chess/src/squads/`.",
@@ -462,7 +586,7 @@ push(
   `- Past the per-move ceiling (${S.moveCeilingSeconds} s) it's missed. They also miss outright (a distraction) ${pct(MISS_CHANCE)} of the time.`,
   "",
   `A half lasts as long as its slowest player, plus the show: ${S.moveShowSeconds} s for a Relay half's moves, ${S.pairRevealSeconds} s for the pair's reveal,`,
-  `${S.finalRevealSeconds} s for the final's reveal. A match starts as soon as its two feeder matches are done, after ${S.roundBreakSeconds} s of bracket; ${f1(2 * (S.voteSeconds + S.voteResultSeconds))} s of votes come first.`,
+  `${S.finalRevealSeconds} s for the final's reveal. A match starts as soon as its two feeder matches are done, after ${S.roundBreakSeconds} s of bracket; ${f1(squadsVotes(S).length * (S.voteSeconds + S.voteResultSeconds))} s of votes come first.`,
   "",
 );
 
@@ -630,6 +754,65 @@ table(
     return [mx.label, String(vs.length), f1(mean(vs.map((v) => v.counted))), pct(vs.filter((v) => v.most >= 3).length / n), pct(vs.filter((v) => v.most === 2 && !v.tie).length / n), pct(vs.filter((v) => v.tie).length / n), pct(vs.filter((v) => v.random).length / n), pct(vs.filter((v) => v.worsePlayed).length / n)];
   }),
 );
+if (MERC) {
+  const M = S.mercenary;
+  const all = results;
+  const coins = (x: number) => Math.round(x).toLocaleString("en");
+  const q = (xs: number[], p: number) => (xs.length ? coins(quantile(xs, p)) : "–");
+  push(
+    "## Mercenary: the economy",
+    "",
+    "Every lobby here is Mercenary. Earning: a capture by the piece taken (" +
+      (["p", "n", "b", "r", "q"] as const).map((k) => `${k.toUpperCase()} ${M.capture[k]}`).join(", ") +
+      `), a board won ${M.boardWin} (a mate ${M.mate} more), drawn ${M.boardDraw} each, a match won ${M.matchWin}, a brilliant move ${M.brilliant.coins}.`,
+    `Catch-up: ${pct(M.catchUp.share)} of the earned gap to the next opponent, at most ${M.catchUp.max}. Prices: ` +
+      MERC_ITEMS.map((it) => `${it} ${M.items[it].price} (cap ${M.items[it].cap})`).join(", ") +
+      `, each +${M.priceStep} for every one already bought. The people's shopping is played by the bots' policy (\`botShop\`): before the final it saves everything ${pct(M.bots.saveChance)} of the time, else spends ${pct(M.bots.spend[0])}–${pct(M.bots.spend[1])} of its wallet; in the final all of it.`,
+    "",
+  );
+  push("### Coins earned per squad per round", "", "Coins by play (catch-up apart), each squad in each match it played (Armageddon with its final).", "");
+  table(
+    ["Round", "All: median", "10th–90th", "Winners: median", "Losers: median", "Captures (mean)", "Board wins", "Mates", "Draws", "Match win", "Brilliant"],
+    [0, 1, 2].map((r) => {
+      const es = all.flatMap((x) => x.econ.earned.filter((e) => e.round === r));
+      const w = es.filter((e) => e.won).map((e) => e.total);
+      const l = es.filter((e) => !e.won).map((e) => e.total);
+      const avg = (why: CoinWhy) => coins(mean(es.map((e) => e.byWhy[why] ?? 0)));
+      return [roundNames[r]!, q(es.map((e) => e.total), 0.5), `${q(es.map((e) => e.total), 0.1)}–${q(es.map((e) => e.total), 0.9)}`, q(w, 0.5), q(l, 0.5), avg("capture"), avg("board_win"), avg("mate"), avg("board_draw"), avg("match_win"), avg("brilliant")];
+    }),
+  );
+  push("### The shop", "", "Each squad still in, as it shops for its next match: its wallet (catch-up included), what it spent, how many items it bought, saved everything, and items at their cap.", "");
+  table(
+    ["Shopping for", "Wallet: median", "10th–90th", "Spent: median", "Items bought (mean)", "Saved everything", "Items at their cap (mean)"],
+    [1, 2].map((r) => {
+      const ss = all.flatMap((x) => x.econ.shops.filter((e) => e.round === r));
+      return [roundNames[r]!, q(ss.map((e) => e.wallet), 0.5), `${q(ss.map((e) => e.wallet), 0.1)}–${q(ss.map((e) => e.wallet), 0.9)}`, q(ss.map((e) => e.spent), 0.5), f1(mean(ss.map((e) => e.bought.length))), pct(ss.filter((e) => !e.bought.length).length / Math.max(1, ss.length)), f1(mean(ss.map((e) => e.capped)))];
+    }),
+  );
+  push("What was bought (per squad shopping, mean):", "");
+  table(
+    ["Shopping for", ...MERC_ITEMS],
+    [1, 2].map((r) => {
+      const ss = all.flatMap((x) => x.econ.shops.filter((e) => e.round === r));
+      return [roundNames[r]!, ...MERC_ITEMS.map((it) => f1(mean(ss.map((e) => e.bought.filter((b) => b === it).length))))];
+    }),
+  );
+  push("### Catch-up and snowballing", "", "Matches of round 2 and the final: the squads' earned gap before catch-up, the catch-up paid, how often the squad that had earned less won, and how often the squad that spent more won.", "");
+  table(
+    ["Round", "Matches", "Earned gap: median", "Catch-up: median", "The poorer squad won", "The squad that spent more won"],
+    [1, 2].map((r) => {
+      const ms = all.flatMap((x) => x.econ.matches.filter((e) => e.round === r));
+      const poorer = ms.filter((m) => m.poorerWon !== null);
+      const spent = ms.filter((m) => m.moreSpentWon !== null);
+      return [roundNames[r]!, String(ms.length), q(ms.map((m) => m.earnedGap), 0.5), q(ms.map((m) => m.catchUp), 0.5), `${pct(poorer.filter((m) => m.poorerWon).length / Math.max(1, poorer.length))} of ${poorer.length}`, `${pct(spent.filter((m) => m.moreSpentWon).length / Math.max(1, spent.length))} of ${spent.length}`];
+    }),
+  );
+  const sm = Math.max(1, all.reduce((t, x) => t + x.squadMatches[1] + x.squadMatches[2], 0));
+  push(
+    `Per squad per match of round 2 and the final: ${f1(all.reduce((t, x) => t + x.econ.assists, 0) / sm)} Stockfish tokens used, ${f1(all.reduce((t, x) => t + x.econ.shielded, 0) / sm)} blocks shielded. Brilliant moves: ${f1(all.reduce((t, x) => t + x.econ.brilliant, 0) / all.length)} a lobby.`,
+    "",
+  );
+}
 push("The \"what this means for fun\" section is written by hand below this line.", "", "<!-- squads-sim: end of generated tables -->", "");
 
 let tail = "";

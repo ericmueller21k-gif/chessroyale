@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FRONT_DOOR, LOBBY_LIFE, SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
-import { SQUADS_PROTOCOL, halfDuties, squadsLegalMoves, type NetSquadsMatch } from "@chessroyale/chess/squads";
+import { SQUADS_PROTOCOL, dutyOf, halfDuties, squadsLegalMoves, squadsVotes, type NetSquadsMatch } from "@chessroyale/chess/squads";
 import { clearTopCache, parseTestClock, partiesFit, squadsClosing, squadsTestAllowed, testLobbyOptions, type LiveMatch } from "../src/squads-lobby.ts";
 import { fallbackTop } from "../src/squads-bots.ts";
 import { squadsLobby } from "./squads-fixture.ts";
@@ -10,7 +10,8 @@ import { squadsLobby } from "./squads-fixture.ts";
  * bracket in real time, bots, missed actions and bot takeover, visibility, the test controls, rewards, and its end.
  */
 
-const VOTES_MS = FRONT_DOOR.fillShowMs + 2 * (SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000;
+/** The votes before the bracket: Mode, Start and Clock. */
+const VOTES_MS = FRONT_DOOR.fillShowMs + squadsVotes().length * (SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000;
 const mineIn = (lm: LiveMatch, id: string) => lm.m.sides.some((x) => x.seats.includes(id));
 
 beforeEach(() => clearTopCache());
@@ -88,8 +89,19 @@ describe("squads lobby: votes and the bracket", () => {
     const L = squadsLobby();
     const a = L.join("Ann");
     L.advance(60_000 + FRONT_DOOR.fillShowMs);
+    // The Mode vote first: "Coming soon" can't be voted for (the bots don't either); Ann votes Mercenary.
+    const mode = L.last(a, "vote")!.vote;
+    expect(mode).toMatchObject({ id: "mode", index: 0, count: 3, result: null });
+    expect(mode.votes.every((v) => v.option === 0 || v.option === 1)).toBe(true);
+    L.core.message(a, { t: "vote", key: mode.key, option: 2 });
+    expect(L.last(a, "voteCast")).toBeUndefined();
+    L.core.message(a, { t: "vote", key: mode.key, option: 1 });
+    expect(L.last(a, "voteCast")).toMatchObject({ playerId: a, option: 1 });
+    L.advance((SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000);
+    const modeResult = L.all(a, "vote").map((x) => x.vote).filter((x) => x.id === "mode").at(-1)!.result!;
+    expect([0, 1]).toContain(modeResult);
     const vote = L.last(a, "vote")!.vote;
-    expect(vote).toMatchObject({ id: "start", index: 0, count: 2, result: null });
+    expect(vote).toMatchObject({ id: "start", index: 1, count: 3, result: null });
     L.core.message(a, { t: "vote", key: vote.key, option: 2 });
     expect(L.last(a, "voteCast")).toMatchObject({ playerId: a, option: 2 });
     L.advance(SQUADS.voteSeconds * 1000);
@@ -103,6 +115,7 @@ describe("squads lobby: votes and the bracket", () => {
     const lobby = L.last(a, "lobby")!.lobby;
     expect(lobby.phase).toBe("bracket");
     expect(lobby.rules).not.toBeNull();
+    expect(lobby.rules!.mode).toBe(modeResult === 1 ? "mercenary" : "classic");
     expect(lobby.bracket.map((b) => [b.key, b.state])).toEqual([
       ["r0m0", "break"],
       ["r0m1", "break"],
@@ -484,7 +497,7 @@ describe("squads lobby: the test lobby from the first vote (/squads/test)", () =
     expect(seats.find((p) => !p.isBot)!.id).toBe(eric);
     L.advance(FRONT_DOOR.fillShowMs);
     expect(L.core.record.phase).toBe("vote");
-    expect(L.last(eric, "vote")!.vote).toMatchObject({ index: 0, id: "start" });
+    expect(L.last(eric, "vote")!.vote).toMatchObject({ index: 0, id: "mode" });
     expect(L.last(eric, "welcome")!.test).toBe(true);
     // Skip votes, then Next round: the bracket from round 1, then on to round 2.
     L.core.message(eric, { t: "nextRound" });
@@ -648,8 +661,9 @@ describe("squads lobby: bots' engine work on players' devices", () => {
   });
 
   it("a bot waits for its devices' answer, then plays from it at once; with no answer, the quick look by its fallback moment", () => {
-    // (A small bank, so bots think for a second or two: less than the devices may take to answer.)
-    const { L, ids, jobs } = withDevices(2, { clock: "40,0,2,0" });
+    // (A small bank, so bots think for a second or two: less than the devices may take to answer. A bigger one than that
+    // would have bots outthink the devices; a smaller one puts squads in sudden death, where bots fall back at once.)
+    const { L, ids, jobs } = withDevices(2, { clock: "60,0,2,0" });
     const found = jobs(ids[0]!)
       .map((job) => {
         const lm = L.core.match(job.id.split("/")[0]!)!;
@@ -661,20 +675,32 @@ describe("squads lobby: bots' engine work on players' devices", () => {
       })
       .filter((x) => !!x);
     expect(found.length).toBeGreaterThan(1);
-    const [first, second] = found as [NonNullable<(typeof found)[0]>, NonNullable<(typeof found)[0]>];
-    const planned = (f: typeof first) => f.lm.half!.startedAt + f.lm.half!.bots[f.bot]!;
+    type Found = NonNullable<(typeof found)[0]>;
+    const planned = (f: Found) => f.lm.half!.startedAt + f.lm.half!.bots[f.bot]!;
+    // (Two bots in different matches, both still waiting once both thinking times have passed: before either's fallback
+    // moment, which comes sooner in sudden death. Answering the first can end its half, if it was the last to act.)
+    const fallbackAt = (f: Found) => f.lm.half!.startedAt + dutyOf(f.lm.m, f.bot)!.duty.deadlineMs - SQUADS_LOBBY.botWork.fallbackMarginMs;
+    const pairs = (found as Found[]).flatMap((a) => (found as Found[]).filter((b) => b.lm !== a.lm && Math.max(planned(a), planned(b)) + 1 < Math.min(fallbackAt(a), fallbackAt(b))).map((b) => [a, b] as const));
+    expect(pairs.length).toBeGreaterThan(0);
+    const [first, second] = pairs[0]!;
     // Its thinking time has passed, but its candidates haven't come: it waits.
     L.advanceTo(Math.max(planned(first), planned(second)) + 1);
     expect(first.lm.half!.inputs.choices[first.bot]).toBeUndefined();
-    // They come (two that agree): it plays one of them at once.
+    // They come (two that agree): it plays at once, from them (its half may be played at once too, if it was the last).
+    // (A bot sometimes plays a random legal move, as in every mode: so what's checked is that it chose now, from them.)
     const top = fallbackTop(first.job.fen, first.job.n);
+    const seq = first.lm.half!.seq;
+    const work = first.lm.half!.work[first.board]!;
     for (const id of ids) L.core.message(id, { t: "botTop", id: first.job.id, top });
-    expect(top.map((m) => m.move)).toContain(first.lm.half!.inputs.choices[first.bot]);
+    expect(work.how).toBe("agreed");
+    expect(work.top!.map((m) => m.move)).toEqual(top.map((m) => m.move));
+    const chosen = first.lm.half?.seq === seq ? first.lm.half.inputs.choices[first.bot] : L.all(ids[0]!, "half").find((h) => h.key === first.lm.key && h.seq === seq)?.events.find((e) => e.kind === "relay" && e.player === first.bot && !e.missed);
+    expect(chosen).toBeDefined();
     // The other job is never answered: past the answer time, its bot plays from the server's quick look.
     const half = second.lm.half!;
-    const work = half.work[second.board]!;
-    L.advanceTo(Math.max(work.sentAt, half.startedAt) + SQUADS_LOBBY.botWork.answerMs + 1);
-    expect(work.how).toBe("fallback");
+    const other = half.work[second.board]!;
+    L.advanceTo(Math.max(other.sentAt, half.startedAt) + SQUADS_LOBBY.botWork.answerMs + 1);
+    expect(other.how).toBe("fallback");
     expect(half.inputs.choices[second.bot]).toBeDefined();
   });
 });

@@ -17,9 +17,10 @@ import {
 } from "./board.ts";
 import { allowedMoves, checkBlock, isBlocked, liftBlocks, type BlockError, type BlockLift, type BlockPiece, type SquadsBlock } from "./blocks.ts";
 import { ROUND_FORMAT, coin, squadsRng, type Squad, type SquadsFormat, type SquadsRound } from "./lobby.ts";
+import { boardCoins, brilliantCandidate, captureCoins, capturedPiece, type BrilliantCandidate, type CapturePiece, type CoinWhy, type ItemCounts } from "./mercenary.ts";
 import { pairSchedule, relaySeat } from "./schedule.ts";
 import type { TokenUse, TokenVerdict } from "./tokens.ts";
-import type { SquadsRules } from "./votes.ts";
+import { modeOf, type SquadsMode, type SquadsRules } from "./votes.ts";
 
 /**
  * One Squads match between two squads, in its round's format: Relay (round 1), Pairs (round 2) or the majority vote
@@ -96,8 +97,58 @@ export interface SquadsMatch {
   blocks: readonly SquadsBlock[];
   /** Every same-move token burned this match, and the judge's verdict once it's in (the post-match breakdown). */
   tokenLog: readonly TokenUse[];
+  /** Classic (no blocks, no coins) or Mercenary (coins earned as "coins" events; items from the shop). */
+  mode: SquadsMode;
+  /** Each side's free time a move (ms): `delayMs`, multiplied for a side with a breather (Mercenary). */
+  delays: readonly [number, number];
+  /** Mercenary: what each side brought from the shop (null in Classic, or before the kit is in). */
+  kit: readonly [ItemCounts, ItemCounts] | null;
+  /** Mercenary: each side's Stockfish tokens and shields left in this match (from its kit). */
+  stockfish: readonly [number, number];
+  shields: readonly [number, number];
+  /** Every Stockfish token used this match: whose lines, where (fair play leaves those moves out). */
+  assists: readonly AssistUse[];
+  /** Mercenary: coins each side has earned in this match so far (its wallet holds the tournament's). */
+  coins: readonly [number, number];
   result: MatchResult | null;
 }
+
+/**
+ * A Stockfish token used (Mercenary): who used it, on which board in which half, the position, and whose screens showed
+ * the lines (the user; in the final the whole squad). Their choices there were made with the engine's moves on screen:
+ * sanctioned help, never fair-play evidence, never a brilliant move.
+ */
+export interface AssistUse {
+  turn: number;
+  half: Colour;
+  board: number;
+  side: Side;
+  by: string;
+  fen: string;
+  shownTo: readonly string[];
+}
+
+/**
+ * A match stored before the modes came (a lobby in play across the deploy): Classic, with none of Mercenary's fields
+ * yet, so the rules and the views never read a missing one.
+ */
+export function upgradeMatch(m: SquadsMatch): SquadsMatch {
+  const old = m as Partial<SquadsMatch> & SquadsMatch;
+  if (old.mode && old.delays && old.stockfish && old.shields && old.assists && old.coins && old.kit !== undefined) return m;
+  return {
+    ...m,
+    mode: old.mode ?? "classic",
+    delays: old.delays ?? [m.delayMs, m.delayMs],
+    kit: old.kit ?? null,
+    stockfish: old.stockfish ?? [0, 0],
+    shields: old.shields ?? [0, 0],
+    assists: old.assists ?? [],
+    coins: old.coins ?? [0, 0],
+  };
+}
+
+/** A side's free time a move (ms). */
+export const delayOf = (m: Pick<SquadsMatch, "delays" | "delayMs">, side: Side): number => m.delays?.[side] ?? m.delayMs;
 
 // ---- Starting positions ----
 
@@ -157,12 +208,26 @@ export interface MatchSetup {
   armageddon?: boolean;
   /** Each side's block bank coming in (Armageddon: what the final left); default the bank for a match. */
   blockBanks?: readonly [number, number];
+  /** Classic (the default) or Mercenary. */
+  mode?: SquadsMode;
+  /** Armageddon after a drawn final carries the final's items on: its free seconds, tokens, shields and kit. */
+  delaysMs?: readonly [number, number];
+  stockfish?: readonly [number, number];
+  shields?: readonly [number, number];
+  kit?: readonly [ItemCounts, ItemCounts] | null;
 }
 
 export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): SquadsMatch {
   if (o.starts.length !== o.whites.length || !o.starts.length) throw new Error("One start and one White side per board");
   for (const st of o.starts) if (colourToMove(st) !== "w") throw new Error("Every board starts with White to move");
   return {
+    mode: o.mode ?? "classic",
+    delays: o.delaysMs ? [o.delaysMs[0], o.delaysMs[1]] : [o.delayMs, o.delayMs],
+    kit: o.kit ?? null,
+    stockfish: o.stockfish ? [o.stockfish[0], o.stockfish[1]] : [0, 0],
+    shields: o.shields ? [o.shields[0], o.shields[1]] : [0, 0],
+    assists: [],
+    coins: [0, 0],
     key: o.key,
     seed: o.seed,
     round: o.round,
@@ -223,7 +288,8 @@ export function matchClocks(m: SquadsMatch): [TeamClock, TeamClock] {
 
 /**
  * A bracket match ready to play: round 1 Relay on 4 boards, round 2 Pairs on 2, the final on 1. Each squad brings its
- * team bank, topped up if this is a later round (it advanced).
+ * team bank, topped up if this is a later round (it advanced). Classic has no blocks (a block bank of 0); Mercenary the
+ * bank for a match, and the items each squad bought come in as its kit (`applyKit`) when the match starts.
  */
 export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, squads: readonly [Squad, Squad], library: readonly Opening[], s: SquadsSettings = SQUADS): SquadsMatch {
   const format = ROUND_FORMAT[round];
@@ -231,6 +297,8 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
   const { starts, whites } = matchStarts(plan, key, s.boards[format], library, s);
   const c = plan.rules.clock;
   const topUp = round > 0 ? c.topUpSeconds * 1000 : 0;
+  const mode = modeOf(plan.rules);
+  const bank = mode === "classic" ? 0 : s.blocks.bankPerMatch;
   return createSquadsMatch(
     {
       key,
@@ -243,9 +311,31 @@ export function planMatch(plan: SquadsPlan, round: SquadsRound, index: number, s
       banksMs: [squads[0].bankMs + topUp, squads[1].bankMs + topUp],
       delayMs: c.delaySeconds * 1000,
       incrementMs: c.incrementSeconds * 1000,
+      blockBanks: [bank, bank],
+      mode,
     },
     s,
   );
+}
+
+/**
+ * Mercenary: each side's kit (what its squad bought for this match) comes in as the match starts: time coins into its
+ * team bank, block points into its block bank, a breather multiplying its free seconds a move, its Stockfish tokens
+ * and shields. Once, before the first half (a match whose kit is in keeps it); used here or lost.
+ */
+export function applyKits(m: SquadsMatch, kits: readonly [ItemCounts, ItemCounts], s: SquadsSettings = SQUADS): SquadsMatch {
+  if (m.mode !== "mercenary" || m.kit !== null || m.turn !== 0 || m.half !== "w" || m.result) return m;
+  const c = s.mercenary;
+  const per = <T>(f: (k: ItemCounts, side: Side) => T): [T, T] => [f(kits[0], 0), f(kits[1], 1)];
+  return {
+    ...m,
+    kit: [{ ...kits[0] }, { ...kits[1] }],
+    banks: per((k, side) => m.banks[side] + k.time * c.timeSeconds * 1000),
+    blockBanks: per((k, side) => m.blockBanks[side] + k.blocks * c.blockPoints),
+    delays: per((k, side) => (k.breather > 0 ? Math.round(m.delayMs * c.breatherFactor) : m.delays[side])),
+    stockfish: per((k) => k.stockfish),
+    shields: per((k) => k.shield),
+  };
 }
 
 // ---- Who acts this half ----
@@ -287,7 +377,7 @@ export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuti
   if (m.result) return out;
   const n = m.boards.length;
   const ceiling = s.moveCeilingSeconds * 1000;
-  const deadline = (side: Side) => (m.banks[side] > 0 ? ceiling : m.delayMs);
+  const deadline = (side: Side) => (m.banks[side] > 0 ? ceiling : delayOf(m, side));
   for (const b of m.boards) {
     const side = sideOf(b, m.half);
     const deadlineMs = deadline(side);
@@ -336,11 +426,20 @@ export interface PlacedBlock {
   at: number;
 }
 
-/** What players have chosen so far this half (a move or a pick), who has locked in, and the blocks placed. */
+/** A Stockfish token used this half (Mercenary): by whom, on which board, when (ms after the half began). */
+export interface PlacedAssist {
+  board: number;
+  by: string;
+  at: number;
+}
+
+/** What players have chosen so far this half (a move or a pick), who has locked in, the blocks placed, tokens used. */
 export interface HalfInputs {
   choices: Readonly<Record<string, string>>;
   locked: Readonly<Record<string, boolean>>;
   blocks: readonly PlacedBlock[];
+  /** Stockfish tokens used this half (Mercenary; missing: none). */
+  assists?: readonly PlacedAssist[];
 }
 
 export const NO_INPUTS: HalfInputs = { choices: {}, locked: {}, blocks: [] };
@@ -416,6 +515,58 @@ export function placedBlocks(m: SquadsMatch, inputs: Pick<HalfInputs, "blocks">,
   });
 }
 
+/** A side's Stockfish tokens now: the match's, less those its players have used this half. */
+export function stockfishNow(m: Pick<SquadsMatch, "stockfish" | "boards" | "half">, inputs: Pick<HalfInputs, "assists">, side: Side): number {
+  const used = (inputs.assists ?? []).filter((a) => {
+    const board = m.boards[a.board];
+    return !!board && sideOf(board, m.half) === side;
+  }).length;
+  return m.stockfish[side] - used;
+}
+
+/** Who sees a Stockfish token's lines: the one who used it, or in the final the whole squad voting (Eric). */
+export const assistShownTo = (format: SquadsFormat, duty: Pick<Duty, "players">, by: string): string[] => (format === "final" ? [...duty.players] : [by]);
+
+/** no_tokens: none left; shown: already on your screen this half (yours, or in the final your squad's). */
+export type AssistError = "match_over" | "no_duty" | "already_moved" | "locked" | "no_tokens" | "shown";
+
+/**
+ * A player uses one of their squad's Stockfish tokens (Mercenary) on their own decision this half: their Relay move
+ * before it's made, their pick or vote before they lock in. Paid at once. It shows their own top moves in this position
+ * (their side to move; never the other squad's moves) to them, or in the final to the whole squad: one a half is
+ * enough there, and one a player a half anywhere. `at`: ms after the half began.
+ */
+export function useStockfish(m: SquadsMatch, inputs: HalfInputs, playerId: string, at: number, s: SquadsSettings = SQUADS): { inputs: HalfInputs; use: AssistUse } | { error: AssistError } {
+  if (m.result) return { error: "match_over" };
+  const d = dutyOf(m, playerId, s);
+  if (!d) return { error: "no_duty" };
+  if (d.duty.role === "move" && inputs.choices[playerId]) return { error: "already_moved" };
+  if (inputs.locked[playerId]) return { error: "locked" };
+  const here = (inputs.assists ?? []).filter((a) => a.board === d.duty.board);
+  if (here.some((a) => a.by === playerId || (m.format === "final" && d.duty.players.includes(a.by)))) return { error: "shown" };
+  if (stockfishNow(m, inputs, d.duty.side) <= 0) return { error: "no_tokens" };
+  const placed: PlacedAssist = { board: d.duty.board, by: playerId, at: Math.max(0, at) };
+  const use: AssistUse = { turn: m.turn, half: m.half, board: d.duty.board, side: d.duty.side, by: playerId, fen: m.boards[d.duty.board]!.fen, shownTo: assistShownTo(m.format, d.duty, playerId) };
+  return { inputs: { ...inputs, assists: [...(inputs.assists ?? []), placed] }, use };
+}
+
+/** The Stockfish tokens used this half, as everyone sees them (who used one is public; the lines are only on their screens). */
+export function placedAssists(m: SquadsMatch, inputs: Pick<HalfInputs, "assists">, s: SquadsSettings = SQUADS): AssistUse[] {
+  const duties = halfDuties(m, s).duties;
+  return (inputs.assists ?? []).flatMap((a) => {
+    const d = duties.find((x) => x.board === a.board && x.players.includes(a.by));
+    if (!d) return [];
+    return [{ turn: m.turn, half: m.half, board: a.board, side: d.side, by: a.by, fen: m.boards[a.board]!.fen, shownTo: assistShownTo(m.format, d, a.by) }];
+  });
+}
+
+/**
+ * Whether a player's choice on a board in a half was made with a Stockfish token's lines on their screen (sanctioned
+ * engine help: fair play never counts it, and it's never brilliant).
+ */
+export const isAssisted = (m: Pick<SquadsMatch, "assists">, playerId: string, turn: number, half: Colour, board: number): boolean =>
+  m.assists.some((a) => a.turn === turn && a.half === half && a.board === board && a.shownTo.includes(playerId));
+
 /** A player locks in their current choice (nothing to lock without one). */
 export function lockIn(inputs: HalfInputs, playerId: string): HalfInputs {
   if (!inputs.choices[playerId] || inputs.locked[playerId]) return inputs;
@@ -443,7 +594,18 @@ export function visibleChoices(m: SquadsMatch, inputs: HalfInputs, viewer: Side 
 // ---- Playing a half ----
 
 export type SquadsEvent =
-  | { kind: "relay"; turn: number; half: Colour; board: number; side: Side; player: string; move: string; missed: boolean }
+  | {
+      kind: "relay";
+      turn: number;
+      half: Colour;
+      board: number;
+      side: Side;
+      player: string;
+      move: string;
+      missed: boolean;
+      /** Mercenary: chosen with a Stockfish token's lines on screen. */
+      assisted?: readonly string[];
+    }
   | {
       kind: "pair";
       turn: number;
@@ -460,6 +622,8 @@ export type SquadsEvent =
       /** Which pick the coin played (null: the same move, no coin). */
       coin: 0 | 1 | null;
       move: string;
+      /** Mercenary: the players who picked with a Stockfish token's lines on screen. */
+      assisted?: readonly string[];
     }
   | {
       kind: "vote";
@@ -479,12 +643,19 @@ export type SquadsEvent =
       /** Nobody picked: a random move played. */
       random: boolean;
       move: string;
+      /** Mercenary: the players who voted with a Stockfish token's lines on screen. */
+      assisted?: readonly string[];
     }
   /**
    * A block placed this half, after the blocking side's move: in effect on the other side's next turn there ("on"),
-   * or lifted and refunded (why).
+   * cancelled by the other squad's shield ("shielded": its points still spent), or lifted and refunded (why).
    */
-  | { kind: "block"; turn: number; half: Colour; board: number; side: Side; by: string; move: string; piece: BlockPiece; cost: number; outcome: "on" | BlockLift }
+  | { kind: "block"; turn: number; half: Colour; board: number; side: Side; by: string; move: string; piece: BlockPiece; cost: number; outcome: "on" | "shielded" | BlockLift }
+  /**
+   * Mercenary: coins a side earned (a capture, a board won, drawn or mated, the match won). `board` and `move`: where;
+   * `piece`: the piece taken.
+   */
+  | { kind: "coins"; turn: number; half: Colour; side: Side; coins: number; why: CoinWhy; board: number | null; move?: string; piece?: CapturePiece }
   | { kind: "forced"; turn: number; half: Colour; board: number; side: Side; move: string }
   | { kind: "scout"; turn: number; half: Colour; board: number; side: Side; players: readonly string[] }
   /** A squad's team bank this half: how much its moves drained, what's left (after any increment), sudden death. */
@@ -507,7 +678,15 @@ export interface HalfOutcome {
    * out. (A slow move under pressure isn't a no-show: leave these out of the no-show streak if you like.)
    */
   timeouts: string[];
+  /** Mercenary: moves played this half that could be brilliant, for the judge (`isBrilliant`). */
+  brilliant: BrilliantCandidate[];
 }
+
+/** Plies played from the starting position, by the position's move number (an opening's moves count). */
+export const plyOf = (fen: string): number => {
+  const [, side, , , , full] = fen.split(" ");
+  return (Math.max(1, Number(full) || 1) - 1) * 2 + (side === "b" ? 1 : 0);
+};
 
 /**
  * Plays the half being played, from the choices as they stand (everyone locked in, or the deadlines passed).
@@ -517,6 +696,10 @@ export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonl
   if (m.result) throw new Error(`Match ${m.key} is over`);
   const duties = halfDuties(m, s);
   const placed = placedBlocks(m, inputs, s);
+  // Stockfish tokens used this half: paid, and logged with whose screens showed the lines.
+  const assistsNow = m.mode === "mercenary" ? placedAssists(m, inputs, s) : [];
+  const stockfish: [number, number] = [m.stockfish[0], m.stockfish[1]];
+  for (const a of assistsNow) stockfish[a.side] = Math.max(0, stockfish[a.side] - 1);
   const ctx: Ctx = {
     m,
     s,
@@ -534,6 +717,10 @@ export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonl
     tokenLog: [...m.tokenLog],
     tokensUsed: [],
     blockBanks: [m.blockBanks[0], m.blockBanks[1]],
+    coins: [m.coins[0], m.coins[1]],
+    shields: [m.shields[0], m.shields[1]],
+    assistsNow,
+    brilliant: [],
   };
   for (const side of [0, 1] as const) drainBank(ctx, side, duties.duties.filter((d) => d.side === side));
   for (const d of duties.scouts) ctx.events.push({ kind: "scout", turn: m.turn, half: m.half, board: d.board, side: d.side, players: d.players });
@@ -549,20 +736,29 @@ export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonl
     else voteMove(ctx, d);
   }
   // The blocks placed this half: paid, then in effect on the other side's next turn, or lifted and refunded (each
-  // board's together, by the mercy rules: the most recent first).
-  const next: SquadsBlock[] = [];
+  // board's together, by the mercy rules: the most recent first). Then a shield (Mercenary) cancels the first of them,
+  // in the order they were placed, that would take effect against its squad: that block's points stay spent. A lifted
+  // block never uses a shield (it would never have taken effect).
+  const lifted = new Map<SquadsBlock, BlockLift | null>();
   for (const board of new Set(placed.map((b) => b.board))) {
     const here = placed.filter((b) => b.board === board);
     const after = ctx.boards[board]!;
     const lifts = after.result ? here.map((): BlockLift => "impossible") : liftBlocks(after.fen, here.map((b) => b.move), s);
-    here.forEach((b, i) => {
-      const lift = lifts[i] ?? null;
-      if (!lift) {
-        ctx.blockBanks[b.side] -= b.cost;
-        next.push(b);
-      }
-      ctx.events.push({ kind: "block", turn: m.turn, half: m.half, board: b.board, side: b.side, by: b.by, move: b.move, piece: b.piece, cost: b.cost, outcome: lift ?? "on" });
-    });
+    here.forEach((b, i) => lifted.set(b, lifts[i] ?? null));
+  }
+  const next: SquadsBlock[] = [];
+  for (const b of placed) {
+    const lift = lifted.get(b) ?? null;
+    let outcome: "on" | "shielded" | BlockLift = lift ?? "on";
+    if (!lift) {
+      ctx.blockBanks[b.side] -= b.cost;
+      const target = otherSide(b.side);
+      if (ctx.shields[target] > 0) {
+        ctx.shields[target]--;
+        outcome = "shielded";
+      } else next.push(b);
+    }
+    ctx.events.push({ kind: "block", turn: m.turn, half: m.half, board: b.board, side: b.side, by: b.by, move: b.move, piece: b.piece, cost: b.cost, outcome });
   }
   ctx.nextBlocks = next;
   for (const side of [0, 1] as const) {
@@ -574,7 +770,7 @@ export function resolveHalf(m: SquadsMatch, inputs: HalfInputs, thinkMs: Readonl
     e.leftMs = ctx.banks[e.side];
     e.suddenDeath = ctx.banks[e.side] <= 0;
   }
-  return afterHalf(ctx);
+  return afterHalf(ctx, stockfish);
 }
 
 interface Ctx {
@@ -598,6 +794,11 @@ interface Ctx {
   blockBanks: [number, number];
   /** The blocks in effect on the next half. */
   nextBlocks?: SquadsBlock[];
+  /** Mercenary: coins each side has earned this match; shields left; Stockfish tokens used this half; brilliant candidates. */
+  coins: [number, number];
+  shields: [number, number];
+  assistsNow: AssistUse[];
+  brilliant: BrilliantCandidate[];
 }
 
 const rngFor = (c: Ctx, board: number, what: string) => squadsRng(c.m.seed, c.m.key, c.m.turn, c.m.half, board, what);
@@ -625,15 +826,17 @@ export function bankRunsOut(ends: readonly number[], delayMs: number, bankMs: nu
  * A squad's bank this half. Each of its moves (a Relay mover, a pair, the final's squad) drains it from the free
  * seconds until the move is made (its slowest player, or a block placed later, which is thinking time too), or to the
  * ceiling if one of them never chose; several at once drain it together. If it runs out, moves not yet made are cut
- * off; at zero (sudden death) each move has only the free seconds.
+ * off; at zero (sudden death) each move has only the free seconds. (The free seconds are the side's own: a breather
+ * multiplies them.)
  */
 function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
   const { m, s } = c;
   if (!duties.length) return;
   const bank = c.banks[side];
   const ceiling = s.moveCeilingSeconds * 1000;
+  const delay = delayOf(m, side);
   if (bank <= 0) {
-    c.cutoff[side] = m.delayMs;
+    c.cutoff[side] = delay;
     c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: 0, leftMs: 0, suddenDeath: true });
     return;
   }
@@ -646,8 +849,8 @@ function drainBank(c: Ctx, side: Side, duties: readonly Duty[]) {
     const blockAt = Math.max(0, ...c.inputs.blocks.filter((b) => b.board === d.board && d.players.includes(b.by)).map((b) => b.at));
     return all ? Math.min(ceiling, Math.max(blockAt, ...d.players.map((p) => c.thinkMs[p] ?? 0))) : ceiling;
   });
-  const out = bankRunsOut(ends, m.delayMs, bank);
-  const drained = ends.reduce((t, e) => t + Math.max(0, Math.min(e, out) - m.delayMs), 0);
+  const out = bankRunsOut(ends, delay, bank);
+  const drained = ends.reduce((t, e) => t + Math.max(0, Math.min(e, out) - delay), 0);
   c.banks[side] = out === Infinity ? bank - drained : 0;
   c.cutoff[side] = Math.min(ceiling, out);
   c.events.push({ kind: "bank", turn: m.turn, half: m.half, side, drainedMs: Math.min(bank, drained), leftMs: c.banks[side], suddenDeath: c.banks[side] <= 0 });
@@ -681,20 +884,57 @@ function randomAllowed(c: Ctx, board: number, what: string, exclude: readonly st
   return from[Math.floor(rngFor(c, board, what)() * from.length)]!;
 }
 
+/** Mercenary: coins to a side, as an event. */
+function pay(c: Ctx, side: Side, coins: number, why: CoinWhy, board: number | null, extra: { move?: string; piece?: CapturePiece } = {}) {
+  if (c.m.mode !== "mercenary" || coins <= 0) return;
+  c.coins[side] += coins;
+  c.events.push({ kind: "coins", turn: c.m.turn, half: c.m.half, side, coins, why, board, ...extra });
+}
+
+/** Mercenary: a finished board's coins (a win and any mate bonus, or a draw for each side). */
+function payBoard(c: Ctx, b: SquadsBoard) {
+  if (c.m.mode !== "mercenary" || !b.result) return;
+  for (const x of boardCoins(b.result, c.s)) pay(c, sideOf(b, x.colour), x.coins, x.why, b.id);
+}
+
 function play(c: Ctx, board: number, move: string) {
   const b = c.boards[board]!;
   if (colourToMove(b) !== c.m.half) throw new Error(`Board ${board} is out of step with the half`);
+  const taken = c.m.mode === "mercenary" ? capturedPiece(b.fen, move) : null;
   const next = playOnBoard(b, move);
   c.boards[board] = next;
-  if (next.result) c.events.push({ kind: "board_end", board, result: next.result });
+  if (taken) pay(c, sideOf(b, c.m.half), captureCoins(taken, c.s), "capture", board, { move, piece: taken });
+  if (next.result) {
+    c.events.push({ kind: "board_end", board, result: next.result });
+    payBoard(c, next);
+  }
 }
+
+/** The players who chose on this board this half with a Stockfish token's lines on their screen. */
+const assistedOn = (c: Ctx, board: number): string[] => [...new Set(c.assistsNow.filter((a) => a.board === board).flatMap((a) => a.shownTo))];
+
+/** Mercenary: a move played that could be brilliant (found by someone without a token's lines), for the judge. */
+function maybeBrilliant(c: Ctx, d: Duty, move: string, found: readonly string[]) {
+  if (c.m.mode !== "mercenary") return;
+  const assisted = assistedOn(c, d.board);
+  const fen = c.boards[d.board]!.fen;
+  const cand: BrilliantCandidate = { board: d.board, side: d.side, fen, move, ply: plyOf(fen), finders: found.filter((p) => !assisted.includes(p)), blocked: blocksOn(c.m, d.board) };
+  if (brilliantCandidate(cand, c.s)) c.brilliant.push(cand);
+}
+
+/** The `assisted` field for an event (only when a token was used there). */
+const assistedField = (c: Ctx, board: number): { assisted?: readonly string[] } => {
+  const a = assistedOn(c, board);
+  return a.length ? { assisted: a } : {};
+};
 
 function relayMove(c: Ctx, d: Duty) {
   const player = d.players[0]!;
   const chosen = take(c, player, d.board, d.side);
   const move = chosen ?? randomAllowed(c, d.board, "miss");
-  c.events.push({ kind: "relay", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, player, move, missed: !chosen });
+  c.events.push({ kind: "relay", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, player, move, missed: !chosen, ...assistedField(c, d.board) });
   if (chosen || c.s.incrementOnMiss) c.earned[d.side]++;
+  if (chosen) maybeBrilliant(c, d, move, [player]);
   play(c, d.board, move);
 }
 
@@ -720,16 +960,18 @@ function pairMove(c: Ctx, d: Duty) {
     const token = c.tokenLog.length;
     c.tokenLog.push({ ...base, move, fen: c.boards[d.board]!.fen, blocked: blocksOn(c.m, d.board), verdict: null });
     c.tokensUsed.push(token);
-    c.events.push({ kind: "pair", ...base, picks: [move, move], missed: [false, false], same: true, token, coin: null, move });
+    c.events.push({ kind: "pair", ...base, picks: [move, move], missed: [false, false], same: true, token, coin: null, move, ...assistedField(c, d.board) });
     c.earned[d.side]++;
+    maybeBrilliant(c, d, move, d.players);
     play(c, d.board, move);
     return;
   }
   const { picks, missed } = twoPicks(c, d, chosen[0], chosen[1]);
   const flip = coin(rngFor(c, d.board, "coin"));
   const move = picks[flip];
-  c.events.push({ kind: "pair", ...base, picks, missed, same: false, token: null, coin: flip, move });
+  c.events.push({ kind: "pair", ...base, picks, missed, same: false, token: null, coin: flip, move, ...assistedField(c, d.board) });
   if (!missed.some(Boolean) || c.s.incrementOnMiss) c.earned[d.side]++;
+  if (!missed[flip]) maybeBrilliant(c, d, move, [d.players[flip]!]);
   play(c, d.board, move);
 }
 
@@ -754,22 +996,25 @@ function voteMove(c: Ctx, d: Duty) {
     coinAt = Math.floor(rngFor(c, d.board, "vote-tie")() * tied.length);
     move = tied[coinAt]!;
   } else move = tied[0]!;
-  c.events.push({ kind: "vote", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, players: d.players, picks, tally, tied: random ? [] : tied, coin: coinAt, random, move });
+  c.events.push({ kind: "vote", turn: c.m.turn, half: c.m.half, board: d.board, side: d.side, players: d.players, picks, tally, tied: random ? [] : tied, coin: coinAt, random, move, ...assistedField(c, d.board) });
   if (!random || c.s.incrementOnMiss) c.earned[d.side]++;
+  if (!random) maybeBrilliant(c, d, move, d.players.filter((_, i) => picks[i] === move));
   play(c, d.board, move);
 }
 
-/** After a half: the safety cap (decided by material), the result, the next half. */
-function afterHalf(c: Ctx): HalfOutcome {
+/** After a half: the safety cap (decided by material), the result (and the match's coins), the next half. */
+function afterHalf(c: Ctx, stockfish: [number, number]): HalfOutcome {
   const { m, s } = c;
   c.boards = c.boards.map((b) => {
     if (b.result || b.moves.length < 2 * m.safetyMoves) return b;
     const done = decideByMaterial(b, "safety_cap", s);
     c.events.push({ kind: "board_end", board: b.id, result: done.result! });
+    payBoard(c, done);
     return done;
   });
   const banks: [number, number] = [Math.max(0, c.banks[0]), Math.max(0, c.banks[1])];
   const result = matchResultOf({ ...m, boards: c.boards, banks }, s);
+  if (result?.winner != null) pay(c, result.winner, s.mercenary.matchWin, "match_win", null);
   if (result) c.events.push({ kind: "match_end", result });
   const match: SquadsMatch = {
     ...m,
@@ -781,9 +1026,13 @@ function afterHalf(c: Ctx): HalfOutcome {
     tokenLog: c.tokenLog,
     blockBanks: [c.blockBanks[0], c.blockBanks[1]],
     blocks: result ? [] : (c.nextBlocks ?? []),
+    coins: [c.coins[0], c.coins[1]],
+    shields: [c.shields[0], c.shields[1]],
+    stockfish,
+    assists: c.assistsNow.length ? [...m.assists, ...c.assistsNow] : m.assists,
     result,
   };
-  return { match, events: c.events, tokensUsed: c.tokensUsed, acted: c.acted, missed: c.missed, timeouts: c.timeouts };
+  return { match, events: c.events, tokensUsed: c.tokensUsed, acted: c.acted, missed: c.missed, timeouts: c.timeouts, brilliant: c.brilliant };
 }
 
 // ---- Same-move tokens: the judge's verdict ----
@@ -876,6 +1125,12 @@ export function startArmageddon(final: SquadsMatch, white: Side, start: BoardSta
       incrementMs: s.armageddon.incrementSeconds * 1000,
       armageddon: true,
       blockBanks: final.blockBanks,
+      // (The same round: Mercenary's items carry on from the final, as its block banks do.)
+      mode: final.mode,
+      delaysMs: final.delays,
+      stockfish: final.stockfish,
+      shields: final.shields,
+      kit: final.kit,
     },
     s,
   );
@@ -890,16 +1145,24 @@ export function startArmageddon(final: SquadsMatch, white: Side, start: BoardSta
 export function endByMaterial(m: SquadsMatch, s: SquadsSettings = SQUADS): { match: SquadsMatch; events: SquadsEvent[] } {
   if (m.result) return { match: m, events: [] };
   const events: SquadsEvent[] = [];
+  const coins: [number, number] = [m.coins[0], m.coins[1]];
+  const pay = (side: Side, n: number, why: CoinWhy, board: number | null) => {
+    if (m.mode !== "mercenary" || n <= 0) return;
+    coins[side] += n;
+    events.push({ kind: "coins", turn: m.turn, half: m.half, side, coins: n, why, board });
+  };
   const boards = m.boards.map((b) => {
     if (b.result) return b;
     const done = decideByMaterial(b, "admin", s);
     events.push({ kind: "board_end", board: b.id, result: done.result! });
+    for (const x of boardCoins(done.result!, s)) pay(sideOf(b, x.colour), x.coins, x.why, b.id);
     return done;
   });
   const decided = matchResultOf({ ...m, boards }, s)!;
   const result: MatchResult = decided.winner !== null ? { ...decided, how: "admin" } : tiebreak(m, decided.points, true);
+  if (result.winner !== null) pay(result.winner, s.mercenary.matchWin, "match_win", null);
   events.push({ kind: "match_end", result });
-  return { match: { ...m, boards, blocks: [], result }, events };
+  return { match: { ...m, boards, blocks: [], coins, result }, events };
 }
 
 /** The winning squad's id. */

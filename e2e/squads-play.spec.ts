@@ -87,7 +87,8 @@ async function testLobby(page: Page, start: "relay" | "pairs" | "final", clock =
   await expect(page.locator(".fd-queue-mode")).toHaveText("Squads · 8 squads of 4", { timeout: 20_000 });
   await expect(page.locator(".fd-queue-line")).toContainText(/Test lobby|Squads formed/);
   await expect(page.getByRole("button", { name: "Skip votes" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".vote-title h1")).toHaveText("How do the boards start?");
+  // (The Mode vote first; nobody voting in it here: Classic.)
+  await expect(page.locator(".vote-title h1")).toHaveText("Which mode?");
   await page.getByRole("button", { name: "Skip votes" }).click();
   await expect.poll(async () => (await seen(page)).phase, { timeout: 20_000 }).toBe("bracket");
 }
@@ -116,10 +117,10 @@ test("Pairs (a test lobby): your partner's pick shows live, both squads' tokens 
   await expect.poll(async () => (await seen(page)).partner, { timeout: 30_000 }).not.toBeNull();
   const partner = (await seen(page)).partner!;
   await expect(page.locator(".sq-choice.partner strong")).not.toHaveText("thinking…");
-  // Each squad's same-move tokens and block points, under the board for both squads.
+  // Each squad's same-move tokens, under the board for both squads; Classic has no block points (and no Block button).
   await expect(page.locator(".sq-clockline .sq-res-tokens")).toHaveText(["×5", "×5"]);
-  // (A bot may already have spent some: each bank is what is left, out of the match's 5.)
-  await expect(page.locator(".sq-clockline .sq-res-bank")).toHaveText([/^[0-5]$/, /^[0-5]$/]);
+  await expect(page.locator(".sq-clockline .sq-res-bank")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Block/ })).toHaveCount(0);
   // Yours, different from theirs (the same move would use a token): tap it, then lock in.
   const mine = legal(s.fen!).find((m) => m.slice(0, 2) !== partner.slice(0, 2) && m.length === 4)!;
   const reveal = await watchFor(page, {

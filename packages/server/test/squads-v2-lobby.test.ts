@@ -11,21 +11,27 @@ import { squadsLobby } from "./squads-fixture.ts";
  * side sees.
  */
 
+/** The votes before the bracket: a test lobby whose mode is set holds Start and Clock only (no Mode vote). */
 const VOTES_MS = FRONT_DOOR.fillShowMs + 2 * (SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000;
-const INTRO_MS = SQUADS_LOBBY.bracketIntroSeconds * 1000;
+/** The bracket's intro: a Mercenary test lobby that skips rounds has a longer one, to shop in. */
+const introMs = (start: number, mode: "classic" | "mercenary") => (start > 0 && mode === "mercenary" ? Math.max(SQUADS_LOBBY.bracketIntroSeconds, SQUADS_LOBBY.testShopSeconds) : SQUADS_LOBBY.bracketIntroSeconds) * 1000;
 const mineIn = (lm: LiveMatch, id: string) => lm.m.sides.some((x) => x.seats.includes(id));
 const ofKind = <K extends SquadsEvent["kind"]>(events: readonly SquadsEvent[], kind: K) => events.filter((e): e is Extract<SquadsEvent, { kind: K }> => e.kind === kind);
 
 beforeEach(() => clearTopCache());
 
-/** A test lobby at `start` with a party of 4 people in one squad, a solo person, and devices if asked; at its first half. */
-function partyLobby(start: 0 | 1, opts: { devices?: boolean; seed?: number; fen?: string } = {}) {
-  const L = squadsLobby({ seed: opts.seed ?? 7, test: { start, ...(opts.fen ? { fen: opts.fen } : {}) }, fillInMs: 5_000 });
+/**
+ * A test lobby at `start` with a party of 4 people in one squad, a solo person, and devices if asked; at its first half.
+ * Classic (same-move tokens, no blocks) unless `mode` says Mercenary (blocks).
+ */
+function partyLobby(start: 0 | 1, opts: { devices?: boolean; seed?: number; fen?: string; mode?: "classic" | "mercenary" } = {}) {
+  const mode = opts.mode ?? "classic";
+  const L = squadsLobby({ seed: opts.seed ?? 7, test: { start, mode, ...(opts.fen ? { fen: opts.fen } : {}) }, fillInMs: 5_000 });
   L.core.reserve([{ size: 4, pass: "four" }], 60_000);
   const party = ["A", "B", "C", "D"].map((n) => L.join(n, { party: "four" }));
   const solo = L.join("Sol");
   if (opts.devices) party.forEach((id, i) => L.core.message(id, { t: "speed", nps: 1_000_000 + i }));
-  L.advance(5_000 + VOTES_MS + INTRO_MS);
+  L.advance(5_000 + VOTES_MS + introMs(start, mode));
   const lm = L.core.allMatches().find((m) => mineIn(m, party[0]!))!;
   return { L, party, solo, lm };
 }
@@ -117,7 +123,7 @@ describe("squads v2 server: same-move tokens and the judge", () => {
 
 describe("squads v2 server: move blocks", () => {
   it("a mover blocks moves before moving: everyone sees each at once with the squad's bank; refused when it can't be", () => {
-    const { L, party, solo, lm } = partyLobby(0);
+    const { L, party, solo, lm } = partyLobby(0, { mode: "mercenary" });
     expect(lm.m.format).toBe("relay");
     const side = lm.m.sides.findIndex((x) => x.seats.includes(party[0]!));
     const duty = halfDuties(lm.m).duties.find((d) => d.side === side)!;
@@ -167,7 +173,7 @@ describe("squads v2 server: move blocks", () => {
 
   it("a block the mover's own move makes impossible is lifted and refunded; a king's move or a non-move is refused", () => {
     // After 1.d4 Nf6 2.Bg5: White's bishop can take the knight.
-    const { L, party, solo, lm } = partyLobby(0, { fen: "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3" });
+    const { L, party, solo, lm } = partyLobby(0, { mode: "mercenary", fen: "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3" });
     const side = lm.m.sides.findIndex((x) => x.seats.includes(party[0]!));
     const duty = halfDuties(lm.m).duties.find((d) => d.side === side)!;
     const mover = duty.players[0]!;
@@ -189,11 +195,11 @@ describe("squads v2 server: move blocks", () => {
 
   it("in the final, the squad to move blocks; the other squad can't then choose that move (refused: blocked)", () => {
     for (let seed = 1; seed < 60; seed++) {
-      const L = squadsLobby({ seed, test: { start: 2 }, fillInMs: 5_000 });
+      const L = squadsLobby({ seed, test: { start: 2, mode: "mercenary" }, fillInMs: 5_000 });
       L.core.reserve([{ size: 4, pass: "red" }, { size: 4, pass: "blue" }], 60_000);
       const red = ["R1", "R2", "R3", "R4"].map((n) => L.join(n, { party: "red" }));
       const blue = ["B1", "B2", "B3", "B4"].map((n) => L.join(n, { party: "blue" }));
-      L.advance(5_000 + VOTES_MS + INTRO_MS);
+      L.advance(5_000 + VOTES_MS + introMs(2, "mercenary"));
       const fin = L.core.match("r2m0");
       if (!fin || !mineIn(fin, red[0]!) || !mineIn(fin, blue[0]!)) continue;
       const duty = halfDuties(fin.m).duties[0]!;
@@ -238,11 +244,14 @@ describe("squads v2 server: test lobbies and views", () => {
     expect(parseTestFen("nonsense")).toBeNull();
     const o = testLobbyOptions(new URLSearchParams({ start: "pairs", fen, bots: "strong", seat: "white" }), 0);
     expect(o.test).toEqual({ start: 1, fen, strong: true, white: true });
+    expect(testLobbyOptions(new URLSearchParams({ start: "votes", mode: "mercenary" }), 0).test).toEqual({ start: 0, mode: "mercenary" });
+    expect(testLobbyOptions(new URLSearchParams({ mode: "pillage" }), 0).test.mode).toBeUndefined();
     // The opener plays White on their first board, whatever the seed.
     for (let seed = 1; seed < 9; seed++) {
       const L = squadsLobby({ seed, test: o.test, fillInMs: 5_000 });
       const tess = L.join("Tess");
-      L.advance(5_000 + VOTES_MS);
+      // (No mode set: the Mode vote too.)
+      L.advance(5_000 + VOTES_MS + (SQUADS.voteSeconds + SQUADS.voteResultSeconds) * 1000);
       expect(L.core.record.bots.every((b) => b.skill === Math.min(...L.core.record.bots.map((x) => x.skill!)))).toBe(true);
       const pairs = L.core.allMatches().filter((m) => m.round === 1);
       expect(pairs.every((m) => m.m.boards.every((b) => b.fen === fen))).toBe(true);
@@ -251,11 +260,11 @@ describe("squads v2 server: test lobbies and views", () => {
     }
   });
 
-  it("every player's match view carries each squad's tokens, block bank, the blocks in effect and the token log", () => {
+  it("every player's match view carries each squad's tokens, block bank, the blocks in effect and the token log (Classic: no blocks)", () => {
     const { L, solo, lm } = partyLobby(1);
     L.core.message(solo, { t: "sync" });
     const m = L.all(solo, "match").find((x) => x.match.key === lm.key)!;
-    expect(m.match).toMatchObject({ tokens: [SQUADS.tokens.perMatch, SQUADS.tokens.perMatch], blockBanks: [SQUADS.blocks.bankPerMatch, SQUADS.blocks.bankPerMatch], blocks: [], tokenLog: [] });
+    expect(m.match).toMatchObject({ mode: "classic", tokens: [SQUADS.tokens.perMatch, SQUADS.tokens.perMatch], blockBanks: [0, 0], blocks: [], tokenLog: [], kit: null });
     expect(m.placed).toEqual([]);
     expect(halfDuties(lm.m).duties.every((d) => d.role === "pick")).toBe(true);
   });

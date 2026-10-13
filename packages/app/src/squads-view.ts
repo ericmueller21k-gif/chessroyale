@@ -1,7 +1,14 @@
+import { SQUADS, type MercItem, type SquadsSettings } from "@chessroyale/core";
 import {
+  MERC_ITEMS,
+  modeOf,
+  nextPrice,
   pairSchedule,
   relayBoardOf,
+  type AssistUse,
   type Colour,
+  type NetWallet,
+  type SquadsMode,
   type SquadsBlock,
   type TokenUse,
   type NetBracketMatch,
@@ -42,6 +49,8 @@ export interface LocalMatch extends Omit<NetSquadsMatch, "boards"> {
   blockAt: Record<string, number>;
   /** The last half played: its events, every board's position before it, when it arrived and when its show ends. */
   last: { seq: number; events: SquadsEvent[]; before: string[]; at: number; until: number; missed: string[] } | null;
+  /** Mercenary: the Stockfish tokens used this half (whose screens show the lines). */
+  assisting: AssistUse[];
 }
 
 /**
@@ -134,8 +143,9 @@ export function scouting(m: Pick<NetSquadsMatch, "state" | "current">, playerId:
  * side's moves still being thought about (a duty whose players haven't all locked in) drains it past the free seconds;
  * a move locked in stopped draining when it was. The exact bank comes with the half's result.
  */
-export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked" | "lockedAt">, side: Side, now: number): number {
+export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked" | "lockedAt"> & { delays?: readonly number[] }, side: Side, now: number): number {
   const start = m.banks[side];
+  const delay = freeMs(m, side);
   if (m.state !== "half" || !m.current || start <= 0) return Math.max(0, start);
   const t0 = m.current.startedAt;
   const t = now - t0;
@@ -144,15 +154,18 @@ export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "de
     if (d.side !== side) continue;
     const done = d.players.every((p) => m.locked.includes(p));
     const end = done ? Math.max(...d.players.map((p) => (m.lockedAt[p] ?? now) - t0)) : Math.min(t, d.deadline - t0);
-    drained += Math.max(0, Math.min(end, t) - m.delayMs);
+    drained += Math.max(0, Math.min(end, t) - delay);
   }
   return Math.max(0, start - drained);
 }
 
+/** A side's free time a move (ms): the match's, more with a breather (Mercenary). */
+export const freeMs = (m: Pick<LocalMatch, "delayMs"> & { delays?: readonly number[] }, side: Side): number => m.delays?.[side] ?? m.delayMs;
+
 /** How many of a side's moves are draining its bank right now (2: Relay's two movers, twice as fast). */
-export function drainRate(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked">, side: Side, now: number): number {
+export function drainRate(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked"> & { delays?: readonly number[] }, side: Side, now: number): number {
   if (m.state !== "half" || !m.current || m.banks[side] <= 0) return 0;
-  if (now - m.current.startedAt <= m.delayMs) return 0;
+  if (now - m.current.startedAt <= freeMs(m, side)) return 0;
   return m.current.duties.filter((d) => d.side === side && !d.players.every((p) => m.locked.includes(p)) && now < d.deadline).length;
 }
 
@@ -341,3 +354,78 @@ export function cheatEval(t: Pick<MoveScore, "expected" | "mate">): string {
 export function cheatArrows(top: readonly Pick<MoveScore, "move" | "expected" | "mate">[]): Arrow[] {
   return top.slice(0, CHEAT_BRUSHES.length).map((t, i) => ({ move: t.move, brush: CHEAT_BRUSHES[i]!, label: cheatEval(t) }));
 }
+
+// ---------------- Mercenary ----------------
+
+/** The lobby's mode (Classic until the Mode vote says otherwise). */
+export const lobbyMode = (lobby: Pick<NetSquadsLobby, "rules"> | null): SquadsMode => modeOf(lobby?.rules);
+
+/** A squad's wallet (Mercenary), if any. */
+export const walletOf = (wallets: readonly NetWallet[], squadId: number | null | undefined): NetWallet | null => wallets.find((w) => w.squadId === squadId) ?? null;
+
+/** Each item's name and what it does, in one line, with its numbers from settings. */
+export function itemText(item: MercItem, s: SquadsSettings = SQUADS, freeSeconds?: number): { name: string; line: string; one: string } {
+  const c = s.mercenary;
+  // (The lobby's own free seconds when known; else the default clock's. Numbers and units never split across lines.)
+  const free = freeSeconds ?? (s.clocks[s.clockDefault] ?? s.clocks[0]!).delaySeconds;
+  switch (item) {
+    case "stockfish":
+      return { name: "Stockfish token", one: "a Stockfish token", line: `Your top ${c.stockfish.lines} moves for one decision, with their evaluations. Never theirs.` };
+    case "breather":
+      return { name: "Breather", one: "a breather", line: `${c.breatherFactor === 2 ? "Double" : `${c.breatherFactor}×`} free seconds a move (${free}\u00a0s\u00a0→\u00a0${Math.round(free * c.breatherFactor)}\u00a0s).` };
+    case "blocks":
+      return { name: "Block points", one: `${c.blockPoints} block points`, line: `+${c.blockPoints} block points.` };
+    case "shield":
+      return { name: "Shield", one: "a shield", line: "Cancels the next block against you. They still pay for it." };
+    case "time":
+      return { name: "Time coin", one: "a time coin", line: `+${c.timeSeconds}\u00a0s on your team clock.` };
+  }
+}
+
+/** One item in a squad's shop: its price now, how many are in the cart, the round's cap, and whether one can be bought. */
+export interface ShopRow {
+  item: MercItem;
+  price: number;
+  count: number;
+  cap: number;
+  /** Bought this tournament (each raised the price). */
+  bought: number;
+  can: boolean;
+  why: "cap" | "coins" | null;
+}
+
+/** The shop's rows for a wallet, strongest item first. */
+export function shopRows(w: Pick<NetWallet, "coins" | "bought" | "cart">, s: SquadsSettings = SQUADS): ShopRow[] {
+  return MERC_ITEMS.map((item) => {
+    const price = nextPrice(w, item, s);
+    const cap = s.mercenary.items[item].cap;
+    const count = w.cart[item] ?? 0;
+    const why = count >= cap ? "cap" : w.coins < price ? "coins" : null;
+    return { item, price, count, cap, bought: w.bought[item] ?? 0, can: !why, why };
+  });
+}
+
+/** A side's Stockfish tokens now: the match's, less those its players used this half. */
+export function stockfishLeft(m: Pick<LocalMatch, "stockfish" | "assisting">, side: Side): number {
+  return (m.stockfish?.[side] ?? 0) - m.assisting.filter((a) => a.side === side).length;
+}
+
+/** The Stockfish token's lines on your screen this half: one used on your board that shows to you (yours; the final, your squad's). */
+export function myAssist(m: Pick<LocalMatch, "assisting">, board: number, playerId: string | null): AssistUse | null {
+  return (playerId && m.assisting.find((a) => a.board === board && a.shownTo.includes(playerId))) || null;
+}
+
+/**
+ * Whether you may use a Stockfish token now (Mercenary): your own decision this half (your move not yet made, your
+ * pick or vote not locked), your squad has one left, and none is on your screen already.
+ */
+export function canUseStockfish(m: Pick<LocalMatch, "mode" | "stockfish" | "assisting" | "state" | "current" | "locked" | "visible">, playerId: string | null): boolean {
+  if (m.mode !== "mercenary" || m.state !== "half" || !m.current || !playerId) return false;
+  const d = m.current.duties.find((x) => x.players.includes(playerId));
+  if (!d || m.locked.includes(playerId) || (d.role === "move" && m.visible[playerId])) return false;
+  if (myAssist(m, d.board, playerId)) return false;
+  return stockfishLeft(m, d.side) > 0;
+}
+
+/** The coin count in words for the screen: "1,240". */
+export const coinText = (n: number): string => Math.max(0, Math.round(n)).toLocaleString("en");

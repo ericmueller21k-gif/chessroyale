@@ -1,12 +1,13 @@
-import type { ItemLook } from "@chessroyale/core";
+import type { ItemLook, MercItem } from "@chessroyale/core";
 import type { LobbyCloseReason } from "../protocol.ts";
 import type { MoveScore } from "../uci.ts";
 import type { BlockError, SquadsBlock } from "./blocks.ts";
 import type { BoardResult, Colour, Side } from "./board.ts";
 import type { SquadsFormat, SquadsRound } from "./lobby.ts";
-import type { ChoiceError, MatchResult, Role, SquadsEvent } from "./match.ts";
+import type { AssistError, AssistUse, ChoiceError, MatchResult, Role, SquadsEvent } from "./match.ts";
+import type { CoinWhy, ShopError } from "./mercenary.ts";
 import type { TokenUse } from "./tokens.ts";
-import type { SquadsRules, SquadsVoteId } from "./votes.ts";
+import type { SquadsMode, SquadsRules, SquadsVoteId } from "./votes.ts";
 
 /**
  * Squads' messages between the app and the server, sent as JSON over WebSockets (docs/areas/squads.md, "The
@@ -21,8 +22,12 @@ import type { SquadsRules, SquadsVoteId } from "./votes.ts";
  * Version 2 (Oct 12, 2026): Squads v2. Same-move tokens in Pairs (`tokens`, `tokenLog`, "token"), move blocks in every
  * round (`block` both ways, "blockNo", `blockBanks`, `blocks`, `placed`), the final a majority vote (one duty for the
  * whole squad; the "vote" event); bot work answers carry the engine line's reply.
+ * Version 3 (Oct 12, 2026): modes. The Mode vote first (an option can be `disabled`: "Coming soon"); Mercenary's
+ * wallets and shop (`wallets` in the lobby and as a message, `buy`/`unbuy`, "bought", "shopNo", "coins"), items in a
+ * match (`mode`, `delays`, `kit`, `stockfish`, `shields`, `assists`, `coins`; `assist` both ways, "assistNo"), coins
+ * as "coins" events in a half, shielded blocks, and brilliant moves ("coins" with why "brilliant").
  */
-export const SQUADS_PROTOCOL = 2;
+export const SQUADS_PROTOCOL = 3;
 
 /** A squad's placement: 1st, 2nd, 3rd-4th (out in round 2), 5th-8th (out in round 1). */
 export type SquadsPlacement = 1 | 2 | 3 | 5;
@@ -96,15 +101,34 @@ export interface NetSquadsLobby {
   rules: SquadsRules | null;
   /** Every squad's team clock (empty until the bracket is drawn). */
   clocks: NetTeamClock[];
+  /** Mercenary: every squad's wallet and shop, for everyone (empty in Classic, and until the bracket is drawn). */
+  wallets: NetWallet[];
   /** A test lobby (the test controls): where it started, and whether a test control has been used (no rewards then). */
   test?: { start: SquadsRound; used: boolean };
 }
 
-/** A pre-game vote (Start, then Clock): the whole lobby votes once, before round 1, on Crowd's machinery. */
+/**
+ * A squad's wallet (Mercenary): every squad's is public, for counterplay. Its coins, what it has earned by play (in all
+ * and by round; catch-up apart), what it has bought this tournament (each raises that item's next price) and its cart
+ * (bought for its next match). `shop`: its shop is open, for its next match (round), until that match starts (`until`,
+ * server time; null while the other match feeding it is still going).
+ */
+export interface NetWallet {
+  squadId: number;
+  coins: number;
+  earned: number;
+  byRound: [number, number, number];
+  catchUp: number;
+  bought: Record<MercItem, number>;
+  cart: Record<MercItem, number>;
+  shop: { round: SquadsRound; until: number | null } | null;
+}
+
+/** A pre-game vote (Mode, Start, then Clock): the whole lobby votes once, before round 1, on Crowd's machinery. */
 export interface NetSquadsVote {
   key: string;
   id: SquadsVoteId;
-  /** Which vote (index into squadsVotes()) and how many there are. */
+  /** Which vote (index into the votes held: a test lobby whose mode is set has no Mode vote) and how many there are. */
   index: number;
   count: number;
   startsAt: number;
@@ -192,6 +216,19 @@ export interface NetSquadsMatch {
   blocks: SquadsBlock[];
   /** Every same-move token burned this match and, once in, the judge's verdict: the post-match breakdown. */
   tokenLog: TokenUse[];
+  /** Classic or Mercenary. */
+  mode: SquadsMode;
+  /** Each side's free seconds a move (ms): `delayMs`, more with a breather (Mercenary). */
+  delays: [number, number];
+  /** Mercenary: what each side brought from the shop (null in Classic, or until the first half). */
+  kit: [Record<MercItem, number>, Record<MercItem, number>] | null;
+  /** Mercenary: each side's Stockfish tokens and shields left (tokens used this half are paid at once: "assist"). */
+  stockfish: [number, number];
+  shields: [number, number];
+  /** Every Stockfish token used this match (the lines show only on `shownTo`'s screens, worked out there). */
+  assists: AssistUse[];
+  /** Mercenary: coins each side has earned in this match. */
+  coins: [number, number];
   /**
    * break: about to start (the first half at `startsAt`); half: a half is being played (`current`); show: the half's
    * moves landing, the reveal and the coin (the next half at `startsAt`); armageddon: a drawn final, its Armageddon's
@@ -243,6 +280,16 @@ export type SquadsClientMessage =
    * before your squad's move there is settled. The first block on a board each turn stands. Refused: "blockNo".
    */
   | { t: "block"; key: string; seq: number; board: number; move: string }
+  /**
+   * Mercenary: use one of your squad's Stockfish tokens on your own decision this half (your move before it's made,
+   * your pick or vote before you lock in): your own top moves show on your screen (the final: your whole squad's),
+   * worked out on your device. Refused: "assistNo".
+   */
+  | { t: "assist"; key: string; seq: number }
+  /** Mercenary: buy one of an item for your squad's next match, from its wallet, while its shop is open. Refused: "shopNo". */
+  | { t: "buy"; item: MercItem }
+  /** Mercenary: put one back while the shop is open (the last one bought, refunded at what it cost). */
+  | { t: "unbuy"; item: MercItem }
   /** A drawn final: your squad picks Armageddon's colour (the side that picks: see `armageddonChoice`; the last pick stands). */
   | { t: "armageddon"; key: string; colour: Colour }
   /** This device's engine speed (nodes per second), from its speed check on joining: it can take bot work. */
@@ -278,9 +325,10 @@ export type SquadsServerMessage = { now: number } & (
   /**
    * A match in full, as you may see it: on (re)joining, when it starts, and when it changes state (Armageddon). `visible`:
    * the choices you may see so far this half (your own squad's), `locked` who has locked in, `placed` the blocks placed
-   * this half (everyone sees them).
+   * this half (everyone sees them), `assisting` the Stockfish tokens used this half (the lines show on `shownTo`'s
+   * screens).
    */
-  | { t: "match"; match: NetSquadsMatch; visible: Record<string, string>; locked: string[]; placed: SquadsBlock[] }
+  | { t: "match"; match: NetSquadsMatch; visible: Record<string, string>; locked: string[]; placed: SquadsBlock[]; assisting: AssistUse[] }
   /** A new half has begun in a match (its duties and deadlines, and both squads' banks as it began). */
   | { t: "turn"; key: string; current: NetSquadsHalf; banks: [number, number] }
   /** Every squad's team clock: as the bracket starts, and whenever a half begins or ends anywhere or a match ends. */
@@ -303,6 +351,24 @@ export type SquadsServerMessage = { now: number } & (
    * with its verdict, and both squads' tokens now (a refund gives one back).
    */
   | { t: "token"; key: string; index: number; use: TokenUse; tokens: [number, number] | null }
+  /**
+   * Mercenary: a Stockfish token used (to everyone, at once: who used one is public), and both squads' tokens left now.
+   * Only `use.shownTo` show its lines, each on their own device.
+   */
+  | { t: "assist"; key: string; seq: number; use: AssistUse; stockfish: [number, number] }
+  /** Your Stockfish token wasn't used (nothing spent): the rules' reason, `late` or `stale`. */
+  | { t: "assistNo"; key: string; seq: number; reason: AssistError | "late" | "stale" }
+  /** Mercenary: every squad's wallet and shop, whenever one changes (coins earned, a purchase, a shop opening or closing). */
+  | { t: "wallets"; wallets: NetWallet[] }
+  /** Mercenary: a purchase (or one put back) in a squad's shop, by whom: to that squad's people, live. */
+  | { t: "bought"; squadId: number; by: string; item: MercItem; price: number; undo: boolean }
+  /** Your purchase was refused: why (closed, cap, coins, none, unknown_item). */
+  | { t: "shopNo"; item: string; reason: ShopError }
+  /**
+   * Mercenary: coins outside a half's events: catch-up as a match is set (`against`: the squad that had earned more), a
+   * brilliant move once the judge has seen it (`key`, `board`, `move`, `by`: who found it), a test lobby's wallet.
+   */
+  | { t: "coins"; squadId: number; coins: number; why: CoinWhy; key?: string; board?: number; move?: string; by?: string[]; against?: number }
   /**
    * Your squad's placement is decided (it's out, or it won): your reward (coins, crates), `recorded` if it went on your
    * profile (signed in, still playing your seat, not a test lobby).

@@ -1,4 +1,4 @@
-import { SQUADS_PROTOCOL, squadsLegalMoves, type NetSquadsLobby, type NetSquadsMatch, type NetTeamClock, type PartyServerMessage, type SquadsServerMessage } from "@chessroyale/chess/squads";
+import { SQUADS_PROTOCOL, squadsLegalMoves, type NetSquadsLobby, type NetSquadsMatch, type NetTeamClock, type NetWallet, type PartyServerMessage, type SquadsServerMessage } from "@chessroyale/chess/squads";
 import type { MoveScore } from "@chessroyale/chess";
 
 /**
@@ -58,6 +58,11 @@ export class SquadsClient {
   results: Record<number, number> | null = null;
   /** Every squad's team clock, as last sent. */
   clocks: NetTeamClock[] = [];
+  /** Mercenary: every squad's wallet as last sent, and each squad's kit as its shop closed (its cart then), by round. */
+  wallets: NetWallet[] = [];
+  kits: { squadId: number; round: number; cart: Record<string, number>; coins: number }[] = [];
+  /** Mercenary: catch-up and brilliant coins as they were announced. */
+  coinNews: Extract<SquadsServerMessage, { t: "coins" }>[] = [];
   errors: string[] = [];
   closed = false;
   test = false;
@@ -137,6 +142,13 @@ export class SquadsClient {
       case "lobby":
         this.lobby = msg.lobby;
         if (msg.lobby.clocks.length) this.clocks = msg.lobby.clocks;
+        if (msg.lobby.wallets?.length) this.noteWallets(msg.lobby.wallets);
+        break;
+      case "wallets":
+        this.noteWallets(msg.wallets);
+        break;
+      case "coins":
+        this.coinNews.push(msg);
         break;
       case "clocks":
         this.clocks = msg.clocks;
@@ -174,6 +186,16 @@ export class SquadsClient {
         this.log(`error: ${msg.message}`);
         break;
     }
+  }
+
+  /** Mercenary: a squad's cart that has just emptied (its shop closed as its match started) was its kit for that round. */
+  private noteWallets(ws: NetWallet[]) {
+    for (const w of ws) {
+      const had = this.wallets.find((x) => x.squadId === w.squadId);
+      const full = (c: Record<string, number>) => Object.values(c).some((n) => n > 0);
+      if (had?.shop && !w.shop && (full(had.cart) || had.coins >= 0)) this.kits.push({ squadId: w.squadId, round: had.shop.round, cart: { ...had.cart }, coins: had.coins });
+    }
+    this.wallets = ws;
   }
 
   private async answer(job: { id: string; fen: string; n: number; nodes?: number }) {

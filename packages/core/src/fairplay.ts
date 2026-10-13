@@ -45,6 +45,12 @@ export interface FairMove {
   away: number;
   /** Used a power-up (saw the engine's top moves): never counted. */
   powerUp?: boolean;
+  /**
+   * Played with a Stockfish token (Squads' Mercenary mode: sanctioned engine help, bought in the shop; the squad's
+   * `assists` log says which moves): never counted, nor part of anyone's crowd, so an honest player is never flagged
+   * for the engine moves the game itself showed them.
+   */
+  engineToken?: boolean;
   /** A boss power touched the turn (a frozen piece, a pie, the blizzard, a flipped board): never counted. */
   power?: boolean;
   /** The best move takes on the square the last move landed on (a recapture, or taking a piece that just moved). */
@@ -60,7 +66,7 @@ export interface FairMove {
   deep?: { best: string; rank: number; loss: number; top?: string[] };
 }
 
-export type SkipReason = "book" | "forced" | "only" | "recapture" | "decided" | "powerUp" | "bossPower";
+export type SkipReason = "book" | "forced" | "only" | "recapture" | "decided" | "powerUp" | "engineToken" | "bossPower";
 
 /** A settings group with its numbers widened (FAIRPLAY is `as const`), so tests and the simulation can try others. */
 type Widen<T> = { [K in keyof T]: T[K] extends number ? number : T[K] };
@@ -81,10 +87,11 @@ export const foundBest = (m: Pick<FairMove, "loss">, s: Pick<Signals, "foundLoss
 /**
  * Why a position doesn't count, or null when it does. Skipped: the opening (book), a forced move, an only move or a
  * recapture that most of the crowd found (or with no crowd to say), a position already won or lost, and any pick made
- * with a power-up (the engine's top moves were on screen).
+ * with the engine's moves on screen that the game showed: a power-up, or a Stockfish token (Squads' Mercenary).
  */
 export function skipReason(m: FairMove, s: Signals = FAIRPLAY.signals): SkipReason | null {
   if (m.powerUp) return "powerUp";
+  if (m.engineToken) return "engineToken";
   if (m.power) return "bossPower";
   if (m.ply < s.bookPlies) return "book";
   if (m.legal <= 1) return "forced";

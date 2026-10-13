@@ -12,6 +12,7 @@ import type { VoteView } from "../game.ts";
 import { VoteScreen, type VoteHost, type VotePlayer } from "./Vote.tsx";
 import { SquadsMatchScreen } from "./SquadsMatch.tsx";
 import { TokenBreakdown } from "../components/SquadsBlocks.tsx";
+import { MercenaryShop } from "../components/MercenaryShop.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { SIDE_PANEL } from "../components/SquadsParts.tsx";
 
@@ -221,7 +222,13 @@ function SquadsBracketPhase({ client, actions }: { client: SquadsClient; actions
       {(!live || placed) && <Bracket lobby={lobby} mine={mine?.id ?? null} />}
     </>
   );
-  return <SquadsMatchScreen client={client} panel={panel} onNextRound={() => client.nextRound()} onLeave={actions.onHome} />;
+  return (
+    <>
+      <SquadsMatchScreen client={client} panel={panel} onNextRound={() => client.nextRound()} onLeave={actions.onHome} />
+      {/* Mercenary: your squad's shop, while it waits for its next match. */}
+      <MercenaryShop client={client} />
+    </>
+  );
 }
 
 /** The results: every squad's placement (yours ringed), your reward, and what next. */

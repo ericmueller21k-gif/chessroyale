@@ -89,6 +89,21 @@ Eric: "too big a change for now". Recorded so they aren't lost; nothing gets bui
     - how it fits the team final, boss battle and duel endings;
     - whether ranked uses only one style.
 
+Added Oct 12, 2026 (with Squads' modes; notes only, nothing built):
+
+- **A waiting-room board for Squads.** Squads that finish early stand their profile pawns on a board; drag your pawn
+  onto a shop piece to open Mercenary's shop. Later it becomes a hangout: an idle world to wait in and chat.
+- **Eliminations in Squads,** with a penalty for the squad, so that losing a weak player never helps the team.
+- **Points turning into power-ups in other modes** (as Mercenary's coins buy items).
+- **Squads' third mode** (the Mode vote's "Coming soon"): Hand & Brain, Bughouse or Fog of War. Eric hasn't picked.
+- **Multi-language support** (Eric, Oct 12: "we need multi language support one day"). The plan:
+  - one strings layer: a `t()` helper and one file per language;
+  - a one-time pass that moves every piece of text into it: the screens, the bosses' and the God King's lines, the
+    FAQ, the items, the banners;
+  - languages chosen by where chess is big (Spanish, Portuguese, Russian, Hindi, German, French, say);
+  - fallback fonts where the pixel title font lacks a script (Cyrillic, Devanagari, CJK);
+  - a layout pass for right-to-left languages.
+
 ## Needs Eric
 
 - **Maia-3 bosses, before players meet them (pre-launch):** your OK to publish the Maia box's source

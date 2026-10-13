@@ -1181,6 +1181,11 @@ export const SQUADS_LOBBY = {
   /** A test lobby fills with bots this long after it opens (time to join it). Not `start=votes`: that fills at once. */
   testFillSeconds: 5,
   /**
+   * A Mercenary test lobby that starts after round 1: the bracket's intro lasts this long (seconds), so there's time
+   * to shop with the test wallet (SQUADS.mercenary.testWallet) before the first match.
+   */
+  testShopSeconds: 30,
+  /**
    * "Cheat lines" (Eric, Oct 12; test controls only, never for players): the engine's top `moves` in the position you
    * are choosing in, searched on your own device at `nodes` (the same Stockfish as the power-up hints), drawn as
    * arrows. It never touches scoring, bots or the server.
@@ -1531,6 +1536,66 @@ export interface SquadsClock {
   /** Credited to the bank after each move made in time (0: none). */
   incrementSeconds: number;
 }
+/** Mercenary's items, in the shop's order (strongest first: DECISIONS.md, "Squads modes: Mercenary"). */
+export type MercItem = "stockfish" | "breather" | "blocks" | "shield" | "time";
+/**
+ * Mercenary (Eric, Oct 12; renamed from Pillage the same night): each squad has one shared coin wallet for the
+ * tournament, earned by play and carried from round to round. After each round, squads still in may spend it in a
+ * team shop that's open during the wait for their next match (it adds no time): items for that next match only. Each
+ * item's price rises by `priceStep` for every one of it the squad has bought before in the tournament; at most
+ * `cap` of an item for one round. Every number here; the rules are `packages/chess/src/squads/mercenary.ts`.
+ */
+export interface MercenarySettings {
+  /** Coins for a capture, by the piece taken (en passant: a pawn). */
+  capture: { p: number; n: number; b: number; r: number; q: number };
+  /** A board won (any way: mate, or material at the safety cap), and extra for a checkmate; a drawn board, each side. */
+  boardWin: number;
+  mate: number;
+  boardDraw: number;
+  /** Winning a match (going through to the next round). */
+  matchWin: number;
+  /**
+   * A brilliant move: a quiet move (no capture, not out of check) that the judge (the bot engine's top moves, from
+   * players' devices, as for same-move tokens) rates the best by at least `gap` of expected score over every other
+   * move, from ply `fromPly` on, in a position still in the balance (the best's expected score within `decided` of
+   * neither end). Never one played with a Stockfish token.
+   */
+  brilliant: { coins: number; gap: number; fromPly: number; decided: number };
+  /**
+   * Catch-up: when a match of round 2 or the final is set, the squad that has earned fewer coins in the tournament
+   * (by play) gets `share` of the difference, to the nearest `round`, at most `max`.
+   */
+  catchUp: { share: number; max: number; round: number };
+  /** Every item's price rises by this for each one of it the squad has already bought this tournament. */
+  priceStep: number;
+  /** Each item's first price and the most a squad may buy for one round. */
+  items: Readonly<Record<MercItem, { price: number; cap: number }>>;
+  /** A time coin: seconds added to the squad's team bank as its next match starts. */
+  timeSeconds: number;
+  /** Block points: added to the squad's block bank for its next match. */
+  blockPoints: number;
+  /** A breather multiplies the squad's free seconds a move for its next match (sudden death's time a move too). */
+  breatherFactor: number;
+  /** A Stockfish token: your own top `lines` moves for one decision, searched on your device at `nodes`. */
+  stockfish: { lines: number; nodes: number };
+  /** A test lobby that starts after round 1 (the rounds before skipped): each squad's wallet to shop with. */
+  testWallet: number;
+  /**
+   * Bots: a squad of bots (nobody playing) shops `shopSeconds` (a range) into its window. Before the final it saves
+   * everything with `saveChance`; otherwise it spends a share of its wallet in `spend` (the final: all of it), item by
+   * item, each drawn by `weights` among those it can afford and hasn't capped. A bot with a Stockfish token uses it with
+   * `stockfishChance` a move, or `stockfishSharp` when the engine's best beats the next by `sharpGap` or more.
+   */
+  bots: {
+    shopSeconds: readonly [number, number];
+    saveChance: number;
+    spend: readonly [number, number];
+    weights: Readonly<Record<MercItem, number>>;
+    stockfishChance: number;
+    stockfishSharp: number;
+    sharpGap: number;
+  };
+}
 export interface SquadsSettings {
   /** Players in a squad, squads in a lobby (a bracket of three rounds). */
   squadSize: number;
@@ -1672,6 +1737,16 @@ export interface SquadsSettings {
     minThinkSeconds: number;
   };
   /**
+   * The mode vote (Eric, Oct 12), the first pre-game vote: Classic (just chess: same-move tokens, no blocks, no coins)
+   * or Mercenary (coins, a team shop between rounds, items; blocks as in Squads v2), and a third mode shown as "Coming
+   * soon" that can't be voted for. Nobody voting: Classic. Each lobby draws how strongly its bots lean to Classic, a
+   * share in `classicLean` (each bot then votes Classic with that chance): most lobbies' bots lean Classic, some
+   * Mercenary, and a few people can swing a close one.
+   */
+  modeVote: { classicLean: readonly [number, number] };
+  /** Mercenary's economy: earning coins, the team shop, the items. */
+  mercenary: MercenarySettings;
+  /**
    * Showing what happened, in seconds: a half's moves landing (Relay), the pair's reveal and coin (Pairs), the
    * final's reveal (every pick as a ghost with its pickers' names, the count, a coin for a tie), the bracket between
    * matches, Armageddon's intro.
@@ -1741,6 +1816,41 @@ export const SQUADS: SquadsSettings = {
     incrementShare: 0.8,
     thinkRange: [0.5, 1.5],
     minThinkSeconds: 1.5,
+  },
+  modeVote: { classicLean: [0.35, 0.75] },
+  // Calibrated by reports/squads-mercenary.md (DECISIONS.md, "Squads modes: Mercenary"): a squad that wins Relay has
+  // about 600 coins to shop with before Pairs, about 700 before the final (it spends some on the way); a lobby takes
+  // about a minute longer than Classic (the time coins and breathers bought: more time to think).
+  mercenary: {
+    capture: { p: 3, n: 9, b: 9, r: 15, q: 27 },
+    boardWin: 50,
+    mate: 50,
+    boardDraw: 15,
+    matchWin: 75,
+    brilliant: { coins: 75, gap: 0.5, fromPly: 16, decided: 0.1 },
+    catchUp: { share: 0.5, max: 300, round: 10 },
+    priceStep: 100,
+    items: {
+      stockfish: { price: 200, cap: 2 },
+      breather: { price: 150, cap: 1 },
+      blocks: { price: 100, cap: 2 },
+      shield: { price: 100, cap: 2 },
+      time: { price: 75, cap: 2 },
+    },
+    timeSeconds: 30,
+    blockPoints: 3,
+    breatherFactor: 2,
+    stockfish: { lines: 3, nodes: 300_000 },
+    testWallet: 600,
+    bots: {
+      shopSeconds: [3, 9],
+      saveChance: 0.25,
+      spend: [0.5, 0.9],
+      weights: { stockfish: 0.5, breather: 1, blocks: 3, shield: 2, time: 2 },
+      stockfishChance: 0.04,
+      stockfishSharp: 0.35,
+      sharpGap: 0.2,
+    },
   },
   moveShowSeconds: 1,
   pairRevealSeconds: 3,

@@ -1,37 +1,52 @@
-import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, botVotes, castPregameVote, cleanLook, closePregameVote, shuffle, type ItemLook, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FRONT_DOOR, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, botVotes, castPregameVote, cleanLook, closePregameVote, shuffle, type ItemLook, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
 import { botRoster, type LobbyCloseReason, type MoveScore, type Opening } from "@chessroyale/chess";
 import { Chess } from "chess.js";
 import {
   NO_INPUTS,
+  NO_ITEMS,
   ROUND_FORMAT,
   SQUADS_PROTOCOL,
+  applyKits,
   armageddonChooser,
   armageddonStart,
   blockBankNow,
   blocksOn,
   botArmageddonColour,
   botBlock,
+  botModeVotes,
   botPairPick,
   botRelayMove,
+  botShop,
   botSkillOf,
+  botUsesStockfish,
   botVotePick,
+  buyItem,
   candidatesFrom,
+  catchUpCoins,
   choose,
   createSquadsMatch,
   coin,
+  delayOf,
   drawBracket,
   dutyOf,
+  earn,
   endByMaterial,
   formSquads,
   halfDuties,
   halfReady,
+  heldVotes,
+  isBrilliant,
+  isMercItem,
   isOnlyMove,
   judgeTokenUse,
   lockIn,
+  modeOf,
   movesAllowed,
+  newWallet,
   noteActions,
   otherSide,
   placeBlock,
+  placedAssists,
   placedBlocks,
   placements,
   planLobby,
@@ -45,20 +60,28 @@ import {
   squadBotThinkMs,
   squadsLegalMoves,
   squadsRng,
-  squadsVotes,
   startArmageddon,
+  stockfishNow,
+  takeCart,
   matchClocks,
   settleTeamClocks,
   startTeamClocks,
   teamClocks,
   tokensLeft,
   topAllowed,
+  unbuyItem,
+  upgradeMatch,
+  useStockfish,
   visibleChoices,
+  votable,
   winnerSquad,
   type Bracket,
+  type BrilliantCandidate,
+  type CoinWhy,
   type Colour,
   type Duty,
   type HalfInputs,
+  type ItemCounts,
   type NetBracketMatch,
   type NetDuty,
   type NetSquadsHalf,
@@ -66,19 +89,23 @@ import {
   type NetSquadsMatch,
   type NetSquadsVote,
   type NetTeamClock,
+  type NetWallet,
   type Party,
   type Side,
   type Squad,
   type SquadPlayer,
   type SquadsClientMessage,
   type SquadsEntrant,
+  type SquadsEvent,
   type SquadsMatch,
+  type SquadsMode,
   type SquadsPlacement,
   type SquadsPlan,
   type SquadsRound,
   type SquadsRules,
   type SquadsServerMessage,
   type SquadsVoteId,
+  type Wallet,
 } from "@chessroyale/chess/squads";
 import { cleanTop, distanceFromVerdict, fallbackTop, topsAgree, verdictMovesOf } from "./squads-bots.ts";
 
@@ -91,7 +118,12 @@ import { cleanTop, distanceFromVerdict, fallbackTop, topsAgree, verdictMovesOf }
  *
  * Bots' engine work goes to players' devices (Eric's computing priorities), two per job, compared; the engine server
  * settles two that disagree; with no device, a bot plays from the server's own quick look (squads-bots.ts). The same
- * jobs judge Pairs' same-move tokens (the judge's top moves for the position; no device, no refund).
+ * jobs judge Pairs' same-move tokens (the judge's top moves for the position; no device, no refund) and, in Mercenary,
+ * brilliant moves.
+ *
+ * Mercenary (the Mode vote; DECISIONS.md, "Squads modes: Mercenary"): every squad has a wallet (`wallets`), earned by
+ * the rules' "coins" events, brilliant moves and catch-up; its shop is open from the end of its match until its next
+ * match's first half (the wait that's there anyway), and what it bought comes into that match as its kit.
  */
 
 export type SquadsOutgoing = SquadsServerMessage extends infer M ? (M extends { now: number } ? Omit<M, "now"> : never) : never;
@@ -176,6 +208,8 @@ export interface WorkJob {
 export interface JudgeJob extends WorkJob {
   index: number;
   notBefore: number;
+  /** Mercenary: a move that may be brilliant (not a token): judged the same way, coins if it was. */
+  brilliant?: BrilliantCandidate;
 }
 
 /** The half being played in a match. */
@@ -207,6 +241,9 @@ export interface LiveMatch {
   arm?: { chooser: Side; until: number; colour: Colour | null };
   /** Same-move tokens waiting for the judge, by their index in the match's tokenLog (a finished match's too). */
   judge?: Record<number, JudgeJob>;
+  /** Mercenary: moves waiting for the judge to say if they were brilliant, by number (`brilliantSeq` counts them). */
+  brilliant?: Record<number, JudgeJob>;
+  brilliantSeq?: number;
 }
 
 /** A reward to write: a results row (when `recorded`) and coins and crates, for one person. */
@@ -262,7 +299,11 @@ export interface SquadsRecord {
    * all at the strongest skill (`strong`), and its opener playing White on their first board (`white`): so a test can
    * count on what happens.
    */
-  test?: { start: SquadsRound; clock?: SquadsClock; fen?: string; strong?: boolean; white?: boolean };
+  test?: { start: SquadsRound; clock?: SquadsClock; fen?: string; strong?: boolean; white?: boolean; mode?: SquadsMode; blocks?: boolean };
+  /** Mercenary: every squad's wallet, by squad id (empty in Classic). */
+  wallets?: Wallet[];
+  /** Mercenary: when each bot-run squad does its shopping (squad id → server time), while its shop is open. */
+  botShop?: Record<number, number>;
   /** A test control was used here: nothing more is recorded or rewarded. */
   testUsed?: boolean;
   /** The last time a person did anything here (when an idle or abandoned lobby closes). */
@@ -363,6 +404,9 @@ export function parseTestFen(text: string | null): string | null {
  * others to join), the rounds before skipped (relay skips none: it has the votes too, after the wait). `fen`: the first
  * round's boards start from that position (tests); `bots=strong`: every bot at the strongest skill; `seat=white`: the
  * opener plays White on their board in the first round's first half (their match's squads swapped if need be).
+ * `mode=classic|mercenary`: that mode, with no Mode vote (without it the Mode vote is held, and the bots don't vote in
+ * it: the opener's vote decides, nobody's gives Classic). `bots=blocks` (with or without strong: `bots=strong,blocks`):
+ * the bots block whenever they can (so a test can count on a block, and on a shield cancelling one).
  */
 export function testLobbyOptions(q: URLSearchParams, now: number): { fillAt: number; test: NonNullable<SquadsRecord["test"]>; keepMs?: number } {
   const which = q.get("start");
@@ -372,7 +416,15 @@ export function testLobbyOptions(q: URLSearchParams, now: number): { fillAt: num
   const keepMs = q.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(q.get("keep")) || 0)) * 1000 : undefined;
   return {
     fillAt: which === "votes" ? now : now + SQUADS_LOBBY.testFillSeconds * 1000,
-    test: { start, ...(clock ? { clock } : {}), ...(fen ? { fen } : {}), ...(q.get("bots") === "strong" ? { strong: true } : {}), ...(q.get("seat") === "white" ? { white: true } : {}) },
+    test: {
+      start,
+      ...(clock ? { clock } : {}),
+      ...(fen ? { fen } : {}),
+      ...((q.get("bots") ?? "").split(",").includes("strong") ? { strong: true } : {}),
+      ...((q.get("bots") ?? "").split(",").includes("blocks") ? { blocks: true } : {}),
+      ...(q.get("seat") === "white" ? { white: true } : {}),
+      ...(q.get("mode") === "mercenary" || q.get("mode") === "classic" ? { mode: q.get("mode") as SquadsMode } : {}),
+    },
     ...(keepMs !== undefined ? { keepMs } : {}),
   };
 }
@@ -407,7 +459,8 @@ export class SquadsCore {
     private readonly library: readonly Opening[],
     private readonly s: SquadsSettings = SQUADS,
   ) {
-    for (const [k, v] of Object.entries(matches)) this.matches.set(k, v);
+    // (Matches stored before the modes came: Classic, with Mercenary's fields filled in.)
+    for (const [k, v] of Object.entries(matches)) this.matches.set(k, { ...v, m: upgradeMatch(v.m), ...(v.drawn ? { drawn: upgradeMatch(v.drawn) } : {}) });
   }
 
   private get r() {
@@ -620,6 +673,15 @@ export class SquadsCore {
       case "block":
         this.humanBlock(id, msg.key, msg.seq, msg.board, msg.move);
         break;
+      case "assist":
+        this.humanAssist(id, msg.key, msg.seq);
+        break;
+      case "buy":
+        this.shopAction(id, msg.item, false);
+        break;
+      case "unbuy":
+        this.shopAction(id, msg.item, true);
+        break;
       case "armageddon":
         this.armageddonColour(id, msg.key, msg.colour);
         break;
@@ -663,6 +725,7 @@ export class SquadsCore {
       if (lm.state === "half" && lm.half) times.push(...this.halfWakes(lm));
     }
     for (const lm of this.allMatches()) times.push(...this.judgeWakes(lm));
+    times.push(...Object.values(this.r.botShop ?? {}));
     // (Everything due has just been done: a time already past would only wake the object to do nothing, over and over.)
     return times.length ? Math.max(Math.min(...times), this.io.now() + 20) : null;
   }
@@ -682,7 +745,8 @@ export class SquadsCore {
       }
       if (this.assignQueued()) changed = true;
       for (const lm of this.liveMatches()) if (this.advance(lm, now)) changed = true;
-      for (const lm of this.allMatches()) if (lm.judge && this.judgeDue(lm, now)) changed = true;
+      for (const lm of this.allMatches()) if ((lm.judge || lm.brilliant) && this.judgeDue(lm, now)) changed = true;
+      if (this.botShopDue(now)) changed = true;
       if (!changed) return;
     }
   }
@@ -699,7 +763,7 @@ export class SquadsCore {
       case "voteEnd":
         return this.endVote();
       case "voteNext":
-        if (this.r.vote && this.r.vote.index + 1 < squadsVotes(this.s).length) return this.startVote(this.r.vote.index + 1);
+        if (this.r.vote && this.r.vote.index + 1 < this.votes().length) return this.startVote(this.r.vote.index + 1);
         return this.drawTheBracket();
       case "bracket":
         return;
@@ -741,19 +805,33 @@ export class SquadsCore {
 
   // ---------------- The votes ----------------
 
+  /** The votes this lobby holds: Mode, Start and Clock (a test lobby whose mode is set: Start and Clock). */
+  private votes() {
+    return heldVotes(this.r.test?.mode, this.s);
+  }
+
+  /**
+   * A vote's name for its random draws: "mode", or Start's and Clock's numbers from before the Mode vote came (0, 1),
+   * so their bots' votes and ties are drawn as they were.
+   */
+  private voteStream(index: number): string | number {
+    const id = this.votes()[index]!.id;
+    return id === "mode" ? "mode" : this.votes().filter((v) => v.id !== "mode").findIndex((v) => v.id === id);
+  }
+
   private everyone(): string[] {
     return this.r.squads.flatMap((sq) => sq.players.map((p) => p.id));
   }
 
   private voteView(): NetSquadsVote {
     const v = this.r.vote!;
-    const def = squadsVotes(this.s)[v.index]!;
+    const def = this.votes()[v.index]!;
     const squadOf = (id: string) => this.squadOf(id)?.id ?? 0;
     return {
       key: v.key,
       id: def.id,
       index: v.index,
-      count: squadsVotes(this.s).length,
+      count: this.votes().length,
       startsAt: v.startsAt,
       until: v.until,
       votes: [
@@ -766,17 +844,21 @@ export class SquadsCore {
   }
 
   private startVote(index: number) {
-    const def = squadsVotes(this.s)[index]!;
+    const def = this.votes()[index]!;
     const now = this.io.now();
     const ms = this.s.voteSeconds * 1000;
     const bots = this.r.squads.flatMap((sq) => sq.players.filter((p) => p.isBot).map((p) => p.id));
+    // The Mode vote: the lobby's bots lean Classic or Mercenary (botModeVotes). In a test lobby they sit it out, so its
+    // opener's vote decides it (Eric tests a mode by voting for it, or sets it with the link's mode=).
+    const rng = squadsRng(this.r.seed, "vote", this.voteStream(index), "bots");
+    const cast = def.id === "mode" ? (this.r.test ? [] : botModeVotes(rng, bots, ms, this.s.voteBotSkip, this.s)) : botVotes(rng, bots, def.options.length, ms, this.s.voteBotSkip);
     this.r.vote = {
       index,
       key: `v${index}-${++this.r.counter}`,
       startsAt: now,
       until: now + ms,
       votes: {},
-      bots: botVotes(squadsRng(this.r.seed, "vote", index, "bots"), bots, def.options.length, ms, this.s.voteBotSkip).map((b) => ({ id: b.id, option: b.option, at: now + b.atMs })),
+      bots: cast.filter((b) => votable(def, b.option)).map((b) => ({ id: b.id, option: b.option, at: now + b.atMs })),
       result: null,
     };
     this.r.phase = "vote";
@@ -789,8 +871,9 @@ export class SquadsCore {
     const v = this.r.vote;
     const now = this.io.now();
     if (this.r.phase !== "vote" || !v || v.key !== key || v.result !== null) return;
-    const def = squadsVotes(this.s)[v.index]!;
-    if (now > v.until + DEFAULT_SETTINGS.lateGraceMs || !Number.isInteger(option) || option < 0 || option >= def.options.length || !this.player(id)) return;
+    const def = this.votes()[v.index]!;
+    // ("Coming soon" can't be voted for.)
+    if (now > v.until + DEFAULT_SETTINGS.lateGraceMs || !votable(def, option) || !this.player(id)) return;
     const had = v.votes[id];
     if (!castPregameVote(had ? [{ playerId: id, option: had.option }] : [], { playerId: id, option }, DEFAULT_SETTINGS.voteChangeAllowed)) return;
     v.votes[id] = { option, at: now };
@@ -801,9 +884,9 @@ export class SquadsCore {
   private endVote() {
     const v = this.r.vote;
     if (this.r.phase !== "vote" || !v || v.result !== null) return;
-    const def = squadsVotes(this.s)[v.index]!;
+    const def = this.votes()[v.index]!;
     const cast = [...v.bots.map((b) => ({ playerId: b.id, option: b.option })), ...Object.entries(v.votes).map(([playerId, x]) => ({ playerId, option: x.option }))];
-    const { result, joined } = closePregameVote(cast, this.everyone(), def, squadsRng(this.r.seed, "vote", v.index, "tally"), (playerId, option) => ({ playerId, option }));
+    const { result, joined } = closePregameVote(cast, this.everyone(), def, squadsRng(this.r.seed, "vote", this.voteStream(v.index), "tally"), (playerId, option) => ({ playerId, option }));
     const now = this.io.now();
     v.result = result;
     for (const id of joined) v.votes[id] = { option: result, at: now, joined: true };
@@ -819,7 +902,7 @@ export class SquadsCore {
   private drawTheBracket() {
     if (this.r.phase !== "vote" && this.r.phase !== "filled") return;
     const now = this.io.now();
-    const rules = rulesFromVotes(this.r.voteResults, this.s);
+    const rules = rulesFromVotes(this.r.voteResults, this.s, this.r.test?.mode);
     if (this.r.test?.clock) rules.clock = this.r.test.clock;
     this.r.rules = rules;
     this.r.plan = planLobby(this.r.seed, rules, this.library, this.s);
@@ -844,7 +927,17 @@ export class SquadsCore {
     }
     this.r.bracket = bracket;
     this.placeNew();
-    for (const bm of bracket[start]!) this.createMatch(start as SquadsRound, bm.index, now + SQUADS_LOBBY.bracketIntroSeconds * 1000);
+    // Mercenary: every squad's wallet. A test lobby that starts after round 1 gives the squads still in a wallet to shop
+    // with, and its intro is long enough to shop in (their shops are open until their first match starts).
+    const merc = modeOf(rules) === "mercenary";
+    if (merc) this.r.wallets = this.r.squads.map((sq) => newWallet(sq.id));
+    const testShop = merc && start > 0;
+    if (testShop) {
+      for (const bm of bracket[start]!) for (const sq of bm.squads) if (sq !== null) this.earnCoins(sq, this.s.mercenary.testWallet, "test", start as SquadsRound);
+    }
+    const intro = testShop ? Math.max(SQUADS_LOBBY.bracketIntroSeconds, SQUADS_LOBBY.testShopSeconds) : SQUADS_LOBBY.bracketIntroSeconds;
+    for (const bm of bracket[start]!) this.createMatch(start as SquadsRound, bm.index, now + intro * 1000);
+    if (testShop) for (const bm of bracket[start]!) for (const sq of bm.squads) if (sq !== null) this.scheduleBotShop(sq, now);
     this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
     this.sendClocks();
   }
@@ -874,6 +967,7 @@ export class SquadsCore {
     this.r.matchKeys.push(key);
     this.touch(lm);
     this.sendAll((id) => this.matchMessage(lm, id, true));
+    if (round > 0) this.catchUp(lm);
   }
 
   private liveMatches(): LiveMatch[] {
@@ -894,6 +988,7 @@ export class SquadsCore {
       lm.half = null;
       delete lm.arm;
       this.touch(lm);
+      this.earnFrom(lm, events);
       this.sendAll({ t: "half", key: lm.key, seq: lm.seq, events, acted: [], missed: [], replaced: [], match: this.netMatch(lm, false) });
       this.matchOver(lm);
       return true;
@@ -931,6 +1026,8 @@ export class SquadsCore {
   // ---------------- A half ----------------
 
   private startHalf(lm: LiveMatch) {
+    // Mercenary: the shop closes as the match starts; what each squad bought comes in as its kit.
+    if (lm.seq === 0 && this.mercenary()) this.bringKits(lm);
     const m = lm.m;
     const now = this.io.now();
     const duties = halfDuties(m, this.s);
@@ -943,7 +1040,7 @@ export class SquadsCore {
       for (const p of d.players) {
         if (!this.botPlays(p)) continue;
         const bankMs = m.banks[d.side];
-        half.bots[p] = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: m.delayMs, deadlineMs: d.deadlineMs }, this.s);
+        half.bots[p] = squadBotThinkMs(squadsRng(m.seed, m.key, m.turn, m.half, d.board, "think", p), { bankMs, incrementMs: m.incrementMs, delayMs: delayOf(m, d.side), deadlineMs: d.deadlineMs }, this.s);
         boards.add(d.board);
       }
     }
@@ -953,8 +1050,9 @@ export class SquadsCore {
     this.touch(lm);
     this.sendAll({ t: "turn", key: lm.key, current: this.netHalf(lm)!, banks: [m.banks[0], m.banks[1]] });
     this.sendClocks();
-    // (The bracket shows the match as playing from its first half.)
+    // (The bracket shows the match as playing from its first half; Mercenary: its squads' shops are closed now.)
     if (half.seq === 0) this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
+    if (half.seq === 0) this.sendWallets();
   }
 
   /** Every squad's team clock, as the rules have it (a squad in a match: that match's bank; else its own). */
@@ -1044,6 +1142,176 @@ export class SquadsCore {
     this.sendAll({ t: "block", key, seq, block: r.block, bank: blockBankNow(lm.m, lm.half.inputs, r.block.side, this.s) });
   }
 
+  /**
+   * Mercenary: a person uses one of their squad's Stockfish tokens on their own decision this half (the rules'
+   * `useStockfish`). Everyone hears of it at once (the count is public); the lines show only on `shownTo`'s screens,
+   * worked out there.
+   */
+  private humanAssist(id: string, key: string, seq: number) {
+    const lm = this.matches.get(key);
+    const no = (reason: Extract<SquadsOutgoing, { t: "assistNo" }>["reason"]) => this.send(id, { t: "assistNo", key, seq, reason });
+    if (!lm || lm.state !== "half" || !lm.half || lm.half.seq !== seq) return no("stale");
+    const d = dutyOf(lm.m, id, this.s);
+    if (!d || this.botPlays(id)) return no("no_duty");
+    const elapsed = this.io.now() - lm.half.startedAt;
+    if (elapsed > d.duty.deadlineMs + DEFAULT_SETTINGS.lateGraceMs) return no("late");
+    const r = useStockfish(lm.m, lm.half.inputs, id, Math.min(elapsed, d.duty.deadlineMs), this.s);
+    if ("error" in r) return no(r.error);
+    lm.half.inputs = r.inputs;
+    this.touch(lm);
+    this.sendAll({ t: "assist", key, seq, use: r.use, stockfish: [stockfishNow(lm.m, lm.half.inputs, 0), stockfishNow(lm.m, lm.half.inputs, 1)] });
+  }
+
+  // ---------------- Mercenary: wallets and the shop ----------------
+
+  /** The lobby plays Mercenary (its Mode vote, or a test lobby's link). */
+  mercenary(): boolean {
+    return modeOf(this.r.rules) === "mercenary";
+  }
+
+  private wallet(squadId: number): Wallet | undefined {
+    return this.r.wallets?.[squadId];
+  }
+
+  private earnCoins(squadId: number, coins: number, why: CoinWhy, round: SquadsRound) {
+    const w = this.wallet(squadId);
+    if (!w || coins <= 0) return;
+    this.r.wallets![squadId] = earn(w, coins, why, round);
+  }
+
+  /** A half's (or a match's end's) "coins" events into the squads' wallets; whether there were any. */
+  private earnFrom(lm: LiveMatch, events: readonly SquadsEvent[]): boolean {
+    let any = false;
+    for (const e of events) {
+      if (e.kind !== "coins") continue;
+      this.earnCoins(lm.m.sides[e.side].squadId, e.coins, e.why, lm.round);
+      any = true;
+    }
+    return any;
+  }
+
+  /**
+   * A squad's shop: open from the end of its match until its next match's first half (the wait for the other match and
+   * the round break, which are there anyway), for a squad still in, never before round 1 (no coins yet). `until`: when
+   * its next match starts (null while the match that decides its opponent is still going).
+   */
+  shopOf(squadId: number): { round: SquadsRound; until: number | null } | null {
+    if (!this.mercenary() || this.r.phase !== "bracket" || !this.r.bracket || this.r.placed[squadId]) return null;
+    const bm = this.r.bracket.flat().find((x) => x.winner === null && x.squads.includes(squadId));
+    if (!bm || bm.round === 0) return null;
+    const lm = this.matches.get(`r${bm.round}m${bm.index}`);
+    if (lm && !(lm.state === "break" && lm.seq === 0)) return null;
+    return { round: bm.round, until: lm?.startsAt ?? null };
+  }
+
+  walletsView(): NetWallet[] {
+    return (this.r.wallets ?? []).map((w) => ({
+      squadId: w.squadId,
+      coins: w.coins,
+      earned: w.earned,
+      byRound: [w.byRound[0], w.byRound[1], w.byRound[2]],
+      catchUp: w.catchUp,
+      bought: { ...w.bought },
+      cart: { ...w.cart },
+      shop: this.shopOf(w.squadId),
+    }));
+  }
+
+  private sendWallets() {
+    if (this.mercenary()) this.sendAll({ t: "wallets", wallets: this.walletsView() });
+  }
+
+  /** Nobody on this squad is playing their seat here and now: its bots shop and use its items. */
+  private botRun(squadId: number): boolean {
+    const sq = this.r.squads[squadId];
+    return !!sq && !sq.players.some((p) => !playsAsBot(p) && !!this.human(p.id)?.connected && !this.human(p.id)?.left);
+  }
+
+  /** A person buys one of an item for their squad's next match (or puts one back), from its wallet, while its shop is open. */
+  private shopAction(id: string, item: unknown, undo: boolean) {
+    const sq = this.squadOf(id);
+    const w = sq ? this.wallet(sq.id) : undefined;
+    const no = (reason: Extract<SquadsOutgoing, { t: "shopNo" }>["reason"]) => this.send(id, { t: "shopNo", item: String(item), reason });
+    if (!sq || !w || !this.shopOf(sq.id)) return no("closed");
+    if (!isMercItem(item)) return no("unknown_item");
+    const r = undo ? unbuyItem(w, item, this.s) : buyItem(w, item, this.s);
+    if ("error" in r) return no(r.error);
+    this.r.wallets![sq.id] = r.wallet;
+    this.tellSquad(sq.id, { t: "bought", squadId: sq.id, by: id, item, price: "price" in r ? r.price : r.refund, undo });
+    this.sendWallets();
+  }
+
+  /** A message to a squad's people only. */
+  private tellSquad(squadId: number, msg: SquadsOutgoing) {
+    for (const p of this.r.squads[squadId]?.players ?? []) if (!p.isBot) this.send(p.id, msg);
+  }
+
+  /** A squad's shop has just opened: its bots shop a few seconds in (if nobody is playing on it then). */
+  private scheduleBotShop(squadId: number, from: number) {
+    const shop = this.shopOf(squadId);
+    if (!shop) return;
+    const [lo, hi] = this.s.mercenary.bots.shopSeconds;
+    const rng = squadsRng(this.r.seed, "shop-at", squadId, shop.round);
+    (this.r.botShop ??= {})[squadId] = from + Math.round((lo + rng() * (hi - lo)) * 1000);
+  }
+
+  /** Bot squads whose shopping time has come: they shop (mercenary.ts, `botShop`) while their shop is still open. */
+  private botShopDue(now: number): boolean {
+    const due = Object.entries(this.r.botShop ?? {}).filter(([, t]) => t <= now);
+    if (!due.length) return false;
+    let bought = false;
+    for (const [k] of due) {
+      delete this.r.botShop![Number(k)];
+      const squadId = Number(k);
+      const shop = this.shopOf(squadId);
+      let w = this.wallet(squadId);
+      if (!shop || !w || !this.botRun(squadId)) continue;
+      for (const item of botShop(squadsRng(this.r.seed, "shop", squadId, shop.round), w, shop.round === 2, this.s)) {
+        const r = buyItem(w, item, this.s);
+        if ("error" in r) break;
+        w = r.wallet;
+        bought = true;
+      }
+      this.r.wallets![squadId] = w;
+    }
+    if (bought) this.sendWallets();
+    return true;
+  }
+
+  /**
+   * Catch-up, as a match of round 2 or the final is set: the squad that has earned fewer coins by play gets a share of
+   * the difference (mercenary.ts, `catchUpCoins`). Everyone hears.
+   */
+  private catchUp(lm: LiveMatch) {
+    if (!this.mercenary()) return;
+    const ids = [lm.m.sides[0].squadId, lm.m.sides[1].squadId] as const;
+    const ws = ids.map((id) => this.wallet(id));
+    if (!ws[0] || !ws[1]) return;
+    const coins = catchUpCoins([ws[0].earned, ws[1].earned], this.s);
+    ([0, 1] as const).forEach((side) => {
+      if (!coins[side]) return;
+      this.earnCoins(ids[side], coins[side], "catch_up", lm.round);
+      this.sendAll({ t: "coins", squadId: ids[side], coins: coins[side], why: "catch_up", against: ids[side === 0 ? 1 : 0] });
+    });
+    this.sendWallets();
+  }
+
+  /** The shop closes as a match starts: each squad's cart comes in as its kit (time, block points, breather, tokens, shields). */
+  private bringKits(lm: LiveMatch) {
+    if (lm.m.kit !== null || lm.m.mode !== "mercenary") return;
+    const kits = lm.m.sides.map((side) => {
+      const w = this.wallet(side.squadId);
+      if (!w) return NO_ITEMS;
+      const t = takeCart(w);
+      this.r.wallets![side.squadId] = t.wallet;
+      delete this.r.botShop?.[side.squadId];
+      return t.kit;
+    }) as [ItemCounts, ItemCounts];
+    lm.m = applyKits(lm.m, kits, this.s);
+    this.touch(lm);
+    this.sendAll((id) => this.matchMessage(lm, id, false));
+  }
+
   /** Live choices, each player the ones they may see (their own squad's), and who has locked in. */
   private sendChoices(lm: LiveMatch, duty: Duty) {
     const half = lm.half!;
@@ -1086,7 +1354,21 @@ export class SquadsCore {
     let top = topAllowed(job?.top ?? fallbackTop(fen, this.s.bots.candidates, this.s), blocked);
     if (!top.length) top = topAllowed(fallbackTop(fen, squadsLegalMoves(fen).length, this.s), blocked).slice(0, this.s.bots.candidates);
     const p = this.player(bot);
-    const skill = squadBotSkill(top, p ? botSkillOf(p, this.s) : this.s.replacementBotSkill, this.s);
+    const elapsedNow = Math.min(this.io.now() - half.startedAt, d.duty.deadlineMs);
+    // Mercenary: a squad of bots now and then uses one of its Stockfish tokens (the engine's best, whatever its skill).
+    // Never a squad with people playing: their tokens are theirs to use.
+    let strong = false;
+    if (this.mercenary() && stockfishNow(m, half.inputs, d.duty.side) > 0 && this.botRun(m.sides[d.duty.side].squadId)) {
+      if (botUsesStockfish(squadsRng(m.seed, m.key, m.turn, m.half, board, "bot-stockfish", bot), top, this.s)) {
+        const used = useStockfish(m, half.inputs, bot, elapsedNow, this.s);
+        if ("inputs" in used) {
+          half.inputs = used.inputs;
+          strong = true;
+          this.sendAll({ t: "assist", key: lm.key, seq: half.seq, use: used.use, stockfish: [stockfishNow(m, half.inputs, 0), stockfishNow(m, half.inputs, 1)] });
+        }
+      }
+    }
+    const skill = strong ? DEFAULT_SETTINGS.botSkillRange[0] : squadBotSkill(top, p ? botSkillOf(p, this.s) : this.s.replacementBotSkill, this.s);
     const cands = candidatesFrom(top, this.s);
     const rng = squadsRng(m.seed, m.key, m.turn, m.half, board, "bot", bot);
     const partner = d.partner ? (half.inputs.choices[d.partner] ?? null) : null;
@@ -1098,12 +1380,14 @@ export class SquadsCore {
       const humans = d.team.filter((id) => !this.botPlays(id)).flatMap((id) => (half.inputs.choices[id] ? [half.inputs.choices[id]!] : []));
       move = botVotePick(rng, cands, skill, allowed, humans, this.s);
     }
-    const elapsed = Math.min(this.io.now() - half.startedAt, d.duty.deadlineMs);
+    const elapsed = elapsedNow;
     // Now and then a block of the other squad's likely best reply (before its own move: Relay's is made at once).
     const reply = top.find((t) => t.move === move)?.reply;
     const bank = blockBankNow(m, half.inputs, d.duty.side, this.s);
     const share = 1 / d.duty.players.length;
-    const blockMove = bank > 0 ? botBlock(squadsRng(m.seed, m.key, m.turn, m.half, board, "bot-block", bot), { fen, ownMove: move, reply, bank, share }, this.s) : null;
+    // (A test lobby's `bots=blocks`: they block whenever they can.)
+    const bs = this.r.test?.blocks ? { ...this.s, bots: { ...this.s.bots, blockChance: 100, sharpChance: 100, blockReserve: 0 } } : this.s;
+    const blockMove = bank > 0 ? botBlock(squadsRng(m.seed, m.key, m.turn, m.half, board, "bot-block", bot), { fen, ownMove: move, reply, bank, share }, bs) : null;
     if (blockMove) {
       const b = placeBlock(m, half.inputs, bot, board, blockMove, elapsed, this.s);
       if ("inputs" in b) {
@@ -1139,9 +1423,13 @@ export class SquadsCore {
     // Same-move tokens burned this half go to the judge (its verdict after the reveal).
     const jobs = new Map<string, { id: string; fen: string; n: number; nodes: number }[]>();
     for (const index of out.tokensUsed) this.requestJudge(lm, index, half, jobs);
+    // Mercenary: the half's coins into the wallets, and its possibly brilliant moves to the judge.
+    const earned = this.earnFrom(lm, out.events);
+    for (const cand of out.brilliant) this.requestBrilliant(lm, cand, half, jobs);
     for (const [device, list] of jobs) this.send(device, { t: "botWork", jobs: list });
     this.touch(lm);
     this.sendAll({ t: "half", key: lm.key, seq: half.seq, events: out.events, acted: out.acted, missed: out.missed, replaced, match: this.netMatch(lm, false) });
+    if (earned) this.sendWallets();
     if (replaced.length) this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
     if (lm.m.result) this.matchOver(lm);
     else this.sendClocks();
@@ -1180,10 +1468,42 @@ export class SquadsCore {
     }
   }
 
+  /**
+   * Mercenary: asks the judge whether a move was brilliant, the same way as for a token: the half's own bot work on
+   * that board, or a remembered answer, else devices (outside the match first, the mover's squad last). Bots' moves are
+   * judged only from work already done. Its verdict shows once the half's show is over.
+   */
+  private requestBrilliant(lm: LiveMatch, cand: BrilliantCandidate, half: HalfRecord | null, out: Map<string, { id: string; fen: string; n: number; nodes: number }[]>) {
+    const now = this.io.now();
+    const n = (lm.brilliantSeq = (lm.brilliantSeq ?? 0) + 1);
+    const id = `${lm.key}/b/${n}`;
+    const base = { id, fen: cand.fen, sentAt: now, answers: {}, index: n, notBefore: now + showMs(lm, this.s), brilliant: cand };
+    const own = half?.work[cand.board];
+    const jobs = (lm.brilliant ??= {});
+    if (own?.top && own.how && own.how !== "fallback" && own.fen === cand.fen) {
+      jobs[n] = { ...base, devices: [], top: own.top, how: own.how };
+      return;
+    }
+    const cached = TOP_CACHE.get(cand.fen);
+    if (cached) {
+      jobs[n] = { ...base, devices: [], top: cached, how: "cached" };
+      return;
+    }
+    if (!cand.finders.some((p) => !this.botPlays(p))) return;
+    const devices = this.pickDevices(lm, SQUADS_LOBBY.botWork.perJob, [], new Set(lm.m.sides[cand.side].seats));
+    const queued = !devices.length && Object.keys(this.r.devices).some((d) => this.deviceUp(d));
+    if (!devices.length && !queued) return;
+    jobs[n] = { ...base, devices, ...(queued ? { queued: true as const } : {}) };
+    for (const d of devices) {
+      this.r.devices[d]!.jobs++;
+      out.set(d, [...(out.get(d) ?? []), { id, fen: cand.fen, n: this.s.bots.candidates, nodes: SQUADS_LOBBY.botWork.nodes }]);
+    }
+  }
+
   /** When a match's judge work is next due: its devices' answers (the grace, the time limit), then its verdicts. */
   private judgeWakes(lm: LiveMatch): number[] {
     const out: number[] = [];
-    for (const job of Object.values(lm.judge ?? {})) {
+    for (const job of [...Object.values(lm.judge ?? {}), ...Object.values(lm.brilliant ?? {})]) {
       if (job.how) {
         out.push(job.notBefore);
         continue;
@@ -1214,6 +1534,21 @@ export class SquadsCore {
       this.sendAll({ t: "token", key: lm.key, index: job.index, use: m.tokenLog[job.index]!, tokens: m.tokens ? [m.tokens[0], m.tokens[1]] : null });
     }
     if (lm.judge && !Object.keys(lm.judge).length) delete lm.judge;
+    // Mercenary: brilliant moves, once the show is over: coins for the squad, and everyone hears who found it.
+    for (const job of Object.values(lm.brilliant ?? {})) {
+      if (!job.how && this.settle(lm, job)) changed = true;
+      if (!job.how || now < job.notBefore) continue;
+      delete lm.brilliant![job.index];
+      changed = true;
+      const cand = job.brilliant;
+      if (!cand || !isBrilliant(cand, job.how === "fallback" ? null : (job.top ?? null), this.s)) continue;
+      const squadId = lm.m.sides[cand.side].squadId;
+      const coins = this.s.mercenary.brilliant.coins;
+      this.earnCoins(squadId, coins, "brilliant", lm.round);
+      this.sendAll({ t: "coins", squadId, coins, why: "brilliant", key: lm.key, board: cand.board, move: cand.move, by: [...cand.finders] });
+      this.sendWallets();
+    }
+    if (lm.brilliant && !Object.keys(lm.brilliant).length) delete lm.brilliant;
     if (changed) this.touch(lm);
     return changed;
   }
@@ -1244,6 +1579,11 @@ export class SquadsCore {
     if (lm.round < 2) {
       const next = (lm.round + 1) as SquadsRound;
       this.createMatch(next, lm.index >> 1, now + this.s.roundBreakSeconds * 1000);
+      // Mercenary: the winner's shop is open now (until its next match starts); a squad of bots shops in a moment.
+      if (this.mercenary()) {
+        this.scheduleBotShop(winnerSquad(m)!, now);
+        this.sendWallets();
+      }
     } else {
       this.r.phase = "results";
       this.r.endedAt = now;
@@ -1364,9 +1704,9 @@ export class SquadsCore {
     if (this.r.phase === "vote" || this.r.phase === "filled") {
       this.r.testUsed = true;
       if (this.r.phase === "filled") this.startVote(0);
-      for (let i = 0; i < squadsVotes(this.s).length && this.r.phase === "vote"; i++) {
+      for (let i = 0; i < this.votes().length && this.r.phase === "vote"; i++) {
         this.endVote();
-        if (this.r.vote && this.r.vote.index + 1 < squadsVotes(this.s).length) this.startVote(this.r.vote.index + 1);
+        if (this.r.vote && this.r.vote.index + 1 < this.votes().length) this.startVote(this.r.vote.index + 1);
         else this.drawTheBracket();
       }
       return;
@@ -1388,6 +1728,7 @@ export class SquadsCore {
       lm.state = "show";
       lm.startsAt = now;
       this.touch(lm);
+      this.earnFrom(lm, events);
       this.sendAll({ t: "half", key: lm.key, seq, events, acted: [], missed: [], replaced: [], match: this.netMatch(lm, false) });
       this.matchOver(lm);
       // ("Next round" moves straight on: the next round's match begins after a short look at the bracket.)
@@ -1469,7 +1810,7 @@ export class SquadsCore {
   private liveJobs(): { lm: LiveMatch; job: WorkJob; judge?: JudgeJob }[] {
     return [
       ...this.liveMatches().flatMap((lm) => Object.values(lm.half?.work ?? {}).map((job) => ({ lm, job }))),
-      ...this.allMatches().flatMap((lm) => Object.values(lm.judge ?? {}).map((job) => ({ lm, job, judge: job }))),
+      ...this.allMatches().flatMap((lm) => [...Object.values(lm.judge ?? {}), ...Object.values(lm.brilliant ?? {})].map((job) => ({ lm, job, judge: job }))),
     ];
   }
 
@@ -1492,8 +1833,9 @@ export class SquadsCore {
     const out = new Map<string, { id: string; fen: string; n: number; nodes: number }[]>();
     let changed = false;
     for (const { lm, job, judge } of waiting) {
-      const use = judge ? lm.m.tokenLog[judge.index] : undefined;
-      const devices = this.pickDevices(lm, SQUADS_LOBBY.botWork.perJob, [], new Set(use ? lm.m.sides[use.side].seats : []));
+      // (A token's judge or a brilliant move's: the squad it concerns last.)
+      const concerns = judge?.brilliant?.side ?? (judge ? lm.m.tokenLog[judge.index]?.side : undefined);
+      const devices = this.pickDevices(lm, SQUADS_LOBBY.botWork.perJob, [], new Set(concerns !== undefined ? lm.m.sides[concerns].seats : []));
       if (!devices.length) break;
       delete job.queued;
       job.devices = devices;
@@ -1512,7 +1854,8 @@ export class SquadsCore {
   private jobById(id: string): { lm: LiveMatch; job: WorkJob } | null {
     const [key, seq, board] = String(id).split("/");
     const lm = key ? this.matches.get(key) : undefined;
-    const job = seq === "t" ? lm?.judge?.[Number(board)] : lm?.half && String(lm.half.seq) === seq ? lm.half.work[Number(board)] : undefined;
+    const job =
+      seq === "t" ? lm?.judge?.[Number(board)] : seq === "b" ? lm?.brilliant?.[Number(board)] : lm?.half && String(lm.half.seq) === seq ? lm.half.work[Number(board)] : undefined;
     return lm && job && job.id === id ? { lm, job } : null;
   }
 
@@ -1658,6 +2001,7 @@ export class SquadsCore {
       bracket: this.netBracket(),
       rules: this.r.rules,
       clocks: this.clocksView(),
+      wallets: this.walletsView(),
       ...(this.r.test ? { test: { start: this.r.test.start, used: true } } : this.r.testUsed ? { test: { start: 0 as SquadsRound, used: true } } : {}),
     };
   }
@@ -1740,6 +2084,13 @@ export class SquadsCore {
       blockBanks: [m.blockBanks[0], m.blockBanks[1]],
       blocks: m.blocks.map((b) => ({ ...b })),
       tokenLog: m.tokenLog.map((u) => ({ ...u, players: [...u.players], blocked: [...u.blocked] })),
+      mode: m.mode,
+      delays: [m.delays[0], m.delays[1]],
+      kit: m.kit ? [{ ...m.kit[0] }, { ...m.kit[1] }] : null,
+      stockfish: [m.stockfish[0], m.stockfish[1]],
+      shields: [m.shields[0], m.shields[1]],
+      assists: m.assists.map((a) => ({ ...a, shownTo: [...a.shownTo] })),
+      coins: [m.coins[0], m.coins[1]],
       ...(lm.drawn ? { drawnFinal: { points: [lm.drawn.result!.points[0], lm.drawn.result!.points[1]] as [number, number], timeLeft: [lm.drawn.banks[0], lm.drawn.banks[1]] as [number, number] } } : {}),
       ...(lm.arm ? { armageddonChoice: { ...lm.arm } } : {}),
     };
@@ -1754,6 +2105,7 @@ export class SquadsCore {
       visible: half ? visibleChoices(lm.m, half.inputs, this.sideIn(lm, id), this.s) : {},
       locked: half ? Object.keys(half.inputs.locked).filter((p) => half.inputs.locked[p]) : [],
       placed: half ? placedBlocks(lm.m, half.inputs, this.s) : [],
+      assisting: half ? placedAssists(lm.m, half.inputs, this.s) : [],
     };
   }
 }

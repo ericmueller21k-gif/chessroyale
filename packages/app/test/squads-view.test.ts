@@ -22,8 +22,16 @@ import {
   squadClocks,
   standingLine,
   standingsOrder,
+  canUseStockfish,
+  coinText,
+  freeMs,
+  itemText,
+  myAssist,
+  shopRows,
+  stockfishLeft,
   type LocalMatch,
 } from "../src/squads-view.ts";
+import { SQUADS } from "@chessroyale/core";
 import { SquadsClient } from "../src/squads.ts";
 
 /** A match as the client keeps it: two squads of four, `boards` boards, a half begun at t=0. */
@@ -48,6 +56,14 @@ function match(over: Partial<LocalMatch> = {}, boards = 4): LocalMatch {
     blockBanks: [5, 5],
     blocks: [],
     tokenLog: [],
+    mode: "classic",
+    delays: [3000, 3000],
+    kit: null,
+    stockfish: [0, 0],
+    shields: [0, 0],
+    assists: [],
+    coins: [0, 0],
+    assisting: [],
     state: "half",
     startsAt: null,
     current: null,
@@ -271,5 +287,54 @@ describe("cheat lines (test controls only)", () => {
       ["g1f3", "yellow"],
     ]);
     expect(arrows.every((a) => /^[+−]\d\.\d$/.test(a.label!))).toBe(true);
+  });
+});
+
+describe("Mercenary on screen", () => {
+  const M = SQUADS.mercenary;
+  const none = { stockfish: 0, breather: 0, blocks: 0, shield: 0, time: 0 };
+
+  it("the shop's rows: strongest first, the price now (risen for each bought), the cart against the round's cap, why not", () => {
+    const rows = shopRows({ coins: 260, bought: { ...none, shield: 1 }, cart: { ...none, shield: 1, time: M.items.time.cap } });
+    expect(rows.map((r) => r.item)).toEqual(["stockfish", "breather", "blocks", "shield", "time"]);
+    const by = Object.fromEntries(rows.map((r) => [r.item, r]));
+    expect(by.shield).toMatchObject({ price: M.items.shield.price + M.priceStep, count: 1, cap: M.items.shield.cap, bought: 1 });
+    expect(by.time).toMatchObject({ can: false, why: "cap" });
+    expect(by.stockfish).toMatchObject({ can: M.items.stockfish.price <= 260, why: M.items.stockfish.price <= 260 ? null : "coins" });
+    expect(by.blocks!.can).toBe(true);
+  });
+
+  it("every item's words carry its numbers from settings", () => {
+    expect(itemText("time").line).toContain(`+${M.timeSeconds}\u00a0s`);
+    expect(itemText("breather", SQUADS, 5).line).toContain(`5\u00a0s\u00a0→\u00a0${5 * M.breatherFactor}\u00a0s`);
+    expect(itemText("blocks").line).toContain(`+${M.blockPoints} block points`);
+    expect(itemText("stockfish").line).toContain(`top ${M.stockfish.lines} moves`);
+    expect(itemText("stockfish").line).toContain("Never theirs");
+    expect(coinText(12345)).toBe("12,345");
+  });
+
+  it("the Stockfish token: usable on your own decision with one left; the lines show to whoever they're shown to", () => {
+    const m = match({ mode: "mercenary", stockfish: [1, 0], current: half([duty(0, 0, ["a0"]), duty(1, 1, ["b1"])]) });
+    expect(canUseStockfish(m, "a0")).toBe(true);
+    expect(canUseStockfish(m, "b1")).toBe(false);
+    expect(canUseStockfish(m, "a3")).toBe(false);
+    expect(canUseStockfish({ ...m, mode: "classic" }, "a0")).toBe(false);
+    expect(canUseStockfish({ ...m, visible: { a0: "e2e4" } }, "a0")).toBe(false);
+    const use = { turn: 0, half: "w" as const, board: 0, side: 0 as const, by: "a0", fen: START_FEN, shownTo: ["a0"] };
+    const used = { ...m, assisting: [use] };
+    expect(stockfishLeft(used, 0)).toBe(0);
+    expect(myAssist(used, 0, "a0")).toEqual(use);
+    expect(myAssist(used, 0, "a1")).toBeNull();
+    expect(canUseStockfish(used, "a0")).toBe(false);
+  });
+
+  it("a breather's free seconds: the side's own", () => {
+    const m = match({ mode: "mercenary", delays: [6000, 3000] });
+    expect(freeMs(m, 0)).toBe(6000);
+    expect(freeMs(m, 1)).toBe(3000);
+    // The bank drains past the side's own free seconds: 5 s thinking drains nothing with a breather.
+    const live = { ...m, current: half([duty(0, 0, ["a0"]), duty(1, 1, ["b1"])]) };
+    expect(liveBank(live, 0, 5000)).toBe(60_000);
+    expect(liveBank(live, 1, 5000)).toBe(58_000);
   });
 });

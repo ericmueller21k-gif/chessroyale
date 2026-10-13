@@ -69,10 +69,13 @@ async function nextDuty(page: Page, after: string | null, timeout = 90_000): Pro
   return s!;
 }
 
-/** Into a test lobby from SCOTCH, as White, with strong bots, past the votes. */
-async function testLobby(page: Page, start: "relay" | "pairs" | "final") {
+/**
+ * Into a test lobby from SCOTCH, as White, with strong bots, past the votes. Blocks are Mercenary's (Classic has none):
+ * `mode` sets it (no Mode vote then).
+ */
+async function testLobby(page: Page, start: "relay" | "pairs" | "final", mode: "classic" | "mercenary" = "classic") {
   await named(page, "Tess");
-  const q = new URLSearchParams({ nolanding: "", debug: "", clock: "120,0,3,0", fen: SCOTCH, bots: "strong", seat: "white" });
+  const q = new URLSearchParams({ nolanding: "", debug: "", clock: "120,0,3,0", fen: SCOTCH, bots: "strong", seat: "white", mode });
   await page.goto(`/squads/test/${start}?${q}`);
   await expect(page.getByRole("button", { name: "Skip votes" })).toBeVisible({ timeout: 40_000 });
   await page.getByRole("button", { name: "Skip votes" }).click();
@@ -109,7 +112,7 @@ test("a same-move token: you and your partner take back with the queen, it plays
 
 test("a block: tap Block, their queen, where it would go; the arrow keeps drawing itself with its lock until they've moved, and they don't play it", async ({ page }) => {
   test.setTimeout(240_000);
-  await testLobby(page, "relay");
+  await testLobby(page, "relay", "mercenary");
   const s = await nextDuty(page, null);
   expect(s.duty!.role).toBe("move");
   expect(s.fen).toBe(SCOTCH);
@@ -154,7 +157,7 @@ test("a block: tap Block, their queen, where it would go; the arrow keeps drawin
 
 test("Cheat lines while blocking: the other squad's best moves (after yours, or as things stand)", async ({ page }) => {
   test.setTimeout(240_000);
-  await testLobby(page, "relay");
+  await testLobby(page, "relay", "mercenary");
   const s = await nextDuty(page, null);
   await page.getByRole("button", { name: /^Block · / }).click();
   const cheat = page.getByRole("button", { name: "Cheat lines" });
