@@ -58,6 +58,22 @@ async function goodMove(page: Page): Promise<string> {
 const middle = (sq: string) => sq[0]! >= "b" && sq[0]! <= "g" && Number(sq[1]) >= 3 && Number(sq[1]) <= 6;
 
 /**
+ * The duel this device's engine rates best. Online there's no ?laststand=0, and a duel that throws the game away is
+ * taken back by the God King's Last Stand: the crowd picks again, and the duel never reaches the board.
+ */
+async function bestDuel(page: Page, fen: string, duels: readonly string[]): Promise<string> {
+  const scored: { move: string; expected: number }[] = await page.evaluate(
+    async ({ fen, duels }) => {
+      const [engine] = await (window as any).match.engines();
+      return engine.scoreMoves(fen, duels);
+    },
+    { fen, duels },
+  );
+  expect(scored.map((m) => m.move).sort()).toEqual([...duels].sort());
+  return [...scored].sort((a, b) => b.expected - a.expected)[0]!.move;
+}
+
+/**
  * Plays good moves until his showdown's duel turn (holds on the way), and returns it. While it may follow your move,
  * you think a while, as a crowd does: his scout searches line-ups meanwhile (showdownSearchMs).
  */
@@ -241,7 +257,8 @@ test("Wrangler online: the host's engine lines up the showdown, the server check
   await tap(page, other.to);
   await page.waitForTimeout(800);
   expect(await phase(page)).toBe("play");
-  const duel = b.powers.allowed[0] as string;
+  // (The best of them: one that loses outright would be taken back by the God King's Last Stand.)
+  const duel = await bestDuel(page, b.board.fen, b.powers.allowed as string[]);
   await play(page, duel);
   await yourMove(page);
   expect((await bossNow(page)).board.history[b.board.history.length]).toBe(duel);
