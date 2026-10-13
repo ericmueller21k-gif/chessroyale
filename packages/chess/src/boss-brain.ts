@@ -46,9 +46,10 @@ export interface BrainNote {
   ms?: number;
   /**
    * Why Stockfish played it: Maia not loaded yet (or failed), too slow, every candidate vetoed, none of Maia's moves
-   * allowed, the bridge band's share, or the King's strike.
+   * allowed, the bridge band's share, the King's strike, or a power's follow-up its engine search scored (its best:
+   * Wrangler's reply to the showdown's duel).
    */
-  why?: "not ready" | "failed" | "no answer" | "guard" | "none allowed" | "share" | "strike";
+  why?: "not ready" | "failed" | "no answer" | "guard" | "none allowed" | "share" | "strike" | "power";
 }
 
 /** Within a guard: never more than maxLoss points, nor more than maxLogitLoss log-odds (a couple of points is always fine). */
@@ -154,6 +155,7 @@ export function brainLine(n: BrainNote): string {
     "not ready": "Stockfish (Maia loading)",
     failed: "Stockfish (Maia failed)",
     strike: "Stockfish (the King's strike)",
+    power: "Stockfish's best (power reply)",
     share: "Stockfish (bridge share)",
     "none allowed": "Stockfish (none of Maia's moves allowed)",
     "no answer": "Stockfish (Maia too slow)",

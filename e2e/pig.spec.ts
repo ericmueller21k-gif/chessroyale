@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { DEFAULT_SETTINGS } from "@chessroyale/core";
 import { BOARD_SEL, createLobbyFromHome, engineTop, test, watchFor } from "./helpers.ts";
 
 /**
@@ -7,7 +8,10 @@ import { BOARD_SEL, createLobbyFromHome, engineTop, test, watchFor } from "./hel
  * (a center pawn three squares, LONG PULL!), a lasso drag (?power=drag: from turn 2; LASSO!, one of your pieces one
  * square, never the king), and SHOWDOWN! (?power=showdown: searched by this device's engine at his next turn; perhaps
  * "Not yet..." first), the line-up yanked into the middle, "DRAW!", and the forced duel: only the duels can be played.
- * Then online (one run): the host's engine lines the showdown up, the server checks it and sends it to everyone.
+ * Then his reply: he takes back, the engine's best at full strength, never his brain's (Eric, Oct 13: on Maia at 600 he
+ * took another piece and lost his queen for free); on the phone you're an admin, so his brain is Maia, as Eric's was.
+ * Then online (one run): the host's engine lines the showdown up, the server checks it and sends it to everyone, and
+ * the host plays his reply.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
@@ -58,19 +62,90 @@ async function goodMove(page: Page): Promise<string> {
 const middle = (sq: string) => sq[0]! >= "b" && sq[0]! <= "g" && Number(sq[1]) >= 3 && Number(sq[1]) <= 6;
 
 /**
+ * Engine work on the page's own engine (the one his moves are played on): started in the page, its answer kept on
+ * `window` and polled, never awaited inside page.evaluate (LESSONS.md, "A navigation that never happened"). "top": the
+ * position's top line at `nodes`, as his reply to a duel is searched (bestReplyFrom); "score": the given moves scored.
+ */
+type EngineJob = { kind: "top"; fen: string; nodes: number } | { kind: "score"; fen: string; moves: readonly string[] };
+async function onPageEngine(page: Page, job: EngineJob): Promise<{ move: string; expected: number }[]> {
+  const key = await page.evaluate((job) => {
+    const w = window as any;
+    const store = (w.__pigEngine ??= {});
+    const k = `${job.kind}-${Math.random().toString(36).slice(2)}`;
+    store[k] = null;
+    const m = w.match;
+    const engine: Promise<any> = m.runner ? Promise.resolve(m.runner.opts.engines[0]) : m.engines().then((es: any[]) => es[0]);
+    void engine
+      .then((e) => (job.kind === "top" ? e.topMovesAt(job.fen, 1, job.nodes) : e.scoreMoves(job.fen, job.moves)))
+      .then(
+        (r: unknown) => (store[k] = { r }),
+        (err: unknown) => (store[k] = { r: [], error: String(err) }),
+      );
+    return k;
+  }, job);
+  let out: { r: { move: string; expected: number }[]; error?: string } | null = null;
+  await expect.poll(async () => (out = await page.evaluate((k) => (window as any).__pigEngine?.[k] ?? null, key)), { timeout: 60_000 }).not.toBeNull();
+  await page.evaluate((k) => delete (window as any).__pigEngine[k], key);
+  expect(out!.error).toBeUndefined();
+  return out!.r;
+}
+
+/**
  * The duel this device's engine rates best. Online there's no ?laststand=0, and a duel that throws the game away is
  * taken back by the God King's Last Stand: the crowd picks again, and the duel never reaches the board.
  */
 async function bestDuel(page: Page, fen: string, duels: readonly string[]): Promise<string> {
-  const scored: { move: string; expected: number }[] = await page.evaluate(
-    async ({ fen, duels }) => {
-      const [engine] = await (window as any).match.engines();
-      return engine.scoreMoves(fen, duels);
-    },
-    { fen, duels },
-  );
+  const scored = await onPageEngine(page, { kind: "score", fen, moves: duels });
   expect(scored.map((m) => m.move).sort()).toEqual([...duels].sort());
   return [...scored].sort((a, b) => b.expected - a.expected)[0]!.move;
+}
+
+/** The position after a duel (him to move), as the board plays it. */
+const afterDuel = (fen: string, duel: string) => {
+  const c = new Chess(fen);
+  c.move({ from: duel.slice(0, 2), to: duel.slice(2, 4) });
+  return c.fen();
+};
+/**
+ * His reply to a duel as the search scored it: the engine's best at full strength (one line at the boss's own budget, on
+ * the same engine he plays on: the same search, so the same move), worked out before the duel is played.
+ */
+async function bestReply(page: Page, fen: string, duel: string): Promise<string> {
+  const [line] = await onPageEngine(page, { kind: "top", fen: afterDuel(fen, duel), nodes: DEFAULT_SETTINGS.bossNodes });
+  expect(line, `a reply to ${duel}`).toBeTruthy();
+  return line!.move;
+}
+/** A duel whose best reply takes back on its square (his pieces in a line-up are protected), and that reply. */
+async function duelTakenBack(page: Page, fen: string, duels: readonly string[]): Promise<{ duel: string; reply: string }> {
+  const seen: string[] = [];
+  for (const duel of duels) {
+    const reply = await bestReply(page, fen, duel);
+    if (reply.slice(2, 4) === duel.slice(2, 4)) return { duel, reply };
+    seen.push(`${duel}: ${reply}`);
+  }
+  throw new Error(`no duel whose best reply takes back: ${seen.join(", ")}`);
+}
+/**
+ * After the duel: your move again, his reply on the board after it, taking back on the duel's square, and the engine's
+ * best (`reply`).
+ */
+async function checkReply(page: Page, ply: number, duel: string, reply: string) {
+  await yourMove(page);
+  const after = await bossNow(page);
+  expect(after.board.history[ply]).toBe(duel);
+  expect(after.board.history[ply + 1]).toBe(reply);
+  expect(reply.slice(2, 4)).toBe(duel.slice(2, 4));
+  expect(new Chess(after.board.fen).get(duel.slice(2, 4) as never)).toMatchObject({ color: after.crowdSide === "w" ? "b" : "w" });
+}
+
+/** Your profile says you're an admin (as /api/me does for an email in ADMIN_EMAILS): every boss on Maia for you. */
+async function asAdmin(page: Page) {
+  await page.route("**/api/me*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const res = await route.fetch();
+    const body = await res.json().catch(() => null);
+    await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+  });
 }
 
 /**
@@ -183,10 +258,13 @@ test("Wrangler's long pull as his first move, then a lasso drag (?power=drag)", 
   expect(errors).toEqual([]);
 });
 
-test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle, DRAW!, and only the duels can be played", async ({ page }) => {
+test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle, DRAW!, only the duels can be played, and he takes back", async ({ page }) => {
   test.setTimeout(7 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  // (On the phone you're an admin: his brain is Maia, no guard, as in Eric's game.)
+  const admin = test.info().project.name === "phone";
+  if (admin) await asAdmin(page);
   await page.goto("/?debug&clock=60&boss=pig&power=showdown&laststand=0");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await yourMove(page);
@@ -219,19 +297,21 @@ test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle
   await page.waitForTimeout(800);
   expect(await phase(page)).toBe("play");
   expect((await bossNow(page)).board.history.length).toBe(b.board.history.length);
-  // A duel: played as a normal move (the crowd's piece takes his).
-  const duel = b.powers.allowed[0] as string;
+  // A duel: played as a normal move (the crowd's piece takes his). Then his reply: he takes back, the engine's best at
+  // full strength (what the search scored), whatever his brain.
+  if (admin) expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Maia \d+ · no guard/);
+  const { duel, reply } = await duelTakenBack(page, b.board.fen, b.powers.allowed as string[]);
   await play(page, duel);
-  await yourMove(page);
+  await checkReply(page, b.board.history.length, duel, reply);
+  if (admin) expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Maia \d+ · no guard · Stockfish's best \(power reply\)$/);
   const after = await bossNow(page);
-  expect(after.board.history[b.board.history.length]).toBe(duel);
   expect(after.powers.allowed).toBeNull();
   await expect(page.locator(".pg-duels")).toHaveCount(0);
   await expect(page.locator(".duel-note")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
-test("Wrangler online: the host's engine lines up the showdown, the server checks it, and the duel is forced", async ({ page }) => {
+test("Wrangler online: the host's engine lines up the showdown, the server checks it, the duel is forced, and he takes back", async ({ page }) => {
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   const errors: string[] = [];
@@ -257,10 +337,11 @@ test("Wrangler online: the host's engine lines up the showdown, the server check
   await tap(page, other.to);
   await page.waitForTimeout(800);
   expect(await phase(page)).toBe("play");
-  // (The best of them: one that loses outright would be taken back by the God King's Last Stand.)
+  // (The best of them: one that loses outright would be taken back by the God King's Last Stand.) His reply, from
+  // the host (this page) through the server: he takes back, the engine's best at full strength.
   const duel = await bestDuel(page, b.board.fen, b.powers.allowed as string[]);
+  const reply = await bestReply(page, b.board.fen, duel);
   await play(page, duel);
-  await yourMove(page);
-  expect((await bossNow(page)).board.history[b.board.history.length]).toBe(duel);
+  await checkReply(page, b.board.history.length, duel, reply);
   expect(errors).toEqual([]);
 });

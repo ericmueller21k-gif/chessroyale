@@ -124,6 +124,9 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A loop that ends only when a check says "done" (a flood fill, a search) also has a bound it can't pass: a visited
     set, each item queued once.
   - Test a tool the way it gets used: many times in a row, on its own result, not once on a fresh state.
+- **A queen won for free** (Oct 13, [story](../docs/history/lessons.md#a-queen-won-for-free-oct-13-2026)): a power's
+  follow-up move that its engine search scored is played by the engine (`BossRules.bestReply`), never the boss's brain
+  or a slip; a test plays the move after the power, on the weakest brain the boss can have.
 
 ## Servers: everything ends
 
