@@ -174,7 +174,9 @@ test("the shop between rounds, a Stockfish token and a shield: bought with the s
     setInterval(() => {
       const s = w.squads;
       for (const m of s.matches.values()) {
-        for (const e of m.last?.events ?? []) if (e.kind === "block" && e.outcome === "shielded" && !w.__shielded.some((x: any) => x.key === m.key && x.seq === m.last.seq && x.move === e.move)) w.__shielded.push({ key: m.key, seq: m.last.seq, move: e.move, side: e.side });
+        // (Each block once: by match, half, board, side and move. Both squads often block the same move, one on each
+        // board from the same start, and both may have a shield.)
+        for (const e of m.last?.events ?? []) if (e.kind === "block" && e.outcome === "shielded" && !w.__shielded.some((x: any) => x.key === m.key && x.seq === m.last.seq && x.board === e.board && x.side === e.side && x.move === e.move)) w.__shielded.push({ key: m.key, seq: m.last.seq, board: e.board, move: e.move, side: e.side });
       }
       if (s.banner?.kind && !w.__banners.includes(s.banner.kind)) w.__banners.push(s.banner.kind);
     }, 100);
