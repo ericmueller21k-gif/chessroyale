@@ -129,10 +129,14 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
   - **His voice:** lines true to the chess persona: anti-theory, anti-engine, "real chess", and when the four team up on
     him, how the Russians teamed up and conspired against him. Eric will supply specifics.
   - **Difficulty (Eric, Oct 14; replaces "fairly easy"):** an elite challenge. His strength doesn't follow the
-    squad's ratings: it's fixed and very strong, **about 3000**, so it takes four elite players (possibly GM level)
-    to beat him. The goal is a fight people talk about and gather their strongest friends for. **All four players
-    must beat him** to complete it.
-    - **His brain is Stockfish:** Maia can't play him. It never saw Fischer Random in training, and it tops out far
+    squad's ratings: it's fixed. In phase 2 it's very strong, **about 3000**, so it takes four elite players
+    (possibly GM level) to beat him. The goal is a fight people talk about and gather their strongest friends for.
+    **All four players must beat him** to complete it.
+    - **Phase 1 is Maia at its strongest (Eric, Oct 14):** "so it feels like an aggressive human playing, which is
+      how [he] would play". The normal-chess board is played by Maia-3 at its top rating (2500 in our setup,
+      `maiaRatingFor`), raw (no guard, no Stockfish share), so his moves are a strong human's. Maia has no style
+      dial: it plays like people at that rating, so his aggressive flavor comes from his lines, art and ultimate.
+    - **Phase 2's brain is Stockfish:** Maia can't play it. It never saw Fischer Random in training, and it tops out far
       below 3000 anyway (it's held at 2500, and Stockfish takes over from 2800 even in normal chess). Stockfish plays
       Fischer Random natively and reaches 3000 (its strength limiter goes up to 3190, already used by raid tier 10).
       It's a fitting irony: in Fischer Random Stockfish has no opening book either and calculates from move 1.
@@ -144,8 +148,8 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
     - **Tuning plan:** a single setting for his strength. First, engine-against-engine tests in Fischer Random at
       the real clock (engine "players" at about 2500–2700 against him at 2800 / 3000 / 3190) for a starting point.
       They can't capture human time trouble, so real tuning comes from strong players trying him after launch.
-    - **Open:** phase 1's strength (default: the same); what happens to the other boards once one board is lost
-      (default: they play on, but the reward needs all four).
+    - **Open:** what happens to the other boards once one board is lost (default: they play on, but the reward
+      needs all four).
   - **Fischer Random takes real rules work:** our rules library (chess.js 1.4) has no Fischer Random castling, so
     the rules code and the board need it (full test lane). A simpler fallback is random back ranks with castling
     turned off, but that isn't true Fischer Random. Decide at build time.
