@@ -290,8 +290,8 @@ last):
 | Batch | Items | Running total | Status |
 | --- | --- | --- | --- |
 | 1 | Crate, supply box, two-crate page; Winter Scarf; the 5 Classics; Smiley Face, Tommy Gun, Dark Shades, Suit and Tie, Eyepatch | 10 of 28 | Live (PR #141) |
-| 2 | Agent: Fake Mustache, Fedora, Briefcase, Wire Earpiece; Pirate: Bandana, Hook, Cutlass, Spyglass, Captain's Coat, Pirate Hat, Parrot | 21 (agent and pirate complete) | Built |
-| 3 | Ninja: Headband, Shuriken, Ninja Mask, Nunchucks, Katana, Ninja Hood, Ninja Gi | 28 (complete) | Next |
+| 2 | Agent: Fake Mustache, Fedora, Briefcase, Wire Earpiece; Pirate: Bandana, Hook, Cutlass, Spyglass, Captain's Coat, Pirate Hat, Parrot | 21 (agent and pirate complete) | Live (PR #181) |
+| 3 | Ninja: Headband, Shuriken, Ninja Mask, Nunchucks, Katana, Ninja Hood, Ninja Gi | 28 (complete) | Built: the crate is complete, at the final odds above |
 
 ### Odds after batch 2
 
@@ -304,4 +304,4 @@ last):
 | Fischer Random | 2% | Legendary 80%: Pirate Hat, Smiley Face | 0.8% each |
 | | | Mythic 20%: Tommy Gun, Parrot | 0.2% each |
 
-(The two Epic items are each likelier than a Common one until the ninja's two Epics join; batch 3 evens it out.)
+(The two Epic items were each likelier than a Common one until the ninja's two Epics joined in batch 3.)
