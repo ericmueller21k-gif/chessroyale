@@ -55,6 +55,10 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   there). The dots show both. `destsFor` adds those squares and `gestureMoves` turns a gesture into its move
   (`board/logic.ts`); a normal FEN gets exactly what it always did. Both pieces slide (`follow`), swaps included, and
   the sound is castling's (`move-sound.ts`).
+- **Four boards in one square** (the Hidden Boss's phase 2, `screens/Recluse2.tsx`): each board is an ordinary board in
+  a cell of the square (`.rc-stage`; its board-wrap forced to the cell's width, since `.board-area .board-wrap` sizes
+  boards to the screen). The phase change grows four full boards out of quarters with a transform and a clip only, so
+  each board keeps the size it measured; the shuffle is the board's own slide from one FEN to the next.
 - **The pieces** are the cburnett set (Colin M.L. Burnett) from Wikimedia Commons under the BSD license
   (`board/pieces/`: the files, `LICENSE.txt`, `SOURCES.md`), drawn by `board/pieces.css` on the board, on anything
   else drawn with them (a layer marked `.hb-pieces`: ghosts, the bounce, the split, the Last Stand's piece, the God

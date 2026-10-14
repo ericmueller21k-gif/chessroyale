@@ -166,7 +166,7 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, the God Kin
   const BANK = BOSS_POWERS.bulletBankSeconds * 1000;
   const allowed = await page.evaluate(() => (window as any).match.phase.allowedMs as number);
   expect(allowed).toBe(BANK);
-  await expect(page.locator(".boss-dock-status .bullet-note")).toContainText(/Bullet · [23]:\d\d left/);
+  await expect(page.locator(".boss-dock-status .bullet-note")).toContainText(/Bullet · \d:\d\d left/);
   // No increment: a move's time comes out of the bank, nothing goes back.
   await page.waitForTimeout(1500);
   await play(page, await quietMove(page));
@@ -213,7 +213,36 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Engine move" })).toHaveCount(0);
 });
 
-test("beaten (?win=1): he collapses and mumbles on the board, then the result screen, a win, still mumbling", async ({ page }) => {
+/** Your phase 2 board: big on a phone, at the bottom left of the four on a computer. */
+const myBoard = (page: Page) => page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .board-row > .board-wrap:not(.rc-stage) .hb-board").first();
+const simulNow = (p: Page) => p.evaluate(() => (window as any).match?.simul ?? null);
+/** A move on your phase 2 board with real taps (White's side down), until it's taken. */
+async function simulPlay(page: Page, move: string) {
+  await expect.poll(async () => (await simulNow(page))?.boards[0].toMove, { timeout: 60_000 }).toBe("crowd");
+  const before = (await simulNow(page)).boards[0].history.length;
+  for (let i = 0; i < 5 && (await simulNow(page))?.boards[0].history.length === before; i++) {
+    const b = (await myBoard(page).boundingBox())!;
+    for (const sq of [move.slice(0, 2), move.slice(2, 4)]) {
+      const f = sq.charCodeAt(0) - 97;
+      const r = Number(sq[1]) - 1;
+      await page.mouse.click(b.x + (f + 0.5) * (b.width / 8), b.y + (7 - r + 0.5) * (b.height / 8));
+    }
+    await page.waitForTimeout(300);
+  }
+  expect((await simulNow(page))?.boards[0].history.length ?? before + 1).toBeGreaterThan(before);
+}
+/** Resign from the match's control, the way this device has it (a phone's "⋯" sheet; a computer's flag), and confirm. */
+async function resignHere(page: Page, note: RegExp) {
+  if (test.info().project.name === "phone") {
+    await page.getByRole("button", { name: "Match options" }).click();
+    await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^Resign$/ }).click();
+  } else await page.getByRole("button", { name: "Resign", exact: true }).click();
+  const confirm = page.getByRole("alertdialog");
+  await expect(confirm.locator(".mm-confirm-note")).toHaveText(note);
+  await confirm.getByRole("button", { name: /Resign/ }).click();
+}
+
+test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase change (the book's slam, the split, his revive, the shuffle) and four boards; all four won: Victory!", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -221,27 +250,121 @@ test("beaten (?win=1): he collapses and mumbles on the board, then the result sc
   await yourMove(page);
   const fall = await watchFor(page, {
     collapse: { selector: `${figure()}[data-anim="collapse"]` },
-    slumped: { selector: ".boss-char[data-anim=\"collapseLoop\"]" },
     dock: { selector: ".boss-dock-status", text: /You beat him!/ },
     mumble: { selector: ".bc-bubble", text: /the book said|Morphy, I think everyone agrees|Sixty-four squares/ },
   });
+  const change = await watchFor(page, {
+    book: { selector: ".rc-book canvas" },
+    crack: { selector: ".rc-crack canvas" },
+    split: { selector: ".rc-split.rc-q3" },
+    revive: { selector: `${figure()}[data-anim="revive"]` },
+    banner: { selector: ".fight-banner", text: /PHASE 2/ },
+    idle2: { selector: `${figure()}[data-anim="idle2"]` },
+    reviveLine: { selector: ".bc-bubble", text: /Not yet\. Now we play real chess\.|On your feet, all of you\. Again!/ },
+  });
   await play(page, "h5f7");
-  // The board holds while he falls (no result yet), then the result.
+  // The board holds while he falls, then (no result screen) the phase change, then phase 2's four boards.
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 60_000 }).toBe(true);
   expect((await bossNow(page)).result).toBe("crowd");
-  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("phaseChange");
   expect(await fall.seen()).toMatchObject({ collapse: true, dock: true });
+  const at = Date.now();
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 }).toBe(true);
+  // (About 7 s: PHASE_CHANGE.total.)
+  expect(Date.now() - at).toBeLessThan(10_000);
+  expect(await phase(page)).toBe("simul");
+  expect(await change.seen()).toMatchObject({ book: true, crack: true, split: true, revive: true, banner: true });
+  const v = await simulNow(page);
+  expect(v.boards).toHaveLength(4);
+  // (Every board from a base at ply 0 with its start: here the test switch's mate in one, written as Chess960.)
+  for (const b of v.boards) expect(b.bases).toEqual([{ ply: 0, fen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w HAha - 4 4" }]);
+  if (test.info().project.name === "phone") await expect(page.locator(".rc-mini")).toHaveCount(3);
+  else await expect(page.locator(".rc-played .hb-board")).toHaveCount(4);
+  // Your Qxf7 mates on your board; the bots mate on theirs: every board won.
+  await simulPlay(page, "h5f7");
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
   await expect(page.locator(".results h1")).toHaveText("Victory!");
-  await expect(page.locator(".team-result")).toContainText("The crowd beat Hidden Boss!");
-  // On the result screen he stays slumped, mumbling (never back on his feet).
-  const results = page.locator(".boss-char.place-results");
-  await expect(results).toHaveAttribute("data-anim", "collapseLoop", { timeout: 10_000 });
-  await expect.poll(() => fall.seen(), { timeout: 20_000 }).toEqual({ collapse: true, slumped: true, dock: true, mumble: true });
-  // His words beside him there, never over him.
-  await expect(results.locator(".bc-bubble")).toBeVisible({ timeout: 15_000 });
-  const fig = (await results.locator("canvas").boundingBox())!;
-  const bubble = (await results.locator(".bc-bubble").boundingBox())!;
-  expect(bubble.x, "the bubble starts right of his middle").toBeGreaterThan(fig.x + fig.width / 2);
-  expect(bubble.x + bubble.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+  await expect(page.locator(".team-result")).toContainText("You beat Hidden Boss on all 4 boards!");
+  // His defeat in phase 2 (a placeholder for his transformation: the spellbook's glow, his hair in the wind).
+  await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /spellbook2|spellLoop2/, { timeout: 10_000 });
+  expect(await change.seen()).toMatchObject({ idle2: true, reviveLine: true });
+  expect(errors).toEqual([]);
+});
+
+test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 2750 answers your move; Engine move on your board; the God King's help mocked", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await meetHim(page, "phase=2");
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 }).toBe(true);
+  const v = await simulNow(page);
+  expect(new Set(v.boards.map((b: { number: number }) => b.number)).size).toBe(4);
+  expect(new Set(v.boards.map((b: { fen: string }) => b.fen)).size).toBe(4);
+  for (const b of v.boards) {
+    expect(b.fen).toMatch(/ w [A-H]{2}[a-h]{2} - 0 1$/);
+    expect(b.bases).toEqual([{ ply: 0, fen: b.fen }]);
+  }
+  await expect.poll(() => page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Stockfish 2750/);
+  // A pawn move of yours, with real taps; he answers on your board.
+  const fen = v.boards[0].fen as string;
+  const pawn = new Chess(fen.replace(/ [A-Ha-h]+ - /, " - - ")).moves({ verbose: true }).find((m) => m.piece === "p" && m.from[0] === "d" && m.to[1] === "4")!;
+  await simulPlay(page, pawn.lan);
+  await expect.poll(async () => (await simulNow(page)).boards[0].history.length, { timeout: 30_000 }).toBe(2);
+  // Engine move (admins): Stockfish's best on your Chess960 board, played as yours.
+  const btn = page.getByRole("button", { name: "Engine move", exact: true });
+  await expect(btn).toBeEnabled({ timeout: 30_000 });
+  await btn.click();
+  await expect.poll(async () => (await simulNow(page)).boards[0].history.length, { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
+  // The God King's help tried: blocked, he slams the book (phase 2's slam), and the God King says it won't take hold.
+  const mock = await watchFor(page, {
+    slam: { selector: `${figure()}[data-anim="slam2"]` },
+    king: { selector: ".gk-bubble", text: /won't take hold|shrugs off my strength|can't reach him/ },
+  });
+  await page.getByRole("button", { name: /God King: tap to summon/ }).click();
+  await page.getByRole("menuitem", { name: /Strike/ }).click();
+  await expect.poll(() => mock.seen(), { timeout: 10_000 }).toEqual({ slam: true, king: true });
+  // The bots play their boards meanwhile.
+  await expect.poll(async () => (await simulNow(page)).boards.slice(1).every((b: { history: string[] }) => b.history.length >= 2), { timeout: 30_000 }).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defeated, 3 of 4 won", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await meetHim(page, "win=1&phase=2");
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 }).toBe(true);
+  await resignHere(page, /Your board is lost\. The other boards play on, but all four must be won\./);
+  await expect.poll(async () => (await simulNow(page))?.boards[0].result?.how ?? null, { timeout: 10_000 }).toBe("resign");
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
+  await expect(page.locator(".results h1")).toHaveText("Defeated");
+  await expect(page.locator(".team-result")).toContainText("Hidden Boss won. You won 3 of 4 boards: all 4 must be won.");
+  await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /laugh2|idle2/, { timeout: 10_000 });
+  expect(errors).toEqual([]);
+});
+
+test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spellbook; then 5 s a move, and out of time a random move is played for you, never a loss", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await meetHim(page, "phase=2");
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 }).toBe(true);
+  // Before it: your bank, and the slow moves counted in the dock.
+  await expect(page.locator(".boss-dock-status")).toContainText(/Your clock \d:\d\d · slow moves \d of 5/);
+  const ult = await watchFor(page, {
+    banner: { selector: ".fight-banner", text: /5 SECONDS!/ },
+    spell: { selector: `${figure()}[data-anim="spellbook2"]` },
+    line: { selector: ".bc-bubble", text: /That's enough!|Enough thinking!/ },
+  });
+  await page.getByRole("button", { name: "Trigger ultimate (testing)" }).click();
+  await expect.poll(async () => (await simulNow(page))?.ultAt ?? null, { timeout: 5_000 }).not.toBeNull();
+  await expect(page.getByRole("button", { name: "Ultimate under way (testing)" })).toBeDisabled();
+  await expect(page.locator(".boss-dock-status")).toContainText(/5 s a move/);
+  await expect.poll(() => ult.seen(), { timeout: 10_000 }).toEqual({ banner: true, spell: true, line: true });
+  // You don't move: within 5 s (and the clock check's beat) a random legal move is played for you, and the board goes on.
+  const before = (await simulNow(page)).boards[0].history.length;
+  await expect.poll(async () => (await simulNow(page)).boards[0].history.length, { timeout: 12_000 }).toBeGreaterThan(before);
+  expect((await simulNow(page)).boards[0].result).toBeNull();
   expect(errors).toEqual([]);
 });

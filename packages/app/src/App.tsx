@@ -19,6 +19,7 @@ import { LobbyScreen } from "./screens/Lobby.tsx";
 import { QueueLine, QueueScreen } from "./screens/Queue.tsx";
 import { OpeningGrid } from "./screens/OpeningGrid.tsx";
 import { PlayScreen } from "./screens/Play.tsx";
+import { PhaseChangeScreen, SimulScreen } from "./screens/Recluse2.tsx";
 import { ResultsScreen } from "./screens/Results.tsx";
 import { RevealScreen } from "./screens/Reveal.tsx";
 import { SoundLab } from "./screens/SoundLab.tsx";
@@ -1088,7 +1089,7 @@ export function App() {
   });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages (and the pre-game votes, so the
   // board is in the same place when the game begins).
-  const tower = ["vote", "play", "scoring", "reveal", "spectating", "final", "watching", "boss"].includes(match.phase.kind) && match.standings().length > 0;
+  const tower = ["vote", "play", "scoring", "reveal", "spectating", "final", "watching", "boss", "phaseChange", "simul"].includes(match.phase.kind) && match.standings().length > 0;
   if (!tower)
     return (
       <>
@@ -1196,6 +1197,10 @@ function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () =>
       return <VoteScreen match={match} vote={p.vote} menu={<MatchMenu exit={exitFor(match)} />} />;
     case "boss":
       return <BossScreen match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} lights={p.lights} fall={p.fall} />;
+    case "phaseChange":
+      return <PhaseChangeScreen match={match} at={p.at} />;
+    case "simul":
+      return <SimulScreen match={match} />;
     case "results":
       return (
         <ResultsScreen

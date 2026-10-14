@@ -111,7 +111,7 @@ export interface EngineLike {
   topMoves(fen: string, n: number): Promise<MoveScore[]>;
   scoreMoves(fen: string, moves: readonly string[]): Promise<MoveScore[]>;
   /** A move at a limited strength (the boss); engines without it play their top move. */
-  playAtElo?(fen: string, elo: number, nodes?: number): Promise<string>;
+  playAtElo?(fen: string, elo: number, nodes?: number, moveMs?: number): Promise<string>;
   /** A deeper search over a few moves (the re-check); engines without it skip the re-check. */
   scoreMovesAt?(fen: string, moves: readonly string[], nodes: number): Promise<MoveScore[]>;
   /** Top moves at another budget (the Big Bounce's quick look at a few positions); engines without it use topMoves. */

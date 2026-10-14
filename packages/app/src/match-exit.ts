@@ -25,8 +25,10 @@ export function exitFor(m: GameView): MatchExit | null {
 }
 
 /** The confirm's line: what happens if you go now. */
-export function exitNote(m: Pick<GameView, "serverPaced" | "seatToBot" | "boss" | "totalPlayers" | "standings">, kind: ExitKind): string {
+export function exitNote(m: Pick<GameView, "serverPaced" | "seatToBot" | "boss" | "totalPlayers" | "standings" | "simul">, kind: ExitKind): string {
   const online = !!m.serverPaced;
+  // (The Hidden Boss's phase 2: resigning is your board's; leaving once it's decided ends the battle.)
+  if (m.simul?.playing) return kind === "resign" ? "Your board is lost. The other boards play on, but all four must be won." : "The battle ends here, and the boss wins it.";
   const out = !!m.standings().find((s) => s.isYou)?.out;
   if (kind === "leave") {
     if (out) return online ? "You're already out, so your result stands. You'll go home." : "You're already out, so your result stands. You'll see it now.";

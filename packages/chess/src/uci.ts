@@ -234,9 +234,10 @@ export class UciEngine {
   /**
    * A move played the way Stockfish plays at a given strength (UCI_Elo, 1320 to
    * 3190, CCRL-anchored): the boss in a boss battle. Strength limits are switched
-   * off again afterwards, so scoring searches are unaffected.
+   * off again afterwards, so scoring searches are unaffected. `moveMs`: also never longer than this (the Hidden Boss's
+   * phase 2, four boards on a phone); the search stops at whichever limit comes first.
    */
-  playAtElo(fen: string, elo: number, nodes = this.options.nodes): Promise<string> {
+  playAtElo(fen: string, elo: number, nodes = this.options.nodes, moveMs?: number): Promise<string> {
     return this.serial(async () => {
       this.transport.send("ucinewgame");
       this.transport.send("setoption name MultiPV value 1");
@@ -245,7 +246,7 @@ export class UciEngine {
       await this.ready();
       this.setPosition(fen);
       const done = this.until((l) => l.startsWith("bestmove"));
-      this.transport.send(`go nodes ${nodes}`);
+      this.transport.send(`go nodes ${nodes}` + (moveMs ? ` movetime ${Math.max(1, Math.round(moveMs))}` : ""));
       const lines = await done;
       this.transport.send("setoption name UCI_LimitStrength value false");
       await this.ready();

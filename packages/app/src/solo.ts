@@ -1,14 +1,17 @@
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
+import { RECLUSE_PHASE2, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, type Augment, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
-import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
+import { phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, LAST_STAND_MS, powerMomentMs } from "@chessroyale/chess";
+import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
+import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game } from "./recluse-phase2.ts";
+import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
+import { playInPlace, setFigureRun } from "./components/BossCharacter.tsx";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { RoundProgress } from "./progress.ts";
 import { ownEngine, warmEngineServer, withServerRecheck } from "./engine.ts";
 import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { crowdMoveCues, kingSay, resetKingSpeech } from "./godKing.ts";
-import { bossVoice } from "./speech.tsx";
+import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
 import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
@@ -218,10 +221,19 @@ export class SoloMatch implements GameView {
     this.live = null;
     this.lights = null;
     this.lobbyChat.close();
+    this.phase2?.stop();
   }
 
   get exit(): ExitKind | null {
     const k = this.phase.kind;
+    // (The Hidden Boss's phase change plays through; in phase 2, resigning is your board's, and once it's decided,
+    // leaving ends the battle where it stands. Nothing once every board is decided: the result is on its way.)
+    if (k === "phaseChange") return null;
+    if (k === "simul") {
+      const g = this.phase2;
+      if (this.stopped || !g || !this.phase2Playing || g.outcome.decided) return null;
+      return g.board(0)?.result ? "leave" : "resign";
+    }
     // (Nor while a beaten boss falls: the battle is over, its result on its way.)
     if (this.stopped || k === "results" || k === "loading" || (k === "boss" && this.phase.kind === "boss" && this.phase.fall)) return null;
     if (!this.begun) return "leave";
@@ -240,6 +252,11 @@ export class SoloMatch implements GameView {
   resign() {
     const exit = this.exit;
     if (!exit) return;
+    // (Phase 2: your board is lost and the others play on; already decided, the battle ends here.)
+    if (this.phase.kind === "simul" && this.phase2) {
+      if (exit === "resign") return this.phase2.resign(0);
+      return this.finishPhase2();
+    }
     const home = this.exitHome;
     const alive = this.you.alive;
     const alone = this.alone;
@@ -428,6 +445,11 @@ export class SoloMatch implements GameView {
   /** Testing, admins: what the boss's brain did with its last move ("Maia 1450 · no guard · Maia's #1 · 120 ms"). */
   get brainLine(): string | null {
     if (!this.brainShown || !this.runner) return null;
+    // (Phase 2: Stockfish only, at his fixed strength, within his time a move.)
+    if (this.phase2) {
+      const ms = this.phase2.lastMs;
+      return `Stockfish ${RECLUSE_PHASE2.elo} · at most ${RECLUSE_PHASE2.moveMs} ms${ms !== null ? ` · last ${Math.round(ms)} ms` : ""}`;
+    }
     const note = this.runner.brainNote;
     if (note) return brainWords(note);
     const hb = this.runner.humanBrain;
@@ -597,6 +619,8 @@ export class SoloMatch implements GameView {
    * the boss's reply and powers as usual). The power-up hints' search: the moves this turn allows, already under way.
    */
   engineMove() {
+    // (The Hidden Boss's phase 2: your board, its Chess960 position, on this device's engine; then your move as usual.)
+    if (this.phase.kind === "simul") return this.engineMove960();
     if (!this.engineMoveShown || this.engineThinking || this.phase.kind !== "play") return;
     if (Date.now() < this.playStartedAt - 300) return;
     const fen = this.phase.board.fen;
@@ -613,9 +637,29 @@ export class SoloMatch implements GameView {
       });
   }
 
+  /** Engine move on your phase 2 board: Stockfish's best (UCI_Chess960 on for the position), played as your move. */
+  private engineMove960() {
+    const b = this.phase2?.board(0);
+    if (!this.engineMoveShown || this.engineThinking || !this.phase2Playing || !b || b.result || b.turnAt === null) return;
+    const fen = b.board.fen;
+    this.engineThinking = true;
+    this.emit();
+    void this.engines[this.engines.length - 1]!
+      .topMoves(fen, 1)
+      .catch(() => [])
+      .then((top) => {
+        this.engineThinking = false;
+        const best = top[0]?.move;
+        if (best && !this.stopped && this.phase2?.board(0)?.board.fen === fen) this.simulMove(0, best);
+        this.emit();
+      });
+  }
+
   /** Testing (admins): the boss's ultimate as the next crowd turn begins. */
   triggerUltimate() {
     if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin) return;
+    // (The Hidden Boss's phase 2: his ultimate now.)
+    if (this.phase.kind === "simul") return void (this.phase2Playing && this.phase2?.ult());
     if (this.runner.triggerUltimate()) this.emit();
   }
   get boss(): BossView | null {
@@ -728,10 +772,181 @@ export class SoloMatch implements GameView {
     this.nextRound();
   }
 
+  // ---------------- The Hidden Boss's phase 2 ----------------
+
+  /** Testing (?phase=2): an admin's Hidden Boss starts at his phase change, skipping phase 1. */
+  private phase2Jump = typeof location !== "undefined" && new URLSearchParams(location.search).get("phase") === "2";
+  /** Phase 2's boards (from the phase change on), and whether its clocks have started. */
+  private phase2: Phase2Game | null = null;
+  private phase2Playing = false;
+  private phase2From = "";
+  private simulCache: { state: unknown; playing: boolean; view: SimulView } | null = null;
+
+  /** Phase 1 won against the Hidden Boss, alone (Boss alone): his phase 2 follows. */
+  private phase2Due(): boolean {
+    return this.runner.boss?.id === "recluse" && this.runner.boss.result === "crowd" && !!this.settings.raid && !this.raidBots && RECLUSE_PHASE2.boards > 0;
+  }
+
+  /**
+   * His phase change (PHASE_CHANGE, about 7 s; not skippable, like a boss's intro): the book's slam, the split, his
+   * revive, the shuffle. Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the
+   * shuffle shows where they go; their clocks start as it ends.
+   */
+  private startPhaseChange() {
+    if (this.timer) clearTimeout(this.timer);
+    this.begun = true;
+    this.freeBrain();
+    this.brainShown = isAdmin();
+    // (Phase 1's words are over: neither voice carries a line into the phase change.)
+    bossVoice.reset();
+    resetKingSpeech();
+    const at = Date.now();
+    const seed = this.runner.state.boss?.powers?.seed ?? Math.floor(this.rng() * 2 ** 32);
+    this.phase2From = this.runner.boards.get(this.runner.state.boards[0]!)!.fen;
+    const bots = botRoster(this.rng, RECLUSE_PHASE2.boards - 1, this.settings);
+    this.phase2Names = new Map(bots.map((b) => [b.id, b.name]));
+    const engines = this.engines;
+    this.phase2 = new Phase2Game({
+      players: [HUMAN, ...bots.map((b) => b.id)],
+      numbers: phase2Numbers(seed),
+      human: HUMAN,
+      boss: engines[0]!,
+      bots: engines[engines.length - 1]!,
+      win: !!this.settings.bossWinTest,
+      rng: this.rng,
+      onChange: () => this.emit(),
+      onResult: (b) => this.phase2Result(b.result!.winner),
+      onSlow: () => this.phase2Slow(),
+      onUlt: () => this.phase2Ult(),
+      onDone: () => this.phase2Done(),
+    });
+    // He stays slumped until he starts to rise, then revives as the book comes back to him, and rests in phase 2's idle.
+    setFigureRun({ since: at + PHASE_CHANGE.reviveAt, anims: ["revive"], loop: "idle2", before: "collapseLoop" });
+    this.set({ kind: "phaseChange", at });
+    this.timer = setTimeout(() => this.startSimul(), PHASE_CHANGE.total);
+  }
+  private phase2Names = new Map<string, string>();
+
+  /** Phase 2's play: every clock starts. His line and the God King's. */
+  private startSimul() {
+    if (!this.phase2 || this.stopped) return;
+    this.phase2Playing = true;
+    this.set({ kind: "simul", at: Date.now() });
+    this.phase2.start();
+    const lines = RECLUSE_LINES.phase2;
+    // (NORMAL: his ultimate's line, if it comes this soon, cuts in.)
+    bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, "recluse:phase2", NORMAL);
+    kingSay("foePhase2", "recluse:phase2");
+  }
+
+  private phase2Lines = { won: 0, lost: 0, slow: 0 };
+
+  /** A slow move: his word on it, if nothing else is being said (one bubble: it waits a little, then lapses). */
+  private phase2Slow() {
+    const lines = RECLUSE_LINES.slow;
+    bossVoice.say(lines[this.phase2Lines.slow++ % lines.length]!, `recluse:p2:slow:${this.phase2Lines.slow}`, LOW);
+  }
+
+  /** His ultimate: his line, the spellbook where he stands; from now on a few seconds a move on every board. */
+  private phase2Ult() {
+    const at = Date.now();
+    playInPlace(`recluse:ult2:${at}`, PHASE2_ULT_ANIMS, at);
+    const lines = RECLUSE_LINES.ult2;
+    bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, `recluse:p2:ult:${at}`, CRITICAL);
+  }
+  /** A board decided: his word on it, and the God King's (a draw: nothing). */
+  private phase2Result(winner: "crowd" | "boss" | "draw") {
+    if (winner === "draw" || this.phase2?.outcome.decided) return;
+    const key = `recluse:p2:${winner}:${this.phase2Lines.won + this.phase2Lines.lost}`;
+    if (winner === "boss") {
+      bossVoice.say(RECLUSE_LINES.boardWon[this.phase2Lines.lost++ % RECLUSE_LINES.boardWon.length]!, key, CRITICAL);
+      kingSay("foeBoardLost", key);
+    } else {
+      bossVoice.say(RECLUSE_LINES.boardLost[this.phase2Lines.won++ % RECLUSE_LINES.boardLost.length]!, key, CRITICAL);
+      kingSay("foeBoardWon", key);
+    }
+  }
+
+  /**
+   * Every board decided: his reaction holds the boards (RECLUSE_PHASE2.endMs), then the result. Beaten: a placeholder
+   * for his "super saiyan" transformation (the spellbook's glow and wind, from his phase 2 frames); he won: his laugh.
+   */
+  private phase2Done() {
+    const o = this.phase2!.outcome;
+    const now = Date.now();
+    if (o.beaten) {
+      setFigureRun({ since: now, anims: ["spellbook2"], loop: "spellLoop2" });
+      bossVoice.say(RECLUSE_LINES.beaten2[Math.floor(this.rng() * RECLUSE_LINES.beaten2.length)]!, "recluse:p2:beaten", CRITICAL);
+      kingSay("foeVictory2", "recluse:p2:beaten");
+    } else {
+      setFigureRun({ since: now, anims: ["laugh2"], loop: "idle2" });
+      bossVoice.say(RECLUSE_LINES.victory[Math.floor(this.rng() * RECLUSE_LINES.victory.length)]!, "recluse:p2:victory", CRITICAL);
+    }
+    this.emit();
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.finishPhase2(), RECLUSE_PHASE2.endMs);
+  }
+
+  /** The result: Victory only with every board won; else a defeat that says how many of the four were won. */
+  private finishPhase2() {
+    const o = this.phase2?.outcome ?? { won: 0, of: RECLUSE_PHASE2.boards, beaten: false };
+    this.halt();
+    this.phase = { kind: "results", placement: 1, winner: "", youWon: o.beaten, bossResult: o.beaten ? "crowd" : "boss", simul: { won: o.won, of: o.of } };
+    this.emit();
+  }
+
+  /** Your move on your board. */
+  simulMove(boardId: number, move: string) {
+    if (this.phase.kind !== "simul" || !this.phase2Playing) return;
+    this.phase2?.move(boardId, move);
+  }
+
+  get simul(): SimulView | null {
+    const g = this.phase2;
+    if (!g || (this.phase.kind !== "phaseChange" && this.phase.kind !== "simul")) return null;
+    // (Built again only when the boards change: the screens read this every frame.)
+    if (this.simulCache?.state === g.state && this.simulCache.playing === this.phase2Playing) return this.simulCache.view;
+    const o = g.outcome;
+    const view: SimulView = {
+      from: this.phase2From,
+      playing: this.phase2Playing,
+      ...o,
+      slow: g.state.slow,
+      ultAt: g.state.ultAt,
+      boards: g.state.boards.map((b) => ({
+        id: b.id,
+        you: b.player === HUMAN,
+        name: b.player === HUMAN ? "You" : (this.phase2Names.get(b.player) ?? "Bot"),
+        number: b.number,
+        fen: b.board.fen,
+        lastMove: b.board.lastMove,
+        history: b.board.history,
+        bases: b.board.bases,
+        bankMs: b.bankMs,
+        turnAt: this.phase2Playing ? b.turnAt : null,
+        toMove: this.phase2Playing ? phase2ToMove(b) : null,
+        result: b.result,
+      })),
+    };
+    this.simulCache = { state: g.state, playing: this.phase2Playing, view };
+    return view;
+  }
+
+  get bossNote(): string | null {
+    const v = this.simul;
+    if (!v) return null;
+    return v.playing ? `Phase 2 · ${v.won} of ${v.of} won` : "Phase 2";
+  }
+
   private nextRound() {
     if (this.runner.isOver()) return this.finish();
     if (!this.you.alive) return void this.simulateRest();
     if (this.runner.boss) {
+      // (Testing, ?phase=2: the Hidden Boss's phase 2 at once, from the phase change.)
+      if (!this.bossIntroDone && this.phase2Jump && this.runner.state.boss?.id === "recluse") {
+        this.bossIntroDone = true;
+        return this.startPhaseChange();
+      }
       if (!this.bossIntroDone) {
         // The boss arrives: it takes over from an even position of the game just played.
         this.bossIntroDone = true;
@@ -744,12 +959,13 @@ export class SoloMatch implements GameView {
       }
       if (this.runner.stageComplete()) {
         this.runner.finishBossBattle();
-        // (A boss with a fall beaten, the Hidden Boss: the board holds while he collapses and starts to mumble, then the
-        // result screen, where he goes on mumbling. Phase 2 isn't built: nothing follows.)
+        // (A boss with a fall beaten, the Hidden Boss: the board holds while he collapses and starts to mumble; then his
+        // phase change and phase 2 (Boss alone), or the result screen, where he goes on mumbling.)
         const fallMs = this.runner.boss?.result === "crowd" ? bossRules(this.runner.boss)?.fallMs : undefined;
         if (fallMs) {
+          const next = this.phase2Due() ? () => this.startPhaseChange() : () => this.finish();
           this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + fallMs, fall: true });
-          this.timer = setTimeout(() => this.finish(), fallMs);
+          this.timer = setTimeout(next, fallMs);
           return;
         }
         return this.finish();

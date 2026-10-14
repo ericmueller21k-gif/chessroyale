@@ -85,7 +85,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
               "FINAL"
             ) : boss ? (
               <>
-                BOSS<span class="muted"> · move {Math.min(boss.crowdMoves + 1, boss.maxMoves)}</span>
+                BOSS<span class="muted"> · {match.bossNote ? "phase 2" : `move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`}</span>
               </>
             ) : crowd ? (
               <>

@@ -3522,3 +3522,119 @@ multiplayer: `NetMatch` has no such method), and `BOSS_POWERS.engineMoveButton` 
 After playing phase 1, Eric: the 3:00 bank after his ultimate "feels like too much honestly, let's do it 1+0". So
 `BOSS_POWERS.bulletBankSeconds` is 60, was 180; nothing else changes (no increment, no per-move cap, out of time loses).
 Still not sim-tested.
+
+### The Hidden Boss, phase 2: the phase change and four Chess960 boards (Eric, Oct 14, 2026)
+
+Eric approved building it (Oct 14). Same reach as phase 1: admins only, in Boss alone, with bots; players never meet
+him (no menu, raid, Crowd, random pick or server path changed; `?boss=recluse` still gives a player another boss).
+Online and stored data are untouched: no protocol or schema change (the result screen's "won N of 4" is solo's own
+phase field). ROADMAP.md, "The hidden boss", has the whole design.
+
+**Eric's calls (Oct 14).**
+- **Each board its own Fischer Random start**, four different setups drawn from the battle's seed, no two the same
+  (Eric: "Every player gets a different one that avoids everybody just discussing the same move in like a Discord").
+  This replaces the director's first call (one shared setup for equal difficulty). Drawn without replacement from
+  the 960 (`phase2Numbers`), so there's no retry loop; the same seed gives the same four.
+- **His strength starts at about 2750** (`RECLUSE_PHASE2.elo`, Stockfish's UCI_Elo), not the roadmap's earlier 3000:
+  at this pace 2750 "may be sufficient". A starting value, to tune after real players try him.
+
+**The phase change** (about 7.2 s; `PHASE_CHANGE` in `packages/app/src/recluse-phase2.ts`; `PhaseChangeScreen`).
+Phase 1 won: the board holds while he collapses and mumbles (phase 1's fall, 4.5 s), then, instead of the result:
+- the red book flies from his side to the board's center, spinning, and slams down (its `slam`: dust, the ring; the
+  board jolts with the saw's crash);
+- crack lines run down and across the middle: Sawyer's board-saw gap (`boardGap`), the same sprite turned 90° for the
+  other line, with its crack sound (Eric's pick: reuse the saw);
+- the quarters part and each grows into a whole board at its corner, a 2x2 in the board's square. Each is a full
+  board clipped to its quarter, its clip opening as it shrinks toward its corner: only a transform and a clip, which
+  the board measures without (`.claude/LESSONS.md`: never change what a board draws under a transform);
+- the book, lying where it fell, flips its pages while every board's pieces fly to their Chess960 squares (the board's
+  own slide), then snaps shut and goes back to him: he started rising before, and his revive's catch comes as it
+  goes; he rests in phase 2's idle (the book in front, hair always flowing) from then on;
+- "PHASE 2" "Chess960 · win all four boards", and the clocks start.
+- **Not skippable,** like a boss's intro (no cutscene in the game is). `?phase=2` jumps straight to it.
+- **His figure** follows a "figure run" (`setFigureRun`, BossCharacter.tsx): a loop before, a run of animations, then a
+  loop for good, over his beat; his beat's lines and fall lines are quiet meanwhile. Both voices are reset as it
+  begins (phase 1's words are over).
+- **Frames that don't exist, and what stands in** (for the director): a slumped frame without the book (in
+  `collapseLoop` the book lies by his knees while the board's book flies and slams: two books on screen for those
+  seconds); a page flip in his hands during the shuffle (the board's book flips instead, and his revive's catch takes it
+  back); his "super saiyan" transformation when beaten (a placeholder: `spellbook2`, then the glowing `spellLoop2`).
+
+**Phase 2's play** (rules `packages/chess/src/bosses/recluse-phase2.ts`, driver `Phase2Game`, screen `SimulScreen`).
+- **Four boards, Chess960, the players White** (as the crowd is in Boss alone; my call: they move first, and it keeps
+  the phase 1 frame "you play White"). You play board 0; bots the other three. Each board is a BoardState from a base
+  at ply 0 holding its start FEN (`phase2Board`: `bases: [{ ply: 0, fen }]`), so `fenAtPly`, `boardEnd` and
+  `recentMoves` replay it from its own setup.
+- **No power-ups, no blocks, no items;** the God King's help stays blocked and mocked as in phase 1 (now with
+  `slam2`). Phase 2's own ultimate (Eric's, below) is the only power.
+- **His brain: Stockfish, never Maia** (`phase2Brain`: Maia can't play Chess960), whatever `BOSS_BRAIN.fixed` says for
+  him in phase 1, at `elo` 2750, `nodes` 250,000 and at most `moveMs` 900 ms a move (`go nodes … movetime …`; a new
+  optional argument of `playAtElo`). On this device, like every solo boss; **one engine serves the four boards in
+  turn** (`phase2Next`: your board first when it waits, then the board that has waited longest). The bots think on
+  the last engine of the pool (the same one on a device with one): Stockfish at 2200, 100,000 nodes, a random 0.9 to
+  2.6 s a move on their own clocks. No engine answer: the first legal move (never a stall).
+- **The clock: ultra-fast bullet** (`bankSeconds` 120: 2:00 a board, an estimate, not yet sim-tested), no increment,
+  nothing adds time; it runs only on the player's move; he has no clock (as in phase 1). Out of time loses that board
+  (checked five times a second; a move made late isn't played).
+- **Winning and losing:** a board ends by mate, stalemate or a draw by rule, time, or resigning. A lost board's
+  neighbors play on (the roadmap's default); the battle ends when every board is decided. **All four must be won**: a
+  draw is not a win. Then his reaction holds the boards for `endMs` (3.2 s): beaten, the transformation's placeholder
+  and his line; he won, `laugh2` and a victory line. Then the result: "Victory!" ("You beat Hidden Boss on all 4
+  boards!"), or "Defeated" with "Hidden Boss won. You won N of 4 boards: all 4 must be won."
+- **His phase 2 ultimate** (Eric, Oct 14, added to this build): a move that takes longer than `slowMoveSeconds` (5 s),
+  by you or a bot, on any board, is a slow move, and he says one of his lines about playing faster (LOW priority in
+  his voice: it waits its turn or lapses, so one sprite never has two bubbles). When the team's slow moves pass
+  `slowMovesForUlt` (5; it fires on the 6th), his ultimate: "That's enough!" (placeholders), the spellbook where he
+  stands (`spellbook2`, `spellLoop2`, `spellClose2`), "5 SECONDS!" over the boards. From then on every move on every
+  board has `ultMoveSeconds` (5 s) with **no bank**; when they run out, a **random legal move** is played for that
+  player (`phase2Timeouts`), never a loss on time. Before it, the 2:00 bank applies as above (a bank that runs out
+  loses the board). Squads' missed move (`randomLegalMove`, squads/board.ts) is the approach reused, a seeded pick
+  from the legal moves, but through our own `legalMoves` (Squads' helper is chess.js's, which has no Chess960). His
+  phase 2 start line is now NORMAL priority so the ultimate's line cuts in if it comes in the first seconds. The dock
+  shows "slow moves N of 5" before it and "5 s a move · 3.2 s left" after; each board's tag shows that board's
+  seconds. The bots think past 5 s now and then before it (`botSlowChance` 12%, `botSlowMs` 5.4 to 7 s) so the count
+  comes in Boss alone even if you're quick; the admins' "Trigger ultimate (testing)" brings it at once. **Estimates,
+  not yet sim-tested:** with a 2:00 bank (about 3 s a move over a game) slow moves will be common, so the ultimate will
+  likely come early in the fight. **Online later:** the 5 s must allow for network lag (a small grace on the server's
+  clock, as `lateGraceMs` does for moves today).
+- **Resigning** is your board's ("Your board is lost. The other boards play on, but all four must be won."); once it's
+  decided, Leave ends the battle where it stands ("The battle ends here, and the boss wins it.").
+- **Layouts** (reusing what exists): the boss screen's frame (header, his bust in the phone's bar, his figure by the
+  board on a computer, the God King's dock). A phone: the other three boards small above yours, tappable to watch one
+  big ("Back to my board"), as Squads does; a computer: all four as the 2x2 the phase change leaves (no jump).
+- **Engine move** (admins, #199) works on your phase 2 board: Stockfish's best for its Chess960 position (UCI_Chess960
+  switched on by the engine wrapper), played as your move.
+- **Test switches:** the admins' "Trigger ultimate (testing)" brings phase 2's ultimate at once. `?win=1` covers both phases: phase 1 is the mate in one; in phase 2 every board starts from the
+  same mate in one, written as Chess960 (`PHASE2_WIN_FEN`, from the normal setup 518), the bots take theirs at once,
+  so your Qxf7 wins it all. `?phase=2` (an admin's Hidden Boss only) starts at the phase change. Together, a loss is
+  one resign away (3 of 4).
+- **The admins' brain line** in phase 2: "Stockfish 2750 · at most 900 ms · last 640 ms".
+
+**Lines** (`characters/recluse-lines.ts`, all placeholders for Eric's own but one quote): his revive, phase 2's start,
+a board he wins, a board he loses, beaten on all four; the God King's phase 2 start, a board won, a board lost, the
+victory. **One real quote, word for word** (the research report's Tier A, A5), for a board he wins (the players are
+White): "Of course White can always play differently, in which case he merely loses differently. (Thank you, Weaver
+Adams!)" ("A Bust to the King's Gambit", *American Chess Quarterly* 1:1, Summer 1961, p. 9). Also placeholders: his
+slow-move lines and his ultimate's ("That's enough! Five seconds a move, all of you!"). Nothing political,
+national or hateful. **Screen text** (admins only): "PHASE 2", "Chess960 · win all four boards", "The red book!", "One
+board becomes four…", "Phase 2!", "Every board must be won.", "Your move", "The boss is thinking…", "Your clock m:ss · no
+added time", "Back to my board", "Won", "Lost", "Lost on time", "Lost: resigned", "Draw", "Phase 2 · N of 4 won", the two
+results lines and the two resign notes. No player-visible text changed.
+
+**Measured** (slow-phone profile and a computer: see the PR for the numbers).
+
+**Next step:** the engine-against-engine sim in Chess960 at the real clock (2750 and the 2:00 bank), then real
+players.
+
+**Testing.** Targeted lane, thorough (rules and the runner): typecheck, the whole unit suite; unit
+`packages/chess/test/recluse-phase2.test.ts` (four different seeded starts, ply-0 bases and replays, Chess960
+castling on a board, the clocks, time and resign, all four must win, a mate by him, his next board, the ultimate's
+slow-move count, its threshold and the random move out of time, the Stockfish-only brain with the exact UCI commands,
+real Stockfish on every board within his time) and
+`packages/app/test/recluse-phase2.test.ts` (the phase change's beats and length, the four boards driven with pretend
+engines: the test switch's win, his strength and budget on every move, your time running out, the ultimate from the
+trigger and from slow moves, resigning); e2e
+`e2e/recluse.spec.ts` (phase 1 beaten into the phase change and four boards, then Victory; `?phase=2`'s four starts,
+Stockfish answering, Engine move, the God King mocked; the ultimate on the trigger, then a random move for you out of
+time; a loss by resigning, 3 of 4), plus the specs of the areas it
+touches (castling, resign, boss-speech, king-attack, maia, perf). Frames: `npm run frames:recluse2`.

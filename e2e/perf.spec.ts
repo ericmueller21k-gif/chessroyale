@@ -311,3 +311,42 @@ test("Sawyer on a slow phone: the split, the board saw and his first saw cut sta
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
   }
 });
+
+test("the Hidden Boss's phase 2 on a slow phone: the phase change and four boards in play stay within budget", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(4 * 60_000);
+  await page.addInitScript(instrument);
+  // (An admin, as /api/me says for an email in ADMIN_EMAILS: only an admin meets him.)
+  await page.route("**/api/me*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    try {
+      const res = await route.fetch();
+      const body = await res.json().catch(() => null);
+      await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+    } catch {
+      // The page is gone.
+    }
+  });
+  const me = page.waitForResponse((r) => r.url().includes("/api/me") && r.request().method() === "GET");
+  await page.goto("/?debug&nolanding&phase=2");
+  await me;
+  await page.waitForTimeout(500);
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await page.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: /^Hidden Boss/ }).click();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await expect.poll(() => page.evaluate(() => !!(window as any).match.simul?.playing), { timeout: 30_000 }).toBe(true);
+  const change = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
+  // Four boards in play: the bots and he move on theirs (you don't), for eight seconds.
+  await page.waitForTimeout(8000);
+  const play = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
+  const moves = await page.evaluate(() => (window as any).match.simul.boards.reduce((n: number, b: { history: string[] }) => n + b.history.length, 0));
+  console.log(`phase 2 on a 4x-slowed phone: the phase change ${JSON.stringify(change)}; four boards in play ${JSON.stringify(play)}, ${moves} moves`);
+  expect(moves, "moves played on the bots' boards meanwhile").toBeGreaterThan(4);
+  for (const [what, s] of [["the phase change", change], ["four boards in play", play]] as const) {
+    expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
+    expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
+  }
+});

@@ -129,7 +129,8 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
   - **His voice:** lines true to the chess persona: anti-theory, anti-engine, "real chess", and when the four team up on
     him, how the Russians teamed up and conspired against him. Eric will supply specifics.
   - **Difficulty (Eric, Oct 14; replaces "fairly easy"):** an elite challenge. His strength doesn't follow the
-    squad's ratings: it's fixed. In phase 2 it's very strong, **about 3000**, so it takes four elite players
+    squad's ratings: it's fixed. In phase 2 it's very strong, **about 2750 to start** (Eric, Oct 14: at that very fast
+    pace 2750 "may be sufficient"; the earlier figure was 3000), so it takes four elite players
     (possibly GM level) to beat him. The goal is a fight people talk about and gather their strongest friends for.
     **All four players must beat him** to complete it.
     - **Phase 1 is Maia at its strongest (Eric, Oct 14):** "so it feels like an aggressive human playing, which is
@@ -140,20 +141,20 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       below 3000 anyway (it's held at 2500, and Stockfish takes over from 2800 even in normal chess). Stockfish plays
       Fischer Random natively and reaches 3000 (its strength limiter goes up to 3190, already used by raid tier 10).
       It's a fitting irony: in Fischer Random Stockfish has no opening book either and calculates from move 1.
-    - **"3000" is on Stockfish's own scale** (engine-calibrated), not a human FIDE rating, and the ultra-fast clock
-      hurts people far more than an engine. So the number is a starting point, not a promise.
+    - **"2750" is on Stockfish's own scale** (engine-calibrated), not a human FIDE rating, and the ultra-fast clock
+      hurts people far more than an engine. So the number is a starting point to tune once real players try him
+      (`RECLUSE_PHASE2.elo`), not a promise.
     - **The math of "all four must win":** if each player beats him with chance p, the squad wins with p⁴: 70% each
       → 24%; 50% → 6% (1 in 16); 30% → under 1%; 20% → 1 in 625. The dials are his strength, the players' clock,
       and whether a draw counts (today's default: no, a draw isn't a win).
     - **Tuning plan:** a single setting for his strength. First, engine-against-engine tests in Fischer Random at
-      the real clock (engine "players" at about 2500–2700 against him at 2800 / 3000 / 3190) for a starting point.
+      the real clock (engine "players" at about 2500–2700 against him at 2750 / 3000 / 3190) for a starting point.
       They can't capture human time trouble, so real tuning comes from strong players trying him after launch.
-    - **Open:** what happens to the other boards once one board is lost (default: they play on, but the reward
-      needs all four).
+    - **Decided (built Oct 14):** once one board is lost, the others play on, but the win needs all four.
   - **Fischer Random takes real rules work:** our rules library (chess.js 1.4) has no Fischer Random castling, so
     the rules code and the board need it (full test lane). A simpler fallback is random back ranks with castling
     turned off, but that isn't true Fischer Random. Decide at build time.
-  - **Cheating (to handle later; Eric, Oct 14):** a full-strength engine beats a 3000-limited one almost every
+  - **Cheating (to handle later; Eric, Oct 14):** a full-strength engine beats a 2750-limited one almost every
     time, so engine help is the main risk. The fast clock slows anyone copying moves from a second device, but it
     doesn't stop automated help. Notes:
     - **The server plays him.** Online, today's bosses are computed on the host player's device; for this fight his
@@ -167,6 +168,18 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       theory, so engine-perfect play from move 1 stands out), move-time patterns, and the look-away count.
     - **Public replays** of every win (a hall of fame), so the community can see the games.
     - **Signed-in accounts with match history** only.
+    - **Does a server-side brain help catch cheaters? (Eric's question, Oct 14)** Not by itself. It stops tampering
+      with the boss (a host can't weaken him), but it can't see a player using an engine on another device. Catching
+      that is fair play's job, which already exists game-wide (`docs/areas/fairplay.md`: the server's judged signals,
+      the suspicion score, the deep re-check before any ban, the review page). For this fight: feed its four boards
+      into fair play like other online matches, hold the reward until the deep re-check and a person clear it, and
+      add the fight's own signals above. No separate anti-cheat system just for this mode.
+    - **Cost (Eric asked, for about 200 phase 2 fights a day, likely an overestimate):** about 160–200 engine
+      searches a fight (four boards, short searches at bullet pace), so roughly 30,000–40,000 a day. At the engine
+      server's measured rates (`docs/history/engine.md`: about $25 a month per 3,000 searches a day for deep
+      re-checks; bullet-pace boss moves are much shorter searches, and the instance's memory while awake dominates),
+      the director's estimate is about $40–100 a month at that volume, a few dollars a month at realistic volumes.
+      To verify against Cloudflare's prices when it's built; it needs its own daily cap like `ENGINE_DAILY_SEARCHES`.
   - **Beating him:** a "super saiyan" transformation with special animations (details later). Every player on the
     winning squad gets a special **Fischer Random crate** with a tiny chance at an item that doesn't exist yet. One
     victory reward per account, ever.
@@ -189,6 +202,8 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       he isn't evil, but he looks scarier.
     - **The book flips its pages again** and all four boards shuffle into random openings (Fischer Random setups):
       the pieces fly to their new squares as the pages turn. Phase 2 then plays as above.
+    - **Each board its own setup (Eric, Oct 14):** four different Fischer Random start positions, no two the same:
+      "Every player gets a different one that avoids everybody just discussing the same move in like a Discord."
     - **Decided (Eric, Oct 14: "your pick is fine, we want easier code and less lag over all else, fewer bug
       risks"):** the split reuses Sawyer's board saw (crack lines, then the quarters slide apart). The book's symbol
       is the gold Cyrillic **"ШАХМАТЫ"** ("chess" in Russian) on the shop item's larger icon, and its first
@@ -220,13 +235,24 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
   - **Phase 1 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 1"): pick
     "Hidden Boss" from the boss menu (admins see him after the rest). Maia-3 at its top rating, raw, at a fixed
     strength; the God King's help blocked and mocked; his ultimate at turn 7, the bullet clock for the rest of the
-    battle (3:00, no added time, out of time loses); beaten, he collapses and mumbles, then the result. Placeholder
+    battle (1:00, no added time, out of time loses; Eric, Oct 14: was 3:00); beaten, he collapses and mumbles, then phase 2. Placeholder
     lines (and five verified quotes) in one table, `characters/recluse-lines.ts`, for Eric's own.
-    - **Left for later:** his real name and lines; how players reach him (the red book Mercenary item and the
-      Squads win); phase 2 (the book's slam, the board split into four with the saw, his revive, the Chess960
-      shuffle, the four boards, his Stockfish brain at about 3000, its bullet clock); his book as a board effect; the
-      special crate and its reward; a server-side brain and fair-play review for real fights; online play (today the
-      server never makes a battle with him); sim-tuning his numbers (turn 7, 180 s).
+  - **Phase 2 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 2"): beaten
+    in phase 1, he collapses and mumbles, then the phase change (about 7 s: the book's slam, Sawyer's crack lines, the
+    quarters growing into four boards, the Chess960 shuffle as the book's pages flip, his revive), then four boards
+    at once, each its own Chess960 start: you on one, bots on three. Stockfish only, at 2750, at most 0.9 s a move;
+    2:00 a board, no added time, out of time loses that board; a lost board's neighbors play on; all four must be
+    won ("Victory!"), else a defeat that says how many of four were won. **His phase 2 ultimate** (Eric, Oct 14):
+    each move longer than 5 s (anyone's, any board) draws a line about playing faster; on the team's 6th slow move,
+    "That's enough!" and from then on 5 s a move on every board, no bank, a random legal move played for whoever runs
+    out (never a loss on time). Test switches: the admins' "Trigger ultimate (testing)", `?win=1` (a mate in one in
+    both phases, the bots take theirs), `?phase=2` (straight to the phase change).
+    - **Left for later:** his real name and lines (phase 2's are placeholders too); how players reach him (the red
+      book Mercenary item and the Squads win); his "super saiyan" transformation (a placeholder today: the spellbook's
+      glow); the special crate and its reward; a server-side brain (the engine server's move endpoint) and fair-play
+      review for real fights; online and Squads play (today the server never makes a battle with him); the
+      engine-against-engine sim in Chess960 at the real clock (next step, for 2750 and the 2:00 bank); sim-tuning
+      phase 1's numbers (turn 7, 60 s); the FAQ's Chess960 words once players can meet him.
 
 Added Oct 14, 2026 (Eric; notes only, nothing built):
 

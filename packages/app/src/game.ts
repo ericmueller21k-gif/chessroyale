@@ -159,11 +159,56 @@ export type Phase =
    */
   | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView; fall?: boolean }
   /**
+   * The Hidden Boss's phase change (`at`: when it began; PHASE_CHANGE in recluse-phase2.ts): the book's slam, the board
+   * split into four, his revive, the Chess960 shuffle. Then `simul`: his phase 2, four boards at once (GameView.simul).
+   */
+  | { kind: "phaseChange"; at: number }
+  | { kind: "simul"; at: number }
+  /**
    * `gameWinner`: Crowd, who won the game on the board (null for a draw). `bossResult`: who won a boss battle. `left`:
    * you left before the end (see GameView.resign): you resigned (a loss; `bot`: online, a bot plays your seat), or you
    * left once you were already out (your place as it stood; the winner isn't known).
    */
-  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean };
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; simul?: { won: number; of: number } };
+
+/** One of the Hidden Boss's phase 2 boards as the screens see it (board 0 is yours). */
+export interface SimulBoardView {
+  id: number;
+  you: boolean;
+  /** Who plays it for the crowd ("You", or a bot's name). */
+  name: string;
+  /** Its Chess960 start position (the standard numbering; -1: the test switch's position). */
+  number: number;
+  fen: string;
+  lastMove: string | null;
+  history: string[];
+  bases?: Base[];
+  /** The player's bank as of `turnAt` (ms), and when their turn began (their clock running), or null. */
+  bankMs: number;
+  turnAt: number | null;
+  toMove: "crowd" | "boss" | null;
+  result: { winner: "crowd" | "boss" | "draw"; how: "mate" | "time" | "resign" | "stalemate" | "draw" } | null;
+}
+
+/** The Hidden Boss's phase 2 as the screens see it: the four boards, and where the battle stands. */
+export interface SimulView {
+  /** The position the phase change splits (phase 1's last), for its first beats. */
+  from: string;
+  boards: SimulBoardView[];
+  /** The clocks are running (after the phase change). */
+  playing: boolean;
+  won: number;
+  lost: number;
+  drawn: number;
+  of: number;
+  /** Every board is decided (his reaction holds the boards, then the result). */
+  decided: boolean;
+  beaten: boolean;
+  /** Slow moves so far (his ultimate comes past RECLUSE_PHASE2.slowMovesForUlt). */
+  slow: number;
+  /** When his ultimate came (then every move has ultMoveSeconds, no bank), or null. */
+  ultAt: number | null;
+}
 
 /** How you left a match before its end (the results screen says so). */
 export interface LeftResult {
@@ -244,6 +289,12 @@ export interface GameView {
    * it does nothing when the ultimate is spent or the battle's over (online, the server checks the admin too).
    */
   triggerUltimate(): void;
+  /** The Hidden Boss's phase 2 (solo only), while it's on: its boards; null otherwise. */
+  readonly simul?: SimulView | null;
+  /** Your move on your phase 2 board. */
+  simulMove?(boardId: number, move: string): void;
+  /** A word in the boss bar instead of the move count (the Hidden Boss's phase 2: "Phase 2 · 1 of 4 won"). */
+  readonly bossNote?: string | null;
   /** Testing, admins in Boss alone (solo only; online has none): the "Engine move" button shows. */
   readonly engineMoveShown?: boolean;
   /** Its search is running (the button waits). */

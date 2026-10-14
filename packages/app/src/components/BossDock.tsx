@@ -179,7 +179,17 @@ export function UltimateTest({ match }: { match: GameView }) {
   // (A press is for the next ultimate only: once it has come, the button is ready again.)
   const key = boss ? `${boss.id}:${boss.startMove}:${boss.board.generation}:${p?.ults ?? 0}` : "";
   const [pressed, setPressed] = useState("");
-  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result) return null;
+  // (The Hidden Boss's phase 2: his own ultimate, the few seconds a move.)
+  const simul = match.simul;
+  if (BOSS_POWERS.ultimateTestButton && account().profile?.admin && simul) {
+    if (!simul.playing || simul.decided) return null;
+    return (
+      <button type="button" class="ult-test" disabled={simul.ultAt !== null} onClick={() => match.triggerUltimate()}>
+        {simul.ultAt !== null ? "Ultimate under way (testing)" : "Trigger ultimate (testing)"}
+      </button>
+    );
+  }
+  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote) return null;
   // (Hollow's Lights out: the full meter has it on its way until the test has begun.)
   const lights = p.ultimate === "lightsout";
   const underWay = p.ultAt !== null && (!lights || (p.lightsAt != null && p.lightsAt >= p.ultAt));
@@ -204,9 +214,13 @@ export function UltimateTest({ match }: { match: GameView }) {
  * Waits while it searches and when it isn't your move. A phone: under the dock; a computer: in the title line (Hud.tsx).
  */
 export function EngineMove({ match }: { match: GameView }) {
-  if (!match.engineMoveShown || !match.engineMove || match.boss?.result) return null;
+  // (The Hidden Boss's phase 2 too: on your board, while it's your move there.)
+  const simul = match.simul;
+  if (!match.engineMoveShown || !match.engineMove || (match.boss?.result && !simul)) return null;
+  if (simul && (simul.decided || !simul.playing)) return null;
+  const ready = simul ? simul.playing && simul.boards[0]?.toMove === "crowd" : match.phase.kind === "play";
   return (
-    <button type="button" class="engine-move" disabled={match.phase.kind !== "play" || !!match.engineThinking} onClick={() => match.engineMove?.()}>
+    <button type="button" class="engine-move" disabled={!ready || !!match.engineThinking} onClick={() => match.engineMove?.()}>
       Engine move
     </button>
   );

@@ -1,7 +1,7 @@
 // The Hidden Boss, frame by frame in a real Boss alone battle, as an admin, on a phone (390 px) and a computer (1280 px),
 // with real taps: his intro (the stare), his ultimate on the admins' trigger (the book consulted, opened like a spell
 // book, slammed shut; "BULLET!"; then the dock's bullet clock), the God King's help tried and mocked (the book slammed
-// shut), and, in a second battle (?win=1: you mate in one), his collapse and mumbling, then the result. Records every
+// shut), and, in a second battle (?win=1: you mate in one), his collapse and mumbling, then his phase change. Records every
 // painted frame (Chrome's screencast) and saves stills, a GIF of each moment, and screenshots.
 //   npm run frames:recluse -- <out-dir> [phone|desktop|both] [light|dark] [base=http://localhost:8788]
 // Needs the app and its API running (npx wrangler dev): his menu entry is for admins, and the admin flag comes from
@@ -172,7 +172,7 @@ const fight = async ({ p, st, waitUntil, play, pick, log, mark, shot }) => {
   await shot("4-bullet-turn");
 };
 
-/** ?win=1: you mate him at once (Qxf7#); his collapse and mumbling, then the result screen. */
+/** ?win=1: you mate him at once (Qxf7#); his collapse and mumbling, then his phase change begins (frames:recluse2 has the rest). */
 const beaten = async ({ p, waitUntil, play, log, mark, shot }) => {
   await waitUntil((s) => s.kind === "play", 60_000);
   await p.waitForTimeout(800);
@@ -181,11 +181,10 @@ const beaten = async ({ p, waitUntil, play, log, mark, shot }) => {
   await waitUntil((s) => s.kind === "boss" && s.fall, 30_000);
   await p.waitForTimeout(1800);
   await shot("5-collapse");
-  const res = await waitUntil((s) => s.kind === "results", 30_000);
-  log("results");
-  await p.waitForTimeout(6000);
-  await shot("6-results");
-  mark("collapse", t - 200, res.now + 6000);
+  // (Then his phase change and phase 2, not the result: npm run frames:recluse2.)
+  const res = await waitUntil((s) => s.kind === "phaseChange", 30_000);
+  log("phase change");
+  mark("collapse", t - 200, res.now + 500);
 };
 
 const runs = [];
