@@ -244,6 +244,12 @@ export interface GameView {
    * it does nothing when the ultimate is spent or the battle's over (online, the server checks the admin too).
    */
   triggerUltimate(): void;
+  /** Testing, admins in Boss alone (solo only; online has none): the "Engine move" button shows. */
+  readonly engineMoveShown?: boolean;
+  /** Its search is running (the button waits). */
+  readonly engineThinking?: boolean;
+  /** Plays Stockfish's best move as your own, through the normal move path. */
+  engineMove?(): void;
   /** You called the King to play this move. */
   readonly kingCalled: boolean;
   /** Testing, admins (Boss alone): what the boss's brain did with its last move (Maia or Stockfish), or null. */

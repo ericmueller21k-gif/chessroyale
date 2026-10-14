@@ -181,6 +181,38 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, the God Kin
   expect(errors).toEqual([]);
 });
 
+test("Engine move (admins, Boss alone): one tap plays Stockfish's best move as yours; a player never sees it", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await meetHim(page);
+  await yourMove(page);
+  // His battle starts from the starting position, never a book opening (he has no memorized lines).
+  expect(await page.evaluate(() => (window as any).match.phase.board.fen)).toBe("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+  const btn = page.getByRole("button", { name: "Engine move", exact: true });
+  await expect(btn).toBeVisible();
+  const before = await page.evaluate(() => (window as any).match.moves.length as number);
+  // (A double tap sends one move: the button waits while the engine searches.)
+  await btn.click();
+  await btn.click({ timeout: 1000 }).catch(() => {});
+  await expect.poll(() => phase(page), { timeout: 15_000 }).not.toBe("play");
+  await yourMove(page);
+  expect(await page.evaluate(() => (window as any).match.moves.length as number)).toBe(before + 1);
+  await expect(btn).toBeEnabled();
+  expect(errors).toEqual([]);
+});
+
+test("a player in Boss alone never sees Engine move", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
+  test.setTimeout(3 * 60_000);
+  await page.goto("/?debug&laststand=0");
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await page.getByRole("dialog", { name: "Choose your boss" }).locator(".boss-row").first().click();
+  await yourMove(page);
+  await expect(page.locator(".ult-test")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Engine move" })).toHaveCount(0);
+});
+
 test("beaten (?win=1): he collapses and mumbles on the board, then the result screen, a win, still mumbling", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];

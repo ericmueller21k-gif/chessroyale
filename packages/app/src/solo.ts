@@ -11,7 +11,7 @@ import { crowdMoveCues, kingSay, resetKingSpeech } from "./godKing.ts";
 import { bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
-import { isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
+import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
 
 export const HUMAN = "you";
@@ -584,6 +584,33 @@ export class SoloMatch implements GameView {
     // Your last try ends the round at once (as online, once everyone's done); otherwise it now ends later.
     if (this.lightsRoundEnd() <= t) return this.lightsStep();
     this.armLights();
+  }
+
+  /** Testing, admins in Boss alone: the "Engine move" button shows (see engineMoveAllowed). */
+  get engineMoveShown(): boolean {
+    return !!this.runner?.boss && engineMoveAllowed(this.settings.raid && !this.raidBots);
+  }
+  /** The engine's move is being searched (the button waits, so a double tap sends one move). */
+  engineThinking = false;
+  /**
+   * Testing, admins in Boss alone: Stockfish's best move played as your own, through the normal move path (clocks,
+   * the boss's reply and powers as usual). The power-up hints' search: the moves this turn allows, already under way.
+   */
+  engineMove() {
+    if (!this.engineMoveShown || this.engineThinking || this.phase.kind !== "play") return;
+    if (Date.now() < this.playStartedAt - 300) return;
+    const fen = this.phase.board.fen;
+    this.engineThinking = true;
+    this.emit();
+    void this.runner
+      .topMovesFor(fen)
+      .catch(() => [])
+      .then((top) => {
+        this.engineThinking = false;
+        const best = top[0]?.move;
+        if (best && !this.stopped && this.phase.kind === "play" && this.phase.board.fen === fen) this.submit(best);
+        else this.emit();
+      });
   }
 
   /** Testing (admins): the boss's ultimate as the next crowd turn begins. */
