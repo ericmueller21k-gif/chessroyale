@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossPowerState, type BossState, type Settings } from "@chessroyale/core";
 import {
   HOLD,
@@ -8,9 +8,13 @@ import {
   SHOWDOWN,
   START_FEN,
   applyMove,
+  bossMoveFrom,
+  bossRules,
+  brainLine,
   checkDrag,
   checkLineup,
   crowdAllowed,
+  duelReplyDue,
   dragCandidates,
   dragFrom,
   dragOptions,
@@ -37,9 +41,11 @@ import {
   showdownFrom,
   ShowdownScout,
   triggerUltimate,
+  sideToMove,
   withPiece,
   withoutPiece,
   type EngineLike,
+  type HumanEngineLike,
   type LineupScore,
   type Opening,
 } from "../src/index.ts";
@@ -89,6 +95,56 @@ function duelEngine(minor = 3) {
     if (count(fen, "b") + count(fen, "n") < count(fen, "B") + count(fen, "N")) return forEdge(minor);
     return 0.5;
   });
+}
+
+const WORTH: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+/**
+ * duelEngine, with his moves (him to move) in an order of their own: his best takes the crowd's most valuable piece with
+ * his least valuable one (after the queens' duel: taking back the queen); next, his captures of other crowd pieces, the
+ * first 4.5 points worse (in a slip's range, bossSlipLoss), the rest far worse. Each position's worth (all the showdown
+ * search reads) is duelEngine's.
+ */
+function recaptureEngine(): EngineLike {
+  const base = duelEngine();
+  const order = (fen: string) => {
+    const took = (m: string) => WORTH[pieceAt(fen, m.slice(2, 4))?.type ?? ""] ?? 0;
+    const by = (m: string) => WORTH[pieceAt(fen, m.slice(0, 2))!.type]!;
+    const legal = legalMoves(fen).sort();
+    const captures = legal.filter((m) => took(m) > 0).sort((a, b) => took(b) - took(a) || by(a) - by(b));
+    const best = captures[0];
+    const others = captures.filter((m) => m.slice(2, 4) !== best?.slice(2, 4));
+    return [...(best ? [best] : []), ...others, ...legal.filter((m) => m !== best && !others.includes(m))];
+  };
+  const top = async (fen: string, n: number) => {
+    if (fen.split(" ")[1] !== "b") return base.topMoves(fen, n);
+    const worth = (await base.topMoves(fen, 1))[0]?.expected ?? 0.5;
+    return order(fen)
+      .slice(0, n)
+      .map((move, i) => ({ move, expected: i === 0 ? worth : Math.max(0.01, worth - (i === 1 ? 0.045 : 0.3)) }));
+  };
+  return { ...base, topMoves: top, topMovesAt: (fen, n) => top(fen, n) };
+}
+
+/**
+ * The boss's brain as Eric met it (Maia at 600, no guard), a stand-in: it takes a crowd piece other than the queen when
+ * it can (Wrangler took another piece and left the queen), else plays its first legal move. Counts how often it's asked.
+ */
+function carelessMaia(): HumanEngineLike & { asked: number } {
+  const m = {
+    asked: 0,
+    ready: () => true,
+    candidates: async (fen: string, _rating: number, allowed: readonly string[] | null) => {
+      m.asked++;
+      const legal = [...(allowed ?? legalMoves(fen))].sort();
+      const other = legal.find((x) => {
+        const t = pieceAt(fen, x.slice(2, 4));
+        return !!t && t.type !== "q" && t.color !== sideToMove(fen);
+      });
+      const pick = other ?? legal[0]!;
+      return { best: pick, moves: [{ move: pick, p: 0.9 }], ms: 5 };
+    },
+  };
+  return m;
 }
 
 const logit = (x: number) => Math.log(x / (1 - x));
@@ -647,6 +703,87 @@ describe("Wrangler's showdown in the match", () => {
     expect(host.boss!.powers!.showdown!.pairs).toEqual(solo.boss!.powers!.showdown!.pairs);
     expect(fenOf(host)).toBe(fenOf(solo));
   });
+
+  /**
+   * Eric, Oct 13: the crowd took his queen in the duel and he took another piece instead of taking back (his brain, Maia
+   * at 600, no guard): the crowd won a queen. The search scored each duel with his best reply, so that's what he plays.
+   * A raid on his brain (Maia at 600) with slips on (every move a stumble), up to the queens' duel.
+   */
+  const toQueensDuel = async () => {
+    const engine = recaptureEngine();
+    const r = showdownRaid(engine, { bossStumbleBelow: 9999, bossStumbleMax: 1 });
+    const maia = carelessMaia();
+    r.humanBrain = { brain: "maia-raw", rating: 600, engine: maia };
+    await turn(r, "e2e4");
+    await crowdOnly(r, "g1f3");
+    await r.playBoss();
+    const sd = r.boss!.powers!.showdown!;
+    expect(sd.turn).toBe(3);
+    const queens = sd.pairs.find((p) => p.piece === "q")!;
+    await crowdOnly(r, queens.crowd + queens.boss);
+    return { r, engine, maia, queens, fen: fenOf(r) };
+  };
+
+  it("his reply to the duel is the engine's best (taking back), never his brain's (Maia at 600) or a slip: solo", async () => {
+    const { r, engine, maia, queens, fen } = await toQueensDuel();
+    expect(r.bossToMove()).toBe(true);
+    expect(duelReplyDue(r.boss!, r.boards.get(0)!)).toBe(true);
+    // What the search assumed: his best reply to the queens' duel takes the queen back.
+    const [scored] = await engine.topMovesAt!(fen, 1, BOSS_POWERS.showdownConfirmNodes);
+    expect(scored!.move.slice(2, 4)).toBe(queens.boss);
+    // His brain would take another piece, and so would a slip, as before.
+    const elo = r.boss!.elo;
+    expect(await bossMoveFrom(engine, fen, elo, DEFAULT_SETTINGS.bossNodes, "stumble", Math.random, [5, 15], undefined, null, { brain: "maia-raw", rating: 600, engine: carelessMaia() })).not.toBe(scored!.move);
+    expect(await bossMoveFrom(engine, fen, elo, DEFAULT_SETTINGS.bossNodes, "stumble")).not.toBe(scored!.move);
+    // He takes it back. Maia isn't asked, and the admins' debug line says whose move it was.
+    const asked = maia.asked;
+    await r.playBoss();
+    expect(r.boards.get(0)!.history.at(-1)).toBe(scored!.move);
+    expect(pieceAt(fenOf(r), queens.boss)?.color).toBe("b");
+    expect(maia.asked).toBe(asked);
+    expect(r.brainNote).toMatchObject({ brain: "maia-raw", rating: 600, by: "stockfish", why: "power" });
+    expect(brainLine(r.brainNote!)).toBe("Maia 600 · no guard · Stockfish's best (power reply)");
+    // Only that one move: his next is his brain's again.
+    await turn(r);
+    expect(r.brainNote).toMatchObject({ by: "maia" });
+    expect(maia.asked).toBe(asked + 1);
+  }, 60_000);
+
+  it("only right after a duel on the showdown's own turn: not before it, nor after a move the Last Stand took back", async () => {
+    const { r, queens, fen } = await toQueensDuel();
+    const board = r.boards.get(0)!;
+    expect(duelReplyDue(r.boss!, board)).toBe(true);
+    // (A turn later, or a move that isn't a duel: his brain's move, as ever.)
+    expect(duelReplyDue({ ...r.boss!, crowdMoves: r.boss!.crowdMoves + 1 }, board)).toBe(false);
+    expect(duelReplyDue(r.boss!, { history: [...board.history.slice(0, -1), "a2a3"] })).toBe(false);
+    // The Last Stand took the duel back: the move count went back one and the duel isn't on the board; the crowd picks again.
+    expect(duelReplyDue({ ...r.boss!, crowdMoves: r.boss!.crowdMoves - 1 }, { history: board.history.slice(0, -1) })).toBe(false);
+    expect(applyMove(fenAtPly(board.history, board.history.length - 1, board.bases), queens.crowd + queens.boss)).toBe(fen);
+    // Wrangler's rules are the only ones that ask for it.
+    expect(PIG.bestReply!(r.boss!, board)).toBe(true);
+    for (const def of BOSS_ROSTER.filter((b) => b.id !== "pig")) expect(bossRules({ id: def.id })?.bestReply).toBeUndefined();
+  }, 60_000);
+
+  it("the King's strike still staggers it (the crowd's own power); the stumble's draw is still made, so nothing else moves", async () => {
+    const { r } = await toQueensDuel();
+    const draws = vi.spyOn(r, "bossStumbles");
+    expect(r.bossMoveKind()).toBe("best");
+    expect(draws).toHaveBeenCalledTimes(1);
+    r.state = { ...r.state, boss: { ...r.boss!, staggerNext: true } };
+    expect(r.bossMoveKind()).toBe("stagger");
+  }, 60_000);
+
+  it("the host's path: the server's request (best, no brain) played as net.ts plays it is the reply solo plays", async () => {
+    const { r, engine, fen } = await toQueensDuel();
+    // The request the server sends (lobby.ts's sendBossRequest), and the host's answer (net.ts's hostBoss).
+    const kind = r.bossMoveKind();
+    expect(kind).toBe("best");
+    const asks = r.bossAsks();
+    const ordinary = () => bossMoveFrom(engine, fen, r.boss!.elo, DEFAULT_SETTINGS.bossNodes, kind, Math.random, DEFAULT_SETTINGS.kingStrikeLoss, undefined, r.bossAllowed());
+    const answer = asks ? await pigTurn([engine], fen, asks, ordinary) : { move: await ordinary() };
+    await r.playBoss();
+    expect(answer.move).toBe(r.boards.get(0)!.history.at(-1));
+  }, 60_000);
 });
 
 describe("Wrangler's moments", () => {

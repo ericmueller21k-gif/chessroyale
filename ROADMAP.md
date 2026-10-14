@@ -114,6 +114,64 @@ Added Oct 13, 2026 (with Wrangler; notes only, nothing built):
   so it never fizzles. Revisit Ginger's blizzard, Hollow's Lights out, Jefferson's Roman candle and the others
   (docs/areas/bosses.md, "An engine-shaped power").
 
+Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
+
+- **The hidden boss, inspired by Bobby Fischer** (Eric, Oct 14; working name only: he'll have a different name).
+  - **Where he lives (open):** maybe Squads' third mode (the Mode vote's "Coming soon"), or a bonus that sometimes
+    fires after a Squads tournament. Eric hasn't decided.
+  - **How it plays:** the winning squad faces him: he plays all four at once (a simul), split across 4 boards. Desktop
+    shows all 4; phones use today's layout (your board big, the other 3 up top, tappable).
+  - **Phase 2 is Fischer Random:** the final showdown's second phase is played in Fischer Random (Chess960),
+    ultra-fast bullet. No power-ups, no blocks, no items. (The Squads games themselves stay normal chess; Fischer
+    Random as a Squads vote option is a separate idea for later.)
+  - **His ultimate:** after a few moves at normal pace he laughs (a little unhinged), then the pace speeds up sharply:
+    only a few seconds a move, no bonus time.
+  - **His voice:** lines true to the chess persona: anti-theory, anti-engine, "real chess", and when the four team up on
+    him, how the Russians teamed up and conspired against him. Eric will supply specifics.
+  - **Difficulty:** fairly easy but still a challenge (to tune later).
+  - **Beating him:** a "super saiyan" transformation with special animations (details later). Every player on the
+    winning squad gets a special **Fischer Random crate** with a tiny chance at an item that doesn't exist yet. One
+    victory reward per account, ever.
+  - **How you reach him (Eric, Oct 14):**
+    - **For real:** a **fifth Mercenary item**, an ominous **red book**, for **1,000 coins**. Its description is
+      along the lines of "A strange red book. It looks powerful..."
+    - The squad must **buy it AND win the Squads tournament** to trigger the hidden boss.
+    - **Price:** 1,000 is more than one round earns (about 600–700), so a squad has to save across rounds.
+    - **The book's symbol:** Eric wants a Russian symbol on it. The director suggests a red star or a Cyrillic
+      letter rather than the hammer and sickle, which is banned in some countries (e.g. Lithuania, Latvia, Ukraine).
+      Eric's call.
+    - **For testing until then:** he's reachable from the boss menu, playing with bots.
+  - **Phase 1 to phase 2 (Eric, Oct 14):**
+    - **Phase 1** is one board against him. Beat him there and **he collapses**: he drops to his knees, slumps and
+      mumbles nonsense to himself (lines from Eric later).
+    - **The red book takes over:** it flies off and **slams onto the center of the board** (dust, a shockwave).
+      Then **the board divides into four**. The director suggests reusing Sawyer's board-saw split: crack lines along
+      the middle, then the quarters slide apart and grow into full boards (desktop: all 4; phone: yours big, 3 up top).
+    - **He revives:** one sprite only, even with 4 boards. In the revived state his hair is **always flowing**, and
+      he isn't evil, but he looks scarier.
+    - **The book flips its pages again** and all four boards shuffle into random openings (Fischer Random setups):
+      the pieces fly to their new squares as the pages turn. Phase 2 then plays as above.
+    - **Decided (Eric, Oct 14: "your pick is fine, we want easier code and less lag over all else, fewer bug
+      risks"):** the split reuses Sawyer's board saw (crack lines, then the quarters slide apart). The book's symbol
+      is the gold Cyrillic **"ШАХМАТЫ"** ("chess" in Russian) on the shop item's larger icon, and its first
+      letter **"Ш"** as a gold monogram on the book in the sprites: clearly Russian, about chess, and not political.
+    - **Effort, easiest to hardest:**
+      - a slam, a flash, then a cross-fade into four boards;
+      - crack lines, then the quarters sliding apart (the pick, reusing the saw);
+      - a true tear or 3D split (not worth it).
+  - **The God King against him (Eric, Oct 14):** the God King's help **doesn't work** against him (his strike, Last
+    Stand and any other help), and when the crowd tries to use it, **he mocks it** as "theory" and "engine" crutches
+    (lines from Eric later). The God King gets **unique lines** for this fight, e.g. "I sense a tremendous power
+    within this foe."
+  - **His real red book:** in 1972 he prepared from what he called "the red book" of his rival's games (a red cloth
+    hardcover). In the game it's an unlabeled red book that he holds at his side, consults at logical moments, and
+    opens like a spell book for his ultimate.
+  - **His art:** Eric's sprite (Oct 14): seated on a stone block, white shirt, patterned blue tie, a chess piece in hand,
+    an intense stare. An in-game version is being drawn (art only, not in the game).
+  - **Director's flags:** use a different name (agreed). A recognizable likeness and real quotes carry the same
+    rights question as the name, so check before launch (his estate; post-mortem publicity rights vary). Keep his lines
+    to his chess views; never his hateful public statements from later life.
+
 ## Needs Eric
 
 - **Maia-3 bosses, before players meet them (pre-launch):** your OK to publish the Maia box's source
