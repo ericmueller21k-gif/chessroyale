@@ -200,7 +200,8 @@ export class Phase2Game {
     const engine = this.opts.bots;
     const search = this.opts.win
       ? engine.topMoves(fen, 1).then((t) => t[0]?.move ?? legalMoves(fen)[0]!)
-      : engine.playAtElo(fen, RECLUSE_PHASE2.botElo, RECLUSE_PHASE2.botNodes, think);
+      : // (A slow one only waits longer: its search keeps the usual budget, so a shared engine isn't held up.)
+        engine.playAtElo(fen, RECLUSE_PHASE2.botElo, RECLUSE_PHASE2.botNodes, Math.min(think, RECLUSE_PHASE2.botMoveMs[1]));
     const wait = new Promise<void>((r) => {
       const t = setTimeout(() => {
         this.timers.delete(t);

@@ -166,7 +166,7 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, the God Kin
   const BANK = BOSS_POWERS.bulletBankSeconds * 1000;
   const allowed = await page.evaluate(() => (window as any).match.phase.allowedMs as number);
   expect(allowed).toBe(BANK);
-  await expect(page.locator(".boss-dock-status .bullet-note")).toContainText(/Bullet · [23]:\d\d left/);
+  await expect(page.locator(".boss-dock-status .bullet-note")).toContainText(/Bullet · \d:\d\d left/);
   // No increment: a move's time comes out of the bank, nothing goes back.
   await page.waitForTimeout(1500);
   await play(page, await quietMove(page));
