@@ -115,6 +115,12 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   (`RECLUSE_PHASE2.endMs`: beaten, the spellbook's glow as a placeholder for his transformation; he won, his laugh) and
   the result (`results.simul`: "won N of 4"). No power-ups, no items; the God King's help stays blocked and mocked
   (`slam2`). Engine move (admins) works on your board.
+- **His phase 2 ultimate** (Eric, Oct 14): a move longer than `slowMoveSeconds` (5 s; anyone's, any board, before it
+  comes) is a slow move (`Phase2State.slow`; his line, `slow`, low priority: it never stacks); the move after
+  `slowMovesForUlt` (5) slow ones brings it (`phase2Ult`): his line (`ult2`), the spellbook where he stands, "5
+  SECONDS!"; from then on every move has `ultMoveSeconds` (5 s), no bank, and out of time a random legal move is played
+  for that player (`phase2Timeouts`, as Squads plays a missed move; never a loss on time). The dock counts it down.
+  Bots think past 5 s now and then before it (`botSlowChance`, `botSlowMs`). The admins' trigger brings it at once.
 - **Layouts:** a phone: the other three boards small above yours (tap one to watch it; "Back to my board"); a computer:
   the four as a 2x2 in the board's square, each at its corner, as the phase change leaves them.
 - **Test switches:** `?win=1` (phase 1 a mate in one; in phase 2 every board starts from a mate in one, written as

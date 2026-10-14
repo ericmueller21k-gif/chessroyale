@@ -235,21 +235,24 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
   - **Phase 1 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 1"): pick
     "Hidden Boss" from the boss menu (admins see him after the rest). Maia-3 at its top rating, raw, at a fixed
     strength; the God King's help blocked and mocked; his ultimate at turn 7, the bullet clock for the rest of the
-    battle (3:00, no added time, out of time loses); beaten, he collapses and mumbles, then phase 2. Placeholder
+    battle (1:00, no added time, out of time loses; Eric, Oct 14: was 3:00); beaten, he collapses and mumbles, then phase 2. Placeholder
     lines (and five verified quotes) in one table, `characters/recluse-lines.ts`, for Eric's own.
   - **Phase 2 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 2"): beaten
     in phase 1, he collapses and mumbles, then the phase change (about 7 s: the book's slam, Sawyer's crack lines, the
     quarters growing into four boards, the Chess960 shuffle as the book's pages flip, his revive), then four boards
     at once, each its own Chess960 start: you on one, bots on three. Stockfish only, at 2750, at most 0.9 s a move;
     2:00 a board, no added time, out of time loses that board; a lost board's neighbors play on; all four must be
-    won ("Victory!"), else a defeat that says how many of four were won. Test switches: `?win=1` (a mate in one in
+    won ("Victory!"), else a defeat that says how many of four were won. **His phase 2 ultimate** (Eric, Oct 14):
+    each move longer than 5 s (anyone's, any board) draws a line about playing faster; on the team's 6th slow move,
+    "That's enough!" and from then on 5 s a move on every board, no bank, a random legal move played for whoever runs
+    out (never a loss on time). Test switches: the admins' "Trigger ultimate (testing)", `?win=1` (a mate in one in
     both phases, the bots take theirs), `?phase=2` (straight to the phase change).
     - **Left for later:** his real name and lines (phase 2's are placeholders too); how players reach him (the red
       book Mercenary item and the Squads win); his "super saiyan" transformation (a placeholder today: the spellbook's
       glow); the special crate and its reward; a server-side brain (the engine server's move endpoint) and fair-play
       review for real fights; online and Squads play (today the server never makes a battle with him); the
       engine-against-engine sim in Chess960 at the real clock (next step, for 2750 and the 2:00 bank); sim-tuning
-      phase 1's numbers (turn 7, 180 s); the FAQ's Chess960 words once players can meet him.
+      phase 1's numbers (turn 7, 60 s); the FAQ's Chess960 words once players can meet him.
 
 Added Oct 14, 2026 (Eric; notes only, nothing built):
 
