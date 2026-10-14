@@ -209,7 +209,7 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await page.getByRole("dialog", { name: "Choose your boss" }).locator(".boss-row").first().click();
   await yourMove(page);
-  await expect(page.locator(".ult-test")).toHaveCount(0);
+  await expect(page.locator(".ult-test, .engine-move")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Engine move" })).toHaveCount(0);
 });
 

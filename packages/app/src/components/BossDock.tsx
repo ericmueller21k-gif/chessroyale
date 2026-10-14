@@ -206,7 +206,7 @@ export function UltimateTest({ match }: { match: GameView }) {
 export function EngineMove({ match }: { match: GameView }) {
   if (!match.engineMoveShown || !match.engineMove || match.boss?.result) return null;
   return (
-    <button type="button" class="ult-test engine-move" disabled={match.phase.kind !== "play" || !!match.engineThinking} onClick={() => match.engineMove?.()}>
+    <button type="button" class="engine-move" disabled={match.phase.kind !== "play" || !!match.engineThinking} onClick={() => match.engineMove?.()}>
       Engine move
     </button>
   );
