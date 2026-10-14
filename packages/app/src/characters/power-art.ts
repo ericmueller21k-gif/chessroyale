@@ -119,9 +119,9 @@
  *                               CATCH point on the piece's square), the `tug` dragging it one square (he steps with it,
  *                               the rope taut), a `leap` back. The long pull after his first move is the same on his
  *                               pawn (`more.pull`).
- *     ultimateWarn "ready"      None comes (Eric, Oct 13: no warning); his meter full shows as his ready loop instead
- *                               (both loops swinging, the wind-up's spin looped: boss-beats.ts's `ready`), with "I've
- *                               got you in my sights." as it fills.
+ *     ultimateWarn "taunt"      Never plays now (Eric, Oct 13: no warning); his meter full shows as his ready loop
+ *                               instead (both loops swinging, the wind-up's spin looped: boss-beats.ts's `ready`), with
+ *                               "I've got you in my sights." as it fills.
  *     ultimate     "windup"     SHOWDOWN!, ON THE BOARD (SHOWDOWN): a `leap` into the middle, both loops spinning (the
  *                               windup to its `throw`), a leap back to his corner, then `haul` while the board's ropes
  *                               yank each pair into the line-up (a `yank` each), and "DRAW!" (the `draw` sting).
@@ -210,7 +210,6 @@ export const POWER_ANIMS = [
   "taunt",
   "windup",
   "haul",
-  "ready",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -289,8 +288,9 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
   },
   "Wrangler": {
     power: { anim: "lasso", hit: "tug", onBoard: true },
-    // (Every boss's moments have a warning; his ultimate has none now: his meter's line and ready loop stand in.)
-    ultimateWarn: { anim: "ready" },
+    // (Every boss's moments name a warning; his ultimate has none now (Eric, Oct 13): his meter's line and ready loop
+    // stand in, so this never plays.)
+    ultimateWarn: { anim: "taunt" },
     ultimate: { anim: "windup", hit: "throw", onBoard: true },
     more: {
       pull: { anim: "lasso", hit: "tug", onBoard: true },
