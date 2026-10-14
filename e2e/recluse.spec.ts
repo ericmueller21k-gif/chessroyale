@@ -492,6 +492,8 @@ test("phase 2's slow moves (?phase=2): each marks a red X for the team in one co
     const quiet = legal.filter((m) => !m.captured && m.piece === "p" && !m.promotion);
     const move = (quiet[i % Math.max(1, quiet.length)] ?? legal[0]!).lan;
     const before = (await simulNow(page)).slow;
+    // (The bots' slow moves can bring his ultimate while you think: then the count is done, and yours isn't one.)
+    if (before >= 10 || (await simulNow(page)).ultAt !== null) break;
     await page.evaluate((m) => (window as any).match.simulMove(0, m), move);
     await expect.poll(async () => (await simulNow(page)).slow, { timeout: 5_000 }).toBeGreaterThan(before);
     // The marks say the team's count at once.

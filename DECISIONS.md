@@ -3921,4 +3921,8 @@ your move yours); e2e `recluse.spec.ts` (no strike text from the intro on; the d
 in phase 2; three moves at 1+0, his line, "+2 s a move from now on" only while the boss screen holds, "Bullet 1+2", the
 bank after a move exactly +2 s less the time taken), `matchmaking.spec.ts`'s Solo raid (another boss's card still says
 "Strikes in…"), `king-attack.spec.ts`, `boss-speech.spec.ts`, `resign.spec.ts`. Frames: `npm run frames:recluse --
-<dir> both light only=plus`.
+<dir> both light only=plus`; the dock's "Your move. Bullet 1+2 · 0:59 left" measured whole in its two lines at 320,
+360 and 390 px, and the band on the squares exactly.
+- **A test fix on the way** (`recluse.spec.ts`, phase 2's slow moves, from #208): it failed on a computer, on main too.
+  The bots' slow moves can bring his ultimate during the 5.4 s the test thinks, and then its own move can't add one; the
+  test now stops counting once the ultimate has come by the time it moves.
