@@ -3148,3 +3148,13 @@ targeted lane): `perf.spec.ts` (with the board's drawings counted through the ca
 a plain move, and every boss effect (the candle and its waves, the blizzard and both thaws, the funhouse and its turns,
 the bounce, the split, the board saw and the cuts, Lights out, the pull, the drag and the Showdown): the same on both,
 no piece flickers, jumps back or slides twice, and the funhouse's forced move still slides after the board turns.
+
+### Maia for players: on (Eric, Oct 14, 2026)
+
+`BOSS_BRAIN.forPlayers` is on: every player's bosses play their normal moves with Maia-3 by the same rule admins had
+(`bossBrainFor`, `maiaRatingFor`, the guards by level, Stockfish from 2800), solo and online. Eric's go: "flip it", on
+Oct 14, after the Maia box's source went up on the site (#183). The session that published the source wasn't
+permitted to change the flag, so the director made this one-value change with Eric's explicit OK. A player's device
+now downloads the Maia model (24 MiB, cached) when a boss battle needs it; a device that can't run it plays
+Stockfish's move as before. The FAQ's Maia section reads as live (it follows the flag). Left for Eric: the real-phone
+check (`TESTING.md`, "Maia").

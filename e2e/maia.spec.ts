@@ -142,7 +142,7 @@ test("an online raid on the Maia brain: the host's device plays Maia's move, eve
   await expect(guest.locator(".brain-debug")).toHaveCount(0);
 });
 
-test("players meet Stockfish: no Brain picker, no Maia download, no debug line", async ({ page }) => {
+test("players meet Maia too (forPlayers on): no Brain picker and no debug line; Maia downloads", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   test.setTimeout(3 * 60_000);
   const maiaFiles: string[] = [];
@@ -157,7 +157,8 @@ test("players meet Stockfish: no Brain picker, no Maia download, no debug line",
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|results)$/);
   await expect(page.locator(".brain-debug")).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).match.brainLine)).toBeNull();
-  expect(maiaFiles).toEqual([]);
+  // Maia is on for players (BOSS_BRAIN.forPlayers): the player's device downloads it for the boss's moves.
+  await expect.poll(() => maiaFiles.length, { timeout: 30_000 }).toBeGreaterThan(0);
 });
 
 test("the credits name Maia-3 and Stockfish, with the Maia box's license beside it and both engines' source to download", async ({ page }) => {
