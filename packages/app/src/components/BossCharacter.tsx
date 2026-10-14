@@ -10,7 +10,7 @@ import { prewarmGinger } from "./Ginger.tsx";
 import { prewarmGrex } from "./Grex.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { prewarmPig } from "./Pig.tsx";
-import { prewarmRecluse } from "./Recluse.tsx";
+import { EngineOverlay, placeEngine, prewarmRecluse } from "./Recluse.tsx";
 import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, holdMs, useVoice, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
@@ -49,17 +49,32 @@ export function resetBeats() {
   played.clear();
   inPlace.run = null;
   figure.run = null;
+  engine.at = null;
 }
 
 /**
  * What the boss's figure shows instead of its beat, for as long as it's set (the Hidden Boss's phase 2): `before` (a loop)
- * until `since`, then `anims` in turn, then `loop` for good. Its beat's lines and fall lines are quiet meanwhile (his
- * phase 2 says its own). Runs in place (playInPlace) still play over it. Cleared by a new battle (resetBeats).
+ * until `since`, then `anims` in turn (a loop given with `ms` plays that long), then `loop` for good. Its beat's lines and
+ * fall lines are quiet meanwhile (his phase 2 says its own). Runs in place (playInPlace) still play over it. Cleared by a
+ * new battle (resetBeats).
  */
-const figure: { run: { since: number; anims: readonly string[]; loop: string; before?: string } | null } = { run: null };
-export function setFigureRun(run: { since: number; anims: readonly string[]; loop: string; before?: string } | null) {
+export type FigureRun = { since: number; anims: readonly (string | { readonly anim: string; readonly ms: number })[]; loop: string; before?: string };
+const figure: { run: FigureRun | null } = { run: null };
+export function setFigureRun(run: FigureRun | null) {
   figure.run = run;
 }
+
+/**
+ * The Hidden Boss's half-engine look (Eric, Oct 14: an overlay, never his frames): from `at` (his phase change, as the God
+ * King's power lands in him) to the end of the battle, on every drawing of him (Recluse.tsx, EngineOverlay). Cleared by a
+ * new battle (resetBeats).
+ */
+const engine: { at: number | null } = { at: null };
+export function setEngineAt(at: number | null) {
+  engine.at = at;
+}
+/** When his half-engine look came on (null: it hasn't). */
+export const engineAt = (): number | null => engine.at;
 /** The loop the figure rests in now, when a figure run is set (phase 2's `idle2`), else null. */
 export const figureLoop = (): string | null => figure.run?.loop ?? null;
 /** What a figure run shows at `now`, or null: none is set. */
@@ -76,13 +91,17 @@ function figureShowing(ch: Character, now: number): { anim: string; frame: numbe
   if (now < run.since) return loopAt(run.before ?? run.loop, 0);
   let t = now - run.since;
   for (let i = 0; i < run.anims.length; i++) {
-    const a = ch.anims[run.anims[i]!];
+    const step = run.anims[i]!;
+    const name = typeof step === "string" ? step : step.anim;
+    const a = ch.anims[name];
     if (!a) continue;
-    if (t < length(a)) {
-      const frame = frameAt(a, t);
-      return { anim: run.anims[i]!, frame, tag: `fig:${run.since}:${i}:${frame}` };
+    // (A loop for a set time: its frames by the time into it.)
+    const ms = typeof step === "string" ? length(a) : step.ms;
+    if (t < ms) {
+      const frame = frameAt(a, typeof step === "string" ? t : t % length(a));
+      return { anim: name, frame, tag: `fig:${run.since}:${i}:${typeof step === "string" ? 0 : Math.floor(t / length(a))}:${frame}` };
     }
-    t -= length(a);
+    t -= ms;
   }
   return loopAt(run.loop, 0);
 }
@@ -218,7 +237,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     // (Jefferson's Roman candle: him, its shots and fireballs.)
     if (kit.ch.id === "grex") prewarmGrex(kit.ch.name);
     // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
-    if (kit.ch.id === "recluse") prewarmRecluse();
+    if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
     // (Its attack on a king too: the God King's Last Stand, or its mate.)
     prewarmKingAttack(kit.ch.name);
   }, [kit]);
@@ -227,22 +246,35 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   lookRef.current = () => (wipLook.now?.() ?? (kit?.lookOf ? kit.lookOf(boss) : undefined)) ?? "";
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
+  // (The Hidden Boss's half-engine look over his drawing, placed on his head frame by frame: Recluse.tsx.)
+  const eng = useRef<HTMLSpanElement>(null);
   // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
   useLayoutEffect(() => {
     if (!kit || !beat || !cv.current) return;
     const g = cv.current.getContext("2d");
     let raf = 0;
     let last = "";
+    let lit: boolean | null = null;
     const draw = () => {
       const now = Date.now();
       // (A run of its own animations in place, over its beat, while one lasts: the Hidden Boss's spellbook, his slam.)
       const s = inPlaceShowing(kit.ch, now) ?? figureShowing(kit.ch, now) ?? showing(kit, beat, now, since);
       const look = lookRef.current();
       const id = `${s.anim}:${s.frame}:${look}:${lightsId()}`;
+      if (eng.current) {
+        const on = engine.at !== null && now >= engine.at;
+        if (on !== lit) {
+          lit = on;
+          eng.current.classList.toggle("on", on);
+          // (It ignites only as it comes; a screen drawn later shows it already on.)
+          eng.current.classList.toggle("fresh", on && now - engine.at! < 400);
+        }
+      }
       if (id !== last) {
         last = id;
         const frame = kit.ch.anims[s.anim]!.frames[s.frame]!;
         g?.putImageData(frameImage(kit.ch, frame, look), 0, 0);
+        placeEngine(eng.current, frame);
         box.current?.setAttribute("data-anim", s.anim);
         box.current?.setAttribute("data-look", look);
         const sound = frame.cue ? kit.sounds[frame.cue] : undefined;
@@ -289,6 +321,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   return (
     <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1] }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
+      {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). */}
       {line && <SpeechBox key={line.key} class="bc-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />}
     </div>

@@ -149,9 +149,11 @@ export interface SpriteAnimProps {
   style?: Record<string, string | number>;
   /** One of the character's looks (Hollow's bulbs: `bulbs0` to `bulbs3`). */
   look?: string;
+  /** Told each frame as it's drawn (the Hidden Boss's half-engine overlay follows his head). Read when the animation starts. */
+  onFrame?: (frame: Frame) => void;
 }
 
-export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look }: SpriteAnimProps) {
+export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look, onFrame }: SpriteAnimProps) {
   const cv = useRef<HTMLCanvasElement>(null);
   // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
   useLayoutEffect(() => {
@@ -168,6 +170,7 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
         const frame = ch.anims[s.anim]!.frames[s.frame]!;
         g.clearRect(0, 0, ch.w, ch.h);
         g.putImageData(frameImage(ch, frame, look), 0, 0);
+        onFrame?.(frame);
         cv.current?.setAttribute("data-frame", shown);
         const sound = frame.cue ? sounds[frame.cue] : undefined;
         const tag = `${ch.id}:${id}:${s.tag}:${s.frame}`;

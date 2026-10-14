@@ -49,6 +49,11 @@ export const RECLUSE_LINES = {
     "Sixty-four squares... I counted every one...",
   ],
   // ---- Phase 2 (DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960. ----
+  /**
+   * The phase change's start: he absorbs the God King (Eric, Oct 14: "brain and engine combined"), said as the power
+   * lands in his fist; one, picked per phase change (placeholders: ours, not his words).
+   */
+  absorb: ["All game you leaned on an engine. Now see how you like it.", "Mind and machine. Both mine now."],
   /** He revives, as he snaps upright and the book flies back to his hand (placeholders). */
   revive: ["Not yet. Now we play real chess.", "On your feet, all of you. Again!"],
   /**
@@ -107,24 +112,34 @@ export const RECLUSE_LINES = {
       "Draw, draw, draw... and every board against me!",
     ],
   },
+  /**
+   * Phase 2's chatter mocks the engine he took from the God King: every third line of his chatter, from the first, in
+   * turn (`Talk`; the lowest priority, as the collusion lines). Placeholders, ours.
+   */
+  engine: [
+    "Fun, isn't it?",
+    "Look how much fun we're having.",
+    "Not so nice when the engine's on my side, is it?",
+    "Go on, call your God King. Oh, that's right.",
+    "Every line, every move. I see them all now.",
+  ],
   /** His phase 2 ultimate as it comes: a few seconds a move from now on (placeholders). */
   ult2: ["That's enough! Five seconds a move, all of you!", "Enough thinking! Five seconds, or I move for you!"],
   /** Beaten on all four boards (placeholders; his "super saiyan" transformation comes later). */
   beaten2: ["Impossible... all four...", "Four boards... and not one book among them..."],
 } as const;
 
-/** The God King's lines in this fight (his usual ones about calling him are left out: his help doesn't work here). */
+/**
+ * The God King's lines in this fight (his usual ones about calling him are left out: his help doesn't work here). He has
+ * none in phase 2: the boss absorbs him as it begins (Eric, Oct 14), so his last words are his cry as he's drained.
+ */
 export const KING_VS_RECLUSE = {
   /** His opening line (the first is Eric's own, ROADMAP.md, Oct 14; the others are placeholders). */
   intro: ["I sense a tremendous power within this foe.", "Careful. My strength feels faint against this one.", "This is no ordinary boss. Trust your own moves."],
   /** His help tried, and blocked (placeholders). */
   blocked: ["My power... it won't take hold!", "Nothing! He shrugs off my strength.", "I can't reach him. This fight is yours alone."],
-  /** Phase 2 begins: he's back, on four boards (placeholders). */
-  phase2: ["He rises again! Four boards now. Win them all!", "His power has doubled. Every board must fall!"],
-  /** A board won by the players (placeholders). */
-  boardWon: ["A board is ours! Keep going!", "One falls! Finish the rest!"],
-  /** A board lost (placeholders). */
-  boardLost: ["A board is lost... the others fight on!", "We lost one. Play on, all of you!"],
-  /** All four won: he's beaten (placeholders). */
-  victory2: ["All four boards! You've done the impossible!", "He's beaten at last. Legendary!"],
+  /** The phase change: he stands over the beaten boss, triumphant (short: his cry cuts in about two seconds later; placeholders). */
+  triumph: ["Kneel. The crown always wins.", "Down you stay, bookworm!", "Your book is closed. Kneel!"],
+  /** The phase change: his cry as the boss drains his power (placeholders). */
+  drained: ["No! My light... what are you doing?!", "Release me! That power is mine!", "Aaagh! My strength!"],
 } as const;

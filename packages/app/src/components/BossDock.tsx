@@ -7,6 +7,7 @@ import { kingLine, kingSay, setKingFallen, type KingCue } from "../godKing.ts";
 import { play } from "../sound.ts";
 import { useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingSprite, kingCommandAct } from "./GodKing.tsx";
+import type { GodKingAnim } from "../characters/god-king.ts";
 import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
 import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { Bolt } from "./PowerUpButton.tsx";
@@ -49,6 +50,7 @@ export function BossDock({
   fallen: fallenNow,
   charges: chargesShown,
   powerUp,
+  king,
 }: {
   match: GameView;
   /** Your move: step back through the game (the arrows are grayed out elsewhere). */
@@ -77,6 +79,12 @@ export function BossDock({
    * this move (its arrows are on the board). Other screens just show how many you hold.
    */
   powerUp?: { enabled: boolean; inUse: boolean };
+  /**
+   * What he shows instead of standing by, never to be called (the Hidden Boss's phase change: triumphant, drained, fading
+   * as the boss absorbs him), or "gone": absorbed, his place empty for the rest of the fight (phase 2), but for his last
+   * words while they last.
+   */
+  king?: KingShow;
 }) {
   const boss = match.boss;
   const fallen = fallenNow ?? !!boss?.lastStand;
@@ -91,7 +99,7 @@ export function BossDock({
   const computer = useMedia(COMPUTER_LAYOUT);
   const view = nav?.view;
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
-  const ready = canCall && charges > 0 && !match.kingCalled && !fallen;
+  const ready = canCall && charges > 0 && !match.kingCalled && !fallen && !king;
   const cueKey = cues.map((c) => c.key).join("|");
   // Fallen, he says nothing more (but his last words, and his return if the crowd wins).
   useEffect(() => setKingFallen(fallen), [fallen]);
@@ -127,6 +135,7 @@ export function BossDock({
         )}
       </div>
       <GodKingUnit
+        show={king}
         side={side}
         charges={charges}
         ready={ready}
@@ -244,8 +253,12 @@ export function BrainDebug({ match }: { match: GameView }) {
   );
 }
 
+/** The God King's place in the dock shown another way (BossDock's `king`). */
+export type KingShow = { anim: GodKingAnim; since: number; then?: GodKingAnim; class: string } | "gone";
+
 /** The God King standing by: breathing, his sword swaying, his charges at his feet; his words in a bubble above. */
 function GodKingUnit({
+  show,
   side,
   charges,
   ready,
@@ -258,6 +271,7 @@ function GodKingUnit({
   menu,
   onTap,
 }: {
+  show?: KingShow;
   side: "w" | "b";
   charges: number;
   ready: boolean;
@@ -276,6 +290,32 @@ function GodKingUnit({
   const act = command ? kingCommandAct(command.mode, command.startAt, now) : undefined;
   // His leap (his Last Stand) plays from when it starts.
   const leapAt = useMemo(() => (leaping ? Date.now() : 0), [leaping]);
+  if (show) {
+    // (The Hidden Boss absorbs him: his aura behind him, his figure as the phase change says, motes as he fades; his place
+    // kept, empty once he's gone, so the dock doesn't move. His words stay up their time, his figure gone or not.)
+    const gone = show === "gone";
+    return (
+      <div class={`gk-unit ${gone ? "gone" : show.class}`}>
+        {line && <SpeechBox key={line.key} class="gk-bubble" text={line.text} at={line.at} until={line.until} now={now} fits={1} />}
+        <span class="gk-unit-btn" role={gone ? undefined : "img"} aria-label={gone ? undefined : "The God King"} aria-hidden={gone ? "true" : undefined}>
+          {!gone && (
+            <>
+              <i class="gk-aura" />
+              <GodKingSprite side={side} anim={show.anim} since={show.since} then={show.then} class="absorbed" />
+              <span class="gk-motes">
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
+            </>
+          )}
+        </span>
+        <span class="gk-unit-charges">{!gone && charges > 0 ? "👑".repeat(charges) : ""}</span>
+      </div>
+    );
+  }
   if (fallen) {
     // After his Last Stand: his fallen figure, on his side, cracked and grayed. No menu, no crowns; the charges he
     // had left are your power-ups, in a ⚡ button above him (the whole column is the button).
