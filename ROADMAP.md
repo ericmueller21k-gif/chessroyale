@@ -229,3 +229,8 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
 - **Privacy policy and terms:** drafted at /privacy and /terms; Eric to read them over.
 - **Real-phone testing** of matchmaking with friends.
 - **Art:** simple icons and emotes can be drawn in code; polished custom art would mean an artist or a paid pack.
+- **At launch (Eric, Oct 13-14):**
+  - Flip the repository to private. Before that: trim CI, and set an Actions budget (the free private plan gives
+    2,000 minutes a month; CI uses about 100-120 a day). The Maia and Stockfish source must be served from the site.
+  - Test lanes: every logic change goes back to the full lane per PR (CLAUDE.md, "Test lanes": the targeted lane
+    and batch full runs are pre-launch only).
