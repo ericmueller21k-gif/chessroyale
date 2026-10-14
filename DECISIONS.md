@@ -3994,7 +3994,10 @@ what any boss final records (your place, the cuts, the boss reached and survived
 - Online the vote's result now patches the app's settings as it does the server's, so the last cut names the right
   ending and the leaderboard's cut line follows the boss final's 13 cuts (a reload mid-match falls back to the queue's
   settings, as before).
-- `?win=1` also works in a solo Crowd's boss final (a mate in one), to see him beaten there.
+- `?win=1` also works in a solo Crowd's boss final (a mate in one), to see him beaten there. New test switch
+  `?weakbots=1` (solo, and a lobby you create; `WEAK_BOT_SKILL`): every bot plays loosely, so a test playing the
+  engine's best move surely reaches the top 4. With the usual bots it didn't (8th in the first run): the strongest bots
+  play the engine's move as often as a perfect player, and only two of each team get through.
 - Settings' "How to play": "a boss battle (top 10 against a boss)" is now "(top 4 against Hidden Boss)", its counts from
   the settings. The FAQ: the endings name him; his own block (met only in the Crowd's final, no God King help, no
   strikes, the bullet clock, phase 2 solo, online a phase 1 win); his fixed strength and brain; the God King's section;
