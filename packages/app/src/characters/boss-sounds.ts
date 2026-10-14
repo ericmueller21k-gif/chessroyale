@@ -1,0 +1,29 @@
+import { bigBoySound } from "./bigboy-sounds.ts";
+import { clownSound } from "./clown-sounds.ts";
+import { gingerSound } from "./gingerbread-sounds.ts";
+import { grexSound } from "./grex-sounds.ts";
+import { hollowSound } from "./hollow-sounds.ts";
+import { pigSound } from "./pig-sounds.ts";
+import { recluseSound } from "./recluse-sounds.ts";
+import { sawyerSound } from "./sawyer-sounds.ts";
+
+/**
+ * The bosses' synthesized sounds by module, each name its cache's (synth.ts, soundCache): one table for the page and
+ * the sound worker (sound-worker.ts), so a sound made ahead off the page is the very one played.
+ */
+const MAKERS = {
+  bigBoy: bigBoySound,
+  clown: clownSound,
+  ginger: gingerSound,
+  grex: grexSound,
+  hollow: hollowSound,
+  pig: pigSound,
+  recluse: recluseSound,
+  sawyer: sawyerSound,
+} as const;
+
+/** One boss sound: its module and its name there. */
+export type BossSound = { [M in keyof typeof MAKERS]: readonly [M, Parameters<(typeof MAKERS)[M]>[0]] }[keyof typeof MAKERS];
+
+/** Makes one (or returns it from its cache). */
+export const makeBossSound = ([module, name]: BossSound, rate: number): Float32Array => (MAKERS[module] as (n: string, r: number) => Float32Array)(name, rate);

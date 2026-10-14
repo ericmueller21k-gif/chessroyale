@@ -5,6 +5,17 @@
 
 export type Voice = (t: number) => number;
 
+/**
+ * Each boss's sounds once made, by its module (`bigBoy`, `grex`, …), keyed `${name}@${rate}`: made on the spot when one
+ * plays, or ahead by the sound worker (sound.ts, warmSounds), whose results land here.
+ */
+const caches = new Map<string, Map<string, Float32Array>>();
+export function soundCache(id: string): Map<string, Float32Array> {
+  let c = caches.get(id);
+  if (!c) caches.set(id, (c = new Map()));
+  return c;
+}
+
 /** The game's old move sample's level (measured with ffmpeg before it was replaced, Oct 12): peak -3.9 dBFS, mean -21.3 dBFS. */
 export const MOVE_PEAK = 0.64;
 export const MOVE_MEAN_DB = -21.3;

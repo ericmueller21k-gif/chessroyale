@@ -5,7 +5,7 @@
  * rate (its noise is seeded), so a test can measure it: every one stays quieter than a piece's move (peak and loudness).
  * Made ahead in idle moments as his battle starts (warmSounds).
  */
-import { bandpass, lowpass, noise, osc, render, sine, soft, type Voice } from "./synth.ts";
+import { bandpass, lowpass, noise, osc, render, sine, soft, type Voice, soundCache } from "./synth.ts";
 
 export type RecluseSound = "flip" | "shut" | "rustle" | "huff" | "hum";
 
@@ -62,7 +62,7 @@ const SOUNDS: Record<RecluseSound, (rate: number) => Float32Array> = {
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
 const LEVEL: Record<RecluseSound, number> = { flip: 0.11, shut: 0.26, rustle: 0.18, huff: 0.1, hum: 0.09 };
 
-const cache = new Map<string, Float32Array>();
+const cache = soundCache("recluse");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */
 export function recluseSound(name: RecluseSound, rate: number): Float32Array {
   const key = `${name}@${rate}`;
