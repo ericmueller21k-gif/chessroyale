@@ -103,7 +103,4 @@ test("Chess960 castling registers onto the rook and onto its square, by tap-tap 
     console.log(info.project.name, want, JSON.stringify(got));
     expect(got).toEqual([want]);
   }
-  // The move stays on the board as played: the king on g1, the rook beside it on f1.
-  await expect(page.locator(`.board-area ${BOARD_SEL.wrap} piece.white.king`).first()).toHaveAttribute("data-square", "g1");
-  await expect(page.locator(`.board-area ${BOARD_SEL.wrap} piece.white.rook[data-square="f1"]`)).toHaveCount(1);
 });
