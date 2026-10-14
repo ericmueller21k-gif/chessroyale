@@ -4,12 +4,14 @@
 //   <model>.onnx                 the converted model (model/, made by scripts/convert.py)
 //   LICENSE.txt                  the GNU AGPL 3.0 (this box and Maia-3)
 //   NOTICE.txt                   what this is, where its source is, and the bundled libraries' licenses
+//   maia-box-source.tar.gz       this box's complete source (scripts/source-archive.mjs)
 // Usage: node scripts/build.mjs [outDir]
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { ARCHIVE, lockText, sourceArchive } from "./source-archive.mjs";
 
 const BOX = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = process.argv[2] ?? join(BOX, "dist");
@@ -51,7 +53,8 @@ writeFileSync(
     "(LICENSE.txt), as Maia-3 is. The game talks to it only by plain-text messages.",
     "",
     `Model: ${MODEL} (${MODEL_NAME}), converted from the official checkpoint UofTCSSLab/Maia3-23M.`,
-    "Its source (the worker, the conversion scripts and how the model was made) is available on request.",
+    `Its complete source (the worker, its build, the conversion script and how the model was made) is ${ARCHIVE},`,
+    `next to these files (/engine/maia/${ARCHIVE}); its README.md says how to build it.`,
     "",
     `Bundled: onnxruntime-web ${ortVersion} (MIT license, (c) Microsoft Corporation), chess.js ${chessVersion}`,
     "(BSD 2-Clause license, (c) Jeff Hlywa). Their license texts follow.",
@@ -65,4 +68,7 @@ writeFileSync(
     "",
   ].join("\n"),
 );
+// The box's complete source, next to what it builds (AGPL-3.0: served beside the worker).
+const built = Object.fromEntries(readdirSync(OUT).map((f) => [f, readFileSync(join(OUT, f))]));
+writeFileSync(join(OUT, ARCHIVE), sourceArchive({ box: BOX, lock: lockText(BOX), built, model: { name: MODEL, data: built[MODEL] } }));
 console.log(`maia box built into ${OUT}`);
