@@ -3036,6 +3036,13 @@ Eric approved finishing the Beta crate, so the planned batches 2 and 3 ship toge
   Common one, as in batch 1.
 - **The fitting sheet** takes `scale=1|2`, to look at the art at 1× and 2×.
 
+### The boss by the board's corner stays in the window (Eric, Oct 14, 2026)
+
+From 900 to 1099 px (no leaderboard beside the screen) the boss there is drawn at 1× (as in a phone's boss bar) next to
+the eval bar, and the board gives up room only if the margin still falls short of his widest frame (Sawyer's), so he's
+whole at every width (he was half off a 1024 px window). At 1024 × 768 the board doesn't move; at 900 × 700 it is 50 px
+smaller. From 1100 px he stays 2× over the leaderboard's edge and nothing moves. The God King keeps his size and place.
+
 ### Beta Crate · Series 001, batch 3: the ninja; the crate is complete (Oct 14, 2026)
 
 The last seven items, so Beta holds all 28 of the plan, at the plan's final odds. Colors and descriptions are the
