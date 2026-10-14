@@ -12,6 +12,7 @@ import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { Bolt } from "./PowerUpButton.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { SpeechBox } from "../speech.tsx";
+import { kingBlocked, mockKingHelp } from "./Recluse.tsx";
 
 /**
  * Boss battle: everything below the board, the same on every screen (your move,
@@ -146,6 +147,8 @@ export function BossDock({
               onPick={(s) => {
                 play("menuSelect");
                 setMenu(false);
+                // (The Hidden Boss: the God King's help doesn't work against him. Nothing is spent; he mocks the try.)
+                if (boss && kingBlocked(boss)) return mockKingHelp(boss);
                 match.callKing(s);
               }}
             />

@@ -6,7 +6,7 @@
  * powers (the power rules add it to boss.ts).
  */
 import type { SoundName } from "../sound.ts";
-import type { Beat, BeatLines } from "./boss-beats.ts";
+import type { Beat, BeatLines, Loop } from "./boss-beats.ts";
 import { BIGBOY, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.ts";
 import { CLOWN, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
@@ -14,6 +14,8 @@ import { GREX, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT, bulbsLook } from "./hollow.ts";
 import { SAWYER, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
 import { PIG, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
+import { RECLUSE, RECLUSE_BUST, RECLUSE_PORTRAIT } from "./recluse.ts";
+import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
 import { lashItem, type SquareItem } from "./power-art.ts";
@@ -40,8 +42,25 @@ export interface KingAttackKit {
 
 export interface BossKit extends BeatLines {
   ch: Character;
+  /**
+   * The drawing in a phone's boss bar, when it isn't `ch` (the Hidden Boss: his full figure is too tall for the bar, so the
+   * bar has his bust, cut from the same rig with the same animations; a computer and the results have `ch`).
+   */
+  bar?: Character;
   /** The animation for a moment, when it isn't the moment's own name. */
   anims: Partial<Record<Beat, string>>;
+  /** The animation for a loop it rests in, when it isn't the loop's own name (the Hidden Boss beaten: `collapseLoop`). */
+  loops?: Partial<Record<Loop, string>>;
+  /**
+   * Beaten: lines it says one after another once its defeat's animation is over, each as the last one goes (the Hidden
+   * Boss's mumbling as he slumps), on the board and on into the result screen.
+   */
+  fall?: readonly string[];
+  /**
+   * A line of its own for a moment, from the battle, instead of one of its kit's lines (the Hidden Boss's entrance when
+   * he's White and the game opened 1.e4: his real quote that reads right only then). Undefined: the kit's lines.
+   */
+  lineOf?: (beat: Beat, boss: BossView) => string | undefined;
   /** Frame cues to sounds. */
   sounds: Record<string, SoundName>;
   /** The part of a frame a portrait shows, and from which animation and frame. */
@@ -239,6 +258,59 @@ export const BOSS_KITS: Record<string, BossKit> = {
     chance: PIG_CHANCE,
     portrait: { ...PIG_PORTRAIT, anim: "idle", frame: 0 },
     // His throw's room out to one side (the frame is 115 wide): a wider box on a phone, as Sawyer's.
+    wide: true,
+  },
+  // The Hidden Boss (admins only, in Boss alone; DECISIONS.md, "The Hidden Boss, phase 1"). His lines are placeholders for
+  // Eric's own, in one table (recluse-lines.ts).
+  "Hidden Boss": {
+    ch: RECLUSE,
+    // (A phone's boss bar: his bust, head and shoulders, the same animations.)
+    bar: RECLUSE_BUST,
+    anims: {
+      // The stare is his entrance; behind on material he consults the red book; beaten he collapses (then slumps,
+      // mumbling: `loops.defeat`); winning, the unhinged laugh. His ultimate's spellbook and the slam as he mocks the God
+      // King's help play where he stands (components/Recluse.tsx, playInPlace).
+      entrance: "stare",
+      thinking: "idle",
+      move: "idle",
+      capture: "idle",
+      hurt: "idle",
+      check: "idle",
+      smug: "idle",
+      rattled: "consult",
+      defeat: "collapse",
+      victory: "laugh",
+      strike: "idle",
+      power: "idle",
+      ultimateWarn: "idle",
+      ultimate: "spellbook",
+    },
+    loops: { defeat: "collapseLoop" },
+    // (Every cue has a sound; his laugh is breath, no voice.)
+    sounds: {
+      dip: "recluseRustle",
+      stare: "recluseHum",
+      lift: "recluseRustle",
+      open: "recluseFlip",
+      snap: "recluseShut",
+      laugh: "recluseHuff",
+      cackle: "recluseHuff",
+      raise: "recluseRustle",
+      slam: "recluseShut",
+      reel: "recluseRustle",
+      drop: "recluseRustle",
+      thud: "recluseShut",
+      book: "recluseShut",
+      rise: "recluseRustle",
+      catch: "recluseShut",
+    },
+    lines: { entrance: RECLUSE_LINES.intro, rattled: RECLUSE_LINES.rattled, victory: RECLUSE_LINES.victory, ultimate: RECLUSE_LINES.bullet },
+    chance: { entrance: 1, rattled: 0.3, victory: 1 },
+    fall: RECLUSE_LINES.fall,
+    // (His real "Best by test.", word for word: only when he's White and the battle's game opened 1.e4.)
+    lineOf: (beat, boss) => (beat === "entrance" && boss.crowdSide === "b" && boss.board.history[0] === "e2e4" ? RECLUSE_LINES.introE4 : undefined),
+    portrait: { ...RECLUSE_PORTRAIT, anim: "idle", frame: 0 },
+    // (The bust is 50 px wide: the wider box on a phone, as Sawyer's and Wrangler's.)
     wide: true,
   },
 };

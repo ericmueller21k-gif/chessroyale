@@ -35,6 +35,14 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   It fits between the slide and the stagger, so the Last Stand takes no longer and nothing changed on the server. See
   [bosses.md](bosses.md), "A boss's attack on a king".
 - **Fair.** A power never changes how a player's own pick was judged, and a move he plays never earns brilliant credit.
+- **Against the Hidden Boss his help doesn't work** (Eric, Oct 14; the boss's passive, `BossRules.blocksKing`): his
+  move, his strike and his Last Stand never come, and nothing is spent (the runner's `kingDecision`, `callStrike`,
+  `lastStandFor`; solo's `callKing`). His menu still opens; picking "Play move" or "Strike" has the boss slam his book
+  shut and mock it, and the God King says his help won't take hold (`mockKingHelp` in `components/Recluse.tsx`). In
+  this fight he opens with his own line as "START!" comes ("I sense a tremendous power within this foe.", Eric's;
+  `foeIntro`, said by the boss screen's intro), and his
+  lines about calling him (the nudge, "spent", "A charge might turn it") are left out (`turnCues`' `noHelp`). His
+  lines for this fight are in the Hidden Boss's table, `characters/recluse-lines.ts`.
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
   power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). Each
   line then follows the speech rule every speaker shares (`speech.tsx`, `SPEECH`; Oct 10): it types out and stays
@@ -69,7 +77,7 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 | Where he's drawn, his on-board animations | `packages/app/src/components/GodKing.tsx`, `LastStand.tsx`, his sections of `styles.css` |
 | Banners | `packages/app/src/components/FightBanner.tsx`, cut-ins in `GodKing.tsx` and `LastStand.tsx` |
 | The dock and his command menu | `packages/app/src/components/BossDock.tsx` |
-| His lines | `packages/app/src/godKing.ts` |
+| His lines | `packages/app/src/godKing.ts` (against the Hidden Boss: `characters/recluse-lines.ts`) |
 | The boss screens | `packages/app/src/screens/Boss.tsx`, the boss parts of `Crowd.tsx` and `Play.tsx` |
 | Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0, credited in `CREDITS.md`), `src/sound.ts` |
 
@@ -81,6 +89,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 ## Tests and tools
 
+- Against the Hidden Boss: unit `packages/chess/test/recluse.test.ts` (blocked, nothing spent),
+  `packages/app/test/recluse-boss.test.ts` (the mocks, his cues); e2e `e2e/recluse.spec.ts`.
 - Unit: `packages/chess/test/last-stand.test.ts`, `packages/app/test/god-king.test.ts`,
   `packages/app/test/god-king-sprite.test.ts`, `packages/server/test/lobby.test.ts`.
 - e2e: `e2e/formats.spec.ts` (the boss final), `e2e/boss-powers.spec.ts`.

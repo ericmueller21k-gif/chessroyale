@@ -22,11 +22,12 @@ import { LightsDock, LightsOutLayer } from "../components/LightsOut.tsx";
 import { seenKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
-import { BossCharacter, BossFace, BossSide, hasCharacter } from "../components/BossCharacter.tsx";
+import { BossCharacter, BossFace, BossSide, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, bossVoice } from "../speech.tsx";
+import { kingBlocked } from "../components/Recluse.tsx";
 
 /** For the raid's opening roulette: famous lines flicking past before the real one lands. */
 const ROULETTE = [
@@ -142,7 +143,7 @@ function ClaimDark({ boss, since, now }: { boss: BossView; since: number; now: n
  * the boss striking down the crowd's worst recent mover, with a flash and the
  * victim's name crossed out.
  */
-export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, lights }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView }) {
+export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, lights, fall }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView; fall?: boolean }) {
   const now = useFrameNow();
   // (Hollow's Lights out comes before his move: as far as the rest of the screen goes, he hasn't moved yet.)
   const thinking = thinkingNow || !!lights;
@@ -167,9 +168,16 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   }, [intro, plies, boss.board.fen, pawnBack]);
   const introLast = intro ? (plies > 0 ? history[plies - 1]! : null) : boss.board.lastMove;
   const showCard = intro && t < tl.replayAt;
+  // The Hidden Boss: the God King's own opening line for this fight (Eric's "I sense a tremendous power within this
+  // foe.") as "START!" comes, while nothing else is being said, so it's always heard; it's his intro, so the first move
+  // doesn't say another.
+  const foeIntro = !!intro && kingBlocked(boss) && t >= tl.bannerAt;
+  useEffect(() => {
+    if (foeIntro) kingSay("foeIntro", "intro");
+  }, [foeIntro]);
   // A new boss battle: the God King starts afresh (he'll introduce himself on your first move). This device remembers
   // the boss, so the next random one is another.
-  useState(() => intro && (resetKingSpeech(), bossVoice.reset()));
+  useState(() => intro && (resetKingSpeech(), bossVoice.reset(), resetBeats()));
   useState(() => intro && rememberBoss(boss.id, `${boss.id}:${history.join("")}`));
   // The boss's mate: its attack on the crowd's king (its kit has one), from KING_ATTACK.mateAt after its move shows;
   // the result waits for it (bossTurnShowMs). No power's moment comes with a mate.
@@ -177,7 +185,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const mateKing = mating ? kingSquare(boss.board.fen, boss.crowdSide) : null;
   const attackAt = until - KING_ATTACK.mateHoldMs + KING_ATTACK.mateAt;
   // Boss powers: the moments that come as the turn passes to the crowd (after the boss's move), or the funhouse's own.
-  const moments = useMemo(() => (intro || thinking || victim || mating ? [] : momentsOf(boss, until)), [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating]);
+  // (Beaten, the Hidden Boss's fall: the board holds while he collapses; no moment of the last turn plays again.)
+  const moments = useMemo(() => (intro || thinking || victim || mating || fall ? [] : momentsOf(boss, until)), [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
   const moment = momentAt(moments, now);
   // Each moment's line, into the boss's voice: its text box keeps it up for its time, into the crowd's turn.
   useMomentSpeech(boss, moments, now);
@@ -286,7 +295,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
       <Hud match={match} />
       <div class={`board-area${slam ? " pw-slam" : ""}${jolt === "crash" ? " pw-crash" : jolt === "bump" ? " pw-bump" : ""}`}>
         <div class="opening-name">
-          <BossHeading side={boss.crowdSide} note={lights ? "lights out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
+          <BossHeading side={boss.crowdSide} note={fall ? "the boss is beaten" : lights ? "lights out" : thinking ? "the boss is thinking" : victim ? "the boss strikes" : intro ? undefined : "the boss's move"} />
         </div>
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           <BossSide match={match} />
@@ -361,6 +370,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 </>
               ) : intro ? (
                 <strong>{boss.raid ? "All of you vs the boss." : "Ten of you vs the boss."}</strong>
+              ) : fall ? (
+                // (Beaten, the Hidden Boss collapses and mumbles before the result.)
+                <>
+                  🏆 <strong>You beat him!</strong>
+                </>
               ) : funMove?.move ? (
                 // (Short enough for a phone's dock with the move in it: his icon says who.)
                 <>

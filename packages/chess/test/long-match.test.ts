@@ -71,6 +71,39 @@ describe("a long boss battle", () => {
       for (let i = 0; i < 200; i++) expect(runner.bossView()).toBe(view);
     })).toBe(0);
     // A board's view (its last few moves and the position before them), a game's end, a position: asked again, free.
+    // Asked again with nothing changed: not even the key is rebuilt (no serializing of the battle and its history).
+    const stringify = vi.spyOn(JSON, "stringify");
+    for (let i = 0; i < 200; i++) runner.bossView();
+    expect(stringify).not.toHaveBeenCalled();
+    stringify.mockRestore();
+    // Each thing it's made from, changed: a fresh view, the one a fresh build gives.
+    const fresh = (f: () => void) => {
+      const before = runner.bossView()!;
+      f();
+      const after = runner.bossView()!;
+      expect(after).not.toBe(before);
+      return after;
+    };
+    const b0 = runner.state.boss!;
+    expect(fresh(() => (runner.state = { ...runner.state, boss: { ...b0, crowdMoves: b0.crowdMoves + 1 } })).crowdMoves).toBe(b0.crowdMoves + 1);
+    runner.state = { ...runner.state, boss: b0 };
+    // (bossLast is private: the test reaches it the way the runner's own battle code does.)
+    const inner = runner as unknown as { bossLast: { move: string; san: string } | null };
+    const last = inner.bossLast;
+    expect(fresh(() => (inner.bossLast = { move: "a2a3", san: "a3" })).lastMove).toEqual({ move: "a2a3", san: "a3" });
+    inner.bossLast = last;
+    // (A board changed in place, as a test does: its position is part of the check too.)
+    const b = runner.boards.get(0)!;
+    const keep = { fen: b.fen, history: b.history, lastMove: b.lastMove };
+    const other = legalMoves(b.fen)[0]!;
+    expect(fresh(() => Object.assign(b, { fen: fenAfter([...b.history, other]), history: [...b.history, other], lastMove: other })).board.lastMove).toBe(other);
+    Object.assign(b, keep);
+    expect(runner.bossView()!.board.fen).toBe(keep.fen);
+    // (A copy of the board, nothing in it changed: the full key says it's the same view.)
+    const same = runner.bossView();
+    runner.boards.set(0, { ...b });
+    expect(runner.bossView()).toBe(same);
+    expect(runner.bossView("h0")!.justKilled).toBe("h0");
     const board = runner.boards.get(0)!;
     const asks = () => {
       netBoard(board, true);

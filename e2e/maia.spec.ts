@@ -16,9 +16,14 @@ const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ??
 async function asAdmin(page: Page) {
   await page.route("**/api/me*", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
-    const res = await route.fetch();
-    const body = await res.json().catch(() => null);
-    await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+    // (A battle's result refetches your profile as it ends: the test may close the page while that's in flight.)
+    try {
+      const res = await route.fetch();
+      const body = await res.json().catch(() => null);
+      await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+    } catch {
+      // The page is gone: nothing to answer.
+    }
   });
 }
 

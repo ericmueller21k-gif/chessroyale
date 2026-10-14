@@ -88,6 +88,16 @@ export interface Settings {
   bossDifficulty: number;
   /** Testing, solo only (?wip=1): `bossId` may be a boss whose powers are built but whose art isn't yet (placeholders). */
   bossUnfinished: boolean;
+  /**
+   * Testing, admins only, Boss alone: `bossId` may be a boss hidden from players (BossDef.adminOnly: the Hidden Boss,
+   * Eric, Oct 14: "for testing available in boss mode with bots for now"). Off everywhere else, so he's never met there.
+   */
+  bossHidden?: boolean;
+  /**
+   * Test switch, solo (?win=1): the boss battle starts after 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6 with the crowd White to move,
+   * so Qxf7 mates the boss at once (to see a boss beaten: the Hidden Boss's collapse).
+   */
+  bossWinTest?: boolean;
   /** Boss battle: the King's strike makes the boss's next move one that loses this many points (from its top moves). */
   kingStrikeLoss: readonly [number, number];
   /**
@@ -496,6 +506,19 @@ export const BOSS_POWERS = {
    * fire most of the game.
    */
   rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3 } as Readonly<Record<string, number>>,
+  /**
+   * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
+   * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
+   * it's bullet with no added time per move so it's a true race against the clock but it should be bearable for a strong
+   * team"). His own meter, not the rage meter: it fills from crowd turn 1 and is full as crowd turn bulletTurn begins,
+   * when it comes (his line and the spellbook, no warning); nothing else fills it (no strikes, no eval). From then to the
+   * end of phase 1 everyone's clock is a bank of bulletBankSeconds: no increment, no per-move cap, nothing adds time; a
+   * bank that runs out loses the battle on time. By estimate (DECISIONS.md, "The Hidden Boss, phase 1"): a strong player
+   * at 3 to 5 s a move gets 36 to 60 more moves out of 180 s, and a battle is capped at bossMaxMoves (60) crowd moves.
+   * Not yet sim-tested.
+   */
+  bulletTurn: 7,
+  bulletBankSeconds: 180,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**
@@ -836,6 +859,13 @@ export const BOSS_BRAIN = {
   brain: "maia-raw" as BossBrain,
   /** A boss on another brain than `brain` (by BOSS_ROSTER id): none. */
   byBoss: {} as Readonly<Record<string, BossBrain>>,
+  /**
+   * A boss whose brain is fixed (by BOSS_ROSTER id), whatever the player's rating, the difficulty, the crowd or an admin's
+   * Brain picker: that brain at Maia's top rating (maiaRating's last point, 2500), no guard and no Stockfish share; its
+   * strength is fixed too, at the level Maia reaches it (2650; bossStrength). The Hidden Boss's phase 1 (Eric, Oct 14:
+   * Maia at its strongest, "so it feels like an aggressive human playing").
+   */
+  fixed: { recluse: "maia-raw" } as Readonly<Record<string, BossBrain>>,
   /**
    * The Maia brain for players too, not only admins: the one value that switches it on. On since Oct 14, 2026 (Eric:
    * "flip it"), after the Maia box's source was published on the site under the AGPL (DECISIONS.md, "The Maia box's
@@ -1886,10 +1916,11 @@ export const SQUADS: SquadsSettings = {
   voteBotSkip: 0.1,
   // Eric, Oct 10: one team clock per squad for the whole tournament; Oct 13: three chess time controls, Bullet, Blitz
   // and Rapid, each with an increment that banks and its own cap on a move. Tuned by reports/squads-sim.md
-  // (DECISIONS.md, "Squads: three chess time controls").
+  // (DECISIONS.md, "Squads: three chess time controls"). Eric, Oct 14: Rapid was too long ("It shouldn't be 55
+  // minutes"): 5+2, was 5+3 (DECISIONS.md, "Squads: Rapid 5+2").
   clocks: [
     // Left to right, slowest to fastest (Eric, Oct 13: "always slowest on the left, fastest on the right").
-    { id: "rapid", label: "Rapid", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 2, incrementSeconds: 3, capSeconds: 20 },
+    { id: "rapid", label: "Rapid", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 2, incrementSeconds: 2, capSeconds: 20 },
     { id: "blitz", label: "Blitz", bankSeconds: 180, topUpSeconds: 30, delaySeconds: 2, incrementSeconds: 2, capSeconds: 15 },
     { id: "bullet", label: "Bullet", bankSeconds: 60, topUpSeconds: 15, delaySeconds: 2, incrementSeconds: 1, capSeconds: 10 },
   ],

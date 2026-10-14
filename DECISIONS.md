@@ -2956,6 +2956,162 @@ Hidden Boss, a sprite preview" above.
   stood without the stone since Eric's redesign, so a palm slam on the stone isn't possible, and bringing the book down
   is the slam Eric approved. The book animations are untouched.
 
+### The Hidden Boss, phase 1: an admin's fight in Boss alone (Eric, Oct 14, 2026)
+
+Eric approved building him (Oct 14: "feel free to even build [him] in once animations are done, I trust this run of
+it"), then specified his phase-1 ultimate himself. Phase 1 only: the 4-board simul, Chess960, the red book item, the
+special crate and Squads come later. ROADMAP.md, "The hidden boss", has the whole design.
+
+**Who and where.**
+- Roster id `recluse`, name "Hidden Boss" (Eric names him later), icon 📕, kit "Hidden Boss". No real name anywhere.
+- **Hidden from players** (`BossDef.adminOnly`): `isPlayable` is false for him, so every place that asks it skips him
+  (a random boss, raids, the Crowd's boss final, the server's lobby creation, the FAQ, a player's boss menu,
+  `maia.spec.ts`'s list). `adminPlayable`, `hiddenBosses` and `menuBosses` add him to the boss menu, after the rest,
+  for an admin picking for Boss alone only (not "for your raid"). The app sets `bossHidden` for an admin's Boss alone,
+  and only then does the runner meet him (`chooseBoss`'s `hidden`). A player's `?boss=recluse`, a stored pick or
+  `?wip=1` gets a random boss instead.
+- **Online:** not reachable (the server makes a raid only with a playable boss), so the host and server paths are
+  untouched and no message changed (no protocol constant to bump: the lobby protocol has none, and Squads' is
+  untouched). His rules live in the shared match runner (the clock, the God King's block), so an online fight later
+  gets them as they are; he asks the host for no engine work besides his move.
+
+**His brain: Maia-3 at its strongest, raw** (Eric, Oct 14: "so it feels like an aggressive human playing").
+- `BOSS_BRAIN.fixed` (`{ recluse: "maia-raw" }`): Maia at its top rating (the last point of `maiaRating`: 2500), no
+  guard, no Stockfish share, whatever his strength, the crowd, the difficulty or an admin's Brain picker. Stockfish only
+  where Maia isn't on offer, and while it loads (as for every boss).
+- **Why not `byBoss`:** it keeps the bridge band (the light and strict guards from 2400, Stockfish's share from 2500),
+  which isn't raw.
+- His strength is fixed too, at 2650, the level where Maia reaches 2500 (`fixedLevel`), whatever the player's rating
+  or the difficulty. So the menu shows 2650 and four skulls, he never slips, and Stockfish's moves while Maia loads are
+  at 2650.
+- Unchanged once `BOSS_BRAIN.forPlayers` turns on (a test checks the plan with it on).
+
+**His passive, "nohelp": the God King's help doesn't work against him** (Eric, Oct 14).
+- `BossRules.blocksKing`: the runner's `kingDecision` (his move), `callStrike` and `lastStandFor` never let him act.
+  Nothing is spent: no charge, no strike, no turn. Solo's `callKing` refuses too.
+- **The try is mocked:** the dock's "Play move" or "Strike" doesn't call him. Instead the boss slams the book shut
+  where he stands and mocks it (his lines in turn), and the God King says his help won't take hold.
+- **The Last Stand** never comes. It isn't something the player calls, so it isn't mocked (my call: simplest).
+- Power-ups are the crowd's own, not the God King's, and Boss alone has none anyway (a raid starts with none, and the
+  Last Stand that leaves some can't come).
+- **The God King in this fight:** his own opening line (`foeIntro`), said as "START!" comes, when nothing else is
+  being said (on the first move it could wait behind a danger warning and lapse), and his blocked line (`foeBlocked`). His lines about
+  calling him (the "Tap me" nudge, "spent", "A charge might turn it") are left out of this fight.
+
+**His ultimate: the bullet clock** (Eric, Oct 14, replacing the brief's "a few seconds a move for N moves": "Meter
+builds starting turn 1, about 7 turns in he says something about how you're thinking too much and to just play pure
+chess etc, true to him, then for the rest of phase 1 it's bullet with no added time per move so it's a true race
+against the clock but it should be bearable for a strong team").
+- **His own meter** (`BossRules.meter`, as Wrangler's), not the rage meter: empty at crowd turn 1, full at
+  `BOSS_POWERS.bulletTurn` (7). Nothing else fills it (no strikes, no eval). It comes as that turn begins: no warning,
+  no "RAGE!". The admins' trigger brings it as the next turn begins; `?power=bullet` on turn 2.
+- **From then to the end of the battle:** every bank still in is set to `bulletBankSeconds` (180 s) as it comes
+  (`turnBegun`). Then no increment, no per-move cap (a move may take the whole bank: `allowedMsFor` is the bank), and
+  nothing adds time. The God King's strike, which stops the clock, can't come; time chips are Squads'.
+- **Running out loses on time** (my call). Today a move that runs out of time is a missed move, and the engine's best
+  is played for the crowd (`scoreGroup`); Boss alone has no loss on time. With no increment, an empty bank would make
+  every move time out, and the engine would play the rest of the game. So in the bullet phase, a bank that runs out
+  (everyone still in at 0: `bossOutOfTime`) ends the battle at once. The move isn't played, the boss wins, and the
+  result screen says "Hidden Boss won on time." (`bossTimedOut`, kept on the runner: nothing stored or sent changed).
+- **The numbers, by estimate (not yet sim-tested):**
+  - 180 s for the rest of phase 1: the clock starts only after his move and its moments have shown (Boss alone: a
+    0.45 s show), so nothing but thinking comes out of it.
+  - A strong player at 3 to 5 s a move gets 36 to 60 more moves out of it. A battle is capped at 60 crowd moves (53
+    after turn 7), and a typical one is over well before.
+  - Turn 7: Eric's "about 7 turns in".
+- **On screen** (`RECLUSE_FX.bullet`, 4.6 s; the clock starts after it, as after every power):
+  - Where he stands (the bust in a phone's bar, the whole figure by the board on a computer; he never steps onto the
+    board): he consults the red book, opens it like a spell book (pages glowing and turning, hair in the wind, the
+    laugh), holds the spell, slams it shut.
+  - His line as it begins; "BULLET!" with "No added time." as the book falls open.
+  - From then on, the dock says "Bullet · 2:41 left" on every move: your bank, ticking (text a player must read to play
+    stays on screen; the timer bar above the board is the bank too).
+  - **How:** `playInPlace`, a run of his own animations played over his beat by his figure, both placements alike.
+
+**Animations used.**
+- `idle`.
+- `stare`: his entrance.
+- `consult`: the first beat of his ultimate ("right before his ultimate"), and when he's behind on material (his
+  `rattled` mood, sometimes with a line).
+- `laugh`: when he wins.
+- The spellbook set: his ultimate.
+- `slam`: as he mocks the God King's help. It's a decisive moment the player causes, during their own move, so it plays
+  whole. His own move shows for only 0.45 s in Boss alone, which would cut a slam on a capture short.
+- `collapse`, then `collapseLoop`: beaten.
+- Phase 2's sets aren't used.
+
+**Beaten.**
+- The battle ends as the crowd's win. The board holds 4.5 s (`BossRules.fallMs`, solo's `fall` phase: "You beat him!")
+  while he collapses and his first mumbled line comes. Then the normal result screen, where he stays slumped
+  (`kit.loops.defeat`) and mumbles on (`kit.fall`: three lines in turn, each as the last one goes).
+- Phase 2 isn't built, so nothing follows: no book slam, no split, no revive.
+
+**His kit and the screens.**
+- `kit.bar` is a drawing of its own for the phone's boss bar: his bust (in the wide box). `ch` is his whole figure: a
+  computer (2x by the board's corner) and the results (1.25x, in a taller box). Other bosses' kits are untouched (a
+  kit without `bar`, `loops`, `fall` or `lineOf` works as before).
+- His words go above his head on a computer, and beside him (never over him) on the results.
+- **Fit** (measured, with the sprite-fit fix for 900 to 1099 px merged): 390 px phone: the bust sits in the bar like
+  the cast. 900 and 1024: his whole figure at 1x (129 px) inside the window by the board's corner. 1280 and 1920: at 2x
+  (258 px), clear of the board. His bubble goes above his head at every width (its rule follows the scale), moved into
+  view at the window's edge.
+- **A fix for every boss:** a new battle's intro now forgets the last battle's moments and sounds (`resetBeats`).
+  Their keys repeat from battle to battle (`intro:N`, `over:crowd`), so a second battle in one visit skipped the
+  entrance and the defeat or victory animation.
+
+**Sounds:** five, synthesized (no files, cheap, made ahead with `warmSounds`, all under a move's loudness): the pages
+fluttering, the book shut, a rustle of cloth, his laugh as breath through the nose (no voice) and a low swell under his
+stare. Every cue has one, as for every boss.
+
+**His lines** (one table, `characters/recluse-lines.ts`; Eric, Oct 14: real quotes "keeping them intact is a must").
+- **Real quotes, word for word,** only the research report's Tier A (verified), never shortened, adapted or
+  re-punctuated:
+  - Intro, only when he's White and the game opened 1.e4 (the one place it reads right): "Best by test." His note to
+    1 P-K4 in his game against Bisguier (NY State Open 1963), *Chess Life*, Dec 1963, pp. 302–303; repeated in his book
+    of his sixty memorable games (1969).
+  - Mocking the God King's help: "I don't believe in psychology. I believe in good moves." Peter Kihss in the
+    *New York Times*, Jul 4, 1972, p. 14 (Winter, C.N. 5830).
+  - Mocking the God King's help: "A genuine beginner's move" (a fragment as published). On 6 Be2 in the Grünfeld,
+    in his game against Greenwald, *Chess Life*, Oct 1963, pp. 237–238.
+  - When he wins: "He played book lines, but didn't know them very well." On Alekhine, "The Ten Greatest Masters in
+    History", *Chessworld*, Jan–Feb 1964, pp. 56–61.
+  - Mumbling, beaten: "Morphy, I think everyone agrees, was probably the greatest genius of them all." Press
+    conference, Sep 21, 1992, in Seirawan & Stefanovic, *No Regrets*.
+  - The player-move triggers (1.d4, the King's Gambit) can't come in phase 1: Boss alone starts five moves into a named
+    opening. Not built.
+- **Placeholders for Eric's own lines** (ours, in his chess persona; not his words, no near-copies of real quotes,
+  nothing political, national or hateful):
+  - Intro: "Sit down. Let's find out if you can really play.", "Forget your opening book. Here we play chess.", "Show
+    me one move you didn't copy from somewhere."
+  - His ultimate (no verified quote fits): "You're thinking too much. Stop calculating and play!", "Enough staring at
+    the board. Pure chess now. Move!", "All that thinking, and still no idea. Play fast!"
+  - Mocking the God King's help: "Engine moves? Keep that crutch away from my board.", "Theory, engines, a king in
+    armor. None of it is chess!"
+  - Consulting the book when behind: "Hm. I've seen this before.", "Interesting. Very interesting."
+  - When he wins: "Memorized moves. I knew it."
+  - Mumbling, beaten: "No... the book said... bishop takes... no...", "Sixty-four squares... I counted every one..."
+- **The God King:** "I sense a tremendous power within this foe." (Eric's own, from ROADMAP.md). Placeholders: "Careful.
+  My strength feels faint against this one.", "This is no ordinary boss. Trust your own moves." (his opening line);
+  "My power... it won't take hold!", "Nothing! He shrugs off my strength.", "I can't reach him. This fight is yours
+  alone." (his help blocked).
+- **Screen text:** "BULLET!", "No added time.", "Bullet · m:ss left" (the dock), "You beat him!" (the dock, beaten),
+  "the boss is beaten" (the line above the board), "… won on time." (results), "Bullet!" (the dock's word for the
+  moment), the menu's "no God King help · bullet clock".
+
+**Test tools:** `?win=1` (solo): the battle starts after 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6, your move: Qxf7 mates him (to see
+him beaten). `npm run frames:recluse -- <dir> [phone|desktop|both]` (against `npx wrangler dev`, as an admin): his
+intro, the trigger's ultimate, the God King's help mocked, and ?win=1's collapse, frame by frame, with GIFs.
+
+**Testing.** The targeted lane (no protocol or stored-data change): `check`; unit
+`packages/chess/test/recluse.test.ts` (hidden from players and the menu, his brain plan and strength, the meter and the
+bullet clock's bank, increment and cap, the trigger and the switch, the loss on time, the God King blocked with nothing
+spent, `?win=1`), `packages/app/test/recluse-boss.test.ts` (the kit, the collapse loop, the run in place within its
+moment, the mock lines in both voices, the God King's cues, the quotes word for word, the sounds) and his art test
+updated; e2e `e2e/recluse.spec.ts` (a player never sees him; an admin's fight on a phone and a computer: the stare, Maia
+2500, the help mocked, the bullet clock on the trigger; beaten: the collapse and the result). Frames on a 390 px phone
+and a 1280 px computer (intro, ultimate, mock, collapse; the machine was loaded, so the boss's thinking was slow and the
+screencast had 0.25–0.7 s gaps, none tied to his moments).
+
 ### The Maia box's source on the site (Eric, Oct 13–14, 2026)
 
 Eric's OK on Oct 13 ("Publish it."): publish the Maia box's source, then turn `BOSS_BRAIN.forPlayers` on. **The source
@@ -3158,6 +3314,118 @@ permitted to change the flag, so the director made this one-value change with Er
 now downloads the Maia model (24 MiB, cached) when a boss battle needs it; a device that can't run it plays
 Stockfish's move as before. The FAQ's Maia section reads as live (it follows the flag). Left for Eric: the real-phone
 check (`TESTING.md`, "Maia").
+
+### Squads: Rapid 5+2 (Eric, Oct 14, 2026)
+
+Eric, Oct 14, of Squads' Rapid: "It shouldn't be 55 minutes, because, yeah, that's just a little too long... find a way
+to reduce that." (Bullet and Blitz stay as they are.) The call, made without Eric: **Rapid 5+2, was 5+3.** One number
+changes (`SQUADS.clocks`, Rapid's `incrementSeconds`, 3 to 2): the bank (5:00), the top-up (+1:00), the free seconds
+(2 s) and the cap (20 s) stay. The aim was Rapid's 90th percentile at about 45 minutes or under, with Rapid still the
+slowest option.
+
+- **The comparison** (`npm run sim:squads`; Classic 72 lobbies an option, 24 per skill mix; Mercenary 24, Mixed; all on
+  the 5+3 calibration's seeds, `SQUADS_SIM_SEEDS="5:00|1:00|2|3|20"`, so every candidate starts from the same lobbies;
+  minutes):
+
+  | Option | Classic median | 90th pct | Longest | Mercenary median | 90th pct | Squads reaching sudden death | Moves in it | Random for want of time |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Rapid 5+3 (before) | 40.7 | 51.3 | 63.7 | 42.9 | 49.1 | 21% (Merc 20%) | 0.3% (0.3%) | 0.4% (0.3%) |
+  | **Rapid 5+2 (chosen)** | **36.3** | **45.3** | 82.0 | **37.4** | **48.2** | 22% (22%) | 0.4% (0.4%) | 0.5% (0.4%) |
+  | Rapid 4+2 | 35.4 | 48.4 | 100.4 | | | 22% | 0.3% | 0.5% |
+  | Rapid 6+2 | 36.3 | 47.3 | 86.7 | 38.1 | 44.6 | 22% (20%) | 0.3% (0.3%) | 0.4% (0.3%) |
+  | Blitz 3+2 (unchanged) | 33.5 | 45.5 | 74.7 | 36.0 | 41.6 | 22% (23%) | 0.3% (0.3%) | 0.5% (0.5%) |
+
+  By skill mix (Classic medians), 5+2 against Blitz: Strong 41.6 and 34.9, Mixed 35.8 and 33.8, Casual 33.9 and 32.5
+  (5+3: 42.9, 40.3, 38.7). Rapid 5+3 with a 17 s cap (36 lobbies on its own seeds) ran 40.6 minutes, 90th percentile
+  56.5: no help, so it was dropped. 4+3 wasn't run: the time controls' tuning had 4+3 within half a minute of 5+3.
+- **The increment is the lever, as the time controls' tuning found.** One second less a move took 4-5 minutes off
+  the median and 6 off the 90th percentile. The bank barely matters: 4+2, 5+2 and 6+2 are within a minute of each
+  other at the median, and their 90th percentiles (45-48) differ by no more than the noise. So the simplest change
+  wins: one number, and the card still reads like a chess clock ("Rapid 5+2").
+- **The long tail is long games.** The 90th percentile comes from the few lobbies whose games run long. With 36
+  lobbies it's about the fourth longest, and it moves 4-7 minutes from one set of lobbies to another. Blitz 3+2 ran 40.9 on the calibration's lobbies and 45.5 on these, and 5+2 ran 52.6 on 36
+  lobbies of its own seeds and 45.3 on these 72. So these numbers compare candidates on the same 72 lobbies. They
+  don't promise a number for one lobby.
+- **Still the slowest, but closer to Blitz.** Rapid's median stays above Blitz's for every skill mix (2.8 minutes overall,
+  6.7 for strong squads, 1.4 in Mercenary), from its bigger bank, top-up and cap. With the same increment as Blitz, it
+  can't be much further apart without bringing back the long tail: a bigger bank adds almost nothing (6+2), and a
+  bigger increment is what made 5+3 long.
+- **Sudden death and random moves: as Blitz's.** 22% of squads reach it (Blitz 22%), 0.4% of moves are made in it
+  (Blitz 0.3%; 5+3 itself 0.3-0.4%), and 0.5% of actions become random moves for want of time (Blitz 0.5%; 0.6% in the
+  calibration). Near zero a squad lives on 2 s free plus 2 s back a move, as on Blitz.
+- **Labels follow the setting** (`clockLabel`, `teamClockLine`, `teamClockDetail`, `matchClockLine`, the FAQ): the
+  vote card "Rapid 5+2", "5 min + 2 s a move · max 20 s"; each match's card "Rapid 5+2 · +2 s a move · max 20 s"; the
+  result's banner "... each move made in time adds 2 s ..."; the FAQ "Rapid 5+2 (5 minutes, +2 s a move, at most 20 s
+  on a move)". The vote order (Rapid, Blitz, Bullet) and the default (Blitz, by its id) stay.
+- **Lobbies in play keep their clock.** Each match carries its own increment (`incrementMs`), and a lobby's rules
+  carry its voted clock, so a lobby that voted 5+3 before the deploy finishes on 5+3.
+- **The sim:** `SQUADS_SIM_SEEDS` (every option on one clock's seeds) and each lobby's minutes in the progress lines,
+  for comparisons like this one. `reports/squads-sim.md` was regenerated with the new Rapid (Bullet and Blitz came out
+  the same as before: the sim is deterministic, and the 5+3 calibration reproduced exactly).
+
+### The boss screen's lag: the boss view free to read (Oct 14, 2026)
+
+Eric, Oct 14 ("make do the boss screen lag fixes"), after "The board draws its pieces only when they change": the boss
+screen still renders everything every frame, and the solo match's boss view was checked by serializing the battle.
+
+**What changed.** `MatchRunner.bossView` (asked many times a frame by a boss screen: the header's tower, the dock, the
+boss's figure) built its cache key by serializing the boss's whole state and the move history on every ask, a cost
+that grew with the match. The runner replaces the boss's state, its boards and its last move rather than changing them
+in place, so the same objects with the same position and history now give the same view after comparing a few values;
+anything else goes on to the full key as before (the guarantee stays: a cached view is the one a fresh build gives).
+Tested in `long-match.test.ts` (no serializing when nothing changed; each input changed gives the fresh view; a board
+changed in place, as tests do, is caught).
+
+**What wasn't changed, and why.** The plan was also to stop the boss screen rendering its header, figure and chat
+every frame, keeping the per-frame clock for the parts that animate. Looking at what those parts draw from, several
+depend on being drawn every frame without saying so: Hollow's bulb strip relights at a time it reads while drawing, the
+admins' brain line reads a note the engine writes without telling the screen, and the chat's "Next in N s" counts down
+only as it's drawn. Each could be given its own timer, but every one found suggests more, and a miss is a visible
+change (a bulb relighting late, a line frozen). Measured, the header, the figure and the chat together are about
+1.5 ms of a 4x-slowed phone's frame (a fifth of the screen's render work), short of what the remaining effects need
+to reach 16.7 ms there. Following "simple beats flashy", it's left for Eric and the director to decide.
+
+**Measured** under the shared lock, base (main) and after side by side, three rounds, medians, as in the board's
+section:
+
+*Phone (iPhone 13 size, CPU slowed 4x):*
+| Effect | p95 frame, ms (before → after) | long tasks > 50 ms (before → after) | main-thread CPU a frame, ms: mean / p95 | tasks over 50 ms of CPU | runs |
+| --- | --- | --- | --- | --- | --- |
+| Jefferson's Roman candle | 33.3 → 33.3 | 2 → 1 (max 71 → 53) | 12.8 → 12.3 / 27.6 → 26.6 | 1 → 0 | 3/3 |
+| Ginger's blizzard | 33.4 → 50 | 3 → 2 (max 81 → 77) | 13.2 → 14.8 / 29.4 → 37.6 | 1 → 1 | 3/3 |
+| Ginger's thaw | 33.4 → 33.4 | 3 → 1 (max 91 → 65) | 12.4 → 13.2 / 25.6 → 29.2 | 0 → 0 | 3/3 |
+| Boingo's funhouse | 33.3 → 16.8 | 0 → 0 (max 0 → 0) | 10.2 → 10 / 16.4 → 15.9 | 0 → 0 | 3/3 |
+| Boingo's funhouse turn | 33.3 → 16.8 | 0 → 0 (max 0 → 0) | 9.2 → 8 / 15.2 → 14.8 | 0 → 0 | 3/3 |
+| Big Boy's bounce | 33.3 → 16.8 | 0 → 1 (max 0 → 51) | 13.1 → 12 / 25.1 → 16.5 | 0 → 0 | 3/3 |
+| Sawyer's board saw | 16.8 → 16.8 | 1 → 1 (max 68 → 51) | 9.8 → 9.8 / 15.6 → 15 | 0 → 0 | 3/3 |
+| Hollow's Lights out | 33.3 → 16.8 | 3 → 4 (max 139 → 105) | 12.2 → 12 / 23.4 → 16.6 | 3 → 4 | 3/3 |
+| Wrangler's lasso drag | 33.3 → 33.3 | 1 → 0 (max 51 → 0) | 10.4 → 10 / 16.2 → 17.3 | 0 → 0 | 3/3 |
+| Wrangler's Showdown | 33.3 → 33.3 | 1 → 1 (max 65 → 68) | 11.8 → 11.6 / 21.2 → 26.1 | 1 → 1 | 3/3 |
+
+*Computer (1280 x 800):*
+| Effect | p95 frame, ms (before → after) | long tasks > 50 ms (before → after) | main-thread CPU a frame, ms: mean / p95 | tasks over 50 ms of CPU | runs |
+| --- | --- | --- | --- | --- | --- |
+| Jefferson's Roman candle | 16.8 → 16.7 | 0 → 0 (max 0 → 0) | 3.6 → 3.5 / 5.5 → 5.6 | 0 → 0 | 3/3 |
+| Ginger's blizzard | 16.7 → 16.8 | 0 → 0 (max 0 → 0) | 3.7 → 3.6 / 6.9 → 6.4 | 0 → 0 | 3/3 |
+| Ginger's thaw | 16.8 → 16.8 | 0 → 0 (max 0 → 0) | 3.4 → 3.3 / 4.9 → 5 | 0 → 0 | 3/3 |
+| Boingo's funhouse | 16.8 → 16.7 | 0 → 0 (max 0 → 0) | 2.4 → 2.7 / 3.7 → 4.4 | 0 → 0 | 3/3 |
+| Boingo's funhouse turn | 16.7 → 16.7 | 0 → 0 (max 0 → 0) | 2.7 → 2.8 / 4.8 → 5.9 | 0 → 0 | 3/3 |
+| Big Boy's bounce | 16.8 → 16.8 | 0 → 0 (max 0 → 0) | 3.6 → 3.6 / 5.2 → 5.2 | 0 → 0 | 3/3 |
+| Sawyer's board saw | 16.7 → 16.8 | 0 → 0 (max 0 → 0) | 3 → 2.8 / 4.5 → 4.2 | 0 → 0 | 3/3 |
+| Hollow's Lights out | 16.8 → 16.7 | 0 → 0 (max 0 → 0) | 3.1 → 3.1 / 6.1 → 6.3 | 0 → 0 | 3/3 |
+| Wrangler's lasso drag | 16.7 → 16.7 | 0 → 0 (max 0 → 0) | 3.1 → 3 / 4.5 → 4.6 | 0 → 0 | 3/3 |
+| Wrangler's Showdown | 16.8 → 16.8 | 0 → 0 (max 0 → 0) | 3.5 → 3.6 / 6 → 6.8 | 0 → 0 | 3/3 |
+
+On a computer every effect now holds 16.7 ms at the 95th percentile. On the slowed phone the boss view's cost in a
+short Boss alone game is small, so most rows move within the rounds' noise; it grows with a match's length and with a
+raid's players, which these runs don't reach. The render counter (a diagnostic build) showed the boss screen's render
+work during the candle, blizzard and Showdown down from 4.1-4.7 ms to 3.1-3.8 ms a frame on the slowed phone. Jefferson's
+candle, Ginger's blizzard and Wrangler's Showdown stay at about 33 ms there: their frames' main-thread time is spread over
+the effects' own drawing (two dozen rocket sprites and their canvases, the blizzard's full-board snow), the browser's
+style, layout and paint, and the screen's render; none alone brings them to 16.7 ms.
+
+**Testing.** Unit: `long-match.test.ts`. e2e (targeted lane: the boss view is read by every boss screen, solo and the
+lobby server): `perf.spec.ts`, every boss spec, `king-attack.spec.ts`, `resign.spec.ts`, `multiplayer.spec.ts`.
 
 ### Chess960's rules: true Fischer Random castling, the rules foundation (Oct 14, 2026)
 

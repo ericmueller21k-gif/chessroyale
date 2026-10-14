@@ -16,6 +16,8 @@ import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
 import { duelCount, duelTurn } from "../components/Pig.tsx";
+import { bulletOn, kingBlocked } from "../components/Recluse.tsx";
+import { clockText } from "../components/RaceTower.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { useReplay } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
@@ -177,7 +179,7 @@ export function PlayScreen({
     kingTurn(board.fen);
     const w = knownEval(board.fen);
     const prevFen = board.history.length >= 2 ? fenAtPly(board.history, board.history.length - 2, board.bases) : undefined;
-    const cues = turnCues({ fen: board.fen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen });
+    const cues = turnCues({ fen: board.fen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen, noHelp: kingBlocked(match.boss) });
     // (Wrangler's forced duel: the move must be a duel, so "move your queen" or "shield the king" can't be heeded.)
     return duelTurn(match.boss) ? cues.filter((c) => c.cue !== "queenDanger" && c.cue !== "mateThreat") : cues;
   }, [board.fen, strike?.at, waiting]);
@@ -299,6 +301,11 @@ export function PlayScreen({
                   <span class="muted">{hint.length ? "⚡ Top 3" : "⚡ Asking the engine…"}</span>
                 ) : barred ? (
                   <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span>
+                ) : bulletOn(match.boss) ? (
+                  // (The Hidden Boss's bullet clock: what's left in your bank, ticking, on every move to the end.)
+                  <span class="bullet-note">
+                    <strong>Bullet</strong> <span class="muted">· {clockText(Math.max(0, deadline - Math.max(now, startsAt)))} left</span>
+                  </span>
                 ) : (
                   match.boss.staggerNext && <span class="muted">Boss staggered.</span>
                 )}

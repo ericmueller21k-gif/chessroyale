@@ -92,6 +92,7 @@ import {
   moveLoss,
   pigBattle,
   pigTurn,
+  bulletClock,
   type Battle,
   type BossAsks,
   type BossLastMove,
@@ -365,12 +366,12 @@ export class MatchRunner {
     // Which boss: the one picked, else a random playable one (not the one to avoid). One draw from the match's random
     // source, which also seeds its powers.
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
-    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
+    const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished, !!this.settings.bossHidden);
     let crowdSide = sideToMove(board.fen);
     // A boss whose battle starts from the starting position (no opening moves), and one who always plays Black (Hollow):
     // if the usual pick made the crowd Black, he claims the dark side before move 1.
     const opening = bossRules(def)?.opening;
-    const claimed = !!opening?.crowdWhite && crowdSide === "b" && !this.settings.bossMateTest;
+    const claimed = !!opening?.crowdWhite && crowdSide === "b" && !this.settings.bossMateTest && !this.settings.bossWinTest;
     if (opening?.fromStart) this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
     if (opening?.crowdWhite) crowdSide = "w";
     // Anything else the boss does to the board before move 1 (Big Boy eats one of the crowd's center pawns).
@@ -378,6 +379,12 @@ export class MatchRunner {
     // (Test switch: the crowd White, mated in one, the boss to move. Instead of any other set-up.)
     if (this.settings.bossMateTest) {
       this.boards.set(id, newBoard(id, { ...BOSS_OPENING, moves: [...MATE_TEST_MOVES] }, MATE_TEST_MOVES.length, board.generation));
+      crowdSide = "w";
+      setUp = null;
+    }
+    // (Test switch: the crowd White to move, mating in one. Instead of any other set-up.)
+    if (this.settings.bossWinTest) {
+      this.boards.set(id, newBoard(id, { ...BOSS_OPENING, moves: [...WIN_TEST_MOVES] }, WIN_TEST_MOVES.length, board.generation));
       crowdSide = "w";
       setUp = null;
     }
@@ -411,7 +418,10 @@ export class MatchRunner {
     const board = this.boards.get(this.state.boards[0]!)!;
     if (sideToMove(board.fen) !== b.crowdSide) return;
     // (The boss's move just played: Hollow covers its piece's square after his first.)
-    this.state = { ...this.state, boss: prepareTurn(b, board.fen, this.settings.bossPowerTest, BOSS_POWERS, board.lastMove) };
+    const next = prepareTurn(b, board.fen, this.settings.bossPowerTest, BOSS_POWERS, board.lastMove);
+    this.state = { ...this.state, boss: next };
+    // (A new turn set up: the boss's own match effect, once a turn: the Hidden Boss's bullet clock sets every bank.)
+    if (next.powers?.turn !== b.powers.turn) bossRules(next)?.turnBegun?.(this.battle);
   }
 
   /** Boss battle, Hollow's dark: the squares covered this turn (their pieces hidden; a move touching one goes unchecked). */
@@ -478,15 +488,37 @@ export class MatchRunner {
     return moveClockAt(this.settings, this.clockMove(boardId));
   }
 
-  /** How long a player may think this round: their bank plus the increment, capped by this move's clock. */
+  /**
+   * How long a player may think this round: their bank plus the increment, capped by this move's clock. On the bullet
+   * clock (the Hidden Boss's ultimate), the bank alone: no increment, no per-move cap.
+   */
   allowedMsFor(playerId: string): number {
     const board = [...this.groups].find(([, ids]) => ids.includes(playerId))?.[0];
-    return allowedMs(this.player(playerId), this.settings, this.clockMove(board));
+    return allowedMs(this.player(playerId), this.roundSettings(board), this.clockMove(board));
   }
 
-  /** The settings with this round's clock fixed in moveClockSeconds (for the bots' timing and capping think times). */
-  private roundSettings(): Settings {
-    return { ...this.settings, moveClockSeconds: this.moveClock(), moveClockSteps: [] };
+  /**
+   * The settings with this round's clock fixed in moveClockSeconds (for the bots' timing and capping think times). On the
+   * bullet clock: no increment (nothing goes back into the bank), and the cap a whole bullet bank (so the bank decides).
+   */
+  private roundSettings(boardId?: number): Settings {
+    const bullet = bulletClock(this.state.boss);
+    return {
+      ...this.settings,
+      moveClockSeconds: bullet ? BOSS_POWERS.bulletBankSeconds : this.moveClock(boardId),
+      moveClockSteps: [],
+      ...(bullet ? { timeIncrementSeconds: 0 } : {}),
+    };
+  }
+
+  /**
+   * The bullet clock has run out (the Hidden Boss's ultimate): nobody still in the battle has any time left in their
+   * bank. The battle is lost on time (finishBossBattle).
+   */
+  bossOutOfTime(): boolean {
+    if (!bulletClock(this.state.boss)) return false;
+    const alive = this.alive();
+    return alive.length > 0 && alive.every((p) => p.bankMs <= 0);
   }
 
   /**
@@ -838,8 +870,9 @@ export class MatchRunner {
     evaluation: BoardEvaluation,
   ): LastStandRound | undefined {
     const b = this.state.boss;
-    // (Never when only one move was open: his re-pick has to leave the crowd another, a power's limits included.)
-    if (!b || b.lastStand || b.barred || (crowdAllowed(b, fen) ?? legalMoves(fen)).length < 2) return undefined;
+    // (Never when only one move was open: his re-pick has to leave the crowd another, a power's limits included. Never
+    // against a boss his help doesn't work against: the Hidden Boss.)
+    if (!b || b.lastStand || b.barred || bossRules(b)?.blocksKing || (crowdAllowed(b, fen) ?? legalMoves(fen)).length < 2) return undefined;
     const mine = scored.find((m) => m.move === played);
     const loss = mine?.loss ?? 0;
     const charges = b.kingCharges ?? 0;
@@ -868,7 +901,8 @@ export class MatchRunner {
    */
   private kingDecision(playerIds: readonly string[], result: GroupResult): { plays: boolean; calls: number } {
     const b = this.state.boss;
-    if (!b || !(b.kingCharges ?? 0)) return { plays: false, calls: 0 };
+    // (A boss the God King's help doesn't work against, the Hidden Boss: he never plays, and nothing is spent.)
+    if (!b || !(b.kingCharges ?? 0) || bossRules(b)?.blocksKing) return { plays: false, calls: 0 };
     const humans = playerIds.filter((id) => this.kingCallers.has(id)).length;
     const popularLoss = result.players.find((p) => p.move === result.playedMove)?.loss ?? 0;
     let calls = humans;
@@ -889,7 +923,7 @@ export class MatchRunner {
   callStrike(playerId: string): { struck: boolean; calls: number } {
     const b = this.state.boss;
     const ids = [...this.groups.values()][0] ?? [];
-    if (!b || !(b.kingCharges ?? 0) || b.staggerNext || !ids.includes(playerId)) return { struck: false, calls: 0 };
+    if (!b || !(b.kingCharges ?? 0) || b.staggerNext || !ids.includes(playerId) || bossRules(b)?.blocksKing) return { struck: false, calls: 0 };
     this.kingStrikers.add(playerId);
     this.strikeBots ??= ids.filter((id) => this.player(id).isBot && this.opts.rng() < this.settings.kingBotFollow).length;
     const calls = ids.filter((id) => this.kingStrikers.has(id)).length + this.strikeBots;
@@ -947,8 +981,10 @@ export class MatchRunner {
       };
       if (stand) this.forceLastStand = false;
     }
+    // (The bullet clock ran out on this move: the battle is lost on time, and no move is played for the crowd.)
+    const outOfTime = this.bossOutOfTime();
     for (const r of results) {
-      if (r.lastStand) continue;
+      if (r.lastStand || outOfTime) continue;
       const board = this.boards.get(r.boardId)!;
       const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
       this.boards.set(r.boardId, playOnBoard(board, r.result.playedMove, moverExpected));
@@ -1009,6 +1045,7 @@ export class MatchRunner {
       planning: null,
       forceLastStand: false,
       showdownScout: null,
+      bossTimedOut: false,
       humanBrain: null,
       brainNote: null,
       bossLast: null,
@@ -1021,7 +1058,7 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves;
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime();
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1282,34 +1319,53 @@ export class MatchRunner {
     return k.victim;
   }
 
-  /** Ends the boss battle: the result from the board (mate, a draw, or the engine's verdict at the move cap). */
+  /**
+   * Ends the boss battle: the result from the board (mate, a draw, or the engine's verdict at the move cap), or the boss
+   * on time when the bullet clock ran out (bossOutOfTime).
+   */
   finishBossBattle(): "crowd" | "boss" | "draw" {
     const b = this.state.boss!;
+    const timeout = this.bossOutOfTime() && !this.finalGameOver();
     const winner = this.gameWinner();
-    const result = winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    const result = timeout ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
     this.state = finishBoss(this.state, this.opts.rng, result, this.settings);
+    this.bossTimedOut = timeout;
     return result;
   }
+
+  /**
+   * The boss battle was lost on time (the bullet clock ran out): for the result screen (solo). Kept on the runner, not in
+   * the match state: nothing stored or sent changes (online the Hidden Boss can't be met).
+   */
+  bossTimedOut = false;
 
   /**
    * The boss battle as sent to the screens. Built once per change: a solo battle's screens ask for it many times on
    * every redraw (several a second), and building it (the board's view, the moves the powers allow) on every ask was
    * the lag that grew with the match (.claude/LESSONS.md: "Lag that grows with the match"). The key is everything the
    * view is made from, so a cached view is always the one a fresh build would give.
+   *
+   * Asking again when nothing has changed costs no more than comparing a few values (Oct 14, 2026: a boss screen asks
+   * many times a frame, and serializing the battle's state and its whole history for the key grew with the match): the
+   * runner replaces the boss's state, a board and its last move rather than changing them in place, so the same
+   * objects, with the same position and history, are the same view. Anything else goes on to the full key.
    */
   bossView(justKilled: string | null = null): NetBoss | null {
     const b = this.state.boss;
     if (!b) return null;
     const board = this.boards.get(this.state.boards[0]!)!;
     const s = this.settings;
+    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid];
+    const m = this.bossViewMemo;
+    if (m && m.same.length === same.length && m.same.every((x, i) => x === same[i])) return m.view;
     const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid]);
-    if (this.bossViewMemo?.key !== key) this.bossViewMemo = { key, view: this.buildBossView(b, justKilled) };
+    this.bossViewMemo = { key, same, view: m?.key === key ? m.view : this.buildBossView(b, justKilled) };
     return this.bossViewMemo.view;
   }
-  private bossViewMemo: { key: string; view: NetBoss } | null = null;
+  private bossViewMemo: { key: string; same: unknown[]; view: NetBoss } | null = null;
 
   private buildBossView(b: BossState, justKilled: string | null): NetBoss {
-    const def = chooseBoss(0, b.id, null, undefined, true);
+    const def = chooseBoss(0, b.id, null, undefined, true, true);
     const info = { name: def.name, icon: def.icon, threat: bossThreat(b.elo) };
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const powers = bossPowers(b);
@@ -1381,7 +1437,8 @@ export class MatchRunner {
     // From the game just played: a roughly even position between moves 5 and 12, White (the crowd) to move.
     let startPly = bossStartPly(old.evals ?? [], old.history.length);
     const alive = this.alive();
-    // Which boss: a random playable one (as in a raid), at the crowd's strength plus its own offset.
+    // Which boss: a random playable one (as in a raid), at the crowd's strength plus its own offset. (Never a hidden one:
+    // the Crowd's boss final isn't Boss alone.)
     const seed = Math.floor(this.opts.rng() * 2 ** 32);
     const def = chooseBoss(seed / 2 ** 32, this.settings.bossId, this.settings.bossAvoid, undefined, this.settings.bossUnfinished);
     // (A boss who plays from the starting position: Hollow; Big Boy too, less the pawn he eats.)
@@ -1663,6 +1720,8 @@ export interface BossGuard {
 
 /** The mate test's start (settings.bossMateTest): 1.f3 e5 2.g4, and the boss (Black) mates with Qh4. */
 export const MATE_TEST_MOVES: readonly string[] = ["f2f3", "e7e5", "g2g4"];
+/** Test switch (settings.bossWinTest, ?win=1): 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6, the crowd White to move: Qxf7 mates the boss. */
+export const WIN_TEST_MOVES: readonly string[] = ["e2e4", "e7e5", "f1c4", "b8c6", "d1h5", "g8f6"];
 
 export const DEFAULT_BOSS_GUARD: BossGuard = { slipLoss: [2, 7], maxLoss: 10, maxLogitLoss: 1 };
 
