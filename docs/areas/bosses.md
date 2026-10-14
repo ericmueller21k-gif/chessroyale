@@ -290,6 +290,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   `frames:rage -- <dir> [boss] [phone|desktop] [moves] [strikes]` (the rage meter: strikes, the warning, the
   ultimate, its slide down and refill, every frame, with the meter's own numbers sampled each frame).
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect; `only=pig` for Wrangler).
+  Art not yet in the game (the Hidden Boss, `characters/recluse.ts`, his book `characters/effects/recluse.ts`): add
+  `extra=packages/app/src/characters/recluse.ts only=recluse,recluse-bust,recluse-book`.
 - Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] 25`.
 - Sims: `packages/sim/scripts/boss-sim.ts` (modes `snack`, Big Boy's; `split`, Sawyer's; `raid <boss,ids|all> <games>
   <seed> <strikes> <tag>`: Solo raids of 50 bots with every power through the match runner, ultimates per game and the
