@@ -19,7 +19,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import { BOARD } from "@chessroyale/core";
 import { applyMove, inCheck, legalMoves, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { BoardTurn, coordLabel, type QuarterTurn } from "../board-view.ts";
-import { BRUSHES, FILES, SLIDE_MS, boardSize, cellOf, destsFor, drawArrows, follow, pieceClass, pieceCloseTo, positionKey, pressDown, pressMove, pressUp, readPieces, slidePiece, squareAtPoint, type BoardPiece, type Box, type PieceCode, type Press, type PressBoard } from "./logic.ts";
+import { BRUSHES, FILES, SLIDE_MS, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, pieceClass, pieceCloseTo, positionKey, pressDown, pressMove, pressUp, readPieces, slidePiece, squareAtPoint, type BoardPiece, type Box, type PieceCode, type Press, type PressBoard } from "./logic.ts";
 import type { BoardProps } from "./types.ts";
 
 let nextPieceId = 1;
@@ -49,31 +49,111 @@ interface Track {
   turn: QuarterTurn;
 }
 
-export function OwnBoard({ fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0 }: BoardProps) {
+/** A move you made, shown until the game next tells the board anything new. */
+type Local = { pieces: Map<string, PieceCode>; last: [string, string] };
+type Promotion = { from: string; to: string; dark?: boolean };
+
+/** What the board's drawing layer tells the board around it (the same object for the board's life). */
+interface BoardActs {
+  move(uci: string): void;
+  darkTry(uci: string): void;
+  promote(p: Promotion): void;
+  selectDark(sq: string | null): void;
+  /** The move you made, while it's shown (OwnBoard clears it). */
+  local: { current: Local | null };
+}
+
+/**
+ * The board: its wrap, what the screen draws over it (`children`), the promotion picker, and its drawing layer
+ * (BoardLayer: the squares, pieces, highlights, arrows and coordinates). A screen that draws every frame (a boss's
+ * effect playing over the board) draws this every frame too, so it stays cheap: the drawing layer is drawn again only
+ * when what it shows changes (`boardInputs` in logic.ts), or by itself (a tap, a drag, a slide or a fade ending).
+ */
+export function OwnBoard(props: BoardProps) {
+  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0 } = props;
+  const onMoveRef = useRef(onMove);
+  onMoveRef.current = onMove;
+  const onDarkRef = useRef(onDarkTry);
+  onDarkRef.current = onDarkTry;
+  const [promotion, setPromotion] = useState<Promotion | null>(null);
+  // Hollow's dark: a dark square tapped (selected without picking anything up).
+  const [darkSel, setDarkSel] = useState<string | null>(null);
+  const darkOn = !!interactive && !!dark?.length && !!onDarkTry;
+
+  // A move you made, shown until the game next tells the board anything new (any of these changing; `arrows` by
+  // identity), as before. Clearing it draws the layer again.
+  const local = useRef<Local | null>(null);
+  const cleared = useRef(0);
+  const deps = [fen, orientation, lastMove, interactive, arrows, animate, moves?.join(), JSON.stringify(marks ?? null), darkOn, dark?.join(), darkSel, turn];
+  const seen = useRef(deps);
+  if (seen.current.length !== deps.length || seen.current.some((d, i) => d !== deps[i])) {
+    seen.current = deps;
+    if (local.current) {
+      local.current = null;
+      cleared.current++;
+    }
+  }
+  // A new position or the dark changing: no dark square stays selected.
+  useLayoutEffect(() => setDarkSel(null), [fen, dark?.join(), interactive]);
+
+  const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), promote: setPromotion, selectDark: setDarkSel, local }), []);
+  // (The same element while nothing it shows has changed: Preact leaves it, and everything in it, alone.)
+  const layer = useMemo(
+    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} acts={acts} />,
+    [...boardInputs(props), darkOn, darkSel, cleared.current],
+  );
+  const promoWhite = sideToMove(fen) === "w";
+
+  return (
+    <div class={`board-wrap ${small ? "board-small" : ""}`} data-dark-sel={darkSel ?? undefined} data-turn={turn || undefined}>
+      {layer}
+      <BoardTurn.Provider value={turn}>{children}</BoardTurn.Provider>
+      {promotion && (
+        <div class="promo" role="dialog" aria-label="Promote to">
+          {(["q", "r", "b", "n"] as const).map((p) => (
+            <button
+              type="button"
+              key={p}
+              class={`promo-piece ${promoWhite ? "white" : "black"} ${p}`}
+              onClick={() => {
+                const pr = promotion;
+                setPromotion(null);
+                if (pr.dark) onDarkRef.current?.(pr.from + pr.to + p);
+                else onMoveRef.current?.(pr.from + pr.to + p);
+              }}
+              aria-label={{ q: "Queen", r: "Rook", b: "Bishop", n: "Knight" }[p]}
+            >
+              <piece class={`${promoWhite ? "white" : "black"} ${{ q: "queen", r: "rook", b: "bishop", n: "knight" }[p]}`} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type LayerProps = Omit<BoardProps, "children" | "silent" | "onMove" | "onDarkTry"> & { darkOn: boolean; darkSel: string | null; acts: BoardActs };
+
+/**
+ * The board's drawing: the squares and their highlights, the pieces (sliding, fading, following a drag), the arrows and
+ * the coordinates, and the taps and drags on them. Drawn again only when what it shows changes (see OwnBoard).
+ */
+function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, acts }: LayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const [, setTick] = useState(0);
   const redraw = () => setTick((n) => n + 1);
-  const onMoveRef = useRef(onMove);
-  onMoveRef.current = onMove;
-  const onDarkRef = useRef(onDarkTry);
-  onDarkRef.current = onDarkTry;
-  const [promotion, setPromotion] = useState<{ from: string; to: string; dark?: boolean } | null>(null);
-  // Hollow's dark: a dark square tapped (selected without picking anything up).
-  const [darkSel, setDarkSel] = useState<string | null>(null);
-  const darkOn = !!interactive && !!dark?.length && !!onDarkTry;
   const darkList = darkOn ? dark! : NONE;
   const uid = useMemo(() => `hb${++boards}`, []);
+  const { local, selectDark: setDarkSel, promote: setPromotion } = acts;
+  // (How many times it has drawn, kept on its squares' element: e2e/perf.spec.ts checks that a boss's effect playing
+  // over the board doesn't draw it again every frame.)
+  useLayoutEffect(() => {
+    const el = boardRef.current as (HTMLElement & { hbDraws?: number }) | null;
+    if (el) el.hbDraws = (el.hbDraws ?? 0) + 1;
+  });
 
-  // A move you made, shown until the game next tells the board anything new (any of these changing), as before.
-  const local = useRef<{ pieces: Map<string, PieceCode>; last: [string, string] } | null>(null);
-  const deps = [fen, orientation, lastMove, interactive, arrows, animate, moves?.join(), JSON.stringify(marks ?? null), darkOn, dark?.join(), darkSel, turn];
-  const seen = useRef(deps);
-  if (seen.current.length !== deps.length || seen.current.some((d, i) => d !== deps[i])) {
-    seen.current = deps;
-    local.current = null;
-  }
   // The next change of position lands at once (a dropped piece), rather than sliding.
   const landNext = useRef(false);
 
@@ -158,9 +238,6 @@ export function OwnBoard({ fen, orientation, lastMove, interactive, moves, onMov
   const live = useRef({ board, shown, orientation, turn, darkOn, darkList, darkSel, fen });
   live.current = { board, shown, orientation, turn, darkOn, darkList, darkSel, fen };
 
-  // A new position or the dark changing: no dark square stays selected.
-  useLayoutEffect(() => setDarkSel(null), [fen, dark?.join(), interactive]);
-
   /** A move from the board (tap-tap or a drop): what it is, as the game sees it. */
   const userMove = (from: string, to: string, dropped: boolean) => {
     const s = live.current;
@@ -168,7 +245,7 @@ export function OwnBoard({ fen, orientation, lastMove, interactive, moves, onMov
       const piece = pieceAt(s.fen, from);
       // (A pawn you can see reaching the last rank: you pick its piece. From the dark: a queen.)
       if (piece?.type === "p" && !s.darkList.includes(from) && (to[1] === "8" || to[1] === "1")) return setPromotion({ from, to, dark: true });
-      return onDarkRef.current?.(from + to);
+      return acts.darkTry(from + to);
     }
     const legal = (moves ?? legalMoves(s.fen)).filter((m) => m.startsWith(from + to));
     // (Hollow's dark takes a drop anywhere: an ordinary move that isn't on stays where it was.)
@@ -188,7 +265,7 @@ export function OwnBoard({ fen, orientation, lastMove, interactive, moves, onMov
     }
     local.current = { pieces: after, last: [from, to] };
     redraw();
-    onMoveRef.current?.(legal[0]!);
+    acts.move(legal[0]!);
   };
 
   const boxOf = (): Box => {
@@ -244,7 +321,7 @@ export function OwnBoard({ fen, orientation, lastMove, interactive, moves, onMov
       if (s.darkSel) {
         if (sq === s.darkSel) return void setDarkSel(null);
         setDarkSel(null);
-        if (!mine) return void onDarkRef.current?.(s.darkSel + sq);
+        if (!mine) return void acts.darkTry(s.darkSel + sq);
       } else {
         const held = selected.current;
         if (held && sq !== held && mine) selected.current = null;
@@ -380,109 +457,85 @@ export function OwnBoard({ fen, orientation, lastMove, interactive, moves, onMov
   const brushes = [...new Set(drawn.filter((a) => !a.circle).map((a) => a.brush))];
   const ghost = dragId !== null && press.current ? tr.pieces.find((q) => q.id === dragId) : undefined;
   const white = orientation === "white";
-  const promoWhite = sideToMove(fen) === "w";
 
   return (
-    <div class={`board-wrap ${small ? "board-small" : ""}`} data-dark-sel={darkSel ?? undefined} data-turn={turn || undefined}>
-      <div ref={rootRef} class={`board hb orientation-${orientation}${small ? "" : " hb-manipulable"}${jump ? " hb-jump" : ""}`} data-board="own">
-        <div ref={containerRef} class="hb-container">
-          <div ref={boardRef} class="hb-board" style={{ backgroundImage: SQUARES_SVG }} onPointerDown={onDown} onPointerMove={onMovePointer} onPointerUp={onUp} onPointerCancel={onUp}>
-            {[...squares].map(([sq, cls]) => (
-              <square key={sq} class={cls} style={{ transform: place(sq, orientation, turn) }} />
-            ))}
-            {fading.map(({ piece }) => (
-              <piece key={`f${piece.id}`} class={`${pieceClass(piece.code)} fading`} style={{ transform: place(piece.square, orientation, turn) }} />
-            ))}
-            {tr.pieces.map((p) => (
-              <piece
-                key={p.id}
-                ref={(el: HTMLElement | null) => {
-                  if (el) pieceEls.current.set(p.id, el);
-                  else pieceEls.current.delete(p.id);
-                }}
-                data-square={p.square}
-                class={`${pieceClass(p.code)}${tr.sliding.has(p.id) ? " anim" : ""}${p.id === dragId ? " dragging" : ""}`}
-                style={{ transform: place(p.square, orientation, turn) }}
-              />
-            ))}
-          </div>
-          {drawn.length > 0 && (
-            <svg class="hb-shapes" viewBox="-4 -4 8 8" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-              <defs>
-                {brushes.map((b) => (
-                  <marker key={b} id={`${uid}-${b}`} orient="auto" overflow="visible" markerWidth="4" markerHeight="4" refX="2.05" refY="2">
-                    <path d="M0,0 V4 L3,2 Z" fill={BRUSHES[b].color} />
-                  </marker>
-                ))}
-              </defs>
-              <g>
-                {drawn.map((a) =>
-                  a.circle ? (
-                    <circle key={a.key} stroke={BRUSHES[a.brush].color} stroke-width={4 / 64} fill="none" opacity={BRUSHES[a.brush].opacity} cx={a.circle.x} cy={a.circle.y} r={a.circle.r} />
-                  ) : (
-                    <line key={a.key} stroke={BRUSHES[a.brush].color} stroke-width={BRUSHES[a.brush].width / 64} stroke-linecap="round" marker-end={`url(#${uid}-${a.brush})`} opacity={BRUSHES[a.brush].opacity} x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} />
-                  ),
-                )}
-              </g>
-            </svg>
-          )}
-          {drawn.some((a) => a.label) && (
-            <svg class="hb-labels" viewBox="-4 -4 8 8" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-              {drawn.map(
-                (a) =>
-                  a.label && (
-                    <g key={a.key} transform={`translate(${a.label.x},${a.label.y})`}>
-                      <circle r={0.2} fill-opacity={0.8} stroke-opacity={0.7} stroke-width={0.03} fill={BRUSHES[a.brush].color} stroke="white" />
-                      <text font-size={a.label.size} font-family="Noto Sans" text-anchor="middle" fill="white" y={a.label.textY}>
-                        {a.label.text}
-                      </text>
-                    </g>
-                  ),
-              )}
-            </svg>
-          )}
-          {!small && (
-            <div class="hb-coords hb-ranks" aria-hidden="true">
-              {[0, 1, 2, 3, 4, 5, 6, 7].map((row) => (
-                <span key={row} class={`hb-coord ${row % 2 ? "hb-on-dark" : "hb-on-light"}`}>
-                  {coordLabel(String(white ? 8 - row : row + 1), "ranks", turn)}
-                </span>
-              ))}
-            </div>
-          )}
-          {!small && (
-            <div class="hb-coords hb-files" aria-hidden="true">
-              {[0, 1, 2, 3, 4, 5, 6, 7].map((col) => (
-                <span key={col} class={`hb-coord ${(col + 7) % 2 ? "hb-on-dark" : "hb-on-light"}`}>
-                  {coordLabel(FILES[white ? col : 7 - col]!, "files", turn)}
-                </span>
-              ))}
-            </div>
-          )}
-          {ghost && <piece class={`ghost ${pieceClass(ghost.code)}`} style={{ transform: place(ghost.square, orientation, turn) }} />}
-        </div>
-      </div>
-      <BoardTurn.Provider value={turn}>{children}</BoardTurn.Provider>
-      {promotion && (
-        <div class="promo" role="dialog" aria-label="Promote to">
-          {(["q", "r", "b", "n"] as const).map((p) => (
-            <button
-              type="button"
-              key={p}
-              class={`promo-piece ${promoWhite ? "white" : "black"} ${p}`}
-              onClick={() => {
-                const pr = promotion;
-                setPromotion(null);
-                if (pr.dark) onDarkRef.current?.(pr.from + pr.to + p);
-                else onMoveRef.current?.(pr.from + pr.to + p);
+    <div ref={rootRef} class={`board hb orientation-${orientation}${small ? "" : " hb-manipulable"}${jump ? " hb-jump" : ""}`} data-board="own">
+      <div ref={containerRef} class="hb-container">
+        <div ref={boardRef} class="hb-board" style={{ backgroundImage: SQUARES_SVG }} onPointerDown={onDown} onPointerMove={onMovePointer} onPointerUp={onUp} onPointerCancel={onUp}>
+          {[...squares].map(([sq, cls]) => (
+            <square key={sq} class={cls} style={{ transform: place(sq, orientation, turn) }} />
+          ))}
+          {fading.map(({ piece }) => (
+            <piece key={`f${piece.id}`} class={`${pieceClass(piece.code)} fading`} style={{ transform: place(piece.square, orientation, turn) }} />
+          ))}
+          {tr.pieces.map((p) => (
+            <piece
+              key={p.id}
+              ref={(el: HTMLElement | null) => {
+                if (el) pieceEls.current.set(p.id, el);
+                else pieceEls.current.delete(p.id);
               }}
-              aria-label={{ q: "Queen", r: "Rook", b: "Bishop", n: "Knight" }[p]}
-            >
-              <piece class={`${promoWhite ? "white" : "black"} ${{ q: "queen", r: "rook", b: "bishop", n: "knight" }[p]}`} />
-            </button>
+              data-square={p.square}
+              class={`${pieceClass(p.code)}${tr.sliding.has(p.id) ? " anim" : ""}${p.id === dragId ? " dragging" : ""}`}
+              style={{ transform: place(p.square, orientation, turn) }}
+            />
           ))}
         </div>
-      )}
+        {drawn.length > 0 && (
+          <svg class="hb-shapes" viewBox="-4 -4 8 8" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <defs>
+              {brushes.map((b) => (
+                <marker key={b} id={`${uid}-${b}`} orient="auto" overflow="visible" markerWidth="4" markerHeight="4" refX="2.05" refY="2">
+                  <path d="M0,0 V4 L3,2 Z" fill={BRUSHES[b].color} />
+                </marker>
+              ))}
+            </defs>
+            <g>
+              {drawn.map((a) =>
+                a.circle ? (
+                  <circle key={a.key} stroke={BRUSHES[a.brush].color} stroke-width={4 / 64} fill="none" opacity={BRUSHES[a.brush].opacity} cx={a.circle.x} cy={a.circle.y} r={a.circle.r} />
+                ) : (
+                  <line key={a.key} stroke={BRUSHES[a.brush].color} stroke-width={BRUSHES[a.brush].width / 64} stroke-linecap="round" marker-end={`url(#${uid}-${a.brush})`} opacity={BRUSHES[a.brush].opacity} x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} />
+                ),
+              )}
+            </g>
+          </svg>
+        )}
+        {drawn.some((a) => a.label) && (
+          <svg class="hb-labels" viewBox="-4 -4 8 8" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            {drawn.map(
+              (a) =>
+                a.label && (
+                  <g key={a.key} transform={`translate(${a.label.x},${a.label.y})`}>
+                    <circle r={0.2} fill-opacity={0.8} stroke-opacity={0.7} stroke-width={0.03} fill={BRUSHES[a.brush].color} stroke="white" />
+                    <text font-size={a.label.size} font-family="Noto Sans" text-anchor="middle" fill="white" y={a.label.textY}>
+                      {a.label.text}
+                    </text>
+                  </g>
+                ),
+            )}
+          </svg>
+        )}
+        {!small && (
+          <div class="hb-coords hb-ranks" aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((row) => (
+              <span key={row} class={`hb-coord ${row % 2 ? "hb-on-dark" : "hb-on-light"}`}>
+                {coordLabel(String(white ? 8 - row : row + 1), "ranks", turn)}
+              </span>
+            ))}
+          </div>
+        )}
+        {!small && (
+          <div class="hb-coords hb-files" aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((col) => (
+              <span key={col} class={`hb-coord ${(col + 7) % 2 ? "hb-on-dark" : "hb-on-light"}`}>
+                {coordLabel(FILES[white ? col : 7 - col]!, "files", turn)}
+              </span>
+            ))}
+          </div>
+        )}
+        {ghost && <piece class={`ghost ${pieceClass(ghost.code)}`} style={{ transform: place(ghost.square, orientation, turn) }} />}
+      </div>
     </div>
   );
 }

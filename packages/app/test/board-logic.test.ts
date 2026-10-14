@@ -6,6 +6,7 @@ import {
   ALL_SQUARES,
   DRAG_DISTANCE_PX,
   SLIDE_MS,
+  boardInputs,
   boardSize,
   cellOf,
   destsFor,
@@ -316,5 +317,60 @@ describe("arrows", () => {
     expect(a!.label!.text).toBe("52.1");
     expect(a!.label!.x).toBeCloseTo(0.5, 6);
     expect(a!.label!.y).toBeCloseTo(0.5 + 33 / 64, 6);
+  });
+});
+
+describe("when the board draws again (boardInputs)", () => {
+  const base = {
+    fen: START_FEN,
+    orientation: "white" as const,
+    lastMove: "e2e4",
+    interactive: true,
+    moves: ["e7e5", "d7d5"],
+    arrows: [{ move: "e7e5", brush: "green" as const, label: "51.0" }],
+    marks: { e4: "ls-blunder" },
+    dark: ["e7"],
+    onDarkTry: () => {},
+    turn: 90 as const,
+  };
+
+  it("the same board from fresh lists, objects and handlers, as a screen drawing a frame passes it: nothing to draw", () => {
+    const again = { ...base, moves: [...base.moves], arrows: base.arrows.map((a) => ({ ...a })), marks: { ...base.marks }, dark: [...base.dark], onDarkTry: () => {} };
+    expect(boardInputs(again)).toEqual(boardInputs(base));
+    // (Plain values, so a hook's dependency list compares them one by one.)
+    for (const v of boardInputs(base)) expect(["string", "number", "boolean"].includes(typeof v) || v === null).toBe(true);
+  });
+
+  it("anything the board shows, changed: drawn again", () => {
+    const changes: Record<string, unknown>[] = [
+      { fen: applyMove(START_FEN, "e2e4") },
+      { orientation: "black" },
+      { lastMove: "d2d4" },
+      { lastMove: null },
+      { interactive: false },
+      { moves: ["e7e5"] },
+      { moves: undefined },
+      { moves: [] },
+      { arrows: [{ move: "e7e5", brush: "blue", label: "51.0" }] },
+      { arrows: [{ move: "e7e5", brush: "green", label: "52.0" }] },
+      { arrows: [{ move: "d7d5", brush: "green", label: "51.0" }] },
+      { arrows: undefined },
+      { small: true },
+      { animate: false },
+      { marks: { d4: "ls-blunder" } },
+      { marks: undefined },
+      { dark: ["e7", "d7"] },
+      { dark: undefined },
+      { onDarkTry: undefined },
+      { turn: 0 },
+      { turn: 270 },
+    ];
+    const before = JSON.stringify(boardInputs(base));
+    for (const c of changes) expect(JSON.stringify(boardInputs({ ...base, ...c } as typeof base)), JSON.stringify(c)).not.toBe(before);
+  });
+
+  it("defaults and their spelled-out values are the same board", () => {
+    const plain = { fen: START_FEN, orientation: "white" as const };
+    expect(boardInputs({ ...plain, animate: true, interactive: false, small: false, turn: 0, lastMove: null })).toEqual(boardInputs(plain));
   });
 });

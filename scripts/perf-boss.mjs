@@ -3,7 +3,10 @@
 // and through the boss's turn), DOM nodes, running animations, rAF callbacks per frame, pending timers, event
 // listeners, JS heap and audio nodes. Prints a table per run and writes everything to <out>.json.
 //   npm run perf:boss -- [out-dir] [gingerbread|clown|grex|crowd|online] [phone|desktop|both] [moves=25] [power]
-// (grex: try power=candle for his barrage.)
+// (grex: try power=candle for his barrage.) Any boss id works (bigboy, sawyer, hollow, pig), with its ultimate's id.
+// Each row also has `fx`: the frames while a boss's effect was on screen (a power's moment, Lights out, the funhouse's
+// spin), and the long tasks (over 50 ms) in them; `fxBy` the same for each effect ("pm-candle", "lightsout", "spin"). PERF_DIST=<dir>: serve that build instead (build it first with
+// \`npx vite build --outDir <dir>\` in packages/app), to compare two versions with PERF_NO_BUILD=1.
 // The production build (vite build + preview), like the live site. Nothing here should grow with the match
 // (.claude/LESSONS.md: "Lag that grows with the match").
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -13,7 +16,7 @@ import { resolve, join, dirname } from "node:path";
 import { chromium, devices } from "@playwright/test";
 import { preview } from "vite";
 import { Chess } from "chess.js";
-import { counts, frameStats, instrument } from "../e2e/perf-probe.js";
+import { counts, frameStats, instrument, longStats } from "../e2e/perf-probe.js";
 
 const [out = "perf-out", mode = "gingerbread", which = "both", movesArg = "25", power = ""] = process.argv.slice(2);
 const MOVES = Number(movesArg) || 25;
@@ -27,7 +30,7 @@ process.chdir("packages/app");
 const PROFILE = Number(process.env.PERF_PROFILE ?? 0);
 const PROFILE_BOSS = !!process.env.PERF_PROFILE_BOSS;
 if (!process.env.PERF_NO_BUILD) execFileSync("npx", ["vite", "build", "--logLevel", "error", ...(PROFILE ? ["--minify", "false"] : [])], { stdio: "inherit" });
-const server = await preview({ root: ".", configFile: "vite.config.ts", preview: { port: 5199, strictPort: false }, logLevel: "error" });
+const server = await preview({ root: ".", configFile: "vite.config.ts", preview: { port: 5199, strictPort: false }, logLevel: "error", ...(process.env.PERF_DIST ? { build: { outDir: resolve(process.env.PERF_DIST) } } : {}) });
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();
 
@@ -143,7 +146,7 @@ async function run(kind, name, context, throttle) {
   };
   const sample = async () => {
     const frames = await p.evaluate(() => window.__perf.frames.splice(0));
-    const page = { frames, ...(await p.evaluate(counts)) };
+    const page = { frames, longs: await p.evaluate(() => window.__perf.longs ?? []), ...(await p.evaluate(counts)) };
     const m = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((x) => [x.name, x.value]));
     return { ...page, listeners: m.JSEventListeners, nodes: m.Nodes, heapMB: +(m.JSHeapUsedSize / 1048576).toFixed(1), script: m.ScriptDuration, layouts: m.LayoutCount, styles: m.RecalcStyleCount };
   };
@@ -175,7 +178,10 @@ async function run(kind, name, context, throttle) {
       break;
     }
     await p.locator(".cc-banner", { hasText: "Round start" }).waitFor({ state: "detached", timeout: 20000 }).catch(() => undefined);
-    const boss = (await sample()).frames; // everything since the last move: the reveal and the boss's turn
+    const before = await sample();
+    const boss = before.frames; // everything since the last move: the reveal and the boss's turn
+    const bossOnly = boss.filter((f) => f[2] !== "play");
+    const fxFrames = boss.filter((f) => f[4]);
     if (move === PROFILE + 1 && PROFILE_BOSS) await stopProfile(`boss-before-move${move}`);
     if (move === PROFILE && !PROFILE_BOSS) await startProfile();
     // Idle on the board for 1.5 s.
@@ -234,7 +240,18 @@ async function run(kind, name, context, throttle) {
       events,
       idle: stats(idle.map((f) => f[0])),
       drag: stats(drag.map((f) => f[0])),
-      boss: stats(boss.filter((f) => f[2] !== "play").map((f) => f[0])),
+      boss: stats(bossOnly.map((f) => f[0])),
+      bossLong: longStats(before.longs, bossOnly),
+      fx: stats(fxFrames.map((f) => f[0])),
+      fxLong: longStats(before.longs, fxFrames),
+      // (Each effect on its own: "pm-candle", "lightsout", "spin"...)
+      fxBy: Object.fromEntries(
+        [...new Set(fxFrames.map((f) => f[4]))].map((k) => {
+          const fr = fxFrames.filter((f) => f[4] === k);
+          // (Its frames and long tasks too, to pool an effect's showings across moves and runs.)
+          return [k, { ...stats(fr.map((f) => f[0])), long: longStats(before.longs, fr), frames: fr.map((f) => +f[0].toFixed(1)), longs: before.longs.filter(([st]) => fr.some((f) => st >= f[3] - f[0] && st < f[3])).map((l) => Math.round(l[1])) }];
+        }),
+      ),
       rafPerFrame: rafPer[Math.floor(rafPer.length / 2)] ?? 0,
       rafMax: rafPer[rafPer.length - 1] ?? 0,
       dom: s.dom,
@@ -254,7 +271,7 @@ async function run(kind, name, context, throttle) {
     prev = s;
     rows.push(row);
     console.log(
-      `${tag} #${String(move).padStart(2)} ${pick.padEnd(5)} idle p50 ${row.idle.p50} p95 ${row.idle.p95} slow ${(row.idle.slow * 100).toFixed(0)}% | drag p50 ${row.drag.p50} p95 ${row.drag.p95} slow ${(row.drag.slow * 100).toFixed(0)}% | boss${events.length ? `(${events.join("+")})` : ""} p95 ${row.boss.p95} slow ${(row.boss.slow * 100).toFixed(0)}% | dom ${row.dom} nodes ${row.nodes} anims ${row.anims} raf/f ${row.rafPerFrame}(${row.rafMax}) timers ${row.timeouts}+${row.intervals}i listeners ${row.listeners} heap ${row.heapMB}MB audio ${row.audio}/${row.audioOff}`,
+      `${tag} #${String(move).padStart(2)} ${pick.padEnd(5)} idle p50 ${row.idle.p50} p95 ${row.idle.p95} slow ${(row.idle.slow * 100).toFixed(0)}% | drag p50 ${row.drag.p50} p95 ${row.drag.p95} slow ${(row.drag.slow * 100).toFixed(0)}% | boss${events.length ? `(${events.join("+")})` : ""} p95 ${row.boss.p95} slow ${(row.boss.slow * 100).toFixed(0)}% long ${row.bossLong.n}(${row.bossLong.max}) | fx ${Object.entries(row.fxBy).map(([k, v]) => `${k} n ${v.n} p95 ${v.p95} long ${v.long.n}(${v.long.max})`).join(", ") || "-"} | dom ${row.dom} nodes ${row.nodes} anims ${row.anims} raf/f ${row.rafPerFrame}(${row.rafMax}) timers ${row.timeouts}+${row.intervals}i listeners ${row.listeners} heap ${row.heapMB}MB audio ${row.audio}/${row.audioOff}`,
     );
   }
   await p.close();

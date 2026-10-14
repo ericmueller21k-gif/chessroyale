@@ -10,6 +10,7 @@
  */
 import { legalMoves, touchesDark } from "@chessroyale/chess";
 import { realSquare, viewSquare, type QuarterTurn } from "../board-view.ts";
+import type { BoardProps } from "./types.ts";
 
 export type Orientation = "white" | "black";
 /** A piece: its color and kind, as "wp", "bk", ... */
@@ -330,4 +331,31 @@ export function drawArrows(arrows: readonly ArrowShape[], orientation: Orientati
     }
     return out;
   });
+}
+
+// ---------------- When the board draws again ----------------
+
+/**
+ * Everything the board's own drawing (its squares, pieces, highlights, arrows and coordinates) is made from, as plain
+ * values: equal lists, the same drawing. The board draws its pieces again only when one of these changes, or on its own
+ * (a tap, a drag, a slide or a fade ending), never just because the screen around it drew again: a boss screen draws
+ * every frame while an effect plays over the board (Oct 14, 2026; docs/areas/board.md). Lists and objects count by
+ * what's in them, not by identity (a screen that builds a fresh `arrows` array each time hasn't changed the board);
+ * the move handlers aren't here (the board calls whichever is current), only whether Hollow's dark takes attempts.
+ */
+export function boardInputs(p: Omit<BoardProps, "children" | "silent" | "onMove">): unknown[] {
+  return [
+    p.fen,
+    p.orientation,
+    p.lastMove ?? null,
+    !!p.interactive,
+    p.moves ? p.moves.join() : null,
+    p.arrows ? p.arrows.map((a) => `${a.move}:${a.brush}:${a.label ?? ""}`).join(" ") : null,
+    !!p.small,
+    p.animate !== false,
+    p.marks ? JSON.stringify(p.marks) : null,
+    p.dark ? p.dark.join() : null,
+    !!p.onDarkTry,
+    p.turn ?? 0,
+  ];
 }
