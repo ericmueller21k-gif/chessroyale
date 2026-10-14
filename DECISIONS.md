@@ -3206,4 +3206,3 @@ slowest option.
 - **The sim:** `SQUADS_SIM_SEEDS` (every option on one clock's seeds) and each lobby's minutes in the progress lines,
   for comparisons like this one. `reports/squads-sim.md` was regenerated with the new Rapid (Bullet and Blitz came out
   the same as before: the sim is deterministic, and the 5+3 calibration reproduced exactly).
-
