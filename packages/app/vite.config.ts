@@ -8,17 +8,26 @@ import preact from "@preact/preset-vite";
 
 const require = createRequire(import.meta.url);
 
-/** Copies the Stockfish WebAssembly build (the same file the simulation uses) into public/engine/. */
+/**
+ * Copies the Stockfish WebAssembly build (the same file the simulation uses) into public/engine/, with its license and
+ * its complete source (GPL-3.0: stockfish-source/, served as /engine/stockfish-source.tar.gz). A package version with
+ * no source archive there stops the build: make one first (stockfish-source/README.md).
+ */
 function stockfish(): Plugin {
   return {
     name: "copy-stockfish",
     buildStart() {
-      const bin = join(dirname(require.resolve("stockfish/package.json")), "bin");
+      const pkg = dirname(require.resolve("stockfish/package.json"));
+      const bin = join(pkg, "bin");
+      const { version } = JSON.parse(readFileSync(join(pkg, "package.json"), "utf8")) as { version: string };
+      const source = `stockfish-source/stockfish.js-${version}-source.tar.gz`;
+      if (!existsSync(source)) throw new Error(`Stockfish ${version} has no source archive (${source}): make it first, see stockfish-source/README.md.`);
       mkdirSync("public/engine", { recursive: true });
       for (const f of ["stockfish-19-lite-single.js", "stockfish-19-lite-single.wasm"]) {
         copyFileSync(join(bin, f), join("public/engine", f));
       }
-      copyFileSync(join(dirname(require.resolve("stockfish/package.json")), "Copying.txt"), "public/engine/COPYING.txt");
+      copyFileSync(join(pkg, "Copying.txt"), "public/engine/COPYING.txt");
+      copyFileSync(source, "public/engine/stockfish-source.tar.gz");
     },
   };
 }
@@ -64,17 +73,19 @@ function serviceWorker(): Plugin {
       const files = listFiles(outDir)
         .map((f) => "/" + relative(outDir, f).split("\\").join("/"))
         // (Not the live window's bot replays: only a computer's home fetches them, so phones never download them. Nor
-        // the Maia box: about 40 MB, fetched only for a battle that uses it, then kept in its own cache: MAIA below.)
-        .filter((f) => f !== "/sw.js" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.startsWith("/replays/") && !f.startsWith("/engine/maia/"))
+        // the Maia box: about 40 MB, fetched only for a battle that uses it, then kept in its own cache: MAIA below.
+        // Nor the engines' source archives: for whoever downloads them, never for the game.)
+        .filter((f) => f !== "/sw.js" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.endsWith(".tar.gz") && !f.startsWith("/replays/") && !f.startsWith("/engine/maia/"))
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
         .sort();
       const hash = createHash("sha256");
       for (const f of files) hash.update(f).update(readFileSync(join(outDir, f === "/" ? "index.html" : f)));
-      // The Maia box's cache is named by its own files, so an app update keeps it and a new model replaces it.
+      // The Maia box's cache is named by its own files, so an app update keeps it and a new model replaces it. (Not its
+      // source archive: the game never fetches it, so a change to the box's README or tests leaves players' copies be.)
       const maiaDir = join(outDir, "engine/maia");
       const maia = createHash("sha256");
-      if (existsSync(maiaDir)) for (const f of readdirSync(maiaDir).sort()) maia.update(f).update(readFileSync(join(maiaDir, f)));
+      if (existsSync(maiaDir)) for (const f of readdirSync(maiaDir).filter((f) => !f.endsWith(".tar.gz")).sort()) maia.update(f).update(readFileSync(join(maiaDir, f)));
       const sw = readFileSync("sw-template.js", "utf8")
         .replace("__VERSION__", `brc-${hash.digest("hex").slice(0, 12)}`)
         .replace("__MAIA__", `brc-maia-${maia.digest("hex").slice(0, 12)}`)
