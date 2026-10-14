@@ -1296,17 +1296,25 @@ export class MatchRunner {
    * every redraw (several a second), and building it (the board's view, the moves the powers allow) on every ask was
    * the lag that grew with the match (.claude/LESSONS.md: "Lag that grows with the match"). The key is everything the
    * view is made from, so a cached view is always the one a fresh build would give.
+   *
+   * Asking again when nothing has changed costs no more than comparing a few values (Oct 14, 2026: a boss screen asks
+   * many times a frame, and serializing the battle's state and its whole history for the key grew with the match): the
+   * runner replaces the boss's state, a board and its last move rather than changing them in place, so the same
+   * objects, with the same position and history, are the same view. Anything else goes on to the full key.
    */
   bossView(justKilled: string | null = null): NetBoss | null {
     const b = this.state.boss;
     if (!b) return null;
     const board = this.boards.get(this.state.boards[0]!)!;
     const s = this.settings;
+    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid];
+    const m = this.bossViewMemo;
+    if (m && m.same.length === same.length && m.same.every((x, i) => x === same[i])) return m.view;
     const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid]);
-    if (this.bossViewMemo?.key !== key) this.bossViewMemo = { key, view: this.buildBossView(b, justKilled) };
+    this.bossViewMemo = { key, same, view: m?.key === key ? m.view : this.buildBossView(b, justKilled) };
     return this.bossViewMemo.view;
   }
-  private bossViewMemo: { key: string; view: NetBoss } | null = null;
+  private bossViewMemo: { key: string; same: unknown[]; view: NetBoss } | null = null;
 
   private buildBossView(b: BossState, justKilled: string | null): NetBoss {
     const def = chooseBoss(0, b.id, null, undefined, true);
