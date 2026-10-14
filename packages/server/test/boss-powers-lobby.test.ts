@@ -777,13 +777,19 @@ describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players o
     expect(L.last("p2", "boss")!.boss.lastMove!.move).toBe((req.allowed ?? legalMoves(req.fen))[0]);
   });
 
-  it("a lobby with a player in it: Stockfish, as before (no brain sent)", () => {
-    const L = raidOf({ bossId: "gingerbread" }, [true, false]);
-    expect(L.last("p1", "bossBrain")).toBeUndefined();
-    expect(L.core.record.bossBrain).toBeNull();
-    L.advance(60_000);
-    crowdMove(L);
-    expect(hostBoss(L).brain).toBeUndefined();
+  it("while it's off for players, a lobby with a player in it: Stockfish (no brain sent)", () => {
+    const was = BOSS_BRAIN.forPlayers;
+    (BOSS_BRAIN as { forPlayers: boolean }).forPlayers = false;
+    try {
+      const L = raidOf({ bossId: "gingerbread" }, [true, false]);
+      expect(L.last("p1", "bossBrain")).toBeUndefined();
+      expect(L.core.record.bossBrain).toBeNull();
+      L.advance(60_000);
+      crowdMove(L);
+      expect(hostBoss(L).brain).toBeUndefined();
+    } finally {
+      (BOSS_BRAIN as { forPlayers: boolean }).forPlayers = was;
+    }
   });
 
   it("once it's on for players (forPlayers, one value), every lobby meets it", () => {
@@ -792,6 +798,21 @@ describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players o
     try {
       const L = raidOf({ bossId: "clown" }, [false, false]);
       expect(L.last("p1", "bossBrain")!.brain.brain).toBe("maia-raw");
+      // The same plan an admins' lobby gets: the rule's Maia rating for a crowd, told to the host only, on every
+      // request for the boss's own move.
+      const b = L.core.save().runner!.state.boss!;
+      const plan = bossBrainFor("clown", b.elo, "", true, { crowd: true });
+      expect(L.last("p1", "bossBrain")!.brain).toEqual({ brain: plan.brain, rating: plan.rating });
+      expect(plan.rating).toBe(maiaRatingFor(b.elo + BOSS_BRAIN.crowdMargin));
+      expect(L.last("p2", "bossBrain")).toBeUndefined();
+      L.advance(60_000);
+      crowdMove(L);
+      expect(hostBoss(L).brain).toEqual({ brain: plan.brain, rating: plan.rating });
+      // A player alone (no crowd margin), and a mixed lobby, too.
+      const alone = raidOf({ bossId: "gingerbread" }, [false]);
+      const a = alone.core.save().runner!.state.boss!;
+      expect(alone.last("p1", "bossBrain")!.brain).toEqual({ brain: "maia-raw", rating: maiaRatingFor(a.elo) });
+      expect(raidOf({ bossId: "gingerbread" }, [true, false]).last("p1", "bossBrain")!.brain.brain).toBe("maia-raw");
     } finally {
       (BOSS_BRAIN as { forPlayers: boolean }).forPlayers = was;
     }

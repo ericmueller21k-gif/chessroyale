@@ -749,6 +749,451 @@ function TommyGun({ p, p2 }: { p: Paint; p2: Paint }) {
   );
 }
 
+/** Whether a color is dark (so details on it should be lighter). */
+const isDark = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 < 0.25;
+};
+
+/**
+ * A fake mustache (Beta, agent): a curled handlebar in its color at the mouth line (under a snowman's carrot, over a
+ * gingerbread man's smile), combed with light strokes (a shade of it) so it reads on a black pawn too.
+ */
+const MUSTACHE =
+  "M50 31.7 Q53.5 29.4 57.2 30.9 Q59.5 31.9 60.8 29.9 Q62.2 30.2 61.2 32.4 Q59.5 35.2 55.8 35.4 Q52.5 35.4 50 34.1 Q47.5 35.4 44.2 35.4 Q40.5 35.2 38.8 32.4 Q37.8 30.2 39.2 29.9 Q40.5 31.9 42.8 30.9 Q46.5 29.4 50 31.7 Z";
+function FakeMustache({ p }: { p: Paint }) {
+  return (
+    <Region
+      p={p}
+      name="mustache"
+      d={[MUSTACHE]}
+      line={1.6}
+      over={
+        <g fill="none" stroke={lighten(p.hex, 0.5)} stroke-linecap="round" opacity="0.85" {...lw(0.7)}>
+          <path d="M43.2 33.1 Q45.8 32.2 48.2 32.9 M51.8 32.9 Q54.2 32.2 56.8 33.1" />
+        </g>
+      }
+    />
+  );
+}
+
+/** A fedora (Beta, agent): a pinched crown and a snap brim in its color, a dark band (a light shade on a dark hat). */
+function Fedora({ p }: { p: Paint }) {
+  const band = isDark(p.hex) ? lighten(p.hex, 0.4) : "#2a2522";
+  return (
+    <g>
+      <Region
+        p={p}
+        name="crown"
+        d={["M39.4 23.6 L40.8 13.6 Q41.6 10 45.6 10.4 Q50 13 54.4 10.4 Q58.4 10 59.2 13.6 L60.6 23.6 Z"]}
+        over={<rect x="38" y="18.2" width="24" height="4.4" fill={band} />}
+      />
+      <path d="M40 18.2 H60 M39.6 22.6 H60.4" fill="none" stroke="#1d1d1f" {...lw(1.1)} />
+      <path d="M46.4 12.4 Q50 15.6 53.6 12.4" fill="none" stroke="#000" opacity="0.3" stroke-linecap="round" {...lw(1.2)} />
+      <Region p={p} name="brim" d={["M29.6 24.6 Q30 22 34.6 22.4 Q50 23.4 65.4 22.4 Q70 22 70.4 24.6 Q70.2 26.8 66 26.4 Q58 25.6 50 26.6 Q42 25.6 34 26.4 Q29.8 26.8 29.6 24.6 Z"]} line={2.4} />
+    </g>
+  );
+}
+
+/** A briefcase (Beta, agent): the case in its color at the pawn's side, a dark leather handle and gold clasps. */
+function Briefcase({ p }: { p: Paint }) {
+  const clasp = { fill: "#e0b43a", stroke: "#1d1d1f", ...lw(1) };
+  return (
+    <g transform="rotate(-6 78 74)">
+      <path d="M72.5 64 V60.4 Q72.5 58.4 74.5 58.4 H81.5 Q83.5 58.4 83.5 60.4 V64" fill="none" stroke="#1d1d1f" stroke-linecap="round" {...lw(4.4)} />
+      <path d="M72.5 64 V60.4 Q72.5 58.4 74.5 58.4 H81.5 Q83.5 58.4 83.5 60.4 V64" fill="none" stroke="#5b3a22" stroke-linecap="round" {...lw(2)} />
+      <Region
+        p={p}
+        name="case"
+        d={["M63 66.4 Q63 63.6 65.8 63.6 H90.2 Q93 63.6 93 66.4 V85.2 Q93 88 90.2 88 H65.8 Q63 88 63 85.2 Z"]}
+        over={<path d="M63 70.6 H93" stroke="#000" opacity="0.3" {...lw(1.2)} />}
+      />
+      <rect x="67.4" y="68.6" width="4.2" height="4.2" rx="0.8" {...clasp} />
+      <rect x="84.4" y="68.6" width="4.2" height="4.2" rx="0.8" {...clasp} />
+    </g>
+  );
+}
+
+/**
+ * A wire earpiece (Beta, agent): a bud at the side of the head and its coiled wire down to the collar, both in its
+ * color. It sits just under where shades' arms go, so it shows with Dark Shades on.
+ */
+function WireEarpiece({ p }: { p: Paint }) {
+  const coil = [];
+  for (let y = 36.4; y < 49; y += 1.5) coil.push(<path key={y} d={`M58 ${y} l10 1.2`} />);
+  return (
+    <g>
+      <Region
+        p={p}
+        name="wire"
+        d={["M60.6 34.6 Q59.6 39.4 62.2 42.4 Q63.8 44.6 62.8 48.8 L66 49 Q67 44.2 64.8 40.8 Q63 38.2 63.6 35 Z"]}
+        over={
+          <g stroke={isDark(p.hex) ? lighten(p.hex, 0.5) : "#000"} opacity="0.45" {...lw(0.7)}>
+            {coil}
+          </g>
+        }
+        line={1.4}
+      />
+      <Region p={p} name="bud" d={["M59 32.6 a2.9 3.1 0 1 0 5.8 0 a2.9 3.1 0 1 0 -5.8 0 Z"]} line={1.6} />
+      <circle cx="61.1" cy="31.6" r="0.9" fill="#fff" opacity="0.75" />
+    </g>
+  );
+}
+
+/** A bandana (Beta, pirate): tied over the top of the head, knotted at the side with two tails; white dots. */
+function Bandana({ p }: { p: Paint }) {
+  const dots = [
+    [44, 21.6],
+    [50, 19.6],
+    [56, 21.6],
+    [46.6, 22.8],
+    [53.4, 22.8],
+  ].map(([x, y]) => <circle key={`${x},${y}`} cx={x} cy={y} r="1" />);
+  return (
+    <g>
+      <Region p={p} name="tails" d={["M60.2 22.4 L67.6 19.4 L66.8 24.4 Z", "M60.2 23.4 L66.2 28.8 L62.4 29.6 Z"]} line={2} />
+      <Region
+        p={p}
+        name="cap"
+        d={["M40.4 25.8 Q39.8 16.6 50 16.4 Q60.2 16.6 59.6 25.8 Q50 23.6 40.4 25.8 Z"]}
+        line={2.4}
+      />
+      <g fill="#fbfbf8" opacity="0.95">
+        {dots}
+      </g>
+      <Region p={p} name="knot" d={["M58.6 23 a2.1 2.1 0 1 0 4.2 0 a2.1 2.1 0 1 0 -4.2 0 Z"]} line={1.6} />
+    </g>
+  );
+}
+
+/** A hook (Beta, pirate): a steel hook out of a cuff in its color, at the pawn's side. */
+function Hook({ p }: { p: Paint }) {
+  const hook = "M74 66 V50.6 A6.4 6.4 0 1 0 61.2 50.6 L63.4 53.2";
+  return (
+    <g transform="rotate(10 74 70)">
+      <path d={hook} fill="none" stroke="#1d1d1f" stroke-linecap="round" stroke-linejoin="round" {...lw(4.6)} />
+      <path d={hook} fill="none" stroke="#cfd5dc" stroke-linecap="round" stroke-linejoin="round" {...lw(2.4)} />
+      <path d="M75.2 64 V51 A5 5 0 0 0 72.4 46.4" fill="none" stroke="#fff" opacity="0.6" stroke-linecap="round" {...lw(0.8)} />
+      <rect x="70.6" y="63.4" width="6.8" height="4.4" rx="1" fill="#9aa3ad" {...LINE} {...lw(1.6)} />
+      <Region
+        p={p}
+        name="cuff"
+        d={["M68.6 67.4 H79.4 L83.4 82 Q74 85.2 64.6 82 Z"]}
+        over={<path d="M64 78.4 Q74 81.4 84 78.4" fill="none" stroke="#000" opacity="0.28" {...lw(1.6)} />}
+        line={2.2}
+      />
+    </g>
+  );
+}
+
+/** A cutlass (Beta, pirate): a curved steel blade, the guard, grip and pommel in its color, at the pawn's side. */
+function Cutlass({ p }: { p: Paint }) {
+  return (
+    <g transform="rotate(12 80 60)">
+      <path d="M77.2 73 L77.2 40 Q77 25 70.2 15.2 Q81.6 20 83 37 L82.4 73 Z" fill="#d6dbe1" {...LINE} {...lw(1.8)} />
+      <path d="M79.4 70 L79.4 40 Q79.2 29 75 21.4" fill="none" stroke="#fff" opacity="0.7" stroke-linecap="round" {...lw(0.9)} />
+      <Region p={p} name="grip" d={["M77.4 77 H82.2 L82.6 88 H77 Z"]} over={<path d="M77 80 l5.6 -1.4 M77 83 l5.6 -1.4 M77 86 l5.6 -1.4" stroke="#000" opacity="0.3" {...lw(0.8)} />} line={1.6} />
+      <Region
+        p={p}
+        name="guard"
+        d={[
+          "M71.4 72.6 Q71.4 71.2 72.8 71.2 H87.2 Q88.6 71.2 88.6 72.6 V75.6 Q88.6 77 87.2 77 H72.8 Q71.4 77 71.4 75.6 Z",
+          "M86 76.6 Q91.8 83 84 91.4 L82 89.6 Q87.6 83.6 83.4 77 Z",
+          "M76.6 89.6 a3.2 2.6 0 1 0 6.4 0 a3.2 2.6 0 1 0 -6.4 0 Z",
+        ]}
+        line={1.8}
+      />
+    </g>
+  );
+}
+
+/**
+ * A spyglass (Beta, pirate): an extended brass telescope raised at the pawn's side, its barrel in its color. Drawn
+ * along its own x axis (eyepiece at 0, the lens at 62), then tilted.
+ */
+function Spyglass({ p }: { p: Paint }) {
+  const brass = { fill: "#d9a93a", ...LINE, ...lw(1.6) };
+  return (
+    <g transform="translate(66 90) rotate(-62)">
+      <rect x="0" y="-2.2" width="7" height="4.4" rx="1" {...brass} />
+      <rect x="6.4" y="-3" width="14" height="6" rx="0.6" {...brass} />
+      <path d="M8.6 -3 V3 M18.2 -3 V3" stroke="#8a6416" {...lw(0.9)} />
+      <Region
+        p={p}
+        name="barrel"
+        d={["M20 -4.2 L52 -5 V5 L20 4.2 Z"]}
+        over={<path d="M21 -2.2 L51 -2.8" stroke="#fff" opacity="0.45" stroke-linecap="round" {...lw(1.2)} />}
+        line={1.8}
+      />
+      <rect x="19" y="-4.8" width="3.6" height="9.6" rx="0.8" {...brass} />
+      <rect x="35" y="-5.2" width="3" height="10.4" rx="0.8" {...brass} />
+      <rect x="51" y="-6.2" width="8.4" height="12.4" rx="1.2" {...brass} />
+      <path d="M53.6 -6.2 V6.2" stroke="#8a6416" {...lw(0.9)} />
+      <ellipse cx="59.4" cy="0" rx="1.4" ry="5" fill="#9fd3f0" stroke="#1d1d1f" {...lw(1)} />
+    </g>
+  );
+}
+
+/**
+ * A captain's coat (Beta, pirate; a skin): the pawn in a long coat in its color, opening at the hem to show the pawn
+ * (so it reads as white or black), wide cuffs and lapels a shade of it, two rows of gold buttons, a white cravat.
+ */
+const COAT =
+  "M43.6 36.2 Q50 39.2 56.4 36.2 L64.4 38.4 Q69.8 40.6 70 47 L71.4 69 L75.4 84.2 Q64 87.6 55.6 85.6 L50 64 L44.4 85.6 Q36 87.6 24.6 84.2 L28.6 69 L30 47 Q30.2 40.6 35.6 38.4 Z";
+function CaptainsCoat({ p, side }: { p: Paint; side: "w" | "b" }) {
+  const shade = isDark(p.hex) ? lighten(p.hex, 0.3) : darken(p.hex, 0.25);
+  const buttons = [46, 52, 58].flatMap((y) => [
+    <circle key={`l${y}`} cx="44.6" cy={y} r="1.35" />,
+    <circle key={`r${y}`} cx="55.4" cy={y} r="1.35" />,
+  ]);
+  return (
+    <g>
+      <g transform="scale(2.2222)">
+        <path d={PAWN_PATH} fill={side === "w" ? "#fff" : "#000"} stroke="#000" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <Region
+        p={p}
+        name="coat"
+        d={[COAT]}
+        over={
+          <g fill={shade}>
+            <path d="M43.6 36.2 L39.4 46 L43 46.6 L41.2 49.6 L47.4 54 L46.6 38 Z" />
+            <path d="M56.4 36.2 L60.6 46 L57 46.6 L58.8 49.6 L52.6 54 L53.4 38 Z" />
+            <path d="M27.8 64.6 L37.4 64.2 L37.8 70.6 L27.4 71.2 Z" />
+            <path d="M72.2 64.6 L62.6 64.2 L62.2 70.6 L72.6 71.2 Z" />
+          </g>
+        }
+      />
+      <g fill="none" stroke="#1d1d1f" stroke-linejoin="round" stroke-linecap="round" {...lw(1.2)}>
+        <path d="M43.6 36.4 L39.4 46 L43 46.6 L41.2 49.6 L47.4 54" />
+        <path d="M56.4 36.4 L60.6 46 L57 46.6 L58.8 49.6 L52.6 54" />
+        <path d="M27.8 64.6 L37.4 64.2 L37.8 70.6 L27.4 71.2 M72.2 64.6 L62.6 64.2 L62.2 70.6 L72.6 71.2" />
+        <path d="M37.6 47 L37.4 64.2 M62.4 47 L62.6 64.2" opacity="0.6" />
+      </g>
+      <path d="M46 36.8 Q50 39 54 36.8 L55 40.6 Q52.6 42.6 53.6 46 L50 48.6 L46.4 46 Q47.4 42.6 45 40.6 Z" fill="#fbfbf8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1.1)} />
+      <path d="M47.6 42.4 Q50 44 52.4 42.4 M48 45.4 Q50 46.8 52 45.4" fill="none" stroke="#9ca3af" stroke-linecap="round" {...lw(0.8)} />
+      <g fill="#f2c14e" stroke="#7a5410" {...lw(0.8)}>
+        {buttons}
+      </g>
+    </g>
+  );
+}
+
+/**
+ * A pirate hat (Beta, pirate; Legendary): a tricorn seen from the front, its brim turned up to a point at each side,
+ * in its color; gold trim along the brim, a white skull and crossbones.
+ */
+const TRICORN = "M25 9.4 Q32 15 38.4 14.6 Q45 13.8 50 17 Q55 13.8 61.6 14.6 Q68 15 75 9.4 Q73.8 19.6 67 24.2 Q50 27.8 33 24.2 Q26.2 19.6 25 9.4 Z";
+const TRIM = "M27.6 12.8 Q33 17.2 38.4 16.8 Q45 16 50 19.2 Q55 16 61.6 16.8 Q67 17.2 72.4 12.8";
+function PirateHat({ p }: { p: Paint }) {
+  return (
+    <g>
+      <Region p={p} name="crown" d={["M38.4 16 Q39.4 7.2 50 7.2 Q60.6 7.2 61.6 16 Z"]} line={2.4} />
+      <Region
+        p={p}
+        name="brim"
+        d={[TRICORN]}
+        line={2.4}
+      />
+      <g fill="none" stroke-linecap="round">
+        <path d={TRIM} stroke="#1d1d1f" {...lw(2.8)} />
+        <path d={TRIM} stroke="#f0c040" {...lw(1.6)} />
+      </g>
+      <path d="M45.2 20.2 L54.8 27.2 M54.8 20.2 L45.2 27.2" stroke="#1d1d1f" stroke-linecap="round" {...lw(2.8)} />
+      <path d="M45.2 20.2 L54.8 27.2 M54.8 20.2 L45.2 27.2" stroke="#fbfbf8" stroke-linecap="round" {...lw(1.5)} />
+      <path d="M46.6 22.8 Q46.6 19 50 19 Q53.4 19 53.4 22.8 Q53.4 24.2 52.2 24.8 V26 H47.8 V24.8 Q46.6 24.2 46.6 22.8 Z" fill="#fbfbf8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(0.8)} />
+      <circle cx="48.6" cy="22.6" r="1" fill="#1d1d1f" />
+      <circle cx="51.4" cy="22.6" r="1" fill="#1d1d1f" />
+    </g>
+  );
+}
+
+/**
+ * A parrot (Beta, pirate; Mythic): perched on the pawn's left shoulder (as we see it), facing out, so it leaves the
+ * eyepatch and the earpiece side clear. Its body in the first color,
+ * its wing and long tail in the second; a hooked beak and a ringed eye.
+ */
+function Parrot({ p, p2 }: { p: Paint; p2: Paint }) {
+  return (
+    <g transform="translate(102.6 -0.4) scale(-1 1)">
+      <Region p={p2} name="tail" d={["M64 35.4 L68 34.8 L74.6 55.4 L71 56.4 Z", "M67 35 L70.4 34.2 L79.4 52 L76.2 53.4 Z"]} line={1.7} />
+      <Region
+        p={p}
+        name="body"
+        d={["M59.6 29.4 Q59.6 20.4 66.6 20.4 Q73.2 20.8 72.6 29.8 Q71.8 37.8 64.4 40.6 Q59.6 36.8 59.6 29.4 Z"]}
+        line={2}
+      />
+      <Region p={p} name="head" d={["M60.4 16.6 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0 Z"]} line={2} />
+      <Region p={p2} name="wing" d={["M61.8 25.4 Q66.8 23.6 69.8 28 Q70 34.8 64.4 40 Q60.6 34.4 61.8 25.4 Z"]} line={1.5} />
+      <path d="M62 40.2 l-1.8 1.4 M62 40.2 l0.6 1.8 M66.2 39.6 l-1.2 1.6 M66.2 39.6 l1.2 1.6" fill="none" stroke="#3f3f46" stroke-linecap="round" {...lw(1.2)} />
+      <path d="M71.6 13.4 Q77.6 13.6 77.2 19.8 Q75.6 17.6 72.2 18.4 Z" fill="#f2c14e" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1.2)} />
+      <circle cx="68.4" cy="15.2" r="2.1" fill="#fbfbf8" stroke="#1d1d1f" {...lw(0.8)} />
+      <circle cx="68.9" cy="15.2" r="1" fill="#1d1d1f" />
+    </g>
+  );
+}
+
+/** A ninja headband (Beta, ninja): a band across the forehead, knotted at the side, its long tails flying out; all in its color. */
+function NinjaHeadband({ p }: { p: Paint }) {
+  return (
+    <g>
+      <Region p={p} name="tails" d={["M58.4 23.6 Q64 20.4 72.4 17.2 Q69.4 20.8 71 22.4 Q65 22.8 59.4 26.2 Z", "M58.8 25.4 Q64.6 25.6 70.6 29.8 Q67.4 30.4 67.2 32.4 Q62.8 28.4 58.6 27.4 Z"]} line={1.8} />
+      <Region p={p} name="band" d={["M40.6 22.4 Q50 20.2 59.4 22.4 L59.8 26.8 Q50 24.8 40.2 26.8 Z"]} line={2} />
+      <Region p={p} name="knot" d={["M57.4 24.6 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z"]} line={1.6} />
+    </g>
+  );
+}
+
+/** A shuriken (Beta, ninja): a four-pointed throwing star in its color, a hole in the middle, at the pawn's side. */
+function Shuriken({ p }: { p: Paint }) {
+  const star = "M77 45 L80.8 58.2 L94 62 L80.8 65.8 L77 79 L73.2 65.8 L60 62 L73.2 58.2 Z";
+  const hole = "M75.2 62 a1.8 1.8 0 1 0 3.6 0 a1.8 1.8 0 1 0 -3.6 0 Z";
+  return (
+    <g transform="rotate(18 77 62)">
+      <Region
+        p={p}
+        name="star"
+        d={[`${star} ${hole}`]}
+        over={<path d="M77 49.2 L77 74.8 M64.2 62 L89.8 62" stroke={lighten(p.hex, 0.5)} opacity="0.7" {...lw(0.9)} />}
+        line={1.8}
+      />
+    </g>
+  );
+}
+
+/** A ninja mask (Beta, ninja): a cloth over everything below the eyes, in its color, with a fold or two. */
+function NinjaMask({ p }: { p: Paint }) {
+  return (
+    <Region
+      p={p}
+      name="mask"
+      d={["M40.6 29.2 Q50 31.2 59.4 29.2 Q59.8 35.4 55.8 38.2 Q50 40.4 44.2 38.2 Q40.2 35.4 40.6 29.2 Z"]}
+      over={<path d="M44.6 34.6 Q50 36.2 55.4 34.6" fill="none" stroke="#000" opacity="0.3" stroke-linecap="round" {...lw(1)} />}
+      line={1.8}
+    />
+  );
+}
+
+/** Nunchucks (Beta, ninja): two sticks in its color joined by a short steel chain, hanging at the pawn's side. */
+function Nunchucks({ p }: { p: Paint }) {
+  const stick = (x: number, y: number, r: number) => `M${x - 2.6} ${y} H${x + 2.6} V${y + 24} Q${x + 2.6} ${y + 26} ${x} ${y + 26} Q${x - 2.6} ${y + 26} ${x - 2.6} ${y + 24} Z`;
+  const links = [
+    [72.6, 47.4],
+    [74.8, 44.6],
+    [78, 43.4],
+    [81.2, 44.6],
+    [83.4, 47.4],
+  ];
+  return (
+    <g>
+      <g fill="none" stroke="#1d1d1f" {...lw(2.2)}>
+        {links.map(([x, y]) => (
+          <ellipse key={x} cx={x} cy={y} rx="1.4" ry="1" />
+        ))}
+      </g>
+      <g fill="none" stroke="#cfd5dc" {...lw(1)}>
+        {links.map(([x, y]) => (
+          <ellipse key={x} cx={x} cy={y} rx="1.4" ry="1" />
+        ))}
+      </g>
+      <g transform="rotate(14 71 50)">
+        <Region p={p} name="left" d={[stick(71, 49, 0)]} over={<path d="M68 66 h6 M68 69 h6 M68 72 h6" stroke="#000" opacity="0.3" {...lw(0.8)} />} line={1.8} />
+      </g>
+      <g transform="rotate(-24 85 50)">
+        <Region p={p} name="right" d={[stick(85, 49, 0)]} over={<path d="M82 66 h6 M82 69 h6 M82 72 h6" stroke="#000" opacity="0.3" {...lw(0.8)} />} line={1.8} />
+      </g>
+    </g>
+  );
+}
+
+/**
+ * A katana (Beta, ninja): in its scabbard at the pawn's side, a hand's width of steel showing. The hilt's wrap and the
+ * scabbard in its color, a dark diamond pattern on the wrap, a gold guard. Drawn along its own x axis (pommel at 0,
+ * the scabbard's tip at 84), then tilted.
+ */
+function Katana({ p }: { p: Paint }) {
+  const diamonds = [];
+  for (let x = 3; x < 17; x += 3.4) diamonds.push(<path key={x} d={`M${x} 0 L${x + 1.7} -1.6 L${x + 3.4} 0 L${x + 1.7} 1.6 Z`} />);
+  return (
+    <g transform="translate(63 92) rotate(-68)">
+      <Region
+        p={p}
+        name="hilt"
+        d={["M1 -2.4 H18 V2.4 H1 Z"]}
+        over={
+          <g fill="#000" opacity="0.32">
+            {diamonds}
+          </g>
+        }
+        line={1.6}
+      />
+      <rect x="-1.4" y="-2.8" width="2.8" height="5.6" rx="1" fill="#2a2522" {...LINE} {...lw(1.3)} />
+      <rect x="23" y="-2" width="5" height="4" fill="#dfe4ea" {...LINE} {...lw(1.3)} />
+      <path d="M23.6 -0.9 H27.6" stroke="#fff" opacity="0.8" {...lw(0.7)} />
+      <Region p={p} name="scabbard" d={["M27.6 -2.6 Q56 -3.4 84 -1.2 Q86 0.2 84 1.6 Q56 3.4 27.6 2.6 Z"]} over={<path d="M38 -2.8 V2.8 M41 -2.8 V2.8" stroke="#000" opacity="0.35" {...lw(0.9)} />} line={1.7} />
+      <ellipse cx="20.6" cy="0" rx="2.2" ry="5.6" fill="#d9a93a" {...LINE} {...lw(1.4)} />
+    </g>
+  );
+}
+
+/**
+ * A ninja hood (Beta, ninja; Epic): a hood over the whole head and down to the shoulders, in its color, with one slit
+ * for the eyes. The piece shows through the slit (so it's still white or black), and two eyes look out.
+ */
+/** (The slit is wound the other way from the hood, so it's a hole.) */
+const HOOD_SLIT = "M41.6 29 Q50 32.8 58.4 29 Q50 25.4 41.6 29 Z";
+function NinjaHood({ p, side }: { p: Paint; side: "w" | "b" }) {
+  const eye = side === "w" ? "#1d1d1f" : "#f8fafc";
+  return (
+    <g>
+      <Region
+        p={p}
+        name="hood"
+        d={[`M50 16.2 Q62.4 16.2 62.6 29 Q62.6 35 60 38 Q66 40.2 66.4 43.6 Q50 47.6 33.6 43.6 Q34 40.2 40 38 Q37.4 35 37.4 29 Q37.6 16.2 50 16.2 Z ${HOOD_SLIT}`]}
+        over={<path d="M40.4 38.2 Q50 41.4 59.6 38.2" fill="none" stroke="#000" opacity="0.28" {...lw(1.2)} />}
+        line={2.2}
+      />
+      <circle cx="46.2" cy="29" r="1.25" fill={eye} />
+      <circle cx="53.8" cy="29" r="1.25" fill={eye} />
+    </g>
+  );
+}
+
+/**
+ * A ninja gi (Beta, ninja; Epic; a skin): the pawn in a wrap-front gi in its color with wide sleeves, the collar a
+ * shade of it, and a black belt, knotted, its ends hanging. The pawn's head, its base and the V at the neck show.
+ */
+const GI = "M44 36.4 L50 43.4 L56 36.4 L64.2 38.4 Q70.2 40.6 72.4 47 L76.6 59.6 L69.6 61.6 L70 75.2 Q50 79.4 30 75.2 L30.4 61.6 L23.4 59.6 L27.6 47 Q29.8 40.6 35.8 38.4 Z";
+function NinjaGi({ p, side }: { p: Paint; side: "w" | "b" }) {
+  const collar = isDark(p.hex) ? lighten(p.hex, 0.35) : darken(p.hex, 0.22);
+  return (
+    <g>
+      <g transform="scale(2.2222)">
+        <path d={PAWN_PATH} fill={side === "w" ? "#fff" : "#000"} stroke="#000" stroke-width="1.5" stroke-linecap="round" />
+      </g>
+      <Region
+        p={p}
+        name="gi"
+        d={[GI]}
+        over={
+          <g fill={collar}>
+            <path d="M43.6 36.6 L46.2 36.4 L57.4 58.6 L54.4 58.6 Z" />
+            <path d="M56.4 36.6 L53.8 36.4 L50 43.4 L51.4 46.4 Z" />
+          </g>
+        }
+      />
+      <g fill="none" stroke="#1d1d1f" stroke-linejoin="round" stroke-linecap="round" {...lw(1.2)}>
+        <path d="M43.6 36.6 L57.4 58.6 M46.2 36.4 L54.6 52.8" />
+        <path d="M56.4 36.6 L51.4 46.4" />
+        <path d="M34.6 47.6 L31.6 60.4 M65.4 47.6 L68.4 60.4" opacity="0.6" />
+      </g>
+      <path d="M30.3 58.2 Q50 61.4 69.7 58.2 L69.8 62.6 Q50 65.8 30.2 62.6 Z" fill="#17171a" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1.2)} />
+      <path d="M48.4 62.8 L45 72 L47.6 72.4 L50.2 64 Z M51.6 62.8 L55.6 71.6 L53 72.2 L50 64 Z" fill="#17171a" stroke={side === "w" ? "#1d1d1f" : "#6b7280"} stroke-linejoin="round" {...lw(0.9)} />
+      <rect x="47.6" y="59.2" width="4.8" height="4.6" rx="1" fill="#17171a" stroke={side === "w" ? "#1d1d1f" : "#6b7280"} {...lw(0.9)} />
+    </g>
+  );
+}
+
 const ITEM_ART: Record<string, (p: { p: Paint; p2: Paint; side: "w" | "b" }) => ComponentChildren> = {
   "santa-hat": SantaHat,
   antlers: Antlers,
@@ -774,6 +1219,24 @@ const ITEM_ART: Record<string, (p: { p: Paint; p2: Paint; side: "w" | "b" }) => 
   "smiley-face": SmileyFace,
   "suit-and-tie": SuitAndTie,
   "tommy-gun": TommyGun,
+  "fake-mustache": FakeMustache,
+  fedora: Fedora,
+  briefcase: Briefcase,
+  "wire-earpiece": WireEarpiece,
+  bandana: Bandana,
+  hook: Hook,
+  cutlass: Cutlass,
+  spyglass: Spyglass,
+  "captains-coat": CaptainsCoat,
+  "pirate-hat": PirateHat,
+  parrot: Parrot,
+  "ninja-headband": NinjaHeadband,
+  shuriken: Shuriken,
+  "ninja-mask": NinjaMask,
+  nunchucks: Nunchucks,
+  katana: Katana,
+  "ninja-hood": NinjaHood,
+  "ninja-gi": NinjaGi,
 };
 
 /** The shine's box where an item is drawn in its own coordinates (the tube is drawn tilted, in a group). */
@@ -781,6 +1244,14 @@ const SHINE_BOX: Record<string, [number, number, number, number]> = {
   "gift-tube": [74, 22, 16, 76],
   "candy-cane": [56, 14, 32, 84],
   "tommy-gun": [-2, -7, 85, 23],
+  briefcase: [62, 57, 32, 32],
+  hook: [58, 42, 28, 44],
+  cutlass: [64, 12, 30, 82],
+  spyglass: [-1, -7, 62, 14],
+  // (The parrot is drawn on the right and mirrored onto the left shoulder.)
+  parrot: [58, 9, 23, 49],
+  shuriken: [59, 44, 36, 36],
+  katana: [-2, -6, 89, 12],
 };
 
 /** Where each item sits on the pawn's square, to frame it alone (a card, the strip): x, y, w, h. */
@@ -809,6 +1280,24 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   "smiley-face": [38, 17, 24, 24],
   "suit-and-tie": [20, 15, 60, 76],
   "tommy-gun": [60, 12, 40, 84],
+  "fake-mustache": [37, 27, 26, 11],
+  fedora: [29, 8, 42, 20],
+  briefcase: [61, 55, 34, 36],
+  "wire-earpiece": [52, 28, 20, 22],
+  bandana: [38, 15, 31, 16],
+  hook: [56, 40, 32, 46],
+  cutlass: [62, 12, 34, 84],
+  spyglass: [62, 30, 36, 62],
+  "captains-coat": [20, 15, 60, 76],
+  "pirate-hat": [23.5, 5.5, 53, 23.5],
+  parrot: [21.5, 8.5, 23, 49],
+  "ninja-headband": [39, 15, 35, 19],
+  shuriken: [58, 43, 38, 38],
+  "ninja-mask": [39, 28, 22, 13],
+  nunchucks: [62, 40, 34, 40],
+  katana: [60, 10, 36, 84],
+  "ninja-hood": [32, 15, 36, 34],
+  "ninja-gi": [20, 15, 60, 76],
 };
 
 /**
@@ -819,16 +1308,21 @@ const FRAMES: Record<string, [number, number, number, number]> = {
  * anchor, unless `ATTACH_TO` names another (goggles are a face item worn at the eyes). A new item needs only that
  * number; a new skin, its anchors. (The cburnett pawn's head: top at y 20, center 29, radius 9.)
  */
-type Anchors = { head: number; face: number; eyes: number; neck: number };
-/** (The pawn's neck: where its head meets its collar, y 34.2.) */
-const PAWN_ANCHORS: Anchors = { head: 25, face: 40, eyes: 29, neck: 34 };
+type Anchors = { head: number; face: number; eyes: number; neck: number; mouth: number };
+/**
+ * (The pawn's neck: where its head meets its collar, y 34.2. Its mouth line, where a mustache goes: y 33, a little
+ * below the middle of its head; a snowman's is under its carrot nose, a gingerbread man's at his smile.)
+ */
+const PAWN_ANCHORS: Anchors = { head: 25, face: 40, eyes: 29, neck: 34, mouth: 33 };
 const SKIN_ANCHORS: Record<string, Anchors> = {
-  snowman: { head: 14, face: 22, eyes: 18, neck: 30 },
-  gingerbread: { head: 15, face: 26, eyes: 21, neck: 34 },
+  snowman: { head: 14, face: 22, eyes: 18, neck: 30, mouth: 27 },
+  gingerbread: { head: 15, face: 26, eyes: 21, neck: 34, mouth: 28 },
   // The chimney, the T-shirt and the suit show the pawn itself, so their anchors are the pawn's.
   chimney: PAWN_ANCHORS,
   "tree-tee": PAWN_ANCHORS,
   "suit-and-tie": PAWN_ANCHORS,
+  "captains-coat": PAWN_ANCHORS,
+  "ninja-gi": PAWN_ANCHORS,
 };
 /** The line in each item's drawing that meets its anchor (head and face items). */
 const ATTACH: Record<string, number> = {
@@ -848,9 +1342,29 @@ const ATTACH: Record<string, number> = {
   eyepatch: 29,
   "dark-shades": 29,
   "smiley-face": 29,
+  "fake-mustache": 33,
+  fedora: 25,
+  "wire-earpiece": 29,
+  bandana: 25,
+  "pirate-hat": 25,
+  "ninja-headband": 25,
+  "ninja-mask": 29,
+  "ninja-hood": 29,
 };
 /** Items that meet another anchor than their slot's. */
-const ATTACH_TO: Record<string, keyof Anchors> = { "ski-goggles": "eyes", scarf: "neck", eyepatch: "eyes", "dark-shades": "eyes", "smiley-face": "eyes" };
+const ATTACH_TO: Record<string, keyof Anchors> = {
+  "ski-goggles": "eyes",
+  scarf: "neck",
+  eyepatch: "eyes",
+  "dark-shades": "eyes",
+  "smiley-face": "eyes",
+  "fake-mustache": "mouth",
+  // (The earpiece is a head item, but it sits at the ear: it follows the eye line, which tracks each head's middle.)
+  "wire-earpiece": "eyes",
+  "ninja-mask": "eyes",
+  // (The hood's eye slit meets the piece's own eyes: a snowman's coal, a gingerbread man's icing.)
+  "ninja-hood": "eyes",
+};
 /** Face items worn over a hat (goggles, shades); other face items go under it (a beard under a present's box). */
 const OVER_HAT = new Set(["ski-goggles", "dark-shades"]);
 /** A piece's anchors (a skin's, or the pawn's). */

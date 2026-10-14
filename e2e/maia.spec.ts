@@ -1,4 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
+import { gunzipSync } from "node:zlib";
 import { Chess } from "chess.js";
 import { BOSS_ROSTER, isPlayable } from "@chessroyale/core";
 import { createLobbyFromHome, joinFromInvite, named, test } from "./helpers.ts";
@@ -141,7 +142,7 @@ test("an online raid on the Maia brain: the host's device plays Maia's move, eve
   await expect(guest.locator(".brain-debug")).toHaveCount(0);
 });
 
-test("players meet Stockfish: no Brain picker, no Maia download, no debug line", async ({ page }) => {
+test("players meet Maia too (forPlayers on): no Brain picker and no debug line; Maia downloads", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   test.setTimeout(3 * 60_000);
   const maiaFiles: string[] = [];
@@ -156,17 +157,42 @@ test("players meet Stockfish: no Brain picker, no Maia download, no debug line",
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|results)$/);
   await expect(page.locator(".brain-debug")).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).match.brainLine)).toBeNull();
-  expect(maiaFiles).toEqual([]);
+  // Maia is on for players (BOSS_BRAIN.forPlayers): the player's device downloads it for the boss's moves.
+  await expect.poll(() => maiaFiles.length, { timeout: 30_000 }).toBeGreaterThan(0);
 });
 
-test("the credits name Maia-3 and Stockfish, with the Maia box's license beside it", async ({ page }) => {
+test("the credits name Maia-3 and Stockfish, with the Maia box's license beside it and both engines' source to download", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
   await page.goto("/settings");
   const credit = page.locator(".maia-credit");
   await expect(credit).toContainText("Maia-3");
   await expect(credit).toContainText("Stockfish");
+  await expect(credit).not.toContainText("on request");
   await expect(credit.getByRole("link", { name: "Maia-3" })).toHaveAttribute("href", "https://github.com/CSSLab/maia3");
   const licence = await page.request.get("/engine/maia/LICENSE.txt");
   expect(licence.ok()).toBe(true);
   expect(await licence.text()).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
+  // The engines' complete source, served by the site itself (DECISIONS.md, "The Maia box's source on the site"): real
+  // gzip files (not the app's page, which any unknown path gets), saved as they are, holding the source.
+  const archives = [
+    { link: "source code", href: "/engine/maia/maia-box-source.tar.gz", holds: ["maia-box/src/worker.ts", "maia-box/scripts/convert.py", "maia-box/LICENSE", "maia-box/package-lock.json"] },
+    { link: "its source", href: "/engine/stockfish-source.tar.gz", holds: ["stockfish.js-19.0.0/Copying.txt", "stockfish.js-19.0.0/src/nn-61e7af4bb97d.nnue", "SOURCE-FOR-HUNCHESS.txt"] },
+  ];
+  for (const a of archives) {
+    await expect(credit.getByRole("link", { name: a.link })).toHaveAttribute("href", a.href);
+    const res = await page.request.get(a.href);
+    expect(res.status(), a.href).toBe(200);
+    expect(res.headers()["content-encoding"], a.href).toBeUndefined();
+    const body = await res.body();
+    expect([body[0], body[1]], a.href).toEqual([0x1f, 0x8b]);
+    const tar = gunzipSync(body).toString("latin1");
+    for (const path of a.holds) expect(tar, `${a.href}: ${path}`).toContain(path);
+  }
+  // A tap saves the file.
+  const [download] = await Promise.all([page.waitForEvent("download"), credit.getByRole("link", { name: "source code" }).click()]);
+  expect(download.suggestedFilename()).toBe("maia-box-source.tar.gz");
+  // The service worker never fetches them for the game (it precaches the engine, not its source).
+  const sw = await (await page.request.get("/sw.js")).text();
+  expect(sw).toContain('"/engine/stockfish-19-lite-single.wasm"');
+  for (const a of archives) expect(sw).not.toContain(`"${a.href}"`);
 });

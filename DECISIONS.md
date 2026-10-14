@@ -2937,6 +2937,228 @@ pull; SHOWDOWN!'s ropes reaching pieces anywhere on the board (a rook hauled fro
 the pairs landing; the duels glowing on edge files (a6-b6); the meter full on the duel's turn. (The computer's
 screencast had 0.4-0.55 s gaps throughout, the machine shared with other sessions' e2e runs, none tied to his moments.)
 
+### The Hidden Boss: no chess piece, a natural free arm (Eric, Oct 14, 2026)
+
+Eric, on the approved sprite: "that chess piece in his hand, we can do away with that... his hand looks all weird with
+the chess piece... The one with the book is fine." Art only (`characters/recluse.ts`); this replaces the piece in "The
+Hidden Boss, a sprite preview" above.
+
+- **No piece anywhere:** every animation, phase 1 and 2, the full figure and the bust (a test checks that no frame
+  draws one).
+- **His free arm** (his left, our right) now hangs relaxed: the same sleeve, rolled cuff and shading as his book arm,
+  a fuller forearm (it was 3 to 4 px, reading as a stick next to the sleeve; now about 5) and a typed hand, open and
+  relaxed, its thumb in front towards his body and parted by a shade line, the fingers loosely curled. The hand carries
+  its own outline, open at the top, so no line crosses the wrist. When he holds the book out in front of him, that hand
+  grips its edge as before.
+- **The animations that used the piece:** the idle's piece-turning is now two small curls of his free hand's fingers
+  while his eyes are down; phase 2's idle keeps his fingers drumming on the book. The stare never held the piece out
+  (it already only leans in), so it is unchanged. The slam stays the book slammed shut with its puff of dust: he has
+  stood without the stone since Eric's redesign, so a palm slam on the stone isn't possible, and bringing the book down
+  is the slam Eric approved. The book animations are untouched.
+
+### The Maia box's source on the site (Eric, Oct 13–14, 2026)
+
+Eric's OK on Oct 13 ("Publish it."): publish the Maia box's source, then turn `BOSS_BRAIN.forPlayers` on. **The source
+is published** (below). **`forPlayers` stays off for now:** the session doing this work wasn't permitted to change
+that value (its permission check treated it as a feature-flag change needing the owner's own approval), so the flip is
+a separate one-line change once Eric approves it himself. It's ready: the FAQ, the credits and the tests already
+cover both states (`packages/app/test/maia-players.test.ts`, `faq.test.ts`, `boss-powers-lobby.test.ts`). My calls:
+
+- **Where:** the site itself serves the box's complete source next to the worker it builds:
+  **`/engine/maia/maia-box-source.tar.gz`** (about 57 KB), so it stays public when the GitHub repository goes private.
+  It's a static file (Workers static assets), behind nothing but Zero Trust Access, which covers the whole site until
+  launch: no Worker route, no admin check.
+- **Built at build time by the box's own build** (`packages/maia-worker/scripts/source-archive.mjs`, called by
+  `build.mjs`), so it can't drift from what's served: the app's build copies the box's `dist/` as it is. Under
+  `maia-box/`: every file of the box (worker code, `build.mjs` and the archive script, `convert.py` and its
+  `requirements.txt`, `package.json`, `tsconfig.json`, the AGPL `LICENSE`, the README with the upstream Maia-3 commit,
+  the checkpoint's revision and sha256 and every conversion step, the bundled libraries' license texts, the tests and
+  their fixtures), minus `dist/`, `node_modules/` and the model; plus three files written for it: `package-lock.json`
+  (the box's own packages cut from the workspace's lockfile, so `npm ci` installs exactly what the site's build used),
+  `model/README.txt` (the model's name, size, sha256 and where to get it) and `SHA256SUMS.txt` (every file the build
+  wrote, to check a rebuild against the site). The same files make the same bytes (sorted entries, fixed times and
+  owners).
+- **Checked by rebuilding:** extracted, the model put in `model/`, `npm ci`, `node scripts/build.mjs`: all five served
+  files came out byte for byte the same (`sha256sum -c SHA256SUMS.txt`), and so did the archive; npm leaves the
+  cut lockfile exactly as it is.
+- **The model is linked, not bundled again.** The AGPL (section 6(d)) lets the Corresponding Source sit on a different
+  server, a third party's included, with clear directions next to the object code, as long as we make sure it stays
+  available. The converted int8 file is itself served next to the archive (`/engine/maia/maia3-23m-int8.onnx`, the
+  same bytes the build takes from `model/`); what it's made from is CSSLab's own release (Hugging Face
+  `UofTCSSLab/Maia3-23M` and the `CSSLab/maia3` code), pinned by revision, commit and sha256, with `convert.py` doing
+  every step. A second copy in the archive (20.3 MB packed) would only make the same bytes download twice. Flagged: if
+  CSSLab ever removed that checkpoint revision, we'd have to host it ourselves (92 MB, over a static file's 25 MiB
+  limit: R2 or split files).
+- **Bundled libraries** (onnxruntime-web 1.30.0, MIT; chess.js 1.4.0, BSD) are pinned by the archive's lockfile
+  (exact versions and integrity hashes), not copied in: generally available packages, used unchanged.
+- **Caching:** the archive isn't precached by the service worker, isn't kept in the Maia cache, and doesn't count
+  toward that cache's name, so editing the box's README or tests never makes a player download Maia again.
+- **Stockfish too (my call: cheap, same mechanism).** The credits pointed upstream only (Stockfish's repository and
+  stockfish.js's, not the exact version), while the GPL-3.0 asks for the source of the very build we serve. Now
+  **`/engine/stockfish-source.tar.gz`** (1.6 MB): stockfish.js at its tag `v19.0.0` (commit `9cb3e506…`, as `git
+  archive` writes it), the lite network the build embeds (`src/nn-61e7af4bb97d.nnue`, which its build would otherwise
+  download) and a note on what it is and how to build the two files (emscripten 3.1.7, `node build.js --lite
+  --single-threaded --no-split`). The npm package's files are byte for byte the tag's GitHub release, and the network
+  is inside the shipped `.wasm`. The npm package has no source, so the archive is committed
+  (`packages/app/stockfish-source/`, with how it was made) and the build refuses a `stockfish` version without one. Not
+  rebuilt by us (it needs emscripten 3.1.7): the provenance above is the check.
+- **Links:** Settings' credits ("this build and its source"; "Our Maia box's source code is free to download"), the
+  FAQ (one plain line in the Maia section, and both archives in its credits), `/licenses/third-party.txt` and the
+  Maia box's `NOTICE.txt` link the archives; nothing says "on request" any more.
+- **Tests:** `packages/maia-worker/test/source-archive.test.ts` (the build writes it; what it holds; nothing from the
+  game; the lockfile against the workspace's; the hashes; the same bytes twice), `packages/app/test/engine-source.test.ts`
+  (Stockfish's archive matches the installed version, its license, its network), `faq.test.ts` (the line, the links,
+  every Maia line live when it's on), `maia-players.test.ts` and `boss-powers-lobby.test.ts` (with `forPlayers` on for
+  the test: a player's boss on Maia by the same rule as an admin's, solo and online), and `e2e/maia.spec.ts` (the
+  archives served as gzip files that hold the source, a tap saving one).
+
+### Beta Crate · Series 001, batch 2: the secret agent and the pirate (Oct 14, 2026)
+
+Eric approved finishing the Beta crate, so the planned batches 2 and 3 ship together (agent and pirate complete,
+21 of 28 items) and the ninja follows as the last batch. Colors and descriptions are the plan's
+(`docs/history/shop-and-crates.md`). The calls:
+
+- **Fake Mustache, not Moustache:** American English (CLAUDE.md). The id is `fake-mustache`.
+- **A `mouth` anchor:** a mustache goes under the nose, and no anchor put it there on every piece (the eye line put it
+  on the snowman's carrot, the neck under the gingerbread man's smile). Pawn 33, snowman 27, gingerbread 28.
+- **The Wire Earpiece follows the eye line** (it's a head item, but sits at the ear), just below where shades' arms
+  go, so it shows with Dark Shades on.
+- **The Parrot perches on the left shoulder (as we see it),** facing out: on the right it covered the eyepatch, and
+  the left is free whatever else is worn. Weapons don't move with the piece, so it's drawn where every piece's
+  shoulder is (pawn, snowman, gingerbread).
+- **The Pirate Hat** is a tricorn seen from the front, its brim turned up to a point at each side, so it doesn't read
+  as a sombrero; its gold trim and the skull stay unblotched (fixed parts), as do the Bandana's white dots.
+- **The Fedora's band is dark,** a light shade of the hat on a very dark one (Midnight), where a dark band vanishes.
+- **The Captain's Coat** opens at the hem to show the pawn, so it reads as white or black; its lapels and cuffs are a
+  shade of its color.
+- **Batch 2 odds (Beta):** Common (6) 6.67% each, Uncommon (5) 5.2%, Rare (4) 4.5%, Epic (2) 7%, Pirate Hat and
+  Smiley Face 0.8%, Tommy Gun and Parrot 0.2%. Until the ninja's two Epics join, an Epic item is likelier than a
+  Common one, as in batch 1.
+- **The fitting sheet** takes `scale=1|2`, to look at the art at 1× and 2×.
+
+### The boss by the board's corner stays in the window (Eric, Oct 14, 2026)
+
+From 900 to 1099 px (no leaderboard beside the screen) the boss there is drawn at 1× (as in a phone's boss bar) next to
+the eval bar, and the board gives up room only if the margin still falls short of his widest frame (Sawyer's), so he's
+whole at every width (he was half off a 1024 px window). At 1024 × 768 the board doesn't move; at 900 × 700 it is 50 px
+smaller. From 1100 px he stays 2× over the leaderboard's edge and nothing moves. The God King keeps his size and place.
+
+### Beta Crate · Series 001, batch 3: the ninja; the crate is complete (Oct 14, 2026)
+
+The last seven items, so Beta holds all 28 of the plan, at the plan's final odds. Colors and descriptions are the
+plan's (`docs/history/shop-and-crates.md`). The calls:
+
+- **The Ninja Hood's eye slit is a hole,** so the piece shows through it (white or black), with two eyes drawn in it
+  (dark on white, light on black). It meets the piece's eye line, so on a snowman or a gingerbread man its eyes land
+  on theirs. It drapes to the shoulders; worn over the Ninja Mask, the slit shows the mask instead of the piece.
+- **The Ninja Mask** covers the lower half of the head from the eye line, so it goes with the headband (head) and
+  with Dark Shades.
+- **The Ninja Gi** shows the pawn's head, its base and a V at the neck, so it reads as white or black; the collar is
+  a shade of its color, and the belt stays black on every color (its knot outlined in gray on a black pawn).
+- **The Katana** is sheathed, a hand's width of steel showing between the guard and the scabbard: the hilt's wrap
+  and the scabbard take the color, as the plan says, and a bare blade would leave nothing in the color but the grip.
+- **The blurb** names the ninjas: "Secret agents, pirates, ninjas, the old shop's hats and a smile".
+- **The final odds (Beta, 28 items):** Common (8) 5% each, Uncommon (7) 3.71%, Rare (5) 3.6%, Epic (4) 3.5%, Pirate
+  Hat and Smiley Face 0.8%, Tommy Gun and Parrot 0.2%. Each tier's items are now rarer than the one below's, and a
+  test keeps it so.
+
+### The board draws its pieces only when they change (Oct 14, 2026)
+
+Queued Oct 12, approved by Eric Oct 14: the board redrew its pieces every frame while a boss effect played, and
+`perf.spec.ts`'s Roman candle check (line 126) was flaky on its frame budget.
+
+**What was re-rendering.** Profiled on a phone slowed 4x and a computer, through every boss effect (Jefferson's
+candle, Ginger's blizzard and thaw, Boingo's funhouse turns, Big Boy's bounce, Sawyer's saw, Hollow's Lights out,
+Wrangler's lasso drag and Showdown), with a render counter on every component:
+- The boss screen keeps a clock that ticks every animation frame (`useFrameNow` at the top of `BossScreen`), so the
+  whole screen renders every frame for the boss's entire turn: the header, the dock, the boss's figure, the eval bar,
+  and the board, whose own drawing (64 squares' highlights, 32 pieces, the coordinates) was rebuilt and compared every
+  frame although nothing in it changed. The board's own drawing was about a fifth of that screen's work each frame.
+- The board also drew itself every 20 ms after any capture, on every screen, until the next move: a finished capture
+  fade stayed in its list, so its settle timer kept firing. On the Play screen (redrawn five times a second) that was
+  the board's biggest cost.
+- The long tasks in the effects weren't the board. Jefferson's candle made its three whistles and the crackle the
+  first time a shot went up (synthesized at the cue), and drew its frames (him, the rockets, the column of shots) as
+  they first showed: together over a second of a slowed phone's time, in chunks of 50 to 250 ms, during the launch
+  the spec measures. Ginger's wind and Boingo's sounds were made at their cue the same way.
+
+**The fix.**
+- The board is two parts (`board/OwnBoard.tsx`): `OwnBoard`, the wrap with what screens draw over the board and the
+  promotion picker, drawn whenever the screen is; and its drawing layer, drawn again only when what it shows changes
+  (`boardInputs` in `board/logic.ts`: plain values, so a screen's fresh arrays change nothing) or by itself (a tap, a
+  drag, a slide or a fade ending). A move you made goes back exactly as before (the first new thing the screen hands
+  the board, `arrows` by identity too, lets it go and draws the layer again). The rule is in docs/areas/board.md.
+- Fades and slides that are over are let go (`stillRunning`, tested): no more drawing every 20 ms.
+- Boingo's, Ginger's and Jefferson's synthesized sounds join the ones made ahead in idle moments as a battle starts
+  (`warmSounds`); Jefferson's candle frames are drawn ahead, a slice a frame, like Big Boy's and Wrangler's
+  (`prewarmGrex`). Nothing looks or sounds different: the same samples and frames, made earlier.
+- The effects already draw on their own layers (the board's children, `BoardEffects`' shared canvas, CSS animations);
+  none of them hands the board a new value every frame.
+
+**Measured** under the shared e2e lock (the machine otherwise quiet), each effect's frames from a solo Boss alone game
+with its ultimate brought early, base (main) and after side by side, three rounds, medians. "Long tasks" are the main
+thread's tasks over 50 ms of wall time; "CPU" is the main thread's own CPU time a frame (the steadier measure: wall
+times include waiting for a core while the other browser runs, and frame times come in whole refreshes, 16.7, 33.3 or
+50 ms). `npm run perf:boss` now reports the same per effect (`fxBy`).
+
+*Phone (iPhone 13 size, CPU slowed 4x):*
+| Effect | p95 frame, ms (before → after) | long tasks > 50 ms (before → after) | main-thread CPU a frame, ms: mean / p95 | tasks over 50 ms of CPU | runs |
+| --- | --- | --- | --- | --- | --- |
+| Jefferson's Roman candle | 49.9 → 33.3 | 7 → 1 (max 211 → 53) | 14.8 → 11.3 / 31.7 → 24.3 | 5 → 0 | 3/3 |
+| Ginger's blizzard | 33.4 → 49.9 | 2 → 2 (max 133 → 65) | 14.2 → 11.4 / 27.1 → 26.7 | 1 → 1 | 3/3 |
+| Ginger's thaw | 33.3 → 33.3 | 0 → 1 (max 0 → 58) | 10.4 → 9.3 / 16.4 → 17.9 | 0 → 0 | 3/3 |
+| Boingo's funhouse | 33.3 → 33.3 | 3 → 1 (max 90 → 77) | 9.7 → 10.4 / 15.8 → 24.6 | 1 → 1 | 3/3 |
+| Boingo's funhouse turn | 33.3 → 33.4 | 1 → 1 (max 53 → 60) | 10.7 → 11.2 / 22.8 → 18 | 1 → 0 | 3/3 |
+| Big Boy's bounce | 33.3 → 16.8 | 1 → 1 (max 68 → 65) | 11.5 → 11.5 / 21.7 → 16.4 | 1 → 1 | 3/3 |
+| Sawyer's board saw | 33.3 → 16.8 | 1 → 1 (max 81 → 57) | 10.9 → 9.9 / 16.6 → 16.1 | 1 → 1 | 3/3 |
+| Hollow's Lights out | 33.3 → 33.3 | 11 → 9 (max 94 → 123) | 12.1 → 11.5 / 26.2 → 24.5 | 3 → 3 | 3/3 |
+| Wrangler's lasso drag | 33.3 → 33.4 | 3 → 1 (max 59 → 56) | 8.9 → 9.9 / 19.8 → 23.7 | 1 → 0 | 3/3 |
+| Wrangler's Showdown | 33.4 → 33.4 | 5 → 2 (max 159 → 177) | 12.8 → 11.5 / 26.6 → 21.2 | 2 → 0 | 3/3 |
+
+*Computer (1280 x 800):*
+| Effect | p95 frame, ms (before → after) | long tasks > 50 ms (before → after) | main-thread CPU a frame, ms: mean / p95 | tasks over 50 ms of CPU | runs |
+| --- | --- | --- | --- | --- | --- |
+| Jefferson's Roman candle | 41.7 → 33.3 | 4 → 2 (max 50 → 160) | 4.4 → 3.4 / 9.9 → 6.1 | 0 → 0 | 2/2 |
+| Ginger's blizzard | 50.1 → 33.4 | 4 → 1 (max 150 → 86) | 3.8 → 3.4 / 7.7 → 7.2 | 0 → 0 | 3/3 |
+| Ginger's thaw | 33.4 → 33.4 | 7 → 2 (max 152 → 152) | 3.1 → 2.9 / 6.2 → 5.9 | 0 → 0 | 3/3 |
+| Boingo's funhouse | 33.3 → 16.8 | 1 → 1 (max 75 → 55) | 2.6 → 2.4 / 5.2 → 4 | 0 → 0 | 3/3 |
+| Boingo's funhouse turn | 33.3 → 66.7 | 0 → 1 (max 0 → 90) | 2.8 → 2.6 / 5.1 → 5.1 | 0 → 0 | 3/3 |
+| Big Boy's bounce | 16.8 → 16.8 | 0 → 2 (max 0 → 108) | 3.1 → 3.1 / 6.3 → 5.5 | 0 → 0 | 3/3 |
+| Sawyer's board saw | 16.8 → 16.8 | 2 → 0 (max 57 → 0) | 2.9 → 2.5 / 5.4 → 3.8 | 0 → 0 | 3/3 |
+| Hollow's Lights out | 16.8 → 16.8 | 0 → 1 (max 0 → 114) | 2.8 → 2.6 / 6.1 → 5.4 | 0 → 0 | 3/3 |
+| Wrangler's lasso drag | 33.4 → 33.4 | 2 → 1 (max 67 → 56) | 2.9 → 2.5 / 5.2 → 4.4 | 0 → 0 | 3/3 |
+| Wrangler's Showdown | 33.4 → 50 | 2 → 4 (max 124 → 122) | 3.1 → 3.1 / 5.8 → 5.8 | 0 → 0 | 3/3 |
+
+What it says: the board's work is gone from every effect (mean CPU a frame down 0.6 to 3.5 ms on the slowed phone for most,
+within the noise for the rest), and the candle's long tasks with it (its stalls were the sounds and frames, now made ahead), which is
+what made `perf.spec.ts:126` flaky. Big Boy's bounce and Sawyer's board saw now hold 16.7 ms at the 95th percentile on
+the slowed phone; the rest are at 33 ms there, held up by the boss screen rendering everything else every frame (the
+follow-up). On a computer the main thread does 3 to 4 ms a frame; its 33 ms frames there aren't the page's scripts.
+A few rounds' numbers swing either way (the funhouse, the lasso drag, the Showdown on a computer): single long tasks
+of 55 to 180 ms land in one round and not the next, on both builds.
+
+**Next** (Eric approved, Oct 14: "make do the boss screen lag fixes"; its own PR): the boss screen still renders its
+header, dock and figure every frame (3 to 5 ms a frame on the slowed phone), and the solo match's `boss` view is
+checked by serializing the boss's state and the whole move history on every read, many reads a frame, which grows with
+the match.
+
+**Testing.** Unit: `board-logic.test.ts` (when the board draws again; the fades and slides still running). e2e (the
+targeted lane): `perf.spec.ts` (with the board's drawings counted through the candle's launch), every boss spec,
+`resign.spec.ts`, `crowd.spec.ts`, `squads-play.spec.ts`. Frame by frame, base and after, phone 390 and computer 1280:
+a plain move, and every boss effect (the candle and its waves, the blizzard and both thaws, the funhouse and its turns,
+the bounce, the split, the board saw and the cuts, Lights out, the pull, the drag and the Showdown): the same on both,
+no piece flickers, jumps back or slides twice, and the funhouse's forced move still slides after the board turns.
+
+### Maia for players: on (Eric, Oct 14, 2026)
+
+`BOSS_BRAIN.forPlayers` is on: every player's bosses play their normal moves with Maia-3 by the same rule admins had
+(`bossBrainFor`, `maiaRatingFor`, the guards by level, Stockfish from 2800), solo and online. Eric's go: "flip it", on
+Oct 14, after the Maia box's source went up on the site (#183). The session that published the source wasn't
+permitted to change the flag, so the director made this one-value change with Eric's explicit OK. A player's device
+now downloads the Maia model (24 MiB, cached) when a boss battle needs it; a device that can't run it plays
+Stockfish's move as before. The FAQ's Maia section reads as live (it follows the flag). Left for Eric: the real-phone
+check (`TESTING.md`, "Maia").
+
 ### Squads: Rapid 5+2 (Eric, Oct 14, 2026)
 
 Eric, Oct 14, of Squads' Rapid: "It shouldn't be 55 minutes, because, yeah, that's just a little too long... find a way
@@ -2984,3 +3206,4 @@ slowest option.
 - **The sim:** `SQUADS_SIM_SEEDS` (every option on one clock's seeds) and each lobby's minutes in the progress lines,
   for comparisons like this one. `reports/squads-sim.md` was regenerated with the new Rapid (Bullet and Blitz came out
   the same as before: the sim is deterministic, and the 5+3 calibration reproduced exactly).
+
