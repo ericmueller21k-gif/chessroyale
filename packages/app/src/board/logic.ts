@@ -8,7 +8,7 @@
  * cubic ease in and out, its arrows' widths and colors), measured against it side by side (Oct 12, 2026), so a player
  * couldn't tell the two apart.
  */
-import { legalMoves, touchesDark } from "@chessroyale/chess";
+import { castleShortcuts960, isChess960Fen, legalMoves, touchesDark } from "@chessroyale/chess";
 import { realSquare, viewSquare, type QuarterTurn } from "../board-view.ts";
 
 export type Orientation = "white" | "black";
@@ -108,19 +108,34 @@ export function pieceCloseTo(pieces: ReadonlyMap<string, PieceCode>, x: number, 
 
 /**
  * Where each piece may go (from square to squares), from the moves allowed (default: every legal move). Hollow's dark:
- * nothing from, onto or past a dark square (its dots would give the piece away).
+ * nothing from, onto or past a dark square (its dots would give the piece away). Chess960: the king may also go onto
+ * the square it castles to, where that can mean nothing else (`gestureMoves`).
  */
 export function destsFor(fen: string, only?: readonly string[], dark: readonly string[] = []): Map<string, string[]> {
   const dests = new Map<string, string[]>();
-  for (const m of only ?? legalMoves(fen)) {
-    if (touchesDark(m, dark, fen)) continue;
-    const from = m.slice(0, 2);
-    const to = m.slice(2, 4);
+  const add = (from: string, to: string) => {
     const list = dests.get(from) ?? [];
     if (!list.includes(to)) list.push(to);
     dests.set(from, list);
-  }
+  };
+  const all = only ?? legalMoves(fen);
+  for (const m of all) if (!touchesDark(m, dark, fen)) add(m.slice(0, 2), m.slice(2, 4));
+  if (isChess960Fen(fen)) for (const [g, m] of castleShortcuts960(fen, all)) if (!touchesDark(m, dark, fen)) add(g.slice(0, 2), g.slice(2, 4));
   return dests;
+}
+
+/**
+ * The moves a piece taken from one square to another makes, from the moves allowed (default: every legal move); more
+ * than one is a promotion still to pick. Chess960's castling is written as the king taking its own rook (e1h1), so
+ * the king dragged onto its rook castles; so does the king dragged onto the square it castles to (g1 or c1, as in
+ * normal chess) wherever no other king move goes there and it isn't already there (castleShortcuts960).
+ */
+export function gestureMoves(fen: string, only: readonly string[] | undefined, from: string, to: string): string[] {
+  const all = only ?? legalMoves(fen);
+  const direct = all.filter((m) => m.startsWith(from + to));
+  if (direct.length || !isChess960Fen(fen)) return direct;
+  const castle = castleShortcuts960(fen, all).get(from + to);
+  return castle ? [castle] : [];
 }
 
 /** The position after a piece is moved from one square to another, nothing else changed (a promotion still to pick). */

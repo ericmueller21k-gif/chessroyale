@@ -5,6 +5,7 @@
  */
 
 import { ENGINE_MAX_ELO, ENGINE_MIN_ELO } from "@chessroyale/core";
+import { isChess960Fen } from "./chess960.ts";
 import { applyMove, gameEnd } from "./rules.ts";
 
 export interface UciTransport {
@@ -76,6 +77,8 @@ const SPEED_FEN = "r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w
 export class UciEngine {
   private listeners: ((line: string) => void)[] = [];
   private queue: Promise<unknown> = Promise.resolve();
+  /** Whether UCI_Chess960 is on in the engine now (off from the start, as Stockfish starts). */
+  private chess960 = false;
 
   constructor(
     private readonly transport: UciTransport,
@@ -125,12 +128,27 @@ export class UciEngine {
     await r;
   }
 
+  /**
+   * Sets up a position. A Chess960 one (its castling rooks named by file: chess960.ts) needs UCI_Chess960 on first,
+   * which also makes the engine write castling as the king taking its own rook (e1h1), the way our Chess960 rules
+   * write it; the option goes off again for the next normal position. A normal position after a normal one sends
+   * nothing new, so normal searches are unchanged.
+   */
+  private setPosition(fen: string): void {
+    const chess960 = isChess960Fen(fen);
+    if (chess960 !== this.chess960) {
+      this.transport.send(`setoption name UCI_Chess960 value ${chess960}`);
+      this.chess960 = chess960;
+    }
+    this.transport.send(`position fen ${fen}`);
+  }
+
   /** One fixed-budget search with a cleared hash. Returns the last score per line. */
   private async search(fen: string, multipv: number, searchMoves?: readonly string[], nodes = this.options.nodes): Promise<MoveScore[]> {
     this.transport.send("ucinewgame");
     this.transport.send(`setoption name MultiPV value ${multipv}`);
     await this.ready();
-    this.transport.send(`position fen ${fen}`);
+    this.setPosition(fen);
     const done = this.until((l) => l.startsWith("bestmove"));
     this.transport.send(
       `go nodes ${nodes}` + (searchMoves?.length ? ` searchmoves ${searchMoves.join(" ")}` : ""),
@@ -225,7 +243,7 @@ export class UciEngine {
       this.transport.send("setoption name UCI_LimitStrength value true");
       this.transport.send(`setoption name UCI_Elo value ${Math.round(Math.max(ENGINE_MIN_ELO, Math.min(ENGINE_MAX_ELO, elo)))}`);
       await this.ready();
-      this.transport.send(`position fen ${fen}`);
+      this.setPosition(fen);
       const done = this.until((l) => l.startsWith("bestmove"));
       this.transport.send(`go nodes ${nodes}`);
       const lines = await done;
@@ -246,7 +264,7 @@ export class UciEngine {
       this.transport.send("ucinewgame");
       this.transport.send("setoption name MultiPV value 1");
       await this.ready();
-      this.transport.send(`position fen ${SPEED_FEN}`);
+      this.setPosition(SPEED_FEN);
       const done = this.until((l) => l.startsWith("bestmove"));
       const t = performance.now();
       this.transport.send(`go nodes ${nodes}`);

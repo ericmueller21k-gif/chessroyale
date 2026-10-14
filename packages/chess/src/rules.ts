@@ -1,18 +1,32 @@
 import { Chess, type Square } from "chess.js";
+import { applyMove960, gameEnd960, isChess960Fen, legalMoves960, replay960, toSan960 } from "./chess960.ts";
 
-/** Chess rules via chess.js. Moves are in UCI form (e2e4, e7e8q). */
+/**
+ * Chess rules via chess.js. Moves are in UCI form (e2e4, e7e8q).
+ *
+ * A Chess960 position (its castling rooks named by file, Shredder-FEN: chess960.ts) goes to our own Chess960 rules
+ * instead, wherever castling matters (its moves, making them, SAN, the game's end); the read-only questions below that
+ * castling can't change (a piece on a square, check) ask chess.js about the same position without its castling rights.
+ * A normal FEN takes exactly the path it always did.
+ */
+
+/** The position for chess.js: a Chess960 one without its castling rights (chess.js can't read them); a normal one as it is. */
+const plainFen = (fen: string) => (isChess960Fen(fen) ? fen.split(" ").map((f, i) => (i === 2 ? "-" : f)).join(" ") : fen);
 
 export function legalMoves(fen: string): string[] {
+  if (isChess960Fen(fen)) return legalMoves960(fen);
   return new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
 }
 
 export function applyMove(fen: string, uci: string): string {
+  if (isChess960Fen(fen)) return applyMove960(fen, uci);
   const chess = new Chess(fen);
   chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
   return chess.fen();
 }
 
 export function toSan(fen: string, uci: string): string {
+  if (isChess960Fen(fen)) return toSan960(fen, uci);
   const chess = new Chess(fen);
   return chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }).san;
 }
@@ -23,7 +37,7 @@ export function toSan(fen: string, uci: string): string {
  */
 export function pieceAt(fen: string, square: string): { color: "w" | "b"; type: "p" | "n" | "b" | "r" | "q" | "k" } | null {
   let board = boards.get(fen);
-  if (!board) board = remember(boards, fen, new Chess(fen).board(), 32);
+  if (!board) board = remember(boards, fen, new Chess(plainFen(fen)).board(), 32);
   const file = square.charCodeAt(0) - 97;
   const rank = square.charCodeAt(1) - 48;
   const p = square.length === 2 && file >= 0 && file < 8 && rank >= 1 && rank <= 8 ? board[8 - rank]![file] : null;
@@ -58,6 +72,7 @@ const endings = new Map<string, GameEnd>();
 
 /** For a board, a game is over by mate, stalemate, or a draw by the rules. History matters for repetition. */
 export function gameEnd(startFen: string, uciHistory: readonly string[]): GameEnd {
+  if (isChess960Fen(startFen)) return gameEnd960(startFen, uciHistory);
   const key = `${startFen}|${uciHistory.join(" ")}`;
   const known = endings.get(key);
   if (known !== undefined) return known;
@@ -108,6 +123,7 @@ export function fenAfter(uciMoves: readonly string[], startFen = START_FEN): str
   let base: string | undefined;
   while (base === undefined && from > 0 && uciMoves.length - from < 8) base = positions.get(key(--from));
   if (base === undefined) from = 0;
+  if (isChess960Fen(startFen)) return remember(positions, key(uciMoves.length), replay960(base ?? startFen, uciMoves.slice(from)));
   const chess = new Chess(base ?? startFen);
   play(chess, uciMoves.slice(from));
   return remember(positions, key(uciMoves.length), chess.fen());
@@ -119,7 +135,7 @@ export function fenAfter(uciMoves: readonly string[], startFen = START_FEN): str
  * For the God King's "your queen is under attack!".
  */
 export function queenInDanger(fen: string, color: "w" | "b"): boolean {
-  const chess = new Chess(fen);
+  const chess = new Chess(plainFen(fen));
   const them = color === "w" ? "b" : "w";
   const value = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 } as const;
   for (const row of chess.board()) {
@@ -163,7 +179,7 @@ export function hangingValue(fen: string, color: "w" | "b"): number {
 
 /** Whether the side to move is in check. */
 export function inCheck(fen: string): boolean {
-  return new Chess(fen).inCheck();
+  return new Chess(plainFen(fen)).inCheck();
 }
 
 /** What a blunder costs, in words a player knows: a forced mate, a piece lost, or (neither) just the chances. */
@@ -281,6 +297,8 @@ export function kingAttacked(fen: string, color: "w" | "b"): boolean {
 /** The game is over in this position (mate or stalemate), with nothing else to go on. */
 export function positionOver(fen: string): boolean {
   try {
+    // (Chess960: a legal castling move can be all that keeps it from stalemate.)
+    if (isChess960Fen(fen)) return !legalMoves960(fen).length;
     const chess = new Chess(fen);
     return chess.isCheckmate() || chess.isStalemate();
   } catch {

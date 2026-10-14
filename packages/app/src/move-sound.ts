@@ -19,8 +19,10 @@ export function moveKnock(before: string | null | undefined, fen: string, lastMo
       return null;
     }
   }
-  const captured = !!pieceAt(before, to) || (mover.type === "p" && from[0] !== to[0]);
-  const castled = mover.type === "k" && Math.abs(from.charCodeAt(0) - to.charCodeAt(0)) === 2;
+  const target = pieceAt(before, to);
+  const captured = (!!target && target.color !== mover.color) || (mover.type === "p" && from[0] !== to[0]);
+  // (Castling: the king two files over, or, in Chess960, onto its own rook, as the move is written there.)
+  const castled = mover.type === "k" && (Math.abs(from.charCodeAt(0) - to.charCodeAt(0)) === 2 || target?.color === mover.color);
   return captured ? "capture" : castled ? "castle" : "move";
 }
 

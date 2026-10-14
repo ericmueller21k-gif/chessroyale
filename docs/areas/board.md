@@ -37,6 +37,13 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     (see-through, z-index 2) and their labels (`svg.hb-labels`, 9), the coordinates (`.hb-coords`) under the pieces.
     The board's own boxes: `.board.hb` (with `orientation-white`/`-black`), `.hb-container` (exactly the board),
     `.hb-board` (the squares). Nothing in it makes a stacking layer of its own.
+- **Chess960's castling** (DECISIONS.md, "Chess960's rules"), only for a Chess960 position (its FEN names castling
+  rooks by file): the move is written as the king taking its own rook (e1h1), so the king dragged or tapped onto its
+  rook castles; the king dragged onto the square it castles to (g1 or c1, as in normal chess) castles too wherever that
+  can't mean anything else (the king isn't there already, its rook isn't standing there, no ordinary king move goes
+  there). The dots show both. `destsFor` adds those squares and `gestureMoves` turns a gesture into its move
+  (`board/logic.ts`); a normal FEN gets exactly what it always did. Both pieces slide (`follow`), swaps included, and
+  the sound is castling's (`move-sound.ts`).
 - **The pieces** are the cburnett set (Colin M.L. Burnett) from Wikimedia Commons under the BSD license
   (`board/pieces/`: the files, `LICENSE.txt`, `SOURCES.md`), drawn by `board/pieces.css` on the board, on anything
   else drawn with them (a layer marked `.hb-pieces`: ghosts, the bounce, the split, the Last Stand's piece, the God
@@ -66,7 +73,9 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 - Unit: `packages/app/test/board-logic.test.ts` (every square's place at every orientation and turn, against
   `squareXY`; the square under a point; the board's size; the 3 px drag threshold; taps, tap-tap, drags, drops and
   what each lets go of; the move dots, a power's moves and Hollow's dark; which piece slides where, a capture's fade,
-  castling, a promotion; arrows), `board-view.test.ts`, `pieces.test.ts` (the pieces' files, sources and license).
+  castling, a promotion; Chess960's castling: the dots, both gestures, a swap, the king or rook already on its square,
+  a screen's limited moves, tap and drag, both pieces sliding, normal castling untouched; arrows), `board-view.test.ts`,
+  `pieces.test.ts` (the pieces' files, sources and license).
 - e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`.
 - Frames: every `npm run frames:*` script.
 
