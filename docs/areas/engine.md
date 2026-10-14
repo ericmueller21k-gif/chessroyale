@@ -89,8 +89,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     battle, if it fails).
   - **Its memory:** onnxruntime's build is the threaded one (one thread here) and its WebAssembly memory is shared, with a
     4 GiB maximum that a shared memory reserves up front; the box caps it at 512 MiB (`MEMORY_MAX_PAGES` in its
-    `model.ts`; the model uses about 70 MB of it). Its load errors come whole, on one line (`errorText`), and the
-    admins' line wraps.
+    `model.ts`; the model uses about 70 MB of it). Its load errors come whole, on one line (`errorText`), and a phone's
+    admins' line wraps (a computer's pill stays one line, the whole text on hover).
 - **Judging with a power.** When a boss power limits the crowd's moves, the best move is the best of the allowed ones
   (`judgeTop`, `judgeCandidates`, `allowedSearch` in `boss-powers.ts`); Jefferson's fire counts a piece left to burn as
   gone (`fireJudged`). Shared with the `god-king` lane by agreement.

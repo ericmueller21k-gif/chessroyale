@@ -3903,7 +3903,8 @@ it if they need to wait 5 or 10 seconds." Then, Oct 14: tell players about the d
   `?win=1` loading and normal battles not. The box now caps it at 512 MiB while the session is made
   (`MEMORY_MAX_PAGES` in `packages/maia-worker/src/model.ts`); the model uses about 70 MB of it (69 MB after loading
   and after 20 moves, the same, in Node), and works the same in Chromium. A load's error now comes whole and on one
-  line (`errorText`: its kind, message and cause), and the admins' line wraps instead of cutting it. Verified in
+  line (`errorText`: its kind, message and cause), and a phone's admins' line wraps instead of cutting it (a computer's
+  pill stays one line in the title line, so the boards below never move, with the whole text on hover). Verified in
   Chromium and Node only; only Eric's iPhone can say which of the three (the cap, Stockfish stopped, the retry) did it
   (TESTING.md, "Maia").
 - **The admins' line** says more: "loading (waited 20 s)" when the step gave up, "… (2nd try; the 1st: <reason>)" after

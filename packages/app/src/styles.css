@@ -1668,8 +1668,9 @@ p {
 }
 
 /* ---- A computer's title line: the admins' testing items (Hud.tsx), then sound, then the flag (Eric, Oct 13) ----
-   One row, on the title's line. When it's tight (900 to 1100 px) the brain's pill shrinks first, its text wrapping
-   (never cut: a failure's reason is read whole); the title, the test button and the player's buttons keep their size. */
+   One row, on the title's line. When it's tight (900 to 1100 px) the brain's pill shrinks and ellipsizes first (its
+   whole text on hover: the title line keeps one row, so the boards below never move); the title, the test button and
+   the player's buttons keep their size. A phone's line, under the dock, wraps instead. */
 .match-tools {
   flex: 0 1 auto;
   min-width: 0;
@@ -1687,7 +1688,10 @@ p {
   margin: 0;
   padding: 2px 9px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: var(--surface-2);
   line-height: 16px;
 }
@@ -11560,7 +11564,7 @@ img.qicon {
   cursor: default;
 }
 /* Testing, admins: the boss's brain at work (Boss alone, BrainDebug in BossDock.tsx). One short line. */
-/* (It wraps rather than cut: a failure's reason is read whole, Oct 14.) */
+/* (A phone's wraps rather than cut: a failure's reason is read whole, Oct 14. A computer's pill: see .match-tools.) */
 .brain-debug {
   margin: 4px auto 0;
   max-width: 100%;
