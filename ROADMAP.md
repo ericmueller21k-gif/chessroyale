@@ -228,6 +228,23 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       special crate and its reward; a server-side brain and fair-play review for real fights; online play (today the
       server never makes a battle with him); sim-tuning his numbers (turn 7, 180 s).
 
+Added Oct 14, 2026 (Eric; notes only, nothing built):
+
+- **Friends and invites** (Eric, Oct 14: "we're gonna need like a, something where you can tap on somebody and just
+  add them as a friend").
+  - **Add a friend:** tap a player, then "Add friend". No chat with friends ("in today's day and age, it's not
+    necessary").
+  - **Friends online:** your friends who are online, in their own list above the players online.
+  - **Tap any name, friend or not:** two options, **invite to your game** or **view their profile** (the player
+    profile screen exists: `screens/PlayerProfile.tsx`, with "Online now"). Invites aren't only for friends, which
+    keeps it to one piece of code.
+  - **Too many invites:** a profile setting turns off invites from people who aren't your friends ("public
+    invites").
+  - **Open, for build time:** where the lists live in the app (Eric expects a layout rework: "we're gonna need to move
+    things around"), whether a friend request must be accepted or "Add friend" is one-sided like a follow, and what
+    an invite does when the other player is already in a match. It's stored data and a client-server change, so it
+    takes the full test lane.
+
 ## Needs Eric
 
 - **Maia-3 bosses for players:** done Oct 14. The site serves the Maia box's complete source
