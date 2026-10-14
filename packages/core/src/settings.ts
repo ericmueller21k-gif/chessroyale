@@ -1362,6 +1362,14 @@ export const SQUADS_LOBBY = {
    * arrows. It never touches scoring, bots or the server.
    */
   cheatLines: { moves: 3, nodes: 300_000 },
+  /**
+   * Who's watching a board, and jumping to your next one (Eric, Oct 14). Each screen tells the lobby which board it
+   * shows full size, only when that changes; the lobby sends everyone the viewers of the boards that changed, at most
+   * once every `coalesceMs` (so a lobby of 32 switching boards can't flood anyone). Over the board, up to `shown` pawns,
+   * then "+N". "Jump to my next board" (Relay) is `jumpToNext` on a device that hasn't set it, and moves you
+   * `jumpAfterMs` after your move (time to see your piece land: your move shows nowhere else until the half ends).
+   */
+  watching: { coalesceMs: 1000, shown: 4, jumpToNext: true, jumpAfterMs: 600 },
   /** A party (an invite code or link, up to SQUADS.partyMax): closes after this long with nobody in it. */
   partyIdleMinutes: 60,
   /** A party in line asks the matchmaker again this often while it's busy. */

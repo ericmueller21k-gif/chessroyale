@@ -12651,6 +12651,135 @@ button.sq-tiny {
 .sq-status {
   line-height: 1.2;
 }
+/* The line above the board: what's happening and, right after it, who else is watching this board (an eye and their
+   pawns; Oct 14). The pawns stand a little taller than the line and spill into the gaps around it, so the line keeps
+   its height and the board never moves as people come and go. */
+.sq-status-row {
+  justify-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  --sq-watch-h: 20px;
+}
+.sq-status-row > .sq-status {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.sq-watchers {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.sq-eye {
+  width: 15px;
+  height: auto;
+  margin-right: 1px;
+}
+.sq-watchers-pawns {
+  display: inline-flex;
+}
+.sq-watcher {
+  flex: none;
+  width: var(--sq-watch-h);
+  height: var(--sq-watch-h);
+}
+.sq-watcher + .sq-watcher {
+  margin-left: calc(var(--sq-watch-h) * -0.5);
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .sq-status-row {
+    --sq-watch-h: 26px;
+  }
+}
+/* "Jump to my next board" (Relay): a small switch, and its (i) opening a line of explanation under it. */
+.sq-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: 13px;
+}
+.sq-jump-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  cursor: pointer;
+}
+.sq-jump-switch input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 36px;
+  height: 21px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--fd-seat);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+  transition: background 150ms;
+}
+.sq-jump-switch input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--fd-off);
+  transition: transform 150ms;
+}
+.sq-jump-switch input[type="checkbox"]:checked {
+  background: var(--fd-gold);
+  box-shadow: none;
+}
+.sq-jump-switch input[type="checkbox"]:checked::before {
+  transform: translateX(15px);
+  background: var(--fd-gold-ink);
+}
+/* (A 36 px target around a small round "i".) */
+.sq-info {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: italic 700 12px Georgia, "Times New Roman", serif;
+  cursor: pointer;
+}
+.sq-info > span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  line-height: 1;
+}
+.sq-info.on {
+  color: var(--accent);
+}
+.sq-jump-info {
+  flex: 1 0 100%;
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
 .sq-game .board-area .board-wrap {
   width: min(100%, calc(100dvh - 318px));
   min-width: 250px;

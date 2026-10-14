@@ -36,6 +36,7 @@ import {
   RATING_MIN_MOVES,
   SHOP_FREE,
   SQUADS,
+  SQUADS_LOBBY,
   TIERS,
   bossBrainFor,
   bossStrength,
@@ -58,6 +59,7 @@ import {
 } from "@chessroyale/core";
 import { clockLabel, defaultClock, minutesName } from "@chessroyale/chess/squads";
 import { anchorsOf, parse, plainText, type Block } from "./markdown.ts";
+import { JUMP_NEXT_LABEL } from "../squads-view.ts";
 
 /** Everything the FAQ quotes. The defaults are the game's; tests pass changed ones. */
 export interface FaqSources {
@@ -87,6 +89,8 @@ export interface FaqSources {
   clockVote: Pick<PregameVote, "options" | "defaultOption">;
   /** Resigning and leaving: how long someone may be gone from a match and still have their seat. */
   leaving: { awayMs: number };
+  /** Squads' "Jump to my next board" (Relay): on for a device that hasn't set it. */
+  squadsWatching: { jumpToNext: boolean };
 }
 
 export const FAQ_DEFAULTS: FaqSources = {
@@ -114,6 +118,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   squads: SQUADS,
   clockVote: PREGAME_VOTES.find((v) => v.id === "speed")!,
   leaving: LEAVING,
+  squadsWatching: SQUADS_LOBBY.watching,
 };
 
 // ---------------- Numbers as words ----------------
@@ -194,7 +199,7 @@ function modes(src: FaqSources): FaqSection {
 
 - **${Q.squadCount} squads of ${Q.squadSize}** play a knockout bracket. Come alone or with a party of up to ${Q.partyMax}; bots fill any empty seats.
 - **Two modes, voted first:** **Classic** is just chess: same-move tokens in Pairs, no blocks, no coins. **Mercenary** adds coins, a team shop between rounds and items, with blocks on (see [Squads: Mercenary](#mode-mercenary)). A third mode is coming soon. Nobody voting means Classic.
-- **Round 1, Relay:** ${n(Q.boards.relay, "board")}; your squad's players move from board to board, a different one each turn.
+- **Round 1, Relay:** ${n(Q.boards.relay, "board")}; your squad's players move from board to board, a different one each turn. Once you've moved you can watch any board (tap its tiny board), and **${JUMP_NEXT_LABEL}** (${src.squadsWatching.jumpToNext ? "on unless you switch it off" : "off unless you switch it on"}, under the board) takes you straight to the board you play next turn, to study it while you wait. An eye and pawns over a board show who else is watching it.
 - **Round 2, Pairs:** ${n(Q.boards.pairs, "board")}, played in pairs that change partners: both partners pick a move, and a coin decides which is played.
 - **Same-move tokens (Pairs):** pick the same move as your partner and it's played for sure, using one of your squad's ${n(Q.tokens.perMatch, "token")} for the match (both squads' tokens show under the board). If the engine then finds it was the only good move, every other move about ${n(Math.round(Q.tokens.refundGap / Q.tokens.pawnWorth), "pawn")} worse, the token comes back a few seconds later. The engine runs on players' devices; if none can judge it, there's no refund. With no tokens left, partners must pick different moves. After the match, a breakdown lists every token used, refunded or not, and why.
 - **The final, the team vote:** one board. On your squad's move all of you pick, you see your teammates' picks as they come (the other squad doesn't), and you can copy one. The most picked move is played; a tie is settled by a coin between the tied moves.

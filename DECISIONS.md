@@ -3656,3 +3656,71 @@ raised.
 
 **So:** a red Big Boy perf run is re-run alone on a quiet machine before a PR is blamed.
 
+
+## Squads: jump to my next board, and who's watching (Oct 14, 2026)
+
+**What (Eric, Oct 14):** two things for the Squads match screen. **Jump to my next board** (Relay): "a button toggle
+with an info thing; enabled it moves you instantly to the next board, waiting and watching, with it off you wait
+until forced. It should be on by default." **Who's watching** (every Squads match board): "your pawn pieces stacked
+above the board for who is spectating the board with like a spectate eye icon." Eric also decided that viewing boards
+after you've moved stays free, helping teammates included ("it is squads after all"); whether to limit viewing a
+teammate's board while they're still to move is an open question for players (ROADMAP.md, Squads).
+
+**Calls:**
+- **The switch** sits on the match screen only (Relay, in the panel after your move's panel, so it never pushes the
+  move or Block down), not in Settings: one place, in view when it matters. "Jump to my next board" with an (i) that
+  opens one line: "On: once you've moved, you go straight to the board you play next turn, to study it while you wait.
+  Off: you stay on your board until the game moves you." On by default (`SQUADS_LOBBY.watching.jumpToNext`),
+  remembered per device (`brc.squads.jumpNext` in prefs.ts, try/catch).
+- **The jump comes 600 ms after your move** (`jumpAfterMs`), not in the same frame: until the half ends your move shows
+  only on your own big board (the tiny boards show the server's position), so an instant switch would hide the piece
+  you just moved. A board you open yourself in those 600 ms wins. It comes once a half; "Back to my board" stays.
+- **The board to study** is next turn's; if that one has finished (you'd sit that turn out and scout it), the first
+  board after it that's still going, the one you'll actually play next; if none but yours, you stay. The line above
+  the board says "Watching Board 3 · your next board".
+- **Who's watching** shows people only (bots never view), never you and never the board's own players this turn: a
+  small pixel eye, then up to 4 profile pawns (`Avatar`, with their items), overlapping, then "+N"; names on hover
+  (a title), nothing on long-press. Each pawn is the watcher's color on that board (white for someone outside the
+  match). The pawns spill a little above and below the line over the board, so the line keeps its height and the
+  board doesn't move as people come and go.
+- **The protocol** gains `view` (the board a screen shows full size, sent only when it changes: a tap, the jump, Back,
+  a new half; again after a reconnect) and `viewers`, optional both ways, so `SQUADS_PROTOCOL` stays 7: an app on
+  either side of the deploy keeps playing, and one that never sends `view` simply isn't shown.
+- **Each screen hears only about the board it shows** (not every board to everyone): who's on it, when that changes,
+  and the whole list when it has just moved there; at most once a second per screen (`coalesceMs` 1000, twice the
+  brief's example: who's watching doesn't need to be quicker, and it halves the worst case on a slow phone).
+- **Only the pawns redraw** on `viewers`: the client tells them alone (`onViewers`), never the whole screen, and each
+  pawn is memoized. Views are kept in the lobby's record (a view change is one storage write, like any message).
+
+**Measured** (a local server, a full 32-seat test lobby, main first and then this change; the frames on an iPhone 13
+profile with the CPU slowed 4x):
+- **Messages, per player per minute** (3 minutes of Relay): 32 people each doing what the screen does with the jump
+  on (their board when a half asks them to move, the next board 600 ms after their move: about 6 view changes a minute
+  each): main 356 → 376 messages (+6%), 194.6 → 196.4 KB (+1%); `viewers` 19.6 a minute each. The first version
+  (every board's changes to everyone) sent 101 a minute each: telling each screen only about its own board cut it
+  five-fold. 4 people and 28 bots, each switching every 3 s: 210 → 234 (+11%), `viewers` 24.8. One client spamming 10
+  switches a second: 42 `viewers` a minute each (the cap is 60). Each view change is one write of the lobby's record,
+  as for any message.
+- **Frames, share over 20 ms** (12 s windows, two runs each; a shared machine, so a few points of noise): nobody
+  switching, the same (main 2.9-5.2%, the branch 2.8%). Three watchers each coming onto and off your board every 5 s:
+  1.1-2.1% → 4.2-5.0% on your board, 0.6% → 1.0-1.9% on your next board; every 2 s (the one-a-second cap): 1.5% →
+  4.8% and 0.4% → 2.7-3.2%. p95 stays at one refresh (16.8 ms) in every case. One change of the pawns costs a slowed
+  phone 10-15 ms (median; 40-50 ms at worst), almost all of it a dressed `Avatar` being drawn (a plain pawn: 2 ms),
+  and only when someone comes or goes; on a real board that's a few times a turn. Before the pawns redrew alone (a
+  `viewers` message redrew the whole screen) the 1-second churn cost 17-20%.
+- **Narrow phones:** at 360 px and up the line over the board stays one line with four pawns and "+2"; at 320 px the
+  longest Relay line ("Moved · Board 1 · waiting for the half to end") wraps under the widest stack and the board moves
+  14 px (as a long block banner does today).
+- **Frame by frame** (`npm run frames:squads relay`, light and dark): the piece slides once, then the board switches
+  once 600 ms later; nothing snaps back, no flash.
+
+**Player-visible text:** "Jump to my next board", its (i) line above and the (i)'s label ('What "Jump to my next
+board" does'), "Watching Board N · your next board", the pawns' hover "Watching: Pam, Quinn" (and "Watching this
+board: …" for screen readers), "+N", and the FAQ's Relay line.
+
+**Testing.** Full lane (a client-server protocol change): typecheck, the whole unit suite (new: the board to jump to,
+finished boards included; who's watching on the server: a board shown, switching, nobody, only your own board's news,
+a burst coalesced, views naming no board, disconnecting, coming back, leaving, an app that never says; the switch's
+default and storage; the FAQ line), e2e `e2e/squads-watch.spec.ts` (the jump on by default and off, remembered; a
+second player's pawn with the eye over your board, the board not moving, gone when they look away or disconnect),
+`squads-play.spec.ts` and `squads-v2.spec.ts` adapted to the jump, and the whole e2e suite.

@@ -1,3 +1,5 @@
+import { SQUADS_LOBBY } from "@chessroyale/core";
+
 /** Small per-device preferences. */
 
 const ANIM_KEY = "brc.crowdAnim";
@@ -26,6 +28,31 @@ export function setCrowdAnimations(on: boolean) {
 export function onPrefsChange(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
+}
+
+const JUMP_NEXT_KEY = "brc.squads.jumpNext";
+
+/**
+ * Squads, Relay: "Jump to my next board" (Eric, Oct 14). On: once you've moved, the big board goes to the board you
+ * play next turn, to study it while you wait. Off: you stay on your board until the game moves you. Remembered on the
+ * device; a device that hasn't set it gets SQUADS_LOBBY.watching.jumpToNext (on).
+ */
+export function squadsJumpNext(): boolean {
+  try {
+    const v = localStorage.getItem(JUMP_NEXT_KEY);
+    return v === null ? SQUADS_LOBBY.watching.jumpToNext : v === "1";
+  } catch {
+    return SQUADS_LOBBY.watching.jumpToNext;
+  }
+}
+
+export function setSquadsJumpNext(on: boolean) {
+  try {
+    localStorage.setItem(JUMP_NEXT_KEY, on ? "1" : "0");
+  } catch {
+    // Not important: it lasts until a reload.
+  }
+  listeners.forEach((l) => l());
 }
 
 const TRAIL_KEY = "brc.crowdTrail";

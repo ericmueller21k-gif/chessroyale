@@ -1,7 +1,9 @@
 import type { MatchExit } from "./MatchMenu.tsx";
 import { memo } from "preact/compat";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { useMedia } from "./QuickChat.tsx";
+import { SQUADS_LOBBY, type ItemLook } from "@chessroyale/core";
+import { Avatar } from "./Items.tsx";
 import type { NetBracketMatch, NetSquadsLobby, NetWallet } from "@chessroyale/chess/squads";
 import { Coins } from "./SquadsBlocks.tsx";
 import { TinyBoard } from "./TinyBoard.tsx";
@@ -290,6 +292,61 @@ function MatchBoards({ m, client, mine, watching, onWatch }: { m: LocalMatch; cl
     </div>
   );
 }
+
+/** A small eye drawn in pixels (13 × 7): who's watching a board. */
+const EYE = ["....XXXXX....", "..XX.....XX..", ".X...XXX...X.", "X...XXXXX...X", ".X...XXX...X.", "..XX.....XX..", "....XXXXX...."];
+const EYE_PATH = EYE.flatMap((row, y) => [...row].flatMap((c, x) => (c === "X" ? [`M${x} ${y}h1v1h-1z`] : []))).join("");
+export function EyeIcon() {
+  return (
+    <svg class="sq-eye" viewBox="0 0 13 7" shape-rendering="crispEdges" aria-hidden="true">
+      <path d={EYE_PATH} fill="currentColor" />
+    </svg>
+  );
+}
+
+/** One watcher's pawn (their items on), drawn again only when their look or color changes. */
+const WatcherPawn = memo(function WatcherPawn({ id, look, side }: { id: string; look: ItemLook | undefined; side: "w" | "b" }) {
+  return (
+    <span class="sq-watcher" data-id={id}>
+      <Avatar look={look} side={side} />
+    </span>
+  );
+});
+
+/**
+ * Who else is watching a board full size (Oct 14), over it: a small eye, then their profile pawns (their items on)
+ * overlapping in one row, at most SQUADS_LOBBY.watching.shown, then "+N"; their names on hover; nothing when nobody
+ * is. `board`: "key/board". `hide`: who never shows ("id,id": you and the board's own players). `colours`: each
+ * player's pawn color on this board ("id:w,id:b"; white for anyone outside the match). It listens for who's watching
+ * itself (`onViewers`), so a change draws these pawns again and nothing else; static, no animation.
+ */
+export const Watchers = memo(
+  function Watchers({ client, board, hide, colours }: { client: SquadsClient; board: string; hide: string; colours: string }) {
+    const [viewers, setViewers] = useState(() => client.viewers.get(board));
+    useEffect(() => {
+      setViewers(client.viewers.get(board));
+      return client.onViewers(() => setViewers(client.viewers.get(board)));
+    }, [client, board]);
+    const sideOf = useMemo(() => new Map(colours.split(",").map((x) => [x.slice(0, x.lastIndexOf(":")), x.endsWith(":b") ? ("b" as const) : ("w" as const)])), [colours]);
+    const skip = new Set(hide.split(","));
+    const list = (viewers ?? []).filter((id) => !skip.has(id));
+    if (!list.length) return null;
+    const shown = list.slice(0, SQUADS_LOBBY.watching.shown);
+    const names = list.map((id) => client.nameOf(id)).join(", ");
+    return (
+      <span class="sq-watchers" title={`Watching: ${names}`} role="img" aria-label={`Watching this board: ${names}`}>
+        <EyeIcon />
+        <span class="sq-watchers-pawns">
+          {shown.map((id) => (
+            <WatcherPawn key={id} id={id} look={client.looks.get(id)} side={sideOf.get(id) ?? "w"} />
+          ))}
+        </span>
+        {list.length > shown.length && <span class="sq-watchers-more">+{list.length - shown.length}</span>}
+      </span>
+    );
+  },
+  (a, b) => a.client === b.client && a.board === b.board && a.hide === b.hide && a.colours === b.colours,
+);
 
 /** The turn whose boards the screen shows: the one just played while its moves land (the show), else the current one. */
 export function shownTurn(m: LocalMatch): number {

@@ -66,6 +66,10 @@ on Eric's account.
      final's staging.
    - Phase 4: e2e and polish, then playtests with real players (the sim's open questions: real think times and
      misses, and how often a final is lost on time).
+   - **Open question for players (Eric, Oct 14): limit viewing a teammate's board while they're still to move?** Once
+     you've moved you can watch any board full size, and "Jump to my next board" takes you to the one you play next,
+     where a teammate may still be thinking: squads can talk it over (on Discord, say) and help. Eric: helping is fine
+     for now, "it is squads after all", so viewing stays free; players may weigh in, and it could be restricted later.
 
 ## Later: Eric's ideas (Oct 9, 2026; not started, not queued)
 
