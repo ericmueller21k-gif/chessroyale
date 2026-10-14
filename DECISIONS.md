@@ -3050,9 +3050,10 @@ against the clock but it should be bearable for a strong team").
   computer (2x by the board's corner) and the results (1.25x, in a taller box). Other bosses' kits are untouched (a
   kit without `bar`, `loops`, `fall` or `lineOf` works as before).
 - His words go above his head on a computer, and beside him (never over him) on the results.
-- **Fit:** 390 px phone: the bust sits in the bar like the cast. 1280 and 1920: his whole figure by the board's corner,
-  clear of it. 900 and 1024: half off the window's left edge, as every boss is there today. The sprite-fit fix for
-  1024 px in progress draws every boss at 1x there; his bubble rule follows the scale.
+- **Fit** (measured, with the sprite-fit fix for 900 to 1099 px merged): 390 px phone: the bust sits in the bar like
+  the cast. 900 and 1024: his whole figure at 1x (129 px) inside the window by the board's corner. 1280 and 1920: at 2x
+  (258 px), clear of the board. His bubble goes above his head at every width (its rule follows the scale), moved into
+  view at the window's edge.
 - **A fix for every boss:** a new battle's intro now forgets the last battle's moments and sounds (`resetBeats`).
   Their keys repeat from battle to battle (`intro:N`, `over:crowd`), so a second battle in one visit skipped the
   entrance and the defeat or victory animation.
