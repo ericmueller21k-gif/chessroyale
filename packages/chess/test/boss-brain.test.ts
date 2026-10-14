@@ -122,8 +122,8 @@ describe("which brain a boss plays with (bossBrainFor)", () => {
     expect(bossBrainFor("gingerbread", 1500, "", false)).toEqual({ brain: "stockfish", rating: null, stockfishShare: 0 });
   });
 
-  it("players stay on Stockfish until it's switched on for them (one value: BOSS_BRAIN.forPlayers)", () => {
-    expect(BOSS_BRAIN.forPlayers).toBe(false);
+  it("players meet Maia too: it's switched on for them (one value: BOSS_BRAIN.forPlayers; Eric, Oct 14)", () => {
+    expect(BOSS_BRAIN.forPlayers).toBe(true);
   });
 });
 
