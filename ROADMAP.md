@@ -116,22 +116,27 @@ Added Oct 13, 2026 (with Wrangler; notes only, nothing built):
 
 Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
 
-- **Bobby Fischer, the hidden boss: Squads' third mode** (it takes the Mode vote's "Coming soon" slot, so the
-  Hand & Brain / Bughouse / Fog of War note above is superseded unless Eric says otherwise).
-  - **How it plays:** after the Squads tournament, the winning squad faces him: he plays all four at once (a simul),
-    split across 4 boards. Desktop shows all 4; phones use today's layout (your board big, the other 3 up top,
-    tappable).
-  - **The games:** all 4 are Fischer Random (Chess960) and ultra-fast bullet. No power-ups, no blocks, no items.
+- **The hidden boss, inspired by Bobby Fischer** (Eric, Oct 14; working name only: he'll have a different name).
+  - **Where he lives (open):** maybe Squads' third mode (the Mode vote's "Coming soon"), or a bonus that sometimes
+    fires after a Squads tournament. Eric hasn't decided.
+  - **How it plays:** the winning squad faces him: he plays all four at once (a simul), split across 4 boards. Desktop
+    shows all 4; phones use today's layout (your board big, the other 3 up top, tappable).
+  - **Phase 2 is Fischer Random:** the final showdown's second phase is played in Fischer Random (Chess960),
+    ultra-fast bullet. No power-ups, no blocks, no items. (The Squads games themselves stay normal chess; Fischer
+    Random as a Squads vote option is a separate idea for later.)
   - **His ultimate:** after a few moves at normal pace he laughs (a little unhinged), then the pace speeds up sharply:
     only a few seconds a move, no bonus time.
-  - **His voice:** lines true to his chess persona: anti-theory, anti-engine, "real chess", and when the four team up
-    on him, how the Russians teamed up and conspired against him. Eric will supply specifics.
+  - **His voice:** lines true to the chess persona: anti-theory, anti-engine, "real chess", and when the four team up on
+    him, how the Russians teamed up and conspired against him. Eric will supply specifics.
   - **Difficulty:** fairly easy but still a challenge (to tune later).
-  - **Beating him:** a "super saiyan" transformation with special animations (details later).
-  - **Before building (director's flags):** he's a real person, so check the rights to use his name, likeness and
-    quotes in a commercial game (his estate; post-mortem publicity rights vary by country and state), or make him an
-    original character clearly inspired by him. Either way, keep his lines to his chess views and never touch his
-    hateful public statements from later life.
+  - **Beating him:** a "super saiyan" transformation with special animations (details later). Every player on the
+    winning squad gets a special **Fischer Random crate** with a tiny chance at an item that doesn't exist yet. One
+    victory reward per account, ever.
+  - **His art:** Eric's sprite (Oct 14): seated on a stone block, white shirt, patterned blue tie, a chess piece in hand,
+    an intense stare. An in-game version is being drawn (art only, not in the game).
+  - **Director's flags:** use a different name (agreed). A recognizable likeness and real quotes carry the same
+    rights question as the name, so check before launch (his estate; post-mortem publicity rights vary). Keep his lines
+    to his chess views; never his hateful public statements from later life.
 
 ## Needs Eric
 
