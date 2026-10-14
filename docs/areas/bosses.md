@@ -24,7 +24,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   moves by the strength), then Stockfish from 2800 (`BOSS_BRAIN`). Maia picks only among the moves its
   powers leave it. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra move, Big Boy's bounce and
   Wrangler's long pull keep their own Stockfish picks (his drag and showdown aren't moves), and Wrangler's reply to the
-  showdown's duel is Stockfish's best at full strength (below); Maia's own mistakes replace the slips. Players meet
+  showdown's duel (and his next moves while its tactics are live) is Stockfish's best at full strength (below); Maia's
+  own mistakes replace the slips. Players meet
   Stockfish until
   `BOSS_BRAIN.forPlayers` is on (needs Eric's OK: the Maia box's source published); admins meet Maia on every boss,
   in every mode (online: in a lobby of admins only). The Brain picker in Boss alone's menu and a debug line are
@@ -40,7 +41,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
     power's search scores an outcome on the boss's best reply, that reply is the engine's best at full strength, never
     the brain's, a slip or a stumble: `BossRules.bestReply` gives the runner's `bossMoveKind` "best" (`bestReplyFrom`),
     the server sends it as `bossRequest.best` (no brain), and solo plays it the same way. The King's strike still
-    staggers it. Today: Wrangler's reply to a duel (`duelReplyDue`).
+    staggers it. Today: Wrangler's reply to a duel and his next moves while its tactics are live (`engineMoveDue`).
   - Every crowd turn is the crowd's own pick, scored as usual, except the one Boingo's funhouse plays for it as it comes
     (Eric, Oct 12: unscored, once a funhouse); any turn a power touches doesn't count for fair play (`powerTurn`).
   - The clock stands still through every power's moment (`POWER_FX`, `powerMomentMs`): the crowd's clock starts after
@@ -55,7 +56,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
     the flip always did, then draws it at its new angle, untransformed. A board made for a turned view is made turned
     (else every piece flies across it).
   - Turns are the crowd's: turn N is the crowd's Nth move of the battle.
-- **The rage meter** (Eric, Oct 11: several ultimates a battle, like a game's rage meter) fills over time
+- **The rage meter** (Eric, Oct 11: several ultimates a battle, like a game's rage meter; every boss but Wrangler, whose
+  meter is his own: his row below) fills over time
   (`ragePerMove` a crowd move, up to `rageAheadMax` more while the crowd is ahead on the judged eval), with the boss's
   own material lost (`ragePerMaterial`: a queen's worth is half the meter) and with each of the God King's strikes on
   the boss (`rageStrike`: a quarter of it), every gain times the boss's `rageSpeed`. Full: a "RAGE!" warning, then the
@@ -81,13 +83,13 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 | Jefferson (`grex`; G-REX until Oct 10) | the game so far | **Sparkler:** a tile on the crowd's half catches fire and burns in `fireStages` stages, one a crowd turn; a crowd piece left on it after the crowd's move on the last stage burns (never the king, never one whose loss leaves a king in check: it fizzles) | **Roman candle:** `candleShots` fireballs in waves (`candleWaves`) from `candleDelay` turns later, each wave's squares shown as growing shadows `candleAhead` turns ahead; `candleOwnShare` (0.4) of each wave, rounded, falls on his own half (Eric, Oct 11: too strong; 10 of the 24 there, 14 on the crowd's), where his pieces never burn (a crowd piece there still would). The first time one of his pieces stands in the candle's fire (`fireproof`, once a match) he laughs it off: a `fireproof` moment, his smug look and one of four lines picked from the seed (`FIREPROOF_LINES`; he has no laugh sound of his own, so none) |
 | Hollow (`hollow`) | always Black, from the starting position (he claims the dark side in the intro if the crowd would have been Black) | **The dark:** after his first move he covers the square of the piece he moved, then another every `darkEvery`-th move (a random occupied square, never a king's) for `darkTurns`; pieces there are hidden; a move touching the dark goes unchecked, an illegal one costs `darkTryCost` and the `darkTries`-th ends the turn as a miss | **Lights out:** at the start of his turn, a memory test in rounds (`lightsOutRounds`: find 1, 2, then 3 of his pieces); each piece missed costs `lightsOutMiss`; below `lightsOutHold` found, he plays an extra quiet move (`lightsOutExtraGain`) |
 | Big Boy (`bigboy`) | from the starting position less the crowd's d- or e-pawn, which he eats (his snack) | **Toy blocks:** every `blockEvery` turns from turn 2, a block on an empty square in the crowd's half that a crowd piece could move to, for `blockTurns`; nothing (either side) may move onto it or slide through it; a knight jumps it; it never stops an attack | **Big Bounce:** at the start of his turn (after the warning), `bouncePieces` crowd pieces thrown to empty squares within `bounceReach` (pawns sideways), into a position `bounceLoss` pawns worse for the crowd (nearest `bounceTarget`) |
-| Wrangler (`pig`; the code id stays `pig`: "wrangler" is Cloudflare's CLI here) | from the starting position, Black as every raid boss (`?side=b` turns it round); his first move is the **long pull** (`pullOptions`, `pullFrom`): a center pawn's double step, then lassoed one square further, three squares in one move (e2-e5 or d2-d5 as White; d7-d4 or e7-e4 as Black after the crowd's first move), the engine's pick of the d- or e-pawn; none sound (it would hang the pawn: a crowd pawn on it, more attackers than defenders, or more than `pullMaxLoss` pawns against his best ordinary move; its path or square taken): an ordinary first move. The board's history keeps the legal double step and a base with the pawn one square on; the screens name it as the pull (`d4`) | **Lasso drag** (`dragOptions`, `dragFrom`): after his move, from turn `dragFirst`, every `dragEvery` turns, a crowd piece (never the king, never a bishop: it would change color) dragged one square up, down, left or right onto an empty square (a pawn never onto the first or last rank; never leaving the crowd in check or without a move, nor his king attacked), the one costing the crowd nearest the middle of `dragLoss` (0.1 to 0.9 pawns, log-odds as Big Boy's bounce), seeded among ties; none in the band (or a game already decided): none, and he tries again after his next move. A base on the board; `?power=drag`: from turn 2, every 2 | **SHOWDOWN!** (an engine-shaped power, below): the warning, then after his move three matched pairs (queens, rooks, a bishop or knight pair) line up facing each other in the middle (files b-g, ranks 3-6, 0 or 1 empty squares between, knights a jump apart, bishops on their color), his pieces protected (`checkLineup`); the crowd's next move must be one of the three duels (its piece taking his; none legal: a normal move), and his reply to it is the engine's best at full strength, the reply the search scored (`duelReplyDue`; never his brain's). The best duel gains him `showdownEdge` pawns over the position before (nearest `showdownTarget`), a wrong one costs the crowd `showdownTrap` more. None found: "Not yet..." (`hold`) for up to `showdownHolds` turns (none when the board lacks three pairs), then two pairs, then a drag; the meter is spent either way. On screen he drops into the middle winding up both loops, leaps to his corner and his ropes yank each pair in; "DRAW!"; the duels glow and the dock says "Showdown! Take one of his three." (the God King quiet about threats he can't heed, his own word at "DRAW!") |
+| Wrangler (`pig`; the code id stays `pig`: "wrangler" is Cloudflare's CLI here) | from the starting position, Black as every raid boss (`?side=b` turns it round); his first move is the **long pull** (`pullOptions`, `pullFrom`): a center pawn's double step, then lassoed one square further, three squares in one move (e2-e5 or d2-d5 as White; d7-d4 or e7-e4 as Black after the crowd's first move), the engine's pick of the d- or e-pawn; none sound (it would hang the pawn: a crowd pawn on it, more attackers than defenders, or more than `pullMaxLoss` pawns against his best ordinary move; its path or square taken): an ordinary first move. The board's history keeps the legal double step and a base with the pawn one square on; the screens name it as the pull (`d4`) | **Lasso drag** (`dragOptions`, `dragFrom`): after his move, from turn `dragFirst`, every `dragEvery` turns, a crowd piece (never the king, never a bishop: it would change color) dragged one square up, down, left or right onto an empty square (a pawn never onto the first or last rank; never leaving the crowd in check or without a move, nor his king attacked), the one costing the crowd nearest the middle of `dragLoss` (0.1 to 0.9 pawns, log-odds as Big Boy's bounce), seeded among ties; none in the band (or a game already decided): none, and he tries again after his next move. A base on the board; `?power=drag`: from turn 2, every 2 | **SHOWDOWN!** (an engine-shaped power, below; Eric, Oct 13: "he checks every turn after three or four moves, and the moment it's ready he fires it with no warning"): **his own meter**, not the rage meter (`BossRules.meter`, `showdownMeter`): his moves fill it, `showdownMeterTurns` (5) from empty, nothing else (no strike rage, no eval speed-up); full, he says "I've got you in my sights." once (a beat of his, `ready`) and swings both ropes (his `ready` loop) until he fires. From then on, on the first of his turns where a line-up qualifies after his move, he fires, no other warning, no "Not yet...": three pairs, a rook, a bishop and a knight of each side (never queens; a pair that can't be formed is replaced by a second rook pair, then a second knight pair), or two (the rook and a minor) when no three-pair line-up qualifies, facing each other anywhere on ranks 2-7 (0 or 1 empty squares between, knights a jump apart, bishops on their color), his pieces protected (`checkLineup`, `pairKinds`); the crowd's next move must be one of the duels (its piece taking his; none legal: a normal move). The best duel gains him `showdownEdge` pawns over the position before (nearest `showdownTarget`), a wrong one costs the crowd `showdownTrap` more. Nothing qualifies: he plays on (drags carry on) and tries again next turn. His reply to the duel, and his next moves while a line-up piece is still attacked, up to `showdownEngineMoves`, are the engine's best at full strength (`engineMoveDue`; never his brain's). Then the meter empties and fills again; at most `showdownMax` a battle (then no meter). The admins' trigger: the meter full at once, fired at his next turn, the best line-up even outside the band (`outside`, on their debug line) if none inside is found in `showdownTestMs`; no pairs to line up: a drag stands in. On screen he drops into the middle winding up both loops, leaps to his corner and his ropes yank each pair in; "DRAW!"; the duels glow and the dock says "Showdown! Take one of his three." (the God King quiet about threats he can't heed, his own word at "DRAW!") |
 | Sawyer (`sawyer`) | the game so far; his first move is a pawn's, then the **split pawn**: that pawn sawn in two, a second pawn of his on an empty square beside it (a seeded side; never where it attacks a crowd piece or gives check), both tracked. On screen (`SAWYER_LOOKS`, Oct 11) the sawn pawn morphs into two smaller whole pawns that hop to their squares and grow back to a pawn's size as they land (my call: they're ordinary pawns); `split: "halves"` brings back the old look (cut in two halves, drawn as halves wherever they go), `settle: "small"` keeps them small. If that pawn has no such square, another of his that has one (the most central, from the seed: `chooseSplit`); none, or a first move that wasn't a pawn's (a check left him none): it waits for his next pawn move. With no room for another pawn of his (8 already, or 32 pieces: the engine's limit) it waits for his first pawn move once there is | **Saw cuts:** every `sawEvery` turns from `sawFirst` (turn 3), an edge between two squares of the crowd's half that one of its moves crosses, for `sawTurns`: no straight move across it (a slide, a pawn's step, the king's, castling's way), either side; knights and diagonal moves pass; taped over as it heals | **Board saw:** the meter full, turn `boardSawFrom` or later, and a half of the board (a-d or e-h) his on material: the warning, then for `boardSawTurns` no move crosses between the d and e files (knights included), either side; then the halves rejoin |
 
 - **An engine-shaped power** (Wrangler's showdown, Oct 13; Eric wants every ultimate this way later: ROADMAP.md): the
-  power searches its possible outcomes with the engine and plays one that moves the game by a set amount, with
-  fallbacks so it never fizzles. The pattern, in `bosses/pig.ts`:
-  - **A pure, seeded generator** of plausible candidates (`lineups`: the director's cluster method, his pieces
+  power searches its possible outcomes with the engine and plays one that moves the game by a set amount, when it finds
+  one. The pattern, in `bosses/pig.ts`:
+  - **A pure, seeded generator** of plausible candidates (`lineups`: a pair at a time anywhere on ranks 2-7, his pieces
     protected, those with at most one of his pieces ganged up on first) and **a pure checker** the server uses on the
     answer (`checkLineup`): the host's word stands only within the rules.
   - **Scored by the engine where the boss's moves are worked out** (the host's device; solo this one), never the server:
@@ -95,19 +97,26 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
     at closely (`confirmShowdown`, `showdownConfirmNodes`), the pick nearest the target, seeded among ties. Its numbers
     are pawns in log-odds of the engine's expected score (as Big Boy's bounce), measured from the position before.
   - **Its search time comes from the crowd's thinking:** a scout (`ShowdownScout`, an engine of its own: `ownEngine`)
-    searches the position while the crowd thinks on the turns it may follow (the meter at `showdownScoutFrom`, the
-    warning, a hold); his move changes the position, so at his turn the scout's promising candidates are scanned again
-    on the new one first (most still stand), then fresh ones, within `showdownTurnMs`. The generator yields to the page
-    every few milliseconds (`SLICE_MS`): nothing freezes the board.
+    searches the position while the crowd thinks, every turn from `showdownFrom` while one may still come (the view's
+    `scout`), three pairs then two, confirming the promising ones and keeping them (those that qualified first) from turn
+    to turn, dropped once they no longer hold; his move changes the position, so at his turn the kept ones are scanned
+    again on the new one first (most still stand), then fresh ones, within `showdownTurnMs` (one run of the seeded
+    generator a size, carried on round after round: until Oct 13 each round started it again, so his turn re-scanned
+    the same few line-ups). The generator yields to the page every few milliseconds (`SLICE_MS`): nothing freezes the
+    board. With his meter full and nothing qualifying, each of his turns spends up to `showdownTurnMs` searching;
+    except in a battle already decided his way (`showdownHopeless`: his edge so high, against the engine's top score,
+    that no duel can cost the crowd `showdownTrap` more), where his turn and the scout stop after one search.
   - **The server asks for it with his move** (`BossRules.asks`: the bossRequest's `pull`, `drag`, `showdown`, and a
     `seed` drawn from the battle's and the turn, never the battle's own) and gets it back with the move (`bossMove`'s
     `drag`, `showdown`); `afterBossMove` checks it and puts it on the board as a base; the next turn's events show it.
     The host has longer to answer when it's asked for one (`bossTimeoutMs`).
   - **The outcome it scored is the outcome played:** the search reads each position after the crowd's answer with the
     engine's best reply, so the boss's reply there is that move, by the engine at full strength (`bestReply`, above),
-    never his brain's.
+    never his brain's, and so are his next moves while the line-up's tactics are live (his best reply can be another
+    capture first, the piece taken back a move later), up to `showdownEngineMoves`.
 - **Test switches:** `?boss=<id>` picks the boss (`?boss=jefferson` too: `BOSS_ALIASES`, read by `bossIdFromLink`);
-  `?power=<id>` brings its ultimate early (warned as turn 2 begins, unleashed on turn 3; its passive as usual); admins
+  `?power=<id>` brings its ultimate early (warned as turn 2 begins, unleashed on turn 3; its passive as usual; Wrangler's
+  `?power=showdown` fills his meter from turn 2, his showdown searched from his next move); admins
   see "Trigger ultimate (testing)" in any boss battle (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next
   crowd turn begins, no warning; on a computer in the title line with the brain's pill, before sound and the flag; on a
   phone under the dock). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
@@ -206,6 +215,8 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `wearOff(next, t)` | As a crowd turn begins, first: what wore off | Ginger (ice), Boingo (pie), Big Boy (block) |
 | `ultimate(next, t)` | The ultimate's step until it has come: true when it comes now. `warnThenUnleash` is the usual one (warn, then the next turn) | all |
 | `ultimateOnHisTurn` | It comes at the start of the boss's turn instead (the test trigger waits for it) | Hollow, Big Boy |
+| `triggerAtHisTurn` | The test trigger is worked out at his turn, after his move: kept until its ultimate comes | Wrangler |
+| `meter(p, turn, s)` | A meter of its own instead of the rage meter (0-1; null: none shown); the King's strike adds nothing to it | Wrangler (his moves fill it) |
 | `everyTurn(next, t)` | Every turn after the ultimate's step | Jefferson (the barrage), Sawyer (the split's moment) |
 | `passive(next, t)` | The passive's step (it waits a turn if the ultimate came now) | all |
 | `crowdFilter`, `bossStops` | Its limits on the crowd's and the boss's moves (the dispatcher lifts them if none are left) | Ginger, Boingo, Big Boy, Sawyer (his first move a pawn's; the cuts) |
@@ -215,11 +226,11 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `afterCrowdMove(b, move)` | After any crowd move, in the match | Jefferson (the burn), Sawyer (the halves follow) |
 | `afterBossMove(b, move, extras)` | After the boss's own move, in the match, before the crowd's turn is set up; `extras`: what his turn worked out besides the move (the host's answer online) | Sawyer (the split: a base on the board; the halves follow), Wrangler (the pull, a drag or the showdown's line-up, each checked) |
 | `specialMove(boss, fen, move)` | A boss move its rules play as something else, with its name on screen | Wrangler (the long pull: the double step, then the base) |
-| `bestReply(boss, board)` | The boss's move now is a follow-up its power's engine search scored: the engine's best at full strength (`bossMoveKind` "best"), never the brain's, a slip or a stumble | Wrangler (his reply to the showdown's duel) |
+| `bestReply(boss, board)` | The boss's move now is a follow-up its power's engine search scored: the engine's best at full strength (`bossMoveKind` "best"), never the brain's, a slip or a stumble | Wrangler (his reply to the showdown's duel, and his next moves while its tactics are live) |
 | `asks(boss, fen)` | What the boss's turn must work out with the engine besides its move (the server asks the host with the move) | Wrangler (his pulls, a drag, the showdown) |
 | `scoreRound(b, players)` | Its own costs on a round's scores | Hollow (dark tries) |
 | `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack), Sawyer (his cuts from turn 3) |
-| `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy, Sawyer |
+| `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy, Sawyer, Wrangler (his meter `ready`, the `scout` cue) |
 
 A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` word, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece by the rage meter and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
 
@@ -265,18 +276,21 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   unscored, its loss band and cap, among them), `rage.test.ts`
   (every boss's ultimate again and again, never two at once), `packages/app/test/board-view.test.ts` (the turned
   board's squares, moves and coordinates), `grex.test.ts` (the meter), `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
-  `long-match.test.ts`, `pig.test.ts` (Wrangler: the pull, the drag's rules and band, the line-up's shape and checks,
-  Eric's goal, the search and the scout, the forced duel, his reply to it on Maia at 600 with slips on, the fallbacks,
-  host and solo agreeing),
-  `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts` ("Wrangler online", his reply
-  to the duel asked as `best` without the brain),
+  `long-match.test.ts`, `pig.test.ts` (Wrangler: the pull, the drag's rules and band, the line-up's kinds, zone,
+  substitutes and checks, Eric's goal and the distance from it, the search (three pairs, then two; new line-ups each
+  round; none in a decided battle) and the scout kept across turns, his meter (his moves only; not a strike), firing when full and a line-up qualifies, playing on when none
+  does, the cap, the test trigger outside the band, the forced duel, his reply and next moves on Maia at 600 with slips
+  on (a two-capture line completed), host and solo agreeing),
+  `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts` ("Wrangler online": the
+  showdown asked with his meter full, no warning or "Not yet...", the trigger's `test` and `outside`, his reply and next
+  moves asked as `best` without the brain), `maia-bosses.test.ts`, `rage.test.ts` (his trigger again and again),
   `packages/app/test/boss-kits.test.ts`, `characters.test.ts`, `boss-character.test.ts`, `gingerbread.test.ts`,
   `grex.test.ts`, `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`, `pig.test.ts`, `fire-replays.test.ts`, `power-words.test.ts`.
 - Unit, a boss's attack on a king: `packages/chess/test/king-attack.test.ts` (the beats, the Last Stand's fit, the
   mate's hold, the mate switch), `packages/app/test/king-attack.test.ts` (the kit, Hollow's frames on the beats, the God
   King's blows, the hits).
-- e2e: `e2e/pig.spec.ts` (Wrangler: the long pull, a drag, a showdown, its forced duel and his reply taking back,
-  phone and computer, solo and online),
+- e2e: `e2e/pig.spec.ts` (Wrangler: the long pull, a drag, his meter's line and ready loop, a showdown with no warning,
+  its forced duel and his reply (the engine's best), phone and computer, solo and online; the admins' trigger),
   `e2e/boss-powers.spec.ts` "Boingo's funhouse at every angle" (a move by tap and by drag, touch on the phone, at
   0°, 180°, 90° and 270°; the coordinates and pies on their squares at each), `e2e/king-attack.spec.ts` (Hollow's mate and his attack in the Last Stand, every frame), `e2e/boss-powers.spec.ts`, `grex.spec.ts`, `hollow.spec.ts`, `bigboy.spec.ts`, `sawyer.spec.ts`, `boss-character.spec.ts`,
   `boss-speech.spec.ts` (one moment of each boss: its line held whole and in view for its full time, every frame, and
@@ -287,20 +301,27 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   `npm run frames:powers -- <dir> [gingerbread|clown|grex|all|both] [phone|desktop|both] [light|dark] [moves] [desktop
   width]` (Ginger: the blizzard, both thaws and the boss's turns between them, six moves by default), `frames:hollow`,
   `frames:bigboy`, `frames:sawyer`, `frames:pig -- <dir> [phone|desktop|both] [light|dark] [side=b] [power=drag]` (his
-  long pull, the warning, SHOWDOWN! and the duels, then a drag), `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`,
+  long pull, his meter filling, SHOWDOWN! and the duels, then a drag), `frames:character -- <dir> [boss] [phone|desktop|both]`, `frames:wip`,
   `frames:rage -- <dir> [boss] [phone|desktop] [moves] [strikes]` (the rage meter: strikes, the warning, the
   ultimate, its slide down and refill, every frame, with the meter's own numbers sampled each frame).
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect; `only=pig` for Wrangler).
   Art not yet in the game (the Hidden Boss, `characters/recluse.ts`, his book `characters/effects/recluse.ts`): add
   `extra=packages/app/src/characters/recluse.ts only=recluse,recluse-bust,recluse-book`.
 - Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] 25`.
-- Sims: `packages/sim/scripts/boss-sim.ts` (modes `snack`, Big Boy's; `split`, Sawyer's; `raid <boss,ids|all> <games>
+- Sims: `packages/sim/scripts/showdown-sim.ts` (Wrangler's showdowns in real battles: a crowd of bots at three
+  strengths, his scout and his turn's search at a computer's or a phone's budget; showdowns a battle, when, the wait
+  after his meter fills, sizes, edges, the engine's moves after the duel, and the positions his full meter waited in;
+  `reports/boss-sim/showdown-*.jsonl`),
+  `packages/sim/scripts/boss-sim.ts` (modes `snack`, Big Boy's; `split`, Sawyer's; `raid <boss,ids|all> <games>
   <seed> <strikes> <tag>`: Solo raids of 50 bots with every power through the match runner, ultimates per game and the
   crowd's results, `raid-summary <tags>` for the table; built for the rage meter, not yet run for its rates),
   `boss-blunders.ts` (`reports/boss-sim/`, `reports/boss-calibration.md`).
 
 ## Rules for this area (from `.claude/LESSONS.md`)
 
+- A search in rounds carries its source on from round to round, and a power that fires only when a search finds
+  something is measured in real battles on a phone's budget before it ships (`showdown-sim.ts`; Oct 13, "A showdown
+  that never came").
 - A power's follow-up move that the engine scored must be played by the engine (`BossRules.bestReply`): when a power's
   search scores an outcome on the boss's best reply, his brain (Maia, a slip) never plays that reply (Oct 13, "A queen
   won for free").

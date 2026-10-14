@@ -196,11 +196,15 @@ export function UltimateTest({ match }: { match: GameView }) {
 }
 
 /**
- * Testing, admins (Boss alone): the boss's brain at work, e.g. "Maia 1450 · no guard · Maia's #1 · 120 ms". A phone: a
- * line under the dock; a computer: a small pill in the title line (Hud.tsx), the first thing to shrink there.
+ * Testing, admins (Boss alone): the boss's brain at work, e.g. "Maia 1450 · no guard · Maia's #1 · 120 ms"; and
+ * Wrangler's showdown when the test trigger fired it outside the band (none inside it found), so it isn't taken for one
+ * a player would get. A phone: a line under the dock; a computer: a small pill in the title line (Hud.tsx), the first
+ * thing to shrink there.
  */
 export function BrainDebug({ match }: { match: GameView }) {
-  const line = match.brainLine;
+  const p = match.boss?.powers;
+  const outside = p?.showdown?.outside && p.showdown.turn === p.turn ? "Showdown (test: outside the band)" : null;
+  const line = [match.brainLine, outside].filter(Boolean).join(" · ");
   if (!line || !account().profile?.admin) return null;
   return (
     <div class="brain-debug" aria-label="Boss brain (testing)" title={line}>

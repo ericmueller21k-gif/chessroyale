@@ -87,7 +87,7 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   const charge = (p.charge ?? 0) + moved * rageTick(p.judged, s);
   // (An ultimate at the start of the boss's turn keeps the test trigger until then.)
   const { ultNext, ...rest } = p;
-  const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && rules.ultimateOnHisTurn ? { ultNext } : {}) };
+  const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && (rules.ultimateOnHisTurn || rules.triggerAtHisTurn) ? { ultNext } : {}) };
   const t: TurnContext = { turn, fen, crowd, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!ultNext, lastMove, rageSpeed: rageSpeedOf(boss.id, s), s, events };
   // The ultimate under way: while its effect runs, nothing gathers in the meter (it stays empty); once it's over, the
   // meter fills again from empty, and the next can come.
@@ -117,7 +117,8 @@ export const ultimateUnderWay = (boss: Pick<BossState, "powers"> | null | undefi
  */
 export function strikeRage(boss: BossState, s: Pick<BossPowerSettings, "rageStrike"> = BOSS_POWERS): BossState {
   const p = boss.powers;
-  if (!p || !bossPowers(boss) || ultimateUnderWay(boss)) return boss;
+  // (A boss with a meter of its own, Wrangler: the strike adds nothing to it.)
+  if (!p || !bossPowers(boss) || ultimateUnderWay(boss) || bossRules(boss)?.meter) return boss;
   return { ...boss, powers: { ...p, charge: (p.charge ?? 0) + s.rageStrike } };
 }
 
@@ -205,6 +206,9 @@ export function icedSquares(boss: BossState | null | undefined, fen: string): st
 export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_POWERS): number | null {
   const p = boss?.powers;
   if (!p || !bossPowers(boss)) return null;
+  // (A meter of its own: Wrangler's.)
+  const own = bossRules(boss)?.meter;
+  if (own) return own(p, turnOf(boss!), { ...BOSS_POWERS, ...s });
   if (p.ultAt !== undefined) return turnOf(boss!) <= p.ultAt ? 1 : 0;
   return Math.max(0, Math.min(1, rageNow(p, rageSpeedOf(boss!.id, s), s) / s.rageFull));
 }
@@ -212,7 +216,7 @@ export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_P
 /** The meter is held empty: an ultimate came and its effect still runs (the screens show it paused). */
 export const ragePaused = (boss: BossState | null | undefined): boolean => {
   const p = boss?.powers;
-  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt;
+  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt && !bossRules(boss)?.meter;
 };
 
 // ---------------- The judge plays by the same rules ----------------

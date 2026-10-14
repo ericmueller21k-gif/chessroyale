@@ -1081,7 +1081,7 @@ export class MatchRunner {
     if (asks) {
       // (His long pull, drag or showdown on every engine of this device; his ordinary move on `engine`, as ever.)
       const answer = await pigTurn(this.opts.engines.length ? this.opts.engines : [engine], fen, asks, ordinary, this.showdownScout);
-      this.applyBossMove(answer.move, kind === "stagger", { drag: answer.drag ?? null, showdown: answer.showdown ?? null, edge: answer.edge ?? null });
+      this.applyBossMove(answer.move, kind === "stagger", { drag: answer.drag ?? null, showdown: answer.showdown ?? null, edge: answer.edge ?? null, outside: answer.outside ?? null });
       return answer.move;
     }
     const move = await ordinary();

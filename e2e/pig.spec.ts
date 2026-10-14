@@ -60,7 +60,8 @@ async function goodMove(page: Page): Promise<string> {
   const { top } = await engineTop(page);
   return top.map((m) => m.move).find((m) => !allowed || allowed.includes(m)) ?? (await allowedMove(page));
 }
-const middle = (sq: string) => sq[0]! >= "b" && sq[0]! <= "g" && Number(sq[1]) >= 3 && Number(sq[1]) <= 6;
+/** Where a line-up stands (Eric, Oct 13): anywhere off both back ranks. */
+const inZone = (sq: string) => Number(sq[1]) >= 2 && Number(sq[1]) <= 7;
 
 /**
  * Engine work on the page's own engine (the one his moves are played on): started in the page, its answer kept on
@@ -152,23 +153,24 @@ async function asAdmin(page: Page) {
 }
 
 /**
- * Plays good moves until his showdown's duel turn (holds on the way), and returns it. While it may follow your move,
- * you think a while, as a crowd does: his scout searches line-ups meanwhile (showdownSearchMs).
+ * Plays good moves until his showdown's duel turn, and returns it. While one may follow your move (the rules' `scout`),
+ * you think a while, as a crowd does: his scout searches line-ups meanwhile (showdownSearchMs). No warning, no
+ * "Not yet..." on the way (Eric, Oct 13).
  */
-async function untilShowdown(page: Page, turns = 6) {
+async function untilShowdown(page: Page, turns = 8) {
   for (let i = 0; i < turns; i++) {
     await yourMove(page);
     const b = await bossNow(page);
+    expect(b.powers.events.map((e: { kind: string }) => e.kind)).not.toContain("warn");
     if (b.powers.showdown && b.powers.showdown.turn === b.powers.turn) return b;
-    if (b.powers.ultAt !== null) throw new Error(`the showdown was spent without a line-up: ${JSON.stringify(b.powers.events)}`);
     const move = await goodMove(page);
-    if (b.powers.warned || b.powers.holds > 0) await page.waitForTimeout(6000);
+    if (b.powers.scout) await page.waitForTimeout(6000);
     await play(page, move);
   }
   throw new Error("no showdown");
 }
 
-/** The line-up as the rules say: matched pairs facing in the middle, his pieces protected, the six squares on the board, the duels the only moves. */
+/** The line-up as the rules say: rook, bishop and knight pairs (or two) facing off the back ranks, his pieces protected, the squares on the board, the duels the only moves. */
 async function checkLineup(page: Page, b: any) {
   const sd = b.powers.showdown;
   const c = new Chess(b.board.fen);
@@ -177,7 +179,8 @@ async function checkLineup(page: Page, b: any) {
   expect([2, 3]).toContain(sd.pairs.length);
   const duels: string[] = [];
   for (const p of sd.pairs) {
-    expect(middle(p.crowd) && middle(p.boss), `${p.crowd} ${p.boss}`).toBe(true);
+    expect(inZone(p.crowd) && inZone(p.boss), `${p.crowd} ${p.boss}`).toBe(true);
+    expect("rbn", "never queens").toContain(p.piece);
     expect(c.get(p.crowd as never)).toMatchObject({ color: crowd, type: p.piece });
     expect(c.get(p.boss as never)).toMatchObject({ color: his, type: p.piece });
     // His piece is protected: after the duel's capture, he can take back.
@@ -271,6 +274,11 @@ test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle
   await page.goto("/?debug&clock=60&boss=pig&power=showdown&laststand=0");
   await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   await yourMove(page);
+  // His meter (the test switch: full from turn 2): his line in his text box, and his ready loop until he fires.
+  const ready = await watchFor(page, {
+    line: { selector: ".bc-bubble", text: /I've got you in my sights\./ },
+    loop: { selector: '.boss-char[data-anim="ready"]' },
+  });
   const seen = await watchFor(page, {
     banner: { selector: ".fight-banner.power-cut", text: /SHOWDOWN!/ },
     windup: { selector: '.pg-layer[data-showdown="windup"] .pg-pig' },
@@ -284,12 +292,15 @@ test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle
   const b = await untilShowdown(page);
   const duels = await checkLineup(page, b);
   expect(await seen.seen()).toEqual({ banner: true, windup: true, yank: true, draw: true, duels: true, dock: true });
+  expect(await ready.seen()).toEqual({ line: true, loop: true });
   await expect(page.locator(".pg-duels")).toHaveAttribute("data-duels", duels.join(" "));
   const heard = (await soundsHeard(page)).map((s) => s.split(":")[0]);
   expect(heard).toEqual(expect.arrayContaining(["pigWindup", "pigYank", "pigDraw"]));
-  // The meter spent on it (shown full on the ultimate's turn, then empty).
+  // His meter spent on it (shown full on the showdown's turn, then empty, filling again over his next moves).
   expect(b.powers.ultAt).toBe(b.powers.turn);
   expect(b.powers.ults).toBe(1);
+  expect(b.powers.ready).toBeNull();
+  expect(b.powers.showdown.outside).toBeUndefined();
 
   // Anything else can't be played: a legal pawn move is refused (still your move).
   const c = new Chess(b.board.fen);
@@ -346,5 +357,37 @@ test("Wrangler online: the host's engine lines up the showdown, the server check
   const reply = await bestReply(page, b.board.fen, duel);
   await play(page, duel);
   await checkReply(page, b.board.history.length, duel, reply);
+  expect(errors).toEqual([]);
+});
+
+test("Wrangler's showdown on demand (the admins' trigger): his meter full at once, the showdown after his next move, no warning; outside the band only marked so", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
+  test.setTimeout(5 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await asAdmin(page);
+  await page.goto("/?debug&clock=60&boss=pig&laststand=0");
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await play(page, "e2e4");
+  await yourMove(page);
+  // His meter: one move of his in, nowhere near full.
+  expect((await powers(page)).rage).toBeLessThan(1);
+  const btn = page.locator(".ult-test");
+  await expect(btn).toHaveText("Trigger ultimate (testing)");
+  await btn.click();
+  await expect(btn).toHaveText("Ultimate next turn (testing)");
+  await expect.poll(async () => (await powers(page)).rage).toBe(1);
+  const seen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /SHOWDOWN!/ }, draw: { selector: ".fight-banner.power-cut", text: /DRAW!/ } });
+  await play(page, await goodMove(page));
+  await yourMove(page);
+  const b = await bossNow(page);
+  expect(b.powers.showdown?.turn).toBe(b.powers.turn);
+  expect(b.powers.events.map((e: { kind: string }) => e.kind)).not.toContain("warn");
+  expect(await seen.seen()).toEqual({ banner: true, draw: true });
+  await checkLineup(page, b);
+  // Outside the band (none inside it found in the trigger's search): said so on the admins' debug line, and only then.
+  const debug = page.locator(".brain-debug");
+  if (b.powers.showdown.outside) await expect(debug).toContainText("Showdown (test: outside the band)");
+  else await expect(debug).not.toContainText("outside the band");
   expect(errors).toEqual([]);
 });

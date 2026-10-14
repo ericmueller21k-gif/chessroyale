@@ -180,6 +180,13 @@ export interface BossRules {
    * Bounce), not as a crowd turn begins: the test trigger is kept until then.
    */
   ultimateOnHisTurn?: boolean;
+  /** The test trigger is worked out at his turn, after his move (Wrangler's line-up): kept until its ultimate comes. */
+  triggerAtHisTurn?: boolean;
+  /**
+   * Its own meter instead of the rage meter (Wrangler's: his moves fill it, nothing else): how full (0-1) as crowd turn
+   * `turn` is picked, or null (none shown). The King's strike adds nothing to it.
+   */
+  meter?(p: BossPowerState, turn: number, s: BossPowerSettings): number | null;
   /** As a crowd turn begins, first: what wore off (its passive's state after its turns). */
   wearOff?(next: BossPowerState, t: TurnContext): void;
   /**
@@ -260,14 +267,14 @@ export interface BossRules {
 
 /**
  * What a boss's turn must work out besides its move (BossRules.asks; Wrangler's): his long pulls to choose from (his
- * first move), a lasso drag after it, or his showdown's line-up after it ("last": his last try, two pairs and then a
- * drag allowed). `seed`: what the engine work is ordered by (drawn from the battle's seed and the turn: the battle's own
- * seed never leaves the server).
+ * first move), his showdown's line-up after it ("try": one that qualifies; "test": the admins' trigger, the best found
+ * even outside the band, or a drag standing in), and a lasso drag after it. `seed`: what the engine work is ordered by
+ * (drawn from the battle's seed and the turn: the battle's own seed never leaves the server).
  */
 export interface BossAsks {
   pull?: string[];
   drag?: true;
-  showdown?: "try" | "last";
+  showdown?: "try" | "test";
   seed: number;
 }
 
@@ -282,6 +289,8 @@ export interface BossMoveExtras {
   drag?: string | null;
   showdown?: string | null;
   edge?: number | null;
+  /** The test trigger's line-up is outside the band (the host found none inside it). */
+  outside?: boolean | null;
 }
 
 /** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */
