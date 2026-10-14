@@ -38,11 +38,11 @@ describe("parsing", () => {
       // (c1b2's latest exact line, from depth 9: the bound line only names its slot.)
       { multipv: 1, move: "c1b2", expected: expectedFromWdl(17, 963, 20), reply: "f8b4" },
     ]);
-    // A move that only ever had a bound line keeps it rather than going missing.
-    expect(searchLines(out.slice(2)).map((m) => m.move)).toEqual(["e1g1", "c1b2"]);
+    // (With no move twice it reads as before: a slot with only a bound line is left out, for scoreMoves' fallback.)
+    expect(searchLines(out.slice(2)).map((m) => m.move)).toEqual(["e1g1"]);
   });
 
-  it("reads a search with no mix-up exactly as before, and drops a move that has left the lines", () => {
+  it("reads a search with no move twice exactly as before: each slot's last exact line", () => {
     // Both of the last lines are bounds: the depth-9 lines stand, in their order.
     const out = [
       "info depth 9 multipv 1 score cp 89 wdl 387 613 0 nodes 14204 pv a2a4 d6d5",
@@ -54,14 +54,27 @@ describe("parsing", () => {
       ["a2a4", expectedFromWdl(387, 613, 0)],
       ["e1g1", expectedFromWdl(303, 696, 1)],
     ]);
-    // Top 2, no searchmoves: d2d4 was second at depth 9, then left the top 2 (its slot's last line a bound).
+    // One line: the last exact one, even when a later bound line names another move.
+    const one = [
+      "info depth 10 multipv 1 score cp 31 wdl 61 929 10 nodes 2 pv e2e4 e7e5",
+      "info depth 11 multipv 1 score cp 40 lowerbound wdl 80 910 10 nodes 3 pv d2d4 d7d5",
+    ];
+    expect(searchLines(one).map((m) => m.move)).toEqual(["e2e4"]);
+  });
+
+  it("with a move twice, lists the moves of the last lines, a move that has left them dropped", () => {
+    // Top 2, no searchmoves: depth 9 has e2e4, d2d4; depth 10 has d2d4 first, then g1f3 as a bound.
     const top = [
       "info depth 9 multipv 1 score cp 30 wdl 60 930 10 nodes 1 pv e2e4 e7e5",
       "info depth 9 multipv 2 score cp 20 wdl 50 940 10 nodes 1 pv d2d4 d7d5",
-      "info depth 10 multipv 1 score cp 31 wdl 61 929 10 nodes 2 pv e2e4 e7e5",
+      "info depth 10 multipv 1 score cp 31 wdl 61 929 10 nodes 2 pv d2d4 d7d5",
       "info depth 10 multipv 2 score cp 25 upperbound wdl 55 935 10 nodes 2 pv g1f3 d7d5",
     ];
-    expect(searchLines(top).map((m) => m.move)).toEqual(["e2e4", "g1f3"]);
+    // (Read by slot: d2d4 twice. g1f3 has only its bound line.)
+    expect(searchLines(top).map((m) => [m.move, m.expected])).toEqual([
+      ["d2d4", expectedFromWdl(61, 929, 10)],
+      ["g1f3", expectedFromWdl(55, 935, 10)],
+    ]);
   });
 });
 
