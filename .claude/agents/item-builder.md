@@ -50,8 +50,9 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
    - Head and face items: `ATTACH[id]` is the line in the drawing that meets the slot's anchor (a hat's brim, a beard's
      top edge, a helmet drawn for the pawn = 25). An item worn somewhere else names that anchor in `ATTACH_TO`
      (goggles: `eyes`).
-   - Skins: `SKIN_ANCHORS[id] = { head, face, eyes }`. `head` is a few points below the top of the head; `face` is where
-     a beard starts; `eyes` is the eye line. A skin that shows the pawn uses `PAWN_ANCHORS`.
+   - Skins: `SKIN_ANCHORS[id] = { head, face, eyes, neck, mouth }`. `head` is a few points below the top of the head;
+     `face` is where a beard starts; `eyes` is the eye line; `neck` where the head meets the body (a scarf); `mouth`
+     where a mustache goes (a snowman's is under its carrot). A skin that shows the pawn uses `PAWN_ANCHORS`.
    - Worn items are drawn face, then head (a box covers a beard), then the weapon. A face item worn over a hat
      (goggles) goes in `OVER_HAT`.
    - Items may rise at most about 9 points above the square (a clip caps them).

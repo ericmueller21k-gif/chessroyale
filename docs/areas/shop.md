@@ -11,7 +11,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   on (everything free while testing). The pawn hats it used to sell are Beta crate items now (Oct 11, 2026); the shop
   is kept for God King packs and, later, things like boss and attack animations.
 - **Crates** (`core/crates.ts`): two series, **Beta Crate · Series 001** (listed first; it ships in batches, the plan
-  is in the history) and **Winter Crate · Series 1**. Each lists its items once; an item's tier says where it is.
+  is in the history: the Classics, the secret agent and the pirate are in, 21 of 28 items; the ninja is next) and
+  **Winter Crate · Series 1**. Each lists its items once; an item's tier says where it is.
   Every drop rolls three things independently:
   1. **its tier**, which decides the item: the opening strip lands on a tier's box (Common to Epic, color-coded:
      Winter's presents, Beta's supply boxes), which opens to one of that tier's items evenly, or on **Fischer Random**
@@ -21,7 +22,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   3. **its purity**: 100% minus a blemish of 0–100% (blotches over that share of its color); shiny at 90%+.
   Crates are opened on the server, so nobody can make themselves a Pearl crown. `CRATES_FREE` is on while testing.
 - **Items** have a slot (head, face, skin, weapon), are drawn on the pawn's 100 × 100 square, and fit by anchors
-  (head, face, eyes, neck). Your
+  (head, face, eyes, neck, mouth: each piece's own lines; a mustache sits at the mouth, under a snowman's carrot).
+  Weapons don't move with the piece: they're drawn where every piece's side (or shoulder) is. Your
   pawn wears your equipped items on the vote board, the cut screen and your profile; other players' looks come with
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
 - **The locker** keeps each item you own (its color, blemish and seed) and what's equipped in each slot; it can
@@ -52,7 +54,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   `packages/app/test/blotches.test.ts`, `icon-pixels.test.ts`.
 - e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts`.
 - The fitting sheet: `npm run preview:items -- <scratch>/sheet.png items=<id>[,<id>]` (read the PNG; keep it out of
-  the repo). `sheet=1` gives a short sheet to show a batch (cards, both pawns, `colors=`, `outfits=a+b;c`).
+  the repo). `sheet=1` gives a short sheet to show a batch (cards, both pawns, `colors=`, `outfits=a+b;c`). `scale=1` or `scale=2`
+  renders at that display scale, to look for stray pixels.
 
 ## Rules for this area (from `.claude/LESSONS.md`)
 
