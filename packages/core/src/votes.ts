@@ -25,10 +25,21 @@ export interface VoteOption {
 export interface PregameVote {
   id: string;
   title: string;
-  /** Three options, left to right on the board. */
+  /**
+   * Three options, left to right on every screen, the same in every game and on every device (Eric, Oct 13: "The
+   * voting rounds in all modes should never change position"). From Black's side too: the board turns, the order
+   * doesn't (screens/Vote.tsx). A speed or clock vote runs slowest to fastest.
+   */
   options: readonly VoteOption[];
-  /** The option that wins if nobody votes. */
+  /** The option that wins if nobody votes: its index, found by its id (`optionIndex`), so a reorder never moves it. */
   defaultOption: number;
+}
+
+/** An option's index by its id: how a default is named, so it stays the same option whatever the order. */
+export function optionIndex(options: readonly Pick<VoteOption, "id">[], id: string): number {
+  const i = options.findIndex((o) => o.id === id);
+  if (i < 0) throw new Error(`No vote option "${id}"`);
+  return i;
 }
 
 /** What a time control sets: the bank for the game, the increment added at the start of every move, the move's cap. */
@@ -53,50 +64,53 @@ function timeControl(id: string, icon: string, name: string, tc: TimeControl): V
   };
 }
 
-export const PREGAME_VOTES: readonly PregameVote[] = [
-  {
-    id: "format",
-    title: "How does it end?",
-    defaultOption: 0,
-    options: [
-      {
-        id: "team",
-        icon: "🛡️",
-        label: "Team final",
-        blurb: "Top 8 play on: 4v4, 3v3, then 2v2 to the end",
-        patch: { finalFormat: "team", knockoutsPerStage: CROWD_KNOCKOUTS.team },
-      },
-      {
-        id: "boss",
-        icon: "👹",
-        label: "Boss battle",
-        blurb: "Top 10 team up against a boss",
-        patch: { finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss },
-      },
-      {
-        id: "duel",
-        icon: "⚔️",
-        label: "Duel",
-        blurb: "The best of each side, 1v1 to the end",
-        patch: { finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel },
-      },
-    ],
-  },
-  {
-    id: "speed",
-    title: "How fast?",
-    // Nobody votes: the middle option, Blitz (DECISIONS.md, "Crowd 50 v 50: three chess time controls").
-    defaultOption: 1,
-    // Real chess time controls (Eric, Oct 13, 2026), fastest first. Each move adds the increment to your bank; what you
-    // think comes out of it, so a quick move banks the rest. No move takes longer than its cap: 50 people pick together,
-    // and every turn has to end. Bullet is 3+2, not 2+1: at 7-8 s a move, 2+1 runs dry before the final (DECISIONS.md).
-    options: [
-      timeControl("bullet", "⚡", "Bullet", { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10 }),
-      timeControl("blitz", "🔥", "Blitz", { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 }),
-      timeControl("rapid", "⏱️", "Rapid", { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20 }),
-    ],
-  },
-];
+/**
+ * The 50 v 50's "How fast?": real chess time controls (Eric, Oct 13, 2026), slowest on the left, fastest on the right
+ * (Eric, Oct 13: "always slowest on the left, fastest on the right"). Each move adds the increment to your bank; what
+ * you think comes out of it, so a quick move banks the rest. No move takes longer than its cap: 50 people pick
+ * together, and every turn has to end. Bullet is 3+2, not 2+1: at 7-8 s a move, 2+1 runs dry before the final
+ * (DECISIONS.md).
+ */
+function speedVote(): PregameVote {
+  const options = [
+    timeControl("rapid", "⏱️", "Rapid", { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20 }),
+    timeControl("blitz", "🔥", "Blitz", { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 }),
+    timeControl("bullet", "⚡", "Bullet", { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10 }),
+  ];
+  // Nobody votes: Blitz, by its id (DECISIONS.md, "Crowd 50 v 50: three chess time controls").
+  return { id: "speed", title: "How fast?", defaultOption: optionIndex(options, "blitz"), options };
+}
+
+/** "How does it end?": its listed order, fixed. Nobody votes: Team final, by its id. */
+function formatVote(): PregameVote {
+  const options: VoteOption[] = [
+    {
+      id: "team",
+      icon: "🛡️",
+      label: "Team final",
+      blurb: "Top 8 play on: 4v4, 3v3, then 2v2 to the end",
+      patch: { finalFormat: "team", knockoutsPerStage: CROWD_KNOCKOUTS.team },
+    },
+    {
+      id: "boss",
+      icon: "👹",
+      label: "Boss battle",
+      blurb: "Top 10 team up against a boss",
+      patch: { finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss },
+    },
+    {
+      id: "duel",
+      icon: "⚔️",
+      label: "Duel",
+      blurb: "The best of each side, 1v1 to the end",
+      patch: { finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel },
+    },
+  ];
+  return { id: "format", title: "How does it end?", defaultOption: optionIndex(options, "team"), options };
+}
+
+/** The 50 v 50's votes, in the order they're held. */
+export const PREGAME_VOTES: readonly PregameVote[] = [formatVote(), speedVote()];
 
 /** Speeds that are gone, by their old ?speed= ids: Normal (and before it Slow and Standard) is Rapid, Variable Blitz. */
 const OLD_SPEEDS: ReadonlyMap<string, string> = new Map([
@@ -138,6 +152,16 @@ export interface BoardSpot {
 export function voteZoneBox(option: number): { x0: number; x1: number; y0: number; y1: number } {
   const col = (VOTE_ZONE_FILES[option]?.[0] ?? "a").charCodeAt(0) - 97;
   return { x0: col, x1: col + 2, y0: 3, y1: 5 };
+}
+
+/**
+ * The zone (from White's side) that holds an option on a viewer's screen. Options keep their order on every screen,
+ * left to right, whichever side you're on (Eric, Oct 13: "The voting rounds in all modes should never change
+ * position"): from Black's side, where the board is turned, the zones are taken the other way round. Its own inverse,
+ * so it also gives the option a zone holds on that screen.
+ */
+export function voteZoneFor(option: number, viewer: "w" | "b", count = VOTE_ZONE_FILES.length): number {
+  return viewer === "w" ? option : count - 1 - option;
 }
 
 /** The zone a point falls in (null outside all three). */

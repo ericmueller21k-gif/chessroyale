@@ -1714,10 +1714,10 @@ export interface SquadsSettings {
   /**
    * The Clock vote's options (Eric, Oct 13: Bullet, Blitz and Rapid, chess time controls like the 50 v 50's; tuned by
    * the sim), each a team clock: the starting bank, the top-up a round, the free seconds a move, the increment and the
-   * cap on one move. And the one if nobody votes.
+   * cap on one move. In the vote's order, left to right: slowest to fastest. And the one if nobody votes, by its id.
    */
   clocks: readonly SquadsClock[];
-  clockDefault: number;
+  clockDefault: string;
   /**
    * A team clock stored before the time controls (Oct 13, 2026: Fast, Normal, Long, or a test lobby's four numbers) had
    * one per-move ceiling for every option, this long: a lobby in play across that deploy keeps its numbers and this cap.
@@ -1876,12 +1876,13 @@ export const SQUADS: SquadsSettings = {
   // and Rapid, each with an increment that banks and its own cap on a move. Tuned by reports/squads-sim.md
   // (DECISIONS.md, "Squads: three chess time controls").
   clocks: [
-    { id: "bullet", label: "Bullet", bankSeconds: 60, topUpSeconds: 15, delaySeconds: 2, incrementSeconds: 1, capSeconds: 10 },
-    { id: "blitz", label: "Blitz", bankSeconds: 180, topUpSeconds: 30, delaySeconds: 2, incrementSeconds: 2, capSeconds: 15 },
+    // Left to right, slowest to fastest (Eric, Oct 13: "always slowest on the left, fastest on the right").
     { id: "rapid", label: "Rapid", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 2, incrementSeconds: 3, capSeconds: 20 },
+    { id: "blitz", label: "Blitz", bankSeconds: 180, topUpSeconds: 30, delaySeconds: 2, incrementSeconds: 2, capSeconds: 15 },
+    { id: "bullet", label: "Bullet", bankSeconds: 60, topUpSeconds: 15, delaySeconds: 2, incrementSeconds: 1, capSeconds: 10 },
   ],
-  // Nobody votes: Blitz, the middle option (as Normal was).
-  clockDefault: 1,
+  // Nobody votes: Blitz (as Normal was), by its id, so reordering the options never changes it.
+  clockDefault: "blitz",
   // The one ceiling every option had before the time controls (20 s, not the brief's starting 40).
   legacyCapSeconds: 20,
   incrementOnMiss: false,

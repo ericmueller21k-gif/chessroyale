@@ -66,7 +66,7 @@ describe("squads lobby: the Clock vote's time control", () => {
 
 describe("squads lobby: a test link's clock", () => {
   it("names an option (bullet, blitz, rapid; the old fast, normal, long map to them; one we don't know gets Blitz) or gives its numbers", () => {
-    const [bullet, blitz, rapid] = SQUADS.clocks;
+    const [rapid, blitz, bullet] = SQUADS.clocks;
     expect(parseTestClock("bullet")).toBe(bullet);
     expect(parseTestClock("Blitz")).toBe(blitz);
     expect(parseTestClock("rapid")).toBe(rapid);
