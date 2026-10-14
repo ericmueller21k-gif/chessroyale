@@ -313,6 +313,9 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 
 ## Rules for this area (from `.claude/LESSONS.md`)
 
+- A search in rounds carries its source on from round to round, and a power that fires only when a search finds
+  something is measured in real battles on a phone's budget before it ships (`showdown-sim.ts`; Oct 13, "A showdown
+  that never came").
 - A power's follow-up move that the engine scored must be played by the engine (`BossRules.bestReply`): when a power's
   search scores an outcome on the boss's best reply, his brain (Maia, a slip) never plays that reply (Oct 13, "A queen
   won for free").

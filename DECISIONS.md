@@ -2711,8 +2711,9 @@ slip or stumble (`BossMoveKind` "best", `bestReplyFrom` in `runner.ts`). All his
 too, so after a duel his best reply can be another capture first (in one e2e game all three duels' best replies were
 his knight taking the crowd's line-up knight, the queen to be taken back a move later). The fix plays that move, as the
 search scored it; but his moves after it are his brain's again, so where the engine's line needs a second move of his
-(taking the queen back next), a weak brain can still miss it. Not changed here (the brief: one reply); the three-round
-Showdown (his replies Stockfish's on every duel turn) covers it.
+(taking the queen back next), a weak brain can still miss it. Not changed here (the brief: one reply); covered since by
+his engine moves after the duel, while the line-up's tactics are live ("Wrangler's showdown: his own meter, no warning,
+fired when ready", below).
 
 **Other powers checked for the same gap** (a power whose engine check assumes a boss reply that his brain might not
 play). None is as clear-cut; recorded, not changed:

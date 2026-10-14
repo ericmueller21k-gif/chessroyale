@@ -621,6 +621,26 @@ describe("Wrangler's showdown: Eric's goal", () => {
     expect(await showdownFrom([e], "3qk3/8/8/8/8/8/8/3QK3 w - - 0 1", 7, { test: true }, s)).toBeNull();
   });
 
+  it("his turn's search in rounds carries its line-ups on: each round scans new ones, none twice (the cause of \"Not yet...\")", async () => {
+    // Every line-up promising at the quick scan and none qualifying at the closer look (all level there): round after
+    // round, until his time is up. Each scanned line-up's duel positions are recorded.
+    const scan = duelEngine();
+    const level = valueEngine(() => 0.5);
+    const scanned: string[] = [];
+    const e: EngineLike = {
+      ...scan,
+      topMovesAt: async (fen, n, nodes) => {
+        if (nodes !== BOSS_POWERS.showdownNodes) return level.topMoves(fen, n);
+        scanned.push(fen);
+        return scan.topMoves(fen, n);
+      },
+    };
+    expect(await showdownFrom([e], RUY, 7, {}, { ...BOSS_POWERS, showdownTurnMs: 1500 })).toBeNull();
+    // Many rounds (three promising a round, three duels each), and no duel position scanned twice.
+    expect(scanned.length).toBeGreaterThan(4 * 3 * 3);
+    expect(new Set(scanned).size).toBe(scanned.length);
+  });
+
   it("the scout: line-ups of both sizes, kept from turn to turn (those that qualified first) and scanned first at his turn if they still hold", async () => {
     const e = duelEngine();
     const scout = new ShowdownScout(async () => e, { ...BOSS_POWERS, showdownSearchMs: 1500 });
