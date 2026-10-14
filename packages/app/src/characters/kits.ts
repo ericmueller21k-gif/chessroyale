@@ -218,7 +218,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
       ultimate: "windup",
       pull: "lasso",
       tug: "lasso",
-      hold: "taunt",
+      ready: "ready",
     },
     sounds: {
       whirl: "pigWhirl",

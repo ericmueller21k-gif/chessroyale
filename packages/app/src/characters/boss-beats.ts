@@ -45,16 +45,15 @@ export type Beat =
   | "snack"
   // Sawyer's split pawn after his first move (that pawn sawn in two).
   | "split"
-  // Wrangler's long pull (his first move), the drag standing in for his showdown, "Not yet..." (it held a turn), and
-  // his showdown spent with nothing to show (no line-up, no drag).
+  // Wrangler's long pull (his first move), the drag standing in for the test trigger's showdown, and his meter full
+  // (Eric, Oct 13: "I've got you in my sights.", then his ready loop until he fires).
   | "pull"
   | "tug"
-  | "hold"
-  | "spent"
+  | "ready"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
-/** The loops it rests in between moments. */
-export type Loop = "idle" | "thinking" | "smug" | "rattled" | "defeat" | "victory";
+/** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */
+export type Loop = "idle" | "thinking" | "smug" | "rattled" | "defeat" | "victory" | "ready";
 
 /** Where the battle is: the boss's entrance, the crowd's move, the boss thinking, its move, its strike, the end. */
 export type Stage = "intro" | "crowd" | "thinking" | "bossMove" | "strike" | "over";
@@ -69,6 +68,11 @@ export interface BeatState {
   lastMove: { captured?: string } | null;
   result?: "crowd" | "boss" | "draw" | null;
   victim?: string | null;
+  /**
+   * Wrangler's meter is full and he's waiting to fire (its fill, the same for everyone: his powers' `ready`): his line
+   * once, then his ready loop where he'd rest in his mood.
+   */
+  ready?: number | null;
 }
 
 export interface BeatLines {
@@ -149,10 +153,13 @@ export function bossBeat(cfg: BeatLines, s: BeatState): BeatResult {
     const took = prev !== null && material(s.fen, bossSide) < material(prev, bossSide);
     return took ? out("hurt", "thinking", `hurt:${ply}`) : out("thinking", "thinking", `think:${ply}`);
   }
+  const ready = s.ready !== undefined && s.ready !== null;
   if (s.stage === "bossMove") {
     const anim: Beat = inCheck(s.fen) ? "check" : s.lastMove?.captured ? "capture" : "move";
-    return out(anim, now, `${anim}:${ply}`);
+    return out(anim, ready ? "ready" : now, `${anim}:${ply}`);
   }
+  // (Wrangler's meter full: his line once a fill, his ready loop until he fires.)
+  if (ready) return out("ready", "ready", `ready:${s.ready}`);
   // The crowd's move: the boss's mood. It says something only when the mood has just changed.
   const prev = before(s.history, 2, s.bases);
   const changed = now !== "idle" && (prev === null || mood(prev, s.crowdSide) !== now);

@@ -673,16 +673,17 @@ export class SoloMatch implements GameView {
   }
 
   /**
-   * As your turn begins: if Wrangler's showdown may follow it (the meter nearly full, his warning, a hold, the test
-   * trigger), his scout searches line-ups on this position (an engine of its own) until his turn; else it stops.
+   * As your turn begins: if Wrangler's showdown may follow before long (the rules' `scout`: from his move showdownFrom
+   * while he has one left; or the test trigger), his scout searches line-ups of three pairs and two on this position (an
+   * engine of its own) until his turn; else it stops.
    */
   private scoutShowdown() {
     const v = this.runner.bossView();
     const p = v?.powers;
-    const soon = !!p && (p.warned || !!p.ultNext || (p.holds ?? 0) > 0 || (p.rage ?? 0) >= BOSS_POWERS.showdownScoutFrom);
+    const soon = !!p && (!!p.scout || !!p.ultNext);
     if (!v || v.id !== "pig" || !p || v.result || p.ultAt !== null || !soon) return void this.runner.showdownScout?.stop();
     this.runner.showdownScout ??= new ShowdownScout(() => ownEngine());
-    this.runner.showdownScout.scout(v.board.fen, (p.holds ?? 0) >= BOSS_POWERS.showdownHolds ? [3, 2] : [3]);
+    this.runner.showdownScout.scout(v.board.fen, [3, 2]);
   }
 
   /** After a crowd move in the boss battle: the boss strikes when it's due. */

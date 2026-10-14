@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type Settings } from "@chessroyale/core";
 import { MatchRunner, legalMoves, pullOptions, sanLineToUci, type BrainNote, type EngineLike, type HumanAnswer, type HumanEngineLike, type Opening } from "../src/index.ts";
 
 /**
@@ -89,8 +89,10 @@ describe("every boss on the Maia path", () => {
       };
       let struck = false;
       for (let i = 0; i < 400 && !r.stageComplete(); i++) {
-        // (Wrangler's showdown searches its line-ups for real, a second or so each try: his trigger once, mid-battle.)
+        // (Wrangler's showdown searches its line-ups for real, up to seconds a turn while his meter is full and none
+        // qualifies on this test's engine: his trigger once, mid-battle, and his showdowns spent after it.)
         if (id !== "pig" || r.boss!.crowdMoves === 6) r.triggerUltimate();
+        if (id === "pig" && r.boss!.powers!.ults) r.boss!.powers!.ults = BOSS_POWERS.showdownMax;
         if (r.bossToMove()) {
           if (r.lightsOutDue()) {
             r.startLightsOut();
@@ -119,6 +121,11 @@ describe("every boss on the Maia path", () => {
             // The King's strike: Stockfish's own step back; Maia wasn't asked.
             expect(note.why).toBe("strike");
             played.strike++;
+          } else if (note.why === "power") {
+            // Wrangler's moves after his showdown's duel: the engine's best, as its search scored them; Maia not asked.
+            expect(id).toBe("pig");
+            expect(maia.asks.length).toBe(asked);
+            played.special++;
           } else {
             expect(note.by).toBe("maia");
             expect(maia.asks.at(-1)!.fen).toBe(fen);
@@ -152,7 +159,7 @@ describe("every boss on the Maia path", () => {
       // Today's Stockfish move (its limited-strength search) was never needed: Maia always had an allowed move.
       expect(engine.elo).toBe(0);
       // Each boss's own special moment came and kept its own pick.
-      if (id === "clown" || id === "hollow" || id === "bigboy") expect(played.special).toBeGreaterThan(0);
+      if (id === "clown" || id === "hollow" || id === "bigboy" || id === "pig") expect(played.special).toBeGreaterThan(0);
       // Powers that limit the boss's moves did, and Maia stayed within them.
       if (id === "clown" || id === "bigboy" || id === "sawyer") expect(played.limited).toBeGreaterThan(0);
       // Sawyer's first move is a pawn's: Maia was asked for pawn moves only.

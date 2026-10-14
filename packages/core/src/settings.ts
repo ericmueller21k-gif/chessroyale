@@ -476,7 +476,8 @@ export const BOSS_POWERS = {
    * (rageStrike: a quarter of the meter). Every gain is multiplied by the boss's rageSpeed (its ultimate's effect
    * lasts longer or shorter, so each gets about two ultimates in a typical battle of about 40 crowd moves). Rates set
    * by estimate (DECISIONS.md, "Rage meters: every boss's ultimate again and again"); not yet tested with the bot sim.
-   * Run the sim at a future date (boss-sim.ts raid). rageOverTime false: material and strikes only.
+   * Run the sim at a future date (boss-sim.ts raid). rageOverTime false: material and strikes only. Wrangler has no
+   * meter (Eric, Oct 13): his showdown comes whenever a line-up is ready (showdownFrom, showdownMax, showdownGap).
    */
   rageFull: 100,
   rageOverTime: true,
@@ -488,14 +489,13 @@ export const BOSS_POWERS = {
   /**
    * How fast each boss's meter fills (every gain times this), by BOSS_ROSTER id (1 when missing). Its ultimate's
    * effect pauses the meter for its length (the blizzard 3 turns, the funhouse 12, the Roman candle about 13, Lights
-   * out 2, the Big Bounce 1, the board saw 5, Wrangler's showdown 1 after its warning, more if he holds it), so a longer
-   * one fills faster to fit two in a typical battle. Ginger a
+   * out 2, the Big Bounce 1, the board saw 5), so a longer one fills faster to fit two in a typical battle. Ginger a
    * little faster (Eric, Oct 11: her ultimate's weak; about twice a game), and 1.2 since her blizzard lasts three turns
    * (Oct 12, by estimate: the second still comes about turn 30). Jefferson's candle burns for about a third of a
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, pig: 1.1 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3 } as Readonly<Record<string, number>>,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**
@@ -670,34 +670,46 @@ export const BOSS_POWERS = {
   dragConfirm: 3,
   dragNodes: 50_000,
   /**
-   * Wrangler's showdown (his ultimate, as the crowd turn after the warning begins): three pairs (a crowd piece and one of
-   * his of the same kind: queens, rooks, then bishops or knights, the most valuable pairs there are) lined up facing
-   * each other in the middle of the board (files b-g, ranks 3-6), his pieces always protected; the crowd's next move
-   * must be one of the duels (its piece taking his). The host's engine (solo: this device's) searches line-ups: the
-   * crowd's best duel gains him showdownEdge pawns over the position before the line-up (nearest showdownTarget, seeded
-   * among ties: DECISIONS.md, "Wrangler, built", on why it's measured from the position before), and another duel costs
-   * the crowd at least showdownTrap pawns more; never a check, never a mate for him after the best duel.
-   * - The search: while the crowd thinks (from showdownScoutFrom of the meter, and through the warning), up to
-   *   showdownSearchMs a turn on the position then (an engine of its own); at his turn, after his move, the promising
-   *   line-ups it found are scanned again on the new position first, then fresh ones, for up to showdownTurnMs (at most
-   *   showdownSetups line-ups a search; on his last try half each for three pairs and two). Each line-up costs one
-   *   search per duel at showdownNodes (a quick scan, read with some slack); the promising ones are looked at closely at
-   *   showdownConfirmNodes. Measured (8 middlegames, one engine on a computer): about 1 line-up in 9 meets the goal;
-   *   found in 1 to 3 s where one exists. A phone is 3 to 5 times slower: the scout's time is what it leans on.
-   * - Nothing found: he holds ("Not yet...") and tries again after his next move, up to showdownHolds times (none when
-   *   the board no longer holds three matched pairs); then a showdown of two pairs under the same rule; then a lasso drag
-   *   (the passive's band).
+   * Wrangler's showdown (his ultimate; Eric, Oct 13: "he checks every turn after three or four moves, and the moment
+   * it's ready he fires it with no warning"; he has no rage meter): three pairs (a crowd piece and one of his of the
+   * same kind: queens, rooks, then bishops or knights, the most valuable pairs there are), or two when no three-pair
+   * line-up qualifies, lined up facing each other in the middle of the board (files b-g, ranks 3-6), his pieces always
+   * protected; the crowd's next move must be one of the duels (its piece taking his). A line-up qualifies when the
+   * crowd's best duel gains him showdownEdge pawns over the position before the line-up (nearest showdownTarget,
+   * seeded among ties: DECISIONS.md, "Wrangler, built", on why it's measured from the position before), and another
+   * duel costs the crowd at least showdownTrap pawns more; never a check, never a mate for him after the best duel.
+   * - When (Eric, Oct 13): his own meter (not the rage meter: nothing but his moves fills it) fills over his first
+   *   showdownMeterTurns moves, and again over as many after each showdown; as it fills he says "I've got you in my
+   *   sights." and swings both ropes until he fires. With it full, on the first of his turns where a qualifying line-up
+   *   is found after his move, he fires (no other warning, no "Not yet..."); none found, he plays on (his lasso drags
+   *   carry on) and tries again next turn. At most showdownMax a battle.
+   * - His moves after the duel: his reply, and his next ones while the showdown's tactics are live (a line-up piece of
+   *   either side still attacked), up to showdownEngineMoves, are the engine's best at full strength, never his brain's.
+   * - The search: while the crowd thinks, every turn from showdownFrom (while one may still come), up to
+   *   showdownSearchMs a turn on the position then (an engine of its own): line-ups of three pairs, then two, scanned
+   *   and the promising ones confirmed; the qualifying and promising ones are kept from turn to turn and checked again
+   *   on each new position (dropped once they no longer hold). At his turn, after his move, the kept ones first, then
+   *   fresh ones (three pairs first, then two), for up to showdownTurnMs (at most showdownSetups line-ups a search).
+   *   Each line-up costs one search per duel at showdownNodes (a quick scan, read with some slack); the promising ones
+   *   are looked at closely at showdownConfirmNodes. A phone is 3 to 5 times slower than a computer: the scout's time
+   *   is what it leans on.
+   * - The admins' test trigger: at his next turn, ignoring showdownFrom, the cap and the gap; up to showdownTestMs of
+   *   searching, then the best line-up found even outside the band (marked so on the admins' debug line), so a
+   *   showdown always comes when the board holds two matched pairs. Players never get one outside the band.
    */
-  showdownEdge: [0.1, 1.2] as readonly [number, number],
+  showdownEdge: [-0.2, 1.5] as readonly [number, number],
   showdownTarget: 0.5,
-  showdownTrap: 2,
-  showdownScoutFrom: 0.85,
+  showdownTrap: 1.5,
+  showdownFrom: 4,
+  showdownMeterTurns: 5,
+  showdownMax: 2,
+  showdownEngineMoves: 3,
   showdownSearchMs: 8000,
   showdownTurnMs: 3000,
+  showdownTestMs: 10_000,
   showdownSetups: 60,
   showdownNodes: 8_000,
   showdownConfirmNodes: 40_000,
-  showdownHolds: 2,
 } as const;
 
 /**
@@ -1714,10 +1726,10 @@ export interface SquadsSettings {
   /**
    * The Clock vote's options (Eric, Oct 13: Bullet, Blitz and Rapid, chess time controls like the 50 v 50's; tuned by
    * the sim), each a team clock: the starting bank, the top-up a round, the free seconds a move, the increment and the
-   * cap on one move. And the one if nobody votes.
+   * cap on one move. In the vote's order, left to right: slowest to fastest. And the one if nobody votes, by its id.
    */
   clocks: readonly SquadsClock[];
-  clockDefault: number;
+  clockDefault: string;
   /**
    * A team clock stored before the time controls (Oct 13, 2026: Fast, Normal, Long, or a test lobby's four numbers) had
    * one per-move ceiling for every option, this long: a lobby in play across that deploy keeps its numbers and this cap.
@@ -1876,12 +1888,13 @@ export const SQUADS: SquadsSettings = {
   // and Rapid, each with an increment that banks and its own cap on a move. Tuned by reports/squads-sim.md
   // (DECISIONS.md, "Squads: three chess time controls").
   clocks: [
-    { id: "bullet", label: "Bullet", bankSeconds: 60, topUpSeconds: 15, delaySeconds: 2, incrementSeconds: 1, capSeconds: 10 },
-    { id: "blitz", label: "Blitz", bankSeconds: 180, topUpSeconds: 30, delaySeconds: 2, incrementSeconds: 2, capSeconds: 15 },
+    // Left to right, slowest to fastest (Eric, Oct 13: "always slowest on the left, fastest on the right").
     { id: "rapid", label: "Rapid", bankSeconds: 300, topUpSeconds: 60, delaySeconds: 2, incrementSeconds: 3, capSeconds: 20 },
+    { id: "blitz", label: "Blitz", bankSeconds: 180, topUpSeconds: 30, delaySeconds: 2, incrementSeconds: 2, capSeconds: 15 },
+    { id: "bullet", label: "Bullet", bankSeconds: 60, topUpSeconds: 15, delaySeconds: 2, incrementSeconds: 1, capSeconds: 10 },
   ],
-  // Nobody votes: Blitz, the middle option (as Normal was).
-  clockDefault: 1,
+  // Nobody votes: Blitz (as Normal was), by its id, so reordering the options never changes it.
+  clockDefault: "blitz",
   // The one ceiling every option had before the time controls (20 s, not the brief's starting 40).
   legacyCapSeconds: 20,
   incrementOnMiss: false,

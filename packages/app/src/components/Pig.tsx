@@ -19,7 +19,8 @@ import { PIECE_WORD, hash, type BossUi, type KitMoment, type Moment, type Moment
  * - **SHOWDOWN!**: he drops into the middle of the board winding up both loops, leaps back to his corner, and his ropes
  *   yank the pairs into the line-up one at a time; "DRAW!" with a quick-draw sting. On the crowd's turn the three duels
  *   glow (a rope of light between each pair) as the only moves.
- * - **"Not yet..."**: the showdown held a turn: his taunt at the board's corner and the line.
+ * - **His meter full** (no moment of its own): "I've got you in my sights." and his ready loop (boss-beats.ts) until he
+ *   fires.
  * All from the shared state (`powers.pull`, `drag`, `showdown`) and the moment's start, so everyone online sees the same
  * thing. Everything sits in eighths of the board's own size (`--board-size`).
  */
@@ -261,13 +262,6 @@ function showdownMoment({ boss, moment, now, t, orientation, banner }: MomentPro
   );
 }
 
-// ---------------- "Not yet..." ----------------
-
-function holdMoment({ t, cast }: MomentProps) {
-  return <div class="power-moment pm-hold">{t < HOLD_CAST_MS && cast("snort", 700)}</div>;
-}
-const HOLD_CAST_MS = 1800;
-
 // ---------------- The board during his moments ----------------
 
 /**
@@ -370,8 +364,8 @@ export function prewarmPig(name: string): void {
 
 // ---------------- His powers on screen ----------------
 
-/** A line from his kit's lines for a beat of his own (pull, tug, hold, spent), picked by the moment: the same for everyone. */
-const lineOf = (beat: "pull" | "tug" | "hold" | "spent" | "power") => (kit: ReturnType<typeof bossKit>, m: Pick<Moment, "key">): string | null => {
+/** A line from his kit's lines for a beat of his own (pull, tug, power), picked by the moment: the same for everyone. */
+const lineOf = (beat: "pull" | "tug" | "power") => (kit: ReturnType<typeof bossKit>, m: Pick<Moment, "key">): string | null => {
   const lines = kit?.lines[beat];
   return lines?.length ? lines[hash(m.key) % lines.length]! : null;
 };
@@ -383,7 +377,6 @@ export const PIG_UI = {
   moments: {
     pull: { order: 0, kit: "power" as KitMoment, dock: "Long pull!", line: lineOf("pull"), view: lassoMoment },
     drag: { order: 0, kit: "power" as KitMoment, dock: "Lasso!", line: (kit, m) => (m.ult ? lineOf("tug") : lineOf("power"))(kit, m), view: lassoMoment },
-    hold: { order: 1, kit: "ultimateWarn" as KitMoment, dock: "Not yet…", line: (kit, m) => (m.ult ? lineOf("spent") : lineOf("hold"))(kit, m), view: holdMoment },
     showdown: { order: 2, kit: "ultimate" as KitMoment, dock: "Showdown!", view: showdownMoment },
   },
   // Over the pieces, on the crowd's duel turn (and from "DRAW!" in the showdown's moment): the three duels glowing.

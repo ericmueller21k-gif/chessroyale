@@ -23,9 +23,12 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   10 × 10 grid, the gavel, the verdict, "Why was I cut?" (the elimination breakdown). `stageBreakSeconds` 10.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
   on an empty board (or tapping a card): how it ends (**team final**, **boss battle**, **duel**), then "How fast?", a
-  chess time control (**Bullet 3+2**, **Blitz 5+3**, **Rapid 10+5**; Blitz when nobody votes). The options and what
+  chess time control (**Rapid 10+5**, **Blitz 5+3**, **Bullet 3+2**; Blitz when nobody votes). The options and what
   they change are plain data in `packages/core/src/votes.ts` (a time control is one `timeControl(...)` entry: its bank,
-  increment and cap; the card's label and blurb are made from them). Non-voters (and `voteBotSkip` of the bots) join
+  increment and cap; the card's label and blurb are made from them). **Every vote's options keep one order** on every
+  screen, every game (Eric, Oct 13): the data's order, left to right, speeds slowest to fastest. From Black's side the
+  board turns but the order doesn't: the zones are taken the other way round (`voteZoneFor`), and the cards never
+  flip. A default is named by its option's id (`optionIndex`), never by its place. Non-voters (and `voteBotSkip` of the bots) join
   the winner. `?speed=bullet|blitz|rapid` skips the vote for tests (old ids map over: normal → rapid, variable →
   blitz; an unknown id gets Blitz).
 - **The endings.** Team final: `teamFinalSizes` players a side, the weakest out every `teamFinalMovesPerStep`.
@@ -50,8 +53,11 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   move on the board (no ghost, no snap-back). The board never moves between screens.
 - **Resigning and leaving** (Eric, Oct 13; `LEAVING`; DECISIONS.md, "Resign: leaving a match in every mode"). The
   top line of every match screen ends in the match's control (`components/MatchMenu.tsx`): a phone's "⋯" (a sheet at
-  the foot of the screen: Sound, Resign) where the sound button was, a computer's flag beside the sound button; a
-  second step says what happens (Cancel focused). Before move 1 it's **Leave**; once out, **Leave the match** (also a
+  the foot of the screen: Sound, Resign) where the sound button was; a computer's sound button, then the flag. On a
+  computer the title line spans the board's column only (the boss bar's width), so these sit at its right end above
+  the board's right edge, after an admin's testing items in boss battles (the brain's pill, which ellipsizes first,
+  and "Trigger ultimate (testing)": `Hud.tsx`, `.match-tools`; Eric, Oct 13); a phone keeps those under the boss dock. A
+  second step (on a computer beside the flag, out into the column next to the board) says what happens (Cancel focused). Before move 1 it's **Leave**; once out, **Leave the match** (also a
   plain button on the cut screen, Classic's watching and stage break, and solo's play-out: "Skip to your result").
   - **Solo:** the match stops at once (`SoloMatch.resign`: every timer, every step after an engine search, Maia and the
     scout), out in the last place still open (`runner.retire`), "You resigned" on the results.

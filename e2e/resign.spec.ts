@@ -32,7 +32,19 @@ async function openConfirm(page: Page, title: RegExp, note: RegExp) {
     await sheet.getByRole("button", { name: resign ? /^Resign$/ : /^Leave the match$/ }).click();
   } else {
     await expect(page.getByRole("button", { name: "Match options" })).toHaveCount(0);
-    await page.getByRole("button", { name: resign ? "Resign" : "Leave the match", exact: true }).click();
+    // (Eric, Oct 13: on the title's line, at its right end over the board's column: sound, then the flag.)
+    const flag = page.getByRole("button", { name: resign ? "Resign" : "Leave the match", exact: true });
+    const [f, s, title, board] = await Promise.all([
+      flag.boundingBox(),
+      page.locator(".hud-row .mute-btn").boundingBox(),
+      page.locator(".hud-row > .hud").boundingBox(),
+      page.locator(".board-area").first().boundingBox(),
+    ]);
+    expect(s!.x + s!.width, "sound before the flag").toBeLessThanOrEqual(f!.x + 1);
+    expect(s!.x, "after the title").toBeGreaterThanOrEqual(title!.x + title!.width - 1);
+    expect(Math.abs(f!.y + f!.height / 2 - (title!.y + title!.height / 2)), "on the title's line").toBeLessThanOrEqual(2);
+    expect(f!.x + f!.width, "over the board's column").toBeLessThanOrEqual(board!.x + board!.width + 1);
+    await flag.click();
   }
   const confirm = page.getByRole("alertdialog");
   await expect(confirm).toBeVisible();

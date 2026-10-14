@@ -453,7 +453,8 @@ describe("lobby: Crowd mode", () => {
     L.advance(DEFAULT_SETTINGS.voteResultSeconds * 1000);
     const v = L.last("p1", "vote")!.vote;
     expect(v.index).toBe(1);
-    for (const id of ["p1", "p2"]) L.core.message(id, { t: "vote", key: v.key, option: 0 });
+    const bullet = PREGAME_VOTES[1]!.options.findIndex((o) => o.id === "bullet");
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "vote", key: v.key, option: bullet });
     L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
     const result = L.last("p1", "vote")!;
     expect(PREGAME_VOTES[1]!.options[result.vote.result!]!.id).toBe("bullet");

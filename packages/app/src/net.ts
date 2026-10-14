@@ -796,15 +796,16 @@ export class NetMatch implements GameView {
   private scout: ShowdownScout | null = null;
 
   /**
-   * As a crowd turn begins: if this device is the host and Wrangler's showdown may follow it (the meter nearly full,
-   * his warning, a hold, the test trigger), its scout searches line-ups on this position until his turn; else it stops.
+   * As a crowd turn begins: if this device is the host and Wrangler's showdown may follow before long (the rules'
+   * `scout`: from his move showdownFrom while he has one left; or the test trigger), its scout searches line-ups of
+   * three pairs and two on this position until his turn; else it stops.
    */
   private scoutShowdown(boss: NetBoss) {
     const p = boss.powers;
-    const soon = !!p && (p.warned || !!p.ultNext || (p.holds ?? 0) > 0 || (p.rage ?? 0) >= BOSS_POWERS.showdownScoutFrom);
+    const soon = !!p && (!!p.scout || !!p.ultNext);
     if (!this.isHost || boss.id !== "pig" || !p || boss.result || p.ultAt !== null || !soon) return void this.scout?.stop();
     this.scout ??= new ShowdownScout(() => ownEngine());
-    this.scout.scout(boss.board.fen, (p.holds ?? 0) >= BOSS_POWERS.showdownHolds ? [3, 2] : [3]);
+    this.scout.scout(boss.board.fen, [3, 2]);
   }
 
   // ---------------- The boss's brain (host only) ----------------

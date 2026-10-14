@@ -82,7 +82,8 @@ export function showing(kit: BossKit, beat: Pick<BeatResult, "anim" | "loop" | "
 }
 
 /** How much a reaction's line matters (speech.tsx): the battle's start and end over the rest, which wait their turn. */
-const BEAT_PRIORITY: Partial<Record<Beat, Priority>> = { entrance: NORMAL, defeat: CRITICAL, victory: CRITICAL };
+// (Wrangler's "I've got you in my sights.": his only tell before his showdown, so it doesn't lapse behind a moment's line.)
+const BEAT_PRIORITY: Partial<Record<Beat, Priority>> = { entrance: NORMAL, ready: NORMAL, defeat: CRITICAL, victory: CRITICAL };
 
 /** Where the battle is, from the screen's phase. */
 export function bossStage(phase: Phase, boss: BossView): Stage {
@@ -115,8 +116,10 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
         lastMove: boss.lastMove,
         result: boss.result,
         victim: boss.justKilled,
+        // (Wrangler's meter full: his line once, then his ready loop until he fires.)
+        ready: boss.powers?.ready ?? null,
       }),
-    [kit, stage, boss.board.fen, boss.board.history.length, boss.result, boss.justKilled],
+    [kit, stage, boss.board.fen, boss.board.history.length, boss.result, boss.justKilled, boss.powers?.ready],
   );
   const since = beat ? startOf(beat.key) : 0;
   // His sounds and his powers' made ahead, in idle moments, so a first play never stalls a slow phone.
