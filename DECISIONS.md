@@ -3011,3 +3011,27 @@ cover both states (`packages/app/test/maia-players.test.ts`, `faq.test.ts`, `bos
   every Maia line live when it's on), `maia-players.test.ts` and `boss-powers-lobby.test.ts` (with `forPlayers` on for
   the test: a player's boss on Maia by the same rule as an admin's, solo and online), and `e2e/maia.spec.ts` (the
   archives served as gzip files that hold the source, a tap saving one).
+
+### Beta Crate · Series 001, batch 2: the secret agent and the pirate (Oct 14, 2026)
+
+Eric approved finishing the Beta crate, so the planned batches 2 and 3 ship together (agent and pirate complete,
+21 of 28 items) and the ninja follows as the last batch. Colors and descriptions are the plan's
+(`docs/history/shop-and-crates.md`). The calls:
+
+- **Fake Mustache, not Moustache:** American English (CLAUDE.md). The id is `fake-mustache`.
+- **A `mouth` anchor:** a mustache goes under the nose, and no anchor put it there on every piece (the eye line put it
+  on the snowman's carrot, the neck under the gingerbread man's smile). Pawn 33, snowman 27, gingerbread 28.
+- **The Wire Earpiece follows the eye line** (it's a head item, but sits at the ear), just below where shades' arms
+  go, so it shows with Dark Shades on.
+- **The Parrot perches on the left shoulder (as we see it),** facing out: on the right it covered the eyepatch, and
+  the left is free whatever else is worn. Weapons don't move with the piece, so it's drawn where every piece's
+  shoulder is (pawn, snowman, gingerbread).
+- **The Pirate Hat** is a tricorn seen from the front, its brim turned up to a point at each side, so it doesn't read
+  as a sombrero; its gold trim and the skull stay unblotched (fixed parts), as do the Bandana's white dots.
+- **The Fedora's band is dark,** a light shade of the hat on a very dark one (Midnight), where a dark band vanishes.
+- **The Captain's Coat** opens at the hem to show the pawn, so it reads as white or black; its lapels and cuffs are a
+  shade of its color.
+- **Batch 2 odds (Beta):** Common (6) 6.67% each, Uncommon (5) 5.2%, Rare (4) 4.5%, Epic (2) 7%, Pirate Hat and
+  Smiley Face 0.8%, Tommy Gun and Parrot 0.2%. Until the ninja's two Epics join, an Epic item is likelier than a
+  Common one, as in batch 1.
+- **The fitting sheet** takes `scale=1|2`, to look at the art at 1× and 2×.
