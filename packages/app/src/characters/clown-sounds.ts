@@ -5,7 +5,7 @@
  * so a test can measure it: every one stays quieter than a piece's move sound (peak and loudness; see
  * test/boss-character.test.ts).
  */
-import { bandpass, lowpass, noise, osc, render, saw, sine, soft, square } from "./synth.ts";
+import { bandpass, lowpass, noise, osc, render, saw, sine, soft, square, soundCache } from "./synth.ts";
 
 export type ClownSound = "boing" | "honk" | "squeak" | "slideUp" | "slideDown" | "laugh" | "splat" | "flip";
 
@@ -71,7 +71,7 @@ const SOUNDS: Record<ClownSound, (rate: number) => Float32Array> = {
 /** Trims each to sit a little under a move's loudness (mean about -24 dBFS, peaks well under the move's). */
 const LEVEL: Record<ClownSound, number> = { boing: 0.78, honk: 0.66, squeak: 0.63, slideUp: 0.51, slideDown: 0.54, laugh: 1, splat: 0.98, flip: 0.55 };
 
-const cache = new Map<string, Float32Array>();
+const cache = soundCache("clown");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */
 export function clownSound(name: ClownSound, rate: number): Float32Array {
   const key = `${name}@${rate}`;

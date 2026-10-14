@@ -6,7 +6,7 @@
  * is a pure function of the sample rate (its noise is seeded), so a test can measure it: every one stays quieter than a
  * piece's move (peak and loudness).
  */
-import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice } from "./synth.ts";
+import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice, soundCache } from "./synth.ts";
 
 export type BigBoySound = "giggle" | "slurp" | "wail" | "boing" | "crash" | "nom" | "toss" | "clack" | "swish" | "bonk" | "stomp" | "poof";
 
@@ -147,7 +147,7 @@ const SOUNDS: Record<BigBoySound, (rate: number) => Float32Array> = {
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
 const LEVEL: Record<BigBoySound, number> = { giggle: 0.117, slurp: 0.323, wail: 0.097, boing: 0.2, crash: 0.164, nom: 0.081, toss: 0.225, clack: 0.375, swish: 0.148, bonk: 0.213, stomp: 0.248, poof: 0.541 };
 
-const cache = new Map<string, Float32Array>();
+const cache = soundCache("bigBoy");
 /** The samples for one of his sounds at a sample rate (made once, then reused). Each is 2.8 to 4.2 dB under a move's mean, peaks under half a move's. */
 export function bigBoySound(name: BigBoySound, rate: number): Float32Array {
   const key = `${name}@${rate}`;
