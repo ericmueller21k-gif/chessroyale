@@ -39,6 +39,9 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
 - Next phase (accounts, profiles, matchmaking, ranked, coins/icons/emotes): see `ROADMAP.md` for the order and what
   needs Eric.
 - Explain rules and scoring in plain language on screen. Real playtests drive changes, so make tweaks easy.
+- **Simple beats flashy (Eric, Oct 14: "we want easier code and less lag over all else, fewer bug risks").** When an
+  effect or feature can be built several ways, pick the one with the least code, the least lag on a phone and the
+  fewest ways to break, and reuse what already works (e.g. an existing animation or effect) before writing new.
 - **Computing priorities (Eric, Oct 8), in this order:**
   1. **Never compromise the game.** Fair scoring, correct results and smooth play come first, whatever it costs.
   2. **Use players' devices wherever they can do the job.** Judging, deep checks and other engine work go to

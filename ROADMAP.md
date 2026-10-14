@@ -151,6 +151,9 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       he isn't evil, but he looks scarier.
     - **The book flips its pages again** and all four boards shuffle into random openings (Fischer Random setups):
       the pieces fly to their new squares as the pages turn. Phase 2 then plays as above.
+    - **Decided (Eric, Oct 14: "your pick is fine, we want easier code and less lag over all else, fewer bug
+      risks"):** the split reuses Sawyer's board saw (crack lines, then the quarters slide apart). The book's symbol
+      is a red star or a Cyrillic letter, not the hammer and sickle.
     - **Effort, easiest to hardest:**
       - a slam, a flash, then a cross-fade into four boards;
       - crack lines, then the quarters sliding apart (the pick, reusing the saw);
