@@ -3158,6 +3158,7 @@ permitted to change the flag, so the director made this one-value change with Er
 now downloads the Maia model (24 MiB, cached) when a boss battle needs it; a device that can't run it plays
 Stockfish's move as before. The FAQ's Maia section reads as live (it follows the flag). Left for Eric: the real-phone
 check (`TESTING.md`, "Maia").
+
 ### The boss screen's lag: the boss view free to read (Oct 14, 2026)
 
 Eric, Oct 14 ("make do the boss screen lag fixes"), after "The board draws its pieces only when they change": the boss
