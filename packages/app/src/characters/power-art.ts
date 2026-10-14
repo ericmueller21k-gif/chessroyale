@@ -119,12 +119,12 @@
  *                               CATCH point on the piece's square), the `tug` dragging it one square (he steps with it,
  *                               the rope taut), a `leap` back. The long pull after his first move is the same on his
  *                               pawn (`more.pull`).
- *     ultimateWarn "taunt"      His hat tip and snorting laugh, for the warning.
+ *     ultimateWarn "ready"      None comes (Eric, Oct 13: no warning); his meter full shows as his ready loop instead
+ *                               (both loops swinging, the wind-up's spin looped: boss-beats.ts's `ready`), with "I've
+ *                               got you in my sights." as it fills.
  *     ultimate     "windup"     SHOWDOWN!, ON THE BOARD (SHOWDOWN): a `leap` into the middle, both loops spinning (the
  *                               windup to its `throw`), a leap back to his corner, then `haul` while the board's ropes
  *                               yank each pair into the line-up (a `yank` each), and "DRAW!" (the `draw` sting).
- *     more:
- *       hold       "taunt"      "Not yet...": the showdown held a turn (his snort).
  *
  *   Each moment's animation is in the kit (`BOSS_KITS[name].anims[power | ultimateWarn | ultimate]`), its lines
  *   are `kit.lines.power / ultimateWarn / ultimate` (pick with `pickLine(kit, "power", key)` from boss-beats.ts,
@@ -210,6 +210,7 @@ export const POWER_ANIMS = [
   "taunt",
   "windup",
   "haul",
+  "ready",
 ] as const;
 export type PowerAnim = (typeof POWER_ANIMS)[number];
 
@@ -288,13 +289,13 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
   },
   "Wrangler": {
     power: { anim: "lasso", hit: "tug", onBoard: true },
-    ultimateWarn: { anim: "taunt" },
+    // (Every boss's moments have a warning; his ultimate has none now: his meter's line and ready loop stand in.)
+    ultimateWarn: { anim: "ready" },
     ultimate: { anim: "windup", hit: "throw", onBoard: true },
     more: {
       pull: { anim: "lasso", hit: "tug", onBoard: true },
       haul: { anim: "haul", hit: "tug", onBoard: true },
       leap: { anim: "leap", hit: "hop", onBoard: true },
-      hold: { anim: "taunt", hit: "snort" },
     },
   },
 };

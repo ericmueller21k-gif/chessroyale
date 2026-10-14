@@ -836,6 +836,15 @@ const windup: Anim = (() => {
 })();
 
 /**
+ * Ready (Eric, Oct 13: his meter full, until he fires his showdown): the wind-up's spin, looped: both loops whirling
+ * over his head, steady and wide, a bob every half turn, a glare; no throw. Two turns a loop, at the wind-up's pace.
+ */
+const ready: Anim = {
+  loop: true,
+  frames: Array.from({ length: 16 }, (_, i) => f(70, { mood: i % 8 === 7 ? "grit" : "wild", loop2: "spin", grow: 1.5, spin: i % 8, bob: i % 4 === 3 ? 1 : 0 })),
+};
+
+/**
  * A hop on or off the board (the board moves him along his arc): a crouch, off the ground at PIG_LEAP.upAt with his
  * boots tucked up and the loop spinning, down at PIG_LEAP.landAt (cue `hop`, dust off his boots), then he steadies.
  */
@@ -881,14 +890,14 @@ export const PIG: Character = {
   palette: PIG_PALETTE,
   halo: "#2c2624",
   parts: PARTS,
-  anims: { idle, lasso, taunt, windup, leap, haul },
+  anims: { idle, lasso, taunt, windup, leap, haul, ready },
 };
 
 /**
  * Wrangler's lines in his text box (a cowboy pig: short, drawled, a snort now and then), by moment; how often each
  * moment gets one is PIG_CHANCE (a power's moment always has its line). The same line for everyone (picked by the
- * moment). `pull`: his long pull; `tug`: the drag that stands in for a showdown he couldn't line up; `hold`: "Not yet...",
- * the showdown held a turn; `spent`: his showdown's turn gone with neither a line-up nor a drag.
+ * moment). `pull`: his long pull; `tug`: the drag that stands in for the test trigger's showdown when the board can't
+ * hold one; `ready`: his meter full (Eric, Oct 13), said once a fill.
  */
 export const PIG_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
   entrance: ["Howdy, varmints.", "Saddle up!", "Yee-haw!"],
@@ -905,9 +914,7 @@ export const PIG_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly 
   strike: ["Git along!", "Yer outta here!", "Yee-haw!"],
   power: ["Git over here!", "C'mere, little doggie.", "Yoink!"],
   tug: ["Fine. Just a tug, then.", "Yoink, anyhow.", "A tug'll do."],
-  hold: ["Not yet...", "Not yet... snort.", "Not yet, partner..."],
-  spent: ["Next time, varmints.", "Dang. No showdown.", "Snort. Not today."],
-  ultimateWarn: ["High noon's comin'.", "Reach for yer pieces…", "Snort. Get ready."],
+  ready: ["I've got you in my sights."],
   ultimate: ["This board ain't big enough for the six of us.", "It's high noon!", "Pick yer duel, varmints."],
 };
 export const PIG_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
@@ -923,7 +930,7 @@ export const PIG_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>>
   victory: 1,
   strike: 0.8,
   power: 1,
-  ultimateWarn: 1,
+  ready: 1,
   ultimate: 1,
 };
 

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossPowerState, type BossState, type Settings } from "@chessroyale/core";
 import {
-  HOLD,
   MatchRunner,
   PIG,
   PULL,
@@ -14,7 +13,7 @@ import {
   checkDrag,
   checkLineup,
   crowdAllowed,
-  duelReplyDue,
+  engineMoveDue,
   dragCandidates,
   dragFrom,
   dragOptions,
@@ -26,6 +25,8 @@ import {
   lassoSeed,
   legalMoves,
   lineups,
+  missBy,
+  pairSizes,
   pickDrag,
   sanLineToUci,
   pieceAt,
@@ -39,6 +40,7 @@ import {
   rankShowdowns,
   searchShowdowns,
   showdownFrom,
+  showdownLive,
   ShowdownScout,
   triggerUltimate,
   sideToMove,
@@ -83,16 +85,17 @@ function valueEngine(value: (fen: string) => number, opts: { mate?: (fen: string
 /** His expected score for an edge of `pawns` (the measure his powers use). */
 const forEdge = (pawns: number) => 1 / (1 + Math.exp(-pawns * BOSS_POWERS.bouncePawnLogit));
 /**
- * The crowd White, him Black. A position after a duel (him to move) is worth: +0.5 pawns to him when the crowd took his
- * queen, +3 when it took a rook, `minor` when it took a bishop or knight (so the queens' duel is the crowd's best and a
+ * The crowd White, him Black. A position after a duel (him to move) is worth, to him, `gain.r` pawns when the crowd took
+ * his rook, `gain.b` his bishop, `gain.n` his knight (by default the rooks' duel is the crowd's best, +0.5 for him, and a
  * wrong one costs it 2.5 more: Eric's goal); everything else level.
  */
-function duelEngine(minor = 3) {
+function duelEngine(gain: Partial<Record<"r" | "b" | "n", number>> = {}) {
+  const g = { r: 0.5, b: 3, n: 3, ...gain };
   return valueEngine((fen) => {
     if (fen.split(" ")[1] !== "b") return 0.5;
-    if (count(fen, "q") < count(fen, "Q")) return forEdge(0.5);
-    if (count(fen, "r") < count(fen, "R")) return forEdge(3);
-    if (count(fen, "b") + count(fen, "n") < count(fen, "B") + count(fen, "N")) return forEdge(minor);
+    if (count(fen, "r") < count(fen, "R")) return forEdge(g.r);
+    if (count(fen, "b") < count(fen, "B")) return forEdge(g.b);
+    if (count(fen, "n") < count(fen, "N")) return forEdge(g.n);
     return 0.5;
   });
 }
@@ -100,14 +103,17 @@ function duelEngine(minor = 3) {
 const WORTH: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
 /**
  * duelEngine, with his moves (him to move) in an order of their own: his best takes the crowd's most valuable piece with
- * his least valuable one (after the queens' duel: taking back the queen); next, his captures of other crowd pieces, the
- * first 4.5 points worse (in a slip's range, bossSlipLoss), the rest far worse. Each position's worth (all the showdown
- * search reads) is duelEngine's.
+ * his least valuable one (after the rooks' duel: taking back the rook), or a knight first when `first` is "n" (the
+ * rook taken back a move later); next, his captures of other crowd pieces, the first 4.5 points worse (in a slip's
+ * range, bossSlipLoss), the rest far worse. Each position's worth (all the showdown search reads) is duelEngine's.
  */
-function recaptureEngine(): EngineLike {
+function recaptureEngine(first?: "n"): EngineLike {
   const base = duelEngine();
   const order = (fen: string) => {
-    const took = (m: string) => WORTH[pieceAt(fen, m.slice(2, 4))?.type ?? ""] ?? 0;
+    const took = (m: string) => {
+      const t = pieceAt(fen, m.slice(2, 4))?.type ?? "";
+      return t === first ? 50 : (WORTH[t] ?? 0);
+    };
     const by = (m: string) => WORTH[pieceAt(fen, m.slice(0, 2))!.type]!;
     const legal = legalMoves(fen).sort();
     const captures = legal.filter((m) => took(m) > 0).sort((a, b) => took(b) - took(a) || by(a) - by(b));
@@ -126,10 +132,11 @@ function recaptureEngine(): EngineLike {
 }
 
 /**
- * The boss's brain as Eric met it (Maia at 600, no guard), a stand-in: it takes a crowd piece other than the queen when
- * it can (Wrangler took another piece and left the queen), else plays its first legal move. Counts how often it's asked.
+ * The boss's brain as Eric met it (Maia at 600, no guard), a stand-in: it takes a crowd piece other than a rook when it
+ * can (Wrangler took another piece and left the crowd's piece standing on his), else plays its first legal move; `blind`:
+ * it never captures (a quiet move each time). Counts how often it's asked.
  */
-function carelessMaia(): HumanEngineLike & { asked: number } {
+function carelessMaia(blind = false): HumanEngineLike & { asked: number } {
   const m = {
     asked: 0,
     ready: () => true,
@@ -138,9 +145,10 @@ function carelessMaia(): HumanEngineLike & { asked: number } {
       const legal = [...(allowed ?? legalMoves(fen))].sort();
       const other = legal.find((x) => {
         const t = pieceAt(fen, x.slice(2, 4));
-        return !!t && t.type !== "q" && t.color !== sideToMove(fen);
+        return !blind && !!t && t.type !== "r" && t.color !== sideToMove(fen);
       });
-      const pick = other ?? legal[0]!;
+      const quiet = legal.find((x) => !pieceAt(fen, x.slice(2, 4)));
+      const pick = other ?? (blind ? (quiet ?? legal[0]!) : legal[0]!);
       return { best: pick, moves: [{ move: pick, p: 0.9 }], ms: 5 };
     },
   };
@@ -411,7 +419,8 @@ describe("Wrangler's lasso drag in the match", () => {
     expect(asked[0]).toBe(BOSS_POWERS.dragFirst);
     expect(asked).toContain(BOSS_POWERS.dragFirst + BOSS_POWERS.dragEvery);
     expect(asked.filter((t) => t > BOSS_POWERS.dragFirst && t < BOSS_POWERS.dragFirst + BOSS_POWERS.dragEvery)).toEqual([]);
-  });
+    // (His meter full from turn 6 and no line-up ever qualifying here: each of his turns searches its showdownTurnMs.)
+  }, 60_000);
 
   it("none in the band (or no answer): no drag that turn, and it doesn't count (he tries after his next move)", () => {
     const fen = applyMove(applyMove(START_FEN, "e2e4"), "e7e5");
@@ -446,18 +455,18 @@ describe("Wrangler's lasso drag in the match", () => {
 
 describe("Wrangler's showdown: the line-up", () => {
   const l0 = [...lineups(RUY, 3, 3, 3000)].find(Boolean)!;
+  const light = (s: string) => (s.charCodeAt(0) - 97 + Number(s[1])) % 2 === 0;
 
-  it("three matched pairs (queens, rooks, then a minor), each facing off with nothing or one empty square between, in the middle (b-g, 3-6)", () => {
+  it("a rook, a bishop and a knight pair (never queens), each facing off with nothing or one empty square between, anywhere on ranks 2-7", () => {
     const found = [...lineups(RUY, 3, 3, 3000)].filter(Boolean).slice(0, 40);
     expect(found.length).toBeGreaterThan(10);
+    const files = new Set<string>();
     for (const l of found) {
-      const kinds = l!.pairs.map((p) => p.piece);
-      expect(kinds.slice(0, 2)).toEqual(["q", "r"]);
-      expect(["b", "n"]).toContain(kinds[2]);
+      expect(l!.pairs.map((p) => p.piece).sort()).toEqual(["b", "n", "r"]);
       for (const p of l!.pairs) {
         for (const sq of [p.crowd, p.boss]) {
-          expect("bcdefg").toContain(sq[0]);
-          expect("3456").toContain(sq[1]);
+          expect("234567").toContain(sq[1]);
+          files.add(sq[0]!);
         }
         expect(pieceAt(l!.fen, p.crowd)).toEqual({ color: "w", type: p.piece });
         expect(pieceAt(l!.fen, p.boss)).toEqual({ color: "b", type: p.piece });
@@ -467,23 +476,46 @@ describe("Wrangler's showdown: the line-up", () => {
         else expect(Math.max(df, dr)).toBeLessThanOrEqual(2);
         // Bishops keep their color.
         if (p.piece === "b") {
-          const light = (s: string) => (s.charCodeAt(0) - 97 + Number(s[1])) % 2 === 0;
           expect(light(p.crowd)).toBe(light(p.crowdFrom));
           expect(light(p.boss)).toBe(light(p.bossFrom));
         }
       }
-      // Every duel is a legal capture, nobody is in check, and the six stand within five files.
+      // Every duel is a legal capture, nobody is in check; the queens stay where they were.
       for (const d of l!.duels) expect(legalMoves(l!.fen)).toContain(d);
       expect(inCheck(l!.fen)).toBe(false);
       expect(kingAttacked(l!.fen, "b")).toBe(false);
-      const files = l!.pairs.flatMap((p) => [p.crowd.charCodeAt(0), p.boss.charCodeAt(0)]);
-      expect(Math.max(...files) - Math.min(...files)).toBeLessThanOrEqual(4);
-      // Material and pawns untouched.
+      expect(pieceAt(l!.fen, "d1")).toEqual({ color: "w", type: "q" });
+      expect(pieceAt(l!.fen, "d8")).toEqual({ color: "b", type: "q" });
       expect(l!.fen.split(" ")[0]!.replace(/[^pP]/g, "").length).toBe(RUY.split(" ")[0]!.replace(/[^pP]/g, "").length);
     }
+    // Anywhere: over most of the board's width, not just its middle.
+    expect(files.size).toBeGreaterThanOrEqual(6);
   });
 
-  it("his three pieces are always protected", () => {
+  it("two pairs: the rook pair and a minor's (the seed picks which)", () => {
+    const kinds = new Set([...lineups(RUY, 5, 2, 3000)].filter(Boolean).slice(0, 40).map((l) => l!.pairs.map((p) => p.piece).sort().join("")));
+    expect([...kinds].sort()).toEqual(["br", "nr"]);
+  });
+
+  it("a pair that can't be formed is replaced: a second rook pair, then a second knight pair; else two pairs only", () => {
+    // Bishops on different colors (his light one and the crowd's dark one gone): no bishop pair, a second rook pair.
+    const noBishops = withoutPiece(withoutPiece(RUY, "c1"), "c8");
+    expect(pairSizes(noBishops, "w")).toEqual([3, 2]);
+    const a = [...lineups(noBishops, 4, 3, 3000)].filter(Boolean).slice(0, 10);
+    expect(a.length).toBeGreaterThan(0);
+    for (const l of a) expect(l!.pairs.map((p) => p.piece).sort()).toEqual(["n", "r", "r"]);
+    // One rook each too: a second knight pair.
+    const oneRook = withoutPiece(withoutPiece(noBishops, "a1"), "a8");
+    for (const l of [...lineups(oneRook, 4, 3, 3000)].filter(Boolean).slice(0, 10)) expect(l!.pairs.map((p) => p.piece).sort()).toEqual(["n", "n", "r"]);
+    // One knight each as well: two pairs only. Fewer than that: none.
+    const twoOnly = withoutPiece(withoutPiece(oneRook, "b1"), "c6");
+    expect(pairSizes(twoOnly, "w")).toEqual([2]);
+    expect(pairSizes(withoutPiece(withoutPiece(twoOnly, "f3"), "f6"), "w")).toEqual([]);
+    // The queens never pair, whatever is left.
+    expect(pairSizes("3qk3/8/8/8/8/8/8/3QK3 w - - 0 1", "w")).toEqual([]);
+  });
+
+  it("his pieces are always protected", () => {
     for (const l of [...lineups(RUY, 9, 3, 3000)].filter(Boolean).slice(0, 30)) {
       for (const p of l!.pairs) {
         // Take his piece with a crowd piece of hers and see that he can take back.
@@ -503,44 +535,51 @@ describe("Wrangler's showdown: the line-up", () => {
     expect(checkLineup(RUY, l0.spec)).toMatchObject({ spec: l0.spec, fen: l0.fen });
     const [p0, ...rest] = l0.spec.split(" ");
     const swap = (i: number, sq: string) => [p0!.slice(0, i) + sq + p0!.slice(i + 2), ...rest].join(" ");
-    // A king, a pawn, mismatched kinds, a square outside the middle, the same square twice, and nonsense.
+    // A king, a pawn, mismatched kinds, the same square twice, and nonsense.
     expect(checkLineup(RUY, swap(0, "g1"))).toBeNull();
     expect(checkLineup(RUY, swap(0, "a2"))).toBeNull();
-    expect(checkLineup(RUY, swap(2, "h4"))).toBeNull();
     expect(checkLineup(RUY, swap(2, rest[0]!.slice(2, 4)))).toBeNull();
     expect(checkLineup(RUY, "d1d4")).toBeNull();
     expect(checkLineup(RUY, "")).toBeNull();
     expect(checkLineup(RUY, null)).toBeNull();
-    // Only the sizes asked for (his last try allows two pairs).
+    // A back rank, and the queens: refused (they'd make a legal line-up otherwise).
+    expect(checkLineup("4k3/8/8/2r5/8/2R5/8/4K3 w - - 0 1", "c3c1c5c8 c3c1c5c8", [2])).toBeNull();
+    expect(checkLineup("3qk3/2r5/8/8/8/8/2R5/3QK3 w - - 0 1", "d1d4d8d6 c2c3c7c5", [2])).toBeNull();
+    // Only the sizes asked for.
     expect(checkLineup(RUY, l0.spec, [2])).toBeNull();
     const two = [...lineups(RUY, 3, 2, 3000)].find(Boolean)!;
     expect(checkLineup(RUY, two.spec, [3])).toBeNull();
     expect(checkLineup(RUY, two.spec, [3, 2])).not.toBeNull();
-    // A bishop pair standing a knight's jump apart, or two squares apart with something between: refused.
-    const far = (spec: string) => spec.replace(/^(..)(..)/, (_m, a: string, b: string) => `${a}${b[0]}${Number(b[1]) === 3 ? 6 : 3}`);
-    expect(checkLineup(RUY, far(l0.spec))).toBeNull();
   });
 
   it("an unprotected piece of his, a check, or a pinned duel: refused", () => {
-    // (Built by hand in an open position: the queens face off on d4-d5 with nothing guarding his.)
-    const open = "4k3/8/8/8/8/8/8/3QK2q w - - 0 1";
+    // (Built by hand in an open position: the rooks face off on d4-d5 with nothing guarding his.)
+    const open = "4k3/8/8/8/8/8/8/3RK2r w - - 0 1";
     expect(checkLineup(open, "d1d4h1d5", [1, 2, 3])).toBeNull();
   });
 });
 
 describe("Wrangler's showdown: Eric's goal", () => {
   const score = (gains: number[], spec = "x", mate = false): LineupScore => ({ spec, duels: gains.length, gains, gain: Math.min(...gains), trap: Math.max(...gains) - Math.min(...gains), mate });
+  const [lo, hi] = BOSS_POWERS.showdownEdge;
+  const trap = BOSS_POWERS.showdownTrap;
 
   it("the crowd's best duel gains him showdownEdge pawns, another costs the crowd showdownTrap more, never a mate", () => {
     expect(qualifies(score([0.5, 3, 3]))).toBe(true);
-    expect(qualifies(score([0.5, 2.6]))).toBe(true);
-    // Too little for him, too much, no trap, a mate.
-    expect(qualifies(score([0.05, 3, 3]))).toBe(false);
-    expect(qualifies(score([1.5, 4, 4]))).toBe(false);
-    expect(qualifies(score([0.5, 1.5, 2]))).toBe(false);
+    expect(qualifies(score([lo, lo + trap]))).toBe(true);
+    expect(qualifies(score([hi, hi + trap, 0 + hi + trap]))).toBe(true);
+    // Too little for him, too much, too small a trap, a mate.
+    expect(qualifies(score([lo - 0.05, 3, 3]))).toBe(false);
+    expect(qualifies(score([hi + 0.05, 4, 4]))).toBe(false);
+    expect(qualifies(score([0.5, 0.5 + trap - 0.1]))).toBe(false);
     expect(qualifies(score([0.5, 3, 3], "x", true))).toBe(false);
     // The crowd's best duel is the smallest gain for him, whatever the order.
     expect(qualifies(score([3, 0.4, 2.5]))).toBe(true);
+    // How far one is from it (the test trigger's fallback takes the nearest).
+    expect(missBy(score([0.5, 3]))).toBe(0);
+    expect(missBy(score([lo - 1, lo - 1 + trap]))).toBeCloseTo(1, 9);
+    expect(missBy(score([0.5, 0.5 + trap - 0.5]))).toBeCloseTo(0.5, 9);
+    expect(missBy(score([0.5, 3], "x", true))).toBe(Infinity);
   });
 
   it("of those that qualify, the one nearest showdownTarget first; ties from the seed", () => {
@@ -551,46 +590,64 @@ describe("Wrangler's showdown: Eric's goal", () => {
     expect(rankShowdowns(tie, 5)[0]!.spec).toBe(rankShowdowns(tie, 5)[0]!.spec);
   });
 
-  it("the search finds a line-up meeting it when one exists (the queens' duel his best, the rooks' and minors' a disaster)", async () => {
-    const e = duelEngine();
-    const pick = await showdownFrom([e], RUY, 7, false);
+  it("the search finds a line-up meeting it when one exists (the rooks' duel his best, the minors' a disaster): three pairs first", async () => {
+    const pick = await showdownFrom([duelEngine()], RUY, 7);
     expect(pick).not.toBeNull();
-    const l = checkLineup(RUY, pick!.spec)!;
-    expect(l.pairs.map((p) => p.piece)).toContain("q");
+    expect(pick!.duels).toBe(3);
+    expect(checkLineup(RUY, pick!.spec)!.pairs.map((p) => p.piece).sort()).toEqual(["b", "n", "r"]);
     expect(pick!.gain).toBeCloseTo(0.5, 1);
+    expect(pick!.outside).toBeUndefined();
     // The same seed and position: the same line-up.
-    expect(await showdownFrom([duelEngine()], RUY, 7, false)).toEqual(pick);
+    expect(await showdownFrom([duelEngine()], RUY, 7)).toEqual(pick);
   });
 
-  it("none qualifying (a minor's duel the crowd's best): none of three pairs; on his last try, two pairs (queens and rooks)", async () => {
-    const e = duelEngine(-3);
-    expect(await showdownFrom([e], RUY, 7, false, null, { ...BOSS_POWERS, showdownTurnMs: 2000, showdownSetups: 40 })).toBeNull();
-    const last = await showdownFrom([e], RUY, 7, true, null, { ...BOSS_POWERS, showdownTurnMs: 4000, showdownSetups: 40 });
-    expect(last).not.toBeNull();
-    expect(checkLineup(RUY, last!.spec, [2])!.pairs.map((p) => p.piece)).toEqual(["q", "r"]);
+  it("no three-pair line-up qualifies: two pairs, the same rule (Eric: the 2-pair showdown by default)", async () => {
+    // (The knights' duel throws the game his way at once: any line-up with knights fails; rook and bishop pairs don't.)
+    const pick = await showdownFrom([duelEngine({ n: -3 })], RUY, 7, {}, { ...BOSS_POWERS, showdownTurnMs: 4000 });
+    expect(pick).not.toBeNull();
+    expect(pick!.duels).toBe(2);
+    expect(checkLineup(RUY, pick!.spec, [2])!.pairs.map((p) => p.piece).sort()).toEqual(["b", "r"]);
   });
 
-  it("the scout: line-ups found while the crowd thinks are scanned first at his turn, if they still hold", async () => {
+  it("none qualifying: none for a player; the test trigger gets the nearest, outside the band", async () => {
+    const e = duelEngine({ r: -3 });
+    const s = { ...BOSS_POWERS, showdownTurnMs: 1500, showdownTestMs: 2500 };
+    expect(await showdownFrom([e], RUY, 7, {}, s)).toBeNull();
+    const test = await showdownFrom([e], RUY, 7, { test: true }, s);
+    expect(test).toMatchObject({ outside: true });
+    expect(test!.gain).toBeLessThan(lo);
+    expect(checkLineup(RUY, test!.spec, [3, 2])).not.toBeNull();
+    // Not even two pairs on the board: nothing to fire, whatever.
+    expect(await showdownFrom([e], "3qk3/8/8/8/8/8/8/3QK3 w - - 0 1", 7, { test: true }, s)).toBeNull();
+  });
+
+  it("the scout: line-ups of both sizes, kept from turn to turn (those that qualified first) and scanned first at his turn if they still hold", async () => {
     const e = duelEngine();
-    const scout = new ShowdownScout(async () => e, { ...BOSS_POWERS, showdownSearchMs: 3000 });
+    const scout = new ShowdownScout(async () => e, { ...BOSS_POWERS, showdownSearchMs: 1500 });
     scout.scout(RUY);
-    await new Promise((r) => setTimeout(r, 400));
-    scout.stop();
     await scout.idle();
+    expect(scout.scanned).toBeGreaterThan(0);
+    expect(scout.ready(3)).toBeGreaterThan(0);
+    expect(scout.ready(2)).toBeGreaterThan(0);
+    expect(scout.qualified).toBeGreaterThan(0);
     const carried = scout.carry(3);
-    expect(carried.length).toBeGreaterThan(0);
-    // His move (a quiet one far from the six) keeps them standing: the first carried one is the line-up.
+    // His move (a quiet one far from the six) keeps them standing: the first carried one is scanned first.
     const after = applyMove(applyMove(RUY, "a2a3"), "h7h6");
-    const still = carried.filter((s) => checkLineup(after, s));
+    const still = carried.filter((s) => checkLineup(after, s, [3]));
     expect(still.length).toBeGreaterThan(0);
     const r = await searchShowdowns({ engines: [e], fen: after, seed: 1, duels: 3, before: 0, carry: carried, max: 1 });
     expect(r.tried).toBe(1);
     expect(r.found[0]?.spec).toBe(still[0]);
+    // On a new position, what no longer qualifies is dropped (here, nothing does: the rooks' duel now a disaster too).
+    const worse = new ShowdownScout(async () => duelEngine({ r: 3 }), { ...BOSS_POWERS, showdownSearchMs: 800 });
+    worse.scout(RUY);
+    await worse.idle();
+    expect(worse.ready(3)).toBe(0);
   });
 });
 
 describe("Wrangler's showdown in the match", () => {
-  /** A raid with the showdown's test switch: warned as turn 2 begins, searched at his turn after the crowd's 2nd move. */
+  /** A raid with the showdown's test switch: his meter full from turn 2, the line-up searched at his turn after the crowd's 2nd move. */
   const showdownRaid = (engine: EngineLike, patch: Partial<Settings> = {}) => raid({ engine, patch: { bossPowerTest: "showdown", ...patch } });
   /** The crowd's move, then (not his turn yet) stop. */
   const crowdOnly = async (r: MatchRunner, move?: string) => {
@@ -598,92 +655,145 @@ describe("Wrangler's showdown in the match", () => {
     const allowed = r.crowdAllowed() ?? legalMoves(fenOf(r));
     await r.score(new Map([["h0", { move: move && allowed.includes(move) ? move : [...allowed].sort()[0]!, thinkMs: 1000 }]]));
   };
+  const kinds = (r: MatchRunner) => r.boss!.powers!.events.map((e) => e.kind);
 
-  it("warned, then at his turn the line-up after his move: a base on the board, its moment, and the crowd's move must be one of the duels", async () => {
-    const r = showdownRaid(duelEngine());
-    await turn(r, "e2e4");
-    expect(r.bossView()!.powers!.warned).toBe(true);
-    await crowdOnly(r, "g1f3");
+  it("his meter: his moves fill it over showdownMeterTurns, nothing else (not a strike, not his material); his line once it's full; the scout from showdownFrom", async () => {
+    // (Nothing ever qualifies here: every duel level.)
+    const r = raid({ engine: valueEngine(() => 0.5) });
+    const fills: (number | null)[] = [];
+    const scouts: boolean[] = [];
+    for (let t = 1; t <= 8; t++) {
+      fills.push(r.bossView()!.powers!.rage);
+      scouts.push(!!r.bossView()!.powers!.scout);
+      if (t === 2) {
+        // The King's strike: nothing on his meter.
+        r.deal();
+        const before = r.bossView()!.powers!.rage;
+        expect(r.callStrike("h0").struck).toBe(true);
+        expect(r.bossView()!.powers!.rage).toBe(before);
+        await r.score(new Map([["h0", { move: [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort()[0]!, thinkMs: 1000 }]]));
+        await r.playBoss();
+      } else await turn(r);
+      expect(kinds(r)).not.toContain("warn");
+    }
+    const n = BOSS_POWERS.showdownMeterTurns;
+    expect(fills).toEqual(Array.from({ length: 8 }, (_, i) => Math.min(1, i / n)));
+    expect(scouts).toEqual(Array.from({ length: 8 }, (_, i) => i + 1 >= BOSS_POWERS.showdownFrom || i >= n));
+    // Full: "ready" from the crowd turn after his showdownMeterTurns-th move, the same fill all along.
+    expect(r.bossView()!.powers!.ready).toBe(0);
+    expect(r.boss!.powers!.showdown ?? null).toBeNull();
+  }, 60_000);
+
+  it("full, he fires on his first turn where one qualifies: the line-up after his move, no warning; the forced duel; the meter empties and fills again", async () => {
+    const r = raid({ engine: duelEngine() });
+    const n = BOSS_POWERS.showdownMeterTurns;
+    for (let t = 1; t <= n; t++) {
+      expect(r.bossAsks()?.showdown).toBeUndefined();
+      await turn(r);
+      expect(kinds(r)).not.toContain("warn");
+    }
+    // Full as crowd turn n + 1 begins: at his turn after it, the showdown is asked for and lined up.
+    await crowdOnly(r);
     expect(r.bossAsks()).toMatchObject({ showdown: "try" });
-    const ask = r.bossAsks()!;
-    expect(ask.seed).toBe(lassoSeed(r.boss!.powers!.seed, 3));
+    expect(r.bossAsks()!.seed).toBe(lassoSeed(r.boss!.powers!.seed, n + 2));
     await r.playBoss();
     const p = r.boss!.powers!;
-    expect(p.ultAt).toBe(3);
-    expect(p.showdown!.turn).toBe(3);
-    expect(p.showdown!.pairs.length).toBe(3);
+    expect(p.ultAt).toBe(n + 2);
+    expect(p.showdown).toMatchObject({ turn: n + 2, ply: r.boards.get(0)!.history.length });
+    expect(p.events).toContainEqual({ kind: "showdown", turn: n + 2, squares: p.showdown!.pairs.flatMap((x) => [x.crowd, x.boss]) });
+    expect(powerMomentMs(p.events)).toBeGreaterThanOrEqual(SHOWDOWN.total);
     const board = r.boards.get(0)!;
     expect(board.bases).toContainEqual({ ply: board.history.length, fen: board.fen });
     expect(p.showdown!.before).toBe(applyMove(fenAtPly(board.history, board.history.length - 1, board.bases), board.history.at(-1)!));
-    expect(checkLineup(p.showdown!.before, p.showdown!.pairs.map((x) => `${x.crowdFrom}${x.crowd}${x.bossFrom}${x.boss}`).join(" "))!.fen).toBe(board.fen);
-    expect(p.events).toContainEqual({ kind: "showdown", turn: 3, squares: p.showdown!.pairs.flatMap((x) => [x.crowd, x.boss]) });
-    expect(powerMomentMs(p.events)).toBeGreaterThanOrEqual(SHOWDOWN.total);
-    // The forced duel: only the three captures.
+    // The forced duel: only the captures.
     const duels = p.showdown!.pairs.map((x) => x.crowd + x.boss).sort();
     expect([...crowdAllowed(r.boss, board.fen)!].sort()).toEqual(duels);
     expect(powerTurn(r.boss)).toBe(true);
-    // The meter's spent; the duel resolves as a normal move, and after it the game is free again.
-    expect(r.bossView()!.powers!.rage).toBe(1);
+    // Its turn: the meter's spent (the screens show it full as it comes); then it fills again from empty.
+    expect(r.bossView()!.powers!.ultAt).toBe(n + 2);
+    expect(r.bossView()!.powers!.ready).toBeNull();
     await turn(r, duels[0]);
     expect(r.crowdAllowed()).toBeNull();
-    expect(r.bossView()!.powers!.rage).toBe(0);
     expect(r.bossView()!.powers!.ultAt).toBeNull();
-  });
-
-  it("no legal duel (one pinned, say): the turn is a normal move, so it never locks up", () => {
-    const fen = applyMove(START_FEN, "e2e4");
-    const b = bossWith(fen, { showdown: { turn: 6, pairs: [{ piece: "q", crowd: "d4", boss: "d5", crowdFrom: "d1", bossFrom: "d8" }], before: fen, edge: null } }, 5);
-    // Neither d4 nor d5 holds those pieces here: no duel is legal, so nothing is limited.
-    expect(crowdAllowed(b, fen)).toBeNull();
-  });
-
-  it("nothing found: \"Not yet...\" for showdownHolds turns, then his last try (two pairs allowed), then a drag; the meter is spent either way", async () => {
-    // Nothing ever qualifies, and drags cost the crowd half a pawn.
-    const e = valueEngine((f) => (f.split(" ")[1] === "w" && f.split(" ")[0] !== lastBefore ? forEdge(-0.5) : 0.5));
-    let lastBefore = "";
-    const r = showdownRaid(e, { bossMaxMoves: 30 });
-    await turn(r, "e2e4");
-    const seen: string[] = [];
-    for (let t = 2; t <= 5; t++) {
-      await crowdOnly(r);
-      const ask = r.bossAsks();
-      seen.push(ask?.showdown ?? "-");
-      lastBefore = "";
-      await r.playBoss();
-      const kinds = r.boss!.powers!.events.map((x) => x.kind);
-      seen.push(kinds.join("+"));
-      if (r.boss!.powers!.ultAt !== undefined) break;
-    }
-    expect(seen.slice(0, 6)).toEqual(["try", "hold", "try", "hold", "last", seen[5]]);
-    const p = r.boss!.powers!;
-    expect(p.ultAt).toBe(5);
-    expect(p.holds).toBe(0);
-    // The last try came to a drag (the passive's band) or, none in it, nothing; either way the ultimate is spent.
-    if (p.drag?.turn === 5) {
-      expect(p.drag.ult).toBe(true);
-      expect(p.events).toContainEqual({ kind: "drag", turn: 5, square: p.drag.to, squares: [p.drag.from, p.drag.to], ult: true });
-    } else expect(p.events).toContainEqual({ kind: "hold", turn: 5, ult: true });
-    expect(powerMomentMs([{ kind: "hold" }])).toBe(HOLD.total);
+    expect(r.bossView()!.powers!.rage).toBe(1 / n);
+    expect(r.boss!.powers!.ults).toBe(1);
   }, 60_000);
 
-  it("the rules alone: holds while warned, then the last try's fallback; the trigger brings it at his next turn without the warning", () => {
-    const fen = applyMove(START_FEN, "e2e4");
-    let b = bossWith(fen, { warnAt: 4 }, 4);
-    b = prepareTurn(b, fen);
-    expect(b.powers!.events).toEqual([{ kind: "hold", turn: 5 }]);
-    expect(b.powers!.holds).toBe(1);
-    b = prepareTurn({ ...b, crowdMoves: 5 }, fen);
-    expect(b.powers!.holds).toBe(2);
-    b = prepareTurn({ ...b, crowdMoves: 6 }, fen);
-    expect(b.powers!.ultAt).toBe(7);
-    expect(b.powers!.holds).toBe(0);
-    // (Spent with nothing to show: a hold marked as the ultimate's, so his line says so rather than "Not yet...".)
-    expect(b.powers!.events).toContainEqual({ kind: "hold", turn: 7, ult: true });
-    // The trigger: due at his next turn.
-    const t = triggerUltimate(bossWith(fen, {}, 4));
-    expect(t.ok).toBe(true);
-    expect(PIG.asks!(t.boss!, fen)).toMatchObject({ showdown: "try" });
-  });
+  it("full but nothing qualifies: he plays on (no warning, no \"Not yet...\"), his line said once; he fires the moment one does", async () => {
+    const gain = { r: -3 };
+    const e = valueEngine((fen) => (fen.split(" ")[1] !== "b" ? 0.5 : count(fen, "r") < count(fen, "R") ? forEdge(gain.r) : count(fen, "b") < count(fen, "B") || count(fen, "n") < count(fen, "N") ? forEdge(3) : 0.5));
+    const r = showdownRaid(e);
+    await turn(r, "e2e4");
+    // The test switch: full as turn 2 begins.
+    expect(r.bossView()!.powers!.ready).toBe(1 - BOSS_POWERS.showdownMeterTurns);
+    for (let t = 0; t < 2; t++) {
+      expect(r.bossAsks()?.showdown).toBeUndefined();
+      await crowdOnly(r);
+      expect(r.bossAsks()?.showdown).toBe("try");
+      await r.playBoss();
+      expect(r.boss!.powers!.showdown ?? null).toBeNull();
+      expect(kinds(r).filter((k) => k === "showdown" || k === "warn")).toEqual([]);
+      expect(r.bossView()!.powers!.ready).toBe(1 - BOSS_POWERS.showdownMeterTurns);
+    }
+    gain.r = 0.5;
+    await crowdOnly(r);
+    await r.playBoss();
+    expect(r.boss!.powers!.showdown?.turn).toBe(r.boss!.powers!.turn);
+    expect(kinds(r)).toContain("showdown");
+  }, 60_000);
+
+  it("at most showdownMax a battle: then no meter (none shown), and none is asked for", async () => {
+    const r = showdownRaid(duelEngine(), { bossMaxMoves: 60 });
+    await turn(r, "e2e4");
+    let fired = 0;
+    for (let t = 0; t < 30 && fired < BOSS_POWERS.showdownMax; t++) {
+      await crowdOnly(r);
+      await r.playBoss();
+      if (r.boss!.powers!.showdown?.turn === r.boss!.powers!.turn) {
+        fired++;
+        await turn(r, r.crowdAllowed()![0]);
+      }
+    }
+    expect(fired).toBe(BOSS_POWERS.showdownMax);
+    expect(r.bossView()!.powers!.rage).toBeNull();
+    for (let t = 0; t < BOSS_POWERS.showdownMeterTurns + 2; t++) {
+      expect(r.bossAsks()?.showdown).toBeUndefined();
+      await turn(r);
+    }
+    expect(r.bossView()!.powers!.ready).toBeNull();
+  }, 120_000);
+
+  it("the admins' test trigger: his meter full at once, fired at his next turn, even outside the band (marked so); with no pairs, a drag stands in", async () => {
+    const was = { ...BOSS_POWERS };
+    Object.assign(BOSS_POWERS as unknown as Record<string, number>, { showdownTestMs: 2500 });
+    try {
+      const r = raid({ engine: duelEngine({ r: -3 }) });
+      await turn(r, "e2e4");
+      await turn(r);
+      expect(r.triggerUltimate()).toBe(true);
+      expect(r.bossView()!.powers!.rage).toBe(1);
+      await crowdOnly(r);
+      expect(r.bossAsks()).toMatchObject({ showdown: "test" });
+      await r.playBoss();
+      const p = r.boss!.powers!;
+      expect(p.showdown).toMatchObject({ turn: p.turn, outside: true });
+      expect(p.showdown!.edge!).toBeLessThan(BOSS_POWERS.showdownEdge[0]);
+      expect(p.ultNext).toBeUndefined();
+      expect(r.bossView()!.powers!.showdown!.outside).toBe(true);
+      // A player's showdown is never marked outside, even if a host says so.
+      const q = raid({ engine: duelEngine() });
+      for (let t = 0; t < BOSS_POWERS.showdownMeterTurns; t++) await turn(q);
+      await crowdOnly(q);
+      const fen = fenOf(q);
+      const move = legalMoves(fen).sort()[0]!;
+      const l = [...lineups(applyMove(fen, move), 1, 3, 3000)].find(Boolean)!;
+      q.applyBossMove(move, false, { showdown: l.spec, outside: true });
+      expect(q.boss!.powers!.showdown).toMatchObject({ pairs: l.pairs });
+      expect(q.boss!.powers!.showdown!.outside).toBeUndefined();
+    } finally {
+      Object.assign(BOSS_POWERS as unknown as Record<string, number>, was);
+    }
+  }, 60_000);
 
   it("host and solo agree: the host's answer to the server's request is the line-up solo plays", async () => {
     const make = () => showdownRaid(duelEngine());
@@ -706,10 +816,10 @@ describe("Wrangler's showdown in the match", () => {
 
   /**
    * Eric, Oct 13: the crowd took his queen in the duel and he took another piece instead of taking back (his brain, Maia
-   * at 600, no guard): the crowd won a queen. The search scored each duel with his best reply, so that's what he plays.
-   * A raid on his brain (Maia at 600) with slips on (every move a stumble), up to the queens' duel.
+   * at 600, no guard): the crowd won it for free. The search scored each duel with his best reply, so that's what he
+   * plays. A raid on his brain (Maia at 600) with slips on (every move a stumble), up to the rooks' duel.
    */
-  const toQueensDuel = async () => {
+  const toRooksDuel = async () => {
     const engine = recaptureEngine();
     const r = showdownRaid(engine, { bossStumbleBelow: 9999, bossStumbleMax: 1 });
     const maia = carelessMaia();
@@ -719,18 +829,18 @@ describe("Wrangler's showdown in the match", () => {
     await r.playBoss();
     const sd = r.boss!.powers!.showdown!;
     expect(sd.turn).toBe(3);
-    const queens = sd.pairs.find((p) => p.piece === "q")!;
-    await crowdOnly(r, queens.crowd + queens.boss);
-    return { r, engine, maia, queens, fen: fenOf(r) };
+    const rooks = sd.pairs.find((p) => p.piece === "r")!;
+    await crowdOnly(r, rooks.crowd + rooks.boss);
+    return { r, engine, maia, rooks, fen: fenOf(r) };
   };
 
   it("his reply to the duel is the engine's best (taking back), never his brain's (Maia at 600) or a slip: solo", async () => {
-    const { r, engine, maia, queens, fen } = await toQueensDuel();
+    const { r, engine, maia, rooks, fen } = await toRooksDuel();
     expect(r.bossToMove()).toBe(true);
-    expect(duelReplyDue(r.boss!, r.boards.get(0)!)).toBe(true);
-    // What the search assumed: his best reply to the queens' duel takes the queen back.
+    expect(engineMoveDue(r.boss!, r.boards.get(0)!)).toBe(true);
+    // What the search assumed: his best reply to the rooks' duel takes the rook back.
     const [scored] = await engine.topMovesAt!(fen, 1, BOSS_POWERS.showdownConfirmNodes);
-    expect(scored!.move.slice(2, 4)).toBe(queens.boss);
+    expect(scored!.move.slice(2, 4)).toBe(rooks.boss);
     // His brain would take another piece, and so would a slip, as before.
     const elo = r.boss!.elo;
     expect(await bossMoveFrom(engine, fen, elo, DEFAULT_SETTINGS.bossNodes, "stumble", Math.random, [5, 15], undefined, null, { brain: "maia-raw", rating: 600, engine: carelessMaia() })).not.toBe(scored!.move);
@@ -739,33 +849,63 @@ describe("Wrangler's showdown in the match", () => {
     const asked = maia.asked;
     await r.playBoss();
     expect(r.boards.get(0)!.history.at(-1)).toBe(scored!.move);
-    expect(pieceAt(fenOf(r), queens.boss)?.color).toBe("b");
+    expect(pieceAt(fenOf(r), rooks.boss)?.color).toBe("b");
     expect(maia.asked).toBe(asked);
     expect(r.brainNote).toMatchObject({ brain: "maia-raw", rating: 600, by: "stockfish", why: "power" });
     expect(brainLine(r.brainNote!)).toBe("Maia 600 · no guard · Stockfish's best (power reply)");
-    // Only that one move: his next is his brain's again.
-    await turn(r);
-    expect(r.brainNote).toMatchObject({ by: "maia" });
-    expect(maia.asked).toBe(asked + 1);
   }, 60_000);
 
-  it("only right after a duel on the showdown's own turn: not before it, nor after a move the Last Stand took back", async () => {
-    const { r, queens, fen } = await toQueensDuel();
+  it("after the duel the engine plays his moves while the showdown's tactics are live, up to showdownEngineMoves: a weak brain completes the line", async () => {
+    // (His engine's best after the rooks' duel: the crowd's knight first, the rook taken back a move later.)
+    const knightsFirst = recaptureEngine("n");
+    const r = showdownRaid(knightsFirst, { bossStumbleBelow: 9999, bossStumbleMax: 1 });
+    // (A brain that misses every capture: a quiet move each time.)
+    const blind = carelessMaia(true);
+    r.humanBrain = { brain: "maia-raw", rating: 600, engine: blind };
+    await turn(r, "e2e4");
+    await crowdOnly(r, "g1f3");
+    await r.playBoss();
+    const sd = r.boss!.powers!.showdown!;
+    const rooks = sd.pairs.find((p) => p.piece === "r")!;
+    const knights = sd.pairs.find((p) => p.piece === "n")!;
+    await crowdOnly(r, rooks.crowd + rooks.boss);
+    const byEngine: boolean[] = [];
+    // His reply, then a quiet crowd move (it leaves its rook where his protector can take it), then his next move...
+    for (let i = 0; i < BOSS_POWERS.showdownEngineMoves + 1 && !r.isOver(); i++) {
+      byEngine.push(r.bossBestReply());
+      await r.playBoss();
+      if (i === 0) expect(r.boards.get(0)!.history.at(-1)!.slice(2, 4)).toBe(knights.crowd);
+      if (i === 1) expect(r.boards.get(0)!.history.at(-1)!.slice(2, 4)).toBe(rooks.boss);
+      const quiet = (r.crowdAllowed() ?? legalMoves(fenOf(r))).filter((m) => !pieceAt(fenOf(r), m.slice(2, 4)) && /^[a-h]2[a-h][34]$/.test(m)).sort()[0];
+      await crowdOnly(r, quiet);
+    }
+    // The engine's two captures (his reply, then the rook taken back), his brain's after the tactics are over or the cap.
+    expect(byEngine.slice(0, 2)).toEqual([true, true]);
+    expect(byEngine.filter(Boolean).length).toBeLessThanOrEqual(BOSS_POWERS.showdownEngineMoves);
+    expect(byEngine.at(-1)).toBe(false);
+    expect(pieceAt(fenOf(r), rooks.boss)?.color).toBe("b");
+  }, 60_000);
+
+  it("only after a duel on the showdown's own turn: not before it, nor after a move the Last Stand took back; the tactics over, his brain", async () => {
+    const { r, rooks, fen } = await toRooksDuel();
     const board = r.boards.get(0)!;
-    expect(duelReplyDue(r.boss!, board)).toBe(true);
-    // (A turn later, or a move that isn't a duel: his brain's move, as ever.)
-    expect(duelReplyDue({ ...r.boss!, crowdMoves: r.boss!.crowdMoves + 1 }, board)).toBe(false);
-    expect(duelReplyDue(r.boss!, { history: [...board.history.slice(0, -1), "a2a3"] })).toBe(false);
-    // The Last Stand took the duel back: the move count went back one and the duel isn't on the board; the crowd picks again.
-    expect(duelReplyDue({ ...r.boss!, crowdMoves: r.boss!.crowdMoves - 1 }, { history: board.history.slice(0, -1) })).toBe(false);
-    expect(applyMove(fenAtPly(board.history, board.history.length - 1, board.bases), queens.crowd + queens.boss)).toBe(fen);
+    expect(engineMoveDue(r.boss!, board)).toBe(true);
+    // A move that isn't a duel from the line-up, or none played yet (the Last Stand took it back): his brain's.
+    const sd = r.boss!.powers!.showdown!;
+    expect(engineMoveDue(r.boss!, { history: [...board.history.slice(0, -1), "a2a3"], fen: board.fen })).toBe(false);
+    expect(engineMoveDue(r.boss!, { history: board.history.slice(0, sd.ply), fen: sd.before })).toBe(false);
+    expect(applyMove(fenAtPly(board.history, sd.ply!, board.bases), rooks.crowd + rooks.boss)).toBe(fen);
+    // The tactics over (no line-up piece attacked): his brain, even within the cap.
+    expect(showdownLive("4k3/8/8/8/8/8/8/R3K3 b - - 0 1", { crowd: ["a1"], boss: [] }, "w")).toBe(false);
+    expect(showdownLive("4k3/8/8/8/8/8/4K3/r6R b - - 0 1", { crowd: ["h1"], boss: [] }, "w")).toBe(true);
+    expect(showdownLive("4k3/8/8/8/8/8/4K3/r6R b - - 0 1", { crowd: [], boss: ["a1"] }, "w")).toBe(true);
     // Wrangler's rules are the only ones that ask for it.
     expect(PIG.bestReply!(r.boss!, board)).toBe(true);
     for (const def of BOSS_ROSTER.filter((b) => b.id !== "pig")) expect(bossRules({ id: def.id })?.bestReply).toBeUndefined();
   }, 60_000);
 
   it("the King's strike still staggers it (the crowd's own power); the stumble's draw is still made, so nothing else moves", async () => {
-    const { r } = await toQueensDuel();
+    const { r } = await toRooksDuel();
     const draws = vi.spyOn(r, "bossStumbles");
     expect(r.bossMoveKind()).toBe("best");
     expect(draws).toHaveBeenCalledTimes(1);
@@ -774,8 +914,7 @@ describe("Wrangler's showdown in the match", () => {
   }, 60_000);
 
   it("the host's path: the server's request (best, no brain) played as net.ts plays it is the reply solo plays", async () => {
-    const { r, engine, fen } = await toQueensDuel();
-    // The request the server sends (lobby.ts's sendBossRequest), and the host's answer (net.ts's hostBoss).
+    const { r, engine, fen } = await toRooksDuel();
     const kind = r.bossMoveKind();
     expect(kind).toBe("best");
     const asks = r.bossAsks();

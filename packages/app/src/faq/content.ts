@@ -583,7 +583,7 @@ Plays from the game so far, and his first move is a pawn's. Then the **split paw
 Plays from the starting position. His first move, after yours, is the **long pull**: a center pawn's double step, then he lassos it one square further, three squares in one move (d7 to d4 or e7 to e4; if you're Black, e2 to e5 or d2 to d5). The engine picks the pawn that suits the position; if neither would be safe there (it would just be taken, or its way is blocked), he plays an ordinary first move. It's worth about nothing either way: flavor. His lassos are why he plays ${Math.abs(b.offset)} under the usual strength.
 
 - **Lasso drag** (passive): from turn ${p.dragFirst}, every ${n(p.dragEvery, "turn")}, after his move he ropes one of your pieces (never your king) and drags it one square up, down, left or right onto an empty square. It never leaves you in check or without a move, and a pawn never ends on the first or last rank. The engine picks a drag that costs you only a little: between ${num(p.dragLoss[0])} and ${num(p.dragLoss[1])} of a pawn. If none fits (or the game is already decided), there's no drag that turn and he tries again after his next move.
-- **SHOWDOWN!** (ultimate): the warning, then after his move he lines up three pairs facing each other in the middle of the board: your queen against his, a rook against a rook, and a bishop or knight against its match. His three are always protected. **Your next move must be one of the three duels**: one of your three takes the piece facing it. The three glow, and nothing else can be played. The engine sets it up so that even the right duel tips the game a little his way (about ${num(p.showdownEdge[0])} to ${num(p.showdownEdge[1])} of a pawn) and a wrong one costs you ${num(p.showdownTrap)} pawns or more on top, so look before you take. If he can't find such a line-up, he says "Not yet..." and tries again after his next move (up to ${n(p.showdownHolds, "time")}), then with two pairs, and failing that he drags a piece instead.`,
+- **SHOWDOWN!** (ultimate): Wrangler has a meter of his own instead of the rage meter. His moves fill it, ${n(p.showdownMeterTurns, "move")} from empty to full, and nothing else adds to it. When it's full he says "I've got you in my sights." and swings both ropes. From then on, after the first of his moves where he finds a line-up that suits him, he fires with no other warning: three pairs facing each other anywhere on the board off the back ranks, a rook against a rook, a bishop against a bishop and a knight against a knight (two pairs when three won't work; never queens). His pieces are always protected. **Your next move must be one of the duels**: one of your pieces takes the one facing it. The duels glow, and nothing else can be played. The engine sets it up so that even the right duel leaves the game about where it was or tips it his way (${p.showdownEdge[0] < 0 ? `from ${num(-p.showdownEdge[0])} of a pawn your way to ${num(p.showdownEdge[1])} his way` : `${num(p.showdownEdge[0])} to ${num(p.showdownEdge[1])} of a pawn his way`}), and a wrong one costs you ${num(p.showdownTrap)} pawns or more on top, so look before you take. He answers your duel with the engine's best move, and keeps playing the engine's moves while pieces from the line-up can still be taken (up to ${n(p.showdownEngineMoves, "move")}). Then his meter empties and fills again: at most ${n(p.showdownMax, "showdown")} a battle.`,
 };
 
 function bossPowers(src: FaqSources): FaqSection {
@@ -593,7 +593,8 @@ function bossPowers(src: FaqSources): FaqSection {
   const level = Math.ceil(p.rageFull / (p.ragePerMove || 1));
   const ahead = Math.ceil(p.rageFull / (p.ragePerMove + p.rageAheadMax || 1));
   const queen = 9 * p.ragePerMaterial >= p.rageFull;
-  const speeds = playable.map((b) => `${b.name} ×${num(p.rageSpeed[b.id] ?? 1)}`).join(", ");
+  // (Wrangler's meter is his own: below.)
+  const speeds = playable.filter((b) => b.id !== "pig").map((b) => `${b.name} ×${num(p.rageSpeed[b.id] ?? 1)}`).join(", ");
   const blocks = playable
     .map((b) => {
       const words = BOSS_BLOCKS[b.id];
@@ -630,7 +631,7 @@ In a level game (at ×1) it's full after about ${n(level, "crowd move")}; with t
 `
     : ""
 }
-When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's and Big Boy's ultimates come at the start of their own turn instead (Lights out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler's can wait a turn or two for a line-up (below).
+When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's and Big Boy's ultimates come at the start of their own turn instead (Lights out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler has a meter of his own with no warning (below).
 
 Then the meter empties and fills again for the next one. While an ultimate is still under way (the blizzard's ${n(Math.max(2, Math.round(p.blizzardTurns)), "turn")}, the Roman candle's fireballs still falling or burning, the board flipped or sawn in two, Lights out and the extra move after it) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap.
 
@@ -668,7 +669,7 @@ The crowd's champion in every boss battle: raids, the Crowd's boss battle and Bo
 He has up to ${n(S.kingChargesMax, "charge")}. In a raid or Boss alone he starts with ${S.kingChargesMax}. In the Crowd's boss battle, the finalists' leftover power-ups become his charges: one for every ${S.kingPowerUpsPerCharge}, rounded, at least ${kingCharges(0, S)} and at most ${S.kingChargesMax}. Tap him to open his menu:
 
 - **Play this move:** he plays the engine's best move for the crowd, at full strength (stronger than the boss).
-- **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move. It enrages the boss too: ${src.powers.rageStrike} on its [rage meter](#rage-meter) (unless an ultimate is under way).
+- **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move. It enrages the boss too: ${src.powers.rageStrike} on its [rage meter](#rage-meter) (unless an ultimate is under way; Wrangler's meter is his own, and a strike adds nothing to it).
 
 Either needs **more than half the crowd** to call him. Bots back a person's call ${pct(S.kingBotFollow, 0)} of the time, and call him to play themselves when the crowd's popular move would give away ${n(S.kingBotLoss, "point")} or more. In Boss alone, your call is enough. If you call him to play instead of picking, you sit that turn out: no score either way, and it isn't a miss. The clock stands still while he acts, and a move he plays is never brilliant.
 

@@ -9,24 +9,27 @@
  * - **The lasso drag** (his passive): every few turns, after his move, he ropes one crowd piece (never the king) and
  *   drags it one square up, down, left or right onto an empty square, picked so it costs the crowd a little by the
  *   engine's measure (BOSS_POWERS.dragLoss); none in the band: none that turn.
- * - **SHOWDOWN!** (his ultimate, the turn after the rage warning): three pairs (a crowd piece and one of his of the
- *   same kind) lined up facing each other in the middle of the board, his always protected, and the crowd's next move
- *   must be one of the duels: its piece taking his. The engine picks a line-up where the best duel still leaves him a
- *   little ahead and a wrong one costs the crowd dearly. Nothing found: he holds it ("Not yet...") and tries again,
- *   then two pairs, then a lasso drag, so it never fizzles. His reply to the duel is the engine's best at full strength,
- *   the reply the search scored (duelReplyDue), never his brain's.
+ * - **SHOWDOWN!** (his ultimate; Eric, Oct 13: "he checks every turn after three or four moves, and the moment it's
+ *   ready he fires it with no warning"): his own meter fills over his first showdownMeterTurns moves ("I've got you in
+ *   my sights." as it fills); from then on, on the first of his turns where one qualifies, three pairs (a rook, a
+ *   bishop and a knight of the crowd's and his: never queens), or two, are lined up facing each other anywhere off the
+ *   back ranks, his always protected, and the crowd's next move must be one of the duels: its piece taking his. The
+ *   engine picks a line-up where the best duel still leaves him a little ahead and a wrong one costs the crowd dearly;
+ *   it searches from his move showdownFrom, while the crowd thinks, so one is usually ready when the meter fills. His
+ *   reply to the duel, and his next moves while its tactics are live, are the engine's at full strength
+ *   (engineMoveDue), never his brain's. Then the meter empties and fills again, showdownMax a battle.
  *
  * The engine's part runs where the boss's moves are worked out (the host's device online, this device in solo) and
  * reaches everyone through the shared match state (each change is a base on the board); the server checks every
  * answer against the rules here (dragOptions, checkLineup). Numbers: BOSS_POWERS.pull*, drag*, showdown*. His art and
  * moments are the app's (characters/pig.ts, components/Pig.tsx).
  */
-import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossState, type LassoDrag, type ShowdownPair, type ShowdownResult } from "@chessroyale/core";
+import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type LassoDrag, type ShowdownPair, type ShowdownResult } from "@chessroyale/core";
 import type { BoardState } from "../boards.ts";
 import { applyMove, gameEnd, legalMoves, pieceAt } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { logit, meterFull, other, powerRoll, testSwitch, turnOf, type Battle, type BossAsks, type BossMoveExtras, type BossRules, type Side } from "./base.ts";
+import { logit, other, powerRoll, turnOf, type Battle, type BossAsks, type BossMoveExtras, type BossRules, type Side } from "./base.ts";
 import { gridAttackers, gridHanging, gridKingAttacked, gridOf, isLight, placementOf, type Grid } from "./grid.ts";
 
 // ---------------- His moments' beats (ms; the app draws them, the server times by POWER_FX) ----------------
@@ -48,11 +51,8 @@ export const DRAG = PULL;
  * crowd picks its duel.
  */
 export const SHOWDOWN = { dropAt: 900, landAt: 1400, throwAt: 2400, cornerAt: 2900, pairs: [3000, 3500, 4000] as readonly number[], yankMs: 420, drawAt: 4600, total: 6000 } as const;
-/** "Not yet...": no line-up this time; his taunt and the line, then the crowd's turn. */
-export const HOLD = { total: 1900 } as const;
-
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
-export const PIG_FX = { pull: PULL.total, drag: DRAG.total, showdown: SHOWDOWN.total, hold: HOLD.total } as const;
+export const PIG_FX = { pull: PULL.total, drag: DRAG.total, showdown: SHOWDOWN.total } as const;
 
 // ---------------- Shared helpers ----------------
 
@@ -371,10 +371,8 @@ export interface Lineup {
   duels: string[];
 }
 
-/** The middle of the board the line-up stands in: files b-g, ranks 3-6. */
-const inMiddle = (sq: string) => file(sq) >= 1 && file(sq) <= 6 && rank(sq) >= 3 && rank(sq) <= 6;
-/** The six squares stand close together: within this many files of each other (the middle is six wide). */
-const SPAN_FILES = 4;
+/** Where a line-up stands (Eric, Oct 13: anywhere on the board, off both back ranks): ranks 2-7, any file. */
+const inZone = (sq: string) => rank(sq) >= 2 && rank(sq) <= 7;
 
 /** The squares strictly between two squares on a line (none for a knight's jump or neighbors). */
 function between(a: string, b: string): string[] {
@@ -426,11 +424,11 @@ function lineupFault(g: Grid, pairs: readonly ShowdownPair[], crowd: Side): stri
 
 /**
  * A line-up as written (lineupSpec) checked against the rules in this position (`fen`: his move just played, the crowd
- * to move): 2 or 3 pairs (`duels`), each a crowd piece and one of his of the same kind (a queen, rook, bishop or knight:
- * never a king or pawn), every square moved to in the middle (files b-g, ranks 3-6), the six within five files, each
- * moved piece's from-square its own and no square used twice, bishops on their own color, each pair facing off with
- * nothing or one empty square between (knights a jump apart), his pieces protected, no check either way, and every duel
- * legal. Returns the checked line-up, or null. Pure: the server checks the host's answer with it.
+ * to move): 2 or 3 pairs (`duels`), each a crowd piece and one of his of the same kind (a rook, bishop or knight: never
+ * a queen, king or pawn; Eric, Oct 13), every square moved to on ranks 2-7 (anywhere off the back ranks), each moved
+ * piece's from-square its own and no square used twice, bishops on their own color, each pair facing off with nothing
+ * or one empty square between (knights a jump apart), his pieces protected, no check either way, and every duel legal.
+ * Returns the checked line-up, or null. Pure: the server checks the host's answer with it.
  */
 export function checkLineup(fen: string, spec: string | null | undefined, duels: readonly number[] = [2, 3]): Lineup | null {
   if (!spec) return null;
@@ -448,8 +446,8 @@ export function checkLineup(fen: string, spec: string | null | undefined, duels:
     const b = g0.get(bossFrom);
     if (!c || !b || !mineOf(c, crowd) || !mineOf(b, boss)) return null;
     const kind = c.toLowerCase();
-    if (kind !== b.toLowerCase() || !"qrbn".includes(kind)) return null;
-    if (!inMiddle(crowdTo) || !inMiddle(bossTo)) return null;
+    if (kind !== b.toLowerCase() || !"rbn".includes(kind)) return null;
+    if (!inZone(crowdTo) || !inZone(bossTo)) return null;
     if (kind === "b" && (isLight(crowdFrom) !== isLight(crowdTo) || isLight(bossFrom) !== isLight(bossTo))) return null;
     pairs.push({ piece: kind, crowd: crowdTo, boss: bossTo, crowdFrom, bossFrom });
     moved.push(crowdFrom, bossFrom);
@@ -464,8 +462,6 @@ export function checkLineup(fen: string, spec: string | null | undefined, duels:
     g.set(pr.crowd, g0.get(pr.crowdFrom)!);
     g.set(pr.boss, g0.get(pr.bossFrom)!);
   }
-  const files = pairs.flatMap((pr) => [file(pr.crowd), file(pr.boss)]);
-  if (Math.max(...files) - Math.min(...files) > SPAN_FILES) return null;
   if (lineupFault(g, pairs, crowd)) return null;
   const after = fenWith(fen, g, moved);
   const duelMoves = pairs.map((pr) => pr.crowd + pr.boss);
@@ -479,51 +475,61 @@ export function checkLineup(fen: string, spec: string | null | undefined, duels:
 }
 
 /**
- * The kinds of pair a showdown of `n` duels lines up (Eric: the most valuable pairs): queens, rooks, then bishops (both
- * on one color) or knights (`minor` first), each kind once while there are enough kinds, then a second pair of a kind
- * both sides have two of. Null when there aren't `n` pairs to be had.
+ * The kinds of pair a showdown of `n` duels lines up (Eric, Oct 13: a rook, a bishop and a knight, never queens): the
+ * rook pair, then the bishop pair (both on one color) and the knight pair (`minor` first: for two pairs, the seed picks
+ * which minor joins the rook), each kind once while there are enough kinds; a pair that can't be formed (bishops on
+ * different colors or gone, say) is replaced by a second pair of a kind both sides have two of, rooks first, then
+ * knights, then bishops (one pair on each color). Null when there aren't `n` pairs to be had (three can't: try two).
  */
 function pairKinds(g: Grid, crowd: Side, n: number, minor: "b" | "n"): string[] | null {
   const count = (side: Side, kind: string, light?: boolean) => [...g].filter(([sq, c]) => mineOf(c, side) && c.toLowerCase() === kind && (light === undefined || isLight(sq) === light)).length;
   const both = (kind: string) => Math.min(count(crowd, kind), count(other(crowd), kind));
-  const bishops = Math.max(Math.min(count(crowd, "b", true), count(other(crowd), "b", true)), Math.min(count(crowd, "b", false), count(other(crowd), "b", false)));
-  const have: Record<string, number> = { q: both("q"), r: both("r"), b: bishops, n: both("n") };
-  const order = ["q", "r", minor, minor === "b" ? "n" : "b"];
+  const onLight = Math.min(count(crowd, "b", true), count(other(crowd), "b", true));
+  const onDark = Math.min(count(crowd, "b", false), count(other(crowd), "b", false));
+  // (Bishop pairs: one on each color at most, a light pair and a dark pair.)
+  const have: Record<string, number> = { r: both("r"), b: Math.min(1, onLight) + Math.min(1, onDark), n: both("n") };
+  const order = ["r", minor, minor === "b" ? "n" : "b"];
   const kinds = order.filter((k) => have[k]! > 0).slice(0, n);
-  for (const k of ["r", "n", "b", "q"]) if (kinds.length < n && have[k]! >= 2) kinds.push(k);
+  for (const k of ["r", "n", "b"]) if (kinds.length < n && have[k]! >= 2) kinds.push(k);
   return kinds.length === n ? kinds : null;
+}
+
+/** How many pairs a showdown can line up on this board now: 3, else 2 (pairKinds); [] when not even two. */
+export function pairSizes(fen: string, crowd: Side): number[] {
+  const g = gridOf(fen);
+  const can = (n: number) => !!(pairKinds(g, crowd, n, "b") ?? pairKinds(g, crowd, n, "n"));
+  return [3, 2].filter(can);
 }
 
 const DIRS: Record<string, readonly (readonly [number, number])[]> = {
   r: [[1, 0], [-1, 0], [0, 1], [0, -1]],
   b: [[1, 1], [1, -1], [-1, 1], [-1, -1]],
-  q: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]],
   n: [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]],
 };
 
-/** One seeded try at a line-up of `n` pairs (the director's method: a cluster near the middle, a pair at a time). */
+/**
+ * One seeded try at a line-up of `n` pairs, a pair at a time: the crowd's piece of the kind to an empty square anywhere
+ * on ranks 2-7 (Eric, Oct 13: anywhere on the board), his facing it.
+ */
 function lineupTry(fen: string, g0: Grid, crowd: Side, n: number, rnd: () => number): { pairs: ShowdownPair[]; ganged: number } | null {
   const boss = other(crowd);
   const kinds = pairKinds(g0, crowd, n, rnd() < 0.5 ? "b" : "n");
   if (!kinds) return null;
   const g = new Map(g0);
-  const cx = 2 + Math.floor(rnd() * 4);
-  const cy = 3 + Math.floor(rnd() * 4);
   const pairs: ShowdownPair[] = [];
   const taken = new Set<string>();
   for (const kind of kinds) {
     let placed = false;
     for (let a = 0; a < 40 && !placed; a++) {
-      const cf = cx + Math.floor(rnd() * 5) - 2;
-      const cr = cy + Math.floor(rnd() * 3) - 1;
-      if (!onBoard(cf, cr)) continue;
+      const cf = Math.floor(rnd() * 8);
+      const cr = 2 + Math.floor(rnd() * 6);
       const c = square(cf, cr);
       const dirs = DIRS[kind]!;
       const [df, dr] = dirs[Math.floor(rnd() * dirs.length)]!;
       const k = kind === "n" ? 1 : rnd() < 0.6 ? 1 : 2;
       if (!onBoard(cf + df * k, cr + dr * k)) continue;
       const h = square(cf + df * k, cr + dr * k);
-      if (!inMiddle(c) || !inMiddle(h) || g.has(c) || g.has(h) || taken.has(c) || taken.has(h)) continue;
+      if (!inZone(c) || !inZone(h) || g.has(c) || g.has(h) || taken.has(c) || taken.has(h)) continue;
       if (between(c, h).some((sq) => g.has(sq) || taken.has(sq))) continue;
       const pick = (side: Side, at: string) => {
         const options = [...g0].filter(([sq, p]) => mineOf(p, side) && p.toLowerCase() === kind && g.get(sq) === p && !taken.has(sq) && (kind !== "b" || isLight(sq) === isLight(at))).map(([sq]) => sq).sort();
@@ -643,6 +649,13 @@ export const promising = (x: LineupScore, s: Pick<BossPowerSettings, "showdownEd
 /** How far outside the goal a quick scan's numbers may be and still be looked at closely (pawns; measured: none missed). */
 const SCAN_SLACK = { below: 0.6, above: 1, trap: 1 } as const;
 
+/**
+ * How far a scored line-up is from Eric's goal, in pawns (0: inside the band with the trap; a forced mate for him:
+ * never). The test trigger's fallback takes the nearest when none qualifies.
+ */
+export const missBy = (x: LineupScore, s: Pick<BossPowerSettings, "showdownEdge" | "showdownTrap"> = BOSS_POWERS): number =>
+  x.mate ? Infinity : Math.max(0, s.showdownEdge[0] - x.gain, x.gain - s.showdownEdge[1]) + Math.max(0, s.showdownTrap - x.trap);
+
 /** The order he takes line-ups in: nearest showdownTarget, ties from the seed. */
 export function rankShowdowns(scored: readonly LineupScore[], seed: number, s: Pick<BossPowerSettings, "showdownTarget"> = BOSS_POWERS): LineupScore[] {
   return scored
@@ -691,6 +704,10 @@ export interface ShowdownSearch {
   enough?: number;
   /** Stops it from outside (a scout's turn is over). */
   stopped?: () => boolean;
+  /** Each line-up as the quick scan scored it (the test trigger keeps the nearest to the goal). */
+  onScored?: (x: LineupScore) => void;
+  /** The fresh line-ups to draw from (a search in rounds carries on from where it stopped); else lineups() from the seed. */
+  fresh?: Generator<Lineup | null>;
 }
 
 /**
@@ -703,7 +720,7 @@ export async function searchShowdowns(q: ShowdownSearch, s: ShowdownSettings = B
   const now = q.now ?? (() => performance.now());
   const max = q.max ?? s.showdownSetups;
   const carried = (q.carry ?? []).map((spec) => checkLineup(q.fen, spec, [q.duels])).filter((l): l is Lineup => !!l);
-  const fresh = lineups(q.fen, q.seed, q.duels);
+  const fresh = q.fresh ?? lineups(q.fen, q.seed, q.duels);
   const seen = new Set<string>();
   // (The tries run on the page's own thread: after SLICE_MS of them it lets the page draw a frame before going on.)
   let sliceFrom = now();
@@ -735,6 +752,7 @@ export async function searchShowdowns(q: ShowdownSearch, s: ShowdownSettings = B
     if (!batch.length) break;
     tried += batch.length;
     const scored = await scoreLineups(q.engines, batch, q.before, s.showdownNodes, s);
+    for (const x of scored) if (x) q.onScored?.(x);
     for (const x of scored) if (x && promising(x, s)) found.push(x);
     if (q.enough && found.length >= q.enough) break;
   }
@@ -752,34 +770,50 @@ export async function confirmShowdown(
   before: number,
   found: readonly LineupScore[],
   s: ShowdownSettings = BOSS_POWERS,
-  opts: { tries?: number; deadline?: number; now?: () => number } = {},
-): Promise<{ spec: string; gain: number } | null> {
+  opts: { tries?: number; deadline?: number; now?: () => number; all?: boolean; onConfirmed?: (x: LineupScore, ok: boolean) => void } = {},
+): Promise<ShowdownPick | null> {
   const now = opts.now ?? (() => performance.now());
+  let first: ShowdownPick | null = null;
   for (const x of found.slice(0, opts.tries ?? 4)) {
     if (opts.deadline !== undefined && now() >= opts.deadline) break;
     const l = checkLineup(fen, x.spec, [x.duels]);
     if (!l) continue;
     const [again] = await scoreLineups(engines, [l], before, s.showdownConfirmNodes, s);
-    if (!again || !qualifies(again, s)) continue;
-    if (mateInOne(applyMove(l.fen, l.duels[again.gains.indexOf(again.gain)]!))) continue;
-    return { spec: l.spec, gain: again.gain };
+    if (!again) continue;
+    const ok = qualifies(again, s) && !mateInOne(applyMove(l.fen, l.duels[again.gains.indexOf(again.gain)]!));
+    opts.onConfirmed?.(again, ok);
+    if (!ok) continue;
+    first ??= { spec: l.spec, gain: again.gain, duels: again.duels };
+    // (`all`: every one confirmed, as the scout keeps them; else the first that qualifies.)
+    if (!opts.all) break;
   }
-  return null;
+  return first;
+}
+
+/** A showdown he can line up: its line-up (lineupSpec), his edge after the crowd's best duel, and its size. */
+export interface ShowdownPick {
+  spec: string;
+  gain: number;
+  duels: number;
+  /** The test trigger's line-up outside the band (none inside it found). */
+  outside?: true;
 }
 
 /**
- * The scout (the director's plan): while the crowd thinks on a turn the showdown may follow (the meter nearly full, the
- * warning, a hold, the test trigger), it scans line-ups on the position then, in the background on an engine of its own,
- * for up to showdownSearchMs a turn. His move changes the position, so at his turn the promising ones it found are
- * scanned again on the new one first (most still stand: a move or two touch few of the six pieces), then fresh ones
- * (showdownFrom). One per device that works out the boss's moves.
+ * The scout (Eric, Oct 13: "he checks every turn after three or four moves"): on each crowd turn a showdown may follow
+ * (from his move showdownFrom, while he has one left), it searches the position then, in the background on an engine of
+ * its own, for up to showdownSearchMs: three pairs, then two, the line-ups it kept from earlier turns first (checked
+ * again on the new position: dropped once they no longer hold or look promising), then fresh ones; the promising ones
+ * are confirmed, and it keeps the best (those that qualify first). His move changes the position, so at his turn the
+ * kept ones are checked again on the new one first (showdownFrom). One per device that works out the boss's moves.
  */
 export class ShowdownScout {
-  private found: { spec: string; duels: number; off: number }[] = [];
+  private kept = new Map<number, { spec: string; off: number; ok: boolean }[]>();
   private running: { fen: string; stop: boolean } | null = null;
   private busy: Promise<unknown> = Promise.resolve();
-  /** How many line-ups it has scanned (tests, and the admins' notes). */
+  /** How many line-ups it has scanned, and how many it confirmed as qualifying (tests, the sims, the admins' notes). */
   scanned = 0;
+  qualified = 0;
 
   constructor(
     private readonly engine: () => Promise<EngineLike | null>,
@@ -788,7 +822,7 @@ export class ShowdownScout {
   ) {}
 
   /** Scouts this position (the crowd to move) for showdowns of these sizes, until showdownSearchMs or stop(). Once per position. */
-  scout(fen: string, duels: readonly number[] = [3]): void {
+  scout(fen: string, sizes: readonly number[] = [3, 2]): void {
     if (this.running?.fen === fen) return;
     this.stop();
     const run = { fen, stop: false };
@@ -801,12 +835,19 @@ export class ShowdownScout {
       const deadline = this.now() + this.s.showdownSearchMs;
       const before = await edgeBefore([engine], fen, this.s.showdownConfirmNodes, this.s).catch(() => null);
       if (before === null) return;
-      for (const n of duels) {
+      const can = sizes.filter((n) => pairSizes(fen, fen.split(" ")[1] === "b" ? "b" : "w").includes(n));
+      for (const [i, n] of can.entries()) {
         if (run.stop) return;
-        const share = n === duels[duels.length - 1] ? deadline : this.now() + (deadline - this.now()) / 2;
-        const r = await searchShowdowns({ engines: [engine], fen, seed, duels: n, before, deadline: share, max: 10_000, now: this.now, stopped: () => run.stop }, this.s).catch(() => ({ found: [] as LineupScore[], tried: 0 }));
+        // (Three pairs the larger share; each size's scan leaves a third of its time for the closer looks.)
+        const share = i === can.length - 1 ? deadline : this.now() + (deadline - this.now()) * 0.6;
+        const scanUntil = this.now() + (share - this.now()) * 0.65;
+        const r = await searchShowdowns({ engines: [engine], fen, seed, duels: n, before, carry: this.carry(n), deadline: scanUntil, max: 10_000, now: this.now, stopped: () => run.stop }, this.s).catch(() => ({ found: [] as LineupScore[], tried: 0 }));
         this.scanned += r.tried;
-        this.keep(r.found);
+        const ok = new Set<string>();
+        await confirmShowdown([engine], fen, before, r.found, this.s, { tries: 6, deadline: share, now: this.now, all: true, onConfirmed: (x, good) => void (good && ok.add(x.spec)) }).catch(() => null);
+        if (run.stop) return;
+        this.qualified += ok.size;
+        this.keep(n, r.found, ok);
       }
     });
   }
@@ -820,23 +861,24 @@ export class ShowdownScout {
   /** Forgets everything (a new battle). */
   reset(): void {
     this.stop();
-    this.found = [];
+    this.kept.clear();
     this.scanned = 0;
+    this.qualified = 0;
   }
 
-  private keep(list: readonly LineupScore[]): void {
-    const fresh = list.map((x) => ({ spec: x.spec, duels: x.duels, off: Math.abs(x.gain - this.s.showdownTarget) }));
-    const specs = new Set(fresh.map((x) => x.spec));
-    this.found = [...fresh, ...this.found.filter((x) => !specs.has(x.spec))].slice(0, 24);
+  /** This position's promising line-ups of a size replace the last (a kept one not among them no longer holds). */
+  private keep(n: number, found: readonly LineupScore[], ok: ReadonlySet<string>): void {
+    this.kept.set(n, found.map((x) => ({ spec: x.spec, off: Math.abs(x.gain - this.s.showdownTarget), ok: ok.has(x.spec) })).slice(0, 24));
   }
 
-  /** The promising line-ups found so far of a size, nearest the target first (most recent first among equals). */
+  /** The line-ups kept of a size, those that qualified first, then nearest the target. */
   carry(duels: number): string[] {
-    return this.found
-      .map((x, i) => ({ ...x, i }))
-      .filter((x) => x.duels === duels)
-      .sort((a, b) => a.off - b.off || a.i - b.i)
-      .map((x) => x.spec);
+    return [...(this.kept.get(duels) ?? [])].sort((a, b) => Number(b.ok) - Number(a.ok) || a.off - b.off).map((x) => x.spec);
+  }
+
+  /** How many kept line-ups of a size qualified where they were confirmed. */
+  ready(duels: number): number {
+    return (this.kept.get(duels) ?? []).filter((x) => x.ok).length;
   }
 
   /** Waits for the scouting under way to wind down (its current line-up's searches), after stop(). */
@@ -846,68 +888,85 @@ export class ShowdownScout {
 }
 
 /**
- * The showdown at his turn (`fen`: his move just played, the crowd to move; `seed`: lassoSeed): for three pairs (on his
- * last try, `last`, then two), the scout's promising line-ups that still hold and fresh ones are scanned, and the
- * promising ones looked at closely, a few at a time, until one qualifies or showdownTurnMs is up (half each on his last
- * try). Null: none found.
+ * The showdown at his turn (`fen`: his move just played, the crowd to move; `seed`: lassoSeed): three pairs, then two
+ * (Eric, Oct 13: two whenever no three-pair line-up qualifies), each the scout's kept line-ups that still hold first,
+ * then fresh ones, scanned and the promising ones confirmed, until one qualifies or showdownTurnMs is up (three pairs
+ * the first 60% of it, unless three can't be had). The test trigger (`test`): up to showdownTestMs, and none qualifying,
+ * the line-up nearest the goal it saw (marked `outside`). Null: none.
  */
 export async function showdownFrom(
   engines: readonly EngineLike[],
   fen: string,
   seed: number,
-  last: boolean,
-  scout: ShowdownScout | null = null,
-  s: ShowdownSettings & Pick<BossPowerSettings, "showdownTurnMs"> = BOSS_POWERS,
+  opts: { scout?: ShowdownScout | null; test?: boolean } = {},
+  s: ShowdownSettings & Pick<BossPowerSettings, "showdownTurnMs" | "showdownTestMs"> = BOSS_POWERS,
   now: () => number = () => performance.now(),
-): Promise<{ spec: string; gain: number } | null> {
+): Promise<ShowdownPick | null> {
   if (!engines.length) return null;
+  const scout = opts.scout ?? null;
   scout?.stop();
   await scout?.idle();
+  const sizes = pairSizes(fen, fen.split(" ")[1] === "b" ? "b" : "w");
+  if (!sizes.length) return null;
   const before = await edgeBefore(engines, fen, s.showdownConfirmNodes, s);
   if (before === null) return null;
-  for (const n of last ? [3, 2] : [3]) {
-    const deadline = now() + (last ? s.showdownTurnMs / 2 : s.showdownTurnMs);
+  const end = now() + (opts.test ? s.showdownTestMs : s.showdownTurnMs);
+  // (The test trigger keeps the line-up nearest the goal it sees, in case none qualifies.)
+  const near: { x: LineupScore | null } = { x: null };
+  const onScored = opts.test ? (x: LineupScore) => void (missBy(x, s) < (near.x ? missBy(near.x, s) : Infinity) && (near.x = x)) : undefined;
+  for (const [i, n] of sizes.entries()) {
+    const deadline = i === 0 && sizes.length > 1 ? now() + (end - now()) * 0.6 : end;
     let carry = scout?.carry(n) ?? [];
-    let budget = s.showdownSetups;
+    let budget = opts.test ? 10_000 : s.showdownSetups;
     const tried = new Set<string>();
+    // (One run of fresh line-ups for the size, carried on round after round: none scanned twice.)
+    const fresh = lineups(fen, seed, n);
     while (budget > 0 && now() < deadline) {
-      const r = await searchShowdowns({ engines, fen, seed, duels: n, before, carry, deadline, max: budget, now, enough: 3 }, s);
+      const r = await searchShowdowns({ engines, fen, seed, duels: n, before, carry, deadline, max: budget, now, enough: 3, fresh, ...(onScored ? { onScored } : {}) }, s);
       budget -= r.tried;
       carry = [];
-      const fresh = r.found.filter((x) => !tried.has(x.spec));
-      for (const x of fresh) tried.add(x.spec);
-      const pick = await confirmShowdown(engines, fen, before, fresh, s, { tries: 3, deadline: deadline + 1500, now });
+      const found = r.found.filter((x) => !tried.has(x.spec));
+      for (const x of found) tried.add(x.spec);
+      const pick = await confirmShowdown(engines, fen, before, found, s, { tries: 3, deadline: deadline + 1500, now, ...(onScored ? { onConfirmed: (x: LineupScore) => onScored(x) } : {}) });
       if (pick) return pick;
       if (!r.tried) break;
     }
   }
-  return null;
+  const x = near.x;
+  const l = x ? checkLineup(fen, x.spec, [x.duels]) : null;
+  if (!x || !l) return null;
+  // (Outside the band, for the admins' test: scored again closely for the edge it reports.)
+  const [again] = await scoreLineups(engines, [l], before, s.showdownConfirmNodes, s);
+  return { spec: l.spec, gain: again?.gain ?? x.gain, duels: l.duels.length, outside: true };
 }
 
 // ---------------- His turn: what it must work out besides his move ----------------
 
 /**
  * What his turn must work out besides his move (the server's request to the host; solo's turn): his long pulls (his
- * first move), a lasso drag after it, or the showdown after it ("last": his last try, two pairs and then a drag if three
- * can't be found). `seed`: lassoSeed for the crowd turn after his move.
+ * first move), then the showdown after his move while his meter is full ("try"; "test": the admins' trigger, the best
+ * line-up even outside the band, or a drag standing in when the board can't hold one), and a lasso drag after it when
+ * one is due and no showdown comes. `seed`: lassoSeed for the crowd turn after his move.
  */
 export type PigAsk = BossAsks;
 
 /**
- * His answer: his move (a long pull is written as its three squares), and the drag or the showdown after it ("" none);
- * `edge`: what the showdown gains him at the crowd's best duel, as this device's engine put it (pawns).
+ * His answer: his move (a long pull is written as its three squares), and the showdown or the drag after it ("" none);
+ * `edge`: what the showdown gains him at the crowd's best duel, as this device's engine put it (pawns); `outside`: the
+ * test trigger's line-up outside the band.
  */
 export interface PigAnswer {
   move: string;
   drag?: string;
   showdown?: string;
   edge?: number;
+  outside?: boolean;
 }
 
 /**
  * His turn on this device's engines (the host's, or solo's): the long pull if one is sound (pullFrom), else his
- * ordinary move (`move`), then the showdown (showdownFrom; on his last try a drag if none) or the drag (dragFrom) on the
- * position after it.
+ * ordinary move (`move`), then on the position after it the showdown (showdownFrom: the scout's line-ups first), and
+ * when none comes the drag (dragFrom), if one is due or (the test trigger) to stand in for it.
  */
 export async function pigTurn(engines: readonly EngineLike[], fen: string, ask: PigAsk, move: () => Promise<string>, scout: ShowdownScout | null = null): Promise<PigAnswer> {
   if (ask.pull?.length && engines[0]) {
@@ -921,49 +980,64 @@ export async function pigTurn(engines: readonly EngineLike[], fen: string, ask: 
   } catch {
     return { move: m };
   }
+  const test = ask.showdown === "test";
   if (ask.showdown) {
-    // (His last try: he has held it enough, or three pairs aren't on the board after his move: two pairs, then a drag.)
-    const last = ask.showdown === "last" || !threePairs(after, after.split(" ")[1] === "b" ? "b" : "w");
-    const pick = await showdownFrom(engines, after, ask.seed, last, scout).catch(() => null);
-    if (pick) return { move: m, showdown: pick.spec, edge: pick.gain };
-    if (last) return { move: m, showdown: "", drag: (await dragFrom(engines, after, ask.seed).catch(() => null))?.drag ?? "" };
-    return { move: m, showdown: "" };
+    const pick = await showdownFrom(engines, after, ask.seed, { scout, test }).catch(() => null);
+    if (pick) return { move: m, showdown: pick.spec, edge: pick.gain, ...(pick.outside ? { outside: true } : {}) };
   }
-  if (ask.drag) return { move: m, drag: (await dragFrom(engines, after, ask.seed).catch(() => null))?.drag ?? "" };
-  return { move: m };
+  const drag = ask.drag || test ? ((await dragFrom(engines, after, ask.seed).catch(() => null))?.drag ?? "") : undefined;
+  return { move: m, ...(ask.showdown ? { showdown: "" } : {}), ...(drag !== undefined ? { drag } : {}) };
 }
 
-// ---------------- The rules ----------------
+// ---------------- His meter (Eric, Oct 13) ----------------
 
 /**
- * The board holds three matched pairs for a showdown (`fen`, either side to move: the crowd's pieces and his are told
- * apart by color, `crowd` its side). Without them, holding his showdown can't help (material only goes): his try is
- * his last at once (two pairs, then a drag).
+ * His meter as crowd turn `turn` is picked (0-1; his own, nothing else adds to it): his moves since it last emptied, of
+ * showdownMeterTurns, so the first showdown can come once both sides have made that many moves. Full while the test
+ * trigger is pulled. Null once he has had showdownMax: no more this battle (the screens hide it).
  */
-export function threePairs(fen: string, crowd: Side): boolean {
-  const g = gridOf(fen);
-  return !!(pairKinds(g, crowd, 3, "b") ?? pairKinds(g, crowd, 3, "n"));
+export function showdownMeter(p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null {
+  if (p.ultNext) return 1;
+  if ((p.ults ?? 0) >= s.showdownMax) return null;
+  return Math.max(0, Math.min(1, (turn - 1 - (p.sdBase ?? 0)) / s.showdownMeterTurns));
 }
 
-/** His showdown's try is his last (two pairs, then a drag, allowed): he has held it showdownHolds times, or three pairs aren't there. */
-export const showdownLast = (boss: Pick<BossState, "powers" | "crowdSide">, fen: string): boolean => (boss.powers?.holds ?? 0) >= BOSS_POWERS.showdownHolds || !threePairs(fen, boss.crowdSide);
+/** His meter is full and he's waiting to fire (none under way): the fill (its sdBase), for his line and his ready loop; else null. */
+export const showdownReady = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt" | "turn">, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null =>
+  p.ultAt === undefined && (showdownMeter(p, p.turn, s) ?? 0) >= 1 ? (p.sdBase ?? 0) : null;
 
-/** His showdown comes as the next crowd turn begins (after his move): warned, or the test trigger pulled. */
-export const showdownDue = (boss: BossState | null | undefined): boolean => {
-  const p = boss?.powers;
-  return !!p && !boss!.result && boss!.id === "pig" && p.ultAt === undefined && (!!p.ultNext || p.warnAt !== undefined);
+/**
+ * The scout searches while crowd turn `turn` is picked (a showdown may follow before long): from showdownFrom (or once
+ * his meter is full), while he has one left and none is under way.
+ */
+export const showdownScouting = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax" | "showdownFrom"> = BOSS_POWERS): boolean => {
+  const m = showdownMeter(p, turn, s);
+  return m !== null && p.ultAt === undefined && (turn >= s.showdownFrom || m >= 1);
 };
+
+/**
+ * His showdown may come after his move now (`boss`: him to move): "try" with his meter full as the crowd's last turn
+ * was picked, "test" with the admins' trigger pulled; null: not now (none under way, he has one left).
+ */
+export const showdownDue = (boss: BossState | null | undefined): "try" | "test" | null => {
+  const p = boss?.powers;
+  if (!p || boss!.result || boss!.id !== "pig" || p.ultAt !== undefined) return null;
+  if (p.ultNext) return "test";
+  return (showdownMeter(p, p.turn) ?? 0) >= 1 ? "try" : null;
+};
+
+// ---------------- The rules ----------------
 
 /** His first move is still to come (the long pull's chance). */
 const firstMoveDue = (boss: Pick<BossState, "powers">): boolean => boss.powers?.pull === undefined;
 
-/** A lasso drag comes after his move (the crowd turn it sets up is due one), unless the showdown does. */
+/** A lasso drag comes after his move (the crowd turn it sets up is due one), if no showdown does. */
 export const dragDue = (boss: BossState | null | undefined): boolean => {
   const p = boss?.powers;
-  return !!p && !boss!.result && boss!.id === "pig" && !firstMoveDue(boss!) && !showdownDue(boss) && turnOf(boss!) >= p.nextPassive;
+  return !!p && !boss!.result && boss!.id === "pig" && !firstMoveDue(boss!) && turnOf(boss!) >= p.nextPassive;
 };
 
-/** The drag (or the showdown's last-resort drag) set up the crowd turn now being picked. */
+/** The drag (or the test trigger's stand-in drag) set up the crowd turn now being picked. */
 const dragNow = (boss: BossState): LassoDrag | null => (boss.powers?.drag?.turn === turnOf(boss) ? boss.powers.drag : null);
 /** The showdown whose duel the crowd must play now. */
 export const showdownNow = (boss: Pick<BossState, "powers" | "crowdMoves"> | null | undefined): ShowdownResult | null =>
@@ -973,58 +1047,78 @@ export const showdownNow = (boss: Pick<BossState, "powers" | "crowdMoves"> | nul
 export const duelMovesOf = (sd: Pick<ShowdownResult, "pairs">): string[] => sd.pairs.map((p) => p.crowd + p.boss);
 
 /**
- * His move now answers the showdown's duel: the crowd has just played one (its piece took his), on the showdown's own
- * turn. The search scored every line-up with his best reply to each duel (scoreLineups), so that's the move he plays
- * (BossRules.bestReply): on his brain he once took another piece instead of taking back, and the crowd won his queen
- * for free (Eric, Oct 13: Maia at 600). Two pairs or three alike; a duel the God King's Last Stand took back isn't on
- * the board, so it waits for the one that is.
+ * The line-up's pieces still on the board after the moves played since it went on (`moves`: the crowd's duel first,
+ * then his reply, and so on): each side's squares, each piece followed as it moves, gone once taken.
  */
-export const duelReplyDue = (boss: Pick<BossState, "powers" | "crowdMoves">, board: Pick<BoardState, "history">): boolean => {
+export function lineupSquares(sd: Pick<ShowdownResult, "pairs">, moves: readonly string[]): { crowd: string[]; boss: string[] } {
+  let crowd = sd.pairs.map((p) => p.crowd);
+  let boss = sd.pairs.map((p) => p.boss);
+  moves.forEach((m, i) => {
+    const from = m.slice(0, 2);
+    const to = m.slice(2, 4);
+    if (i % 2 === 0) {
+      crowd = crowd.map((q) => (q === from ? to : q));
+      boss = boss.filter((q) => q !== to);
+    } else {
+      boss = boss.map((q) => (q === from ? to : q));
+      crowd = crowd.filter((q) => q !== to);
+    }
+  });
+  return { crowd, boss };
+}
+
+/**
+ * The showdown's tactics are still live (`fen`: him to move): a line-up piece of either side is still attacked by a
+ * piece of the other, so a capture inside the line-up is still on (his engine line's next capture is one of these).
+ */
+export function showdownLive(fen: string, sq: { crowd: readonly string[]; boss: readonly string[] }, crowd: Side): boolean {
+  const g = gridOf(fen);
+  return sq.crowd.some((x) => gridAttackers(g, x, other(crowd)).length > 0) || sq.boss.some((x) => gridAttackers(g, x, crowd).length > 0);
+}
+
+/**
+ * His move now is the engine's at full strength (BossRules.bestReply): the showdown's duel was played (a duel the God
+ * King's Last Stand took back isn't on the board: it waits for the one that is), and this is his reply to it (the
+ * search scored every line-up with it), or one of his next moves while the showdown's tactics are still live
+ * (showdownLive: his best reply can be another capture first, the piece taken back a move later), up to
+ * showdownEngineMoves in all (Eric, Oct 13: on his brain, Maia at 600, he once took another piece instead of taking
+ * back, and the crowd won his queen for free). Then his brain again.
+ */
+export function engineMoveDue(boss: Pick<BossState, "powers" | "crowdMoves" | "crowdSide">, board: Pick<BoardState, "history" | "fen">, s: Pick<BossPowerSettings, "showdownEngineMoves"> = BOSS_POWERS): boolean {
   const sd = boss.powers?.showdown;
-  if (!sd || sd.turn !== boss.crowdMoves) return false;
-  const last = board.history.at(-1)?.slice(0, 4);
-  return !!last && duelMovesOf(sd).includes(last);
-};
+  if (!sd) return false;
+  if (sd.ply === undefined) {
+    // (A showdown from before its ply was kept: his reply to its duel only.)
+    const last = board.history.at(-1)?.slice(0, 4);
+    return sd.turn === boss.crowdMoves && !!last && duelMovesOf(sd).includes(last);
+  }
+  const since = board.history.slice(sd.ply);
+  // (The crowd's duel, then a reply of his after each crowd move: him to move after an odd count.)
+  if (since.length % 2 === 0 || !duelMovesOf(sd).includes(since[0]!.slice(0, 4))) return false;
+  const nth = (since.length + 1) / 2;
+  if (nth > s.showdownEngineMoves) return false;
+  return nth === 1 || showdownLive(board.fen, lineupSquares(sd, since), boss.crowdSide);
+}
 
 /** Wrangler: the long pull, the lasso drag every few turns, and SHOWDOWN! */
 export const PIG: BossRules = {
   id: "pig",
-  // SHOWDOWN!: the meter full (or the test switch), its warning ("RAGE!") that turn; at his turn the line-up is searched
-  // after his move, and as the next turn begins it comes (its forced duel), or he holds it ("Not yet...") and tries
-  // again after his next move, up to showdownHolds times; then his last try's two pairs, or a lasso drag, or (no engine
-  // anywhere) nothing: the meter is spent either way. The test trigger: searched at his next turn, no warning.
+  // (The test trigger is worked out at his turn, after his move: kept until then.)
+  triggerAtHisTurn: true,
+  // SHOWDOWN! (Eric, Oct 13: "the moment it's ready he fires it with no warning"): lined up after his move on his first
+  // turn with his meter full where a line-up qualifies (afterBossMove), it comes as the next crowd turn begins; the
+  // meter empties. The test trigger's stand-in drag (the board can't hold a line-up) comes the same way.
   ultimate(next, t) {
-    const due = t.ultNext || next.warnAt !== undefined;
-    if (!due) {
-      if (meterFull(next, t) || testSwitch(t, next)) {
-        next.warnAt = t.turn;
-        t.events.push({ kind: "warn", turn: t.turn });
-      }
-      return false;
-    }
-    // (Warned as this very turn began: not yet due.)
-    if (!t.ultNext && next.warnAt === t.turn) return false;
     const sd = next.showdown?.turn === t.turn ? next.showdown : null;
-    if (sd) {
-      next.ultAt = t.turn;
-      next.holds = 0;
-      t.events.push({ kind: "showdown", turn: t.turn, squares: sd.pairs.flatMap((p) => [p.crowd, p.boss]) });
-      return true;
-    }
-    const holds = next.holds ?? 0;
-    if (holds < t.s.showdownHolds && threePairs(t.fen, t.crowd)) {
-      next.holds = holds + 1;
-      // (The test trigger, held: it carries on as if warned.)
-      if (next.warnAt === undefined) next.warnAt = t.turn;
-      t.events.push({ kind: "hold", turn: t.turn });
-      return false;
-    }
-    next.ultAt = t.turn;
-    next.holds = 0;
     const d = next.drag?.turn === t.turn && next.drag.ult ? next.drag : null;
-    t.events.push(d ? { kind: "drag", turn: t.turn, square: d.to, squares: [d.from, d.to], ult: true } : { kind: "hold", turn: t.turn, ult: true });
+    if (!sd && !d) return false;
+    next.ultAt = t.turn;
+    delete next.ultNext;
+    t.events.push(sd ? { kind: "showdown", turn: t.turn, squares: sd.pairs.flatMap((p) => [p.crowd, p.boss]) } : { kind: "drag", turn: t.turn, square: d!.to, squares: [d!.from, d!.to], ult: true });
     return true;
   },
+  // His own meter, not the rage meter (nothing but his moves fills it).
+  meter: (p, turn, s) => showdownMeter(p, turn, s),
   // The long pull's moment, as the turn after his first move begins.
   everyTurn(next, t) {
     if (next.pull && next.pull.turn === t.turn) t.events.push({ kind: "pull", turn: t.turn, square: next.pull.to, squares: [next.pull.from, next.pull.via, next.pull.to] });
@@ -1055,10 +1149,11 @@ export const PIG: BossRules = {
     if (!firstMoveDue(boss) || !pullOptions(fen).includes(move)) return null;
     return { play: pullStep(move), san: `${move.slice(2, 4)}` };
   },
-  // His reply to the showdown's duel: the engine's best, as the search scored it.
-  bestReply: (boss, board) => duelReplyDue(boss, board),
-  // After his move: his first one, the long pull (or nothing: an ordinary first move); later, the showdown's line-up or
-  // the lasso drag he found, each checked against the rules here and put on the board as a base.
+  // His reply to the showdown's duel, and his next moves while its tactics are live: the engine's, as the search scored it.
+  bestReply: (boss, board) => engineMoveDue(boss, board),
+  // After his move: his first one, the long pull (or nothing: an ordinary first move); later, the showdown's line-up
+  // (his meter full, or the test trigger's, outside the band if the host found none inside), the trigger's stand-in drag,
+  // or the lasso drag, each checked against the rules here and put on the board as a base.
   afterBossMove(b, move, extras) {
     const boss = b.state.boss!;
     const p = boss.powers!;
@@ -1082,20 +1177,22 @@ export const PIG: BossRules = {
       } else b.state = { ...b.state, boss: { ...boss, powers: { ...p, pull: null } } };
       return;
     }
-    if (showdownDue(boss)) {
-      const last = showdownLast(boss, board.fen);
-      const lineup = checkLineup(board.fen, extras?.showdown, last ? [3, 2] : [3]);
+    const due = showdownDue(boss);
+    if (due) {
+      const lineup = checkLineup(board.fen, extras?.showdown, [3, 2]);
       if (lineup) {
         put(lineup.fen);
-        b.state = { ...b.state, boss: { ...boss, powers: { ...p, showdown: { turn, pairs: lineup.pairs, before: board.fen, edge: extras?.edge ?? null } } } };
+        const outside = due === "test" && extras?.outside ? { outside: true as const } : {};
+        b.state = { ...b.state, boss: { ...boss, powers: { ...p, sdBase: boss.crowdMoves, showdown: { turn, pairs: lineup.pairs, before: board.fen, edge: extras?.edge ?? null, ply: board.history.length, ...outside } } } };
         return;
       }
-      const d = last ? checkDrag(board.fen, extras?.drag) : null;
+      // (The test trigger, and the board can't hold a line-up: a drag stands in.)
+      const d = due === "test" ? checkDrag(board.fen, extras?.drag) : null;
       if (d) {
         put(d.fen);
-        b.state = { ...b.state, boss: { ...boss, powers: { ...p, drag: { turn, from: d.from, to: d.to, piece: d.piece, ult: true } } } };
+        b.state = { ...b.state, boss: { ...boss, powers: { ...p, sdBase: boss.crowdMoves, drag: { turn, from: d.from, to: d.to, piece: d.piece, ult: true } } } };
+        return;
       }
-      return;
     }
     if (dragDue(boss)) {
       const d = checkDrag(board.fen, extras?.drag);
@@ -1105,7 +1202,8 @@ export const PIG: BossRules = {
       }
     }
   },
-  // What his turn must work out besides his move: the long pull (his first), the showdown, or a drag.
+  // What his turn must work out besides his move: the long pull (his first); then the showdown (his meter full, or
+  // the trigger) and a drag when one is due.
   asks(boss, fen) {
     const p = boss.powers!;
     const seed = lassoSeed(p.seed, turnOf(boss));
@@ -1113,17 +1211,23 @@ export const PIG: BossRules = {
       const pull = pullOptions(fen);
       return pull.length ? { pull, seed } : null;
     }
-    if (showdownDue(boss)) return { showdown: (p.holds ?? 0) >= BOSS_POWERS.showdownHolds ? "last" : "try", seed };
-    if (dragDue(boss)) return { drag: true, seed };
-    return null;
+    const due = showdownDue(boss);
+    const showdown = due === "test" || (due === "try" && pairSizes(fen, boss.crowdSide).length > 0) ? due : null;
+    const drag = dragDue(boss);
+    if (!showdown && !drag) return null;
+    return { ...(showdown ? { showdown } : {}), ...(drag ? { drag: true as const } : {}), seed };
   },
   // From the starting position (his long pull needs his center pawns home), sides as usual (a raid's crowd is White:
-  // he plays Black); his first drag on turn dragFirst (the test switch ?power=drag: from turn 2, every 2 turns).
+  // he plays Black); his first drag on turn dragFirst (the test switch ?power=drag: from turn 2, every 2 turns); the
+  // test switch ?power=showdown fills his meter from turn 2.
   opening: {
     fromStart: true,
-    setUp: (b) => ({ nextPassive: b.settings.bossPowerTest === "drag" ? 2 : BOSS_POWERS.dragFirst }),
+    setUp: (b) => ({
+      nextPassive: b.settings.bossPowerTest === "drag" ? 2 : BOSS_POWERS.dragFirst,
+      sdBase: b.settings.bossPowerTest === "showdown" ? 1 - BOSS_POWERS.showdownMeterTurns : 0,
+    }),
   },
-  view: (p) => ({ pull: p.pull ?? null, drag: p.drag ?? null, showdown: p.showdown ?? null, holds: p.holds ?? 0 }),
+  view: (p) => ({ pull: p.pull ?? null, drag: p.drag ?? null, showdown: p.showdown ?? null, ready: showdownReady(p), scout: showdownScouting(p, p.turn) }),
 };
 
 /** His part in the match runner (solo, and the host's answer online). */
