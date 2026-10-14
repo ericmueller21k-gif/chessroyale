@@ -3660,9 +3660,9 @@ raised.
 ## The engine reader: a slot's last exact line may name another move (Oct 14, 2026)
 
 **What:** The code that reads Stockfish's output (`searchLines` in `packages/chess/src/uci.ts`, and the same function in
-`engine/server.mjs`) lists each move once, with the numbers of that move's own latest exact line. The moves listed are
-the ones in the last line printed for each MultiPV slot (bound lines included), in the slots' order. Before, it kept
-each slot's last exact line and skipped bound lines. Eric approved the fix ("Engine fix is a go").
+`engine/server.mjs`) reads each MultiPV slot's last exact line, as before, unless that lists a move twice. Then it lists
+each move once, with the numbers of that move's own latest exact line; the moves listed are the ones in the last line
+printed for each slot (bound lines included), in the slots' order. Eric approved the fix ("Engine fix is a go").
 
 **Why:** Stockfish re-sorts its lines as it goes deeper, and a search that runs out of nodes partway through a line
 prints that slot as a bound. The slot's last exact line was then from the depth before, and it often named the move
@@ -3673,8 +3673,10 @@ moves. Players felt it as silent misgrading: a duplicated move's out-of-date num
 1.75% of top-8 searches, up to about 35), a board's best move missing from the top 8 (about 0.5%), and a re-check
 quietly ignored when the best move was the one left out. The castling move in the first report was a coincidence.
 
-**Only broken searches change:** on the raw output of 700 saved searches, every search the old reader got right
-reads identically with the new one (each number and the order), and every broken one is fixed.
+**Only broken searches change:** a search with no move twice reads exactly as before, by construction (checked on the
+raw output of 1,300 saved searches: lite top 8 at 250k, single lines at 250k, re-checks at 700k, the server's at 2M).
+A first version also re-read a search whose last line was a bound naming another move (about 2 single-line searches in
+100), with that move and an older number; it was narrowed so those keep their old reading.
 
 **Kept as safety nets:** `scoreMoves`' fallback for a move left out (`scoreAfter`) and Squads' `cleanTop` (keeps a
 move's first line if it is listed twice).

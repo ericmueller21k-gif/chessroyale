@@ -726,8 +726,9 @@ happened in about one in five of the judge's top-8 searches. It had been seen tw
 showed: `scoreMoves` re-scored a missing move another way (milestone 1), and Squads' `cleanTop` kept a duplicated
 move's first line. Neither covered re-checks, the engine server or the top-8 search, and nobody asked why.
 
-**The fix:** `searchLines` reads each move once, with its own latest exact line; the moves come from the last line
-printed for each slot, bound lines included. Searches the old reader got right read identically.
+**The fix:** `searchLines` reads each slot's last exact line as before, unless that lists a move twice; then each move
+once, with its own latest exact line, the moves from the last line printed for each slot (bound lines included). A
+search with no move twice reads exactly as before.
 
 **The rule:**
 - When an engine's answer looks impossible (a move twice, a move missing), find out why before patching around it, and

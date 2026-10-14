@@ -139,7 +139,8 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   budget, before it ships (`showdown-sim.ts`).
 
 - **A move scored twice, another not at all** (Oct 14, [story](../docs/history/lessons.md#a-move-scored-twice-another-not-at-all-oct-14-2026)):
-  read Stockfish's MultiPV output by move, not by slot (`searchLines`): a slot's last exact line may name another move.
+  a slot's last exact line in Stockfish's MultiPV output may name another move: read through `searchLines`, never by
+  slot alone.
   When an engine's answer looks impossible, find out why and measure how often across many positions before adding a
   fallback where it showed.
 

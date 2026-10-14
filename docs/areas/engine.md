@@ -137,8 +137,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - Measure before and after: a judge or boss change comes with a sim's before/after table in `reports/`.
 - Never break the fallback: every server path degrades to the host's own engine.
 - "The engine's best move" is the line with the highest score, not the first line.
-- Stockfish's output is read by move, not by MultiPV slot (`searchLines` in `uci.ts`, the same in `engine/server.mjs`;
-  keep the two the same): a slot's last exact line may name another move (DECISIONS.md, "The engine reader", Oct 14).
+- Stockfish's output goes through `searchLines` (`uci.ts`, the same in `engine/server.mjs`; keep the two the same): a
+  slot's last exact line may name another move, so a move listed twice is read again by move (DECISIONS.md, "The
+  engine reader", Oct 14).
 - The FAQ explains the judge, the re-check and the boss's brain and strength to players (`packages/app/src/faq/content.ts`):
   a change to how they work changes its words in the same PR.
 - The Maia box stays a separate program: nothing in the game imports it, and nothing in it imports the game; only
