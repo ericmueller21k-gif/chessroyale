@@ -94,6 +94,7 @@ import {
   pigBattle,
   pigTurn,
   bulletClock,
+  bulletIncrement,
   type Battle,
   type BossAsks,
   type BossLastMove,
@@ -491,7 +492,7 @@ export class MatchRunner {
 
   /**
    * How long a player may think this round: their bank plus the increment, capped by this move's clock. On the bullet
-   * clock (the Hidden Boss's ultimate), the bank alone: no increment, no per-move cap.
+   * clock (the Hidden Boss's ultimate), no per-move cap: the bank, plus its increment once he has added one.
    */
   allowedMsFor(playerId: string): number {
     const board = [...this.groups].find(([, ids]) => ids.includes(playerId))?.[0];
@@ -500,15 +501,16 @@ export class MatchRunner {
 
   /**
    * The settings with this round's clock fixed in moveClockSeconds (for the bots' timing and capping think times). On the
-   * bullet clock: no increment (nothing goes back into the bank), and the cap a whole bullet bank (so the bank decides).
+   * bullet clock: its own increment (none for its first moves, then BOSS_POWERS.bulletIncrementSeconds: bulletIncrement),
+   * and a cap no bank can reach (the bullet bank plus the increment on every move a battle can have), so the bank decides.
    */
   private roundSettings(boardId?: number): Settings {
-    const bullet = bulletClock(this.state.boss);
+    if (!bulletClock(this.state.boss)) return { ...this.settings, moveClockSeconds: this.moveClock(boardId), moveClockSteps: [] };
     return {
       ...this.settings,
-      moveClockSeconds: bullet ? BOSS_POWERS.bulletBankSeconds : this.moveClock(boardId),
+      moveClockSeconds: BOSS_POWERS.bulletBankSeconds + BOSS_POWERS.bulletIncrementSeconds * this.settings.bossMaxMoves,
       moveClockSteps: [],
-      ...(bullet ? { timeIncrementSeconds: 0 } : {}),
+      timeIncrementSeconds: bulletIncrement(this.state.boss),
     };
   }
 
@@ -936,6 +938,19 @@ export class MatchRunner {
     return { struck: true, calls };
   }
 
+  /**
+   * Boss battle: the God King's move or strike tried against a boss his help doesn't work against (the Hidden Boss,
+   * BossRules.blocksKing). He doesn't come, but the try spends a charge as if it had worked (Eric, Oct 14: "using the
+   * king's move doesn't draw down on the usage vs him like it should"); nothing else changes (no move, no strike, the
+   * clock runs on). Each try spends one, until none is left. Returns whether one was spent.
+   */
+  kingTried(): boolean {
+    const b = this.state.boss;
+    if (!b || !(b.kingCharges ?? 0) || !bossRules(b)?.blocksKing) return false;
+    this.state = { ...this.state, boss: { ...b, kingCharges: b.kingCharges! - 1 } };
+    return true;
+  }
+
   /** Applies scored boards: updates scores and plays the drawn moves. */
   finishRound(
     results: readonly BoardRound[],
@@ -1308,9 +1323,9 @@ export class MatchRunner {
     };
   }
 
-  /** The boss strikes now (every bossKillEvery crowd moves). */
+  /** The boss strikes now (every bossKillEvery crowd moves; never a boss that doesn't strike: BossRules.noStrikes). */
   bossKillDue(): boolean {
-    return bossKillDue(this.state, this.settings) && !this.finalGameOver();
+    return bossKillDue(this.state, this.settings) && !this.finalGameOver() && !bossRules(this.state.boss)?.noStrikes;
   }
 
   /** The boss strikes down the player with the worst recent moves; returns who. */
@@ -1372,7 +1387,7 @@ export class MatchRunner {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const powers = bossPowers(b);
     const p = b.powers;
-    const strikes = this.alive().length > (b.minSurvivors ?? this.settings.bossMinSurvivors) && !b.result;
+    const strikes = this.alive().length > (b.minSurvivors ?? this.settings.bossMinSurvivors) && !b.result && !bossRules(b)?.noStrikes;
     return {
       board: netBoard(this.boards.get(this.state.boards[0]!)!),
       name: info.name,

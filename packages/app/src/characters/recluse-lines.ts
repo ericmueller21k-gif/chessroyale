@@ -24,6 +24,16 @@ export const RECLUSE_LINES = {
   introE4: "Best by test.",
   /** His ultimate as it comes, the clock turning to bullet: one, picked by the battle (placeholders: no verified quote fits). */
   bullet: ["You're thinking too much. Stop calculating and play!", "Enough staring at the board. Pure chess now. Move!", "All that thinking, and still no idea. Play fast!"],
+  /**
+   * A few moves into the bullet clock, he adds time per move (Eric, Oct 14): grudging, too fast even for real chess. One,
+   * picked by the battle (placeholders: ours, not his words; the clock that adds time per move was his own invention, so
+   * a line may hint at it, never as a quote). The number is on the board, not in the line (it's a setting).
+   */
+  bulletPlus: [
+    "Too fast, even for real chess. Fine. A little time on every move.",
+    "This is a lottery, not chess. Time per move, then. My own idea, you know.",
+    "Bah. Nobody plays real chess this fast. I'll add time to every move.",
+  ],
   /** The God King's help tried, and blocked (he slams the book shut): one, in turn. */
   mock: [
     // QUOTE (A6): Peter Kihss in the New York Times, Jul 4, 1972, p. 14 (Winter, C.N. 5830).
@@ -67,12 +77,7 @@ export const RECLUSE_LINES = {
   /** Phase 2 begins, the four boards set up (placeholders). */
   phase2: ["No more memorized openings. Find your moves now!", "Four boards. No theory. Let's see who can play.", "Now nobody has a book. Except me."],
   /** He wins a board (mate, time or resign): one, in turn. */
-  boardWon: [
-    // QUOTE (A5): "A Bust to the King's Gambit", American Chess Quarterly 1:1, Summer 1961, p. 9 (whole, parenthetical included).
-    "Of course White can always play differently, in which case he merely loses differently. (Thank you, Weaver Adams!)",
-    "One down. Who's next?",
-    "Too slow. The clock doesn't wait.",
-  ],
+  boardWon: ["One down. Who's next?", "Too slow. The clock doesn't wait."],
   /** He loses a board (placeholders). */
   boardLost: ["Hm. A lucky one.", "That board was nothing. Watch the others.", "So one of you can play."],
   /** A slow move (more than slowMoveSeconds, anyone's), before his ultimate: one, in turn (placeholders). */

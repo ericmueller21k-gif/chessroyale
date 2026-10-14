@@ -525,13 +525,23 @@ export const BOSS_POWERS = {
    * it's bullet with no added time per move so it's a true race against the clock but it should be bearable for a strong
    * team"). His own meter, not the rage meter: it fills from crowd turn 1 and is full as crowd turn bulletTurn begins,
    * when it comes (his line and the spellbook, no warning); nothing else fills it (no strikes, no eval). From then to the
-   * end of phase 1 everyone's clock is a bank of bulletBankSeconds: no increment, no per-move cap, nothing adds time; a
-   * bank that runs out loses the battle on time. Eric, Oct 14, after playing it: 3:00 "feels like too much", so 1:00
-   * ("1+0"), was 180 s. A player at 2 to 3 s a move gets 20 to 30 more moves out of it, and a battle is capped at
-   * bossMaxMoves (60) crowd moves. Not yet sim-tested.
+   * end of phase 1 everyone's clock is a bank of bulletBankSeconds: no per-move cap, and no increment for its first
+   * bulletPlainMoves moves (below); a bank that runs out loses the battle on time. Eric, Oct 14, after playing it: 3:00
+   * "feels like too much", so 1:00 ("1+0"), was 180 s. A battle is capped at bossMaxMoves (60) crowd moves. Not yet
+   * sim-tested.
    */
   bulletTurn: 7,
   bulletBankSeconds: 60,
+  /**
+   * Then he adds time per move (Eric, Oct 14, after playing it again: "1 min too short, needs to be 1+1 or even 1+2... a
+   * few moves, say 3, with 1+0, then he says a comment about it and suggests adding time per move"): the crowd plays the
+   * bullet clock's first bulletPlainMoves moves on the bank alone (1+0); as the next crowd turn begins he says so (his
+   * line, then "+2 s a move from now on" across the board), and from then on each move made in time adds
+   * bulletIncrementSeconds to that player's bank (1+2: the more forgiving of Eric's two, as 1:00 alone felt too short).
+   * No cap on the bank: it grows by at most this a move, over at most bossMaxMoves moves. Estimates, not sim-tested.
+   */
+  bulletPlainMoves: 3,
+  bulletIncrementSeconds: 2,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**

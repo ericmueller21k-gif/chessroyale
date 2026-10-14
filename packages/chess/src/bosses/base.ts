@@ -184,9 +184,16 @@ export interface BossRules {
   triggerAtHisTurn?: boolean;
   /**
    * The God King's help doesn't work against this boss (the Hidden Boss's passive): his move, his strike and his Last
-   * Stand never come, and nothing is spent (the runner's kingDecision, callStrike, lastStandFor).
+   * Stand never come (the runner's kingDecision, callStrike, lastStandFor). A player's try at his move or strike spends a
+   * charge as if it had worked (the runner's kingTried; Eric, Oct 14); the Last Stand, which nobody calls, spends nothing.
    */
   blocksKing?: boolean;
+  /**
+   * The boss never strikes the crowd: nobody is knocked out every bossKillEvery moves (the runner's bossKillDue), and
+   * the screens get no count to its next strike (`strikeIn` null). The Hidden Boss: his real fight is a squad of four,
+   * who must all reach phase 2's four boards (Oct 14).
+   */
+  noStrikes?: boolean;
   /** Beaten (Boss alone): the board holds this long for its fall before the result screen (the Hidden Boss's collapse). */
   fallMs?: number;
   /**
