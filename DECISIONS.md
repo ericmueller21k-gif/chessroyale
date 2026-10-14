@@ -3656,3 +3656,121 @@ raised.
 
 **So:** a red Big Boy perf run is re-run alone on a quiet machine before a PR is blamed.
 
+
+## The Hidden Boss's phase change, reworked (Eric, Oct 14, 2026)
+
+Eric, after seeing the phase change from #201: "I wanted it where the board split is a bit longer cool animation, he
+drops down to the center of the board, book in hand, angry, drops it to the ground, light beaming from it as he chants
+nonsense and then the boards crack and split like they do now." Then, the same day, what he chants: the 1962
+Candidates in Curaçao, where he said his rivals teamed up on him ("He should mumble their last names randomly, say
+things like 'they worked as a team'... just don't say Soviets obviously and Russians, their last names are ok
+though"), and through phase 2's play, lines about the team against him, escalating. Same reach as before: admins only,
+in Boss alone; no rule, protocol or stored data changed.
+
+**The sequence** (one timeline, `PHASE_CHANGE` in `packages/app/src/recluse-phase2.ts`; about 10.4 s after a 1.8 s fall,
+was 7.2 s after 4.5 s; not skippable, as before):
+1. **Beaten** (0 to 1.8 s before it): he collapses and mumbles as before, but the fall is short when phase 2 follows
+   (`PHASE_CHANGE.fallMs`; the rules' 4.5 s stays for a fall without one). His voice is cleared as he falls rather than
+   as the change begins, so his mumbling carries on until his chant cuts in.
+2. **Up in a rage** (0 to 1.3 s), where he stands, both drawings (the bust in a phone's bar, the figure by a computer's
+   board): his brows come down, his head snaps up glaring, teeth bared, he gets up and the book flies back up into his
+   hand (`rage`).
+3. **The leap** (1.3 to 2.3 s): the board draws his whole figure, on a phone too (his place stands empty meanwhile; his
+   bubble stays beside it, as for Sawyer and Wrangler). From his place (the bar's top left on a phone, beside the
+   board's bottom left on a computer) onto the middle, his shadow where he'll land; a thud (`recluseThump`), a burst
+   of dust, the board jolts (`leap`).
+4. **The book thrown down** (2.3 to 3.5 s): brandished over his head, a shout, then thrown at his feet, where it lands
+   open with a thud and dust (`drop`).
+5. **The chant** (3.5 to 7.35 s): arms raised over the open book, his mouth working, his hair lifting: phase 2's face
+   and hair from here (the light is his power coming back), so the transformation is this beat. Light pours up out of
+   the book: a cone of it behind him with rays, pulsing, and a glow on the pages (CSS only), motes rising in his frames,
+   the pages lit; a soft minor chord swelling over the stare's hum (`recluseGlow`). One chant line in his bubble.
+6. **The boards crack and split** (5.2 to 7.25 s), as before: Sawyer's board-saw gap down and across, the quarters part
+   (the board jolts again) and grow into four boards, as the light dies.
+7. **The book back** (7.35 to 8.2 s): it snaps shut and flies up into his hands (his revive's own frames: `pickup`),
+   his revive line; meanwhile every board's pieces fly to their Chess960 squares (7.5 to 8.4 s).
+8. **The leap back** (8.2 to 8.9 s) to his place, gone before he lands (`leap2`); there, phase 2's idle from then on.
+9. **"PHASE 2"** at 9.0 s; the clocks start at 10.4 s.
+
+**One book on screen**, his own, in his frames, from start to end. The flying book effect (`RECLUSE_BOOK`) isn't shown
+any more (kept as art), so the slumped frame's book and a second book on the board can't both show, as they did.
+
+**My calls.**
+- **The light in CSS, not a sprite:** two layers (`.rc-light`, `.rc-glow`) whose opacity and transform alone move;
+  the least code and no new frames to paint. The motes and lit pages are in his frames (as his spellbook's are).
+- **His size on the board:** 24% of its width, about his own 2x beside a computer's board (1.3x on a phone).
+- **One chant line a phase change**, picked from the list: each bubble stays 3.5 to 4.5 s (the one rule), so two
+  wouldn't end before his revive line. One bubble at a time throughout: the mumble, the chant, the revive line, then
+  phase 2's line.
+- **The dock's first line** "The red book!" is now "The boss rises!" (admins only). The flying book's page-flip sound is
+  gone with it.
+- **Frames** (41 new frame specs, the bust 11 of them; parts painted only when first shown, drawn ahead from his
+  battle's start: `prewarmRecluse`): `rage`, `leap`, `drop`, `chantRaise`, `chant` (an 8-frame loop), `pickup` (one
+  new frame, then the revive's), `leap2`; a raised open hand, his angry face (brows drawn down in a V, a glare, a
+  scowl, a shout), a free hand clenched, no shadow in the air. Two new synth sounds (`thump`, `glow`), made ahead in
+  the sound worker like his others.
+
+**His words** (`characters/recluse-lines.ts`; Eric's rules: his rivals' last names are fine, Petrosian, Keres, Geller,
+Tal, Korchnoi; never the words for their country or its people; nothing that says Korchnoi threw games, only the agreed
+draws and the teamwork, which historians largely accept; a test checks the first and the last):
+- **Real quotes, word for word**, from his article "The Russians Have Fixed World Chess", Sports Illustrated, Aug 20,
+  1962, read on a scan of the printed pages (p. 19's passage is also quoted word for word in Dominic Lawson, "Collusion
+  in Curaçao", Standpoint, 2012): "They worked as a team." (p. 19), "They consulted during the games." (p. 19), "They
+  agreed ahead of time to draw the games they played against each other." (p. 19), "They would openly analyze my game
+  while I was still playing it." (p. 65), "It made me mad that they thought they could get away with it." (p. 65), "I
+  will never again play in one of these tournaments." (p. 18). Of the other candidates passed along: "Well, I now know
+  better." (p. 18) is verified but reads oddly alone; "Anyone could draw his own conclusions from this sequence of
+  events" (p. 64) is about Korchnoi's games (left out by Eric's rule); "If you start out badly..." isn't in the article
+  (not used, not paraphrased).
+- **Ours** (placeholders): the mumbled name fragments ("Petrosian... Keres... Geller...", "Keres... Geller... draw...
+  draw...") and the phase 2 lines below.
+
+**His collusion lines in phase 2** (Eric, Oct 14: the four boards against a team fit his story): every `talkEvery` (8)
+of his moves on all the boards, give or take `talkJitter` (2), a line from three pools by his moves so far: early,
+suspicious muttering; from `talkMiddleFrom` (24), accusations (his games analyzed, the quick draws, the names); from
+`talkLateFrom` (64), paranoid ranting (`Talk`, `talkStage`). Each pool in turn. **The lowest priority:** skipped (not
+queued) while any line of his is up, and a new priority below LOW in the speech rules (`CHATTER`): any other line (a
+slow move's, his ultimate's, a board's) cuts in on it, so those always come first. Estimates: on four boards he moves
+about once a second, so a line every 6 to 10 s when nothing else is said, the middle from about half a minute in, the
+late after about a minute.
+
+**Phase 2's slow moves, reworked (Eric, Oct 14, after playtesting; same PR, the same files).**
+- **The ultimate at 10 of 10:** `slowMovesForUlt` is 10 (was 5, firing on the 6th). Still one shared team counter, one
+  per slow move as it's made; now the 10th brings it (`>=`, not `>`).
+- **The marks beside every board** (`SlowMarks` in `screens/Recluse2.tsx`), as Jefferson's candle shots stand beside
+  his board ("it fits the theme of the other boss"): ten slots, a red pixel X for each slow move, the rest dim, a small
+  "slow" label. A column by the right edge of each of a computer's four boards (in the gutter, never over a board) and
+  of a phone's big board; a phone's three small boards have no room beside them, so a row above each. Eric: no turtle,
+  "something basic... doesn't distract too much, but it's clear to everyone playing". The dock's "slow moves N of 5" is
+  gone (the dock keeps your clock).
+- **Each slow move:** a soft sound (`recluseSlow`: two low notes falling, D to A, quick plucks with a little of their
+  octave so a phone's speaker carries them, well under a move's loudness, made ahead in the sound worker: never a
+  buzzer), the marks of the board it was on flash red for 1.8 s with a small "slow move" note over its top-right corner
+  (my call: a note on the board says which board without numbering them, and a dock note didn't fit a phone's line),
+  and his slow-move line as before (not on the 10th: his ultimate's line then).
+- **The ultimate's banner** ("5 SECONDS!") over every board at the same moment: over the four on a computer, over yours
+  on a phone with "5 s!" across each small board. Nobody is paused; everyone whose move it is gets a fresh, full 5 s
+  from that moment (`phase2Ult` already restarted them; now tested), however long they'd thought.
+- **That banner is held 1 s longer** (`PHASE2_ULT_BANNER_MS` 2.8 s): `FightBanner`'s new `long` option, the same
+  entrance and exit with the hold a second longer (its own keyframes, 2.5 s). Every other banner keeps its timing.
+
+**His bubble over the boards in phase 2** (Eric, Oct 14: a long line, the Weaver Adams quote, was cut off and covered
+by the boards). Each board now keeps its own layers to itself (`isolation: isolate` on a phone's small boards and a
+computer's four), so his bubble sits over every board; it already wraps within the screen (at most 220 px or 60% of
+the width, moved back into view if it would run off). Measured with the longest line on a 390 px and a 360 px phone and
+at 1280 and 1024 px: nothing covers it, all of it on screen.
+
+**Measured** (the slow-phone perf case, `e2e/perf.spec.ts`, 4x CPU throttling, three runs each on this machine):
+PERF_NUMBERS
+
+**Testing.** Targeted lane (animation, art and lines, and one rule number: the ultimate's threshold): typecheck, the
+app's unit tests
+(`recluse-phase2.test.ts`: the timeline's beats and length, one book in every frame, the leap's shadow and dust, the
+lines' rules and quotes, the collusion stages, intervals and priority, his moves counted, the slow moves' boards and
+the 10th bringing the ultimate; `recluse.test.ts`: every new
+frame inside its frame, the cues; `recluse-boss.test.ts`: a recluse sound for every cue, the new sounds under a move's
+loudness); the rules' `packages/chess/test/recluse-phase2.test.ts` (the ultimate at 10 of 10, a fresh full 5 s for
+anyone mid-move); e2e `recluse.spec.ts` (the phase change's every beat watched from before it can show, no second
+book, his place empty only while he's on the board; ten slow moves marking every board, the note, the sound, the long
+banner at 10), `boss-character.spec.ts`, and `perf.spec.ts`'s phase 2 case. Frames:
+`npm run frames:recluse2 -- <dir> both light only=change`.

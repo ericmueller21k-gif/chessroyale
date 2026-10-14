@@ -238,13 +238,14 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
     battle (1:00, no added time, out of time loses; Eric, Oct 14: was 3:00); beaten, he collapses and mumbles, then phase 2. Placeholder
     lines (and five verified quotes) in one table, `characters/recluse-lines.ts`, for Eric's own.
   - **Phase 2 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 2"): beaten
-    in phase 1, he collapses and mumbles, then the phase change (about 7 s: the book's slam, Sawyer's crack lines, the
-    quarters growing into four boards, the Chess960 shuffle as the book's pages flip, his revive), then four boards
+    in phase 1, he collapses and mumbles, then the phase change (about 10 s, reworked Oct 14: up in a rage, he leaps
+    onto the board, throws the book down and chants over its light; Sawyer's crack lines, the quarters growing into four
+    boards; the book back in his hands, the Chess960 shuffle, his leap back), then four boards
     at once, each its own Chess960 start: you on one, bots on three. Stockfish only, at 2750, at most 0.9 s a move;
     2:00 a board, no added time, out of time loses that board; a lost board's neighbors play on; all four must be
     won ("Victory!"), else a defeat that says how many of four were won. **His phase 2 ultimate** (Eric, Oct 14):
-    each move longer than 5 s (anyone's, any board) draws a line about playing faster; on the team's 6th slow move,
-    "That's enough!" and from then on 5 s a move on every board, no bank, a random legal move played for whoever runs
+    each move longer than 5 s (anyone's, any board) draws a line about playing faster and marks a red X beside every
+    board; on the team's 10th slow move, "That's enough!" and from then on 5 s a move on every board, no bank, a random legal move played for whoever runs
     out (never a loss on time). Test switches: the admins' "Trigger ultimate (testing)", `?win=1` (a mate in one in
     both phases, the bots take theirs), `?phase=2` (straight to the phase change).
     - **Left for later:** his real name and lines (phase 2's are placeholders too); how players reach him (the red
