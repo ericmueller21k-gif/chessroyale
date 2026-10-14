@@ -196,6 +196,21 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       letter rather than the hammer and sickle, which is banned in some countries (e.g. Lithuania, Latvia, Ukraine).
       Eric's call.
     - **For testing until then:** he's reachable from the boss menu, playing with bots.
+    - **Rewards vs. just playing him (Eric, Oct 14; ideas only, undecided, nothing to build yet):** Eric doesn't
+      want an awesome boss that most people never get to play, but playing him mustn't take away from the quest.
+      - **Rewards only the real way:** a trophy, the Fischer Random crate and any other reward come only from
+        beating him through Squads (the red book plus a tournament win).
+      - **Ways to play him for fun, no rewards** (any or none; Eric isn't sure yet):
+        - Buying the red book once unlocks him in solo Boss alone (with bots, who will lose; that's fine).
+        - Friends: a group of four (a party, or queued together) can choose him if all four have him unlocked (or
+          a book). Needs a four-player Boss mode, which doesn't exist yet.
+        - **The Crowd (50v50) mode** (Eric: "probably a decent compromise"): when it's down to the last four
+          players, an extra vote: fight him, or the usual ending.
+      - Why it matters: if the player base stays small, Squads wins may be rare, and a few players should still
+        get a chance at him.
+      - Director's notes: the solo unlock is the cheapest. The Crowd vote and the friends' mode both need the
+        four-player online fight (his server-side brain, the four boards online) that the Squads path needs anyway.
+        Keeping rewards to the Squads path keeps fair-play review to one place.
   - **Phase 1 to phase 2 (Eric, Oct 14):**
     - **Phase 1** is one board against him. Beat him there and **he collapses**: he drops to his knees, slumps and
       mumbles nonsense to himself (lines from Eric later).
