@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { moveIndex, VOCAB } from "../src/encode.ts";
 import type { Prediction, Predictor } from "../src/model.ts";
-import { MaiaUci, START_FEN } from "../src/uci.ts";
+import { MaiaUci, START_FEN, errorText } from "../src/uci.ts";
 
 /** A pretend model: a fixed score per move (anything else very unlikely); it records what it was asked. */
 function fakeModel(scores: Record<string, number>) {
@@ -49,6 +49,17 @@ describe("the Maia box's UCI-style protocol", () => {
     expect(await say("isready")).toEqual(["readyok"]);
     expect(await say("isready")).toEqual(["readyok"]);
     expect(loads).toBe(1);
+  });
+
+  it("a failed load's reason comes whole, on one line: its kind, its message and its cause", async () => {
+    const backend = new Error("no available backend found. ERR: [wasm] RangeError: Out of memory");
+    const { say } = engine(async () => {
+      throw backend;
+    });
+    expect(await say("isready")).toEqual([`info string error load failed: ${backend.message}`, "readyok"]);
+    expect(errorText(new RangeError("Out of memory"))).toBe("RangeError: Out of memory");
+    expect(errorText(new Error("failed to create session", { cause: new RangeError("Out of\nmemory") }))).toBe("failed to create session (cause: RangeError: Out of memory)");
+    expect(errorText("plain text\nover two lines")).toBe("plain text over two lines");
   });
 
   it("a failed load says so, still answers readyok, and go then has no move", async () => {

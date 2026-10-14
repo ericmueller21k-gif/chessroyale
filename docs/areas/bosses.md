@@ -31,11 +31,10 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   showdown's duel (and his next moves while its tactics are live) is Stockfish's best at full strength (below); Maia's
   own mistakes replace the slips. A boss with a **fixed brain** (`BOSS_BRAIN.fixed`: the Hidden Boss, Maia raw) plays it
   at Maia's top rating (2500), no guard, no Stockfish share, whatever its strength, the crowd, the difficulty or the Brain
-  picker, and its strength is fixed at the level Maia reaches that (2650: `fixedLevel`). Players meet
-  Stockfish until
-  `BOSS_BRAIN.forPlayers` is on (needs Eric's OK: the Maia box's source published); admins meet Maia on every boss,
-  in every mode (online: in a lobby of admins only). The Brain picker in Boss alone's menu and a debug line are
-  admins' test tools. Details in [engine.md](engine.md), "The boss's brain".
+  picker, and its strength is fixed at the level Maia reaches that (2650: `fixedLevel`). Players meet Maia too since
+  Oct 14 (`BOSS_BRAIN.forPlayers`). A solo battle on Maia begins with a short loading step before its intro ("Loading
+  the boss…": Maia loads alone, this device's Stockfish paused, 20 s at most; Oct 14). The Brain picker in Boss alone's
+  menu and a debug line are admins' test tools. Details in [engine.md](engine.md), "The boss's brain".
 - **Engine move** (admins only, Boss alone, Oct 14; `BOSS_POWERS.engineMoveButton`): a small "Engine move" button
   beside the ultimate's test trigger (a phone: under the dock; a computer: the title line) plays Stockfish's best move
   as yours (`SoloMatch.engineMove`: the power-up hints' search, `topMovesFor`, so only the moves the turn allows), through

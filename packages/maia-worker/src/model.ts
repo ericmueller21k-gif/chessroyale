@@ -17,6 +17,30 @@ export interface Runtime {
   wasm: string | ArrayBuffer;
 }
 
+/**
+ * The most WebAssembly memory onnxruntime may have, in 64 KiB pages: 512 MiB. Its build is the threaded one (run here on
+ * one thread), whose memory is shared and asks for a 4 GiB maximum; a shared memory reserves its maximum up front, and
+ * iOS Safari can refuse that much ("RangeError: Out of memory", reported as "no available backend found"). This model
+ * needs about 70 MB of it (measured: 69 MB after loading and 20 moves, the same before and after), so 512 MiB leaves
+ * seven times that.
+ */
+export const MEMORY_MAX_PAGES = 8192;
+
+/** Runs `create` with every shared WebAssembly memory made in it capped at MEMORY_MAX_PAGES (then puts things back). */
+export async function withCappedMemory<T>(create: () => Promise<T>): Promise<T> {
+  const Memory = WebAssembly.Memory;
+  const Capped = function (d: WebAssembly.MemoryDescriptor & { shared?: boolean }) {
+    return new Memory(d.shared && (d.maximum ?? Infinity) > MEMORY_MAX_PAGES ? { ...d, maximum: Math.max(d.initial, MEMORY_MAX_PAGES) } : d);
+  } as unknown as typeof WebAssembly.Memory;
+  Capped.prototype = Memory.prototype;
+  (WebAssembly as { Memory: typeof WebAssembly.Memory }).Memory = Capped;
+  try {
+    return await create();
+  } finally {
+    (WebAssembly as { Memory: typeof WebAssembly.Memory }).Memory = Memory;
+  }
+}
+
 export class MaiaModel {
   private constructor(private session: ort.InferenceSession) {}
 
@@ -25,7 +49,7 @@ export class MaiaModel {
     ort.env.wasm.proxy = false;
     if (typeof runtime.wasm === "string") ort.env.wasm.wasmPaths = { wasm: runtime.wasm };
     else ort.env.wasm.wasmBinary = runtime.wasm;
-    const session = await ort.InferenceSession.create(model, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+    const session = await withCappedMemory(() => ort.InferenceSession.create(model, { executionProviders: ["wasm"], graphOptimizationLevel: "all" }));
     return new MaiaModel(session);
   }
 

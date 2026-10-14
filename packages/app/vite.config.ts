@@ -95,7 +95,18 @@ function serviceWorker(): Plugin {
   };
 }
 
+/**
+ * The Maia box's files' sizes (unpacked), for its loading bar (src/maia.ts): live, the worker and the WebAssembly come
+ * compressed, with no length the bar could use. Empty when the box isn't built.
+ */
+function maiaFileBytes(): Record<string, number> {
+  const dist = join(dirname(fileURLToPath(import.meta.url)), "../maia-worker/dist");
+  if (!existsSync(dist)) return {};
+  return Object.fromEntries(readdirSync(dist).filter((f) => /\.(js|wasm|onnx)$/.test(f)).map((f) => [f, statSync(join(dist, f)).size]));
+}
+
 export default defineConfig({
+  define: { __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()) },
   plugins: [stockfish(), maiaBox(), preact(), serviceWorker()],
   server: { host: true },
   build: { target: "es2020", chunkSizeWarningLimit: 1000 },

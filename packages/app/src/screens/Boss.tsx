@@ -28,6 +28,7 @@ import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, bossVoice } from "../speech.tsx";
 import { kingBlocked } from "../components/Recluse.tsx";
+import { BrainLoading } from "../components/BrainLoading.tsx";
 
 /** For the raid's opening roulette: famous lines flicking past before the real one lands. */
 const ROULETTE = [
@@ -146,7 +147,7 @@ function ClaimDark({ boss, since, now }: { boss: BossView; since: number; now: n
  * the boss striking down the crowd's worst recent mover, with a flash and the
  * victim's name crossed out.
  */
-export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, lights, fall }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; lights?: LightsView; fall?: boolean }) {
+export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, loading, afterLoading, lights, fall }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; fall?: boolean }) {
   const now = useFrameNow();
   // (Hollow's Lights out comes before his move: as far as the rest of the screen goes, he hasn't moved yet.)
   const thinking = thinkingNow || !!lights;
@@ -159,7 +160,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const claimed = !!intro && !!boss.powers?.claimed;
   const snack = intro && boss.powers?.snack ? boss.powers.snack : null;
   const tl = useMemo(() => bossIntroTimeline(history.length, claimed, !!snack), [history.length, claimed, !!snack]);
-  const t = now - mountedAt;
+  // (Solo, the loading step before the intro, while the boss's brain loads: the intro's first frame, held, under its
+  // own card. The intro then starts afresh: App mounts it anew.)
+  const t = loading ? 0 : now - mountedAt;
   const plies = intro ? Math.max(0, Math.min(history.length, Math.floor((t - tl.replayAt) / Math.max(1, tl.step)))) : history.length;
   const bases = boss.board.bases;
   const snackAt = mountedAt + tl.claimAt;
@@ -170,7 +173,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
     return pawnBack ? withPiece(f, snack!, { color: boss.crowdSide, type: "p" }) : f;
   }, [intro, plies, boss.board.fen, pawnBack]);
   const introLast = intro ? (plies > 0 ? history[plies - 1]! : null) : boss.board.lastMove;
-  const showCard = intro && t < tl.replayAt;
+  const showCard = intro && !loading && t < tl.replayAt;
   // The Hidden Boss: the God King's own opening line for this fight (Eric's "I sense a tremendous power within this
   // foe.") as "START!" comes, while nothing else is being said, so it's always heard; it's his intro, so the first move
   // doesn't say another.
@@ -180,8 +183,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   }, [foeIntro]);
   // A new boss battle: the God King starts afresh (he'll introduce himself on your first move). This device remembers
   // the boss, so the next random one is another.
-  useState(() => intro && (resetKingSpeech(), bossVoice.reset(), resetBeats()));
-  useState(() => intro && rememberBoss(boss.id, `${boss.id}:${history.join("")}`));
+  useState(() => intro && !loading && (resetKingSpeech(), bossVoice.reset(), resetBeats()));
+  useState(() => intro && !loading && rememberBoss(boss.id, `${boss.id}:${history.join("")}`));
   // The boss's mate: its attack on the crowd's king (its kit has one), from KING_ATTACK.mateAt after its move shows;
   // the result waits for it (bossTurnShowMs). No power's moment comes with a mate.
   const mating = !intro && !thinking && !victim && mateAttack(boss);
@@ -318,8 +321,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 queenGasp in sound.ts, public/sounds/banner/queen-gasp.mp3.) */}
             {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${boss.name}'s queen`} />}
             {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${boss.name} takes your queen`} />}
+            {loading && <BrainLoading match={match} boss={boss} />}
             {showCard && (
-              <div class={`boss-intro${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
+              // (After the loading step, whose card it takes over from: no entrance, so the board doesn't blink between.)
+              <div class={`boss-intro${afterLoading ? " no-entrance" : ""}${t > tl.replayAt - 350 ? " leaving" : ""}`} role="alert">
                 <span class="boss-intro-icon" aria-hidden="true">
                   <BossFace boss={boss} />
                 </span>

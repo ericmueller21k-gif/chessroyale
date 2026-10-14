@@ -2,7 +2,7 @@ import { devices, expect, type Page } from "@playwright/test";
 import { gunzipSync } from "node:zlib";
 import { Chess } from "chess.js";
 import { BOSS_ROSTER, isPlayable } from "@chessroyale/core";
-import { createLobbyFromHome, joinFromInvite, named, test } from "./helpers.ts";
+import { createLobbyFromHome, joinFromInvite, named, test, watchFor } from "./helpers.ts";
 
 /**
  * The Maia boss (DECISIONS.md, "A human-like boss: Maia-3 for Ginger", Oct 11; "Every boss on Maia", Oct 12): for an
@@ -145,6 +145,128 @@ test("an online raid on the Maia brain: the host's device plays Maia's move, eve
   // The player's device never downloaded Maia, and shows no debug line.
   expect(guestMaia).toEqual([]);
   await expect(guest.locator(".brain-debug")).toHaveCount(0);
+});
+
+/**
+ * Every Worker the page makes, in order, with when (ms since the page began): made, each command sent to it, ended
+ * (Stockfish's: /engine/stockfish…; Maia's: /engine/maia/…).
+ */
+function workerLog() {
+  const log: { t: number; worker: number; url: string; what: string }[] = [];
+  (window as any).__workers = log;
+  const Real = window.Worker;
+  let n = 0;
+  (window as any).Worker = class extends Real {
+    constructor(url: string | URL, opts?: WorkerOptions) {
+      super(url, opts);
+      const worker = ++n;
+      const u = String(url);
+      log.push({ t: performance.now(), worker, url: u, what: "new" });
+      const post = this.postMessage.bind(this);
+      this.postMessage = (m: unknown, ...rest: unknown[]) => {
+        log.push({ t: performance.now(), worker, url: u, what: `send ${String(m)}` });
+        return (post as (...a: unknown[]) => void)(m, ...rest);
+      };
+      const end = this.terminate.bind(this);
+      this.terminate = () => {
+        log.push({ t: performance.now(), worker, url: u, what: "end" });
+        end();
+      };
+    }
+  };
+}
+
+test("the loading step: Stockfish's workers end, Maia loads alone behind \"Loading the boss…\", then the battle on Maia", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
+  test.setTimeout(3 * 60_000);
+  await asAdmin(page);
+  await page.addInitScript(workerLog);
+  await page.goto("/?debug&clock=40&bossMoves=4&laststand=0&boss=gingerbread");
+  // (The app's Stockfish is up before the battle: the pool made as the app opens.)
+  await expect.poll(() => page.evaluate(() => (window as any).__workers.filter((w: any) => w.what === "send isready" && w.url.includes("stockfish")).length)).toBeGreaterThan(0);
+  const seen = await watchFor(page, { overlay: { selector: ".boss-loading", text: /Loading the boss…/ }, starting: { selector: ".boss-loading", text: /Starting…/ } });
+  // Every frame from here: the step's card, the intro's card (and how opaque), so the hand-over is seen frame by frame.
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__frames = [] as { t: number; step: boolean; intro: number | null }[];
+    const look = () => {
+      const intro = document.querySelector(".boss-intro");
+      const step = !!document.querySelector(".boss-loading");
+      w.__frames.push({ t: performance.now(), step, intro: intro ? Number(getComputedStyle(intro).opacity) : null });
+      if (step && w.__stepFrom === undefined) w.__stepFrom = performance.now();
+      if (!step && w.__stepFrom !== undefined && w.__stepTo === undefined) w.__stepTo = performance.now();
+      // (Until the intro's card has been up 30 frames.)
+      if (intro) w.__introFrames = (w.__introFrames ?? 0) + 1;
+      if ((w.__introFrames ?? 0) < 30 && w.__frames.length < 20_000) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 60_000 });
+  expect(await seen.seen()).toEqual({ overlay: true, starting: true });
+  // Frame by frame: from the step's card to the intro's, always one of them, and the intro's whole from its first frame
+  // (no entrance: the board never shows between the two).
+  const frames = await page.evaluate(() => (window as any).__frames as { step: boolean; intro: number | null }[]);
+  const first = frames.findIndex((f) => f.step);
+  const introAt = frames.findIndex((f) => f.intro !== null);
+  expect(first).toBeGreaterThanOrEqual(0);
+  expect(introAt).toBeGreaterThan(first);
+  expect(frames.slice(first, introAt + 1).filter((f) => !f.step && f.intro === null), "a frame with neither card").toEqual([]);
+  expect(frames[introAt]!.intro).toBe(1);
+  // Ready before the battle began (its line says so from the intro on).
+  expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Maia \d+ · no guard · ready$/);
+  const { log, from, to } = await page.evaluate(() => ({ log: (window as any).__workers as { t: number; worker: number; url: string; what: string }[], from: (window as any).__stepFrom as number, to: (window as any).__stepTo as number }));
+  const sf = (w: { url: string }) => w.url.includes("stockfish");
+  const maiaReady = log.find((w) => w.url.includes("/engine/maia/") && w.what === "send isready")!;
+  expect(maiaReady, JSON.stringify(log)).toBeTruthy();
+  // Every Stockfish worker made before the step ended before Maia's model began to load, and none searched in the step.
+  const before = [...new Set(log.filter((w) => sf(w) && w.what === "new" && w.t < from).map((w) => w.worker))];
+  expect(before.length).toBeGreaterThan(0);
+  for (const id of before) {
+    const end = log.find((w) => w.worker === id && w.what === "end");
+    expect(end && end.t, `Stockfish worker ${id} ended before Maia's load`).toBeLessThan(maiaReady.t);
+  }
+  const searching = log.filter((w) => sf(w) && w.what.startsWith("send go") && w.t > from && w.t < to);
+  expect(searching, "Stockfish searched during the step").toEqual([]);
+  // Fresh Stockfish workers after it, as many as before, and the battle goes on: Maia's moves come through.
+  const after = new Set(log.filter((w) => sf(w) && w.what === "new" && w.t >= maiaReady.t).map((w) => w.worker));
+  expect(after.size).toBe(before.length);
+  console.log(`loading step: ${Math.round(to - from)} ms (files fetched first by the boss menu's prefetch, or by the step)`);
+  const lines: string[] = [];
+  for (let i = 0; i < 2 && (await phase(page)) !== "results"; i++) {
+    await play(page);
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|results)$/);
+    lines.push(await page.evaluate(() => ((window as any).match.brainLine as string | null) ?? ""));
+  }
+  expect(lines.filter((l) => /Maia \d+ · no guard · Maia's #\d+ · \d+ ms/.test(l)).length, lines.join(" | ")).toBeGreaterThanOrEqual(1);
+});
+
+test("the loading step gives up when Maia can't load (its model missing): the battle goes on with Stockfish, the admins' line says why", async ({ browser }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
+  test.setTimeout(3 * 60_000);
+  // (No service worker: the route answers every request, the Maia worker's own too.)
+  const ctx = await browser.newContext({ ...devices["iPhone 13"], browserName: undefined, serviceWorkers: "block" } as any);
+  const page = await ctx.newPage();
+  await asAdmin(page);
+  await ctx.route("**/engine/maia/maia3-23m-int8.onnx", (route) => route.fulfill({ status: 404, body: "missing" }));
+  await page.goto("/?debug&clock=40&bossMoves=4&laststand=0&boss=gingerbread");
+  const seen = await watchFor(page, { overlay: { selector: ".boss-loading", text: /Loading the boss…/ } });
+  const t0 = Date.now();
+  await page.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 60_000 });
+  expect(await seen.seen()).toEqual({ overlay: true });
+  // (A missing file isn't tried again, nor waited on to the step's limit.)
+  expect(Date.now() - t0).toBeLessThan(15_000);
+  await expect(page.locator(".boss-loading")).toHaveCount(0);
+  const debug = page.locator(".brain-debug");
+  await expect(debug).toContainText(/failed: Stockfish \(load failed: model: HTTP 404\)/, { timeout: 10_000 });
+  // The whole reason shows: the line wraps, nothing cut.
+  expect(await debug.evaluate((el) => getComputedStyle(el).textOverflow)).not.toBe("ellipsis");
+  await play(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|results)$/);
+  // The boss played Stockfish's move: the battle went on.
+  expect(await page.evaluate(() => (window as any).match.boss.lastMove?.move ?? null)).toBeTruthy();
+  expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/Stockfish/);
 });
 
 test("players meet Maia too (forPlayers on): no Brain picker and no debug line; Maia downloads", async ({ page }) => {
