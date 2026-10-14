@@ -338,6 +338,15 @@ export interface SquadsRecord {
   keepMs?: number;
   /** It ended early because everyone had left (nothing more is played; it closes at once). */
   wrapped?: true;
+  /**
+   * Who's watching (Oct 14): the board each person's screen shows full size ("r0m1/2"), the boards whose viewers have
+   * changed since they were last sent, the people who have moved to a board since (they get its viewers whole), and
+   * when updates last went out (at most once every SQUADS_LOBBY.watching.coalesceMs).
+   */
+  views?: Record<string, string>;
+  viewsDirty?: string[];
+  viewsFresh?: string[];
+  viewsSentAt?: number;
 }
 
 export function newSquadsRecord(code: string, now: number, seed: number, opts: { auto?: boolean; fillAt?: number | null; test?: SquadsRecord["test"]; keepMs?: number } = {}): SquadsRecord {
@@ -681,6 +690,8 @@ export class SquadsCore {
     if (!h || !h.connected) return;
     h.connected = false;
     h.goneAt = this.io.now();
+    // (Gone: not watching anything. Back, the screen says again what it shows.)
+    this.setView(id, null);
     this.r.activeAt = this.io.now();
     this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
     // Bot work it owed goes elsewhere (or another answer stands).
@@ -742,6 +753,9 @@ export class SquadsCore {
       case "sync":
         this.resendTo(id);
         break;
+      case "view":
+        this.view(id, msg.key, msg.board);
+        break;
       case "nextRound":
         this.nextRound(id);
         break;
@@ -771,6 +785,8 @@ export class SquadsCore {
     }
     for (const lm of this.allMatches()) times.push(...this.judgeWakes(lm));
     times.push(...Object.values(this.r.botShop ?? {}));
+    // (Viewers changed within the last round's window: they go out when it's over.)
+    if (this.r.viewsDirty?.length || this.r.viewsFresh?.length) times.push((this.r.viewsSentAt ?? 0) + SQUADS_LOBBY.watching.coalesceMs);
     // (Someone gone from the lobby: when they run out of LEAVING.awayMs, it checks whether anyone is left.)
     const away = this.awayAt();
     if (away !== null) times.push(away);
@@ -797,6 +813,7 @@ export class SquadsCore {
       for (const lm of this.liveMatches()) if (this.advance(lm, now)) changed = true;
       for (const lm of this.allMatches()) if ((lm.judge || lm.brilliant) && this.judgeDue(lm, now)) changed = true;
       if (this.botShopDue(now)) changed = true;
+      if (this.viewersDue(now)) changed = true;
       if (!changed) return;
     }
   }
@@ -1789,6 +1806,59 @@ export class SquadsCore {
     return this.r.rewardQueue.splice(0);
   }
 
+  // ---------------- Who's watching (Oct 14) ----------------
+
+  /**
+   * A person's screen shows a board full size (`key` a match here and `board` one of its boards), or none. Anything else
+   * counts as none: an app's view can only name a board that exists.
+   */
+  private view(id: string, key: unknown, board: unknown) {
+    const lm = typeof key === "string" ? this.matches.get(key) : undefined;
+    const ok = !!lm && typeof board === "number" && Number.isInteger(board) && board >= 0 && board < lm.m.boards.length;
+    this.setView(id, ok ? `${lm!.key}/${board as number}` : null);
+  }
+
+  /**
+   * Who shows what changed: both boards it touches change for the people showing them, and the person's own screen
+   * needs its new board's viewers whole. Sent with the next round of updates (viewersDue).
+   */
+  private setView(id: string, at: string | null) {
+    const views = (this.r.views ??= {});
+    const was = views[id] ?? null;
+    if (was === at) return;
+    if (at === null) delete views[id];
+    else views[id] = at;
+    this.r.viewsDirty = [...new Set([...(this.r.viewsDirty ?? []), ...[was, at].filter((b): b is string => !!b)])];
+    if (at) this.r.viewsFresh = [...new Set([...(this.r.viewsFresh ?? []), id])];
+  }
+
+  /** The people showing a board now (connected, still here; bots never view). */
+  private viewersOf(board: string): string[] {
+    return this.r.humans.filter((h) => h.connected && !h.left && this.r.views?.[h.id] === board).map((h) => h.id);
+  }
+
+  /**
+   * Each screen hears only about the board it shows: who's on it now, if that changed (or whole, `full`, if it has just
+   * moved there). At once if the last round went out more than SQUADS_LOBBY.watching.coalesceMs ago, else when it's
+   * that old, everything changed meanwhile in one message each.
+   */
+  private viewersDue(now: number): boolean {
+    const dirty = new Set(this.r.viewsDirty ?? []);
+    const fresh = new Set(this.r.viewsFresh ?? []);
+    if ((!dirty.size && !fresh.size) || now < (this.r.viewsSentAt ?? -Infinity) + SQUADS_LOBBY.watching.coalesceMs) return false;
+    this.r.viewsDirty = [];
+    this.r.viewsFresh = [];
+    const to = this.r.humans.filter((h) => !h.left && this.r.views?.[h.id] && (fresh.has(h.id) || dirty.has(this.r.views[h.id]!)));
+    // (Nobody shows a board that changed: nothing goes, and the window stays open.)
+    if (!to.length) return false;
+    this.r.viewsSentAt = now;
+    for (const h of to) {
+      const at = this.r.views![h.id]!;
+      this.io.send(h.id, { t: "viewers", boards: { [at]: this.viewersOf(at) }, ...(fresh.has(h.id) ? { full: true as const } : {}) });
+    }
+    return true;
+  }
+
   // ---------------- People's choices outside a half ----------------
 
   private reclaim(id: string) {
@@ -1854,6 +1924,7 @@ export class SquadsCore {
     h.left = true;
     h.leftAs = leftAs;
     h.connected = false;
+    this.setView(id, null);
     this.r.squads = this.r.squads.map((s) => ({ ...s, players: s.players.map((p) => (p.id === id && !this.r.placed[s.id] ? { ...p, replacedByBot: true } : p)) }));
     // Bot work it owed goes elsewhere (or another answer stands).
     for (const { lm, job } of this.liveJobs()) this.settle(lm, job);

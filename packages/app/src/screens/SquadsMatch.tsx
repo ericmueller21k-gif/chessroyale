@@ -8,14 +8,17 @@ import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
 import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
-import { ClockText, Member, SquadTag, SquadsBoards, StandingsStrip, shownTurn, useNow } from "../components/SquadsParts.tsx";
+import { ClockText, Member, SquadTag, SquadsBoards, StandingsStrip, Watchers, shownTurn, useNow } from "../components/SquadsParts.tsx";
 import { BlockArrows, BlockPicker, ChipIcon, LockIcon, PickTags, SquadResources, TokenBreakdown, squareAt } from "../components/SquadsBlocks.tsx";
 import { Coins, ItemIcon, KitIcons } from "../components/MercenaryShop.tsx";
 import { ownEngine } from "../engine.ts";
+import { onPrefsChange, setSquadsJumpNext, squadsJumpNext } from "../prefs.ts";
 import type { SquadsClient } from "../squads.ts";
 import {
   CHEAT_BRUSHES,
   FORMAT_NAME,
+  JUMP_NEXT_INFO,
+  JUMP_NEXT_LABEL,
   ROUND_NAME,
   bankText,
   blockBankNow,
@@ -42,6 +45,8 @@ import {
   sideIn,
   squadName,
   stockfishLeft,
+  notWatchers,
+  studyBoard,
   walletOf,
   type LocalMatch,
 } from "../squads-view.ts";
@@ -326,13 +331,28 @@ export function SquadsMatchScreen({
   useLayoutEffect(() => {
     if (duty && !myLocked) setWatch(null);
   }, [mine?.key, seq, !!duty]);
+  // "Jump to my next board" (Relay; on unless switched off, remembered on this device): once you've moved, the big
+  // board goes to the board you play next, a beat later (your piece lands first), unless you've opened another.
+  const jump = useJumpNext();
+  const moved = !!duty && duty.duty.role === "move" && !!me && !!mine!.visible[me];
+  const study = mine && moved && jump ? studyBoard(mine, me) : null;
+  useEffect(() => {
+    if (study === null || !mine) return;
+    const key = mine.key;
+    const t = setTimeout(() => setWatch((w) => w ?? { key, board: study }), SQUADS_LOBBY.watching.jumpAfterMs);
+    return () => clearTimeout(t);
+  }, [mine?.key, seq, study]);
   // A watched match that has gone (finished long ago, or never was): back home.
   const viewing = watch && client.matches.get(watch.key) && shownMatches(matches).some((m) => m.key === watch.key) ? watch : home;
   const vm = viewing ? client.matches.get(viewing.key)! : null;
+  const vb = vm && viewing ? (vm.boards[viewing.board] ?? vm.boards[0]!) : null;
   // The sudden-death sting follows the big board's match.
   client.focus = vm?.key ?? null;
-  if (!vm || !viewing) return <div class="screen center sq-wait">{panel ?? <p class="muted">Waiting for the bracket…</p>}</div>;
-  const vb = vm.boards[viewing.board] ?? vm.boards[0]!;
+  // Who's watching: the server hears which board this screen shows, only when it changes (none once it's gone).
+  const shown = vm && vb ? `${vm.key}/${vb.id}` : null;
+  useEffect(() => client.view(vm && vb ? vm.key : null, vb?.id), [shown]);
+  useEffect(() => () => client.view(null), []);
+  if (!vm || !viewing || !vb) return <div class="screen center sq-wait">{panel ?? <p class="muted">Waiting for the bracket…</p>}</div>;
   const onMine = !!mine && vm.key === mine.key && viewing.board === myBoard;
   const mySide = sideIn(vm, me);
   const myColour: Colour = mySide === null ? "w" : colourOf(vb, mySide);
@@ -346,6 +366,7 @@ export function SquadsMatchScreen({
       orientation={orientation}
       onMine={onMine}
       watching={!!watch && !onMine}
+      studying={!onMine && !!mine && vm.key === mine.key && vb.id === studyBoard({ ...mine, turn: shownTurn(mine) }, me)}
       canWatch={!duty || myLocked || vm.state !== "half"}
       onWatch={(key, board) => setWatch({ key, board })}
       onBack={() => setWatch(null)}
@@ -364,6 +385,7 @@ function MatchView({
   orientation,
   onMine,
   watching,
+  studying,
   canWatch,
   onWatch,
   onBack,
@@ -378,6 +400,8 @@ function MatchView({
   orientation: "white" | "black";
   onMine: boolean;
   watching: boolean;
+  /** The board on screen is the one you play next (Relay: "Jump to my next board", or a tap). */
+  studying: boolean;
   canWatch: boolean;
   onWatch: (key: string, board: number) => void;
   onBack: () => void;
@@ -454,7 +478,11 @@ function MatchView({
   const arrowKey = arrows.map((a) => a.move + a.brush).join();
   const liveArrows = useMemo(() => arrows, [arrowKey]);
   const myDeadline = d && m.current ? d.duty.deadline : null;
-  const status = revealing && reveal ? revealCaption(client, reveal, before, now - m.last!.at, Math.max(1500, m.last!.until - m.last!.at)) : statusLine(client, m, boardId, onMine, watching, d, scout, revealing, blocking);
+  const status = revealing && reveal ? revealCaption(client, reveal, before, now - m.last!.at, Math.max(1500, m.last!.until - m.last!.at)) : statusLine(client, m, boardId, onMine, watching, studying, d, scout, revealing, blocking);
+  // Who else is watching this board (their pawns over it): never you or its own players this turn; each pawn in its
+  // player's color here. (Strings, so the pawns are drawn again only when these change or someone comes or goes.)
+  const notWatching = notWatchers({ ...m, turn: shownTurn(m) }, boardId, me).join(",");
+  const colours = m.sides.flatMap((s, side) => s.seats.map((id) => `${id}:${colourOf(b, side as Side)}`)).join(",");
   const round = `${ROUND_NAME[m.round]} · ${m.armageddon ? "Armageddon" : FORMAT_NAME[m.format]}`;
   const intro = m.state === "break" && m.startsAt !== null && m.startsAt > now;
   const armChoice = m.state === "armageddon" ? m.armageddonChoice : undefined;
@@ -509,16 +537,19 @@ function MatchView({
       <StandingsStrip client={client} onLeave={onLeave} exit={exit} />
       <SquadsBoards client={client} watching={`${m.key}/${boardId}`} onWatch={canWatch ? onWatch : null} />
       <div class="board-area">
-        <div class="opening-name sq-status" aria-live="polite">
-          {/* (A block placed or lifted: said here for a few seconds, both squads; the reveal's words come first.) */}
-          {banner && !revealing ? (
-            <span class={`sq-status-block${banner.kind ? ` mc-${banner.kind}` : ""}`} key={banner.at}>
-              {banner.kind === "shield" ? <ItemIcon item="shield" size={13} /> : banner.kind === "brilliant" ? <span class="mc-bang" aria-hidden="true">!!</span> : <LockIcon size={13} />}
-              {banner.text}
-            </span>
-          ) : (
-            status
-          )}
+        <div class="sq-status-row">
+          <div class="opening-name sq-status" aria-live="polite">
+            {/* (A block placed or lifted: said here for a few seconds, both squads; the reveal's words come first.) */}
+            {banner && !revealing ? (
+              <span class={`sq-status-block${banner.kind ? ` mc-${banner.kind}` : ""}`} key={banner.at}>
+                {banner.kind === "shield" ? <ItemIcon item="shield" size={13} /> : banner.kind === "brilliant" ? <span class="mc-bang" aria-hidden="true">!!</span> : <LockIcon size={13} />}
+                {banner.text}
+              </span>
+            ) : (
+              status
+            )}
+          </div>
+          <Watchers client={client} board={`${m.key}/${boardId}`} hide={notWatching} colours={colours} />
         </div>
         <div class="board-row">
           <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={choosing && !blocking} moves={allowed} onMove={(mv) => client.choose(m.key, mv)} arrows={boardArrows}>
@@ -617,6 +648,8 @@ function MatchView({
             noTokens={noTokens}
           />
         )}
+        {/* (After your move's panel, so it never pushes the move or Block down.) */}
+        {m.format === "relay" && mySide !== null && <JumpNextSwitch />}
         {m.format === "pairs" && m.tokenLog.length > 0 && (m.state === "over" || !!m.result) && <TokenBreakdown log={m.tokenLog} sides={m.sides} mine={mySide} />}
         {m.mode === "mercenary" && <KitLine client={client} m={m} mine={mySide} />}
         {!d && <p class="sq-explain">{rulesLine(m)}</p>}
@@ -636,6 +669,34 @@ function MatchView({
         )}
         {panel}
       </div>
+    </div>
+  );
+}
+
+/** "Jump to my next board", as this device has it (redrawn when it's switched). */
+function useJumpNext(): boolean {
+  const [on, setOn] = useState(squadsJumpNext);
+  useEffect(() => onPrefsChange(() => setOn(squadsJumpNext())), []);
+  return on;
+}
+
+/**
+ * "Jump to my next board" (Relay; Eric, Oct 14): the switch, and an (i) that says what it does in a sentence or two.
+ * On by default, remembered on this device.
+ */
+function JumpNextSwitch() {
+  const on = useJumpNext();
+  const [info, setInfo] = useState(false);
+  return (
+    <div class="sq-jump">
+      <label class="sq-jump-switch">
+        <input type="checkbox" role="switch" checked={on} onChange={(e) => setSquadsJumpNext(e.currentTarget.checked)} />
+        <span>{JUMP_NEXT_LABEL}</span>
+      </label>
+      <button type="button" class={`sq-info${info ? " on" : ""}`} aria-expanded={info} aria-label={`What "${JUMP_NEXT_LABEL}" does`} onClick={() => setInfo(!info)}>
+        <span aria-hidden="true">i</span>
+      </button>
+      {info && <p class="sq-jump-info">{JUMP_NEXT_INFO}</p>}
     </div>
   );
 }
@@ -814,6 +875,7 @@ function statusLine(
   boardId: number,
   onMine: boolean,
   watching: boolean,
+  studying: boolean,
   d: ReturnType<typeof dutyOf>,
   scout: ReturnType<typeof scouting>,
   revealing: boolean,
@@ -822,7 +884,7 @@ function statusLine(
   const b = m.boards[boardId]!;
   const where = m.boards.length > 1 ? `Board ${boardId + 1}` : "The board";
   if (b.result) return `${where} is over: ${b.result.winner === null ? "a draw" : `${sideWord(b.result.winner)} won`}`;
-  if (watching) return `Watching ${where} · ${squadName(m.sides[0].squadId)} v ${squadName(m.sides[1].squadId)}`;
+  if (watching) return studying ? `Watching ${where} · your next board` : `Watching ${where} · ${squadName(m.sides[0].squadId)} v ${squadName(m.sides[1].squadId)}`;
   if (m.state === "break") return m.boards.length > 1 ? `${where} · starting soon` : "Starting soon";
   if (m.state === "armageddon") return "Armageddon: choosing colors";
   if (m.state === "over") return "The match is over";

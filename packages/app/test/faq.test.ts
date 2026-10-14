@@ -262,6 +262,16 @@ describe("the FAQ on Squads (v2: tokens, blocks, the team vote)", () => {
   });
 });
 
+describe("the FAQ on Squads' screens (Oct 14: jump to my next board, who's watching)", () => {
+  it("names the switch as the screen does, and says whether it starts on from the setting", () => {
+    const t = section("modes");
+    expect(t).toContain("Jump to my next board (on unless you switch it off, under the board) takes you straight to the board you play next turn");
+    expect(t).toContain("An eye and pawns over a board show who else is watching it.");
+    const off = section("modes", { ...FAQ_DEFAULTS, squadsWatching: { jumpToNext: false } });
+    expect(off).toContain("Jump to my next board (off unless you switch it on, under the board)");
+  });
+});
+
 describe("the FAQ on Squads' team clock (Oct 13: three chess time controls)", () => {
   it("names each time control in chess form with its bank, increment and cap, the default, the free seconds and sudden death, all from the settings", () => {
     const Q = FAQ_DEFAULTS.squads;
