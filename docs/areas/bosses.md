@@ -159,6 +159,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
   bottom-right, mirroring him (feet level, as far from the board); the status box under the board at its width; the
   column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
+  From 900 to 1099 px the boss is drawn at 1× by the eval bar, so he's whole in the window; the board makes room only
+  if it must (`--bs-reach`, `--bs-need` in styles.css; Oct 14). From 1100 px he's 2× (2 screen px a sprite px).
 - **The bars at the back, the ice on its square, the queen banners silent** (Eric, Oct 11): the move clock's bars above
   and below the board draw behind everything (squares' overlays, the boss, his effects and words, the God King), as the
   eval bar does. Ginger's ice is one block the square's shape on every square, whatever the piece, placed on

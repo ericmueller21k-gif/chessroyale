@@ -113,7 +113,8 @@ describe("the FAQ's numbers come from the settings", () => {
   it("every boss is on Maia (or the bosses with a brain of their own are named)", () => {
     expect(section("boss-brain")).toContain(BOSS_BRAIN.forPlayers ? "Every boss plays with Maia" : "In the test, every boss plays with Maia");
     const own = section("boss-brain", { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, byBoss: { hollow: "stockfish" } } });
-    expect(own).toContain("every boss except Hollow (Stockfish) plays with Maia");
+    // (The live note starts its sentence with it: "Every boss except…".)
+    expect(own.toLowerCase()).toContain("every boss except hollow (stockfish) plays with maia");
   });
 
   it("Maia is marked as being tested only while it's off for players", () => {

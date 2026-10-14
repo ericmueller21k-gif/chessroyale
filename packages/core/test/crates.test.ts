@@ -72,20 +72,24 @@ describe("crates", () => {
     expect(itemChance(beta, "antlers")).toBe(0);
   });
 
-  it("Beta after batch 2 (agent and pirate complete): each box's items and every item's chance", () => {
+  it("Beta, complete (28 items): each box's items and every item's chance, each tier's items rarer than the one below's", () => {
     const boxes = Object.fromEntries((["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const).map((t) => [t, beta.items.filter((id) => itemDef(id)?.tier === t)]));
     expect(boxes).toEqual({
-      common: ["party-hat", "wizard-hat", "top-hat", "fake-mustache", "fedora", "bandana"],
-      uncommon: ["viking-helm", "little-crown", "briefcase", "eyepatch", "hook"],
-      rare: ["dark-shades", "wire-earpiece", "cutlass", "spyglass"],
-      epic: ["suit-and-tie", "captains-coat"],
+      common: ["party-hat", "wizard-hat", "top-hat", "fake-mustache", "fedora", "bandana", "ninja-headband", "shuriken"],
+      uncommon: ["viking-helm", "little-crown", "briefcase", "eyepatch", "hook", "ninja-mask", "nunchucks"],
+      rare: ["dark-shades", "wire-earpiece", "cutlass", "spyglass", "katana"],
+      epic: ["suit-and-tie", "captains-coat", "ninja-hood", "ninja-gi"],
       legendary: ["pirate-hat", "smiley-face"],
       mythic: ["tommy-gun", "parrot"],
     });
-    expect(beta.items).toHaveLength(21);
-    // Boxes 40/26/18/14 shared evenly; Fischer Random 2%: Legendary 80 (0.8% each), Mythic 20 (0.2% each).
-    const chance: Record<string, number> = { common: 0.4 / 6, uncommon: 0.26 / 5, rare: 0.18 / 4, epic: 0.14 / 2, legendary: 0.008, mythic: 0.002 };
+    expect(beta.items).toHaveLength(28);
+    // Boxes 40/26/18/14 shared evenly (5, 3.71, 3.6 and 3.5% each); Fischer Random 2%: Legendary 80 (0.8% each),
+    // Mythic 20 (0.2% each).
+    const chance: Record<string, number> = { common: 0.05, uncommon: 0.26 / 7, rare: 0.036, epic: 0.035, legendary: 0.008, mythic: 0.002 };
     for (const [tier, ids] of Object.entries(boxes)) for (const id of ids) expect(itemChance(beta, id), id).toBeCloseTo(chance[tier]!, 6);
+    // The ladder holds item by item: any one item is rarer than any one item of the tier below.
+    const each = TIERS.map((t) => chance[t.id]!);
+    for (let i = 1; i < each.length; i++) expect(each[i]!).toBeLessThan(each[i - 1]!);
     expect(fischerOdds(beta)).toEqual([
       { item: "pirate-hat", weight: 40 },
       { item: "smiley-face", weight: 40 },

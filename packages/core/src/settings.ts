@@ -867,11 +867,11 @@ export const BOSS_BRAIN = {
    */
   fixed: { recluse: "maia-raw" } as Readonly<Record<string, BossBrain>>,
   /**
-   * The Maia brain for players too, not only admins: the one value that switches it on. Off until the launch step
-   * (ROADMAP.md, "Needs Eric": the Maia box's source published under the AGPL, with Eric's OK): until then players
-   * meet Stockfish as before and never download Maia; admins meet Maia on every boss, in every mode.
+   * The Maia brain for players too, not only admins: the one value that switches it on. On since Oct 14, 2026 (Eric:
+   * "flip it"), after the Maia box's source was published on the site under the AGPL (DECISIONS.md, "The Maia box's
+   * source on the site"). Off, players would meet Stockfish and never download Maia; admins meet Maia either way.
    */
-  forPlayers: false,
+  forPlayers: true,
   /**
    * Maia's rating for a boss's level (its strength, plus crowdMargin for a crowd), on straight lines between these
    * points: below the first along the first line, down to maiaRatingMin; above the last held there (Maia's ceiling).

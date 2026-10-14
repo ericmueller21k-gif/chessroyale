@@ -7,6 +7,14 @@
  * window.__perf.frames.
  */
 export function instrument() {
+  /** Which boss's effect is on screen, if any: a power's moment (its class, "pm-candle"), Lights out, the funhouse's spin. */
+  const fxOn = () => {
+    const pm = document.querySelector(".power-moment");
+    if (pm) return [...pm.classList].find((c) => c.startsWith("pm-")) ?? "moment";
+    if (document.querySelector(".lo-board")) return "lightsout";
+    if (document.querySelector(".pw-flipping, .pw-turning-cw, .pw-turning-ccw")) return "spin";
+    return document.querySelector(".king-attack") ? "king-attack" : "";
+  };
   const P = (window.__perf = { raf: 0, frames: [], tag: "", timeouts: new Set(), intervals: new Set(), tSet: 0, iSet: 0, audio: 0, audioOff: 0, contexts: 0 });
   const raf = window.requestAnimationFrame.bind(window);
   window.requestAnimationFrame = (cb) => raf((t) => (P.raf++, cb(t)));
@@ -48,10 +56,20 @@ export function instrument() {
       return dis.apply(this, a);
     };
   }
+  // Long tasks (over 50 ms on the main thread), as [start, duration] in page time.
+  P.longs = [];
+  try {
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) P.longs.push([e.startTime, e.duration]);
+    }).observe({ type: "longtask", buffered: true });
+  } catch {
+    // (No long-task timing in this browser.)
+  }
   let last = 0;
   let lastRaf = 0;
   const loop = (t) => {
-    if (last && !document.hidden) P.frames.push([t - last, P.raf - lastRaf, P.tag || (window.match?.phase?.kind ?? "")]);
+    // Each frame: its length, the rAF callbacks in it, what was going on, when it ended, and the boss's effect on screen.
+    if (last && !document.hidden) P.frames.push([t - last, P.raf - lastRaf, P.tag || (window.match?.phase?.kind ?? ""), t, fxOn()]);
     last = t;
     lastRaf = P.raf;
     raf(loop);
@@ -72,6 +90,15 @@ export function counts() {
     audioOff: P.audioOff,
     canvases: document.getElementsByTagName("canvas").length,
   };
+}
+
+/**
+ * Long tasks during some frames (`frames` as instrument records them: [length, rAF, tag, end]): those that started
+ * inside one of them: how many, and the longest (ms).
+ */
+export function longStats(longs, frames) {
+  const inside = longs.filter(([start]) => frames.some((f) => start >= f[3] - f[0] && start < f[3]));
+  return { n: inside.length, max: inside.length ? Math.round(Math.max(...inside.map((l) => l[1]))) : 0 };
 }
 
 /** Frame lengths (ms) as p50, p95, the share over 20 ms (a missed 60 Hz refresh: a dropped frame) and the longest. */

@@ -10,7 +10,7 @@
 import { QUICK_CHAT } from "@chessroyale/core";
 import { clownSound, type ClownSound } from "./characters/clown-sounds.ts";
 import { gingerSound, type GingerSound } from "./characters/gingerbread-sounds.ts";
-import { grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds.ts";
+import { WHISTLES, grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds.ts";
 import { hollowSound, type HollowSound } from "./characters/hollow-sounds.ts";
 import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
 import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
@@ -693,8 +693,32 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   },
 };
 
-/** Synthesised sounds that can be made ahead (warmSounds), by name: Hollow's (his smash took 150 ms to make on a computer), Big Boy's, Sawyer's, Wrangler's. */
-const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
+/**
+ * Synthesised sounds that can be made ahead (warmSounds), by name: Boingo's, Ginger's, Jefferson's (his three candle
+ * whistles and the crackle took about 180 ms to make the first time a shot went up, on a computer: Oct 14), Hollow's
+ * (his smash took 150 ms on a computer), Big Boy's, Sawyer's, Wrangler's. A list: each made in an idle moment of its own.
+ */
+const MAKE: Partial<Record<SoundName, ((rate: number) => unknown) | ((rate: number) => unknown)[]>> = {
+  clownBoing: (r) => clownSound("boing", r),
+  clownHonk: (r) => clownSound("honk", r),
+  clownSqueak: (r) => clownSound("squeak", r),
+  clownSlideUp: (r) => clownSound("slideUp", r),
+  clownSlideDown: (r) => clownSound("slideDown", r),
+  clownLaugh: (r) => clownSound("laugh", r),
+  clownSplat: (r) => clownSound("splat", r),
+  clownFlip: (r) => clownSound("flip", r),
+  gingerCrunch: (r) => gingerSound("crunch", r),
+  gingerJingle: (r) => gingerSound("jingle", r),
+  gingerCrackle: (r) => gingerSound("crackle", r),
+  gingerWind: (r) => gingerSound("wind", r),
+  grexCrackle: (r) => grexSound("crackle", r),
+  grexWhoosh: (r) => grexSound("whoosh", r),
+  grexFizz: (r) => grexSound("fizz", r),
+  grexPoof: (r) => grexSound("poof", r),
+  grexPop: (r) => grexSound("pop", r),
+  grexRoar: (r) => grexSound("roar", r),
+  grexSmack: (r) => grexSound("smack", r),
+  grexWhistle: [...WHISTLES, "sparkle" as const].map((w) => (r: number) => grexSound(w, r)),
   hollowHum: (r) => hollowSound("hum", r),
   hollowCast: (r) => hollowSound("cast", r),
   hollowWhisper: (r) => hollowSound("whisper", r),
@@ -752,12 +776,12 @@ const MAKE: Partial<Record<SoundName, (rate: number) => unknown>> = {
 export function warmSounds(names: readonly SoundName[]): void {
   if (!ctx) return;
   const rate = ctx.sampleRate;
-  const todo = [...new Set(names)].filter((n) => MAKE[n]);
+  const todo = [...new Set(names)].flatMap((n) => MAKE[n] ?? []);
   const idle = (fn: () => void) => (typeof requestIdleCallback === "function" ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 60));
   const next = () => {
-    const n = todo.shift();
-    if (!n) return;
-    MAKE[n]!(rate);
+    const make = todo.shift();
+    if (!make) return;
+    make(rate);
     idle(next);
   };
   if (todo.length) idle(next);

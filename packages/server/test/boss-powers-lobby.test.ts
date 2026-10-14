@@ -777,13 +777,19 @@ describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players o
     expect(L.last("p2", "boss")!.boss.lastMove!.move).toBe((req.allowed ?? legalMoves(req.fen))[0]);
   });
 
-  it("a lobby with a player in it: Stockfish, as before (no brain sent)", () => {
-    const L = raidOf({ bossId: "gingerbread" }, [true, false]);
-    expect(L.last("p1", "bossBrain")).toBeUndefined();
-    expect(L.core.record.bossBrain).toBeNull();
-    L.advance(60_000);
-    crowdMove(L);
-    expect(hostBoss(L).brain).toBeUndefined();
+  it("while it's off for players, a lobby with a player in it: Stockfish (no brain sent)", () => {
+    const was = BOSS_BRAIN.forPlayers;
+    (BOSS_BRAIN as { forPlayers: boolean }).forPlayers = false;
+    try {
+      const L = raidOf({ bossId: "gingerbread" }, [true, false]);
+      expect(L.last("p1", "bossBrain")).toBeUndefined();
+      expect(L.core.record.bossBrain).toBeNull();
+      L.advance(60_000);
+      crowdMove(L);
+      expect(hostBoss(L).brain).toBeUndefined();
+    } finally {
+      (BOSS_BRAIN as { forPlayers: boolean }).forPlayers = was;
+    }
   });
 
   it("once it's on for players (forPlayers, one value), every lobby meets it", () => {
