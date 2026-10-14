@@ -313,14 +313,17 @@ export interface NetBossPowers {
   boardSaw?: { at: number; until: number } | null;
   /**
    * Wrangler (missing for other bosses): his long pull once his first move is played (null: an ordinary first move), his
-   * last lasso drag (the piece, its squares, the crowd turn it set up; `ult`: the drag that stood in for his showdown),
-   * his last showdown (the pairs and where each came from, the crowd turn whose move must be one of its duels, the
-   * position before the line-up), and how many turns he has held his showdown so far ("Not yet...").
+   * last lasso drag (the piece, its squares, the crowd turn it set up; `ult`: the drag that stood in for the test
+   * trigger's showdown), his last showdown (the pairs and where each came from, the crowd turn whose move must be one of
+   * its duels, the position before the line-up; `outside`: the test trigger's, outside the band), his meter full and
+   * waiting to fire (`ready`: which fill, for his line and his ready loop; null: not), and whether the device that works
+   * out his moves scouts for line-ups while this crowd turn is picked (`scout`). His meter itself is `rage`.
    */
   pull?: LongPull | null;
   drag?: LassoDrag | null;
   showdown?: ShowdownResult | null;
-  holds?: number;
+  ready?: number | null;
+  scout?: boolean;
 }
 
 /**
@@ -414,7 +417,7 @@ export type ClientMessage =
    * asked to work out besides (Wrangler's): the lasso drag after it ("c3c4", "" none) and the showdown's line-up after it
    * (checkLineup's spec, "" none). The server checks each against the rules.
    */
-  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string }
+  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
   /**
@@ -665,12 +668,13 @@ export type ServerMessage = { now: number } & (
       brain?: NetBossBrain;
       /**
        * Wrangler's turn (BossAsks): his long pulls to choose from (his first move: answer one of them as `move`, or an
-       * ordinary move), a lasso drag after his move (`drag`), or his showdown's line-up after it (`showdown`; "last": two
-       * pairs, then a drag, allowed); `seed` orders the engine's candidates (never the battle's own seed).
+       * ordinary move), his showdown's line-up after his move (`showdown`: "try", one that qualifies, else ""; "test",
+       * the admins' trigger: the best found even outside the band, answered with `outside`, or a stand-in drag), a lasso
+       * drag after it when no showdown comes (`drag`); `seed` orders the engine's candidates (never the battle's own seed).
        */
       pull?: string[];
       drag?: true;
-      showdown?: "try" | "last";
+      showdown?: "try" | "test";
       seed?: number;
     }
   /**
