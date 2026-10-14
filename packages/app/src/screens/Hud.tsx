@@ -1,7 +1,9 @@
 import { useEffect, useState } from "preact/hooks";
 import { LeaderboardSheet } from "../components/LeaderboardSheet.tsx";
 import { LiveNumber } from "../components/LiveNumber.tsx";
-import { MatchMenu } from "../components/MatchMenu.tsx";
+import { BrainDebug, UltimateTest } from "../components/BossDock.tsx";
+import { COMPUTER_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
+import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
 import { clockText } from "../components/RaceTower.tsx";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
@@ -44,6 +46,7 @@ const pts = (x: number) => (Math.abs(x) < 0.05 ? "0.0" : (x > 0 ? "+" : "−") +
  */
 export function Hud({ match, stripFrozen = false }: { match: GameView; stripFrozen?: boolean }) {
   const [open, setOpen] = useState(false);
+  const computer = useMedia(COMPUTER_LAYOUT);
   // During the reveal the round counter has already moved on; show the round just played.
   const shownRound = match.phase.kind === "reveal" ? match.roundsPlayed : match.roundsPlayed + 1;
   // Crowd 50 v 50: your team, with your team's cut line.
@@ -125,7 +128,15 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
           )}
           {crowd ? <span class="hud-spacer" /> : <BankTime match={match} />}
         </button>
-        {/* Sound, and Resign (a phone: "⋯" and its sheet; a computer: the flag). */}
+        {/* A computer, admins only: the boss's brain and the ultimate's test trigger, before the player's buttons (Eric,
+            Oct 13; a phone has them under the boss dock). */}
+        {computer && boss && (
+          <span class="match-tools">
+            <BrainDebug match={match} />
+            <UltimateTest match={match} />
+          </span>
+        )}
+        {/* Sound, and Resign (a phone: "⋯" and its sheet; a computer: the sound button, then the flag). */}
         <MatchMenu exit={exitFor(match)} />
       </div>
       {boss ? <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}

@@ -884,9 +884,19 @@ p {
     row-gap: 10px;
     align-content: start;
   }
+  /* The title line: over the board's column only (the boss bar's width), its controls at its right end, above the
+     board's right edge (Eric, Oct 13). */
   .screen.game .hud-row {
-    grid-column: 1 / -1;
+    grid-column: 1;
     grid-row: 1;
+  }
+  .screen.game .hud-row > .hud {
+    flex: 1 0 auto;
+  }
+  /* (The boss's bar under it, the same width: placed, since the line no longer fills row 1.) */
+  .screen.game > .boss-bar {
+    grid-column: 1;
+    grid-row: 2;
   }
   .screen.game .boards-strip {
     grid-column: 1 / -1;
@@ -1657,6 +1667,36 @@ p {
   font-size: 16px;
 }
 
+/* ---- A computer's title line: the admins' testing items (Hud.tsx), then sound, then the flag (Eric, Oct 13) ----
+   One row, on the title's line. When it's tight (900 to 1100 px) the brain's pill shrinks and ellipsizes first; the
+   title, the test button and the player's buttons keep their size. */
+.match-tools {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.match-tools:empty {
+  display: none;
+}
+.match-tools > .brain-debug {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  line-height: 16px;
+}
+.match-tools > .ult-test {
+  flex: none;
+  margin: 0;
+  white-space: nowrap;
+}
+
 /* ---- Resign and leave (components/MatchMenu.tsx; Eric, Oct 13) ----
    At the right end of a match's top line: a phone's "⋯" (its sheet at the foot of the screen: Sound, Resign), a
    computer's flag beside the sound button (its confirm under the flag). Nothing dims or covers the board. */
@@ -1833,10 +1873,12 @@ p {
   background: var(--danger);
   color: #fff;
 }
+/* (A computer's: beside the flag, out into the column next to the board, its top level with the title line. The flag
+   sits over the board's right edge, so a confirm dropping under it would cover the board; Eric, Oct 13.) */
 .mm-confirm.mm-pop {
   position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  top: 0;
+  left: calc(100% + 28px);
   z-index: 66;
   width: 300px;
   display: grid;
