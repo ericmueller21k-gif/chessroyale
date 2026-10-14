@@ -513,12 +513,12 @@ export const BOSS_POWERS = {
    * team"). His own meter, not the rage meter: it fills from crowd turn 1 and is full as crowd turn bulletTurn begins,
    * when it comes (his line and the spellbook, no warning); nothing else fills it (no strikes, no eval). From then to the
    * end of phase 1 everyone's clock is a bank of bulletBankSeconds: no increment, no per-move cap, nothing adds time; a
-   * bank that runs out loses the battle on time. By estimate (DECISIONS.md, "The Hidden Boss, phase 1"): a strong player
-   * at 3 to 5 s a move gets 36 to 60 more moves out of 180 s, and a battle is capped at bossMaxMoves (60) crowd moves.
-   * Not yet sim-tested.
+   * bank that runs out loses the battle on time. Eric, Oct 14, after playing it: 3:00 "feels like too much", so 1:00
+   * ("1+0"), was 180 s. A player at 2 to 3 s a move gets 20 to 30 more moves out of it, and a battle is capped at
+   * bossMaxMoves (60) crowd moves. Not yet sim-tested.
    */
   bulletTurn: 7,
-  bulletBankSeconds: 180,
+  bulletBankSeconds: 60,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**
