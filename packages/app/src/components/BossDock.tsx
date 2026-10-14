@@ -178,7 +178,8 @@ export function UltimateTest({ match }: { match: GameView }) {
   // (A press is for the next ultimate only: once it has come, the button is ready again.)
   const key = boss ? `${boss.id}:${boss.startMove}:${boss.board.generation}:${p?.ults ?? 0}` : "";
   const [pressed, setPressed] = useState("");
-  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result) return null;
+  // (Nor in the Hidden Boss's phase 2: no ultimate there.)
+  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote) return null;
   // (Hollow's Lights out: the full meter has it on its way until the test has begun.)
   const lights = p.ultimate === "lightsout";
   const underWay = p.ultAt !== null && (!lights || (p.lightsAt != null && p.lightsAt >= p.ultAt));

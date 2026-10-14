@@ -6,7 +6,7 @@ import { animLength, cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { kingSay } from "../godKing.ts";
 import { CRITICAL, bossVoice } from "../speech.tsx";
-import { playInPlace } from "./BossCharacter.tsx";
+import { figureLoop, playInPlace } from "./BossCharacter.tsx";
 import type { BossUi, KitMoment, MomentProps } from "./PowerParts.tsx";
 
 /**
@@ -59,7 +59,8 @@ let mocks = 0;
 export function mockKingHelp(boss: BossView): void {
   const n = mocks++;
   const key = `${boss.id}:${boss.startMove}:mock:${boss.crowdMoves}:${n}`;
-  playInPlace(key, ["slam"]);
+  // (Phase 2, revived: the same slam with his hair in the wind.)
+  playInPlace(key, [figureLoop() === "idle2" ? "slam2" : "slam"]);
   bossVoice.say(RECLUSE_LINES.mock[n % RECLUSE_LINES.mock.length], key, CRITICAL);
   kingSay("foeBlocked", key);
 }

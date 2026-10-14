@@ -56,7 +56,11 @@ export type KingCue =
   | "queenLost"
   | "queenWon"
   | "foeIntro"
-  | "foeBlocked";
+  | "foeBlocked"
+  | "foePhase2"
+  | "foeBoardWon"
+  | "foeBoardLost"
+  | "foeVictory2";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
   // One of these as the battle begins (Eric, Oct 9: one opening line, from a much bigger pool).
@@ -130,6 +134,10 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   // and his help tried and blocked (it doesn't work against him).
   foeIntro: KING_VS_RECLUSE.intro,
   foeBlocked: KING_VS_RECLUSE.blocked,
+  foePhase2: KING_VS_RECLUSE.phase2,
+  foeBoardWon: KING_VS_RECLUSE.boardWon,
+  foeBoardLost: KING_VS_RECLUSE.boardLost,
+  foeVictory2: KING_VS_RECLUSE.victory2,
   // G-REX: the first time a piece of ours steps onto a burning tile (once a match).
   fireTile: [
     "Careful on that tile, don't stand there too long!",
@@ -176,6 +184,10 @@ const KIND: Record<KingCue, Kind> = {
   fireTile: "critical",
   foeIntro: "critical",
   foeBlocked: "critical",
+  foePhase2: "critical",
+  foeBoardWon: "critical",
+  foeBoardLost: "critical",
+  foeVictory2: "critical",
 };
 
 /** How much each kind of line matters to his voice: critical cuts in; a remark waits its turn ahead of small talk. */
