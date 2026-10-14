@@ -133,6 +133,9 @@ test("Boss raid: the three types too; a Solo raid is you and 49 bots against a b
   await expect.poll(async () => (await full.seen()).fifty, { timeout: 6_000 }).toBe(true);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.runner.state.players.filter((p: any) => p.isBot).length)).toBe(49);
+  // A boss with a crowd strikes (every boss but the Hidden Boss): its card counts down to it, and the intro says so.
+  await expect(page.locator(".boss-next")).toHaveText(/^Strikes (in \d+ moves|after this move)$/);
+  await expect(page.locator(".boss-dock-status")).toContainText("Worst mover struck every 3 moves.");
   // Play it out (the engine's move each time).
   const stopAt = Date.now() + 5 * 60_000;
   while (Date.now() < stopAt && (await phase(page)) !== "results") {

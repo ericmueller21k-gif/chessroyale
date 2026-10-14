@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
-import { KING_ATTACK, SNACK, bossIntroTimeline, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
+import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, lastMoveTookQueen, pieceAt, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, PowerBoard, PowerMoment, RageMeter, funhouseView, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackLine, snackPawnShown } from "../components/BigBoy.tsx";
@@ -412,7 +412,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             </span>
             <span class="dock-line muted">
               {intro
-                ? `Worst mover struck every ${match.settings.bossKillEvery} moves.`
+                ? // (A boss that never strikes, the Hidden Boss: nothing about strikes.)
+                  bossRules(boss)?.noStrikes
+                  ? ""
+                  : `Worst mover struck every ${match.settings.bossKillEvery} moves.`
                 : funMove?.move
                   ? "Not scored."
                   : victim

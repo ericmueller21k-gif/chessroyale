@@ -16,7 +16,7 @@ import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
 import { duelCount, duelTurn } from "../components/Pig.tsx";
-import { bulletOn, kingBlocked } from "../components/Recluse.tsx";
+import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
 import { clockText } from "../components/RaceTower.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { useReplay } from "../hooks.ts";
@@ -302,9 +302,11 @@ export function PlayScreen({
                 ) : barred ? (
                   <span class="muted barred-note">✕ {toSan(board.fen, barred)}</span>
                 ) : bulletOn(match.boss) ? (
-                  // (The Hidden Boss's bullet clock: what's left in your bank, ticking, on every move to the end.)
+                  // (The Hidden Boss's bullet clock: what's left in your bank, ticking, on every move to the end; once he
+                  // has added time per move, the time control too: "Bullet 1+2".)
                   <span class="bullet-note">
-                    <strong>Bullet</strong> <span class="muted">· {clockText(Math.max(0, deadline - Math.max(now, startsAt)))} left</span>
+                    <strong>Bullet{bulletIncrementOn(match.boss) ? ` ${bulletControl(bulletIncrementOn(match.boss))}` : ""}</strong>{" "}
+                    <span class="muted">· {clockText(Math.max(0, deadline - Math.max(now, startsAt)))} left</span>
                   </span>
                 ) : (
                   match.boss.staggerNext && <span class="muted">Boss staggered.</span>

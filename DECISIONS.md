@@ -3859,6 +3859,74 @@ the right edge of your board (on a phone, the big board, yours or the one you're
 other three on a computer show none. The marks flash at every slow move, whoever's; the short "slow move" note still
 sits on the board it was on, so you see which board was slow.
 
+## The Hidden Boss after Eric's playtest: no strikes, a try spends its charge, one quote gone, 1+0 then 1+2 (Eric, Oct 14, 2026)
+
+Eric played phase 1 on Oct 14 and asked for four changes. Same reach as before: admins only, in Boss alone; no
+protocol or stored data changed (online can't meet him: the new event kind and rule are the shared runner's, as his
+others are).
+
+**1. He never strikes the crowd** (my call; Eric: "I'll leave you to that").
+- Every boss knocks out the crowd's worst mover every `bossKillEvery` (3) moves while more than its minimum is left,
+  and its intro says "Worst mover struck every 3 moves." Eric saw it in his fight and wasn't sure it belonged. It
+  doesn't: his real fight is a squad of four, who must all reach phase 2's four boards.
+- A per-boss rule, `BossRules.noStrikes` (his only): the runner's `bossKillDue` is never true for him (solo, the server
+  and the sims all ask it), the screens get `strikeIn` null, so his card says "Move N of M", and his intro's second
+  line is empty instead of the strikes line. Other bosses unchanged (a unit test runs a crowd of five against him and
+  against Boingo: no knockouts for him, Boingo's at moves 3 and 6, the card counting down).
+
+**2. The Weaver Adams line is gone** from `boardWon` (Eric: "it doesn't fit the rest"), with its source note. His board
+win lines are the two placeholders. Nothing else referred to it but its test (now: no Weaver Adams anywhere in his
+lines). Its research entry stays in "The Hidden Boss, phase 2" as a record.
+
+**3. The God King's help tried against him spends the charge** (Eric: "using the king's move doesn't draw down on the
+usage vs him like it should").
+- Tapping "Play move" or "Strike" is still blocked and mocked as before (the slam, his line, the God King's), and now
+  uses up that charge as if it had worked: the runner's `kingTried` (one charge a try; none left, nothing), called by
+  solo's `callKing`, which the dock now calls after the mock. The crowns go down; with none left the God King can't be
+  called, as against any boss. Phase 2 too (the same dock, the same charges).
+- **My calls:** a blocked try leaves your move yours (he played nothing; the clock runs on), and a second try in the
+  same move spends another charge (each try is a use; no new state to track). `kingMoves` and `kingStrikes` stay empty
+  (he never acted). The Last Stand isn't a player's action: unchanged, it never comes and spends nothing.
+- Online can't meet him: `NetMatch.callKing` sends nothing for him (no server path takes such a try), as before.
+
+**4. The bullet clock: 1+0 for three moves, then he adds 2 s a move** (Eric: "1 min too short, needs to be 1+1 or even
+1+2... a few moves, say 3, with 1+0, then he says a comment about it and suggests adding time per move, then a banner
+or just text on the center of the board that says time being added per move").
+- After his ultimate (the 1:00 bank, as before), the crowd plays `BOSS_POWERS.bulletPlainMoves` (3) moves at 1+0. As
+  the next crowd turn begins, his moment `bulletPlus` (a new event kind, once, from his rules' `everyTurn`): where he
+  stands he consults the book and says one grudging line (new placeholders, `RECLUSE_LINES.bulletPlus`: too fast even
+  for real chess, time per move then; one hints that the clock that adds time per move was his own idea, never as a
+  quote, and no number in the lines), then clean text across the middle of the board, "+2 s a move from now on"
+  (`.rc-plus`: a dark band, white text sized to the board, fading in and out; not a FightBanner), from 0.5 s to the
+  end of the moment (2.8 s, `RECLUSE_FX.bulletPlus`). The dock's word for the moment is "+2 s a move".
+- From then on each move made in time adds `bulletIncrementSeconds` to that player's bank. **2 s** (the director's
+  pick: Eric said 1+1 or 1+2; 1:00 felt too short, so the more forgiving one; one setting). It's the game's usual
+  increment: the runner's round settings give the bullet clock that increment (`bulletIncrement`, from the turn and
+  `ultAt`), so a move may take the bank plus 2 s, and the bank after it is the bank plus 2 s less the time taken; a move
+  not made in time empties the bank, and the battle is lost on time as before. No cap on the bank (none existed for
+  bullet): the per-move cap is set where no bank can reach it (the bullet bank plus the increment on every move a
+  battle can have), so the bank decides.
+- The dock shows the time control once it applies: "Bullet 1+2 · 0:41 left" (before it, "Bullet · 0:41 left" as now).
+- **The clock still only counts your own thinking:** his moment is a power's moment like any other (`POWER_FX`), so
+  the crowd's clock starts after it, as it starts after his move, his thinking and every reveal.
+- Settings in `packages/core/src/settings.ts` with comments; estimates, not sim-tested.
+
+**Testing.** Targeted lane (rules touched, so the whole unit suite): typecheck; unit
+`packages/chess/test/recluse.test.ts` (no strikes against him and Boingo's as before; a try spends a charge, one a try,
+none left nothing, phase 2's too, another boss's untouched; three moves at 1+0, his moment once as the fourth begins,
++2 s a move made in time, the bank growing past 1:00 uncapped, out of time still loses, the rule's numbers, the moment's
+length in the boss's turn show), `packages/app/test/recluse-boss.test.ts` (the moment's line, priority, text, dock word
+and timing; "Bullet 1+2" from the right turn; no Weaver Adams; solo's `callKing` spending a charge a try and leaving
+your move yours); e2e `recluse.spec.ts` (no strike text from the intro on; the dock's crowns 3, 2, 1 in phase 1 and 3, 2
+in phase 2; three moves at 1+0, his line, "+2 s a move from now on" only while the boss screen holds, "Bullet 1+2", the
+bank after a move exactly +2 s less the time taken), `matchmaking.spec.ts`'s Solo raid (another boss's card still says
+"Strikes in…"), `king-attack.spec.ts`, `boss-speech.spec.ts`, `resign.spec.ts`. Frames: `npm run frames:recluse --
+<dir> both light only=plus`; the dock's "Your move. Bullet 1+2 · 0:59 left" measured whole in its two lines at 320,
+360 and 390 px, and the band on the squares exactly.
+- **A test fix on the way** (`recluse.spec.ts`, phase 2's slow moves, from #208): it failed on a computer, on main too.
+  The bots' slow moves can bring his ultimate during the 5.4 s the test thinks, and then its own move can't add one; the
+  test now stops counting once the ultimate has come by the time it moves.
+
 ### Maia's loading step (Eric, Oct 14, 2026)
 
 On Eric's iPhone 15 (Safari, Wi-Fi) Maia failed to load in every normal boss battle and loaded with `?win=1`, where

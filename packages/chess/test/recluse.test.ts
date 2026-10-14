@@ -19,13 +19,14 @@ import {
   playableBosses,
   type Settings,
 } from "@chessroyale/core";
-import { MatchRunner, RECLUSE_FX, WIN_TEST_MOVES, bulletClock, bulletMeter, kingHelpBlocked, legalMoves, rageOf, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
+import { MatchRunner, RECLUSE_FX, WIN_TEST_MOVES, bossTurnShowMs, bulletClock, bulletIncrement, bulletIncrementAt, bulletMeter, kingHelpBlocked, legalMoves, powerMomentMs, rageOf, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 /**
  * The Hidden Boss, phase 1 (Eric, Oct 14): hidden from players (an admin's Boss alone only), Maia at its strongest as
- * his brain whatever the player's rating, the God King's help blocked, and his ultimate: the bullet clock (his meter full
- * at crowd turn bulletTurn, then every bank bulletBankSeconds with no increment for the rest of the battle; a bank that
- * runs out loses on time).
+ * his brain whatever the player's rating, the God King's help blocked (a try spends its charge), no strikes on the crowd,
+ * and his ultimate: the bullet clock (his meter full at crowd turn bulletTurn, then every bank bulletBankSeconds for the
+ * rest of the battle, no increment for its first bulletPlainMoves moves, then bulletIncrementSeconds a move made in time;
+ * a bank that runs out loses on time).
  */
 
 const hash = (s: string) => {
@@ -201,13 +202,15 @@ describe("his ultimate, the bullet clock (Eric, Oct 14)", () => {
     // Every bank is the bullet bank; a move may take all of it (no 20 s cap), nothing is added.
     expect(r.player("h0").bankMs).toBe(BANK);
     expect(r.allowedMsFor("h0")).toBe(BANK);
+    // (Its first bulletPlainMoves (3) moves: 1+0.)
+    expect(BOSS_POWERS.bulletPlainMoves).toBe(3);
     for (const think of [4000, 30_000, 2500]) {
       const bank = r.player("h0").bankMs;
+      expect(bulletIncrement(r.boss), `turn ${r.boss!.powers!.turn}`).toBe(0);
       r.deal();
       await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: think }]]));
       expect(r.player("h0").bankMs, `after ${think} ms`).toBe(bank - think);
       await r.playBoss();
-      expect(r.allowedMsFor("h0")).toBe(bank - think);
       // (It lasts the rest of the battle: no meter, no other ultimate, the test trigger refused.)
       expect(rageOf(r.boss)).toBeNull();
       expect(r.triggerUltimate()).toBe(false);
@@ -215,6 +218,89 @@ describe("his ultimate, the bullet clock (Eric, Oct 14)", () => {
     }
     expect(r.player("h0").bankMs).toBe(BANK - 36_500);
     expect(RECLUSE_FX.bullet).toBeGreaterThan(4000);
+  });
+
+  it("then he adds time per move: 3 moves at 1+0, his moment as the 4th begins, and from then on +2 s a move made in time", async () => {
+    expect(BOSS_POWERS.bulletIncrementSeconds).toBe(2);
+    const INC = BOSS_POWERS.bulletIncrementSeconds * 1000;
+    const r = alone();
+    await untilTurn(r, 7);
+    expect(r.boss!.powers!.ultAt).toBe(7);
+    const kinds: Record<number, string[]> = {};
+    // Turns 7, 8, 9: the bank alone (what you take out of it is gone), and his moment hasn't come.
+    for (const turn of [7, 8, 9]) {
+      expect(r.boss!.powers!.turn).toBe(turn);
+      kinds[turn] = r.boss!.powers!.events.map((e) => e.kind);
+      const bank = r.player("h0").bankMs;
+      expect(r.allowedMsFor("h0"), `turn ${turn}`).toBe(bank);
+      r.deal();
+      await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: 3000 }]]));
+      expect(r.player("h0").bankMs, `turn ${turn}`).toBe(bank - 3000);
+      await r.playBoss();
+    }
+    expect(kinds).toEqual({ 7: ["bullet"], 8: [], 9: [] });
+    // Turn 10 begins: his moment (once), the increment on from this move.
+    let p = r.boss!.powers!;
+    expect(p.turn).toBe(10);
+    expect(p.events).toEqual([{ kind: "bulletPlus", turn: 10 }]);
+    expect(bulletIncrement(r.boss)).toBe(2);
+    // (The clock starts after his moment, as after every power's: alone, his move's 0.45 s show and then the moment.)
+    expect(RECLUSE_FX.bulletPlus).toBeGreaterThan(2000);
+    expect(powerMomentMs(p.events)).toBe(RECLUSE_FX.bulletPlus);
+    expect(bossTurnShowMs({ crowdSide: "w", board: { fen: r.boards.get(0)!.fen }, lastMove: null, powers: { events: p.events } }, true)).toBe(450 + RECLUSE_FX.bulletPlus);
+    // Each move made in time: the increment into the bank, the time taken out; a move may take the bank and the increment.
+    expect(r.player("h0").bankMs).toBe(BANK - 9000);
+    for (const think of [1000, 5000, 2000]) {
+      const bank = r.player("h0").bankMs;
+      expect(r.allowedMsFor("h0")).toBe(bank + INC);
+      r.deal();
+      await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: think }]]));
+      expect(r.player("h0").bankMs, `after ${think} ms`).toBe(bank + INC - think);
+      await r.playBoss();
+      p = r.boss!.powers!;
+      // (His moment came once: none since.)
+      expect(p.events).toEqual([]);
+      expect(bulletIncrement(r.boss)).toBe(2);
+    }
+    expect(r.player("h0").bankMs).toBe(BANK - 9000 + 3 * INC - 8000);
+    // A quick move makes the bank grow, past the bullet bank too: no cap (nothing caps a move below what the bank holds).
+    for (let i = 0; i < 8; i++) {
+      r.deal();
+      await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: 0 }]]));
+      await r.playBoss();
+    }
+    expect(r.player("h0").bankMs).toBe(BANK - 11_000 + 8 * INC);
+    expect(r.player("h0").bankMs).toBeGreaterThan(BANK);
+    expect(r.allowedMsFor("h0")).toBe(r.player("h0").bankMs + INC);
+  });
+
+  it("with the increment, running out still loses on time: a move not made in time adds nothing, and empties the bank", async () => {
+    const r = alone({ bossPowerTest: "bullet" });
+    await untilTurn(r, 2 + BOSS_POWERS.bulletPlainMoves);
+    expect(bulletIncrement(r.boss)).toBe(2);
+    const allowed = r.allowedMsFor("h0");
+    expect(allowed).toBe(r.player("h0").bankMs + 2000);
+    const ply = r.boards.get(0)!.history.length;
+    r.deal();
+    await r.score(new Map([["h0", { move: null, thinkMs: allowed }]]));
+    expect(r.player("h0").bankMs).toBe(0);
+    expect(r.bossOutOfTime()).toBe(true);
+    expect(r.boards.get(0)!.history.length).toBe(ply);
+    expect(r.finishBossBattle()).toBe("boss");
+    expect(r.bossTimedOut).toBe(true);
+  });
+
+  it("the increment's rule: none before the bullet clock or for its first bulletPlainMoves turns, then the setting's", () => {
+    const s = { bulletPlainMoves: 3, bulletIncrementSeconds: 2 };
+    expect([7, 8, 9, 10, 11, 40].map((t) => bulletIncrementAt(t, 7, s))).toEqual([0, 0, 0, 2, 2, 2]);
+    expect(bulletIncrementAt(12, undefined, s)).toBe(0);
+    expect(bulletIncrementAt(12, null, s)).toBe(0);
+    // (Easy to change: 1+1, or straight away.)
+    expect(bulletIncrementAt(10, 7, { bulletPlainMoves: 3, bulletIncrementSeconds: 1 })).toBe(1);
+    expect(bulletIncrementAt(7, 7, { bulletPlainMoves: 0, bulletIncrementSeconds: 2 })).toBe(2);
+    // (Another boss, or before his ultimate: none.)
+    expect(bulletIncrement(null)).toBe(0);
+    expect(bulletIncrement({ id: "pig", powers: { turn: 20, ultAt: 7 } } as never)).toBe(0);
   });
 
   it("the admins' trigger brings it as the next crowd turn begins; the test switch (?power=bullet) on turn 2", async () => {
@@ -255,8 +341,8 @@ describe("his ultimate, the bullet clock (Eric, Oct 14)", () => {
   });
 });
 
-describe("the God King's help doesn't work against him (his passive), and nothing is spent", () => {
-  it("his strike never comes; his move is never played for the crowd; his Last Stand never comes, even forced", async () => {
+describe("the God King's help doesn't work against him (his passive); a try spends its charge", () => {
+  it("his strike never comes; his move is never played for the crowd; his Last Stand never comes, even forced, and spends nothing", async () => {
     const r = alone();
     expect(kingHelpBlocked(r.boss)).toBe(true);
     expect(kingHelpBlocked({ id: "pig" })).toBe(false);
@@ -277,6 +363,93 @@ describe("the God King's help doesn't work against him (his passive), and nothin
     expect(r.boss!.kingStrikes ?? []).toEqual([]);
     expect(r.boss!.kingMoves ?? []).toEqual([]);
     expect(r.boss!.lastStand).toBeUndefined();
+  });
+
+  it("a try at his move or his strike (the dock's) spends a charge as if it had worked, one a try, until none is left; nothing else changes", async () => {
+    const r = alone();
+    await untilTurn(r, 2);
+    r.deal();
+    const fen = r.boards.get(0)!.fen;
+    const bank = r.player("h0").bankMs;
+    const max = DEFAULT_SETTINGS.kingChargesMax;
+    expect(max).toBe(3);
+    for (let left = max - 1; left >= 0; left--) {
+      expect(r.kingTried()).toBe(true);
+      expect(r.boss!.kingCharges).toBe(left);
+    }
+    // None left: nothing more to spend (the dock's God King can't be called any more, as against any boss).
+    expect(r.kingTried()).toBe(false);
+    expect(r.boss!.kingCharges).toBe(0);
+    // He never came: no move, no strike, no stagger, the position and your clock as they were; the move is still yours.
+    expect(r.boss!).toMatchObject({ kingMoves: [], kingStrikes: [] });
+    expect(r.boss!.staggerNext).toBeFalsy();
+    expect(r.boards.get(0)!.fen).toBe(fen);
+    expect(r.player("h0").bankMs).toBe(bank);
+    const report = await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: 1000 }]]));
+    expect(report.boards[0]!.king).toBe(false);
+    expect(r.boards.get(0)!.history.length).toBeGreaterThan(0);
+    // (Phase 1 won, phase 2 still tries against him: the battle's result doesn't stop it.)
+    const won = alone({ bossWinTest: true });
+    won.deal();
+    await won.score(new Map([["h0", { move: "h5f7", thinkMs: 1000 }]]));
+    won.finishBossBattle();
+    expect(won.boss!.result).toBe("crowd");
+    expect(won.kingTried()).toBe(true);
+    expect(won.boss!.kingCharges).toBe(max - 1);
+  });
+
+  it("another boss: a try isn't this (his help works there, through his move and strike as before)", async () => {
+    const r = alone({ bossId: "clown", bossHidden: false });
+    const charges = r.boss!.kingCharges;
+    expect(r.kingTried()).toBe(false);
+    expect(r.boss!.kingCharges).toBe(charges);
+  });
+});
+
+describe("he never strikes the crowd (Oct 14: his fight is a squad's, who must all reach phase 2)", () => {
+  /** A crowd of five against a boss (a raid, people only), every one picking the same move, `turns` crowd moves. */
+  async function crowdOf5(bossId: string, turns: number) {
+    const ids = ["h0", "h1", "h2", "h3", "h4"];
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1400, bossId, bossHidden: true } as Settings;
+    const r = new MatchRunner({ settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(RUY)], entrants: ids.map((id) => ({ id, name: id, isBot: false })) });
+    const due: number[] = [];
+    const strikeIn: (number | null)[] = [];
+    for (let i = 0; i < 200 && r.boss!.crowdMoves < turns && !r.stageComplete(); i++) {
+      if (r.bossToMove()) {
+        await r.playBoss();
+        continue;
+      }
+      strikeIn.push(r.bossView()!.strikeIn);
+      r.deal();
+      const move = crowdMove(r);
+      await r.score(new Map(ids.map((id) => [id, { move, thinkMs: 1000 }])));
+      if (r.bossKillDue()) {
+        due.push(r.boss!.crowdMoves);
+        r.bossKill();
+      }
+    }
+    return { r, due, strikeIn };
+  }
+
+  it("no knockouts, ever, and no count to a strike on the boss card (Move N of M instead)", async () => {
+    const { r, due, strikeIn } = await crowdOf5("recluse", 9);
+    expect(r.boss!.id).toBe("recluse");
+    expect(r.boss!.crowdMoves).toBe(9);
+    expect(due).toEqual([]);
+    expect(r.boss!.kills).toEqual([]);
+    expect(r.alive()).toHaveLength(5);
+    expect(strikeIn).toEqual(Array(9).fill(null));
+  });
+
+  it("other bosses still strike every bossKillEvery moves, the card counting down to it", async () => {
+    const { r, due, strikeIn } = await crowdOf5("clown", 9);
+    expect(r.boss!.id).toBe("clown");
+    expect(RAID_SETTINGS.bossKillEvery ?? DEFAULT_SETTINGS.bossKillEvery).toBe(3);
+    // (Five of them: down to half, rounded up, so two strikes.)
+    expect(due).toEqual([3, 6]);
+    expect(r.alive()).toHaveLength(3);
+    expect(strikeIn.slice(0, 6)).toEqual([3, 2, 1, 3, 2, 1]);
+    expect(strikeIn.slice(6)).toEqual([null, null, null]);
   });
 });
 

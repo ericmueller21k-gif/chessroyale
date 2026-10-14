@@ -253,8 +253,9 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
     source recorded (DECISIONS.md, "The Hidden Boss, phase 1"); his hateful and political statements stay excluded.
   - **Phase 1 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 1"): pick
     "Hidden Boss" from the boss menu (admins see him after the rest). Maia-3 at its top rating, raw, at a fixed
-    strength; the God King's help blocked and mocked; his ultimate at turn 7, the bullet clock for the rest of the
-    battle (1:00, no added time, out of time loses; Eric, Oct 14: was 3:00); beaten, he collapses and mumbles, then phase 2. Placeholder
+    strength; the God King's help blocked and mocked (a try spends its charge); no strikes on the crowd; his ultimate at
+    turn 7, the bullet clock for the rest of the battle (1:00 with no added time for 3 moves, then he adds 2 s a move;
+    out of time loses; Eric, Oct 14: was 3:00, then 1+0); beaten, he collapses and mumbles, then phase 2. Placeholder
     lines (and five verified quotes) in one table, `characters/recluse-lines.ts`, for Eric's own.
   - **Phase 2 is built (Oct 14), for admins only, in Boss alone** (DECISIONS.md, "The Hidden Boss, phase 2"): beaten
     in phase 1, he collapses and mumbles, then the phase change (about 10 s, reworked Oct 14: up in a rage, he leaps
@@ -272,7 +273,7 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       glow); the special crate and its reward; a server-side brain (the engine server's move endpoint) and fair-play
       review for real fights; online and Squads play (today the server never makes a battle with him); the
       engine-against-engine sim in Chess960 at the real clock (next step, for 2750 and the 2:00 bank); sim-tuning
-      phase 1's numbers (turn 7, 60 s); the FAQ's Chess960 words once players can meet him.
+      phase 1's numbers (turn 7, 60 s, 3 moves at 1+0, then +2 s); the FAQ's Chess960 words once players can meet him.
 
 Added Oct 14, 2026 (Eric; notes only, nothing built):
 
