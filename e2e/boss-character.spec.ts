@@ -47,6 +47,17 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
     expect(status.y).toBeGreaterThanOrEqual(wrap.y + wrap.height);
     expect(Math.abs(status.x - wrap.x)).toBeLessThanOrEqual(2);
     expect(Math.abs(status.width - wrap.width)).toBeLessThanOrEqual(2);
+    // In a narrower window (900 to 1099 px, no leaderboard) he's drawn at 1× and stays whole inside it, clear of the
+    // board (Eric, Oct 14: at 1024 px half of him was off the window's left edge).
+    for (const [width, height] of [[1024, 768], [900, 1000]] as const) {
+      await page.setViewportSize({ width, height });
+      await expect.poll(async () => (await char.boundingBox())?.width).toBe(48);
+      const sprite = (await char.locator("canvas").boundingBox())!;
+      const narrow = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
+      expect(sprite.x, `${width}×${height}`).toBeGreaterThanOrEqual(0);
+      expect((await char.boundingBox())!.x + 48).toBeLessThanOrEqual(narrow.x);
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
   }
   // Taps on the board's corner by him still reach the board.
   const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest(".boss-char") === null, [board.x + 4, board.y + 4]);

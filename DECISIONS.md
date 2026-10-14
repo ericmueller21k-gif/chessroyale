@@ -2936,3 +2936,10 @@ both loops whirling over his head in the ready loop (in view on the phone's bar,
 pull; SHOWDOWN!'s ropes reaching pieces anywhere on the board (a rook hauled from h8 to b6, a bishop from f1 to h5) and
 the pairs landing; the duels glowing on edge files (a6-b6); the meter full on the duel's turn. (The computer's
 screencast had 0.4-0.55 s gaps throughout, the machine shared with other sessions' e2e runs, none tied to his moments.)
+
+### The boss by the board's corner stays in the window (Eric, Oct 14, 2026)
+
+From 900 to 1099 px (no leaderboard beside the screen) the boss there is drawn at 1× (as in a phone's boss bar) next to
+the eval bar, and the board gives up room only if the margin still falls short of his widest frame (Sawyer's), so he's
+whole at every width (he was half off a 1024 px window). At 1024 × 768 the board doesn't move; at 900 × 700 it is 50 px
+smaller. From 1100 px he stays 2× over the leaderboard's edge and nothing moves. The God King keeps his size and place.
