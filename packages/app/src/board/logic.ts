@@ -10,6 +10,7 @@
  */
 import { castleShortcuts960, isChess960Fen, legalMoves, touchesDark } from "@chessroyale/chess";
 import { realSquare, viewSquare, type QuarterTurn } from "../board-view.ts";
+import type { BoardProps } from "./types.ts";
 
 export type Orientation = "white" | "black";
 /** A piece: its color and kind, as "wp", "bk", ... */
@@ -196,6 +197,18 @@ export function follow(prev: readonly BoardPiece[], next: ReadonlyMap<string, Pi
   return { pieces, gone: missing.filter((m) => !taken.has(m.id)), moved };
 }
 
+/**
+ * The captured pieces still fading and the pieces still sliding at `now` (those that are over are let go), and when the
+ * next of them ends (null: none), when the board draws again by itself. (A fade kept after it ended had the board drawn
+ * again every 20 ms until the next move: Oct 14, 2026.)
+ */
+export function stillRunning<F extends { until: number }>(fading: readonly F[], sliding: ReadonlyMap<number, number>, now: number): { fading: F[]; sliding: Map<number, number>; next: number | null } {
+  const f = fading.filter((x) => x.until > now);
+  const s = new Map([...sliding].filter(([, until]) => until > now));
+  const next = Math.min(...f.map((x) => x.until), ...s.values());
+  return { fading: f, sliding: s, next: Number.isFinite(next) ? next : null };
+}
+
 // ---------------- Taps and drags ----------------
 
 /** What a press needs to know about the board as it is. */
@@ -345,4 +358,31 @@ export function drawArrows(arrows: readonly ArrowShape[], orientation: Orientati
     }
     return out;
   });
+}
+
+// ---------------- When the board draws again ----------------
+
+/**
+ * Everything the board's own drawing (its squares, pieces, highlights, arrows and coordinates) is made from, as plain
+ * values: equal lists, the same drawing. The board draws its pieces again only when one of these changes, or on its own
+ * (a tap, a drag, a slide or a fade ending), never just because the screen around it drew again: a boss screen draws
+ * every frame while an effect plays over the board (Oct 14, 2026; docs/areas/board.md). Lists and objects count by
+ * what's in them, not by identity (a screen that builds a fresh `arrows` array each time hasn't changed the board);
+ * the move handlers aren't here (the board calls whichever is current), only whether Hollow's dark takes attempts.
+ */
+export function boardInputs(p: Omit<BoardProps, "children" | "silent" | "onMove">): unknown[] {
+  return [
+    p.fen,
+    p.orientation,
+    p.lastMove ?? null,
+    !!p.interactive,
+    p.moves ? p.moves.join() : null,
+    p.arrows ? p.arrows.map((a) => `${a.move}:${a.brush}:${a.label ?? ""}`).join(" ") : null,
+    !!p.small,
+    p.animate !== false,
+    p.marks ? JSON.stringify(p.marks) : null,
+    p.dark ? p.dark.join() : null,
+    !!p.onDarkTry,
+    p.turn ?? 0,
+  ];
 }

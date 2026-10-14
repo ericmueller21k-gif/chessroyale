@@ -7,6 +7,7 @@ import { play, warmSounds } from "../sound.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
 import { prewarmBigBoy } from "./BigBoy.tsx";
 import { prewarmGinger } from "./Ginger.tsx";
+import { prewarmGrex } from "./Grex.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { prewarmPig } from "./Pig.tsx";
 import { CRITICAL, LOW, NORMAL, SpeechBox, bossVoice, useVoice, type Priority } from "../speech.tsx";
@@ -136,6 +137,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     if (kit.ch.id === "pig") prewarmPig(kit.ch.name);
     // (Ginger's ice: its crack, thin ice and thaw.)
     if (kit.ch.id === "gingerbread") prewarmGinger();
+    // (Jefferson's Roman candle: him, its shots and fireballs.)
+    if (kit.ch.id === "grex") prewarmGrex(kit.ch.name);
     // (Its attack on a king too: the God King's Last Stand, or its mate.)
     prewarmKingAttack(kit.ch.name);
   }, [kit]);
