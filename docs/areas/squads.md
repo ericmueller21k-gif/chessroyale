@@ -11,8 +11,9 @@ the final a majority vote of the whole squad; the old Pick and Block is gone. **
 "Squads modes: Classic and Mercenary"): the first vote picks **Classic** (just chess: same-move tokens, no blocks, no
 coins) or **Mercenary** (coins, a team shop between rounds, items for the next match; blocks on), and shows a third
 mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `mercenary` everywhere. **Time controls**
-(Eric, Oct 13; DECISIONS.md, "Squads: three chess time controls"): the Clock vote picks **Bullet 1+1**, **Blitz 3+2** or
-**Rapid 5+3** (nobody voting: Blitz), each a team bank with a chess increment that banks and its own cap on a move.
+(Eric, Oct 13; DECISIONS.md, "Squads: three chess time controls"): the Clock vote picks **Rapid 5+3**, **Blitz 3+2** or
+**Bullet 1+1** (left to right, slowest to fastest; nobody voting: Blitz), each a team bank with a chess increment
+that banks and its own cap on a move.
 
 ## How it works today
 
@@ -29,7 +30,10 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
   what's drawn), so the server can replay any decision from the lobby's seed, and adding a draw never moves others.
 - **Votes** (`votes.ts`): Mode, Start and Clock as `PregameVote`s, run by Crowd's machinery (`castPregameVote`,
   `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: Classic, the normal start, the
-  Blitz clock (the middle option). The Mode vote's third option is `disabled` ("Coming soon": shown, never votable: `votable`). Bots vote
+  Blitz clock, each named by its option's id (`optionIndex`, `clockDefault: "blitz"`), never by its place. Every vote's
+  options keep one order, left to right, every game (Eric, Oct 13): Mode is Classic, Mercenary, Coming soon; Start is
+  Normal, One opening, Random openings; Clock is Rapid, Blitz, Bullet. The app finds the vote it shows by its id. The
+  Mode vote's third option is `disabled` ("Coming soon": shown, never votable: `votable`). Bots vote
   on the mode by a lean drawn per lobby (`botModeVotes`, `modeVote.classicLean`: most lobbies' bots lean Classic). A test
   lobby's bots sit the Mode vote out (its opener decides), and its link's `mode=` skips it (`heldVotes`).
 - **The team clock** (Eric, Oct 10): one bank per squad for the whole tournament (`Squad.bankMs`), carried from
@@ -42,12 +46,11 @@ mode as "Coming soon". Mercenary was called Pillage in the first notes; it's `me
 
     | Option | Bank | Increment | Free seconds | Cap on a move | Top-up a round |
     | --- | --- | --- | --- | --- | --- |
-    | Bullet 1+1 | 1:00 | +1 s | 2 s | 10 s | +15 s |
-    | Blitz 3+2 (nobody votes) | 3:00 | +2 s | 2 s | 15 s | +30 s |
     | Rapid 5+3 | 5:00 | +3 s | 2 s | 20 s | +1:00 |
+    | Blitz 3+2 (nobody votes) | 3:00 | +2 s | 2 s | 15 s | +30 s |
+    | Bullet 1+1 | 1:00 | +1 s | 2 s | 10 s | +15 s |
   - **Old ids** (`clockById`): fast → bullet, normal → blitz, long → rapid; one we don't know gets Blitz, never an
-    error. A stored vote's result is the option's place, so an old Fast, Normal or Long vote reads as Bullet, Blitz or
-    Rapid. A clock stored before the time controls (`upgradeClock`, `upgradeRules`; a match: `upgradeMatch`) keeps its
+    error. A vote's result is the option's place (0 Rapid, 1 Blitz, 2 Bullet since Oct 13; before, 0 was Bullet). A clock stored before the time controls (`upgradeClock`, `upgradeRules`; a match: `upgradeMatch`) keeps its
     own numbers and the one ceiling every option had then (`legacyCapSeconds`, 20 s): a lobby in play across that
     deploy finishes on the clock it voted.
   - **Draining.** Each of a squad's moves being thought about drains its bank past the free seconds: a Relay mover,

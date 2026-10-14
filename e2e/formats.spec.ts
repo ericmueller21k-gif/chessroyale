@@ -66,21 +66,22 @@ test("pre-game votes: the cards vote too; the winners set the ending and the clo
   // Vote 2: tap the Bullet card.
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("radio", { name: /Bullet/ }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(0);
+  // (Bullet is the right-hand card: slowest on the left, fastest on the right.)
+  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(2);
   await expect.poll(() => page.evaluate(() => (window as any).match.phase.vote?.result ?? null), { timeout: 15_000 }).not.toBeNull();
   const result: number = await page.evaluate(() => (window as any).match.phase.vote.result);
   await expect.poll(() => phase(page), { timeout: 20_000 }).toMatch(/play|watching/);
-  // The game's clock is the winning time control's: Bullet 3+2 (10 s a move at most), Blitz 5+3 (15 s), Rapid 10+5
-  // (20 s). Everyone's bank starts at its minutes (yours too, until your first move).
+  // The game's clock is the winning time control's (left to right): Rapid 10+5 (20 s a move at most), Blitz 5+3 (15 s),
+  // Bullet 3+2 (10 s). Everyone's bank starts at its minutes (yours too, until your first move).
   const clock = await page.evaluate(() => {
     const r = (window as any).match.runner;
     const me = r.player("you");
     return { cap: r.moveClock(), bank: r.settings.timeBankSeconds, increment: r.settings.timeIncrementSeconds, mine: me.movesTimed ? null : me.bankMs };
   });
   expect(clock).toEqual([
-    { cap: 10, bank: 180, increment: 2, mine: 180_000 },
-    { cap: 15, bank: 300, increment: 3, mine: 300_000 },
     { cap: 20, bank: 600, increment: 5, mine: 600_000 },
+    { cap: 15, bank: 300, increment: 3, mine: 300_000 },
+    { cap: 10, bank: 180, increment: 2, mine: 180_000 },
   ][result]);
 });
 
