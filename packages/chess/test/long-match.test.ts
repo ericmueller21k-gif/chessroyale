@@ -87,9 +87,11 @@ describe("a long boss battle", () => {
     const b0 = runner.state.boss!;
     expect(fresh(() => (runner.state = { ...runner.state, boss: { ...b0, crowdMoves: b0.crowdMoves + 1 } })).crowdMoves).toBe(b0.crowdMoves + 1);
     runner.state = { ...runner.state, boss: b0 };
-    const last = runner.bossLast;
-    expect(fresh(() => (runner.bossLast = { move: "a2a3", san: "a3" })).lastMove).toEqual({ move: "a2a3", san: "a3" });
-    runner.bossLast = last;
+    // (bossLast is private: the test reaches it the way the runner's own battle code does.)
+    const inner = runner as unknown as { bossLast: { move: string; san: string } | null };
+    const last = inner.bossLast;
+    expect(fresh(() => (inner.bossLast = { move: "a2a3", san: "a3" })).lastMove).toEqual({ move: "a2a3", san: "a3" });
+    inner.bossLast = last;
     // (A board changed in place, as a test does: its position is part of the check too.)
     const b = runner.boards.get(0)!;
     const keep = { fen: b.fen, history: b.history, lastMove: b.lastMove };
