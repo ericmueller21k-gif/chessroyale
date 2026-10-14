@@ -27,6 +27,7 @@ import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { BossHeading } from "./Play.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, bossVoice } from "../speech.tsx";
+import { kingBlocked } from "../components/Recluse.tsx";
 
 /** For the raid's opening roulette: famous lines flicking past before the real one lands. */
 const ROULETTE = [
@@ -167,6 +168,13 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   }, [intro, plies, boss.board.fen, pawnBack]);
   const introLast = intro ? (plies > 0 ? history[plies - 1]! : null) : boss.board.lastMove;
   const showCard = intro && t < tl.replayAt;
+  // The Hidden Boss: the God King's own opening line for this fight (Eric's "I sense a tremendous power within this
+  // foe.") as "START!" comes, while nothing else is being said, so it's always heard; it's his intro, so the first move
+  // doesn't say another.
+  const foeIntro = !!intro && kingBlocked(boss) && t >= tl.bannerAt;
+  useEffect(() => {
+    if (foeIntro) kingSay("foeIntro", "intro");
+  }, [foeIntro]);
   // A new boss battle: the God King starts afresh (he'll introduce himself on your first move). This device remembers
   // the boss, so the next random one is another.
   useState(() => intro && (resetKingSpeech(), bossVoice.reset(), resetBeats()));

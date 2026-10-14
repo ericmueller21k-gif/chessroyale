@@ -103,7 +103,7 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, the God Kin
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page);
   // His intro: the stare (his figure where it stands on this screen). The God King's opening line in this fight is his
-  // own (said on the first turn no new danger comes first: checked at the end), never one of his usual ones.
+  // own, as "START!" comes (checked at the end: it may wait for his line to type out), never one of his usual ones.
   const intro = await watchFor(page, { stare: { selector: `${figure()}[data-anim="stare"]` } });
   const kingIntro = await watchFor(page, {
     foe: { selector: ".gk-bubble", text: /tremendous power|faint against this one|no ordinary boss/ },
@@ -177,7 +177,7 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, the God Kin
   expect(bank).toBeGreaterThan(BANK - 20_000);
   expect(await page.evaluate(() => (window as any).match.phase.allowedMs as number)).toBe(bank);
   await expect(page.locator(".boss-dock-status .bullet-note")).toBeVisible();
-  await expect.poll(() => kingIntro.seen(), { timeout: 15_000 }).toEqual({ foe: true, usual: false });
+  expect(await kingIntro.seen()).toEqual({ foe: true, usual: false });
   expect(errors).toEqual([]);
 });
 

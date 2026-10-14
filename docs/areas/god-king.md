@@ -39,7 +39,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   move, his strike and his Last Stand never come, and nothing is spent (the runner's `kingDecision`, `callStrike`,
   `lastStandFor`; solo's `callKing`). His menu still opens; picking "Play move" or "Strike" has the boss slam his book
   shut and mock it, and the God King says his help won't take hold (`mockKingHelp` in `components/Recluse.tsx`). In
-  this fight he opens with his own line ("I sense a tremendous power within this foe.", Eric's; `foeIntro`), and his
+  this fight he opens with his own line as "START!" comes ("I sense a tremendous power within this foe.", Eric's;
+  `foeIntro`, said by the boss screen's intro), and his
   lines about calling him (the nudge, "spent", "A charge might turn it") are left out (`turnCues`' `noHelp`). His
   lines for this fight are in the Hidden Boss's table, `characters/recluse-lines.ts`.
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss

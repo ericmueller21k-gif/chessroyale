@@ -2994,7 +2994,8 @@ special crate and Squads come later. ROADMAP.md, "The hidden boss", has the whol
 - **The Last Stand** never comes. It isn't something the player calls, so it isn't mocked (my call: simplest).
 - Power-ups are the crowd's own, not the God King's, and Boss alone has none anyway (a raid starts with none, and the
   Last Stand that leaves some can't come).
-- **The God King in this fight:** his own opening line (`foeIntro`) and his blocked line (`foeBlocked`). His lines about
+- **The God King in this fight:** his own opening line (`foeIntro`), said as "START!" comes, when nothing else is
+  being said (on the first move it could wait behind a danger warning and lapse), and his blocked line (`foeBlocked`). His lines about
   calling him (the "Tap me" nudge, "spent", "A charge might turn it") are left out of this fight.
 
 **His ultimate: the bullet clock** (Eric, Oct 14, replacing the brief's "a few seconds a move for N moves": "Meter
