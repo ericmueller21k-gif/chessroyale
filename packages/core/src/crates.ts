@@ -106,6 +106,14 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "captains-coat", name: "Captain's Coat", tier: "epic", slot: "skin", description: "Long, gold-buttoned and made for shouting orders." },
   { id: "pirate-hat", name: "Pirate Hat", tier: "legendary", slot: "head", description: "A captain's tricorn, skull and all. Arr." },
   { id: "parrot", name: "Parrot", tier: "mythic", slot: "weapon", colors: 2, description: "Perches on your shoulder and repeats your moves back to you." },
+  // Batch 3 (Oct 14): the ninja.
+  { id: "ninja-headband", name: "Ninja Headband", tier: "common", slot: "head", description: "Long tails, for dramatic wind." },
+  { id: "shuriken", name: "Shuriken", tier: "common", slot: "weapon", description: "A throwing star. Not for throwing at the board." },
+  { id: "ninja-mask", name: "Ninja Mask", tier: "uncommon", slot: "face", description: "Covers everything below the eyes, including your thinking face." },
+  { id: "nunchucks", name: "Nunchucks", tier: "uncommon", slot: "weapon", description: "Two sticks, one chain, zero hand-eye coordination." },
+  { id: "katana", name: "Katana", tier: "rare", slot: "weapon", description: "Folded a thousand times. Still can't cut through a fortress." },
+  { id: "ninja-hood", name: "Ninja Hood", tier: "epic", slot: "head", description: "Only the eyes show, and they're calculating." },
+  { id: "ninja-gi", name: "Ninja Gi", tier: "epic", slot: "skin", description: "A wrap-front gi. The belt is black; you've earned it." },
 ];
 
 export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);
@@ -144,7 +152,7 @@ export const CRATES: readonly CrateDef[] = [
   {
     id: "beta-001",
     name: "Beta Crate · Series 001",
-    blurb: "Secret agents, pirates, the old shop's hats and a smile",
+    blurb: "Secret agents, pirates, ninjas, the old shop's hats and a smile",
     look: "beta",
     // Eric (Oct 11): the same odds as Winter.
     strip: [
@@ -178,6 +186,14 @@ export const CRATES: readonly CrateDef[] = [
       "captains-coat",
       "pirate-hat",
       "parrot",
+      // Ninja.
+      "ninja-headband",
+      "shuriken",
+      "ninja-mask",
+      "nunchucks",
+      "katana",
+      "ninja-hood",
+      "ninja-gi",
       // A one-off.
       "smiley-face",
     ],

@@ -11,7 +11,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   on (everything free while testing). The pawn hats it used to sell are Beta crate items now (Oct 11, 2026); the shop
   is kept for God King packs and, later, things like boss and attack animations.
 - **Crates** (`core/crates.ts`): two series, **Beta Crate · Series 001** (listed first; it ships in batches, the plan
-  is in the history: the Classics, the secret agent and the pirate are in, 21 of 28 items; the ninja is next) and
+  is in the history: complete since Oct 14, 28 items: the Classics, the secret agent, the pirate, the ninja and a
+  one-off Smiley Face) and
   **Winter Crate · Series 1**. Each lists its items once; an item's tier says where it is.
   Every drop rolls three things independently:
   1. **its tier**, which decides the item: the opening strip lands on a tier's box (Common to Epic, color-coded:

@@ -3042,3 +3042,22 @@ From 900 to 1099 px (no leaderboard beside the screen) the boss there is drawn a
 the eval bar, and the board gives up room only if the margin still falls short of his widest frame (Sawyer's), so he's
 whole at every width (he was half off a 1024 px window). At 1024 × 768 the board doesn't move; at 900 × 700 it is 50 px
 smaller. From 1100 px he stays 2× over the leaderboard's edge and nothing moves. The God King keeps his size and place.
+
+### Beta Crate · Series 001, batch 3: the ninja; the crate is complete (Oct 14, 2026)
+
+The last seven items, so Beta holds all 28 of the plan, at the plan's final odds. Colors and descriptions are the
+plan's (`docs/history/shop-and-crates.md`). The calls:
+
+- **The Ninja Hood's eye slit is a hole,** so the piece shows through it (white or black), with two eyes drawn in it
+  (dark on white, light on black). It meets the piece's eye line, so on a snowman or a gingerbread man its eyes land
+  on theirs. It drapes to the shoulders; worn over the Ninja Mask, the slit shows the mask instead of the piece.
+- **The Ninja Mask** covers the lower half of the head from the eye line, so it goes with the headband (head) and
+  with Dark Shades.
+- **The Ninja Gi** shows the pawn's head, its base and a V at the neck, so it reads as white or black; the collar is
+  a shade of its color, and the belt stays black on every color (its knot outlined in gray on a black pawn).
+- **The Katana** is sheathed, a hand's width of steel showing between the guard and the scabbard: the hilt's wrap
+  and the scabbard take the color, as the plan says, and a bare blade would leave nothing in the color but the grip.
+- **The blurb** names the ninjas: "Secret agents, pirates, ninjas, the old shop's hats and a smile".
+- **The final odds (Beta, 28 items):** Common (8) 5% each, Uncommon (7) 3.71%, Rare (5) 3.6%, Epic (4) 3.5%, Pirate
+  Hat and Smiley Face 0.8%, Tommy Gun and Parrot 0.2%. Each tier's items are now rarer than the one below's, and a
+  test keeps it so.
