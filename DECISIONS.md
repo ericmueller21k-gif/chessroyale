@@ -3517,6 +3517,12 @@ multiplayer: `NetMatch` has no such method), and `BOSS_POWERS.engineMoveButton` 
   (his board starts at the standard FEN, as White he moves first; another boss still gets its opening), `e2e/recluse.spec.ts` (an admin's tap
   plays a move on phone and computer; a player's Boss alone has no button) and `e2e/resign.spec.ts`.
 
+### The Hidden Boss's bullet bank: 1:00 (Eric, Oct 14, 2026)
+
+After playing phase 1, Eric: the 3:00 bank after his ultimate "feels like too much honestly, let's do it 1+0". So
+`BOSS_POWERS.bulletBankSeconds` is 60, was 180; nothing else changes (no increment, no per-move cap, out of time loses).
+Still not sim-tested.
+
 ### The Hidden Boss, phase 2: the phase change and four Chess960 boards (Eric, Oct 14, 2026)
 
 Eric approved building it (Oct 14). Same reach as phase 1: admins only, in Boss alone, with bots; players never meet
