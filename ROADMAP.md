@@ -132,6 +132,15 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
   - **Beating him:** a "super saiyan" transformation with special animations (details later). Every player on the
     winning squad gets a special **Fischer Random crate** with a tiny chance at an item that doesn't exist yet. One
     victory reward per account, ever.
+  - **How you reach him (Eric, Oct 14):**
+    - **For real:** a **fifth Mercenary item**, an ominous **red book**, for **1,000 coins**. Its description is
+      along the lines of "A strange red book. It looks powerful..."
+    - The squad must **buy it AND win the Squads tournament** to trigger the hidden boss.
+    - **Price:** 1,000 is more than one round earns (about 600–700), so a squad has to save across rounds.
+    - **The book's symbol:** Eric wants a Russian symbol on it. The director suggests a red star or a Cyrillic
+      letter rather than the hammer and sickle, which is banned in some countries (e.g. Lithuania, Latvia, Ukraine).
+      Eric's call.
+    - **For testing until then:** he's reachable from the boss menu, playing with bots.
   - **Phase 1 to phase 2 (Eric, Oct 14):**
     - **Phase 1** is one board against him. Beat him there and **he collapses**: he drops to his knees, slumps and
       mumbles nonsense to himself (lines from Eric later).
