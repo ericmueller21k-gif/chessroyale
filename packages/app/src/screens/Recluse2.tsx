@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "preact/hooks";
+import { useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { moveLeft } from "@chessroyale/chess";
 import { RECLUSE, RECLUSE_JUMP } from "../characters/recluse.ts";
@@ -259,11 +259,14 @@ function SlowMarks({ n, flash, row }: { n: number; flash: boolean; row?: boolean
 function SimulBoard({ match, v, b, now, small, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; children?: ComponentChildren }) {
   const mine = b.you && v.playing && b.toMove === "crowd";
   const flash = !!v.lastSlow && v.lastSlow.board === b.id && now - v.lastSlow.at < SLOW_NOTE_MS;
+  const n = Math.min(v.slow, RECLUSE_PHASE2.slowMovesForUlt);
+  // (The same element while its count and flash stand: the screen draws every frame, the marks only when they change.)
+  const marks = useMemo(() => <SlowMarks n={n} flash={flash} row={small} />, [n, flash, small]);
   return (
     <Board fen={b.fen} orientation="white" lastMove={b.lastMove} interactive={mine} onMove={(m) => match.simulMove?.(b.id, m)} small={small} silent={!b.you}>
       <Tag b={b} v={v} now={now} small={small} />
       <Outcome b={b} />
-      {v.playing && <SlowMarks n={Math.min(v.slow, RECLUSE_PHASE2.slowMovesForUlt)} flash={flash} row={small} />}
+      {v.playing && marks}
       {/* (Which board the last slow move was on: a small note over its top-right corner, for a moment.) */}
       {flash && <span class="rc-slow-note">slow move</span>}
       {children}
