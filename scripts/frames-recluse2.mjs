@@ -2,7 +2,8 @@
 // (1280 px), with real taps: the phase change (?win=1: you mate him in phase 1; the book's slam, the split into four, his
 // revive, the Chess960 shuffle), the four boards in play (?phase=2: a few of your moves against him), a win (?win=1: your
 // Qxf7 mates on your board, the bots mate on theirs: "Victory!") and a loss (?win=1, then you resign your board: "won 3 of
-// 4"). Records every painted frame (Chrome's screencast) and saves stills, a GIF of each moment, and screenshots.
+// 4"), and his phase 2 ultimate on the admins' trigger. Records every painted frame (Chrome's screencast) and saves
+// stills, a GIF of each moment, and screenshots.
 //   npm run frames:recluse2 -- <out-dir> [phone|desktop|both] [light|dark] [base=http://localhost:8788]
 // Needs the app and its API running (npx wrangler dev), as frames:recluse does.
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
@@ -200,6 +201,21 @@ const playing = async (ctx) => {
   void st;
 };
 
+/** ?phase=2, then the admins' trigger: his ultimate ("5 SECONDS!"), then a random move played for you when yours run out. */
+const ult = async (ctx) => {
+  const { p, waitUntil, mark, shot, log } = ctx;
+  await waitUntil((s) => s.kind === "simul" && s.simul?.playing, 60_000);
+  await p.waitForTimeout(1500);
+  const t = Date.now();
+  await p.getByRole("button", { name: "Trigger ultimate (testing)" }).click();
+  log("ultimate triggered");
+  await p.waitForTimeout(900);
+  await shot("12-ultimate");
+  await p.waitForTimeout(7000);
+  await shot("13-random-move");
+  mark("ultimate", t - 300, Date.now());
+};
+
 /** ?win=1, then you resign your board: the bots win theirs, "won 3 of 4". */
 const loss = async (ctx) => {
   const { p, waitUntil, play, mark, shot } = ctx;
@@ -227,6 +243,7 @@ if (which !== "phone") runs.push(["desktop", { viewport: { width: 1280, height: 
 for (const [name, context] of runs) {
   await battle(`${name}-change`, context, "win=1&laststand=0", change);
   await battle(`${name}-play`, context, "phase=2", playing);
+  await battle(`${name}-ult`, context, "phase=2", ult);
   await battle(`${name}-loss`, context, "win=1&laststand=0", loss);
 }
 await browser.close();
