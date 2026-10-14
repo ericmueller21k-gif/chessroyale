@@ -713,3 +713,23 @@ every one of 21 battles on a phone's budget.
   Test that a later round sees new candidates.
 - A power that fires only when a search finds something is measured in real battles (a sim through the match runner,
   on a phone's budget) before it ships: how often it fires, and how long after it may. A fixed position doesn't show it.
+
+## A move scored twice, another not at all (Oct 14, 2026)
+
+**What was seen:** while building the Chess960 rules, a helper asked the engine server (run locally at 20k nodes) to
+score two moves, one of them castling, and got the same move back twice, the castling move missing.
+
+**The cause:** our reader of Stockfish's output kept the last exact line for each MultiPV slot and skipped bound lines.
+Stockfish re-sorts its lines as it deepens, and a search cut off partway through a line prints that slot as a bound, so
+the slot's last exact line came from the depth before and could name the move that now sat in the other slot. It
+happened in about one in five of the judge's top-8 searches. It had been seen twice before and patched where it
+showed: `scoreMoves` re-scored a missing move another way (milestone 1), and Squads' `cleanTop` kept a duplicated
+move's first line. Neither covered re-checks, the engine server or the top-8 search, and nobody asked why.
+
+**The fix:** `searchLines` reads each move once, with its own latest exact line; the moves come from the last line
+printed for each slot, bound lines included. Searches the old reader got right read identically.
+
+**The rule:**
+- When an engine's answer looks impossible (a move twice, a move missing), find out why before patching around it, and
+  measure how often it happens across many positions: a fallback where it showed hides it everywhere else.
+- Read Stockfish's MultiPV output by move, not by slot: a slot's last exact line may name another move.

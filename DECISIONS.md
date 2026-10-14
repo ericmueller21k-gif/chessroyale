@@ -3656,3 +3656,32 @@ raised.
 
 **So:** a red Big Boy perf run is re-run alone on a quiet machine before a PR is blamed.
 
+
+## The engine reader: a slot's last exact line may name another move (Oct 14, 2026)
+
+**What:** The code that reads Stockfish's output (`searchLines` in `packages/chess/src/uci.ts`, and the same function in
+`engine/server.mjs`) lists each move once, with the numbers of that move's own latest exact line. The moves listed are
+the ones in the last line printed for each MultiPV slot (bound lines included), in the slots' order. Before, it kept
+each slot's last exact line and skipped bound lines. Eric approved the fix ("Engine fix is a go").
+
+**Why:** Stockfish re-sorts its lines as it goes deeper, and a search that runs out of nodes partway through a line
+prints that slot as a bound. The slot's last exact line was then from the depth before, and it often named the move
+that had since moved to another slot. One move came out twice (with an out-of-date number) and another not at all.
+Measured: about 19% of the judge's top-8 searches (lite build, 250k nodes, 800 searches), 6.7% of device re-checks
+(700k, 3 moves), 5 to 6% of the engine server's re-checks (native 17.1, 400k and 2M, 4 moves), 2.2% at 20k nodes with 2
+moves. Players felt it as silent misgrading: a duplicated move's out-of-date number (5 points or more off in about
+1.75% of top-8 searches, up to about 35), a board's best move missing from the top 8 (about 0.5%), and a re-check
+quietly ignored when the best move was the one left out. The castling move in the first report was a coincidence.
+
+**Only broken searches change:** on the raw output of 700 saved searches, every search the old reader got right
+reads identically with the new one (each number and the order), and every broken one is fixed.
+
+**Kept as safety nets:** `scoreMoves`' fallback for a move left out (`scoreAfter`) and Squads' `cleanTop` (keeps a
+move's first line if it is listed twice).
+
+**Rollout:** during a deploy, a device on the old code and one on the new can disagree on an affected search; the
+lobby then asks a third judge and the engine server, as for any disagreement. Fine before launch.
+
+**Testing.** Full lane (judging numbers on every device and on the server): typecheck, the whole unit suite, the whole
+e2e suite. Unit: `packages/chess/test/uci.test.ts` (recorded lines where two moves swap slots and the search stops on
+a bound; a search with no mix-up reads as before; a move that left the lines is dropped).
