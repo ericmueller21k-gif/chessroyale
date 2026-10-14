@@ -842,10 +842,11 @@ export class NetMatch implements GameView {
   /** Testing, admins: what the boss's brain did with its last move, on the device that plays the boss. */
   get brainLine(): string | null {
     if (!isAdmin() || !this.bossPlan || !this.boss) return null;
-    if (this.brainNote) return brainWords(this.brainNote);
+    // (Maia failed to load: why, for the admin reading it.)
+    if (this.brainNote) return `${brainWords(this.brainNote)}${this.maia?.status === "failed" ? ` · ${this.maia.error ?? "no reason"}` : ""}`;
     const p = this.bossPlan;
     const share = p.stockfishShare ? ` · ${Math.round(p.stockfishShare * 100)}% Stockfish` : "";
-    return `Maia ${p.rating} · ${GUARD_WORDS[p.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? "failed: Stockfish" : "loading"}`;
+    return `Maia ${p.rating} · ${GUARD_WORDS[p.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? `failed: Stockfish (${this.maia.error ?? "no reason"})` : "loading"}`;
   }
 
   /** Hollow's extra move (a failed Lights out), host only: a quiet move within the cap, or "" (he skips it). */

@@ -452,11 +452,12 @@ export class SoloMatch implements GameView {
       return `Stockfish ${RECLUSE_PHASE2.elo} · at most ${RECLUSE_PHASE2.moveMs} ms${ms !== null ? ` · last ${Math.round(ms)} ms` : ""}`;
     }
     const note = this.runner.brainNote;
-    if (note) return brainWords(note);
+    // (Maia failed to load: why, for the admin reading it, e.g. "load timed out" or the worker's error.)
+    if (note) return `${brainWords(note)}${this.maia?.status === "failed" ? ` · ${this.maia.error ?? "no reason"}` : ""}`;
     const hb = this.runner.humanBrain;
     if (!hb) return "Stockfish";
     const share = hb.stockfishShare ? ` · ${Math.round(hb.stockfishShare * 100)}% Stockfish` : "";
-    return `Maia ${hb.rating} · ${GUARD_WORDS[hb.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? "failed: Stockfish" : "loading"}`;
+    return `Maia ${hb.rating} · ${GUARD_WORDS[hb.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? `failed: Stockfish (${this.maia.error ?? "no reason"})` : "loading"}`;
   }
 
   private bossIntroDone = false;
