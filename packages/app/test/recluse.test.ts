@@ -60,6 +60,14 @@ describe("the Hidden Boss (art only)", () => {
     expect(RECLUSE.anims.idle!.frames.some(windy)).toBe(false);
   });
 
+  it("holds no chess piece anywhere (Eric, Oct 14), and his free arm hangs with an open hand at rest", () => {
+    for (const ch of [RECLUSE, RECLUSE_BUST])
+      for (const [name, anim] of Object.entries(ch.anims))
+        anim.frames.forEach((f, i) => expect(f.layers.some((l) => l.part.startsWith("piece")), `${ch.id} ${name} frame ${i + 1}`).toBe(false));
+    expect(Object.keys(RECLUSE.parts).some((n) => n.startsWith("piece"))).toBe(false);
+    for (const f of RECLUSE.anims.idle!.frames) expect(f.layers.some((l) => l.part.startsWith("hand:"))).toBe(true);
+  });
+
   it("renders every frame without anything cut off at the frame's edges (the bust is cut at its foot on purpose)", () => {
     for (const ch of ALL)
       for (const [name, anim] of Object.entries(ch.anims))
