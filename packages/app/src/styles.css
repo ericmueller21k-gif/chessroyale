@@ -10899,15 +10899,17 @@ img.qicon {
   max-width: min(220px, 50vw - 64px);
 }
 /* He adds time per move (his bullet clock's increment, Recluse.tsx's bulletPlus): one clean line across the board's
-   middle for the rest of its moment, gone as your clock starts. Only its opacity moves; sized in the board's own width
-   (cqw) with a floor and a ceiling, so it reads on a phone and a computer, light or dark. */
+   middle for the rest of its moment, gone as your clock starts. Only its opacity moves; exactly the squares' width
+   (--board-size: the wrap is a hair wider), its text in the board's own width (cqw) with a floor and a ceiling, so it
+   reads on a phone and a computer, light or dark. */
 .rc-plus {
   position: absolute;
   z-index: 7;
   left: 0;
-  right: 0;
-  top: 50%;
+  width: var(--board-size, 100%);
+  top: calc(var(--board-size, 100%) / 2);
   transform: translateY(-50%);
+  box-sizing: border-box;
   padding: 2.2cqw 3cqw;
   background: rgba(0, 0, 0, 0.8);
   color: #fff;
