@@ -103,7 +103,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
     again on the new one first (most still stand), then fresh ones, within `showdownTurnMs` (one run of the seeded
     generator a size, carried on round after round: until Oct 13 each round started it again, so his turn re-scanned
     the same few line-ups). The generator yields to the page every few milliseconds (`SLICE_MS`): nothing freezes the
-    board. With his meter full and nothing qualifying, each of his turns spends up to `showdownTurnMs` searching.
+    board. With his meter full and nothing qualifying, each of his turns spends up to `showdownTurnMs` searching;
+    except in a battle already decided his way (`showdownHopeless`: his edge so high, against the engine's top score,
+    that no duel can cost the crowd `showdownTrap` more), where his turn and the scout stop after one search.
   - **The server asks for it with his move** (`BossRules.asks`: the bossRequest's `pull`, `drag`, `showdown`, and a
     `seed` drawn from the battle's and the turn, never the battle's own) and gets it back with the move (`bossMove`'s
     `drag`, `showdown`); `afterBossMove` checks it and puts it on the board as a base; the next turn's events show it.
@@ -274,8 +276,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   (every boss's ultimate again and again, never two at once), `packages/app/test/board-view.test.ts` (the turned
   board's squares, moves and coordinates), `grex.test.ts` (the meter), `hollow.test.ts`, `bigboy.test.ts`, `sawyer.test.ts`,
   `long-match.test.ts`, `pig.test.ts` (Wrangler: the pull, the drag's rules and band, the line-up's kinds, zone,
-  substitutes and checks, Eric's goal and the distance from it, the search (three pairs, then two) and the scout kept
-  across turns, his meter (his moves only; not a strike), firing when full and a line-up qualifies, playing on when none
+  substitutes and checks, Eric's goal and the distance from it, the search (three pairs, then two; new line-ups each
+  round; none in a decided battle) and the scout kept across turns, his meter (his moves only; not a strike), firing when full and a line-up qualifies, playing on when none
   does, the cap, the test trigger outside the band, the forced duel, his reply and next moves on Maia at 600 with slips
   on (a two-capture line completed), host and solo agreeing),
   `packages/core/test/boss.test.ts`, `packages/server/test/boss-powers-lobby.test.ts` ("Wrangler online": the
@@ -305,7 +307,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] 25`.
 - Sims: `packages/sim/scripts/showdown-sim.ts` (Wrangler's showdowns in real battles: a crowd of bots at three
   strengths, his scout and his turn's search at a computer's or a phone's budget; showdowns a battle, when, the wait
-  after his meter fills, sizes, edges, the engine's moves after the duel; `reports/boss-sim/showdown-*.jsonl`),
+  after his meter fills, sizes, edges, the engine's moves after the duel, and the positions his full meter waited in;
+  `reports/boss-sim/showdown-*.jsonl`),
   `packages/sim/scripts/boss-sim.ts` (modes `snack`, Big Boy's; `split`, Sawyer's; `raid <boss,ids|all> <games>
   <seed> <strikes> <tag>`: Solo raids of 50 bots with every power through the match runner, ultimates per game and the
   crowd's results, `raid-summary <tags>` for the table; built for the rage meter, not yet run for its rates),
