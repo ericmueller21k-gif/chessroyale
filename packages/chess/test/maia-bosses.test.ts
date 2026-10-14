@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type Settings } from "@chessroyale/core";
 import { MatchRunner, legalMoves, pullOptions, sanLineToUci, type BrainNote, type EngineLike, type HumanAnswer, type HumanEngineLike, type Opening } from "../src/index.ts";
 
 /**
@@ -89,8 +89,10 @@ describe("every boss on the Maia path", () => {
       };
       let struck = false;
       for (let i = 0; i < 400 && !r.stageComplete(); i++) {
-        // (Wrangler's showdown searches its line-ups for real, a second or so each try: his trigger once, mid-battle.)
+        // (Wrangler's showdown searches its line-ups for real, up to seconds a turn while his meter is full and none
+        // qualifies on this test's engine: his trigger once, mid-battle, and his showdowns spent after it.)
         if (id !== "pig" || r.boss!.crowdMoves === 6) r.triggerUltimate();
+        if (id === "pig" && r.boss!.powers!.ults) r.boss!.powers!.ults = BOSS_POWERS.showdownMax;
         if (r.bossToMove()) {
           if (r.lightsOutDue()) {
             r.startLightsOut();

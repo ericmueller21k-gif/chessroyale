@@ -60,6 +60,8 @@ interface Row {
   /** Crowd turns his meter was full as they began (each fill's first). */
   full: number[];
   showdowns: { turn: number; duels: number; edge: number | null; afterFull: number | null; engineMoves: number }[];
+  /** Crowd turns that began with his meter full and no showdown: the position (to look at why none qualified). */
+  waits: { turn: number; fen: string }[];
   scanned: number;
   secs: number;
 }
@@ -79,7 +81,7 @@ async function run(crowd: string, games: number, seed: number, speed: string, ta
     const entrants: Entrant[] = skills.map((skill, i) => ({ id: `bot${i}`, name: `Bot ${i + 1}`, isBot: true, skill }));
     const runner = new MatchRunner({ settings: s, rng, engines, library, entrants });
     runner.showdownScout = new ShowdownScout(async () => scoutEngine, BOSS_POWERS);
-    const row: Row = { tag, crowd, speed, seed, game: g, moves: 0, result: null, full: [], showdowns: [], scanned: 0, secs: 0 };
+    const row: Row = { tag, crowd, speed, seed, game: g, moves: 0, result: null, full: [], showdowns: [], waits: [], scanned: 0, secs: 0 };
     const t0 = Date.now();
     let lastFill: number | null = null;
     let fullAt: number | null = null;
@@ -109,7 +111,7 @@ async function run(crowd: string, games: number, seed: number, speed: string, ta
         seenShowdown = sd.turn;
         row.showdowns.push({ turn: sd.turn, duels: sd.pairs.length, edge: sd.edge, afterFull: fullAt === null ? null : sd.turn - fullAt, engineMoves: 0 });
         fullAt = null;
-      }
+      } else if (ready !== null && fullAt !== null && p.turn > fullAt) row.waits.push({ turn: p.turn, fen: runner.bossView()!.board.fen });
       // The crowd thinks: his scout searches meanwhile (when the rules say a showdown may follow before long).
       const view = runner.bossView()!;
       if (view.powers?.scout) {

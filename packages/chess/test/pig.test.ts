@@ -40,6 +40,7 @@ import {
   rankShowdowns,
   searchShowdowns,
   showdownFrom,
+  showdownHopeless,
   showdownLive,
   ShowdownScout,
   triggerUltimate,
@@ -639,6 +640,22 @@ describe("Wrangler's showdown: Eric's goal", () => {
     // Many rounds (three promising a round, three duels each), and no duel position scanned twice.
     expect(scanned.length).toBeGreaterThan(4 * 3 * 3);
     expect(new Set(scanned).size).toBe(scanned.length);
+  });
+
+  it("a battle already decided his way: no search (no duel could cost the crowd more), but the admins' trigger still looks", async () => {
+    // Past the engine's top score for him everywhere: every duel reads the same, so no line-up can meet the goal.
+    const e = valueEngine((fen) => (fen.split(" ")[1] === "b" ? 0.9995 : 0.0005));
+    expect(showdownHopeless(5.9)).toBe(false);
+    expect(showdownHopeless(6)).toBe(true);
+    // His turn: only the position before is searched; the scout the same.
+    expect(await showdownFrom([e], RUY, 7)).toBeNull();
+    expect(e.searches).toBe(1);
+    const scout = new ShowdownScout(async () => e, BOSS_POWERS);
+    scout.scout(RUY);
+    await scout.idle();
+    expect(scout.scanned).toBe(0);
+    expect(e.searches).toBe(2);
+    expect(await showdownFrom([e], RUY, 7, { test: true }, { ...BOSS_POWERS, showdownTestMs: 800 })).toMatchObject({ outside: true });
   });
 
   it("the scout: line-ups of both sizes, kept from turn to turn (those that qualified first) and scanned first at his turn if they still hold", async () => {

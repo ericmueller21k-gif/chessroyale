@@ -656,6 +656,15 @@ const SCAN_SLACK = { below: 0.6, above: 1, trap: 1 } as const;
 export const missBy = (x: LineupScore, s: Pick<BossPowerSettings, "showdownEdge" | "showdownTrap"> = BOSS_POWERS): number =>
   x.mate ? Infinity : Math.max(0, s.showdownEdge[0] - x.gain, x.gain - s.showdownEdge[1]) + Math.max(0, s.showdownTrap - x.trap);
 
+/**
+ * No line-up can meet Eric's goal in a position where his edge is `before` pawns: the engine's scores stop at a 0.999
+ * expected score (logit), so when he's this far ahead no duel can leave him showdownEdge[0] up and another cost the crowd
+ * showdownTrap more (0.01: the gains' rounding). A battle already decided his way; the search would only spend the
+ * device's time (the sims: the only time his full meter waited long).
+ */
+export const showdownHopeless = (before: number, s: Pick<BossPowerSettings, "showdownEdge" | "showdownTrap" | "bouncePawnLogit"> = BOSS_POWERS): boolean =>
+  before > edgeInPawns(1, s) - (s.showdownEdge[0] + s.showdownTrap) + 0.01;
+
 /** The order he takes line-ups in: nearest showdownTarget, ties from the seed. */
 export function rankShowdowns(scored: readonly LineupScore[], seed: number, s: Pick<BossPowerSettings, "showdownTarget"> = BOSS_POWERS): LineupScore[] {
   return scored
@@ -834,7 +843,7 @@ export class ShowdownScout {
       if (!engine || run.stop) return;
       const deadline = this.now() + this.s.showdownSearchMs;
       const before = await edgeBefore([engine], fen, this.s.showdownConfirmNodes, this.s).catch(() => null);
-      if (before === null) return;
+      if (before === null || showdownHopeless(before, this.s)) return;
       const can = sizes.filter((n) => pairSizes(fen, fen.split(" ")[1] === "b" ? "b" : "w").includes(n));
       for (const [i, n] of can.entries()) {
         if (run.stop) return;
@@ -909,7 +918,7 @@ export async function showdownFrom(
   const sizes = pairSizes(fen, fen.split(" ")[1] === "b" ? "b" : "w");
   if (!sizes.length) return null;
   const before = await edgeBefore(engines, fen, s.showdownConfirmNodes, s);
-  if (before === null) return null;
+  if (before === null || (!opts.test && showdownHopeless(before, s))) return null;
   const end = now() + (opts.test ? s.showdownTestMs : s.showdownTurnMs);
   // (The test trigger keeps the line-up nearest the goal it sees, in case none qualifies.)
   const near: { x: LineupScore | null } = { x: null };
