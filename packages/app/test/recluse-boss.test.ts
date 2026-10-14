@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER, isPlayable, menuBosses } from "@chessroyale/core";
-import { RECLUSE_FX } from "@chessroyale/chess";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, menuBosses, type Settings } from "@chessroyale/core";
+import { RECLUSE_FX, legalMoves, type UciEngine } from "@chessroyale/chess";
+import { SoloMatch } from "../src/solo.ts";
 import { BOSS_KITS } from "../src/characters/kits.ts";
 import { RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
@@ -9,8 +10,9 @@ import { animLength } from "../src/characters/power-art.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { bossBeat, type Beat } from "../src/characters/boss-beats.ts";
 import { showing } from "../src/components/BossCharacter.tsx";
-import { powerLine } from "../src/components/BossPowers.tsx";
-import { BULLET, BULLET_ANIMS, bulletOn, kingBlocked, mockKingHelp } from "../src/components/Recluse.tsx";
+import { dockLine, momentPriority, powerLine } from "../src/components/BossPowers.tsx";
+import { BULLET, BULLET_ANIMS, BULLET_PLUS, bulletControl, bulletIncrementOn, bulletOn, kingBlocked, mockKingHelp } from "../src/components/Recluse.tsx";
+import { CRITICAL } from "../src/speech.tsx";
 import { kingLine, resetKingSpeech, turnCues } from "../src/godKing.ts";
 import { POWER_WORDS, powersLine } from "../src/power-words.ts";
 import { bossVoice } from "../src/speech.tsx";
@@ -82,6 +84,34 @@ describe("his ultimate, the bullet clock, on screen", () => {
   });
 });
 
+describe("then he adds time per move (Eric, Oct 14)", () => {
+  it("his moment: one grudging line as it begins (it cuts in), consulting the book, then the increment across the board until the clock starts", () => {
+    const line = powerLine(kit, { kind: "bulletPlus", key: "recluse:bulletPlus:10" });
+    expect(RECLUSE_LINES.bulletPlus).toContain(line);
+    expect(powerLine(kit, { kind: "bulletPlus", key: "recluse:bulletPlus:10" }), "the same for everyone").toBe(line);
+    expect(RECLUSE_LINES.bulletPlus.length).toBeGreaterThanOrEqual(2);
+    // (The number is the board's text, from the setting, never in his line.)
+    for (const l of RECLUSE_LINES.bulletPlus) expect(l).not.toMatch(/\d/);
+    expect(momentPriority({ kind: "bulletPlus" })).toBe(CRITICAL);
+    expect(BULLET_PLUS.text()).toBe("+2 s a move from now on");
+    expect(dockLine({ kind: "bulletPlus" })).toBe("+2 s a move");
+    // Within its moment: the consult, and the text up for a couple of seconds before the clock starts.
+    expect(BULLET_PLUS.anims).toEqual(["consult"]);
+    expect(animLength(RECLUSE_BUST.anims.consult!)).toBeLessThanOrEqual(RECLUSE_FX.bulletPlus);
+    expect(animLength(RECLUSE.anims.consult!)).toBeLessThanOrEqual(RECLUSE_FX.bulletPlus);
+    expect(RECLUSE_FX.bulletPlus - BULLET_PLUS.textAt).toBeGreaterThanOrEqual(2000);
+  });
+
+  it("the dock's time control once it applies (\"Bullet 1+2\"), from bulletPlainMoves turns after the bullet clock came", () => {
+    expect(BOSS_POWERS.bulletPlainMoves).toBe(3);
+    const at = (turn: number, extra: Partial<BossView> = {}) => bulletIncrementOn(view({ powers: { ultimate: "bullet", ultAt: 7, turn }, ...extra } as Partial<BossView>));
+    expect([7, 8, 9, 10, 30].map((t) => at(t))).toEqual([0, 0, 0, 2, 2]);
+    expect(bulletIncrementOn(view())).toBe(0);
+    expect(at(12, { result: "crowd" })).toBe(0);
+    expect(bulletControl(2)).toBe("1+2");
+  });
+});
+
 describe("the God King's help, blocked and mocked", () => {
   it("tried (his move or his strike): the boss mocks it and the God King says it won't take hold, each in their own voice", () => {
     resetKingSpeech();
@@ -115,8 +145,9 @@ describe("his lines: real quotes word for word, the rest placeholders", () => {
     expect(RECLUSE_LINES.mock).toEqual(expect.arrayContaining(["I don't believe in psychology. I believe in good moves.", "A genuine beginner's move"]));
     expect(RECLUSE_LINES.victory).toContain("He played book lines, but didn't know them very well.");
     expect(RECLUSE_LINES.fall).toContain("Morphy, I think everyone agrees, was probably the greatest genius of them all.");
-    // (Phase 2: a board he wins. Whole, the parenthetical included.)
-    expect(RECLUSE_LINES.boardWon).toContain("Of course White can always play differently, in which case he merely loses differently. (Thank you, Weaver Adams!)");
+    // (Eric, Oct 14: the Weaver Adams quote, a board he won in phase 2, "doesn't fit the rest": gone.)
+    expect(JSON.stringify(RECLUSE_LINES)).not.toMatch(/Weaver|merely loses differently/);
+    expect(RECLUSE_LINES.boardWon.length).toBeGreaterThan(0);
   });
 
   it("says 'Best by test.' as his entrance only when he's White and the game opened 1.e4", () => {
@@ -143,5 +174,50 @@ describe("his sounds", () => {
       expect(10 * Math.log10(sum / s.length), name).toBeLessThan(MOVE_MEAN_DB - 2);
       expect(s, `${name} is the same every time`).toEqual(recluseSound(name, 44100));
     }
+  });
+});
+
+/** The God King's help tried in Boss alone against him (SoloMatch.callKing, what the dock calls after his mock). */
+describe("the God King's help tried in Boss alone: blocked, and the charge spent", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+    vi.stubGlobal("location", { search: "" });
+    vi.stubGlobal("Worker", class { onmessage = null; onerror = null; postMessage() {} terminate() {} });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("each try (his strike, his move) takes a charge from the dock's count and your move goes on; none left, a try does nothing", () => {
+    // (A stand-in engine: its searches answer with the legal moves; the boss never gets to move here.)
+    const engine = {
+      topMoves: async (fen: string, n: number) => legalMoves(fen).slice(0, n).map((move) => ({ move, expected: 0.5 })),
+      scoreMoves: async (_fen: string, moves: string[]) => moves.map((move) => ({ move, expected: 0.5 })),
+      topMovesAt: async () => [{ move: "0000", expected: 0.5 }],
+      playAtElo: async (fen: string) => legalMoves(fen)[0]!,
+    } as unknown as UciEngine;
+    const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "recluse", bossHidden: true } as Settings);
+    m.start();
+    // (Before your move: nothing.)
+    m.callKing(true);
+    expect(m.boss!.kingCharges).toBe(3);
+    for (let i = 0; i < 60 && m.phase.kind !== "play"; i++) vi.advanceTimersByTime(500);
+    expect(m.phase.kind).toBe("play");
+    expect(m.boss!.id).toBe("recluse");
+    m.callKing(true);
+    expect(m.boss!.kingCharges).toBe(2);
+    m.callKing();
+    expect(m.boss!.kingCharges).toBe(1);
+    // (He didn't play your move: it's still yours to make, your clock running as it was.)
+    expect(m.phase.kind).toBe("play");
+    expect(m.kingCalled).toBe(false);
+    expect(m.boss!).toMatchObject({ kingMoves: [], kingStrikes: [], staggerNext: false });
+    m.callKing();
+    m.callKing(true);
+    expect(m.boss!.kingCharges).toBe(0);
+    expect(m.phase.kind).toBe("play");
+    m.dispose();
   });
 });

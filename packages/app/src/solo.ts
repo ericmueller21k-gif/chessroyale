@@ -467,11 +467,15 @@ export class SoloMatch implements GameView {
   /**
    * Calling the God King. To play the move: your whole turn, no move of your own. To strike the boss: he comes
    * now if enough of the crowd has called, the clock stands still while he strikes, and then you pick as usual.
+   * Against the Hidden Boss neither comes, but the try spends its charge as if it had (Eric, Oct 14), in phase 1 on your
+   * move or in phase 2 while the boards are in play; the dock has him mock it, and your move goes on (its clock too).
    */
   callKing(strike = false) {
+    if (kingHelpBlocked(this.runner?.boss)) {
+      if ((this.phase.kind === "play" || (this.phase.kind === "simul" && this.phase2Playing)) && this.runner.kingTried()) this.emit();
+      return;
+    }
     if (this.phase.kind !== "play" || !this.runner.boss?.kingCharges || this.kingCalled) return;
-    // (The Hidden Boss: the God King's help doesn't work against him; the dock has him mock the try, nothing spent.)
-    if (kingHelpBlocked(this.runner.boss)) return;
     if (strike) return this.callStrike();
     this.kingCalled = true;
     this.runner.kingCallers.add(HUMAN);
