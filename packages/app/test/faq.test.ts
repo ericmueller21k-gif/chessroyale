@@ -124,6 +124,31 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(off).toContain("Being tested; coming soon.");
   });
 
+  it("with Maia on for players, every line about it reads as live (the brain, Stockfish's part and the credits)", () => {
+    const on: FaqSources = { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: true } };
+    const brain = section("boss-brain", on);
+    expect(brain).toContain("Every boss plays with Maia");
+    expect(brain).toContain(`A boss at ${BOSS_BRAIN.stockfishFrom} or more plays with Stockfish`);
+    for (const stale of ["Being tested", "coming soon", "isn't switched on", "In the test", "Every boss you meet today plays with Stockfish"]) expect(brain).not.toContain(stale);
+    expect(section("credits", on)).toContain("Maia-3, the human-like model behind the bosses");
+    expect(section("credits", on)).not.toContain("being tested");
+    const off: FaqSources = { ...FAQ_DEFAULTS, brain: { ...BOSS_BRAIN, forPlayers: false } };
+    expect(section("boss-brain", off)).toContain("Every boss you meet today plays with Stockfish");
+    expect(section("credits", off)).toContain("being tested for bosses");
+  });
+
+  it("links the engines' source: the Maia box's in one line of its section, both in the credits, nothing \"on request\"", () => {
+    const maia = faqPage().sections.find((s) => s.id === "boss-brain")!;
+    const line = plainText(maia.blocks)
+      .split("\n")
+      .filter((l) => l.includes("source code"));
+    expect(line).toEqual(["Maia runs in your browser as its own program, under the AGPL-3.0, and its source code is free to download."]);
+    expect(linksOf(maia.blocks)).toContain("/engine/maia/maia-box-source.tar.gz");
+    const credits = faqPage().sections.find((s) => s.id === "credits")!;
+    expect(linksOf(credits.blocks)).toEqual(expect.arrayContaining(["/engine/maia/maia-box-source.tar.gz", "/engine/stockfish-source.tar.gz", "/engine/COPYING.txt", "/engine/maia/LICENSE.txt"]));
+    expect(text()).not.toMatch(/on request/i);
+  });
+
   it("the blunder guard, the slips and the strength example", () => {
     const t = section("boss-brain");
     expect(t).toContain(`more than ${DEFAULT_SETTINGS.bossMaxLoss} points against the best move`);

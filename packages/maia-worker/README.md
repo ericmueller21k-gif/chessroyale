@@ -5,9 +5,12 @@ a **separate program**: a Web Worker that speaks a UCI-style text protocol. HunC
 human of a given rating would play.
 
 **License: GNU AGPL 3.0** (`LICENSE`), as Maia-3's code and weights are. Everything in this folder is part of the box
-and under that license. The game (the rest of this repository) never imports, bundles or shares memory with any of it:
-it starts the built worker (`/engine/maia/maia-worker.js`) and exchanges plain-text lines with it, exactly as it does
-with Stockfish. Nothing in this folder imports game code.
+and under that license. The game never imports, bundles or shares memory with any of it: it starts the built worker
+(`/engine/maia/maia-worker.js`) and exchanges plain-text lines with it, exactly as it does with Stockfish. Nothing in
+this folder imports game code.
+
+**Its source is public:** the site serves this folder as `/engine/maia/maia-box-source.tar.gz`, next to the worker it
+builds ("The source archive", below).
 
 ## What's here
 
@@ -15,14 +18,16 @@ with Stockfish. Nothing in this folder imports game code.
 | --- | --- |
 | `LICENSE` | The GNU AGPL 3.0, as shipped by CSSLab/maia3 |
 | `scripts/convert.py`, `scripts/requirements.txt` | The conversion: the official checkpoint to ONNX, then int8, with checks |
-| `model/maia3-23m-int8.onnx` | The converted model (committed; 25,191,199 bytes, 24.02 MiB) |
+| `model/maia3-23m-int8.onnx` | The converted model (25,191,199 bytes, 24.02 MiB; in the game's repository, not in the source archive: see `model/README.txt` there) |
 | `src/encode.ts` | The model's input (64 squares × 12 planes, × 8 boards of history) and its 4352 moves |
 | `src/policy.ts` | Probabilities over the legal moves, and the official way of drawing one (temperature, top-p) |
 | `src/model.ts` | The model in onnxruntime-web's WebAssembly backend, one thread |
 | `src/uci.ts` | The text protocol (below) |
 | `src/worker.ts` | The Web Worker |
-| `src/cli.ts` | The same engine on stdin/stdout for Node (simulations): `npx tsx packages/maia-worker/src/cli.ts` |
-| `scripts/build.mjs` | Builds `dist/`: `maia-worker.js`, `ort-wasm-simd-threaded.wasm`, the model, `LICENSE.txt`, `NOTICE.txt` |
+| `src/cli.ts` | The same engine on stdin/stdout for Node (simulations): `npx tsx src/cli.ts` |
+| `scripts/build.mjs` | Builds `dist/`: `maia-worker.js`, `ort-wasm-simd-threaded.wasm`, the model, `LICENSE.txt`, `NOTICE.txt` and the source archive |
+| `scripts/source-archive.mjs` | Writes the source archive, `maia-box-source.tar.gz` (below) |
+| `package.json` | The box's packages: onnxruntime-web and chess.js (bundled into the worker), esbuild (the build) |
 | `licenses/` | License texts of what the build bundles (onnxruntime-web's MIT; chess.js's BSD comes from its package) |
 | `test/` | The encoder against the official tokenizer, the protocol, and the model in the browser runtime |
 
@@ -41,7 +46,7 @@ with Stockfish. Nothing in this folder imports game code.
 Run with Python 3.11 and `scripts/requirements.txt` (torch 2.14.1 CPU, onnx 1.23.2, onnxruntime 1.23.2, numpy, chess):
 
 ```sh
-python -I packages/maia-worker/scripts/convert.py --work <scratch dir>     # about 30 s on a CPU
+python -I scripts/convert.py --work <scratch dir>     # from this folder (any folder works); about 30 s on a CPU
 ```
 
 1. Clone `CSSLab/maia3` at the commit above; download the checkpoint at the revision above and check its sha256.
@@ -106,12 +111,45 @@ quit                                  → frees the model and ends the worker
 
 ## Building and testing
 
-- `npm run build -w maia-worker` writes `dist/`; the app's build copies `dist/` into `public/engine/maia/` as it is
-  (the root `npm run build` does both).
+In the game's repository:
+
+- `npm run build -w maia-worker` writes `dist/` (and the source archive into it); the app's build copies `dist/` into
+  `public/engine/maia/` as it is (the root `npm run build` does both).
 - `npx vitest run packages/maia-worker` runs the box's tests (the model test loads the real file: about 6 s).
 
-## Source availability
+From the source archive (Node 22 and npm):
 
-This folder is the box's complete source. Publishing it (for example as a public repository, or a download on the
-site) is a launch step that needs Eric's OK; until then the site is private and the in-game notice says the source is
-available on request.
+```sh
+tar -xzf maia-box-source.tar.gz && cd maia-box
+# The model: from the site, next to the archive (or made by scripts/convert.py); model/README.txt says where.
+curl -o model/maia3-23m-int8.onnx https://hunchess.com/engine/maia/maia3-23m-int8.onnx
+npm ci                      # the exact packages the site's build used (package-lock.json)
+node scripts/build.mjs      # writes dist/
+cd dist && sha256sum -c ../SHA256SUMS.txt     # the same files the site serves at /engine/maia/
+```
+
+The tests run with Vitest (`npx vitest run`).
+
+## The source archive
+
+The build writes this folder's complete source as `dist/maia-box-source.tar.gz`, and the site serves it next to the
+worker: **`/engine/maia/maia-box-source.tar.gz`** (Settings' credits, the FAQ and `/licenses/third-party.txt` link
+it). It is everything needed to rebuild the worker the site runs, under `maia-box/`:
+
+- every file in this folder (the worker's code, `scripts/build.mjs` and `scripts/source-archive.mjs`, the conversion
+  `scripts/convert.py` and its `requirements.txt`, `package.json`, `tsconfig.json`, `LICENSE`, this README, the
+  license texts in `licenses/` and the tests with their fixtures), but not `dist/`, `node_modules/` or the model;
+- `package-lock.json`: the exact versions of the packages the build used (cut from the game's lockfile: the box's own
+  packages only);
+- `model/README.txt`: the model's file name, size and sha256, and where to get it;
+- `SHA256SUMS.txt`: the sha256 of every file the build wrote (but the archive), so a rebuild can be checked against
+  what the site serves.
+
+**The model is linked, not included:** the converted file is already served next to the archive
+(`/engine/maia/maia3-23m-int8.onnx`, the same bytes the build takes from `model/`), and the official checkpoint it's
+made from is CSSLab's own release, pinned above by revision and sha256, with every conversion step in
+`scripts/convert.py`. A second copy inside the archive (about 20 MB packed) would only make the same bytes download
+twice.
+
+The archive is the same bytes for the same files (sorted entries, fixed times and owners), so a build of unchanged
+sources doesn't change it. Nothing in it comes from the game: the tests check that (`test/source-archive.test.ts`).

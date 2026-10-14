@@ -36,6 +36,13 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   - **The Maia box:** a separate AGPL program (`packages/maia-worker/`, its own README and license): a module worker at
     `/engine/maia/` (the official 23M checkpoint converted to int8 ONNX, 24 MiB, run by onnxruntime-web on one thread,
     about 80 ms a move here). The game only exchanges UCI-style text with it (`HumanUciEngine`).
+  - **Its source, on the site** (DECISIONS.md, "The Maia box's source on the site", Oct 14): the box's build writes its
+    complete source as `maia-box-source.tar.gz` beside the worker (`scripts/source-archive.mjs`: every box file but the
+    model, plus a lockfile cut from the workspace's, `model/README.txt` and `SHA256SUMS.txt`), served at
+    `/engine/maia/maia-box-source.tar.gz`; extracted, `npm ci` and `node scripts/build.mjs` rebuild the served files
+    byte for byte. The model is linked (served beside it; CSSLab's checkpoint pinned), not bundled again. Stockfish's
+    build's source is served the same way: `/engine/stockfish-source.tar.gz`, committed in
+    `packages/app/stockfish-source/` (the npm package has none; the build refuses a version without its archive).
   - **The rule** (`BOSS_BRAIN`): the boss's **level** is its strength, plus `crowdMargin` (400) when more than one picks
     the crowd's moves. Maia plays at `maiaRatingFor(level)`: 600 (its floor) up to a level of 1800, 850 at 2000, 1100
     at 2250, 2000 at 2400, held at 2500 from 2650 (`reports/maia-calibration.md`; Eric, Oct 12: the boss clearly
@@ -54,9 +61,11 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   - **Where:** every boss battle, solo (`startBrain` in `solo.ts`, the runner's `humanBrain`) and online (the lobby
     decides the battle's plan once, `bossBrainNow`; the host is told as the intro starts, `bossBrain`, and each boss
     request carries it; the host's device plays Maia's move and the server sends that one move to everyone).
-  - **Who:** players meet Stockfish until `forPlayers` is on (Eric's OK first: the Maia box's source published); an
-    admin's device meets Maia on every boss in every mode, online in a lobby of admins only (`MAIA_TEST=1` in
-    `wrangler dev` for the e2e). A device that may not run Maia never downloads it and plays Stockfish's move as host.
+  - **Who:** players meet Stockfish until `forPlayers` is on (the source is published, Oct 14; the flip itself awaits
+    Eric's own approval, ROADMAP.md "Needs Eric"); an admin's device meets Maia on every boss in every mode, online in a
+    lobby of admins only (`MAIA_TEST=1` in `wrangler dev` for the e2e). A device that may not run Maia never downloads
+    it and plays Stockfish's move as host. `forPlayers` is the only gate: on, a player's device runs the same rule
+    (`maiaAllowed`, `soloBrain`; online `bossBrainNow`), with no admin's pick and no debug line.
   - **Loading:** the files are fetched ahead when a battle on Maia may come (the boss menu, a Solo raid's queue, a raid
     lobby on a device that may run it, the Crowd's vote for a boss battle); the worker starts as the battle's intro
     begins (a prefetch under way finishes first) and ends with the battle; the service worker keeps the files.
@@ -80,6 +89,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 | Maia in the browser (start, prefetch, free) | `packages/app/src/maia.ts`, `boss-brain.ts` (who may run it; the admins' pick), `solo.ts` (`startBrain`), `net.ts` (`useBrain`, `hostBoss`) |
 | The online plan | `packages/server/src/lobby.ts` (`bossBrainNow`, the `bossBrain` message, the boss request's `brain`) |
 | The Maia box (AGPL: worker, conversion, model) | `packages/maia-worker/` (README.md), built into `/engine/maia/` |
+| The engines' source archives | `packages/maia-worker/scripts/source-archive.mjs` (→ `/engine/maia/maia-box-source.tar.gz`); `packages/app/stockfish-source/` (→ `/engine/stockfish-source.tar.gz`, copied by `vite.config.ts`) |
 
 ## Settings
 
@@ -95,8 +105,10 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   headers (never print their values).
 - The brain: `packages/chess/test/boss-brain.test.ts` (the rating lines, the bridge, the brains' choices with made-up
   candidates, the fallbacks, the text client), `maia-bosses.test.ts` (every boss's Maia path in a battle),
-  `packages/server/test/boss-powers-lobby.test.ts` ("the boss's brain online"); `packages/maia-worker/test/` (the
-  encoder against the official tokenizer, the protocol, the int8 model in onnxruntime-web); `e2e/maia.spec.ts`;
+  `packages/server/test/boss-powers-lobby.test.ts` ("the boss's brain online"); `packages/app/test/maia-players.test.ts`
+  (`forPlayers` on: a player's boss on Maia by the rule, solo); `packages/maia-worker/test/` (the encoder against the
+  official tokenizer, the protocol, the int8 model in onnxruntime-web, the source archive);
+  `packages/app/test/engine-source.test.ts` (Stockfish's archive); `e2e/maia.spec.ts` (also: both archives served);
   `npx tsx packages/sim/scripts/maia-calibration.ts` (`reports/maia-calibration.md`), `maia-sim.ts`
   (`reports/maia-boss.md`).
 - Sims (`packages/sim/scripts/`, write to `reports/`): `judge-accuracy.ts`, `judge-cuts.ts`, `judge-determinism.ts`,
@@ -114,4 +126,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
 - The FAQ explains the judge, the re-check and the boss's brain and strength to players (`packages/app/src/faq/content.ts`):
   a change to how they work changes its words in the same PR.
 - The Maia box stays a separate program: nothing in the game imports it, and nothing in it imports the game; only
-  text goes between them (Eric's license decision). Its source is published only with Eric's OK.
+  text goes between them (Eric's license decision). Its source is public (`/engine/maia/maia-box-source.tar.gz`): a
+  new file in the box lands in the archive by itself, and nothing from the game may go in it (its test checks).
+- A new Stockfish version needs its source archive in `packages/app/stockfish-source/` first (the build stops
+  without one; its README says how it was made).
