@@ -10898,6 +10898,40 @@ img.qicon {
 .place-results.ch-recluse .bc-bubble {
   max-width: min(220px, 50vw - 64px);
 }
+/* He adds time per move (his bullet clock's increment, Recluse.tsx's bulletPlus): one clean line across the board's
+   middle for the rest of its moment, gone as your clock starts. Only its opacity moves; sized in the board's own width
+   (cqw) with a floor and a ceiling, so it reads on a phone and a computer, light or dark. */
+.rc-plus {
+  position: absolute;
+  z-index: 7;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2.2cqw 3cqw;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: clamp(16px, 6.2cqw, 34px);
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+  pointer-events: none;
+  animation: rc-plus var(--rc-plus-ms, 2300ms) linear both;
+}
+@keyframes rc-plus {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 
 /* ---------------- Boss powers (BossPowers.tsx) ---------------- */
 

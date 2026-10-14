@@ -36,9 +36,12 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   [bosses.md](bosses.md), "A boss's attack on a king".
 - **Fair.** A power never changes how a player's own pick was judged, and a move he plays never earns brilliant credit.
 - **Against the Hidden Boss his help doesn't work** (Eric, Oct 14; the boss's passive, `BossRules.blocksKing`): his
-  move, his strike and his Last Stand never come, and nothing is spent (the runner's `kingDecision`, `callStrike`,
-  `lastStandFor`; solo's `callKing`). His menu still opens; picking "Play move" or "Strike" has the boss slam his book
-  shut and mock it, and the God King says his help won't take hold (`mockKingHelp` in `components/Recluse.tsx`). In
+  move, his strike and his Last Stand never come (the runner's `kingDecision`, `callStrike`, `lastStandFor`). His menu
+  still opens; picking "Play move" or "Strike" has the boss slam his book shut and mock it, and the God King says his
+  help won't take hold (`mockKingHelp` in `components/Recluse.tsx`). Each try spends its charge as if it had worked
+  (Eric, Oct 14: "using the king's move doesn't draw down on the usage vs him like it should"; the runner's
+  `kingTried`, solo's `callKing`, in phase 1 and 2): the crowns go down one a try, and with none left he can't be called,
+  as against any boss. Your move goes on (he played nothing); the Last Stand, which nobody calls, spends nothing. In
   this fight he opens with his own line as "START!" comes ("I sense a tremendous power within this foe.", Eric's;
   `foeIntro`, said by the boss screen's intro), and his
   lines about calling him (the nudge, "spent", "A charge might turn it") are left out (`turnCues`' `noHelp`). His
@@ -89,8 +92,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 ## Tests and tools
 
-- Against the Hidden Boss: unit `packages/chess/test/recluse.test.ts` (blocked, nothing spent),
-  `packages/app/test/recluse-boss.test.ts` (the mocks, his cues); e2e `e2e/recluse.spec.ts`.
+- Against the Hidden Boss: unit `packages/chess/test/recluse.test.ts` (blocked; a try spends its charge, the Last Stand
+  nothing), `packages/app/test/recluse-boss.test.ts` (the mocks, his cues, solo's `callKing` spending); e2e
+  `e2e/recluse.spec.ts` (the dock's count drops, phase 1 and 2).
 - Unit: `packages/chess/test/last-stand.test.ts`, `packages/app/test/god-king.test.ts`,
   `packages/app/test/god-king-sprite.test.ts`, `packages/server/test/lobby.test.ts`.
 - e2e: `e2e/formats.spec.ts` (the boss final), `e2e/boss-powers.spec.ts`.

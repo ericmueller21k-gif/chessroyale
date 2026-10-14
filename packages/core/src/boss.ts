@@ -601,7 +601,8 @@ export interface BurnEvent {
  * Wrangler's long pull (his first move, a center pawn three squares); `drag`: his lasso drag (a crowd piece dragged a
  * square after his move; `ult`: standing in for the test trigger's showdown when the board can't hold one); `showdown`:
  * his showdown (pairs lined up, a forced duel). `bullet`: the Hidden Boss's ultimate (his clock speech and spellbook; the
- * crowd's clock is bullet from then on).
+ * crowd's clock is bullet from then on). `bulletPlus`: a few moves into it, he adds time per move from then on (his line,
+ * the increment across the board; BOSS_POWERS.bulletPlainMoves, bulletIncrementSeconds).
  */
 export type PowerEventKind =
   | "freeze"
@@ -625,7 +626,8 @@ export type PowerEventKind =
   | "pull"
   | "drag"
   | "showdown"
-  | "bullet";
+  | "bullet"
+  | "bulletPlus";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

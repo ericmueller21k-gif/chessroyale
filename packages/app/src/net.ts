@@ -50,6 +50,7 @@ import {
   type BossMoveKind,
   pigTurn,
   ShowdownScout,
+  kingHelpBlocked,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
@@ -1097,7 +1098,8 @@ export class NetMatch implements GameView {
 
   kingCalled = false;
   callKing(strike = false) {
-    if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled) return;
+    // (The Hidden Boss can't be met online: no server path takes a try against him, so nothing is sent.)
+    if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled || kingHelpBlocked(this.boss)) return;
     if (strike) {
       // A strike isn't your turn: you still pick once he's done (the server says when he strikes).
       if (this.phase.strike?.mine) return;
