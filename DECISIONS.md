@@ -3638,3 +3638,21 @@ trigger and from slow moves, resigning); e2e
 Stockfish answering, Engine move, the God King mocked; the ultimate on the trigger, then a random move for you out of
 time; a loss by resigning, 3 of 4), plus the specs of the areas it
 touches (castling, resign, boss-speech, king-attack, maia, perf). Frames: `npm run frames:recluse2`.
+
+## Big Boy's perf check near its budget (Oct 14, 2026)
+
+**What:** Big Boy's slow-phone perf check (`e2e/perf.spec.ts`, his intro and snack) stays as it is, budget included,
+and is known to sit near its limit. Boss sounds are now made ahead in a worker (#203), off the page's thread.
+
+**Why:** The check failed in the batch run and alone. A/B runs (#202) showed the same results on 878ccab and main, with
+matching CPU profiles; nothing merged since had changed it. On a quiet machine the window drops 8 to 16% of frames
+against a 15% budget, with p95 at two or three refreshes (and `p95 < 50` sits exactly on three, so timing jitter
+decides 49.9 against 50.1). With four busy loops added it drops 21 to 34%, and other sessions' builds and unit tests
+don't take the e2e lock. Moving the sounds to a worker removed their 50 to 180 ms tasks from the page (Big Boy's
+intro lost 1,120 → 1,025 ms to dropped frames, Hollow's 1,001 → 803 ms, 8 runs each). What's left is mostly the
+browser's own work and the boss screen redrawing every frame. Memoizing that redraw is what would clear the budget,
+but it's a riskier change to the boss screen (many lessons apply), so it's held for Eric to decide. No budget was
+raised.
+
+**So:** a red Big Boy perf run is re-run alone on a quiet machine before a PR is blamed.
+

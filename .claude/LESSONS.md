@@ -112,6 +112,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Anything that shows many new frames at once (a board of tiles) is drawn ahead, a slice a frame. A sound made in
     code is made before its cue, and costs no more than about 30 ms on a computer.
   - Nothing a boss needs only in its battle is made when the app loads.
+  - Boss sounds are made ahead in the sound worker (`sound-worker.ts`, Oct 14), never on the page: a new boss's sounds
+    go in `MAKE` in `sound.ts` and `characters/boss-sounds.ts`.
+  - Big Boy's perf check (`e2e/perf.spec.ts`) sits near its budget on a slowed phone (8 to 16% dropped against 15%),
+    on every commit since at least Oct 13: a busy machine tips it over. It stays there until the boss screen's
+    per-frame redraw is memoized, a separate, riskier change held for Eric (DECISIONS.md, "Big Boy's perf check near
+    its budget"). A red Big Boy perf run: re-run it alone on a quiet machine before blaming a PR.
 
 ## Game state
 
