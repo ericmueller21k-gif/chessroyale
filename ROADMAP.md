@@ -128,10 +128,78 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
     only a few seconds a move, no bonus time.
   - **His voice:** lines true to the chess persona: anti-theory, anti-engine, "real chess", and when the four team up on
     him, how the Russians teamed up and conspired against him. Eric will supply specifics.
-  - **Difficulty:** fairly easy but still a challenge (to tune later).
+  - **Difficulty (Eric, Oct 14; replaces "fairly easy"):** an elite challenge. His strength doesn't follow the
+    squad's ratings: it's fixed and very strong, **about 3000**, so it takes four elite players (possibly GM level)
+    to beat him. The goal is a fight people talk about and gather their strongest friends for. **All four players
+    must beat him** to complete it.
+    - **His brain is Stockfish:** Maia can't play him. It never saw Fischer Random in training, and it tops out far
+      below 3000 anyway (it's held at 2500, and Stockfish takes over from 2800 even in normal chess). Stockfish plays
+      Fischer Random natively and reaches 3000 (its strength limiter goes up to 3190, already used by raid tier 10).
+      It's a fitting irony: in Fischer Random Stockfish has no opening book either and calculates from move 1.
+    - **"3000" is on Stockfish's own scale** (engine-calibrated), not a human FIDE rating, and the ultra-fast clock
+      hurts people far more than an engine. So the number is a starting point, not a promise.
+    - **The math of "all four must win":** if each player beats him with chance p, the squad wins with p⁴: 70% each
+      → 24%; 50% → 6% (1 in 16); 30% → under 1%; 20% → 1 in 625. The dials are his strength, the players' clock,
+      and whether a draw counts (today's default: no, a draw isn't a win).
+    - **Tuning plan:** a single setting for his strength. First, engine-against-engine tests in Fischer Random at
+      the real clock (engine "players" at about 2500–2700 against him at 2800 / 3000 / 3190) for a starting point.
+      They can't capture human time trouble, so real tuning comes from strong players trying him after launch.
+    - **Open:** phase 1's strength (default: the same); what happens to the other boards once one board is lost
+      (default: they play on, but the reward needs all four).
+  - **Fischer Random takes real rules work:** our rules library (chess.js 1.4) has no Fischer Random castling, so
+    the rules code and the board need it (full test lane). A simpler fallback is random back ranks with castling
+    turned off, but that isn't true Fischer Random. Decide at build time.
+  - **Cheating (to handle later; Eric, Oct 14):** a full-strength engine beats a 3000-limited one almost every
+    time, so engine help is the main risk. The fast clock slows anyone copying moves from a second device, but it
+    doesn't stop automated help. Notes:
+    - **The server plays him.** Online, today's bosses are computed on the host player's device; for this fight his
+      moves must come from our engine server, never a player's device, or a host could weaken him. Engine server
+      cost: about 200 searches a fight (one board, then four) against today's 3,000-a-day budget; rare, since it
+      takes the 1,000-coin book and a tournament win.
+    - **Hold the reward for review.** A win goes to fair-play review (the deep re-check on the engine server) before
+      the crates are granted, and a person decides. Elite players naturally play accurately, so no automatic bans
+      from this fight.
+    - **Signals:** how often each player's moves match the engine's top choice (Fischer Random has no opening
+      theory, so engine-perfect play from move 1 stands out), move-time patterns, and the look-away count.
+    - **Public replays** of every win (a hall of fame), so the community can see the games.
+    - **Signed-in accounts with match history** only.
   - **Beating him:** a "super saiyan" transformation with special animations (details later). Every player on the
     winning squad gets a special **Fischer Random crate** with a tiny chance at an item that doesn't exist yet. One
     victory reward per account, ever.
+  - **How you reach him (Eric, Oct 14):**
+    - **For real:** a **fifth Mercenary item**, an ominous **red book**, for **1,000 coins**. Its description is
+      along the lines of "A strange red book. It looks powerful..."
+    - The squad must **buy it AND win the Squads tournament** to trigger the hidden boss.
+    - **Price:** 1,000 is more than one round earns (about 600–700), so a squad has to save across rounds.
+    - **The book's symbol:** Eric wants a Russian symbol on it. The director suggests a red star or a Cyrillic
+      letter rather than the hammer and sickle, which is banned in some countries (e.g. Lithuania, Latvia, Ukraine).
+      Eric's call.
+    - **For testing until then:** he's reachable from the boss menu, playing with bots.
+  - **Phase 1 to phase 2 (Eric, Oct 14):**
+    - **Phase 1** is one board against him. Beat him there and **he collapses**: he drops to his knees, slumps and
+      mumbles nonsense to himself (lines from Eric later).
+    - **The red book takes over:** it flies off and **slams onto the center of the board** (dust, a shockwave).
+      Then **the board divides into four**. The director suggests reusing Sawyer's board-saw split: crack lines along
+      the middle, then the quarters slide apart and grow into full boards (desktop: all 4; phone: yours big, 3 up top).
+    - **He revives:** one sprite only, even with 4 boards. In the revived state his hair is **always flowing**, and
+      he isn't evil, but he looks scarier.
+    - **The book flips its pages again** and all four boards shuffle into random openings (Fischer Random setups):
+      the pieces fly to their new squares as the pages turn. Phase 2 then plays as above.
+    - **Decided (Eric, Oct 14: "your pick is fine, we want easier code and less lag over all else, fewer bug
+      risks"):** the split reuses Sawyer's board saw (crack lines, then the quarters slide apart). The book's symbol
+      is the gold Cyrillic **"ШАХМАТЫ"** ("chess" in Russian) on the shop item's larger icon, and its first
+      letter **"Ш"** as a gold monogram on the book in the sprites: clearly Russian, about chess, and not political.
+    - **Effort, easiest to hardest:**
+      - a slam, a flash, then a cross-fade into four boards;
+      - crack lines, then the quarters sliding apart (the pick, reusing the saw);
+      - a true tear or 3D split (not worth it).
+  - **The God King against him (Eric, Oct 14):** the God King's help **doesn't work** against him (his strike, Last
+    Stand and any other help), and when the crowd tries to use it, **he mocks it** as "theory" and "engine" crutches
+    (lines from Eric later). The God King gets **unique lines** for this fight, e.g. "I sense a tremendous power
+    within this foe."
+  - **His real red book:** in 1972 he prepared from what he called "the red book" of his rival's games (a red cloth
+    hardcover). In the game it's an unlabeled red book that he holds at his side, consults at logical moments, and
+    opens like a spell book for his ultimate.
   - **His art:** Eric's sprite (Oct 14): seated on a stone block, white shirt, patterned blue tie, a chess piece in hand,
     an intense stare. An in-game version is being drawn (art only, not in the game).
   - **Director's flags:** use a different name (agreed). A recognizable likeness and real quotes carry the same

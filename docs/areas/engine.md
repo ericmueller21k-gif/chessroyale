@@ -48,7 +48,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     veto from the boss's own top-8 search (no extra search): Maia's next likely move, else Stockfish's best.
   - **Within the powers:** Maia is asked for the allowed moves only (`searchmoves`), and nothing else is played; none of
     its moves allowed: today's Stockfish move. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra
-    move and Big Boy's bounce keep their own Stockfish picks; Maia's own mistakes replace the slips.
+    move and Big Boy's bounce keep their own Stockfish picks; a reply its power's search scored (Wrangler's to the
+    showdown's duel: `BossRules.bestReply`, `bossRequest.best`) is Stockfish's best at full strength, Maia not asked;
+    Maia's own mistakes replace the slips.
   - **Never waited on:** not ready, failed, or no answer in 1.5 s (`timeoutMs`): today's move. A slow or old device
     falls back to Stockfish this way, move by move.
   - **Where:** every boss battle, solo (`startBrain` in `solo.ts`, the runner's `humanBrain`) and online (the lobby

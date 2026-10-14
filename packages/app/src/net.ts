@@ -47,6 +47,7 @@ import {
   type NetBossBrain,
   type NetBoss,
   type BossAsks,
+  type BossMoveKind,
   pigTurn,
   ShowdownScout,
 } from "@chessroyale/chess";
@@ -686,7 +687,7 @@ export class NetMatch implements GameView {
       case "bossRequest":
         if (m.extra) return void this.hostExtra(m.key, m.fen);
         if (m.bounce) return void this.hostBounce(m.key, m.fen, m.bounce);
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
         return void this.useBrain(m.brain);
@@ -763,13 +764,16 @@ export class NetMatch implements GameView {
   /**
    * Boss battle, host only: play the boss's move with this device's engine at the boss's strength, or on the Maia
    * brain (`brain`, the lobby's plan for the battle) with Maia, never waiting for it (Stockfish's move meanwhile).
+   * "best" (Wrangler's reply to the showdown's duel): the engine's best at full strength, sent without a brain.
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: "elo" | "stumble" | "stagger", allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
       if (brain) this.useBrain(brain);
       const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), engine: this.maia, onNote: (n: BrainNote) => (this.brainNote = n) } : undefined;
+      // (The admins' debug line: the battle is on Maia, but this move is the engine's.)
+      if (kind === "best" && this.bossPlan) this.brainNote = { brain: this.bossPlan.brain, rating: this.bossPlan.rating, ...(this.bossPlan.stockfishShare ? { share: this.bossPlan.stockfishShare } : {}), by: "stockfish", why: "power" };
       const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia);
       if (asks && !funhouse) {
         // Wrangler's turn: his long pull (his first move) or his move, then his drag or his showdown's line-up after it,

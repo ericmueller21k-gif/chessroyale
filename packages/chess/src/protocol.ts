@@ -645,6 +645,11 @@ export type ServerMessage = { now: number } & (
       nodes: number;
       stumble?: boolean;
       stagger?: boolean;
+      /**
+       * A power's follow-up its engine search scored (Wrangler's reply to the showdown's duel): the engine's best move at
+       * full strength (bossMoveFrom's "best"), never the brain's nor a slip; no `brain` is sent with it.
+       */
+      best?: boolean;
       /** A boss power limits the boss's moves (a pie): play one of these. */
       allowed?: string[];
       /** Boingo's funhouse: play the crowd's move for it, a weak but recoverable one (funhouseMoveFrom) from `allowed`. */
