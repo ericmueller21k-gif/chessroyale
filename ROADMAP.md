@@ -159,6 +159,10 @@ Added Oct 14, 2026 (Eric; notes only, nothing built, more context to come):
       - a slam, a flash, then a cross-fade into four boards;
       - crack lines, then the quarters sliding apart (the pick, reusing the saw);
       - a true tear or 3D split (not worth it).
+  - **The God King against him (Eric, Oct 14):** the God King's help **doesn't work** against him (his strike, Last
+    Stand and any other help), and when the crowd tries to use it, **he mocks it** as "theory" and "engine" crutches
+    (lines from Eric later). The God King gets **unique lines** for this fight, e.g. "I sense a tremendous power
+    within this foe."
   - **His real red book:** in 1972 he prepared from what he called "the red book" of his rival's games (a red cloth
     hardcover). In the game it's an unlabeled red book that he holds at his side, consults at logical moments, and
     opens like a spell book for his ultimate.
